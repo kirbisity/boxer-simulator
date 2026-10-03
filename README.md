@@ -9,8 +9,11 @@ This is the proof of concept: the body model and the core physics, in a ring.
 - **Life** (`src/life.js`). Seeded idle motion: a rhythmic bounce, head and trunk sway, hands that drift in the guard. Feet stay planted and step when the stance drifts away from them.
 - **Fight AI** (`src/ai.js`). The AI issues the same commands the player does.
 - **Hits.** A landed punch gives its momentum to the struck part, and the punching arm takes the same momentum back. The struck muscles hold only passive tone for a reflex delay of 55–85 ms, then catch the part with whatever force they have. Muscles are spring-dampers capped by their strength, so every movement has inertia. Knees, elbows and the neck have joint limits for the ragdoll.
-- **Face** (`src/face.js`). Eyes have whites, iris, pupil, highlight and lids that blink. The face also has brows, nose, lips, ears, a tapered jaw, hair styles and facial hair. It winces when hit, goes slack when stunned, shuts when knocked out, pants when tired, and reddens with damage.
-- **View** (`src/render.js`). Three.js renders four layers from the same model: skin, muscle, bone and the physics skeleton. The skin is a soft shell of damped springs, so punches dent it.
+- **Face** (`src/face.js`). Lightly anime: large drawn eyes (white, two-tone iris, pupil, highlights, a heavy lash line), a small nose and mouth, and a soft V-shaped jaw. Hair is built from tapered locks (spiky, short, fade, buzz, cornrows, bun, ponytail), and there is optional facial hair. It winces when hit, goes slack when stunned, shuts when knocked out, pants when tired, and reddens with damage.
+- **Rig and skin** (`src/rig.js`, `src/bodymesh.js`). Seventeen bones, whose frames come straight from the physics particles. The body is one continuous skinned mesh, generated from that fighter's anatomy: each muscle group and fat deposit is a rounded shape, blended into the next with a smooth minimum. The mesh is built in an A-pose (surface nets) and each vertex is weighted to its nearest bones. A limb's bones only move skin on their own side of the body.
+- **Skeleton** (`src/bones.js`). Skull with jaw and eye sockets, vertebrae, ten pairs of ribs and a sternum, shoulder blades, clavicles, pelvis, humerus, radius and ulna, femur and kneecap, tibia and fibula, and foot bones. Each piece rides its rig bone.
+- **Style** (`src/toon.js`). Cel shading with ink outlines by default, which keeps the stylised faces out of the uncanny valley. Soft lit shading is available to compare.
+- **View** (`src/render.js`). Three.js renders four layers: skin, muscle, bone and the physics skeleton. The skin is a soft shell of damped springs, so punches dent it.
 
 ## Run
 

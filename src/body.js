@@ -88,7 +88,7 @@ export const PRESETS = {
   },
   light: {
     name: 'Leo Quickhands', sex: 'male', heightCm: 172, frame: 'small', age: 24, training: 0.9, bodyFat: 0.1,
-    look: { skinTone: 'light', hairStyle: 'fade', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
+    look: { skinTone: 'light', hairStyle: 'spiky', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
   },
   amateur: {
     name: 'Dave from Accounts', sex: 'male', heightCm: 180, frame: 'medium', age: 34, training: 0.1, bodyFat: 0.28,

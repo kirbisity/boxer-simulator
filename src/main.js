@@ -5,6 +5,7 @@ import { buildBody, fighterFile, PRESETS } from './body.js';
 import { thinkAll } from './ai.js';
 import { advance, boutWinner, createWorld, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
+import { STYLE } from './toon.js';
 import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, showImpact, updateFighterView, updateSpray } from './render.js';
 
 const STEP = 1 / 60;
@@ -28,19 +29,24 @@ const state = {
 const scene = createScene($('#stage'));
 
 function newBout() {
-  for (const view of state.views) disposeFighterView(scene, view);
   state.seed += 1;
   state.world = createWorld([{ inputs: state.corners.red, corner: 'red' }, { inputs: state.corners.blue, corner: 'blue' }], { seed: state.seed });
-  state.views = state.world.fighters.map((fighter) => {
-    const view = buildFighterView(scene, fighter);
-    setLayer(view, state.layer);
-    return view;
-  });
+  rebuildViews();
   state.eventCursor = 0;
   state.finishedAt = null;
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   renderHud();
+}
+
+/** Rebuild the fighters' models, for a new bout or a new shading style. */
+function rebuildViews() {
+  for (const view of state.views) disposeFighterView(scene, view);
+  state.views = state.world.fighters.map((fighter) => {
+    const view = buildFighterView(scene, fighter);
+    setLayer(view, state.layer);
+    return view;
+  });
 }
 
 // ---- Loop -------------------------------------------------------------------
@@ -152,6 +158,10 @@ segmented('#layers', (layer) => {
   for (const view of state.views) setLayer(view, layer);
 });
 segmented('#corner-tabs', (corner) => { $('.corners').dataset.showing = corner; });
+segmented('#styles', (style) => {
+  STYLE.current = style;
+  rebuildViews();
+});
 segmented('#speeds', (speed) => { state.speed = Number(speed); });
 segmented('#modes', (mode) => {
   state.mode = mode;

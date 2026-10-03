@@ -17,11 +17,19 @@ export const SOFT = {
 
 /** Mesh whose vertices are damped springs about their rest positions. */
 export class SoftShell {
-  constructor(geometry, material, firmness) {
-    this.mesh = new THREE.Mesh(geometry, material);
+  /**
+   * @param geometry  the shell's geometry (or `mesh` to wrap an existing one)
+   * @param options   { mesh, recomputeNormals }: pass a skinned body as
+   *   `mesh`; its normals come from the anatomy field and are kept, since
+   *   recomputing them on every frame of a dent would cost more than it shows.
+   */
+  constructor(geometry, material, firmness, { mesh = null, recomputeNormals = true } = {}) {
+    this.mesh = mesh ?? new THREE.Mesh(geometry, material);
     this.mesh.castShadow = true;
+    geometry = this.mesh.geometry;
+    this.recomputeNormals = recomputeNormals;
     const positions = geometry.attributes.position;
-    geometry.computeVertexNormals();
+    if (recomputeNormals) geometry.computeVertexNormals();
     this.rest = Float32Array.from(positions.array);
     this.normals = Float32Array.from(geometry.attributes.normal.array);
     this.offset = new Float32Array(positions.count);
@@ -33,7 +41,11 @@ export class SoftShell {
 
   /** Push the shell in around a world point by an impulse (N·s). */
   dent(worldPoint, impulse) {
-    const local = this.mesh.worldToLocal(worldPoint.clone());
+    this.dentLocal(this.mesh.worldToLocal(worldPoint.clone()), impulse);
+  }
+
+  /** As `dent`, with the point already in the geometry's own (bind) space. */
+  dentLocal(local, impulse) {
     const scale = this.mesh.scale;
     const depth = Math.min(SOFT.maxDent, impulse * SOFT.dentPerImpulse * this.depthScale);
     const rest = this.rest;
@@ -66,13 +78,13 @@ export class SoftShell {
       }
     }
     this.mesh.geometry.attributes.position.needsUpdate = true;
-    this.mesh.geometry.computeVertexNormals();
+    if (this.recomputeNormals) this.mesh.geometry.computeVertexNormals();
     if (energy < 1e-5 * this.offset.length) {
       this.offset.fill(0);
       this.velocity.fill(0);
       this.mesh.geometry.attributes.position.array.set(this.rest);
       this.mesh.geometry.attributes.position.needsUpdate = true;
-      this.mesh.geometry.computeVertexNormals();
+      if (this.recomputeNormals) this.mesh.geometry.computeVertexNormals();
       this.active = false;
     }
   }

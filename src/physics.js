@@ -90,7 +90,7 @@ const BRACES = [
   ['lShoulder', 'rHip', 'diagonalCompliance'], ['rShoulder', 'lHip', 'diagonalCompliance'],
   ['neck', 'lHip', 'diagonalCompliance'], ['neck', 'rHip', 'diagonalCompliance'],
 ];
-const BONES = [
+const BONE_LINKS = [
   ['neck', 'head'], ['neck', 'lShoulder'], ['neck', 'rShoulder'], ['lShoulder', 'lElbow'], ['rShoulder', 'rElbow'],
   ['lElbow', 'lHand'], ['rElbow', 'rHand'], ['pelvis', 'neck'], ['pelvis', 'lHip'], ['pelvis', 'rHip'],
   ['lHip', 'lKnee'], ['rHip', 'rKnee'], ['lKnee', 'lFoot'], ['rKnee', 'rFoot'],
@@ -164,7 +164,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
   plantFeet(fighter);
-  for (const [a, b] of BONES) addConstraint(fighter, a, b, 0);
+  for (const [a, b] of BONE_LINKS) addConstraint(fighter, a, b, 0);
   for (const [a, b, key] of BRACES) addConstraint(fighter, a, b, WORLD[key]);
   return fighter;
 }

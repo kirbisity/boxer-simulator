@@ -1,20 +1,26 @@
 // Three.js view of the fight world. Reads the simulation; never writes to it.
-// Each fighter is drawn in four layers — skin, muscle, bone and the physics
-// skeleton — from the same body model, and the skin is a soft shell: every
-// vertex is a damped spring to its rest place, so a punch leaves a dent that
-// ripples out and springs back at the speed the tissue under it allows.
+// Each fighter is one skinned body over a rig that the physics skeleton
+// drives, drawn in four layers: skin, muscle, bone and the physics itself.
+// The skin is a soft shell: every vertex is a damped spring about its rest
+// place, so a punch leaves a dent that springs back at the tissue's speed.
 
 /* global THREE */
-import { P, SEGMENTS } from './body.js';
-import { capsules, capsuleEnds, point, WORLD } from './physics.js';
-import { yawRotate } from './pose.js';
-import { SoftShell } from './soft.js';
+import { P, PARTICLES } from './body.js';
+import { buildBodyMesh } from './bodymesh.js';
+import { buildSkeleton } from './bones.js';
 import { buildHead } from './face.js';
+import { capsules, capsuleEnds, point, WORLD } from './physics.js';
+import { BONE, BONES, boneFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
+import { SoftShell } from './soft.js';
+import { outlineFor, surface } from './toon.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
 const SKIN_TONES = { light: 0xe8b796, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
 
+// Drawn characters carry slightly large heads; it is what makes them read
+// as characters rather than as small-headed mannequins.
+const HEAD_SCALE = 1.12;
 const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 
 // ---- Scene -----------------------------------------------------------------
@@ -29,8 +35,8 @@ export function createScene(canvas) {
   scene.fog = new THREE.Fog(0x0b0d14, 9, 22);
   const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 60);
 
-  scene.add(new THREE.HemisphereLight(0xb8c6e0, 0x3a2e24, 0.8));
-  const key = new THREE.SpotLight(0xfff2e0, 1.5, 20, 0.62, 0.45, 1.2);
+  scene.add(new THREE.HemisphereLight(0xb8c6e0, 0x3a2e24, 0.62));
+  const key = new THREE.SpotLight(0xfff2e0, 1.2, 20, 0.62, 0.45, 1.2);
   key.position.set(0.8, 7.5, 1.2);
   key.target.position.set(0, 0, 0);
   key.castShadow = true;
@@ -109,74 +115,72 @@ export function placeCamera(view, focus) {
   view.camera.lookAt(target);
 }
 
-// ---- Shapes ----------------------------------------------------------------
-
-/** Lathe profile along +y from 0 to `length`, rounded at both ends. */
-function limbGeometry(radius, length, shape, segments = 18) {
-  const points = [];
-  const rows = 14;
-  const capTop = radius * 0.55;
-  const capBottom = radius * 0.6;
-  points.push(new THREE.Vector2(0.0001, -capBottom));
-  for (let row = 0; row <= rows; row += 1) {
-    const u = row / rows;
-    points.push(new THREE.Vector2(radius * shape(u), u * length));
-  }
-  points.push(new THREE.Vector2(radius * shape(1) * 0.6, length + capTop * 0.7));
-  points.push(new THREE.Vector2(0.0001, length + capTop));
-  return new THREE.LatheGeometry(points, segments);
-}
-
-// Muscle bellies sit nearer the proximal joint; tendons taper distally.
-const SHAPES = {
-  upperArm: (u) => 0.82 + 0.34 * Math.sin(Math.PI * Math.min(1, u * 1.15)),
-  forearm: (u) => (u < 0.82 ? 1.12 - 0.42 * u : 0.78),
-  thigh: (u) => 1.16 - 0.32 * u + 0.08 * Math.sin(Math.PI * u),
-  shank: (u) => 0.78 + 0.42 * Math.exp(-((u - 0.28) ** 2) / 0.03) - 0.12 * u,
-  bone: (u) => 1 + 0.6 * Math.exp(-(u * u) / 0.004) + 0.6 * Math.exp(-((1 - u) ** 2) / 0.004),
-};
-
-function torsoGeometry(body, kind, range = [-0.05, 1.04], inflate = 1) {
-  const trunk = body.segments.trunk;
-  const fatShare = trunk.tissue.fat / trunk.mass;
-  const base = kind === 'skin' ? trunk.skinRadius : trunk.muscleRadius;
-  const length = trunk.length;
-  const shoulderHalf = body.lengths.shoulderSpan / 2;
-  const hipHalf = body.lengths.hipSpan / 2 + base * 0.45;
-  const width = (u) => {
-    // Hips → waist → chest → shoulders → neck, in metres of half-width.
-    const waist = base * (0.86 + fatShare * 1.1);
-    const chest = Math.max(base * 1.05, shoulderHalf * 0.9);
-    const stops = [[0, hipHalf], [0.32, waist], [0.66, chest], [0.9, shoulderHalf + base * 0.22], [1.04, base * 0.42]];
-    for (let index = 1; index < stops.length; index += 1) {
-      const [u0, w0] = stops[index - 1];
-      const [u1, w1] = stops[index];
-      if (u <= u1) {
-        const t = (u - u0) / (u1 - u0);
-        return w0 + (w1 - w0) * (t * t * (3 - 2 * t));
-      }
-    }
-    return stops.at(-1)[1];
-  };
-  const [start, end] = range;
-  const points = start < 0 ? [new THREE.Vector2(0.0001, (start - 0.02) * length)] : [];
-  for (let row = 0; row <= 20; row += 1) {
-    const u = start + (row / 20) * (end - start);
-    points.push(new THREE.Vector2(width(Math.max(0, u)) * inflate, u * length));
-  }
-  if (end > 1) points.push(new THREE.Vector2(0.0001, (end + 0.02) * length));
-  const geometry = new THREE.LatheGeometry(points, 28);
-  // Deeper with fat (the belly), shallower without; the lathe is round.
-  const depth = (0.62 + fatShare * 0.7) * (kind === 'skin' ? 1 : 0.92);
-  geometry.scale(1, 1, depth);
-  return geometry;
-}
-
-function material(color, options = {}) {
-  return new THREE.MeshStandardMaterial({ color, roughness: options.roughness ?? 0.65, metalness: 0, transparent: !!options.opacity, opacity: options.opacity ?? 1, depthWrite: !options.opacity });
-}
-
 // ---- Fighter view ---------------------------------------------------------
+
+const UP = new THREE.Vector3(0, 1, 0);
+const tmpB = new THREE.Vector3();
+const ARM_BONES = new Set(['lClavicle', 'lUpperArm', 'lForearm', 'rClavicle', 'rUpperArm', 'rForearm'].map((name) => BONE[name]));
+
+/** Kit and skin colours painted onto the body by where each vertex sits in the bind pose. */
+function paintBody(mesh, body, look, corner) {
+  const { positions, skinIndex, bindPoints } = mesh;
+  const skin = new THREE.Color(SKIN_TONES[look.skinTone ?? 'medium']);
+  const shorts = new THREE.Color(corner);
+  const band = new THREE.Color(0xf4f4f4);
+  const top = new THREE.Color(corner).multiplyScalar(0.7);
+  const hipY = bindPoints[P.pelvis][1];
+  const trunk = body.lengths.trunk;
+  const legReach = body.lengths.hipSpan / 2 + body.segments.lThigh.skinRadius * 1.7;
+  const colors = new Float32Array(positions.length);
+  for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+    const y = positions[vertex * 3 + 1];
+    const z = positions[vertex * 3 + 2];
+    const onArm = ARM_BONES.has(skinIndex[vertex * 4]);
+    let color = skin;
+    if (!onArm && Math.abs(z) < legReach && y > hipY - body.lengths.thigh * 0.42 && y < hipY + trunk * 0.24) {
+      color = y > hipY + trunk * 0.17 ? band : shorts;
+    }
+    if (!onArm && body.inputs.sex === 'female' && y > hipY + trunk * 0.56 && y < hipY + trunk * 0.9) color = top;
+    colors.set([color.r, color.g, color.b], vertex * 3);
+  }
+  return colors;
+}
+
+/** Muscle red, paling to tendon near the joints the muscles cross. */
+function paintMuscle(mesh) {
+  const { positions, bindPoints } = mesh;
+  const red = new THREE.Color(0xa3333a);
+  const tendon = new THREE.Color(0xe2cdb4);
+  const joints = ['lElbow', 'rElbow', 'lKnee', 'rKnee', 'lHand', 'rHand', 'lFoot', 'rFoot'].map((name) => bindPoints[P[name]]);
+  const colors = new Float32Array(positions.length);
+  const mixed = new THREE.Color();
+  for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+    let nearest = Infinity;
+    for (const joint of joints) {
+      nearest = Math.min(nearest, Math.hypot(positions[vertex * 3] - joint[0], positions[vertex * 3 + 1] - joint[1], positions[vertex * 3 + 2] - joint[2]));
+    }
+    mixed.copy(red).lerp(tendon, Math.max(0, Math.min(1, (0.07 - nearest) / 0.05)));
+    colors.set([mixed.r, mixed.g, mixed.b], vertex * 3);
+  }
+  return colors;
+}
+
+/** A skinned mesh over the rig's bones from a built body mesh. */
+function skinnedMesh(built, bones, colors) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(built.positions, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(built.normals, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(built.skinIndex, 4));
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(built.skinWeight, 4));
+  geometry.setIndex(new THREE.BufferAttribute(built.indices, 1));
+  const inverses = built.bindFrames.map((frame) => new THREE.Matrix4().fromArray(frameMatrix(frame)).invert());
+  const mesh = new THREE.SkinnedMesh(geometry, surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }));
+  mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
+  mesh.castShadow = true;
+  mesh.frustumCulled = false;
+  return mesh;
+}
 
 export function buildFighterView(view, fighter) {
   const body = fighter.body;
@@ -186,107 +190,68 @@ export function buildFighterView(view, fighter) {
   const group = new THREE.Group();
   const layers = Object.fromEntries(LAYERS.map((name) => [name, new THREE.Group()]));
   for (const layer of Object.values(layers)) group.add(layer);
-  const skinMaterial = material(skinColor, { roughness: 0.55 });
-  const muscleMaterial = material(0xa3333a, { roughness: 0.45 });
-  const tendonMaterial = material(0xd9c7b5, { roughness: 0.5 });
-  const boneMaterial = material(0xf1ead8, { roughness: 0.8 });
-  const parts = [];
-  const shells = [];
 
-  const addSegment = (layer, key, geometry, mat, from, to, options = {}) => {
-    const shell = options.soft ? new SoftShell(geometry, mat, body.segments[options.segment ?? key]?.fleshFirmness ?? 0.6) : null;
-    const mesh = shell ? shell.mesh : new THREE.Mesh(geometry, mat);
-    mesh.castShadow = true;
-    layers[layer].add(mesh);
-    const part = { key, mesh, from, to, layer, length: options.length, basis: options.basis ?? 'limb', lerp: options.lerp, shell };
-    parts.push(part);
-    if (shell) shells.push(part);
-    return part;
-  };
+  // The rig: bones whose world matrices are set straight from the physics.
+  const bones = BONES.map(() => {
+    const bone = new THREE.Bone();
+    bone.matrixAutoUpdate = false;
+    return bone;
+  });
+  const built = buildBodyMesh(body, 'skin');
+  const skinMesh = skinnedMesh(built, bones, paintBody(built, body, look, corner));
+  const skinOutline = outlineFor(skinMesh);
+  layers.skin.add(skinMesh, skinOutline);
+  const shells = [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
 
-  // Limbs: skin over muscle over bone, each sized from its own tissue mass.
-  for (const key of Object.keys(SEGMENTS)) {
-    if (key === 'head' || key === 'trunk') continue;
-    const segment = body.segments[key];
-    const kind = segment.kind;
-    const { from, to } = SEGMENTS[key];
-    addSegment('skin', key, limbGeometry(segment.skinRadius, segment.length, SHAPES[kind]), skinMaterial, P[from], P[to], { soft: true, length: segment.length });
-    addSegment('muscle', key, limbGeometry(segment.muscleRadius, segment.length, SHAPES[kind]), muscleMaterial, P[from], P[to], { soft: true, length: segment.length });
-    addSegment('bone', key, limbGeometry(Math.max(0.011, segment.boneRadius * 0.75), segment.length, SHAPES.bone, 10), boneMaterial, P[from], P[to], { length: segment.length });
-  }
-  // Trunk, neck and shoulders.
-  addSegment('skin', 'trunk', torsoGeometry(body, 'skin'), skinMaterial, P.pelvis, P.neck, { soft: true, length: body.segments.trunk.length, basis: 'trunk' });
-  addSegment('muscle', 'trunk', torsoGeometry(body, 'muscle'), muscleMaterial, P.pelvis, P.neck, { soft: true, length: body.segments.trunk.length, basis: 'trunk' });
-  // A neck is about 0.6 of the head's radius, thicker with training.
-  const neckRadius = body.lengths.headRadius * (0.56 + 0.14 * body.neckIndex);
-  const neckLength = body.lengths.neckToHead;
-  addSegment('skin', 'neck', limbGeometry(neckRadius, neckLength * 0.7, () => 1), skinMaterial, P.neck, P.head, { length: neckLength * 0.7 });
-  addSegment('muscle', 'neck', limbGeometry(neckRadius * 0.92, neckLength * 0.7, (u) => 1 - 0.1 * u), muscleMaterial, P.neck, P.head, { length: neckLength * 0.7 });
-  addSegment('bone', 'spine', limbGeometry(0.016, body.segments.trunk.length + neckLength * 0.6, () => 1, 8), boneMaterial, P.pelvis, P.head, { length: body.segments.trunk.length + neckLength * 0.6 });
-  // Trapezius: the slope from the neck down to the shoulders.
-  const trapsGeometry = new THREE.SphereGeometry(1, 20, 12);
-  trapsGeometry.scale(body.lengths.shoulderSpan * 0.42, 0.075 * body.heightM / 1.8 * (0.8 + 0.4 * body.neckIndex), body.segments.trunk.skinRadius * 0.52);
-  trapsGeometry.translate(0, body.segments.trunk.length * 0.95, -0.01);
-  addSegment('skin', 'traps', trapsGeometry, skinMaterial, P.pelvis, P.neck, { length: body.segments.trunk.length, basis: 'trunk' });
-  for (const side of ['l', 'r']) {
-    const deltoid = body.segments[`${side}UpperArm`].skinRadius * 1.3;
-    addSegment('skin', `${side}Deltoid`, new THREE.SphereGeometry(deltoid, 16, 12), skinMaterial, P[`${side}Shoulder`], P[`${side}Shoulder`], { basis: 'point' });
-    addSegment('muscle', `${side}Deltoid`, new THREE.SphereGeometry(deltoid * 0.92, 14, 10), muscleMaterial, P[`${side}Shoulder`], P[`${side}Shoulder`], { basis: 'point' });
-    addSegment('bone', `${side}Clavicle`, limbGeometry(0.012, body.lengths.shoulderSpan / 2, () => 1, 8), boneMaterial, P.neck, P[`${side}Shoulder`], { length: body.lengths.shoulderSpan / 2 });
-  }
-  // Rib cage and pelvis bones, sized from the trunk.
-  const ribs = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshStandardMaterial({ color: 0xf1ead8, wireframe: true }));
-  layers.bone.add(ribs);
-  parts.push({ key: 'ribs', mesh: ribs, from: P.pelvis, to: P.neck, basis: 'ribs', layer: 'bone' });
-  const pelvisBone = new THREE.Mesh(new THREE.TorusGeometry(body.lengths.hipSpan * 0.62, 0.025, 8, 18), boneMaterial);
-  layers.bone.add(pelvisBone);
-  parts.push({ key: 'pelvisBone', mesh: pelvisBone, from: P.pelvis, to: P.neck, basis: 'pelvis', layer: 'bone' });
-
-  // Head: skull, face, hair, all oriented by the neck and the facing.
-  const headRadius = body.lengths.headRadius;
   const headView = buildHead(body, look, skinColor, corner);
+  headView.group.matrixAutoUpdate = false;
   layers.skin.add(headView.group);
-  parts.push({ key: 'head', mesh: headView.group, from: P.neck, to: P.head, basis: 'head', layer: 'skin', shell: headView.shell });
   shells.push({ key: 'head', shell: headView.shell });
-  const skullBone = new THREE.Mesh(new THREE.SphereGeometry(headRadius * 0.82, 16, 12), boneMaterial);
-  skullBone.scale.set(0.95, 1.08, 0.85);
-  layers.bone.add(skullBone);
-  parts.push({ key: 'skull', mesh: skullBone, from: P.neck, to: P.head, basis: 'head', layer: 'bone' });
 
-  // Gloves, cuffs, shorts, shoes: in the corner's colour.
-  const gloveMaterial = material(corner, { roughness: 0.32 });
+  // Gloves and shoes ride on the forearm and foot bones.
+  const attachments = [];
+  const gloveMaterial = surface(corner, { roughness: 0.32 });
   for (const side of ['l', 'r']) {
     const glove = new THREE.Group();
-    const fist = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 1.12, 18, 14), gloveMaterial);
-    fist.scale.set(1, 1.18, 0.95);
+    const fist = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 1.12, 20, 16), gloveMaterial);
+    fist.scale.set(1, 1.15, 0.95);
     const thumb = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 0.42, 10, 8), gloveMaterial);
-    thumb.position.set(side === 'l' ? -0.045 : 0.045, -0.01, 0.04);
-    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.07, 14), material(0xf2f2f2, { roughness: 0.5 }));
-    cuff.position.y = -0.085;
+    thumb.position.set(0.045, -0.01, side === 'l' ? -0.04 : 0.04);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.08, 16), surface(0xf2f2f2));
+    cuff.position.y = -0.09;
+    for (const piece of [fist, thumb, cuff]) {
+      piece.castShadow = true;
+      piece.add(outlineFor(piece, 0.004));
+    }
     glove.add(fist, thumb, cuff);
-    glove.traverse((mesh) => { mesh.castShadow = true; });
+    glove.matrixAutoUpdate = false;
     layers.skin.add(glove);
-    parts.push({ key: `${side}Glove`, mesh: glove, from: P[`${side}Elbow`], to: P[`${side}Hand`], basis: 'glove', layer: 'skin' });
-    const shortsLeg = limbGeometry(body.segments[`${side}Thigh`].skinRadius * 1.16, body.segments[`${side}Thigh`].length * 0.42, (u) => 1.05 - 0.08 * u);
-    addSegment('skin', `${side}Shorts`, shortsLeg, material(corner, { roughness: 0.4 }), P[`${side}Hip`], P[`${side}Knee`], { length: body.segments[`${side}Thigh`].length });
-    const shoeLength = 0.25 * body.heightM / 1.8;
-    const shoeGeometry = new THREE.SphereGeometry(1, 16, 10);
-    shoeGeometry.scale(shoeLength / 2, 0.045, 0.048);
-    // The ankle sits over the heel: the foot reaches forward of it.
-    shoeGeometry.translate(shoeLength * 0.28, -0.012, 0);
-    const shoe = new THREE.Mesh(shoeGeometry, material(0x15151a, { roughness: 0.4 }));
-    shoe.castShadow = true;
+    attachments.push({ object: glove, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
+
+    const shoe = new THREE.Group();
+    const length = 0.25 * body.heightM / 1.8;
+    const sole = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), surface(0x17171c, { roughness: 0.4 }));
+    sole.scale.set(0.05, length / 2, 0.045);
+    sole.position.set(-0.012, length * 0.28, 0);
+    const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.07, 14), surface(0xf2f2f2));
+    sock.rotation.z = Math.PI / 2;
+    sock.position.set(0.03, 0.0, 0);
+    for (const piece of [sole, sock]) {
+      piece.castShadow = true;
+      piece.add(outlineFor(piece, 0.004));
+    }
+    shoe.add(sole, sock);
+    shoe.matrixAutoUpdate = false;
     layers.skin.add(shoe);
-    parts.push({ key: `${side}Shoe`, mesh: shoe, from: P[`${side}Foot`], to: P[`${side}Foot`], basis: 'shoe', layer: 'skin' });
+    attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
   }
-  // Shorts: the lower trunk's own shape, a little proud of the skin.
-  const shortsMaterial = material(corner, { roughness: 0.4 });
-  shortsMaterial.side = THREE.DoubleSide;
-  addSegment('skin', 'shorts', torsoGeometry(body, 'skin', [-0.06, 0.24], 1.05), shortsMaterial, P.pelvis, P.neck, { length: body.segments.trunk.length, basis: 'trunk' });
-  addSegment('skin', 'waistband', torsoGeometry(body, 'skin', [0.2, 0.27], 1.07), material(0xf4f4f4, { roughness: 0.4 }), P.pelvis, P.neck, { length: body.segments.trunk.length, basis: 'trunk' });
+
+  // Bone layer: the anatomical skeleton, moved rigidly with the rig.
+  const skeleton = buildSkeleton(body, built.bindFrames);
+  for (const piece of skeleton) layers.bone.add(piece);
 
   // The physics layer: particles, constraints, motor targets, collision capsules.
-  const particleMaterial = material(0xffd34d, { roughness: 0.3 });
+  const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffd34d });
   const particles = fighter.body.masses.map((mass) => {
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.014 + 0.004 * Math.cbrt(mass), 10, 8), particleMaterial);
     layers.physics.add(sphere);
@@ -318,7 +283,19 @@ export function buildFighterView(view, fighter) {
   });
 
   view.scene.add(group);
-  return { fighter, group, layers, parts, shells, particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', materials: { skinMaterial, muscleMaterial, tendonMaterial, boneMaterial } };
+  return {
+    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells,
+    particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
+  };
+}
+
+/** The muscle layer is built the first time it is shown: it costs a body mesh. */
+function ensureMuscle(fighterView) {
+  if (fighterView.muscle) return;
+  const built = buildBodyMesh(fighterView.fighter.body, 'muscle', 0.016);
+  const mesh = skinnedMesh(built, fighterView.bones, paintMuscle(built));
+  fighterView.layers.muscle.add(mesh, outlineFor(mesh, 0.003));
+  fighterView.muscle = { built, mesh };
 }
 
 export function disposeFighterView(view, fighterView) {
@@ -328,89 +305,49 @@ export function disposeFighterView(view, fighterView) {
   });
 }
 
-/** Which layers show: skin; muscle (with bone); bone; physics over ghosted skin. */
+/** Which layers show: skin; muscle (with bone); bone over a ghost; physics over a ghost. */
 export function setLayer(fighterView, layer) {
   fighterView.layer = layer;
-  const { layers, materials } = fighterView;
-  layers.skin.visible = layer === 'skin' || layer === 'physics' || layer === 'bone';
+  if (layer === 'muscle') ensureMuscle(fighterView);
+  const { layers, skinMesh, skinOutline, head, attachments } = fighterView;
+  const ghost = layer === 'physics' ? 0.25 : layer === 'bone' ? 0.12 : 1;
+  layers.skin.visible = layer !== 'muscle';
   layers.muscle.visible = layer === 'muscle';
   layers.bone.visible = layer === 'muscle' || layer === 'bone';
   layers.physics.visible = layer === 'physics';
-  const ghost = layer === 'physics' ? 0.22 : layer === 'bone' ? 0.12 : 1;
-  layers.skin.traverse((object) => {
-    if (!object.material) return;
-    object.material.transparent = ghost < 1;
-    object.material.opacity = ghost;
-    object.material.depthWrite = ghost === 1;
-    object.castShadow = ghost === 1;
-  });
-  void materials;
+  // Ghosting: the body goes see-through and drops its ink; the head and kit hide.
+  const material = skinMesh.material;
+  material.transparent = ghost < 1;
+  material.opacity = ghost;
+  material.depthWrite = ghost === 1;
+  skinMesh.castShadow = ghost === 1;
+  skinOutline.visible = ghost === 1;
+  head.group.visible = ghost === 1;
+  for (const { object } of attachments) object.visible = ghost === 1;
 }
 
 // ---- Per-frame update -----------------------------------------------------
 
-const UP = new THREE.Vector3(0, 1, 0);
-const tmpA = new THREE.Vector3();
-const tmpB = new THREE.Vector3();
-
-function basisMatrix(xAxis, yAxis, origin) {
-  const y = yAxis.clone().normalize();
-  const x = xAxis.clone().sub(y.clone().multiplyScalar(xAxis.dot(y))).normalize();
-  const z = new THREE.Vector3().crossVectors(x, y);
-  return new THREE.Matrix4().makeBasis(x, y, z).setPosition(origin);
-}
-
 export function updateFighterView(fighterView, dt, time) {
   const fighter = fighterView.fighter;
-  const at = (index) => v3(point(fighter.x, index));
-  const forward = v3(yawRotate([1, 0, 0], fighter.yaw));
-  const across = at(P.lShoulder).sub(at(P.rShoulder));
-  const hipAcross = at(P.lHip).sub(at(P.rHip));
-
-  for (const part of fighterView.parts) {
-    const a = at(part.from);
-    const b = at(part.to);
-    const mesh = part.mesh;
-    mesh.matrixAutoUpdate = false;
-    if (part.basis === 'limb') {
-      const axis = tmpA.copy(b).sub(a);
-      const length = axis.length() || 1e-6;
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(UP, axis.clone().divideScalar(length));
-      mesh.matrix.compose(a, quaternion, new THREE.Vector3(1, part.length ? length / part.length : 1, 1));
-    } else if (part.basis === 'trunk') {
-      const axis = b.clone().sub(a);
-      const matrix = basisMatrix(across.clone().add(hipAcross).negate(), axis, a);
-      matrix.scale(new THREE.Vector3(1, axis.length() / part.length, 1));
-      mesh.matrix.copy(matrix);
-    } else if (part.basis === 'ribs') {
-      const trunk = fighter.body.segments.trunk;
-      const center = a.clone().lerp(b, 0.66);
-      const matrix = basisMatrix(across.clone().negate(), b.clone().sub(a), center);
-      matrix.scale(new THREE.Vector3(fighter.body.lengths.shoulderSpan * 0.42, trunk.length * 0.33, trunk.muscleRadius * 0.62));
-      mesh.matrix.copy(matrix);
-    } else if (part.basis === 'pelvis') {
-      const matrix = basisMatrix(hipAcross.clone().negate(), b.clone().sub(a), a);
-      matrix.multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2 - 0.3));
-      mesh.matrix.copy(matrix);
-    } else if (part.basis === 'head') {
-      const up = b.clone().sub(a);
-      const matrix = basisMatrix(forward, up, b);
-      mesh.matrix.copy(matrix);
-    } else if (part.basis === 'glove') {
-      const axis = b.clone().sub(a);
-      const matrix = basisMatrix(forward, axis, b);
-      mesh.matrix.copy(matrix);
-    } else if (part.basis === 'shoe') {
-      const matrix = basisMatrix(forward, UP, a.clone().setY(Math.max(0.045, a.y)));
-      mesh.matrix.copy(matrix);
-    } else if (part.basis === 'point') {
-      mesh.matrix.makeTranslation(a.x, a.y, a.z);
-    }
-    mesh.matrixWorldNeedsUpdate = true;
+  const points = PARTICLES.map((_, index) => point(fighter.x, index));
+  const frames = boneFrames(points, fighter.body);
+  fighterView.frames = frames;
+  frames.forEach((frame, index) => {
+    const matrix = frameMatrix(frame);
+    fighterView.bones[index].matrixWorld.fromArray(matrix);
+    fighterView.skeleton[index].matrix.fromArray(matrix);
+    fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
+  });
+  fighterView.head.group.matrix.fromArray(frameMatrix(frames[BONE.head])).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
+  fighterView.head.group.matrixWorldNeedsUpdate = true;
+  for (const { object, bone, at } of fighterView.attachments) {
+    object.matrix.fromArray(frameMatrix({ ...frames[bone], origin: points[at] }));
+    object.matrixWorldNeedsUpdate = true;
   }
-  for (const entry of fighterView.shells) entry.shell.update(Math.min(dt, 1 / 30));
-  fighterView.head.update(Math.min(dt, 1 / 30), fighter, time);
-
+  const step = Math.min(dt, 1 / 30);
+  for (const entry of fighterView.shells) entry.shell.update(step);
+  fighterView.head.update(step, fighter, time);
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
 
@@ -453,8 +390,18 @@ export function showImpact(view, fighterViews, event) {
   const defenderView = fighterViews.find((entry) => entry.fighter.id === event.defender);
   if (!defenderView) return;
   const where = v3(event.point);
-  const candidates = defenderView.shells.filter((entry) => entry.key === event.target || (event.target === 'head' && entry.key === 'head'));
-  for (const entry of candidates) entry.shell.dent(where, event.impulse);
+  if (event.target === 'head') defenderView.head.shell.dent(where, event.impulse);
+  else {
+    // Carry the world point back to the bind pose through the struck bone.
+    const frames = defenderView.frames;
+    let bone = BONE[event.target] ?? BONE.chest;
+    if (event.target === 'trunk') {
+      const distanceTo = (index) => Math.hypot(...toFrame(frames[index], event.point));
+      bone = [BONE.pelvis, BONE.spine, BONE.chest].reduce((best, index) => (distanceTo(index) < distanceTo(best) ? index : best));
+    }
+    const bind = fromFrame(defenderView.built.bindFrames[bone], toFrame(frames[bone], event.point));
+    defenderView.shells[0].shell.dentLocal(v3(bind), event.impulse);
+  }
   const spray = view.spray ?? (view.spray = []);
   const count = Math.min(14, Math.round(event.impulse / 2));
   for (let index = 0; index < count; index += 1) {
