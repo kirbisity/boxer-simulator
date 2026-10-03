@@ -29,7 +29,7 @@ export const SEGMENTS = {
 const SHARE = {
   muscle: { head: 0.03, trunk: 0.44, upperArm: 0.032, forearm: 0.024, thigh: 0.13, shank: 0.073 },
   bone: { head: 0.16, trunk: 0.34, upperArm: 0.035, forearm: 0.03, thigh: 0.1, shank: 0.085 },
-  fat: { head: 0.02, trunk: 0.6, upperArm: 0.025, forearm: 0.01, thigh: 0.11, shank: 0.04 },
+  fat: { head: 0.02, trunk: 0.57, upperArm: 0.035, forearm: 0.015, thigh: 0.11, shank: 0.04 },
   other: { head: 0.12, trunk: 0.74, upperArm: 0.02, forearm: 0.015, thigh: 0.025, shank: 0.015 },
 };
 const DENSITY = { muscle: 1060, bone: 1850, fat: 900, other: 1050 };
@@ -52,7 +52,12 @@ export const BODY = {
   ffmiBase: { male: 19, female: 15.5 },
   ffmiTrainedGain: { male: 5.5, female: 4.5 },
   skeletalMuscleShareOfLean: 0.52,
-  boneShareOfLean: 0.16,
+  // The skeleton is sized by the frame, not by the muscle on it: ~11 kg for a
+  // 1.75 m man of medium frame, scaling with height cubed. A thin fighter
+  // carries the same bones as a muscular one of the same height, with less
+  // muscle to move them: dead weight, so slower limbs.
+  referenceBoneKg: { male: 11, female: 8.6 },
+  referenceHeightM: 1.75,
   // Muscle is lost at ~0.5%/yr after thirty and fast fibres faster, so force
   // per kilogram falls too (Janssen 2000; Lexell 1995).
   muscleLossPerYear: 0.005,
@@ -62,7 +67,25 @@ export const BODY = {
   // Peak motor force per kilogram of muscle that drives the particle. Set so
   // a trained heavyweight's straight right reaches ~9–10 m/s and an untrained
   // man's ~6–7 m/s, the ranges reported for boxers and novices.
-  forcePerMuscleKg: { arm: 80, trunk: 26, leg: 30, neck: 900 },
+  forcePerMuscleKg: { arm: 130, trunk: 26, leg: 30, neck: 900 },
+  // Muscle force grows with its cross-section, so with mass to the 2/3: a
+  // heavier limb's muscle does not keep up with the mass it must move. The
+  // reference sizes are where the per-kilogram figures above hold exactly.
+  allometryExponent: 2 / 3,
+  referenceMuscleKg: { arm: 2.4, leg: 9, trunk: 14 },
+  // Hill's force–velocity law: a muscle's force falls as it shortens faster,
+  // to nothing at its top speed. That speed scales with fibre length, so with
+  // limb length (m/s per metre of limb); trained fast fibres add to it. Short
+  // limbs top out sooner — why very small fighters are not the fastest.
+  topSpeedPerMetre: { arm: 42, leg: 36 },
+  // Bulkier muscle is more pennate (fibres at a steeper angle): more force,
+  // slower shortening (Kawakami et al. 1993). Bulk is muscle kg per metre of
+  // limb; below the reference it costs nothing, above it the cost grows with
+  // the square of the excess, as fibre angles steepen.
+  referenceBulk: { arm: 3.1, leg: 9.5 },
+  pennationCost: 14,
+  hillCurvature: 1.0,
+  kickForcePerMuscleKg: 95,
   neuralDriveBase: 0.55,
   neuralDriveTrained: 0.55,
   gloveKg: 0.34,
@@ -76,30 +99,30 @@ export const BODY = {
 /** Default inputs, also the shape of a fighter file's `inputs`. */
 export const DEFAULT_INPUTS = {
   name: 'Fighter', sex: 'male', heightCm: 180, frame: 'medium', age: 27,
-  training: 0.6, bodyFat: 0.16,
+  training: 0.6, bodyFat: 0.16, style: 'boxing',
   look: { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' },
 };
 
 // `look` is appearance only; nothing in the simulation reads it.
 export const PRESETS = {
   heavy: {
-    name: 'Marcus "The Wall"', sex: 'male', heightCm: 193, frame: 'large', age: 29, training: 0.85, bodyFat: 0.17,
+    name: 'Marcus "The Wall"', style: 'boxing', sex: 'male', heightCm: 193, frame: 'large', age: 29, training: 0.85, bodyFat: 0.17,
     look: { skinTone: 'deep', hairStyle: 'cornrows', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   light: {
-    name: 'Leo Quickhands', sex: 'male', heightCm: 172, frame: 'small', age: 24, training: 0.9, bodyFat: 0.1,
+    name: 'Leo Quickhands', style: 'kickboxing', sex: 'male', heightCm: 172, frame: 'small', age: 24, training: 0.9, bodyFat: 0.1,
     look: { skinTone: 'light', hairStyle: 'spiky', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
   },
   amateur: {
-    name: 'Dave from Accounts', sex: 'male', heightCm: 180, frame: 'medium', age: 34, training: 0.1, bodyFat: 0.28,
+    name: 'Dave from Accounts', style: 'boxing', sex: 'male', heightCm: 180, frame: 'medium', age: 34, training: 0.1, bodyFat: 0.28,
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a37a45', facialHair: 'stubble', eyeColor: 'green' },
   },
   veteran: {
-    name: 'Old Sal', sex: 'male', heightCm: 182, frame: 'medium', age: 48, training: 0.7, bodyFat: 0.2,
+    name: 'Old Sal', style: 'boxing', sex: 'male', heightCm: 182, frame: 'medium', age: 48, training: 0.7, bodyFat: 0.2,
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#8d8d8d', facialHair: 'mustache', eyeColor: 'grey' },
   },
   contender: {
-    name: 'Ana Ruiz', sex: 'female', heightCm: 170, frame: 'medium', age: 26, training: 0.9, bodyFat: 0.17,
+    name: 'Ana Ruiz', style: 'muayThai', sex: 'female', heightCm: 170, frame: 'medium', age: 26, training: 0.9, bodyFat: 0.17,
     look: { skinTone: 'medium', hairStyle: 'bun', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'hazel' },
   },
 };
@@ -117,7 +140,7 @@ export function buildBody(rawInputs) {
   const ffmi = (BODY.ffmiBase[inputs.sex] + BODY.ffmiTrainedGain[inputs.sex] * inputs.training) * frame.lean;
   const leanKg = ffmi * heightM * heightM * (1 - BODY.muscleLossPerYear * yearsAging * 0.5);
   const muscleKg = leanKg * BODY.skeletalMuscleShareOfLean * (1 - BODY.muscleLossPerYear * yearsAging);
-  const boneKg = leanKg * BODY.boneShareOfLean * frame.bone;
+  const boneKg = BODY.referenceBoneKg[inputs.sex] * (heightM / BODY.referenceHeightM) ** 3 * frame.bone;
   const otherKg = leanKg - muscleKg - boneKg;
   const fatKg = (leanKg * inputs.bodyFat) / (1 - inputs.bodyFat);
   const massKg = leanKg + fatKg;
@@ -165,16 +188,37 @@ export function buildBody(rawInputs) {
   // Trained punchers recruit more of their muscle, faster: the larger part of
   // the elite–novice gap in hand speed is skill, not size.
   const neuralDrive = BODY.neuralDriveBase + BODY.neuralDriveTrained * inputs.training;
+  const allometric = (muscle, reference) => reference * (muscle / reference) ** BODY.allometryExponent;
+  const strikeForce = new Array(PARTICLES.length).fill(0);
+  const topSpeed = new Array(PARTICLES.length).fill(Infinity);
+  const fastFibres = (0.72 + 0.38 * inputs.training) * muscleQuality;
+  const legLength = lengths.thigh + lengths.shank;
+  // The trunk turns the shoulders into a punch: the same cross-section law.
+  const trunkForce = allometric(trunkMuscle, BODY.referenceMuscleKg.trunk) * force.trunk * muscleQuality;
   for (const side of ['l', 'r']) {
-    motorForce[P[`${side}Hand`]] = arm(side) * force.arm * muscleQuality * neuralDrive;
-    motorForce[P[`${side}Elbow`]] = arm(side) * force.arm * 0.6 * muscleQuality * neuralDrive;
-    motorForce[P[`${side}Shoulder`]] = trunkMuscle * force.trunk * muscleQuality;
-    motorForce[P[`${side}Hip`]] = trunkMuscle * force.trunk * muscleQuality;
-    motorForce[P[`${side}Knee`]] = leg(side) * force.leg * muscleQuality;
-    motorForce[P[`${side}Foot`]] = leg(side) * force.leg * 2 * muscleQuality;
+    const armForce = allometric(arm(side), BODY.referenceMuscleKg.arm) * force.arm * muscleQuality * neuralDrive;
+    motorForce[P[`${side}Hand`]] = armForce;
+    motorForce[P[`${side}Elbow`]] = armForce * 0.6;
+    strikeForce[P[`${side}Hand`]] = armForce;
+    strikeForce[P[`${side}Elbow`]] = armForce;
+    const kickForce = allometric(leg(side), BODY.referenceMuscleKg.leg) * BODY.kickForcePerMuscleKg * muscleQuality * neuralDrive;
+    strikeForce[P[`${side}Foot`]] = kickForce;
+    strikeForce[P[`${side}Knee`]] = kickForce * 0.9;
+    const armLength = lengths.upperArm + lengths.forearmToFist;
+    const armBulk = arm(side) / armLength / BODY.referenceBulk.arm;
+    const legBulk = leg(side) / legLength / BODY.referenceBulk.leg;
+    const pennation = (bulk) => 1 / (1 + BODY.pennationCost * Math.max(0, bulk - 1) ** 2);
+    topSpeed[P[`${side}Hand`]] = BODY.topSpeedPerMetre.arm * armLength * fastFibres * pennation(armBulk);
+    topSpeed[P[`${side}Elbow`]] = topSpeed[P[`${side}Hand`]] * 0.85;
+    topSpeed[P[`${side}Foot`]] = BODY.topSpeedPerMetre.leg * legLength * fastFibres * pennation(legBulk);
+    topSpeed[P[`${side}Knee`]] = topSpeed[P[`${side}Foot`]] * 0.6;
+    motorForce[P[`${side}Shoulder`]] = trunkForce;
+    motorForce[P[`${side}Hip`]] = trunkForce;
+    motorForce[P[`${side}Knee`]] = allometric(leg(side), BODY.referenceMuscleKg.leg) * force.leg * muscleQuality;
+    motorForce[P[`${side}Foot`]] = allometric(leg(side), BODY.referenceMuscleKg.leg) * force.leg * 2 * muscleQuality;
   }
-  motorForce[P.neck] = trunkMuscle * force.trunk * muscleQuality;
-  motorForce[P.pelvis] = (leg('l') + leg('r')) * force.leg * 1.5 * muscleQuality;
+  motorForce[P.neck] = trunkForce;
+  motorForce[P.pelvis] = allometric(leg('l') + leg('r'), BODY.referenceMuscleKg.leg * 2) * force.leg * 1.5 * muscleQuality;
   motorForce[P.head] = segments.head.tissue.muscle * force.neck * (0.5 + neckIndex);
   // A motor must at least hold its own particle up, or the fighter sags.
   for (let index = 0; index < motorForce.length; index += 1) motorForce[index] = Math.max(motorForce[index], masses[index] * 9.81 * 2.2);
@@ -185,7 +229,14 @@ export function buildBody(rawInputs) {
 
   return {
     inputs, heightM, massKg, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex,
-    lengths, segments, masses, motorForce, aerobic,
+    lengths, segments, masses, motorForce, strikeForce, topSpeed, aerobic,
+    limbKg: {
+      lArm: segments.lUpperArm.mass + segments.lForearm.mass + BODY.gloveKg,
+      rArm: segments.rUpperArm.mass + segments.rForearm.mass + BODY.gloveKg,
+      lLeg: segments.lThigh.mass + segments.lShank.mass,
+      rLeg: segments.rThigh.mass + segments.rShank.mass,
+    },
+    technique,
     reach: lengths.upperArm + lengths.forearmToFist,
     headMass,
     // Effective head mass at impact: a strong neck braces the head to the

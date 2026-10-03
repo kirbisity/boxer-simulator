@@ -5,19 +5,25 @@ import { PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld } from '../src/physics.js';
 
+// A preset may carry a style: heavy:muayThai, light:kickboxing.
 const [red = 'heavy', blue = 'light', boutsArg = '10', secondsArg = '180'] = process.argv.slice(2);
+const fighterFor = (spec) => {
+  const [preset, style = 'boxing'] = spec.split(':');
+  return { ...PRESETS[preset], style };
+};
 const bouts = Number(boutsArg);
 const seconds = Number(secondsArg);
 
 const totals = { red: { wins: 0, kd: 0 }, blue: { wins: 0, kd: 0 }, draws: 0 };
 const speeds = { red: {}, blue: {} };
 const impacts = [];
+const others = {};
 const stamina = { red: [], blue: [] };
 let thrown = 0;
 let landed = 0;
 const started = performance.now();
 for (let bout = 0; bout < bouts; bout += 1) {
-  const world = createWorld([PRESETS[red], PRESETS[blue]], { seed: 1000 + bout });
+  const world = createWorld([fighterFor(red), fighterFor(blue)], { seed: 1000 + bout });
   let elapsed = 0;
   while (elapsed < seconds && !boutWinner(world)) {
     advance(world, 1, (current, dt) => thinkAll(current, dt));
@@ -33,6 +39,10 @@ for (let bout = 0; bout < bouts; bout += 1) {
     landed += fighter.stats.landed;
   }
   for (const event of world.events) {
+    if (['fell', 'clinch', 'collision'].includes(event.kind)) {
+      const key = event.kind === 'fell' ? `fell: ${event.effects[0]}` : event.kind;
+      others[key] = (others[key] ?? 0) + 1;
+    }
     if (event.kind !== 'landed' && event.kind !== 'blocked') continue;
     const corner = world.fighters[event.attacker].corner;
     (speeds[corner][event.punch] ??= []).push(event.speed);
@@ -52,6 +62,9 @@ const head = impacts.filter((event) => event.target === 'head');
 const sorted = head.map((event) => event.headDeltaV).sort((a, b) => a - b);
 const quantile = (q) => sorted[Math.floor(q * (sorted.length - 1))] ?? 0;
 console.log(`head shots ${head.length}: head Δv median ${fmt(quantile(0.5), 2)} p90 ${fmt(quantile(0.9), 2)} max ${fmt(quantile(1), 2)} m/s; force median ${fmt(mean(head.map((event) => event.force)), 0)} N`);
+const byMove = {};
+for (const event of impacts) byMove[event.punch] = (byMove[event.punch] ?? 0) + 1;
+console.log('contacts by move', byMove);
 const effects = {};
 for (const event of impacts) for (const effect of event.effects) effects[effect] = (effects[effect] ?? 0) + 1;
 console.log('effects', effects);
@@ -64,3 +77,4 @@ const landedHead = {};
 for (const event of impacts) if (event.kind === 'landed' && event.target === 'head') (landedHead[event.punch] ??= []).push(event.speed);
 console.log('landed head speed', Object.fromEntries(Object.entries(landedHead).map(([punch, values]) => [punch, `${fmt(mean(values))} m/s ×${values.length}`])));
 for (const corner of ['red', 'blue']) console.log(`stamina by 30 s (${corner}):`, stamina[corner].map((values) => fmt(mean(values), 2)).join(' '));
+console.log('falls, clinches, charges landed', others);

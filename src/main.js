@@ -3,7 +3,8 @@
 
 import { buildBody, fighterFile, P, PRESETS } from './body.js';
 import { thinkAll } from './ai.js';
-import { advance, boutWinner, createWorld, placeFighter, throwPunch } from './physics.js';
+import { MOVES, STYLE_KEYS, STYLES } from './moves.js';
+import { advance, boutWinner, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, showImpact, updateFighterView, updateSpray } from './render.js';
@@ -37,6 +38,7 @@ function newBout() {
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   renderHud();
+  if (state.mode === 'play') buildPad();
 }
 
 /** Rebuild the fighters' models, for a new bout or a new shading style. */
@@ -128,6 +130,9 @@ function logEvent(event) {
   const name = (id) => state.corners[world.fighters[id].corner].name.split(' ')[0];
   let text;
   if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
+  else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
+  else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   else {
     const where = event.kind === 'blocked' ? `blocked by ${event.target.replace(/^[lr]/, '').toLowerCase()}` : `→ ${event.target}`;
     const head = event.target === 'head' ? ` · head Δv <b>${event.headDeltaV.toFixed(2)}</b> m/s` : '';
@@ -167,6 +172,7 @@ segmented('#speeds', (speed) => { state.speed = Number(speed); });
 segmented('#modes', (mode) => {
   state.mode = mode;
   $('#pad').hidden = mode !== 'play';
+  if (mode === 'play') buildPad();
   document.body.classList.toggle('playing', mode === 'play');
 });
 $('#pause').addEventListener('click', () => {
@@ -177,21 +183,48 @@ $('#restart').addEventListener('click', newBout);
 $('#banner-again').addEventListener('click', newBout);
 
 const player = () => state.world.fighters[0];
-const COMMANDS = {
-  jab: () => throwPunch(state.world, player(), 'jab', state.aimBody ? 'body' : 'head'),
-  cross: () => throwPunch(state.world, player(), 'cross', state.aimBody ? 'body' : 'head'),
-  hook: () => throwPunch(state.world, player(), 'hook', state.aimBody ? 'body' : 'head'),
-  uppercut: () => throwPunch(state.world, player(), 'uppercut', state.aimBody ? 'body' : 'head'),
-  guard: () => { player().guardHigh = 0.6; },
-  slip: () => {
-    player().slip = 0.32;
-    player().slipSide = Math.random() < 0.5 ? 1 : -1;
-  },
-  body: () => {
-    state.aimBody = !state.aimBody;
-    $('[data-command="body"]').classList.toggle('on', state.aimBody);
-  },
+// Keys: punches on the right hand's home row, kicks and knees above and
+// below, defences on the left hand.
+const KEYS = {
+  j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
+  c: 'clinch', r: 'rush', ' ': 'guard', s: 'slip', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body',
 };
+const LABELS = {
+  jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
+  elbow: 'Elbow', upElbow: 'Up elbow', clinch: 'Clinch', rush: 'Charge', guard: 'Guard', slip: 'Slip', roll: 'Roll', parry: 'Parry',
+  leanBack: 'Lean back', check: 'Check', stepBack: 'Step back', body: 'Body',
+};
+
+function command(name) {
+  if (name === 'body') {
+    state.aimBody = !state.aimBody;
+    document.querySelector('[data-command="body"]')?.classList.toggle('on', state.aimBody);
+    return;
+  }
+  const spec = MOVES[name];
+  if (spec?.kind === 'strike') {
+    const zone = spec.zones.includes('legs') ? 'legs' : state.aimBody ? 'body' : 'head';
+    throwPunch(state.world, player(), name, zone);
+  } else perform(state.world, player(), name);
+}
+
+/** The pad shows the moves of the player's own style. */
+function buildPad() {
+  const style = STYLES[player().style];
+  const names = [...Object.keys(style.attacks), ...Object.keys(style.defences), 'body'];
+  const keyFor = Object.fromEntries(Object.entries(KEYS).map(([key, name]) => [name, key === ' ' ? '␣' : key.toUpperCase()]));
+  const pad = $('#pad');
+  pad.replaceChildren(...['◀', '▶'].map((arrow, index) => Object.assign(document.createElement('button'), { textContent: arrow, ariaLabel: index ? 'Step in' : 'Step back' })));
+  pad.children[0].dataset.move = '-1';
+  pad.children[1].dataset.move = '1';
+  for (const name of names) {
+    const button = document.createElement('button');
+    button.dataset.command = name;
+    button.innerHTML = `${LABELS[name] ?? name} <kbd>${keyFor[name] ?? ''}</kbd>`;
+    pad.append(button);
+  }
+}
+
 $('#pad').addEventListener('pointerdown', (press) => {
   const button = press.target.closest('button');
   if (!button) return;
@@ -202,16 +235,15 @@ $('#pad').addEventListener('pointerdown', (press) => {
       window.removeEventListener('pointerup', stop);
     };
     window.addEventListener('pointerup', stop);
-  } else COMMANDS[button.dataset.command]?.();
+  } else command(button.dataset.command);
 });
-const KEYS = { j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', ' ': 'guard', s: 'slip', b: 'body' };
 window.addEventListener('keydown', (press) => {
   if (state.mode !== 'play' || press.target.closest('input, select')) return;
   if (press.key === 'a' || press.key === 'ArrowLeft') player().move = -1;
   else if (press.key === 'd' || press.key === 'ArrowRight') player().move = 1;
   else if (KEYS[press.key]) {
     press.preventDefault();
-    COMMANDS[KEYS[press.key]]();
+    command(KEYS[press.key]);
   }
 });
 window.addEventListener('keyup', (press) => {
@@ -258,7 +290,9 @@ const FIELDS = [
   { key: 'bodyFat', label: 'Body fat', type: 'range', min: 0.06, max: 0.4, step: 0.01, format: (value) => `${Math.round(value * 100)}%` },
 ];
 const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
+// The compact grid: the fighting style first, then the look.
 const LOOK_FIELDS = [
+  { key: 'style', label: 'Style', options: STYLE_KEYS, names: Object.fromEntries(STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
   { key: 'skinTone', label: 'Skin', options: ['light', 'medium', 'tan', 'deep'] },
   { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle },
   { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
@@ -281,7 +315,7 @@ function buildCornerForm(corner) {
     row.className = 'field';
     row.innerHTML = `<span>${field.label}</span>`;
     const input = field.type === 'select' ? document.createElement('select') : document.createElement('input');
-    if (field.type === 'select') input.append(...field.options.map((option) => new Option(option, option)));
+    if (field.type === 'select') input.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
     else Object.assign(input, { type: 'range', min: field.min, max: field.max, step: field.step });
     input.dataset.key = field.key;
     const value = document.createElement('output');
@@ -298,10 +332,11 @@ function buildCornerForm(corner) {
     row.className = 'look-field';
     row.innerHTML = `<span>${field.label}</span>`;
     const select = document.createElement('select');
-    select.append(...field.options.map((option) => new Option(option, option)));
+    select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
     select.dataset.look = field.key;
     select.addEventListener('change', () => {
-      state.corners[corner].look = { ...DEFAULT_LOOK, ...state.corners[corner].look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
+      if (field.onInputs) state.corners[corner][field.key] = select.value;
+      else state.corners[corner].look = { ...DEFAULT_LOOK, ...state.corners[corner].look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
     });
     row.append(select);
     return row;
@@ -345,7 +380,8 @@ function fillCornerForm(corner) {
   }
   const look = { ...DEFAULT_LOOK, ...inputs.look };
   for (const field of LOOK_FIELDS) {
-    form.querySelector(`[data-look="${field.key}"]`).value = field.fromValue ? field.fromValue(look[field.key]) : look[field.key];
+    const value = field.onInputs ? inputs[field.key] ?? 'boxing' : look[field.key];
+    form.querySelector(`[data-look="${field.key}"]`).value = field.fromValue ? field.fromValue(value) : value;
   }
   const body = buildBody(inputs);
   const rows = [
@@ -374,6 +410,8 @@ $('#close-builder').addEventListener('click', () => {
 function fit() {
   const box = canvas.getBoundingClientRect();
   resize(scene, box.width, box.height);
+  // The pad and log sit just above the controls, however many rows they wrap to.
+  document.documentElement.style.setProperty('--controls-height', `${$('.controls').getBoundingClientRect().height}px`);
 }
 window.addEventListener('resize', fit);
 buildCornerForm('red');

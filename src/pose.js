@@ -63,26 +63,33 @@ export function clampReach(shoulder, target, reach) {
 /**
  * Desired particle positions in the local frame.
  * @param body   built body (lengths)
- * @param intent { twist, headOffset:[x,y,z], lHand:[x,y,z]|null, rHand, guardTight }
+ * @param intent { stance, twist, lean, dip, shift, headOffset, guardTight,
+ *   guardOffset, and per-limb overrides lHand, rHand, lElbow, rElbow,
+ *   lFoot, rFoot, lKnee, rKnee (local points), check (lead shin up) }
  */
 export function desiredPose(body, intent = {}) {
   const H = body.heightM;
   const L = body.lengths;
+  const stance = { blade: POSE.bladeAngle, crouch: POSE.crouch, width: 1, lean: POSE.forwardLean, guardHeight: 0, ...intent.stance };
   const out = new Array(PARTICLES.length);
   const twist = intent.twist ?? 0;
-  const blade = POSE.bladeAngle + twist;
+  const blade = stance.blade + twist;
   const across = (angle) => yawRotate([0, 0, 1], angle);
 
-  out[P.lFoot] = [POSE.leadFoot[0] * H, L.ankle, POSE.leadFoot[1] * H];
-  out[P.rFoot] = [POSE.rearFoot[0] * H, L.ankle, POSE.rearFoot[1] * H];
-  const hipHeight = L.ankle + L.shank + L.thigh - POSE.crouch * H - (intent.dip ?? 0) * H;
+  const hipHeight = L.ankle + L.shank + L.thigh - stance.crouch * H - (intent.dip ?? 0) * H;
+  out[P.lFoot] = intent.lFoot ?? [POSE.leadFoot[0] * H * stance.width, L.ankle, POSE.leadFoot[1] * H * stance.width];
+  out[P.rFoot] = intent.rFoot ?? [POSE.rearFoot[0] * H * stance.width, L.ankle, POSE.rearFoot[1] * H * stance.width];
+  if (intent.check && !intent.lFoot) {
+    // Checking a kick: the lead knee comes up and out, the shin a shield.
+    out[P.lFoot] = [POSE.leadFoot[0] * H * stance.width + 0.04 * H, hipHeight * 0.42, POSE.leadFoot[1] * H + 0.03 * H];
+  }
   const pelvis = [0, hipHeight, 0];
   out[P.pelvis] = pelvis;
-  const hipAxis = across(POSE.bladeAngle * POSE.hipBladeShare + twist * 0.3);
+  const hipAxis = across(stance.blade * POSE.hipBladeShare + twist * 0.3);
   out[P.lHip] = vec.add(pelvis, vec.scale(hipAxis, L.hipSpan / 2));
   out[P.rHip] = vec.add(pelvis, vec.scale(hipAxis, -L.hipSpan / 2));
 
-  const lean = POSE.forwardLean + (intent.lean ?? 0);
+  const lean = stance.lean + (intent.lean ?? 0);
   const neck = vec.add(pelvis, [Math.sin(lean) * L.trunk, Math.cos(lean) * L.trunk, 0]);
   out[P.neck] = neck;
   const shoulderAxis = across(blade);
@@ -103,13 +110,25 @@ export function desiredPose(body, intent = {}) {
     const hip = out[P[`${side}Hip`]];
     const foot = out[P[`${side}Foot`]];
     const outward = side === 'l' ? 0.35 : -0.35;
-    out[P[`${side}Knee`]] = twoBoneIK(hip, foot, L.thigh, L.shank, [1, 0, outward]);
+    // A raised or kicking leg folds with its knee where the move puts it.
+    const kneeOverride = intent[`${side}Knee`];
+    out[P[`${side}Knee`]] = kneeOverride ?? twoBoneIK(hip, foot, L.thigh, L.shank, [1, intent.check && side === 'l' ? 0.6 : 0, outward]);
+    if (kneeOverride) out[P[`${side}Foot`]] = intent[`${side}Foot`] ?? vec.add(kneeOverride, [-0.2, -L.shank * 0.8, 0]);
 
     const shoulder = out[P[`${side}Shoulder`]];
     const guard = side === 'l' ? POSE.leadGuard : POSE.rearGuard;
     const tight = intent.guardTight ? 0.6 : 1;
     const drift = intent.guardOffset?.[side] ?? [0, 0, 0];
-    const guardPoint = vec.add(out[P.head], [(guard[0] * tight + drift[0]) * H, (guard[1] + drift[1]) * H, (guard[2] + drift[2]) * H]);
+    const guardPoint = vec.add(out[P.head], [(guard[0] * tight + drift[0]) * H, (guard[1] + stance.guardHeight + drift[1]) * H, (guard[2] + drift[2]) * H]);
+    const elbowOverride = intent[`${side}Elbow`];
+    if (elbowOverride) {
+      // Elbow strikes: the point of the elbow leads; the forearm folds back.
+      const elbow = vec.add(shoulder, vec.scale(vec.normalize(vec.sub(elbowOverride, shoulder)), L.upperArm));
+      out[P[`${side}Elbow`]] = elbow;
+      const hand = intent[`${side}Hand`] ?? vec.add(elbow, [0, 0.1, 0]);
+      out[P[`${side}Hand`]] = vec.add(elbow, vec.scale(vec.normalize(vec.sub(hand, elbow)), L.forearmToFist));
+      continue;
+    }
     const target = clampReach(shoulder, intent[`${side}Hand`] ?? guardPoint, (L.upperArm + L.forearmToFist) * 0.995);
     out[P[`${side}Hand`]] = target;
     const pole = [-0.4, -1, side === 'l' ? 0.5 : -0.5];

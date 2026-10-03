@@ -47,13 +47,13 @@ button.on { background: var(--fg); color: var(--bg); }
 .log li b { color: var(--fg); }
 .log li em { color: var(--gold); font-style: normal; }
 .log li.big { border-left: 3px solid var(--gold); }
-body.playing .log { bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+body.playing .log { display: none; }
 
 .controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; background: linear-gradient(transparent, rgba(5, 6, 10, 0.85) 45%); }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; }
 
-.pad { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(60px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: min(720px, calc(100% - 24px)); }
+.pad { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--controls-height, 56px) + 6px); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: min(720px, calc(100% - 24px)); }
 .pad button { background: var(--panel-solid); min-width: 64px; padding: 10px 12px; font-weight: 600; }
 .pad button.on { background: var(--gold); color: #191300; }
 kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
@@ -111,7 +111,6 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
   .corners[data-showing="red"] .corner.blue, .corners[data-showing="blue"] .corner.red { display: none; }
   .pad button { min-width: 54px; padding: 9px 8px; }
   kbd { display: none; }
-  body.playing .log { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Design sheets: labels under each option; the game's chrome steps aside. */

@@ -3,7 +3,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const MODULES = ['body', 'pose', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'bones', 'face', 'render', 'main'];
+const MODULES = ['body', 'pose', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'bones', 'face', 'render', 'main'];
 const out = process.argv[2] ?? 'dist/boxer-simulator.html';
 
 const html = readFileSync('index.html', 'utf8');
