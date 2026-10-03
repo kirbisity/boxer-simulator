@@ -6,13 +6,18 @@
 // seven sides and flat normals, for a low-poly art look.
 
 import { P } from './body.js';
-import { skinWeights } from './bodymesh.js';
+import { relax, skinWeights } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 
 export const LOFT = {
-  sides: 14,
+  sides: 18,
   facetedSides: 7,
+  // Rings per unit of each part's count; above 1 is denser along the limbs.
+  rowDensity: 1.4,
+  // A light relaxation rounds the ring edges without losing the shapes.
+  relaxPasses: 2,
+  relaxAmount: 0.3,
 };
 
 const smooth = (t) => t * t * (3 - 2 * t);
@@ -114,7 +119,7 @@ function facet(positions, indices, colors) {
 
 export function buildLoftBody(body, { faceted = false } = {}) {
   const sides = faceted ? LOFT.facetedSides : LOFT.sides;
-  const rows = faceted ? 0.5 : 1;
+  const rows = faceted ? 0.5 : LOFT.rowDensity;
   const count = (n) => Math.max(2, Math.round(n * rows));
   const points = bindPoints(body);
   const frames = boneFrames(points, body);
@@ -154,9 +159,10 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     const armForward = frames[BONE[`${side}UpperArm`]].x;
     // Deltoid cap, biceps and triceps (deeper than wide), the narrow elbow.
     // It starts well inside the trunk so its end never shows at the shoulder.
+    // Its root closes to a point inside the shoulder, so no end face shows.
     loft(mesh, along(shoulder, elbow, armForward, count(10), -0.3, 1.0,
-      profile([[-0.3, upperR * 0.45], [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]),
-      profile([[-0.3, upperR * 0.45], [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]])), sides);
+      profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]),
+      profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]])), sides, { capStart: false });
     // Forearm: full below the elbow, tapering to the wrist inside the glove.
     loft(mesh, along(elbow, hand, armForward, count(8), -0.04, 0.74,
       profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6]]),
@@ -175,16 +181,18 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
     loft(mesh, thighRings(-0.05, 0.42, count(4)), sides, { color: 'kit', inflate: 1.08, capStart: false, capEnd: false });
     // Shin and calf: the calf sits high and behind.
-    loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(10), 0, 0.97,
-      profile([[0, shankR * 0.9], [0.28, shankR * 1.1], [0.7, shankR * 0.7], [0.97, shankR * 0.5]]),
-      profile([[0, shankR * 0.88], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
+    // The shin starts inside the thigh, so the knee bends without a seam.
+    loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(10), -0.12, 0.97,
+      profile([[-0.12, shankR * 0.6], [0, shankR * 0.92], [0.28, shankR * 1.1], [0.7, shankR * 0.7], [0.97, shankR * 0.5]]),
+      profile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
       profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]])), sides);
   }
 
   let { positions, indices, colors } = mesh;
   if (faceted) ({ positions, indices, colors } = facet(positions, indices, colors));
-  const positionArray = Float32Array.from(positions);
+  let positionArray = Float32Array.from(positions);
   const indexArray = Uint32Array.from(indices);
+  if (!faceted) positionArray = relax({ positions: positionArray, indices: indexArray }, LOFT.relaxPasses, LOFT.relaxAmount).positions;
   const normals = computeNormals(positionArray, indexArray);
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(positionArray, frames), bindFrames: frames, bindPoints: points };

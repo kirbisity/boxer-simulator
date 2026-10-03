@@ -399,7 +399,7 @@ const SHEETS = {
   bodies: {
     field: 'bodyStyle',
     options: [
-      ['lofted', '1 · Lofted', 'clean low-poly rings · ~2.9k triangles'],
+      ['lofted', '1 · Lofted', 'low-poly rings, lightly smoothed · ~5.9k triangles'],
       ['smoothed', '2 · Smoothed', 'anatomy field, coarse and relaxed · ~8k'],
       ['faceted', '3 · Faceted', 'flat-shaded low poly · ~0.8k'],
     ],

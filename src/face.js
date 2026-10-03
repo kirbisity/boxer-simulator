@@ -253,7 +253,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const look = { ...DEFAULT_LOOK, ...lookInput };
   const r = body.lengths.headRadius;
   const female = body.inputs.sex === 'female';
-  const shape = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shojo' : 'shonen'];
+  // Chosen from the design sheet: shonen for women, seinen for men.
+  const shape = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
   const group = new THREE.Group();
   const skinMaterial = surface(skinHex, { steps: STYLE.faceSteps });
   const baseSkin = skinMaterial.color.clone();
