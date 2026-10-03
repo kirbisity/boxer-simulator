@@ -438,6 +438,9 @@ function buildKabuto(group, head, r, steel, color) {
   }
 }
 
+// How much bigger than first drawn a crest and a plume stand: they are meant to be seen.
+const HEAD_DRESS_SCALE = 1.7;
+
 /** A kabuto's crest (maedate) on its holder at the brow, in head coordinates. */
 export function kabutoCrest(head, r, steel) {
   const gold = metal(steel, head.gold ?? 0xd6a743);
@@ -574,22 +577,30 @@ export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
       // On the crown of the helm, sweeping back.
       const top = dress.head.kind === 'bascinet' ? (dress.head.pointed ? 1.55 : 1.35) * r : 0.95 * r;
       const feather = surface(cornerHex, { roughness: 0.9 });
+      // Built round its holder on the crown, then sized up as a whole.
+      const plume = new THREE.Group();
+      plume.position.y = top;
+      plume.scale.setScalar(HEAD_DRESS_SCALE);
       const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * r, 0.08 * r, 0.3 * r, 8), steel);
-      holder.position.y = top;
-      group.add(holder);
-      for (let index = 0; index < 7; index += 1) {
-        const angle = 0.15 + index * 0.22;
-        const plume = new THREE.Mesh(new THREE.SphereGeometry(0.16 * r, 8, 6), feather);
-        plume.scale.set(1, 3.4, 0.6);
-        plume.position.set(-Math.sin(angle) * 0.75 * r, top + 0.15 * r + Math.cos(angle) * 0.75 * r, (index % 2 ? 1 : -1) * 0.05 * r);
-        plume.rotation.z = angle;
-        group.add(plume);
+      plume.add(holder);
+      for (let index = 0; index < 9; index += 1) {
+        const angle = 0.1 + index * 0.19;
+        const blade = new THREE.Mesh(new THREE.SphereGeometry(0.17 * r, 8, 6), feather);
+        blade.scale.set(1, 3.6, 0.6);
+        blade.position.set(-Math.sin(angle) * 0.8 * r, 0.15 * r + Math.cos(angle) * 0.8 * r, (index % 2 ? 1 : -1) * 0.06 * r);
+        blade.rotation.z = angle;
+        plume.add(blade);
       }
+      group.add(plume);
       break;
     }
-    case 'crest':
+    case 'crest': {
       if (dress.head?.kind !== 'kabuto') return null;
-      return kabutoCrest(dress.head, r, steel);
+      // Grown from its holder at the brow.
+      const crest = kabutoCrest(dress.head, r, steel);
+      crest.scale.setScalar(HEAD_DRESS_SCALE);
+      return crest;
+    }
     default:
       return null;
   }
