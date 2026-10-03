@@ -832,11 +832,11 @@ function solveJointLimits(world, fighter) {
     const elbowSide = vec.normalize(vec.add(vec.add(vec.scale(forward, -0.4), vec.scale(trunkUp, -1)), vec.scale(leftward, 0.5 * sign)));
     if (hingeDefined) hinge(world, fighter, `${side}Elbow`, P[`${side}Shoulder`], P[`${side}Elbow`], P[`${side}Hand`], elbowSide, L.forearmToFist);
     // Hips: the thigh swings within a cone about straight down.
-    cone(world, fighter, `${side}Hip`, P[`${side}Hip`], P[`${side}Knee`], vec.scale(trunkUp, -1), WORLD.joint.hipCone);
+    coneLimit(world, fighter, `${side}Hip`, P[`${side}Hip`], P[`${side}Knee`], vec.scale(trunkUp, -1), WORLD.joint.hipCone);
     foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], WORLD.minFold.leg);
     foldLimit(fighter, P[`${side}Shoulder`], P[`${side}Hand`], WORLD.minFold.arm);
   }
-  cone(world, fighter, 'neck', P.neck, P.head, trunkUp, WORLD.headCone);
+  coneLimit(world, fighter, 'neck', P.neck, P.head, trunkUp, WORLD.headCone);
 }
 
 /**
@@ -862,7 +862,7 @@ function hinge(world, fighter, joint, root, middle, end, bendSide, lever) {
 }
 
 /** A cone: the tip stays within `limit` radians of `axis` about the pivot. */
-function cone(world, fighter, joint, pivot, tip, axis, limit) {
+function coneLimit(world, fighter, joint, pivot, tip, axis, limit) {
   if (fighter.broken.has(joint)) return;
   const origin = point(fighter.x, pivot);
   const offset = vec.sub(point(fighter.x, tip), origin);
