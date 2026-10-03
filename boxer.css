@@ -129,3 +129,14 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 .event-icon.ko b { background: #d12a2a; font-size: 18px; }
 .event-icon.bone b { background: #b0201c; }
 .event-icon.down b { background: #c48a12; }
+
+/* Levels: one card per scenario, the sandbox first. */
+.levels-sheet { width: min(640px, 100%); }
+.level-list { display: grid; gap: 10px; }
+.level { display: grid; gap: 4px; text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.04); }
+.level:hover { border-color: var(--gold); }
+.level b { font: 700 20px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+.level em { font-style: normal; color: var(--gold); font-size: 13px; }
+.level span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+.level small { font: 12px var(--mono); color: var(--fg, inherit); opacity: 0.85; }
+#close-levels { justify-self: end; }

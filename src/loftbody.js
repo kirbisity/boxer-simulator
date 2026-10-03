@@ -10,6 +10,14 @@ import { relax, skinWeights } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 
+// Street tops: where the hem and neckline sit along the trunk (0 hips, 1
+// neck), how far the cloth stands off the skin, and how long the sleeves run
+// (as a share of the upper arm; above 1, on down the forearm).
+export const CLOTHES = {
+  tshirt: { hem: 0.02, neck: 0.98, loose: 1.06, sleeve: 0.5, sleeveLoose: 1.22, ribbed: false },
+  hoodie: { hem: -0.1, neck: 1.0, loose: 1.11, sleeve: 1.8, sleeveLoose: 1.24, ribbed: true },
+};
+
 export const LOFT = {
   // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
   // how far forward it bulges, and how far below the waistband it hangs,
@@ -56,6 +64,10 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       const angle = (step / sides) * Math.PI * 2;
       const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * inflate), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * inflate)));
       mesh.positions.push(...p);
+      // Weighted where the body's own surface is beneath it: cloth standing
+      // off the skin would otherwise follow the bones less than the skin
+      // under it, and the skin would come through when a limb moves.
+      mesh.weightPositions.push(...vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width))));
       mesh.colors.push(color);
       mesh.bones.push(bones(ring, Math.cos(angle)));
     }
@@ -70,6 +82,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   const cap = (row, flip) => {
     const center = mesh.positions.length / 3;
     mesh.positions.push(...rings[row].center);
+    mesh.weightPositions.push(...rings[row].center);
     mesh.colors.push(color);
     mesh.bones.push(bones(rings[row], 0));
     for (let step = 0; step < sides; step += 1) {
@@ -116,19 +129,21 @@ function computeNormals(positions, indices) {
 }
 
 /** Split every triangle's corners apart so each face shades flat. */
-function facet(positions, indices, colors, bones) {
+function facet(positions, indices, colors, bones, weightPositions) {
   const flatPositions = [];
   const flatIndices = [];
   const flatColors = [];
   const flatBones = [];
+  const flatWeights = [];
   for (let face = 0; face < indices.length; face += 1) {
     const i = indices[face];
     flatPositions.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
     flatColors.push(colors[i]);
     flatBones.push(bones[i]);
+    flatWeights.push(weightPositions[i * 3], weightPositions[i * 3 + 1], weightPositions[i * 3 + 2]);
     flatIndices.push(face);
   }
-  return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones };
+  return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones, weightPositions: flatWeights };
 }
 
 export function buildLoftBody(body, { faceted = false } = {}) {
@@ -140,7 +155,7 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
-  const mesh = { positions: [], indices: [], colors: [], bones: [] };
+  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [] };
   const build = seg.trunk.tissue.muscle / (seg.trunk.tissue.muscle + seg.trunk.tissue.fat);
   // The trunk is a lean shape (from the radius without fat) under a layer
   // of fat, laid on where fat goes: thickest at the waist and belly, then
@@ -193,10 +208,22 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   // Shorts sit on the hips under the belly, which hangs over them.
   const unbulged = (shape, bellyPart) => (u) => shape(u) - belly * LOFT.bellyScale * bellyPart * bulge(u);
   const shortsRings = (from, to, rings) => along(at('pelvis'), at('neck'), forward, rings, from, to, unbulged(bodyDepth, 1), bodyWidth, unbulged(bodyLean, 0.8));
-  loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: 'kit', inflate: 1.05, capStart: false, capEnd: false, bones: abdomen });
-  loft(mesh, shortsRings(0.17, 0.25, 1), sides, { color: 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen });
+  // Street clothes replace the ring kit: a T-shirt or a hoodie over the
+  // trunk, and jeans or joggers to the ankle (see the limbs below).
+  const clothing = body.inputs.clothing;
+  const outfit = clothing ? CLOTHES[clothing.top] : null;
+  if (!clothing) {
+    loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: 'kit', inflate: 1.05, capStart: false, capEnd: false, bones: abdomen });
+    loft(mesh, shortsRings(0.17, 0.25, 1), sides, { color: 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen });
+  } else {
+    loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: 'pants', inflate: 1.06, capStart: false, capEnd: false, bones: abdomen });
+    if (clothing.bottom === 'jeans') loft(mesh, shortsRings(0.12, 0.17, 1), sides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen });
+    // The top hangs from the shoulders and drapes over the belly.
+    loft(mesh, trunkRings(outfit.hem, outfit.neck, count(14)), sides, { color: 'shirt', inflate: outfit.loose, capStart: false, capEnd: false, bones: abdomen });
+    if (outfit.ribbed) loft(mesh, trunkRings(outfit.hem, outfit.hem + 0.06, 1), sides, { color: 'cuff', inflate: outfit.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
+  }
   // Fewer sides cut deeper chords, so the faceted top needs more clearance.
-  if (body.inputs.sex === 'female') loft(mesh, trunkRings(0.56, 0.86, count(5)), sides, { color: 'top', inflate: faceted ? 1.1 : 1.05, capStart: false, capEnd: false, bones: abdomen });
+  if (body.inputs.sex === 'female' && !clothing) loft(mesh, trunkRings(0.56, 0.86, count(5)), sides, { color: 'top', inflate: faceted ? 1.1 : 1.05, capStart: false, capEnd: false, bones: abdomen });
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -210,13 +237,29 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     // Deltoid cap, biceps and triceps (deeper than wide), the narrow elbow.
     // It starts well inside the trunk so its end never shows at the shoulder.
     // Its root closes to a point inside the shoulder, so no end face shows.
-    loft(mesh, along(shoulder, elbow, armForward, count(10), -0.3, 1.0,
-      profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]),
-      profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]])), sides, { capStart: false });
-    // Forearm: full below the elbow, tapering to the wrist inside the glove.
-    loft(mesh, along(elbow, hand, armForward, count(8), -0.04, 0.74,
-      profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6]]),
-      profile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68]])), sides);
+    const upperDepth = profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]);
+    const upperWidth = profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]]);
+    loft(mesh, along(shoulder, elbow, armForward, count(10), -0.3, 1.0, upperDepth, upperWidth), sides, { capStart: false });
+    // Forearm: full below the elbow, tapering to the wrist inside the glove
+    // (or, bare, on to the wrist above the fist).
+    const wrist = body.inputs.gloves === false ? 0.84 : 0.74;
+    const forearmRings = (from, to, rings) => along(elbow, hand, armForward, rings, from, to,
+      profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.84, foreR * 0.56]]),
+      profile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.84, foreR * 0.62]]));
+    loft(mesh, forearmRings(-0.04, wrist, count(8)), sides);
+    if (outfit) {
+      // Sleeves: a T-shirt's stop halfway down the upper arm; a hoodie's
+      // run to a ribbed cuff at the wrist.
+      // The sleeve follows the arm's own shape, deltoid and all, a little off it.
+      const upperArmRings = (from, to, rings) => along(shoulder, elbow, armForward, rings, from, to, (t) => Math.max(upperDepth(t), upperR * 0.9), (t) => Math.max(upperWidth(t), upperR * 0.9));
+      // From as deep in the shoulder as the arm's own skin starts, so the
+      // arm's root never swings out through the back of the top.
+      loft(mesh, upperArmRings(-0.3, outfit.sleeve > 1 ? 1.05 : outfit.sleeve, count(6)), sides, { color: 'shirt', inflate: outfit.sleeveLoose, capStart: false, capEnd: false });
+      if (outfit.sleeve > 1) {
+        loft(mesh, forearmRings(-0.06, outfit.sleeve - 1, count(5)), sides, { color: 'shirt', inflate: outfit.sleeveLoose, capStart: false, capEnd: false });
+        loft(mesh, forearmRings(outfit.sleeve - 1.07, outfit.sleeve - 1, 1), sides, { color: 'cuff', inflate: outfit.sleeveLoose + 0.04, capStart: false, capEnd: false });
+      }
+    }
 
     const hip = at(`${side}Hip`);
     const knee = at(`${side}Knee`);
@@ -229,21 +272,29 @@ export function buildLoftBody(body, { faceted = false } = {}) {
       profile([[-0.14, thighR * 1.0], [0.1, thighR * 1.1], [0.5, thighR * 0.95], [1, shankR * 0.9]]),
       profile([[0, 0], [0.5, thighR * 0.08], [1, 0]]));
     loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
-    loft(mesh, thighRings(-0.05, 0.42, count(4)), sides, { color: 'kit', inflate: 1.08, capStart: false, capEnd: false });
+    if (!clothing) loft(mesh, thighRings(-0.05, 0.42, count(4)), sides, { color: 'kit', inflate: 1.08, capStart: false, capEnd: false });
+    else loft(mesh, thighRings(-0.05, 1.04, count(9)), sides, { color: 'pants', inflate: 1.12, capStart: false, capEnd: false });
     // Shin and calf: the calf sits high and behind.
     // The shin starts inside the thigh, so the knee bends without a seam.
-    loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(10), -0.12, 0.97,
+    const shinRings = (from, to, rings) => along(knee, foot, frames[BONE[`${side}Shin`]].x, rings, from, to,
       profile([[-0.12, shankR * 0.6], [0, shankR * 0.92], [0.28, shankR * 1.1], [0.7, shankR * 0.7], [0.97, shankR * 0.5]]),
       profile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
-      profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]])), sides);
+      profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]]));
+    loft(mesh, shinRings(-0.12, 0.97, count(10)), sides);
+    if (clothing) {
+      // Jeans fall straight to the shoe; joggers gather into a cuff.
+      const joggers = clothing.bottom === 'joggers';
+      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(8), -0.14, 0.9, () => shankR * 1.12, () => shankR * 1.1), sides, { color: 'pants', inflate: joggers ? 1.12 : 1.22, capStart: false, capEnd: false });
+      if (joggers) loft(mesh, shinRings(0.82, 0.9, 1), sides, { color: 'cuff2', inflate: 1.15, capStart: false, capEnd: false });
+    }
   }
 
-  let { positions, indices, colors, bones } = mesh;
-  if (faceted) ({ positions, indices, colors, bones } = facet(positions, indices, colors, bones));
+  let { positions, indices, colors, bones, weightPositions } = mesh;
+  if (faceted) ({ positions, indices, colors, bones, weightPositions } = facet(positions, indices, colors, bones, weightPositions));
   let positionArray = Float32Array.from(positions);
   const indexArray = Uint32Array.from(indices);
   if (!faceted) positionArray = relax({ positions: positionArray, indices: indexArray }, LOFT.relaxPasses, LOFT.relaxAmount).positions;
   const normals = computeNormals(positionArray, indexArray);
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
-  return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(positionArray, frames, bones), bindFrames: frames, bindPoints: points };
+  return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(Float32Array.from(weightPositions), frames, bones), bindFrames: frames, bindPoints: points };
 }

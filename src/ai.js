@@ -55,7 +55,7 @@ function chooseStrategy(world, fighter, opponent, dt) {
   let next = null;
   if (hurt && fighter.aiStrategy !== 'outboxer' && !held) next = 'outboxer';
   else if (!hurt && finishing && !['pressure', 'brawler'].includes(fighter.aiStrategy) && !held) next = world.random() < 0.5 ? 'pressure' : 'brawler';
-  else if (!fighter.aiStrategy || fighter.aiStrategyFor <= 0) next = pick(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight])), world.random);
+  else if (!fighter.aiStrategy || fighter.aiStrategyFor <= 0) next = pick(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight * (STYLES[fighter.style].plans?.[key] ?? 1)])), world.random);
   if (next) {
     if (next !== fighter.aiStrategy) world.events.push({ time: world.time, kind: 'strategy', fighter: fighter.id, strategy: next, effects: [] });
     fighter.aiStrategy = next;

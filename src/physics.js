@@ -16,6 +16,18 @@ export const WORLD = {
   // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
   ringHalf: 2.85,
   gloveRadius: 0.065,
+  // Fists, gloved and bare. A 10 oz glove spreads a punch over ~11 ms; a
+  // bare fist lands sooner on a smaller, harder knuckle — peak force some
+  // 20–40% higher for the same impulse — so skin splits, and the hand's own
+  // bones break at a lower load (the boxer's fracture of street fights).
+  fists: {
+    gloved: { radius: 0.065, contactSeconds: 0.011, handFracture: 1, cutForce: Infinity },
+    bare: { radius: 0.042, contactSeconds: 0.008, handFracture: 0.9, cutForce: 2100 },
+  },
+  // Things worn that come off: a headset is knocked away by the first clean
+  // shot to the head (or when its wearer goes down). Free, it flies with the
+  // head's new speed and the blow's direction, tumbles, and settles on the floor.
+  props: { radius: 0.06, flySpeedPerHeadDeltaV: 1.6, flyBase: 1.2, flyUp: 1.5, restitution: 0.35, slide: 0.75, spinMin: 8, spinRange: 8 },
   contactStep: 0.012, // m a strike contact may separate per substep
   // Head movement in range: how far past both reaches it starts (m), how
   // quickly it eases in (/s), its rhythm (Hz), its side-to-side size as a
@@ -225,7 +237,7 @@ function particleRadii(body) {
     if (name === 'pelvis') return segments.trunk.skinRadius * 0.7;
     if (name.endsWith('Shoulder')) return segments[`${side}UpperArm`].skinRadius * 1.2;
     if (name.endsWith('Elbow')) return segments[`${side}Forearm`].skinRadius;
-    if (name.endsWith('Hand')) return WORLD.gloveRadius;
+    if (name.endsWith('Hand')) return fistsOf(body).radius;
     if (name.endsWith('Hip')) return segments[`${side}Thigh`].skinRadius;
     if (name.endsWith('Knee')) return segments[`${side}Shank`].skinRadius;
     return 0.045;
@@ -290,7 +302,16 @@ function addConstraint(fighter, a, b, compliance) {
   fighter.constraints.push({ i, j, rest, compliance });
 }
 
-export function createWorld(fighterInputs, { seed = 1 } = {}) {
+/** Gloved unless the fighter's inputs say otherwise. */
+export function fistsOf(body) {
+  return body.inputs.gloves === false ? WORLD.fists.bare : WORLD.fists.gloved;
+}
+
+/**
+ * @param arena half-sizes of the floor fighters can use, in x and z
+ * (a ring is square; a subway platform long and narrow).
+ */
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf } } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   const fighters = sides.map((side, index) => {
@@ -299,7 +320,8 @@ export function createWorld(fighterInputs, { seed = 1 } = {}) {
     const x = (onRed ? -1 : 1) * (1.1 + sameCorner * 0.5);
     return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
   });
-  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60 };
+  const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
+  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props };
 }
 
 // ---- Frames -------------------------------------------------------------
@@ -616,7 +638,7 @@ export function step(world, dt) {
         fighter.v.fill(0);
         continue;
       }
-      collideGround(fighter, h);
+      collideGround(fighter, h, world.arena);
       for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / h;
       settleWhenStill(fighter, h);
     }
@@ -626,7 +648,9 @@ export function step(world, dt) {
   for (const fighter of world.fighters) {
     trackHandSpeed(fighter);
     checkBalance(world, fighter);
+    if (fighter.state !== 'up' && fighter.state !== 'rising') knockOff(world, fighter, null);
   }
+  moveProps(world, dt);
   world.time += dt;
   world.lastDt = dt;
 }
@@ -752,9 +776,9 @@ function moveRoot(world, fighter, dt) {
   const follow = Math.min(1, dt * 2.5);
   fighter.root[0] += (pelvis[0] - rootPelvis[0]) * follow;
   fighter.root[1] += (pelvis[2] - rootPelvis[2]) * follow;
-  const edge = WORLD.ringHalf - 0.3;
-  fighter.root[0] = Math.max(-edge, Math.min(edge, fighter.root[0]));
-  fighter.root[1] = Math.max(-edge, Math.min(edge, fighter.root[1]));
+  const { halfX, halfZ } = world.arena;
+  fighter.root[0] = Math.max(-(halfX - 0.3), Math.min(halfX - 0.3, fighter.root[0]));
+  fighter.root[1] = Math.max(-(halfZ - 0.3), Math.min(halfZ - 0.3, fighter.root[1]));
 }
 
 function updateTimers(world, fighter, dt) {
@@ -1188,7 +1212,7 @@ function foldLimit(fighter, rootIndex, endIndex, minimum) {
   correctJoint(fighter, endIndex, [rootIndex], vec.scale(offset, (minimum - distance) / distance));
 }
 
-function collideGround(fighter, h) {
+function collideGround(fighter, h, arena) {
   const friction = Math.exp(-WORLD.groundFriction * h);
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const base = index * 3;
@@ -1202,9 +1226,68 @@ function collideGround(fighter, h) {
       fighter.x[base + 2] = fighter.prev[base + 2] + (fighter.x[base + 2] - fighter.prev[base + 2]) * friction;
     }
     for (const axis of [0, 2]) {
-      const limit = WORLD.ringHalf;
+      const limit = axis === 0 ? arena.halfX : arena.halfZ;
       if (fighter.x[base + axis] > limit) fighter.x[base + axis] = limit;
       if (fighter.x[base + axis] < -limit) fighter.x[base + axis] = -limit;
+    }
+  }
+}
+
+// ---- Props -------------------------------------------------------------------
+
+/**
+ * Whatever the fighter wears that comes off, comes off: thrown along the
+ * blow with the head's new speed, or simply dropped when he goes down.
+ */
+function knockOff(world, fighter, event) {
+  for (const prop of world.props ?? []) {
+    if (prop.owner !== fighter.id || !prop.attached) continue;
+    const spec = WORLD.props;
+    const head = point(fighter.x, P.head);
+    prop.attached = false;
+    prop.x = vec.add(head, [0, fighter.body.lengths.headRadius * 0.6, 0]);
+    const headVelocity = point(fighter.v, P.head);
+    if (event) {
+      const along = vec.scale(event.normal, -1);
+      const speed = spec.flyBase + spec.flySpeedPerHeadDeltaV * event.headDeltaV;
+      prop.v = vec.add(vec.add(headVelocity, vec.scale(along, speed)), [0, spec.flyUp, 0]);
+    } else prop.v = vec.add(headVelocity, [0, 0.4, 0]);
+    const random = world.random;
+    prop.spin = [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (spec.spinMin + random() * spec.spinRange));
+    world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: PROP_ICONS[prop.kind] ?? '✦', effects: [`${prop.kind} knocked off`] });
+  }
+}
+
+const PROP_ICONS = { headset: '🎧' };
+
+/** Worn props ride on the head; free ones fly, tumble, bounce and settle. */
+function moveProps(world, dt) {
+  const spec = WORLD.props;
+  for (const prop of world.props ?? []) {
+    if (prop.attached) {
+      prop.x = point(world.fighters[prop.owner].x, P.head);
+      continue;
+    }
+    if (prop.resting) continue;
+    prop.v[1] -= WORLD.gravity * dt;
+    prop.x = vec.add(prop.x, vec.scale(prop.v, dt));
+    prop.turn = vec.add(prop.turn, vec.scale(prop.spin, dt));
+    if (prop.x[1] < spec.radius) {
+      prop.x[1] = spec.radius;
+      prop.v = [prop.v[0] * spec.slide, -prop.v[1] * spec.restitution, prop.v[2] * spec.slide];
+      prop.spin = vec.scale(prop.spin, spec.slide);
+      if (Math.abs(prop.v[1]) < 0.4 && Math.hypot(prop.v[0], prop.v[2]) < 0.15) {
+        prop.resting = true;
+        // Flat on the floor, the way it fell.
+        prop.turn = [0, prop.turn[1], 0];
+      }
+    }
+    const { halfX, halfZ } = world.arena;
+    for (const [axis, half] of [[0, halfX + 0.3], [2, halfZ + 0.3]]) {
+      if (Math.abs(prop.x[axis]) > half) {
+        prop.x[axis] = Math.sign(prop.x[axis]) * half;
+        prop.v[axis] *= -spec.restitution;
+      }
     }
   }
 }
@@ -1261,7 +1344,8 @@ function collideFighters(world, h, time) {
  * the shin from knee to foot.
  */
 function strikers(fighter) {
-  const list = ['l', 'r'].map((side) => ({ key: `${side}Hand`, a: P[`${side}Hand`], b: P[`${side}Hand`], radius: WORLD.gloveRadius, side }));
+  const fist = fistsOf(fighter.body).radius;
+  const list = ['l', 'r'].map((side) => ({ key: `${side}Hand`, a: P[`${side}Hand`], b: P[`${side}Hand`], radius: fist, side }));
   const punch = fighter.punch;
   if (!punch || punch.t > punch.spec.extendUntil + 0.06) return list;
   const limb = punch.spec.limb;
@@ -1453,7 +1537,11 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
   const impulse = reducedMass * closing * (1 + WORLD.restitution);
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
-  const peakForce = ((Math.PI / 2) * impulse) / (WORLD.contactSeconds * (1 + 0.6 * (1 - firmness)));
+  // Gloved strikes spread over the glove's contact time; kicks, knees and
+  // elbows over the general one; bare fists over their own short one.
+  const fists = fistsOf(attacker.body);
+  const contactSeconds = spec.limb.endsWith('Hand') ? fists.contactSeconds : WORLD.contactSeconds;
+  const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id,
@@ -1474,7 +1562,8 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
       // is what knocks people out (Ommaya; Viano 2005).
       event.headDeltaV = (impulse / body.headEffectiveMass) * spec.rotation;
       applyHeadDamage(world, defender, event);
-      if (spec.cuts && peakForce > 1800) {
+      knockOff(world, defender, event);
+      if ((spec.cuts && peakForce > 1800) || (spec.limb.endsWith('Hand') && peakForce > fists.cutForce)) {
         defender.cuts = (defender.cuts ?? 0) + 1;
         event.effects.push('cut opened');
       }
@@ -1501,7 +1590,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
       }
     }
   }
-  if (spec.limb.endsWith('Hand') && peakForce > attacker.body.fracture.hand * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
+  if (spec.limb.endsWith('Hand') && peakForce > attacker.body.fracture.hand * fists.handFracture * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
     attacker.injuries.push({ kind: 'hand', side, time: world.time });
     event.effects.push(`${attacker.body.inputs.name}: broken hand`);
   }

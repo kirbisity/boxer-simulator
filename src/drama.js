@@ -12,6 +12,7 @@ export const DRAMA = {
   knockdown: { slowest: 0.4, seconds: 1.4, hold: 0.4, shake: 0.045, pushIn: 0.85, flash: 0.3 },
   broken: { slowest: 0.5, seconds: 0.9, hold: 0.3, shake: 0.03, pushIn: 1, flash: 0 },
   shakeHz: 23,
+  flashSeconds: 0.6,
   iconSeconds: 2.2,
 };
 
@@ -40,7 +41,7 @@ export function startMoment(drama, moment, now) {
   const current = drama.active;
   if (current && now < current.start + DRAMA[current.kind].seconds && DRAMA[current.kind].slowest <= spec.slowest) return;
   drama.active = { ...moment, start: now };
-  if (spec.flash > 0) flash(spec.flash);
+  if (spec.flash > 0) drama.flash = { start: now, strength: spec.flash };
 }
 
 /** Simulated seconds per real second now: slow, held, then easing back to normal. */
@@ -90,15 +91,14 @@ export function dramaCamera(view, drama, world, now) {
   camera.lookAt(focus.lerp(view.orbit.target, 0.35 + 0.65 * u));
 }
 
-function flash(strength) {
+/** Drawn each frame from the moment's own clock, like everything else on screen. */
+function drawFlash(drama, now) {
   const layer = document.querySelector('#flash');
   if (!layer) return;
-  layer.style.transition = 'none';
-  layer.style.opacity = String(strength);
-  requestAnimationFrame(() => {
-    layer.style.transition = 'opacity 0.6s ease-out';
-    layer.style.opacity = '0';
-  });
+  const flash = drama.flash;
+  const left = flash ? Math.max(0, 1 - (now - flash.start) / DRAMA.flashSeconds) : 0;
+  layer.style.opacity = String(flash ? flash.strength * left * left : 0);
+  if (left === 0) drama.flash = null;
 }
 
 // ---- Icons ------------------------------------------------------------------
@@ -117,6 +117,7 @@ export function addIcon(drama, moment, now) {
 
 /** Place every icon over its body part on screen, rising and fading. */
 export function updateIcons(drama, view, world, canvas, now) {
+  drawFlash(drama, now);
   const box = canvas.getBoundingClientRect();
   const projected = new THREE.Vector3();
   drama.icons = drama.icons.filter((icon) => {
@@ -141,4 +142,5 @@ export function resetDrama(drama) {
   for (const icon of drama.icons) icon.element.remove();
   drama.icons = [];
   drama.active = null;
+  drama.flash = null;
 }

@@ -4,12 +4,13 @@
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { thinkAll } from './ai.js';
-import { MOVES, STYLE_KEYS, STYLES } from './moves.js';
+import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
+import { SCENARIOS, scenarioFighters } from './scenarios.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
-import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, showImpact, updateFighterView, updateSpray } from './render.js';
+import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -28,6 +29,7 @@ const state = {
   accumulator: 0,
   finishedAt: null,
   drama: { active: null, icons: [] },
+  scenario: null,
 };
 const realSeconds = () => performance.now() / 1000;
 
@@ -35,7 +37,14 @@ const scene = createScene($('#stage'));
 
 function newBout() {
   state.seed += 1;
-  state.world = createWorld([{ inputs: state.corners.red, corner: 'red' }, { inputs: state.corners.blue, corner: 'blue' }], { seed: state.seed });
+  // A scenario is the same world on its own floor, with its own people.
+  const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
+  state.world = scenario
+    ? createWorld(scenarioFighters(scenario), { seed: state.seed, arena: scenario.arena })
+    : createWorld([{ inputs: state.corners.red, corner: 'red' }, { inputs: state.corners.blue, corner: 'blue' }], { seed: state.seed });
+  setPlace(scene, scenario?.scene ?? 'ring', scenario?.arena);
+  if (scenario) Object.assign(scene.orbit, scenario.camera);
+  document.body.dataset.place = scenario?.scene ?? 'ring';
   rebuildViews();
   state.eventCursor = 0;
   state.finishedAt = null;
@@ -84,7 +93,7 @@ function tick(seconds) {
   const winner = boutWinner(state.world);
   if (winner && state.finishedAt === null && !momentPlaying(state.drama, realSeconds())) {
     state.finishedAt = state.world.time;
-    const name = state.corners[winner].name;
+    const name = state.world.fighters.find((fighter) => fighter.corner === winner).body.inputs.name;
     $('#banner').hidden = false;
     $('#banner-text').textContent = `KO — ${name} wins`;
   }
@@ -101,6 +110,7 @@ function draw(dt) {
   placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
   dramaCamera(scene, state.drama, world, realSeconds());
   for (const view of state.views) updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
+  updateProps(scene, state.views, world);
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
@@ -127,7 +137,7 @@ function consumeEvents() {
 function renderHud() {
   for (const fighter of state.world?.fighters ?? []) {
     const card = $(`#hud-${fighter.corner}`);
-    card.querySelector('.name').textContent = state.corners[fighter.corner].name;
+    card.querySelector('.name').textContent = fighter.body.inputs.name;
     card.querySelector('.stamina i').style.width = `${Math.round(fighter.stamina * 100)}%`;
     const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;
@@ -140,16 +150,18 @@ function renderHud() {
 
 function logEvent(event) {
   const world = state.world;
-  const name = (id) => state.corners[world.fighters[id].corner].name.split(' ')[0];
+  const name = (id) => world.fighters[id].body.inputs.name.split(' ')[0];
   let text;
   if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
   else if (event.kind === 'knockout') text = `💥 <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'broken') text = `🦴 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'heavy') text = `<b>${name(event.attacker)}</b> loads up a heavy ${event.punch}`;
+  else if (event.kind === 'strategy') text = `<b>${name(event.fighter)}</b> switches to ${STRATEGIES[event.strategy]?.label ?? event.strategy}`;
   else if (event.kind === 'accessory') text = `${event.icon} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
+  else if (event.attacker === undefined || event.speed === undefined) return;
   else {
     const where = event.kind === 'blocked' ? `blocked by ${event.target.replace(/^[lr]/, '').toLowerCase()}` : `→ ${event.target}`;
     const head = event.target === 'head' ? ` · head Δv <b>${event.headDeltaV.toFixed(2)}</b> m/s` : '';
@@ -421,6 +433,41 @@ function fillCornerForm(corner) {
   form.querySelector('.derived').innerHTML = rows.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('');
 }
 
+// ---- Levels -------------------------------------------------------------------
+
+function buildLevels() {
+  const list = $('#level-list');
+  const sandbox = document.createElement('button');
+  sandbox.className = 'level';
+  sandbox.innerHTML = '<b>Sandbox</b><span>The ring, gloves on, any two fighters from the builder.</span>';
+  sandbox.addEventListener('click', () => chooseLevel(null));
+  list.replaceChildren(sandbox, ...Object.entries(SCENARIOS).map(([key, scenario]) => {
+    const card = document.createElement('button');
+    card.className = 'level';
+    const who = scenario.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg} kg`).join('<br>');
+    card.innerHTML = `<b>${scenario.title}</b><em>${scenario.place}</em><span>${scenario.blurb}</span><small>${who}</small>`;
+    card.addEventListener('click', () => chooseLevel(key));
+    return card;
+  }));
+}
+
+function chooseLevel(key) {
+  state.scenario = key;
+  $('#levels').hidden = true;
+  state.paused = false;
+  $('#pause').textContent = 'Pause';
+  newBout();
+}
+
+$('#open-levels').addEventListener('click', () => {
+  $('#levels').hidden = false;
+  state.paused = true;
+});
+$('#close-levels').addEventListener('click', () => {
+  $('#levels').hidden = true;
+  state.paused = false;
+});
+
 $('#open-builder').addEventListener('click', () => {
   $('#builder').hidden = false;
   state.paused = true;
@@ -443,6 +490,7 @@ function fit() {
 window.addEventListener('resize', fit);
 buildCornerForm('red');
 buildCornerForm('blue');
+buildLevels();
 newBout();
 fit();
 requestAnimationFrame(frame);

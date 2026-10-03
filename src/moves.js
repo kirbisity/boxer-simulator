@@ -59,6 +59,8 @@ export const STYLES = {
     // Head off the centre line, always moving, whenever in range.
     headMovement: 1,
     counter: 0.45, // after slipping a punch, how often the answer comes straight back
+    // Which game plans this style leans to (multiplies each plan's weight).
+    plans: { pressure: 1.8, brawler: 0.8, outboxer: 0.5, counter: 0.6 },
     pressure: 0.3, // share of the time spent working inside
   },
   kickboxing: {
@@ -70,6 +72,23 @@ export const STYLES = {
     defendChance: 0.38,
     headMovement: 0.4,
     pressure: 0.05,
+  },
+  // No training to speak of: wide looping hooks and big rear hands, guard
+  // dropping, charging in; defence is covering up or backing off.
+  street: {
+    label: 'Street',
+    stance: { blade: 0.3, crouch: 0.01, width: 0.95, lean: 0.06, guardHeight: -0.05 },
+    idle: { bounce: 0.3, sway: 1.3, rock: 0.5 },
+    attacks: { jab: 0.12, cross: 0.34, hook: 0.38, uppercut: 0.1, rush: 0.03 },
+    combos: { 'cross hook': 0.6, 'hook hook': 0.4 },
+    comboChance: 0.3,
+    tempo: 1.2,
+    defences: { guard: 0.5, stepBack: 0.3, slip: 0.2 },
+    defendChance: 0.35,
+    headMovement: 0.2,
+    counter: 0.1,
+    plans: { brawler: 2.5, pressure: 1.2, outboxer: 0.3, counter: 0.2 },
+    pressure: 0.25,
   },
   muayThai: {
     label: 'Muay Thai',

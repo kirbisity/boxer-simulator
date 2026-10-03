@@ -7,8 +7,9 @@
 /* global THREE */
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
-import { buildLoftBody } from './loftbody.js';
+import { buildLoftBody, CLOTHES } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
+import { Dangle } from './dangle.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -50,8 +51,247 @@ export function createScene(canvas) {
   const rim = new THREE.DirectionalLight(0x6f8cff, 0.35);
   rim.position.set(-4, 3, -5);
   scene.add(rim);
-  scene.add(buildRing());
-  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) } };
+  const places = { ring: buildRing(), subway: null };
+  scene.add(places.ring);
+  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim }, place: 'ring' };
+}
+
+/**
+ * Where the fight is: the ring, or a scenario's scene round its arena. The
+ * scene is built the first time it is needed; lighting goes with it.
+ */
+export function setPlace(view, place, arena) {
+  if (place === view.place) return;
+  for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
+  if (place === 'subway') {
+    if (!view.places.subway) {
+      view.places.subway = buildSubway(arena);
+      view.scene.add(view.places.subway);
+    }
+    view.places.subway.visible = true;
+    view.scene.background = new THREE.Color(0x10140f);
+    view.scene.fog = new THREE.Fog(0x10140f, 8, 26);
+    view.lights.key.color.set(0xf2fff0);
+    view.lights.key.intensity = 0.9;
+    view.lights.rim.color.set(0x9fd8c0);
+  } else {
+    view.scene.background = new THREE.Color(0x0b0d14);
+    view.scene.fog = new THREE.Fog(0x0b0d14, 9, 22);
+    view.lights.key.color.set(0xfff2e0);
+    view.lights.key.intensity = 1.2;
+    view.lights.rim.color.set(0x6f8cff);
+  }
+  view.place = place;
+}
+
+/** A canvas texture: tiles, a station name, a warning strip. */
+function paintedTexture(width, height, paint, repeat = [1, 1]) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  paint(canvas.getContext('2d'), width, height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(...repeat);
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/**
+ * A New York platform at night: concrete floor, the yellow tactile strip at
+ * the edge, the track bed and a train standing at it, a row of painted
+ * I-beam columns, a tiled wall with the station's mosaic name band, and
+ * fluorescent tubes. The fight's arena is the strip of platform between the
+ * wall and the edge (z from −halfZ to +halfZ).
+ */
+function buildSubway(arena) {
+  const place = new THREE.Group();
+  const length = 26;
+  const wallZ = -(arena.halfZ + 0.9);
+  const edgeZ = arena.halfZ + 0.75;
+  const mat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...options });
+
+  // Platform slab and its worn, speckled concrete.
+  const concrete = paintedTexture(256, 256, (g, w, h) => {
+    g.fillStyle = '#8a8b85';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 1600; index += 1) {
+      g.fillStyle = `rgba(${40 + Math.random() * 60},${40 + Math.random() * 60},${40 + Math.random() * 55},${0.08 + Math.random() * 0.15})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 2 + Math.random() * 3);
+    }
+    g.strokeStyle = 'rgba(50,50,48,0.35)';
+    g.lineWidth = 2;
+    g.strokeRect(0, 0, w, h);
+  }, [length / 2, (edgeZ - wallZ) / 2]);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(length, 1.2, edgeZ - wallZ), mat(0xffffff, { map: concrete }));
+  slab.position.set(0, -0.6, (edgeZ + wallZ) / 2);
+  slab.receiveShadow = true;
+  place.add(slab);
+  // Yellow tactile warning strip, raised domes and all, then the white edge.
+  const tactile = paintedTexture(64, 64, (g, w, h) => {
+    g.fillStyle = '#e8b50f';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c99a08';
+    for (let row = 0; row < 4; row += 1) for (let col = 0; col < 4; col += 1) {
+      g.beginPath();
+      g.arc(8 + col * 16 + (row % 2) * 8, 8 + row * 16, 4.5, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, [length / 0.3, 2]);
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.012, 0.6), mat(0xffffff, { map: tactile, roughness: 0.6 }));
+  strip.position.set(0, 0.006, edgeZ - 0.38);
+  strip.receiveShadow = true;
+  place.add(strip);
+  const lip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.02, 0.08), mat(0xe9e6dc));
+  lip.position.set(0, 0.01, edgeZ - 0.04);
+  place.add(lip);
+
+  // Track bed: ballast, ties, running rails, the covered third rail.
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(length, 0.1, 3.4), mat(0x2a2620, { roughness: 1 }));
+  bed.position.set(0, -1.25, edgeZ + 1.7);
+  place.add(bed);
+  for (let x = -length / 2; x < length / 2; x += 0.6) {
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, 2.4), mat(0x3a2f25));
+    tie.position.set(x, -1.17, edgeZ + 1.7);
+    place.add(tie);
+  }
+  for (const offset of [-0.72, 0.72]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.08, 0.07), mat(0x8c8d90, { metalness: 0.7, roughness: 0.35 }));
+    rail.position.set(0, -1.1, edgeZ + 1.7 + offset);
+    place.add(rail);
+  }
+  const third = new THREE.Mesh(new THREE.BoxGeometry(length, 0.1, 0.22), mat(0x6e5a2c));
+  third.position.set(0, -1.05, edgeZ + 0.45);
+  place.add(third);
+
+  // The train at the platform: brushed steel car bodies, dark window bands,
+  // doors, a blue stripe and the route bullet.
+  const steel = mat(0xb9bec4, { metalness: 0.75, roughness: 0.32 });
+  const glass = mat(0x10151a, { metalness: 0.3, roughness: 0.15, emissive: 0x1c2a22, emissiveIntensity: 0.6 });
+  const trainZ = edgeZ + 1.75;
+  for (const carX of [-7.8, 7.8]) {
+    const car = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(15.4, 3.1, 2.9), steel);
+    shell.position.y = 0.5;
+    car.add(shell);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.75, 0.02), glass);
+    band.position.set(0, 1.0, -1.46);
+    car.add(band);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.1, 0.02), mat(0x1d4fa3));
+    stripe.position.set(0, 0.45, -1.465);
+    car.add(stripe);
+    for (let door = -2; door <= 2; door += 1) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.0, 0.03), mat(0xa9aeb4, { metalness: 0.7, roughness: 0.3 }));
+      panel.position.set(door * 3.1, 0.05, -1.47);
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.7, 0.02), glass);
+      pane.position.set(door * 3.1 - 0.3, 0.55, -1.49);
+      const pane2 = pane.clone();
+      pane2.position.x = door * 3.1 + 0.3;
+      const seam = new THREE.Mesh(new THREE.BoxGeometry(0.02, 2.0, 0.035), mat(0x2a2d31));
+      seam.position.set(door * 3.1, 0.05, -1.48);
+      car.add(panel, pane, pane2, seam);
+    }
+    car.position.set(carX, 0, trainZ);
+    car.traverse((object) => {
+      if (object.isMesh) {
+        object.castShadow = false;
+        object.receiveShadow = true;
+      }
+    });
+    place.add(car);
+  }
+
+  // Columns: I-beams painted dark green, a white band at eye level.
+  const columnPaint = mat(0x24443a, { roughness: 0.55, metalness: 0.2 });
+  for (let x = -length / 2 + 2; x < length / 2; x += 4.6) {
+    const column = new THREE.Group();
+    const web = new THREE.Mesh(new THREE.BoxGeometry(0.06, 3.3, 0.26), columnPaint);
+    const flangeA = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.3, 0.04), columnPaint);
+    flangeA.position.z = 0.13;
+    const flangeB = flangeA.clone();
+    flangeB.position.z = -0.13;
+    const bandWhite = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.3), mat(0xe8e5da));
+    bandWhite.position.y = 0.1;
+    column.add(web, flangeA, flangeB, bandWhite);
+    column.position.set(x, 1.65, edgeZ - 1.0);
+    column.traverse((object) => { if (object.isMesh) object.castShadow = true; });
+    place.add(column);
+  }
+
+  // The wall: cream tiles, a maroon-and-green mosaic band with the name.
+  const tiles = paintedTexture(256, 128, (g, w, h) => {
+    g.fillStyle = '#e9e2cf';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#b9b19d';
+    g.lineWidth = 2;
+    for (let x = 0; x <= w; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+    for (let y = 0; y <= h; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+    for (let index = 0; index < 120; index += 1) {
+      g.fillStyle = `rgba(120,100,70,${Math.random() * 0.12})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 6, 3);
+    }
+  }, [length / 1.6, 2]);
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(length, 3.4), mat(0xffffff, { map: tiles, roughness: 0.5 }));
+  wall.position.set(0, 1.7, wallZ);
+  wall.receiveShadow = true;
+  place.add(wall);
+  const name = paintedTexture(1024, 128, (g, w, h) => {
+    g.fillStyle = '#6b1f24';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2f5a3d';
+    for (let x = 0; x < w; x += 24) g.fillRect(x, 0, 12, 14), g.fillRect(x + 12, h - 14, 12, 14);
+    g.fillStyle = '#efe6cc';
+    g.fillRect(140, 26, w - 280, h - 52);
+    g.fillStyle = '#1d1a17';
+    g.font = 'bold 64px Georgia, serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('CANAL  ST', w / 2, h / 2 + 3);
+  });
+  for (const x of [-6.5, 6.5]) {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 0.52), mat(0xffffff, { map: name, roughness: 0.4 }));
+    sign.position.set(x, 2.15, wallZ + 0.01);
+    place.add(sign);
+  }
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(length, 0.16, 0.03), mat(0x2f5a3d));
+  trim.position.set(0, 2.85, wallZ + 0.015);
+  place.add(trim);
+  // A bench against the wall and a trash can by a column.
+  const bench = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 0.42), mat(0x6b4a2b, { roughness: 0.7 }));
+  seat.position.y = 0.46;
+  bench.add(seat);
+  for (const leg of [-0.95, 0.95]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.46, 0.38), mat(0x2b2d31, { metalness: 0.5 }));
+    post.position.set(leg, 0.23, 0);
+    bench.add(post);
+  }
+  bench.position.set(-2.8, 0, wallZ + 0.3);
+  bench.traverse((object) => { if (object.isMesh) object.castShadow = true; });
+  place.add(bench);
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.24, 0.85, 16, 1, true), mat(0x3b5f45, { side: THREE.DoubleSide, metalness: 0.3 }));
+  can.position.set(4.4, 0.43, wallZ + 0.4);
+  can.castShadow = true;
+  place.add(can);
+
+  // Ceiling and fluorescent tubes; a few lights so the platform reads.
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(length, edgeZ - wallZ + 4), mat(0x1a1d1b, { side: THREE.DoubleSide }));
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.set(0, 3.4, (edgeZ + wallZ) / 2 + 1.5);
+  place.add(ceiling);
+  const tube = new THREE.MeshStandardMaterial({ color: 0xf4fff4, emissive: 0xe8fff0, emissiveIntensity: 1.4 });
+  for (let x = -length / 2 + 1.5; x < length / 2; x += 3.2) {
+    const light = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 0.1), tube);
+    light.position.set(x, 3.3, 0);
+    place.add(light);
+  }
+  for (const x of [-5, 0, 5]) {
+    const glow = new THREE.PointLight(0xe6ffe8, 0.55, 9, 1.6);
+    glow.position.set(x, 3.0, 0);
+    place.add(glow);
+  }
+  return place;
 }
 
 function buildRing() {
@@ -132,7 +372,14 @@ function paintBody(mesh, body, look, corner) {
   const top = new THREE.Color(corner).multiplyScalar(0.7);
   if (mesh.regions) {
     // A lofted body names its kit pieces; paint each its colour.
-    const byRegion = { skin, kit: shorts, band, top };
+    // Street clothes take their colours from the outfit.
+    const clothing = body.inputs.clothing;
+    const shirt = new THREE.Color(clothing?.topColor ?? corner);
+    const pants = new THREE.Color(clothing?.bottomColor ?? corner);
+    const byRegion = {
+      skin, kit: shorts, band, top, shirt, pants,
+      cuff: shirt.clone().multiplyScalar(0.78), cuff2: pants.clone().multiplyScalar(0.7), belt: new THREE.Color(0x2a1d14),
+    };
     const colors = new Float32Array(positions.length);
     mesh.regions.forEach((region, vertex) => colors.set([byRegion[region].r, byRegion[region].g, byRegion[region].b], vertex * 3));
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
@@ -245,7 +492,17 @@ export function buildFighterView(view, fighter) {
   // Gloves and shoes ride on the forearm and foot bones.
   const attachments = [];
   const gloveMaterial = surface(corner, { roughness: 0.32 });
+  const bare = body.inputs.gloves === false;
   for (const side of ['l', 'r']) {
+    if (bare) {
+      // A bare fist: knuckles forward, thumb folded across, in skin.
+      const hand = buildBareFist(body, skinColor, side);
+      hand.matrixAutoUpdate = false;
+      layers.skin.add(hand);
+      attachments.push({ object: hand, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
+      buildShoe(body, layers, attachments, side, body.inputs.clothing ? 0xe9e9ec : 0x17171c);
+      continue;
+    }
     const glove = new THREE.Group();
     const fist = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 1.12, 20, 16), gloveMaterial);
     fist.scale.set(1, 1.15, 0.95);
@@ -261,23 +518,19 @@ export function buildFighterView(view, fighter) {
     glove.matrixAutoUpdate = false;
     layers.skin.add(glove);
     attachments.push({ object: glove, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
+    buildShoe(body, layers, attachments, side, 0x17171c);
+  }
 
-    const shoe = new THREE.Group();
-    const length = 0.25 * body.heightM / 1.8;
-    const sole = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), surface(0x17171c, { roughness: 0.4 }));
-    sole.scale.set(0.05, length / 2, 0.045);
-    sole.position.set(-0.012, length * 0.28, 0);
-    const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.07, 14), surface(0xf2f2f2));
-    sock.rotation.z = Math.PI / 2;
-    sock.position.set(0.03, 0.0, 0);
-    for (const piece of [sole, sock]) {
-      piece.castShadow = true;
-      piece.add(outlineFor(piece, 0.004));
-    }
-    shoe.add(sole, sock);
-    shoe.matrixAutoUpdate = false;
-    layers.skin.add(shoe);
-    attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
+  // Worn things: a headset on the head (it can be knocked off), a hoodie's
+  // hood and drawstrings swinging from the collar.
+  const dangles = [];
+  const headset = (body.inputs.accessories ?? []).includes('headset') ? buildHeadset(body, headView.group) : null;
+  if (body.inputs.clothing?.top === 'hoodie') {
+    const collar = new THREE.Group();
+    collar.matrixAutoUpdate = false;
+    layers.skin.add(collar);
+    attachments.push({ object: collar, bone: BONE.chest, at: P.neck });
+    dangles.push(...buildHood(body, collar, body.inputs.clothing.topColor));
   }
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig.
@@ -319,7 +572,7 @@ export function buildFighterView(view, fighter) {
   view.scene.add(group);
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells,
-    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }),
+    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headset, dangles,
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
 }
@@ -335,9 +588,151 @@ function ensureMuscle(fighterView) {
 
 export function disposeFighterView(view, fighterView) {
   view.scene.remove(fighterView.group);
+  if (fighterView.headset?.loose.parent) view.scene.remove(fighterView.headset.loose);
   fighterView.group.traverse((object) => {
     object.geometry?.dispose();
   });
+}
+
+function dangleColliders(fighterView, points) {
+  const body = fighterView.fighter.body;
+  const v = (at) => new THREE.Vector3(...at);
+  const head = v(points[P.head]);
+  const cloth = body.inputs.clothing ? CLOTHES[body.inputs.clothing.top]?.loose ?? 1 : 1;
+  const trunkRadius = body.segments.trunk.skinRadius * 0.85 * cloth;
+  const neck = v(points[P.neck]);
+  const pelvis = v(points[P.pelvis]);
+  // The trunk capsule stops short of the neck, under the collarbones.
+  const top = pelvis.clone().lerp(neck, 0.9);
+  return [
+    { a: head, b: head, radius: body.lengths.headRadius * HEAD_SCALE * 1.02 },
+    { a: pelvis, b: top, radius: trunkRadius },
+    { a: v(points[P.lShoulder]), b: v(points[P.rShoulder]), radius: body.segments.lUpperArm.skinRadius * 1.25 * cloth },
+  ];
+}
+
+/** A boxing boot or, in street clothes, a trainer: sole along the foot, and the ankle. */
+function buildShoe(body, layers, attachments, side, soleColor) {
+  const shoe = new THREE.Group();
+  const length = 0.25 * body.heightM / 1.8;
+  const sole = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), surface(soleColor, { roughness: 0.4 }));
+  sole.scale.set(0.05, length / 2, 0.045);
+  sole.position.set(-0.012, length * 0.28, 0);
+  const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.07, 14), surface(0xf2f2f2));
+  sock.rotation.z = Math.PI / 2;
+  sock.position.set(0.03, 0.0, 0);
+  for (const piece of [sole, sock]) {
+    piece.castShadow = true;
+    piece.add(outlineFor(piece, 0.004));
+  }
+  shoe.add(sole, sock);
+  shoe.matrixAutoUpdate = false;
+  layers.skin.add(shoe);
+  attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
+}
+
+/**
+ * A bare fist, in the forearm's frame at the hand point (y along the
+ * forearm): a closed hand as wide as four knuckles, the knuckles leading,
+ * the thumb folded across the front of the fingers.
+ */
+function buildBareFist(body, skinColor, side) {
+  const scale = body.heightM / 1.8;
+  const material = surface(skinColor);
+  const hand = new THREE.Group();
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), material);
+  palm.scale.set(0.034 * scale, 0.045 * scale, 0.042 * scale);
+  palm.position.y = 0.012 * scale;
+  hand.add(palm);
+  for (let finger = 0; finger < 4; finger += 1) {
+    const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.0115 * scale, 10, 8), material);
+    knuckle.position.set(0.012 * scale, 0.05 * scale, (finger - 1.5) * 0.019 * scale);
+    hand.add(knuckle);
+  }
+  const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.011 * scale, 0.012 * scale, 0.045 * scale, 8), material);
+  thumb.rotation.x = Math.PI / 2;
+  thumb.position.set(0.03 * scale, 0.022 * scale, (side === 'l' ? -1 : 1) * 0.004 * scale);
+  hand.add(thumb);
+  for (const piece of hand.children) {
+    piece.castShadow = true;
+    piece.add(outlineFor(piece, 0.003));
+  }
+  return hand;
+}
+
+/**
+ * Over-ear headphones, in head coordinates: a band over the crown, a cup over
+ * each ear. Returned so the view can hide it once it is knocked off, along
+ * with a loose copy for the floor.
+ */
+function buildHeadset(body, headGroup) {
+  const r = body.lengths.headRadius;
+  const shell = surface(0x1b1c22, { roughness: 0.35 });
+  const accent = surface(0xd6402e, { roughness: 0.4 });
+  const make = () => {
+    const set = new THREE.Group();
+    const band = new THREE.Mesh(new THREE.TorusGeometry(1.02 * r, 0.06 * r, 8, 28, Math.PI), shell);
+    band.rotation.y = Math.PI / 2;
+    band.position.y = 0.05 * r;
+    set.add(band);
+    for (const side of [1, -1]) {
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.36 * r, 0.38 * r, 0.2 * r, 20), shell);
+      cup.rotation.x = Math.PI / 2;
+      cup.position.set(-0.05 * r, -0.05 * r, side * 0.98 * r);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.33 * r, 0.04 * r, 6, 20), accent);
+      ring.position.set(-0.05 * r, -0.05 * r, side * 1.09 * r);
+      set.add(cup, ring);
+    }
+    for (const piece of set.children) {
+      piece.castShadow = true;
+      piece.add(outlineFor(piece, 0.003));
+    }
+    return set;
+  };
+  const worn = make();
+  headGroup.add(worn);
+  return { worn, loose: make() };
+}
+
+/**
+ * A hoodie's hood, bunched behind the neck, and its two drawstrings: each
+ * hangs from the collar and swings with the body's movement.
+ */
+function buildHood(body, collar, colorHex) {
+  const scale = body.heightM / 1.8;
+  const cloth = surface(new THREE.Color(colorHex).getHex());
+  const lining = surface(new THREE.Color(colorHex).multiplyScalar(0.6).getHex());
+  const dangles = [];
+  // Collar coordinates: x forward, y up the chest, z to the left.
+  // Hung from the back of the collar, clear of the hoodie's own shell.
+  const backOfNeck = body.segments.trunk.skinRadius * 0.75 + 0.03 * scale;
+  const hood = new Dangle(collar, [-backOfNeck, -0.01 * scale, 0], [-0.35, -1, 0], 0.2 * scale, { sag: 0.5, damping: 0.3 });
+  const bag = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), cloth);
+  bag.scale.set(0.06 * scale, 0.13 * scale, 0.14 * scale);
+  bag.position.y = -0.08 * scale;
+  bag.rotation.z = Math.PI;
+  const inside = new THREE.Mesh(new THREE.SphereGeometry(0.95, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), lining);
+  inside.scale.copy(bag.scale);
+  inside.position.copy(bag.position);
+  inside.position.x += 0.012 * scale;
+  inside.rotation.z = Math.PI;
+  for (const piece of [bag, inside]) {
+    piece.castShadow = true;
+    piece.add(outlineFor(piece, 0.003));
+    hood.group.add(piece);
+  }
+  dangles.push(hood);
+  const cord = surface(0xf0ece4);
+  for (const side of [1, -1]) {
+    const string = new Dangle(collar, [0.07 * scale, -0.03 * scale, side * 0.035 * scale], [0.25, -1, side * 0.05], 0.17 * scale, { sag: 0.8, damping: 0.15 });
+    const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.004 * scale, 0.004 * scale, 0.17 * scale, 5), cord);
+    strand.position.y = -0.085 * scale;
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.006 * scale, 0.006 * scale, 0.02 * scale, 6), surface(0x8a8a8a));
+    tip.position.y = -0.17 * scale;
+    string.group.add(strand, tip);
+    dangles.push(string);
+  }
+  return dangles;
 }
 
 /** Which layers show: skin; muscle (with bone); bone over a ghost; physics over a ghost. */
@@ -389,7 +784,11 @@ export function updateFighterView(fighterView, dt, time) {
   if (fighter.damageVersion !== fighterView.damageVersion) paintDamage(fighterView);
   const step = Math.min(dt, 1 / 30);
   for (const entry of fighterView.shells) entry.shell.update(step);
-  fighterView.head.update(step, fighter, time);
+  // What hanging hair and cloth rest on: the head, and the trunk with
+  // whatever is worn over it.
+  const colliders = dangleColliders(fighterView, points);
+  fighterView.head.update(step, fighter, time, colliders);
+  for (const dangle of fighterView.dangles) dangle.update(step, colliders.slice(1));
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
 
@@ -470,10 +869,21 @@ function paintDamage(fighterView) {
 
 const SKIN_BONE_INSET = 0.87;
 
+/** The bones a set of street clothes covers: the trunk under a top, the legs under trousers, the arms under long sleeves. */
+function coveredBones(clothing) {
+  if (!clothing) return new Set();
+  const names = ['pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle', 'lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShin', 'rShin'];
+  if (clothing.top === 'hoodie') names.push('lForearm', 'rForearm');
+  return new Set(names.map((name) => BONE[name]));
+}
+
 /** Bones wear skin in the skin view and their own colour elsewhere; broken ones stay red. */
 function paintSkeleton(fighterView, asSkin) {
   const broken = new Set([...fighterView.fighter.broken].flatMap((joint) => JOINT_BONES[joint].map((bone) => BONE[bone])));
+  const covered = coveredBones(fighterView.fighter.body.inputs.clothing);
   fighterView.skeleton.forEach((piece, index) => {
+    // Under clothes, no bone shows in the skin view, however thin the man.
+    piece.visible = !(asSkin && covered.has(index));
     // Drawn as skin, the bones sit a little in from where the anatomy layer
     // draws them, towards each bone's axis: under the flesh of a normal body,
     // through it only where the flesh has wasted away.
@@ -495,6 +905,26 @@ function paintSkeleton(fighterView, asSkin) {
       else object.material = asSkin ? fighterView.skinBone : object.userData.boneMaterial;
     });
   });
+}
+
+/**
+ * Props in the world: a worn one shows on its owner's head; once knocked
+ * off, a loose copy flies, tumbles and lies where the physics put it.
+ */
+export function updateProps(view, fighterViews, world) {
+  for (const prop of world.props ?? []) {
+    const owner = fighterViews.find((entry) => entry.fighter.id === prop.owner);
+    const headset = owner?.headset;
+    if (!headset) continue;
+    headset.worn.visible = prop.attached && owner.layers.skin.visible;
+    if (prop.attached) continue;
+    if (!headset.loose.parent) {
+      headset.loose.scale.setScalar(HEAD_SCALE);
+      view.scene.add(headset.loose);
+    }
+    headset.loose.position.set(...prop.x);
+    headset.loose.rotation.set(...prop.turn);
+  }
 }
 
 /** Show an impact: dent the struck flesh and throw a spray of sweat. */

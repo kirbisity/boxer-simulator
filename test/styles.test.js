@@ -170,6 +170,8 @@ test('a boxer sees the punch coming and slips it: crosses that land on a still h
       placeFighter(world.fighters[1], 0.5);
       advance(world, 0.6);
       const [attacker, defender] = world.fighters;
+      // A boxing plan, not a brawl: the defender is there to defend.
+      Object.assign(defender, { aiStrategy: 'outboxer', aiStrategyFor: 99 });
       assert.ok(throwPunch(world, attacker, 'cross', 'head'));
       for (let frame = 0; frame < 30; frame += 1) {
         advance(world, 1 / 60, (current, dt) => {

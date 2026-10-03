@@ -12,11 +12,12 @@
 /* global THREE */
 import { P } from './body.js';
 import { concussionCapacity } from './physics.js';
+import { Dangle } from './dangle.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
-  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'bald'],
+  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'dreads', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'beard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
@@ -355,12 +356,13 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     return disc;
   });
 
-  buildHair(group, look, r, shape, hairMaterial, female);
+  const dangles = buildHair(group, look, r, shape, hairMaterial, female);
   buildFacialHair(group, look, r, shape, hairMaterial);
 
   // ---- Expression -------------------------------------------------------
   const face = { blinkIn: 1 + Math.random() * 3, blinking: 0, lid: 0, mouth: 0, brow: 0, flush: 0, gaze: [0, 0], gazeIn: 1 };
-  function update(dt, fighter, time) {
+  function update(dt, fighter, time, colliders = []) {
+    for (const dangle of dangles) dangle.update(dt, colliders);
     face.blinkIn -= dt;
     if (face.blinkIn <= 0) {
       face.blinking = FACE.blinkSeconds;
@@ -414,7 +416,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     skinMaterial.color.copy(baseSkin).lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare);
   }
 
-  return { group, shell: skull, update };
+  return { group, shell: skull, update, dangles };
 }
 
 function hairLock(group, material, points, width, thickness, taper = 1) {
@@ -425,9 +427,24 @@ function hairLock(group, material, points, width, thickness, taper = 1) {
   return lock;
 }
 
+/**
+ * A lock that hangs and swings: built along −y from its root, hung from the
+ * scalp at `root`, resting along `rest` (head coordinates).
+ */
+function hangingLock(group, material, dangles, root, rest, length, width, thickness, { sag = 0.35, damping = 0.25, curl = 0 } = {}) {
+  const dangle = new Dangle(group, root, rest, length, { sag, damping });
+  const lock = new THREE.Mesh(lockGeometry([[0, 0, 0], [curl * 0.5, -length * 0.5, curl], [curl, -length, 0]], width, thickness, 0.35), material);
+  lock.castShadow = true;
+  lock.add(outlineFor(lock, 0.0025));
+  dangle.group.add(lock);
+  dangles.push(dangle);
+  return dangle;
+}
+
 function buildHair(group, look, r, shape, material, female) {
   const style = look.hairStyle;
-  if (style === 'bald') return;
+  const dangles = [];
+  if (style === 'bald') return dangles;
   // A cap down to the hairline: high at the brow, low at the nape.
   const cap = (inflate, front = 1.1, back = 1.95) => {
     const mesh = new THREE.Mesh(shellGeometry(r, shape, inflate, () => 0, hairline(front, back)), material);
@@ -499,7 +516,41 @@ function buildHair(group, look, r, shape, material, female) {
       const tie = onScalp(r, 1.2, Math.PI, 1.05);
       hairLock(group, material, [tie, [tie[0] - 0.35 * r, tie[1] - 0.3 * r, 0], [tie[0] - 0.3 * r, tie[1] - 1.2 * r, 0], [tie[0] - 0.1 * r, tie[1] - 1.7 * r, 0]], 0.36 * r, 0.22 * r, 0.9);
     }
+  } else if (style === 'midLong') {
+    // Parted in the middle, curtains to the cheekbones, and the rest falling
+    // past the ears to the jaw at the sides and the collar at the back.
+    cap(1.06, 1.05, 2.0);
+    bangs(6, 0.5, 0);
+    for (let index = 0; index < 13; index += 1) {
+      const azimuth = Math.PI * 0.42 + (index / 12) * Math.PI * 1.16;
+      const back = -Math.cos(azimuth);
+      const root = onScalp(r, 1.05 + 0.12 * back, azimuth, 1.04);
+      const out = [Math.cos(azimuth) * 0.25, -1, Math.sin(azimuth) * 0.25];
+      hangingLock(group, material, dangles, root, out, (0.72 + 0.38 * Math.max(0, back)) * r, 0.42 * r, 0.12 * r, { sag: 0.45, damping: 0.3 });
+    }
+  } else if (style === 'dreads') {
+    // Locs from all over the scalp, hanging heavy to the shoulders, a few
+    // pushed back off the face.
+    cap(1.03, 1.08, 1.95);
+    for (let ring = 0; ring < 3; ring += 1) {
+      const count = 6 + ring * 3;
+      for (let index = 0; index < count; index += 1) {
+        const azimuth = (index / count) * Math.PI * 2 + ring * 0.3;
+        const front = Math.cos(azimuth);
+        // Nothing grows down over the face: the lower rings leave the front clear.
+        if (ring > 0 && front > 0.3) continue;
+        const polar = 0.45 + ring * 0.38;
+        const root = onScalp(r, polar, azimuth, 1.02);
+        // Front locs are swept back over the crown, the rest hang outwards.
+        const out = front > 0.35 ? [-0.8, -0.35, Math.sin(azimuth) * 0.5] : [Math.cos(azimuth) * 0.35, -1, Math.sin(azimuth) * 0.35];
+        // Shoulder length at the back, to the jaw at the sides.
+        const length = (front > 0.35 ? 1.4 : 2.2 + 0.9 * Math.max(0, -front)) * r;
+        // Locs are heavy: even the front ones, pushed back, droop and swing.
+        hangingLock(group, material, dangles, root, out, length, 0.13 * r, 0.12 * r, { sag: front > 0.35 ? 0.45 : 0.7, damping: 0.18, curl: 0.03 * r });
+      }
+    }
   }
+  return dangles;
 }
 
 function buildFacialHair(group, look, r, shape, material) {
