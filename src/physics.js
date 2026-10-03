@@ -16,6 +16,10 @@ export const WORLD = {
   // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
   ringHalf: 2.85,
   gloveRadius: 0.065,
+  teamSpacing: 1.1, // m between team-mates at the start of a team fight
+  sidestepShare: 0.7, // sidestep speed as a share of footwork speed
+  // A clean power shot lands at about this share of the limb's top speed.
+  threatSpeedShare: 0.6,
   // Fists, gloved and bare. A 10 oz glove spreads a punch over ~11 ms; a
   // bare fist lands sooner on a smaller, harder knuckle — peak force some
   // 20–40% higher for the same impulse — so skin splits, and the hand's own
@@ -317,9 +321,17 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
     const sameCorner = sides.slice(0, index).filter((other) => other.corner === side.corner).length;
-    const x = (onRed ? -1 : 1) * (1.1 + sameCorner * 0.5);
+    const x = (onRed ? -1 : 1) * 1.1;
     return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
   });
+  // Teams line up abreast, facing each other across the floor.
+  for (const corner of ['red', 'blue']) {
+    const team = fighters.filter((fighter) => fighter.corner === corner);
+    team.forEach((fighter, index) => {
+      const across = (index - (team.length - 1) / 2) * WORLD.teamSpacing;
+      if (team.length > 1) placeFighter(fighter, fighter.root[0], Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
+    });
+  }
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props };
 }
@@ -340,6 +352,16 @@ export function toWorld(fighter, local) {
 }
 export function toLocal(fighter, world) {
   return yawRotate([world[0] - fighter.root[0], world[1], world[2] - fighter.root[1]], -fighter.yaw);
+}
+
+/**
+ * Who this fighter is fighting: the one it has chosen to focus on (an AI's
+ * pick in a team fight), or else the nearest opponent still in it.
+ */
+export function opponentFor(world, fighter) {
+  const focus = fighter.focus === undefined ? null : world.fighters[fighter.focus];
+  if (focus && focus.corner !== fighter.corner && focus.state !== 'out') return focus;
+  return nearestOpponent(world, fighter);
 }
 
 export function nearestOpponent(world, fighter) {
@@ -372,7 +394,7 @@ function aimPoint(target, zone) {
 export function throwPunch(world, fighter, type, zone = null, { heavy = false } = {}) {
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
-  const target = nearestOpponent(world, fighter);
+  const target = opponentFor(world, fighter);
   const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) : 0;
   if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.stamina < cost) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
@@ -399,7 +421,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
     return true;
   }
   const spec = MOVES[name];
-  const target = nearestOpponent(world, fighter);
+  const target = opponentFor(world, fighter);
   if (!spec || !target || fighter.punch || fighter.rush || fighter.stamina < spec.cost) return false;
   if (spec.kind === 'rush') {
     fighter.rush = { t: 0, duration: spec.duration, hit: false };
@@ -497,7 +519,7 @@ function updateIntent(world, fighter, dt) {
  */
 function weaveHead(world, fighter, intent, dt) {
   const amount = STYLES[fighter.style].headMovement ?? 0;
-  const opponent = nearestOpponent(world, fighter);
+  const opponent = opponentFor(world, fighter);
   if (!amount || !opponent) return;
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
   const engaged = distance < fighter.body.reach + opponent.body.reach + WORLD.weave.range && !fighter.punch && !fighter.clinch && !fighter.rush;
@@ -736,7 +758,7 @@ export function advance(world, seconds, think = null, stepSeconds = 1 / 60) {
 }
 
 function moveRoot(world, fighter, dt) {
-  const opponent = nearestOpponent(world, fighter);
+  const opponent = opponentFor(world, fighter);
   if (fighter.state !== 'up') {
     fighter.rootVelocity = [0, 0];
     return;
@@ -761,7 +783,10 @@ function moveRoot(world, fighter, dt) {
     drive = WORLD.rush.speedFactor;
     if (fighter.rush.t >= fighter.rush.duration) fighter.rush = null;
   }
-  const wanted = [forward[0] * drive * WORLD.footSpeed * legs, forward[2] * drive * WORLD.footSpeed * legs];
+  // A sidestep (+ to the left), slower than stepping in or out.
+  const left = yawRotate([0, 0, 1], fighter.yaw);
+  const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare;
+  const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs];
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const limit = WORLD.footAcceleration * legs * (fighter.rush ? 1.6 : 1) * dt;
@@ -1657,6 +1682,27 @@ export function applyHeadDamage(world, defender, event) {
   } else if (defender.state === 'up' && (deltaV > chin || defender.concussion > capacity)) {
     knockDown(world, defender, event, deltaV > chin ? 'knockdown (one clean shot)' : 'knockdown (accumulated)');
   }
+}
+
+/**
+ * How hard one fighter can hurt another, as a fighter sizing him up would
+ * judge it: the head speed change of a good clean power shot (a cross, or a
+ * head kick from a kicking style), over the defender's chin. Built from the
+ * same strike mass, impact speed and head mass the impacts use; above 1, one
+ * such shot drops him.
+ */
+export function strikeThreat(attacker, defender) {
+  const body = attacker.body;
+  const head = defender.body.headEffectiveMass;
+  const landing = (mass, speed, rotation) => {
+    const reduced = (mass * head) / (mass + head);
+    return ((reduced * speed * (1 + WORLD.restitution)) / head) * rotation;
+  };
+  const technique = body.technique;
+  const cross = landing((0.6 * body.limbKg.rArm + 0.012 * body.massKg) * technique, WORLD.threatSpeedShare * body.topSpeed[P.rHand], 1);
+  const kicks = (STYLES[attacker.style]?.attacks.roundhouse ?? 0) > 0.1;
+  const kick = kicks ? 0.45 * landing((0.55 * body.limbKg.rLeg + 0.025 * body.massKg) * technique, WORLD.threatSpeedShare * body.topSpeed[P.rFoot], 1.45) : 0;
+  return Math.max(cross, kick) / chinNow(defender);
 }
 
 /** Total brain strain that puts this fighter down, given knockdowns so far. */

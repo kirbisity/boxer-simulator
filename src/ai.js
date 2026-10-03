@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { nearestOpponent, perform, point, throwPunch, toLocal } from './physics.js';
+import { chinNow, nearestOpponent, perform, point, strikeThreat, throwPunch, toLocal } from './physics.js';
 import { vec } from './pose.js';
 
 export const AI = {
@@ -40,6 +40,20 @@ export const AI = {
   // Heavy attacks: extra share when the opponent is hurt and there to be finished.
   finishingHeavy: 0.15,
   neutralDistance: 1.8, // m kept from an opponent who is down or rising
+  // Fear and confidence: how much stronger one side's shots are than the
+  // other's (ratio of threats) makes for full confidence or full fear;
+  // how many clean shots felt before experience weighs as much as the look
+  // of the man; and what confidence (+1) or fear (−1) does to the fight.
+  confidenceRatio: 2.5,
+  experienceShots: 3,
+  confidence: { closer: 0.15, pressure: 1.0, tempo: 0.45, defend: 0.45, heavy: 0.08 },
+  // Team fights: a fighter facing an opponent already taken on by this many
+  // team-mates looks for another, all else near equal (m of extra distance each).
+  crowdPenalty: 0.7,
+  // Team-mates keep this far apart (m), and treat one within this far of
+  // the line to their man as in the line of fire.
+  mateSpacing: 1.0,
+  lineOfFire: 0.4,
 };
 
 /**
@@ -127,19 +141,126 @@ function pickDefence(style, incoming, random) {
   return pick(answers, random) ?? 'guard';
 }
 
+/**
+ * Who to fight. Whoever just hit me, if it is not the man I am on; a new man
+ * when mine is down; otherwise the one I am on. A new man is the nearest one
+ * standing, passing over those my team-mates already have in hand.
+ */
+function chooseFocus(world, fighter) {
+  const events = world.events;
+  if ((fighter.aiEventCursor ?? 0) > events.length) fighter.aiEventCursor = events.length;
+  let hitBy = null;
+  for (let index = fighter.aiEventCursor ?? 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.kind !== 'landed' && event.kind !== 'blocked') continue;
+    feel(world, fighter, event);
+    if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) hitBy = event.attacker;
+  }
+  fighter.aiEventCursor = events.length;
+  const current = fighter.focus === undefined ? null : world.fighters[fighter.focus];
+  if (hitBy !== null && hitBy !== fighter.focus && world.fighters[hitBy].state === 'up') {
+    fighter.focus = hitBy;
+    return world.fighters[hitBy];
+  }
+  if (current && current.state === 'up') return current;
+  const standing = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up');
+  if (!standing.length) {
+    fighter.focus = undefined;
+    return nearestOpponent(world, fighter);
+  }
+  const at = point(fighter.x, P.pelvis);
+  const score = (other) => {
+    const crowd = world.fighters.filter((mate) => mate !== fighter && mate.corner === fighter.corner && mate.focus === other.id && mate.state === 'up').length;
+    return vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * crowd;
+  };
+  const next = standing.reduce((best, other) => (score(other) < score(best) ? other : best));
+  if (next.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: next.id, effects: [] });
+  fighter.focus = next.id;
+  return next;
+}
+
+/**
+ * Team-mates: where to sidestep (+ left) to stay apart and keep the line to
+ * my man clear, and whether one stands in that line now.
+ */
+function teamSpacing(world, fighter, opponent) {
+  const at = point(fighter.x, P.pelvis);
+  const to = point(opponent.x, P.pelvis);
+  const line = vec.sub(to, at);
+  const length = vec.length(line) || 1e-6;
+  const ahead = vec.scale(line, 1 / length);
+  const left = [-ahead[2], 0, ahead[0]];
+  let strafe = 0;
+  let blocked = false;
+  for (const mate of world.fighters) {
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') continue;
+    const offset = vec.sub(point(mate.x, P.pelvis), at);
+    const along = vec.dot(offset, ahead);
+    const across = vec.dot(offset, left);
+    const apart = Math.hypot(offset[0], offset[2]);
+    // In the way: between me and him, near the line.
+    if (along > 0.1 && along < length - 0.1 && Math.abs(across) < AI.lineOfFire) {
+      blocked = true;
+      strafe += across >= 0 ? -1 : 1;
+    } else if (apart < AI.mateSpacing) strafe += (across >= 0 ? -1 : 1) * (1 - apart / AI.mateSpacing);
+  }
+  // Facing turns the line: the fighter's own left is the line's left.
+  return { strafe: Math.max(-1, Math.min(1, strafe)), blocked };
+}
+
+/** Clean head shots exchanged, as each side's felt threat: what one blow really did, over the chin. */
+function feel(world, fighter, event) {
+  if (event.kind !== 'landed' || event.target !== 'head' || !event.headDeltaV) return;
+  const blend = (memory, value) => ({ sum: (memory?.sum ?? 0) + value, count: (memory?.count ?? 0) + 1 });
+  if (event.defender === fighter.id) fighter.aiFelt = blend(fighter.aiFelt, event.headDeltaV / chinNow(fighter));
+  if (event.attacker === fighter.id) fighter.aiDealt = blend(fighter.aiDealt, event.headDeltaV / chinNow(world.fighters[event.defender]));
+}
+
+/**
+ * Confidence, −1 (afraid) to +1 (sure of himself): his best shot against
+ * mine, sized up from the look of the man and corrected by what the shots
+ * landed so far have actually done. A man whose punches feel weak is pressed;
+ * a man who could end it with one is respected.
+ */
+export function confidence(fighter, opponent) {
+  const judged = (looks, memory) => {
+    if (!memory?.count) return looks;
+    const weight = memory.count / (memory.count + AI.experienceShots);
+    // A clean shot's average, scaled up to a power shot: the jabs are not the threat.
+    return looks * (1 - weight) + Math.max(looks * 0.25, 1.6 * (memory.sum / memory.count)) * weight;
+  };
+  const mine = judged(strikeThreat(fighter, opponent), fighter.aiDealt);
+  const theirs = judged(strikeThreat(opponent, fighter), fighter.aiFelt);
+  return Math.max(-1, Math.min(1, Math.log(mine / theirs) / Math.log(AI.confidenceRatio)));
+}
+
 export function think(world, fighter, dt) {
   const random = world.random;
+  fighter.strafe = 0;
   if (fighter.state !== 'up') {
     fighter.move = 0;
     return;
   }
-  const opponent = nearestOpponent(world, fighter);
+  const opponent = chooseFocus(world, fighter);
   if (!opponent) {
     fighter.move = 0;
     return;
   }
   const style = STYLES[fighter.style];
-  const plan = chooseStrategy(world, fighter, opponent, dt);
+  const nerve = confidence(fighter, opponent);
+  fighter.aiConfidence = nerve;
+  const bold = AI.confidence;
+  const basePlan = chooseStrategy(world, fighter, opponent, dt);
+  // Confidence presses: closer, more often inside, quicker to throw, slower
+  // to cover up, readier to load up. Fear is the reverse.
+  const plan = {
+    ...basePlan,
+    range: basePlan.range - bold.closer * nerve,
+    pressure: basePlan.pressure * Math.exp(bold.pressure * nerve),
+    tempo: basePlan.tempo * Math.exp(-bold.tempo * nerve),
+    defend: basePlan.defend * Math.exp(-bold.defend * nerve),
+    heavy: Math.max(0, basePlan.heavy + bold.heavy * nerve),
+  };
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
   // A man down or getting up is not hit: stand off at a neutral distance.
   if (opponent.state !== 'up') {
@@ -147,6 +268,8 @@ export function think(world, fighter, dt) {
     fighter.aiCombo = null;
     return;
   }
+  const spacing = teamSpacing(world, fighter, opponent);
+  fighter.strafe = spacing.strafe;
   const kicker = (style.attacks.roundhouse ?? 0) + (style.attacks.teep ?? 0) > 0.15;
   // Spells of pressure: for a few seconds the fighter works inside.
   fighter.aiPressure = Math.max(0, (fighter.aiPressure ?? 0) - dt);
@@ -162,7 +285,9 @@ export function think(world, fighter, dt) {
 
   // React to a strike once it can be seen coming: after a reaction time
   // that training shortens, and only if not busy throwing one.
-  const incoming = opponent.punch;
+  // In a crowd, the strike to answer is whichever is coming at me.
+  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id) ?? opponent;
+  const incoming = striker.punch;
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;
     const skill = fighter.body.inputs.exercise;
@@ -173,7 +298,7 @@ export function think(world, fighter, dt) {
   if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && (incoming.age ?? incoming.t) >= fighter.reactAt) {
     fighter.reacted = true;
     if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise))) {
-      const { name, side } = chooseDefence(fighter, opponent, style, incoming, random);
+      const { name, side } = chooseDefence(fighter, striker, style, incoming, random);
       perform(world, fighter, name, { side });
       // Slip and fire back: the counter comes while the attacker's hand is out.
       if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {
@@ -184,6 +309,11 @@ export function think(world, fighter, dt) {
   }
 
   if (fighter.punch || fighter.rush) return;
+  // Never through a team-mate: hold it until the line is clear.
+  if (spacing.blocked) {
+    fighter.aiCombo = null;
+    return;
+  }
   // The rest of a combination follows as soon as the last hand is back.
   if (fighter.aiCombo?.length) {
     const next = fighter.aiCombo.shift();

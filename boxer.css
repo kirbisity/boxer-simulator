@@ -142,3 +142,10 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 .level span { color: var(--muted); font-size: 13px; line-height: 1.4; }
 .level small { font: 12px var(--mono); color: var(--fg, inherit); opacity: 0.85; }
 #close-levels { justify-self: end; }
+
+/* Team fights: everyone on a side, by state. */
+.roster { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; font: 11px var(--mono); }
+.roster span::before { content: '●'; margin-right: 3px; color: #49d17a; }
+.roster span.down::before { color: #e7b52c; }
+.roster span.out { opacity: 0.55; text-decoration: line-through; }
+.roster span.out::before { color: #d12a2a; }
