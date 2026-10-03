@@ -4,13 +4,14 @@
 import { buildBody, fighterFile, PRESETS } from './body.js';
 import { thinkAll } from './ai.js';
 import { advance, boutWinner, createWorld, throwPunch } from './physics.js';
+import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, showImpact, updateFighterView, updateSpray } from './render.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
 
 const state = {
-  corners: { red: { ...PRESETS.heavy, skinTone: 'tan' }, blue: { ...PRESETS.light, skinTone: 'light' } },
+  corners: { red: structuredClone(PRESETS.heavy), blue: structuredClone(PRESETS.light) },
   world: null,
   views: [],
   layer: 'skin',
@@ -31,8 +32,7 @@ function newBout() {
   state.seed += 1;
   state.world = createWorld([{ inputs: state.corners.red, corner: 'red' }, { inputs: state.corners.blue, corner: 'blue' }], { seed: state.seed });
   state.views = state.world.fighters.map((fighter) => {
-    const look = state.corners[fighter.corner];
-    const view = buildFighterView(scene, fighter, { skinTone: look.skinTone, hairColor: fighter.corner === 'red' ? 0x1b1410 : 0x6b4a2a });
+    const view = buildFighterView(scene, fighter);
     setLayer(view, state.layer);
     return view;
   });
@@ -84,7 +84,7 @@ function draw(dt) {
     pelvisMid[2] += fighter.x[26] / world.fighters.length;
   }
   placeCamera(scene, pelvisMid);
-  for (const view of state.views) updateFighterView(view, dt * (state.paused ? 0 : state.speed));
+  for (const view of state.views) updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   render(scene);
   renderHud();
@@ -245,7 +245,14 @@ const FIELDS = [
   { key: 'age', label: 'Age', type: 'range', min: 18, max: 60, step: 1, unit: 'yr' },
   { key: 'training', label: 'Training', type: 'range', min: 0, max: 1, step: 0.05, format: (value) => `${Math.round(value * 100)}%` },
   { key: 'bodyFat', label: 'Body fat', type: 'range', min: 0.06, max: 0.4, step: 0.01, format: (value) => `${Math.round(value * 100)}%` },
-  { key: 'skinTone', label: 'Skin', type: 'select', options: ['light', 'medium', 'tan', 'deep'] },
+];
+const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
+const LOOK_FIELDS = [
+  { key: 'skinTone', label: 'Skin', options: ['light', 'medium', 'tan', 'deep'] },
+  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle },
+  { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
+  { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair },
+  { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor },
 ];
 
 function buildCornerForm(corner) {
@@ -254,7 +261,7 @@ function buildCornerForm(corner) {
   presetSelect.replaceChildren(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, key)));
   presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === state.corners[corner].name) ?? 'heavy';
   presetSelect.addEventListener('change', () => {
-    state.corners[corner] = { ...PRESETS[presetSelect.value], skinTone: state.corners[corner].skinTone };
+    state.corners[corner] = structuredClone(PRESETS[presetSelect.value]);
     fillCornerForm(corner);
   });
   const fields = form.querySelector('.fields');
@@ -274,6 +281,20 @@ function buildCornerForm(corner) {
     });
     return row;
   }));
+  const looks = form.querySelector('.looks');
+  looks.replaceChildren(...LOOK_FIELDS.map((field) => {
+    const row = document.createElement('label');
+    row.className = 'look-field';
+    row.innerHTML = `<span>${field.label}</span>`;
+    const select = document.createElement('select');
+    select.append(...field.options.map((option) => new Option(option, option)));
+    select.dataset.look = field.key;
+    select.addEventListener('change', () => {
+      state.corners[corner].look = { ...DEFAULT_LOOK, ...state.corners[corner].look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
+    });
+    row.append(select);
+    return row;
+  }));
   form.querySelector('.copy').addEventListener('click', async () => {
     const code = btoa(JSON.stringify(fighterFile(state.corners[corner])));
     const box = form.querySelector('.code');
@@ -289,7 +310,7 @@ function buildCornerForm(corner) {
     try {
       const file = JSON.parse(atob(form.querySelector('.code').value.trim()));
       if (file.kind !== 'boxer-simulator/fighter') throw new Error('not a fighter file');
-      state.corners[corner] = { ...file.inputs, skinTone: state.corners[corner].skinTone };
+      state.corners[corner] = { ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } };
       fillCornerForm(corner);
     } catch {
       form.querySelector('.code').value = 'That code is not a fighter file.';
@@ -310,6 +331,10 @@ function fillCornerForm(corner) {
     const input = form.querySelector(`[data-key="${field.key}"]`);
     input.value = inputs[field.key];
     input.nextElementSibling.textContent = field.format ? field.format(inputs[field.key]) : field.unit ? `${inputs[field.key]} ${field.unit}` : '';
+  }
+  const look = { ...DEFAULT_LOOK, ...inputs.look };
+  for (const field of LOOK_FIELDS) {
+    form.querySelector(`[data-look="${field.key}"]`).value = field.fromValue ? field.fromValue(look[field.key]) : look[field.key];
   }
   const body = buildBody(inputs);
   const rows = [

@@ -77,14 +77,31 @@ export const BODY = {
 export const DEFAULT_INPUTS = {
   name: 'Fighter', sex: 'male', heightCm: 180, frame: 'medium', age: 27,
   training: 0.6, bodyFat: 0.16,
+  look: { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' },
 };
 
+// `look` is appearance only; nothing in the simulation reads it.
 export const PRESETS = {
-  heavy: { name: 'Marcus "The Wall"', sex: 'male', heightCm: 193, frame: 'large', age: 29, training: 0.85, bodyFat: 0.17 },
-  light: { name: 'Leo Quickhands', sex: 'male', heightCm: 172, frame: 'small', age: 24, training: 0.9, bodyFat: 0.1 },
-  amateur: { name: 'Dave from Accounts', sex: 'male', heightCm: 180, frame: 'medium', age: 34, training: 0.1, bodyFat: 0.28 },
-  veteran: { name: 'Old Sal', sex: 'male', heightCm: 182, frame: 'medium', age: 48, training: 0.7, bodyFat: 0.2 },
-  contender: { name: 'Ana Ruiz', sex: 'female', heightCm: 170, frame: 'medium', age: 26, training: 0.9, bodyFat: 0.17 },
+  heavy: {
+    name: 'Marcus "The Wall"', sex: 'male', heightCm: 193, frame: 'large', age: 29, training: 0.85, bodyFat: 0.17,
+    look: { skinTone: 'deep', hairStyle: 'cornrows', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  light: {
+    name: 'Leo Quickhands', sex: 'male', heightCm: 172, frame: 'small', age: 24, training: 0.9, bodyFat: 0.1,
+    look: { skinTone: 'light', hairStyle: 'fade', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
+  },
+  amateur: {
+    name: 'Dave from Accounts', sex: 'male', heightCm: 180, frame: 'medium', age: 34, training: 0.1, bodyFat: 0.28,
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a37a45', facialHair: 'stubble', eyeColor: 'green' },
+  },
+  veteran: {
+    name: 'Old Sal', sex: 'male', heightCm: 182, frame: 'medium', age: 48, training: 0.7, bodyFat: 0.2,
+    look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#8d8d8d', facialHair: 'mustache', eyeColor: 'grey' },
+  },
+  contender: {
+    name: 'Ana Ruiz', sex: 'female', heightCm: 170, frame: 'medium', age: 26, training: 0.9, bodyFat: 0.17,
+    look: { skinTone: 'medium', hairStyle: 'bun', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'hazel' },
+  },
 };
 
 const segmentKind = (key) => key.replace(/^[lr](?=[A-Z])/, '').replace(/^./, (c) => c.toLowerCase());

@@ -1,10 +1,13 @@
 // The fight world: each fighter is a particle skeleton held together by XPBD
-// distance constraints, driven by force-limited motors that chase a desired
-// pose. Punches are hand targets; the muscle's force limit decides how fast
-// the glove gets there, and the masses decide what a landed punch does.
+// distance constraints and joint limits, driven by muscles modelled as
+// spring-dampers whose force is capped by the muscle's strength. Mass gives
+// every movement inertia; the cap decides how hard a muscle can fight back.
+// A landed punch hands its momentum to the struck part, which flies until
+// the fighter's muscles, after a reflex delay, catch it.
 
 import { buildBody, P, PARTICLES, SEGMENTS } from './body.js';
-import { desiredPose, restPose, vec, yawRotate } from './pose.js';
+import { idleMotion, lifePhases } from './life.js';
+import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
 export const WORLD = {
   gravity: 9.81,
@@ -12,18 +15,51 @@ export const WORLD = {
   // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
   ringHalf: 2.85,
   gloveRadius: 0.065,
-  // Motors drive velocity towards the target at this rate (1/s), capped by
-  // the muscle's force; high, so the force cap — the body — sets the speed.
-  motorGain: { hand: 70, elbow: 40, head: 20, default: 30 },
+  // Each muscle group is a spring-damper towards its target: natural
+  // frequency ω (rad/s) and damping ratio ζ. Below ζ = 1 a part overshoots a
+  // little and settles, which is what inertia looks like; the force cap from
+  // the muscle bounds it, so a heavy, weak part lags and a light, strong one
+  // snaps. Hands are stiff so the cap, not the spring, sets punch speed.
+  motor: {
+    hand: { omega: 60, zeta: 0.6 },
+    elbow: { omega: 34, zeta: 0.75 },
+    head: { omega: 12, zeta: 0.4 },
+    trunk: { omega: 13, zeta: 0.5 },
+    pelvis: { omega: 12, zeta: 0.5 },
+    knee: { omega: 22, zeta: 0.7 },
+    foot: { omega: 36, zeta: 0.9 },
+  },
+  // Muscles react to a blow after a reflex delay (~60–90 ms for a startle
+  // response; less when braced), then ramp back to full force. Until then
+  // only passive tone holds (the floor): the share of force a relaxed
+  // muscle and its tendons still give.
+  reflex: { latency: 0.085, trainedSaving: 0.03, bracedSaving: 0.035, ramp: 0.12, floor: 0.25 },
   // Per-second velocity damping: joints and tissue lose energy; a limp body
   // less so, which is why it falls rather than sinks.
-  damping: { up: 2.5, down: 0.7 },
+  damping: { up: 0.8, down: 0.5 },
   groundFriction: 14,
-  braceCompliance: 5e-4, // m/N: torso cross-braces give a little so the trunk can twist
+  braceCompliance: 5e-4, // m/N: torso braces give a little so the trunk can twist
   diagonalCompliance: 3e-3,
+  // Joint limits for the ragdoll: knees bend only forward; the head stays
+  // within this angle of the trunk's axis; elbows and knees cannot fold flat.
+  headCone: 1.2,
+  minFold: { arm: 0.13, leg: 0.16 },
+  limitStep: 0.004, // m: most a joint limit may correct in one substep
+  // Footwork: a planted foot stays put until the stance has drifted this far
+  // from it, then steps; one foot at a time.
+  step: { threshold: 0.11, seconds: 0.17, lift: 0.05, lead: 0.5 },
+  // Footwork speed and how quickly it can change (m/s, m/s²), for a body
+  // whose leg drive is typical (legStrengthTypical × its weight); stronger
+  // or weaker legs scale both.
+  // Boxers move explosively (push-offs of ~8 m/s²), so the trunk visibly
+  // lags a step in and sways past the stance when it stops.
+  footSpeed: 1.2,
+  footAcceleration: 8,
+  legStrengthTypical: 0.8,
   // An impact's contact lasts about this long through a 10–12 oz glove;
   // peak force ≈ (π/2)·impulse / contact time for a half-sine pulse.
   contactSeconds: 0.011,
+  restitution: 0.1,
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -60,12 +96,19 @@ const BONES = [
   ['lHip', 'lKnee'], ['rHip', 'rKnee'], ['lKnee', 'lFoot'], ['rKnee', 'rFoot'],
 ];
 // Each motor chases its target relative to an anchor's actual position, so a
-// head knocked sideways is pulled back by the neck, not by the world.
+// head knocked sideways is pulled back by the neck, not by the world. Knees
+// are placed by IK between the actual hip and the foot's target instead.
 const ANCHOR = {
   head: 'neck', neck: 'pelvis', lShoulder: 'pelvis', rShoulder: 'pelvis', lHip: 'pelvis', rHip: 'pelvis',
-  lElbow: 'lShoulder', rElbow: 'rShoulder', lHand: 'lShoulder', rHand: 'rShoulder', lKnee: 'pelvis', rKnee: 'pelvis',
+  lElbow: 'lShoulder', rElbow: 'rShoulder', lHand: 'lShoulder', rHand: 'rShoulder', lKnee: null, rKnee: null,
   pelvis: null, lFoot: null, rFoot: null,
 };
+const MOTOR_GROUP = {
+  head: 'head', neck: 'trunk', lShoulder: 'trunk', rShoulder: 'trunk', lHip: 'trunk', rHip: 'trunk',
+  lElbow: 'elbow', rElbow: 'elbow', lHand: 'hand', rHand: 'hand', lKnee: 'knee', rKnee: 'knee',
+  pelvis: 'pelvis', lFoot: 'foot', rFoot: 'foot',
+};
+const TRUNK_PARTICLES = ['pelvis', 'lHip', 'rHip', 'neck', 'lShoulder', 'rShoulder'].map((name) => P[name]);
 const STRUCK = ['head', 'trunk', 'lForearm', 'rForearm', 'lUpperArm', 'rUpperArm'];
 
 /** Small deterministic generator so a seed replays a bout exactly. */
@@ -80,7 +123,24 @@ export function seededRandom(seed) {
   };
 }
 
-export function createFighter(inputs, { id, corner, x, facing }) {
+/** Contact radius of each particle: the flesh around it, so a body lies on the canvas at its real thickness. */
+function particleRadii(body) {
+  const segments = body.segments;
+  return PARTICLES.map((name) => {
+    const side = name[0];
+    if (name === 'head') return body.lengths.headRadius;
+    if (name === 'neck') return segments.trunk.skinRadius * 0.45;
+    if (name === 'pelvis') return segments.trunk.skinRadius * 0.7;
+    if (name.endsWith('Shoulder')) return segments[`${side}UpperArm`].skinRadius * 1.2;
+    if (name.endsWith('Elbow')) return segments[`${side}Forearm`].skinRadius;
+    if (name.endsWith('Hand')) return WORLD.gloveRadius;
+    if (name.endsWith('Hip')) return segments[`${side}Thigh`].skinRadius;
+    if (name.endsWith('Knee')) return segments[`${side}Shank`].skinRadius;
+    return 0.045;
+  });
+}
+
+export function createFighter(inputs, { id, corner, x, facing, random }) {
   const body = buildBody(inputs);
   const rest = restPose(body);
   const count = PARTICLES.length;
@@ -88,10 +148,13 @@ export function createFighter(inputs, { id, corner, x, facing }) {
     id, corner, body,
     x: new Float64Array(count * 3), v: new Float64Array(count * 3), prev: new Float64Array(count * 3),
     invMass: body.masses.map((mass) => 1 / mass),
-    radius: PARTICLES.map((name) => (name === 'head' ? body.lengths.headRadius : name.endsWith('Hand') ? WORLD.gloveRadius : name.endsWith('Foot') ? 0.05 : 0.04)),
+    radius: particleRadii(body),
     constraints: [],
-    root: [x, 0], yaw: facing, move: 0,
+    root: [x, 0], rootVelocity: [0, 0], yaw: facing, move: 0,
     intent: {}, desired: rest, targets: rest.map((point) => [...point]),
+    feet: null,
+    hitAt: new Float64Array(count).fill(-1e9),
+    life: lifePhases(random),
     state: 'up', motorScale: 1, stun: 0, downTimer: 0,
     stamina: 1, concussion: 0, knockdowns: 0, injuries: [],
     punch: null, cooldown: 0, guardHigh: 0, slip: 0,
@@ -100,9 +163,24 @@ export function createFighter(inputs, { id, corner, x, facing }) {
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
+  plantFeet(fighter);
   for (const [a, b] of BONES) addConstraint(fighter, a, b, 0);
   for (const [a, b, key] of BRACES) addConstraint(fighter, a, b, WORLD[key]);
   return fighter;
+}
+
+/** Move a fighter bodily to stand with its root at (x, z), feet replanted. */
+export function placeFighter(fighter, x, z = fighter.root[1]) {
+  const dx = x - fighter.root[0];
+  const dz = z - fighter.root[1];
+  fighter.root = [x, z];
+  for (let index = 0; index < fighter.x.length; index += 3) {
+    for (const array of [fighter.x, fighter.prev]) {
+      array[index] += dx;
+      array[index + 2] += dz;
+    }
+  }
+  plantFeet(fighter);
 }
 
 function addConstraint(fighter, a, b, compliance) {
@@ -113,15 +191,15 @@ function addConstraint(fighter, a, b, compliance) {
 }
 
 export function createWorld(fighterInputs, { seed = 1 } = {}) {
+  const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
     const sameCorner = sides.slice(0, index).filter((other) => other.corner === side.corner).length;
     const x = (onRed ? -1 : 1) * (1.1 + sameCorner * 0.5);
-    return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI });
+    return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
   });
-  for (const [index, fighter] of fighters.entries()) fighter.root[1] = (index % 3 - 1) * 0.6 * (fighters.length > 2 ? 1 : 0);
-  return { time: 0, fighters, events: [], random: seededRandom(seed), over: false };
+  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [] };
 }
 
 // ---- Frames -------------------------------------------------------------
@@ -188,8 +266,13 @@ function punchHandTarget(fighter) {
   return through;
 }
 
-function updateIntent(fighter, dt) {
-  const intent = { twist: 0, headOffset: [0, 0, 0], guardTight: fighter.guardHigh > 0 };
+function updateIntent(world, fighter, dt) {
+  const H = fighter.body.heightM;
+  const idle = idleMotion(fighter, world.time);
+  const intent = {
+    twist: idle.twist, lean: idle.lean, dip: idle.dip,
+    headOffset: vec.scale(idle.headOffset, H), guardOffset: idle.guardOffset, guardTight: fighter.guardHigh > 0,
+  };
   if (fighter.punch) {
     const punch = fighter.punch;
     punch.t += dt;
@@ -198,20 +281,73 @@ function updateIntent(fighter, dt) {
     // turning by the time the glove is halfway there.
     const phase = Math.min(1, punch.t / (spec.extendUntil * WORLD.rotationLead));
     const twistShape = punch.t < spec.extendUntil ? Math.sin(phase * Math.PI * 0.5) : Math.max(0, 1 - (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil));
-    intent.twist = spec.twist * twistShape;
-    intent.dip = (spec.dip ?? 0) * twistShape;
-    intent.lean = 0.12 * twistShape;
+    intent.twist += spec.twist * twistShape;
+    intent.dip += (spec.dip ?? 0) * twistShape;
+    intent.lean += 0.12 * twistShape;
     intent.shift = (spec.shift ?? 0) * twistShape;
     intent[`${spec.hand}Hand`] = punchHandTarget(fighter);
     if (punch.t >= spec.duration) fighter.punch = null;
   }
   if (fighter.slip > 0) {
-    const H = fighter.body.heightM;
-    intent.headOffset = [-0.02 * H, -0.05 * H, (fighter.slipSide ?? 1) * 0.07 * H];
-    intent.lean = (intent.lean ?? 0) - 0.05;
+    intent.headOffset = vec.add(intent.headOffset, [-0.02 * H, -0.05 * H, (fighter.slipSide ?? 1) * 0.07 * H]);
+    intent.lean -= 0.05;
   }
   fighter.intent = intent;
   fighter.desired = desiredPose(fighter.body, intent);
+}
+
+// ---- Footwork -------------------------------------------------------------
+
+function plantFeet(fighter) {
+  fighter.feet = {};
+  for (const side of ['l', 'r']) {
+    const index = P[`${side}Foot`];
+    fighter.feet[side] = { index, planted: point(fighter.x, index), step: null };
+  }
+}
+
+/** Feet stay planted while the stance drifts, then step to catch up, one at a time. */
+function updateFeet(fighter, dt) {
+  if (fighter.state !== 'up' && fighter.state !== 'rising') {
+    plantFeet(fighter);
+    return;
+  }
+  const spec = WORLD.step;
+  const feet = Object.values(fighter.feet);
+  const stepping = feet.some((foot) => foot.step);
+  let worst = null;
+  let worstDrift = spec.threshold;
+  for (const foot of feet) {
+    const desired = toWorld(fighter, fighter.desired[foot.index]);
+    foot.desired = desired;
+    const drift = Math.hypot(desired[0] - foot.planted[0], desired[2] - foot.planted[2]);
+    if (!foot.step && drift > worstDrift) {
+      worst = foot;
+      worstDrift = drift;
+    }
+  }
+  if (worst && !stepping) {
+    // Step to where the stance will be, not where it is: lead the motion.
+    const lead = spec.lead * spec.seconds;
+    const to = [worst.desired[0] + fighter.rootVelocity[0] * lead, worst.desired[1], worst.desired[2] + fighter.rootVelocity[1] * lead];
+    worst.step = { from: [...worst.planted], to, t: 0 };
+  }
+  for (const foot of feet) {
+    if (!foot.step) continue;
+    foot.step.t += dt / spec.seconds;
+    if (foot.step.t >= 1) {
+      foot.planted = foot.step.to;
+      foot.step = null;
+    }
+  }
+}
+
+function footTarget(fighter, foot) {
+  if (!foot.step) return [foot.planted[0], fighter.desired[foot.index][1], foot.planted[2]];
+  const t = foot.step.t;
+  const ease = t * t * (3 - 2 * t);
+  const along = vec.lerp(foot.step.from, foot.step.to, ease);
+  return [along[0], fighter.desired[foot.index][1] + WORLD.step.lift * Math.sin(Math.PI * t), along[2]];
 }
 
 // ---- Stepping -------------------------------------------------------------
@@ -219,20 +355,25 @@ function updateIntent(fighter, dt) {
 /** Advance the world by `dt` seconds (one outer step, several substeps). */
 export function step(world, dt) {
   for (const fighter of world.fighters) {
-    faceOpponent(world, fighter, dt);
+    moveRoot(world, fighter, dt);
     updateTimers(world, fighter, dt);
-    updateIntent(fighter, dt);
+    updateIntent(world, fighter, dt);
+    updateFeet(fighter, dt);
   }
   const h = dt / WORLD.substeps;
   for (let substep = 0; substep < WORLD.substeps; substep += 1) {
-    for (const fighter of world.fighters) integrate(fighter, h);
-    for (const fighter of world.fighters) solveConstraints(fighter, h);
-    collideFighters(world, h);
+    const time = world.time + substep * h;
+    for (const fighter of world.fighters) integrate(fighter, h, time);
+    for (const fighter of world.fighters) {
+      solveConstraints(fighter, h);
+      solveJointLimits(fighter);
+    }
+    collideFighters(world, h, time);
     for (const fighter of world.fighters) {
       collideGround(fighter, h);
       for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / h;
     }
-    for (const impulse of world.pendingImpulses ?? []) applyImpulse(impulse);
+    for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
     world.pendingImpulses = [];
   }
   for (const fighter of world.fighters) trackHandSpeed(fighter);
@@ -250,9 +391,12 @@ export function advance(world, seconds, think = null, stepSeconds = 1 / 60) {
   }
 }
 
-function faceOpponent(world, fighter, dt) {
+function moveRoot(world, fighter, dt) {
   const opponent = nearestOpponent(world, fighter);
-  if (fighter.state !== 'up') return;
+  if (fighter.state !== 'up') {
+    fighter.rootVelocity = [0, 0];
+    return;
+  }
   if (opponent) {
     const from = point(fighter.x, P.pelvis);
     const to = point(opponent.x, P.pelvis);
@@ -261,20 +405,29 @@ function faceOpponent(world, fighter, dt) {
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     fighter.yaw += turn * Math.min(1, dt * 6);
   }
-  // Footwork moves the stance; a shove moves the stance too, because the
-  // root follows the pelvis that was actually pushed.
+  // Footwork has inertia: the stance accelerates and brakes at what the legs
+  // can push, rather than starting and stopping dead.
+  const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
+  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical));
   const forward = yawRotate([1, 0, 0], fighter.yaw);
-  const speed = 1.2 * Math.min(1.3, fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * 9.81 * 3));
-  fighter.root[0] += forward[0] * fighter.move * speed * dt;
-  fighter.root[1] += forward[2] * fighter.move * speed * dt;
+  const wanted = [forward[0] * fighter.move * WORLD.footSpeed * legs, forward[2] * fighter.move * WORLD.footSpeed * legs];
+  const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
+  const size = Math.hypot(change[0], change[1]);
+  const limit = WORLD.footAcceleration * legs * dt;
+  const scale = size > limit ? limit / size : 1;
+  fighter.rootVelocity[0] += change[0] * scale;
+  fighter.rootVelocity[1] += change[1] * scale;
+  fighter.root[0] += fighter.rootVelocity[0] * dt;
+  fighter.root[1] += fighter.rootVelocity[1] * dt;
+  // A shove moves the stance too: the root drifts to where the pelvis was pushed.
   const pelvis = point(fighter.x, P.pelvis);
   const rootPelvis = toWorld(fighter, fighter.desired[P.pelvis]);
-  const follow = Math.min(1, dt * 3);
+  const follow = Math.min(1, dt * 2.5);
   fighter.root[0] += (pelvis[0] - rootPelvis[0]) * follow;
   fighter.root[1] += (pelvis[2] - rootPelvis[2]) * follow;
-  const limit = WORLD.ringHalf - 0.3;
-  fighter.root[0] = Math.max(-limit, Math.min(limit, fighter.root[0]));
-  fighter.root[1] = Math.max(-limit, Math.min(limit, fighter.root[1]));
+  const edge = WORLD.ringHalf - 0.3;
+  fighter.root[0] = Math.max(-edge, Math.min(edge, fighter.root[0]));
+  fighter.root[1] = Math.max(-edge, Math.min(edge, fighter.root[1]));
 }
 
 function updateTimers(world, fighter, dt) {
@@ -294,45 +447,73 @@ function updateTimers(world, fighter, dt) {
         fighter.state = 'rising';
         const pelvis = point(fighter.x, P.pelvis);
         fighter.root = [pelvis[0], pelvis[2]];
+        plantFeet(fighter);
       }
     }
   } else if (fighter.state === 'rising') {
     fighter.motorScale = Math.min(1, fighter.motorScale + dt / WORLD.getUpSeconds);
     if (fighter.motorScale >= 1) fighter.state = 'up';
   } else if (fighter.state === 'up') {
-    fighter.motorScale = fighter.stun > 0 ? 0.45 : 1;
+    fighter.motorScale = fighter.stun > 0 ? 0.55 : 1;
   }
 }
 
-function integrate(fighter, h) {
+/** Share of a muscle's force available `elapsed` seconds after its part was hit. */
+function reflexShare(fighter, elapsed) {
+  const reflex = WORLD.reflex;
+  const braced = fighter.guardHigh > 0 || fighter.slip > 0;
+  const latency = reflex.latency - reflex.trainedSaving * fighter.body.inputs.training - (braced ? reflex.bracedSaving : 0);
+  if (elapsed < latency) return reflex.floor;
+  if (elapsed < latency + reflex.ramp) return reflex.floor + (1 - reflex.floor) * ((elapsed - latency) / reflex.ramp);
+  return 1;
+}
+
+function motorTarget(fighter, index) {
+  const name = PARTICLES[index];
+  const desired = fighter.desired[index];
+  if (name.endsWith('Foot')) return { target: footTarget(fighter, fighter.feet[name[0]]), velocity: [0, 0, 0] };
+  if (name.endsWith('Knee')) {
+    const side = name[0];
+    const hip = point(fighter.x, P[`${side}Hip`]);
+    const foot = footTarget(fighter, fighter.feet[side]);
+    const pole = yawRotate([1, 0, side === 'l' ? 0.35 : -0.35], fighter.yaw);
+    const L = fighter.body.lengths;
+    return { target: twoBoneIK(hip, foot, L.thigh, L.shank, pole), velocity: point(fighter.v, P[`${side}Hip`]) };
+  }
+  const anchorName = ANCHOR[name];
+  if (anchorName === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
+  const anchor = P[anchorName];
+  const offset = yawRotate(vec.sub(desired, fighter.desired[anchor]), fighter.yaw);
+  return { target: vec.add(point(fighter.x, anchor), offset), velocity: point(fighter.v, anchor) };
+}
+
+function integrate(fighter, h, time) {
   const fatigue = 0.55 + 0.45 * fighter.stamina;
-  const damping = Math.exp(-h * (fighter.state === 'up' || fighter.state === 'rising' ? WORLD.damping.up : WORLD.damping.down));
+  const alive = fighter.state === 'up' || fighter.state === 'rising';
+  const damping = Math.exp(-h * (alive ? WORLD.damping.up : WORLD.damping.down));
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const name = PARTICLES[index];
     const base = index * 3;
-    fighter.v[base + 1] -= WORLD.gravity * h;
-    const anchorName = ANCHOR[name];
-    const desired = fighter.desired[index];
-    const target = anchorName === null
-      ? toWorld(fighter, desired)
-      : vec.add(point(fighter.x, P[anchorName]), yawRotate(vec.sub(desired, fighter.desired[P[anchorName]]), fighter.yaw));
+    const { target, velocity } = motorTarget(fighter, index);
     fighter.targets[index] = target;
-    const scale = fighter.motorScale * (name.endsWith('Hand') || name.endsWith('Elbow') ? fatigue * handHealth(fighter, name) : 1);
-    if (scale > 0) {
-      const gain = WORLD.motorGain[name.endsWith('Hand') ? 'hand' : name.endsWith('Elbow') ? 'elbow' : name === 'head' ? 'head' : 'default'];
-      const maxDelta = (fighter.body.motorForce[index] * scale * fighter.invMass[index]) * h;
-      const delta = [];
+    let acceleration = [0, -WORLD.gravity, 0];
+    const arm = name.endsWith('Hand') || name.endsWith('Elbow');
+    const scale = fighter.motorScale * (arm ? fatigue * handHealth(fighter, name) : 1) * reflexShare(fighter, time - fighter.hitAt[index]);
+    if (scale > 0.01) {
+      const { omega, zeta } = WORLD.motor[MOTOR_GROUP[name]];
+      const want = [];
       for (let axis = 0; axis < 3; axis += 1) {
-        // Gravity is part of what the motor fights, so it aims for the target
-        // velocity after gravity has already pulled this substep.
-        delta.push((target[axis] - fighter.x[base + axis]) * gain - fighter.v[base + axis]);
+        // Spring towards the target, damper towards its velocity, and hold
+        // the part up against gravity — all within the muscle's force.
+        want.push(omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? WORLD.gravity : 0));
       }
-      const size = vec.length(delta);
-      const limit = size > maxDelta ? maxDelta / size : 1;
-      for (let axis = 0; axis < 3; axis += 1) fighter.v[base + axis] += delta[axis] * limit;
+      const size = vec.length(want);
+      const cap = fighter.body.motorForce[index] * scale * fighter.invMass[index];
+      const limit = size > cap ? cap / size : 1;
+      acceleration = vec.add(acceleration, vec.scale(want, limit));
     }
     for (let axis = 0; axis < 3; axis += 1) {
-      fighter.v[base + axis] *= damping;
+      fighter.v[base + axis] = (fighter.v[base + axis] + acceleration[axis] * h) * damping;
       fighter.prev[base + axis] = fighter.x[base + axis];
       fighter.x[base + axis] += fighter.v[base + axis] * h;
     }
@@ -347,9 +528,7 @@ function handHealth(fighter, name) {
 function solveConstraints(fighter, h) {
   for (const constraint of fighter.constraints) {
     const { i, j, rest, compliance } = constraint;
-    const a = point(fighter.x, i);
-    const b = point(fighter.x, j);
-    const offset = vec.sub(a, b);
+    const offset = vec.sub(point(fighter.x, i), point(fighter.x, j));
     const distance = vec.length(offset) || 1e-9;
     const error = distance - rest;
     const weight = fighter.invMass[i] + fighter.invMass[j] + compliance / (h * h);
@@ -360,6 +539,66 @@ function solveConstraints(fighter, h) {
       fighter.x[j * 3 + axis] -= normal[axis] * lambda * fighter.invMass[j];
     }
   }
+}
+
+/**
+ * Correct a joint by moving `index` by `delta` and the bones it hangs from
+ * the opposite way, shared by inverse mass so momentum is kept. The step is
+ * capped: a limit that yanks a particle far in one substep turns into a
+ * velocity on the next and pumps energy into a resting body.
+ */
+function correctJoint(fighter, index, others, delta) {
+  const size = vec.length(delta);
+  if (size < 1e-9) return;
+  const capped = size > WORLD.limitStep ? vec.scale(delta, WORLD.limitStep / size) : delta;
+  const weights = [fighter.invMass[index], ...others.map((other) => fighter.invMass[other] / others.length)];
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  for (let axis = 0; axis < 3; axis += 1) fighter.x[index * 3 + axis] += capped[axis] * (weights[0] / total);
+  others.forEach((other, order) => {
+    for (let axis = 0; axis < 3; axis += 1) fighter.x[other * 3 + axis] -= capped[axis] * (weights[order + 1] / total);
+  });
+}
+
+/** Hinges and cones, so a limp body folds the way a body folds. */
+function solveJointLimits(fighter) {
+  const pelvis = point(fighter.x, P.pelvis);
+  const neck = point(fighter.x, P.neck);
+  const trunkUp = vec.normalize(vec.sub(neck, pelvis));
+  const across = vec.sub(point(fighter.x, P.lHip), point(fighter.x, P.rHip));
+  // Local axes are x forward, y up, z left, so forward = up × left. When the
+  // hips are edge-on to the trunk there is no forward to bend towards.
+  const forwardRaw = vec.cross(trunkUp, across);
+  const hingeDefined = vec.length(forwardRaw) > 0.3 * vec.length(across);
+  const forward = vec.normalize(forwardRaw);
+
+  for (const side of ['l', 'r']) {
+    const hip = point(fighter.x, P[`${side}Hip`]);
+    const knee = point(fighter.x, P[`${side}Knee`]);
+    const foot = point(fighter.x, P[`${side}Foot`]);
+    const axis = vec.normalize(vec.sub(foot, hip));
+    const onLine = vec.add(hip, vec.scale(axis, vec.dot(vec.sub(knee, hip), axis)));
+    const bend = vec.dot(vec.sub(knee, onLine), forward);
+    if (hingeDefined && bend < 0.005) correctJoint(fighter, P[`${side}Knee`], [P[`${side}Hip`], P[`${side}Foot`]], vec.scale(forward, 0.005 - bend));
+    foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], WORLD.minFold.leg);
+    foldLimit(fighter, P[`${side}Shoulder`], P[`${side}Hand`], WORLD.minFold.arm);
+  }
+
+  const head = point(fighter.x, P.head);
+  const offset = vec.sub(head, neck);
+  const length = vec.length(offset);
+  const cos = vec.dot(offset, trunkUp) / length;
+  if (cos < Math.cos(WORLD.headCone)) {
+    const sideways = vec.normalize(vec.sub(offset, vec.scale(trunkUp, vec.dot(offset, trunkUp))));
+    const limited = vec.add(vec.scale(trunkUp, Math.cos(WORLD.headCone) * length), vec.scale(sideways, Math.sin(WORLD.headCone) * length));
+    correctJoint(fighter, P.head, [P.neck], vec.sub(limited, offset));
+  }
+}
+
+function foldLimit(fighter, rootIndex, endIndex, minimum) {
+  const offset = vec.sub(point(fighter.x, endIndex), point(fighter.x, rootIndex));
+  const distance = vec.length(offset);
+  if (distance >= minimum || distance < 1e-9) return;
+  correctJoint(fighter, endIndex, [rootIndex], vec.scale(offset, (minimum - distance) / distance));
 }
 
 function collideGround(fighter, h) {
@@ -382,7 +621,7 @@ function collideGround(fighter, h) {
 
 // ---- Contact --------------------------------------------------------------
 
-/** Capsules a glove can hit or a body can lean on: [segment name, a, b, radius]. */
+/** Capsules a glove can hit or a body can lean on. */
 export function capsules(fighter) {
   const segments = fighter.body.segments;
   return STRUCK.map((key) => {
@@ -413,12 +652,12 @@ function closestOnSegment(p, a, b) {
   return { t, point: vec.add(a, vec.scale(ab, t)) };
 }
 
-function collideFighters(world, h) {
+function collideFighters(world, h, time) {
   const fighters = world.fighters;
   for (const attacker of fighters) {
     for (const defender of fighters) {
       if (attacker === defender) continue;
-      for (const side of ['l', 'r']) collideGlove(world, attacker, defender, side, h);
+      for (const side of ['l', 'r']) collideGlove(world, attacker, defender, side, time);
     }
   }
   for (let first = 0; first < fighters.length; first += 1) {
@@ -426,7 +665,7 @@ function collideFighters(world, h) {
   }
 }
 
-function collideGlove(world, attacker, defender, side, h) {
+function collideGlove(world, attacker, defender, side, time) {
   const hand = P[`${side}Hand`];
   const glove = point(attacker.x, hand);
   for (const capsule of capsules(defender)) {
@@ -445,7 +684,7 @@ function collideGlove(world, attacker, defender, side, h) {
     const normal = distance > 1e-9 ? vec.scale(offset, 1 / distance) : [0, 1, 0];
     if (!attacker.contacts.has(contactKey)) {
       attacker.contacts.add(contactKey);
-      registerImpact(world, attacker, defender, side, capsule, closest, normal, h);
+      registerImpact(world, attacker, defender, side, capsule, closest, normal, time);
     }
     // Separate the glove from the body, sharing the push by inverse mass.
     const penetration = reach - distance;
@@ -484,7 +723,21 @@ function pushApart(first, second) {
   }
 }
 
-function registerImpact(world, attacker, defender, side, capsule, closest, normal, h) {
+/** Which of the struck fighter's particles take the blow, and in what share. */
+function struckParticles(defender, capsule, closest, contactPoint) {
+  if (capsule.key === 'head') return [[P.head, 1]];
+  if (capsule.key === 'trunk') {
+    // A blow to the body moves the trunk near where it landed most.
+    return TRUNK_PARTICLES.map((index) => {
+      const distance = vec.length(vec.sub(point(defender.x, index), contactPoint));
+      return [index, Math.exp(-((distance / 0.22) ** 2))];
+    });
+  }
+  const shoulder = P[`${capsule.key[0]}Shoulder`];
+  return [[capsule.a, 1 - closest.t], [capsule.b, closest.t], [shoulder, 0.25]];
+}
+
+function registerImpact(world, attacker, defender, side, capsule, closest, normal, time) {
   const punch = attacker.punch;
   if (!punch || punch.spec.hand !== side || punch.landed || punch.t > punch.spec.extendUntil + 0.06) return;
   const hand = P[`${side}Hand`];
@@ -503,14 +756,15 @@ function registerImpact(world, attacker, defender, side, capsule, closest, norma
   // A collision of two effective masses; flesh and glove make it largely
   // inelastic, so the impulse is the reduced mass times the closing speed.
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
-  const impulse = reducedMass * closing * 1.1;
+  const impulse = reducedMass * closing * (1 + WORLD.restitution);
   // Softer (fattier) flesh stretches the contact out and lowers the peak.
   const firmness = body.segments[capsule.key === 'head' ? 'head' : 'trunk'].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (WORLD.contactSeconds * (1 + 0.6 * (1 - firmness)));
+  const contactPoint = vec.add(closest.point, vec.scale(normal, capsule.radius));
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
-    point: vec.add(closest.point, vec.scale(normal, capsule.radius)), normal,
+    point: contactPoint, normal,
   };
   if (blocked) {
     attacker.stats.blocked += 1;
@@ -539,18 +793,37 @@ function registerImpact(world, attacker, defender, side, capsule, closest, norma
     attacker.injuries.push({ kind: 'hand', side, time: world.time });
     event.effects.push(`${attacker.body.inputs.name}: broken hand`);
   }
-  // The struck part moves with the momentum it was given: the head snaps.
-  world.pendingImpulses = world.pendingImpulses ?? [];
-  world.pendingImpulses.push({ fighter: defender, indices: capsule.a === capsule.b ? [capsule.a] : [capsule.a, capsule.b], weights: capsule.a === capsule.b ? [1] : [1 - closest.t, closest.t], direction: vec.scale(normal, -1), impulse });
-  world.pendingImpulses.push({ fighter: attacker, indices: [hand], weights: [1], direction: normal, impulse: impulse * 0.35 });
+
+  // Momentum is conserved: the struck part takes the impulse, the punching
+  // arm takes it back. Both sides' muscles there are caught off guard for a
+  // reflex delay, so the part flies before it is caught.
+  const struck = struckParticles(defender, capsule, closest, contactPoint);
+  world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse });
+  world.pendingImpulses.push({ fighter: attacker, shares: [[hand, 1], [P[`${side}Elbow`], 0.7], [P[`${side}Shoulder`], 0.35], [P.neck, 0.15]], direction: normal, impulse });
+  for (const [index, share] of struck) if (share > 0.2) defender.hitAt[index] = time;
+  if (capsule.key === 'head') defender.hitAt[P.neck] = time;
   world.events.push(event);
 }
 
-function applyImpulse({ fighter, indices, weights, direction, impulse }) {
-  indices.forEach((index, order) => {
-    const deltaV = (impulse * weights[order]) * fighter.invMass[index];
+/** Strike one particle of a fighter as a landed blow would: impulse, then a reflex delay. */
+export function hitParticle(world, fighter, index, direction, impulse) {
+  deliverImpulse({ fighter, shares: [[index, 1]], direction: vec.normalize(direction), impulse });
+  fighter.hitAt[index] = world.time;
+}
+
+/**
+ * Give `impulse` (N·s) along `direction` to a set of particles, weighted by
+ * share: each moves with the same velocity change scaled by its share, and
+ * the momentum added sums to exactly the impulse.
+ */
+export function deliverImpulse({ fighter, shares, direction, impulse }) {
+  let weightedMass = 0;
+  for (const [index, share] of shares) weightedMass += share * fighter.body.masses[index];
+  if (weightedMass <= 0) return;
+  for (const [index, share] of shares) {
+    const deltaV = (impulse * share) / weightedMass;
     for (let axis = 0; axis < 3; axis += 1) fighter.v[index * 3 + axis] += direction[axis] * deltaV;
-  });
+  }
 }
 
 function applyHeadDamage(world, defender, event) {
@@ -559,7 +832,7 @@ function applyHeadDamage(world, defender, event) {
   // Brain strain grows faster than linearly with head speed change; small
   // touches add almost nothing, hard shots add a lot.
   defender.concussion += Math.max(0, deltaV - 1.2) ** 2;
-  defender.stun = Math.max(defender.stun, 0.12 * deltaV);
+  defender.stun = Math.max(defender.stun, 0.25 * deltaV);
   const capacity = WORLD.concussionCapacity * body.chin * (defender.knockdowns + 1);
   if (defender.state === 'up' && (deltaV > body.chin || defender.concussion > capacity)) {
     defender.state = 'down';
@@ -567,8 +840,7 @@ function applyHeadDamage(world, defender, event) {
     defender.punch = null;
     defender.downTimer = WORLD.downSecondsMin + world.random() * WORLD.downSecondsRange + defender.knockdowns;
     event.effects.push(deltaV > body.chin ? 'knockdown (one clean shot)' : 'knockdown (accumulated)');
-    const attacker = world.fighters[event.attacker];
-    attacker.stats.knockdownsScored += 1;
+    world.fighters[event.attacker].stats.knockdownsScored += 1;
   }
 }
 
@@ -582,7 +854,7 @@ function trackHandSpeed(fighter) {
   fighter.stats.maxHandSpeed = Math.max(fighter.stats.maxHandSpeed, speed);
 }
 
-/** True when one corner has no fighter left standing a chance. */
+/** The winning corner once the other has no fighter able to continue. */
 export function boutWinner(world) {
   const alive = (corner) => world.fighters.some((fighter) => fighter.corner === corner && fighter.state !== 'out');
   if (!alive('red')) return 'blue';

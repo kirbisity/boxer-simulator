@@ -2,19 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, fighterFile, P, PRESETS, SEGMENTS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { advance, createWorld, point, throwPunch, WORLD } from '../src/physics.js';
+import { advance, createWorld, placeFighter, point, throwPunch, WORLD } from '../src/physics.js';
 import { vec } from '../src/pose.js';
 
 function shadowPeak(inputs, type) {
   const world = createWorld([inputs, PRESETS.light], { seed: 1 });
-  const opponent = world.fighters[1];
   // Far away, so nothing stops the glove.
-  const shift = 2.6 - opponent.root[0];
-  opponent.root[0] += shift;
-  for (let index = 0; index < opponent.x.length; index += 3) {
-    opponent.x[index] += shift;
-    opponent.prev[index] += shift;
-  }
+  placeFighter(world.fighters[1], 2.6);
   advance(world, 1);
   const fighter = world.fighters[0];
   assert.ok(throwPunch(world, fighter, type), 'the punch was thrown');

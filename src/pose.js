@@ -108,7 +108,8 @@ export function desiredPose(body, intent = {}) {
     const shoulder = out[P[`${side}Shoulder`]];
     const guard = side === 'l' ? POSE.leadGuard : POSE.rearGuard;
     const tight = intent.guardTight ? 0.6 : 1;
-    const guardPoint = vec.add(out[P.head], [guard[0] * H * tight, guard[1] * H, guard[2] * H]);
+    const drift = intent.guardOffset?.[side] ?? [0, 0, 0];
+    const guardPoint = vec.add(out[P.head], [(guard[0] * tight + drift[0]) * H, (guard[1] + drift[1]) * H, (guard[2] + drift[2]) * H]);
     const target = clampReach(shoulder, intent[`${side}Hand`] ?? guardPoint, (L.upperArm + L.forearmToFist) * 0.995);
     out[P[`${side}Hand`]] = target;
     const pole = [-0.4, -1, side === 'l' ? 0.5 : -0.5];

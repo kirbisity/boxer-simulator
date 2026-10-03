@@ -8,20 +8,12 @@
 import { P, SEGMENTS } from './body.js';
 import { capsules, capsuleEnds, point, WORLD } from './physics.js';
 import { yawRotate } from './pose.js';
+import { SoftShell } from './soft.js';
+import { buildHead } from './face.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
 const SKIN_TONES = { light: 0xe8b796, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
-const SOFT = {
-  // Natural frequency of the flesh springs (rad/s): firm muscle rings fast,
-  // fat slow and deep. Damping ratio low enough to see one wobble.
-  omegaFirm: 34,
-  omegaSoft: 15,
-  damping: 0.22,
-  dentPerImpulse: 0.0016, // m of dent per N·s on the softest flesh
-  maxDent: 0.05,
-  spread: 0.09, // m radius of a dent
-};
 
 const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 
@@ -32,14 +24,13 @@ export function createScene(canvas) {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputEncoding = THREE.sRGBEncoding;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0d14);
   scene.fog = new THREE.Fog(0x0b0d14, 9, 22);
   const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 60);
 
-  scene.add(new THREE.HemisphereLight(0x9fb4d8, 0x221a14, 0.55));
-  const key = new THREE.SpotLight(0xfff2e0, 1.25, 20, 0.62, 0.45, 1.2);
+  scene.add(new THREE.HemisphereLight(0xb8c6e0, 0x3a2e24, 0.8));
+  const key = new THREE.SpotLight(0xfff2e0, 1.5, 20, 0.62, 0.45, 1.2);
   key.position.set(0.8, 7.5, 1.2);
   key.target.position.set(0, 0, 0);
   key.castShadow = true;
@@ -118,71 +109,6 @@ export function placeCamera(view, focus) {
   view.camera.lookAt(target);
 }
 
-// ---- Soft shell ------------------------------------------------------------
-
-/** Mesh whose vertices are damped springs about their rest positions. */
-class SoftShell {
-  constructor(geometry, material, firmness) {
-    this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.castShadow = true;
-    const positions = geometry.attributes.position;
-    geometry.computeVertexNormals();
-    this.rest = Float32Array.from(positions.array);
-    this.normals = Float32Array.from(geometry.attributes.normal.array);
-    this.offset = new Float32Array(positions.count);
-    this.velocity = new Float32Array(positions.count);
-    this.active = false;
-    this.omega = SOFT.omegaSoft + (SOFT.omegaFirm - SOFT.omegaSoft) * firmness;
-    this.depthScale = 1.6 - firmness;
-  }
-
-  /** Push the shell in around a world point by an impulse (N·s). */
-  dent(worldPoint, impulse) {
-    const local = this.mesh.worldToLocal(worldPoint.clone());
-    const scale = this.mesh.scale;
-    const depth = Math.min(SOFT.maxDent, impulse * SOFT.dentPerImpulse * this.depthScale);
-    const rest = this.rest;
-    for (let index = 0; index < this.offset.length; index += 1) {
-      const dx = (rest[index * 3] - local.x) * scale.x;
-      const dy = (rest[index * 3 + 1] - local.y) * scale.y;
-      const dz = (rest[index * 3 + 2] - local.z) * scale.z;
-      const distanceSquared = dx * dx + dy * dy + dz * dz;
-      const falloff = Math.exp(-distanceSquared / (SOFT.spread * SOFT.spread));
-      if (falloff < 0.02) continue;
-      // An impulse sets the flesh moving inward; the spring does the rest.
-      this.velocity[index] -= depth * this.omega * falloff;
-    }
-    this.active = true;
-  }
-
-  update(dt) {
-    if (!this.active) return;
-    const positions = this.mesh.geometry.attributes.position.array;
-    const stiffness = this.omega * this.omega;
-    const damping = 2 * SOFT.damping * this.omega;
-    let energy = 0;
-    for (let index = 0; index < this.offset.length; index += 1) {
-      // Semi-implicit Euler is stable here: ω·dt ≤ 34 / 30 ≈ 1.1 < 2.
-      this.velocity[index] += (-stiffness * this.offset[index] - damping * this.velocity[index]) * dt;
-      this.offset[index] += this.velocity[index] * dt;
-      energy += Math.abs(this.offset[index]) + Math.abs(this.velocity[index]) * 0.05;
-      for (let axis = 0; axis < 3; axis += 1) {
-        positions[index * 3 + axis] = this.rest[index * 3 + axis] + this.normals[index * 3 + axis] * this.offset[index];
-      }
-    }
-    this.mesh.geometry.attributes.position.needsUpdate = true;
-    this.mesh.geometry.computeVertexNormals();
-    if (energy < 1e-5 * this.offset.length) {
-      this.offset.fill(0);
-      this.velocity.fill(0);
-      this.mesh.geometry.attributes.position.array.set(this.rest);
-      this.mesh.geometry.attributes.position.needsUpdate = true;
-      this.mesh.geometry.computeVertexNormals();
-      this.active = false;
-    }
-  }
-}
-
 // ---- Shapes ----------------------------------------------------------------
 
 /** Lathe profile along +y from 0 to `length`, rounded at both ends. */
@@ -252,8 +178,9 @@ function material(color, options = {}) {
 
 // ---- Fighter view ---------------------------------------------------------
 
-export function buildFighterView(view, fighter, look = {}) {
+export function buildFighterView(view, fighter) {
   const body = fighter.body;
+  const look = body.inputs.look ?? {};
   const corner = CORNER_COLORS[fighter.corner];
   const skinColor = SKIN_TONES[look.skinTone ?? 'medium'];
   const group = new THREE.Group();
@@ -290,11 +217,17 @@ export function buildFighterView(view, fighter, look = {}) {
   // Trunk, neck and shoulders.
   addSegment('skin', 'trunk', torsoGeometry(body, 'skin'), skinMaterial, P.pelvis, P.neck, { soft: true, length: body.segments.trunk.length, basis: 'trunk' });
   addSegment('muscle', 'trunk', torsoGeometry(body, 'muscle'), muscleMaterial, P.pelvis, P.neck, { soft: true, length: body.segments.trunk.length, basis: 'trunk' });
-  const neckRadius = body.lengths.headRadius * (0.42 + 0.12 * body.neckIndex);
+  // A neck is about 0.6 of the head's radius, thicker with training.
+  const neckRadius = body.lengths.headRadius * (0.56 + 0.14 * body.neckIndex);
   const neckLength = body.lengths.neckToHead;
   addSegment('skin', 'neck', limbGeometry(neckRadius, neckLength * 0.7, () => 1), skinMaterial, P.neck, P.head, { length: neckLength * 0.7 });
   addSegment('muscle', 'neck', limbGeometry(neckRadius * 0.92, neckLength * 0.7, (u) => 1 - 0.1 * u), muscleMaterial, P.neck, P.head, { length: neckLength * 0.7 });
   addSegment('bone', 'spine', limbGeometry(0.016, body.segments.trunk.length + neckLength * 0.6, () => 1, 8), boneMaterial, P.pelvis, P.head, { length: body.segments.trunk.length + neckLength * 0.6 });
+  // Trapezius: the slope from the neck down to the shoulders.
+  const trapsGeometry = new THREE.SphereGeometry(1, 20, 12);
+  trapsGeometry.scale(body.lengths.shoulderSpan * 0.42, 0.075 * body.heightM / 1.8 * (0.8 + 0.4 * body.neckIndex), body.segments.trunk.skinRadius * 0.52);
+  trapsGeometry.translate(0, body.segments.trunk.length * 0.95, -0.01);
+  addSegment('skin', 'traps', trapsGeometry, skinMaterial, P.pelvis, P.neck, { length: body.segments.trunk.length, basis: 'trunk' });
   for (const side of ['l', 'r']) {
     const deltoid = body.segments[`${side}UpperArm`].skinRadius * 1.3;
     addSegment('skin', `${side}Deltoid`, new THREE.SphereGeometry(deltoid, 16, 12), skinMaterial, P[`${side}Shoulder`], P[`${side}Shoulder`], { basis: 'point' });
@@ -311,35 +244,10 @@ export function buildFighterView(view, fighter, look = {}) {
 
   // Head: skull, face, hair, all oriented by the neck and the facing.
   const headRadius = body.lengths.headRadius;
-  const head = new THREE.Group();
-  const skull = new SoftShell(new THREE.SphereGeometry(headRadius, 24, 18), skinMaterial, body.segments.head.fleshFirmness);
-  skull.mesh.scale.set(0.92, 1.12, 0.86);
-  head.add(skull.mesh);
-  const jaw = new THREE.Mesh(new THREE.SphereGeometry(headRadius * 0.62, 16, 12), skinMaterial);
-  jaw.position.set(headRadius * 0.3, -headRadius * 0.55, 0);
-  jaw.scale.set(1, 0.8, 1.2);
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(headRadius * 1.03, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), material(look.hairColor ?? 0x1d1611, { roughness: 0.9 }));
-  // Clear of the skull everywhere, or the two surfaces flicker through each other.
-  hair.scale.set(0.99, 1.15, 0.94);
-  // Tilt the cap back so the hairline sits above the brow.
-  hair.rotation.z = 0.35;
-  const eyeMaterial = material(0x111111, { roughness: 0.3 });
-  for (const side of [1, -1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(headRadius * 0.1, 8, 6), eyeMaterial);
-    eye.position.set(headRadius * 0.8, headRadius * 0.1, side * headRadius * 0.32);
-    const ear = new THREE.Mesh(new THREE.SphereGeometry(headRadius * 0.2, 8, 6), skinMaterial);
-    ear.position.set(-headRadius * 0.05, 0, side * headRadius * 0.86);
-    ear.scale.set(0.8, 1.3, 0.4);
-    head.add(eye, ear);
-  }
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(headRadius * 0.14, headRadius * 0.34, 8), skinMaterial);
-  nose.rotation.z = -Math.PI / 2;
-  nose.position.set(headRadius * 0.95, -headRadius * 0.08, 0);
-  head.add(jaw, hair, nose);
-  head.traverse((mesh) => { mesh.castShadow = true; });
-  layers.skin.add(head);
-  parts.push({ key: 'head', mesh: head, from: P.neck, to: P.head, basis: 'head', layer: 'skin', shell: skull });
-  shells.push({ key: 'head', shell: skull });
+  const headView = buildHead(body, look, skinColor, corner);
+  layers.skin.add(headView.group);
+  parts.push({ key: 'head', mesh: headView.group, from: P.neck, to: P.head, basis: 'head', layer: 'skin', shell: headView.shell });
+  shells.push({ key: 'head', shell: headView.shell });
   const skullBone = new THREE.Mesh(new THREE.SphereGeometry(headRadius * 0.82, 16, 12), boneMaterial);
   skullBone.scale.set(0.95, 1.08, 0.85);
   layers.bone.add(skullBone);
@@ -410,7 +318,7 @@ export function buildFighterView(view, fighter, look = {}) {
   });
 
   view.scene.add(group);
-  return { fighter, group, layers, parts, shells, particles, lines, capsuleMeshes, gloveSpheres, layer: 'skin', materials: { skinMaterial, muscleMaterial, tendonMaterial, boneMaterial } };
+  return { fighter, group, layers, parts, shells, particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', materials: { skinMaterial, muscleMaterial, tendonMaterial, boneMaterial } };
 }
 
 export function disposeFighterView(view, fighterView) {
@@ -452,7 +360,7 @@ function basisMatrix(xAxis, yAxis, origin) {
   return new THREE.Matrix4().makeBasis(x, y, z).setPosition(origin);
 }
 
-export function updateFighterView(fighterView, dt) {
+export function updateFighterView(fighterView, dt, time) {
   const fighter = fighterView.fighter;
   const at = (index) => v3(point(fighter.x, index));
   const forward = v3(yawRotate([1, 0, 0], fighter.yaw));
@@ -501,6 +409,7 @@ export function updateFighterView(fighterView, dt) {
     mesh.matrixWorldNeedsUpdate = true;
   }
   for (const entry of fighterView.shells) entry.shell.update(Math.min(dt, 1 / 30));
+  fighterView.head.update(Math.min(dt, 1 / 30), fighter, time);
 
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
