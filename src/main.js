@@ -8,6 +8,7 @@ import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
+import { randomCharacter, varyCharacter } from './cast.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -68,14 +69,9 @@ function ensureRoster(corner, scenario) {
     const index = roster.length - 1;
     const crew = scenario?.crews?.[corner];
     let mate;
+    // A level's crew; in the sandbox, someone like the lead (the dice re-roll them as anyone).
     if (crew) mate = crewFighter(lead, crew[index % crew.length]);
-    else {
-      const leads = new Set([state.rosters.red[0].name, state.rosters.blue[0].name]);
-      const spare = Object.values(PRESETS).filter((preset) => !leads.has(preset.name));
-      // Fighters added to a side fight mixed by default: boxing, kicking, the clinch, pushing.
-      mate = normaliseInputs({ ...structuredClone(spare[(index + (corner === 'blue' ? 2 : 0)) % spare.length]), style: 'mix' });
-      shuffleColors(mate);
-    }
+    else mate = varyCharacter(lead);
     // A name already in the fight gets a number.
     const taken = new Set([...state.rosters.red, ...state.rosters.blue].map((fighter) => fighter.name));
     let name = mate.name;
@@ -339,6 +335,17 @@ $('#shuffle-all').addEventListener('click', () => {
     fillCornerForm(corner);
   }
 });
+// The dice beside a side's size: everyone after its lead, re-rolled as anyone at all.
+for (const corner of ['red', 'blue']) {
+  document.querySelector(`.dice[data-corner="${corner}"]`).addEventListener('click', () => {
+    const roster = state.rosters[corner];
+    for (let index = 1; index < roster.length; index += 1) roster[index] = randomCharacter();
+    state.rosters[corner] = roster.slice(0, Math.max(1, state.teamSizes[corner]));
+    ensureRoster(corner, state.scenario ? SCENARIOS[state.scenario] : null);
+    refreshBuilder();
+    newBout();
+  });
+}
 $('#place').addEventListener('change', (event) => {
   state.place = event.target.value;
   newBout();

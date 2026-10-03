@@ -440,6 +440,7 @@ function buildKabuto(group, head, r, steel, color) {
 
 // How much bigger than first drawn a crest and a plume stand: they are meant to be seen.
 const HEAD_DRESS_SCALE = 1.7;
+const PLUME_SCALE = 1.15;
 
 /** A kabuto's crest (maedate) on its holder at the brow, in head coordinates. */
 export function kabutoCrest(head, r, steel) {
@@ -580,7 +581,7 @@ export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
       // Built round its holder on the crown, then sized up as a whole.
       const plume = new THREE.Group();
       plume.position.y = top;
-      plume.scale.setScalar(HEAD_DRESS_SCALE);
+      plume.scale.setScalar(PLUME_SCALE);
       const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * r, 0.08 * r, 0.3 * r, 8), steel);
       plume.add(holder);
       for (let index = 0; index < 9; index += 1) {

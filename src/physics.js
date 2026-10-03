@@ -38,7 +38,8 @@ export const WORLD = {
   contactStep: 0.012, // m a strike contact may separate per substep
   // Both hands on a weapon turn it this much more stiffly than one wrist.
   twoHandWrist: 1.7,
-  weaponTurnLimit: 40,
+  // Wrists turn a weapon no faster than this (rad/s): real cuts peak near 20–30.
+  weaponTurnLimit: 25,
   // A blade fending off a strike drives out this far (share of the line to the strike) past where they meet.
   fendDrive: 0.25,
   gripStep: 0.006, // m the off hand is drawn onto a two-handed grip per substep
@@ -61,7 +62,10 @@ export const WORLD = {
   motor: {
     hand: { omega: 60, zeta: 0.6 },
     elbow: { omega: 34, zeta: 0.75 },
-    head: { omega: 12, zeta: 0.4 },
+    // The neck holds the head steady and on the opponent (stiff, well
+    // damped: it does not bob); a blow still snaps it back before the
+    // reflex delay is up.
+    head: { omega: 20, zeta: 0.85 },
     trunk: { omega: 13, zeta: 0.5 },
     pelvis: { omega: 12, zeta: 0.5 },
     knee: { omega: 22, zeta: 0.7 },
@@ -436,7 +440,8 @@ function updatePickup(world, fighter, dt) {
 function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
   if (!weapon?.held || impulse <= 0) return;
-  weapon.strain += impulse / (BLADES.gripImpulsePerNewton * fighter.body.strikeForce[P[`${weapon.main}Hand`]]);
+  // A long lever off the hands is easier to tear away (`grip` < 1).
+  weapon.strain += impulse / (BLADES.gripImpulsePerNewton * (weapon.spec.grip ?? 1) * fighter.body.strikeForce[P[`${weapon.main}Hand`]]);
   if (weapon.strain >= 1) dropWeapon(world, fighter, 'disarmed', push);
 }
 
@@ -547,9 +552,16 @@ function updateWeapon(fighter, h) {
     if (gap > WORLD.gripStep) offset = vec.scale(offset, WORLD.gripStep / gap);
     const wMain = fighter.invMass[main];
     const wOff = fighter.invMass[off];
+    // Moved, not pushed: the previous positions move too, so a grip held
+    // against the arms every substep adds no speed (a steady correction
+    // otherwise becomes a huge, unbounded force on the hands).
     for (let index = 0; index < 3; index += 1) {
-      fighter.x[off * 3 + index] -= offset[index] * (wOff / (wMain + wOff));
-      fighter.x[main * 3 + index] += offset[index] * (wMain / (wMain + wOff));
+      const offShift = -offset[index] * (wOff / (wMain + wOff));
+      const mainShift = offset[index] * (wMain / (wMain + wOff));
+      fighter.x[off * 3 + index] += offShift;
+      fighter.prev[off * 3 + index] += offShift;
+      fighter.x[main * 3 + index] += mainShift;
+      fighter.prev[main * 3 + index] += mainShift;
     }
   }
   weapon.twoHanded = twoHands;
@@ -857,7 +869,8 @@ function updateIntent(world, fighter, dt) {
     const debris = world.debris[fighter.pickup.debris];
     intent.dip += 0.3;
     intent.lean += 0.6;
-    if (debris) intent.rHand = toLocal(fighter, vec.add(debris.x, [0, 0.03, 0]));
+    // Just above the grip, never into the floor (the floor and the muscle would fight over the hand).
+    if (debris) intent.rHand = toLocal(fighter, [debris.x[0], Math.max(debris.x[1], fighter.radius[P.rHand]) + 0.05, debris.x[2]]);
   }
   if (fighter.pin) {
     // Kneeling beside him, leaning over, hands on his chest and his hips.
@@ -1990,6 +2003,9 @@ function collideStriker(world, attacker, defender, striker, time) {
     attacker.contacts.delete(bladeKey);
   }
   const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
+  // One push out of the body per substep, however many parts it touches
+  // (a long weapon can lie across several at once).
+  let pushBudget = WORLD.contactStep;
   for (const capsule of capsules(defender)) {
     // Kicks and weapons hit legs and bodies; gloves only collide above the waist.
     if (!striker.shin && capsule.leg && !striking) continue;
@@ -2020,7 +2036,9 @@ function collideStriker(world, attacker, defender, striker, time) {
     // Separate them, sharing the push by inverse mass; a limb that starts a
     // strike already inside a body is eased out over a few substeps, not
     // thrown clear in one.
-    const penetration = Math.min(reach - distance, WORLD.contactStep);
+    const penetration = Math.min(reach - distance, pushBudget);
+    pushBudget -= penetration;
+    if (penetration <= 0) continue;
     const shares = [
       [attacker, striker.a, striker.a === striker.b ? 1 : 1 - closest.s, 1],
       [attacker, striker.b, striker.a === striker.b ? 0 : closest.s, 1],
@@ -2030,7 +2048,13 @@ function collideStriker(world, attacker, defender, striker, time) {
     const total = shares.reduce((sum, [fighter, index, share]) => sum + fighter.invMass[index] * share, 0);
     for (const [fighter, index, share, sign] of shares) {
       const amount = (penetration * fighter.invMass[index] * share) / total;
-      for (let axis = 0; axis < 3; axis += 1) fighter.x[index * 3 + axis] += sign * normal[axis] * amount;
+      for (let axis = 0; axis < 3; axis += 1) {
+        fighter.x[index * 3 + axis] += sign * normal[axis] * amount;
+        // A weapon resting in a body is held off it at the hand, far from
+        // where it touches: move the hand without making that a speed, or
+        // the push repeated each substep winds the arm up into a fling.
+        if (striker.weapon && fighter === attacker) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;
+      }
     }
   }
 }
@@ -2397,7 +2421,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const peakForce = ((Math.PI / 2) * impulse) / (wspec.contactSeconds * (1 + 0.6 * (1 - firmness)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const blocked = BLOCKING.has(capsule.key);
-  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0));
+  // A heavy hard head drives part of its blow through armour (`crush`).
+  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0));
   const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0));
   const glanced = Boolean(body.gear.deflects) && mix.cut + mix.pierce > 0.2;
@@ -2469,6 +2494,11 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away) {
   const relative = vec.sub(strikeVelocity, bladeVelocity);
   const closing = -vec.dot(relative, away);
   if (closing < WORLD.minImpactSpeed) return;
+  // Both fists, a forearm and a weapon can touch one blade in the same instant: that is one meeting, not several.
+  const pairKey = `${defender.id}`;
+  attacker.bladeMet ??= {};
+  if (world.time - (attacker.bladeMet[pairKey] ?? -Infinity) < 0.15) return;
+  attacker.bladeMet[pairKey] = world.time;
   const side = striker.side;
   const limbs = attacker.body.limbKg;
   const strikeMass = striking

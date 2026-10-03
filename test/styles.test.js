@@ -158,7 +158,8 @@ test('each style fights with its own moves, chosen by distance: a boxer never ki
 });
 
 test('boxing is aggressive: a pro volume of punches, most of them in combinations', () => {
-  const boxing = measureStyle('boxing', 3, 45);
+  // Six bouts: knockouts come quickly now, and three leave too few standing minutes.
+  const boxing = measureStyle('boxing', 6, 45);
   // Volume punchers throw ~80–100 a three-minute round.
   assert.ok(boxing.perMinute > 26 && boxing.perMinute < 40, `${boxing.perMinute.toFixed(1)} punches a minute`);
   assert.ok(boxing.comboShare > 0.3, `${(boxing.comboShare * 100).toFixed(0)}% follow-ups`);

@@ -159,6 +159,7 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 .teams .team.blue span { color: var(--blue); }
 .teams select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
 .teams .versus { color: var(--muted); }
+.teams .dice { padding: 3px 6px; font-size: 14px; line-height: 1; }
 .scene-pick span { font-weight: 600; color: var(--muted); margin-right: 4px; }
 
 /* The whole setup as JSON, beside the Fight button. */

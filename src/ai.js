@@ -58,6 +58,10 @@ export const AI = {
   // how many clean shots felt before experience weighs as much as the look
   // of the man; and what confidence (+1) or fear (−1) does to the fight.
   confidenceRatio: 2.5,
+  // Fear per metre of reach the other has on me.
+  reachFear: 0.6,
+  // His weapon is out of line when it points this far off me (cosine).
+  openingAngle: 0.5,
   experienceShots: 3,
   // `cadence`: a confident man works longer and moves less between, fear the reverse.
   confidence: { closer: 0.15, pressure: 1.0, tempo: 0.45, defend: 0.45, heavy: 0.08, cadence: 0.5 },
@@ -290,6 +294,8 @@ export function confidence(fighter, opponent, world = null) {
   const mine = judged(strikeThreat(fighter, opponent), fighter.aiDealt);
   const theirs = judged(strikeThreat(opponent, fighter), fighter.aiFelt);
   let nerve = Math.log(mine / theirs) / Math.log(AI.confidenceRatio);
+  // A longer reach is frightening in itself: he can hit me before I can hit him.
+  nerve -= AI.reachFear * Math.max(0, reachOf(opponent) - reachOf(fighter));
   if (world) {
     // Outnumbering is courage; being outnumbered, fear.
     const standing = (corner) => world.fighters.filter((other) => other.corner === corner && other.state !== 'out').length;
@@ -442,7 +448,14 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   };
   if (!phase) start('work', phaseLength(random, cadence.work));
   phase.t += dt;
-  const recovering = (opponent.punch && opponent.punch.t > opponent.punch.spec.extendUntil) || opponent.committed > 0;
+  // Openings: he is recovering from a blow, committed, giving ground, or
+  // his weapon's point is off the line to me.
+  const offLine = opponent.weapon?.held && (() => {
+    const toMe = vec.normalize(vec.sub(point(fighter.x, P.pelvis), point(opponent.x, P.pelvis)));
+    const d = opponent.weapon.dir;
+    return (d[0] * toMe[0] + d[2] * toMe[2]) / (Math.hypot(d[0], d[2]) || 1) < AI.openingAngle;
+  })();
+  const recovering = (opponent.punch && opponent.punch.t > opponent.punch.spec.extendUntil) || opponent.committed > 0 || opponent.defence?.name === 'stepBack' || offLine;
   // Afraid, he lets the distance open rather than walk back into range.
   const approach = Math.max(0.3, 1 + Math.min(0, cadence.nerve) * AI.confidence.pressure * 0.5);
   if (phase.name === 'move') {
@@ -492,7 +505,7 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
   const spec = AI.range;
   const mine = reachOf(fighter) + opponent.body.lengths.headRadius;
   const his = reachOf(opponent) + fighter.body.lengths.headRadius;
-  const hold = Math.min(mine - spec.inside, his + spec.outside);
+  const hold = Math.min(mine - (STYLES[fighter.style]?.rangeInside ?? spec.inside), Math.max(his + spec.outside, mine * 0.6));
   if (distance < his) fighter.move = -1;
   else if (distance < hold - AI.blade.slack) fighter.move = -0.6;
   else if (distance > hold + AI.blade.slack) fighter.move = 0.8;

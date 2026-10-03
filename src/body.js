@@ -54,7 +54,7 @@ export const BODY = {
   // fractures, worn-out tissue, cuts through, blood lost — as a share of the
   // figures below. Lower means fists and weapons alike end fights sooner;
   // nothing in the physics (masses, forces, impulses, knockback) changes.
-  toughness: 0.7,
+  toughness: 0.55,
   // Lean mass that is not skeleton or skeletal muscle: organs, skin, blood.
   // A share of lean (so it shrinks in starvation) plus a little per kg of
   // fat (a bigger body needs bigger organs). Leaves ~32 kg of muscle in a
@@ -135,6 +135,62 @@ export const PRESETS = {
   contender: {
     name: 'Ana Ruiz', style: 'muayThai', sex: 'female', heightCm: 170, frame: 'medium', age: 26, exercise: 0.88, calories: 3810,
     look: { skinTone: 'medium', hairStyle: 'bun', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'hazel' },
+  },
+  // A character for every other style, dressed for it.
+  street: {
+    name: 'Vinnie Russo', style: 'street', sex: 'male', heightCm: 178, frame: 'medium', age: 31, exercise: 0.3, calories: 3100,
+    outfit: { kind: 'casual', design: 0 },
+    look: { skinTone: 'light', hairStyle: 'fade', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
+  },
+  sumo: {
+    name: 'Takanohana', style: 'sumo', sex: 'male', heightCm: 185, frame: 'large', age: 27, exercise: 0.7, calories: 7400,
+    outfit: { kind: 'sumo', design: 0 },
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  mix: {
+    name: 'Kai Moana', style: 'mix', sex: 'male', heightCm: 180, frame: 'medium', age: 26, exercise: 0.8, calories: 4000,
+    outfit: { kind: 'sports', design: 0 },
+    look: { skinTone: 'tan', hairStyle: 'spiky', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  unskilled: {
+    name: 'Wat Tyler', style: 'unskilled', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.25, calories: 2900,
+    outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#6b4a2a', facialHair: 'beard', eyeColor: 'green' },
+  },
+  baton: {
+    name: 'Officer Reyes', style: 'baton', sex: 'male', heightCm: 182, frame: 'medium', age: 33, exercise: 0.6, calories: 3600,
+    outfit: { kind: 'swat', design: 0 },
+    look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  knight: {
+    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 183, frame: 'large', age: 30, exercise: 0.75, calories: 4200,
+    outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
+  },
+  samurai: {
+    name: 'Takeda Shingen', style: 'katana', sex: 'male', heightCm: 172, frame: 'medium', age: 34, exercise: 0.8, calories: 3600,
+    outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  knife: {
+    name: 'Ryo Kanda', style: 'knife', sex: 'male', heightCm: 175, frame: 'small', age: 29, exercise: 0.55, calories: 3100,
+    outfit: { kind: 'yakuza', design: 0 }, accessories: ['hat'],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  warhammer: {
+    name: 'Gunnar Holt', style: 'warhammer', sex: 'male', heightCm: 190, frame: 'large', age: 36, exercise: 0.7, calories: 4800,
+    outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
+    look: { skinTone: 'light', hairStyle: 'long', hairColor: '#8a3a1c', facialHair: 'beard', eyeColor: 'grey' },
+  },
+  naginata: {
+    name: 'Tomoe Gozen', style: 'naginata', sex: 'female', heightCm: 165, frame: 'medium', age: 27, exercise: 0.85, calories: 3200,
+    outfit: { kind: 'samurai', design: 3 }, accessories: ['crest'],
+    look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  spear: {
+    name: 'Hob Miller', style: 'spear', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
+    outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'hazel' },
   },
   // A gladiator armed as a Greek hoplite: spear, parma, a gladius in reserve.
   hoplomachus: {

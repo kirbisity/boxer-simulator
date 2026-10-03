@@ -140,6 +140,49 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(guard, cylinder(0.014, 0.015, -spec.handle, 0.012, dark));
       break;
     }
+    case 'warhammer': {
+      // An ash shaft; at the head a hammer face, a back spike and a top spike.
+      const head = spec.length - 0.12;
+      group.add(cylinder(0.017, 0.019, -spec.handle, head + 0.02, wood, 10));
+      const block = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.07), steel);
+      block.position.y = head;
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.09, 10), steel);
+      face.rotation.x = Math.PI / 2;
+      face.position.set(0, head, 0.08);
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 8), steel);
+      beak.rotation.x = -Math.PI / 2;
+      beak.position.set(0, head, -0.11);
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.14, 8), steel);
+      spike.position.y = head + 0.12;
+      const langets = cylinder(0.021, 0.021, head - 0.2, head - 0.04, steel, 8);
+      const butt = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 8), steel);
+      butt.rotation.x = Math.PI;
+      butt.position.y = -spec.handle - 0.03;
+      group.add(block, face, beak, spike, langets, butt);
+      break;
+    }
+    case 'naginata': {
+      // A long shaft and a long curving blade on its end.
+      const bladeStart = spec.strikeFrom - 0.06;
+      const bladeLength = spec.length - bladeStart;
+      group.add(cylinder(0.016, 0.018, -spec.handle, bladeStart + 0.02, surface(0x3a1e14, { roughness: 0.6 }), 10));
+      const bend = (y) => -0.06 * ((y - bladeStart) / bladeLength) ** 2;
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.045, 0.008, 0.14, bend), steel));
+      const collar = cylinder(0.022, 0.022, bladeStart - 0.06, bladeStart + 0.01, brass, 10);
+      const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.008, 16), surface(0x2a2420, { roughness: 0.5 }));
+      tsuba.position.y = bladeStart - 0.07;
+      const ishizuki = cylinder(0.019, 0.016, -spec.handle - 0.05, -spec.handle + 0.01, brass, 10);
+      group.add(collar, tsuba, ishizuki);
+      break;
+    }
+    case 'longSpear': {
+      const headStart = spec.length - 0.28;
+      group.add(cylinder(0.015, 0.017, -spec.handle, headStart + 0.02, wood, 8));
+      group.add(bladeMesh(bladeGeometry(headStart, 0.28, 0.055, 0.012, 0.18), steel));
+      const socket = cylinder(0.013, 0.018, headStart - 0.07, headStart + 0.01, steel, 8);
+      group.add(socket);
+      break;
+    }
     case 'spear': {
       group.add(cylinder(0.014, 0.015, -spec.handle, spec.length - 0.24, wood, 8));
       group.add(bladeMesh(bladeGeometry(spec.length - 0.26, 0.26, 0.05, 0.012, 0.16), steel));

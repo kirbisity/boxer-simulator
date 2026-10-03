@@ -45,6 +45,25 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 1, cut: 0.1, blunt: 0.2 }, swing: { blunt: 0.6 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.5,
   },
+  // Polearms, two hands well apart on the shaft. `crush`: the share of
+  // blunt armour a hard, heavy head drives straight through (the hammer's
+  // blow is felt through plate); `grip`: how firmly the weapon is held
+  // against blows (a long spear, levered from the hands, is easiest lost).
+  warhammer: {
+    label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, mass: 2.6, balance: 0.85, radius: 0.04,
+    harm: { swing: { blunt: 1.6 }, thrust: { blunt: 1, pierce: 0.35 } },
+    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, crush: 0.6,
+  },
+  naginata: {
+    label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, mass: 1.9, balance: 0.55, radius: 0.014,
+    harm: { swing: { cut: 1.3, blunt: 0.5 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.2 } },
+    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5,
+  },
+  longSpear: {
+    label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, mass: 1.9, balance: 0.55, radius: 0.016,
+    harm: { thrust: { pierce: 1, blunt: 0.25, cut: 0.15 }, swing: { blunt: 0.5, cut: 0.2 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.5, grip: 0.5,
+  },
   // His backup: a short sword that cuts and stabs.
   gladius: {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,

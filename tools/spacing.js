@@ -18,6 +18,9 @@ export const SPACING_PAIRINGS = [
   ['contender:boxing', 'contender:knife'],
   ['contender:street', 'contender:baton'],
   ['contender:katana', 'contender:hoplomachus:hoplomachus'],
+  ['contender:boxing', 'contender:spear'],
+  ['contender:street', 'contender:naginata'],
+  ['contender:boxing', 'contender:warhammer'],
 ];
 
 export function spacing(red, blue, bouts = 3, seconds = 60) {

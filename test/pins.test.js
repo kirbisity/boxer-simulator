@@ -57,13 +57,16 @@ test('sumo pushes men off their feet: a heavy sumo drives a lighter man over, op
 });
 
 test('a mixed fighter switches between the unarmed styles, never to a weapon', () => {
-  const world = createWorld([{ ...PRESETS.contender, style: 'mix' }, { ...PRESETS.contender, style: 'mix' }], { seed: 3 });
+  // Bouts end fast now: pool a few.
   const seen = new Set();
-  for (let second = 0; second < 60 && !boutWinner(world); second += 0.5) {
-    advance(world, 0.5, (current, dt) => thinkAll(current, dt));
-    for (const fighter of world.fighters) if (fighter.state === 'up') seen.add(fighter.style);
+  for (let seed = 3; seed < 7; seed += 1) {
+    const world = createWorld([{ ...PRESETS.contender, style: 'mix' }, { ...PRESETS.heavy, style: 'mix' }], { seed });
+    for (let second = 0; second < 60 && !boutWinner(world); second += 0.5) {
+      advance(world, 0.5, (current, dt) => thinkAll(current, dt));
+      for (const fighter of world.fighters) if (fighter.state === 'up') seen.add(fighter.style);
+    }
+    assert.ok(world.fighters.every((fighter) => !fighter.weapon));
   }
   assert.ok(seen.size >= 3, `styles seen: ${[...seen]}`);
   for (const style of seen) assert.ok(['boxing', 'kickboxing', 'muayThai', 'sumo'].includes(style), style);
-  assert.ok(world.fighters.every((fighter) => !fighter.weapon));
 });

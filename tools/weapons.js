@@ -21,6 +21,12 @@ export const WEAPON_PAIRINGS = [
   ['contender:katana', 'contender:katana:samurai'],
   ['contender:hoplomachus:hoplomachus', 'contender:longsword'],
   ['contender:hoplomachus:hoplomachus', 'contender:hoplomachus:hoplomachus'],
+  ['contender:warhammer', 'contender:katana:knight'],
+  ['contender:warhammer', 'contender:boxing'],
+  ['contender:naginata', 'contender:katana'],
+  ['contender:naginata', 'contender:boxing'],
+  ['contender:spear', 'contender:boxing'],
+  ['contender:spear', 'contender:longsword'],
 ];
 
 export const fighterFor = (spec) => {
