@@ -242,7 +242,32 @@ export function buildShieldMesh(spec, envMap) {
 // ---- In the hand ------------------------------------------------------------------
 
 /** Keep a fighter's weapon and shield drawn where the simulation holds them. */
-export function updateArms(view, fighterView) {
+// A polearm's blade (`edgeLeads`) is not turned by the wrist the way a
+// sword's is: the edge faces down at rest, the curve sweeping up from it,
+// and in a cut it leads, facing the way the blade travels. Turned gradually,
+// so it never flips edge for spine in a frame.
+const EDGE = { leadsAbove: 1.5, turn: 0.35 }; // m/s of the tip; share turned a frame
+
+function leadingEdge(arms, hand, along, length, now) {
+  const tip = new THREE.Vector3(hand[0], hand[1], hand[2]).addScaledVector(along, length);
+  const across = (vector) => vector.sub(along.clone().multiplyScalar(vector.dot(along)));
+  let wanted = across(new THREE.Vector3(0, -1, 0));
+  if (arms.tip && now > arms.tipAt) {
+    const travel = across(tip.clone().sub(arms.tip));
+    if (travel.length() / (now - arms.tipAt) > EDGE.leadsAbove) wanted = travel;
+  }
+  arms.tip = tip;
+  arms.tipAt = now;
+  if (wanted.lengthSq() < 1e-8) wanted = new THREE.Vector3(0, 1, 0).cross(along);
+  wanted.normalize();
+  const edge = arms.edge ? across(arms.edge.clone().lerp(wanted, EDGE.turn)) : wanted;
+  if (edge.lengthSq() < 1e-8) edge.copy(wanted);
+  arms.edge = edge.normalize();
+  return arms.edge.clone();
+}
+
+/** `time`: the simulated time being drawn (s). */
+export function updateArms(view, fighterView, time = 0) {
   const fighter = fighterView.fighter;
   const weapon = fighter.weapon;
   const arms = fighterView.arms ?? (fighterView.arms = { weapon: null, kind: null, shield: null });
@@ -257,11 +282,15 @@ export function updateArms(view, fighterView) {
     // Along the blade, the edge turned the way the forearm's front faces.
     const hand = point(fighter.x, P[`${weapon.main}Hand`]);
     const along = toVector(weapon.dir).normalize();
-    const forearm = fighterView.frames[BONE[`${weapon.main}Forearm`]];
-    const front = toVector(forearm.x);
-    let edge = front.clone().sub(along.clone().multiplyScalar(front.dot(along)));
-    if (edge.lengthSq() < 1e-6) edge = new THREE.Vector3(0, 1, 0).cross(along);
-    edge.normalize();
+    let edge;
+    if (weapon.spec.edgeLeads) edge = leadingEdge(arms, hand, along, weapon.spec.length, time);
+    else {
+      const forearm = fighterView.frames[BONE[`${weapon.main}Forearm`]];
+      const front = toVector(forearm.x);
+      edge = front.clone().sub(along.clone().multiplyScalar(front.dot(along)));
+      if (edge.lengthSq() < 1e-6) edge = new THREE.Vector3(0, 1, 0).cross(along);
+      edge.normalize();
+    }
     const flat = along.clone().cross(edge);
     arms.weapon.matrixAutoUpdate = false;
     arms.weapon.matrix.makeBasis(flat, along, edge).setPosition(hand[0], hand[1], hand[2]);

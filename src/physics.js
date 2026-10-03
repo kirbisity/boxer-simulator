@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, segmentToDisc } from './weapons.js';
+import { BLADES, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
 export const WORLD = {
@@ -43,6 +43,9 @@ export const WORLD = {
   // A blade fending off a strike drives out this far (share of the line to the strike) past where they meet.
   fendDrive: 0.25,
   gripStep: 0.006, // m the off hand is drawn onto a two-handed grip per substep
+  // A polearm's front hand slides along the shaft: no closer to the rear
+  // hand than this share of its usual spacing, and this far short of the head (m).
+  grip: { shortest: 0.4, headClear: 0.08 },
   contactRange: 2.6, // m between hips beyond which two fighters cannot touch
   bodyReach: 1.3, // m from the hips that any part of a body (standing or lying) can be
   // A strike from more than this far off the defender's facing (rad) is
@@ -487,6 +490,7 @@ function weaponIntent(world, fighter, intent) {
   }
   const weapon = fighter.weapon;
   intent.bladeDir = null;
+  intent.weaponArms = null;
   if (!weapon?.held || !style.weaponGuard) return;
   let target;
   if (punch?.spec.path === 'blade' && punch.t <= punch.spec.extendUntil) {
@@ -500,11 +504,16 @@ function weaponIntent(world, fighter, intent) {
     target = interceptBlock(world, fighter) ?? { hand: vec.scale([0.2, 0.8, -0.08], H), dir: vec.normalize([0.15, 0.3, 1]) };
   } else target = guardTargets(style, fighter.body);
   const main = weapon.main;
+  if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };
   intent[`${main}Hand`] = target.hand;
   intent.bladeDir = target.dir;
   const oneHanded = weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil);
   intent.twoHanded = !oneHanded;
-  if (!oneHanded) intent[`${weapon.off}Hand`] = vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing));
+  if (!oneHanded) intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, offHandAlong(weapon.spec)));
+  intent.weaponArms = oneHanded ? [main] : [main, weapon.off];
+  intent.weaponReach = style.weaponGuard.reach ?? null;
+  intent.polearmRear = weapon.spec.leadAhead && !oneHanded ? main : null;
+  intent.windingUp = punch?.spec.path === 'blade' && (punch.load > 0 || punch.t < punch.spec.windup);
 }
 
 /**
@@ -545,7 +554,16 @@ function updateWeapon(fighter, h) {
   const dir = rotateAbout(previous, weapon.spin, h);
   if (twoHands) {
     // The off hand on the handle, shared by the hands' inverse masses.
-    const handle = vec.sub(point(fighter.x, main), vec.scale(dir, spec.spacing));
+    // A sword's hands keep their places on the grip. On a polearm the shaft
+    // slides through the front hand: it holds the line wherever along the
+    // shaft it is (short of the head), so a thrust driven by the rear hand
+    // is not dragged back by a front arm that cannot reach any further.
+    let along = offHandAlong(spec);
+    if (spec.leadAhead) {
+      const reached = vec.dot(vec.sub(point(fighter.x, off), point(fighter.x, main)), dir);
+      along = Math.min(spec.strikeFrom - WORLD.grip.headClear, Math.max(spec.spacing * WORLD.grip.shortest, reached));
+    }
+    const handle = vec.add(point(fighter.x, main), vec.scale(dir, along));
     let offset = vec.sub(point(fighter.x, off), handle);
     // Drawn together a little each substep, never snapped: a big correction
     // here becomes speed, and speed fed back each substep explodes the arm.
@@ -1495,7 +1513,9 @@ function solveJointLimits(world, fighter) {
     if (hingeDefined) hinge(world, fighter, `${side}Knee`, P[`${side}Hip`], P[`${side}Knee`], P[`${side}Foot`], forward, L.shank);
     // Elbows bend only towards their natural side: down, back and out from
     // the shoulder–hand line, as the guard holds them.
-    const elbowSide = vec.normalize(vec.add(vec.add(vec.scale(forward, -0.4), vec.scale(trunkUp, -1)), vec.scale(leftward, 0.5 * sign)));
+    // An arm on a weapon bends down and out, never back: it is held forward.
+    const weaponArm = fighter.intent.weaponArms?.includes(side);
+    const elbowSide = vec.normalize(vec.add(vec.add(vec.scale(forward, weaponArm ? 0.15 : -0.4), vec.scale(trunkUp, -1)), vec.scale(leftward, 0.5 * sign)));
     if (hingeDefined) hinge(world, fighter, `${side}Elbow`, P[`${side}Shoulder`], P[`${side}Elbow`], P[`${side}Hand`], elbowSide, L.forearmToFist);
     // Hips: the thigh swings within a cone about straight down.
     coneLimit(world, fighter, `${side}Hip`, P[`${side}Hip`], P[`${side}Knee`], vec.scale(trunkUp, -1), limp ? WORLD.ragdoll.hipCone : WORLD.joint.hipCone);
@@ -1986,7 +2006,9 @@ function collideStriker(world, attacker, defender, striker, time) {
     }
     attacker.contacts.delete(shieldKey);
   }
-  if (!striker.weapon && defender.weapon?.held && defender.state === 'up') {
+  // The hand and forearm in a shield's grip are behind it: a blade meets the shield.
+  const shieldArm = attacker.shield && (striker.key === 'lHand' || striker.key === 'lForearm');
+  if (!striker.weapon && !shieldArm && defender.weapon?.held && defender.state === 'up') {
     // A blade in the way: a fist, shin, elbow or knee that comes on meets its edge.
     const weapon = defender.weapon;
     const hilt = vec.add(point(defender.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));

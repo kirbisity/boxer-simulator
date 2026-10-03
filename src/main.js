@@ -256,6 +256,8 @@ function draw(dt) {
 
 function drawWorld(dt) {
   const world = state.world;
+  // The moment on screen: between the last two steps, as the bodies are drawn.
+  const drawnTime = world.time - STEP + (state.paused ? STEP : state.accumulator);
   const pelvisMid = [0, 0, 0];
   for (const fighter of world.fighters) {
     pelvisMid[0] += fighter.x[24] / world.fighters.length;
@@ -271,7 +273,7 @@ function drawWorld(dt) {
   dramaCamera(scene, state.drama, world, realSeconds());
   for (const view of state.views) {
     updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
-    updateArms(scene, view);
+    updateArms(scene, view, drawnTime);
     updateStumps(view);
   }
   updateProps(scene, state.views, world);

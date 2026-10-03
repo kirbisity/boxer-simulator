@@ -15,6 +15,17 @@ export const POSE = {
   // Guard: hands in front of the face, relative to the head, in heights.
   leadGuard: [0.13, -0.1, 0.06],
   rearGuard: [0.035, -0.075, -0.075],
+  // An arm holding a weapon: the hand at least this far in front of its
+  // shoulder (heights), and the elbow bent down and out, a little forward,
+  // so the arm reads as held out rather than folded back behind the body.
+  weaponReach: 0.1,
+  // Cocking a blow the hand may come back level with its shoulder: the
+  // wind-up is where a swing gets its length.
+  weaponWindupReach: 0,
+  // A polearm's rear hand drives from beside the hip, as far back as its
+  // shoulder: the run-up a thrust needs. The front arm holds forward.
+  polearmRearReach: 0,
+  weaponPole: [0.25, -1, 0.6],
 };
 
 export const vec = {
@@ -129,9 +140,15 @@ export function desiredPose(body, intent = {}) {
       out[P[`${side}Hand`]] = vec.add(elbow, vec.scale(vec.normalize(vec.sub(hand, elbow)), L.forearmToFist));
       continue;
     }
-    const target = clampReach(shoulder, intent[`${side}Hand`] ?? guardPoint, (L.upperArm + L.forearmToFist) * 0.995);
+    const weaponArm = intent.weaponArms?.includes(side);
+    let wanted = intent[`${side}Hand`] ?? guardPoint;
+    if (weaponArm) {
+      const reach = intent.windingUp ? POSE.weaponWindupReach : intent.polearmRear === side ? POSE.polearmRearReach : intent.weaponReach ?? POSE.weaponReach;
+      wanted = [Math.max(wanted[0], shoulder[0] + reach * H), wanted[1], wanted[2]];
+    }
+    const target = clampReach(shoulder, wanted, (L.upperArm + L.forearmToFist) * 0.995);
     out[P[`${side}Hand`]] = target;
-    const pole = [-0.4, -1, side === 'l' ? 0.5 : -0.5];
+    const pole = weaponArm ? [POSE.weaponPole[0], POSE.weaponPole[1], POSE.weaponPole[2] * (side === 'l' ? 1 : -1)] : [-0.4, -1, side === 'l' ? 0.5 : -0.5];
     out[P[`${side}Elbow`]] = twoBoneIK(shoulder, target, L.upperArm, L.forearmToFist, pole);
   }
   return out;

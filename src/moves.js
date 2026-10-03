@@ -351,7 +351,8 @@ export const STYLES = {
     label: 'Hoplomachus', weapon: 'spear', shield: 'parma', fallback: 'gladius',
     cadence: { work: 0.9, move: 1.2, burst: 0.4, mobility: 0.4 },
     stance: { blade: 0.5, crouch: 0.06, width: 1.2, lean: 0.1, guardHeight: 0 },
-    weaponGuard: { hand: [-0.02, 0.8, -0.18], dir: [1, -0.05, 0.03] },
+    // Overhand, raised behind the shield's rim: its hand stays back there (reach 0).
+    weaponGuard: { hand: [-0.02, 0.8, -0.18], dir: [1, -0.05, 0.03], reach: 0 },
     // The shield arm: forearm across before the chest.
     shieldGuard: [0.3, 0.72, 0.05],
     idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },

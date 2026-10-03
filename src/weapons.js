@@ -50,17 +50,17 @@ export const WEAPONS = {
   // blow is felt through plate); `grip`: how firmly the weapon is held
   // against blows (a long spear, levered from the hands, is easiest lost).
   warhammer: {
-    label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, mass: 2.6, balance: 0.85, radius: 0.04,
+    label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 2.6, balance: 0.85, radius: 0.04,
     harm: { swing: { blunt: 1.6 }, thrust: { blunt: 1, pierce: 0.35 } },
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, crush: 0.6,
   },
   naginata: {
-    label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, mass: 1.9, balance: 0.55, radius: 0.014,
+    label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 1.9, balance: 0.55, radius: 0.014,
     harm: { swing: { cut: 1.3, blunt: 0.5 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.2 } },
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5,
   },
   longSpear: {
-    label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, mass: 1.9, balance: 0.55, radius: 0.016,
+    label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.9, balance: 0.55, radius: 0.016,
     harm: { thrust: { pierce: 1, blunt: 0.25, cut: 0.15 }, swing: { blunt: 0.5, cut: 0.2 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.5, grip: 0.5,
   },
@@ -118,6 +118,24 @@ export const BLADES = {
 };
 
 export const WEAPON_KEYS = Object.keys(WEAPONS);
+
+/**
+ * Where the off hand holds, along the weapon from the main hand (m): a
+ * sword's pommel hand below and behind the guard hand; on a polearm
+ * (`leadAhead`) the front hand reaches up the shaft ahead of the rear one,
+ * as spears and hammers are held, so neither arm folds back.
+ */
+export function offHandAlong(spec) {
+  return spec.leadAhead ? spec.spacing : -spec.spacing;
+}
+
+/**
+ * How far back along the weapon the rear (main) hand is set from where a
+ * move puts the grip, for a polearm held with the lead hand ahead: the two
+ * hands straddle that point, so the front hand is no further out — no more
+ * exposed to a blade — than a single grip there would be.
+ */
+export const LEAD_GRIP = { rearShare: 0.5 };
 
 /**
  * Where a segment comes nearest a disc (centre c, unit normal n, radius r):
