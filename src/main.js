@@ -10,7 +10,7 @@ import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { SCENARIOS, scenarioFighters } from './scenarios.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
-import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { buildFighterView, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -30,6 +30,8 @@ const state = {
   finishedAt: null,
   drama: { active: null, icons: [] },
   scenario: null,
+  sandboxCorners: null,
+  levelCorners: {},
 };
 const realSeconds = () => performance.now() / 1000;
 
@@ -39,9 +41,7 @@ function newBout() {
   state.seed += 1;
   // A scenario is the same world on its own floor, with its own people.
   const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
-  state.world = scenario
-    ? createWorld(scenarioFighters(scenario), { seed: state.seed, arena: scenario.arena })
-    : createWorld([{ inputs: state.corners.red, corner: 'red' }, { inputs: state.corners.blue, corner: 'blue' }], { seed: state.seed });
+  state.world = createWorld([{ inputs: state.corners.red, corner: 'red' }, { inputs: state.corners.blue, corner: 'blue' }], { seed: state.seed, arena: scenario?.arena });
   setPlace(scene, scenario?.scene ?? 'ring', scenario?.arena);
   if (scenario) Object.assign(scene.orbit, scenario.camera);
   document.body.dataset.place = scenario?.scene ?? 'ring';
@@ -324,11 +324,31 @@ const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a
 // The compact grid: the fighting style first, then the look.
 const LOOK_FIELDS = [
   { key: 'style', label: 'Style', options: STYLE_KEYS, names: Object.fromEntries(STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
-  { key: 'skinTone', label: 'Skin', options: ['light', 'medium', 'tan', 'deep'] },
-  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle },
+  { key: 'skinTone', label: 'Skin', options: Object.keys(SKIN_TONES), names: { light: 'light', lightTan: 'light tan', medium: 'medium', tan: 'tan', deep: 'deep' } },
+  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long' } },
   { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
   { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair },
   { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor },
+];
+
+// Street clothes and gear, for fighters who wear them (the levels): what
+// they wear on top and below, the colours, the headset, and bare fists or gloves.
+const CLOTH_COLORS = {
+  navy: '#24324a', maroon: '#7a2230', black: '#1c1c20', charcoal: '#26262b', grey: '#6b6e74',
+  white: '#e4e4e6', olive: '#4a5233', denim: '#2b3550', sand: '#b39a73',
+};
+const colorName = (hex) => Object.keys(CLOTH_COLORS).find((name) => CLOTH_COLORS[name] === hex) ?? hex;
+const OUTFIT_FIELDS = [
+  { key: 'top', label: 'Top', options: ['tshirt', 'hoodie'], names: { tshirt: 'T-shirt', hoodie: 'hoodie' }, get: (inputs) => inputs.clothing.top, set: (inputs, value) => { inputs.clothing.top = value; } },
+  { key: 'topColor', label: 'Colour', options: Object.keys(CLOTH_COLORS), get: (inputs) => colorName(inputs.clothing.topColor), set: (inputs, value) => { inputs.clothing.topColor = CLOTH_COLORS[value]; } },
+  { key: 'bottom', label: 'Legs', options: ['jeans', 'joggers'], get: (inputs) => inputs.clothing.bottom, set: (inputs, value) => { inputs.clothing.bottom = value; } },
+  { key: 'bottomColor', label: 'Colour', options: Object.keys(CLOTH_COLORS), get: (inputs) => colorName(inputs.clothing.bottomColor), set: (inputs, value) => { inputs.clothing.bottomColor = CLOTH_COLORS[value]; } },
+  {
+    key: 'headset', label: 'Headset', options: ['on', 'off'],
+    get: (inputs) => ((inputs.accessories ?? []).includes('headset') ? 'on' : 'off'),
+    set: (inputs, value) => { inputs.accessories = value === 'on' ? ['headset'] : []; },
+  },
+  { key: 'fists', label: 'Fists', options: ['bare', 'gloved'], get: (inputs) => (inputs.gloves === false ? 'bare' : 'gloved'), set: (inputs, value) => { inputs.gloves = value === 'gloved'; } },
 ];
 
 function buildCornerForm(corner) {
@@ -372,6 +392,21 @@ function buildCornerForm(corner) {
     row.append(select);
     return row;
   }));
+  // Gear: only shown for a fighter in street clothes.
+  const outfit = document.createElement('div');
+  outfit.className = 'looks outfit';
+  outfit.replaceChildren(...OUTFIT_FIELDS.map((field) => {
+    const row = document.createElement('label');
+    row.className = 'look-field';
+    row.innerHTML = `<span>${field.label}</span>`;
+    const select = document.createElement('select');
+    select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
+    select.dataset.outfit = field.key;
+    select.addEventListener('change', () => field.set(state.corners[corner], select.value));
+    row.append(select);
+    return row;
+  }));
+  looks.after(outfit);
   form.querySelector('.copy').addEventListener('click', async () => {
     const code = btoa(JSON.stringify(fighterFile(state.corners[corner])));
     const box = form.querySelector('.code');
@@ -402,6 +437,11 @@ function buildCornerForm(corner) {
 function fillCornerForm(corner) {
   const form = $(`#build-${corner}`);
   const inputs = state.corners[corner];
+  // A level's fighters are tuned, not swapped for a preset.
+  form.querySelector('.preset').closest('label').hidden = Boolean(state.scenario);
+  const outfit = form.querySelector('.outfit');
+  outfit.hidden = !inputs.clothing;
+  if (inputs.clothing) for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
   form.querySelector('.name-input').value = inputs.name;
   form.querySelector('.copy').textContent = 'Copy code';
   for (const field of FIELDS) {
@@ -451,13 +491,54 @@ function buildLevels() {
   }));
 }
 
+/**
+ * The builder edits whichever fighters are on: the sandbox's own two, or a
+ * level's. A level's are kept as tuned until the page is reloaded, so the
+ * tuning survives going back to the ring and returning.
+ */
 function chooseLevel(key) {
+  if (!state.scenario) state.sandboxCorners = state.corners;
+  if (key) {
+    state.levelCorners[key] ??= Object.fromEntries(scenarioFighters(SCENARIOS[key]).map(({ inputs, corner }) => [corner, inputs]));
+    state.corners = state.levelCorners[key];
+  } else state.corners = state.sandboxCorners;
   state.scenario = key;
+  fillCornerForm('red');
+  fillCornerForm('blue');
+  updateBuilderTitle();
   $('#levels').hidden = true;
   state.paused = false;
   $('#pause').textContent = 'Pause';
   newBout();
 }
+
+function updateBuilderTitle() {
+  const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
+  $('#builder h1').textContent = scenario ? `Fighters · ${scenario.title}` : 'Fighters';
+  $('#copy-level').hidden = !scenario;
+}
+
+/**
+ * The level as tuned, to hand back for locking in: each fighter's inputs
+ * as the scenario file writes them, with the weight the body settled at.
+ */
+$('#copy-level').addEventListener('click', async () => {
+  const fighters = ['red', 'blue'].map((corner) => {
+    const { calories, ...inputs } = state.corners[corner];
+    return { ...inputs, weightKg: Math.round(buildBody(state.corners[corner]).massKg * 10) / 10, calories };
+  });
+  const text = JSON.stringify({ level: state.scenario, fighters }, null, 2);
+  const button = $('#copy-level');
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = 'Copied';
+  } catch {
+    $('#build-red .code').value = text;
+    $('#build-red .code').select();
+    button.textContent = 'Select and copy below';
+  }
+  setTimeout(() => { button.textContent = 'Copy level'; }, 2500);
+});
 
 $('#open-levels').addEventListener('click', () => {
   $('#levels').hidden = false;

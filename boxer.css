@@ -87,7 +87,9 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .derived b { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
 .share { display: flex; gap: 6px; }
 .share .code { flex: 1; min-width: 0; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: 11px var(--mono); user-select: text; -webkit-user-select: text; }
-#close-builder { justify-self: end; padding: 9px 22px; }
+#close-builder { padding: 9px 22px; }
+.builder-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.outfit { border-top: 1px dashed var(--line); padding-top: 4px; }
 .corner-tabs { display: none; justify-self: start; }
 
 @media (max-width: 640px) {

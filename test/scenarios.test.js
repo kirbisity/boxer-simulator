@@ -7,19 +7,19 @@ import { SCENARIOS, scenarioWorld } from '../src/scenarios.js';
 
 test('the subway fighters are who the scenario says: height, weight, bare fists, the headset on', () => {
   const world = scenarioWorld('subway');
-  const [kenji, dre] = world.fighters;
-  assert.equal(kenji.body.inputs.heightCm, 183);
-  assert.ok(Math.abs(kenji.body.massKg - 72) < 1.5, `Kenji ${kenji.body.massKg.toFixed(1)} kg`);
+  const [simon, dre] = world.fighters;
+  assert.equal(simon.body.inputs.heightCm, 183);
+  assert.ok(Math.abs(simon.body.massKg - 72) < 1.5, `Simon ${simon.body.massKg.toFixed(1)} kg`);
   assert.ok(Math.abs(dre.body.massKg - 75) < 1.5, `Dre ${dre.body.massKg.toFixed(1)} kg`);
-  assert.equal(fistsOf(kenji.body), WORLD.fists.bare);
+  assert.equal(fistsOf(simon.body), WORLD.fists.bare);
   assert.deepEqual(world.props.map((prop) => [prop.kind, prop.owner, prop.attached]), [['headset', 0, true]]);
   assert.deepEqual(world.arena, SCENARIOS.subway.arena);
 });
 
 test('the first clean shot to the head knocks the headset off: it flies, lands and lies on the platform', () => {
   const world = scenarioWorld('subway', 3);
-  const [kenji, dre] = world.fighters;
-  placeFighter(kenji, 0.3, 0);
+  const [simon, dre] = world.fighters;
+  placeFighter(simon, 0.3, 0);
   placeFighter(dre, -0.3, 0);
   advance(world, 0.5);
   let thrown = 0;
@@ -28,7 +28,7 @@ test('the first clean shot to the head knocks the headset off: it flies, lands a
       throwPunch(world, dre, thrown % 2 ? 'hook' : 'cross', 'head');
       thrown += 1;
     }
-    advance(world, 1 / 60, () => { kenji.cooldown = 99; });
+    advance(world, 1 / 60, () => { simon.cooldown = 99; });
   }
   const off = world.events.find((event) => event.kind === 'accessory');
   assert.ok(off, 'knocked off');

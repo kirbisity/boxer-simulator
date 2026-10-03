@@ -23,9 +23,9 @@ export const SCENARIOS = {
     camera: { yaw: -0.25, pitch: 0.14, distance: 5.4 },
     fighters: [
       {
-        name: 'Kenji', style: 'street', sex: 'male', heightCm: 183, weightKg: 72, frame: 'medium', age: 27, exercise: 0.35,
+        name: 'Simon', style: 'street', sex: 'male', heightCm: 183, weightKg: 72, frame: 'medium', age: 27, exercise: 0.35,
         gloves: false, clothing: { top: 'tshirt', topColor: '#24324a', bottom: 'jeans', bottomColor: '#2b3550' }, accessories: ['headset'],
-        look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+        look: { skinTone: 'lightTan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
       },
       {
         name: 'Dre', style: 'street', sex: 'male', heightCm: 180, weightKg: 75, frame: 'medium', age: 25, exercise: 0.4,

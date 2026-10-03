@@ -18,7 +18,9 @@ import { outlineFor, surface } from './toon.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
-const SKIN_TONES = { light: 0xe8b796, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
+// Skin tones, lightest to deepest. Light tan is a warm, yellow-leaning
+// light skin: a shade under light, nowhere near medium.
+export const SKIN_TONES = { light: 0xe8b796, lightTan: 0xcc9a66, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
 
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
@@ -645,8 +647,9 @@ function buildBareFist(body, skinColor, side) {
   palm.position.y = 0.012 * scale;
   hand.add(palm);
   for (let finger = 0; finger < 4; finger += 1) {
-    const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.0115 * scale, 10, 8), material);
-    knuckle.position.set(0.012 * scale, 0.05 * scale, (finger - 1.5) * 0.019 * scale);
+    // Knuckles: a low ridge across the front of the fist, not separate balls.
+    const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.0095 * scale, 10, 8), material);
+    knuckle.position.set(0.008 * scale, 0.045 * scale, (finger - 1.5) * 0.018 * scale);
     hand.add(knuckle);
   }
   const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.011 * scale, 0.012 * scale, 0.045 * scale, 8), material);

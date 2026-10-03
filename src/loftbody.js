@@ -242,10 +242,11 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     loft(mesh, along(shoulder, elbow, armForward, count(10), -0.3, 1.0, upperDepth, upperWidth), sides, { capStart: false });
     // Forearm: full below the elbow, tapering to the wrist inside the glove
     // (or, bare, on to the wrist above the fist).
-    const wrist = body.inputs.gloves === false ? 0.84 : 0.74;
+    // Bare, the forearm runs right into the back of the fist.
+    const wrist = body.inputs.gloves === false ? 0.98 : 0.74;
     const forearmRings = (from, to, rings) => along(elbow, hand, armForward, rings, from, to,
-      profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.84, foreR * 0.56]]),
-      profile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.84, foreR * 0.62]]));
+      profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.98, foreR * 0.6]]),
+      profile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.98, foreR * 0.7]]));
     loft(mesh, forearmRings(-0.04, wrist, count(8)), sides);
     if (outfit) {
       // Sleeves: a T-shirt's stop halfway down the upper arm; a hoodie's
@@ -293,7 +294,15 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   if (faceted) ({ positions, indices, colors, bones, weightPositions } = facet(positions, indices, colors, bones, weightPositions));
   let positionArray = Float32Array.from(positions);
   const indexArray = Uint32Array.from(indices);
-  if (!faceted) positionArray = relax({ positions: positionArray, indices: indexArray }, LOFT.relaxPasses, LOFT.relaxAmount).positions;
+  if (!faceted) {
+    // Smooth the skin only: cloth tubes are all open edges, and relaxing an
+    // open edge pulls it in — hems would sink into the body beneath them.
+    const loose = Float32Array.from(positionArray);
+    positionArray = relax({ positions: positionArray, indices: indexArray }, LOFT.relaxPasses, LOFT.relaxAmount).positions;
+    colors.forEach((region, vertex) => {
+      if (region !== 'skin') positionArray.set(loose.subarray(vertex * 3, vertex * 3 + 3), vertex * 3);
+    });
+  }
   const normals = computeNormals(positionArray, indexArray);
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(Float32Array.from(weightPositions), frames, bones), bindFrames: frames, bindPoints: points };
