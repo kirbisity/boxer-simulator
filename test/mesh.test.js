@@ -69,3 +69,40 @@ test('rig frames are orthonormal and carry a point from the bind pose to the pos
   const back = fromFrame(bind[BONE.lUpperArm], local);
   assert.ok(vec.length(vec.sub(back, elbow)) < 1e-9);
 });
+
+/** Share of faces whose normal points away from the nearest bone: outward. */
+function outwardShare(mesh) {
+  const { positions, indices, bindFrames } = mesh;
+  const p = (i) => [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+  let outward = 0;
+  for (let face = 0; face < indices.length; face += 3) {
+    const [a, b, c] = [p(indices[face]), p(indices[face + 1]), p(indices[face + 2])];
+    const normal = vec.cross(vec.sub(b, a), vec.sub(c, a));
+    const centroid = vec.scale(vec.add(a, vec.add(b, c)), 1 / 3);
+    let nearest = null;
+    let best = Infinity;
+    for (const frame of bindFrames) {
+      const ab = vec.sub(frame.end, frame.origin);
+      const t = Math.max(0, Math.min(1, vec.dot(vec.sub(centroid, frame.origin), ab) / Math.max(1e-9, vec.dot(ab, ab))));
+      const onBone = vec.add(frame.origin, vec.scale(ab, t));
+      const distance = vec.length(vec.sub(centroid, onBone));
+      if (distance < best) {
+        best = distance;
+        nearest = onBone;
+      }
+    }
+    if (vec.dot(normal, vec.sub(centroid, nearest)) > 0) outward += 1;
+  }
+  return outward / (indices.length / 3);
+}
+
+test('every body style is wound outward, so the ink outline stays behind it', async () => {
+  const { buildLoftBody } = await import('../src/loftbody.js');
+  const body = buildBody(PRESETS.heavy);
+  for (const [name, mesh] of [['dense', buildBodyMesh(body)], ['smoothed', buildBodyMesh(body, 'skin', 0.024, 4)], ['lofted', buildLoftBody(body)], ['faceted', buildLoftBody(body, { faceted: true })]]) {
+    // Big faceted faces near the joints are sometimes nearest the wrong
+    // bone, so the measure reads a little low there; inside-out reads ~10%.
+    const share = outwardShare(mesh);
+    assert.ok(share > 0.8, `${name}: ${(share * 100).toFixed(0)}% of faces outward`);
+  }
+});

@@ -1,9 +1,9 @@
 // Page wiring: builder, HUD, controls, and the loop that steps the world and
 // draws it. The simulation runs at a fixed step whatever the frame rate.
 
-import { buildBody, fighterFile, PRESETS } from './body.js';
+import { buildBody, fighterFile, P, PRESETS } from './body.js';
 import { thinkAll } from './ai.js';
-import { advance, boutWinner, createWorld, throwPunch } from './physics.js';
+import { advance, boutWinner, createWorld, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, showImpact, updateFighterView, updateSpray } from './render.js';
@@ -89,7 +89,8 @@ function draw(dt) {
     pelvisMid[0] += fighter.x[24] / world.fighters.length;
     pelvisMid[2] += fighter.x[26] / world.fighters.length;
   }
-  placeCamera(scene, pelvisMid);
+  // A design sheet holds its own framing.
+  placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
   for (const view of state.views) updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   render(scene);
@@ -381,10 +382,82 @@ newBout();
 fit();
 requestAnimationFrame(frame);
 
+// ---- Design sheets -------------------------------------------------------------
+
+const SHEETS = {
+  faces: {
+    field: 'faceShape',
+    options: [
+      ['shonen', 'A · Shonen', 'angular jaw, pointed chin, sharp slanted eyes'],
+      ['shojo', 'B · Shojo', 'soft round cheeks, small chin, big round eyes'],
+      ['seinen', 'C · Seinen', 'longer face, squarer jaw, narrow eyes'],
+    ],
+    rows: [PRESETS.light, PRESETS.contender, PRESETS.heavy],
+    // The stance is bladed: the face looks about 0.55 rad round from +x.
+    camera: { distance: 1.55, pitch: 0.04, yaw: 0.12, height: 1.4 },
+  },
+  bodies: {
+    field: 'bodyStyle',
+    options: [
+      ['lofted', '1 · Lofted', 'clean low-poly rings · ~2.9k triangles'],
+      ['smoothed', '2 · Smoothed', 'anatomy field, coarse and relaxed · ~8k'],
+      ['faceted', '3 · Faceted', 'flat-shaded low poly · ~0.8k'],
+    ],
+    rows: [PRESETS.heavy, PRESETS.contender],
+    // Inside the ropes (the ring edge is 3 m out), so none cross the view.
+    camera: { distance: 2.75, pitch: 0.1, yaw: 0.15, height: 0.95 },
+  },
+};
+
+/** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
+function designSheet(kind, row = 0) {
+  const sheet = SHEETS[kind];
+  const spacing = kind === 'faces' ? 0.55 : 0.8;
+  const entries = sheet.options.map(([value, label], column) => {
+    const inputs = structuredClone(sheet.rows[row]);
+    inputs.look = { ...inputs.look, [sheet.field]: value };
+    return { inputs: { ...inputs, name: label }, corner: 'red', column };
+  });
+  state.paused = true;
+  state.world = createWorld(entries, { seed: 3 });
+  // Option A on the left as the camera sees it (+z is screen left).
+  state.world.fighters.forEach((fighter, index) => {
+    placeFighter(fighter, 0, (1 - entries[index].column) * spacing);
+    fighter.handsDown = true;
+    // Turn the bladed stance so the face, not the hips, points at the camera.
+    fighter.yaw = -0.5;
+  });
+  advance(state.world, 0.6, null, STEP);
+  rebuildViews();
+  const { distance, pitch, yaw, height } = sheet.camera;
+  Object.assign(scene.orbit, { distance, pitch, yaw });
+  for (let pass = 0; pass < 3; pass += 1) {
+    scene.orbit.target.set(0, height, 0);
+    draw(0);
+  }
+  // Labels under each option of the framed row.
+  const overlay = document.querySelector('#sheet-labels') ?? document.body.appendChild(Object.assign(document.createElement('div'), { id: 'sheet-labels' }));
+  overlay.replaceChildren();
+  const box = canvas.getBoundingClientRect();
+  sheet.options.forEach(([, label, note], column) => {
+    const fighter = state.world.fighters[column];
+    const anchor = new THREE.Vector3(fighter.x[P.pelvis * 3], kind === 'faces' ? fighter.x[P.neck * 3 + 1] - 0.2 : 0.35, fighter.x[P.pelvis * 3 + 2]).project(scene.camera);
+    const tag = document.createElement('div');
+    tag.className = 'sheet-label';
+    tag.innerHTML = `<b>${label}</b><span>${note}</span>`;
+    tag.style.left = `${box.left + ((anchor.x + 1) / 2) * box.width}px`;
+    tag.style.top = `${box.top + ((1 - anchor.y) / 2) * box.height}px`;
+    overlay.append(tag);
+  });
+  document.body.classList.add('sheet');
+  return state.world.fighters.length;
+}
+
 // Test hook: step the world by seconds without the frame clock.
 window.boxer = {
   state,
   scene,
+  designSheet,
   advance: (seconds) => {
     tick(seconds);
     draw(0);

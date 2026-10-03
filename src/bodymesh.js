@@ -292,10 +292,43 @@ export function skinWeights(positions, frames) {
   return { skinIndex, skinWeight };
 }
 
+/**
+ * Laplacian relaxation: move each vertex part of the way to the average of
+ * its neighbours. Irons out the small bumps where blended shapes meet and
+ * the stair-step a coarse grid leaves, at some cost in volume.
+ */
+export function relax(surface, iterations, amount = 0.5) {
+  const { positions, indices } = surface;
+  const count = positions.length / 3;
+  const neighbours = Array.from({ length: count }, () => new Set());
+  for (let face = 0; face < indices.length; face += 3) {
+    const [a, b, c] = [indices[face], indices[face + 1], indices[face + 2]];
+    neighbours[a].add(b).add(c);
+    neighbours[b].add(a).add(c);
+    neighbours[c].add(a).add(b);
+  }
+  let current = Float32Array.from(positions);
+  for (let pass = 0; pass < iterations; pass += 1) {
+    const next = new Float32Array(current.length);
+    for (let vertex = 0; vertex < count; vertex += 1) {
+      const around = neighbours[vertex];
+      for (let axis = 0; axis < 3; axis += 1) {
+        let sum = 0;
+        for (const other of around) sum += current[other * 3 + axis];
+        const mean = around.size ? sum / around.size : current[vertex * 3 + axis];
+        next[vertex * 3 + axis] = current[vertex * 3 + axis] + (mean - current[vertex * 3 + axis]) * amount;
+      }
+    }
+    current = next;
+  }
+  return { ...surface, positions: current };
+}
+
 /** Everything a renderer needs to skin this body: bind-pose surface, weights, bind frames. */
-export function buildBodyMesh(body, layer = 'skin', cell = MESH.cell) {
+export function buildBodyMesh(body, layer = 'skin', cell = MESH.cell, relaxPasses = 0) {
   const { shapes, points } = anatomy(body, layer);
-  const surface = surfaceNets(sampleField(shapes, cell));
+  let surface = surfaceNets(sampleField(shapes, cell));
+  if (relaxPasses > 0) surface = relax(surface, relaxPasses);
   const frames = boneFrames(points, body);
   return { ...surface, ...skinWeights(surface.positions, frames), bindFrames: frames, bindPoints: points };
 }

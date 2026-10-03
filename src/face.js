@@ -13,17 +13,34 @@
 import { P } from './body.js';
 import { WORLD } from './physics.js';
 import { SoftShell } from './soft.js';
-import { outlineFor, surface } from './toon.js';
+import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'beard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
-export const DEFAULT_LOOK = { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' };
+export const DEFAULT_LOOK = { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown', faceShape: null };
 const EYE_COLORS = { brown: 0x6b3f22, hazel: 0x8a6a2c, blue: 0x2f6fc0, green: 0x3f8a52, grey: 0x7a8a9a, amber: 0xc0821c };
 // Rounder than a real skull: depth, height, width as multiples of the radius.
 const SKULL = [0.94, 1.06, 0.86];
+
+/**
+ * Anime head constructions. Below the eye line the face is drawn, not
+ * rounded: its half-width runs in straight lines from the cheek to the jaw
+ * corner and on to the chin, the back of the head falls away into the neck,
+ * and the front is pressed into a flat plane. Each has the eyes that go
+ * with it.
+ *   jawWidth / jawAt — width at the jaw corner, and how far down it sits
+ *   chinWidth, chinLength, chinForward — the point of the chin
+ *   faceFront — depth of the flat face plane; cheek — fullness at the cheeks
+ *   eye — width, height (of the radius), slant (rad), lash weight
+ */
+export const FACE_SHAPES = {
+  shonen: { jawWidth: 0.8, jawAt: 0.5, chinWidth: 0.16, chinLength: 1.0, chinForward: 0.74, faceFront: 0.84, cheek: 0, crown: 1.0, eye: { width: 0.34, height: 0.25, slant: 0.14, lash: 0.055 } },
+  shojo: { jawWidth: 0.9, jawAt: 0.38, chinWidth: 0.16, chinLength: 0.9, chinForward: 0.7, faceFront: 0.88, cheek: 0.07, crown: 1.06, eye: { width: 0.38, height: 0.42, slant: 0, lash: 0.07 } },
+  seinen: { jawWidth: 0.88, jawAt: 0.62, chinWidth: 0.32, chinLength: 1.14, chinForward: 0.8, faceFront: 0.86, cheek: 0, crown: 0.97, eye: { width: 0.3, height: 0.19, slant: 0.06, lash: 0.04 } },
+};
 const FACE = {
   eyeLine: -0.06, // eyes sit a little below the middle of the head, as drawn
   eyeSpread: 0.36,
@@ -35,26 +52,48 @@ const FACE = {
 
 // ---- Skull --------------------------------------------------------------
 
-function headDeform(position, jaw) {
+const easeInOut = (t) => t * t * (3 - 2 * t);
+
+function headDeform(position, shape) {
   for (let index = 0; index < position.count; index += 1) {
-    let x = position.getX(index);
-    let y = position.getY(index);
-    let z = position.getZ(index);
-    if (y < 0.05) {
-      // Below the eyes the face narrows to a soft point at the chin.
-      const drop = Math.min(1.05, 0.05 - y);
-      z *= 1 - jaw * 0.55 * drop ** 1.4;
-      if (x < 0) x *= 1 - 0.45 * drop;
-      else x *= 1 - 0.12 * drop * drop;
-      y = 0.05 - drop * (1 - 0.12 * drop);
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    let X;
+    let Y;
+    let Z;
+    if (y < 0) {
+      // Lower face: rebuild each ring from its direction, at a drawn width.
+      const t = Math.min(1, -y);
+      const ring = Math.sqrt(Math.max(1e-6, 1 - y * y));
+      const ux = x / ring;
+      const uz = z / ring;
+      const width = t < shape.jawAt
+        ? 1 + (shape.jawWidth - 1) * (t / shape.jawAt) + shape.cheek * Math.sin((Math.PI * t) / shape.jawAt)
+        : shape.jawWidth + (shape.chinWidth - shape.jawWidth) * ((t - shape.jawAt) / (1 - shape.jawAt));
+      const front = 1 + (shape.chinForward - 1) * smooth(t);
+      const back = 1 - 0.62 * smooth(t);
+      X = ux * (ux > 0 ? front : back) * Math.min(1, ring * 3 + 0.25);
+      Z = uz * width * Math.min(1, ring * 3 + 0.25);
+      Y = -t * shape.chinLength;
+    } else {
+      X = x;
+      Y = y * shape.crown;
+      Z = z;
     }
-    position.setXYZ(index, x * SKULL[0], y * SKULL[1], z * SKULL[2]);
+    // The flat face plane: the front is pressed back where the features sit,
+    // fading in and out over the brow and the chin so no crease forms.
+    if (X > shape.faceFront) {
+      const band = smooth(Math.max(0, Math.min(1, (0.6 - Y) / 0.25))) * smooth(Math.max(0, Math.min(1, (Y + 0.95) / 0.3)));
+      X -= (X - shape.faceFront) * 0.7 * band;
+    }
+    position.setXYZ(index, X * SKULL[0], Y * SKULL[1], Z * SKULL[2]);
   }
 }
 
-function headGeometry(radius, jaw, segments = 36) {
+function headGeometry(radius, shape, segments = 36) {
   const geometry = new THREE.SphereGeometry(1, segments, Math.round(segments * 0.75));
-  headDeform(geometry.attributes.position, jaw);
+  headDeform(geometry.attributes.position, shape);
   geometry.scale(radius, radius, radius);
   geometry.computeVertexNormals();
   return geometry;
@@ -66,7 +105,7 @@ function headGeometry(radius, jaw, segments = 36) {
  * angles from `from(azimuth)` to `to(azimuth)` (0 is the crown). Rows are
  * spaced inside that range, so the edge is a smooth line, not a staircase.
  */
-function shellGeometry(radius, jaw, inflate, from, to, azimuths = [-Math.PI, Math.PI]) {
+function shellGeometry(radius, shape, inflate, from, to, azimuths = [-Math.PI, Math.PI]) {
   const columns = 72;
   const rows = 24;
   const positions = [];
@@ -90,7 +129,7 @@ function shellGeometry(radius, jaw, inflate, from, to, azimuths = [-Math.PI, Mat
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
-  headDeform(geometry.attributes.position, jaw);
+  headDeform(geometry.attributes.position, shape);
   geometry.scale(radius * inflate, radius * inflate, radius * inflate);
   geometry.computeVertexNormals();
   return geometry;
@@ -214,14 +253,14 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const look = { ...DEFAULT_LOOK, ...lookInput };
   const r = body.lengths.headRadius;
   const female = body.inputs.sex === 'female';
-  const jaw = female ? 1.1 : 0.8;
+  const shape = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shojo' : 'shonen'];
   const group = new THREE.Group();
-  const skinMaterial = surface(skinHex);
+  const skinMaterial = surface(skinHex, { steps: STYLE.faceSteps });
   const baseSkin = skinMaterial.color.clone();
   const hairMaterial = surface(look.hairColor);
   const ink = 0x24181a;
 
-  const skull = new SoftShell(headGeometry(r, jaw), skinMaterial, body.segments.head.fleshFirmness);
+  const skull = new SoftShell(headGeometry(r, shape), skinMaterial, body.segments.head.fleshFirmness);
   group.add(skull.mesh);
   skull.mesh.add(outlineFor(skull.mesh, 0.0035));
   for (const side of [1, -1]) {
@@ -233,13 +272,13 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     group.add(ear);
   }
 
-  const probe = new THREE.Mesh(headGeometry(r, jaw, 28));
+  const probe = new THREE.Mesh(headGeometry(r, shape, 28));
   probe.updateMatrixWorld();
   const raycaster = new THREE.Raycaster();
 
   // Eyes, drawn in layers on the surface.
-  const eyeWidth = 0.34 * r;
-  const eyeHeight = (female ? 0.36 : 0.3) * r;
+  const eyeWidth = shape.eye.width * r;
+  const eyeHeight = shape.eye.height * r;
   const irisColor = new THREE.Color(EYE_COLORS[look.eyeColor] ?? EYE_COLORS.brown);
   const eyes = [1, -1].map((side) => {
     const holder = onSurface(new THREE.Group(), probe, raycaster, r, FACE.eyeLine, side * FACE.eyeSpread, 0.006 * r);
@@ -258,7 +297,9 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     iris.add(flat(ellipseShape(eyeWidth * 0.08, eyeWidth * 0.08, eyeWidth * 0.1, -eyeHeight * 0.18), 0xffffff, 0.0012));
     ball.add(iris);
     mirror.add(ball);
-    const upperLash = flat(lashShape(eyeWidth, eyeHeight, (female ? 0.07 : 0.05) * r, (female ? 0.05 : 0.02) * r), ink, 0.0016);
+    const upperLash = flat(lashShape(eyeWidth, eyeHeight, shape.eye.lash * r, (female ? 0.05 : 0.02) * r), ink, 0.0016);
+    // Slant: outer corners up for a sharp look (mirroring turns it outward on both eyes).
+    mirror.rotation.z = (side > 0 ? -1 : 1) * shape.eye.slant;
     const lowerLash = flat(lashShape(eyeWidth * 0.7, eyeHeight * 0.8, 0.012 * r, 0), ink, 0.0016);
     lowerLash.rotation.z = Math.PI;
     lowerLash.position.x = -eyeWidth * 0.12;
@@ -313,8 +354,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     return disc;
   });
 
-  buildHair(group, look, r, jaw, hairMaterial, female);
-  buildFacialHair(group, look, r, jaw, hairMaterial);
+  buildHair(group, look, r, shape, hairMaterial, female);
+  buildFacialHair(group, look, r, shape, hairMaterial);
 
   // ---- Expression -------------------------------------------------------
   const face = { blinkIn: 1 + Math.random() * 3, blinking: 0, lid: 0, mouth: 0, brow: 0, flush: 0, gaze: [0, 0], gazeIn: 1 };
@@ -383,12 +424,12 @@ function hairLock(group, material, points, width, thickness, taper = 1) {
   return lock;
 }
 
-function buildHair(group, look, r, jaw, material, female) {
+function buildHair(group, look, r, shape, material, female) {
   const style = look.hairStyle;
   if (style === 'bald') return;
   // A cap down to the hairline: high at the brow, low at the nape.
   const cap = (inflate, front = 1.1, back = 1.95) => {
-    const mesh = new THREE.Mesh(shellGeometry(r, jaw, inflate, () => 0, hairline(front, back)), material);
+    const mesh = new THREE.Mesh(shellGeometry(r, shape, inflate, () => 0, hairline(front, back)), material);
     mesh.material.side = THREE.DoubleSide;
     mesh.add(outlineFor(mesh, 0.003));
     group.add(mesh);
@@ -403,7 +444,8 @@ function buildHair(group, look, r, jaw, material, female) {
     for (let index = 0; index < count; index += 1) {
       const across = (index / (count - 1) - 0.5) * 1.3;
       const from = onScalp(r, 0.35, across * 0.8, 1.04);
-      const to = [SKULL[0] * r * 0.98, (0.32 - length) * r, (across * 0.62 + sweep) * r];
+      // Bangs stop at the brow line, so they frame the eyes rather than cover them.
+      const to = [SKULL[0] * r * 0.98, Math.max(FACE.eyeLine + 0.24, 0.32 - length) * r, (across * 0.62 + sweep) * r];
       lock(from, to, 0.32 * r, 0.07 * r, [0.12 * r, 0.06 * r, sweep * 0.3 * r]);
     }
   };
@@ -459,7 +501,7 @@ function buildHair(group, look, r, jaw, material, female) {
   }
 }
 
-function buildFacialHair(group, look, r, jaw, material) {
+function buildFacialHair(group, look, r, shape, material) {
   const style = look.facialHair;
   if (style === 'none') return;
   // Jaw and chin, ear to ear: up to the sideburns at the sides, below the
@@ -470,7 +512,7 @@ function buildFacialHair(group, look, r, jaw, material) {
   };
   if (style === 'stubble' || style === 'beard') {
     const mat = style === 'stubble' ? surface(material.color.getHex(), { opacity: 0.3 }) : material;
-    const beard = new THREE.Mesh(shellGeometry(r, jaw, style === 'beard' ? 1.04 : 1.01, top, () => Math.PI * 0.97, [-Math.PI * 0.62, Math.PI * 0.62]), mat);
+    const beard = new THREE.Mesh(shellGeometry(r, shape, style === 'beard' ? 1.04 : 1.01, top, () => Math.PI * 0.97, [-Math.PI * 0.62, Math.PI * 0.62]), mat);
     beard.material.side = THREE.DoubleSide;
     if (style === 'beard') beard.add(outlineFor(beard, 0.003));
     group.add(beard);

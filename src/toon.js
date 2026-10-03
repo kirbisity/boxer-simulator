@@ -13,26 +13,29 @@ export const STYLE = {
   toonSteps: [0.48, 0.72, 0.86],
   outlineWidth: 0.0045, // m
   outlineColor: 0x1a1216,
+  // Faces in cel animation are barely shaded: two close tones.
+  faceSteps: [0.7, 0.86],
 };
 
-let gradient = null;
-function gradientMap() {
-  if (gradient) return gradient;
-  const steps = STYLE.toonSteps;
+const gradients = new Map();
+function gradientMap(steps = STYLE.toonSteps) {
+  const key = steps.join(',');
+  if (gradients.has(key)) return gradients.get(key);
   const data = new Uint8Array(steps.length * 3);
   steps.forEach((value, index) => data.set([value * 255, value * 255, value * 255], index * 3));
-  gradient = new THREE.DataTexture(data, steps.length, 1, THREE.RGBFormat);
+  const gradient = new THREE.DataTexture(data, steps.length, 1, THREE.RGBFormat);
   gradient.minFilter = THREE.NearestFilter;
   gradient.magFilter = THREE.NearestFilter;
   gradient.generateMipmaps = false;
   gradient.needsUpdate = true;
+  gradients.set(key, gradient);
   return gradient;
 }
 
 /** A surface material in the current style. */
-export function surface(color, { skinning = false, vertexColors = false, roughness = 0.6, opacity = 1 } = {}) {
+export function surface(color, { skinning = false, vertexColors = false, roughness = 0.6, opacity = 1, steps = STYLE.toonSteps } = {}) {
   const common = { color, skinning, vertexColors, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 };
-  if (STYLE.current === 'toon') return new THREE.MeshToonMaterial({ ...common, gradientMap: gradientMap() });
+  if (STYLE.current === 'toon') return new THREE.MeshToonMaterial({ ...common, gradientMap: gradientMap(steps) });
   return new THREE.MeshStandardMaterial({ ...common, roughness, metalness: 0 });
 }
 

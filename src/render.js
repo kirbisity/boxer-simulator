@@ -7,6 +7,7 @@
 /* global THREE */
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
+import { buildLoftBody } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, point, WORLD } from './physics.js';
@@ -21,6 +22,7 @@ const SKIN_TONES = { light: 0xe8b796, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
 const HEAD_SCALE = 1.12;
+const HEAD_SEAT = 0.18; // head radii the head sits lower than the physics head
 const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 
 // ---- Scene -----------------------------------------------------------------
@@ -128,6 +130,13 @@ function paintBody(mesh, body, look, corner) {
   const shorts = new THREE.Color(corner);
   const band = new THREE.Color(0xf4f4f4);
   const top = new THREE.Color(corner).multiplyScalar(0.7);
+  if (mesh.regions) {
+    // A lofted body names its kit pieces; paint each its colour.
+    const byRegion = { skin, kit: shorts, band, top };
+    const colors = new Float32Array(positions.length);
+    mesh.regions.forEach((region, vertex) => colors.set([byRegion[region].r, byRegion[region].g, byRegion[region].b], vertex * 3));
+    return colors;
+  }
   const hipY = bindPoints[P.pelvis][1];
   const trunk = body.lengths.trunk;
   const legReach = body.lengths.hipSpan / 2 + body.segments.lThigh.skinRadius * 1.7;
@@ -182,6 +191,24 @@ function skinnedMesh(built, bones, colors) {
   return mesh;
 }
 
+/**
+ * Ways to build the skin. 'smoothed' is the anatomy field on a coarse grid,
+ * relaxed; 'lofted' is clean low-poly rings; 'faceted' is the same with few
+ * sides and flat shading; 'dense' is the fine field, as first built.
+ */
+export const BODY_STYLES = ['lofted', 'smoothed', 'faceted', 'dense'];
+export let BODY_STYLE = 'lofted';
+export function setBodyStyle(style) {
+  BODY_STYLE = style;
+}
+
+function buildSkin(body, style) {
+  if (style === 'lofted') return buildLoftBody(body);
+  if (style === 'faceted') return buildLoftBody(body, { faceted: true });
+  if (style === 'smoothed') return buildBodyMesh(body, 'skin', 0.024, 4);
+  return buildBodyMesh(body, 'skin');
+}
+
 export function buildFighterView(view, fighter) {
   const body = fighter.body;
   const look = body.inputs.look ?? {};
@@ -197,7 +224,7 @@ export function buildFighterView(view, fighter) {
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  const built = buildBodyMesh(body, 'skin');
+  const built = buildSkin(body, look.bodyStyle ?? BODY_STYLE);
   const skinMesh = skinnedMesh(built, bones, paintBody(built, body, look, corner));
   const skinOutline = outlineFor(skinMesh);
   layers.skin.add(skinMesh, skinOutline);
@@ -339,7 +366,10 @@ export function updateFighterView(fighterView, dt, time) {
     fighterView.skeleton[index].matrix.fromArray(matrix);
     fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
   });
-  fighterView.head.group.matrix.fromArray(frameMatrix(frames[BONE.head])).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
+  const headFrame = frames[BONE.head];
+  // Seated a little down the neck, as drawn heads are.
+  const seat = fighter.body.lengths.headRadius * HEAD_SEAT;
+  fighterView.head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
   fighterView.head.group.matrixWorldNeedsUpdate = true;
   for (const { object, bone, at } of fighterView.attachments) {
     object.matrix.fromArray(frameMatrix({ ...frames[bone], origin: points[at] }));

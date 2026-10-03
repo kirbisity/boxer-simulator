@@ -288,6 +288,10 @@ function updateIntent(world, fighter, dt) {
     intent[`${spec.hand}Hand`] = punchHandTarget(fighter);
     if (punch.t >= spec.duration) fighter.punch = null;
   }
+  if (fighter.handsDown) {
+    // Hands at the sides, for portraits and design sheets.
+    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * 0.2 * H];
+  }
   if (fighter.slip > 0) {
     intent.headOffset = vec.add(intent.headOffset, [-0.02 * H, -0.05 * H, (fighter.slipSide ?? 1) * 0.07 * H]);
     intent.lean -= 0.05;
