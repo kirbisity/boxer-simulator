@@ -1,0 +1,13 @@
+{
+  "name": "gladiator",
+  "version": "0.1.0",
+  "description": "Gladiator: fighters built from bone, joint and muscle, fought in a physics simulation",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "bout": "node tools/bout.js",
+    "bundle": "node tools/bundle.js",
+    "serve": "python3 tools/serve.py 8934"
+  }
+}

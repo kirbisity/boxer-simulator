@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Gladiator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="boxer.css">
+</head>
+<body>
+<main class="arena">
+  <canvas id="stage" aria-label="Boxing ring"></canvas>
+
+  <header class="hud">
+    <section class="card red" id="hud-red">
+      <div class="top"><span class="name"></span><span class="kd"></span></div>
+      <div class="bar stamina" title="Stamina"><i></i></div>
+      <div class="bar brain" title="Brain strain: accumulated head impacts"><i></i></div>
+      <div class="bar blood" title="Blood lost: at the end of this bar he collapses" hidden><i></i></div>
+      <div class="meta">hand <span class="speed"></span></div>
+    </section>
+    <div class="clock" id="clock">0:00</div>
+    <section class="card blue" id="hud-blue">
+      <div class="top"><span class="name"></span><span class="kd"></span></div>
+      <div class="bar stamina" title="Stamina"><i></i></div>
+      <div class="bar brain" title="Brain strain: accumulated head impacts"><i></i></div>
+      <div class="bar blood" title="Blood lost: at the end of this bar he collapses" hidden><i></i></div>
+      <div class="meta">hand <span class="speed"></span></div>
+    </section>
+  </header>
+
+  <ol class="log" id="log" aria-live="polite"></ol>
+  <div id="icons" aria-hidden="true"></div>
+  <div id="flash" aria-hidden="true"></div>
+
+  <!-- The menus: one screen at a time, over the fight behind them. -->
+  <div class="screen" id="home" hidden></div>
+  <div class="screen" id="quick" hidden></div>
+  <div class="screen" id="levels-screen" hidden></div>
+  <div class="screen" id="versus" hidden></div>
+  <div class="wizard" id="wizard" hidden></div>
+
+  <div class="banner" id="banner" hidden>
+    <p id="banner-text"></p>
+    <div class="banner-actions"><button id="banner-menu">Menu</button><button id="banner-again" class="primary">Next bout</button></div>
+  </div>
+
+  <div class="pad" id="pad" hidden>
+    <button data-move="-1" aria-label="Step back">◀</button>
+    <button data-move="1" aria-label="Step in">▶</button>
+    <button data-command="jab">Jab <kbd>J</kbd></button>
+    <button data-command="cross">Cross <kbd>K</kbd></button>
+    <button data-command="hook">Hook <kbd>H</kbd></button>
+    <button data-command="uppercut">Upper <kbd>U</kbd></button>
+    <button data-command="guard">Guard <kbd>␣</kbd></button>
+    <button data-command="slip">Slip <kbd>S</kbd></button>
+    <button data-command="body">Body <kbd>B</kbd></button>
+  </div>
+
+  <footer class="controls">
+    <button id="open-menu" class="menu-button">☰ Menu</button>
+    <div class="seg sandbox-only" id="layers" aria-label="Layer">
+      <button data-value="skin" class="on">Skin</button>
+      <button data-value="muscle">Muscle</button>
+      <button data-value="bone">Bone</button>
+      <button data-value="physics">Physics</button>
+    </div>
+    <div class="seg sandbox-only" id="styles" aria-label="Shading">
+      <button data-value="toon" class="on">Toon</button>
+      <button data-value="soft">Soft</button>
+    </div>
+    <div class="seg" id="speeds" aria-label="Speed">
+      <button data-value="0.25">¼×</button>
+      <button data-value="1" class="on">1×</button>
+      <button data-value="4">4×</button>
+    </div>
+    <div class="teams sandbox-only" aria-label="Fighters a side">
+      <label class="team red"><span>Red</span><select id="team-red"></select></label>
+      <button class="dice" data-corner="red" title="Re-roll Red's other fighters as anyone at random">🎲</button>
+      <span class="versus">v</span>
+      <label class="team blue"><span>Blue</span><select id="team-blue"></select></label>
+      <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random">🎲</button>
+    </div>
+    <label class="teams scene-pick sandbox-only" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option><option value="meadow">Village green</option></select></label>
+    <div class="seg" id="modes" aria-label="Mode">
+      <button data-value="watch" class="on">Watch</button>
+      <button data-value="play">Play red</button>
+    </div>
+    <button id="pause">Pause</button>
+    <button id="restart">Restart</button>
+    <button id="open-builder" class="primary sandbox-only">Build fighters</button>
+  </footer>
+
+  <div class="builder" id="builder" hidden>
+    <div class="sheet">
+      <h1>Fighters</h1>
+      <p class="lede">Body fat is not set but grown: daily calories and weekly exercise settle into weight, fat, muscle and bone over months. The fight then runs on that body.</p>
+      <div class="seg corner-tabs" id="corner-tabs">
+        <button data-value="red" class="on">Red corner</button>
+        <button data-value="blue">Blue corner</button>
+      </div>
+      <div class="corners" data-showing="red">
+        <form class="corner red" id="build-red" onsubmit="return false">
+          <h2>Red corner</h2>
+          <label class="field wide member-row"><span>Fighter</span><select class="member"></select></label>
+          <label class="field wide"><span>Preset</span><select class="preset"></select></label>
+          <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
+          <div class="fields"></div>
+          <div class="looks"></div>
+          <div class="derived"></div>
+          <div class="share"><input class="code" placeholder="Fighter code"><button type="button" class="copy">Copy code</button><button type="button" class="load">Load</button></div>
+        </form>
+        <form class="corner blue" id="build-blue" onsubmit="return false">
+          <h2>Blue corner</h2>
+          <label class="field wide member-row"><span>Fighter</span><select class="member"></select></label>
+          <label class="field wide"><span>Preset</span><select class="preset"></select></label>
+          <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
+          <div class="fields"></div>
+          <div class="looks"></div>
+          <div class="derived"></div>
+          <div class="share"><input class="code" placeholder="Fighter code"><button type="button" class="copy">Copy code</button><button type="button" class="load">Load</button></div>
+        </form>
+      </div>
+      <div class="builder-actions"><textarea id="setup-code" rows="1" placeholder="Setup JSON: every fighter on both sides"></textarea><button id="shuffle-all">Shuffle all colours</button><button id="copy-setup">Copy setup</button><button id="load-setup">Load setup</button>
+<button id="close-builder" class="primary">Fight</button></div>
+    </div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
