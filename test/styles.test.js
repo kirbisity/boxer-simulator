@@ -1,10 +1,10 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, FRAMES, P, PRESETS } from '../src/body.js';
 import { caloriesForBodyFat } from '../src/physiology.js';
 
 const caloriesFor = (exercise, bodyFat) => caloriesForBodyFat({ sex: 'male', heightCm: 178, age: 30, frame: 'medium', exercise }, bodyFat, FRAMES.medium.lean);
-import { think, thinkAll } from '../src/ai.js';
+import { think, thinkAll, AI } from '../src/ai.js';
 import { vec } from '../src/pose.js';
 import { measureStyle } from '../tools/aggression.js';
 import { MOVES, STYLES } from '../src/moves.js';
@@ -120,6 +120,10 @@ test('in the clinch the hands lock behind the neck and hold it', () => {
 
 test('each style fights with its own moves, chosen by distance: a boxer never kicks; Muay Thai knees and elbows inside, kicks outside', () => {
   // A passive opponent at a fixed distance; count what the style throws.
+  // Nobody holds him down when he falls: the sample would end there.
+  const pinners = AI.pin.pinners;
+  AI.pin.pinners = 0;
+  after(() => { AI.pin.pinners = pinners; });
   const thrown = (style, gap) => {
     const world = createWorld([{ ...PRESETS.light, style }, { ...PRESETS.veteran, style: 'boxing' }], { seed: 9 });
     placeFighter(world.fighters[0], -gap / 2);

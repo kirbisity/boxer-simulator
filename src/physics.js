@@ -175,7 +175,8 @@ export const WORLD = {
   // The clinch: hands locked behind the neck; it breaks when the defender's
   // strength wins or the time runs out.
   // reachSeconds: time the hands have to get to the neck before the clinch is abandoned.
-  clinch: { lockDistance: 0.14, range: 0.95, pullDown: 0.08, reachSeconds: 0.6 },
+  // driveShare: of a sumo's leg force (less his man's) that drives his man back in the clinch.
+  clinch: { lockDistance: 0.14, range: 0.95, pullDown: 0.08, reachSeconds: 0.6, driveShare: 0.85 },
   // Leg kicks add up: the speed change each kick gives the struck leg
   // (m/s, summed) until it gives way — some 20 hard low kicks from a heavy
   // man into a lightweight's thigh, many more the other way. After it first
@@ -191,6 +192,16 @@ export const WORLD = {
   downSecondsMin: 3,
   downSecondsRange: 4,
   knockdownsToStop: 3,
+  // Holding the last man down. Pinners kneel beside him (hips this share of
+  // height lower, leaning in), lock their hands on his chest and hips once
+  // within `lockDistance` (m), and press with this share of their weight;
+  // the hands let go past `release` m. Held with his trunk below `lowNeck` × his standing neck
+  // height for `seconds`, he is beaten. Trying to rise under the hold and
+  // failing, he tries again after `retry` s. At most `pinners` at once. The
+  // hold presses and holds; it never strikes and adds no harm.
+  // A man held down who is not out fights it: he tries to get up `struggleAfter` s into the hold.
+  // The grip pulls like a spring of `gripStiffness` N/m, up to `gripShare` of the arm's strike force.
+  pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 3, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
 };
 
 // Every attack and its data live in moves.js; the old name stays for callers.
@@ -277,7 +288,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     life: lifePhases(random),
     state: 'up', motorScale: 1, stun: 0, downTimer: 0,
     stamina: 1, concussion: 0, knockdowns: 0, injuries: [],
-    style: STYLES[inputs.style] ? inputs.style : 'boxing',
+    // A mixed fighter starts in one of his styles and switches as he goes.
+    mixed: STYLES[inputs.style]?.mix ? inputs.style : null,
+    style: STYLES[inputs.style]?.mix ? STYLES[inputs.style].mix[Math.floor((random ?? Math.random)() * STYLES[inputs.style].mix.length)] : STYLES[inputs.style] ? inputs.style : 'boxing',
     punch: null, cooldown: 0, guardHigh: 0, slip: 0, defence: null, rush: null, clinch: null,
     legDamage: { l: 0, r: 0 },
     // Damage per body segment (0 fresh, 1 seriously hurt), for the record
@@ -674,6 +687,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
     }
     return true;
   }
+  if (name === 'pin') return startPin(world, fighter);
   const spec = MOVES[name];
   const target = opponentFor(world, fighter);
   if (!spec || !target || fighter.punch || fighter.rush || fighter.stamina < spec.cost) return false;
@@ -751,6 +765,25 @@ function updateIntent(world, fighter, dt) {
     const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown, 0]);
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = vec.add(toLocal(fighter, neck), [0.05, 0.04, sign * 0.07]);
     intent.lean += 0.08;
+  }
+  if (fighter.pin) {
+    // Kneeling beside him, leaning over, hands on his chest and his hips.
+    const target = world.fighters[fighter.pin.target];
+    intent.dip += WORLD.pin.dip;
+    intent.lean += WORLD.pin.lean;
+    intent.twist = 0;
+    intent.twoHanded = false;
+    intent.bladeDir = null;
+    const [chest, hips] = pinPoints(target);
+    intent.lHand = toLocal(fighter, chest);
+    intent.rHand = toLocal(fighter, hips);
+    // Both knees down on the floor before him, shins back, feet behind.
+    const L = fighter.body.lengths;
+    const H = fighter.body.heightM;
+    for (const [side, sign] of [['l', 1], ['r', -1]]) {
+      intent[`${side}Knee`] = [0.06 * H, L.ankle + 0.02, sign * 0.1 * H];
+      intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
+    }
   }
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
@@ -924,6 +957,7 @@ export function step(world, dt) {
       if (fighter.weapon?.held) updateWeapon(fighter, h);
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
+    for (const fighter of world.fighters) if (fighter.pin) holdPin(world, fighter, h);
     collideFighters(world, h, time);
     for (const fighter of world.fighters) {
       if (asleep(fighter)) {
@@ -956,6 +990,7 @@ export function step(world, dt) {
  */
 function holdClinch(world, fighter) {
   const target = world.fighters[fighter.clinch.target];
+  if (STYLES[fighter.style]?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) driveClinch(world, fighter, target);
   for (const side of ['l', 'r']) {
     const hand = P[`${side}Hand`];
     const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown * 0.5, 0]);
@@ -994,7 +1029,8 @@ function holdClinch(world, fighter) {
  * counted, and up again after a moment. Strong legs hold more.
  */
 function checkBalance(world, fighter) {
-  if (fighter.state !== 'up' || fighter.handsDown) return;
+  // Kneeling over a man held down is a base of its own, not a fall.
+  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin) return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
   const knock = Math.hypot(fighter.knock[0], fighter.knock[2]);
@@ -1107,6 +1143,11 @@ function updateTimers(world, fighter, dt) {
     const target = world.fighters[fighter.clinch.target];
     if (fighter.clinch.t >= fighter.clinch.duration || fighter.state !== 'up' || target.state !== 'up') fighter.clinch = null;
   }
+  if (fighter.pin) {
+    const target = world.fighters[fighter.pin.target];
+    if (fighter.state !== 'up' || target.state === 'out' || target.state === 'up') fighter.pin = null;
+  }
+  countPin(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
   if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
@@ -1140,8 +1181,20 @@ function updateTimers(world, fighter, dt) {
   } else if (fighter.state === 'rising') {
     fighter.motorScale = Math.min(1, fighter.motorScale + dt / WORLD.getUpSeconds);
     if (fighter.motorScale >= 1) {
-      fighter.state = 'up';
-      fighter.riseFrom = null;
+      // Held down: if the hold kept his trunk low, he did not get up. He
+      // sinks back and tries again in a moment.
+      if (pinnedBy(world, fighter).length && neckLow(fighter)) {
+        fighter.state = 'down';
+        fighter.motorScale = 0;
+        fighter.downTimer = WORLD.pin.retry;
+        fighter.riseFrom = null;
+      } else {
+        // On his feet: any hold on him is broken, and he starts square.
+        fighter.state = 'up';
+        fighter.riseFrom = null;
+        fighter.knock = [0, 0, 0];
+        for (const holder of world.fighters) if (holder.pin?.target === fighter.id) holder.pin = null;
+      }
     }
   } else if (fighter.state === 'up') {
     // Hurt after a knockdown: the legs and arms come back over seconds.
@@ -1178,6 +1231,8 @@ function motorTarget(fighter, index) {
 function standingTarget(fighter, index) {
   const name = PARTICLES[index];
   const desired = fighter.desired[index];
+  // Kneeling to hold a man down, the legs go where the kneel puts them.
+  if (fighter.pin && (name.endsWith('Foot') || name.endsWith('Knee'))) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
   if (name.endsWith('Foot')) return { target: footTarget(fighter, fighter.feet[name[0]]), velocity: [0, 0, 0] };
   if (name.endsWith('Knee')) {
     const side = name[0];
@@ -1598,7 +1653,8 @@ function collideGround(fighter, h, arena) {
 export function harmShare(attacker, defender, spec) {
   const kind = spec.damageType ?? 'blunt';
   const limb = spec.limb.endsWith('Hand') ? 'hand' : 'foot';
-  return (1 - (defender.body.gear.protection[kind] ?? 0)) * (attacker.body.gear.damageDealt[limb] ?? 1);
+  // An open palm pushes more than it hurts (`harm`).
+  return (1 - (defender.body.gear.protection[kind] ?? 0)) * (attacker.body.gear.damageDealt[limb] ?? 1) * (spec.harm ?? 1);
 }
 
 /** Whether the attacker is outside the defender's field of view. */
@@ -1840,6 +1896,9 @@ function collideStriker(world, attacker, defender, striker, time) {
     }
     // A blade that went through is not held back by what it cut.
     if (attacker.contacts.has(`${contactKey}:through`)) continue;
+    // A sumo push: while the palms are on his trunk, the legs keep driving.
+    const pushing = attacker.punch?.spec.shove && !striker.weapon && striker.key.endsWith('Hand') && attacker.punch.t <= attacker.punch.spec.extendUntil + 0.1;
+    if (pushing && capsule.key === 'trunk') drive(world, attacker, defender, vec.scale(normal, -1), attacker.punch.spec.shove);
     // Separate them, sharing the push by inverse mass; a limb that starts a
     // strike already inside a body is eased out over a few substeps, not
     // thrown clear in one.
@@ -1976,7 +2035,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   // Gloved strikes spread over the glove's contact time; kicks, knees and
   // elbows over the general one; bare fists over their own short one.
   const fists = fistsOf(attacker.body);
-  const contactSeconds = spec.limb.endsWith('Hand') ? fists.contactSeconds : WORLD.contactSeconds;
+  const contactSeconds = spec.contactSeconds ?? (spec.limb.endsWith('Hand') ? fists.contactSeconds : WORLD.contactSeconds);
   const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const event = {
@@ -2422,11 +2481,20 @@ export function hitParticle(world, fighter, index, direction, impulse) {
  * share: each moves with the same velocity change scaled by its share, and
  * the momentum added sums to exactly the impulse.
  */
-export function deliverImpulse({ fighter, shares, direction, impulse, braced = 0, massShare = WORLD.balance.massShare }) {
+export function deliverImpulse({ fighter, shares, direction, impulse, braced = 0, massShare = WORLD.balance.massShare, holding = false }) {
   fighter.stillFor = 0;
   let weightedMass = 0;
   for (const [index, share] of shares) weightedMass += share * fighter.body.masses[index];
   if (weightedMass <= 0) return;
+  // A hold presses and pulls a man who is already down: it moves him, but it
+  // is no knock his legs must take.
+  if (holding) {
+    for (const [index, share] of shares) {
+      const deltaV = (impulse * share) / weightedMass;
+      for (let axis = 0; axis < 3; axis += 1) fighter.v[index * 3 + axis] += direction[axis] * deltaV;
+    }
+    return;
+  }
   // The trunk's share of the push, as a velocity of the whole body: the
   // feet are planted, so all of the body's mass resists being moved.
   const trunkShare = shares.filter(([index]) => TRUNK_PARTICLES.includes(index)).reduce((sum, [index, share]) => sum + share * fighter.body.masses[index], 0);
@@ -2506,6 +2574,139 @@ function addDamage(fighter, key, deltaV, blocked) {
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
   fighter.damageVersion += 1;
+}
+
+// ---- Holding down ------------------------------------------------------------
+
+/** Where a pin's hands go on a lying man: his upper chest and his hips, on top of him. */
+function pinPoints(target) {
+  const up = (index, radius) => vec.add(point(target.x, index), [0, radius, 0]);
+  const chest = vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.8);
+  return [vec.add(chest, [0, target.body.segments.trunk.skinRadius * 0.7, 0]), up(P.pelvis, target.radius[P.pelvis])];
+}
+
+/** Kneel over the man down and take hold, if there is room for another pair of hands. */
+function startPin(world, fighter) {
+  const target = opponentFor(world, fighter) ?? world.fighters.find((other) => other.corner !== fighter.corner && other.state !== 'out');
+  if (!target || fighter.state !== 'up' || fighter.punch || fighter.pin) return false;
+  if (target.state !== 'down' && target.state !== 'rising') return false;
+  if (pinnedBy(world, target).length >= WORLD.pin.pinners) return false;
+  fighter.pin = { target: target.id, locked: { l: false, r: false } };
+  fighter.clinch = null;
+  fighter.rush = null;
+  world.events.push({ time: world.time, kind: 'pinning', attacker: fighter.id, defender: target.id, effects: [] });
+  return true;
+}
+
+/** Who has hold of this man now. */
+export function pinnedBy(world, target) {
+  return world.fighters.filter((fighter) => fighter.pin?.target === target.id && (fighter.pin.locked.l || fighter.pin.locked.r));
+}
+
+function neckLow(fighter) {
+  const L = fighter.body.lengths;
+  const standing = L.ankle + L.shank + L.thigh + L.trunk;
+  return fighter.x[P.neck * 3 + 1] < standing * WORLD.pin.lowNeck;
+}
+
+/**
+ * The hold, each substep: the hands reach him under their own muscles and
+ * take hold once there; held, each hand pulls on its place on him as hard
+ * as the pinner's arm can (a stiff spring, capped by the arm's strength),
+ * and presses him into the floor with a share of the pinner's weight, the
+ * same pull and push coming back on the pinner. A strong enough man can
+ * lift through it; no blow, so no harm. Pulled too far apart, it breaks.
+ */
+function holdPin(world, fighter, h) {
+  const target = world.fighters[fighter.pin.target];
+  const spec = WORLD.pin;
+  const places = pinPoints(target);
+  const held = [P.neck, P.pelvis];
+  const pressEach = (spec.weightShare * fighter.body.massKg * WORLD.gravity * h) / 2;
+  for (const [index, side] of ['l', 'r'].entries()) {
+    const hand = P[`${side}Hand`];
+    const offset = vec.sub(point(fighter.x, hand), places[index]);
+    const distance = vec.length(offset);
+    if (!fighter.pin.locked[side]) {
+      if (distance < spec.lockDistance) fighter.pin.locked[side] = true;
+      continue;
+    }
+    if (distance > spec.release) {
+      fighter.pin.locked[side] = false;
+      continue;
+    }
+    if (distance > 1e-6) {
+      const grip = Math.min(spec.gripStiffness * distance, spec.gripShare * fighter.body.strikeForce[hand]) * h;
+      const along = vec.scale(offset, 1 / distance);
+      world.pendingImpulses.push({ fighter: target, shares: [[held[index], 1]], direction: along, impulse: grip, holding: true });
+      world.pendingImpulses.push({ fighter, shares: [[hand, 1]], direction: vec.scale(along, -1), impulse: grip, holding: true });
+    }
+    // His weight through the hand: down on the man, up on the arm.
+    world.pendingImpulses.push({ fighter: target, shares: [[held[index], 1]], direction: [0, -1, 0], impulse: pressEach, holding: true });
+    world.pendingImpulses.push({ fighter, shares: [[hand, 1]], direction: [0, 1, 0], impulse: pressEach, holding: true });
+  }
+}
+
+/**
+ * The clock on a man held down: it runs while someone has hold of him and
+ * his trunk is down, restarts if he gets up off the floor under them, and
+ * past `seconds` he is beaten. A hold is announced when it starts and when
+ * it is broken (no hands on him, or he is back on his feet).
+ */
+function countPin(world, fighter, dt) {
+  const holders = fighter.state === 'out' || fighter.state === 'up' ? [] : pinnedBy(world, fighter);
+  if (!holders.length) {
+    if (fighter.heldAnnounced) world.events.push({ time: world.time, kind: 'pinBroken', fighter: fighter.id, effects: ['breaks the hold'] });
+    fighter.heldAnnounced = false;
+    fighter.pinClock = 0;
+    return;
+  }
+  if (!fighter.heldAnnounced) {
+    fighter.heldAnnounced = true;
+    world.events.push({ time: world.time, kind: 'held', fighter: fighter.id, attacker: holders[0].id, effects: ['held down'] });
+  }
+  if (!neckLow(fighter)) {
+    fighter.pinClock = 0;
+    return;
+  }
+  fighter.pinClock = (fighter.pinClock ?? 0) + dt;
+  // Held, he does not wait for the count: he tries to get up.
+  if (fighter.state === 'down' && fighter.knockdowns < WORLD.knockdownsToStop) fighter.downTimer = Math.min(fighter.downTimer, WORLD.pin.struggleAfter);
+  if (fighter.pinClock >= WORLD.pin.seconds) {
+    fighter.state = 'out';
+    fighter.punch = null;
+    fighter.rush = null;
+    fighter.clinch = null;
+    fighter.heldAnnounced = false;
+    dropWeapon(world, fighter, 'dropped');
+    world.events.push({ time: world.time, kind: 'pinned', fighter: fighter.id, attacker: holders[0].id, effects: [`held down ${WORLD.pin.seconds} s`] });
+    for (const holder of holders) holder.pin = null;
+  }
+}
+
+/**
+ * Gripped and driven: a sumo walks his man back with his legs. The push on
+ * the man's trunk is the driver's leg force less the man's own, a share of
+ * it each substep; what his legs cannot take puts him off his feet.
+ */
+function driveClinch(world, fighter, target) {
+  drive(world, fighter, target, yawRotate([1, 0, 0], fighter.yaw), 1);
+}
+
+/**
+ * One body driven into another by the legs, for a substep: a share of the
+ * driver's leg force onto the other's trunk as momentum. The other's legs
+ * absorb it as they absorb any knock (their strength and footing decide
+ * whether he goes over). The driver is braced: he means to be going forward.
+ */
+function drive(world, fighter, target, direction, share) {
+  const h = world.lastDt / WORLD.substeps;
+  const net = WORLD.clinch.driveShare * share * fighter.body.motorForce[P.pelvis] * Math.max(0.3, fighter.motorScale);
+  if (net <= 0) return;
+  const flat = vec.normalize([direction[0], 0, direction[2]]);
+  const trunk = TRUNK_PARTICLES.map((index) => [index, 1]);
+  world.pendingImpulses.push({ fighter: target, shares: trunk, direction: flat, impulse: net * h, massShare: WORLD.balance.massShare });
+  world.pendingImpulses.push({ fighter, shares: trunk, direction: vec.scale(flat, -1), impulse: net * h * 0.5, braced: 10 });
 }
 
 /** Leg damage (summed m/s) that makes a leg give way, for everyone's toughness. */

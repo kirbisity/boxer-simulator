@@ -40,6 +40,10 @@ export const AI = {
   // Heavy attacks: extra share when the opponent is hurt and there to be finished.
   finishingHeavy: 0.15,
   neutralDistance: 1.8, // m kept from an opponent who is down or rising
+  // A mixed fighter's spells in one style (s, give or take half).
+  mix: { seconds: 10 },
+  // Holding the last man down: how near his chest (m, hips to chest) to kneel, and how many hold at once.
+  pin: { reach: 0.55, pinners: 2 },
   // Fear and confidence: how much stronger one side's shots are than the
   // other's (ratio of threats) makes for full confidence or full fear;
   // how many clean shots felt before experience weighs as much as the look
@@ -298,6 +302,23 @@ export function outreached(fighter, opponent) {
   return Boolean(sharp && !(mine && mine.length >= theirs.length - 0.1));
 }
 
+/**
+ * A mixed fighter changes style now and then, between strikes, never to a
+ * weapon style: a spell of boxing, then of kicking, of clinching, of pushing.
+ */
+function switchMix(world, fighter, dt) {
+  const mix = STYLES[fighter.mixed]?.mix;
+  if (!mix || fighter.punch || fighter.clinch || fighter.weapon?.held) return;
+  fighter.mixFor = (fighter.mixFor ?? AI.mix.seconds * (0.5 + world.random())) - dt;
+  if (fighter.mixFor > 0) return;
+  const others = mix.filter((key) => key !== fighter.style);
+  const next = others[Math.floor(world.random() * others.length)];
+  fighter.style = next;
+  fighter.mixFor = AI.mix.seconds * (0.5 + world.random());
+  fighter.aiCombo = null;
+  world.events.push({ time: world.time, kind: 'styleSwitch', fighter: fighter.id, style: next, effects: [`switches to ${STYLES[next].label}`] });
+}
+
 /** Spread of one temperament trait round 1: e^(±spread). */
 function trait(random) {
   return Math.exp((random() * 2 - 1) * AI.cadence.spread);
@@ -406,6 +427,35 @@ function nextGap(world, fighter, style, plan, cadence) {
   return restAfterAttack(fighter, style, random) * plan.tempo * (1 + size * 0.6);
 }
 
+/**
+ * The last man of his side is down: kneel over him and hold him there. Go
+ * to his side, level with his chest, and take hold once there. Returns
+ * whether this fighter is on it (false: stand off as usual).
+ */
+function holdDown(world, fighter, opponent) {
+  if (fighter.pin) {
+    fighter.move = 0;
+    fighter.strafe = 0;
+    return true;
+  }
+  const lastOfSide = world.fighters.filter((other) => other.corner === opponent.corner && other.state !== 'out').length === 1;
+  if (!lastOfSide || (opponent.state !== 'down' && opponent.state !== 'rising')) return false;
+  const holding = world.fighters.filter((other) => other.pin?.target === opponent.id).length;
+  if (holding >= AI.pin.pinners) return false;
+  // Beside his chest, a forearm's length off the line of his body.
+  const chest = vec.lerp(point(opponent.x, P.pelvis), point(opponent.x, P.neck), 0.6);
+  const at = point(fighter.x, P.pelvis);
+  const apart = Math.hypot(chest[0] - at[0], chest[2] - at[2]);
+  fighter.strafe = 0;
+  if (apart > AI.pin.reach) {
+    fighter.move = Math.min(1, (apart - AI.pin.reach) * 2 + 0.3);
+    return true;
+  }
+  fighter.move = 0;
+  perform(world, fighter, 'pin');
+  return true;
+}
+
 export function think(world, fighter, dt) {
   const random = world.random;
   fighter.strafe = 0;
@@ -418,6 +468,7 @@ export function think(world, fighter, dt) {
     fighter.move = 0;
     return;
   }
+  switchMix(world, fighter, dt);
   const style = STYLES[fighter.style];
   const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;
@@ -434,10 +485,12 @@ export function think(world, fighter, dt) {
     heavy: Math.max(0, basePlan.heavy + bold.heavy * nerve),
   };
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
-  // A man down or getting up is not hit: stand off at a neutral distance.
+  // A man down or getting up is not hit. The last man of his side, down,
+  // is held down; anyone else is given room.
   if (opponent.state !== 'up') {
-    fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
     fighter.aiCombo = null;
+    if (holdDown(world, fighter, opponent)) return;
+    fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
     return;
   }
   const spacing = teamSpacing(world, fighter, opponent);
@@ -459,7 +512,8 @@ export function think(world, fighter, dt) {
   const wary = !waiting && !fighter.clinch && outreached(fighter, opponent);
   const cadence = cadenceOf(world, fighter, style, plan, nerve);
   let mayAttack = true;
-  if (waiting || fighter.clinch) {
+  if (fighter.clinch && style.clinchDrive) fighter.move = 1;
+  else if (waiting || fighter.clinch) {
     if (distance > range + AI.rangeSlack) fighter.move = 1;
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
     else fighter.move *= Math.exp(-dt * 4);

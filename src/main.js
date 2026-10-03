@@ -72,7 +72,8 @@ function ensureRoster(corner, scenario) {
     else {
       const leads = new Set([state.rosters.red[0].name, state.rosters.blue[0].name]);
       const spare = Object.values(PRESETS).filter((preset) => !leads.has(preset.name));
-      mate = normaliseInputs({ ...structuredClone(spare[(index + (corner === 'blue' ? 2 : 0)) % spare.length]), style: lead.style });
+      // Fighters added to a side fight mixed by default: boxing, kicking, the clinch, pushing.
+      mate = normaliseInputs({ ...structuredClone(spare[(index + (corner === 'blue' ? 2 : 0)) % spare.length]), style: 'mix' });
     }
     // A name already in the fight gets a number.
     const taken = new Set([...state.rosters.red, ...state.rosters.blue].map((fighter) => fighter.name));
@@ -162,7 +163,7 @@ function tick(seconds) {
     const name = team.length > 1 ? `${winner === 'red' ? 'Red' : 'Blue'} team` : team[0].body.inputs.name;
     $('#banner').hidden = false;
     // How it ended: the last fighter out on the losing side says.
-    const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', knockout: 'KO', stopped: 'Stopped' };
+    const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
     const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
     $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
   }
@@ -268,7 +269,12 @@ function logEvent(event) {
   else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out') return;
+  else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
+  else if (event.kind === 'styleSwitch') text = `<b>${name(event.fighter)}</b> switches to ${STYLES[event.style].label}`;
+  else if (event.kind === 'pinning') text = `<b>${name(event.attacker)}</b> goes to hold <b>${name(event.defender)}</b> down`;
+  else if (event.kind === 'held') text = `🤼 <b>${name(event.fighter)}</b> is held down`;
+  else if (event.kind === 'pinBroken') text = `<b>${name(event.fighter)}</b> breaks the hold`;
+  else if (event.kind === 'pinned') text = `🤼 <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   else if (event.attacker === undefined || event.speed === undefined) return;
   else {
@@ -279,7 +285,7 @@ function logEvent(event) {
   }
   const row = document.createElement('li');
   row.innerHTML = text;
-  if (['knockout', 'broken', 'severed', 'killed', 'bledOut'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
+  if (['knockout', 'broken', 'severed', 'killed', 'bledOut', 'pinned'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
   const log = $('#log');
   log.prepend(row);
   while (log.children.length > 5) log.lastChild.remove();

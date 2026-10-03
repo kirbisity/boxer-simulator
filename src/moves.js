@@ -21,6 +21,14 @@ export const MOVES = {
   roundhouse: { kind: 'strike', limb: 'rFoot', path: 'roundhouse', windup: 0.12, extendUntil: 0.36, duration: 0.7, twist: -1.25, lean: -0.22, cost: 0.04, mass: { leg: 0.55, body: 0.025 }, rotation: 1.45, zones: ['body', 'head'], reach: 'leg' },
   lowKick: { kind: 'strike', limb: 'rFoot', path: 'roundhouse', windup: 0.1, extendUntil: 0.32, duration: 0.62, twist: -1.1, lean: -0.12, cost: 0.03, mass: { leg: 0.55, body: 0.02 }, rotation: 1, zones: ['legs'], reach: 'leg' },
   teep: { kind: 'strike', limb: 'lFoot', path: 'teep', windup: 0.14, extendUntil: 0.34, duration: 0.6, twist: 0.1, lean: -0.18, cost: 0.03, mass: { leg: 0.45, body: 0.12 }, rotation: 0.5, push: true, zones: ['body'], reach: 'leg' },
+  // Sumo: open-hand thrusts to the chest (tsuppari), a two-handed drive
+  // with the legs behind it (oshi). An open palm spreads the blow over a
+  // longer contact (`contactSeconds`) and harms little (`harm`); the push
+  // is the point: momentum into the man's balance.
+  // `shove`: while the hands are on him, the legs keep driving (share of the drive).
+  tsuppariL: { kind: 'strike', limb: 'lHand', path: 'straight', windup: 0, extendUntil: 0.2, duration: 0.34, twist: 0.25, shift: 0.07, cost: 0.014, mass: { arm: 0.65, body: 0.04 }, rotation: 0.4, push: true, shove: 0.6, harm: 0.35, contactSeconds: 0.03, zones: ['body', 'head'], reach: 'arm' },
+  tsuppariR: { kind: 'strike', limb: 'rHand', path: 'straight', windup: 0, extendUntil: 0.22, duration: 0.36, twist: -0.3, shift: 0.07, cost: 0.014, mass: { arm: 0.65, body: 0.04 }, rotation: 0.4, push: true, shove: 0.6, harm: 0.35, contactSeconds: 0.03, zones: ['body', 'head'], reach: 'arm' },
+  oshi: { kind: 'strike', limb: 'rHand', path: 'pushBoth', windup: 0.08, extendUntil: 0.36, duration: 0.6, twist: 0, shift: 0.12, lean: 0.25, dip: 0.03, step: 1.4, cost: 0.03, mass: { arm: 1.2, body: 0.14 }, rotation: 0.2, push: true, shove: 1.2, harm: 0.2, contactSeconds: 0.05, zones: ['body'], reach: 'arm' },
   // Weapon moves (path 'blade'): the main hand and the blade follow a path
   // from `from` to `to` (hand in heights, local; dir where the weapon points),
   // bent through the aim; `grip` says whether both hands hold it. A thrust
@@ -147,6 +155,38 @@ export const STYLES = {
     headMovement: 0.15,
     // Muay Thai walks forward into the clinch, knees and elbows.
     pressure: 0.35,
+  },
+  // Sumo: low and wide, hands forward; thrusts, drives and charges to push
+  // a man off his feet, and in the clinch (`clinchDrive`) walks him back.
+  sumo: {
+    label: 'Sumo',
+    cadence: { work: 1.5, move: 0.5, burst: 0.75, mobility: 0.2 },
+    stance: { blade: 0.05, crouch: 0.07, width: 1.45, lean: 0.22, guardHeight: -0.08 },
+    idle: { bounce: 0.1, sway: 0.4, rock: 0.5 },
+    attacks: { tsuppariL: 0.25, tsuppariR: 0.25, oshi: 0.2, clinch: 0.3, rush: 0.04 },
+    combos: { 'tsuppariL tsuppariR tsuppariL': 0.5, 'tsuppariR tsuppariL oshi': 0.5 },
+    comboChance: 0.6,
+    tempo: 1,
+    defences: { guard: 0.4, parry: 0.4, stepBack: 0.2 },
+    defendChance: 0.45,
+    headMovement: 0.05,
+    plans: { pressure: 2.2, brawler: 1.2, outboxer: 0.2, counter: 0.4 },
+    pressure: 0.6,
+    clinchDrive: true,
+  },
+  // Mixed: switches every so often between the unarmed styles in `mix`, so
+  // it boxes for a while, then kicks, then clinches and knees, then pushes.
+  mix: {
+    label: 'Mix',
+    mix: ['boxing', 'kickboxing', 'muayThai', 'sumo'],
+    cadence: { work: 1.2, move: 0.8, burst: 0.55, mobility: 0.5 },
+    stance: { blade: 0.45, crouch: 0.03, width: 1.05, lean: 0.12, guardHeight: 0 },
+    idle: { bounce: 0.7, sway: 0.8, rock: 0.4 },
+    attacks: { jab: 0.3, cross: 0.25, hook: 0.2, roundhouse: 0.1, lowKick: 0.1, rush: 0.005 },
+    defences: { guard: 0.3, slip: 0.3, stepBack: 0.2, parry: 0.2 },
+    defendChance: 0.6,
+    headMovement: 0.5,
+    pressure: 0.2,
   },
   // Weapon styles: `weapon` is what is carried; `weaponGuard` where the
   // main hand rests (heights, local) and where the weapon points. Knocked
@@ -305,6 +345,11 @@ export function strikeTargets(move, t, aim, body, followThrough) {
       // across it and through.
       if (windingUp) return { [`${s}Foot`]: add(aim, [-0.12, 0.04, 0.55 * side]) };
       return { [`${s}Foot`]: add(aim, [0.06, 0, -0.35 * side]) };
+    }
+    case 'pushBoth': {
+      // Both palms into his chest, a shoulder's width apart, and through.
+      const through = windingUp ? -0.12 : followThrough;
+      return { lHand: add(aim, [through, 0, 0.12]), rHand: add(aim, [through, 0, -0.12]) };
     }
     case 'teep': {
       // Knee up in front, then the sole drives straight out into the target.

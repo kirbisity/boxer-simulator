@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { fallSweep } from '../tools/falls-quality.js';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
-import { thinkAll } from '../src/ai.js';
+import { thinkAll, AI } from '../src/ai.js';
 import { advance, createWorld, deliverImpulse, hitParticle, placeFighter, point, WORLD } from '../src/physics.js';
 import { twoBoneIK, vec } from '../src/pose.js';
 
@@ -211,8 +211,12 @@ test('a slow, steady pull bends a joint but never breaks it', () => {
 });
 
 test('damage builds per body part with each blow and stops at seriously hurt', () => {
+  // Ninety seconds of blows: nobody ends it early by holding a man down.
+  const pinners = AI.pin.pinners;
+  AI.pin.pinners = 0;
   const world = createWorld([PRESETS.heavy, PRESETS.amateur], { seed: 11 });
   advance(world, 90, (current, dt) => thinkAll(current, dt));
+  AI.pin.pinners = pinners;
   const damage = world.fighters[1].damage;
   assert.ok(Object.keys(damage).length > 0 && Object.values(damage).every((value) => value > 0 && value <= 1));
   assert.ok((damage.head ?? 0) + (damage.trunk ?? 0) > 0.3, 'what was hit most shows most');
