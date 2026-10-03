@@ -4,7 +4,9 @@ import { buildBody, FRAMES, P, PRESETS } from '../src/body.js';
 import { caloriesForBodyFat } from '../src/physiology.js';
 
 const caloriesFor = (exercise, bodyFat) => caloriesForBodyFat({ sex: 'male', heightCm: 178, age: 30, frame: 'medium', exercise }, bodyFat, FRAMES.medium.lean);
-import { thinkAll } from '../src/ai.js';
+import { think, thinkAll } from '../src/ai.js';
+import { vec } from '../src/pose.js';
+import { measureStyle } from '../tools/aggression.js';
 import { MOVES, STYLES } from '../src/moves.js';
 import { advance, createWorld, perform, placeFighter, point, throwPunch, WORLD } from '../src/physics.js';
 import { buildCurve, fatCurve, footworkDistance, speedCurve } from '../tools/speed-curve.js';
@@ -144,4 +146,40 @@ test('each style fights with its own moves, chosen by distance: a boxer never ki
   const outside = thrown('muayThai', 1.1);
   assert.ok([...outside].some((type) => MOVES[type].limb?.endsWith('Foot')), `Muay Thai outside threw ${[...outside]}`);
   assert.ok(![...outside].some((type) => MOVES[type].reach === 'close'), 'and no close-range strikes from out there');
+});
+
+test('boxing is aggressive: a pro volume of punches, most of them in combinations', () => {
+  const boxing = measureStyle('boxing', 3, 45);
+  // Volume punchers throw ~80–100 a three-minute round.
+  assert.ok(boxing.perMinute > 26 && boxing.perMinute < 40, `${boxing.perMinute.toFixed(1)} punches a minute`);
+  assert.ok(boxing.comboShare > 0.3, `${(boxing.comboShare * 100).toFixed(0)}% follow-ups`);
+});
+
+test('a boxer sees the punch coming and slips it: crosses that land on a still head miss a moving one', () => {
+  const crosses = (defending) => {
+    let clean = 0;
+    let slipped = 0;
+    for (let seed = 0; seed < 12; seed += 1) {
+      const world = createWorld([{ ...PRESETS.heavy, style: 'boxing' }, { ...PRESETS.light, style: 'boxing' }], { seed });
+      placeFighter(world.fighters[0], -0.5);
+      placeFighter(world.fighters[1], 0.5);
+      advance(world, 0.6);
+      const [attacker, defender] = world.fighters;
+      assert.ok(throwPunch(world, attacker, 'cross', 'head'));
+      for (let frame = 0; frame < 30; frame += 1) {
+        advance(world, 1 / 60, (current, dt) => {
+          defender.cooldown = 99;
+          if (defending) think(current, defender, dt);
+          defender.move = 0;
+          if (defender.defence?.name === 'slip' && defender.defence.t === 0) slipped += 1;
+        });
+      }
+      if (world.events.some((event) => event.kind === 'landed' && event.target === 'head')) clean += 1;
+    }
+    return { clean, slipped };
+  };
+  const still = crosses(false);
+  const moving = crosses(true);
+  assert.ok(moving.slipped >= 8, `slipped ${moving.slipped} of 12`);
+  assert.ok(moving.clean <= still.clean - 2, `clean to the head: ${moving.clean} of 12 slipping, ${still.clean} standing still`);
 });

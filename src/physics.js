@@ -16,6 +16,12 @@ export const WORLD = {
   // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
   ringHalf: 2.85,
   gloveRadius: 0.065,
+  // Head movement in range: how far past both reaches it starts (m), how
+  // quickly it eases in (/s), its rhythm (Hz), its side-to-side size as a
+  // share of height (~8 cm on a 1.8 m boxer) and the knee bend as it crosses.
+  // Slip and roll targets, as shares of height.
+  headMovement: { slip: { across: 0.14, down: 0.06 }, roll: { across: 0.14, down: 0.04 } },
+  weave: { range: 0.35, easeRate: 4, hz: 0.75, size: 0.045, kneeDip: 0.03 },
   // Each muscle group is a spring-damper towards its target: natural
   // frequency ω (rad/s) and damping ratio ζ. Below ζ = 1 a part overshoots a
   // little and settles, which is what inertia looks like; the force cap from
@@ -312,10 +318,10 @@ export function throwPunch(world, fighter, type, zone = null) {
 }
 
 /** Start a whole-body move (rush, clinch) or a defence. */
-export function perform(world, fighter, name) {
+export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1 } = {}) {
   if (fighter.state !== 'up') return false;
   if (DEFENCES[name]) {
-    fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side: world.random() < 0.5 ? 1 : -1 };
+    fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side };
     if (name === 'guard') fighter.guardHigh = DEFENCES.guard.seconds;
     if (name === 'slip') {
       fighter.slip = DEFENCES.slip.seconds;
@@ -372,6 +378,7 @@ function updateIntent(world, fighter, dt) {
     if (punch.t >= spec.duration) fighter.punch = null;
   }
   applyDefence(fighter, intent, dt);
+  weaveHead(world, fighter, intent, dt);
   if (fighter.rush) {
     // Charging: head down, shoulder first, hands up.
     intent.lean += 0.28;
@@ -391,11 +398,39 @@ function updateIntent(world, fighter, dt) {
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * 0.2 * H];
   }
   if (fighter.slip > 0) {
-    intent.headOffset = vec.add(intent.headOffset, [-0.02 * H, -0.05 * H, (fighter.slipSide ?? 1) * 0.07 * H]);
+    // Aimed past where the head ends up: the muscles drive harder towards a
+    // far target, and a slip must clear head and glove (~18 cm) in ~0.1 s.
+    const slip = WORLD.headMovement.slip;
+    intent.headOffset = vec.add(intent.headOffset, [-0.02 * H, -slip.down * H, (fighter.slipSide ?? 1) * slip.across * H]);
     intent.lean -= 0.05;
   }
   fighter.intent = intent;
   fighter.desired = desiredPose(fighter.body, intent);
+}
+
+/**
+ * Head movement in range: the head never rests on the centre line but
+ * weaves side to side, dipping as it crosses, at an uneven rhythm. It eases
+ * in as the opponent comes within reach and stops while punching.
+ */
+function weaveHead(world, fighter, intent, dt) {
+  const amount = STYLES[fighter.style].headMovement ?? 0;
+  const opponent = nearestOpponent(world, fighter);
+  if (!amount || !opponent) return;
+  const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
+  const engaged = distance < fighter.body.reach + opponent.body.reach + WORLD.weave.range && !fighter.punch && !fighter.clinch && !fighter.rush;
+  fighter.weave = (fighter.weave ?? 0) + ((engaged ? 1 : 0) - (fighter.weave ?? 0)) * Math.min(1, WORLD.weave.easeRate * dt);
+  if (fighter.weave < 0.01) return;
+  const H = fighter.body.heightM;
+  const time = world.time * Math.PI * 2;
+  const phase = fighter.id * 1.7;
+  // Two rhythms summed, so it does not settle into a beat a puncher can time;
+  // tanh holds it off centre and makes it cross quickly.
+  const wave = Math.sin(time * WORLD.weave.hz + phase) + 0.45 * Math.sin(time * WORLD.weave.hz * 2.3 + phase * 2);
+  const across = Math.tanh(2.2 * wave);
+  const size = amount * WORLD.weave.size * H * fighter.weave * (0.4 + 0.6 * fighter.body.inputs.exercise) * (0.5 + 0.5 * fighter.stamina);
+  intent.headOffset = vec.add(intent.headOffset, [0, -size * 0.6 * (1 - across * across), size * across]);
+  intent.dip += WORLD.weave.kneeDip * amount * fighter.weave * (1 - across * across);
 }
 
 /** A defence's posture over its few tenths of a second. */
@@ -409,7 +444,8 @@ function applyDefence(fighter, intent, dt) {
   if (defence.name === 'roll') {
     // Down under the punch and across: a U through the hips and knees.
     intent.dip += 0.07 * arc;
-    intent.headOffset = vec.add(intent.headOffset, [0, -0.04 * H * arc, defence.side * 0.08 * H * Math.cos(Math.PI * u)]);
+    const roll = WORLD.headMovement.roll;
+    intent.headOffset = vec.add(intent.headOffset, [0, -roll.down * H * arc, defence.side * roll.across * H * Math.cos(Math.PI * u)]);
   } else if (defence.name === 'parry' && !fighter.punch) {
     // The lead hand slaps across the line of the incoming punch.
     intent.lHand = vec.add(desiredPose(fighter.body, { stance: intent.stance })[P.lHand], [0.06 * H * arc, -0.02 * H, -0.1 * H * arc]);

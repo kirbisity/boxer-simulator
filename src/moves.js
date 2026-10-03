@@ -48,10 +48,18 @@ export const STYLES = {
     label: 'Boxing',
     stance: { blade: 0.55, crouch: 0.03, width: 1, lean: 0.14, guardHeight: 0 },
     idle: { bounce: 1, sway: 1, rock: 0.2 },
-    attacks: { jab: 0.4, cross: 0.22, hook: 0.16, uppercut: 0.1, rush: 0.006 },
-    defences: { slip: 0.32, roll: 0.24, parry: 0.2, guard: 0.18, stepBack: 0.06 },
-    defendChance: 0.42,
-    pressure: 0.12, // share of the time spent working inside
+    attacks: { jab: 0.34, cross: 0.26, hook: 0.2, uppercut: 0.12, rush: 0.006 },
+    // Punches come in combinations: most attacks open one, and each
+    // punch follows the last as soon as the hand is back.
+    combos: { 'jab cross': 0.3, 'jab jab cross': 0.14, 'jab cross hook': 0.26, 'cross hook cross': 0.12, 'hook uppercut hook': 0.1, 'jab uppercut cross': 0.08 },
+    comboChance: 0.6,
+    tempo: 1.8, // rest between attacks, as a share of the AI's default
+    defences: { slip: 0.38, roll: 0.3, parry: 0.12, guard: 0.15, stepBack: 0.05 },
+    defendChance: 0.85,
+    // Head off the centre line, always moving, whenever in range.
+    headMovement: 1,
+    counter: 0.45, // after slipping a punch, how often the answer comes straight back
+    pressure: 0.3, // share of the time spent working inside
   },
   kickboxing: {
     label: 'Kickboxing',
@@ -60,6 +68,7 @@ export const STYLES = {
     attacks: { jab: 0.22, cross: 0.17, hook: 0.1, uppercut: 0.05, roundhouse: 0.18, lowKick: 0.15, teep: 0.08, rush: 0.008 },
     defences: { guard: 0.3, check: 0.28, leanBack: 0.18, slip: 0.14, stepBack: 0.1 },
     defendChance: 0.38,
+    headMovement: 0.4,
     pressure: 0.05,
   },
   muayThai: {
@@ -70,6 +79,7 @@ export const STYLES = {
     attacks: { jab: 0.1, cross: 0.1, roundhouse: 0.2, lowKick: 0.12, teep: 0.12, knee: 0.14, elbow: 0.1, upElbow: 0.04, clinch: 0.06, rush: 0.005 },
     defences: { check: 0.34, guard: 0.28, leanBack: 0.26, parry: 0.12 },
     defendChance: 0.4,
+    headMovement: 0.15,
     // Muay Thai walks forward into the clinch, knees and elbows.
     pressure: 0.35,
   },
