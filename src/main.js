@@ -5,7 +5,7 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, collapseAt, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
+import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
@@ -280,6 +280,7 @@ function logEvent(event) {
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
   else if (event.kind === 'bladeBlock') text = `<b>${name(event.attacker)}</b> meets <b>${name(event.defender)}</b>'s ${event.punch ?? 'strike'} with the blade · <em>${event.effects.join(', ') || 'fended off'}</em>`;
+  else if (event.kind === 'pickup') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'styleSwitch') text = `<b>${name(event.fighter)}</b> switches to ${STYLES[event.style].label}`;
   else if (event.kind === 'pinning') text = `<b>${name(event.attacker)}</b> goes to hold <b>${name(event.defender)}</b> down`;
   else if (event.kind === 'held') text = `🤼 <b>${name(event.fighter)}</b> is held down`;
@@ -942,6 +943,8 @@ window.boxer = {
   designSheet,
   fight,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
+  // Knock a fighter's weapon out of his hand, sideways.
+  disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
   advance: (seconds) => {
     tick(seconds);
     draw(0);

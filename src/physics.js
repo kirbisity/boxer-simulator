@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { glovedFists } from './outfits.js';
-import { BLADES, SHIELDS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, segmentToDisc } from './weapons.js';
+import { BLADES, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, segmentToDisc } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
 export const WORLD = {
@@ -194,6 +194,11 @@ export const WORLD = {
   downSecondsMin: 3,
   downSecondsRange: 4,
   knockdownsToStop: 3,
+  // Weapons on the floor and in the hand: a fall or knockdown shakes the
+  // grip loose this often (a knockout always); a man without a weapon who
+  // reaches one on the floor stoops `pickupSeconds` to take it, and gives
+  // up if he has not got his hand to it (within `pickupReach` m) in `pickupGiveUp` s.
+  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2 },
   // Holding the last man down. Pinners kneel beside him (hips this share of
   // height lower, leaning in), lock their hands on his chest and hips once
   // within `lockDistance` (m), and press with this share of their weight;
@@ -309,7 +314,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
   plantFeet(fighter);
   for (const [a, b] of BONE_LINKS) addConstraint(fighter, a, b, 0);
   for (const [a, b, key] of BRACES) addConstraint(fighter, a, b, WORLD[key]);
-  armFighter(fighter, fighter.style);
+  armFighter(fighter, fighter.style, { random: random ?? Math.random });
   return fighter;
 }
 
@@ -325,10 +330,17 @@ function addParticleMass(fighter, index, kg) {
  * its shield onto the off forearm. A style without a weapon leaves the
  * hands empty.
  */
-function armFighter(fighter, styleKey) {
+function armFighter(fighter, styleKey, { random = Math.random, shield = true } = {}) {
+  // Mixed: one of its styles now, switching as he goes.
+  if (STYLES[styleKey]?.mix) {
+    fighter.mixed = styleKey;
+    fighter.style = STYLES[styleKey].mix[Math.floor(random() * STYLES[styleKey].mix.length)];
+    return;
+  }
   const style = STYLES[styleKey] ?? STYLES.boxing;
   fighter.style = STYLES[styleKey] ? styleKey : 'boxing';
-  if (style.shield && !fighter.shield) {
+  if (style.weapon) fighter.mixed = null;
+  if (shield && style.shield && !fighter.shield) {
     const spec = SHIELDS[style.shield];
     fighter.shield = { kind: style.shield, spec };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
@@ -350,7 +362,7 @@ function armFighter(fighter, styleKey) {
  * on the floor, and the fighter fights on in the style that follows (a
  * hoplomachus draws his gladius; anyone else boxes).
  */
-function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
+export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
   if (!weapon?.held) return;
   weapon.held = false;
@@ -369,7 +381,8 @@ function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   if (fighter.punch?.spec.path === 'blade') fighter.punch = null;
   world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
   if (fighter.state === 'out') return;
-  const next = STYLES[fighter.style]?.fallback ?? 'boxing';
+  // A backup weapon if he carries one (the hoplomachus's gladius); else he fights mixed.
+  const next = STYLES[fighter.style]?.fallback ?? 'mix';
   fighter.weapon = null;
   if (fighter.state === 'down') {
     // Down, he draws the next weapon (if any) as he gets up.
@@ -377,8 +390,46 @@ function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
     fighter.pendingArm = next;
     return;
   }
-  armFighter(fighter, next);
+  armFighter(fighter, next, { random: world.random });
   if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
+}
+
+/** Going down shakes the grip: sometimes the weapon goes with the fall. */
+function shakenLoose(world, fighter) {
+  if (fighter.weapon?.held && world.random() < WORLD.weapons.dropOnFall) dropWeapon(world, fighter, 'dropped');
+}
+
+/** Which style a weapon picked up off the floor is fought in. */
+export function styleForWeapon(kind) {
+  return STYLE_KEYS_ALL.find((key) => STYLES[key].weapon === kind && !STYLES[key].hidden) ?? STYLE_KEYS_ALL.find((key) => STYLES[key].weapon === kind);
+}
+const STYLE_KEYS_ALL = Object.keys(STYLES);
+const WEAPON_LABEL = (kind) => WEAPONS[kind].label.toLowerCase();
+
+/** Stoop for a weapon on the floor: he crouches and reaches for it. */
+export function startPickup(world, fighter, debris) {
+  if (fighter.state !== 'up' || fighter.weapon?.held || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
+  fighter.pickup = { debris: debris.id, t: 0 };
+  fighter.clinch = null;
+  return true;
+}
+
+/** Each frame of a pickup: once stooped with the hand on it, the weapon is his. */
+function updatePickup(world, fighter, dt) {
+  const pickup = fighter.pickup;
+  if (!pickup) return;
+  const debris = world.debris[pickup.debris];
+  pickup.t += dt;
+  if (!debris || debris.taken || fighter.state !== 'up' || pickup.t > WORLD.weapons.pickupGiveUp) {
+    fighter.pickup = null;
+    return;
+  }
+  const reach = vec.length(vec.sub(point(fighter.x, P.rHand), debris.x));
+  if (pickup.t < WORLD.weapons.pickupSeconds || reach > WORLD.weapons.pickupReach) return;
+  debris.taken = true;
+  fighter.pickup = null;
+  armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
+  world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, weapon: debris.weapon, effects: [`picks up the ${WEAPON_LABEL(debris.weapon)}`] });
 }
 
 /** A blow jars the grip; strained past what the hand can hold, the weapon goes. */
@@ -800,6 +851,13 @@ function updateIntent(world, fighter, dt) {
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = vec.add(toLocal(fighter, neck), [0.05, 0.04, sign * 0.07]);
     intent.lean += 0.08;
   }
+  if (fighter.pickup) {
+    // Stooping for it: down on the legs, leaning over, the hand to the grip.
+    const debris = world.debris[fighter.pickup.debris];
+    intent.dip += 0.3;
+    intent.lean += 0.6;
+    if (debris) intent.rHand = toLocal(fighter, vec.add(debris.x, [0, 0.03, 0]));
+  }
   if (fighter.pin) {
     // Kneeling beside him, leaning over, hands on his chest and his hips.
     const target = world.fighters[fighter.pin.target];
@@ -1082,7 +1140,7 @@ function checkBalance(world, fighter) {
   if (knock > WORLD.balance.speed * footing || outside > WORLD.balance.reach * legLength * footing) {
     fighter.knock = [0, 0, 0];
     fighter.state = 'down';
-    dropWeapon(world, fighter, 'dropped');
+    shakenLoose(world, fighter);
     fighter.punch = null;
     fighter.rush = null;
     fighter.clinch = null;
@@ -1108,9 +1166,11 @@ function moveRoot(world, fighter, dt) {
     fighter.rootVelocity = [0, 0];
     return;
   }
-  if (opponent) {
+  // Facing his man, or the place he is going (a weapon on the floor).
+  const facePoint = fighter.goTo ?? (opponent ? point(opponent.x, P.pelvis) : null);
+  if (facePoint) {
     const from = point(fighter.x, P.pelvis);
-    const to = point(opponent.x, P.pelvis);
+    const to = facePoint;
     const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
@@ -1182,6 +1242,7 @@ function updateTimers(world, fighter, dt) {
     if (fighter.state !== 'up' || target.state === 'out' || target.state === 'up') fighter.pin = null;
   }
   countPin(world, fighter, dt);
+  updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
   if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
@@ -1197,7 +1258,7 @@ function updateTimers(world, fighter, dt) {
       } else {
         fighter.state = 'rising';
         if (fighter.pendingArm) {
-          armFighter(fighter, fighter.pendingArm);
+          armFighter(fighter, fighter.pendingArm, { random: world.random });
           if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
           fighter.pendingArm = null;
         }
@@ -2549,7 +2610,7 @@ function clashWeapons(world, first, second) {
 function moveDebris(world, dt) {
   const spec = WORLD.props;
   for (const piece of world.debris) {
-    if (piece.resting) continue;
+    if (piece.resting || piece.taken) continue;
     piece.v[1] -= WORLD.gravity * dt;
     piece.x = vec.add(piece.x, vec.scale(piece.v, dt));
     const rate = vec.length(piece.spin);
@@ -2855,7 +2916,7 @@ function knockOut(world, defender, event, reason, kind = 'knockout') {
 /** Down, counted: the muscles let go and the count begins. */
 function knockDown(world, defender, event, reason) {
   defender.state = 'down';
-  dropWeapon(world, defender, 'dropped');
+  shakenLoose(world, defender);
   defender.knockdowns += 1;
   defender.punch = null;
   defender.rush = null;

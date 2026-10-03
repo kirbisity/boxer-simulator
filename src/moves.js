@@ -299,7 +299,7 @@ export const STYLES = {
     pressure: 0.05,
   },
   gladius: {
-    label: 'Gladius and parma', hidden: true, weapon: 'gladius', shield: 'parma', fallback: 'boxing',
+    label: 'Gladius and parma', hidden: true, weapon: 'gladius', shield: 'parma', fallback: 'mix',
     cadence: { work: 1.1, move: 0.9, burst: 0.6, mobility: 0.4 },
     stance: { blade: 0.45, crouch: 0.06, width: 1.15, lean: 0.12, guardHeight: 0 },
     weaponGuard: { hand: [0.08, 0.6, -0.14], dir: [1, 0.2, 0.05] },

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
 import { gearTraits } from '../src/outfits.js';
 import { STYLES, STYLE_KEYS } from '../src/moves.js';
-import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, perform, placeFighter, throwPunch } from '../src/physics.js';
-import { thinkAll } from '../src/ai.js';
+import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, dropWeapon, perform, placeFighter, throwPunch, WORLD } from '../src/physics.js';
+import { AI, thinkAll } from '../src/ai.js';
 import { WEAPONS, harmMix } from '../src/weapons.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 import { fighterFor } from '../tools/weapons.js';
@@ -89,17 +89,23 @@ test('a baton strike does blunt harm only, and hits harder than a jab', () => {
   assert.ok(baton.force > jab.force * 1.8, `${baton.force} vs ${jab.force}`);
 });
 
-test('knocked down, a fighter drops his weapon and boxes; a hoplomachus draws his gladius', () => {
+test('a weapon shaken loose in a fall: he fights mixed; a hoplomachus draws his gladius', () => {
   const world = createWorld([{ ...PRESETS.contender, style: 'baton' }, { ...PRESETS.contender, style: 'hoplomachus' }]);
   const [police, gladiator] = world.fighters;
-  for (const fighter of world.fighters) {
-    fighter.knock = [9, 0, 0];
-  }
+  const chance = WORLD.weapons.dropOnFall;
+  WORLD.weapons.dropOnFall = 1;
+  for (const fighter of world.fighters) fighter.knock = [9, 0, 0];
   advance(world, 1 / 60);
+  WORLD.weapons.dropOnFall = chance;
   assert.equal(police.weapon, null);
-  assert.equal(police.style, 'boxing');
   assert.ok(world.debris.some((piece) => piece.kind === 'weapon' && piece.weapon === 'baton'));
+  // Nobody picks anything up here: this is about what he falls back on.
+  const pickup = AI.pickup.enabled;
+  AI.pickup.enabled = false;
   advance(world, 9);
+  AI.pickup.enabled = pickup;
+  assert.equal(police.mixed, 'mix');
+  assert.ok(['boxing', 'kickboxing', 'muayThai', 'sumo'].includes(police.style), police.style);
   assert.equal(gladiator.weapon?.kind, 'gladius');
   assert.equal(gladiator.style, 'gladius');
   assert.ok(gladiator.shield, 'the shield stays on his arm');
@@ -200,4 +206,24 @@ test('an unskilled fighter swings one at a time, barely defends, and misses more
   assert.equal(unskilled.comboShare, 0);
   assert.ok(unskilled.defencesPerMinute < boxer.defencesPerMinute * 0.25, `${unskilled.defencesPerMinute.toFixed(1)} vs ${boxer.defencesPerMinute.toFixed(1)} defences a minute`);
   assert.ok(unskilled.headEvaded > boxer.headEvaded, 'wild swings miss more');
+});
+
+test('a fighter who loses his weapon fights mixed, and anyone can pick a loose weapon up', () => {
+  const pickups = [];
+  for (let seed = 1600; seed < 1606; seed += 1) {
+    const world = createWorld([{ ...PRESETS.contender, style: 'katana' }, { ...PRESETS.light, style: 'boxing' }], { seed });
+    const [swordsman] = world.fighters;
+    placeFighter(swordsman, -1.2, 0);
+    placeFighter(world.fighters[1], 1.2, 0);
+    advance(world, 0.3);
+    dropWeapon(world, swordsman, 'disarmed', [0, 1.2, (seed % 2 ? 1 : -1) * 2.2]);
+    assert.equal(swordsman.mixed, 'mix', 'unarmed, he fights mixed');
+    for (let second = 0; second < 25 && !boutWinner(world) && !world.events.some((event) => event.kind === 'pickup'); second += 0.25) advance(world, 0.25, (current, dt) => thinkAll(current, dt));
+    const pickup = world.events.find((event) => event.kind === 'pickup');
+    if (!pickup) continue;
+    pickups.push(pickup.fighter);
+    assert.equal(world.fighters[pickup.fighter].weapon?.kind, 'katana');
+    assert.ok(world.debris.find((piece) => piece.kind === 'weapon').taken);
+  }
+  assert.ok(pickups.length >= 2, `${pickups.length} pickups in 6`);
 });

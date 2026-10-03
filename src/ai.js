@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, nearestOpponent, perform, point, reachOf, strikeThreat, throwPunch, toLocal } from './physics.js';
+import { chinNow, nearestOpponent, perform, point, reachOf, startPickup, strikeThreat, throwPunch, toLocal } from './physics.js';
 import { vec } from './pose.js';
 
 export const AI = {
@@ -44,6 +44,11 @@ export const AI = {
   // he is coming in when the gap closes faster than `closingSpeed` (m/s);
   // then a burst of `burstMin` + up to `burstRange` × burstiness attacks.
   range: { inside: 0.12, outside: 0.25, closingSpeed: 0.4, burstMin: 2, burstRange: 2 },
+  // Picking a weapon up: as far as he will go for one (m); it must be this
+  // much nearer him than any of them (unless it is at his feet), and not
+  // with a blow coming at him; he stoops for it this near (hips to weapon, m).
+  // `eagerness`: chance per second, when one is there for the taking, that he goes for it.
+  pickup: { enabled: true, maxDistance: 3.5, margin: 0.3, atFeet: 0.7, stoopAt: 0.55, eagerness: 1.5 },
   // A mixed fighter's spells in one style (s, give or take half).
   mix: { seconds: 10 },
   // Holding the last man down: how near his chest (m, hips to chest) to kneel, and how many hold at once.
@@ -307,6 +312,65 @@ export function outreached(fighter, opponent) {
 }
 
 /**
+ * A weapon lying loose, and nothing in my hands: go and get it, if it is
+ * nearer me than any of them and no one stands close enough to hit me
+ * while I stoop (or it is at my feet). Walk to it, stoop, take it.
+ * Returns whether this fighter is on it.
+ */
+function goForWeapon(world, fighter, opponent) {
+  if (fighter.pickup) {
+    fighter.move = 0;
+    fighter.strafe = 0;
+    return true;
+  }
+  // Nothing loose on the floor (the usual case): no thought, and no draw on the bout's randomness.
+  const loose = world.debris?.some((debris) => debris.kind === 'weapon' && !debris.taken && debris.resting);
+  if (!loose || fighter.weapon?.held || fighter.clinch || fighter.pin || fighter.punch || !AI.pickup.enabled) {
+    fighter.aiPickupFor = null;
+    return false;
+  }
+  const at = point(fighter.x, P.pelvis);
+  const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
+  const enemies = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up');
+  const attackingMe = enemies.some((other) => other.punch?.target === fighter.id);
+  // Still worth it: loose, on the floor, and nearer me than any of them.
+  const worth = (debris) => {
+    if (!debris || debris.kind !== 'weapon' || debris.taken || !debris.resting) return null;
+    const mine = flat(debris.x, at);
+    const theirs = enemies.reduce((least, other) => Math.min(least, flat(debris.x, point(other.x, P.pelvis))), Infinity);
+    if (mine > AI.pickup.maxDistance || (mine > AI.pickup.atFeet && mine > theirs - AI.pickup.margin)) return null;
+    return mine;
+  };
+  let target = world.debris?.[fighter.aiPickupFor];
+  let mine = worth(target);
+  if (mine === null) {
+    fighter.aiPickupFor = null;
+    target = null;
+    // Not while a blow is coming at me; then, now and then, when one is there for the taking.
+    if (attackingMe || world.random() > AI.pickup.eagerness * world.lastDt) return false;
+    for (const debris of world.debris ?? []) {
+      const distance = worth(debris);
+      if (distance !== null && (mine === null || distance < mine)) {
+        mine = distance;
+        target = debris;
+      }
+    }
+    if (!target) return false;
+    fighter.aiPickupFor = target.id;
+  }
+  fighter.goTo = target.x;
+  fighter.strafe = 0;
+  fighter.aiCombo = null;
+  if (mine > AI.pickup.stoopAt) {
+    fighter.move = Math.min(1.4, 0.6 + mine);
+    return true;
+  }
+  fighter.move = 0;
+  startPickup(world, fighter, target);
+  return true;
+}
+
+/**
  * A mixed fighter changes style now and then, between strikes, never to a
  * weapon style: a spell of boxing, then of kicking, of clinching, of pushing.
  */
@@ -508,6 +572,9 @@ export function think(world, fighter, dt) {
     return;
   }
   switchMix(world, fighter, dt);
+  // A weapon on the floor, and the chance to get it.
+  fighter.goTo = null;
+  if (goForWeapon(world, fighter, opponent)) return;
   const style = STYLES[fighter.style];
   const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;

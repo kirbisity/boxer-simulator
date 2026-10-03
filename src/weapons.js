@@ -87,8 +87,8 @@ export const BLADES = {
   shockStrength: 0.55,
   // Grip: hard knocks to the weapon arm or the weapon strain the grip by
   // impulse over (this × the hand's strike force); past 1 the weapon goes.
-  gripImpulsePerNewton: 0.055,
-  gripLeak: 0.35, // per second
+  gripImpulsePerNewton: 0.1,
+  gripLeak: 0.5, // per second
   armHitShare: 0.6, // a blow to the forearm or upper arm, against one to the weapon
   // Blades meeting: how much bounce, and the closing speed (m/s) that counts as a clash.
   clashRestitution: 0.25,

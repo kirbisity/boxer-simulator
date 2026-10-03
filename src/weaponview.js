@@ -364,6 +364,14 @@ export function updateDebris(view, world) {
   view.pieces ??= new Map();
   for (const debris of world.debris ?? []) {
     let mesh = view.pieces.get(debris.id);
+    // Picked up: it is in someone's hand now, drawn there.
+    if (debris.taken) {
+      if (mesh) {
+        view.scene.remove(mesh);
+        view.pieces.delete(debris.id);
+      }
+      continue;
+    }
     if (!mesh) {
       if (debris.kind !== 'weapon') continue;
       mesh = new THREE.Group();
