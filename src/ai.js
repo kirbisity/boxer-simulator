@@ -91,7 +91,7 @@ export function think(world, fighter, dt) {
   // React to a strike already on its way, the way a trained fighter would.
   if (opponent.punch && opponent.punch.t < 0.07 && !fighter.reacted && !fighter.punch) {
     fighter.reacted = true;
-    if (random() < style.defendChance * (0.6 + 0.6 * fighter.body.inputs.training)) perform(world, fighter, chooseDefence(style, opponent.punch, random));
+    if (random() < style.defendChance * (0.6 + 0.6 * fighter.body.inputs.exercise)) perform(world, fighter, chooseDefence(style, opponent.punch, random));
   }
   if (!opponent.punch) fighter.reacted = false;
 

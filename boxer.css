@@ -71,7 +71,7 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .corner.red h2 { color: var(--red); }
 .corner.blue h2 { color: var(--blue); }
 .fields { display: grid; gap: 4px; }
-.field { display: grid; grid-template-columns: 74px 1fr 52px; gap: 8px; align-items: center; font-size: 13px; }
+.field { display: grid; grid-template-columns: 74px 1fr 76px; gap: 8px; align-items: center; font-size: 13px; }
 .field.wide { grid-template-columns: 74px 1fr; }
 .field span { color: var(--muted); }
 .field select, .field input:not([type=range]) { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; min-width: 0; }
@@ -81,7 +81,7 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .look-field { display: grid; grid-template-columns: 44px 1fr; gap: 6px; align-items: center; font-size: 12px; }
 .look-field span { color: var(--muted); }
 .look-field select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; min-width: 0; font-size: 12px; }
-.derived { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 14px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.derived { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 12px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .derived div { display: flex; justify-content: space-between; font-size: 12px; }
 .derived span { color: var(--muted); }
 .derived b { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }

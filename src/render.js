@@ -319,7 +319,7 @@ export function buildFighterView(view, fighter) {
   view.scene.add(group);
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells,
-    baseColors, vertexSegment, damageVersion: -1,
+    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }),
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
 }
@@ -348,8 +348,11 @@ export function setLayer(fighterView, layer) {
   const ghost = layer === 'physics' ? 0.25 : layer === 'bone' ? 0.12 : 1;
   layers.skin.visible = layer !== 'muscle';
   layers.muscle.visible = layer === 'muscle';
-  layers.bone.visible = layer === 'muscle' || layer === 'bone';
+  // In the skin view the skeleton stays, painted as skin: hidden inside a
+  // normal body, it shows through where a wasted one is thinner than its bones.
+  layers.bone.visible = layer !== 'physics';
   layers.physics.visible = layer === 'physics';
+  paintSkeleton(fighterView, layer === 'skin');
   // Ghosting: the body goes see-through and drops its ink; the head and kit hide.
   const material = skinMesh.material;
   material.transparent = ghost < 1;
@@ -463,6 +466,35 @@ function paintDamage(fighterView) {
       });
     }
   }
+}
+
+const SKIN_BONE_INSET = 0.87;
+
+/** Bones wear skin in the skin view and their own colour elsewhere; broken ones stay red. */
+function paintSkeleton(fighterView, asSkin) {
+  const broken = new Set([...fighterView.fighter.broken].flatMap((joint) => JOINT_BONES[joint].map((bone) => BONE[bone])));
+  fighterView.skeleton.forEach((piece, index) => {
+    // Drawn as skin, the bones sit a little in from where the anatomy layer
+    // draws them, towards each bone's axis: under the flesh of a normal body,
+    // through it only where the flesh has wasted away.
+    for (const part of piece.children) {
+      part.userData.bind ??= { x: part.position.x, z: part.position.z, scale: part.scale.clone() };
+      const inset = asSkin ? SKIN_BONE_INSET : 1;
+      part.position.x = part.userData.bind.x * inset;
+      part.position.z = part.userData.bind.z * inset;
+      part.scale.set(part.userData.bind.scale.x * inset, part.userData.bind.scale.y, part.userData.bind.scale.z * inset);
+    }
+    piece.traverse((object) => {
+      if (!object.isMesh) return;
+      if (object.userData.outline) {
+        object.visible = !asSkin;
+        return;
+      }
+      object.userData.boneMaterial ??= object.material;
+      if (broken.has(index)) object.material = fighterView.brokenBone ?? (fighterView.brokenBone = surface(0xe01b1b));
+      else object.material = asSkin ? fighterView.skinBone : object.userData.boneMaterial;
+    });
+  });
 }
 
 /** Show an impact: dent the struck flesh and throw a spray of sweat. */

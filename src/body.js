@@ -2,6 +2,8 @@
 // physical quantities the simulation runs on (particle masses, motor forces,
 // collision radii). Every coefficient is a dial with its source beside it.
 
+import { boneTScore, caloriesForBodyFat, settleComposition, starvation } from './physiology.js';
+
 export const PARTICLES = [
   'head', 'neck', 'lShoulder', 'rShoulder', 'lElbow', 'rElbow', 'lHand', 'rHand',
   'pelvis', 'lHip', 'rHip', 'lKnee', 'rKnee', 'lFoot', 'rFoot',
@@ -47,11 +49,14 @@ export const FRAMES = {
 };
 
 export const BODY = {
-  // Fat-free mass index (kg/m²): ~19 untrained men, ~15.5 women; trained
-  // natural athletes reach ~24–25 and ~19–20 (Kouri et al. 1995).
-  ffmiBase: { male: 19, female: 15.5 },
-  ffmiTrainedGain: { male: 5.5, female: 4.5 },
-  skeletalMuscleShareOfLean: 0.52,
+  // Lean mass that is not skeleton or skeletal muscle: organs, skin, blood.
+  // A share of lean (so it shrinks in starvation) plus a little per kg of
+  // fat (a bigger body needs bigger organs). Leaves ~32 kg of muscle in a
+  // healthy 80 kg man and ~11 kg in a 28 kg starving one.
+  organShareOfLean: 0.33,
+  armHypertrophy: 0.6, // arm muscle share multiplies by 1 + this × exercise^2.5
+  limbWasting: 4, // limb muscle share divides by 1 + this × starvation
+  organPerFatKg: 0.08,
   // The skeleton is sized by the frame, not by the muscle on it: ~11 kg for a
   // 1.75 m man of medium frame, scaling with height cubed. A thin fighter
   // carries the same bones as a muscular one of the same height, with less
@@ -82,7 +87,7 @@ export const BODY = {
   // slower shortening (Kawakami et al. 1993). Bulk is muscle kg per metre of
   // limb; below the reference it costs nothing, above it the cost grows with
   // the square of the excess, as fibre angles steepen.
-  referenceBulk: { arm: 3.1, leg: 9.5 },
+  referenceBulk: { arm: 3.5, leg: 9.5 },
   pennationCost: 14,
   hillCurvature: 1.0,
   kickForcePerMuscleKg: 95,
@@ -99,30 +104,30 @@ export const BODY = {
 /** Default inputs, also the shape of a fighter file's `inputs`. */
 export const DEFAULT_INPUTS = {
   name: 'Fighter', sex: 'male', heightCm: 180, frame: 'medium', age: 27,
-  training: 0.6, bodyFat: 0.16, style: 'boxing',
+  exercise: 0.4, calories: 2800, style: 'boxing',
   look: { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' },
 };
 
 // `look` is appearance only; nothing in the simulation reads it.
 export const PRESETS = {
   heavy: {
-    name: 'Marcus "The Wall"', style: 'boxing', sex: 'male', heightCm: 193, frame: 'large', age: 29, training: 0.85, bodyFat: 0.17,
+    name: 'Marcus "The Wall"', style: 'boxing', sex: 'male', heightCm: 193, frame: 'large', age: 29, exercise: 0.65, calories: 5740,
     look: { skinTone: 'deep', hairStyle: 'cornrows', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   light: {
-    name: 'Leo Quickhands', style: 'kickboxing', sex: 'male', heightCm: 172, frame: 'small', age: 24, training: 0.9, bodyFat: 0.1,
+    name: 'Leo Quickhands', style: 'kickboxing', sex: 'male', heightCm: 172, frame: 'small', age: 24, exercise: 0.81, calories: 4160,
     look: { skinTone: 'light', hairStyle: 'spiky', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
   },
   amateur: {
-    name: 'Dave from Accounts', style: 'boxing', sex: 'male', heightCm: 180, frame: 'medium', age: 34, training: 0.1, bodyFat: 0.28,
+    name: 'Dave from Accounts', style: 'boxing', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.1, calories: 2900,
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a37a45', facialHair: 'stubble', eyeColor: 'green' },
   },
   veteran: {
-    name: 'Old Sal', style: 'boxing', sex: 'male', heightCm: 182, frame: 'medium', age: 48, training: 0.7, bodyFat: 0.2,
+    name: 'Old Sal', style: 'boxing', sex: 'male', heightCm: 182, frame: 'medium', age: 48, exercise: 0.48, calories: 3800,
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#8d8d8d', facialHair: 'mustache', eyeColor: 'grey' },
   },
   contender: {
-    name: 'Ana Ruiz', style: 'muayThai', sex: 'female', heightCm: 170, frame: 'medium', age: 26, training: 0.9, bodyFat: 0.17,
+    name: 'Ana Ruiz', style: 'muayThai', sex: 'female', heightCm: 170, frame: 'medium', age: 26, exercise: 0.88, calories: 3810,
     look: { skinTone: 'medium', hairStyle: 'bun', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'hazel' },
   },
 };
@@ -130,21 +135,48 @@ export const PRESETS = {
 const segmentKind = (key) => key.replace(/^[lr](?=[A-Z])/, '').replace(/^./, (c) => c.toLowerCase());
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
+/**
+ * The player's inputs, completed: daily calories and exercise level are what
+ * a player sets. Older fighter files set training and body fat instead; they
+ * are read as an exercise level and the calories that settle at that fat.
+ */
+export function normaliseInputs(rawInputs) {
+  const inputs = { ...DEFAULT_INPUTS, ...rawInputs, look: { ...DEFAULT_INPUTS.look, ...rawInputs?.look } };
+  if (rawInputs?.exercise === undefined) inputs.exercise = rawInputs?.training ?? DEFAULT_INPUTS.exercise;
+  if (rawInputs?.calories === undefined) {
+    const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
+    inputs.calories = Math.round(caloriesForBodyFat(inputs, rawInputs?.bodyFat ?? 0.16, frame.lean));
+  }
+  delete inputs.training;
+  delete inputs.bodyFat;
+  return inputs;
+}
+
 /** Build the full body model from a character's inputs. */
 export function buildBody(rawInputs) {
-  const inputs = { ...DEFAULT_INPUTS, ...rawInputs };
+  const inputs = normaliseInputs(rawInputs);
   const heightM = inputs.heightCm / 100;
   const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
   const yearsAging = Math.max(0, inputs.age - BODY.agingFrom);
 
-  const ffmi = (BODY.ffmiBase[inputs.sex] + BODY.ffmiTrainedGain[inputs.sex] * inputs.training) * frame.lean;
-  const leanKg = ffmi * heightM * heightM * (1 - BODY.muscleLossPerYear * yearsAging * 0.5);
-  const muscleKg = leanKg * BODY.skeletalMuscleShareOfLean * (1 - BODY.muscleLossPerYear * yearsAging);
-  const boneKg = BODY.referenceBoneKg[inputs.sex] * (heightM / BODY.referenceHeightM) ** 3 * frame.bone;
-  const otherKg = leanKg - muscleKg - boneKg;
-  const fatKg = (leanKg * inputs.bodyFat) / (1 - inputs.bodyFat);
+  // What eating and exercise settle into: lean and fat are outcomes.
+  const composition = settleComposition(inputs, frame.lean);
+  const leanKg = composition.lean;
+  const fatKg = composition.fat;
   const massKg = leanKg + fatKg;
-  const boneDensity = frame.bone * (1 - BODY.boneLossPerYear[inputs.sex] * Math.max(0, inputs.age - 35)) * (0.92 + 0.12 * inputs.training);
+  // Downstream reads training (skill, recruitment) and body fat from inputs.
+  inputs.training = inputs.exercise;
+  inputs.bodyFat = composition.bodyFat;
+  const tScore = boneTScore(inputs, massKg, composition.bodyFat);
+  // Bone: the frame's skeleton, denser or more porous by its T-score
+  // (each SD is ~10% of bone mineral).
+  // A T-score is in standard deviations of mineral density, about 10% each;
+  // mineral is half the skeleton's mass, so its weight moves half as much.
+  const boneDensity = Math.max(0.35, 1 + 0.1 * tScore) * frame.bone;
+  const boneKg = BODY.referenceBoneKg[inputs.sex] * (heightM / BODY.referenceHeightM) ** 3 * Math.max(0.6, 1 + 0.05 * tScore) * frame.bone;
+  const otherKg = BODY.organShareOfLean * leanKg + BODY.organPerFatKg * fatKg;
+  const muscleKg = Math.max(0.05 * leanKg, leanKg - boneKg - otherKg);
+  const ffmi = leanKg / (heightM * heightM);
   const muscleQuality = 1 - BODY.qualityLossPerYear * yearsAging;
 
   const lengths = {};
@@ -152,11 +184,20 @@ export function buildBody(rawInputs) {
   lengths.hipSpan *= frame.width;
   lengths.shoulderSpan *= frame.width * (inputs.sex === 'female' ? 0.92 : 1) * (1 + 0.06 * inputs.training);
 
+  // Training grows the arms (and shoulders) disproportionately; starvation
+  // strips the limbs before the trunk. Shares are renormalised to sum to the
+  // body's muscle.
+  const starving = starvation(inputs, composition.bodyFat);
+  const muscleShares = { ...SHARE.muscle };
+  for (const kind of ['upperArm', 'forearm']) muscleShares[kind] *= 1 + BODY.armHypertrophy * inputs.exercise ** 2.5;
+  for (const kind of ['upperArm', 'forearm', 'thigh', 'shank']) muscleShares[kind] /= 1 + BODY.limbWasting * starving;
+  const shareTotal = muscleShares.head + muscleShares.trunk + 2 * (muscleShares.upperArm + muscleShares.forearm + muscleShares.thigh + muscleShares.shank);
+  for (const kind of Object.keys(muscleShares)) muscleShares[kind] /= shareTotal;
   const segments = {};
   for (const key of Object.keys(SEGMENTS)) {
     const kind = segmentKind(key);
     const tissue = {
-      muscle: muscleKg * SHARE.muscle[kind],
+      muscle: muscleKg * muscleShares[kind],
       bone: boneKg * SHARE.bone[kind],
       fat: fatKg * SHARE.fat[kind],
       other: otherKg * SHARE.other[kind],
@@ -228,7 +269,7 @@ export function buildBody(rawInputs) {
   const aerobic = clamp(0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15) - 0.008 * yearsAging, 0.15, 1.1);
 
   return {
-    inputs, heightM, massKg, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex,
+    inputs, heightM, massKg, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
     lengths, segments, masses, motorForce, strikeForce, topSpeed, aerobic,
     limbKg: {
       lArm: segments.lUpperArm.mass + segments.lForearm.mass + BODY.gloveKg,
@@ -286,5 +327,5 @@ function particleMasses(segments, massKg) {
 
 /** A shareable fighter file: inputs and a version; the body is rebuilt from them. */
 export function fighterFile(inputs) {
-  return { schemaVersion: 1, kind: 'boxer-simulator/fighter', inputs: { ...DEFAULT_INPUTS, ...inputs } };
+  return { schemaVersion: 2, kind: 'boxer-simulator/fighter', inputs: normaliseInputs(inputs) };
 }

@@ -37,7 +37,7 @@ export function peakSpeed(inputs, move) {
 }
 
 export function speedCurve(move, extra = {}) {
-  return WEIGHT_CLASSES.map((entry) => ({ ...entry, ...peakSpeed({ sex: 'male', age: 26, training: 0.85, ...entry, ...extra }, move) }));
+  return WEIGHT_CLASSES.map((entry) => ({ ...entry, ...peakSpeed({ sex: 'male', age: 26, exercise: 0.65, ...entry, ...extra }, move) }));
 }
 
 if (process.argv[1]?.endsWith('speed-curve.js')) {

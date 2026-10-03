@@ -11,6 +11,16 @@ import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 
 export const LOFT = {
+  // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
+  // how far forward it bulges, and how far below the waistband it hangs,
+  // per metre of layer past that.
+  bellyFrom: 0.035,
+  bellyScale: 0.9,
+  bellyDrop: 2.2,
+  // Trunk lean radius (m) below which the body looks wasted, and over what
+  // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
+  wastingFrom: 0.135,
+  wastingSpan: 0.03,
   sides: 18,
   facetedSides: 7,
   // Rings per unit of each part's count; above 1 is denser along the limbs.
@@ -39,7 +49,7 @@ function profile(stops) {
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
-function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1 } = {}) {
+function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null } = {}) {
   const start = mesh.positions.length / 3;
   for (const ring of rings) {
     for (let step = 0; step < sides; step += 1) {
@@ -47,6 +57,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * inflate), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * inflate)));
       mesh.positions.push(...p);
       mesh.colors.push(color);
+      mesh.bones.push(bones(ring, Math.cos(angle)));
     }
   }
   for (let row = 0; row < rings.length - 1; row += 1) {
@@ -60,6 +71,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
     const center = mesh.positions.length / 3;
     mesh.positions.push(...rings[row].center);
     mesh.colors.push(color);
+    mesh.bones.push(bones(rings[row], 0));
     for (let step = 0; step < sides; step += 1) {
       const a = start + row * sides + step;
       const b = start + row * sides + ((step + 1) % sides);
@@ -81,7 +93,7 @@ function along(a, b, forward, count, from, to, depthAt, widthAt, offsetAt = () =
   for (let index = 0; index <= count; index += 1) {
     const t = from + ((to - from) * index) / count;
     const center = vec.add(vec.add(a, vec.scale(axis, t * length)), vec.scale(depthAxis, offsetAt(t)));
-    rings.push({ center, depthAxis, widthAxis, depth: depthAt(t), width: widthAt(t) });
+    rings.push({ t, center, depthAxis, widthAxis, depth: depthAt(t), width: widthAt(t) });
   }
   return rings;
 }
@@ -104,17 +116,19 @@ function computeNormals(positions, indices) {
 }
 
 /** Split every triangle's corners apart so each face shades flat. */
-function facet(positions, indices, colors) {
+function facet(positions, indices, colors, bones) {
   const flatPositions = [];
   const flatIndices = [];
   const flatColors = [];
+  const flatBones = [];
   for (let face = 0; face < indices.length; face += 1) {
     const i = indices[face];
     flatPositions.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
     flatColors.push(colors[i]);
+    flatBones.push(bones[i]);
     flatIndices.push(face);
   }
-  return { positions: flatPositions, indices: flatIndices, colors: flatColors };
+  return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones };
 }
 
 export function buildLoftBody(body, { faceted = false } = {}) {
@@ -126,27 +140,63 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
-  const mesh = { positions: [], indices: [], colors: [] };
-  const fat = seg.trunk.tissue.fat / seg.trunk.mass;
+  const mesh = { positions: [], indices: [], colors: [], bones: [] };
   const build = seg.trunk.tissue.muscle / (seg.trunk.tissue.muscle + seg.trunk.tissue.fat);
-  const R = seg.trunk.skinRadius;
+  // The trunk is a lean shape (from the radius without fat) under a layer
+  // of fat, laid on where fat goes: thickest at the waist and belly, then
+  // the hips (more so for women), least over the shoulders.
+  const R = seg.trunk.muscleRadius;
+  const fatLayer = Math.max(0, seg.trunk.skinRadius - seg.trunk.muscleRadius);
+  const female = body.inputs.sex === 'female';
   const forward = [1, 0, 0];
 
   // Trunk: hips, waist, chest, shoulders, narrowing into the neck.
-  const hipHalf = L.hipSpan / 2 + seg.lThigh.skinRadius * 0.85;
+  const hipHalf = L.hipSpan / 2 + seg.lThigh.muscleRadius * 0.85;
   const neckR = L.headRadius * (0.44 + 0.12 * body.neckIndex);
-  // The top slopes from the shoulders up into the neck: the trapezius.
-  const width = profile([[-0.12, hipHalf * 0.8], [0.02, hipHalf], [0.3, L.hipSpan * 0.42 + R * 0.25 + fat * 0.1], [0.62, L.shoulderSpan * 0.42 + 0.02], [0.84, L.shoulderSpan * 0.48], [0.94, L.shoulderSpan * 0.4], [1.04, neckR * (1.7 + 0.5 * body.neckIndex)], [1.12, neckR * 1.15]]);
-  const depth = profile([[-0.12, R * 0.5], [0.02, R * 0.62], [0.3, R * (0.55 + fat * 0.8)], [0.62, R * 0.62 * (1 + 0.15 * build)], [0.88, R * 0.52], [1.04, neckR * 1.3], [1.12, neckR * 1.05]]);
-  const lean = profile([[0, -0.012], [0.3, fat * 0.05], [0.65, 0.012], [1, -0.01]]);
+  const hipFat = female ? 1.6 : 1.1;
+  // Wasting (0 at a normal build, 1 at the BMI floor): the abdomen sinks
+  // behind the ribs, the waist pinches and the chest shrinks onto its cage.
+  const wasting = Math.min(1, Math.max(0, (LOFT.wastingFrom - R) / LOFT.wastingSpan));
+  const leanWidth = profile([[-0.12, hipHalf * 0.8], [0.02, hipHalf], [0.3, (L.hipSpan * 0.42 + R * 0.25) * (1 - 0.3 * wasting)], [0.62, (L.shoulderSpan * 0.42 + 0.02) * (1 - 0.14 * wasting)], [0.84, L.shoulderSpan * 0.48 * (1 - 0.06 * wasting)], [0.94, L.shoulderSpan * 0.4], [1.04, neckR * (1.7 + 0.5 * body.neckIndex)], [1.12, neckR * 1.15]]);
+  const fatWidth = profile([[-0.12, 0.9 * hipFat], [0.05, 1.25 * hipFat], [0.3, 1.55], [0.6, 1.05], [0.86, 0.55], [1.04, 0.45], [1.12, 0.25]]);
+  const leanDepth = profile([[-0.12, R * 0.5], [0.02, R * 0.62], [0.3, R * 0.55 * (1 - 0.3 * wasting)], [0.62, R * 0.62 * (1 + 0.15 * build) * (1 - 0.1 * wasting)], [0.88, R * 0.52], [1.04, neckR * 1.3], [1.12, neckR * 1.05]]);
+  const fatDepth = profile([[-0.12, 0.8], [0.1, 1.05], [0.3, 1.45], [0.62, 0.95], [0.88, 0.5], [1.04, 0.6], [1.12, 0.35]]);
+  // The belly carries forward of the spine as fat thickens.
+  const leanOffset = profile([[0, -0.012], [0.3, 0], [0.65, 0.012], [1, -0.01]]);
+  const fatOffset = profile([[0, 0.1], [0.25, 0.55], [0.45, 0.35], [0.65, 0.1], [1, 0]]);
+  // Past a thick enough layer the abdomen bulges forward, then hangs: the
+  // trunk carries on below the waistband as an apron in front of the thighs,
+  // narrowing and thinning to its hem.
+  const belly = Math.max(0, fatLayer - LOFT.bellyFrom);
+  const bulge = profile([[-0.12, 0.7], [0.15, 1], [0.4, 0.4], [0.6, 0]]);
+  const hem = -0.12 - (belly * LOFT.bellyDrop) / vec.length(vec.sub(at('neck'), at('pelvis')));
+  const bodyWidth = (u) => leanWidth(u) + fatLayer * fatWidth(u);
+  const bodyDepth = (u) => leanDepth(u) + fatLayer * fatDepth(u) + belly * LOFT.bellyScale * bulge(u);
+  const bodyLean = (u) => leanOffset(u) + fatLayer * fatOffset(u) + belly * LOFT.bellyScale * 0.8 * bulge(u);
+  // 0 at the hem, 1 at the waistband.
+  const apron = (u) => Math.sqrt(Math.max(0, (u - hem) / (-0.12 - hem)));
+  const width = (u) => (u >= -0.12 ? bodyWidth(u) : bodyWidth(-0.12) * (0.55 + 0.45 * apron(u)));
+  const depth = (u) => (u >= -0.12 ? bodyDepth(u) : bodyDepth(-0.12) * (0.3 + 0.7 * apron(u)));
+  const lean = (u) => (u >= -0.12 ? bodyLean(u) : bodyLean(-0.12) + bodyDepth(-0.12) * 0.7 * (1 - apron(u)));
   const trunkRings = (from, to, rings) => along(at('pelvis'), at('neck'), forward, rings, from, to, depth, width, lean);
-  loft(mesh, trunkRings(-0.12, 1.12, count(18)), sides);
+  // Skin weights go by distance; a wide belly lies nearer the hanging
+  // forearms than the spine, so the abdomen is bound to the torso alone,
+  // and the apron to the pelvis and spine, not the legs it hangs over.
+  // The front of a fat belly lies over the thighs too, which swing forward
+  // in a crouch; only the sides and back of the hips follow the legs.
+  const torso = [BONE.pelvis, BONE.spine, BONE.chest, BONE.lThigh, BONE.rThigh];
+  const hanging = [BONE.pelvis, BONE.spine, BONE.chest];
+  const abdomen = (ring, front) => (ring.t < -0.12 || (belly > 0 && front > 0.2) ? hanging : ring.t < 0.55 ? torso : null);
+  loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, count(18) + Math.round((-0.12 - Math.min(-0.12, hem)) * 10)), sides, { bones: abdomen });
   // Kit is geometry, not paint: shorts, waistband and (for women) a sports
   // top are lofts a little proud of the skin, so their edges are crisp.
-  loft(mesh, trunkRings(-0.12, 0.2, count(5)), sides, { color: 'kit', inflate: 1.05, capStart: false, capEnd: false });
-  loft(mesh, trunkRings(0.17, 0.25, 1), sides, { color: 'band', inflate: 1.08, capStart: false, capEnd: false });
+  // Shorts sit on the hips under the belly, which hangs over them.
+  const unbulged = (shape, bellyPart) => (u) => shape(u) - belly * LOFT.bellyScale * bellyPart * bulge(u);
+  const shortsRings = (from, to, rings) => along(at('pelvis'), at('neck'), forward, rings, from, to, unbulged(bodyDepth, 1), bodyWidth, unbulged(bodyLean, 0.8));
+  loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: 'kit', inflate: 1.05, capStart: false, capEnd: false, bones: abdomen });
+  loft(mesh, shortsRings(0.17, 0.25, 1), sides, { color: 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen });
   // Fewer sides cut deeper chords, so the faceted top needs more clearance.
-  if (body.inputs.sex === 'female') loft(mesh, trunkRings(0.56, 0.86, count(5)), sides, { color: 'top', inflate: faceted ? 1.1 : 1.05, capStart: false, capEnd: false });
+  if (body.inputs.sex === 'female') loft(mesh, trunkRings(0.56, 0.86, count(5)), sides, { color: 'top', inflate: faceted ? 1.1 : 1.05, capStart: false, capEnd: false, bones: abdomen });
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -188,12 +238,12 @@ export function buildLoftBody(body, { faceted = false } = {}) {
       profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]])), sides);
   }
 
-  let { positions, indices, colors } = mesh;
-  if (faceted) ({ positions, indices, colors } = facet(positions, indices, colors));
+  let { positions, indices, colors, bones } = mesh;
+  if (faceted) ({ positions, indices, colors, bones } = facet(positions, indices, colors, bones));
   let positionArray = Float32Array.from(positions);
   const indexArray = Uint32Array.from(indices);
   if (!faceted) positionArray = relax({ positions: positionArray, indices: indexArray }, LOFT.relaxPasses, LOFT.relaxAmount).positions;
   const normals = computeNormals(positionArray, indexArray);
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
-  return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(positionArray, frames), bindFrames: frames, bindPoints: points };
+  return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(positionArray, frames, bones), bindFrames: frames, bindPoints: points };
 }

@@ -1,7 +1,8 @@
 // Page wiring: builder, HUD, controls, and the loop that steps the world and
 // draws it. The simulation runs at a fixed step whatever the frame rate.
 
-import { buildBody, fighterFile, P, PRESETS } from './body.js';
+import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
+import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { thinkAll } from './ai.js';
 import { MOVES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, createWorld, perform, placeFighter, throwPunch } from './physics.js';
@@ -286,8 +287,10 @@ const FIELDS = [
   { key: 'heightCm', label: 'Height', type: 'range', min: 150, max: 210, step: 1, unit: 'cm' },
   { key: 'frame', label: 'Frame', type: 'select', options: ['small', 'medium', 'large'] },
   { key: 'age', label: 'Age', type: 'range', min: 18, max: 60, step: 1, unit: 'yr' },
-  { key: 'training', label: 'Training', type: 'range', min: 0, max: 1, step: 0.05, format: (value) => `${Math.round(value * 100)}%` },
-  { key: 'bodyFat', label: 'Body fat', type: 'range', min: 0.06, max: 0.4, step: 0.01, format: (value) => `${Math.round(value * 100)}%` },
+  { key: 'exercise', label: 'Exercise', type: 'range', min: 0, max: 1, step: 0.01, format: (value) => `${Math.round(exerciseHours(value))} h/wk` },
+  // Body fat is not set but settles from what goes in and what is burnt; the
+  // slider spans the intakes that settle between BMI 10 and BMI 100.
+  { key: 'calories', label: 'Calories', type: 'range', step: 10, range: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean), format: (value) => `${Math.round(value).toLocaleString('en')} kcal` },
 ];
 const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 // The compact grid: the fighting style first, then the look.
@@ -306,7 +309,7 @@ function buildCornerForm(corner) {
   presetSelect.replaceChildren(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, key)));
   presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === state.corners[corner].name) ?? 'heavy';
   presetSelect.addEventListener('change', () => {
-    state.corners[corner] = structuredClone(PRESETS[presetSelect.value]);
+    state.corners[corner] = normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
     fillCornerForm(corner);
   });
   const fields = form.querySelector('.fields');
@@ -356,7 +359,7 @@ function buildCornerForm(corner) {
     try {
       const file = JSON.parse(atob(form.querySelector('.code').value.trim()));
       if (file.kind !== 'boxer-simulator/fighter') throw new Error('not a fighter file');
-      state.corners[corner] = { ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } };
+      state.corners[corner] = normaliseInputs({ ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } });
       fillCornerForm(corner);
     } catch {
       form.querySelector('.code').value = 'That code is not a fighter file.';
@@ -375,6 +378,12 @@ function fillCornerForm(corner) {
   form.querySelector('.copy').textContent = 'Copy code';
   for (const field of FIELDS) {
     const input = form.querySelector(`[data-key="${field.key}"]`);
+    if (field.range) {
+      // The span moves with height, sex, frame and exercise; keep the intake inside it.
+      const [low, high] = field.range(inputs);
+      Object.assign(input, { min: Math.floor(low / 10) * 10, max: Math.ceil(high / 10) * 10 });
+      inputs[field.key] = Math.min(Number(input.max), Math.max(Number(input.min), inputs[field.key]));
+    }
     input.value = inputs[field.key];
     input.nextElementSibling.textContent = field.format ? field.format(inputs[field.key]) : field.unit ? `${inputs[field.key]} ${field.unit}` : '';
   }
@@ -384,12 +393,14 @@ function fillCornerForm(corner) {
     form.querySelector(`[data-look="${field.key}"]`).value = field.fromValue ? field.fromValue(value) : value;
   }
   const body = buildBody(inputs);
+  const stats = deriveStats(body);
+  const kg = (value) => (value > 0 ? `${Math.round(value)} kg` : 'cannot');
   const rows = [
-    ['Weight', `${body.massKg.toFixed(1)} kg`], ['Muscle', `${body.muscleKg.toFixed(1)} kg`],
-    ['Bone', `${body.boneKg.toFixed(1)} kg`], ['Fat', `${body.fatKg.toFixed(1)} kg`],
-    ['Reach', `${Math.round(body.reach * 100)} cm`], ['Bone density', `${Math.round(body.boneDensity * 100)}%`],
-    ['Punch force', `${Math.round(body.motorForce[7])} N`], ['Cross mass', `${body.strikeMass.cross.toFixed(1)} kg`],
-    ['Chin', `${body.chin.toFixed(2)} m/s`], ['Engine', `${Math.round(body.aerobic * 100)}%`],
+    ['Weight', `${stats.weight.toFixed(1)} kg`], ['Body fat', `${(stats.bodyFat * 100).toFixed(1)}%`], ['BMI', stats.bmi.toFixed(1)],
+    ['Lean', `${stats.lean.toFixed(1)} kg`], ['Resting', `${Math.round(stats.rmr)} kcal`], ['Arm', `${Math.round(stats.arm)} cm`],
+    ['Bone T', stats.tScore.toFixed(1)], ['Squat', kg(stats.squat)], ['Bench', kg(stats.bench)],
+    ['Grip', `${Math.round(stats.grip)} kg`], ['30 m', Number.isFinite(stats.sprint) ? `${stats.sprint.toFixed(2)} s` : 'cannot'], ['Impact', `${Math.round(stats.impact)} J`],
+    ['Reach', `${Math.round(body.reach * 100)} cm`], ['Punch', `${Math.round(body.motorForce[7])} N`], ['Chin', `${body.chin.toFixed(2)} m/s`],
   ];
   form.querySelector('.derived').innerHTML = rows.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('');
 }
@@ -445,39 +456,58 @@ const SHEETS = {
     // Inside the ropes (the ring edge is 3 m out), so none cross the view.
     camera: { distance: 2.75, pitch: 0.1, yaw: 0.15, height: 0.95 },
   },
+  // One build fed for BMI 10 to 100: the extremes of the calorie slider.
+  physiques: {
+    options: [10, 17, 24, 45, 100].map((bmi) => [{ bmi }, `BMI ${bmi}`, '']),
+    rows: [{ ...PRESETS.amateur, exercise: 0.3 }, { ...PRESETS.contender, exercise: 0.3 }],
+    camera: { distance: 4.2, pitch: 0.08, yaw: 0.15, height: 0.95 },
+  },
 };
 
+/** The inputs a sheet option builds: a look field, or a body fed to a BMI. */
+function sheetInputs(sheet, row, value) {
+  const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
+  if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
+  const height = inputs.heightCm / 100;
+  return { ...inputs, calories: Math.round(caloriesForWeight(inputs, value.bmi * height * height, FRAMES[inputs.frame].lean)) };
+}
+
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
-function designSheet(kind, row = 0) {
+function designSheet(kind, row = 0, closeUp = null) {
   const sheet = SHEETS[kind];
-  const spacing = kind === 'faces' ? 0.55 : 0.8;
-  const entries = sheet.options.map(([value, label], column) => {
-    const inputs = structuredClone(sheet.rows[row]);
-    inputs.look = { ...inputs.look, [sheet.field]: value };
-    return { inputs: { ...inputs, name: label }, corner: 'red', column };
-  });
+  const spacing = { faces: 0.55, bodies: 0.8, physiques: 1.15 }[kind];
+  const entries = sheet.options.map(([value, label], column) => ({ inputs: { ...sheetInputs(sheet, row, value), name: label }, corner: 'red', column }));
+  const middle = (entries.length - 1) / 2;
   state.paused = true;
   state.world = createWorld(entries, { seed: 3 });
   // Option A on the left as the camera sees it (+z is screen left).
   state.world.fighters.forEach((fighter, index) => {
-    placeFighter(fighter, 0, (1 - entries[index].column) * spacing);
+    placeFighter(fighter, 0, (middle - entries[index].column) * spacing);
     fighter.handsDown = true;
     // Turn the bladed stance so the face, not the hips, points at the camera.
     fighter.yaw = -0.5;
   });
   advance(state.world, 0.6, null, STEP);
   rebuildViews();
-  const { distance, pitch, yaw, height } = sheet.camera;
+  // A close-up frames one option from any side: { column, yaw, pitch, distance }.
+  const { distance, pitch, yaw, height } = { ...sheet.camera, ...closeUp };
   Object.assign(scene.orbit, { distance, pitch, yaw });
+  const focusZ = closeUp ? state.world.fighters[closeUp.column].x[P.pelvis * 3 + 2] : 0;
+  $('#banner').hidden = true;
   for (let pass = 0; pass < 3; pass += 1) {
-    scene.orbit.target.set(0, height, 0);
+    scene.orbit.target.set(0, height, focusZ);
     draw(0);
   }
   // Labels under each option of the framed row.
   const overlay = document.querySelector('#sheet-labels') ?? document.body.appendChild(Object.assign(document.createElement('div'), { id: 'sheet-labels' }));
   overlay.replaceChildren();
+  overlay.hidden = Boolean(closeUp);
   const box = canvas.getBoundingClientRect();
   sheet.options.forEach(([, label, note], column) => {
+    if (kind === 'physiques') {
+      const stats = deriveStats(state.world.fighters[column].body);
+      note = `${stats.weight.toFixed(0)} kg · ${(stats.bodyFat * 100).toFixed(0)}% fat · ${entries[column].inputs.calories} kcal`;
+    }
     const fighter = state.world.fighters[column];
     const anchor = new THREE.Vector3(fighter.x[P.pelvis * 3], kind === 'faces' ? fighter.x[P.neck * 3 + 1] - 0.2 : 0.35, fighter.x[P.pelvis * 3 + 2]).project(scene.camera);
     const tag = document.createElement('div');

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBody, P, PRESETS } from '../src/body.js';
+import { buildBody, FRAMES, P, PRESETS } from '../src/body.js';
+import { caloriesForBodyFat } from '../src/physiology.js';
+
+const caloriesFor = (exercise, bodyFat) => caloriesForBodyFat({ sex: 'male', heightCm: 178, age: 30, frame: 'medium', exercise }, bodyFat, FRAMES.medium.lean);
 import { thinkAll } from '../src/ai.js';
 import { MOVES, STYLES } from '../src/moves.js';
 import { advance, createWorld, perform, placeFighter, point, throwPunch, WORLD } from '../src/physics.js';
@@ -17,9 +20,10 @@ test('speed peaks at light to middle weight: lighter and heavier are both slower
 test('a thin build carries bone it cannot move fast; fat is weight with no force', () => {
   // The skeleton is sized by height and frame, not by the muscle on it: the
   // thin fighter carries the same bones, and they are more of his arm.
-  const thin = buildBody({ sex: 'male', heightCm: 178, training: 0, bodyFat: 0.08 });
-  const muscular = buildBody({ sex: 'male', heightCm: 178, training: 1, bodyFat: 0.08 });
-  assert.equal(thin.boneKg, muscular.boneKg);
+  // Training and load thicken bone a little (a higher T-score), not much.
+  const thin = buildBody({ sex: 'male', heightCm: 178, exercise: 0, calories: caloriesFor(0, 0.08) });
+  const muscular = buildBody({ sex: 'male', heightCm: 178, exercise: 1, calories: caloriesFor(1, 0.08) });
+  assert.ok(muscular.boneKg < thin.boneKg * 1.3, `bone ${thin.boneKg.toFixed(1)} vs ${muscular.boneKg.toFixed(1)} kg`);
   const boneShare = (body) => body.segments.lUpperArm.tissue.bone / body.segments.lUpperArm.mass;
   assert.ok(boneShare(thin) > boneShare(muscular) * 1.15, 'bone is a bigger share of the thin arm');
   const builds = buildCurve('cross').map((row) => row.peak);

@@ -266,7 +266,7 @@ function segmentDistance(p, a, b) {
 const SIDE = BONES.map((name) => (/^l[A-Z]/.test(name) ? 1 : /^r[A-Z]/.test(name) ? -1 : 0));
 
 /** Up to four bone influences per vertex, by inverse distance to each bone's segment. */
-export function skinWeights(positions, frames) {
+export function skinWeights(positions, frames, allowedBones = []) {
   const count = positions.length / 3;
   const skinIndex = new Uint16Array(count * 4);
   const skinWeight = new Float32Array(count * 4);
@@ -274,8 +274,9 @@ export function skinWeights(positions, frames) {
   for (let vertex = 0; vertex < count; vertex += 1) {
     const p = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
     const side = p[2] > 0.02 ? 1 : p[2] < -0.02 ? -1 : 0;
+    const allowed = allowedBones[vertex];
     for (let bone = 0; bone < BONES.length; bone += 1) {
-      if (SIDE[bone] !== 0 && side !== 0 && SIDE[bone] !== side) {
+      if ((SIDE[bone] !== 0 && side !== 0 && SIDE[bone] !== side) || (allowed && !allowed.includes(bone))) {
         scores[bone] = 0;
         continue;
       }

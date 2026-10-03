@@ -109,6 +109,6 @@ test('the same seed replays the same bout', () => {
 
 test('a fighter file carries its inputs and rebuilds the same body', () => {
   const file = JSON.parse(JSON.stringify(fighterFile(PRESETS.contender)));
-  assert.equal(file.schemaVersion, 1);
+  assert.equal(file.schemaVersion, 2);
   assert.deepEqual(buildBody(file.inputs).masses, buildBody(PRESETS.contender).masses);
 });
