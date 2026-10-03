@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Boxer Simulator</title>
+<title>Gladiator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="boxer.css">
@@ -17,6 +17,7 @@
       <div class="top"><span class="name"></span><span class="kd"></span></div>
       <div class="bar stamina" title="Stamina"><i></i></div>
       <div class="bar brain" title="Brain strain: accumulated head impacts"><i></i></div>
+      <div class="bar blood" title="Blood lost: at the end of this bar he collapses" hidden><i></i></div>
       <div class="meta">hand <span class="speed"></span></div>
     </section>
     <div class="clock" id="clock">0:00</div>
@@ -24,6 +25,7 @@
       <div class="top"><span class="name"></span><span class="kd"></span></div>
       <div class="bar stamina" title="Stamina"><i></i></div>
       <div class="bar brain" title="Brain strain: accumulated head impacts"><i></i></div>
+      <div class="bar blood" title="Blood lost: at the end of this bar he collapses" hidden><i></i></div>
       <div class="meta">hand <span class="speed"></span></div>
     </section>
   </header>
@@ -79,6 +81,7 @@
       <span class="versus">v</span>
       <label class="team blue"><span>Blue</span><select id="team-blue"></select></label>
     </div>
+    <label class="teams scene-pick" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option></select></label>
     <div class="seg" id="modes" aria-label="Mode">
       <button data-value="watch" class="on">Watch</button>
       <button data-value="play">Play red</button>

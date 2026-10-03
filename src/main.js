@@ -11,7 +11,9 @@ import { STYLE } from './toon.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { OUTFIT_KEYS, OUTFITS, outfitOf } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
-import { buildFighterView, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { BLADES } from './weapons.js';
+import { clearGore, severView, spawnSparks, updateArms, updateBlood, updateDebris, updateStumps, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -36,6 +38,8 @@ const state = {
   scenario: null,
   // How many on each side: 1 to 8, not necessarily the same.
   teamSizes: { red: 1, blue: 1 },
+  // The sandbox's place: the ring, the Colosseum, or the subway platform.
+  place: 'ring',
   sandboxRosters: null,
   levelRosters: {},
 };
@@ -99,10 +103,14 @@ function newBout() {
     names.set(entry.inputs.name, count);
     if (count > 1) entry.inputs = { ...entry.inputs, name: `${entry.inputs.name.split(" ")[0]} ${count}` };
   }
-  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena: scenario?.arena });
-  setPlace(scene, scenario?.scene ?? 'ring', scenario?.arena);
+  const place = scenario?.scene ?? state.place;
+  const arena = scenario?.arena ?? PLACE_ARENAS[place];
+  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena });
+  clearGore(scene);
+  setPlace(scene, place, arena);
   if (scenario) Object.assign(scene.orbit, scenario.camera);
-  document.body.dataset.place = scenario?.scene ?? 'ring';
+  document.body.dataset.place = place;
+  $('#place').closest('label').hidden = Boolean(scenario);
   rebuildViews();
   state.eventCursor = 0;
   state.finishedAt = null;
@@ -154,7 +162,10 @@ function tick(seconds) {
     const team = state.world.fighters.filter((fighter) => fighter.corner === winner);
     const name = team.length > 1 ? `${winner === 'red' ? 'Red' : 'Blue'} team` : team[0].body.inputs.name;
     $('#banner').hidden = false;
-    $('#banner-text').textContent = `KO — ${name} wins`;
+    // How it ended: the last fighter out on the losing side says.
+    const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', knockout: 'KO', stopped: 'Stopped' };
+    const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
+    $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
   }
 }
 
@@ -173,8 +184,14 @@ function draw(dt) {
   // A design sheet holds its own framing.
   placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
   dramaCamera(scene, state.drama, world, realSeconds());
-  for (const view of state.views) updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
+  for (const view of state.views) {
+    updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
+    updateArms(scene, view);
+    updateStumps(view);
+  }
   updateProps(scene, state.views, world);
+  updateDebris(scene, world);
+  updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
@@ -186,7 +203,13 @@ function consumeEvents() {
   while (state.eventCursor < events.length) {
     const event = events[state.eventCursor];
     state.eventCursor += 1;
-    if (event.kind === 'landed' || event.kind === 'blocked') showImpact(scene, state.views, event);
+    if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
+    if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked')) woundBlood(scene, event);
+    if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
+    if (event.kind === 'severed') {
+      const view = state.views.find((entry) => entry.fighter.id === event.fighter);
+      if (view) severView(scene, view, event, state.world.debris[event.debris]);
+    }
     const moment = momentFor(event);
     if (moment) {
       startMoment(state.drama, moment, realSeconds());
@@ -209,6 +232,10 @@ function renderHud() {
     card.querySelector('.stamina i').style.width = `${Math.round(fighter.stamina * 100)}%`;
     const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;
+    // Blood lost, against what puts him down: shown once he is bleeding.
+    const blood = card.querySelector('.blood');
+    blood.hidden = !(fighter.bloodLost > 0);
+    blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / BLADES.collapseAt) * 100))}%`;
     card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : `KD ${fighter.knockdowns}`;
     const nerve = fighter.aiConfidence ?? 0;
     const mood = nerve > 0.35 ? ' · confident' : nerve < -0.35 ? ' · wary' : '';
@@ -238,6 +265,11 @@ function logEvent(event) {
   else if (event.kind === 'accessory') text = `${event.icon} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
+  else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out') return;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   else if (event.attacker === undefined || event.speed === undefined) return;
   else {
@@ -248,7 +280,7 @@ function logEvent(event) {
   }
   const row = document.createElement('li');
   row.innerHTML = text;
-  if (event.kind === 'knockout' || event.kind === 'broken' || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
+  if (['knockout', 'broken', 'severed', 'killed', 'bledOut'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
   const log = $('#log');
   log.prepend(row);
   while (log.children.length > 5) log.lastChild.remove();
@@ -285,6 +317,10 @@ for (const corner of ['red', 'blue']) {
     newBout();
   });
 }
+$('#place').addEventListener('change', (event) => {
+  state.place = event.target.value;
+  newBout();
+});
 segmented('#modes', (mode) => {
   state.mode = mode;
   $('#pad').hidden = mode !== 'play';
@@ -541,7 +577,7 @@ function buildCornerForm(corner) {
   form.querySelector('.load').addEventListener('click', () => {
     try {
       const file = JSON.parse(decodeURIComponent(escape(atob(form.querySelector('.code').value.trim()))));
-      if (file.kind !== 'boxer-simulator/fighter') throw new Error('not a fighter file');
+      if (file.kind !== 'gladiator/fighter' && file.kind !== 'boxer-simulator/fighter') throw new Error('not a fighter file');
       setCurrent(corner, normaliseInputs({ ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } }));
       fillCornerForm(corner);
     } catch {
@@ -652,7 +688,8 @@ function refreshBuilder() {
 
 // ---- Setups: everything in the fight, as JSON to keep and load again ----------
 
-const SETUP_KIND = 'boxer-simulator/setup';
+const SETUP_KIND = 'gladiator/setup';
+const OLD_SETUP_KIND = 'boxer-simulator/setup';
 
 /** The whole fight as set up: the place, both sides' sizes and every fighter on them. */
 function setupFile() {
@@ -665,7 +702,7 @@ function setupFile() {
 }
 
 function loadSetup(file) {
-  if (file?.kind !== SETUP_KIND || !file.teams?.red?.length || !file.teams?.blue?.length) throw new Error('not a setup');
+  if ((file?.kind !== SETUP_KIND && file?.kind !== OLD_SETUP_KIND) || !file.teams?.red?.length || !file.teams?.blue?.length) throw new Error('not a setup');
   if (file.level && !SCENARIOS[file.level]) throw new Error(`no level called ${file.level}`);
   if ((file.level ?? null) !== state.scenario) chooseLevel(file.level ?? null);
   const fighter = (entry) => {
@@ -781,7 +818,8 @@ for (const kind of OUTFIT_KEYS) {
   SHEETS[`outfit-${kind}`] = {
     options: OUTFITS[kind].designs.filter((design) => !design.levelOnly).map((design, index) => [{ outfit: { kind, design: index } }, design.label, OUTFITS[kind].label]),
     rows: [PRESETS.light, PRESETS.contender],
-    camera: { distance: 2.9, pitch: 0.08, yaw: 0.15, height: 0.95 },
+    // Wider for more designs, and above the ropes.
+    camera: { distance: 2.9 + 0.7 * Math.max(0, OUTFITS[kind].designs.length - 3), pitch: 0.08 + 0.03 * Math.max(0, OUTFITS[kind].designs.length - 3), yaw: 0.15, height: 0.95 },
   };
 }
 
@@ -802,6 +840,7 @@ function designSheet(kind, row = 0, closeUp = null) {
   const middle = (entries.length - 1) / 2;
   state.paused = true;
   state.world = createWorld(entries, { seed: 3 });
+  clearGore(scene);
   // Option A on the left as the camera sees it (+z is screen left).
   state.world.fighters.forEach((fighter, index) => {
     placeFighter(fighter, 0, (middle - entries[index].column) * spacing);
@@ -843,11 +882,38 @@ function designSheet(kind, row = 0, closeUp = null) {
   return state.world.fighters.length;
 }
 
+/**
+ * Test hook: a fight of any inputs, red against blue (each a list of
+ * partial inputs over the contender preset), at a distance, paused or not.
+ */
+function fight(red, blue, { seed = 1, distance = null, paused = false, place = state.place } = {}) {
+  const build = ({ preset = 'contender', ...inputs }) => ({ ...structuredClone(PRESETS[preset]), ...inputs });
+  const entries = [...red.map((inputs) => ({ inputs: build(inputs), corner: 'red' })), ...blue.map((inputs) => ({ inputs: build(inputs), corner: 'blue' }))];
+  document.body.classList.remove('sheet');
+  document.querySelector('#sheet-labels')?.replaceChildren();
+  state.world = createWorld(entries, { seed, arena: PLACE_ARENAS[place] });
+  clearGore(scene);
+  setPlace(scene, place, PLACE_ARENAS[place]);
+  if (distance && state.world.fighters.length === 2) {
+    placeFighter(state.world.fighters[0], -distance / 2, 0);
+    placeFighter(state.world.fighters[1], distance / 2, 0);
+  }
+  state.eventCursor = 0;
+  state.finishedAt = null;
+  state.paused = paused;
+  resetDrama(state.drama);
+  $('#banner').hidden = true;
+  rebuildViews();
+  return state.world.fighters.map((fighter) => fighter.style);
+}
+
 // Test hook: step the world by seconds without the frame clock.
 window.boxer = {
   state,
   scene,
   designSheet,
+  fight,
+  throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   advance: (seconds) => {
     tick(seconds);
     draw(0);

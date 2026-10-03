@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, nearestOpponent, perform, point, strikeThreat, throwPunch, toLocal } from './physics.js';
+import { chinNow, nearestOpponent, perform, point, reachOf, strikeThreat, throwPunch, toLocal } from './physics.js';
 import { vec } from './pose.js';
 
 export const AI = {
@@ -307,7 +307,8 @@ export function think(world, fighter, dt) {
   fighter.aiPressure = Math.max(0, (fighter.aiPressure ?? 0) - dt);
   if (fighter.aiPressure === 0 && random() < (style.pressure ?? 0) * plan.pressure * AI.pressureSpellsPerShare * dt) fighter.aiPressure = AI.pressureSeconds;
   const inside = fighter.aiPressure > 0;
-  const range = (inside ? fighter.body.reach * 0.75 : fighter.body.reach + opponent.body.lengths.headRadius + AI.rangeExtra + plan.range + (kicker ? AI.kickerExtra : 0)) + (waiting ? AI.waitingDistance : 0);
+  const reach = reachOf(fighter);
+  const range = (inside ? reach * 0.75 : reach + opponent.body.lengths.headRadius + AI.rangeExtra + plan.range + (kicker ? AI.kickerExtra : 0)) + (waiting ? AI.waitingDistance : 0);
   // Circling while waiting: round him, a way chosen by who I am.
   if (waiting) fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 0.6 : -0.6)));
   if (!fighter.defence || fighter.defence.name !== 'stepBack') {
@@ -379,7 +380,9 @@ export function think(world, fighter, dt) {
       continue;
     }
     if (!spacing.kickRoom && spec.limb.match(/Foot|Knee/)) continue;
-    const reach = moveRange(spec, fighter.body) + opponent.body.lengths.headRadius;
+    const held = fighter.weapon?.held ? fighter.weapon.spec : null;
+    if (spec.reach === 'weapon' && !held) continue;
+    const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius;
     // Close-range moves only when close; long ones only when there is room.
     if (distance <= reach && (spec.reach !== 'leg' || distance > fighter.body.reach * 0.9)) choices[name] = weight;
   }

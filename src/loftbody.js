@@ -232,6 +232,10 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   const bottom = look.bottom ?? null;
   const armor = look.armor ?? null;
   const plate = armor?.kind === 'plate';
+  const lamellar = armor?.kind === 'lamellar';
+  const hoplomachus = armor?.kind === 'hoplomachus';
+  // Lamellar: rows of lacquered scales, laced between rows and down each column.
+  const laced = (ring, angle, index) => (index % 3 === 2 ? 'lace' : 'steel');
   const hanging3 = [BONE.pelvis, BONE.lThigh, BONE.rThigh];
   // Patterns on the trunk: a zip, a suit's V with the shirt and tie in it,
   // an open shirt, checks, quilting, a seam down the side.
@@ -279,6 +283,10 @@ export function buildLoftBody(body, { faceted = false } = {}) {
         shortsOn('mawashi', bottom.under ? 1.07 : 1.04);
         loft(mesh, shortsRings(-0.04, 0.2, count(3)), sides, { color: 'mawashi', inflate: 1.14, capStart: false, capEnd: false, bones: abdomen });
         break;
+      case 'loincloth':
+        // The subligaculum: wrapped linen, with a fold hanging in front.
+        shortsOn('kit', 1.05);
+        break;
       case 'slacks': case 'pants': case 'jeans': case 'cargo':
         shortsOn('kit', 1.06);
         loft(mesh, shortsRings(0.12, 0.17, 1), sides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen });
@@ -300,6 +308,11 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   const skirted = Boolean(bottom?.skirt && female);
   if (skirted) loft(mesh, skirtRings(skirtTo(0.85), count(8), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
   if (plate) loft(mesh, skirtRings(skirtTo(0.4), count(5)), sides, { color: (ring, angle, index) => (index % 2 ? 'steel2' : 'steel'), inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+  // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
+  if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
+  if (bottom?.kind === 'loincloth') loft(mesh, skirtRings(skirtTo(0.22), count(2), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
+  // The balteus: a gladiator's broad bronze belt.
+  if (hoplomachus) loft(mesh, shortsRings(0.04, 0.24, count(3)), sides, { color: (ring, angle, index) => (index === 1 ? 'gold' : 'steel'), inflate: 1.14, capStart: false, capEnd: false, bones: abdomen });
   // The top, over any layer beneath it; then body armour over both.
   if (topShape?.inner) loft(mesh, trunkRings(-0.02, 0.99, count(12)), sides, { color: 'shirt', inflate: TOPS[topShape.inner].loose, capStart: false, capEnd: false, bones: abdomen });
   if (topShape) {
@@ -307,20 +320,21 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), sides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
   }
   if (armor) {
-    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17] }[armor.kind];
+    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
     const role = (ring, angle, index, step) => {
       if (plate) return armor.fluted && step % 2 ? 'steel2' : 'steel';
+      if (lamellar) return laced(ring, angle, index, step);
       if (armor.kind === 'carrier') return Math.abs(Math.sin(angle)) < 0.75 ? 'armor' : 'top';
       return 'armor';
     };
-    loft(mesh, trunkRings(shell[0], shell[1], count(12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
+    if (shell) loft(mesh, trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
   }
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
-  const collarFrom = plate ? -0.15 : -0.6;
-  const flare = (t) => 1 + (plate ? 0 : 0.9 * Math.max(0, -t) / 0.6);
-  if (plate || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: plate ? 'steel' : 'armor', capStart: false, capEnd: false });
+  const collarFrom = plate || lamellar ? -0.15 : -0.6;
+  const flare = (t) => 1 + (plate || lamellar ? 0 : 0.9 * Math.max(0, -t) / 0.6);
+  if (plate || lamellar || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: plate ? 'steel' : 'armor', capStart: false, capEnd: false });
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -363,7 +377,17 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     };
     if (topShape?.inner) sleeveOf(TOPS[topShape.inner], 'shirt');
     sleeveOf(topShape, 'top');
-    if (armor && armor.kind !== 'carrier') {
+    if (lamellar) {
+      // Sode: broad laced shoulder plates; kote: armoured cloth sleeves.
+      armorPiece(upperArmRings(-0.18, 0.5, count(4)), 1.85 * (armor.sode ?? 1), (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
+      armorPiece(forearmRings(-0.04, wrist - 0.04, count(4)), 1.3, 'top');
+    } else if (hoplomachus) {
+      // The manica: a segmented guard down the sword arm only.
+      if (side === 'r') {
+        armorPiece(upperArmRings(-0.25, 1.02, count(7)), 1.32, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
+        armorPiece(forearmRings(-0.06, wrist - 0.02, count(6)), 1.32, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
+      }
+    } else if (armor && armor.kind !== 'carrier') {
       const big = { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
       armorPiece(upperArmRings(-0.2, 0.38, count(3)), big);
       if (plate) armorPiece(upperArmRings(0.36, 1.0, count(4)), 1.28);
@@ -393,7 +417,13 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     };
     if (bottom?.under) loft(mesh, thighRings(-0.05, 0.4, count(3)), sides, { color: 'under', inflate: 1.05, capStart: false, capEnd: false });
     if (legReach[0] > 0 && !skirted) loft(mesh, thighRings(-0.05, legReach[0], count(Math.max(3, Math.round(9 * legReach[0])))), sides, { color: legPattern, inflate: legLoose, capStart: false, capEnd: false });
-    if (armor) {
+    if (lamellar) {
+      // Haidate: laced apron plates down the thigh.
+      armorPiece(thighRings(0.25, 0.85, count(5)), 1.3, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
+    } else if (hoplomachus) {
+      // Ocreae: high greaves, up over the knee.
+      armorPiece(thighRings(0.68, 1.05, count(3)), 1.34, 'steel');
+    } else if (armor) {
       if (plate) armorPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
       if (armor.kind === 'heavyRiot') armorPiece(thighRings(0.05, 0.7, count(3)), 1.35);
       armorPiece(thighRings(0.82, 1.05, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
@@ -411,7 +441,12 @@ export function buildLoftBody(body, { faceted = false } = {}) {
       loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : 1.22, capStart: false, capEnd: false });
       if (gathered) loft(mesh, shinRings(legReach[1] - 0.08, legReach[1], 1), sides, { color: 'trim2', inflate: 1.15, capStart: false, capEnd: false });
     }
-    if (armor) {
+    if (lamellar) {
+      // Suneate: splinted shin guards.
+      armorPiece(shinRings(0.04, 0.86, count(5)), 1.34, 'steel');
+    } else if (hoplomachus) {
+      armorPiece(shinRings(-0.14, 0.9, count(6)), 1.32, (ring, angle, index) => (index === 0 ? 'gold' : 'steel'));
+    } else if (armor) {
       armorPiece(shinRings(-0.12, 0.12, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
       if (plate || armor.kind !== 'carrier') armorPiece(shinRings(0.1, plate ? 0.95 : 0.8, count(4)), plate ? 1.32 : 1.35);
     }

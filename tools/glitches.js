@@ -13,7 +13,7 @@ import { caloriesForWeight } from '../src/physiology.js';
 import { advance, boutWinner, createWorld, point } from '../src/physics.js';
 import { boneFrames, coherentFrames } from '../src/rig.js';
 import { vec } from '../src/pose.js';
-import { STYLE_KEYS } from '../src/moves.js';
+import { STYLE_KEYS, STYLES } from '../src/moves.js';
 
 const PARTICLE_COUNT = 15;
 
@@ -103,8 +103,29 @@ export function glitchSweep(seconds = 40) {
   return rows;
 }
 
+/** Weapon styles against each other and against the bare-handed ones. */
+export const WEAPON_STYLES = STYLE_KEYS.filter((key) => STYLES[key].weapon);
+
+export function weaponGlitchSweep(seconds = 40) {
+  const rows = [];
+  const pairs = [['contender', 'heavy'], ['light', 'heavy'], ['wasted', 'obese']];
+  for (const [a, b] of pairs) {
+    for (const styleA of WEAPON_STYLES) {
+      for (const styleB of [...WEAPON_STYLES, 'boxing', 'street']) {
+        for (const seed of [1, 2]) {
+          const tally = boutGlitches({ ...BODIES[a](), style: styleA }, { ...BODIES[b](), style: styleB }, seconds, seed);
+          rows.push({ pairing: `${a}:${styleA} v ${b}:${styleB} #${seed}`, ...tally });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
 if (process.argv[1]?.endsWith('glitches.js')) {
-  const rows = glitchSweep(Number(process.argv[2] ?? 40));
+  const weapons = process.argv[2] === 'weapons';
+  const seconds = Number(process.argv[weapons ? 3 : 2] ?? 40);
+  const rows = weapons ? weaponGlitchSweep(seconds) : glitchSweep(seconds);
   const total = { pops: 0, flips: 0, folds: 0, knees: 0, broken: 0, minutes: 0 };
   for (const row of rows) {
     for (const key of Object.keys(total)) total[key] += row[key];

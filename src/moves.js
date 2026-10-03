@@ -21,14 +21,48 @@ export const MOVES = {
   roundhouse: { kind: 'strike', limb: 'rFoot', path: 'roundhouse', windup: 0.12, extendUntil: 0.36, duration: 0.7, twist: -1.25, lean: -0.22, cost: 0.04, mass: { leg: 0.55, body: 0.025 }, rotation: 1.45, zones: ['body', 'head'], reach: 'leg' },
   lowKick: { kind: 'strike', limb: 'rFoot', path: 'roundhouse', windup: 0.1, extendUntil: 0.32, duration: 0.62, twist: -1.1, lean: -0.12, cost: 0.03, mass: { leg: 0.55, body: 0.02 }, rotation: 1, zones: ['legs'], reach: 'leg' },
   teep: { kind: 'strike', limb: 'lFoot', path: 'teep', windup: 0.14, extendUntil: 0.34, duration: 0.6, twist: 0.1, lean: -0.18, cost: 0.03, mass: { leg: 0.45, body: 0.12 }, rotation: 0.5, push: true, zones: ['body'], reach: 'leg' },
+  // Weapon moves (path 'blade'): the main hand and the blade follow a path
+  // from `from` to `to` (hand in heights, local; dir where the weapon points),
+  // bent through the aim; `grip` says whether both hands hold it. A thrust
+  // drives the point along the line to the aim instead, the legs driving
+  // in behind it at `step` × footwork speed. `mid` is where the
+  // blade points as it passes through the aim. `sweep`: the swing
+  // carries on through, so it can take more than one man.
+  // Katana: cut from an upright guard, two hands always.
+  shomen: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.02, 0.98, -0.02], dir: [-0.65, 0.75, 0] }, mid: [0.9, 0.3, 0], to: { hand: [0.3, 0.5, 0], dir: [0.5, -0.85, 0] }, windup: 0.14, extendUntil: 0.36, duration: 0.72, twist: -0.15, lean: 0.14, shift: 0.07, cost: 0.03, mass: { arm: 0.6, body: 0.03 }, rotation: 0.8, zones: ['head'], reach: 'weapon' },
+  kesagiri: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.02, 0.92, -0.15], dir: [-0.4, 0.7, -0.6] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.27, 0.42, 0.18], dir: [0.45, -0.7, 0.55] }, windup: 0.14, extendUntil: 0.36, duration: 0.72, twist: -0.5, lean: 0.12, shift: 0.06, cost: 0.03, mass: { arm: 0.6, body: 0.03 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  gyakuKesa: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.05, 0.9, 0.12], dir: [-0.4, 0.7, 0.6] }, mid: [0.9, 0.15, -0.1], to: { hand: [0.27, 0.42, -0.2], dir: [0.45, -0.7, -0.55] }, windup: 0.14, extendUntil: 0.36, duration: 0.72, twist: 0.4, lean: 0.12, shift: 0.06, cost: 0.03, mass: { arm: 0.6, body: 0.03 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  yokogiri: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', sweep: true, from: { hand: [0.04, 0.68, -0.26], dir: [-0.2, 0.12, -1] }, mid: [1, 0.05, 0], to: { hand: [0.2, 0.66, 0.26], dir: [0.15, 0.05, 1] }, windup: 0.13, extendUntil: 0.36, duration: 0.7, twist: -0.75, lean: 0.06, shift: 0.04, cost: 0.03, mass: { arm: 0.6, body: 0.035 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  kiriage: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.14, 0.4, -0.18], dir: [0.4, -0.6, -0.6] }, mid: [0.9, 0.1, 0], to: { hand: [0.12, 0.86, 0.12], dir: [0.3, 0.8, 0.5] }, windup: 0.12, extendUntil: 0.34, duration: 0.68, twist: 0.3, lean: 0.04, shift: 0.04, cost: 0.028, mass: { arm: 0.55, body: 0.025 }, rotation: 0.8, zones: ['body'], reach: 'weapon' },
+  tsuki: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.12, 0.6, 0], dir: [1, 0.2, 0] }, windup: 0.08, extendUntil: 0.32, duration: 0.55, twist: -0.1, lean: 0.16, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.025, mass: { arm: 0.6, body: 0.05 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
+  // Long sword: two hands for the cuts (the middle cut sweeps), one for the lunge.
+  oberhau: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.94, -0.16], dir: [-0.45, 0.65, -0.6] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.27, 0.42, 0.18], dir: [0.45, -0.7, 0.55] }, windup: 0.16, extendUntil: 0.4, duration: 0.78, twist: -0.5, lean: 0.12, shift: 0.07, cost: 0.034, mass: { arm: 0.6, body: 0.035 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  zwerchhau: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', sweep: true, from: { hand: [0.03, 0.72, -0.28], dir: [-0.25, 0.15, -1] }, mid: [1, 0.05, 0], to: { hand: [0.2, 0.68, 0.28], dir: [0.15, 0.05, 1] }, windup: 0.16, extendUntil: 0.42, duration: 0.8, twist: -0.8, lean: 0.06, shift: 0.05, cost: 0.036, mass: { arm: 0.6, body: 0.04 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  unterhau: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.14, 0.4, -0.2], dir: [0.4, -0.6, -0.6] }, mid: [0.9, 0.1, 0], to: { hand: [0.12, 0.86, 0.12], dir: [0.3, 0.8, 0.5] }, windup: 0.14, extendUntil: 0.38, duration: 0.74, twist: 0.3, lean: 0.04, shift: 0.04, cost: 0.03, mass: { arm: 0.55, body: 0.03 }, rotation: 0.8, zones: ['body'], reach: 'weapon' },
+  lunge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.1, 0.62, -0.08], dir: [1, 0.15, 0] }, windup: 0.1, extendUntil: 0.36, duration: 0.62, twist: -0.6, lean: 0.2, shift: 0.15, depth: 0.25, step: 2.4, cost: 0.03, mass: { arm: 0.6, body: 0.05 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
+  // Police baton: forehand strikes high and low, and a short jab with the tip.
+  overhand: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [-0.02, 0.92, -0.2], dir: [-0.6, 0.6, -0.3] }, mid: [0.9, 0.2, 0.1], to: { hand: [0.3, 0.55, 0.1], dir: [0.5, -0.6, 0.4] }, windup: 0.14, extendUntil: 0.36, duration: 0.58, twist: -0.7, lean: 0.12, shift: 0.05, cost: 0.024, mass: { arm: 0.6, body: 0.015 }, rotation: 1.15, zones: ['head', 'body'], reach: 'weapon', contactAt: 0.7 },
+  forehand: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.0, 0.72, -0.3], dir: [-0.4, 0.3, -0.85] }, mid: [1, 0.05, 0], to: { hand: [0.25, 0.62, 0.15], dir: [0.3, 0, 0.95] }, windup: 0.14, extendUntil: 0.36, duration: 0.56, twist: -0.85, lean: 0.06, shift: 0.04, cost: 0.024, mass: { arm: 0.6, body: 0.015 }, rotation: 1.3, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.7 },
+  legSwing: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.04, 0.76, -0.24], dir: [-0.3, 0.7, -0.5] }, mid: [0.8, -0.4, 0.1], to: { hand: [0.3, 0.32, 0.1], dir: [0.4, -0.7, 0.4] }, windup: 0.14, extendUntil: 0.38, duration: 0.6, twist: -0.6, lean: 0.18, dip: 0.04, shift: 0.05, cost: 0.024, mass: { arm: 0.6, body: 0.015 }, rotation: 1, zones: ['legs'], reach: 'weapon', contactAt: 0.7 },
+  poke: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.12, 0.66, -0.1], dir: [1, 0.1, 0] }, windup: 0.05, extendUntil: 0.27, duration: 0.45, twist: -0.4, lean: 0.1, shift: 0.07, depth: 0.25, step: 1.2, cost: 0.016, mass: { arm: 0.6, body: 0.02 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
+  // Knife: thrusts, short and quick, from a low guard.
+  stab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.16, 0.6, -0.1], dir: [1, 0.15, 0.05] }, windup: 0.04, extendUntil: 0.25, duration: 0.42, twist: -0.6, lean: 0.12, shift: 0.07, depth: 0.25, step: 1.3, cost: 0.016, mass: { arm: 0.6, body: 0.02 }, rotation: 0.6, zones: ['body'], reach: 'weapon' },
+  upStab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.1, 0.44, -0.1], dir: [0.75, 0.65, 0] }, windup: 0.06, extendUntil: 0.27, duration: 0.45, twist: -0.4, lean: 0.1, dip: 0.03, shift: 0.06, depth: 0.25, step: 1.2, cost: 0.018, mass: { arm: 0.6, body: 0.025 }, rotation: 0.6, zones: ['body'], reach: 'weapon' },
+  highStab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.12, 0.74, -0.12], dir: [1, 0.25, 0.05] }, windup: 0.05, extendUntil: 0.27, duration: 0.45, twist: -0.65, lean: 0.12, shift: 0.07, depth: 0.25, step: 1.3, cost: 0.018, mass: { arm: 0.6, body: 0.02 }, rotation: 0.6, zones: ['head'], reach: 'weapon' },
+  // Hoplomachus: the spear thrust overhand at the face and throat, or
+  // underhand at the belly; then, with the spear gone, the gladius.
+  spearHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [-0.02, 0.86, -0.18], dir: [1, -0.05, 0.05] }, windup: 0.1, extendUntil: 0.36, duration: 0.6, twist: -0.6, lean: 0.14, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.026, mass: { arm: 0.6, body: 0.04 }, rotation: 0.5, zones: ['head', 'body'], reach: 'weapon' },
+  spearLow: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [-0.04, 0.5, -0.18], dir: [1, 0.12, 0.05] }, windup: 0.08, extendUntil: 0.34, duration: 0.56, twist: -0.5, lean: 0.12, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.024, mass: { arm: 0.6, body: 0.04 }, rotation: 0.5, zones: ['body'], reach: 'weapon' },
+  gladiusThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.08, 0.6, -0.14], dir: [1, 0.1, 0.05] }, windup: 0.06, extendUntil: 0.3, duration: 0.5, twist: -0.6, lean: 0.12, shift: 0.08, depth: 0.25, step: 1.5, cost: 0.02, mass: { arm: 0.6, body: 0.03 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
+  gladiusCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.0, 0.88, -0.2], dir: [-0.55, 0.65, -0.4] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.28, 0.5, 0.12], dir: [0.5, -0.6, 0.45] }, windup: 0.1, extendUntil: 0.3, duration: 0.6, twist: -0.6, lean: 0.12, shift: 0.05, cost: 0.024, mass: { arm: 0.6, body: 0.02 }, rotation: 0.7, zones: ['body', 'head'], reach: 'weapon' },
   // Whole-body moves.
   // A charge runs until it meets the other body or runs out of steam.
   rush: { kind: 'rush', duration: 1.2, cost: 0.05 },
   clinch: { kind: 'clinch', duration: 3, cost: 0.02 },
 };
 
-// Every strike here does blunt harm; a move with an edge or a point would
-// carry `damageType: 'cut'` or `'pierce'`, and armour answers each its own way.
+// Bare strikes do blunt harm; a weapon move's harm splits into blunt, cut
+// and pierce by the weapon and how its contact lands (weapons.js).
 // Defences, each a timed posture change the physics carries out.
 export const DEFENCES = {
   guard: { seconds: 0.5 }, // gloves tight to the face, elbows in
@@ -38,6 +72,10 @@ export const DEFENCES = {
   leanBack: { seconds: 0.4 }, // trunk back out of range: the answer to a head kick
   check: { seconds: 0.45 }, // lead knee up, shin out: the answer to a low kick
   stepBack: { seconds: 0.35 },
+  // The weapon brought across the line of the incoming strike, to meet it.
+  weaponBlock: { seconds: 0.45 },
+  // The shield punched out towards the incoming strike.
+  shieldBlock: { seconds: 0.45 },
 };
 
 /**
@@ -104,9 +142,100 @@ export const STYLES = {
     // Muay Thai walks forward into the clinch, knees and elbows.
     pressure: 0.35,
   },
+  // Weapon styles: `weapon` is what is carried; `weaponGuard` where the
+  // main hand rests (heights, local) and where the weapon points. Knocked
+  // out of the hand, the fighter boxes.
+  baton: {
+    label: 'Police baton', weapon: 'baton',
+    stance: { blade: 0.42, crouch: 0.02, width: 1.05, lean: 0.08, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.78, -0.13], dir: [-0.15, 1, -0.1] },
+    idle: { bounce: 0.4, sway: 0.8, rock: 0.4 },
+    attacks: { overhand: 0.34, forehand: 0.26, legSwing: 0.14, poke: 0.12, jab: 0.14 },
+    tempo: 0.9,
+    defences: { weaponBlock: 0.35, guard: 0.3, stepBack: 0.35 },
+    defendChance: 0.5,
+    headMovement: 0.2,
+    plans: { pressure: 1.8, brawler: 1.4, outboxer: 0.4, counter: 0.5 },
+    pressure: 0.25,
+  },
+  longsword: {
+    label: 'Long sword', weapon: 'longsword',
+    stance: { blade: 0.4, crouch: 0.04, width: 1.2, lean: 0.06, guardHeight: 0 },
+    // Pflug: hilt at the hip, point at the opponent's face.
+    weaponGuard: { hand: [0.17, 0.55, -0.03], dir: [1, 0.55, 0] },
+    idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },
+    attacks: { oberhau: 0.3, zwerchhau: 0.25, unterhau: 0.15, lunge: 0.3 },
+    tempo: 1.6,
+    defences: { weaponBlock: 0.5, stepBack: 0.4, guard: 0.1 },
+    defendChance: 0.6,
+    headMovement: 0.1,
+    plans: { outboxer: 1.4, counter: 1.2, pressure: 0.8, brawler: 0.4 },
+    pressure: 0.05,
+  },
+  katana: {
+    label: 'Katana', weapon: 'katana',
+    stance: { blade: 0.15, crouch: 0.05, width: 1.15, lean: 0.03, guardHeight: 0 },
+    // Hands before the navel, blade held upright.
+    weaponGuard: { hand: [0.17, 0.6, -0.03], dir: [0.3, 1, 0.05] },
+    idle: { bounce: 0.1, sway: 0.3, rock: 0.2 },
+    attacks: { shomen: 0.25, kesagiri: 0.25, gyakuKesa: 0.15, yokogiri: 0.15, kiriage: 0.1, tsuki: 0.1 },
+    tempo: 1.7,
+    defences: { weaponBlock: 0.5, stepBack: 0.4, guard: 0.1 },
+    defendChance: 0.6,
+    headMovement: 0.1,
+    plans: { counter: 1.4, outboxer: 1.2, pressure: 0.8, brawler: 0.4 },
+    pressure: 0.05,
+  },
+  knife: {
+    label: 'Knife', weapon: 'knife',
+    stance: { blade: 0.35, crouch: 0.05, width: 1.05, lean: 0.12, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.2, 0.6, -0.09], dir: [1, 0.25, 0.1] },
+    idle: { bounce: 0.6, sway: 1.1, rock: 0.4 },
+    attacks: { stab: 0.35, upStab: 0.2, highStab: 0.1, jab: 0.2, hook: 0.15 },
+    combos: { 'jab stab': 0.5, 'stab stab': 0.3, 'hook upStab': 0.2 },
+    comboChance: 0.4,
+    tempo: 1.2,
+    defences: { stepBack: 0.35, slip: 0.25, guard: 0.2, parry: 0.2 },
+    defendChance: 0.45,
+    headMovement: 0.4,
+    plans: { pressure: 1.5, brawler: 1.2, outboxer: 0.5, counter: 0.6 },
+    pressure: 0.3,
+  },
+  // The hoplomachus: spear in the right hand, the parma on the left forearm
+  // held out before him. Losing the spear, he draws the gladius.
+  hoplomachus: {
+    label: 'Hoplomachus', weapon: 'spear', shield: 'parma', fallback: 'gladius',
+    stance: { blade: 0.5, crouch: 0.06, width: 1.2, lean: 0.1, guardHeight: 0 },
+    weaponGuard: { hand: [-0.02, 0.8, -0.18], dir: [1, -0.05, 0.03] },
+    // The shield arm: forearm across before the chest.
+    shieldGuard: [0.3, 0.72, 0.05],
+    idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },
+    attacks: { spearHigh: 0.55, spearLow: 0.45 },
+    tempo: 1.5,
+    defences: { shieldBlock: 0.6, stepBack: 0.4 },
+    defendChance: 0.65,
+    headMovement: 0.1,
+    plans: { outboxer: 1.5, counter: 1.2, pressure: 0.6, brawler: 0.3 },
+    pressure: 0.05,
+  },
+  gladius: {
+    label: 'Gladius and parma', hidden: true, weapon: 'gladius', shield: 'parma', fallback: 'boxing',
+    stance: { blade: 0.45, crouch: 0.06, width: 1.15, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.08, 0.6, -0.14], dir: [1, 0.2, 0.05] },
+    shieldGuard: [0.3, 0.72, 0.05],
+    idle: { bounce: 0.3, sway: 0.6, rock: 0.3 },
+    attacks: { gladiusThrust: 0.6, gladiusCut: 0.4 },
+    tempo: 1.4,
+    defences: { shieldBlock: 0.65, stepBack: 0.35 },
+    defendChance: 0.6,
+    headMovement: 0.1,
+    plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
+    pressure: 0.25,
+  },
 };
 
-export const STYLE_KEYS = Object.keys(STYLES);
+/** Styles a player can pick (a fallback such as the drawn gladius is not one). */
+export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden);
 
 /**
  * Game plans the AI switches between within a bout, as adjustments to its
@@ -176,8 +305,9 @@ export function strikeTargets(move, t, aim, body, followThrough) {
 }
 
 /** How far a move reaches from the attacker's pelvis, for choosing moves by distance. */
-export function moveRange(move, body) {
+export function moveRange(move, body, weapon = null) {
   const legReach = body.lengths.thigh + body.lengths.shank;
+  if (move.reach === 'weapon') return body.reach * 1.05 + (weapon?.length ?? 0) * (move.mode === 'thrust' ? 0.9 : 0.85);
   if (move.reach === 'leg') return legReach * 1.25;
   if (move.reach === 'close') return body.reach * 0.95;
   return body.reach * 1.3;

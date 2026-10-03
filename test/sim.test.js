@@ -43,7 +43,8 @@ test('every body part has bone inside muscle inside skin, and the particles carr
       assert.ok(segment.boneRadius < segment.muscleRadius && segment.muscleRadius <= segment.skinRadius, `${preset.name} ${key}`);
     }
     const total = body.masses.reduce((sum, mass) => sum + mass, 0);
-    assert.ok(Math.abs(total - (body.massKg + 0.68)) < 0.01, 'body plus two gloves');
+    // Armour's weight is carried on the particles in proportion, gloves and all.
+    assert.ok(Math.abs(total - (body.bodyMassKg + 0.68) * (1 + body.gear.extraMass)) < 0.01, 'body plus two gloves, plus armour');
   }
 });
 

@@ -11,6 +11,11 @@ export const DRAMA = {
   knockout: { slowest: 0.15, seconds: 2.8, hold: 0.55, shake: 0.09, pushIn: 0.62, flash: 0.75 },
   knockdown: { slowest: 0.4, seconds: 1.4, hold: 0.4, shake: 0.045, pushIn: 0.85, flash: 0.3 },
   broken: { slowest: 0.5, seconds: 0.9, hold: 0.3, shake: 0.03, pushIn: 1, flash: 0 },
+  // A blade ends it: slower, longer, nearer than a knockout.
+  severed: { slowest: 0.12, seconds: 3.2, hold: 0.6, shake: 0.08, pushIn: 0.6, flash: 0.6 },
+  killed: { slowest: 0.15, seconds: 2.8, hold: 0.55, shake: 0.06, pushIn: 0.62, flash: 0.5 },
+  bledOut: { slowest: 0.4, seconds: 1.6, hold: 0.4, shake: 0, pushIn: 0.8, flash: 0 },
+  disarmed: { slowest: 0.6, seconds: 0.8, hold: 0.3, shake: 0.02, pushIn: 1, flash: 0 },
   shakeHz: 23,
   flashSeconds: 0.6,
   iconSeconds: 2.2,
@@ -21,12 +26,20 @@ const ICONS = {
   knockdown: { glyph: '💫', label: 'DOWN', tone: 'down' },
   broken: { glyph: '🦴', label: 'BROKEN', tone: 'bone' },
   accessory: { glyph: '🎧', label: 'KNOCKED OFF', tone: 'gear' },
+  severed: { glyph: '🩸', label: 'SEVERED', tone: 'ko' },
+  killed: { glyph: '☠️', label: 'KILLED', tone: 'ko' },
+  bledOut: { glyph: '🩸', label: 'BLED OUT', tone: 'ko' },
+  disarmed: { glyph: '🗡️', label: 'DISARMED', tone: 'gear' },
 };
 
 /** What a world event means for the viewer: a moment kind and the particle it centres on, or null. */
 export function momentFor(event) {
   if (event.kind === 'knockout') return { kind: 'knockout', fighter: event.fighter, particle: P.head };
   if (event.kind === 'broken') return { kind: 'broken', fighter: event.fighter, particle: P[event.joint] ?? P.neck, label: event.joint };
+  if (event.kind === 'severed') return { kind: 'severed', fighter: event.fighter, particle: event.joint === 'neck' ? P.neck : P[`${event.side}${{ shoulder: 'Shoulder', elbow: 'Elbow', wrist: 'Hand', hip: 'Hip', knee: 'Knee', ankle: 'Foot' }[event.joint]}`] };
+  if (event.kind === 'killed') return { kind: 'killed', fighter: event.fighter, particle: P.neck };
+  if (event.kind === 'bledOut') return { kind: 'bledOut', fighter: event.fighter, particle: P.neck };
+  if (event.kind === 'disarmed' && event.effects[0]?.includes('knocked away')) return { kind: 'disarmed', fighter: event.fighter, particle: P.rHand };
   if (event.kind === 'accessory') return { kind: 'accessory', fighter: event.fighter, particle: P.head, icon: event.icon };
   if ((event.kind === 'landed' || event.kind === 'blocked') && !event.knockout && event.effects.some((effect) => effect.startsWith('knockdown'))) {
     return { kind: 'knockdown', fighter: event.defender, particle: event.target === 'head' ? P.head : P.neck };

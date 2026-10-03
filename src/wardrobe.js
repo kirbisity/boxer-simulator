@@ -57,6 +57,9 @@ export function roleColors(dress, skin) {
     boot: base(feet?.color, 0x17171c),
     sock: base(feet?.socks, 0xdddddd),
     top2: topColor,
+    // Lamellar's lacing and gilt; the leather of a gladiator's straps.
+    lace: base(armor?.lace, 0x1d2a4f),
+    gold: base(armor?.gold, 0xd6a743),
   };
 }
 
@@ -182,10 +185,13 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     compactBoot: { width: 0.054, height: 0.05, sole: 0x111111 },
     heelAnkleBoot: { width: 0.05, height: 0.042, sole: 0x0b0b0d },
     dressShoe: { width: 0.045, height: 0.038, sole: 0x2a1d14 },
+    // Split-toed socks on straw sandals; a gladiator's leather sandal.
+    tabi: { width: 0.046, height: 0.045, sole: 0xc8b27a },
+    sandal: { width: 0.036, height: 0.044, sole: 0x5a3a22, skin: true },
     sabaton: { width: 0.058, height: 0.05 },
     bare: { width: 0.042, height: 0.032 },
   }[kind] ?? { width: 0.05, height: 0.045, sole: 0x17171c };
-  const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' ? surface(skinColor) : surface(upperColor, { roughness: 0.5 });
+  const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: 0.5 });
   const upper = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), upperMaterial);
   upper.scale.set(spec.width, length / 2, spec.height);
   upper.position.set(-0.012, length * 0.28, 0);
@@ -194,6 +200,16 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     const sole = new THREE.Mesh(new THREE.BoxGeometry(0.018, length * 0.95, spec.height * 1.9), surface(spec.sole));
     sole.position.set(-spec.width * 0.95, length * 0.28, 0);
     shoe.add(sole);
+  }
+  if (kind === 'sandal') {
+    // Straps across the bare foot.
+    for (const along of [0.15, 0.45, 0.72]) {
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(spec.height * 1.02, 0.005, 5, 14, Math.PI), surface(upperColor));
+      strap.rotation.y = Math.PI / 2;
+      strap.rotation.z = Math.PI / 2;
+      strap.position.set(-0.01, length * along, 0);
+      shoe.add(strap);
+    }
   }
   if (kind === 'trainer' && colors.accent) {
     const swoosh = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.6, length * 0.5, spec.height * 2.02), surface(colors.accent));
@@ -281,7 +297,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       dome.position.y = 0.05 * r;
       group.add(dome);
       if (head.visor !== false) {
-        const visor = new THREE.Mesh(new THREE.SphereGeometry(1.3 * r, 20, 12, -Math.PI * 0.42, Math.PI * 0.84, Math.PI * 0.35, Math.PI * 0.33), new THREE.MeshStandardMaterial({ color: 0x9fb6d6, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2, side: THREE.DoubleSide }));
+        const visor = new THREE.Mesh(new THREE.SphereGeometry(1.3 * r, 20, 12, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.35, Math.PI * 0.33), new THREE.MeshStandardMaterial({ color: 0x9fb6d6, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2, side: THREE.DoubleSide }));
         visor.position.y = -0.02 * r;
         visor.userData.noOutline = true;
         group.add(visor);
@@ -325,11 +341,202 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       group.add(skull, visor, slits, aventail);
       break;
     }
+    case 'kabuto':
+      buildKabuto(group, head, r, steel, color);
+      break;
+    case 'gladiatorHelm':
+      buildGladiatorHelm(group, head, r, steel, color);
+      break;
     default:
       return null;
   }
   inkAll(group);
   return { group, hidesHair };
+}
+
+/** Steel of another colour, polished like the rest. */
+function metal(steel, hex) {
+  const material = steel.clone();
+  material.color = new THREE.Color(hex);
+  return material;
+}
+
+/**
+ * A samurai's kabuto, head coordinates (x forward, y up, z left; r the head
+ * radius): a ribbed bowl, the shikoro (tiers of laced lames flaring down
+ * over the neck), fukigaeshi turned back beside the face, a crest at the
+ * brow, and perhaps a menpo over the lower face.
+ */
+function buildKabuto(group, head, r, steel, color) {
+  const bowlSteel = metal(steel, color);
+  const gold = metal(steel, head.gold ?? 0xd6a743);
+  const lace = surface(head.lace ?? 0x1d2a4f);
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.24 * r, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), bowlSteel);
+  bowl.scale.y = 0.95;
+  bowl.position.y = 0.05 * r;
+  // Ribs down the bowl, and the tehen ring at the crown.
+  for (let rib = 0; rib < 12; rib += 1) {
+    const angle = (rib / 12) * Math.PI * 2;
+    const ridge = new THREE.Mesh(new THREE.TorusGeometry(1.25 * r, 0.025 * r, 4, 16, Math.PI * 0.5), gold);
+    ridge.rotation.set(0, angle, Math.PI / 2);
+    ridge.position.y = 0.05 * r;
+    ridge.scale.y = 0.95;
+    group.add(ridge);
+  }
+  const crown = new THREE.Mesh(new THREE.TorusGeometry(0.22 * r, 0.05 * r, 6, 14), gold);
+  crown.rotation.x = Math.PI / 2;
+  crown.position.y = 1.22 * r;
+  group.add(bowl, crown);
+  // Shikoro: tiers widening down and out, open at the face.
+  for (let tier = 0; tier < 4; tier += 1) {
+    const top = 1.2 * r + tier * 0.18 * r;
+    const bottom = top + 0.2 * r;
+    // Cylinder angles start at +z (the left); the open part faces +x, the front.
+    const lame = new THREE.Mesh(new THREE.CylinderGeometry(top, bottom, 0.26 * r, 22, 1, true, Math.PI * 0.82, Math.PI * 1.36), bowlSteel);
+    lame.material = bowlSteel.clone();
+    lame.material.side = THREE.DoubleSide;
+    lame.position.y = -0.05 * r - tier * 0.24 * r;
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(bottom * 1.005, bottom * 1.01, 0.05 * r, 22, 1, true, Math.PI * 0.82, Math.PI * 1.36), lace);
+    cord.material = lace.clone();
+    cord.material.side = THREE.DoubleSide;
+    cord.position.y = lame.position.y - 0.13 * r;
+    group.add(lame, cord);
+  }
+  // Fukigaeshi: the top lame turned back beside the face.
+  for (const side of [1, -1]) {
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.45 * r, 0.42 * r, 0.06 * r), bowlSteel);
+    flap.position.set(0.55 * r, -0.05 * r, side * 1.3 * r);
+    flap.rotation.y = side * -0.6;
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.47 * r, 0.06 * r, 0.07 * r), gold);
+    edge.position.copy(flap.position).add(new THREE.Vector3(0, 0.2 * r, 0));
+    edge.rotation.y = flap.rotation.y;
+    group.add(flap, edge);
+  }
+  // The peak over the brow.
+  const peak = new THREE.Mesh(new THREE.CylinderGeometry(1.32 * r, 1.4 * r, 0.06 * r, 20, 1, false, Math.PI * 0.2, Math.PI * 0.6), bowlSteel);
+  peak.position.set(0.05 * r, 0.12 * r, 0);
+  group.add(peak);
+  // The crest (maedate), on a holder at the brow.
+  const crest = new THREE.Group();
+  crest.position.set(1.22 * r, 0.32 * r, 0);
+  const crestMetal = head.crest === 'antlers' ? surface(0x16161a, { roughness: 0.5 }) : gold;
+  switch (head.crest) {
+    case 'crescent': {
+      const moon = new THREE.Mesh(new THREE.TorusGeometry(0.9 * r, 0.07 * r, 6, 24, Math.PI), crestMetal);
+      moon.scale.set(1, 0.75, 0.35);
+      moon.rotation.y = Math.PI / 2;
+      moon.position.y = 0.05 * r;
+      crest.add(moon);
+      break;
+    }
+    case 'kuwagata': case 'tall': {
+      for (const side of [1, -1]) {
+        const horn = new THREE.Mesh(new THREE.BoxGeometry(0.04 * r, (head.crest === 'tall' ? 1.9 : 1.3) * r, 0.18 * r), crestMetal);
+        horn.position.set(0, (head.crest === 'tall' ? 0.9 : 0.6) * r, side * 0.32 * r);
+        horn.rotation.x = side * (head.crest === 'tall' ? 0.22 : 0.42);
+        crest.add(horn);
+      }
+      if (head.crest === 'tall') {
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * r, 0.22 * r, 0.04 * r, 18), gold);
+        disc.rotation.z = Math.PI / 2;
+        disc.position.y = 0.2 * r;
+        crest.add(disc);
+      }
+      break;
+    }
+    case 'sun': {
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.42 * r, 0.42 * r, 0.05 * r, 26), crestMetal);
+      disc.rotation.z = Math.PI / 2;
+      disc.position.y = 0.38 * r;
+      const sun = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * r, 0.3 * r, 0.06 * r, 22), surface(0xc8161b));
+      sun.rotation.z = Math.PI / 2;
+      sun.position.set(0.01 * r, 0.38 * r, 0);
+      crest.add(disc, sun);
+      break;
+    }
+    case 'antlers': {
+      for (const side of [1, -1]) {
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * r, 0.05 * r, 1.5 * r, 6), crestMetal);
+        beam.position.set(-0.3 * r, 0.65 * r, side * 0.55 * r);
+        beam.rotation.set(side * 0.55, 0, 0.35);
+        crest.add(beam);
+        for (const [up, out] of [[0.35, 0.3], [0.75, 0.45], [1.1, 0.4]]) {
+          const tine = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * r, 0.035 * r, 0.5 * r, 5), crestMetal);
+          tine.position.set(-0.2 * r - up * 0.25 * r, up * r + 0.1 * r, side * (0.3 + out) * r);
+          tine.rotation.set(side * 0.1, 0, -0.6);
+          crest.add(tine);
+        }
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  group.add(crest);
+  // Menpo: the lower face guard, with a nose and a bristling moustache.
+  if (head.mask) {
+    const maskSteel = metal(steel, head.mask === 'red' ? color : 0x141416);
+    // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
+    const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);
+    menpo.material = maskSteel.clone();
+    menpo.material.side = THREE.DoubleSide;
+    menpo.position.y = 0;
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.14 * r, 0.32 * r, 8), maskSteel);
+    nose.rotation.z = -Math.PI / 2;
+    nose.position.set(1.08 * r, -0.12 * r, 0);
+    const moustache = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.08 * r, 0.6 * r), surface(0xe8e4da));
+    moustache.position.set(1.06 * r, -0.34 * r, 0);
+    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), lace);
+    throat.material = lace.clone();
+    throat.material.side = THREE.DoubleSide;
+    throat.position.y = -1.0 * r;
+    group.add(menpo, nose, moustache, throat);
+  }
+}
+
+/**
+ * A hoplomachus's helmet: a bronze bowl with a broad brim all round, a
+ * grated visor over the face, a crest along the top and a plume in it.
+ */
+function buildGladiatorHelm(group, head, r, steel, color) {
+  const bronze = metal(steel, color);
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.22 * r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), bronze);
+  bowl.position.y = 0.05 * r;
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.95 * r, 2.0 * r, 0.06 * r, 28), bronze);
+  brim.position.y = -0.38 * r;
+  // A drooping brim at the back and sides, rolled at the edge.
+  const roll = new THREE.Mesh(new THREE.TorusGeometry(1.98 * r, 0.06 * r, 6, 32), bronze);
+  roll.rotation.x = Math.PI / 2;
+  roll.position.y = -0.38 * r;
+  // The visor: a face plate pierced by a grille.
+  const visor = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 18, 10, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.42, Math.PI * 0.4), bronze);
+  visor.material = bronze.clone();
+  visor.material.side = THREE.DoubleSide;
+  const dark = surface(0x0c0b09);
+  for (let row = 0; row < 4; row += 1) {
+    for (let column = -2; column <= 2; column += 1) {
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.07 * r, 8), dark);
+      const theta = Math.PI * 0.5 + 0.18 + row * 0.12;
+      const phi = column * 0.16;
+      hole.position.set(1.215 * r * Math.sin(theta) * Math.cos(phi), 1.215 * r * Math.cos(theta), -1.215 * r * Math.sin(theta) * Math.sin(phi));
+      hole.lookAt(hole.position.clone().multiplyScalar(2));
+      hole.userData.noOutline = true;
+      group.add(hole);
+    }
+  }
+  // The crest ridge front to back, the plume standing in it.
+  const ridge = new THREE.Mesh(new THREE.TorusGeometry(1.25 * r, 0.09 * r, 6, 20, Math.PI), bronze);
+  ridge.position.y = 0.05 * r;
+  ridge.scale.y = 1.05;
+  const plume = surface(head.plume ?? 0xb81d22, { roughness: 0.9 });
+  for (let feather = 0; feather < 9; feather += 1) {
+    const angle = 0.25 + (feather / 8) * (Math.PI - 0.5);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.2 * r, 1.3 * r, 0.06 * r), plume);
+    blade.position.set(Math.cos(angle) * 1.75 * r, 0.05 * r + Math.sin(angle) * 1.75 * r, 0);
+    blade.rotation.z = angle - Math.PI / 2;
+    group.add(blade);
+  }
+  group.add(bowl, brim, roll, visor, ridge);
 }
 
 /**

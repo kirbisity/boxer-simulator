@@ -55,11 +55,19 @@ export function createScene(canvas) {
   const rim = new THREE.DirectionalLight(0x6f8cff, 0.35);
   rim.position.set(-4, 3, -5);
   scene.add(rim);
-  const places = { ring: buildRing(), subway: null };
+  // The sun, for open-air places: off until one is shown.
+  const sun = new THREE.DirectionalLight(0xfff0d6, 0);
+  sun.position.set(6, 11, 4);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 30 });
+  sun.shadow.bias = -0.0008;
+  scene.add(sun, sun.target);
+  const places = { ring: buildRing(), subway: null, colosseum: null };
   // One reflection map for every piece of steel in the scene.
   const steelEnv = steelEnvironment(renderer);
   scene.add(places.ring);
-  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim }, place: 'ring', steelEnv };
+  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim, sun }, place: 'ring', steelEnv };
 }
 
 /**
@@ -68,26 +76,217 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
-  if (place === 'subway') {
-    if (!view.places.subway) {
-      view.places.subway = buildSubway(arena);
-      view.scene.add(view.places.subway);
-    }
-    view.places.subway.visible = true;
-    view.scene.background = new THREE.Color(0x10140f);
-    view.scene.fog = new THREE.Fog(0x10140f, 8, 26);
-    view.lights.key.color.set(0xf2fff0);
-    view.lights.key.intensity = 0.9;
-    view.lights.rim.color.set(0x9fd8c0);
-  } else {
-    view.scene.background = new THREE.Color(0x0b0d14);
-    view.scene.fog = new THREE.Fog(0x0b0d14, 9, 22);
-    view.lights.key.color.set(0xfff2e0);
-    view.lights.key.intensity = 1.2;
-    view.lights.rim.color.set(0x6f8cff);
+  const builders = { subway: buildSubway, colosseum: buildColosseum };
+  if (!view.places[place] && builders[place]) {
+    view.places[place] = builders[place](arena);
+    view.scene.add(view.places[place]);
   }
+  for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
+  const light = PLACE_LIGHT[place] ?? PLACE_LIGHT.ring;
+  view.scene.background = new THREE.Color(light.background);
+  view.scene.fog = new THREE.Fog(light.background, light.fog[0], light.fog[1]);
+  view.lights.key.color.set(light.key);
+  view.lights.key.intensity = light.keyIntensity;
+  view.lights.rim.color.set(light.rim);
+  view.lights.sun.intensity = light.sun ?? 0;
+  view.lights.key.castShadow = !light.sun;
   view.place = place;
+}
+
+// Each place's light: sky or dark hall, fog, the overhead key, the rim,
+// and the sun for a place open to the sky.
+const PLACE_LIGHT = {
+  ring: { background: 0x0b0d14, fog: [9, 22], key: 0xfff2e0, keyIntensity: 1.2, rim: 0x6f8cff },
+  subway: { background: 0x10140f, fog: [8, 26], key: 0xf2fff0, keyIntensity: 0.9, rim: 0x9fd8c0 },
+  colosseum: { background: 0x9cc4e8, fog: [30, 90], key: 0xfff4e0, keyIntensity: 0.2, rim: 0xbcd4ff, sun: 0.85 },
+};
+
+/** The fighting floor of each sandbox place (half-sizes in x and z). */
+export const PLACE_ARENAS = {
+  ring: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
+  colosseum: { halfX: 6.5, halfZ: 4.4 },
+  subway: { halfX: 4.2, halfZ: 1.35 },
+};
+
+/**
+ * The Colosseum, open to the sky: an oval of raked sand, the podium wall
+ * round it with its gates and marble balustrade, the stepped stone tiers of
+ * the cavea rising behind, filled with a crowd, and the arched travertine
+ * outer wall above them.
+ */
+function buildColosseum() {
+  const place = new THREE.Group();
+  const rx = 10.5;
+  const rz = 7;
+  const stone = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
+  const oval = (geometry) => {
+    geometry.scale(rx, 1, rz);
+    return geometry;
+  };
+  // Sand, raked and trodden.
+  const sand = paintedTexture(512, 512, (g, w, h) => {
+    g.fillStyle = '#c9a675';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 9000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${150 + shade * 80},${120 + shade * 70},${80 + shade * 50},${0.12 + Math.random() * 0.2})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 3, 1 + Math.random() * 2);
+    }
+    g.strokeStyle = 'rgba(140,105,65,0.18)';
+    g.lineWidth = 2;
+    for (let y = 6; y < h; y += 14) {
+      g.beginPath();
+      g.moveTo(0, y + Math.random() * 3);
+      for (let x = 0; x <= w; x += 32) g.lineTo(x, y + Math.sin(x * 0.05) * 2 + Math.random() * 2);
+      g.stroke();
+    }
+  }, [6, 4]);
+  const floorGeometry = new THREE.CircleGeometry(1, 72);
+  floorGeometry.rotateX(-Math.PI / 2);
+  const floor = new THREE.Mesh(oval(floorGeometry), stone(0xffffff, { map: sand, roughness: 1 }));
+  floor.receiveShadow = true;
+  place.add(floor);
+  // The podium wall: dressed stone, a dark base, marble on top.
+  const podiumHeight = 3.2;
+  const wallTexture = paintedTexture(512, 128, (g, w, h) => {
+    g.fillStyle = '#c8b089';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(90,70,45,0.45)';
+    g.lineWidth = 2;
+    for (let row = 0; row < 4; row += 1) {
+      const y = (row + 1) * (h / 4);
+      g.beginPath();
+      g.moveTo(0, y);
+      g.lineTo(w, y);
+      g.stroke();
+      for (let x = (row % 2) * 32; x < w; x += 64) {
+        g.beginPath();
+        g.moveTo(x, y - h / 4);
+        g.lineTo(x, y);
+        g.stroke();
+      }
+    }
+    for (let index = 0; index < 1500; index += 1) {
+      g.fillStyle = `rgba(80,60,40,${Math.random() * 0.12})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+  }, [24, 1]);
+  const podium = new THREE.Mesh(oval(new THREE.CylinderGeometry(1, 1, podiumHeight, 96, 1, true)), stone(0xffffff, { map: wallTexture, side: THREE.BackSide }));
+  podium.position.y = podiumHeight / 2;
+  podium.receiveShadow = true;
+  const base = new THREE.Mesh(oval(new THREE.CylinderGeometry(0.995, 0.995, 0.45, 96, 1, true)), stone(0x6b5a44, { side: THREE.BackSide }));
+  base.position.y = 0.22;
+  const coping = new THREE.Mesh(oval(new THREE.CylinderGeometry(1.03, 1.0, 0.22, 96, 1, true)), stone(0xeee8dc, { side: THREE.DoubleSide, roughness: 0.6 }));
+  coping.position.y = podiumHeight + 0.11;
+  place.add(podium, base, coping);
+  // Gates at the two ends and the middle of each side: dark arches in the wall.
+  const gate = stone(0x1b140e);
+  for (const angle of [0, Math.PI, Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, (Math.PI * 3) / 4, (-Math.PI * 3) / 4]) {
+    const x = Math.cos(angle) * rx * 0.992;
+    const z = Math.sin(angle) * rz * 0.992;
+    const big = Math.abs(Math.sin(angle)) < 0.1;
+    const width = big ? 2.2 : 1.3;
+    const height = big ? 2.6 : 2.0;
+    const opening = new THREE.Mesh(new THREE.PlaneGeometry(width, height - width / 2), gate);
+    const top = new THREE.Mesh(new THREE.CircleGeometry(width / 2, 16, 0, Math.PI), gate);
+    const facing = Math.atan2(-x / (rx * rx), -z / (rz * rz));
+    for (const [mesh, y] of [[opening, (height - width / 2) / 2], [top, height - width / 2]]) {
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = facing;
+      place.add(mesh);
+    }
+    // A bronze grille across the big gates.
+    if (big) {
+      for (let bar = -4; bar <= 4; bar += 1) {
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, height - 0.1, 6), stone(0x4a3a24, { metalness: 0.6, roughness: 0.4 }));
+        const along = new THREE.Vector3(Math.cos(facing), 0, -Math.sin(facing)).multiplyScalar((bar * width) / 10);
+        rod.position.set(x + along.x, (height - 0.1) / 2, z + along.z);
+        place.add(rod);
+      }
+    }
+  }
+  // The cavea: tiers of seats rising back from the podium, and a crowd on them.
+  const tiers = 9;
+  const tierStone = [0xd9c6a3, 0xcdb894];
+  const crowdSpots = [];
+  for (let tier = 0; tier < tiers; tier += 1) {
+    const inner = 1.04 + tier * 0.075;
+    const outer = inner + 0.075;
+    const y = podiumHeight + 0.2 + tier * 0.62;
+    const tread = new THREE.Mesh(oval(new THREE.RingGeometry(inner, outer, 96, 1).rotateX(-Math.PI / 2)), stone(tierStone[tier % 2], { side: THREE.DoubleSide }));
+    tread.position.y = y;
+    const riser = new THREE.Mesh(oval(new THREE.CylinderGeometry(inner, inner, 0.62, 96, 1, true)), stone(0xb9a37d, { side: THREE.DoubleSide }));
+    riser.position.y = y - 0.31;
+    tread.receiveShadow = true;
+    place.add(tread, riser);
+    // An aisle every so often; the rest of the tier is filled.
+    const seats = Math.round(150 + tier * 14);
+    for (let seat = 0; seat < seats; seat += 1) {
+      const angle = (seat / seats) * Math.PI * 2 + tier * 0.013;
+      if (Math.abs(Math.sin(angle * 8)) < 0.12 || Math.random() < 0.18) continue;
+      const radius = (inner + outer) / 2;
+      crowdSpots.push([Math.cos(angle) * rx * radius, y, Math.sin(angle) * rz * radius, angle]);
+    }
+  }
+  // The crowd: small robed figures in many colours, looking down at the sand.
+  const robes = [0xe8e2d4, 0xc23b2a, 0x6b4a8a, 0x2e5f8a, 0xd9a441, 0x7a8a4a, 0xb7b1a4, 0x8a3a2a, 0xf0ece2];
+  const bodies = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.22, 0.8, 6), stone(0xffffff, { roughness: 0.9 }), crowdSpots.length);
+  const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6), stone(0xffffff, { roughness: 0.8 }), crowdSpots.length);
+  const placer = new THREE.Object3D();
+  const skins = [0xe0b48c, 0xc48c64, 0x9a6a46, 0x6e4a32, 0xf0c8a0];
+  crowdSpots.forEach(([x, y, z], index) => {
+    placer.position.set(x, y + 0.4, z);
+    placer.rotation.set(0, 0, 0);
+    placer.scale.setScalar(0.9 + Math.random() * 0.25);
+    placer.updateMatrix();
+    bodies.setMatrixAt(index, placer.matrix);
+    bodies.setColorAt(index, new THREE.Color(robes[Math.floor(Math.random() * robes.length)]));
+    placer.position.y = y + 0.92;
+    placer.updateMatrix();
+    heads.setMatrixAt(index, placer.matrix);
+    heads.setColorAt(index, new THREE.Color(skins[Math.floor(Math.random() * skins.length)]));
+  });
+  place.add(bodies, heads);
+  // The outer wall: tiers of arches, and the attic storey above them.
+  const top = podiumHeight + 0.2 + tiers * 0.62;
+  const outerRadius = 1.04 + tiers * 0.075 + 0.08;
+  const arches = paintedTexture(512, 256, (g, w, h) => {
+    g.fillStyle = '#d8c4a0';
+    g.fillRect(0, 0, w, h);
+    for (let storey = 0; storey < 2; storey += 1) {
+      const y0 = storey * (h / 2);
+      for (let x = 0; x < w; x += 64) {
+        g.fillStyle = 'rgba(40,30,20,0.85)';
+        g.beginPath();
+        g.moveTo(x + 14, y0 + h / 2 - 8);
+        g.lineTo(x + 14, y0 + 34);
+        g.arc(x + 32, y0 + 34, 18, Math.PI, 0);
+        g.lineTo(x + 50, y0 + h / 2 - 8);
+        g.closePath();
+        g.fill();
+        g.fillStyle = 'rgba(120,95,65,0.6)';
+        g.fillRect(x + 2, y0 + 6, 6, h / 2 - 14);
+      }
+      g.fillStyle = 'rgba(120,95,65,0.7)';
+      g.fillRect(0, y0 + h / 2 - 8, w, 8);
+    }
+  }, [28, 1]);
+  const facade = new THREE.Mesh(oval(new THREE.CylinderGeometry(outerRadius, outerRadius, 7, 96, 1, true)), stone(0xffffff, { map: arches, side: THREE.DoubleSide }));
+  facade.position.y = top + 3.5;
+  place.add(facade);
+  // Velarium masts round the top.
+  for (let mast = 0; mast < 40; mast += 1) {
+    const angle = (mast / 40) * Math.PI * 2;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3, 6), stone(0x6a4a2a));
+    pole.position.set(Math.cos(angle) * rx * outerRadius, top + 8.5, Math.sin(angle) * rz * outerRadius);
+    place.add(pole);
+  }
+  // Ground beyond, under the stands.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), stone(0xb9a07a));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.02;
+  place.add(ground);
+  return place;
 }
 
 /** A canvas texture: tiles, a station name, a warning strip. */
@@ -391,7 +590,7 @@ function paintBody(mesh, body, look, corner) {
       colors.set([color.r, color.g, color.b], vertex * 3);
     });
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
-    mesh.steelMask = mesh.regions.map((region) => region === 'steel' || region === 'steel2');
+    mesh.steelMask = mesh.regions.map((region) => region === 'steel' || region === 'steel2' || region === 'gold');
     return colors;
   }
   const hipY = bindPoints[P.pelvis][1];
@@ -500,7 +699,10 @@ export function buildFighterView(view, fighter) {
     target.push(built.indices[triangle * 3], built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
-  const steel = steelMaterial(view.steelEnv, { skinning: true });
+  // Lacquered lamellar is glossy paint over steel: its colour shows, not only reflections.
+  const dressLook = dressFor(body.inputs, corner);
+  const lacquer = dressLook.armor?.kind === 'lamellar' ? { metalness: 0.45, roughness: 0.3 } : {};
+  const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
   let steelMesh = null;
   if (steelIndices.length) {
     steelMesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(steelIndices), material: steel, share: skinMesh.geometry });
@@ -524,7 +726,7 @@ export function buildFighterView(view, fighter) {
   const attachments = [];
   const gloveMaterial = surface(corner, { roughness: 0.32 });
   const hands = handKind(body.inputs, glovedFists(body.inputs));
-  const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: roleColors(dress, new THREE.Color(skinColor)).steel });
+  const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: roleColors(dress, new THREE.Color(skinColor)).steel, ...lacquer });
   const garmentColors = { ...roleColors(dress, new THREE.Color(skinColor)), accent: dress.feet.accent };
   for (const side of ['l', 'r']) {
     let hand;
@@ -770,11 +972,18 @@ export function updateFighterView(fighterView, dt, time) {
     fighterView.skeleton[index].matrix.fromArray(matrix);
     fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
   });
+  // Bones whose part was cut off: what skin is left on them shrinks into the joint.
+  for (const index of fighterView.severedBones ?? []) {
+    const at = frames[index].origin;
+    fighterView.bones[index].matrixWorld.makeScale(1e-4, 1e-4, 1e-4).setPosition(at[0], at[1], at[2]);
+  }
   const headFrame = frames[BONE.head];
   // Seated a little down the neck, as drawn heads are.
   const seat = fighter.body.lengths.headRadius * HEAD_SEAT;
-  fighterView.head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
-  fighterView.head.group.matrixWorldNeedsUpdate = true;
+  if (!fighterView.headDetached) {
+    fighterView.head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
+    fighterView.head.group.matrixWorldNeedsUpdate = true;
+  }
   for (const { object, bone, at } of fighterView.attachments) {
     object.matrix.fromArray(frameMatrix({ ...frames[bone], origin: points[at] }));
     object.matrixWorldNeedsUpdate = true;
@@ -785,7 +994,7 @@ export function updateFighterView(fighterView, dt, time) {
   // What hanging hair and cloth rest on: the head, and the trunk with
   // whatever is worn over it.
   const colliders = dangleColliders(fighterView, points);
-  fighterView.head.update(step, fighter, time, colliders);
+  if (!fighterView.headDetached) fighterView.head.update(step, fighter, time, colliders);
   for (const dangle of fighterView.dangles) dangle.update(step, colliders.slice(1));
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
@@ -878,12 +1087,14 @@ function coveredBones(body) {
   // wasted body in shorts the knees below still should, so bare-legged
   // fighters keep their thighs visible when BMI is low.
   const dress = dressFor(body.inputs, 0);
+  // A hoplomachus fights bare-chested: his armour is an arm and two greaves.
+  const covering = dress.armor && dress.armor.kind !== 'hoplomachus' ? dress.armor : null;
   const names = [];
   if (dress.bottom) names.push('pelvis');
-  if (dress.top || dress.armor) names.push('pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle');
-  if (TOPS[dress.top?.kind]?.sleeve > 0 || dress.armor) names.push('lUpperArm', 'rUpperArm');
-  if (TOPS[dress.top?.kind]?.sleeve > 1 || dress.armor) names.push('lForearm', 'rForearm');
-  const longLegs = ['tights', 'trackPants', 'pants', 'slacks', 'jeans', 'cargo', 'joggers'].includes(dress.bottom?.kind) || dress.armor;
+  if (dress.top || covering) names.push('pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle');
+  if (TOPS[dress.top?.kind]?.sleeve > 0 || covering) names.push('lUpperArm', 'rUpperArm');
+  if (TOPS[dress.top?.kind]?.sleeve > 1 || covering) names.push('lForearm', 'rForearm');
+  const longLegs = ['tights', 'trackPants', 'pants', 'slacks', 'jeans', 'cargo', 'joggers'].includes(dress.bottom?.kind) || covering;
   if (longLegs || body.composition.bmi >= 16) names.push('lThigh', 'rThigh');
   if (longLegs) names.push('lShin', 'rShin');
   return new Set(names.map((name) => BONE[name]));

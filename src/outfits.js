@@ -82,7 +82,7 @@ export const OUTFITS = {
   swat: {
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
     balance: 1.5, extraMass: 0.2,
-    protection: { blunt: 0.8, cut: 0.9, pierce: 0.7 },
+    protection: { blunt: 0.8, cut: 0.6, pierce: 0.4 },
     designs: [
       { label: 'Heavy riot', top: { kind: 'longsleeve', color: '#202226' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'heavyRiot', color: '#121316', backPrint: 'SWAT' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
     ],
@@ -90,12 +90,36 @@ export const OUTFITS = {
   knight: {
     label: 'Knight armour', movement: 'limited', fists: 'gauntlet',
     extraMass: 0.5,
-    // Plate against blunt force spreads it; against an edge or a point it is
-    // nearly proof (when there are such things to fight with).
-    protection: { blunt: 0.6, cut: 0.95, pierce: 0.85 },
+    // Plate against blunt force spreads it; against an edge it is proof,
+    // against a point nearly so, and a blade that meets it glances off.
+    protection: { blunt: 0.6, cut: 1, pierce: 0.9 },
+    deflects: true,
     designs: [
       // The gothic shape — fluted plate, pointed bascinet — in bright polished steel.
       { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true }, feet: { kind: 'sabaton', color: '#b7bcc4' } },
+    ],
+  },
+  // Lamellar: small lacquered steel scales laced in rows, in red. Proof
+  // against most cuts, good against points; lighter than plate.
+  samurai: {
+    label: 'Samurai armour', movement: 'good', fists: 'bare',
+    extraMass: 0.4,
+    protection: { blunt: 0.7, cut: 0.9, pierce: 0.8 },
+    designs: [
+      { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743' }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25 }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
+      { label: 'Sun disc', top: { kind: 'longsleeve', color: '#2a2a30' }, bottom: { kind: 'pants', color: '#2a2a30' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#e8e4da', gold: '#d6a743' }, head: { kind: 'kabuto', color: '#17171a', crest: 'sun', lace: '#e8e4da', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#e8e4da' } },
+      { label: 'Daimyo', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#2a0c0e' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#d6a743', gold: '#d6a743', sode: 1.3 }, head: { kind: 'kabuto', color: '#b3161b', crest: 'tall', mask: 'red', lace: '#d6a743', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Antlers', top: { kind: 'longsleeve', color: '#16201a' }, bottom: { kind: 'pants', color: '#1a221c' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#2f5a3a', gold: '#d6a743' }, head: { kind: 'kabuto', color: '#b3161b', crest: 'antlers', mask: 'black', lace: '#2f5a3a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#16201a' } },
+    ],
+  },
+  // A gladiator armed as a Greek hoplite: little armour over a bare body.
+  hoplomachus: {
+    label: 'Hoplomachus', movement: 'good', fists: 'bare',
+    extraMass: 0.3,
+    protection: { blunt: 0.4, cut: 0.4, pierce: 0.2 },
+    designs: [
+      { label: 'Hoplomachus', bottom: { kind: 'loincloth', color: '#ece4d0' }, armor: { kind: 'hoplomachus', color: '#b98a3e', lace: '#6a4526' }, head: { kind: 'gladiatorHelm', color: '#b98a3e', plume: '#b81d22' }, feet: { kind: 'sandal', color: '#6a4526' }, top: { kind: 'sportsBra', color: '#ece4d0', female: true } },
     ],
   },
 };
@@ -123,6 +147,7 @@ export function gearTraits(inputs) {
     kick: bySex.kick ?? spec.kick ?? 1,
     extraMass: spec.extraMass ?? 0,
     protection: { ...NO_PROTECTION, ...spec.protection },
+    deflects: Boolean(spec.deflects),
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },
   };
 }

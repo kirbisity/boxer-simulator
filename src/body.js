@@ -131,6 +131,12 @@ export const PRESETS = {
     name: 'Ana Ruiz', style: 'muayThai', sex: 'female', heightCm: 170, frame: 'medium', age: 26, exercise: 0.88, calories: 3810,
     look: { skinTone: 'medium', hairStyle: 'bun', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'hazel' },
   },
+  // A gladiator armed as a Greek hoplite: spear, parma, a gladius in reserve.
+  hoplomachus: {
+    name: 'Priscus', style: 'hoplomachus', sex: 'male', heightCm: 178, frame: 'medium', age: 28, exercise: 0.8, calories: 3900,
+    outfit: { kind: 'hoplomachus', design: 0 },
+    look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#1c130c', facialHair: 'beard', eyeColor: 'brown' },
+  },
 };
 
 const segmentKind = (key) => key.replace(/^[lr](?=[A-Z])/, '').replace(/^./, (c) => c.toLowerCase());
@@ -340,5 +346,5 @@ function particleMasses(segments, massKg) {
 
 /** A shareable fighter file: inputs and a version; the body is rebuilt from them. */
 export function fighterFile(inputs) {
-  return { schemaVersion: 2, kind: 'boxer-simulator/fighter', inputs: normaliseInputs(inputs) };
+  return { schemaVersion: 2, kind: 'gladiator/fighter', inputs: normaliseInputs(inputs) };
 }

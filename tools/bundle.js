@@ -4,8 +4,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const MODULES = ['outfits', 'physiology', 'body', 'pose', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'render', 'drama', 'scenarios', 'main'];
-const out = process.argv[2] ?? 'dist/boxer-simulator.html';
+const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'render', 'weaponview', 'drama', 'scenarios', 'main'];
+const out = process.argv[2] ?? 'dist/gladiator.html';
 
 const html = readFileSync('index.html', 'utf8');
 const css = readFileSync('boxer.css', 'utf8');

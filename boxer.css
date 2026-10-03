@@ -39,6 +39,7 @@ button.on { background: var(--fg); color: var(--bg); }
 .bar i { display: block; height: 100%; width: 0; transition: width 0.15s linear; }
 .bar.stamina i { background: var(--green); }
 .bar.brain i { background: linear-gradient(90deg, #ff9b3d, #ff3d5e); }
+.bar.blood i { background: linear-gradient(90deg, #a5121b, #5e070c); }
 .meta { font: 11px var(--mono); color: var(--muted); }
 .clock { font: 700 26px var(--display); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px 12px; font-variant-numeric: tabular-nums; }
 
@@ -158,6 +159,7 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 .teams .team.blue span { color: var(--blue); }
 .teams select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
 .teams .versus { color: var(--muted); }
+.scene-pick span { font-weight: 600; color: var(--muted); margin-right: 4px; }
 
 /* The whole setup as JSON, beside the Fight button. */
 #setup-code { flex: 1; min-width: 0; resize: vertical; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: 11px var(--mono); user-select: text; -webkit-user-select: text; }
