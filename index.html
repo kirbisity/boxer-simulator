@@ -74,10 +74,10 @@
       <button data-value="1" class="on">1×</button>
       <button data-value="4">4×</button>
     </div>
-    <div class="seg" id="teams" aria-label="Team size">
-      <button data-value="1" class="on">1v1</button>
-      <button data-value="2">2v2</button>
-      <button data-value="3">3v3</button>
+    <div class="teams" aria-label="Fighters a side">
+      <label class="team red"><span>Red</span><select id="team-red"></select></label>
+      <span class="versus">v</span>
+      <label class="team blue"><span>Blue</span><select id="team-blue"></select></label>
     </div>
     <div class="seg" id="modes" aria-label="Mode">
       <button data-value="watch" class="on">Watch</button>
@@ -100,6 +100,7 @@
       <div class="corners" data-showing="red">
         <form class="corner red" id="build-red" onsubmit="return false">
           <h2>Red corner</h2>
+          <label class="field wide member-row"><span>Fighter</span><select class="member"></select></label>
           <label class="field wide"><span>Preset</span><select class="preset"></select></label>
           <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
           <div class="fields"></div>
@@ -109,6 +110,7 @@
         </form>
         <form class="corner blue" id="build-blue" onsubmit="return false">
           <h2>Blue corner</h2>
+          <label class="field wide member-row"><span>Fighter</span><select class="member"></select></label>
           <label class="field wide"><span>Preset</span><select class="preset"></select></label>
           <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
           <div class="fields"></div>
@@ -117,7 +119,7 @@
           <div class="share"><input class="code" placeholder="Fighter code"><button type="button" class="copy">Copy code</button><button type="button" class="load">Load</button></div>
         </form>
       </div>
-      <div class="builder-actions"><button id="copy-level" hidden>Copy level</button>
+      <div class="builder-actions"><textarea id="setup-code" rows="1" placeholder="Setup JSON: every fighter on both sides"></textarea><button id="copy-setup">Copy setup</button><button id="load-setup">Load setup</button>
 <button id="close-builder" class="primary">Fight</button></div>
     </div>
   </div>

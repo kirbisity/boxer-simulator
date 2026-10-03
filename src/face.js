@@ -17,7 +17,7 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
-  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'dreads', 'bald'],
+  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'beard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
@@ -441,6 +441,25 @@ function hangingLock(group, material, dangles, root, rest, length, width, thickn
   return dangle;
 }
 
+/**
+ * A long lock that bends: two segments, the second hung from the tip of the
+ * first, so it curves as it swings and streams out behind a turning head.
+ */
+function flowingLock(group, material, dangles, root, rest, lengths, width, thickness) {
+  const [upper, lower] = lengths;
+  const first = new Dangle(group, root, rest, upper, { sag: 0.5, damping: 0.16 });
+  const second = new Dangle(first.group, [0, -upper * 0.96, 0], [0, -1, 0], lower, { sag: 0.9, damping: 0.12 });
+  const piece = (length, taper, wide) => {
+    const lock = new THREE.Mesh(lockGeometry([[0, 0.01 * length, 0], [0, -length * 0.5, 0], [0, -length, 0]], wide, thickness, taper), material);
+    lock.castShadow = true;
+    lock.add(outlineFor(lock, 0.0025));
+    return lock;
+  };
+  first.group.add(piece(upper, 0.15, width));
+  second.group.add(piece(lower, 0.75, width * 0.85));
+  dangles.push(first, second);
+}
+
 function buildHair(group, look, r, shape, material, female) {
   const style = look.hairStyle;
   const dangles = [];
@@ -527,6 +546,20 @@ function buildHair(group, look, r, shape, material, female) {
       const root = onScalp(r, 1.05 + 0.12 * back, azimuth, 1.04);
       const out = [Math.cos(azimuth) * 0.25, -1, Math.sin(azimuth) * 0.25];
       hangingLock(group, material, dangles, root, out, (0.72 + 0.38 * Math.max(0, back)) * r, 0.42 * r, 0.12 * r, { sag: 0.45, damping: 0.3 });
+    }
+  } else if (style === 'long') {
+    // Past the shoulder blades: side-swept bangs, a crown, and locks all
+    // round the sides and back that swing, bend and stream with motion.
+    cap(1.06, 1.05, 2.0);
+    bangs(5, 0.48, 0.14);
+    for (let index = 0; index < 15; index += 1) {
+      const azimuth = Math.PI * 0.45 + (index / 14) * Math.PI * 1.1;
+      const back = -Math.cos(azimuth);
+      const root = onScalp(r, 1.0 + 0.15 * back, azimuth, 1.04);
+      const out = [Math.cos(azimuth) * 0.3, -1, Math.sin(azimuth) * 0.3];
+      // Longest down the back, shorter framing the face.
+      const length = (2.0 + 2.6 * Math.max(0, back)) * r;
+      flowingLock(group, material, dangles, root, out, [length * 0.48, length * 0.52], 0.46 * r, 0.11 * r);
     }
   } else if (style === 'dreads') {
     // Locs from all over the scalp, hanging heavy to the shoulders, a few

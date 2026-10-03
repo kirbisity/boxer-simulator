@@ -54,6 +54,17 @@ export const AI = {
   // the line to their man as in the line of fire.
   mateSpacing: 1.0,
   lineOfFire: 0.4,
+  pastTarget: 0.45, // m: a team-mate this close behind my man is in the line too
+  kickClearance: 1.3, // m: no kicks or knees with a team-mate this close, beside or ahead
+  // Numbers: confidence gained per doubling of my side's standing fighters
+  // over theirs (lost when outnumbered).
+  numbersConfidence: 0.45,
+  // A gang: at most this many take on one man at once; the rest hold this
+  // far outside their range and circle until a place or another man frees up.
+  engageSlots: 3,
+  waitingDistance: 0.5,
+  // How often (per second) a waiting fighter looks for a less crowded man.
+  refocusRate: 0.6,
 };
 
 /**
@@ -192,20 +203,32 @@ function teamSpacing(world, fighter, opponent) {
   const left = [-ahead[2], 0, ahead[0]];
   let strafe = 0;
   let blocked = false;
+  // A kick or knee sweeps wide: it needs a team-mate-free arc beside me too.
+  let kickRoom = true;
   for (const mate of world.fighters) {
     if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') continue;
     const offset = vec.sub(point(mate.x, P.pelvis), at);
     const along = vec.dot(offset, ahead);
     const across = vec.dot(offset, left);
     const apart = Math.hypot(offset[0], offset[2]);
-    // In the way: between me and him, near the line.
-    if (along > 0.1 && along < length - 0.1 && Math.abs(across) < AI.lineOfFire) {
+    // In the way: between me and him, or crowding him, near the line.
+    if (along > 0.1 && along < length + AI.pastTarget && Math.abs(across) < AI.lineOfFire) {
       blocked = true;
       strafe += across >= 0 ? -1 : 1;
     } else if (apart < AI.mateSpacing) strafe += (across >= 0 ? -1 : 1) * (1 - apart / AI.mateSpacing);
+    if (apart < AI.kickClearance && along > -0.2) kickRoom = false;
   }
   // Facing turns the line: the fighter's own left is the line's left.
-  return { strafe: Math.max(-1, Math.min(1, strafe)), blocked };
+  return { strafe: Math.max(-1, Math.min(1, strafe)), blocked, kickRoom };
+}
+
+/** Whether team-mates nearer my man already fill the places to take him on. */
+function waitingTurn(world, fighter, opponent) {
+  const at = point(opponent.x, P.pelvis);
+  const away = (other) => Math.hypot(...[0, 2].map((axis) => point(other.x, P.pelvis)[axis] - at[axis]));
+  const mine = away(fighter);
+  const closer = world.fighters.filter((mate) => mate !== fighter && mate.corner === fighter.corner && mate.state === 'up' && mate.focus === opponent.id && away(mate) < mine).length;
+  return closer >= AI.engageSlots;
 }
 
 /** Clean head shots exchanged, as each side's felt threat: what one blow really did, over the chin. */
@@ -222,7 +245,7 @@ function feel(world, fighter, event) {
  * landed so far have actually done. A man whose punches feel weak is pressed;
  * a man who could end it with one is respected.
  */
-export function confidence(fighter, opponent) {
+export function confidence(fighter, opponent, world = null) {
   const judged = (looks, memory) => {
     if (!memory?.count) return looks;
     const weight = memory.count / (memory.count + AI.experienceShots);
@@ -231,7 +254,13 @@ export function confidence(fighter, opponent) {
   };
   const mine = judged(strikeThreat(fighter, opponent), fighter.aiDealt);
   const theirs = judged(strikeThreat(opponent, fighter), fighter.aiFelt);
-  return Math.max(-1, Math.min(1, Math.log(mine / theirs) / Math.log(AI.confidenceRatio)));
+  let nerve = Math.log(mine / theirs) / Math.log(AI.confidenceRatio);
+  if (world) {
+    // Outnumbering is courage; being outnumbered, fear.
+    const standing = (corner) => world.fighters.filter((other) => other.corner === corner && other.state !== 'out').length;
+    nerve += AI.numbersConfidence * Math.log2(Math.max(1, standing(fighter.corner)) / Math.max(1, standing(opponent.corner)));
+  }
+  return Math.max(-1, Math.min(1, nerve));
 }
 
 export function think(world, fighter, dt) {
@@ -247,7 +276,7 @@ export function think(world, fighter, dt) {
     return;
   }
   const style = STYLES[fighter.style];
-  const nerve = confidence(fighter, opponent);
+  const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;
   const bold = AI.confidence;
   const basePlan = chooseStrategy(world, fighter, opponent, dt);
@@ -270,12 +299,17 @@ export function think(world, fighter, dt) {
   }
   const spacing = teamSpacing(world, fighter, opponent);
   fighter.strafe = spacing.strafe;
+  // In a gang, wait my turn: only the nearest few take him on.
+  const waiting = waitingTurn(world, fighter, opponent);
+  if (waiting && random() < AI.refocusRate * dt) fighter.focus = undefined;
   const kicker = (style.attacks.roundhouse ?? 0) + (style.attacks.teep ?? 0) > 0.15;
   // Spells of pressure: for a few seconds the fighter works inside.
   fighter.aiPressure = Math.max(0, (fighter.aiPressure ?? 0) - dt);
   if (fighter.aiPressure === 0 && random() < (style.pressure ?? 0) * plan.pressure * AI.pressureSpellsPerShare * dt) fighter.aiPressure = AI.pressureSeconds;
   const inside = fighter.aiPressure > 0;
-  const range = inside ? fighter.body.reach * 0.75 : fighter.body.reach + opponent.body.lengths.headRadius + AI.rangeExtra + plan.range + (kicker ? AI.kickerExtra : 0);
+  const range = (inside ? fighter.body.reach * 0.75 : fighter.body.reach + opponent.body.lengths.headRadius + AI.rangeExtra + plan.range + (kicker ? AI.kickerExtra : 0)) + (waiting ? AI.waitingDistance : 0);
+  // Circling while waiting: round him, a way chosen by who I am.
+  if (waiting) fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 0.6 : -0.6)));
   if (!fighter.defence || fighter.defence.name !== 'stepBack') {
     if (distance > range + AI.rangeSlack) fighter.move = 1;
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
@@ -309,8 +343,8 @@ export function think(world, fighter, dt) {
   }
 
   if (fighter.punch || fighter.rush) return;
-  // Never through a team-mate: hold it until the line is clear.
-  if (spacing.blocked) {
+  // Never through a team-mate, and not while waiting a turn.
+  if (spacing.blocked || waiting) {
     fighter.aiCombo = null;
     return;
   }
@@ -329,7 +363,7 @@ export function think(world, fighter, dt) {
   for (const [name, weight] of Object.entries(style.attacks)) {
     const spec = MOVES[name];
     if (fighter.clinch) {
-      if (name === 'knee') choices[name] = 1;
+      if (name === 'knee' && spacing.kickRoom) choices[name] = 1;
       continue;
     }
     if (spec.kind === 'rush') {
@@ -344,6 +378,7 @@ export function think(world, fighter, dt) {
       if (distance < fighter.body.reach * 1.05) choices[name] = weight * 2;
       continue;
     }
+    if (!spacing.kickRoom && spec.limb.match(/Foot|Knee/)) continue;
     const reach = moveRange(spec, fighter.body) + opponent.body.lengths.headRadius;
     // Close-range moves only when close; long ones only when there is room.
     if (distance <= reach && (spec.reach !== 'leg' || distance > fighter.body.reach * 0.9)) choices[name] = weight;

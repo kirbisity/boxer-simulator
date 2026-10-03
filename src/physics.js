@@ -17,6 +17,7 @@ export const WORLD = {
   ringHalf: 2.85,
   gloveRadius: 0.065,
   teamSpacing: 1.1, // m between team-mates at the start of a team fight
+  teamRowSpacing: 0.9, // m between rows of a side too big to stand abreast
   sidestepShare: 0.7, // sidestep speed as a share of footwork speed
   // A clean power shot lands at about this share of the limb's top speed.
   threatSpeedShare: 0.6,
@@ -33,6 +34,11 @@ export const WORLD = {
   // head's new speed and the blow's direction, tumbles, and settles on the floor.
   props: { radius: 0.06, flySpeedPerHeadDeltaV: 1.6, flyBase: 1.2, flyUp: 1.5, restitution: 0.35, slide: 0.75, spinMin: 8, spinRange: 8 },
   contactStep: 0.012, // m a strike contact may separate per substep
+  contactRange: 2.6, // m between hips beyond which two fighters cannot touch
+  // A strike from more than this far off the defender's facing (rad) is
+  // unseen; the head moves this much further for it.
+  blindsideAngle: Math.PI / 3,
+  blindsideFactor: 1.6,
   // Head movement in range: how far past both reaches it starts (m), how
   // quickly it eases in (/s), its rhythm (Hz), its side-to-side size as a
   // share of height (~8 cm on a 1.8 m boxer) and the knee bend as it crosses.
@@ -324,14 +330,22 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const x = (onRed ? -1 : 1) * 1.1;
     return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
   });
-  // Teams line up abreast, facing each other across the floor.
+  // Sides line up in rows facing each other: as many abreast as the floor
+  // is wide, the rest in rows behind. The sides need not be the same size.
   for (const corner of ['red', 'blue']) {
     const team = fighters.filter((fighter) => fighter.corner === corner);
+    if (team.length < 2) continue;
+    const perRow = Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / WORLD.teamSpacing) + 1);
+    const sign = corner === 'red' ? -1 : 1;
     team.forEach((fighter, index) => {
-      const across = (index - (team.length - 1) / 2) * WORLD.teamSpacing;
-      if (team.length > 1) placeFighter(fighter, fighter.root[0], Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
+      const row = Math.floor(index / perRow);
+      const inRow = Math.min(perRow, team.length - row * perRow);
+      const across = ((index % perRow) - (inRow - 1) / 2) * WORLD.teamSpacing;
+      const x = sign * Math.min(arena.halfX - 0.4, 1.1 + row * WORLD.teamRowSpacing);
+      placeFighter(fighter, x, Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
     });
   }
+  for (const fighter of fighters) fighter.arena = arena;
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props };
 }
@@ -622,6 +636,21 @@ function updateFeet(fighter, dt) {
 }
 
 function footTarget(fighter, foot) {
+  return onTheFloor(fighter, rawFootTarget(fighter, foot));
+}
+
+/**
+ * A foot is never aimed past the edge of the floor: the edge holds it
+ * there, and a target beyond would set the two fighting every substep.
+ */
+function onTheFloor(fighter, target) {
+  const arena = fighter.arena;
+  if (!arena) return target;
+  const margin = fighter.radius[P.lFoot] + 0.01;
+  return [Math.max(-(arena.halfX - margin), Math.min(arena.halfX - margin, target[0])), target[1], Math.max(-(arena.halfZ - margin), Math.min(arena.halfZ - margin, target[2]))];
+}
+
+function rawFootTarget(fighter, foot) {
   if (foot.lifted) return toWorld(fighter, fighter.desired[foot.index]);
   if (!foot.step) return [foot.planted[0], fighter.desired[foot.index][1], foot.planted[2]];
   const t = foot.step.t;
@@ -831,6 +860,10 @@ function updateTimers(world, fighter, dt) {
         world.events.push({ time: world.time, kind: 'stopped', fighter: fighter.id });
       } else {
         fighter.state = 'rising';
+        // Get up facing the way the hips lie: the knees then bend the way
+        // the legs are pulled, not through the wrong side.
+        fighter.yaw = lyingYaw(fighter) ?? fighter.yaw;
+        fighter.riseFrom = PARTICLES.map((_, index) => point(fighter.x, index));
         fighter.hurt = WORLD.hurt.hurtSeconds + WORLD.hurt.hurtPerKnockdown * fighter.knockdowns;
         fighter.hurtFor = fighter.hurt;
         const pelvis = point(fighter.x, P.pelvis);
@@ -840,7 +873,10 @@ function updateTimers(world, fighter, dt) {
     }
   } else if (fighter.state === 'rising') {
     fighter.motorScale = Math.min(1, fighter.motorScale + dt / WORLD.getUpSeconds);
-    if (fighter.motorScale >= 1) fighter.state = 'up';
+    if (fighter.motorScale >= 1) {
+      fighter.state = 'up';
+      fighter.riseFrom = null;
+    }
   } else if (fighter.state === 'up') {
     // Hurt after a knockdown: the legs and arms come back over seconds.
     const recovering = fighter.hurt > 0 ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
@@ -858,7 +894,20 @@ function reflexShare(fighter, elapsed) {
   return 1;
 }
 
+/**
+ * Getting up: each part's target starts where the part lay and moves to
+ * its standing target as the muscles come back, eased in and out. The body
+ * unfolds from the pose it fell in instead of being yanked upright from it.
+ */
 function motorTarget(fighter, index) {
+  const standing = standingTarget(fighter, index);
+  if (fighter.state !== 'rising' || !fighter.riseFrom) return standing;
+  const u = Math.min(1, fighter.motorScale);
+  const eased = u * u * (3 - 2 * u);
+  return { target: vec.lerp(fighter.riseFrom[index], standing.target, eased), velocity: vec.scale(standing.velocity, eased) };
+}
+
+function standingTarget(fighter, index) {
   const name = PARTICLES[index];
   const desired = fighter.desired[index];
   if (name.endsWith('Foot')) return { target: footTarget(fighter, fighter.feet[name[0]]), velocity: [0, 0, 0] };
@@ -979,7 +1028,8 @@ function correctJoint(fighter, index, others, delta) {
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   // A limp body's limits only reposition: limits that disagree would
   // otherwise turn each other's corrections into speed and set it thrashing.
-  const arrays = isLimp(fighter) ? [fighter.x, fighter.prev] : [fighter.x];
+  // Getting up too: a body unfolding from a heap breaks several limits at once.
+  const arrays = isLimp(fighter) || fighter.state === 'rising' ? [fighter.x, fighter.prev] : [fighter.x];
   for (const array of arrays) {
     for (let axis = 0; axis < 3; axis += 1) array[index * 3 + axis] += capped[axis] * (weights[0] / total);
     others.forEach((other, order) => {
@@ -1046,6 +1096,19 @@ function keepArmsOffRibs(fighter) {
     if (distance >= radius || distance < 1e-6) continue;
     correctJoint(fighter, index, [P.pelvis, P.neck], vec.scale(radial, (radius - distance) / distance));
   }
+}
+
+/**
+ * The heading a body lying on the floor faces: where its hips point,
+ * flattened onto the floor (or, flat on its back or front, along the trunk).
+ */
+function lyingYaw(fighter) {
+  const up = vec.normalize(vec.sub(point(fighter.x, P.neck), point(fighter.x, P.pelvis)));
+  const across = vec.sub(point(fighter.x, P.lHip), point(fighter.x, P.rHip));
+  let forward = vec.cross(up, across);
+  if (Math.hypot(forward[0], forward[2]) < 0.3 * vec.length(forward)) forward = up;
+  if (Math.hypot(forward[0], forward[2]) < 1e-6) return null;
+  return Math.atan2(-forward[2], forward[0]);
 }
 
 /** Down or out: the muscles have let go. */
@@ -1258,6 +1321,14 @@ function collideGround(fighter, h, arena) {
   }
 }
 
+/** Whether the attacker is outside the defender's field of view. */
+function blindside(defender, attacker) {
+  const facing = yawRotate([1, 0, 0], defender.yaw);
+  const from = vec.sub(point(attacker.x, P.pelvis), point(defender.x, P.pelvis));
+  const length = Math.hypot(from[0], from[2]) || 1e-6;
+  return (facing[0] * from[0] + facing[2] * from[2]) / length < Math.cos(WORLD.blindsideAngle);
+}
+
 // ---- Props -------------------------------------------------------------------
 
 /**
@@ -1321,6 +1392,14 @@ function moveProps(world, dt) {
 
 /** Capsules a glove can hit or a body can lean on. */
 export function capsules(fighter) {
+  // They depend only on the body: built once, then shared by every contact test.
+  if (fighter.capsuleCache?.body === fighter.body) return fighter.capsuleCache.list;
+  const list = buildCapsules(fighter);
+  fighter.capsuleCache = { body: fighter.body, list, byKey: Object.fromEntries(list.map((capsule) => [capsule.key, capsule])) };
+  return list;
+}
+
+function buildCapsules(fighter) {
   const segments = fighter.body.segments;
   return STRUCK.map((key) => {
     if (key === 'head') return { key, a: P.head, b: P.head, radius: fighter.body.lengths.headRadius };
@@ -1332,7 +1411,7 @@ export function capsules(fighter) {
       const radius = segments.trunk.skinRadius * 0.78;
       return { key, a: P[segment.from], b: P[segment.to], radius, bLength: 1 - (radius * 0.9) / segments.trunk.length };
     }
-    return { key, a: P[segment.from], b: P[segment.to], radius: segments[key].skinRadius };
+    return { key, a: P[segment.from], b: P[segment.to], radius: segments[key].skinRadius, leg: /Thigh|Shank/.test(key) };
   });
 }
 
@@ -1352,14 +1431,19 @@ function closestOnSegment(p, a, b) {
 
 function collideFighters(world, h, time) {
   const fighters = world.fighters;
-  for (const attacker of fighters) {
-    for (const defender of fighters) {
-      if (attacker === defender) continue;
-      for (const striker of strikers(attacker)) collideStriker(world, attacker, defender, striker, time);
-    }
-  }
+  // Two bodies whose hips are further apart than a kick and a body can
+  // span cannot touch: skip them. In a crowd most pairs are like that.
+  const hips = fighters.map((fighter) => point(fighter.x, P.pelvis));
+  const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange;
+  fighters.forEach((attacker, a) => {
+    const limbs = strikers(attacker);
+    fighters.forEach((defender, d) => {
+      if (attacker === defender || !near(a, d)) return;
+      for (const striker of limbs) collideStriker(world, attacker, defender, striker, time);
+    });
+  });
   for (let first = 0; first < fighters.length; first += 1) {
-    for (let second = first + 1; second < fighters.length; second += 1) pushApart(world, fighters[first], fighters[second]);
+    for (let second = first + 1; second < fighters.length; second += 1) if (near(first, second)) pushApart(world, fighters[first], fighters[second]);
   }
 }
 
@@ -1425,7 +1509,7 @@ function collideStriker(world, attacker, defender, striker, time) {
   const sb = point(attacker.x, striker.b);
   for (const capsule of capsules(defender)) {
     // Kicks hit legs and bodies; gloves only collide above the waist.
-    if (!striker.shin && capsule.key.match(/Thigh|Shank/) && !(attacker.punch?.spec.limb === striker.key)) continue;
+    if (!striker.shin && capsule.leg && !(attacker.punch?.spec.limb === striker.key)) continue;
     const [a, b] = capsuleEnds(defender, capsule);
     const closest = closestBetween(sa, sb, a, b);
     closest.t *= capsule.bLength ?? 1;
@@ -1467,8 +1551,10 @@ function collideStriker(world, attacker, defender, striker, time) {
  */
 function pushApart(world, first, second) {
   const pairs = [['trunk', 'trunk'], ['head', 'head'], ['head', 'trunk'], ['trunk', 'head']];
-  const firstCapsules = Object.fromEntries(capsules(first).map((capsule) => [capsule.key, capsule]));
-  const secondCapsules = Object.fromEntries(capsules(second).map((capsule) => [capsule.key, capsule]));
+  capsules(first);
+  capsules(second);
+  const firstCapsules = first.capsuleCache.byKey;
+  const secondCapsules = second.capsuleCache.byKey;
   for (const [firstKey, secondKey] of pairs) {
     const one = firstCapsules[firstKey];
     const two = secondCapsules[secondKey];
@@ -1586,6 +1672,12 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
       // Rotational strikes turn the head as well as pushing it, and rotation
       // is what knocks people out (Ommaya; Viano 2005).
       event.headDeltaV = (impulse / body.headEffectiveMass) * spec.rotation;
+      // Unseen, unbraced: a blow from well off where he faces finds the neck
+      // slack, and the head snaps further — the blindside shot of a brawl.
+      if (blindside(defender, attacker)) {
+        event.headDeltaV *= WORLD.blindsideFactor;
+        event.effects.push('blindsided');
+      }
       applyHeadDamage(world, defender, event);
       knockOff(world, defender, event);
       if ((spec.cuts && peakForce > 1800) || (spec.limb.endsWith('Hand') && peakForce > fists.cutForce)) {

@@ -601,7 +601,10 @@ function dangleColliders(fighterView, points) {
   const v = (at) => new THREE.Vector3(...at);
   const head = v(points[P.head]);
   const cloth = body.inputs.clothing ? CLOTHES[body.inputs.clothing.top]?.loose ?? 1 : 1;
-  const trunkRadius = body.segments.trunk.skinRadius * 0.85 * cloth;
+  // The trunk is wider than deep; the capsule is sized to its depth, so hair
+  // falling from the back of the head lies on the back (the shoulders have
+  // their own capsule).
+  const trunkRadius = body.segments.trunk.skinRadius * 0.8 * cloth;
   const neck = v(points[P.neck]);
   const pelvis = v(points[P.pelvis]);
   // The trunk capsule stops short of the neck, under the collarbones.
@@ -872,9 +875,21 @@ function paintDamage(fighterView) {
 
 const SKIN_BONE_INSET = 0.87;
 
-/** The bones a set of street clothes covers: the trunk under a top, the legs under trousers, the arms under long sleeves. */
-function coveredBones(clothing) {
-  if (!clothing) return new Set();
+/**
+ * The bones clothes cover, so none shows through them in the skin view: in
+ * the ring, the pelvis under the shorts (and the chest under a sports top);
+ * in street clothes, the trunk under a top, the legs under trousers, the
+ * arms under long sleeves.
+ */
+function coveredBones(body) {
+  const inputs = body.inputs;
+  const clothing = inputs.clothing;
+  if (!clothing) {
+    // Shorts cover the pelvis and the top of the thighs; on a wasted body
+    // the knees below them should still show, so the thighs stay visible.
+    const names = ['pelvis', ...(inputs.sex === 'female' ? ['chest'] : []), ...(body.composition.bmi >= 16 ? ['lThigh', 'rThigh'] : [])];
+    return new Set(names.map((name) => BONE[name]));
+  }
   const names = ['pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle', 'lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShin', 'rShin'];
   if (clothing.top === 'hoodie') names.push('lForearm', 'rForearm');
   return new Set(names.map((name) => BONE[name]));
@@ -883,7 +898,7 @@ function coveredBones(clothing) {
 /** Bones wear skin in the skin view and their own colour elsewhere; broken ones stay red. */
 function paintSkeleton(fighterView, asSkin) {
   const broken = new Set([...fighterView.fighter.broken].flatMap((joint) => JOINT_BONES[joint].map((bone) => BONE[bone])));
-  const covered = coveredBones(fighterView.fighter.body.inputs.clothing);
+  const covered = coveredBones(fighterView.fighter.body);
   fighterView.skeleton.forEach((piece, index) => {
     // Under clothes, no bone shows in the skin view, however thin the man.
     piece.visible = !(asSkin && covered.has(index));

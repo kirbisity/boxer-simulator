@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
-import { think, thinkAll } from '../src/ai.js';
+import { confidence, think, thinkAll } from '../src/ai.js';
+import { crowdBout } from '../tools/crowds.js';
 import { advance, boutWinner, createWorld, point } from '../src/physics.js';
 import { fearProfile } from '../tools/fear.js';
 
@@ -63,4 +64,20 @@ test('fear and confidence: the stronger man presses and covers up less, the weak
   assert.ok(on[heavy].defencesPerMinute < off[heavy].defencesPerMinute, 'and covers up less');
   assert.ok(on[light].advancing < off[light].advancing, 'the afraid man keeps away');
   assert.ok(on[light].defencesPerMinute > off[light].defencesPerMinute, 'and defends more');
+});
+
+test('uneven sides, up to eight a side: everyone fits the floor, team-mates rarely hit each other, nothing breaks', () => {
+  for (const [red, blue] of [[1, 5], [8, 3]]) {
+    const tally = crowdBout(red, blue, { seconds: 30, seed: 2 });
+    assert.equal(tally.broken, 0, `${red} v ${blue}`);
+    assert.ok(tally.friendly <= Math.max(2, tally.landed * 0.05), `${red} v ${blue}: ${tally.friendly} of ${tally.landed} landed blows on a team-mate`);
+    assert.ok(tally.pops / tally.fighterMinutes < 0.5, `${red} v ${blue}: pops`);
+  }
+});
+
+test('outnumbered is afraid; outnumbering, bold', () => {
+  const world = team(['amateur'], ['amateur', 'amateur', 'amateur']);
+  const [alone, ...gang] = world.fighters;
+  assert.ok(confidence(alone, gang[0], world) < -0.4, `alone ${confidence(alone, gang[0], world).toFixed(2)}`);
+  assert.ok(confidence(gang[0], alone, world) > 0.4, `gang ${confidence(gang[0], alone, world).toFixed(2)}`);
 });

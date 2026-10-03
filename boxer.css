@@ -149,3 +149,17 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 .roster span.down::before { color: #e7b52c; }
 .roster span.out { opacity: 0.55; text-decoration: line-through; }
 .roster span.out::before { color: #d12a2a; }
+
+/* Fighters a side: two small counts in the control bar. */
+.teams { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.teams .team { display: flex; align-items: center; gap: 4px; }
+.teams .team span { font-weight: 600; }
+.teams .team.red span { color: var(--red); }
+.teams .team.blue span { color: var(--blue); }
+.teams select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
+.teams .versus { color: var(--muted); }
+
+/* The whole setup as JSON, beside the Fight button. */
+#setup-code { flex: 1; min-width: 0; resize: vertical; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: 11px var(--mono); user-select: text; -webkit-user-select: text; }
+.builder-actions { align-items: stretch; }
+.member-row select { font-weight: 600; }

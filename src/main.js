@@ -16,7 +16,10 @@ const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
 
 const state = {
-  corners: { red: structuredClone(PRESETS.heavy), blue: structuredClone(PRESETS.light) },
+  // Each side's fighters, in order (the first leads); the builder edits one
+  // of each side at a time, the one `editing` points to.
+  rosters: { red: [normaliseInputs(structuredClone(PRESETS.heavy))], blue: [normaliseInputs(structuredClone(PRESETS.light))] },
+  editing: { red: 0, blue: 0 },
   world: null,
   views: [],
   layer: 'skin',
@@ -30,30 +33,55 @@ const state = {
   finishedAt: null,
   drama: { active: null, icons: [] },
   scenario: null,
-  teamSize: 1,
-  sandboxCorners: null,
-  levelCorners: {},
+  // How many on each side: 1 to 8, not necessarily the same.
+  teamSizes: { red: 1, blue: 1 },
+  sandboxRosters: null,
+  levelRosters: {},
 };
 const realSeconds = () => performance.now() / 1000;
+/** A short name for crowded places: the first name, and its number if it has one ("Dave 2"). */
+const shortName = (name) => {
+  const number = name.match(/ (\d+)$/);
+  return `${name.split(' ')[0]}${number ? ` ${number[1]}` : ''}`;
+};
 
 const scene = createScene($('#stage'));
 
-/** A side's fighters: the lead, then team-mates up to the team size. */
-function teamFor(corner, scenario) {
-  const lead = state.corners[corner];
-  const mates = [];
-  for (let index = 0; index < state.teamSize - 1; index += 1) {
+/** The fighter of a side the builder is editing, and replacing it. */
+const current = (corner) => state.rosters[corner][state.editing[corner]];
+const setCurrent = (corner, inputs) => { state.rosters[corner][state.editing[corner]] = inputs; };
+
+/**
+ * Fill a side's roster up to its size: the level's crew or, in the ring,
+ * the presets, each in the lead's style. Members already there — and any
+ * edits to them — are kept, even past the size, so shrinking a side and
+ * growing it again brings the same people back.
+ */
+function ensureRoster(corner, scenario) {
+  const roster = state.rosters[corner];
+  const lead = roster[0];
+  while (roster.length < state.teamSizes[corner]) {
+    const index = roster.length - 1;
     const crew = scenario?.crews?.[corner];
-    if (crew) mates.push(crewFighter(lead, crew[index % crew.length]));
+    let mate;
+    if (crew) mate = crewFighter(lead, crew[index % crew.length]);
     else {
-      // The presets not already in this fight, each in the lead's style.
-      const taken = new Set([state.corners.red.name, state.corners.blue.name]);
-      const spare = Object.values(PRESETS).filter((preset) => !taken.has(preset.name));
-      const preset = spare[(index * 2 + (corner === 'blue' ? 1 : 0)) % spare.length];
-      mates.push(normaliseInputs({ ...structuredClone(preset), style: lead.style }));
+      const leads = new Set([state.rosters.red[0].name, state.rosters.blue[0].name]);
+      const spare = Object.values(PRESETS).filter((preset) => !leads.has(preset.name));
+      mate = normaliseInputs({ ...structuredClone(spare[(index + (corner === 'blue' ? 2 : 0)) % spare.length]), style: lead.style });
     }
+    // A name already in the fight gets a number.
+    const taken = new Set([...state.rosters.red, ...state.rosters.blue].map((fighter) => fighter.name));
+    let name = mate.name;
+    for (let count = 2; taken.has(name); count += 1) name = `${mate.name.split(' ')[0]} ${count}`;
+    roster.push({ ...mate, name });
   }
-  return [lead, ...mates];
+}
+
+/** A side's fighters for a bout: its roster, as many as the side has. */
+function teamFor(corner, scenario) {
+  ensureRoster(corner, scenario);
+  return state.rosters[corner].slice(0, state.teamSizes[corner]);
 }
 
 function newBout() {
@@ -189,7 +217,7 @@ function renderHud() {
     roster.hidden = team.length < 2;
     roster.innerHTML = team.map((member) => {
       const status = member.state === 'out' ? 'out' : member.state === 'up' ? 'up' : 'down';
-      return `<span class="${status}">${member.body.inputs.name.split(' ')[0]}</span>`;
+      return `<span class="${status}">${shortName(member.body.inputs.name)}</span>`;
     }).join('');
   }
   const time = state.world?.time ?? 0;
@@ -198,7 +226,7 @@ function renderHud() {
 
 function logEvent(event) {
   const world = state.world;
-  const name = (id) => world.fighters[id].body.inputs.name.split(' ')[0];
+  const name = (id) => shortName(world.fighters[id].body.inputs.name);
   let text;
   if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
   else if (event.kind === 'knockout') text = `💥 <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
@@ -247,10 +275,15 @@ segmented('#styles', (style) => {
   rebuildViews();
 });
 segmented('#speeds', (speed) => { state.speed = Number(speed); });
-segmented('#teams', (size) => {
-  state.teamSize = Number(size);
-  newBout();
-});
+for (const corner of ['red', 'blue']) {
+  const select = $(`#team-${corner}`);
+  select.append(...Array.from({ length: 8 }, (_, index) => new Option(String(index + 1), String(index + 1))));
+  select.addEventListener('change', () => {
+    state.teamSizes[corner] = Number(select.value);
+    refreshBuilder();
+    newBout();
+  });
+}
 segmented('#modes', (mode) => {
   state.mode = mode;
   $('#pad').hidden = mode !== 'play';
@@ -378,7 +411,7 @@ const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a
 const LOOK_FIELDS = [
   { key: 'style', label: 'Style', options: STYLE_KEYS, names: Object.fromEntries(STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
   { key: 'skinTone', label: 'Skin', options: Object.keys(SKIN_TONES), names: { light: 'light', lightTan: 'light tan', medium: 'medium', tan: 'tan', deep: 'deep' } },
-  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long' } },
+  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long', long: 'long' } },
   { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
   { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair },
   { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor },
@@ -404,13 +437,26 @@ const OUTFIT_FIELDS = [
   { key: 'fists', label: 'Fists', options: ['bare', 'gloved'], get: (inputs) => (inputs.gloves === false ? 'bare' : 'gloved'), set: (inputs, value) => { inputs.gloves = value === 'gloved'; } },
 ];
 
+/** Which of a side's fighters the form is showing: one entry per fighter on the side. */
+function fillMemberPicker(corner) {
+  const picker = $(`#build-${corner} .member`);
+  const size = state.teamSizes[corner];
+  picker.closest('label').hidden = size < 2;
+  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${fighter.name}${index === 0 ? ' (lead)' : ''}`, String(index))));
+  picker.value = String(state.editing[corner]);
+}
+
 function buildCornerForm(corner) {
   const form = $(`#build-${corner}`);
+  form.querySelector('.member').addEventListener('change', (changed) => {
+    state.editing[corner] = Number(changed.target.value);
+    fillCornerForm(corner);
+  });
   const presetSelect = form.querySelector('.preset');
   presetSelect.replaceChildren(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, key)));
-  presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === state.corners[corner].name) ?? 'heavy';
+  presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === current(corner).name) ?? 'heavy';
   presetSelect.addEventListener('change', () => {
-    state.corners[corner] = normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
+    setCurrent(corner, normaliseInputs(structuredClone(PRESETS[presetSelect.value])));
     fillCornerForm(corner);
   });
   const fields = form.querySelector('.fields');
@@ -425,7 +471,7 @@ function buildCornerForm(corner) {
     const value = document.createElement('output');
     row.append(input, value);
     input.addEventListener('input', () => {
-      state.corners[corner][field.key] = field.type === 'range' ? Number(input.value) : input.value;
+      current(corner)[field.key] = field.type === 'range' ? Number(input.value) : input.value;
       fillCornerForm(corner);
     });
     return row;
@@ -439,8 +485,8 @@ function buildCornerForm(corner) {
     select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
     select.dataset.look = field.key;
     select.addEventListener('change', () => {
-      if (field.onInputs) state.corners[corner][field.key] = select.value;
-      else state.corners[corner].look = { ...DEFAULT_LOOK, ...state.corners[corner].look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
+      if (field.onInputs) current(corner)[field.key] = select.value;
+      else current(corner).look = { ...DEFAULT_LOOK, ...current(corner).look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
     });
     row.append(select);
     return row;
@@ -455,13 +501,13 @@ function buildCornerForm(corner) {
     const select = document.createElement('select');
     select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
     select.dataset.outfit = field.key;
-    select.addEventListener('change', () => field.set(state.corners[corner], select.value));
+    select.addEventListener('change', () => field.set(current(corner), select.value));
     row.append(select);
     return row;
   }));
   looks.after(outfit);
   form.querySelector('.copy').addEventListener('click', async () => {
-    const code = btoa(JSON.stringify(fighterFile(state.corners[corner])));
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(fighterFile(current(corner))))));
     const box = form.querySelector('.code');
     box.value = code;
     try {
@@ -473,23 +519,25 @@ function buildCornerForm(corner) {
   });
   form.querySelector('.load').addEventListener('click', () => {
     try {
-      const file = JSON.parse(atob(form.querySelector('.code').value.trim()));
+      const file = JSON.parse(decodeURIComponent(escape(atob(form.querySelector('.code').value.trim()))));
       if (file.kind !== 'boxer-simulator/fighter') throw new Error('not a fighter file');
-      state.corners[corner] = normaliseInputs({ ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } });
+      setCurrent(corner, normaliseInputs({ ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } }));
       fillCornerForm(corner);
     } catch {
       form.querySelector('.code').value = 'That code is not a fighter file.';
     }
   });
   form.querySelector('.name-input').addEventListener('input', (typed) => {
-    state.corners[corner].name = typed.target.value || 'Fighter';
+    current(corner).name = typed.target.value || 'Fighter';
+    fillMemberPicker(corner);
   });
   fillCornerForm(corner);
 }
 
 function fillCornerForm(corner) {
   const form = $(`#build-${corner}`);
-  const inputs = state.corners[corner];
+  const inputs = current(corner);
+  fillMemberPicker(corner);
   // A level's fighters are tuned, not swapped for a preset.
   form.querySelector('.preset').closest('label').hidden = Boolean(state.scenario);
   const outfit = form.querySelector('.outfit');
@@ -550,47 +598,86 @@ function buildLevels() {
  * tuning survives going back to the ring and returning.
  */
 function chooseLevel(key) {
-  if (!state.scenario) state.sandboxCorners = state.corners;
+  if (!state.scenario) state.sandboxRosters = state.rosters;
   if (key) {
-    state.levelCorners[key] ??= Object.fromEntries(scenarioFighters(SCENARIOS[key]).map(({ inputs, corner }) => [corner, inputs]));
-    state.corners = state.levelCorners[key];
-  } else state.corners = state.sandboxCorners;
+    state.levelRosters[key] ??= Object.fromEntries(scenarioFighters(SCENARIOS[key]).map(({ inputs, corner }) => [corner, [inputs]]));
+    state.rosters = state.levelRosters[key];
+  } else state.rosters = state.sandboxRosters;
   state.scenario = key;
-  fillCornerForm('red');
-  fillCornerForm('blue');
-  updateBuilderTitle();
+  refreshBuilder();
   $('#levels').hidden = true;
   state.paused = false;
   $('#pause').textContent = 'Pause';
   newBout();
 }
 
-function updateBuilderTitle() {
+/** Rosters filled to size, the fighter being edited kept in range, both forms redrawn. */
+function refreshBuilder() {
   const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
+  for (const corner of ['red', 'blue']) {
+    ensureRoster(corner, scenario);
+    state.editing[corner] = Math.min(state.editing[corner], state.teamSizes[corner] - 1);
+    $(`#team-${corner}`).value = String(state.teamSizes[corner]);
+    fillCornerForm(corner);
+  }
   $('#builder h1').textContent = scenario ? `Fighters · ${scenario.title}` : 'Fighters';
-  $('#copy-level').hidden = !scenario;
 }
 
-/**
- * The level as tuned, to hand back for locking in: each fighter's inputs
- * as the scenario file writes them, with the weight the body settled at.
- */
-$('#copy-level').addEventListener('click', async () => {
-  const fighters = ['red', 'blue'].map((corner) => {
-    const { calories, ...inputs } = state.corners[corner];
-    return { ...inputs, weightKg: Math.round(buildBody(state.corners[corner]).massKg * 10) / 10, calories };
-  });
-  const text = JSON.stringify({ level: state.scenario, fighters }, null, 2);
-  const button = $('#copy-level');
+// ---- Setups: everything in the fight, as JSON to keep and load again ----------
+
+const SETUP_KIND = 'boxer-simulator/setup';
+
+/** The whole fight as set up: the place, both sides' sizes and every fighter on them. */
+function setupFile() {
+  const side = (corner) => state.rosters[corner].slice(0, state.teamSizes[corner]).map((inputs) => ({
+    ...inputs,
+    // The weight the body settles at, for reading (and for a level's file); calories are what set it.
+    weightKg: Math.round(buildBody(inputs).massKg * 10) / 10,
+  }));
+  return { kind: SETUP_KIND, version: 1, level: state.scenario, teams: { red: side('red'), blue: side('blue') } };
+}
+
+function loadSetup(file) {
+  if (file?.kind !== SETUP_KIND || !file.teams?.red?.length || !file.teams?.blue?.length) throw new Error('not a setup');
+  if (file.level && !SCENARIOS[file.level]) throw new Error(`no level called ${file.level}`);
+  if ((file.level ?? null) !== state.scenario) chooseLevel(file.level ?? null);
+  const fighter = (entry) => {
+    const { weightKg, ...inputs } = entry;
+    return normaliseInputs({ ...inputs, look: { ...DEFAULT_LOOK, ...inputs.look } });
+  };
+  state.rosters = { red: file.teams.red.map(fighter), blue: file.teams.blue.map(fighter) };
+  if (state.scenario) state.levelRosters[state.scenario] = state.rosters;
+  for (const corner of ['red', 'blue']) {
+    state.teamSizes[corner] = Math.min(8, state.rosters[corner].length);
+    state.editing[corner] = 0;
+  }
+  refreshBuilder();
+  newBout();
+}
+
+$('#copy-setup').addEventListener('click', async () => {
+  const text = JSON.stringify(setupFile(), null, 2);
+  const box = $('#setup-code');
+  box.value = text;
+  const button = $('#copy-setup');
   try {
     await navigator.clipboard.writeText(text);
     button.textContent = 'Copied';
   } catch {
-    $('#build-red .code').value = text;
-    $('#build-red .code').select();
-    button.textContent = 'Select and copy below';
+    box.select();
+    button.textContent = 'Select and copy';
   }
-  setTimeout(() => { button.textContent = 'Copy level'; }, 2500);
+  setTimeout(() => { button.textContent = 'Copy setup'; }, 2500);
+});
+$('#load-setup').addEventListener('click', () => {
+  const box = $('#setup-code');
+  try {
+    loadSetup(JSON.parse(box.value));
+    $('#load-setup').textContent = 'Loaded';
+  } catch (error) {
+    box.value = `That is not a setup (${error.message}). Paste one copied with Copy setup.`;
+  }
+  setTimeout(() => { $('#load-setup').textContent = 'Load setup'; }, 2500);
 });
 
 $('#open-levels').addEventListener('click', () => {
