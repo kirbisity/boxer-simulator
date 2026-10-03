@@ -3,7 +3,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const MODULES = ['body', 'pose', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'bones', 'face', 'render', 'main'];
+const MODULES = ['physiology', 'body', 'pose', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'bones', 'face', 'render', 'main'];
 const out = process.argv[2] ?? 'dist/boxer-simulator.html';
 
 const html = readFileSync('index.html', 'utf8');
@@ -14,6 +14,10 @@ const code = MODULES.map((name) => {
     .replace(/^import [^;]+;\n/gm, '')
     .replace(/^export (const|function|class|let) /gm, '$1 ');
   if (/^(import|export) /m.test(stripped)) throw new Error(`src/${name}.js: an import or export survived the bundling`);
+  // Every local module imported must be on the list, or the page dies at load.
+  for (const [, imported] of source.matchAll(/from '\.\/([\w-]+)\.js'/g)) {
+    if (!MODULES.includes(imported)) throw new Error(`src/${name}.js imports ${imported}.js, which is not in MODULES`);
+  }
   return `// ---- src/${name}.js ----\n${stripped}`;
 }).join('\n');
 
