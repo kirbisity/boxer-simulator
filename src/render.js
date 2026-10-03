@@ -11,7 +11,7 @@ import { buildLoftBody, TOPS } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists } from './outfits.js';
-import { buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor } from './wardrobe.js';
+import { buildBackPrint, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -545,7 +545,7 @@ export function buildFighterView(view, fighter) {
     } else hand = buildHand(body, side, hands, skinColor, plainSteel);
     layers.skin.add(hand);
     attachments.push({ object: hand, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
-    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, dress.feet.heels && dress.female);
+    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, Boolean(dress.feet.heels));
     layers.skin.add(shoe);
     attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
   }
@@ -570,6 +570,7 @@ export function buildFighterView(view, fighter) {
   attachments.push({ object: hips, bone: BONE.pelvis, at: P.pelvis });
   if (dress.top?.kind === 'hoodie') dangles.push(...buildHood(body, collar, dress.top.color));
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
+  if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig.
   const skeleton = buildSkeleton(body, built.bindFrames);
@@ -609,7 +610,7 @@ export function buildFighterView(view, fighter) {
 
   view.scene.add(group);
   return {
-    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells,
+    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
     baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headset, dangles, steelMesh,
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
@@ -742,6 +743,8 @@ export function setLayer(fighterView, layer) {
   layers.bone.visible = layer !== 'physics';
   layers.physics.visible = layer === 'physics';
   paintSkeleton(fighterView, layer === 'skin');
+  // A shod foot's bones stay hidden in the skin view: a heeled boot lifts off them.
+  for (const side of ['l', 'r']) fighterView.skeleton[BONE[`${side}Foot`]].visible = layer !== 'skin' || !fighterView.shod;
   // Ghosting: the body goes see-through and drops its ink; the head and kit hide.
   for (const mesh of [skinMesh, fighterView.steelMesh].filter(Boolean)) {
     mesh.material.transparent = ghost < 1;

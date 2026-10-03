@@ -564,8 +564,11 @@ function fillCornerForm(corner) {
   const outfit = form.querySelector('.outfit');
   // The design names follow the outfit chosen.
   const kind = outfitOf(inputs).kind;
+  // One design picked per outfit: the choice shows only when there are more.
   const designSelect = outfit.querySelector('[data-outfit="design"]');
-  OUTFITS[kind].designs.forEach((design, index) => { designSelect.options[index].textContent = design.label; });
+  const offered = OUTFITS[kind].designs.map((design, index) => [design, index]).filter(([design, index]) => !design.levelOnly || index === outfitOf(inputs).design);
+  designSelect.replaceChildren(...offered.map(([design, index]) => new Option(design.label, String(index))));
+  designSelect.closest('label').hidden = offered.length < 2;
   for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
   form.querySelector('.name-input').value = inputs.name;
   form.querySelector('.copy').textContent = 'Copy code';
@@ -776,7 +779,7 @@ const SHEETS = {
 // One sheet per outfit: its three designs on a man (row 0) and a woman (row 1).
 for (const kind of OUTFIT_KEYS) {
   SHEETS[`outfit-${kind}`] = {
-    options: OUTFITS[kind].designs.map((design, index) => [{ outfit: { kind, design: index } }, `${'ABC'[index]} · ${design.label}`, OUTFITS[kind].label]),
+    options: OUTFITS[kind].designs.filter((design) => !design.levelOnly).map((design, index) => [{ outfit: { kind, design: index } }, design.label, OUTFITS[kind].label]),
     rows: [PRESETS.light, PRESETS.contender],
     camera: { distance: 2.9, pitch: 0.08, yaw: 0.15, height: 0.95 },
   };

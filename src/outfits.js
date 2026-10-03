@@ -9,8 +9,10 @@
 // harm (blunt now; cut and pierce for blades and points to come), and
 // `damageDealt` is the same for what a fighter's own strikes do.
 //
-// Each outfit has three designs: garment pieces the body is built from (a
-// top, a bottom, boots, a helmet, armour, tattoos, things that swing).
+// Each outfit has its chosen design (three were drawn; one was picked):
+// garment pieces the body is built from (a top, a bottom, boots, a helmet,
+// armour, tattoos, things that swing). `designs` stays a list, so more can
+// be added and picked between again.
 // Colours may be hex or 'corner' (red or blue by side).
 
 export const DAMAGE_TYPES = ['blunt', 'cut', 'pierce'];
@@ -31,24 +33,18 @@ export const OUTFITS = {
     damageDealt: { hand: 0.9 },
     designs: [
       { label: 'Pro trunks', bottom: { kind: 'trunks', color: 'corner' }, top: { kind: 'sportsBra', color: 'corner', female: true }, feet: { kind: 'boxingBoot', color: '#17171c' } },
-      { label: 'Amateur vest', top: { kind: 'tank', color: 'corner' }, bottom: { kind: 'trunks', color: 'corner' }, head: { kind: 'headguard', color: 'corner' }, feet: { kind: 'boxingBoot', color: '#f2f2f2' } },
-      { label: 'Long shorts', bottom: { kind: 'longShorts', color: '#1a1a1f', trim: 'corner' }, top: { kind: 'sportsBra', color: '#1a1a1f', female: true }, feet: { kind: 'boxingBoot', color: '#1a1a1f', high: true } },
     ],
   },
   sports: {
     label: 'Sports', movement: 'excellent', fists: 'bare',
     designs: [
       { label: 'Running', top: { kind: 'tank', color: '#2f7fd8' }, bottom: { kind: 'splitShorts', color: '#1c1c22' }, feet: { kind: 'trainer', color: '#f4f4f6', accent: '#ff6a2a' } },
-      { label: 'Compression', top: { kind: 'compression', color: '#22252c', trim: '#46d38a' }, bottom: { kind: 'tights', color: '#22252c' }, feet: { kind: 'trainer', color: '#22252c', accent: '#46d38a' } },
-      { label: 'Track suit', top: { kind: 'jacket', color: '#1d3f8f', stripe: '#f2f2f2', zip: true }, bottom: { kind: 'trackPants', color: '#1d3f8f', stripe: '#f2f2f2' }, feet: { kind: 'trainer', color: '#f4f4f6', accent: '#1d3f8f' } },
     ],
   },
   sumo: {
     label: 'Sumo', movement: 'excellent', fists: 'bare',
     designs: [
       { label: 'Black mawashi', bottom: { kind: 'mawashi', color: '#1a1a1d' }, extras: [{ kind: 'sagari', color: '#1a1a1d' }], feet: { kind: 'bare' }, hair: 'topknot' },
-      { label: 'Silk mawashi', bottom: { kind: 'mawashi', color: '#5b2a86' }, extras: [{ kind: 'sagari', color: '#5b2a86' }], feet: { kind: 'bare' }, hair: 'topknot' },
-      { label: 'Amateur', bottom: { kind: 'mawashi', color: '#efe9dc', under: '#1c1c22' }, top: { kind: 'tank', color: '#1c1c22', female: true }, feet: { kind: 'bare' } },
     ],
   },
   hiking: {
@@ -57,16 +53,15 @@ export const OUTFITS = {
     kick: 1.1,
     designs: [
       { label: 'Shell jacket', top: { kind: 'jacket', color: '#d4612a', zip: true, hood: false }, bottom: { kind: 'cargo', color: '#4a4f45' }, feet: { kind: 'hikingBoot', color: '#5a3d24' } },
-      { label: 'Softshell & shorts', top: { kind: 'jacket', color: '#2f5f4f', zip: true }, bottom: { kind: 'hikingShorts', color: '#6b6352' }, feet: { kind: 'hikingBoot', color: '#3d3b38', socks: '#9a8f7a' }, head: { kind: 'beanie', color: '#c7a24a' } },
-      { label: 'Puffer vest', top: { kind: 'puffer', color: '#2a4a8a', under: '#7a7f88' }, bottom: { kind: 'pants', color: '#3a3a40' }, feet: { kind: 'hikingBoot', color: '#6b4a2e' } },
     ],
   },
   casual: {
     label: 'Casual', movement: 'good', fists: 'bare',
     designs: [
-      { label: 'T-shirt & jeans', top: { kind: 'tee', color: '#24324a' }, bottom: { kind: 'jeans', color: '#2b3550' }, feet: { kind: 'trainer', color: '#e9e9ec' } },
-      { label: 'Hoodie & joggers', top: { kind: 'hoodie', color: '#7a2230' }, bottom: { kind: 'joggers', color: '#26262b' }, feet: { kind: 'trainer', color: '#e9e9ec' } },
       { label: 'Flannel & chinos', top: { kind: 'flannel', color: '#8a2a24', check: '#2a1a1a', under: '#e4e4e6' }, bottom: { kind: 'pants', color: '#b39a73' }, feet: { kind: 'trainer', color: '#3a2a20' } },
+      // Worn in the subway level (as the brief there asked): not offered elsewhere.
+      { label: 'T-shirt & jeans', levelOnly: true, top: { kind: 'tee', color: '#24324a' }, bottom: { kind: 'jeans', color: '#2b3550' }, feet: { kind: 'trainer', color: '#e9e9ec' } },
+      { label: 'Hoodie & joggers', levelOnly: true, top: { kind: 'hoodie', color: '#7a2230' }, bottom: { kind: 'joggers', color: '#26262b' }, feet: { kind: 'trainer', color: '#e9e9ec' } },
     ],
   },
   business: {
@@ -74,17 +69,14 @@ export const OUTFITS = {
     // Heels: a woman in them goes over very easily, and kicks with the heel.
     female: { balance: 0.45, kick: 1.2 },
     designs: [
-      { label: 'Navy suit', top: { kind: 'suit', color: '#1f2a44', shirt: '#f2f2f4', tie: '#8a1f2a' }, bottom: { kind: 'slacks', color: '#1f2a44', skirt: true }, feet: { kind: 'dressShoe', color: '#120f0d', heels: true }, extras: [{ kind: 'tie', color: '#8a1f2a' }] },
-      { label: 'Grey three-piece', top: { kind: 'suit', color: '#55585e', shirt: '#dfe7f2', tie: '#2a3a6a', waistcoat: true }, bottom: { kind: 'slacks', color: '#55585e', skirt: true }, feet: { kind: 'dressShoe', color: '#3a2216', heels: true }, extras: [{ kind: 'tie', color: '#2a3a6a' }] },
-      { label: 'Shirt-sleeves', top: { kind: 'waistcoat', color: '#26262c', shirt: '#f2f2f4', tie: '#6a5a1f' }, bottom: { kind: 'slacks', color: '#26262c', skirt: false }, feet: { kind: 'dressShoe', color: '#120f0d', heels: true }, extras: [{ kind: 'tie', color: '#6a5a1f', loose: true }] },
+      // A black suit; for a woman the skirt suit, in black high-heeled ankle boots with pointed toes.
+      { label: 'Black suit', top: { kind: 'suit', color: '#16171b', shirt: '#f2f2f4', tie: '#8a1f2a' }, bottom: { kind: 'slacks', color: '#16171b', skirt: true }, feet: { kind: 'dressShoe', color: '#0e0d0c' }, femaleFeet: { kind: 'heelAnkleBoot', color: '#0b0b0d', heels: true }, extras: [{ kind: 'tie', color: '#8a1f2a' }] },
     ],
   },
   yakuza: {
     label: 'Yakuza', movement: 'good', fists: 'bare', kick: 1.1,
     designs: [
       { label: 'Bare back', tattoo: 'full', bottom: { kind: 'slacks', color: '#16161a' }, feet: { kind: 'compactBoot', color: '#0e0e10' }, top: { kind: 'sportsBra', color: '#16161a', female: true } },
-      { label: 'Open aloha shirt', tattoo: 'full', top: { kind: 'aloha', color: '#c23a2a', pattern: '#f2c94c' }, bottom: { kind: 'slacks', color: '#e8e4da' }, feet: { kind: 'compactBoot', color: '#e8e4da' } },
-      { label: 'Haramaki', tattoo: 'full', top: { kind: 'haramaki', color: '#e9e5da' }, bottom: { kind: 'slacks', color: '#2a2a30' }, feet: { kind: 'compactBoot', color: '#0e0e10' } },
     ],
   },
   swat: {
@@ -92,9 +84,7 @@ export const OUTFITS = {
     balance: 1.5, extraMass: 0.2,
     protection: { blunt: 0.8, cut: 0.9, pierce: 0.7 },
     designs: [
-      { label: 'Black riot', top: { kind: 'longsleeve', color: '#1a1b1f' }, bottom: { kind: 'cargo', color: '#1a1b1f' }, armor: { kind: 'riot', color: '#0f1013' }, head: { kind: 'riotHelmet', color: '#0f1013' }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
-      { label: 'Navy tactical', top: { kind: 'longsleeve', color: '#1c2638' }, bottom: { kind: 'cargo', color: '#1c2638' }, armor: { kind: 'carrier', color: '#2b3245' }, head: { kind: 'riotHelmet', color: '#1c2638', visor: false }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
-      { label: 'Heavy riot', top: { kind: 'longsleeve', color: '#202226' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'heavyRiot', color: '#121316' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
+      { label: 'Heavy riot', top: { kind: 'longsleeve', color: '#202226' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'heavyRiot', color: '#121316', backPrint: 'SWAT' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
     ],
   },
   knight: {
@@ -104,9 +94,8 @@ export const OUTFITS = {
     // nearly proof (when there are such things to fight with).
     protection: { blunt: 0.6, cut: 0.95, pierce: 0.85 },
     designs: [
-      { label: 'Polished plate', top: { kind: 'longsleeve', color: '#4a3a2c' }, bottom: { kind: 'tights', color: '#3a2e25' }, armor: { kind: 'plate', color: '#c9ced6' }, head: { kind: 'greatHelm', color: '#c9ced6' }, feet: { kind: 'sabaton', color: '#c9ced6' } },
-      { label: 'Plate & tabard', top: { kind: 'longsleeve', color: '#5a2a2a' }, bottom: { kind: 'tights', color: '#3a2e25' }, armor: { kind: 'plate', color: '#b7bcc4' }, head: { kind: 'bascinet', color: '#b7bcc4' }, feet: { kind: 'sabaton', color: '#b7bcc4' }, extras: [{ kind: 'tabard', color: 'corner', emblem: '#f2d24a' }] },
-      { label: 'Blackened gothic', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#3a3d44', fluted: true }, head: { kind: 'bascinet', color: '#3a3d44', pointed: true }, feet: { kind: 'sabaton', color: '#3a3d44' } },
+      // The gothic shape — fluted plate, pointed bascinet — in bright polished steel.
+      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true }, feet: { kind: 'sabaton', color: '#b7bcc4' } },
     ],
   },
 };
@@ -116,7 +105,7 @@ export const OUTFIT_KEYS = Object.keys(OUTFITS);
 /** The outfit a fighter wears: kind and design, defaulting to boxing's first. */
 export function outfitOf(inputs) {
   const kind = OUTFITS[inputs.outfit?.kind] ? inputs.outfit.kind : 'boxing';
-  const design = Math.max(0, Math.min(2, inputs.outfit?.design ?? 0));
+  const design = Math.max(0, Math.min(OUTFITS[kind].designs.length - 1, inputs.outfit?.design ?? 0));
   return { kind, design, spec: OUTFITS[kind], look: OUTFITS[kind].designs[design] };
 }
 

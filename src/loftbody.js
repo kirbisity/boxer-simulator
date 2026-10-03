@@ -307,7 +307,7 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), sides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
   }
   if (armor) {
-    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 0.99, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17] }[armor.kind];
+    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17] }[armor.kind];
     const role = (ring, angle, index, step) => {
       if (plate) return armor.fluted && step % 2 ? 'steel2' : 'steel';
       if (armor.kind === 'carrier') return Math.abs(Math.sin(angle)) < 0.75 ? 'armor' : 'top';
@@ -316,7 +316,11 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     loft(mesh, trunkRings(shell[0], shell[1], count(12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
   }
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
-  if (plate) loft(mesh, along(at('neck'), at('head'), forward, count(2), -0.1, 0.45, () => neckR * 1.55, () => neckR * 1.6), sides, { color: 'steel', capStart: false, capEnd: false });
+  // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
+  // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
+  const collarFrom = plate ? -0.15 : -0.6;
+  const flare = (t) => 1 + (plate ? 0 : 0.9 * Math.max(0, -t) / 0.6);
+  if (plate || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: plate ? 'steel' : 'armor', capStart: false, capEnd: false });
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -412,9 +416,9 @@ export function buildLoftBody(body, { faceted = false } = {}) {
       if (plate || armor.kind !== 'carrier') armorPiece(shinRings(0.1, plate ? 0.95 : 0.8, count(4)), plate ? 1.32 : 1.35);
     }
     // Boot shafts up the shin; heels for a woman in business dress.
-    const feet = look.feet ?? {};
-    const heels = feet.heels && female;
-    const shaft = heels ? [0.45, 1.12] : { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36] }[feet.kind];
+    const feet = (female && look.femaleFeet) || look.feet || {};
+    // Shafts up the shin: an ankle boot just over the ankle bone.
+    const shaft = { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36], heelAnkleBoot: [0.74, 1.2] }[feet.kind];
     if (shaft && !plate) loft(mesh, shinRings(shaft[0], 0.98, count(3)), sides, { color: 'boot', inflate: shaft[1], capStart: false, capEnd: false });
     if (feet.socks) loft(mesh, shinRings(0.66, 0.75, 1), sides, { color: 'sock', inflate: 1.28, capStart: false, capEnd: false });
   }

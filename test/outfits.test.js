@@ -7,9 +7,9 @@ import { footworkDistance } from '../tools/speed-curve.js';
 
 const wearing = (preset, kind, extra = {}) => ({ ...PRESETS[preset], outfit: { kind, design: 0 }, ...extra });
 
-test('every outfit has three designs, a movement class, and traits as specified', () => {
+test('every outfit has its picked design, a movement class, and traits as specified', () => {
   for (const [kind, outfit] of Object.entries(OUTFITS)) {
-    assert.equal(outfit.designs.length, 3, kind);
+    assert.ok(outfit.designs.length >= 1, kind);
     assert.ok(['excellent', 'good', 'limited'].includes(outfit.movement), kind);
   }
   const male = { sex: 'male' };

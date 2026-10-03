@@ -151,7 +151,7 @@ export function normaliseInputs(rawInputs) {
   // Street clothes from before outfits: the casual outfit, in their colours.
   if (rawInputs?.clothing && !rawInputs.outfit) {
     const { top, topColor, bottomColor } = rawInputs.clothing;
-    inputs.outfit = { kind: 'casual', design: top === 'hoodie' ? 1 : 0, colors: { top: topColor, bottom: bottomColor } };
+    inputs.outfit = { kind: 'casual', design: top === 'hoodie' ? 2 : 1, colors: { top: topColor, bottom: bottomColor } };
   }
   delete inputs.clothing;
   delete inputs.training;

@@ -25,7 +25,8 @@ export function dressFor(inputs, cornerHex) {
   const color = (value) => resolveColor(value, cornerHex);
   const top = look.top && (!look.top.female || female) ? { ...look.top, color: color(chosen.top ?? look.top.color) } : null;
   const bottom = look.bottom ? { ...look.bottom, color: color(chosen.bottom ?? look.bottom.color) } : null;
-  return { kind, design, look, top, bottom, armor: look.armor, feet: look.feet ?? { kind: 'bare' }, head: look.head, extras: look.extras ?? [], tattoo: look.tattoo, female, color };
+  const feet = (female && look.femaleFeet) || look.feet || { kind: 'bare' };
+  return { kind, design, look, top, bottom, armor: look.armor, feet, head: look.head, extras: look.extras ?? [], tattoo: look.tattoo, female, color };
 }
 
 /** The colour of each role the body mesh is painted with, for this dress. */
@@ -179,6 +180,7 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     hikingBoot: { width: 0.06, height: 0.058, sole: 0x2a2420 },
     tacticalBoot: { width: 0.06, height: 0.056, sole: 0x111111 },
     compactBoot: { width: 0.054, height: 0.05, sole: 0x111111 },
+    heelAnkleBoot: { width: 0.05, height: 0.042, sole: 0x0b0b0d },
     dressShoe: { width: 0.045, height: 0.038, sole: 0x2a1d14 },
     sabaton: { width: 0.058, height: 0.05 },
     bare: { width: 0.042, height: 0.032 },
@@ -199,11 +201,29 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     shoe.add(swoosh);
   }
   if (heels) {
-    // A stiletto-ish block under the heel, the toe pointed.
-    const heel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.016), surface(0x0e0e10));
-    heel.position.set(-0.04, -0.005, 0);
+    // A long pointed toe; then the whole boot pitched up at the heel, its
+    // toe still on the floor, standing on a slim stiletto.
+    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.95, length * 0.42, 12), upperMaterial);
+    toe.scale.set(spec.width / spec.height * 0.7, 1, 1);
+    toe.position.set(-0.02, length * 0.86, 0);
+    shoe.add(toe);
+    const pitch = -0.32;
+    const floor = -(spec.width * 0.95 + 0.009);
+    const toeTip = length * 1.07;
+    const lift = floor * (1 - Math.cos(pitch)) - toeTip * Math.sin(pitch);
+    for (const piece of [...shoe.children]) {
+      const { x, y } = piece.position;
+      piece.position.set(x * Math.cos(pitch) + y * Math.sin(pitch) + lift, -x * Math.sin(pitch) + y * Math.cos(pitch), piece.position.z);
+      piece.rotation.z -= pitch;
+    }
+    // The heel's back corner, lifted, down to the floor.
+    const heelBack = -length * 0.18;
+    const heelTop = floor * Math.cos(pitch) + heelBack * Math.sin(pitch) + lift;
+    const heelLength = heelTop - floor;
+    const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.004, heelLength, 8), surface(0x0b0b0d));
+    heel.rotation.z = Math.PI / 2;
+    heel.position.set(floor + heelLength / 2, heelBack * Math.cos(pitch) - floor * Math.sin(pitch) + 0.01, 0);
     shoe.add(heel);
-    upper.scale.x *= 0.85;
   }
   if (kind === 'sabaton') {
     // Overlapping lames over the toes.
@@ -267,8 +287,12 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
         group.add(visor);
       }
       if (head.neck) {
-        const guard = new THREE.Mesh(new THREE.CylinderGeometry(1.15 * r, 1.3 * r, 0.6 * r, 18, 1, true, Math.PI * 0.55, Math.PI * 0.9), cloth);
-        guard.position.y = -0.55 * r;
+        // A neck protector all the way round under the helmet, down to the
+        // collar: a padded back flap and a throat guard.
+        const guard = new THREE.Mesh(new THREE.CylinderGeometry(1.12 * r, 1.45 * r, 1.25 * r, 20, 1, true), cloth);
+        guard.material = cloth.clone();
+        guard.material.side = THREE.DoubleSide;
+        guard.position.y = -0.95 * r;
         group.add(guard);
       }
       break;
@@ -353,6 +377,33 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
   }
   for (const dangle of dangles) inkAll(dangle.group, 0.0025);
   return dangles;
+}
+
+/**
+ * Lettering across the back of the armour ("SWAT"), on the chest bone's
+ * frame at the neck: x forward, y up the spine, z to the left.
+ */
+export function buildBackPrint(body, text, colorHex = '#e9e2c8') {
+  const scale = body.heightM / 1.8;
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 96;
+  const g = canvas.getContext('2d');
+  g.fillStyle = colorHex;
+  g.font = 'bold 78px Arial Black, Impact, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 128, 52);
+  const texture = new THREE.CanvasTexture(canvas);
+  const print = new THREE.Mesh(new THREE.PlaneGeometry(0.26 * scale, 0.1 * scale), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }));
+  // Facing backwards, across the shoulder blades, just off the armour.
+  const back = body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.012;
+  print.rotation.y = -Math.PI / 2;
+  print.position.set(-back, -0.13 * scale, 0);
+  print.renderOrder = 2;
+  const group = new THREE.Group();
+  group.add(print);
+  return group;
 }
 
 /** Which kind of hand an outfit gives. */
