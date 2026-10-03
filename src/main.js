@@ -9,6 +9,7 @@ import { advance, boutWinner, concussionCapacity, createWorld, perform, placeFig
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
+import { OUTFIT_KEYS, OUTFITS, outfitOf } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 
@@ -417,24 +418,41 @@ const LOOK_FIELDS = [
   { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor },
 ];
 
-// Street clothes and gear, for fighters who wear them (the levels): what
-// they wear on top and below, the colours, the headset, and bare fists or gloves.
+// The outfit: which kind and which of its designs, its colours (the
+// design's own unless chosen), a headset, and the fists.
 const CLOTH_COLORS = {
-  navy: '#24324a', maroon: '#7a2230', black: '#1c1c20', charcoal: '#26262b', grey: '#6b6e74',
-  white: '#e4e4e6', olive: '#4a5233', denim: '#2b3550', sand: '#b39a73',
+  design: null, navy: '#24324a', maroon: '#7a2230', black: '#1c1c20', charcoal: '#26262b', grey: '#6b6e74',
+  white: '#e4e4e6', olive: '#4a5233', denim: '#2b3550', sand: '#b39a73', red: '#b8302c', blue: '#2a59c4',
 };
-const colorName = (hex) => Object.keys(CLOTH_COLORS).find((name) => CLOTH_COLORS[name] === hex) ?? hex;
+const colorName = (hex) => (hex ? Object.keys(CLOTH_COLORS).find((name) => CLOTH_COLORS[name] === hex) ?? 'design' : 'design');
+const outfitField = (inputs) => (inputs.outfit ??= { kind: 'boxing', design: 0 });
 const OUTFIT_FIELDS = [
-  { key: 'top', label: 'Top', options: ['tshirt', 'hoodie'], names: { tshirt: 'T-shirt', hoodie: 'hoodie' }, get: (inputs) => inputs.clothing.top, set: (inputs, value) => { inputs.clothing.top = value; } },
-  { key: 'topColor', label: 'Colour', options: Object.keys(CLOTH_COLORS), get: (inputs) => colorName(inputs.clothing.topColor), set: (inputs, value) => { inputs.clothing.topColor = CLOTH_COLORS[value]; } },
-  { key: 'bottom', label: 'Legs', options: ['jeans', 'joggers'], get: (inputs) => inputs.clothing.bottom, set: (inputs, value) => { inputs.clothing.bottom = value; } },
-  { key: 'bottomColor', label: 'Colour', options: Object.keys(CLOTH_COLORS), get: (inputs) => colorName(inputs.clothing.bottomColor), set: (inputs, value) => { inputs.clothing.bottomColor = CLOTH_COLORS[value]; } },
   {
-    key: 'headset', label: 'Headset', options: ['on', 'off'],
+    key: 'kind', label: 'Outfit', options: OUTFIT_KEYS, names: Object.fromEntries(OUTFIT_KEYS.map((key) => [key, OUTFITS[key].label])),
+    get: (inputs) => outfitField(inputs).kind, set: (inputs, value) => { Object.assign(outfitField(inputs), { kind: value, design: 0, colors: {} }); },
+  },
+  {
+    key: 'design', label: 'Design', options: ['0', '1', '2'], names: null,
+    get: (inputs) => String(outfitField(inputs).design ?? 0), set: (inputs, value) => { outfitField(inputs).design = Number(value); },
+  },
+  {
+    key: 'top', label: 'Top', options: Object.keys(CLOTH_COLORS),
+    get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: CLOTH_COLORS[value] ?? undefined }; },
+  },
+  {
+    key: 'bottom', label: 'Legs', options: Object.keys(CLOTH_COLORS),
+    get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: CLOTH_COLORS[value] ?? undefined }; },
+  },
+  {
+    key: 'headset', label: 'Headset', options: ['off', 'on'],
     get: (inputs) => ((inputs.accessories ?? []).includes('headset') ? 'on' : 'off'),
     set: (inputs, value) => { inputs.accessories = value === 'on' ? ['headset'] : []; },
   },
-  { key: 'fists', label: 'Fists', options: ['bare', 'gloved'], get: (inputs) => (inputs.gloves === false ? 'bare' : 'gloved'), set: (inputs, value) => { inputs.gloves = value === 'gloved'; } },
+  {
+    key: 'fists', label: 'Fists', options: ['outfit', 'bare', 'gloved'],
+    get: (inputs) => (inputs.gloves === undefined ? 'outfit' : inputs.gloves ? 'gloved' : 'bare'),
+    set: (inputs, value) => { if (value === 'outfit') delete inputs.gloves; else inputs.gloves = value === 'gloved'; },
+  },
 ];
 
 /** Which of a side's fighters the form is showing: one entry per fighter on the side. */
@@ -501,7 +519,10 @@ function buildCornerForm(corner) {
     const select = document.createElement('select');
     select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
     select.dataset.outfit = field.key;
-    select.addEventListener('change', () => field.set(current(corner), select.value));
+    select.addEventListener('change', () => {
+      field.set(current(corner), select.value);
+      fillCornerForm(corner);
+    });
     row.append(select);
     return row;
   }));
@@ -541,8 +562,11 @@ function fillCornerForm(corner) {
   // A level's fighters are tuned, not swapped for a preset.
   form.querySelector('.preset').closest('label').hidden = Boolean(state.scenario);
   const outfit = form.querySelector('.outfit');
-  outfit.hidden = !inputs.clothing;
-  if (inputs.clothing) for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
+  // The design names follow the outfit chosen.
+  const kind = outfitOf(inputs).kind;
+  const designSelect = outfit.querySelector('[data-outfit="design"]');
+  OUTFITS[kind].designs.forEach((design, index) => { designSelect.options[index].textContent = design.label; });
+  for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
   form.querySelector('.name-input').value = inputs.name;
   form.querySelector('.copy').textContent = 'Copy code';
   for (const field of FIELDS) {
@@ -749,10 +773,20 @@ const SHEETS = {
   },
 };
 
-/** The inputs a sheet option builds: a look field, or a body fed to a BMI. */
+// One sheet per outfit: its three designs on a man (row 0) and a woman (row 1).
+for (const kind of OUTFIT_KEYS) {
+  SHEETS[`outfit-${kind}`] = {
+    options: OUTFITS[kind].designs.map((design, index) => [{ outfit: { kind, design: index } }, `${'ABC'[index]} · ${design.label}`, OUTFITS[kind].label]),
+    rows: [PRESETS.light, PRESETS.contender],
+    camera: { distance: 2.9, pitch: 0.08, yaw: 0.15, height: 0.95 },
+  };
+}
+
+/** The inputs a sheet option builds: a look field, an outfit, or a body fed to a BMI. */
 function sheetInputs(sheet, row, value) {
   const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
   if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
+  if (value.outfit) return { ...inputs, outfit: value.outfit };
   const height = inputs.heightCm / 100;
   return { ...inputs, calories: Math.round(caloriesForWeight(inputs, value.bmi * height * height, FRAMES[inputs.frame].lean)) };
 }
@@ -760,7 +794,7 @@ function sheetInputs(sheet, row, value) {
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
 function designSheet(kind, row = 0, closeUp = null) {
   const sheet = SHEETS[kind];
-  const spacing = { faces: 0.55, bodies: 0.8, physiques: 1.15 }[kind];
+  const spacing = { faces: 0.55, bodies: 0.8, physiques: 1.15 }[kind] ?? 0.85;
   const entries = sheet.options.map(([value, label], column) => ({ inputs: { ...sheetInputs(sheet, row, value), name: label }, corner: 'red', column }));
   const middle = (entries.length - 1) / 2;
   state.paused = true;

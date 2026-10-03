@@ -24,24 +24,24 @@ export const SCENARIOS = {
     fighters: [
       {
         name: 'Simon', style: 'street', sex: 'male', heightCm: 183, weightKg: 72, frame: 'medium', age: 27, exercise: 0.35,
-        gloves: false, clothing: { top: 'tshirt', topColor: '#24324a', bottom: 'jeans', bottomColor: '#2b3550' }, accessories: ['headset'],
+        outfit: { kind: 'casual', design: 0, colors: { top: '#24324a', bottom: '#2b3550' } }, accessories: ['headset'],
         look: { skinTone: 'lightTan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
       },
       {
         name: 'Dre', style: 'street', sex: 'male', heightCm: 180, weightKg: 75, frame: 'medium', age: 25, exercise: 0.4,
-        gloves: false, clothing: { top: 'hoodie', topColor: '#7a2230', bottom: 'joggers', bottomColor: '#26262b' }, accessories: [],
+        outfit: { kind: 'casual', design: 1, colors: { top: '#7a2230', bottom: '#26262b' } }, accessories: [],
         look: { skinTone: 'deep', hairStyle: 'dreads', hairColor: '#1a120c', facialHair: 'stubble', eyeColor: 'brown' },
       },
     ],
     // Each side's friends, for a team fight: changes to that side's lead.
     crews: {
       red: [
-        { name: 'Tomo', heightCm: 176, weightKg: 68, age: 24, clothing: { top: 'hoodie', topColor: '#1c1c20', bottom: 'jeans', bottomColor: '#2b3550' }, accessories: [], look: { hairStyle: 'spiky', skinTone: 'lightTan' } },
-        { name: 'Jae', heightCm: 185, weightKg: 84, age: 29, exercise: 0.5, clothing: { top: 'tshirt', topColor: '#e4e4e6', bottom: 'joggers', bottomColor: '#26262b' }, accessories: [], look: { hairStyle: 'fade', skinTone: 'light' } },
+        { name: 'Tomo', heightCm: 176, weightKg: 68, age: 24, outfit: { kind: 'casual', design: 1, colors: { top: '#1c1c20', bottom: '#2b3550' } }, accessories: [], look: { hairStyle: 'spiky', skinTone: 'lightTan' } },
+        { name: 'Jae', heightCm: 185, weightKg: 84, age: 29, exercise: 0.5, outfit: { kind: 'casual', design: 0, colors: { top: '#e4e4e6', bottom: '#26262b' } }, accessories: [], look: { hairStyle: 'fade', skinTone: 'light' } },
       ],
       blue: [
-        { name: 'Marco', heightCm: 174, weightKg: 79, age: 30, clothing: { top: 'tshirt', topColor: '#4a5233', bottom: 'jeans', bottomColor: '#2b3550' }, look: { hairStyle: 'buzz', skinTone: 'tan', facialHair: 'beard' } },
-        { name: 'Kofi', heightCm: 188, weightKg: 82, age: 23, exercise: 0.45, clothing: { top: 'hoodie', topColor: '#6b6e74', bottom: 'joggers', bottomColor: '#1c1c20' }, look: { hairStyle: 'cornrows', skinTone: 'deep' } },
+        { name: 'Marco', heightCm: 174, weightKg: 79, age: 30, outfit: { kind: 'casual', design: 0, colors: { top: '#4a5233', bottom: '#2b3550' } }, look: { hairStyle: 'buzz', skinTone: 'tan', facialHair: 'beard' } },
+        { name: 'Kofi', heightCm: 188, weightKg: 82, age: 23, exercise: 0.45, outfit: { kind: 'casual', design: 1, colors: { top: '#6b6e74', bottom: '#1c1c20' } }, look: { hairStyle: 'cornrows', skinTone: 'deep' } },
       ],
     },
   },
@@ -60,7 +60,7 @@ export function scenarioFighters(scenario) {
 /** A crew member: the side's lead, changed as the crew entry says, fed to its weight. */
 export function crewFighter(lead, entry) {
   const { weightKg, ...changes } = entry;
-  const inputs = normaliseInputs({ ...lead, ...changes, clothing: { ...lead.clothing, ...changes.clothing }, look: { ...lead.look, ...changes.look } });
+  const inputs = normaliseInputs({ ...lead, ...changes, outfit: { ...lead.outfit, ...changes.outfit }, look: { ...lead.look, ...changes.look } });
   inputs.calories = Math.round(caloriesForWeight(inputs, weightKg, (FRAMES[inputs.frame] ?? FRAMES.medium).lean));
   return inputs;
 }

@@ -9,13 +9,25 @@ import { P } from './body.js';
 import { relax, skinWeights } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
+import { glovedFists, outfitOf } from './outfits.js';
 
-// Street tops: where the hem and neckline sit along the trunk (0 hips, 1
-// neck), how far the cloth stands off the skin, and how long the sleeves run
-// (as a share of the upper arm; above 1, on down the forearm).
-export const CLOTHES = {
-  tshirt: { hem: 0.02, neck: 0.98, loose: 1.06, sleeve: 0.5, sleeveLoose: 1.22, ribbed: false },
+// Tops: where the hem and neckline sit along the trunk (0 hips, 1 neck),
+// how far the cloth stands off the skin, how long the sleeves run (a share of
+// the upper arm; above 1, on down the forearm), and any layer beneath.
+export const TOPS = {
+  sportsBra: { hem: 0.56, neck: 0.86, loose: 1.05, sleeve: 0 },
+  tank: { hem: 0.04, neck: 0.95, loose: 1.05, sleeve: 0 },
+  tee: { hem: 0.02, neck: 0.98, loose: 1.06, sleeve: 0.5, sleeveLoose: 1.22 },
+  longsleeve: { hem: 0, neck: 0.99, loose: 1.05, sleeve: 1.85, sleeveLoose: 1.16 },
+  compression: { hem: 0.02, neck: 0.99, loose: 1.03, sleeve: 1.85, sleeveLoose: 1.08 },
+  jacket: { hem: -0.1, neck: 1.0, loose: 1.11, sleeve: 1.85, sleeveLoose: 1.24, ribbed: true },
   hoodie: { hem: -0.1, neck: 1.0, loose: 1.11, sleeve: 1.8, sleeveLoose: 1.24, ribbed: true },
+  puffer: { hem: -0.06, neck: 0.98, loose: 1.21, sleeve: 0, inner: 'longsleeve' },
+  flannel: { hem: -0.08, neck: 0.99, loose: 1.1, sleeve: 1.82, sleeveLoose: 1.2 },
+  suit: { hem: -0.16, neck: 0.99, loose: 1.09, sleeve: 1.85, sleeveLoose: 1.2 },
+  waistcoat: { hem: -0.02, neck: 0.93, loose: 1.08, sleeve: 0, inner: 'longsleeve' },
+  aloha: { hem: -0.06, neck: 0.98, loose: 1.11, sleeve: 0.55, sleeveLoose: 1.3 },
+  haramaki: { hem: -0.02, neck: 0.45, loose: 1.05, sleeve: 0 },
 };
 
 export const LOFT = {
@@ -59,7 +71,10 @@ function profile(stops) {
  */
 function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null } = {}) {
   const start = mesh.positions.length / 3;
-  for (const ring of rings) {
+  // A colour may be a pattern: a function of the ring (and its index), and
+  // of the angle round it (0 at the front, as the depth axis points).
+  const paint = typeof color === 'function' ? color : () => color;
+  for (const [ringIndex, ring] of rings.entries()) {
     for (let step = 0; step < sides; step += 1) {
       const angle = (step / sides) * Math.PI * 2;
       const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * inflate), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * inflate)));
@@ -68,7 +83,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       // off the skin would otherwise follow the bones less than the skin
       // under it, and the skin would come through when a limb moves.
       mesh.weightPositions.push(...vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width))));
-      mesh.colors.push(color);
+      mesh.colors.push(paint(ring, angle, ringIndex, step));
       mesh.bones.push(bones(ring, Math.cos(angle)));
     }
   }
@@ -83,7 +98,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
     const center = mesh.positions.length / 3;
     mesh.positions.push(...rings[row].center);
     mesh.weightPositions.push(...rings[row].center);
-    mesh.colors.push(color);
+    mesh.colors.push(paint(rings[row], 0, row, 0));
     mesh.bones.push(bones(rings[row], 0));
     for (let step = 0; step < sides; step += 1) {
       const a = start + row * sides + step;
@@ -208,23 +223,101 @@ export function buildLoftBody(body, { faceted = false } = {}) {
   // Shorts sit on the hips under the belly, which hangs over them.
   const unbulged = (shape, bellyPart) => (u) => shape(u) - belly * LOFT.bellyScale * bellyPart * bulge(u);
   const shortsRings = (from, to, rings) => along(at('pelvis'), at('neck'), forward, rings, from, to, unbulged(bodyDepth, 1), bodyWidth, unbulged(bodyLean, 0.8));
-  // Street clothes replace the ring kit: a T-shirt or a hoodie over the
-  // trunk, and jeans or joggers to the ankle (see the limbs below).
-  const clothing = body.inputs.clothing;
-  const outfit = clothing ? CLOTHES[clothing.top] : null;
-  if (!clothing) {
-    loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: 'kit', inflate: 1.05, capStart: false, capEnd: false, bones: abdomen });
-    loft(mesh, shortsRings(0.17, 0.25, 1), sides, { color: 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen });
-  } else {
-    loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: 'pants', inflate: 1.06, capStart: false, capEnd: false, bones: abdomen });
-    if (clothing.bottom === 'jeans') loft(mesh, shortsRings(0.12, 0.17, 1), sides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen });
-    // The top hangs from the shoulders and drapes over the belly.
-    loft(mesh, trunkRings(outfit.hem, outfit.neck, count(14)), sides, { color: 'shirt', inflate: outfit.loose, capStart: false, capEnd: false, bones: abdomen });
-    if (outfit.ribbed) loft(mesh, trunkRings(outfit.hem, outfit.hem + 0.06, 1), sides, { color: 'cuff', inflate: outfit.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
+  // The outfit, piece by piece. Every piece is a loft over the body part
+  // it covers, painted by role (top, trim, shirt, tie, armour, steel...);
+  // the view turns roles into the design's colours.
+  const { look } = outfitOf(body.inputs);
+  const top = look.top && (!look.top.female || female) ? look.top : null;
+  const topShape = top ? TOPS[top.kind] : null;
+  const bottom = look.bottom ?? null;
+  const armor = look.armor ?? null;
+  const plate = armor?.kind === 'plate';
+  const hanging3 = [BONE.pelvis, BONE.lThigh, BONE.rThigh];
+  // Patterns on the trunk: a zip, a suit's V with the shirt and tie in it,
+  // an open shirt, checks, quilting, a seam down the side.
+  const topPattern = (ring, angle, index, step) => {
+    const u = ring.t;
+    const ahead = Math.cos(angle);
+    const side = Math.abs(Math.sin(angle));
+    switch (top.kind) {
+      case 'jacket': case 'hoodie':
+        return top.zip && ahead > 0 && side < 0.06 ? 'trim' : 'top';
+      case 'compression':
+        return side > 0.93 ? 'trim' : 'top';
+      case 'suit': case 'waistcoat': {
+        const open = top.kind === 'suit' ? 0.5 : 0.55;
+        const width = (u - open) * (top.kind === 'suit' ? 1.4 : 1.6);
+        if (ahead > 0.25 && u > open && side < width) {
+          if (side < 0.06) return 'tie';
+          if (top.waistcoat && side > width * 0.55) return 'pattern';
+          return 'shirt';
+        }
+        return 'top';
+      }
+      case 'flannel':
+        if (ahead > 0.2 && side < 0.22) return 'shirt';
+        return ((index >> 1) + (step >> 1)) % 2 ? 'pattern' : 'top';
+      case 'aloha':
+        if (ahead > 0.2 && side < 0.25) return 'skin';
+        return (index * 3 + step * 5) % 7 === 0 ? 'pattern' : 'top';
+      case 'puffer':
+        return index % 2 ? 'trim' : 'top';
+      default:
+        return 'top';
+    }
+  };
+  // Below the waist: shorts on the hips, a belt, a sumo's mawashi.
+  const shortsOn = (role, inflate) => loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: role, inflate, capStart: false, capEnd: false, bones: abdomen });
+  if (bottom) {
+    switch (bottom.kind) {
+      case 'trunks': case 'longShorts':
+        shortsOn('kit', 1.05);
+        loft(mesh, shortsRings(0.17, 0.25, 1), sides, { color: bottom.trim ? 'trim2' : 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen });
+        break;
+      case 'mawashi':
+        if (bottom.under) shortsOn('under', 1.04);
+        shortsOn('mawashi', bottom.under ? 1.07 : 1.04);
+        loft(mesh, shortsRings(-0.04, 0.2, count(3)), sides, { color: 'mawashi', inflate: 1.14, capStart: false, capEnd: false, bones: abdomen });
+        break;
+      case 'slacks': case 'pants': case 'jeans': case 'cargo':
+        shortsOn('kit', 1.06);
+        loft(mesh, shortsRings(0.12, 0.17, 1), sides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen });
+        break;
+      default:
+        shortsOn('kit', bottom.kind === 'tights' ? 1.03 : 1.06);
+    }
   }
-  // Fewer sides cut deeper chords, so the faceted top needs more clearance.
-  if (body.inputs.sex === 'female' && !clothing) loft(mesh, trunkRings(0.56, 0.86, count(5)), sides, { color: 'top', inflate: faceted ? 1.1 : 1.05, capStart: false, capEnd: false, bones: abdomen });
+  // A skirt (or a knight's tassets) hangs from the waist past the hips and
+  // is carried by the pelvis and both thighs.
+  const trunkLength = vec.length(vec.sub(at('neck'), at('pelvis')));
+  const skirtTo = (share) => -0.12 - (share * L.thigh) / trunkLength;
+  // Flared to the hem (an A-line skirt, tassets spreading over the thighs),
+  // so a fighting stance does not push the legs through it.
+  const skirtRings = (hemAt, rings, flare = 0.3) => along(at('pelvis'), at('neck'), forward, rings, hemAt, 0.2,
+    (u) => (u >= -0.12 ? unbulged(bodyDepth, 1)(u) : bodyDepth(-0.12) * (1 + flare * 0.7 * Math.sqrt((-0.12 - u) / (-0.12 - hemAt)))),
+    (u) => (u >= -0.12 ? bodyWidth(u) : bodyWidth(-0.12) * (1 + flare * Math.sqrt((-0.12 - u) / (-0.12 - hemAt)))),
+    (u) => (u >= -0.12 ? unbulged(bodyLean, 0.8)(u) : unbulged(bodyLean, 0.8)(-0.12)));
+  const skirted = Boolean(bottom?.skirt && female);
+  if (skirted) loft(mesh, skirtRings(skirtTo(0.85), count(8), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
+  if (plate) loft(mesh, skirtRings(skirtTo(0.4), count(5)), sides, { color: (ring, angle, index) => (index % 2 ? 'steel2' : 'steel'), inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+  // The top, over any layer beneath it; then body armour over both.
+  if (topShape?.inner) loft(mesh, trunkRings(-0.02, 0.99, count(12)), sides, { color: 'shirt', inflate: TOPS[topShape.inner].loose, capStart: false, capEnd: false, bones: abdomen });
+  if (topShape) {
+    loft(mesh, trunkRings(topShape.hem, topShape.neck, count(Math.max(4, Math.round(14 * (topShape.neck - topShape.hem))))), sides, { color: topPattern, inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen });
+    if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), sides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
+  }
+  if (armor) {
+    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 0.99, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17] }[armor.kind];
+    const role = (ring, angle, index, step) => {
+      if (plate) return armor.fluted && step % 2 ? 'steel2' : 'steel';
+      if (armor.kind === 'carrier') return Math.abs(Math.sin(angle)) < 0.75 ? 'armor' : 'top';
+      return 'armor';
+    };
+    loft(mesh, trunkRings(shell[0], shell[1], count(12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
+  }
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
+  if (plate) loft(mesh, along(at('neck'), at('head'), forward, count(2), -0.1, 0.45, () => neckR * 1.55, () => neckR * 1.6), sides, { color: 'steel', capStart: false, capEnd: false });
+  const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
     const shoulder = at(`${side}Shoulder`);
@@ -243,23 +336,35 @@ export function buildLoftBody(body, { faceted = false } = {}) {
     // Forearm: full below the elbow, tapering to the wrist inside the glove
     // (or, bare, on to the wrist above the fist).
     // Bare, the forearm runs right into the back of the fist.
-    const wrist = body.inputs.gloves === false ? 0.98 : 0.74;
+    const wrist = glovedFists(body.inputs) ? 0.74 : 0.98;
     const forearmRings = (from, to, rings) => along(elbow, hand, armForward, rings, from, to,
       profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.98, foreR * 0.6]]),
       profile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.98, foreR * 0.7]]));
     loft(mesh, forearmRings(-0.04, wrist, count(8)), sides);
-    if (outfit) {
-      // Sleeves: a T-shirt's stop halfway down the upper arm; a hoodie's
-      // run to a ribbed cuff at the wrist.
-      // The sleeve follows the arm's own shape, deltoid and all, a little off it.
-      const upperArmRings = (from, to, rings) => along(shoulder, elbow, armForward, rings, from, to, (t) => Math.max(upperDepth(t), upperR * 0.9), (t) => Math.max(upperWidth(t), upperR * 0.9));
-      // From as deep in the shoulder as the arm's own skin starts, so the
-      // arm's root never swings out through the back of the top.
-      loft(mesh, upperArmRings(-0.3, outfit.sleeve > 1 ? 1.05 : outfit.sleeve, count(6)), sides, { color: 'shirt', inflate: outfit.sleeveLoose, capStart: false, capEnd: false });
-      if (outfit.sleeve > 1) {
-        loft(mesh, forearmRings(-0.06, outfit.sleeve - 1, count(5)), sides, { color: 'shirt', inflate: outfit.sleeveLoose, capStart: false, capEnd: false });
-        loft(mesh, forearmRings(outfit.sleeve - 1.07, outfit.sleeve - 1, 1), sides, { color: 'cuff', inflate: outfit.sleeveLoose + 0.04, capStart: false, capEnd: false });
+    // Sleeves follow the arm's own shape, deltoid and all, a little off it,
+    // from as deep in the shoulder as the arm's skin starts.
+    const upperArmRings = (from, to, rings) => along(shoulder, elbow, armForward, rings, from, to, (t) => Math.max(upperDepth(t), upperR * 0.9), (t) => Math.max(upperWidth(t), upperR * 0.9));
+    const sleeveOf = (shape, role) => {
+      if (!shape?.sleeve) return;
+      const outer = side === 'l' ? 1 : -1;
+      let pattern = role;
+      if (role === 'top' && top?.stripe) pattern = (ring, angle) => (Math.sin(angle) * outer > 0.85 ? 'stripe' : 'top');
+      if (role === 'top' && top?.kind === 'flannel') pattern = (ring, angle, index, step) => (((index >> 1) + (step >> 1)) % 2 ? 'pattern' : 'top');
+      if (role === 'top' && top?.kind === 'aloha') pattern = (ring, angle, index, step) => ((index * 3 + step * 5) % 7 === 0 ? 'pattern' : 'top');
+      loft(mesh, upperArmRings(-0.3, shape.sleeve > 1 ? 1.05 : shape.sleeve, count(6)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false });
+      if (shape.sleeve > 1) {
+        loft(mesh, forearmRings(-0.06, shape.sleeve - 1, count(5)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false });
+        if (shape.ribbed || top?.kind === 'suit') loft(mesh, forearmRings(shape.sleeve - 1.07, shape.sleeve - 1, 1), sides, { color: top?.kind === 'suit' ? 'shirt' : 'trim', inflate: shape.sleeveLoose + 0.04, capStart: false, capEnd: false });
       }
+    };
+    if (topShape?.inner) sleeveOf(TOPS[topShape.inner], 'shirt');
+    sleeveOf(topShape, 'top');
+    if (armor && armor.kind !== 'carrier') {
+      const big = { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
+      armorPiece(upperArmRings(-0.2, 0.38, count(3)), big);
+      if (plate) armorPiece(upperArmRings(0.36, 1.0, count(4)), 1.28);
+      if (plate) armorPiece(forearmRings(-0.12, 0.12, count(2)), 1.5);
+      armorPiece(forearmRings(0.12, wrist - 0.06, count(4)), plate ? 1.32 : 1.42);
     }
 
     const hip = at(`${side}Hip`);
@@ -273,8 +378,22 @@ export function buildLoftBody(body, { faceted = false } = {}) {
       profile([[-0.14, thighR * 1.0], [0.1, thighR * 1.1], [0.5, thighR * 0.95], [1, shankR * 0.9]]),
       profile([[0, 0], [0.5, thighR * 0.08], [1, 0]]));
     loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
-    if (!clothing) loft(mesh, thighRings(-0.05, 0.42, count(4)), sides, { color: 'kit', inflate: 1.08, capStart: false, capEnd: false });
-    else loft(mesh, thighRings(-0.05, 1.04, count(9)), sides, { color: 'pants', inflate: 1.12, capStart: false, capEnd: false });
+    // The legs of the bottom: how far down the thigh, then the shin, it runs.
+    const legReach = { trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
+    const legLoose = { tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
+    const outer = side === 'l' ? 1 : -1;
+    const legPattern = (ring, angle) => {
+      if (bottom?.stripe && Math.abs(Math.sin(angle)) > 0.9) return 'trim2';
+      if (bottom?.kind === 'cargo' && ring.t > 0.35 && ring.t < 0.62 && Math.sin(angle) * outer > 0.55) return 'trim2';
+      return 'kit';
+    };
+    if (bottom?.under) loft(mesh, thighRings(-0.05, 0.4, count(3)), sides, { color: 'under', inflate: 1.05, capStart: false, capEnd: false });
+    if (legReach[0] > 0 && !skirted) loft(mesh, thighRings(-0.05, legReach[0], count(Math.max(3, Math.round(9 * legReach[0])))), sides, { color: legPattern, inflate: legLoose, capStart: false, capEnd: false });
+    if (armor) {
+      if (plate) armorPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
+      if (armor.kind === 'heavyRiot') armorPiece(thighRings(0.05, 0.7, count(3)), 1.35);
+      armorPiece(thighRings(0.82, 1.05, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
+    }
     // Shin and calf: the calf sits high and behind.
     // The shin starts inside the thigh, so the knee bends without a seam.
     const shinRings = (from, to, rings) => along(knee, foot, frames[BONE[`${side}Shin`]].x, rings, from, to,
@@ -282,12 +401,22 @@ export function buildLoftBody(body, { faceted = false } = {}) {
       profile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
       profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]]));
     loft(mesh, shinRings(-0.12, 0.97, count(10)), sides);
-    if (clothing) {
-      // Jeans fall straight to the shoe; joggers gather into a cuff.
-      const joggers = clothing.bottom === 'joggers';
-      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(8), -0.14, 0.9, () => shankR * 1.12, () => shankR * 1.1), sides, { color: 'pants', inflate: joggers ? 1.12 : 1.22, capStart: false, capEnd: false });
-      if (joggers) loft(mesh, shinRings(0.82, 0.9, 1), sides, { color: 'cuff2', inflate: 1.15, capStart: false, capEnd: false });
+    if (legReach[1] > 0 && !skirted) {
+      // Trousers fall straight to the shoe; joggers and track pants gather.
+      const gathered = bottom.kind === 'joggers' || bottom.kind === 'trackPants';
+      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : 1.22, capStart: false, capEnd: false });
+      if (gathered) loft(mesh, shinRings(legReach[1] - 0.08, legReach[1], 1), sides, { color: 'trim2', inflate: 1.15, capStart: false, capEnd: false });
     }
+    if (armor) {
+      armorPiece(shinRings(-0.12, 0.12, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
+      if (plate || armor.kind !== 'carrier') armorPiece(shinRings(0.1, plate ? 0.95 : 0.8, count(4)), plate ? 1.32 : 1.35);
+    }
+    // Boot shafts up the shin; heels for a woman in business dress.
+    const feet = look.feet ?? {};
+    const heels = feet.heels && female;
+    const shaft = heels ? [0.45, 1.12] : { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36] }[feet.kind];
+    if (shaft && !plate) loft(mesh, shinRings(shaft[0], 0.98, count(3)), sides, { color: 'boot', inflate: shaft[1], capStart: false, capEnd: false });
+    if (feet.socks) loft(mesh, shinRings(0.66, 0.75, 1), sides, { color: 'sock', inflate: 1.28, capStart: false, capEnd: false });
   }
 
   let { positions, indices, colors, bones, weightPositions } = mesh;

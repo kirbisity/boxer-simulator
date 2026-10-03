@@ -17,7 +17,7 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
-  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'bald'],
+  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'beard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
@@ -416,7 +416,14 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     skinMaterial.color.copy(baseSkin).lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare);
   }
 
-  return { group, shell: skull, update, dangles };
+  // Under a helmet: no hair, and no locks swinging through the steel.
+  function hideHair() {
+    group.traverse((object) => {
+      if (object.isMesh && object.material === hairMaterial) object.visible = false;
+    });
+    dangles.length = 0;
+  }
+  return { group, shell: skull, update, dangles, hideHair };
 }
 
 function hairLock(group, material, points, width, thickness, taper = 1) {
@@ -547,6 +554,14 @@ function buildHair(group, look, r, shape, material, female) {
       const out = [Math.cos(azimuth) * 0.25, -1, Math.sin(azimuth) * 0.25];
       hangingLock(group, material, dangles, root, out, (0.72 + 0.38 * Math.max(0, back)) * r, 0.42 * r, 0.12 * r, { sag: 0.45, damping: 0.3 });
     }
+  } else if (style === 'topknot') {
+    // A sumo's oiled hair, drawn up into a knot folded on the crown.
+    cap(1.04, 1.04, 2.0);
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.22 * r, 12, 10), material);
+    knot.scale.set(1.7, 0.75, 0.8);
+    knot.position.set(0.1 * r, 1.12 * r, 0);
+    knot.add(outlineFor(knot, 0.004));
+    group.add(knot);
   } else if (style === 'long') {
     // Past the shoulder blades: side-swept bangs, a crown, and locks all
     // round the sides and back that swing, bend and stream with motion.

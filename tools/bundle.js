@@ -2,8 +2,9 @@
 // Usage: node tools/bundle.js [out.html]
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import vm from 'node:vm';
 
-const MODULES = ['physiology', 'body', 'pose', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'render', 'drama', 'scenarios', 'main'];
+const MODULES = ['outfits', 'physiology', 'body', 'pose', 'moves', 'life', 'physics', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'render', 'drama', 'scenarios', 'main'];
 const out = process.argv[2] ?? 'dist/boxer-simulator.html';
 
 const html = readFileSync('index.html', 'utf8');
@@ -30,6 +31,14 @@ for (const name of MODULES) {
     if (seen.has(identifier)) throw new Error(`${identifier} is declared in both ${seen.get(identifier)} and ${name}`);
     seen.set(identifier, name);
   }
+}
+
+// The whole page must at least compile: a name declared twice inside a
+// function stops it as surely as one at the top.
+try {
+  new vm.Script(code);
+} catch (error) {
+  throw new Error(`the bundled page does not compile: ${error.message}`);
 }
 
 const title = html.match(/<title>.*<\/title>/)[0];

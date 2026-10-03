@@ -8,6 +8,7 @@
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
+import { glovedFists } from './outfits.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
 export const WORLD = {
@@ -314,7 +315,7 @@ function addConstraint(fighter, a, b, compliance) {
 
 /** Gloved unless the fighter's inputs say otherwise. */
 export function fistsOf(body) {
-  return body.inputs.gloves === false ? WORLD.fists.bare : WORLD.fists.gloved;
+  return glovedFists(body.inputs) ? WORLD.fists.gloved : WORLD.fists.bare;
 }
 
 /**
@@ -764,7 +765,9 @@ function checkBalance(world, fighter) {
   const feet = vec.lerp(point(fighter.x, P.lFoot), point(fighter.x, P.rFoot), 0.5);
   const outside = planted ? Math.hypot(pelvis[0] - feet[0], pelvis[2] - feet[2]) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
-  if (knock > WORLD.balance.speed * legs || outside > WORLD.balance.reach * legLength * legs) {
+  // Heels make it easy to go over; riot gear's wide stance and weight, hard.
+  const footing = legs * fighter.body.gear.balance;
+  if (knock > WORLD.balance.speed * footing || outside > WORLD.balance.reach * legLength * footing) {
     fighter.knock = [0, 0, 0];
     fighter.state = 'down';
     fighter.punch = null;
@@ -815,10 +818,12 @@ function moveRoot(world, fighter, dt) {
   // A sidestep (+ to the left), slower than stepping in or out.
   const left = yawRotate([0, 0, 1], fighter.yaw);
   const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare;
-  const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs];
+  // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
+  const gear = fighter.body.gear;
+  const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
-  const limit = WORLD.footAcceleration * legs * (fighter.rush ? 1.6 : 1) * dt;
+  const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : 1) * dt;
   const scale = size > limit ? limit / size : 1;
   fighter.rootVelocity[0] += change[0] * scale;
   fighter.rootVelocity[1] += change[1] * scale;
@@ -1321,6 +1326,17 @@ function collideGround(fighter, h, arena) {
   }
 }
 
+/**
+ * The share of a strike's harm that reaches the defender: what his gear
+ * stops of this kind of harm (blunt, for fists, feet, knees and elbows),
+ * times what the attacker's own gear lets through (a padded glove less).
+ */
+export function harmShare(attacker, defender, spec) {
+  const kind = spec.damageType ?? 'blunt';
+  const limb = spec.limb.endsWith('Hand') ? 'hand' : 'foot';
+  return (1 - (defender.body.gear.protection[kind] ?? 0)) * (attacker.body.gear.damageDealt[limb] ?? 1);
+}
+
 /** Whether the attacker is outside the defender's field of view. */
 function blindside(defender, attacker) {
   const facing = yawRotate([1, 0, 0], defender.yaw);
@@ -1638,7 +1654,9 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const blocked = BLOCKING.has(capsule.key) || checked;
   const technique = attacker.body.technique;
   const limbs = attacker.body.limbKg;
-  const strikeMass = ((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1);
+  // Heavy boots put weight behind a kick or a knee.
+  const kicking = /Foot|Knee/.test(spec.limb);
+  const strikeMass = ((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1);
   const struckMass = capsule.key === 'head' ? body.headEffectiveMass
     : capsule.key === 'trunk' ? body.massKg * 0.35
       : onLeg ? body.segments[capsule.key].mass + body.massKg * (capsule.key.includes('Thigh') ? 0.12 : 0.06)
@@ -1660,12 +1678,16 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
     point: contactPoint, normal,
   };
   if (checked) event.effects.push('checked');
-  addDamage(defender, capsule.key, impulse / struckMass, blocked);
+  // Harm, apart from physics: what the defender wears takes some of it, and
+  // a padded glove gives less. The impulse and the knockback are untouched.
+  const harm = harmShare(attacker, defender, spec);
+  event.harm = harm;
+  addDamage(defender, capsule.key, (impulse / struckMass) * harm, blocked);
   if (blocked) {
     attacker.stats.blocked += 1;
     event.headDeltaV = BLOCKING.has(capsule.key) ? (impulse * 0.12) / body.headEffectiveMass : 0;
     // Kicking into a checked shin hurts the kicker's shin.
-    if (checked) attacker.legDamage[side] += (impulse * 0.5) / limbs[`${side}Leg`];
+    if (checked) attacker.legDamage[side] += ((impulse * 0.5) / limbs[`${side}Leg`]) * (1 - attacker.body.gear.protection.blunt);
   } else {
     attacker.stats.landed += 1;
     if (capsule.key === 'head') {
@@ -1678,20 +1700,22 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
         event.headDeltaV *= WORLD.blindsideFactor;
         event.effects.push('blindsided');
       }
+      event.harmDeltaV = event.headDeltaV * harm;
       applyHeadDamage(world, defender, event);
       knockOff(world, defender, event);
-      if ((spec.cuts && peakForce > 1800) || (spec.limb.endsWith('Hand') && peakForce > fists.cutForce)) {
+      const cutting = peakForce * (1 - defender.body.gear.protection.cut);
+      if ((spec.cuts && cutting > 1800) || (spec.limb.endsWith('Hand') && cutting > fists.cutForce)) {
         defender.cuts = (defender.cuts ?? 0) + 1;
         event.effects.push('cut opened');
       }
-      if (peakForce > body.fracture.face && !defender.injuries.some((injury) => injury.kind === 'face')) {
+      if (peakForce * harm > body.fracture.face && !defender.injuries.some((injury) => injury.kind === 'face')) {
         defender.injuries.push({ kind: 'face', time: world.time });
         event.effects.push('facial fracture');
       }
     } else if (capsule.key === 'trunk') {
-      defender.stamina = Math.max(0, defender.stamina - (impulse / (body.massKg * 0.6)) / body.aerobic);
+      defender.stamina = Math.max(0, defender.stamina - ((impulse / (body.massKg * 0.6)) / body.aerobic) * harm);
       event.effects.push(spec.push ? 'pushed back' : 'body: wind taken');
-      if (peakForce > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
+      if (peakForce * harm > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
         defender.injuries.push({ kind: 'rib', time: world.time });
         event.effects.push('rib fracture');
       }
@@ -1699,7 +1723,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
       const legSide = capsule.key[0];
       // The defender's own leg takes the blow: its speed change is the damage.
       const before = defender.legDamage[legSide];
-      defender.legDamage[legSide] += impulse / struckMass;
+      defender.legDamage[legSide] += (impulse / struckMass) * harm;
       event.effects.push('leg kicked');
       const buckles = (damage) => (damage < WORLD.legCapacity ? 0 : 1 + Math.floor((damage / WORLD.legCapacity - 1) / WORLD.legGivesAgainEvery));
       if (buckles(defender.legDamage[legSide]) > buckles(before) && defender.state === 'up') {
@@ -1720,7 +1744,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   event.transferred = transferred;
   // Too much for the mass that took it: the whole body is thrown, and out.
   const bodyDeltaV = transferred / body.massKg;
-  if (defender.state === 'up' && bodyDeltaV > WORLD.knockout.bodyDeltaV && !blocked) {
+  if (defender.state === 'up' && bodyDeltaV * harm > WORLD.knockout.bodyDeltaV && !blocked) {
     knockOut(world, defender, event, `knocked out (the blow moved his whole body ${bodyDeltaV.toFixed(1)} m/s)`);
   }
   world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse: transferred, massShare: WORLD.balance.strikeMassShare });
@@ -1762,7 +1786,8 @@ export function deliverImpulse({ fighter, shares, direction, impulse, braced = 0
 
 export function applyHeadDamage(world, defender, event) {
   const body = defender.body;
-  const deltaV = event.headDeltaV;
+  // The harm a helmet lets through, not the head's physical speed change.
+  const deltaV = event.harmDeltaV ?? event.headDeltaV;
   // Brain strain grows faster than linearly with head speed change; small
   // touches add almost nothing, hard shots add a lot.
   defender.concussion += Math.max(0, deltaV - 1.2) ** 2;

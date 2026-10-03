@@ -3,6 +3,7 @@
 // collision radii). Every coefficient is a dial with its source beside it.
 
 import { boneTScore, caloriesForBodyFat, settleComposition, starvation } from './physiology.js';
+import { gearTraits } from './outfits.js';
 
 export const PARTICLES = [
   'head', 'neck', 'lShoulder', 'rShoulder', 'lElbow', 'rElbow', 'lHand', 'rHand',
@@ -147,6 +148,12 @@ export function normaliseInputs(rawInputs) {
     const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
     inputs.calories = Math.round(caloriesForBodyFat(inputs, rawInputs?.bodyFat ?? 0.16, frame.lean));
   }
+  // Street clothes from before outfits: the casual outfit, in their colours.
+  if (rawInputs?.clothing && !rawInputs.outfit) {
+    const { top, topColor, bottomColor } = rawInputs.clothing;
+    inputs.outfit = { kind: 'casual', design: top === 'hoodie' ? 1 : 0, colors: { top: topColor, bottom: bottomColor } };
+  }
+  delete inputs.clothing;
   delete inputs.training;
   delete inputs.bodyFat;
   return inputs;
@@ -223,7 +230,11 @@ export function buildBody(rawInputs) {
   // Neck muscle is what couples the head to the body when it is hit.
   const neckIndex = clamp((ffmi - 15) / 9, 0, 1.4) * muscleQuality;
 
-  const masses = particleMasses(segments, massKg);
+  // What he wears weighs: armour is spread over the body like its own mass,
+  // so it is moved by the same muscles and knocked back with the same body.
+  const gear = gearTraits(inputs);
+  const gearKg = massKg * gear.extraMass;
+  const masses = particleMasses(segments, massKg).map((mass) => mass * (1 + gear.extraMass));
   const force = BODY.forcePerMuscleKg;
   const motorForce = new Array(PARTICLES.length).fill(0);
   // Trained punchers recruit more of their muscle, faster: the larger part of
@@ -261,6 +272,8 @@ export function buildBody(rawInputs) {
   motorForce[P.neck] = trunkForce;
   motorForce[P.pelvis] = allometric(leg('l') + leg('r'), BODY.referenceMuscleKg.leg * 2) * force.leg * 1.5 * muscleQuality;
   motorForce[P.head] = segments.head.tissue.muscle * force.neck * (0.5 + neckIndex);
+  // Armour and tight tailoring keep the limbs from swinging as fast.
+  for (let index = 0; index < topSpeed.length; index += 1) topSpeed[index] *= gear.swing;
   // A motor must at least hold its own particle up, or the fighter sags.
   for (let index = 0; index < motorForce.length; index += 1) motorForce[index] = Math.max(motorForce[index], masses[index] * 9.81 * 2.2);
 
@@ -269,7 +282,7 @@ export function buildBody(rawInputs) {
   const aerobic = clamp(0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15) - 0.008 * yearsAging, 0.15, 1.1);
 
   return {
-    inputs, heightM, massKg, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
+    inputs, heightM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
     lengths, segments, masses, motorForce, strikeForce, topSpeed, aerobic,
     limbKg: {
       lArm: segments.lUpperArm.mass + segments.lForearm.mass + BODY.gloveKg,

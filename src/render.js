@@ -7,9 +7,11 @@
 /* global THREE */
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
-import { buildLoftBody, CLOTHES } from './loftbody.js';
+import { buildLoftBody, TOPS } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
+import { glovedFists } from './outfits.js';
+import { buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -54,8 +56,10 @@ export function createScene(canvas) {
   rim.position.set(-4, 3, -5);
   scene.add(rim);
   const places = { ring: buildRing(), subway: null };
+  // One reflection map for every piece of steel in the scene.
+  const steelEnv = steelEnvironment(renderer);
   scene.add(places.ring);
-  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim }, place: 'ring' };
+  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim }, place: 'ring', steelEnv };
 }
 
 /**
@@ -373,18 +377,21 @@ function paintBody(mesh, body, look, corner) {
   const band = new THREE.Color(0xf4f4f4);
   const top = new THREE.Color(corner).multiplyScalar(0.7);
   if (mesh.regions) {
-    // A lofted body names its kit pieces; paint each its colour.
-    // Street clothes take their colours from the outfit.
-    const clothing = body.inputs.clothing;
-    const shirt = new THREE.Color(clothing?.topColor ?? corner);
-    const pants = new THREE.Color(clothing?.bottomColor ?? corner);
-    const byRegion = {
-      skin, kit: shorts, band, top, shirt, pants,
-      cuff: shirt.clone().multiplyScalar(0.78), cuff2: pants.clone().multiplyScalar(0.7), belt: new THREE.Color(0x2a1d14),
-    };
+    // A lofted body names each garment piece's role; the outfit's design
+    // colours it. Bare skin may carry a tattooed body suit.
+    const dress = dressFor(body.inputs, corner);
+    const byRegion = roleColors(dress, skin);
     const colors = new Float32Array(positions.length);
-    mesh.regions.forEach((region, vertex) => colors.set([byRegion[region].r, byRegion[region].g, byRegion[region].b], vertex * 3));
+    mesh.regions.forEach((region, vertex) => {
+      let color = byRegion[region] ?? skin;
+      if (region === 'skin' && dress.tattoo) {
+        const segment = BONE_SEGMENT[BONES[skinIndex[vertex * 4]]];
+        color = tattooColor([positions[vertex * 3], positions[vertex * 3 + 1] - bindPoints[P.pelvis][1], positions[vertex * 3 + 2]], segment, skin) ?? skin;
+      }
+      colors.set([color.r, color.g, color.b], vertex * 3);
+    });
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
+    mesh.steelMask = mesh.regions.map((region) => region === 'steel' || region === 'steel2');
     return colors;
   }
   const hipY = bindPoints[P.pelvis][1];
@@ -428,16 +435,20 @@ function paintMuscle(mesh) {
 }
 
 /** A skinned mesh over the rig's bones from a built body mesh. */
-function skinnedMesh(built, bones, colors) {
+function skinnedMesh(built, bones, colors, { indices = built.indices, material = null, share = null } = {}) {
+  // A second mesh over the same vertices (the steel) shares the attributes.
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(built.positions, 3));
-  geometry.setAttribute('normal', new THREE.BufferAttribute(built.normals, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(built.skinIndex, 4));
-  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(built.skinWeight, 4));
-  geometry.setIndex(new THREE.BufferAttribute(built.indices, 1));
+  if (share) for (const [name, attribute] of Object.entries(share.attributes)) geometry.setAttribute(name, attribute);
+  else {
+    geometry.setAttribute('position', new THREE.BufferAttribute(built.positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(built.normals, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(built.skinIndex, 4));
+    geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(built.skinWeight, 4));
+  }
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   const inverses = built.bindFrames.map((frame) => new THREE.Matrix4().fromArray(frameMatrix(frame)).invert());
-  const mesh = new THREE.SkinnedMesh(geometry, surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }));
+  const mesh = new THREE.SkinnedMesh(geometry, material ?? surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }));
   mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
   mesh.castShadow = true;
   mesh.frustumCulled = false;
@@ -479,61 +490,86 @@ export function buildFighterView(view, fighter) {
   });
   const built = buildSkin(body, look.bodyStyle ?? BODY_STYLE);
   const baseColors = paintBody(built, body, look, corner);
-  const skinMesh = skinnedMesh(built, bones, baseColors.slice());
+  // Steel is drawn apart, as metal; everything else is the toon body.
+  const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];
+  const triangles = built.indices.length / 3;
+  const bodyIndices = [];
+  const steelIndices = [];
+  for (let triangle = 0; triangle < triangles; triangle += 1) {
+    const target = steelTriangle(triangle) ? steelIndices : bodyIndices;
+    target.push(built.indices[triangle * 3], built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
+  }
+  const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
+  const steel = steelMaterial(view.steelEnv, { skinning: true });
+  let steelMesh = null;
+  if (steelIndices.length) {
+    steelMesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(steelIndices), material: steel, share: skinMesh.geometry });
+    layers.skin.add(steelMesh, outlineFor(steelMesh));
+  }
   // Which body segment each skin vertex belongs to, by its strongest bone.
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   layers.skin.add(skinMesh, skinOutline);
   const shells = [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
 
-  const headView = buildHead(body, look, skinColor, corner);
+  const dress = dressFor(body.inputs, corner);
+  // A design may set the hair (a sumo's topknot).
+  const headView = buildHead(body, dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look, skinColor, corner);
   headView.group.matrixAutoUpdate = false;
   layers.skin.add(headView.group);
   shells.push({ key: 'head', shell: headView.shell });
 
-  // Gloves and shoes ride on the forearm and foot bones.
+  // Hands and feet ride on the forearm and foot bones: gloves, bare fists,
+  // tactical gloves or gauntlets; boots, trainers, heels or sabatons.
   const attachments = [];
   const gloveMaterial = surface(corner, { roughness: 0.32 });
-  const bare = body.inputs.gloves === false;
+  const hands = handKind(body.inputs, glovedFists(body.inputs));
+  const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: roleColors(dress, new THREE.Color(skinColor)).steel });
+  const garmentColors = { ...roleColors(dress, new THREE.Color(skinColor)), accent: dress.feet.accent };
   for (const side of ['l', 'r']) {
-    if (bare) {
-      // A bare fist: knuckles forward, thumb folded across, in skin.
-      const hand = buildBareFist(body, skinColor, side);
+    let hand;
+    if (hands === 'gloved') {
+      hand = new THREE.Group();
+      const fist = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 1.12, 20, 16), gloveMaterial);
+      fist.scale.set(1, 1.15, 0.95);
+      const thumb = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 0.42, 10, 8), gloveMaterial);
+      thumb.position.set(0.045, -0.01, side === 'l' ? -0.04 : 0.04);
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.08, 16), surface(0xf2f2f2));
+      cuff.position.y = -0.09;
+      for (const piece of [fist, thumb, cuff]) {
+        piece.castShadow = true;
+        piece.add(outlineFor(piece, 0.004));
+      }
+      hand.add(fist, thumb, cuff);
       hand.matrixAutoUpdate = false;
-      layers.skin.add(hand);
-      attachments.push({ object: hand, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
-      buildShoe(body, layers, attachments, side, body.inputs.clothing ? 0xe9e9ec : 0x17171c);
-      continue;
-    }
-    const glove = new THREE.Group();
-    const fist = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 1.12, 20, 16), gloveMaterial);
-    fist.scale.set(1, 1.15, 0.95);
-    const thumb = new THREE.Mesh(new THREE.SphereGeometry(WORLD.gloveRadius * 0.42, 10, 8), gloveMaterial);
-    thumb.position.set(0.045, -0.01, side === 'l' ? -0.04 : 0.04);
-    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.08, 16), surface(0xf2f2f2));
-    cuff.position.y = -0.09;
-    for (const piece of [fist, thumb, cuff]) {
-      piece.castShadow = true;
-      piece.add(outlineFor(piece, 0.004));
-    }
-    glove.add(fist, thumb, cuff);
-    glove.matrixAutoUpdate = false;
-    layers.skin.add(glove);
-    attachments.push({ object: glove, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
-    buildShoe(body, layers, attachments, side, 0x17171c);
+    } else hand = buildHand(body, side, hands, skinColor, plainSteel);
+    layers.skin.add(hand);
+    attachments.push({ object: hand, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
+    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, dress.feet.heels && dress.female);
+    layers.skin.add(shoe);
+    attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
   }
 
-  // Worn things: a headset on the head (it can be knocked off), a hoodie's
-  // hood and drawstrings swinging from the collar.
+  // Worn things: headgear (which hides the hair it encloses), a headset
+  // (it can be knocked off), and what swings: a hood, a tie, sumo strings,
+  // a tabard.
+  const headgear = buildHeadgear(body, dress.head, garmentColors, plainSteel, corner);
+  if (headgear) {
+    headView.group.add(headgear.group);
+    if (headgear.hidesHair) headView.hideHair();
+  }
   const dangles = [];
   const headset = (body.inputs.accessories ?? []).includes('headset') ? buildHeadset(body, headView.group) : null;
-  if (body.inputs.clothing?.top === 'hoodie') {
-    const collar = new THREE.Group();
-    collar.matrixAutoUpdate = false;
-    layers.skin.add(collar);
-    attachments.push({ object: collar, bone: BONE.chest, at: P.neck });
-    dangles.push(...buildHood(body, collar, body.inputs.clothing.topColor));
-  }
+  const collar = new THREE.Group();
+  collar.matrixAutoUpdate = false;
+  layers.skin.add(collar);
+  attachments.push({ object: collar, bone: BONE.chest, at: P.neck });
+  const hips = new THREE.Group();
+  hips.matrixAutoUpdate = false;
+  layers.skin.add(hips);
+  attachments.push({ object: hips, bone: BONE.pelvis, at: P.pelvis });
+  if (dress.top?.kind === 'hoodie') dangles.push(...buildHood(body, collar, dress.top.color));
+  dangles.push(...buildSwinging(body, dress, collar, hips, corner));
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig.
   const skeleton = buildSkeleton(body, built.bindFrames);
@@ -574,7 +610,7 @@ export function buildFighterView(view, fighter) {
   view.scene.add(group);
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells,
-    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headset, dangles,
+    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headset, dangles, steelMesh,
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
 }
@@ -600,7 +636,9 @@ function dangleColliders(fighterView, points) {
   const body = fighterView.fighter.body;
   const v = (at) => new THREE.Vector3(...at);
   const head = v(points[P.head]);
-  const cloth = body.inputs.clothing ? CLOTHES[body.inputs.clothing.top]?.loose ?? 1 : 1;
+  // Whatever is worn over the trunk stands off it: hair rests on that.
+  const dress = dressFor(body.inputs, 0);
+  const cloth = Math.max(TOPS[dress.top?.kind]?.loose ?? 1, dress.armor ? 1.2 : 1);
   // The trunk is wider than deep; the capsule is sized to its depth, so hair
   // falling from the back of the head lies on the back (the shoulders have
   // their own capsule).
@@ -614,56 +652,6 @@ function dangleColliders(fighterView, points) {
     { a: pelvis, b: top, radius: trunkRadius },
     { a: v(points[P.lShoulder]), b: v(points[P.rShoulder]), radius: body.segments.lUpperArm.skinRadius * 1.25 * cloth },
   ];
-}
-
-/** A boxing boot or, in street clothes, a trainer: sole along the foot, and the ankle. */
-function buildShoe(body, layers, attachments, side, soleColor) {
-  const shoe = new THREE.Group();
-  const length = 0.25 * body.heightM / 1.8;
-  const sole = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), surface(soleColor, { roughness: 0.4 }));
-  sole.scale.set(0.05, length / 2, 0.045);
-  sole.position.set(-0.012, length * 0.28, 0);
-  const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.07, 14), surface(0xf2f2f2));
-  sock.rotation.z = Math.PI / 2;
-  sock.position.set(0.03, 0.0, 0);
-  for (const piece of [sole, sock]) {
-    piece.castShadow = true;
-    piece.add(outlineFor(piece, 0.004));
-  }
-  shoe.add(sole, sock);
-  shoe.matrixAutoUpdate = false;
-  layers.skin.add(shoe);
-  attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
-}
-
-/**
- * A bare fist, in the forearm's frame at the hand point (y along the
- * forearm): a closed hand as wide as four knuckles, the knuckles leading,
- * the thumb folded across the front of the fingers.
- */
-function buildBareFist(body, skinColor, side) {
-  const scale = body.heightM / 1.8;
-  const material = surface(skinColor);
-  const hand = new THREE.Group();
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), material);
-  palm.scale.set(0.034 * scale, 0.045 * scale, 0.042 * scale);
-  palm.position.y = 0.012 * scale;
-  hand.add(palm);
-  for (let finger = 0; finger < 4; finger += 1) {
-    // Knuckles: a low ridge across the front of the fist, not separate balls.
-    const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.0095 * scale, 10, 8), material);
-    knuckle.position.set(0.008 * scale, 0.045 * scale, (finger - 1.5) * 0.018 * scale);
-    hand.add(knuckle);
-  }
-  const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.011 * scale, 0.012 * scale, 0.045 * scale, 8), material);
-  thumb.rotation.x = Math.PI / 2;
-  thumb.position.set(0.03 * scale, 0.022 * scale, (side === 'l' ? -1 : 1) * 0.004 * scale);
-  hand.add(thumb);
-  for (const piece of hand.children) {
-    piece.castShadow = true;
-    piece.add(outlineFor(piece, 0.003));
-  }
-  return hand;
 }
 
 /**
@@ -755,10 +743,11 @@ export function setLayer(fighterView, layer) {
   layers.physics.visible = layer === 'physics';
   paintSkeleton(fighterView, layer === 'skin');
   // Ghosting: the body goes see-through and drops its ink; the head and kit hide.
-  const material = skinMesh.material;
-  material.transparent = ghost < 1;
-  material.opacity = ghost;
-  material.depthWrite = ghost === 1;
+  for (const mesh of [skinMesh, fighterView.steelMesh].filter(Boolean)) {
+    mesh.material.transparent = ghost < 1;
+    mesh.material.opacity = ghost;
+    mesh.material.depthWrite = ghost === 1;
+  }
   skinMesh.castShadow = ghost === 1;
   skinOutline.visible = ghost === 1;
   head.group.visible = ghost === 1;
@@ -882,16 +871,18 @@ const SKIN_BONE_INSET = 0.87;
  * arms under long sleeves.
  */
 function coveredBones(body) {
-  const inputs = body.inputs;
-  const clothing = inputs.clothing;
-  if (!clothing) {
-    // Shorts cover the pelvis and the top of the thighs; on a wasted body
-    // the knees below them should still show, so the thighs stay visible.
-    const names = ['pelvis', ...(inputs.sex === 'female' ? ['chest'] : []), ...(body.composition.bmi >= 16 ? ['lThigh', 'rThigh'] : [])];
-    return new Set(names.map((name) => BONE[name]));
-  }
-  const names = ['pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle', 'lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShin', 'rShin'];
-  if (clothing.top === 'hoodie') names.push('lForearm', 'rForearm');
+  // Bones under anything worn do not show through it in the skin view; on a
+  // wasted body in shorts the knees below still should, so bare-legged
+  // fighters keep their thighs visible when BMI is low.
+  const dress = dressFor(body.inputs, 0);
+  const names = [];
+  if (dress.bottom) names.push('pelvis');
+  if (dress.top || dress.armor) names.push('pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle');
+  if (TOPS[dress.top?.kind]?.sleeve > 0 || dress.armor) names.push('lUpperArm', 'rUpperArm');
+  if (TOPS[dress.top?.kind]?.sleeve > 1 || dress.armor) names.push('lForearm', 'rForearm');
+  const longLegs = ['tights', 'trackPants', 'pants', 'slacks', 'jeans', 'cargo', 'joggers'].includes(dress.bottom?.kind) || dress.armor;
+  if (longLegs || body.composition.bmi >= 16) names.push('lThigh', 'rThigh');
+  if (longLegs) names.push('lShin', 'rShin');
   return new Set(names.map((name) => BONE[name]));
 }
 

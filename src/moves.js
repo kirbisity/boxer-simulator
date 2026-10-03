@@ -27,6 +27,8 @@ export const MOVES = {
   clinch: { kind: 'clinch', duration: 3, cost: 0.02 },
 };
 
+// Every strike here does blunt harm; a move with an edge or a point would
+// carry `damageType: 'cut'` or `'pierce'`, and armour answers each its own way.
 // Defences, each a timed posture change the physics carries out.
 export const DEFENCES = {
   guard: { seconds: 0.5 }, // gloves tight to the face, elbows in

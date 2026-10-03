@@ -67,11 +67,16 @@ test('fear and confidence: the stronger man presses and covers up less, the weak
 });
 
 test('uneven sides, up to eight a side: everyone fits the floor, team-mates rarely hit each other, nothing breaks', () => {
+  // A rate needs a sample: three short crowd fights of each shape, pooled.
   for (const [red, blue] of [[1, 5], [8, 3]]) {
-    const tally = crowdBout(red, blue, { seconds: 30, seed: 2 });
-    assert.equal(tally.broken, 0, `${red} v ${blue}`);
-    assert.ok(tally.friendly <= Math.max(2, tally.landed * 0.05), `${red} v ${blue}: ${tally.friendly} of ${tally.landed} landed blows on a team-mate`);
-    assert.ok(tally.pops / tally.fighterMinutes < 0.5, `${red} v ${blue}: pops`);
+    const total = { broken: 0, friendly: 0, landed: 0, pops: 0, fighterMinutes: 0 };
+    for (const seed of [2, 3, 4]) {
+      const tally = crowdBout(red, blue, { seconds: 30, seed });
+      for (const key of Object.keys(total)) total[key] += tally[key];
+    }
+    assert.equal(total.broken, 0, `${red} v ${blue}`);
+    assert.ok(total.friendly <= total.landed * 0.05, `${red} v ${blue}: ${total.friendly} of ${total.landed} landed blows on a team-mate`);
+    assert.ok(total.pops / total.fighterMinutes < 0.5, `${red} v ${blue}: pops`);
   }
 });
 

@@ -233,7 +233,9 @@ export function starvation(inputs, bodyFat) {
  * @param body  from buildBody
  */
 export function deriveStats(body) {
-  const { inputs, segments, massKg, fatKg, tScore, composition } = body;
+  const { inputs, segments, fatKg, tScore, composition } = body;
+  // The man, not his armour.
+  const massKg = body.bodyMassKg ?? body.massKg;
   const exercise = inputs.exercise;
   const recruitment = 0.55 + 0.55 * exercise;
   const starving = starvation(inputs, composition.bodyFat);
