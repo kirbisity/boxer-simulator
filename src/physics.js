@@ -16,6 +16,7 @@ export const WORLD = {
   // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
   ringHalf: 2.85,
   gloveRadius: 0.065,
+  contactStep: 0.012, // m a strike contact may separate per substep
   // Head movement in range: how far past both reaches it starts (m), how
   // quickly it eases in (/s), its rhythm (Hz), its side-to-side size as a
   // share of height (~8 cm on a 1.8 m boxer) and the knee bend as it crosses.
@@ -1332,8 +1333,10 @@ function collideStriker(world, attacker, defender, striker, time) {
       attacker.contacts.add(contactKey);
       registerImpact(world, attacker, defender, striker, closest, capsule, normal, time);
     }
-    // Separate them, sharing the push by inverse mass.
-    const penetration = reach - distance;
+    // Separate them, sharing the push by inverse mass; a limb that starts a
+    // strike already inside a body is eased out over a few substeps, not
+    // thrown clear in one.
+    const penetration = Math.min(reach - distance, WORLD.contactStep);
     const shares = [
       [attacker, striker.a, striker.a === striker.b ? 1 : 1 - closest.s, 1],
       [attacker, striker.b, striker.a === striker.b ? 0 : closest.s, 1],

@@ -39,6 +39,7 @@ export const AI = {
   strategyMinimum: 6, // s a new plan is kept before hurt or finishing may change it
   // Heavy attacks: extra share when the opponent is hurt and there to be finished.
   finishingHeavy: 0.15,
+  neutralDistance: 1.8, // m kept from an opponent who is down or rising
 };
 
 /**
@@ -140,6 +141,12 @@ export function think(world, fighter, dt) {
   const style = STYLES[fighter.style];
   const plan = chooseStrategy(world, fighter, opponent, dt);
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
+  // A man down or getting up is not hit: stand off at a neutral distance.
+  if (opponent.state !== 'up') {
+    fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
+    fighter.aiCombo = null;
+    return;
+  }
   const kicker = (style.attacks.roundhouse ?? 0) + (style.attacks.teep ?? 0) > 0.15;
   // Spells of pressure: for a few seconds the fighter works inside.
   fighter.aiPressure = Math.max(0, (fighter.aiPressure ?? 0) - dt);
