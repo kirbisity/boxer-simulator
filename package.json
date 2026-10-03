@@ -1,0 +1,13 @@
+{
+  "name": "boxer-simulator",
+  "version": "0.1.0",
+  "description": "Boxer Simulator: fighters built from bone, joint and muscle, fought in a physics simulation",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "bout": "node tools/bout.js",
+    "bundle": "node tools/bundle.js",
+    "serve": "python3 -m http.server 8934 --bind 127.0.0.1"
+  }
+}
