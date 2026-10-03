@@ -39,8 +39,8 @@ for (let bout = 0; bout < bouts; bout += 1) {
     landed += fighter.stats.landed;
   }
   for (const event of world.events) {
-    if (['fell', 'clinch', 'collision'].includes(event.kind)) {
-      const key = event.kind === 'fell' ? `fell: ${event.effects[0]}` : event.kind;
+    if (['fell', 'clinch', 'collision', 'broken'].includes(event.kind)) {
+      const key = event.kind === 'fell' || event.kind === 'broken' ? `${event.kind}: ${event.effects[0]}` : event.kind;
       others[key] = (others[key] ?? 0) + 1;
     }
     if (event.kind !== 'landed' && event.kind !== 'blocked') continue;

@@ -34,7 +34,7 @@ export const WORLD = {
   // response; less when braced), then ramp back to full force. Until then
   // only passive tone holds (the floor): the share of force a relaxed
   // muscle and its tendons still give.
-  reflex: { latency: 0.085, trainedSaving: 0.03, bracedSaving: 0.035, ramp: 0.12, floor: 0.25 },
+  reflex: { latency: 0.095, trainedSaving: 0.03, bracedSaving: 0.035, ramp: 0.14, floor: 0.12 },
   // Per-second velocity damping: joints and tissue lose energy; a limp body
   // less so, which is why it falls rather than sinks.
   damping: { up: 0.8, down: 0.5 },
@@ -45,7 +45,22 @@ export const WORLD = {
   // within this angle of the trunk's axis; elbows and knees cannot fold flat.
   headCone: 1.2,
   minFold: { arm: 0.13, leg: 0.16 },
-  limitStep: 0.004, // m: most a joint limit may correct in one substep
+  // Held firmly: up to this far corrected per substep (more is stable now
+  // that corrections are shared by mass).
+  limitStep: 0.006, // m
+  limitStepLimp: 0.006, // m: firmer corrections inject speed of their own
+  joint: {
+    hipCone: 2.4, // rad from straight down: room for a head kick, not the splits
+    // Forced this far past its range in an instant, a joint breaks.
+    breakAngle: 0.8, // rad past the limit
+    // The neck is braced by the whole shoulder girdle: it takes far more.
+    breakAngles: { neck: 1.5 },
+    straightAllowance: 0.01, // m a hinge may pass straight before it is held
+    // ...held there: rad·s of strain past the break angle before it gives,
+    // and how fast strain leaks away (per s) once the joint is back in range.
+    strainToBreak: 0.05,
+    strainLeak: 6,
+  },
   // Footwork: a planted foot stays put until the stance has drifted this far
   // from it, then steps; one foot at a time.
   step: { threshold: 0.11, seconds: 0.17, lift: 0.05, lead: 0.5 },
@@ -61,6 +76,11 @@ export const WORLD = {
   // peak force ≈ (π/2)·impulse / contact time for a half-sine pulse.
   contactSeconds: 0.011,
   restitution: 0.1,
+  // How much momentum a blow hands to what it hits, as a restitution: higher
+  // than the damage figure above, because the glove and flesh cushion the
+  // tissue's strain more than they cushion the push. Raised for a sharper,
+  // more visible knockback; damage still uses the cushioned figure.
+  transferRestitution: 0.6,
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -76,7 +96,8 @@ export const WORLD = {
   // Balance: pushed past these, a fighter goes over rather than stepping.
   // Speed of the hips (m/s) and their distance outside the feet, as a share
   // of leg length; both scale with how strong the legs are.
-  balance: { speed: 1.6, reach: 0.8, fallSeconds: 1.4, absorbPerSecond: 5 },
+  // The knock speed scales with the transfer above, so the limit does too.
+  balance: { speed: 2.1, reach: 0.8, fallSeconds: 1.4, absorbPerSecond: 5 },
   // Charging: top speed as a multiple of footwork speed, and how much of the
   // trunk's mass meets the other body in a collision.
   rush: { speedFactor: 2.6, trunkShare: 0.7, minClosing: 0.8 },
@@ -86,6 +107,11 @@ export const WORLD = {
   // Leg kicks add up: past this damage (in kicks' impulse, N·s, per kg of
   // leg) the leg gives way.
   legCapacity: 9,
+  // Speed change (m/s, summed over blows) a segment takes before it is
+  // seriously hurt and shows fully red: a face about a dozen hard shots,
+  // a trunk two dozen body shots, a forearm a lot of blocking.
+  damageCapacity: { head: 26, trunk: 16, Forearm: 30, UpperArm: 30, Thigh: 12, Shank: 12 },
+  blockedDamageShare: 0.35,
   downSecondsMin: 3,
   downSecondsRange: 4,
   knockdownsToStop: 3,
@@ -178,6 +204,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     style: STYLES[inputs.style] ? inputs.style : 'boxing',
     punch: null, cooldown: 0, guardHigh: 0, slip: 0, defence: null, rush: null, clinch: null,
     legDamage: { l: 0, r: 0 },
+    // Damage per body segment (0 fresh, 1 seriously hurt), for the record
+    // and for the view; broken joints and the particles they leave limp.
+    damage: {}, damageVersion: 0, broken: new Set(), limp: new Set(),
     // Velocity blows and collisions have put into the trunk, which the legs
     // must absorb; what topples a fighter is this, not their own movement.
     knock: [0, 0, 0],
@@ -477,7 +506,7 @@ export function step(world, dt) {
     for (const fighter of world.fighters) integrate(fighter, h, time);
     for (const fighter of world.fighters) {
       solveConstraints(fighter, h);
-      solveJointLimits(fighter);
+      solveJointLimits(world, fighter);
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
     collideFighters(world, h, time);
@@ -719,6 +748,7 @@ function integrate(fighter, h, time) {
  * uses the force that drives strikes; damaged legs lose some of theirs.
  */
 function motorForceNow(fighter, index, name) {
+  if (fighter.limp.has(index)) return 0;
   const body = fighter.body;
   let force = body.motorForce[index];
   const punch = fighter.punch;
@@ -763,7 +793,11 @@ function solveConstraints(fighter, h) {
 function correctJoint(fighter, index, others, delta) {
   const size = vec.length(delta);
   if (size < 1e-9) return;
-  const capped = size > WORLD.limitStep ? vec.scale(delta, WORLD.limitStep / size) : delta;
+  // A limp body has no kick to protect: its limits hold as firmly as
+  // ligaments do. Upright, they give a little, so a locked-out limb
+  // is not snapped back.
+  const step = fighter.state === 'up' ? WORLD.limitStep : WORLD.limitStepLimp;
+  const capped = size > step ? vec.scale(delta, step / size) : delta;
   const weights = [fighter.invMass[index], ...others.map((other) => fighter.invMass[other] / others.length)];
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   for (let axis = 0; axis < 3; axis += 1) fighter.x[index * 3 + axis] += capped[axis] * (weights[0] / total);
@@ -772,39 +806,133 @@ function correctJoint(fighter, index, others, delta) {
   });
 }
 
-/** Hinges and cones, so a limp body folds the way a body folds. */
-function solveJointLimits(fighter) {
+/**
+ * Hinges and cones, so a body folds the way a body folds. A joint forced well
+ * past its range breaks: from then on it has no limit and its limb no muscle.
+ */
+function solveJointLimits(world, fighter) {
   const pelvis = point(fighter.x, P.pelvis);
   const neck = point(fighter.x, P.neck);
   const trunkUp = vec.normalize(vec.sub(neck, pelvis));
   const across = vec.sub(point(fighter.x, P.lHip), point(fighter.x, P.rHip));
+  const leftward = vec.normalize(vec.sub(point(fighter.x, P.lShoulder), point(fighter.x, P.rShoulder)));
   // Local axes are x forward, y up, z left, so forward = up × left. When the
   // hips are edge-on to the trunk there is no forward to bend towards.
   const forwardRaw = vec.cross(trunkUp, across);
   const hingeDefined = vec.length(forwardRaw) > 0.3 * vec.length(across);
   const forward = vec.normalize(forwardRaw);
+  const L = fighter.body.lengths;
 
   for (const side of ['l', 'r']) {
-    const hip = point(fighter.x, P[`${side}Hip`]);
-    const knee = point(fighter.x, P[`${side}Knee`]);
-    const foot = point(fighter.x, P[`${side}Foot`]);
-    const axis = vec.normalize(vec.sub(foot, hip));
-    const onLine = vec.add(hip, vec.scale(axis, vec.dot(vec.sub(knee, hip), axis)));
-    const bend = vec.dot(vec.sub(knee, onLine), forward);
-    if (hingeDefined && bend < 0.005) correctJoint(fighter, P[`${side}Knee`], [P[`${side}Hip`], P[`${side}Foot`]], vec.scale(forward, 0.005 - bend));
+    const sign = side === 'l' ? 1 : -1;
+    // Knees bend only forward.
+    if (hingeDefined) hinge(world, fighter, `${side}Knee`, P[`${side}Hip`], P[`${side}Knee`], P[`${side}Foot`], forward, L.shank);
+    // Elbows bend only towards their natural side: down, back and out from
+    // the shoulder–hand line, as the guard holds them.
+    const elbowSide = vec.normalize(vec.add(vec.add(vec.scale(forward, -0.4), vec.scale(trunkUp, -1)), vec.scale(leftward, 0.5 * sign)));
+    if (hingeDefined) hinge(world, fighter, `${side}Elbow`, P[`${side}Shoulder`], P[`${side}Elbow`], P[`${side}Hand`], elbowSide, L.forearmToFist);
+    // Hips: the thigh swings within a cone about straight down.
+    cone(world, fighter, `${side}Hip`, P[`${side}Hip`], P[`${side}Knee`], vec.scale(trunkUp, -1), WORLD.joint.hipCone);
     foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], WORLD.minFold.leg);
     foldLimit(fighter, P[`${side}Shoulder`], P[`${side}Hand`], WORLD.minFold.arm);
   }
+  cone(world, fighter, 'neck', P.neck, P.head, trunkUp, WORLD.headCone);
+}
 
-  const head = point(fighter.x, P.head);
-  const offset = vec.sub(head, neck);
+/**
+ * A hinge: the middle joint may not cross the root–end line to the wrong
+ * side. `bendSide` is the side it bends to; `lever` the outer bone's length.
+ */
+function hinge(world, fighter, joint, root, middle, end, bendSide, lever) {
+  if (fighter.broken.has(joint)) return;
+  const a = point(fighter.x, root);
+  const b = point(fighter.x, middle);
+  const c = point(fighter.x, end);
+  const axis = vec.normalize(vec.sub(c, a));
+  const onLine = vec.add(a, vec.scale(axis, vec.dot(vec.sub(b, a), axis)));
+  const bend = vec.dot(vec.sub(b, onLine), bendSide);
+  // Straight is within range (a kick or a punch locks out); only bending
+  // past straight, the wrong way, is held back.
+  const tolerance = -WORLD.joint.straightAllowance;
+  if (bend >= tolerance) return;
+  // The joint bends by about twice the angle its offset makes over one bone.
+  const overAngle = 2 * Math.asin(Math.min(1, (tolerance - bend) / lever));
+  if (strain(world, fighter, joint, overAngle)) return;
+  correctJoint(fighter, middle, [root, end], vec.scale(bendSide, tolerance - bend));
+}
+
+/** A cone: the tip stays within `limit` radians of `axis` about the pivot. */
+function cone(world, fighter, joint, pivot, tip, axis, limit) {
+  if (fighter.broken.has(joint)) return;
+  const origin = point(fighter.x, pivot);
+  const offset = vec.sub(point(fighter.x, tip), origin);
   const length = vec.length(offset);
-  const cos = vec.dot(offset, trunkUp) / length;
-  if (cos < Math.cos(WORLD.headCone)) {
-    const sideways = vec.normalize(vec.sub(offset, vec.scale(trunkUp, vec.dot(offset, trunkUp))));
-    const limited = vec.add(vec.scale(trunkUp, Math.cos(WORLD.headCone) * length), vec.scale(sideways, Math.sin(WORLD.headCone) * length));
-    correctJoint(fighter, P.head, [P.neck], vec.sub(limited, offset));
+  if (length < 1e-9) return;
+  const angle = Math.acos(Math.max(-1, Math.min(1, vec.dot(offset, axis) / length)));
+  if (angle <= limit) return;
+  if (strain(world, fighter, joint, angle - limit)) return;
+  const sideways = vec.normalize(vec.sub(offset, vec.scale(axis, vec.dot(offset, axis))));
+  const limited = vec.add(vec.scale(axis, Math.cos(limit) * length), vec.scale(sideways, Math.sin(limit) * length));
+  correctJoint(fighter, tip, [pivot], vec.sub(limited, offset));
+}
+
+/** How far past its range a joint can be wrenched before it gives. */
+function breakAngleFor(joint) {
+  return WORLD.joint.breakAngles[joint] ?? WORLD.joint.breakAngle;
+}
+
+/**
+ * Strain: angle held past the breaking point, times how long, leaking away.
+ * A joint gives under a sustained overload, not a single substep's spike
+ * (which the limit's own correction can produce). Returns true if it broke.
+ */
+function strain(world, fighter, joint, overAngle) {
+  if (fighter.state === 'rising') return false;
+  const h = world.lastDt / WORLD.substeps;
+  const strains = fighter.strain ?? (fighter.strain = {});
+  const past = Math.max(0, overAngle - breakAngleFor(joint));
+  strains[joint] = (strains[joint] ?? 0) * Math.exp(-WORLD.joint.strainLeak * h) + past * h;
+  if (strains[joint] <= WORLD.joint.strainToBreak) return false;
+  breakJoint(world, fighter, joint);
+  return true;
+}
+
+// What hangs off each joint: the particles whose muscles die with it.
+const LIMP_BELOW = {
+  lElbow: ['lHand'], rElbow: ['rHand'],
+  lKnee: ['lFoot'], rKnee: ['rFoot'],
+  lHip: ['lKnee', 'lFoot'], rHip: ['rKnee', 'rFoot'],
+  neck: ['head'],
+};
+
+/** A joint gives: no more limit, no more muscle below it; a leg or neck ends the fight. */
+function breakJoint(world, fighter, joint) {
+  fighter.broken.add(joint);
+  for (const name of LIMP_BELOW[joint]) fighter.limp.add(P[name]);
+  fighter.damage[JOINT_SEGMENTS[joint][0]] = Math.max(fighter.damage[JOINT_SEGMENTS[joint][0]] ?? 0, 1);
+  const ending = !joint.endsWith('Elbow');
+  const event = { time: world.time, kind: 'broken', fighter: fighter.id, joint, effects: [`${jointName(joint)} broken${ending ? ' — cannot continue' : ''}`] };
+  world.events.push(event);
+  fighter.damageVersion += 1;
+  if (ending) {
+    fighter.state = 'down';
+    fighter.punch = null;
+    fighter.rush = null;
+    fighter.clinch = null;
+    fighter.knockdowns = Math.max(fighter.knockdowns, WORLD.knockdownsToStop);
+    fighter.downTimer = Math.min(fighter.downTimer || Infinity, 2);
   }
+}
+
+export const JOINT_SEGMENTS = {
+  lElbow: ['lForearm', 'lUpperArm'], rElbow: ['rForearm', 'rUpperArm'],
+  lKnee: ['lShank', 'lThigh'], rKnee: ['rShank', 'rThigh'],
+  lHip: ['lThigh'], rHip: ['rThigh'], neck: ['head'],
+};
+
+function jointName(joint) {
+  const side = joint[0] === 'l' ? 'left ' : joint[0] === 'r' ? 'right ' : '';
+  return side + joint.replace(/^[lr](?=[A-Z])/, '').toLowerCase();
 }
 
 function foldLimit(fighter, rootIndex, endIndex, minimum) {
@@ -821,6 +949,9 @@ function collideGround(fighter, h) {
     const floor = fighter.radius[index];
     if (fighter.x[base + 1] < floor) {
       fighter.x[base + 1] = floor;
+      // Flesh on canvas does not bounce: the push out of the floor must not
+      // turn into upward speed, or a falling body springs back up.
+      fighter.prev[base + 1] = Math.max(fighter.prev[base + 1], floor);
       fighter.x[base] = fighter.prev[base] + (fighter.x[base] - fighter.prev[base]) * friction;
       fighter.x[base + 2] = fighter.prev[base + 2] + (fighter.x[base + 2] - fighter.prev[base + 2]) * friction;
     }
@@ -1017,7 +1148,7 @@ function collideBodies(world, first, second, normal) {
   charger.rush.t = Math.max(charger.rush.t, charger.rush.duration - 0.15);
   const m1 = first.body.massKg * WORLD.rush.trunkShare;
   const m2 = second.body.massKg * WORLD.rush.trunkShare;
-  const impulse = ((m1 * m2) / (m1 + m2)) * closing * (1 + WORLD.restitution);
+  const impulse = ((m1 * m2) / (m1 + m2)) * closing * (1 + WORLD.transferRestitution);
   const everywhere = TRUNK_PARTICLES.map((index) => [index, 1]);
   // The charger meant to be moving: the impulse that only cancels his own
   // run is braking, not a knock. Only what goes beyond it can topple him.
@@ -1082,6 +1213,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
     point: contactPoint, normal,
   };
   if (checked) event.effects.push('checked');
+  addDamage(defender, capsule.key, impulse / struckMass, blocked);
   if (blocked) {
     attacker.stats.blocked += 1;
     event.headDeltaV = BLOCKING.has(capsule.key) ? (impulse * 0.12) / body.headEffectiveMass : 0;
@@ -1127,9 +1259,11 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   // limb takes it back. Both sides' muscles there are caught off guard for a
   // reflex delay, so the part flies before it is caught.
   const struck = struckParticles(defender, capsule, closest, contactPoint, spec.push);
-  world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse });
+  const transferred = (impulse * (1 + WORLD.transferRestitution)) / (1 + WORLD.restitution);
+  event.transferred = transferred;
+  world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse: transferred });
   const limbKind = spec.limb.slice(1);
-  world.pendingImpulses.push({ fighter: attacker, shares: RECOIL[limbKind].map(([part, share]) => [P[`${side}${part}`], share]), direction: normal, impulse });
+  world.pendingImpulses.push({ fighter: attacker, shares: RECOIL[limbKind].map(([part, share]) => [P[`${side}${part}`], share]), direction: normal, impulse: transferred });
   for (const [index, share] of struck) if (share > 0.2) defender.hitAt[index] = time;
   if (capsule.key === 'head') defender.hitAt[P.neck] = time;
   world.events.push(event);
@@ -1173,6 +1307,18 @@ function applyHeadDamage(world, defender, event) {
   if (defender.state === 'up' && (deltaV > body.chin || defender.concussion > capacity)) {
     knockDown(world, defender, event, deltaV > body.chin ? 'knockdown (one clean shot)' : 'knockdown (accumulated)');
   }
+}
+
+/**
+ * Damage to a body segment, 0 to 1: the speed each blow gave it, summed
+ * against what that tissue takes before it is seriously hurt. Blocked blows
+ * count for a little. The view reddens a segment as this rises.
+ */
+function addDamage(fighter, key, deltaV, blocked) {
+  const capacity = WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20;
+  const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
+  fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
+  fighter.damageVersion += 1;
 }
 
 /** Down, counted: the muscles let go and the count begins. */

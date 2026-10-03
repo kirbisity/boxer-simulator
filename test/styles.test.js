@@ -67,7 +67,9 @@ test('a charge is a collision of masses: the heavy man drives the light one back
   const intoLight = charge('heavy', 'light');
   const intoHeavy = charge('light', 'heavy');
   assert.ok(intoLight.hit && intoHeavy.hit);
-  assert.ok(intoLight.knock.target > intoHeavy.knock.target * 1.3, `light man knocked ${intoLight.knock.target.toFixed(2)} m/s, heavyweight ${intoHeavy.knock.target.toFixed(2)}`);
+  // Knocked over counts as the strongest knock of all.
+  const lightKnock = intoLight.target.state === 'down' ? Infinity : intoLight.knock.target;
+  assert.ok(lightKnock > intoHeavy.knock.target * 1.3, `light man knocked ${intoLight.target.state === 'down' ? 'over' : `${lightKnock.toFixed(2)} m/s`}, heavyweight ${intoHeavy.knock.target.toFixed(2)} m/s`);
   assert.equal(intoHeavy.target.state, 'up', 'the heavyweight stays up');
   assert.equal(intoLight.charger.state, 'up', 'and a charger who meant to run into a man stays on his feet');
 });

@@ -10,7 +10,7 @@ import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { buildHead } from './face.js';
-import { capsules, capsuleEnds, point, WORLD } from './physics.js';
+import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, boneFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, surface } from './toon.js';
@@ -135,12 +135,14 @@ function paintBody(mesh, body, look, corner) {
     const byRegion = { skin, kit: shorts, band, top };
     const colors = new Float32Array(positions.length);
     mesh.regions.forEach((region, vertex) => colors.set([byRegion[region].r, byRegion[region].g, byRegion[region].b], vertex * 3));
+    mesh.skinMask = mesh.regions.map((region) => region === 'skin');
     return colors;
   }
   const hipY = bindPoints[P.pelvis][1];
   const trunk = body.lengths.trunk;
   const legReach = body.lengths.hipSpan / 2 + body.segments.lThigh.skinRadius * 1.7;
   const colors = new Float32Array(positions.length);
+  const skinMask = [];
   for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
     const y = positions[vertex * 3 + 1];
     const z = positions[vertex * 3 + 2];
@@ -151,7 +153,9 @@ function paintBody(mesh, body, look, corner) {
     }
     if (!onArm && body.inputs.sex === 'female' && y > hipY + trunk * 0.56 && y < hipY + trunk * 0.9) color = top;
     colors.set([color.r, color.g, color.b], vertex * 3);
+    skinMask.push(color === skin);
   }
+  mesh.skinMask = skinMask;
   return colors;
 }
 
@@ -225,7 +229,10 @@ export function buildFighterView(view, fighter) {
     return bone;
   });
   const built = buildSkin(body, look.bodyStyle ?? BODY_STYLE);
-  const skinMesh = skinnedMesh(built, bones, paintBody(built, body, look, corner));
+  const baseColors = paintBody(built, body, look, corner);
+  const skinMesh = skinnedMesh(built, bones, baseColors.slice());
+  // Which body segment each skin vertex belongs to, by its strongest bone.
+  const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   layers.skin.add(skinMesh, skinOutline);
   const shells = [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
@@ -312,6 +319,7 @@ export function buildFighterView(view, fighter) {
   view.scene.add(group);
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells,
+    baseColors, vertexSegment, damageVersion: -1,
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
 }
@@ -375,6 +383,7 @@ export function updateFighterView(fighterView, dt, time) {
     object.matrix.fromArray(frameMatrix({ ...frames[bone], origin: points[at] }));
     object.matrixWorldNeedsUpdate = true;
   }
+  if (fighter.damageVersion !== fighterView.damageVersion) paintDamage(fighterView);
   const step = Math.min(dt, 1 / 30);
   for (const entry of fighterView.shells) entry.shell.update(step);
   fighterView.head.update(step, fighter, time);
@@ -413,6 +422,47 @@ function updatePhysicsLayer(fighterView) {
     mesh.scale.set(1, axis.length(), 1);
   }
   for (const { index, mesh } of fighterView.gloveSpheres) mesh.position.copy(v3(point(fighter.x, index)));
+}
+
+// Rig bones to the physics' body segments, for damage.
+const BONE_SEGMENT = {
+  pelvis: 'trunk', spine: 'trunk', chest: 'trunk', neck: 'head', head: 'head',
+  lClavicle: 'trunk', rClavicle: 'trunk', lUpperArm: 'lUpperArm', rUpperArm: 'rUpperArm', lForearm: 'lForearm', rForearm: 'rForearm',
+  lThigh: 'lThigh', rThigh: 'rThigh', lShin: 'lShank', rShin: 'rShank', lFoot: 'lShank', rFoot: 'rShank',
+};
+const JOINT_BONES = {
+  lElbow: ['lUpperArm', 'lForearm'], rElbow: ['rUpperArm', 'rForearm'], lKnee: ['lThigh', 'lShin'], rKnee: ['rThigh', 'rShin'],
+  lHip: ['lThigh'], rHip: ['rThigh'], neck: ['neck', 'head'],
+};
+const BRUISE = new THREE.Color(0xa3121c);
+const BROKEN = new THREE.Color(0xe01b1b);
+
+/**
+ * Skin reddens with each segment's damage; a broken joint turns its limb
+ * fully red, on the skin and in the skeleton.
+ */
+function paintDamage(fighterView) {
+  const fighter = fighterView.fighter;
+  fighterView.damageVersion = fighter.damageVersion;
+  const brokenSegments = new Set([...fighter.broken].flatMap((joint) => JOINT_SEGMENTS[joint]));
+  const colors = fighterView.skinMesh.geometry.attributes.color;
+  const base = fighterView.baseColors;
+  const mixed = new THREE.Color();
+  fighterView.vertexSegment.forEach((segment, vertex) => {
+    if (!segment) return;
+    mixed.setRGB(base[vertex * 3], base[vertex * 3 + 1], base[vertex * 3 + 2]);
+    if (brokenSegments.has(segment)) mixed.copy(BROKEN);
+    else mixed.lerp(BRUISE, Math.min(1, fighter.damage[segment] ?? 0) * 0.85);
+    colors.setXYZ(vertex, mixed.r, mixed.g, mixed.b);
+  });
+  colors.needsUpdate = true;
+  for (const joint of fighter.broken) {
+    for (const bone of JOINT_BONES[joint]) {
+      fighterView.skeleton[BONE[bone]].traverse((object) => {
+        if (object.isMesh && !object.userData.outline) object.material = fighterView.brokenBone ?? (fighterView.brokenBone = surface(0xe01b1b));
+      });
+    }
+  }
 }
 
 /** Show an impact: dent the struck flesh and throw a spray of sweat. */

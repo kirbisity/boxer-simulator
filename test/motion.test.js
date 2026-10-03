@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
+import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, deliverImpulse, hitParticle, placeFighter, point, WORLD } from '../src/physics.js';
-import { vec } from '../src/pose.js';
+import { twoBoneIK, vec } from '../src/pose.js';
 
 function alone(inputs, seed = 3) {
   const world = createWorld([inputs, PRESETS.light], { seed });
@@ -92,7 +93,7 @@ test('a knocked-out body folds like a body: knees forward, head within its cone'
   assert.ok(point(fighter.x, P.head)[1] < 0.5, 'it went down');
   // Landing can force a knee back for a frame; the limit then restores it.
   assert.ok(worstKnee > -0.08, `knees bent backwards at most briefly (${worstKnee.toFixed(3)} m)`);
-  assert.ok(settledKnee > -0.005, `and not at all once lying still (${settledKnee.toFixed(3)} m)`);
+  assert.ok(settledKnee > -(WORLD.joint.straightAllowance + 0.005), `and no further than straight once lying still (${settledKnee.toFixed(3)} m)`);
   assert.ok(worstHead < WORLD.headCone + 0.1, `head stayed within its cone (${worstHead.toFixed(2)} rad)`);
 });
 
@@ -143,4 +144,71 @@ test('a fighter at rest is never still: it bounces and sways, and replays the sa
   assert.ok(range(0) > 0.02 && range(1) > 0.01 && range(2) > 0.02, 'the head moves on every axis');
   assert.ok(range(0) < 0.15 && range(2) < 0.15, 'but stays a guard, not a dance');
   assert.deepEqual(trace().at(-1), heads.at(-1));
+});
+
+test('a blow hands over more momentum than the cushioned damage figure: a sharper knockback', () => {
+  const world = createWorld([PRESETS.heavy, PRESETS.amateur], { seed: 11 });
+  let hit = null;
+  for (let second = 0; second < 60 && !hit; second += 1) {
+    advance(world, 1, (current, dt) => thinkAll(current, dt));
+    hit = world.events.find((event) => event.kind === 'landed');
+  }
+  assert.ok(hit, 'a blow landed');
+  assert.ok(hit.transferred > hit.impulse * 1.3, `${hit.transferred.toFixed(1)} N·s pushed vs ${hit.impulse.toFixed(1)} N·s of damage`);
+});
+
+/** Hold the left knee bent backwards by `angle`, foot planted, for `seconds`. */
+function holdKneeBackwards(angle, seconds) {
+  const { world, fighter } = alone(PRESETS.amateur);
+  fighter.state = 'down';
+  fighter.downTimer = 99;
+  const L = fighter.body.lengths;
+  const forward = vec.normalize(vec.cross(vec.normalize(vec.sub(point(fighter.x, P.neck), point(fighter.x, P.pelvis))), vec.sub(point(fighter.x, P.lHip), point(fighter.x, P.rHip))));
+  const hip = point(fighter.x, P.lHip);
+  const down = vec.normalize(vec.sub(point(fighter.x, P.lFoot), hip));
+  const reach = Math.sqrt(L.thigh ** 2 + L.shank ** 2 - 2 * L.thigh * L.shank * Math.cos(Math.PI - angle));
+  const foot = vec.add(hip, vec.scale(down, reach));
+  const knee = twoBoneIK(hip, foot, L.thigh, L.shank, vec.scale(forward, -1));
+  // Something heavy forces it there and keeps it there.
+  for (let frame = 0; frame < Math.round(seconds * 60); frame += 1) {
+    for (const array of [fighter.x, fighter.prev]) {
+      array.set(hip, P.lHip * 3);
+      array.set(knee, P.lKnee * 3);
+      array.set(foot, P.lFoot * 3);
+    }
+    advance(world, 1 / 60);
+  }
+  advance(world, 0.3);
+  return { world, fighter };
+}
+
+test('a joint forced well past its range and held there breaks: the limb goes limp and stays that way', () => {
+  const { world, fighter } = holdKneeBackwards(2.6, 0.8);
+  assert.ok(fighter.broken.has('lKnee'), 'the knee gave');
+  assert.ok(fighter.limp.has(P.lFoot), 'the shin hangs');
+  assert.ok(world.events.some((event) => event.kind === 'broken' && event.joint === 'lKnee'));
+  assert.equal(fighter.damage.lShank, 1, 'shown as fully hurt');
+  assert.ok(fighter.knockdowns >= WORLD.knockdownsToStop, 'a broken knee ends the fight');
+});
+
+test('a single jolt past the range, gone the next instant, does not break it', () => {
+  const { fighter } = holdKneeBackwards(2.6, 1 / 60);
+  assert.equal(fighter.broken.has('lKnee'), false);
+});
+
+test('a slow, steady pull bends a joint but never breaks it', () => {
+  const { world, fighter } = alone(PRESETS.amateur);
+  for (let frame = 0; frame < 120; frame += 1) {
+    fighter.v[P.lKnee * 3] -= 0.05;
+    advance(world, 1 / 60);
+  }
+  assert.equal(fighter.broken.size, 0);
+});
+
+test('damage builds per body part with each blow and stops at seriously hurt', () => {
+  const world = createWorld([PRESETS.heavy, PRESETS.amateur], { seed: 11 });
+  advance(world, 90, (current, dt) => thinkAll(current, dt));
+  const damage = world.fighters[1].damage;
+  assert.ok(Object.keys(damage).length > 0 && Object.values(damage).every((value) => value > 0 && value <= 1));
+  assert.ok((damage.head ?? 0) + (damage.trunk ?? 0) > 0.3, 'what was hit most shows most');
 });
