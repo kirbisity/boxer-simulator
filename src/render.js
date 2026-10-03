@@ -10,8 +10,8 @@ import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
-import { glovedFists } from './outfits.js';
-import { buildBackPrint, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor } from './wardrobe.js';
+import { glovedFists, headgearOptions } from './outfits.js';
+import { buildBackPrint, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -761,7 +761,15 @@ export function buildFighterView(view, fighter) {
     if (headgear.hidesHair) headView.hideHair();
   }
   const dangles = [];
-  const headset = (body.inputs.accessories ?? []).includes('headset') ? buildHeadset(body, headView.group) : null;
+  // Headgear: worn on the head, and a loose copy for when it is knocked off.
+  const allowed = headgearOptions(dress.kind);
+  const headProps = (body.inputs.accessories ?? []).filter((kind) => allowed.includes(kind)).map((kind) => {
+    const make = () => (kind === 'headset' ? headsetMesh(body) : buildHeadProp(kind, body, dress, garmentColors, plainSteel, corner));
+    const worn = make();
+    if (!worn) return null;
+    headView.group.add(worn);
+    return { kind, worn, loose: make() };
+  }).filter(Boolean);
   const collar = new THREE.Group();
   collar.matrixAutoUpdate = false;
   layers.skin.add(collar);
@@ -813,7 +821,7 @@ export function buildFighterView(view, fighter) {
   view.scene.add(group);
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
-    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headset, dangles, steelMesh,
+    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh,
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
 }
@@ -829,7 +837,7 @@ function ensureMuscle(fighterView) {
 
 export function disposeFighterView(view, fighterView) {
   view.scene.remove(fighterView.group);
-  if (fighterView.headset?.loose.parent) view.scene.remove(fighterView.headset.loose);
+  for (const prop of fighterView.headProps ?? []) if (prop.loose.parent) view.scene.remove(prop.loose);
   fighterView.group.traverse((object) => {
     object.geometry?.dispose();
   });
@@ -862,11 +870,11 @@ function dangleColliders(fighterView, points) {
  * each ear. Returned so the view can hide it once it is knocked off, along
  * with a loose copy for the floor.
  */
-function buildHeadset(body, headGroup) {
+function headsetMesh(body) {
   const r = body.lengths.headRadius;
   const shell = surface(0x1b1c22, { roughness: 0.35 });
   const accent = surface(0xd6402e, { roughness: 0.4 });
-  const make = () => {
+  {
     const set = new THREE.Group();
     const band = new THREE.Mesh(new THREE.TorusGeometry(1.02 * r, 0.06 * r, 8, 28, Math.PI), shell);
     band.rotation.y = Math.PI / 2;
@@ -885,10 +893,7 @@ function buildHeadset(body, headGroup) {
       piece.add(outlineFor(piece, 0.003));
     }
     return set;
-  };
-  const worn = make();
-  headGroup.add(worn);
-  return { worn, loose: make() };
+  }
 }
 
 /**
@@ -1137,16 +1142,16 @@ function paintSkeleton(fighterView, asSkin) {
 export function updateProps(view, fighterViews, world) {
   for (const prop of world.props ?? []) {
     const owner = fighterViews.find((entry) => entry.fighter.id === prop.owner);
-    const headset = owner?.headset;
-    if (!headset) continue;
-    headset.worn.visible = prop.attached && owner.layers.skin.visible;
+    const worn = owner?.headProps?.find((entry) => entry.kind === prop.kind);
+    if (!worn) continue;
+    worn.worn.visible = prop.attached && owner.layers.skin.visible && !owner.headDetached;
     if (prop.attached) continue;
-    if (!headset.loose.parent) {
-      headset.loose.scale.setScalar(HEAD_SCALE);
-      view.scene.add(headset.loose);
+    if (!worn.loose.parent) {
+      worn.loose.scale.setScalar(HEAD_SCALE);
+      view.scene.add(worn.loose);
     }
-    headset.loose.position.set(...prop.x);
-    headset.loose.rotation.set(...prop.turn);
+    worn.loose.position.set(...prop.x);
+    worn.loose.rotation.set(...prop.turn);
   }
 }
 

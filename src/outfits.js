@@ -45,6 +45,7 @@ export const OUTFITS = {
   },
   sports: {
     label: 'Sports', movement: 'excellent', fists: 'bare',
+    headgear: ['cap'],
     palette: [['sky', 'black'], ['red', 'black'], ['green', 'charcoal'], ['yellow', 'navy'], ['white', 'black'], ['black', 'grey']],
     designs: [
       { label: 'Running', top: { kind: 'tank', color: '#2f7fd8' }, bottom: { kind: 'splitShorts', color: '#1c1c22' }, feet: { kind: 'trainer', color: '#f4f4f6', accent: '#ff6a2a' } },
@@ -59,6 +60,7 @@ export const OUTFITS = {
   },
   hiking: {
     label: 'Hiking', movement: 'good', fists: 'bare',
+    headgear: ['boonie'],
     palette: [['orange', 'olive'], ['forest', 'brown'], ['sky', 'slate'], ['red', 'charcoal'], ['yellow', 'olive']],
     // A heavy-soled boot puts weight behind a kick.
     kick: 1.1,
@@ -88,6 +90,7 @@ export const OUTFITS = {
   },
   yakuza: {
     label: 'Yakuza', movement: 'good', fists: 'bare', kick: 1.1,
+    headgear: ['hat'],
     palette: [[null, 'black'], [null, 'charcoal'], [null, 'white'], [null, 'navy']],
     designs: [
       { label: 'Bare back', tattoo: 'full', bottom: { kind: 'slacks', color: '#16161a' }, feet: { kind: 'compactBoot', color: '#0e0e10' }, top: { kind: 'sportsBra', color: '#16161a', female: true } },
@@ -104,6 +107,7 @@ export const OUTFITS = {
   },
   knight: {
     label: 'Knight armour', movement: 'limited', fists: 'gauntlet',
+    headgear: ['plume'],
     palette: [['brown', 'brown'], ['wine', 'black'], ['navy', 'charcoal'], ['forest', 'brown']],
     extraMass: 0.5,
     // Plate against blunt force spreads it; against an edge it is proof,
@@ -119,6 +123,8 @@ export const OUTFITS = {
   // against most cuts, good against points; lighter than plate.
   samurai: {
     label: 'Samurai armour', movement: 'good', fists: 'bare',
+    headgear: ['crest'],
+    defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     extraMass: 0.4,
     protection: { blunt: 0.7, cut: 0.9, pierce: 0.8 },
@@ -143,6 +149,7 @@ export const OUTFITS = {
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
   commoner: {
     label: 'Commoner', movement: 'good', fists: 'bare',
+    headgear: ['headWrap'],
     palette: [['undyed', 'brown'], ['linen', 'slate'], ['rust', 'brown'], ['forest', 'undyed'], ['ochre', 'brown'], ['slate', 'undyed'], ['brown', 'grey']],
     designs: [
       { label: 'Tunic and hose', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#6a4a30', skirt: true }, feet: { kind: 'bare' } },
@@ -151,6 +158,35 @@ export const OUTFITS = {
 };
 
 export const OUTFIT_KEYS = Object.keys(OUTFITS);
+
+/**
+ * Headgear and head decoration, one at a time, knocked off by a blow that
+ * moves the head at least `knock` m/s (a headset by any clean shot; a crest
+ * or plume fixed to a helmet only by a heavy one); `falls`: it comes off
+ * when he goes down.
+ */
+export const HEADGEAR = {
+  headset: { label: 'Headset', knock: 0, falls: true, icon: '🎧' },
+  cap: { label: "Runner's cap", knock: 1.4, falls: true, icon: '🧢' },
+  boonie: { label: 'Boonie hat', knock: 1.1, falls: true, icon: '👒' },
+  hat: { label: 'Hat', knock: 1.1, falls: true, icon: '🎩' },
+  headWrap: { label: 'Head wrap', knock: 2.2, falls: false, icon: '🧣' },
+  plume: { label: 'Plume', knock: 2.4, falls: false, icon: '🪶' },
+  crest: { label: 'Crest', knock: 2.8, falls: false, icon: '🌙' },
+};
+
+/** What can be worn on the head with this outfit: a headset unless there is a helmet, and its own. */
+export function headgearOptions(kind) {
+  const outfit = OUTFITS[kind] ?? OUTFITS.boxing;
+  const helmet = outfit.designs.some((design) => design.head);
+  return ['none', ...(helmet ? [] : ['headset']), ...(outfit.headgear ?? [])];
+}
+
+/** What a fighter in this outfit wears on his head to begin with. */
+export function defaultHeadgear(kind) {
+  const first = OUTFITS[kind]?.defaultHeadgear;
+  return first ? [first] : [];
+}
 
 /**
  * Colours for a fighter in this outfit, drawn from the outfit's palette:

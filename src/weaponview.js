@@ -43,10 +43,10 @@ function bladeGeometry(from, length, width, thickness, tip, curve = 0) {
     const y = from + u * length;
     const toPoint = Math.max(0, (y - (from + length - tip)) / tip);
     const taper = ring === rings ? 0 : 1 - toPoint * toPoint * 0.9 - toPoint * 0.1;
-    // The curve (sori) bows the blade back towards its spine (−z), the edge on the outside of the curve.
-    const bow = -curve * Math.sin(u * Math.PI);
-    const tipBack = -curve * 0.6 * u * u;
-    const z = bow + tipBack;
+    // The curve (sori) bows the blade back towards its spine (−z), the edge
+    // on the outside of the curve: a number for the blade alone, or a
+    // function of y for a curve that runs on through the handle.
+    const z = typeof curve === 'function' ? curve(y) : -curve * Math.sin(u * Math.PI) - curve * 0.6 * u * u;
     // Edge (+z), back (−z), and the two flats (±x).
     positions.push(0, y, (width / 2) * taper + z, (thickness / 2) * taper, y, z, 0, y, (-width / 2) * taper * 0.85 + z, (-thickness / 2) * taper, y, z);
   }
@@ -109,13 +109,28 @@ export function buildWeaponMesh(kind, envMap) {
       break;
     }
     case 'katana': {
-      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.032, 0.007, 0.08, 0.05), steel));
-      const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.008, 18), surface(0x2a2420, { roughness: 0.5 }));
-      tsuba.position.y = 0.03;
-      const habaki = cylinder(0.012, 0.012, 0.034, 0.06, brass, 8);
-      const tsuka = cylinder(0.016, 0.017, -spec.handle, 0.026, surface(0x14161f, { roughness: 0.8 }), 8);
-      const kashira = cylinder(0.018, 0.018, -spec.handle - 0.012, -spec.handle + 0.004, brass, 8);
-      group.add(tsuba, habaki, tsuka, kashira);
+      // One curve from the pommel to the point, the hilt carrying it on; zero at the grip.
+      const sori = 0.045;
+      const span = spec.handle + spec.length;
+      const along = (y) => Math.sin((Math.PI * (y + spec.handle)) / span);
+      const bend = (y) => -sori * (along(y) - along(0));
+      const slope = (y) => (bend(y + 0.001) - bend(y - 0.001)) / 0.002;
+      // A fitting set square to the curve at y.
+      const onCurve = (mesh, y) => {
+        mesh.position.set(0, y, bend(y));
+        mesh.rotation.x = Math.atan(slope(y));
+        return mesh;
+      };
+      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.032, 0.007, 0.08, bend), steel));
+      const handlePath = new THREE.CatmullRomCurve3(Array.from({ length: 7 }, (_, index) => {
+        const y = -spec.handle + ((spec.handle + 0.026) * index) / 6;
+        return new THREE.Vector3(0, y, bend(y));
+      }));
+      const tsuka = new THREE.Mesh(new THREE.TubeGeometry(handlePath, 12, 0.0165, 8, false), surface(0x14161f, { roughness: 0.8 }));
+      const tsuba = onCurve(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.008, 18), surface(0x2a2420, { roughness: 0.5 })), 0.03);
+      const habaki = onCurve(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.026, 8), brass), 0.047);
+      const kashira = onCurve(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.016, 8), brass), -spec.handle - 0.004);
+      group.add(tsuka, tsuba, habaki, kashira);
       break;
     }
     case 'knife': {

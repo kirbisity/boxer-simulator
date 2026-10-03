@@ -9,7 +9,7 @@ import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, create
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
-import { CLOTH_COLORS, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
+import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { clearGore, severView, spawnSparks, updateArms, updateBlood, updateDebris, updateStumps, woundBlood } from './weaponview.js';
@@ -477,7 +477,7 @@ const LOOK_FIELDS = [
 ];
 
 // The outfit: which kind and which of its designs, its colours (the
-// design's own unless chosen), a headset, and the fists.
+// design's own unless chosen), headgear, and the fists.
 // The pickers offer the design's own colour and every named cloth colour.
 const PICKER_COLORS = { design: null, ...CLOTH_COLORS };
 const colorName = (hex) => (hex ? Object.keys(PICKER_COLORS).find((name) => PICKER_COLORS[name] === hex) ?? 'design' : 'design');
@@ -485,7 +485,11 @@ const outfitField = (inputs) => (inputs.outfit ??= { kind: 'boxing', design: 0 }
 const OUTFIT_FIELDS = [
   {
     key: 'kind', label: 'Outfit', options: OUTFIT_KEYS, names: Object.fromEntries(OUTFIT_KEYS.map((key) => [key, OUTFITS[key].label])),
-    get: (inputs) => outfitField(inputs).kind, set: (inputs, value) => { Object.assign(outfitField(inputs), { kind: value, design: 0, colors: randomColors(value) }); },
+    get: (inputs) => outfitField(inputs).kind,
+    set: (inputs, value) => {
+      Object.assign(outfitField(inputs), { kind: value, design: 0, colors: randomColors(value) });
+      inputs.accessories = defaultHeadgear(value);
+    },
   },
   {
     key: 'design', label: 'Design', options: ['0', '1', '2'], names: null,
@@ -500,9 +504,10 @@ const OUTFIT_FIELDS = [
     get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: PICKER_COLORS[value] ?? undefined }; },
   },
   {
-    key: 'headset', label: 'Headset', options: ['off', 'on'],
-    get: (inputs) => ((inputs.accessories ?? []).includes('headset') ? 'on' : 'off'),
-    set: (inputs, value) => { inputs.accessories = value === 'on' ? ['headset'] : []; },
+    // What the outfit offers for the head; filled in per outfit (see fillCornerForm).
+    key: 'headgear', label: 'Headgear', options: Object.keys(HEADGEAR).concat('none'),
+    get: (inputs) => (inputs.accessories ?? [])[0] ?? 'none',
+    set: (inputs, value) => { inputs.accessories = value === 'none' ? [] : [value]; },
   },
   {
     key: 'fists', label: 'Fists', options: ['outfit', 'bare', 'gloved'],
@@ -634,6 +639,10 @@ function fillCornerForm(corner) {
   const offered = OUTFITS[kind].designs.map((design, index) => [design, index]).filter(([design, index]) => !design.levelOnly || index === outfitOf(inputs).design);
   designSelect.replaceChildren(...offered.map(([design, index]) => new Option(design.label, String(index))));
   designSelect.closest('label').hidden = offered.length < 2;
+  // Headgear this outfit allows; anything else is taken off.
+  const headOptions = headgearOptions(kind);
+  if (!headOptions.includes((inputs.accessories ?? [])[0] ?? 'none')) inputs.accessories = [];
+  outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
   for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
   form.querySelector('.name-input').value = inputs.name;
   form.querySelector('.copy').textContent = 'Copy code';
@@ -852,11 +861,19 @@ for (const kind of OUTFIT_KEYS) {
   };
 }
 
+// Every piece of headgear, on the outfit it goes with.
+SHEETS.headgear = {
+  options: [['casual', 'headset'], ['sports', 'cap'], ['hiking', 'boonie'], ['yakuza', 'hat'], ['commoner', 'headWrap'], ['knight', 'plume'], ['samurai', 'crest']]
+    .map(([kind, item]) => [{ outfit: { kind, design: 0 }, accessories: [item] }, HEADGEAR[item].label, OUTFITS[kind].label]),
+  rows: [PRESETS.heavy, PRESETS.contender],
+  camera: { distance: 6.2, pitch: 0.12, yaw: 0.15, height: 1.2 },
+};
+
 /** The inputs a sheet option builds: a look field, an outfit, or a body fed to a BMI. */
 function sheetInputs(sheet, row, value) {
   const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
   if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
-  if (value.outfit) return { ...inputs, outfit: value.outfit };
+  if (value.outfit) return { ...inputs, outfit: value.outfit, accessories: value.accessories ?? defaultHeadgear(value.outfit.kind) };
   const height = inputs.heightCm / 100;
   return { ...inputs, calories: Math.round(caloriesForWeight(inputs, value.bmi * height * height, FRAMES[inputs.frame].lean)) };
 }

@@ -416,7 +416,31 @@ function buildKabuto(group, head, r, steel, color) {
   const peak = new THREE.Mesh(new THREE.CylinderGeometry(1.32 * r, 1.4 * r, 0.06 * r, 20, 1, false, Math.PI * 0.2, Math.PI * 0.6), bowlSteel);
   peak.position.set(0.05 * r, 0.12 * r, 0);
   group.add(peak);
-  // The crest (maedate), on a holder at the brow.
+  // The crest (maedate) is headgear of its own (kabutoCrest): it can be knocked off.
+  // Menpo: the lower face guard, with a nose and a bristling moustache.
+  if (head.mask) {
+    const maskSteel = metal(steel, head.mask === 'red' ? color : 0x141416);
+    // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
+    const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);
+    menpo.material = maskSteel.clone();
+    menpo.material.side = THREE.DoubleSide;
+    menpo.position.y = 0;
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.14 * r, 0.32 * r, 8), maskSteel);
+    nose.rotation.z = -Math.PI / 2;
+    nose.position.set(1.08 * r, -0.12 * r, 0);
+    const moustache = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.08 * r, 0.6 * r), surface(0xe8e4da));
+    moustache.position.set(1.06 * r, -0.34 * r, 0);
+    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), lace);
+    throat.material = lace.clone();
+    throat.material.side = THREE.DoubleSide;
+    throat.position.y = -1.0 * r;
+    group.add(menpo, nose, moustache, throat);
+  }
+}
+
+/** A kabuto's crest (maedate) on its holder at the brow, in head coordinates. */
+export function kabutoCrest(head, r, steel) {
+  const gold = metal(steel, head.gold ?? 0xd6a743);
   const crest = new THREE.Group();
   crest.position.set(1.22 * r, 0.32 * r, 0);
   const crestMetal = head.crest === 'antlers' ? surface(0x16161a, { roughness: 0.5 }) : gold;
@@ -472,26 +496,105 @@ function buildKabuto(group, head, r, steel, color) {
     default:
       break;
   }
-  group.add(crest);
-  // Menpo: the lower face guard, with a nose and a bristling moustache.
-  if (head.mask) {
-    const maskSteel = metal(steel, head.mask === 'red' ? color : 0x141416);
-    // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
-    const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);
-    menpo.material = maskSteel.clone();
-    menpo.material.side = THREE.DoubleSide;
-    menpo.position.y = 0;
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.14 * r, 0.32 * r, 8), maskSteel);
-    nose.rotation.z = -Math.PI / 2;
-    nose.position.set(1.08 * r, -0.12 * r, 0);
-    const moustache = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.08 * r, 0.6 * r), surface(0xe8e4da));
-    moustache.position.set(1.06 * r, -0.34 * r, 0);
-    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), lace);
-    throat.material = lace.clone();
-    throat.material.side = THREE.DoubleSide;
-    throat.position.y = -1.0 * r;
-    group.add(menpo, nose, moustache, throat);
+  inkAll(crest);
+  return crest;
+}
+
+/**
+ * Headgear worn over the head or the helmet, in head coordinates (r the
+ * head radius): a runner's cap, a boonie hat, a yakuza's hat, a commoner's
+ * wrapped head, a knight's plume, a kabuto's crest. Null if the outfit has
+ * nothing for it to sit on.
+ */
+export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
+  const r = body.lengths.headRadius;
+  const group = new THREE.Group();
+  const cloth = (hex) => surface(hex, { roughness: 0.75 });
+  switch (kind) {
+    case 'cap': {
+      const fabric = cloth(colors.top.getHex());
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.14 * r, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), fabric);
+      crown.position.y = 0.08 * r;
+      const peak = new THREE.Mesh(new THREE.CylinderGeometry(0.95 * r, 0.95 * r, 0.05 * r, 18, 1, false, Math.PI * 0.2, Math.PI * 0.6), fabric);
+      peak.scale.set(1, 1, 0.75);
+      peak.position.set(0.55 * r, 0.12 * r, 0);
+      const button = new THREE.Mesh(new THREE.SphereGeometry(0.1 * r, 8, 6), fabric);
+      button.position.y = 1.2 * r;
+      group.add(crown, peak, button);
+      break;
+    }
+    case 'boonie': {
+      const fabric = cloth(0x9a9068);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.14 * r, 0.75 * r, 18), fabric);
+      crown.position.y = 0.45 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.95 * r, 0.3 * r, 22, 1, true), fabric);
+      brim.material = fabric.clone();
+      brim.material.side = THREE.DoubleSide;
+      brim.position.y = 0.0;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(1.12 * r, 1.14 * r, 0.12 * r, 18, 1, true), cloth(0x5a5238));
+      band.position.y = 0.18 * r;
+      group.add(crown, brim, band);
+      break;
+    }
+    case 'hat': {
+      const felt = cloth(0x1a1a1d);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.88 * r, 1.08 * r, 0.85 * r, 20), felt);
+      crown.scale.z = 0.88;
+      crown.position.y = 0.5 * r;
+      const pinch = new THREE.Mesh(new THREE.BoxGeometry(0.9 * r, 0.12 * r, 0.25 * r), felt);
+      pinch.position.y = 0.9 * r;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(1.085 * r, 1.09 * r, 0.16 * r, 20, 1, true), cloth(0x8a1f2a));
+      band.position.y = 0.2 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.8 * r, 1.75 * r, 0.05 * r, 26), felt);
+      brim.position.y = 0.1 * r;
+      group.add(crown, pinch, band, brim);
+      break;
+    }
+    case 'headWrap': {
+      const linen = cloth(0xd8cfb8);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(1.1 * r, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.46), linen);
+      cap.position.y = 0.06 * r;
+      const roll = new THREE.Mesh(new THREE.TorusGeometry(1.06 * r, 0.16 * r, 8, 22), linen);
+      roll.rotation.x = Math.PI / 2;
+      roll.rotation.z = 0.15;
+      roll.position.y = 0.22 * r;
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.22 * r, 10, 8), linen);
+      knot.position.set(-1.12 * r, 0.25 * r, 0);
+      group.add(cap, roll, knot);
+      for (const side of [1, -1]) {
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.6 * r, 0.22 * r), linen);
+        tail.position.set(-1.18 * r, -0.05 * r, side * 0.14 * r);
+        tail.rotation.x = side * 0.25;
+        group.add(tail);
+      }
+      break;
+    }
+    case 'plume': {
+      if (!dress.head) return null;
+      // On the crown of the helm, sweeping back.
+      const top = dress.head.kind === 'bascinet' ? (dress.head.pointed ? 1.55 : 1.35) * r : 0.95 * r;
+      const feather = surface(cornerHex, { roughness: 0.9 });
+      const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * r, 0.08 * r, 0.3 * r, 8), steel);
+      holder.position.y = top;
+      group.add(holder);
+      for (let index = 0; index < 7; index += 1) {
+        const angle = 0.15 + index * 0.22;
+        const plume = new THREE.Mesh(new THREE.SphereGeometry(0.16 * r, 8, 6), feather);
+        plume.scale.set(1, 3.4, 0.6);
+        plume.position.set(-Math.sin(angle) * 0.75 * r, top + 0.15 * r + Math.cos(angle) * 0.75 * r, (index % 2 ? 1 : -1) * 0.05 * r);
+        plume.rotation.z = angle;
+        group.add(plume);
+      }
+      break;
+    }
+    case 'crest':
+      if (dress.head?.kind !== 'kabuto') return null;
+      return kabutoCrest(dress.head, r, steel);
+    default:
+      return null;
   }
+  inkAll(group);
+  return group;
 }
 
 /**

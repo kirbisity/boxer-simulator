@@ -93,3 +93,42 @@ test('in heels a woman goes over far more easily; in riot gear a man hardly at a
   assert.ok(falls(wearing('contender', 'business')) > falls(wearing('contender', 'boxing')), 'heels fall to a knock trunks shrug off');
   assert.ok(falls(wearing('heavy', 'swat')) < falls(wearing('heavy', 'casual')) || falls(wearing('heavy', 'casual')) === 0, 'riot gear stands where casual goes over');
 });
+
+test('headgear comes off by how hard the head is hit: a cap easily, a crest only by a heavy blow', async () => {
+  const { createWorld, advance, placeFighter, throwPunch } = await import('../src/physics.js');
+  const { PRESETS } = await import('../src/body.js');
+  const { HEADGEAR, headgearOptions } = await import('../src/outfits.js');
+  assert.ok(HEADGEAR.cap.knock < HEADGEAR.crest.knock);
+  assert.ok(headgearOptions('samurai').includes('crest') && !headgearOptions('samurai').includes('headset'), 'a kabuto takes a crest, not a headset');
+  assert.ok(headgearOptions('casual').includes('headset'));
+  // The same crosses at a cap and at a crest.
+  const knocked = (kind, accessory) => {
+    const world = createWorld([{ ...PRESETS.heavy, style: 'boxing' }, { ...PRESETS.light, style: 'boxing', outfit: { kind, design: 0 }, accessories: [accessory] }], { seed: 2 });
+    placeFighter(world.fighters[0], -0.45, 0);
+    placeFighter(world.fighters[1], 0.45, 0);
+    let heaviest = 0;
+    for (let tries = 0; tries < 6 && world.props[0].attached; tries += 1) {
+      throwPunch(world, world.fighters[0], 'cross', 'head');
+      advance(world, 0.6);
+      for (const event of world.events) if (event.kind === 'landed' && event.target === 'head') heaviest = Math.max(heaviest, event.headDeltaV);
+    }
+    return { off: !world.props[0].attached, heaviest };
+  };
+  const cap = knocked('sports', 'cap');
+  const crest = knocked('samurai', 'crest');
+  assert.ok(cap.off, `cap still on after a ${cap.heaviest.toFixed(2)} m/s blow`);
+  assert.equal(crest.off, crest.heaviest >= HEADGEAR.crest.knock, 'the crest goes only to a blow past its threshold');
+});
+
+test('a fall shakes a cap off; a crest stays on the helmet', async () => {
+  const { createWorld, advance } = await import('../src/physics.js');
+  const { PRESETS } = await import('../src/body.js');
+  const world = createWorld([
+    { ...PRESETS.light, style: 'boxing', outfit: { kind: 'sports', design: 0 }, accessories: ['cap'] },
+    { ...PRESETS.light, style: 'boxing', outfit: { kind: 'samurai', design: 0 }, accessories: ['crest'] },
+  ], { seed: 2 });
+  for (const fighter of world.fighters) fighter.knock = [6, 0, 0];
+  advance(world, 0.5);
+  assert.equal(world.props.find((prop) => prop.kind === 'cap').attached, false);
+  assert.equal(world.props.find((prop) => prop.kind === 'crest').attached, true);
+});

@@ -8,7 +8,7 @@
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
-import { glovedFists } from './outfits.js';
+import { glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, segmentToDisc } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
@@ -680,7 +680,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     });
   }
   for (const fighter of fighters) fighter.arena = arena;
-  const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
+  // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
+  const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], clashing: new Set() };
 }
 
@@ -1769,6 +1770,9 @@ function blindside(defender, attacker) {
 function knockOff(world, fighter, event) {
   for (const prop of world.props ?? []) {
     if (prop.owner !== fighter.id || !prop.attached) continue;
+    // A blow moves the head hard enough to send it flying, or a fall shakes it off.
+    const gear = HEADGEAR[prop.kind] ?? HEADGEAR.headset;
+    if (event ? (event.headDeltaV ?? 0) < gear.knock : !gear.falls) continue;
     const spec = WORLD.props;
     const head = point(fighter.x, P.head);
     prop.attached = false;
@@ -1781,11 +1785,10 @@ function knockOff(world, fighter, event) {
     } else prop.v = vec.add(headVelocity, [0, 0.4, 0]);
     const random = world.random;
     prop.spin = [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (spec.spinMin + random() * spec.spinRange));
-    world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: PROP_ICONS[prop.kind] ?? '✦', effects: [`${prop.kind} knocked off`] });
+    world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: gear.icon, effects: [`${gear.label.toLowerCase()} knocked off`] });
   }
 }
 
-const PROP_ICONS = { headset: '🎧' };
 
 /** Worn props ride on the head; free ones fly, tumble, bounce and settle. */
 function moveProps(world, dt) {
