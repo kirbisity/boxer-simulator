@@ -118,3 +118,14 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 .sheet-label { position: fixed; transform: translate(-50%, 0); text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; display: grid; gap: 2px; pointer-events: none; }
 .sheet-label b { font: 700 18px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
 .sheet-label span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* Big moments: a white flash and icons that pop over the body part. */
+#flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
+#icons { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+.event-icon { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; transform: translate(-50%, -100%); will-change: transform, opacity; }
+.event-icon .glyph { font-size: 34px; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }
+.event-icon b { font: 700 13px var(--display); letter-spacing: 0.08em; padding: 2px 7px; border-radius: 4px; color: #fff; background: rgba(10, 10, 14, 0.78); }
+.event-icon.ko .glyph { font-size: 52px; }
+.event-icon.ko b { background: #d12a2a; font-size: 18px; }
+.event-icon.bone b { background: #b0201c; }
+.event-icon.down b { background: #c48a12; }

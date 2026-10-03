@@ -87,6 +87,19 @@ export const STYLES = {
 
 export const STYLE_KEYS = Object.keys(STYLES);
 
+/**
+ * Game plans the AI switches between within a bout, as adjustments to its
+ * style: distance kept (m), tempo and pressure (multipliers on the style's),
+ * defence (multiplier on its chance), extra counters, and the share of
+ * attacks thrown heavy. `weight` is how often each is picked at random.
+ */
+export const STRATEGIES = {
+  outboxer: { label: 'out-boxing', weight: 1, range: 0.15, tempo: 1.15, pressure: 0.3, defend: 1.15, counter: 0, heavy: 0.02 },
+  pressure: { label: 'pressure', weight: 1, range: -0.1, tempo: 0.75, pressure: 2.2, defend: 0.85, counter: 0, heavy: 0.05 },
+  counter: { label: 'counter-punching', weight: 0.8, range: 0.05, tempo: 1.5, pressure: 0.6, defend: 1.25, counter: 0.35, heavy: 0.06 },
+  brawler: { label: 'brawling', weight: 0.6, range: -0.05, tempo: 0.9, pressure: 1.5, defend: 0.6, counter: 0, heavy: 0.15 },
+};
+
 /** Which moves the style can use, for the player's pad. */
 export function movesFor(styleKey) {
   return Object.keys(STYLES[styleKey]?.attacks ?? STYLES.boxing.attacks);

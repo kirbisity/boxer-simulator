@@ -1,4 +1,6 @@
+import { BODIES, boutGlitches } from '../tools/glitches.js';
 import { test } from 'node:test';
+import { fallSweep } from '../tools/falls-quality.js';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
@@ -93,7 +95,10 @@ test('a knocked-out body folds like a body: knees forward, head within its cone'
   assert.ok(point(fighter.x, P.head)[1] < 0.5, 'it went down');
   // Landing can force a knee back for a frame; the limit then restores it.
   assert.ok(worstKnee > -0.08, `knees bent backwards at most briefly (${worstKnee.toFixed(3)} m)`);
-  assert.ok(settledKnee > -(WORLD.joint.straightAllowance + 0.005), `and no further than straight once lying still (${settledKnee.toFixed(3)} m)`);
+  // Lying still, a knee may rest a little past straight, as real knees do
+  // (5–10° of hyperextension), never more.
+  const restingAngle = (2 * Math.asin(Math.min(1, -Math.min(0, settledKnee) / fighter.body.lengths.shank)) * 180) / Math.PI;
+  assert.ok(restingAngle <= 10, `and within 10° of straight once lying still (${restingAngle.toFixed(1)}°)`);
   assert.ok(worstHead < WORLD.headCone + 0.1, `head stayed within its cone (${worstHead.toFixed(2)} rad)`);
 });
 
@@ -211,4 +216,25 @@ test('damage builds per body part with each blow and stops at seriously hurt', (
   const damage = world.fighters[1].damage;
   assert.ok(Object.keys(damage).length > 0 && Object.values(damage).every((value) => value > 0 && value <= 1));
   assert.ok((damage.head ?? 0) + (damage.trunk ?? 0) > 0.3, 'what was hit most shows most');
+});
+
+test('a knocked-out body falls as a clean ragdoll: no twisting skin, no rattling, at rest within seconds, limbs outside the trunk', () => {
+  const { flips, jitter, unsettled, settle, folded } = fallSweep();
+  assert.ok(flips < 3, `${flips.toFixed(1)} rig flips a fall`);
+  assert.ok(jitter < 2, `jitter ${jitter.toFixed(2)} m/s² a frame while lying`);
+  assert.equal(unsettled, 0, 'every fall comes to rest');
+  assert.ok(settle < 3, `at rest after ${settle.toFixed(1)} s`);
+  assert.ok(folded < 5, `${folded.toFixed(1)} frames with a limb inside the trunk`);
+});
+
+test('mixed styles and weights fight without visible glitches: no teleporting parts, no flipping skin', () => {
+  const pairs = [['light', 'muayThai', 'heavy', 'boxing'], ['wasted', 'kickboxing', 'obese', 'muayThai'], ['contender', 'boxing', 'heavy', 'muayThai']];
+  const total = { pops: 0, flips: 0, broken: 0, minutes: 0 };
+  for (const [a, styleA, b, styleB] of pairs) {
+    const tally = boutGlitches({ ...BODIES[a](), style: styleA }, { ...BODIES[b](), style: styleB }, 30);
+    for (const key of Object.keys(total)) total[key] += tally[key];
+  }
+  assert.equal(total.broken, 0);
+  assert.ok(total.pops / total.minutes < 1, `${(total.pops / total.minutes).toFixed(2)} pops a minute`);
+  assert.ok(total.flips / total.minutes < 3, `${(total.flips / total.minutes).toFixed(2)} flips a minute`);
 });

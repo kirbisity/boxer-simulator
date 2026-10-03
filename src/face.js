@@ -11,7 +11,7 @@
 
 /* global THREE */
 import { P } from './body.js';
-import { WORLD } from './physics.js';
+import { concussionCapacity } from './physics.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 
@@ -378,7 +378,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     if (face.blinking > 0 || out) lid = 1;
     const mouthOpen = out ? 0.6 : Math.min(1, 0.9 * wince + panting + 0.3 * stunned) * (punching ? 0.2 : 1);
     const brow = Math.min(1, 0.8 * wince + 0.5 * punching) - 0.6 * stunned;
-    const capacity = WORLD.concussionCapacity * fighter.body.chin * (fighter.knockdowns + 1);
+    const capacity = concussionCapacity(fighter);
     const damage = Math.min(1, Math.max(fighter.concussion / capacity + fighter.knockdowns * 0.25, fighter.damage.head ?? 0, fighter.broken.has('neck') ? 1 : 0));
     const flush = Math.min(1, (1 - fighter.stamina) * 0.7 + damage * 0.5);
     const ease = (target, current, speed) => current + (target - current) * Math.min(1, dt * speed);

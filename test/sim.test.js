@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, fighterFile, P, PRESETS, SEGMENTS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { advance, createWorld, placeFighter, point, throwPunch, WORLD } from '../src/physics.js';
+import { advance, applyHeadDamage, boutWinner, chinNow, createWorld, placeFighter, point, throwPunch, WORLD } from '../src/physics.js';
 import { vec } from '../src/pose.js';
 
 function shadowPeak(inputs, type) {
@@ -111,4 +111,20 @@ test('a fighter file carries its inputs and rebuilds the same body', () => {
   const file = JSON.parse(JSON.stringify(fighterFile(PRESETS.contender)));
   assert.equal(file.schemaVersion, 2);
   assert.deepEqual(buildBody(file.inputs).masses, buildBody(PRESETS.contender).masses);
+});
+
+test('a blow far past the chin knocks out on the spot: no count, no getting up, the bout is over', () => {
+  const world = createWorld([PRESETS.heavy, PRESETS.light], { seed: 2 });
+  const [attacker, defender] = world.fighters;
+  placeFighter(attacker, -0.55);
+  placeFighter(defender, 0.55);
+  advance(world, 0.5);
+  // A strike whose head speed change is twice the defender's chin.
+  const event = { time: world.time, kind: 'landed', attacker: attacker.id, defender: defender.id, punch: 'cross', target: 'head', headDeltaV: 1.1 * chinNow(defender) * WORLD.knockout.overChin, effects: [] };
+  applyHeadDamage(world, defender, event);
+  assert.equal(defender.state, 'out');
+  assert.ok(world.events.some((entry) => entry.kind === 'knockout'));
+  advance(world, 12);
+  assert.equal(defender.state, 'out', 'and stays out');
+  assert.equal(boutWinner(world), 'red');
 });

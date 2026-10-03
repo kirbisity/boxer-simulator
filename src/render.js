@@ -11,7 +11,7 @@ import { buildLoftBody } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
-import { BONE, BONES, boneFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
+import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, surface } from './toon.js';
 
@@ -369,7 +369,7 @@ export function setLayer(fighterView, layer) {
 export function updateFighterView(fighterView, dt, time) {
   const fighter = fighterView.fighter;
   const points = PARTICLES.map((_, index) => point(fighter.x, index));
-  const frames = boneFrames(points, fighter.body);
+  const frames = coherentFrames(boneFrames(points, fighter.body), fighterView.frames);
   fighterView.frames = frames;
   frames.forEach((frame, index) => {
     const matrix = frameMatrix(frame);

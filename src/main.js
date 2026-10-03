@@ -5,9 +5,10 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { thinkAll } from './ai.js';
 import { MOVES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, createWorld, perform, placeFighter, throwPunch } from './physics.js';
+import { advance, boutWinner, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
+import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, createScene, disposeFighterView, placeCamera, render, resize, setLayer, showImpact, updateFighterView, updateSpray } from './render.js';
 
 const STEP = 1 / 60;
@@ -26,7 +27,9 @@ const state = {
   eventCursor: 0,
   accumulator: 0,
   finishedAt: null,
+  drama: { active: null, icons: [] },
 };
+const realSeconds = () => performance.now() / 1000;
 
 const scene = createScene($('#stage'));
 
@@ -36,6 +39,7 @@ function newBout() {
   rebuildViews();
   state.eventCursor = 0;
   state.finishedAt = null;
+  resetDrama(state.drama);
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   renderHud();
@@ -63,7 +67,8 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (!state.paused) tick(dt * state.speed);
+  // A big moment slows the simulation, not the drawing.
+  if (!state.paused) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
   draw(dt);
   requestAnimationFrame(frame);
 }
@@ -77,7 +82,7 @@ function tick(seconds) {
   }
   consumeEvents();
   const winner = boutWinner(state.world);
-  if (winner && state.finishedAt === null) {
+  if (winner && state.finishedAt === null && !momentPlaying(state.drama, realSeconds())) {
     state.finishedAt = state.world.time;
     const name = state.corners[winner].name;
     $('#banner').hidden = false;
@@ -94,9 +99,11 @@ function draw(dt) {
   }
   // A design sheet holds its own framing.
   placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
+  dramaCamera(scene, state.drama, world, realSeconds());
   for (const view of state.views) updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   render(scene);
+  updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
 }
 
@@ -106,6 +113,11 @@ function consumeEvents() {
     const event = events[state.eventCursor];
     state.eventCursor += 1;
     if (event.kind === 'landed' || event.kind === 'blocked') showImpact(scene, state.views, event);
+    const moment = momentFor(event);
+    if (moment) {
+      startMoment(state.drama, moment, realSeconds());
+      addIcon(state.drama, moment, realSeconds());
+    }
     logEvent(event);
   }
 }
@@ -117,7 +129,7 @@ function renderHud() {
     const card = $(`#hud-${fighter.corner}`);
     card.querySelector('.name').textContent = state.corners[fighter.corner].name;
     card.querySelector('.stamina i').style.width = `${Math.round(fighter.stamina * 100)}%`;
-    const capacity = 4 * fighter.body.chin * (fighter.knockdowns + 1);
+    const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;
     card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : `KD ${fighter.knockdowns}`;
     card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s`;
@@ -131,6 +143,10 @@ function logEvent(event) {
   const name = (id) => state.corners[world.fighters[id].corner].name.split(' ')[0];
   let text;
   if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
+  else if (event.kind === 'knockout') text = `💥 <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'broken') text = `🦴 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'heavy') text = `<b>${name(event.attacker)}</b> loads up a heavy ${event.punch}`;
+  else if (event.kind === 'accessory') text = `${event.icon} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
@@ -142,7 +158,7 @@ function logEvent(event) {
   }
   const row = document.createElement('li');
   row.innerHTML = text;
-  if (event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
+  if (event.kind === 'knockout' || event.kind === 'broken' || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
   const log = $('#log');
   log.prepend(row);
   while (log.children.length > 5) log.lastChild.remove();

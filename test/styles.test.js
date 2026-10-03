@@ -134,6 +134,11 @@ test('each style fights with its own moves, chosen by distance: a boxer never ki
         if (current.fighters[0].punch) types.add(current.fighters[0].punch.type);
       });
       if (fighter.state !== 'up') break;
+      // Keep the distance being tested: a teep would push the passive man out of it.
+      if (!fighter.punch) {
+        placeFighter(world.fighters[0], -gap / 2, 0);
+        placeFighter(world.fighters[1], gap / 2, 0);
+      }
     }
     return types;
   };

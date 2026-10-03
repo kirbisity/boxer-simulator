@@ -3,7 +3,7 @@
 // choosing from its style's moves those that reach from where it stands.
 
 import { P } from './body.js';
-import { MOVES, STYLES, moveRange } from './moves.js';
+import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { nearestOpponent, perform, point, throwPunch, toLocal } from './physics.js';
 import { vec } from './pose.js';
 
@@ -33,7 +33,35 @@ export const AI = {
   // How much more often a straight punch to the head is slipped than the
   // style's overall mix says (the mix includes body shots, which cannot be).
   slipPreference: 3,
+  // A game plan lasts this long (s, plus up to `strategyRange`) before a rethink.
+  strategySeconds: 20,
+  strategyRange: 20,
+  strategyMinimum: 6, // s a new plan is kept before hurt or finishing may change it
+  // Heavy attacks: extra share when the opponent is hurt and there to be finished.
+  finishingHeavy: 0.15,
 };
+
+/**
+ * The game plan for now: survive when hurt, finish when the opponent is,
+ * otherwise a weighted pick that holds for a while.
+ */
+function chooseStrategy(world, fighter, opponent, dt) {
+  // Hurt means after a knockdown, not a passing stun: a plan is held, not flipped.
+  const hurt = fighter.hurt > 0;
+  const finishing = opponent.hurt > 0 || opponent.state === 'rising';
+  fighter.aiStrategyFor = (fighter.aiStrategyFor ?? 0) - dt;
+  const held = fighter.aiStrategyFor > AI.strategySeconds + AI.strategyRange - AI.strategyMinimum;
+  let next = null;
+  if (hurt && fighter.aiStrategy !== 'outboxer' && !held) next = 'outboxer';
+  else if (!hurt && finishing && !['pressure', 'brawler'].includes(fighter.aiStrategy) && !held) next = world.random() < 0.5 ? 'pressure' : 'brawler';
+  else if (!fighter.aiStrategy || fighter.aiStrategyFor <= 0) next = pick(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight])), world.random);
+  if (next) {
+    if (next !== fighter.aiStrategy) world.events.push({ time: world.time, kind: 'strategy', fighter: fighter.id, strategy: next, effects: [] });
+    fighter.aiStrategy = next;
+    fighter.aiStrategyFor = AI.strategySeconds + world.random() * AI.strategyRange;
+  }
+  return STRATEGIES[fighter.aiStrategy];
+}
 
 function pick(weights, random) {
   const entries = Object.entries(weights).filter(([, weight]) => weight > 0);
@@ -110,13 +138,14 @@ export function think(world, fighter, dt) {
     return;
   }
   const style = STYLES[fighter.style];
+  const plan = chooseStrategy(world, fighter, opponent, dt);
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
   const kicker = (style.attacks.roundhouse ?? 0) + (style.attacks.teep ?? 0) > 0.15;
   // Spells of pressure: for a few seconds the fighter works inside.
   fighter.aiPressure = Math.max(0, (fighter.aiPressure ?? 0) - dt);
-  if (fighter.aiPressure === 0 && random() < (style.pressure ?? 0) * AI.pressureSpellsPerShare * dt) fighter.aiPressure = AI.pressureSeconds;
+  if (fighter.aiPressure === 0 && random() < (style.pressure ?? 0) * plan.pressure * AI.pressureSpellsPerShare * dt) fighter.aiPressure = AI.pressureSeconds;
   const inside = fighter.aiPressure > 0;
-  const range = inside ? fighter.body.reach * 0.75 : fighter.body.reach + opponent.body.lengths.headRadius + AI.rangeExtra + (kicker ? AI.kickerExtra : 0);
+  const range = inside ? fighter.body.reach * 0.75 : fighter.body.reach + opponent.body.lengths.headRadius + AI.rangeExtra + plan.range + (kicker ? AI.kickerExtra : 0);
   if (!fighter.defence || fighter.defence.name !== 'stepBack') {
     if (distance > range + AI.rangeSlack) fighter.move = 1;
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
@@ -133,13 +162,14 @@ export function think(world, fighter, dt) {
     fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter;
     fighter.reacted = false;
   }
-  if (incoming && !fighter.reacted && !fighter.punch && incoming.t >= fighter.reactAt) {
+  // Seen from when it starts to move, loading included; not while committed.
+  if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && (incoming.age ?? incoming.t) >= fighter.reactAt) {
     fighter.reacted = true;
-    if (random() < style.defendChance * (0.6 + 0.6 * fighter.body.inputs.exercise)) {
+    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise))) {
       const { name, side } = chooseDefence(fighter, opponent, style, incoming, random);
       perform(world, fighter, name, { side });
       // Slip and fire back: the counter comes while the attacker's hand is out.
-      if ((name === 'slip' || name === 'roll') && random() < (style.counter ?? 0)) {
+      if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {
         fighter.cooldown = Math.min(fighter.cooldown, 0.12);
         fighter.aiCombo = null;
       }
@@ -152,7 +182,7 @@ export function think(world, fighter, dt) {
     const next = fighter.aiCombo.shift();
     fighter.aiComboStep += 1;
     if (!throwPunch(world, fighter, next, fighter.aiComboZone)) fighter.aiCombo = null;
-    else if (!fighter.aiCombo.length) fighter.cooldown = restAfterAttack(fighter, style, random);
+    else if (!fighter.aiCombo.length) fighter.cooldown = restAfterAttack(fighter, style, random) * plan.tempo;
     return;
   }
   fighter.aiComboStep = 0;
@@ -190,12 +220,20 @@ export function think(world, fighter, dt) {
     const sequence = pick(openers, random);
     if (sequence) [move, ...combo] = sequence.split(' ');
   }
+  // Now and then, one big shot instead: a power strike loaded up and thrown alone.
+  const finishing = opponent.hurt > 0;
+  const heavy = !fighter.clinch && random() < plan.heavy + (finishing ? AI.finishingHeavy : 0);
+  if (heavy) {
+    combo = null;
+    if (move === 'jab' && choices.cross) move = 'cross';
+    if (move === 'teep' && choices.roundhouse) move = 'roundhouse';
+  }
   const spec = MOVES[move];
   const zone = spec.zones ? (random() < AI.bodyShotShare ? spec.zones.at(-1) : spec.zones[0]) : null;
-  if (throwPunch(world, fighter, move, zone)) {
+  if (throwPunch(world, fighter, move, zone, { heavy })) {
     fighter.aiCombo = combo;
     fighter.aiComboZone = zone;
-    fighter.cooldown = combo ? 0 : restAfterAttack(fighter, style, random);
+    fighter.cooldown = combo ? 0 : restAfterAttack(fighter, style, random) * plan.tempo;
   }
 }
 
