@@ -19,6 +19,8 @@ export const DRAMA = {
   // Held down: no blow, so no shake or flash; the camera closes in.
   held: { slowest: 1, seconds: 1.2, hold: 0.2, shake: 0, pushIn: 0.85, flash: 0 },
   pinned: { slowest: 0.5, seconds: 1.6, hold: 0.4, shake: 0, pushIn: 0.75, flash: 0 },
+  // Real seconds to slow from full speed to the slowest: a slide, not a cut.
+  easeIn: 0.18,
   shakeHz: 23,
   flashSeconds: 0.6,
   iconSeconds: 2.2,
@@ -73,9 +75,11 @@ export function timeScale(drama, now) {
     drama.active = null;
     return 1;
   }
-  if (u < spec.hold) return spec.slowest;
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const into = Math.min(1, (now - active.start) / DRAMA.easeIn);
+  if (u < spec.hold) return 1 + (spec.slowest - 1) * smooth(into);
   const ease = (u - spec.hold) / (1 - spec.hold);
-  return spec.slowest + (1 - spec.slowest) * ease * ease * (3 - 2 * ease);
+  return spec.slowest + (1 - spec.slowest) * smooth(ease);
 }
 
 /** True while a moment is still playing out: the result waits for it. */

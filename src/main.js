@@ -162,10 +162,10 @@ function frame(now) {
 
 function tick(seconds) {
   state.accumulator += seconds;
-  const steps = Math.floor(state.accumulator / STEP);
-  if (steps > 0) {
-    advance(state.world, steps * STEP, thinkForBout, STEP);
-    state.accumulator -= steps * STEP;
+  while (state.accumulator >= STEP) {
+    state.before = snapshot(state.world);
+    advance(state.world, STEP, thinkForBout, STEP);
+    state.accumulator -= STEP;
   }
   consumeEvents();
   const winner = boutWinner(state.world);
@@ -183,7 +183,78 @@ function tick(seconds) {
   }
 }
 
+// ---- Drawing between steps ---------------------------------------------------
+// The world moves in fixed 1/60 s steps. In slow motion a step comes only
+// every few frames, so drawing the latest step shows a body that jumps and
+// then stands still. Drawing instead the share of the way from the step
+// before to the latest that the clock has reached keeps every frame moving.
+// Only the picture is blended; the simulation is untouched, so a bout plays
+// out the same whether it is watched slowed or not.
+
+/** What drawing reads from the simulation, as it is now. */
+function snapshot(world) {
+  return {
+    world,
+    fighters: world.fighters.map((fighter) => ({ x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice() })),
+    debris: world.debris.map((piece) => ({ x: piece.x?.slice(), q: piece.q?.slice() })),
+  };
+}
+
+const blend = (from, to, share) => to.map((value, index) => from[index] + (value - from[index]) * share);
+const unit = (vector) => {
+  const length = Math.hypot(...vector) || 1;
+  return vector.map((value) => value / length);
+};
+
+/**
+ * Put the world where the clock is, between the last two steps, for one
+ * drawing; returns how to put it back.
+ */
+function blendWorld(world, before, share) {
+  if (!before || before.world !== world || share <= 0 || share >= 1) return () => {};
+  const kept = [];
+  world.fighters.forEach((fighter, index) => {
+    const then = before.fighters[index];
+    if (!then) return;
+    const now = { fighter, x: fighter.x.slice(), dir: fighter.weapon?.dir };
+    kept.push(now);
+    fighter.x.set(blend(then.x, now.x, share));
+    if (then.dir && now.dir) fighter.weapon.dir = unit(blend(then.dir, now.dir, share));
+  });
+  world.debris.forEach((piece, index) => {
+    const then = before.debris[index];
+    if (!then?.x || !piece.x) return;
+    kept.push({ piece, x: piece.x, q: piece.q });
+    piece.x = blend(then.x, piece.x, share);
+    if (then.q && piece.q) {
+      // The short way round: q and −q are the same turn.
+      const sign = then.q.reduce((sum, value, at) => sum + value * piece.q[at], 0) < 0 ? -1 : 1;
+      piece.q = unit(blend(then.q.map((value) => value * sign), piece.q, share));
+    }
+  });
+  return () => {
+    for (const entry of kept) {
+      if (entry.fighter) {
+        entry.fighter.x.set(entry.x);
+        if (entry.dir) entry.fighter.weapon.dir = entry.dir;
+      } else {
+        entry.piece.x = entry.x;
+        entry.piece.q = entry.q;
+      }
+    }
+  };
+}
+
 function draw(dt) {
+  const restore = blendWorld(state.world, state.before, state.paused ? 1 : state.accumulator / STEP);
+  try {
+    drawWorld(dt);
+  } finally {
+    restore();
+  }
+}
+
+function drawWorld(dt) {
   const world = state.world;
   const pelvisMid = [0, 0, 0];
   for (const fighter of world.fighters) {
@@ -227,7 +298,9 @@ function consumeEvents() {
     }
     const moment = momentFor(event);
     if (moment) {
-      startMoment(state.drama, moment, realSeconds());
+      // Slow motion and the camera's push-in are for one man against
+      // another; in a crowd something is always happening, and the icon says enough.
+      if (state.world.fighters.length <= 2) startMoment(state.drama, moment, realSeconds());
       addIcon(state.drama, moment, realSeconds());
     }
     logEvent(event);
