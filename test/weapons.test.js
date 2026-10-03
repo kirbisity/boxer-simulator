@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
 import { gearTraits } from '../src/outfits.js';
 import { STYLES, STYLE_KEYS } from '../src/moves.js';
-import { SEVER_PARTS, advance, boutWinner, capsules, createWorld, perform } from '../src/physics.js';
+import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, perform } from '../src/physics.js';
 import { thinkAll } from '../src/ai.js';
 import { WEAPONS, harmMix } from '../src/weapons.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 import { fighterFor } from '../tools/weapons.js';
+import { spacing } from '../tools/spacing.js';
 
 const wearing = (kind) => gearTraits({ ...PRESETS.contender, outfit: { kind, design: 0 } });
 
@@ -114,11 +115,29 @@ test('a shield takes strikes at the body, and a sweeping cut stops on it', () =>
 });
 
 test('knife wounds bleed; enough of them and a man collapses', () => {
-  const world = createWorld([fighterFor('contender:knife'), fighterFor('contender:boxing')], { seed: 501 });
-  for (let second = 0; second < 90 && !boutWinner(world); second += 1) advance(world, 1, (current, dt) => thinkAll(current, dt));
-  assert.ok(world.fighters[1].bloodLost >= 0.38, `blood lost ${world.fighters[1].bloodLost}`);
-  assert.ok(world.events.some((event) => event.kind === 'bledOut'));
-  assert.equal(boutWinner(world), 'red');
+  // Through lamellar: a wound, not a kill.
+  const { hit, world } = strikeAt('knife', 'stab', 'body', 1.2, { outfit: 'samurai' });
+  assert.ok(hit.pierce > 0, 'the stab went in');
+  const victim = world.fighters[1];
+  assert.ok(victim.bleed > 0, 'and it bleeds');
+  const before = victim.bloodLost;
+  advance(world, 2);
+  assert.ok(victim.bloodLost > before, 'blood keeps going');
+  // Enough bleeding, and he goes down for good.
+  victim.bleed = 0.05;
+  advance(world, 20);
+  assert.ok(victim.bloodLost >= collapseAt(), `blood lost ${victim.bloodLost}`);
+  assert.equal(victim.state, 'out');
+  assert.ok(world.events.some((event) => event.kind === 'bledOut' && event.fighter === victim.id));
+});
+
+test('facing a longer reach or a blade, a fighter holds off and surges; even fighters do not', () => {
+  const outside = spacing('contender:boxing', 'contender:longsword', 2, 40);
+  assert.ok(outside[0].surgesPerMinute > 4, `surges ${outside[0].surgesPerMinute}`);
+  assert.ok(outside[0].inside < 0.7, `inside ${outside[0].inside}`);
+  assert.equal(outside[1].surgesPerMinute, 0, 'the sword does not surge at the fists');
+  const even = spacing('contender:boxing', 'contender:boxing', 1, 30);
+  assert.equal(even[0].surgesPerMinute + even[1].surgesPerMinute, 0);
 });
 
 test('a weapon block meets the incoming blade', () => {

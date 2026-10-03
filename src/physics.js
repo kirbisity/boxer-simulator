@@ -996,7 +996,7 @@ function holdClinch(world, fighter) {
 function checkBalance(world, fighter) {
   if (fighter.state !== 'up' || fighter.handsDown) return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
-  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * WORLD.legCapacity)));
+  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
   const knock = Math.hypot(fighter.knock[0], fighter.knock[2]);
   // The legs soak the knock up over a few tenths of a second, stepping.
   const decay = Math.exp(-WORLD.balance.absorbPerSecond * world.lastDt);
@@ -1092,7 +1092,7 @@ function updateTimers(world, fighter, dt) {
     // Wounds bleed, easing as they clot; lose enough blood and you go down.
     fighter.bloodLost = (fighter.bloodLost ?? 0) + fighter.bleed * dt;
     fighter.bleed *= Math.exp(-dt / BLADES.clotSeconds);
-    if (fighter.state !== 'out' && fighter.bloodLost >= BLADES.collapseAt) {
+    if (fighter.state !== 'out' && fighter.bloodLost >= collapseAt()) {
       const event = { time: world.time, kind: 'bled', attacker: fighter.lastWoundedBy ?? fighter.id, effects: [] };
       knockOut(world, fighter, event, 'collapsed from blood loss', 'bledOut');
     }
@@ -1147,7 +1147,7 @@ function updateTimers(world, fighter, dt) {
     // Hurt after a knockdown: the legs and arms come back over seconds.
     const recovering = fighter.hurt > 0 ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
     // Blood loss: weaker the more is gone.
-    const shock = 1 - (1 - BLADES.shockStrength) * Math.min(1, (fighter.bloodLost ?? 0) / BLADES.collapseAt) ** 2;
+    const shock = 1 - (1 - BLADES.shockStrength) * Math.min(1, (fighter.bloodLost ?? 0) / collapseAt()) ** 2;
     fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock;
   }
 }
@@ -1250,7 +1250,7 @@ function motorForceNow(fighter, index, name) {
   else if (legPart && fighter.feet[side].lifted) force = body.strikeForce[index];
   if (legPart || name === 'pelvis') {
     const damage = name === 'pelvis' ? (fighter.legDamage.l + fighter.legDamage.r) / 2 : fighter.legDamage[side];
-    force *= 1 - 0.6 * Math.min(1, damage / WORLD.legCapacity);
+    force *= 1 - 0.6 * Math.min(1, damage / legCapacity());
   }
   return force;
 }
@@ -2054,7 +2054,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     const before = defender.legDamage[legSide];
     defender.legDamage[legSide] += (impulse / struckMass) * harm;
     event.effects.push('leg struck');
-    const buckles = (damage) => (damage < WORLD.legCapacity ? 0 : 1 + Math.floor((damage / WORLD.legCapacity - 1) / WORLD.legGivesAgainEvery));
+    const buckles = (damage) => (damage < legCapacity() ? 0 : 1 + Math.floor((damage / legCapacity() - 1) / WORLD.legGivesAgainEvery));
     if (buckles(defender.legDamage[legSide]) > buckles(before) && defender.state === 'up') {
       knockDown(world, defender, event, 'knockdown (leg gave way)');
     }
@@ -2073,7 +2073,7 @@ function pushBack(world, attacker, defender, capsule, closest, contactPoint, nor
   const transferred = ((impulse * (1 + WORLD.transferRestitution)) / (1 + WORLD.restitution)) * share;
   event.transferred = transferred;
   const bodyDeltaV = transferred / body.massKg;
-  if (defender.state === 'up' && bodyDeltaV * harm > WORLD.knockout.bodyDeltaV && !blocked) {
+  if (defender.state === 'up' && bodyDeltaV * harm > WORLD.knockout.bodyDeltaV * BODY.toughness && !blocked) {
     knockOut(world, defender, event, `knocked out (the blow moved his whole body ${bodyDeltaV.toFixed(1)} m/s)`);
   }
   world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse: transferred, massShare: WORLD.balance.strikeMassShare });
@@ -2115,9 +2115,9 @@ function jointAt(defender, capsule, t, contactPoint) {
 /** Joules of cut it takes to go through this joint of this body: more for a thicker limb. */
 function severThreshold(defender, { joint, side }) {
   const [base, segment, typical] = BLADES.sever[joint];
-  if (!segment) return base;
+  if (!segment) return base * BODY.toughness;
   const radius = defender.body.segments[`${side}${segment}`].skinRadius;
-  return base * (radius / typical) ** 2;
+  return base * (radius / typical) ** 2 * BODY.toughness;
 }
 
 /** Into the chest or the head: where a deep stab kills. */
@@ -2253,7 +2253,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     if (joint && cut > severThreshold(defender, joint)) {
       sever(world, defender, joint, event, bladeVelocity);
       through = true;
-    } else if (pierce > BLADES.lethalPierce && vital(defender, capsule, contactPoint)) {
+    } else if (pierce > BLADES.lethalPierce * BODY.toughness && vital(defender, capsule, contactPoint)) {
       knockOut(world, defender, event, capsule.key === 'head' ? 'stabbed through the head' : 'stabbed through the heart', 'killed');
     }
   }
@@ -2502,10 +2502,20 @@ export function chinNow(fighter) {
  * count for a little. The view reddens a segment as this rises.
  */
 function addDamage(fighter, key, deltaV, blocked) {
-  const capacity = WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20;
+  const capacity = (WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20) * BODY.toughness;
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
   fighter.damageVersion += 1;
+}
+
+/** Leg damage (summed m/s) that makes a leg give way, for everyone's toughness. */
+function legCapacity() {
+  return WORLD.legCapacity * BODY.toughness;
+}
+
+/** Share of blood lost that collapses a man. */
+export function collapseAt() {
+  return BLADES.collapseAt * BODY.toughness;
 }
 
 /** Out on the spot: the bout is over, no count. */

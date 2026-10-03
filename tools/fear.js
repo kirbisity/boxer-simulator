@@ -13,7 +13,9 @@ export const MISMATCHES = [['heavy', 'amateur'], ['heavy', 'light'], ['contender
 export function fearProfile(pair, { bouts = 6, seconds = 60, enabled = true, style = 'boxing' } = {}) {
   const saved = { ...AI.confidence };
   if (!enabled) for (const key of Object.keys(AI.confidence)) AI.confidence[key] = 0;
-  const rows = pair.map(() => ({ confidence: 0, advancing: 0, thrown: 0, defences: 0, frames: 0, minutes: 0 }));
+  // Pressing and defending are counted only while both stand: time spent
+  // waiting out a knockdown is neither.
+  const rows = pair.map(() => ({ confidence: 0, advancing: 0, thrown: 0, defences: 0, frames: 0, standing: 0, minutes: 0 }));
   try {
     for (let bout = 0; bout < bouts; bout += 1) {
       const world = createWorld(pair.map((key) => ({ ...PRESETS[key], style })), { seed: 600 + bout });
@@ -26,7 +28,9 @@ export function fearProfile(pair, { bouts = 6, seconds = 60, enabled = true, sty
           const row = rows[index];
           row.frames += 1;
           row.confidence += confidence(fighter, world.fighters[1 - index]);
-          if (fighter.move > 0.3) row.advancing += 1;
+          const bothUp = world.fighters.every((each) => each.state === 'up');
+          if (bothUp) row.standing += 1;
+          if (bothUp && fighter.move > 0.3) row.advancing += 1;
           for (const thing of [fighter.punch, fighter.defence]) {
             if (thing && !seen.has(thing)) {
               seen.add(thing);
@@ -41,7 +45,7 @@ export function fearProfile(pair, { bouts = 6, seconds = 60, enabled = true, sty
   } finally {
     Object.assign(AI.confidence, saved);
   }
-  return rows.map((row) => ({ confidence: row.confidence / row.frames, advancing: row.advancing / row.frames, perMinute: row.thrown / row.minutes, defencesPerMinute: row.defences / row.minutes }));
+  return rows.map((row) => ({ confidence: row.confidence / row.frames, advancing: row.advancing / Math.max(1, row.standing), perMinute: row.thrown / row.minutes, defencesPerMinute: row.defences / (row.standing / 30 / 60 || 1) }));
 }
 
 if (process.argv[1]?.endsWith('fear.js')) {

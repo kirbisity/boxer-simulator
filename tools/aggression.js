@@ -17,6 +17,8 @@ export function measureStyle(style = 'boxing', bouts = 6, seconds = 60, pair = [
     while (elapsed < seconds && !boutWinner(world)) {
       advance(world, 1 / 30, (current, dt) => thinkAll(current, dt));
       elapsed += 1 / 30;
+      // A rate of fighting: minutes of both men on their feet, not of a count.
+      if (world.fighters.every((fighter) => fighter.state === 'up')) tally.minutes += (world.fighters.length / 30) / 60;
       for (const fighter of world.fighters) {
         tally.frames += 1;
         if (fighter.move > 0.3) tally.advancing += 1;
@@ -54,7 +56,6 @@ export function measureStyle(style = 'boxing', bouts = 6, seconds = 60, pair = [
         if (event.kind === 'blocked' && (event.punch ?? '').match(/jab|cross|hook|uppercut/)) tally.headBlocked += 1;
       }
     }
-    tally.minutes += (elapsed * world.fighters.length) / 60;
   }
   return {
     perMinute: tally.thrown / tally.minutes,

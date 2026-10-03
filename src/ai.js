@@ -46,7 +46,8 @@ export const AI = {
   // of the man; and what confidence (+1) or fear (−1) does to the fight.
   confidenceRatio: 2.5,
   experienceShots: 3,
-  confidence: { closer: 0.15, pressure: 1.0, tempo: 0.45, defend: 0.45, heavy: 0.08 },
+  // `cadence`: a confident man works longer and moves less between, fear the reverse.
+  confidence: { closer: 0.15, pressure: 1.0, tempo: 0.45, defend: 0.45, heavy: 0.08, cadence: 0.5 },
   // Team fights: a fighter facing an opponent already taken on by this many
   // team-mates looks for another, all else near equal (m of extra distance each).
   crowdPenalty: 0.7,
@@ -56,6 +57,24 @@ export const AI = {
   lineOfFire: 0.4,
   pastTarget: 0.45, // m: a team-mate this close behind my man is in the line too
   kickClearance: 1.3, // m: no kicks or knees with a team-mate this close, beside or ahead
+  // Facing a longer reach (a sword, a baton, a spear) or a blade: keep out of
+  // it, then surge. Outreached by this much (m) or facing an edge or a point
+  // with nothing as long in hand, a fighter holds `margin` beyond the other's
+  // reach, circling; after a wait (shorter when confident, at once when the
+  // other has just thrown and is recovering) he surges in at `surgeSpeed`
+  // × footwork, throws a burst of a few quick attacks, and retreats.
+  blade: {
+    outreachedBy: 0.25, margin: 0.3, slack: 0.12,
+    surgeSpeed: 1.8, retreatSpeed: 1.4, surgeSeconds: 1.4,
+    stepBackChance: 0.65,
+  },
+  // Cadence: every fighter alternates spells of moving (circling, nothing
+  // thrown but into an opening) and of working (attacking, much of it in
+  // quick bursts). Mean spell lengths (s) before the style, plan, temper
+  // and nerve stretch them; how widely each fighter's temperament varies
+  // (e^±spread on each trait); the gap between attacks in a burst (s); and
+  // how readily a moving fighter jumps on an opponent recovering from a miss.
+  cadence: { workSeconds: 4.5, moveSeconds: 1.6, spread: 0.45, burstGap: 0.1, openingChance: 0.7 },
   // Numbers: confidence gained per doubling of my side's standing fighters
   // over theirs (lost when outnumbered).
   numbersConfidence: 0.45,
@@ -165,7 +184,10 @@ function chooseFocus(world, fighter) {
     const event = events[index];
     if (event.kind !== 'landed' && event.kind !== 'blocked') continue;
     feel(world, fighter, event);
-    if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) hitBy = event.attacker;
+    if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) {
+      hitBy = event.attacker;
+      if (event.kind === 'landed') fighter.aiLastHit = event.time;
+    }
   }
   fighter.aiEventCursor = events.length;
   const current = fighter.focus === undefined ? null : world.fighters[fighter.focus];
@@ -263,6 +285,127 @@ export function confidence(fighter, opponent, world = null) {
   return Math.max(-1, Math.min(1, nerve));
 }
 
+/**
+ * Whether this fighter must keep out of his opponent's reach: outreached
+ * (a sword against fists, a spear against a sword) or facing an edge or a
+ * point with nothing as long in his own hands.
+ */
+export function outreached(fighter, opponent) {
+  const theirs = opponent.weapon?.held ? opponent.weapon.spec : null;
+  const mine = fighter.weapon?.held ? fighter.weapon.spec : null;
+  if (reachOf(opponent) - reachOf(fighter) > AI.blade.outreachedBy) return true;
+  const sharp = theirs && Object.values(theirs.harm).some((mix) => (mix.cut ?? 0) + (mix.pierce ?? 0) > 0.3);
+  return Boolean(sharp && !(mine && mine.length >= theirs.length - 0.1));
+}
+
+/** Spread of one temperament trait round 1: e^(±spread). */
+function trait(random) {
+  return Math.exp((random() * 2 - 1) * AI.cadence.spread);
+}
+
+/**
+ * A fighter's own cadence for now: how long he moves and how long he works,
+ * how much of his work comes in bursts and how far he circles. From his
+ * style, his game plan, his own temperament (drawn once, his for the
+ * bout) and his nerve: confidence works longer and waits less.
+ */
+function cadenceOf(world, fighter, style, plan, nerve) {
+  fighter.temperament ??= { work: trait(world.random), move: trait(world.random), burst: trait(world.random), mobility: trait(world.random) };
+  const own = fighter.temperament;
+  const base = { work: 1, move: 1, burst: 0.5, mobility: 0.5, ...style.cadence };
+  const tilt = plan.cadence ?? {};
+  return {
+    work: AI.cadence.workSeconds * base.work * (tilt.work ?? 1) * own.work * Math.exp(AI.confidence.cadence * nerve),
+    move: AI.cadence.moveSeconds * base.move * (tilt.move ?? 1) * own.move * Math.exp(-AI.confidence.cadence * nerve),
+    burst: Math.min(1, base.burst * (tilt.burst ?? 1) * own.burst),
+    mobility: Math.min(1, base.mobility * (tilt.mobility ?? 1) * own.mobility),
+    opening: AI.cadence.openingChance * (tilt.opening ?? 1),
+    nerve,
+  };
+}
+
+/** Draw how long a phase lasts: around its mean, never instant. */
+function phaseLength(random, mean) {
+  return mean * (0.4 + 1.2 * random());
+}
+
+/**
+ * Move or work. Moving, a fighter circles at his distance and throws
+ * nothing unless an opening shows; working, he attacks, much of it in
+ * bursts. Facing a longer reach or a blade (`wary`), moving means holding
+ * outside that reach, working means a surge in for one burst, and a
+ * retreat follows. Sets the fighter's footwork; returns whether he may
+ * start an attack now.
+ */
+function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt }) {
+  const random = world.random;
+  const blade = AI.blade;
+  const safe = reachOf(opponent) + fighter.body.lengths.headRadius + blade.margin;
+  const myRange = reachOf(fighter) + opponent.body.lengths.headRadius;
+  let phase = fighter.aiCadence;
+  const start = (name, length) => {
+    phase = fighter.aiCadence = { name, t: 0, length, thrownAtStart: fighter.stats.thrown, burstLeft: 0 };
+    if (name === 'work' && wary) world.events.push({ time: world.time, kind: 'surge', fighter: fighter.id, effects: [] });
+  };
+  if (!phase) start('work', phaseLength(random, cadence.work));
+  phase.t += dt;
+  const recovering = (opponent.punch && opponent.punch.t > opponent.punch.spec.extendUntil) || opponent.committed > 0;
+  // Afraid, he lets the distance open rather than walk back into range.
+  const approach = Math.max(0.3, 1 + Math.min(0, cadence.nerve) * AI.confidence.pressure * 0.5);
+  if (phase.name === 'move') {
+    // Circle at my distance (out of his reach if he outreaches me).
+    const hold = wary ? safe : range;
+    if (distance < hold - blade.slack) fighter.move = wary ? -1 : -0.7;
+    else if (distance > hold + blade.slack) fighter.move = (wary ? 0.6 : 1) * approach;
+    else fighter.move *= Math.exp(-dt * 4);
+    fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 1 : -1) * cadence.mobility));
+    const opening = recovering && random() < cadence.opening * dt * 10;
+    if ((phase.t > phase.length || opening) && fighter.stamina > (wary ? 0.3 : 0.15)) start('work', wary ? blade.surgeSeconds : phaseLength(random, cadence.work));
+    return false;
+  }
+  if (phase.name === 'retreat') {
+    fighter.move = -blade.retreatSpeed;
+    if (distance > safe || !wary) start('move', phaseLength(random, cadence.move));
+    return false;
+  }
+  // Working.
+  if (wary) {
+    fighter.move = distance > myRange * 0.85 ? blade.surgeSpeed : 0.4;
+    fighter.strafe = 0;
+    const thrown = fighter.stats.thrown - phase.thrownAtStart;
+    const hit = (fighter.aiLastHit ?? -Infinity) > world.time - phase.t;
+    if (!phase.burstSize) phase.burstSize = 1 + Math.floor(random() * (1 + 3 * cadence.burst));
+    if ((thrown >= phase.burstSize && !fighter.punch) || phase.t > phase.length || hit) start('retreat', 0);
+    fighter.cooldown = Math.min(fighter.cooldown, AI.cadence.burstGap);
+    return true;
+  }
+  // Sure of himself, he works from closer still: he walks his man down.
+  const workRange = range - AI.confidence.closer * Math.max(0, cadence.nerve);
+  if (distance > workRange + AI.rangeSlack) fighter.move = approach;
+  else if (distance < workRange - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
+  else fighter.move *= Math.exp(-dt * 4);
+  if (fighter.stamina < 0.25 && distance < range + 0.4) fighter.move = -0.6;
+  if (phase.t > phase.length && !fighter.punch && !fighter.aiCombo?.length) start('move', phaseLength(random, cadence.move));
+  return true;
+}
+
+/**
+ * The rest after an attack: in a burst, hardly any; between bursts the
+ * style's rest, stretched so that a bursty fighter throws about as much
+ * over a round as an even one, only bunched.
+ */
+function nextGap(world, fighter, style, plan, cadence) {
+  const random = world.random;
+  const phase = fighter.aiCadence;
+  if (phase?.burstLeft > 0) {
+    phase.burstLeft -= 1;
+    return AI.cadence.burstGap;
+  }
+  const size = random() < cadence.burst ? 1 + Math.floor(random() * (1 + 3 * cadence.burst)) : 0;
+  if (phase) phase.burstLeft = size;
+  return restAfterAttack(fighter, style, random) * plan.tempo * (1 + size * 0.6);
+}
+
 export function think(world, fighter, dt) {
   const random = world.random;
   fighter.strafe = 0;
@@ -311,11 +454,17 @@ export function think(world, fighter, dt) {
   const range = (inside ? reach * 0.75 : reach + opponent.body.lengths.headRadius + AI.rangeExtra + plan.range + (kicker ? AI.kickerExtra : 0)) + (waiting ? AI.waitingDistance : 0);
   // Circling while waiting: round him, a way chosen by who I am.
   if (waiting) fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 0.6 : -0.6)));
-  if (!fighter.defence || fighter.defence.name !== 'stepBack') {
+  // His own cadence: spells of moving and of working, in bursts; against a
+  // longer reach or a blade, held off out of reach between surges.
+  const wary = !waiting && !fighter.clinch && outreached(fighter, opponent);
+  const cadence = cadenceOf(world, fighter, style, plan, nerve);
+  let mayAttack = true;
+  if (waiting || fighter.clinch) {
     if (distance > range + AI.rangeSlack) fighter.move = 1;
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
     else fighter.move *= Math.exp(-dt * 4);
-    if (fighter.stamina < 0.25 && distance < range + 0.4) fighter.move = -0.6;
+  } else if (!fighter.defence || fighter.defence.name !== 'stepBack') {
+    mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt });
   }
 
   // React to a strike once it can be seen coming: after a reaction time
@@ -333,7 +482,9 @@ export function think(world, fighter, dt) {
   if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && (incoming.age ?? incoming.t) >= fighter.reactAt) {
     fighter.reacted = true;
     if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise))) {
-      const { name, side } = chooseDefence(fighter, striker, style, incoming, random);
+      let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
+      // A blade coming is got away from, not blocked with an arm.
+      if (incoming.spec.path === 'blade' && wary && random() < AI.blade.stepBackChance) name = 'stepBack';
       perform(world, fighter, name, { side });
       // Slip and fire back: the counter comes while the attacker's hand is out.
       if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {
@@ -343,7 +494,7 @@ export function think(world, fighter, dt) {
     }
   }
 
-  if (fighter.punch || fighter.rush) return;
+  if (fighter.punch || fighter.rush || !mayAttack) return;
   // Never through a team-mate, and not while waiting a turn.
   if (spacing.blocked || waiting) {
     fighter.aiCombo = null;
@@ -354,7 +505,7 @@ export function think(world, fighter, dt) {
     const next = fighter.aiCombo.shift();
     fighter.aiComboStep += 1;
     if (!throwPunch(world, fighter, next, fighter.aiComboZone)) fighter.aiCombo = null;
-    else if (!fighter.aiCombo.length) fighter.cooldown = restAfterAttack(fighter, style, random) * plan.tempo;
+    else if (!fighter.aiCombo.length) fighter.cooldown = nextGap(world, fighter, style, plan, cadence);
     return;
   }
   fighter.aiComboStep = 0;
@@ -408,7 +559,7 @@ export function think(world, fighter, dt) {
   if (throwPunch(world, fighter, move, zone, { heavy })) {
     fighter.aiCombo = combo;
     fighter.aiComboZone = zone;
-    fighter.cooldown = combo ? 0 : restAfterAttack(fighter, style, random) * plan.tempo;
+    fighter.cooldown = combo ? 0 : nextGap(world, fighter, style, plan, cadence);
   }
 }
 

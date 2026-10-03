@@ -5,14 +5,13 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
+import { advance, boutWinner, collapseAt, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { OUTFIT_KEYS, OUTFITS, outfitOf } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
-import { BLADES } from './weapons.js';
 import { clearGore, severView, spawnSparks, updateArms, updateBlood, updateDebris, updateStumps, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -235,7 +234,7 @@ function renderHud() {
     // Blood lost, against what puts him down: shown once he is bleeding.
     const blood = card.querySelector('.blood');
     blood.hidden = !(fighter.bloodLost > 0);
-    blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / BLADES.collapseAt) * 100))}%`;
+    blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / collapseAt()) * 100))}%`;
     card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : `KD ${fighter.knockdowns}`;
     const nerve = fighter.aiConfidence ?? 0;
     const mood = nerve > 0.35 ? ' · confident' : nerve < -0.35 ? ' · wary' : '';

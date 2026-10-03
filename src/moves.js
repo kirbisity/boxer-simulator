@@ -79,13 +79,16 @@ export const DEFENCES = {
 };
 
 /**
- * Styles. `stance` shapes the guard (blade angle, crouch, stance width,
+ * Styles. `cadence` is the style's rhythm (see the AI): relative lengths of
+ * spells of working and of moving, the share of attacks thrown in bursts,
+ * and how much it circles. `stance` shapes the guard (blade angle, crouch, stance width,
  * how upright), `idle` the constant motion, `attacks` and `defences` the
  * AI's mix (relative weights), `rushChance` how often it charges (per s).
  */
 export const STYLES = {
   boxing: {
     label: 'Boxing',
+    cadence: { work: 1.6, move: 0.45, burst: 0.6, mobility: 0.6 },
     stance: { blade: 0.55, crouch: 0.03, width: 1, lean: 0.14, guardHeight: 0 },
     idle: { bounce: 1, sway: 1, rock: 0.2 },
     attacks: { jab: 0.34, cross: 0.26, hook: 0.2, uppercut: 0.12, rush: 0.006 },
@@ -105,6 +108,7 @@ export const STYLES = {
   },
   kickboxing: {
     label: 'Kickboxing',
+    cadence: { work: 1, move: 1, burst: 0.45, mobility: 0.5 },
     stance: { blade: 0.42, crouch: 0.02, width: 1.12, lean: 0.1, guardHeight: 0.01 },
     idle: { bounce: 0.8, sway: 0.8, rock: 0.4 },
     attacks: { jab: 0.22, cross: 0.17, hook: 0.1, uppercut: 0.05, roundhouse: 0.18, lowKick: 0.15, teep: 0.08, rush: 0.008 },
@@ -117,6 +121,7 @@ export const STYLES = {
   // dropping, charging in; defence is covering up or backing off.
   street: {
     label: 'Street',
+    cadence: { work: 1.2, move: 0.7, burst: 0.8, mobility: 0.25 },
     stance: { blade: 0.3, crouch: 0.01, width: 0.95, lean: 0.06, guardHeight: -0.05 },
     idle: { bounce: 0.3, sway: 1.3, rock: 0.5 },
     attacks: { jab: 0.12, cross: 0.34, hook: 0.38, uppercut: 0.1, rush: 0.03 },
@@ -132,6 +137,7 @@ export const STYLES = {
   },
   muayThai: {
     label: 'Muay Thai',
+    cadence: { work: 1.2, move: 0.8, burst: 0.3, mobility: 0.3 },
     // Square and upright, weight back, guard high and long.
     stance: { blade: 0.22, crouch: 0, width: 0.92, lean: 0.03, guardHeight: 0.02 },
     idle: { bounce: 0.25, sway: 0.7, rock: 1 },
@@ -147,6 +153,7 @@ export const STYLES = {
   // out of the hand, the fighter boxes.
   baton: {
     label: 'Police baton', weapon: 'baton',
+    cadence: { work: 1, move: 0.8, burst: 0.55, mobility: 0.45 },
     stance: { blade: 0.42, crouch: 0.02, width: 1.05, lean: 0.08, guardHeight: 0 },
     weaponGuard: { hand: [0.1, 0.78, -0.13], dir: [-0.15, 1, -0.1] },
     idle: { bounce: 0.4, sway: 0.8, rock: 0.4 },
@@ -160,6 +167,7 @@ export const STYLES = {
   },
   longsword: {
     label: 'Long sword', weapon: 'longsword',
+    cadence: { work: 0.8, move: 1.3, burst: 0.4, mobility: 0.6 },
     stance: { blade: 0.4, crouch: 0.04, width: 1.2, lean: 0.06, guardHeight: 0 },
     // Pflug: hilt at the hip, point at the opponent's face.
     weaponGuard: { hand: [0.17, 0.55, -0.03], dir: [1, 0.55, 0] },
@@ -174,6 +182,7 @@ export const STYLES = {
   },
   katana: {
     label: 'Katana', weapon: 'katana',
+    cadence: { work: 0.6, move: 1.6, burst: 0.3, mobility: 0.55 },
     stance: { blade: 0.15, crouch: 0.05, width: 1.15, lean: 0.03, guardHeight: 0 },
     // Hands before the navel, blade held upright.
     weaponGuard: { hand: [0.17, 0.6, -0.03], dir: [0.3, 1, 0.05] },
@@ -188,6 +197,7 @@ export const STYLES = {
   },
   knife: {
     label: 'Knife', weapon: 'knife',
+    cadence: { work: 1, move: 0.9, burst: 0.9, mobility: 0.7 },
     stance: { blade: 0.35, crouch: 0.05, width: 1.05, lean: 0.12, guardHeight: -0.02 },
     weaponGuard: { hand: [0.2, 0.6, -0.09], dir: [1, 0.25, 0.1] },
     idle: { bounce: 0.6, sway: 1.1, rock: 0.4 },
@@ -205,6 +215,7 @@ export const STYLES = {
   // held out before him. Losing the spear, he draws the gladius.
   hoplomachus: {
     label: 'Hoplomachus', weapon: 'spear', shield: 'parma', fallback: 'gladius',
+    cadence: { work: 0.9, move: 1.2, burst: 0.4, mobility: 0.4 },
     stance: { blade: 0.5, crouch: 0.06, width: 1.2, lean: 0.1, guardHeight: 0 },
     weaponGuard: { hand: [-0.02, 0.8, -0.18], dir: [1, -0.05, 0.03] },
     // The shield arm: forearm across before the chest.
@@ -220,6 +231,7 @@ export const STYLES = {
   },
   gladius: {
     label: 'Gladius and parma', hidden: true, weapon: 'gladius', shield: 'parma', fallback: 'boxing',
+    cadence: { work: 1.1, move: 0.9, burst: 0.6, mobility: 0.4 },
     stance: { blade: 0.45, crouch: 0.06, width: 1.15, lean: 0.12, guardHeight: 0 },
     weaponGuard: { hand: [0.08, 0.6, -0.14], dir: [1, 0.2, 0.05] },
     shieldGuard: [0.3, 0.72, 0.05],
@@ -244,10 +256,10 @@ export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidde
  * attacks thrown heavy. `weight` is how often each is picked at random.
  */
 export const STRATEGIES = {
-  outboxer: { label: 'out-boxing', weight: 1, range: 0.15, tempo: 1.15, pressure: 0.3, defend: 1.15, counter: 0, heavy: 0.02 },
-  pressure: { label: 'pressure', weight: 1, range: -0.1, tempo: 0.75, pressure: 2.2, defend: 0.85, counter: 0, heavy: 0.05 },
-  counter: { label: 'counter-punching', weight: 0.8, range: 0.05, tempo: 1.5, pressure: 0.6, defend: 1.25, counter: 0.35, heavy: 0.06 },
-  brawler: { label: 'brawling', weight: 0.6, range: -0.05, tempo: 0.9, pressure: 1.5, defend: 0.6, counter: 0, heavy: 0.15 },
+  outboxer: { label: 'out-boxing', weight: 1, range: 0.15, tempo: 1.15, pressure: 0.3, defend: 1.15, counter: 0, heavy: 0.02, cadence: { work: 0.7, move: 1.5, burst: 0.8, mobility: 1.5 } },
+  pressure: { label: 'pressure', weight: 1, range: -0.1, tempo: 0.75, pressure: 2.2, defend: 0.85, counter: 0, heavy: 0.05, cadence: { work: 1.6, move: 0.5, burst: 1.3, mobility: 0.6 } },
+  counter: { label: 'counter-punching', weight: 0.8, range: 0.05, tempo: 1.5, pressure: 0.6, defend: 1.25, counter: 0.35, heavy: 0.06, cadence: { work: 0.6, move: 1.4, burst: 0.7, opening: 2 } },
+  brawler: { label: 'brawling', weight: 0.6, range: -0.05, tempo: 0.9, pressure: 1.5, defend: 0.6, counter: 0, heavy: 0.15, cadence: { work: 1.4, move: 0.4, burst: 1.5, mobility: 0.3 } },
 };
 
 /** Which moves the style can use, for the player's pad. */

@@ -50,6 +50,11 @@ export const FRAMES = {
 };
 
 export const BODY = {
+  // How much harm everyone takes before it tells — chin, brain strain,
+  // fractures, worn-out tissue, cuts through, blood lost — as a share of the
+  // figures below. Lower means fists and weapons alike end fights sooner;
+  // nothing in the physics (masses, forces, impulses, knockback) changes.
+  toughness: 0.7,
   // Lean mass that is not skeleton or skeletal muscle: organs, skin, blood.
   // A share of lean (so it shrinks in starvation) plus a little per kg of
   // fat (a bigger body needs bigger organs). Leaves ~32 kg of muscle in a
@@ -312,11 +317,12 @@ export function buildBody(rawInputs) {
       uppercut: (armKg('r') * 0.6 + massKg * 0.01) * technique,
     },
     // Head speed change that drops this fighter, ~3–4.5 m/s ("chin").
-    chin: 3.1 * (0.8 + 0.25 * neckIndex) * (1 - 0.004 * yearsAging),
+    chin: 3.1 * (0.8 + 0.25 * neckIndex) * (1 - 0.004 * yearsAging) * BODY.toughness,
+    // A man's own hand breaking on a punch is the attacker's risk, not his health: it stays.
     fracture: {
-      face: BODY.fractureN.face * boneDensity,
+      face: BODY.fractureN.face * boneDensity * BODY.toughness,
       hand: BODY.fractureN.hand * boneDensity,
-      rib: BODY.fractureN.rib * boneDensity,
+      rib: BODY.fractureN.rib * boneDensity * BODY.toughness,
     },
   };
 }
