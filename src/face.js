@@ -71,8 +71,8 @@ function headDeform(position, shape) {
       const width = t < shape.jawAt
         ? 1 + (shape.jawWidth - 1) * (t / shape.jawAt) + shape.cheek * Math.sin((Math.PI * t) / shape.jawAt)
         : shape.jawWidth + (shape.chinWidth - shape.jawWidth) * ((t - shape.jawAt) / (1 - shape.jawAt));
-      const front = 1 + (shape.chinForward - 1) * smooth(t);
-      const back = 1 - 0.62 * smooth(t);
+      const front = 1 + (shape.chinForward - 1) * easeInOut(t);
+      const back = 1 - 0.62 * easeInOut(t);
       X = ux * (ux > 0 ? front : back) * Math.min(1, ring * 3 + 0.25);
       Z = uz * width * Math.min(1, ring * 3 + 0.25);
       Y = -t * shape.chinLength;
@@ -84,7 +84,7 @@ function headDeform(position, shape) {
     // The flat face plane: the front is pressed back where the features sit,
     // fading in and out over the brow and the chin so no crease forms.
     if (X > shape.faceFront) {
-      const band = smooth(Math.max(0, Math.min(1, (0.6 - Y) / 0.25))) * smooth(Math.max(0, Math.min(1, (Y + 0.95) / 0.3)));
+      const band = easeInOut(Math.max(0, Math.min(1, (0.6 - Y) / 0.25))) * easeInOut(Math.max(0, Math.min(1, (Y + 0.95) / 0.3)));
       X -= (X - shape.faceFront) * 0.7 * band;
     }
     position.setXYZ(index, X * SKULL[0], Y * SKULL[1], Z * SKULL[2]);
