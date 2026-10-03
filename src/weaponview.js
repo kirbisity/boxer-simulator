@@ -43,9 +43,12 @@ function bladeGeometry(from, length, width, thickness, tip, curve = 0) {
     const y = from + u * length;
     const toPoint = Math.max(0, (y - (from + length - tip)) / tip);
     const taper = ring === rings ? 0 : 1 - toPoint * toPoint * 0.9 - toPoint * 0.1;
-    const bow = curve * Math.sin(u * Math.PI * 0.5) * u;
+    // The curve (sori) bows the blade back towards its spine (−z), the edge on the outside of the curve.
+    const bow = -curve * Math.sin(u * Math.PI);
+    const tipBack = -curve * 0.6 * u * u;
+    const z = bow + tipBack;
     // Edge (+z), back (−z), and the two flats (±x).
-    positions.push(bow, y, (width / 2) * taper, thickness / 2 * taper + bow, y, 0, bow, y, (-width / 2) * taper * 0.85, -thickness / 2 * taper + bow, y, 0);
+    positions.push(0, y, (width / 2) * taper + z, (thickness / 2) * taper, y, z, 0, y, (-width / 2) * taper * 0.85 + z, (-thickness / 2) * taper, y, z);
   }
   for (let ring = 0; ring < rings; ring += 1) {
     for (let side = 0; side < 4; side += 1) {
@@ -106,7 +109,7 @@ export function buildWeaponMesh(kind, envMap) {
       break;
     }
     case 'katana': {
-      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.032, 0.007, 0.08, 0.025), steel));
+      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.032, 0.007, 0.08, 0.05), steel));
       const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.008, 18), surface(0x2a2420, { roughness: 0.5 }));
       tsuba.position.y = 0.03;
       const habaki = cylinder(0.012, 0.012, 0.034, 0.06, brass, 8);

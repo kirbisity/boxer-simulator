@@ -9,7 +9,7 @@ import { advance, boutWinner, collapseAt, concussionCapacity, createWorld, perfo
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
-import { OUTFIT_KEYS, OUTFITS, outfitOf } from './outfits.js';
+import { CLOTH_COLORS, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { clearGore, severView, spawnSparks, updateArms, updateBlood, updateDebris, updateStumps, woundBlood } from './weaponview.js';
@@ -74,6 +74,7 @@ function ensureRoster(corner, scenario) {
       const spare = Object.values(PRESETS).filter((preset) => !leads.has(preset.name));
       // Fighters added to a side fight mixed by default: boxing, kicking, the clinch, pushing.
       mate = normaliseInputs({ ...structuredClone(spare[(index + (corner === 'blue' ? 2 : 0)) % spare.length]), style: 'mix' });
+      shuffleColors(mate);
     }
     // A name already in the fight gets a number.
     const taken = new Set([...state.rosters.red, ...state.rosters.blue].map((fighter) => fighter.name));
@@ -87,6 +88,13 @@ function ensureRoster(corner, scenario) {
 function teamFor(corner, scenario) {
   ensureRoster(corner, scenario);
   return state.rosters[corner].slice(0, state.teamSizes[corner]);
+}
+
+/** Fresh colours from the fighter's outfit palette (a level's characters keep theirs). */
+function shuffleColors(inputs) {
+  const outfit = outfitField(inputs);
+  const colors = randomColors(outfit.kind);
+  if (Object.keys(colors).length) outfit.colors = colors;
 }
 
 function newBout() {
@@ -206,6 +214,7 @@ function consumeEvents() {
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
     if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked')) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
+    if (event.kind === 'bladeBlock') (event.cut > 1 ? woundBlood : (view, at) => spawnSparks(view, at.point, 6))(scene, event);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);
@@ -270,6 +279,7 @@ function logEvent(event) {
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
+  else if (event.kind === 'bladeBlock') text = `<b>${name(event.attacker)}</b> meets <b>${name(event.defender)}</b>'s ${event.punch ?? 'strike'} with the blade · <em>${event.effects.join(', ') || 'fended off'}</em>`;
   else if (event.kind === 'styleSwitch') text = `<b>${name(event.fighter)}</b> switches to ${STYLES[event.style].label}`;
   else if (event.kind === 'pinning') text = `<b>${name(event.attacker)}</b> goes to hold <b>${name(event.defender)}</b> down`;
   else if (event.kind === 'held') text = `🤼 <b>${name(event.fighter)}</b> is held down`;
@@ -322,6 +332,12 @@ for (const corner of ['red', 'blue']) {
     newBout();
   });
 }
+$('#shuffle-all').addEventListener('click', () => {
+  for (const corner of ['red', 'blue']) {
+    for (const inputs of state.rosters[corner]) shuffleColors(inputs);
+    fillCornerForm(corner);
+  }
+});
 $('#place').addEventListener('change', (event) => {
   state.place = event.target.value;
   newBout();
@@ -461,28 +477,26 @@ const LOOK_FIELDS = [
 
 // The outfit: which kind and which of its designs, its colours (the
 // design's own unless chosen), a headset, and the fists.
-const CLOTH_COLORS = {
-  design: null, navy: '#24324a', maroon: '#7a2230', black: '#1c1c20', charcoal: '#26262b', grey: '#6b6e74',
-  white: '#e4e4e6', olive: '#4a5233', denim: '#2b3550', sand: '#b39a73', red: '#b8302c', blue: '#2a59c4',
-};
-const colorName = (hex) => (hex ? Object.keys(CLOTH_COLORS).find((name) => CLOTH_COLORS[name] === hex) ?? 'design' : 'design');
+// The pickers offer the design's own colour and every named cloth colour.
+const PICKER_COLORS = { design: null, ...CLOTH_COLORS };
+const colorName = (hex) => (hex ? Object.keys(PICKER_COLORS).find((name) => PICKER_COLORS[name] === hex) ?? 'design' : 'design');
 const outfitField = (inputs) => (inputs.outfit ??= { kind: 'boxing', design: 0 });
 const OUTFIT_FIELDS = [
   {
     key: 'kind', label: 'Outfit', options: OUTFIT_KEYS, names: Object.fromEntries(OUTFIT_KEYS.map((key) => [key, OUTFITS[key].label])),
-    get: (inputs) => outfitField(inputs).kind, set: (inputs, value) => { Object.assign(outfitField(inputs), { kind: value, design: 0, colors: {} }); },
+    get: (inputs) => outfitField(inputs).kind, set: (inputs, value) => { Object.assign(outfitField(inputs), { kind: value, design: 0, colors: randomColors(value) }); },
   },
   {
     key: 'design', label: 'Design', options: ['0', '1', '2'], names: null,
     get: (inputs) => String(outfitField(inputs).design ?? 0), set: (inputs, value) => { outfitField(inputs).design = Number(value); },
   },
   {
-    key: 'top', label: 'Top', options: Object.keys(CLOTH_COLORS),
-    get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: CLOTH_COLORS[value] ?? undefined }; },
+    key: 'top', label: 'Top', options: Object.keys(PICKER_COLORS),
+    get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: PICKER_COLORS[value] ?? undefined }; },
   },
   {
-    key: 'bottom', label: 'Legs', options: Object.keys(CLOTH_COLORS),
-    get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: CLOTH_COLORS[value] ?? undefined }; },
+    key: 'bottom', label: 'Legs', options: Object.keys(PICKER_COLORS),
+    get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: PICKER_COLORS[value] ?? undefined }; },
   },
   {
     key: 'headset', label: 'Headset', options: ['off', 'on'],
@@ -515,7 +529,9 @@ function buildCornerForm(corner) {
   presetSelect.replaceChildren(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, key)));
   presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === current(corner).name) ?? 'heavy';
   presetSelect.addEventListener('change', () => {
-    setCurrent(corner, normaliseInputs(structuredClone(PRESETS[presetSelect.value])));
+    const chosen = normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
+    shuffleColors(chosen);
+    setCurrent(corner, chosen);
     fillCornerForm(corner);
   });
   const fields = form.querySelector('.fields');
@@ -568,6 +584,13 @@ function buildCornerForm(corner) {
     return row;
   }));
   looks.after(outfit);
+  // New colours from this outfit's palette, as often as wanted.
+  const shuffle = Object.assign(document.createElement('button'), { type: 'button', className: 'shuffle', textContent: 'Shuffle colours' });
+  shuffle.addEventListener('click', () => {
+    shuffleColors(current(corner));
+    fillCornerForm(corner);
+  });
+  outfit.append(shuffle);
   form.querySelector('.copy').addEventListener('click', async () => {
     const code = btoa(unescape(encodeURIComponent(JSON.stringify(fighterFile(current(corner))))));
     const box = form.querySelector('.code');

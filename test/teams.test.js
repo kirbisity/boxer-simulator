@@ -56,8 +56,9 @@ test('a three-a-side fight runs on the same physics: everyone fights, and it end
 
 test('fear and confidence: the stronger man presses and covers up less, the weaker keeps away and defends more', () => {
   const pair = ['heavy', 'light'];
-  const on = fearProfile(pair, { bouts: 3, seconds: 45 });
-  const off = fearProfile(pair, { bouts: 3, seconds: 45, enabled: false });
+  // Six bouts: holds end some early, and three leave too few standing seconds to judge.
+  const on = fearProfile(pair, { bouts: 6, seconds: 45 });
+  const off = fearProfile(pair, { bouts: 6, seconds: 45, enabled: false });
   const [heavy, light] = [0, 1];
   assert.ok(on[heavy].confidence > 0.3 && on[light].confidence < -0.3, `confidence ${on[heavy].confidence.toFixed(2)} / ${on[light].confidence.toFixed(2)}`);
   assert.ok(on[heavy].advancing > off[heavy].advancing, 'the confident man presses forward more');

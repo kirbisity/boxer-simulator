@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
 import { gearTraits } from '../src/outfits.js';
 import { STYLES, STYLE_KEYS } from '../src/moves.js';
-import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, perform } from '../src/physics.js';
+import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, perform, placeFighter, throwPunch } from '../src/physics.js';
 import { thinkAll } from '../src/ai.js';
 import { WEAPONS, harmMix } from '../src/weapons.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 import { fighterFor } from '../tools/weapons.js';
 import { spacing } from '../tools/spacing.js';
+import { measureStyle } from '../tools/aggression.js';
 
 const wearing = (kind) => gearTraits({ ...PRESETS.contender, outfit: { kind, design: 0 } });
 
@@ -143,4 +144,60 @@ test('facing a longer reach or a blade, a fighter holds off and surges; even fig
 test('a weapon block meets the incoming blade', () => {
   const world = createWorld([{ ...PRESETS.contender, style: 'katana' }, { ...PRESETS.contender, style: 'katana' }]);
   assert.ok(perform(world, world.fighters[1], 'weaponBlock'));
+});
+
+test('a sword holds its range against fists, attacks often, and fends punches off with the blade', () => {
+  let gap = 0;
+  let samples = 0;
+  let fended = 0;
+  let attacks = 0;
+  let minutes = 0;
+  for (let seed = 1200; seed < 1204; seed += 1) {
+    const world = createWorld([fighterFor('contender:longsword'), fighterFor('contender:street')], { seed });
+    let elapsed = 0;
+    while (elapsed < 60 && !boutWinner(world)) {
+      advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+      elapsed += 0.1;
+      const [a, b] = world.fighters;
+      if (a.state === 'up' && b.state === 'up') {
+        gap += Math.hypot(a.x[24] - b.x[24], a.x[26] - b.x[26]);
+        samples += 1;
+      }
+    }
+    fended += world.events.filter((event) => event.kind === 'bladeBlock' && event.effects.includes('fended off')).length;
+    attacks += world.fighters[0].stats.thrown;
+    minutes += elapsed / 60;
+  }
+  assert.ok(gap / samples > 0.85, `kept ${(gap / samples).toFixed(2)} m off`);
+  assert.ok(attacks / minutes > 25, `${(attacks / minutes).toFixed(0)} attacks a minute`);
+  assert.ok(fended > 0, 'punches met on the blade');
+});
+
+test('a punch into a held blade is stopped there, and the edge cuts the hand', () => {
+  const world = createWorld([{ ...PRESETS.contender, style: 'street' }, { ...PRESETS.contender, style: 'katana' }], { seed: 2 });
+  const [puncher, swordsman] = world.fighters;
+  placeFighter(puncher, -0.45, 0);
+  placeFighter(swordsman, 0.45, 0);
+  advance(world, 0.5);
+  // The blade held straight across the line of the cross, at the height of the punch.
+  swordsman.defence = { name: 'weaponBlock', t: 0, seconds: 5, side: 1, from: puncher.id };
+  let stopped = null;
+  for (let tries = 0; tries < 6 && !stopped; tries += 1) {
+    throwPunch(world, puncher, 'cross', 'head');
+    swordsman.defence = { name: 'weaponBlock', t: 0, seconds: 5, side: 1, from: puncher.id };
+    advance(world, 0.6);
+    stopped = world.events.find((event) => event.kind === 'bladeBlock' && event.effects.includes('fended off'));
+  }
+  assert.ok(stopped, 'the cross met the blade');
+  assert.ok(stopped.cut > 0, 'and the edge cut');
+  assert.ok(!world.events.some((event) => event.kind === 'landed' && event.attacker === puncher.id && event.target === 'head'), 'nothing reached the head');
+});
+
+test('an unskilled fighter swings one at a time, barely defends, and misses more', () => {
+  const pair = ['contender', 'contender'];
+  const unskilled = measureStyle('unskilled', 3, 40, pair);
+  const boxer = measureStyle('boxing', 3, 40, pair);
+  assert.equal(unskilled.comboShare, 0);
+  assert.ok(unskilled.defencesPerMinute < boxer.defencesPerMinute * 0.25, `${unskilled.defencesPerMinute.toFixed(1)} vs ${boxer.defencesPerMinute.toFixed(1)} defences a minute`);
+  assert.ok(unskilled.headEvaded > boxer.headEvaded, 'wild swings miss more');
 });

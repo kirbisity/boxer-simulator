@@ -35,7 +35,7 @@ export const WEAPONS = {
   },
   knife: {
     label: 'Knife', hands: 'one', length: 0.21, strikeFrom: 0.05, handle: 0.1, mass: 0.22, balance: 0, radius: 0.01,
-    harm: { thrust: { pierce: 0.42, blunt: 0.3 }, swing: { cut: 0.35, blunt: 0.2 } },
+    harm: { thrust: { pierce: 0.5, blunt: 0.35 }, swing: { cut: 0.42, blunt: 0.22 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 45, zeta: 0.8 }, threat: 2.2,
   },
   // The hoplomachus's hasta: held near its balance in one hand, long ahead

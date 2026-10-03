@@ -40,6 +40,10 @@ export const AI = {
   // Heavy attacks: extra share when the opponent is hurt and there to be finished.
   finishingHeavy: 0.15,
   neutralDistance: 1.8, // m kept from an opponent who is down or rising
+  // The longer weapon: hold this far (m) inside my reach and outside his;
+  // he is coming in when the gap closes faster than `closingSpeed` (m/s);
+  // then a burst of `burstMin` + up to `burstRange` × burstiness attacks.
+  range: { inside: 0.12, outside: 0.25, closingSpeed: 0.4, burstMin: 2, burstRange: 2 },
   // A mixed fighter's spells in one style (s, give or take half).
   mix: { seconds: 10 },
   // Holding the last man down: how near his chest (m, hips to chest) to kneel, and how many hold at once.
@@ -364,6 +368,10 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   const safe = reachOf(opponent) + fighter.body.lengths.headRadius + blade.margin;
   const myRange = reachOf(fighter) + opponent.body.lengths.headRadius;
   let phase = fighter.aiCadence;
+  // The longer weapon: hold at the edge of his reach, inside mine; answer
+  // whoever steps in with a burst; step back when pressed.
+  const outreaching = !wary && fighter.weapon?.held && reachOf(fighter) - reachOf(opponent) > blade.outreachedBy;
+  if (outreaching) return holdTheRange(world, fighter, opponent, distance, cadence, dt);
   const start = (name, length) => {
     phase = fighter.aiCadence = { name, t: 0, length, thrownAtStart: fighter.stats.thrown, burstLeft: 0 };
     if (name === 'work' && wary) world.events.push({ time: world.time, kind: 'surge', fighter: fighter.id, effects: [] });
@@ -407,6 +415,37 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   else fighter.move *= Math.exp(-dt * 4);
   if (fighter.stamina < 0.25 && distance < range + 0.4) fighter.move = -0.6;
   if (phase.t > phase.length && !fighter.punch && !fighter.aiCombo?.length) start('move', phaseLength(random, cadence.move));
+  return true;
+}
+
+/**
+ * Footwork with the longer weapon: stand just outside his reach and well
+ * inside my own, so he must come through my range to reach me. When he
+ * steps in (or surges), meet him with a quick burst; when he is inside
+ * his own range, give ground. Attacks are thrown whenever he is in reach.
+ */
+function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
+  const spec = AI.range;
+  const mine = reachOf(fighter) + opponent.body.lengths.headRadius;
+  const his = reachOf(opponent) + fighter.body.lengths.headRadius;
+  const hold = Math.min(mine - spec.inside, his + spec.outside);
+  if (distance < his) fighter.move = -1;
+  else if (distance < hold - AI.blade.slack) fighter.move = -0.6;
+  else if (distance > hold + AI.blade.slack) fighter.move = 0.8;
+  else fighter.move *= Math.exp(-dt * 4);
+  fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 1 : -1) * cadence.mobility * 0.5));
+  // Coming in: the moment to strike, and to keep striking.
+  const closing = (fighter.aiLastGap ?? distance) - distance;
+  fighter.aiLastGap = distance;
+  const comingIn = distance < mine && (closing > spec.closingSpeed * dt || opponent.aiCadence?.name === 'work');
+  if (comingIn && !fighter.punch && !fighter.aiBurst) {
+    fighter.aiBurst = { left: spec.burstMin + Math.floor(world.random() * (1 + spec.burstRange * cadence.burst)) };
+  }
+  if (fighter.aiBurst) {
+    fighter.cooldown = Math.min(fighter.cooldown, AI.cadence.burstGap);
+    if (fighter.aiBurst.thrown === undefined) fighter.aiBurst.thrown = fighter.stats.thrown;
+    if (fighter.stats.thrown - fighter.aiBurst.thrown >= fighter.aiBurst.left || distance > mine + 0.3) fighter.aiBurst = null;
+  }
   return true;
 }
 
@@ -529,7 +568,7 @@ export function think(world, fighter, dt) {
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;
     const skill = fighter.body.inputs.exercise;
-    fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter;
+    fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter + (style.reactionSlow ?? 0);
     fighter.reacted = false;
   }
   // Seen from when it starts to move, loading included; not while committed.
@@ -539,7 +578,7 @@ export function think(world, fighter, dt) {
       let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
       // A blade coming is got away from, not blocked with an arm.
       if (incoming.spec.path === 'blade' && wary && random() < AI.blade.stepBackChance) name = 'stepBack';
-      perform(world, fighter, name, { side });
+      perform(world, fighter, name, { side, from: striker.id });
       // Slip and fire back: the counter comes while the attacker's hand is out.
       if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {
         fighter.cooldown = Math.min(fighter.cooldown, 0.12);

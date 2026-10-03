@@ -156,6 +156,28 @@ export const STYLES = {
     // Muay Thai walks forward into the clinch, knees and elbows.
     pressure: 0.35,
   },
+  // An ordinary person in a fight: square, hands low, swinging wild hooks
+  // and crosses at random, one at a time, with poor technique (less of the
+  // body behind each blow: `technique`) and poor aim (`aimJitter`, m). No
+  // blocking, no slipping: at best a late flinch back (`reactionSlow`, s).
+  unskilled: {
+    label: 'Unskilled',
+    cadence: { work: 1.2, move: 0.6, burst: 0.5, mobility: 0.15 },
+    stance: { blade: 0.12, crouch: 0, width: 0.9, lean: 0.02, guardHeight: -0.14 },
+    idle: { bounce: 0.1, sway: 1.4, rock: 0.6 },
+    attacks: { jab: 0.1, cross: 0.3, hook: 0.35, uppercut: 0.08, lowKick: 0.07, rush: 0.04 },
+    comboChance: 0,
+    tempo: 1,
+    defences: { stepBack: 1 },
+    defendChance: 0.15,
+    headMovement: 0,
+    counter: 0,
+    technique: 0.75,
+    aimJitter: 0.12,
+    reactionSlow: 0.12,
+    plans: { brawler: 2.5, pressure: 1, outboxer: 0.3, counter: 0.1 },
+    pressure: 0.2,
+  },
   // Sumo: low and wide, hands forward; thrusts, drives and charges to push
   // a man off his feet, and in the clinch (`clinchDrive`) walks him back.
   sumo: {
@@ -207,49 +229,56 @@ export const STYLES = {
   },
   longsword: {
     label: 'Long sword', weapon: 'longsword',
-    cadence: { work: 0.8, move: 1.3, burst: 0.4, mobility: 0.6 },
+    cadence: { work: 1.4, move: 0.6, burst: 0.75, mobility: 0.6 },
     stance: { blade: 0.4, crouch: 0.04, width: 1.2, lean: 0.06, guardHeight: 0 },
     // Pflug: hilt at the hip, point at the opponent's face.
     weaponGuard: { hand: [0.17, 0.55, -0.03], dir: [1, 0.55, 0] },
     idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },
     attacks: { oberhau: 0.3, zwerchhau: 0.25, unterhau: 0.15, lunge: 0.3 },
-    tempo: 1.6,
-    defences: { weaponBlock: 0.5, stepBack: 0.4, guard: 0.1 },
-    defendChance: 0.6,
+    // Cuts chained one into the next.
+    combos: { 'oberhau zwerchhau': 0.35, 'zwerchhau unterhau oberhau': 0.25, 'oberhau lunge': 0.2, 'unterhau oberhau': 0.2 },
+    comboChance: 0.55,
+    tempo: 1,
+    // The blade meets what comes: it blocks, and an edge met cuts.
+    defences: { weaponBlock: 0.7, stepBack: 0.25, guard: 0.05 },
+    defendChance: 0.8,
     headMovement: 0.1,
     plans: { outboxer: 1.4, counter: 1.2, pressure: 0.8, brawler: 0.4 },
     pressure: 0.05,
   },
   katana: {
     label: 'Katana', weapon: 'katana',
-    cadence: { work: 0.6, move: 1.6, burst: 0.3, mobility: 0.55 },
+    cadence: { work: 1.2, move: 0.8, burst: 0.7, mobility: 0.55 },
     stance: { blade: 0.15, crouch: 0.05, width: 1.15, lean: 0.03, guardHeight: 0 },
     // Hands before the navel, blade held upright.
     weaponGuard: { hand: [0.17, 0.6, -0.03], dir: [0.3, 1, 0.05] },
     idle: { bounce: 0.1, sway: 0.3, rock: 0.2 },
     attacks: { shomen: 0.25, kesagiri: 0.25, gyakuKesa: 0.15, yokogiri: 0.15, kiriage: 0.1, tsuki: 0.1 },
-    tempo: 1.7,
-    defences: { weaponBlock: 0.5, stepBack: 0.4, guard: 0.1 },
-    defendChance: 0.6,
+    combos: { 'kesagiri gyakuKesa': 0.35, 'kiriage kesagiri': 0.2, 'shomen tsuki': 0.2, 'yokogiri shomen': 0.25 },
+    comboChance: 0.5,
+    tempo: 1.1,
+    defences: { weaponBlock: 0.7, stepBack: 0.25, guard: 0.05 },
+    defendChance: 0.8,
     headMovement: 0.1,
     plans: { counter: 1.4, outboxer: 1.2, pressure: 0.8, brawler: 0.4 },
     pressure: 0.05,
   },
   knife: {
     label: 'Knife', weapon: 'knife',
-    cadence: { work: 1, move: 0.9, burst: 0.9, mobility: 0.7 },
-    stance: { blade: 0.35, crouch: 0.05, width: 1.05, lean: 0.12, guardHeight: -0.02 },
+    // Close the distance and keep stabbing: long working spells, in flurries.
+    cadence: { work: 1.7, move: 0.45, burst: 1, mobility: 0.6 },
+    stance: { blade: 0.35, crouch: 0.05, width: 1.05, lean: 0.14, guardHeight: -0.02 },
     weaponGuard: { hand: [0.2, 0.6, -0.09], dir: [1, 0.25, 0.1] },
     idle: { bounce: 0.6, sway: 1.1, rock: 0.4 },
     attacks: { stab: 0.35, upStab: 0.2, highStab: 0.1, jab: 0.2, hook: 0.15 },
-    combos: { 'jab stab': 0.5, 'stab stab': 0.3, 'hook upStab': 0.2 },
-    comboChance: 0.4,
-    tempo: 1.2,
+    combos: { 'jab stab': 0.3, 'stab stab': 0.25, 'stab stab upStab': 0.2, 'hook upStab stab': 0.15, 'jab stab highStab': 0.1 },
+    comboChance: 0.65,
+    tempo: 0.75,
     defences: { stepBack: 0.35, slip: 0.25, guard: 0.2, parry: 0.2 },
     defendChance: 0.45,
     headMovement: 0.4,
-    plans: { pressure: 1.5, brawler: 1.2, outboxer: 0.5, counter: 0.6 },
-    pressure: 0.3,
+    plans: { pressure: 2.2, brawler: 1.6, outboxer: 0.3, counter: 0.4 },
+    pressure: 0.55,
   },
   // The hoplomachus: spear in the right hand, the parma on the left forearm
   // held out before him. Losing the spear, he draws the gladius.

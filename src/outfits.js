@@ -26,6 +26,14 @@ export const MOVEMENT = {
 
 const NO_PROTECTION = { blunt: 0, cut: 0, pierce: 0 };
 
+/** Cloth colours by name, for designs' palettes and the builder's pickers. */
+export const CLOTH_COLORS = {
+  navy: '#24324a', maroon: '#7a2230', black: '#1c1c20', charcoal: '#26262b', grey: '#6b6e74', white: '#e4e4e6',
+  olive: '#4a5233', denim: '#2b3550', sand: '#b39a73', red: '#b8302c', blue: '#2a59c4', sky: '#2f7fd8',
+  green: '#2aa86a', forest: '#2f5a3a', yellow: '#e0b030', ochre: '#b8902f', orange: '#d4612a', rust: '#9a4a2a',
+  brown: '#6a4a30', wine: '#5a1a2a', purple: '#5a3a6a', slate: '#4a5560', linen: '#d8cfb8', undyed: '#c8bc9e', cream: '#ece4d0',
+};
+
 export const OUTFITS = {
   boxing: {
     label: 'Boxing', movement: 'excellent', fists: 'gloved',
@@ -37,18 +45,21 @@ export const OUTFITS = {
   },
   sports: {
     label: 'Sports', movement: 'excellent', fists: 'bare',
+    palette: [['sky', 'black'], ['red', 'black'], ['green', 'charcoal'], ['yellow', 'navy'], ['white', 'black'], ['black', 'grey']],
     designs: [
       { label: 'Running', top: { kind: 'tank', color: '#2f7fd8' }, bottom: { kind: 'splitShorts', color: '#1c1c22' }, feet: { kind: 'trainer', color: '#f4f4f6', accent: '#ff6a2a' } },
     ],
   },
   sumo: {
     label: 'Sumo', movement: 'excellent', fists: 'bare',
+    palette: [[null, 'black'], [null, 'purple'], [null, 'wine'], [null, 'navy'], [null, 'brown']],
     designs: [
       { label: 'Black mawashi', bottom: { kind: 'mawashi', color: '#1a1a1d' }, extras: [{ kind: 'sagari', color: '#1a1a1d' }], feet: { kind: 'bare' }, hair: 'topknot' },
     ],
   },
   hiking: {
     label: 'Hiking', movement: 'good', fists: 'bare',
+    palette: [['orange', 'olive'], ['forest', 'brown'], ['sky', 'slate'], ['red', 'charcoal'], ['yellow', 'olive']],
     // A heavy-soled boot puts weight behind a kick.
     kick: 1.1,
     designs: [
@@ -57,6 +68,7 @@ export const OUTFITS = {
   },
   casual: {
     label: 'Casual', movement: 'good', fists: 'bare',
+    palette: [['maroon', 'sand'], ['navy', 'denim'], ['forest', 'sand'], ['purple', 'charcoal'], ['rust', 'denim'], ['grey', 'black']],
     designs: [
       { label: 'Flannel & chinos', top: { kind: 'flannel', color: '#8a2a24', check: '#2a1a1a', under: '#e4e4e6' }, bottom: { kind: 'pants', color: '#b39a73' }, feet: { kind: 'trainer', color: '#3a2a20' } },
       // Worn in the subway level (as the brief there asked): not offered elsewhere.
@@ -66,6 +78,7 @@ export const OUTFITS = {
   },
   business: {
     label: 'Business', movement: 'limited', fists: 'bare',
+    palette: [['black', 'black'], ['charcoal', 'charcoal'], ['navy', 'navy'], ['slate', 'slate']],
     // Heels: a woman in them goes over very easily, and kicks with the heel.
     female: { balance: 0.45, kick: 1.2 },
     designs: [
@@ -75,12 +88,14 @@ export const OUTFITS = {
   },
   yakuza: {
     label: 'Yakuza', movement: 'good', fists: 'bare', kick: 1.1,
+    palette: [[null, 'black'], [null, 'charcoal'], [null, 'white'], [null, 'navy']],
     designs: [
       { label: 'Bare back', tattoo: 'full', bottom: { kind: 'slacks', color: '#16161a' }, feet: { kind: 'compactBoot', color: '#0e0e10' }, top: { kind: 'sportsBra', color: '#16161a', female: true } },
     ],
   },
   swat: {
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
+    palette: [['charcoal', 'charcoal'], ['olive', 'olive'], ['slate', 'slate']],
     balance: 1.5, extraMass: 0.2,
     protection: { blunt: 0.8, cut: 0.6, pierce: 0.4 },
     designs: [
@@ -89,6 +104,7 @@ export const OUTFITS = {
   },
   knight: {
     label: 'Knight armour', movement: 'limited', fists: 'gauntlet',
+    palette: [['brown', 'brown'], ['wine', 'black'], ['navy', 'charcoal'], ['forest', 'brown']],
     extraMass: 0.5,
     // Plate against blunt force spreads it; against an edge it is proof,
     // against a point nearly so, and a blade that meets it glances off.
@@ -103,6 +119,7 @@ export const OUTFITS = {
   // against most cuts, good against points; lighter than plate.
   samurai: {
     label: 'Samurai armour', movement: 'good', fists: 'bare',
+    palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     extraMass: 0.4,
     protection: { blunt: 0.7, cut: 0.9, pierce: 0.8 },
     designs: [
@@ -116,15 +133,36 @@ export const OUTFITS = {
   // A gladiator armed as a Greek hoplite: little armour over a bare body.
   hoplomachus: {
     label: 'Hoplomachus', movement: 'good', fists: 'bare',
+    palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
     protection: { blunt: 0.4, cut: 0.4, pierce: 0.2 },
     designs: [
       { label: 'Hoplomachus', bottom: { kind: 'loincloth', color: '#ece4d0' }, armor: { kind: 'hoplomachus', color: '#b98a3e', lace: '#6a4526' }, head: { kind: 'gladiatorHelm', color: '#b98a3e', plume: '#b81d22' }, feet: { kind: 'sandal', color: '#6a4526' }, top: { kind: 'sportsBra', color: '#ece4d0', female: true } },
     ],
   },
+  // A medieval common man: a belted tunic, hose, bare feet. No traits.
+  commoner: {
+    label: 'Commoner', movement: 'good', fists: 'bare',
+    palette: [['undyed', 'brown'], ['linen', 'slate'], ['rust', 'brown'], ['forest', 'undyed'], ['ochre', 'brown'], ['slate', 'undyed'], ['brown', 'grey']],
+    designs: [
+      { label: 'Tunic and hose', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#6a4a30', skirt: true }, feet: { kind: 'bare' } },
+    ],
+  },
 };
 
 export const OUTFIT_KEYS = Object.keys(OUTFITS);
+
+/**
+ * Colours for a fighter in this outfit, drawn from the outfit's palette:
+ * combinations that suit it (a suit's jacket and trousers alike, a
+ * peasant's undyed and earth tones). Boxing keeps its corner colours.
+ */
+export function randomColors(kind, random = Math.random) {
+  const palette = OUTFITS[kind]?.palette;
+  if (!palette?.length) return {};
+  const [top, bottom] = palette[Math.floor(random() * palette.length)];
+  return { ...(top ? { top: CLOTH_COLORS[top] } : {}), ...(bottom ? { bottom: CLOTH_COLORS[bottom] } : {}) };
+}
 
 /** The outfit a fighter wears: kind and design, defaulting to boxing's first. */
 export function outfitOf(inputs) {

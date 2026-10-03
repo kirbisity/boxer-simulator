@@ -39,6 +39,8 @@ export const WORLD = {
   // Both hands on a weapon turn it this much more stiffly than one wrist.
   twoHandWrist: 1.7,
   weaponTurnLimit: 40,
+  // A blade fending off a strike drives out this far (share of the line to the strike) past where they meet.
+  fendDrive: 0.25,
   gripStep: 0.006, // m the off hand is drawn onto a two-handed grip per substep
   contactRange: 2.6, // m between hips beyond which two fighters cannot touch
   // A strike from more than this far off the defender's facing (rad) is
@@ -388,7 +390,35 @@ function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
 }
 
 /** The weapon's targets for this frame: guard, block or the move in flight, and how many hands hold it. */
-function weaponIntent(fighter, intent) {
+/**
+ * A block that goes to meet the strike: the blade set across the line from
+ * the strike to what it aims at, halfway along it, the edge towards it —
+ * a fist or a shin that comes on runs into the edge. Tracks the strike as
+ * it comes. Null if there is nothing to meet.
+ */
+function interceptBlock(world, fighter) {
+  const attacker = world.fighters[fighter.defence?.from];
+  const punch = attacker?.punch;
+  if (!punch) return null;
+  const weapon = fighter.weapon;
+  const threat = attacker.weapon?.held && punch.spec.path === 'blade'
+    ? vec.add(point(attacker.x, P[`${attacker.weapon.main}Hand`]), vec.scale(attacker.weapon.dir, attacker.weapon.spec.length * 0.7))
+    : point(attacker.x, P[punch.spec.limb]);
+  const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
+  const line = vec.sub(threat, mine);
+  if (vec.length(line) < 1e-3) return null;
+  const toward = vec.normalize(line);
+  // Driven out through the meeting point, towards the strike: the edge goes into whatever comes.
+  const meet = vec.add(mine, vec.scale(line, Math.min(0.5, (weapon.spec.length * 0.6) / vec.length(line)) + WORLD.fendDrive));
+  // Across the line, tilted up; pointed to whichever side the strike is not coming round from.
+  let across = vec.cross(toward, [0, 1, 0]);
+  if (vec.length(across) < 1e-3) across = yawRotate([0, 0, 1], fighter.yaw);
+  across = vec.normalize(vec.add(vec.normalize(across), [0, 0.6, 0]));
+  const hand = vec.sub(meet, vec.scale(across, weapon.spec.length * 0.45));
+  return { hand: toLocal(fighter, hand), dir: yawRotate(across, -fighter.yaw) };
+}
+
+function weaponIntent(world, fighter, intent) {
   const style = STYLES[fighter.style];
   const H = fighter.body.heightM;
   const punch = fighter.punch;
@@ -409,8 +439,8 @@ function weaponIntent(fighter, intent) {
       target.dir = vec.normalize(vec.sub(punch.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
     }
   } else if (fighter.defence?.name === 'weaponBlock') {
-    // Blade across before the head, meeting the cut.
-    target = { hand: vec.scale([0.2, 0.8, -0.08], H), dir: vec.normalize([0.15, 0.3, 1]) };
+    // Blade across the strike's line, meeting it; or across before the head.
+    target = interceptBlock(world, fighter) ?? { hand: vec.scale([0.2, 0.8, -0.08], H), dir: vec.normalize([0.15, 0.3, 1]) };
   } else target = guardTargets(style, fighter.body);
   const main = weapon.main;
   intent[`${main}Hand`] = target.hand;
@@ -665,8 +695,11 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
   const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) : 0;
   if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.stamina < cost) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
+  // A wild swinger's aim wanders off the mark.
+  const jitter = STYLES[fighter.style]?.aimJitter ?? 0;
+  const aimed = jitter > 0 ? vec.add(aimPoint(target, aimZone), [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : aimPoint(target, aimZone);
   fighter.punch = {
-    type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimPoint(target, aimZone)), target: target.id, landed: false, peakSpeed: 0, limb: P[spec.limb],
+    type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target.id, landed: false, peakSpeed: 0, limb: P[spec.limb],
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
   };
   fighter.stamina = Math.max(0, fighter.stamina - cost / fighter.body.aerobic);
@@ -676,10 +709,11 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
 }
 
 /** Start a whole-body move (rush, clinch) or a defence. */
-export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1 } = {}) {
+export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1, from = null } = {}) {
   if (fighter.state !== 'up') return false;
   if (DEFENCES[name]) {
-    fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side };
+    // `from`: who the strike comes from, for a block that goes to meet it.
+    fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from };
     if (name === 'guard') fighter.guardHigh = DEFENCES.guard.seconds;
     if (name === 'slip') {
       fighter.slip = DEFENCES.slip.seconds;
@@ -750,7 +784,7 @@ function updateIntent(world, fighter, dt) {
     }
   }
   applyDefence(fighter, intent, dt);
-  weaponIntent(fighter, intent);
+  weaponIntent(world, fighter, intent);
   weaveHead(world, fighter, intent, dt);
   if (fighter.rush) {
     // Charging: head down, shoulder first, hands up.
@@ -1871,6 +1905,26 @@ function collideStriker(world, attacker, defender, striker, time) {
     }
     attacker.contacts.delete(shieldKey);
   }
+  if (!striker.weapon && defender.weapon?.held && defender.state === 'up') {
+    // A blade in the way: a fist, shin, elbow or knee that comes on meets its edge.
+    const weapon = defender.weapon;
+    const hilt = vec.add(point(defender.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));
+    const closest = closestBetween(sa, sb, hilt, weapon.tip);
+    const offset = vec.sub(closest.onFirst, closest.onSecond);
+    const distance = vec.length(offset);
+    const bladeKey = `${defender.id}:${striker.key}:blade`;
+    if (distance < striker.radius + weapon.spec.radius) {
+      const away = distance > 1e-6 ? vec.scale(offset, 1 / distance) : yawRotate([-1, 0, 0], defender.yaw);
+      if (!attacker.contacts.has(bladeKey)) {
+        attacker.contacts.add(bladeKey);
+        registerBladeBlock(world, attacker, defender, striker, closest, away);
+      }
+      const push = Math.min(striker.radius + weapon.spec.radius - distance, WORLD.contactStep);
+      for (const index of new Set([striker.a, striker.b])) for (let axis = 0; axis < 3; axis += 1) attacker.x[index * 3 + axis] += away[axis] * push;
+      return;
+    }
+    attacker.contacts.delete(bladeKey);
+  }
   const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
   for (const capsule of capsules(defender)) {
     // Kicks and weapons hit legs and bodies; gloves only collide above the waist.
@@ -2021,7 +2075,8 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const onLeg = /Thigh|Shank/.test(capsule.key);
   const checked = onLeg && defender.intent.check && capsule.key[0] === 'l';
   const blocked = BLOCKING.has(capsule.key) || checked;
-  const technique = attacker.body.technique;
+  // Untrained hands put less of the body behind a blow.
+  const technique = attacker.body.technique * (STYLES[attacker.style]?.technique ?? 1);
   const limbs = attacker.body.limbKg;
   // Heavy boots put weight behind a kick or a knee.
   const kicking = /Foot|Knee/.test(spec.limb);
@@ -2326,6 +2381,70 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   return through;
 }
 
+// What part of the striker a blade meets, by striker: the segment it cuts,
+// and the joint it can take off near each end of the striker (a = start, b = end).
+const BLADE_MEETS = {
+  Hand: { segment: 'Forearm', at: 1, joint: 'wrist' },
+  Elbow: { segment: 'Forearm', at: 0, joint: 'elbow' },
+  Knee: { segment: 'Thigh', at: 1, joint: 'knee' },
+};
+
+/**
+ * A fist, foot, elbow or knee runs into a blade held in its way. The strike
+ * is stopped; how hard it drove in, against the blade and the arm behind
+ * it, is the collision; an edge met across cuts as deep as that, and a hand
+ * or foot driven onto it can come off. The blade's owner has fended it off.
+ */
+function registerBladeBlock(world, attacker, defender, striker, closest, away) {
+  const weapon = defender.weapon;
+  const punch = attacker.punch;
+  const striking = punch && punch.spec.path !== 'blade' && punch.spec.limb === striker.key && !punch.landed && punch.t <= punch.spec.extendUntil + 0.06;
+  const along = weapon.spec.strikeFrom + closest.t * (weapon.spec.length - weapon.spec.strikeFrom);
+  const strikeVelocity = vec.lerp(point(attacker.v, striker.a), point(attacker.v, striker.b), closest.s);
+  const bladeVelocity = vec.lerp(handVelocityOf(defender, P[`${weapon.main}Hand`]), weapon.tipVelocity, along / weapon.spec.length);
+  const relative = vec.sub(strikeVelocity, bladeVelocity);
+  const closing = -vec.dot(relative, away);
+  if (closing < WORLD.minImpactSpeed) return;
+  const side = striker.side;
+  const limbs = attacker.body.limbKg;
+  const strikeMass = striking
+    ? (punch.spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (punch.spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (punch.spec.mass.body ?? 0) * attacker.body.massKg
+    : striker.shin ? limbs[`${side}Leg`] * 0.4 : limbs[`${side}Arm`] * 0.4;
+  const armLength = defender.body.lengths.upperArm + defender.body.lengths.forearmToFist;
+  const bladeMass = effectiveMassAt(weapon.spec, defender.body.limbKg[`${weapon.main}Arm`] * 0.6, along, armLength);
+  const reduced = (strikeMass * bladeMass) / (strikeMass + bladeMass);
+  const impulse = reduced * closing * (1 + WORLD.restitution);
+  const energy = 0.5 * reduced * closing * closing;
+  const speed = vec.length(relative);
+  const mix = harmMix(weapon.spec, 'swing', speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0, closest.t);
+  // A padded glove takes some of an edge.
+  const padded = striker.key.endsWith('Hand') && glovedFists(attacker.body.inputs) ? 0.6 : 1;
+  const cut = energy * mix.cut * padded * (1 - (attacker.body.gear.protection.cut ?? 0));
+  const meets = striker.shin ? { segment: 'Shank', at: closest.s, joint: closest.s > 0.6 ? 'ankle' : 'knee' } : BLADE_MEETS[striker.key.slice(1)];
+  const limbKey = `${side}${meets.segment}`;
+  const contactPoint = closest.onSecond;
+  const event = {
+    time: world.time, kind: 'bladeBlock', attacker: defender.id, defender: attacker.id, punch: punch?.type, target: limbKey, weapon: weapon.kind,
+    speed: closing, impulse, force: 0, headDeltaV: 0, cut, pierce: 0, energy, effects: [], point: contactPoint, normal: vec.scale(away, -1),
+  };
+  if (striking) {
+    punch.landed = true;
+    punch.stopped = true;
+    event.effects.push('fended off');
+  }
+  if (cut > 0.5) {
+    wound(attacker, 'cut', cut, limbKey, defender);
+    addDamage(attacker, limbKey, cut / 6, false);
+    event.effects.push(cut > 25 ? 'deep cut' : 'cut');
+    if (attacker.state !== 'out' && cut > severThreshold(attacker, { joint: meets.joint, side })) sever(world, attacker, { joint: meets.joint, side }, event, vec.scale(relative, -1));
+  }
+  const chain = striker.shin ? [[P[`${side}Foot`], 1], [P[`${side}Knee`], 0.7]] : (RECOIL[striker.key.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${side}${part}`], share]);
+  world.pendingImpulses.push({ fighter: attacker, shares: chain, direction: away, impulse });
+  world.pendingImpulses.push({ fighter: defender, shares: [[P[`${weapon.main}Hand`], 1], [P[`${weapon.main}Elbow`], 0.6]], direction: vec.scale(away, -1), impulse });
+  strainGrip(world, defender, impulse * 0.3);
+  world.events.push(event);
+}
+
 /**
  * A strike meets a shield: stopped there. The momentum goes into the shield
  * arm and the body braced behind it; the arm takes a little of the harm.
@@ -2539,7 +2658,7 @@ export function strikeThreat(attacker, defender) {
     const reduced = (mass * head) / (mass + head);
     return ((reduced * speed * (1 + WORLD.restitution)) / head) * rotation;
   };
-  const technique = body.technique;
+  const technique = body.technique * (STYLES[attacker.style]?.technique ?? 1);
   const cross = landing((0.6 * body.limbKg.rArm + 0.012 * body.massKg) * technique, WORLD.threatSpeedShare * body.topSpeed[P.rHand], 1);
   const kicks = (STYLES[attacker.style]?.attacks.roundhouse ?? 0) > 0.1;
   const kick = kicks ? 0.45 * landing((0.55 * body.limbKg.rLeg + 0.025 * body.massKg) * technique, WORLD.threatSpeedShare * body.topSpeed[P.rFoot], 1.45) : 0;
