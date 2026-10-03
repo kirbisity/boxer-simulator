@@ -44,6 +44,7 @@ export const WORLD = {
   fendDrive: 0.25,
   gripStep: 0.006, // m the off hand is drawn onto a two-handed grip per substep
   contactRange: 2.6, // m between hips beyond which two fighters cannot touch
+  bodyReach: 1.3, // m from the hips that any part of a body (standing or lying) can be
   // A strike from more than this far off the defender's facing (rad) is
   // unseen; the head moves this much further for it.
   blindsideAngle: Math.PI / 3,
@@ -1887,6 +1888,9 @@ function collideFighters(world, h, time) {
     const limbs = strikers(attacker);
     fighters.forEach((defender, d) => {
       if (attacker === defender || !near(a, d)) return;
+      // Team-mates are checked only while a blow is in the air (it can
+      // still go astray); idle hands among friends touch nothing that matters.
+      if (attacker.corner === defender.corner && !attacker.punch) return;
       for (const striker of limbs) collideStriker(world, attacker, defender, striker, time);
     });
   });
@@ -2003,6 +2007,16 @@ function collideStriker(world, attacker, defender, striker, time) {
     attacker.contacts.delete(bladeKey);
   }
   const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
+  // Nowhere near him: no part of his body can be touched (a crowd is mostly
+  // this). Forget any contact with him, so the next real one counts.
+  const hips = point(defender.x, P.pelvis);
+  if (vec.length(vec.sub(closestOnSegment(hips, sa, sb).point, hips)) > WORLD.bodyReach + striker.radius) {
+    if (attacker.contacts.size) {
+      const prefix = `${defender.id}:${striker.key}:`;
+      for (const key of attacker.contacts) if (key.startsWith(prefix) && !key.endsWith(':shield') && !key.endsWith(':blade')) attacker.contacts.delete(key);
+    }
+    return;
+  }
   // One push out of the body per substep, however many parts it touches
   // (a long weapon can lie across several at once).
   let pushBudget = WORLD.contactStep;

@@ -76,7 +76,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum };
+  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     view.scene.add(view.places[place]);
@@ -99,6 +99,7 @@ const PLACE_LIGHT = {
   ring: { background: 0x0b0d14, fog: [9, 22], key: 0xfff2e0, keyIntensity: 1.2, rim: 0x6f8cff },
   subway: { background: 0x10140f, fog: [8, 26], key: 0xf2fff0, keyIntensity: 0.9, rim: 0x9fd8c0 },
   colosseum: { background: 0x9cc4e8, fog: [30, 90], key: 0xfff4e0, keyIntensity: 0.2, rim: 0xbcd4ff, sun: 0.85 },
+  meadow: { background: 0xa9cbe6, fog: [25, 70], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xc8e0ff, sun: 0.9 },
 };
 
 /** The fighting floor of each sandbox place (half-sizes in x and z). */
@@ -106,7 +107,96 @@ export const PLACE_ARENAS = {
   ring: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
   colosseum: { halfX: 6.5, halfZ: 4.4 },
   subway: { halfX: 4.2, halfZ: 1.35 },
+  meadow: { halfX: 9, halfZ: 7 },
 };
+
+/**
+ * A village green under an open sky: trodden grass, a dirt track, thatched
+ * cottages and a wattle fence round the edge, haystacks, a few trees, and
+ * low hills beyond.
+ */
+function buildMeadow() {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...options });
+  const grass = paintedTexture(512, 512, (g, w, h) => {
+    g.fillStyle = '#5f7f3a';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 14000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${60 + shade * 70},${95 + shade * 70},${30 + shade * 35},${0.25 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
+    }
+    // A worn track across the green.
+    g.fillStyle = 'rgba(120,96,62,0.55)';
+    g.beginPath();
+    g.ellipse(w / 2, h / 2, w * 0.5, h * 0.12, 0.2, 0, Math.PI * 2);
+    g.fill();
+  }, [3, 3]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), lit(0xffffff, { map: grass }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  place.add(ground);
+  // Low hills all round.
+  for (let index = 0; index < 14; index += 1) {
+    const angle = (index / 14) * Math.PI * 2;
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(8 + Math.random() * 6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x6d8a45));
+    hill.scale.y = 0.25 + Math.random() * 0.2;
+    hill.position.set(Math.cos(angle) * 40, -0.5, Math.sin(angle) * 40);
+    place.add(hill);
+  }
+  // Cottages: wattle and daub under thatch.
+  const daub = lit(0xd8c8a4);
+  const thatch = lit(0xb08a4a);
+  const timber = lit(0x4a3422);
+  for (const [x, z, turn] of [[-13, -9, 0.3], [-6, -12, -0.1], [9, -11, 0.2], [14, 4, 1.4], [-14, 6, -1.2], [4, 12, 3.0]]) {
+    const cottage = new THREE.Group();
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 3), daub);
+    walls.position.y = 1.1;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.4, 4), thatch);
+    roof.rotation.y = Math.PI / 4;
+    roof.scale.set(1.35, 1, 0.95);
+    roof.position.y = 3.3;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.6, 0.06), timber);
+    door.position.set(0, 0.8, 1.52);
+    for (const piece of [walls, roof]) {
+      piece.castShadow = true;
+      piece.receiveShadow = true;
+    }
+    cottage.add(walls, roof, door);
+    cottage.position.set(x, 0, z);
+    cottage.rotation.y = turn;
+    place.add(cottage);
+  }
+  // A wattle fence round the green, gapped.
+  const post = lit(0x5a4128);
+  for (let index = 0; index < 64; index += 1) {
+    const angle = (index / 64) * Math.PI * 2;
+    if (Math.sin(angle * 3) > 0.85) continue;
+    const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.1, 6), post);
+    stake.position.set(Math.cos(angle) * 11.5, 0.55, Math.sin(angle) * 9.5);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 1.2), lit(0x7a5a34));
+    rail.position.set(stake.position.x, 0.55, stake.position.z);
+    rail.rotation.y = -angle;
+    place.add(stake, rail);
+  }
+  // Haystacks and trees.
+  for (const [x, z] of [[-10, 2], [11, -4], [-3, 10], [6, -9]]) {
+    const stack = new THREE.Mesh(new THREE.SphereGeometry(1.2, 14, 10), lit(0xd8b860));
+    stack.scale.y = 1.2;
+    stack.position.set(x, 0.9, z);
+    stack.castShadow = true;
+    place.add(stack);
+  }
+  for (const [x, z, size] of [[-18, -2, 1.2], [18, -8, 1], [-8, 16, 1.4], [16, 12, 1.1], [0, -17, 1.3]]) {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25 * size, 0.35 * size, 3 * size, 8), lit(0x5a4128));
+    trunk.position.set(x, 1.5 * size, z);
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(2.2 * size, 12, 10), lit(0x3f6a2a));
+    crown.position.set(x, 4 * size, z);
+    crown.castShadow = true;
+    place.add(trunk, crown);
+  }
+  return place;
+}
 
 /**
  * The Colosseum, open to the sky: an oval of raked sand, the podium wall
@@ -687,7 +777,10 @@ export function buildFighterView(view, fighter) {
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  const built = buildSkin(body, look.bodyStyle ?? BODY_STYLE);
+  // A crowd character (`simple`) is drawn cheaply: fewer sides to the body,
+  // no skeleton or muscle beneath, no springing flesh. Its physics is whole.
+  const simple = Boolean(body.inputs.simple);
+  const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkin(body, look.bodyStyle ?? BODY_STYLE);
   const baseColors = paintBody(built, body, look, corner);
   // Steel is drawn apart, as metal; everything else is the toon body.
   const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];
@@ -712,7 +805,7 @@ export function buildFighterView(view, fighter) {
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   layers.skin.add(skinMesh, skinOutline);
-  const shells = [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
+  const shells = simple ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
 
   const dress = dressFor(body.inputs, corner);
   // A design may set the hair (a sumo's topknot).
@@ -783,7 +876,7 @@ export function buildFighterView(view, fighter) {
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig.
-  const skeleton = buildSkeleton(body, built.bindFrames);
+  const skeleton = simple ? BONES.map(() => new THREE.Group()) : buildSkeleton(body, built.bindFrames);
   for (const piece of skeleton) layers.bone.add(piece);
 
   // The physics layer: particles, constraints, motor targets, collision capsules.
@@ -818,12 +911,35 @@ export function buildFighterView(view, fighter) {
     return { index: P[`${side}Hand`], mesh };
   });
 
+  if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
     baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh,
     particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
   };
+}
+
+// A simple character (a crowd of them) draws its ink outline only round the
+// shapes big enough to read at a distance, and casts its shadow from the body
+// alone: a rebel's eyelids and finger joints cost as much to draw as his torso.
+const SIMPLE_OUTLINE_TRIANGLES = 600;
+
+function thinOut(skinLayer, skinMesh) {
+  const triangles = (geometry) => (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3;
+  const drop = [];
+  skinLayer.traverse((object) => {
+    if (!object.isMesh) return;
+    if (object.userData.outline) {
+      if (object.parent !== skinMesh && triangles(object.geometry) < SIMPLE_OUTLINE_TRIANGLES) drop.push(object);
+      return;
+    }
+    object.castShadow = object === skinMesh;
+  });
+  for (const outline of drop) {
+    outline.material.dispose();
+    outline.parent.remove(outline);
+  }
 }
 
 /** The muscle layer is built the first time it is shown: it costs a body mesh. */
@@ -1170,7 +1286,7 @@ export function showImpact(view, fighterViews, event) {
       bone = [BONE.pelvis, BONE.spine, BONE.chest].reduce((best, index) => (distanceTo(index) < distanceTo(best) ? index : best));
     }
     const bind = fromFrame(defenderView.built.bindFrames[bone], toFrame(frames[bone], event.point));
-    defenderView.shells[0].shell.dentLocal(v3(bind), event.impulse);
+    defenderView.shells.find((entry) => entry.key === 'body')?.shell.dentLocal(v3(bind), event.impulse);
   }
   const spray = view.spray ?? (view.spray = []);
   const count = Math.min(14, Math.round(event.impulse / 2));

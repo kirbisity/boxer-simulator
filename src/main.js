@@ -8,7 +8,8 @@ import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
-import { randomCharacter, varyCharacter } from './cast.js';
+import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
+import { installMenus } from './menu.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -42,6 +43,12 @@ const state = {
   place: 'ring',
   sandboxRosters: null,
   levelRosters: {},
+  // Which part of the game is on: 'home' (the fight behind the menus),
+  // 'quick', 'versus', 'level' or 'sandbox'; and what the banner's button does.
+  game: 'home',
+  next: null,
+  // The sandbox's own fighters, sizes and place, kept while elsewhere.
+  sandbox: null,
 };
 const realSeconds = () => performance.now() / 1000;
 /** A short name for crowded places: the first name, and its number if it has one ("Dave 2"). */
@@ -112,7 +119,8 @@ function newBout() {
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena });
   clearGore(scene);
   setPlace(scene, place, arena);
-  if (scenario) Object.assign(scene.orbit, scenario.camera);
+  // A level frames its own place; anything else starts from the usual ringside view.
+  Object.assign(scene.orbit, scenario?.camera ?? { yaw: -0.5, pitch: 0.2, distance: 5.2 });
   document.body.dataset.place = place;
   $('#place').closest('label').hidden = Boolean(scenario);
   rebuildViews();
@@ -161,11 +169,13 @@ function tick(seconds) {
   }
   consumeEvents();
   const winner = boutWinner(state.world);
+  // Behind the menus, one fight follows another.
+  if (state.game === 'home' && state.finishedAt !== null && state.world.time > state.finishedAt + 3) state.next.run();
   if (winner && state.finishedAt === null && !momentPlaying(state.drama, realSeconds())) {
     state.finishedAt = state.world.time;
     const team = state.world.fighters.filter((fighter) => fighter.corner === winner);
     const name = team.length > 1 ? `${winner === 'red' ? 'Red' : 'Blue'} team` : team[0].body.inputs.name;
-    $('#banner').hidden = false;
+    $('#banner').hidden = state.game === 'home';
     // How it ended: the last fighter out on the losing side says.
     const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
     const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
@@ -361,7 +371,9 @@ $('#pause').addEventListener('click', () => {
   $('#pause').textContent = state.paused ? 'Play' : 'Pause';
 });
 $('#restart').addEventListener('click', newBout);
-$('#banner-again').addEventListener('click', newBout);
+$('#banner-again').addEventListener('click', () => (state.next ? state.next.run() : newBout()));
+$('#banner-menu').addEventListener('click', () => goHome());
+$('#open-menu').addEventListener('click', () => goHome());
 
 const player = () => state.world.fighters[0];
 // Keys: punches on the right hand's home row, kicks and knees above and
@@ -684,22 +696,6 @@ function fillCornerForm(corner) {
 
 // ---- Levels -------------------------------------------------------------------
 
-function buildLevels() {
-  const list = $('#level-list');
-  const sandbox = document.createElement('button');
-  sandbox.className = 'level';
-  sandbox.innerHTML = '<b>Sandbox</b><span>The ring, gloves on, any two fighters from the builder.</span>';
-  sandbox.addEventListener('click', () => chooseLevel(null));
-  list.replaceChildren(sandbox, ...Object.entries(SCENARIOS).map(([key, scenario]) => {
-    const card = document.createElement('button');
-    card.className = 'level';
-    const who = scenario.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg} kg`).join('<br>');
-    card.innerHTML = `<b>${scenario.title}</b><em>${scenario.place}</em><span>${scenario.blurb}</span><small>${who}</small>`;
-    card.addEventListener('click', () => chooseLevel(key));
-    return card;
-  }));
-}
-
 /**
  * The builder edits whichever fighters are on: the sandbox's own two, or a
  * level's. A level's are kept as tuned until the page is reloaded, so the
@@ -708,12 +704,15 @@ function buildLevels() {
 function chooseLevel(key) {
   if (!state.scenario) state.sandboxRosters = state.rosters;
   if (key) {
-    state.levelRosters[key] ??= Object.fromEntries(scenarioFighters(SCENARIOS[key]).map(({ inputs, corner }) => [corner, [inputs]]));
+    const scenario = SCENARIOS[key];
+    // A level with a whole cast is made fresh each visit, at its own sizes.
+    if (scenario.cast) state.levelRosters[key] = scenario.cast(Math.random);
+    state.levelRosters[key] ??= Object.fromEntries(scenarioFighters(scenario).map(({ inputs, corner }) => [corner, [inputs]]));
     state.rosters = state.levelRosters[key];
+    if (scenario.cast) for (const corner of ['red', 'blue']) state.teamSizes[corner] = state.rosters[corner].length;
   } else state.rosters = state.sandboxRosters;
   state.scenario = key;
   refreshBuilder();
-  $('#levels').hidden = true;
   state.paused = false;
   $('#pause').textContent = 'Pause';
   newBout();
@@ -789,14 +788,6 @@ $('#load-setup').addEventListener('click', () => {
   setTimeout(() => { $('#load-setup').textContent = 'Load setup'; }, 2500);
 });
 
-$('#open-levels').addEventListener('click', () => {
-  $('#levels').hidden = false;
-  state.paused = true;
-});
-$('#close-levels').addEventListener('click', () => {
-  $('#levels').hidden = true;
-  state.paused = false;
-});
 
 $('#open-builder').addEventListener('click', () => {
   $('#builder').hidden = false;
@@ -809,6 +800,87 @@ $('#close-builder').addEventListener('click', () => {
   newBout();
 });
 
+// ---- The parts of the game: the menus' fights, levels and the sandbox -----------
+
+let goHome = () => {};
+
+/** Show which part of the game is on: the footer keeps only what it uses. */
+function setGame(game, next = null) {
+  if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
+  state.game = game;
+  state.next = next;
+  document.body.dataset.game = game;
+  $('#banner-again').textContent = next?.text ?? 'Next bout';
+  $('#builder').hidden = true;
+  state.paused = false;
+  $('#pause').textContent = 'Pause';
+  document.body.classList.remove('sheet');
+  document.querySelector('#sheet-labels')?.replaceChildren();
+}
+
+/** A one-on-one (or any sides) from the menus: given fighters, in a given place. */
+function match({ red, blue, place, game, next }) {
+  setGame(game, next);
+  state.scenario = null;
+  state.rosters = { red: red.map((inputs) => normaliseInputs(structuredClone(inputs))), blue: blue.map((inputs) => normaliseInputs(structuredClone(inputs))) };
+  state.teamSizes = { red: red.length, blue: blue.length };
+  state.editing = { red: 0, blue: 0 };
+  state.place = place;
+  newBout();
+}
+
+/** The fight behind the menus: two random gladiators in the Colosseum, one after another. */
+function attract() {
+  if (state.mode === 'play') $('#modes button[data-value="watch"]').click();
+  match({ red: [randomGladiator()], blue: [randomGladiator()], place: 'colosseum', game: 'home', next: { text: 'Next bout', run: attract } });
+  Object.assign(scene.orbit, { distance: 4.6, pitch: 0.12 });
+}
+
+function enterLevel(key) {
+  setGame('level', { text: 'Again', run: () => chooseLevel(key) });
+  chooseLevel(key);
+}
+
+/** The sandbox as it was left: its own fighters, sides and place. */
+function enterSandbox() {
+  setGame('sandbox');
+  const kept = state.sandbox ?? { rosters: { red: [normaliseInputs(structuredClone(PRESETS.heavy))], blue: [normaliseInputs(structuredClone(PRESETS.light))] }, teamSizes: { red: 1, blue: 1 }, place: 'ring' };
+  state.scenario = null;
+  state.rosters = kept.rosters;
+  state.sandboxRosters = kept.rosters;
+  state.teamSizes = { ...kept.teamSizes };
+  state.place = kept.place;
+  state.editing = { red: 0, blue: 0 };
+  $('#place').value = kept.place;
+  refreshBuilder();
+  newBout();
+}
+
+/** The character creator's fighter: standing alone, facing the camera, to one side of the panel. */
+function preview(inputs, event) {
+  const place = event === 'boxing' ? 'ring' : 'colosseum';
+  const wide = innerWidth > 760;
+  state.world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed: 3, arena: PLACE_ARENAS[place] });
+  clearGore(scene);
+  setPlace(scene, place, PLACE_ARENAS[place]);
+  const fighter = state.world.fighters[0];
+  // +z is screen left: on a wide screen the panel is on the left, so the fighter goes right.
+  placeFighter(fighter, 0, wide ? -0.75 : 0);
+  fighter.handsDown = true;
+  fighter.yaw = -0.5;
+  advance(state.world, 0.6, null, STEP);
+  state.paused = true;
+  state.finishedAt = null;
+  state.eventCursor = 0;
+  resetDrama(state.drama);
+  rebuildViews();
+  // On a phone the panel fills the lower part, so the camera stands back and
+  // aims below the feet: the whole fighter sits in the top third.
+  Object.assign(scene.orbit, { distance: wide ? 4.2 : 7, pitch: 0.08, yaw: 0.15 });
+  scene.orbit.target.set(0, wide ? 1 : -0.8, 0);
+  document.body.classList.add('sheet');
+}
+
 // ---- Start -------------------------------------------------------------------
 
 function fit() {
@@ -820,8 +892,14 @@ function fit() {
 window.addEventListener('resize', fit);
 buildCornerForm('red');
 buildCornerForm('blue');
-buildLevels();
-newBout();
+const menus = installMenus({
+  attract, match, sandbox: enterSandbox, level: enterLevel, preview,
+  stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
+  calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
+  hours: exerciseHours,
+  onMenu: (home) => { goHome = home; },
+});
+menus.home();
 fit();
 requestAnimationFrame(frame);
 
@@ -966,6 +1044,7 @@ window.boxer = {
   scene,
   designSheet,
   fight,
+  preview,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),

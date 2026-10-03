@@ -163,9 +163,10 @@ function facet(positions, indices, colors, bones, weightPositions) {
   return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones, weightPositions: flatWeights };
 }
 
-export function buildLoftBody(body, { faceted = false } = {}) {
-  const sides = faceted ? LOFT.facetedSides : LOFT.sides;
-  const rows = faceted ? 0.5 : LOFT.rowDensity;
+export function buildLoftBody(body, { faceted = false, lowDetail = false } = {}) {
+  // Low detail (a crowd): fewer sides and rows, still smooth.
+  const sides = faceted ? LOFT.facetedSides : lowDetail ? Math.round(LOFT.sides * 0.6) : LOFT.sides;
+  const rows = faceted ? 0.5 : lowDetail ? LOFT.rowDensity * 0.6 : LOFT.rowDensity;
   const count = (n) => Math.max(2, Math.round(n * rows));
   const points = bindPoints(body);
   const frames = boneFrames(points, body);

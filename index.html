@@ -34,18 +34,16 @@
   <div id="icons" aria-hidden="true"></div>
   <div id="flash" aria-hidden="true"></div>
 
-  <div class="builder" id="levels" hidden>
-    <div class="sheet levels-sheet">
-      <h1>Levels</h1>
-      <p class="lede">Set fights in set places, on the same bodies and physics as the ring.</p>
-      <div class="level-list" id="level-list"></div>
-      <button id="close-levels">Close</button>
-    </div>
-  </div>
+  <!-- The menus: one screen at a time, over the fight behind them. -->
+  <div class="screen" id="home" hidden></div>
+  <div class="screen" id="quick" hidden></div>
+  <div class="screen" id="levels-screen" hidden></div>
+  <div class="screen" id="versus" hidden></div>
+  <div class="wizard" id="wizard" hidden></div>
 
   <div class="banner" id="banner" hidden>
     <p id="banner-text"></p>
-    <button id="banner-again" class="primary">Next bout</button>
+    <div class="banner-actions"><button id="banner-menu">Menu</button><button id="banner-again" class="primary">Next bout</button></div>
   </div>
 
   <div class="pad" id="pad" hidden>
@@ -61,13 +59,14 @@
   </div>
 
   <footer class="controls">
-    <div class="seg" id="layers" aria-label="Layer">
+    <button id="open-menu" class="menu-button">☰ Menu</button>
+    <div class="seg sandbox-only" id="layers" aria-label="Layer">
       <button data-value="skin" class="on">Skin</button>
       <button data-value="muscle">Muscle</button>
       <button data-value="bone">Bone</button>
       <button data-value="physics">Physics</button>
     </div>
-    <div class="seg" id="styles" aria-label="Shading">
+    <div class="seg sandbox-only" id="styles" aria-label="Shading">
       <button data-value="toon" class="on">Toon</button>
       <button data-value="soft">Soft</button>
     </div>
@@ -76,22 +75,21 @@
       <button data-value="1" class="on">1×</button>
       <button data-value="4">4×</button>
     </div>
-    <div class="teams" aria-label="Fighters a side">
+    <div class="teams sandbox-only" aria-label="Fighters a side">
       <label class="team red"><span>Red</span><select id="team-red"></select></label>
       <button class="dice" data-corner="red" title="Re-roll Red's other fighters as anyone at random">🎲</button>
       <span class="versus">v</span>
       <label class="team blue"><span>Blue</span><select id="team-blue"></select></label>
       <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random">🎲</button>
     </div>
-    <label class="teams scene-pick" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option></select></label>
+    <label class="teams scene-pick sandbox-only" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option><option value="meadow">Village green</option></select></label>
     <div class="seg" id="modes" aria-label="Mode">
       <button data-value="watch" class="on">Watch</button>
       <button data-value="play">Play red</button>
     </div>
     <button id="pause">Pause</button>
     <button id="restart">Restart</button>
-    <button id="open-levels">Levels</button>
-    <button id="open-builder" class="primary">Build fighters</button>
+    <button id="open-builder" class="primary sandbox-only">Build fighters</button>
   </footer>
 
   <div class="builder" id="builder" hidden>

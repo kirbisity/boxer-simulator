@@ -120,7 +120,7 @@ test('headgear comes off by how hard the head is hit: a cap easily, a crest only
   assert.equal(crest.off, crest.heaviest >= HEADGEAR.crest.knock, 'the crest goes only to a blow past its threshold');
 });
 
-test('a fall shakes a cap off; a crest stays on the helmet', async () => {
+test('a fall shakes headgear off, even a crest', async () => {
   const { createWorld, advance } = await import('../src/physics.js');
   const { PRESETS } = await import('../src/body.js');
   const world = createWorld([
@@ -130,5 +130,5 @@ test('a fall shakes a cap off; a crest stays on the helmet', async () => {
   for (const fighter of world.fighters) fighter.knock = [6, 0, 0];
   advance(world, 0.5);
   assert.equal(world.props.find((prop) => prop.kind === 'cap').attached, false);
-  assert.equal(world.props.find((prop) => prop.kind === 'crest').attached, true);
+  assert.equal(world.props.find((prop) => prop.kind === 'crest').attached, false);
 });

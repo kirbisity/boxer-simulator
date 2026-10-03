@@ -168,12 +168,12 @@ export const OUTFIT_KEYS = Object.keys(OUTFITS);
  */
 export const HEADGEAR = {
   headset: { label: 'Headset', knock: 0, falls: true, icon: '🎧' },
-  cap: { label: "Runner's cap", knock: 0.7, falls: true, icon: '🧢' },
-  boonie: { label: 'Boonie hat', knock: 0.5, falls: true, icon: '👒' },
-  hat: { label: 'Hat', knock: 0.5, falls: true, icon: '🎩' },
-  headWrap: { label: 'Head wrap', knock: 1.0, falls: true, icon: '🧣' },
-  plume: { label: 'Plume', knock: 1.1, falls: false, icon: '🪶' },
-  crest: { label: 'Crest', knock: 1.3, falls: false, icon: '🌙' },
+  cap: { label: "Runner's cap", knock: 0.3, falls: true, icon: '🧢' },
+  boonie: { label: 'Boonie hat', knock: 0.25, falls: true, icon: '👒' },
+  hat: { label: 'Hat', knock: 0.25, falls: true, icon: '🎩' },
+  headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: '🧣' },
+  plume: { label: 'Plume', knock: 0.45, falls: true, icon: '🪶' },
+  crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙' },
 };
 
 /** What can be worn on the head with this outfit: a headset unless there is a helmet, and its own. */

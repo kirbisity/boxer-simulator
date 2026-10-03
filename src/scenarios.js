@@ -5,6 +5,7 @@
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
+import { knight, rebel } from './cast.js';
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -13,6 +14,18 @@ import { createWorld } from './physics.js';
  * the bout is built, as the builder's slider would.
  */
 export const SCENARIOS = {
+  rebellion: {
+    title: 'Peasant Rebellion',
+    place: 'A village green, Kent, June 1381',
+    blurb: 'The village has risen. Five knights ride out to put it down — and meet twenty peasants with spears.',
+    scene: 'meadow',
+    arena: { halfX: 9, halfZ: 7 },
+    camera: { yaw: -0.55, pitch: 0.32, distance: 10 },
+    roster: 'Five knights · twenty rebels with spears',
+    // The whole cast, made fresh for each visit (the rebels differ every time).
+    cast: (random) => ({ red: Array.from({ length: 5 }, (_, index) => knight(random, index)), blue: Array.from({ length: 20 }, () => rebel(random)) }),
+    fighters: [],
+  },
   subway: {
     title: 'Last Train',
     place: 'New York subway platform, 1:40 a.m.',

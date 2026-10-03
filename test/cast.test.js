@@ -35,3 +35,29 @@ test('the dice make anyone at all', () => {
   const styles = new Set(Array.from({ length: 30 }, () => randomCharacter(random).style));
   assert.ok(styles.size >= 6, `styles: ${[...styles]}`);
 });
+
+test('a prize fight pairs boxers in gloves, within a weight class', async () => {
+  const { randomBoxer, weightOf } = await import('../src/cast.js');
+  const { STYLES } = await import('../src/moves.js');
+  let seed = 11;
+  const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let round = 0; round < 6; round += 1) {
+    const player = randomBoxer(random);
+    const opponent = randomBoxer(random, { weightKg: weightOf(player) });
+    for (const fighter of [player, opponent]) {
+      assert.equal(fighter.outfit.kind, 'boxing');
+      assert.ok(!STYLES[fighter.style].weapon, `${fighter.style} is unarmed`);
+    }
+    assert.ok(Math.abs(weightOf(player) - weightOf(opponent)) < 5, `${weightOf(player)} v ${weightOf(opponent)}`);
+  }
+});
+
+test('the rebellion: five knights against twenty simply drawn rebels with spears', async () => {
+  const { SCENARIOS } = await import('../src/scenarios.js');
+  const cast = SCENARIOS.rebellion.cast(Math.random);
+  assert.equal(cast.red.length, 5);
+  assert.equal(cast.blue.length, 20);
+  assert.ok(cast.red.every((fighter) => fighter.outfit.kind === 'knight'));
+  assert.ok(cast.blue.every((fighter) => fighter.style === 'spear' && fighter.simple));
+  assert.ok(new Set(cast.blue.map((fighter) => fighter.heightCm)).size > 5, 'rebels differ in build');
+});
