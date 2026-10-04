@@ -76,7 +76,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow };
+  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     view.scene.add(view.places[place]);
@@ -100,6 +100,8 @@ const PLACE_LIGHT = {
   subway: { background: 0x10140f, fog: [8, 26], key: 0xf2fff0, keyIntensity: 0.9, rim: 0x9fd8c0 },
   colosseum: { background: 0x9cc4e8, fog: [30, 90], key: 0xfff4e0, keyIntensity: 0.2, rim: 0xbcd4ff, sun: 0.85 },
   meadow: { background: 0xa9cbe6, fog: [25, 70], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xc8e0ff, sun: 0.9 },
+  // A dark hall, the ring alone under hard white light.
+  stadium: { background: 0x040509, fog: [12, 46], key: 0xfff8ee, keyIntensity: 1.75, rim: 0x5a78ff },
 };
 
 /** The fighting floor of each sandbox place (half-sizes in x and z). */
@@ -108,6 +110,7 @@ export const PLACE_ARENAS = {
   colosseum: { halfX: 6.5, halfZ: 4.4 },
   subway: { halfX: 4.2, halfZ: 1.35 },
   meadow: { halfX: 9, halfZ: 7 },
+  stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
 };
 
 /**
@@ -585,6 +588,79 @@ function buildSubway(arena) {
     const glow = new THREE.PointLight(0xe6ffe8, 0.55, 9, 1.6);
     glow.position.set(x, 3.0, 0);
     place.add(glow);
+  }
+  return place;
+}
+
+/**
+ * A big-fight stadium: the ring in the middle of a dark hall, stands of
+ * people rising on every side into the dark, and a rig of lamps over the
+ * ring throwing hard light down onto the canvas.
+ */
+function buildStadium() {
+  const place = buildRing();
+  // The stands: tiers stepping up and back from a dark floor, on four sides.
+  const tierMaterial = new THREE.MeshStandardMaterial({ color: 0x14161e, roughness: 0.95 });
+  const crowd = [];
+  for (let tier = 0; tier < 14; tier += 1) {
+    const inner = 7 + tier * 0.9;
+    const height = -1.2 + tier * 0.55;
+    for (let side = 0; side < 4; side += 1) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(inner * 2, 0.55, 0.9), tierMaterial);
+      const angle = (side * Math.PI) / 2;
+      step.position.set(Math.cos(angle) * (inner + 0.45), height, Math.sin(angle) * (inner + 0.45));
+      step.rotation.y = -angle + Math.PI / 2;
+      place.add(step);
+      // People along the step, a seat apart.
+      for (let seat = -inner + 0.4; seat < inner - 0.4; seat += 0.55) {
+        if (Math.random() < 0.12) continue;
+        const along = [Math.cos(angle + Math.PI / 2), Math.sin(angle + Math.PI / 2)];
+        crowd.push([Math.cos(angle) * (inner + 0.35) + along[0] * seat, height + 0.55, Math.sin(angle) * (inner + 0.35) + along[1] * seat]);
+      }
+    }
+  }
+  // One instanced mesh for the whole crowd: shoulders and heads in the dark.
+  const person = new THREE.CylinderGeometry(0.17, 0.2, 0.75, 6);
+  person.translate(0, 0.38, 0);
+  const people = new THREE.InstancedMesh(person, new THREE.MeshStandardMaterial({ roughness: 0.9 }), crowd.length);
+  const placing = new THREE.Object3D();
+  const shirt = new THREE.Color();
+  crowd.forEach((at, index) => {
+    placing.position.set(at[0], at[1], at[2]);
+    placing.scale.setScalar(0.85 + Math.random() * 0.3);
+    placing.updateMatrix();
+    people.setMatrixAt(index, placing.matrix);
+    people.setColorAt(index, shirt.setHSL(Math.random(), 0.35, 0.12 + Math.random() * 0.16));
+  });
+  place.add(people);
+  // The lighting rig: a square truss over the ring, lamps glowing, and the
+  // beams they throw, faint in the haze.
+  const truss = new THREE.MeshStandardMaterial({ color: 0x1c1f28, metalness: 0.6, roughness: 0.4 });
+  const lamp = new THREE.MeshBasicMaterial({ color: 0xfff6e6 });
+  // Seen only from outside: from inside a beam the camera would be lost in the haze.
+  const beam = new THREE.MeshBasicMaterial({ color: 0xfff3dd, transparent: true, opacity: 0.035, depthWrite: false, side: THREE.FrontSide });
+  const rigHeight = 8;
+  for (let side = 0; side < 4; side += 1) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(8, 0.25, 0.25), truss);
+    const angle = (side * Math.PI) / 2;
+    bar.position.set(Math.cos(angle) * 4, rigHeight, Math.sin(angle) * 4);
+    bar.rotation.y = -angle + Math.PI / 2;
+    place.add(bar);
+    for (const offset of [-2.6, -0.9, 0.9, 2.6]) {
+      const along = [Math.cos(angle + Math.PI / 2), Math.sin(angle + Math.PI / 2)];
+      const x = Math.cos(angle) * 4 + along[0] * offset;
+      const z = Math.sin(angle) * 4 + along[1] * offset;
+      const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), lamp);
+      glow.position.set(x, rigHeight - 0.2, z);
+      place.add(glow);
+      // A cone from the lamp to the canvas.
+      const length = Math.hypot(x, rigHeight, z);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.7, length, 16, 1, true), beam);
+      cone.position.set(x / 2, rigHeight / 2, z / 2);
+      cone.lookAt(0, 0, 0);
+      cone.rotateX(-Math.PI / 2);
+      place.add(cone);
+    }
   }
   return place;
 }

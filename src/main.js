@@ -14,7 +14,7 @@ import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
-import { clearGore, severView, spawnSparks, updateArms, updateBlood, updateDebris, updateStumps, woundBlood } from './weaponview.js';
+import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateBlood, updateDebris, updateShots, updateStumps, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -116,7 +116,7 @@ function newBout() {
   }
   const place = scenario?.scene ?? state.place;
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
-  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena });
+  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules });
   clearGore(scene);
   setPlace(scene, place, arena);
   // A level frames its own place; anything else starts from the usual ringside view.
@@ -279,6 +279,7 @@ function drawWorld(dt) {
   updateProps(scene, state.views, world);
   updateDebris(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
+  updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
@@ -293,6 +294,7 @@ function consumeEvents() {
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
     if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked')) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
+    if (event.kind === 'shot') spawnShot(scene, event);
     if (event.kind === 'bladeBlock') (event.cut > 1 ? woundBlood : (view, at) => spawnSparks(view, at.point, 6))(scene, event);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
@@ -356,6 +358,7 @@ function logEvent(event) {
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'shot') text = `🔫 <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
@@ -456,12 +459,12 @@ const player = () => state.world.fighters[0];
 // below, defences on the left hand.
 const KEYS = {
   j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
-  c: 'clinch', r: 'rush', ' ': 'guard', s: 'slip', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body',
+  c: 'clinch', r: 'rush', ' ': 'guard', s: 'slip', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', f: 'shoot', y: 'rHook', g: 'collarTie',
 };
 const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
   elbow: 'Elbow', upElbow: 'Up elbow', clinch: 'Clinch', rush: 'Charge', guard: 'Guard', slip: 'Slip', roll: 'Roll', parry: 'Parry',
-  leanBack: 'Lean back', check: 'Check', stepBack: 'Step back', body: 'Body',
+  leanBack: 'Lean back', check: 'Check', stepBack: 'Step back', body: 'Body', shoot: 'Shoot', rHook: 'Rear hook', collarTie: 'Collar tie',
 };
 
 function command(name) {

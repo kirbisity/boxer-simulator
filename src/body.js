@@ -157,6 +157,18 @@ export const PRESETS = {
     outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#6b4a2a', facialHair: 'beard', eyeColor: 'green' },
   },
+  // A clinch brawler: big, heavy-handed, an MMA veteran who grabs and swings.
+  clinchBrawl: {
+    name: 'Hank Doyle', style: 'clinchBrawl', sex: 'male', heightCm: 186, frame: 'large', age: 33, exercise: 0.7, calories: 5100,
+    outfit: { kind: 'mma', design: 0 },
+    look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#4a3020', facialHair: 'handlebar', eyeColor: 'grey' },
+  },
+  // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
+  handgun: {
+    name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,
+    outfit: { kind: 'swat', design: 0 },
+    look: { skinTone: 'light', hairStyle: 'fade', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'blue' },
+  },
   baton: {
     name: 'Officer Reyes', style: 'baton', sex: 'male', heightCm: 182, frame: 'medium', age: 33, exercise: 0.6, calories: 3600,
     outfit: { kind: 'swat', design: 0 },

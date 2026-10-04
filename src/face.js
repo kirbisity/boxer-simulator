@@ -18,7 +18,7 @@ import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'bald'],
-  facialHair: ['none', 'stubble', 'mustache', 'beard'],
+  facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'beard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
 export const DEFAULT_LOOK = { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown', faceShape: null };
@@ -616,6 +616,13 @@ function buildFacialHair(group, look, r, shape, material) {
     beard.material.side = THREE.DoubleSide;
     if (style === 'beard') beard.add(outlineFor(beard, 0.003));
     group.add(beard);
+  }
+  if (style === 'handlebar') {
+    // Thick over the lip and down past the corners of the mouth to the jaw:
+    // the horseshoe a brawler wears.
+    for (const side of [1, -1]) {
+      hairLock(group, material, [[SKULL[0] * r * 0.84, -0.47 * r, 0], [SKULL[0] * r * 0.82, -0.52 * r, side * 0.14 * r], [SKULL[0] * r * 0.74, -0.62 * r, side * 0.24 * r], [SKULL[0] * r * 0.68, -0.86 * r, side * 0.27 * r]], 0.14 * r, 0.07 * r, 0.85);
+    }
   }
   if (style === 'mustache' || style === 'beard') {
     for (const side of [1, -1]) {

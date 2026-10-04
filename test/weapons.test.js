@@ -14,10 +14,10 @@ import { measureStyle } from '../tools/aggression.js';
 const wearing = (kind) => gearTraits({ ...PRESETS.contender, outfit: { kind, design: 0 } });
 
 test('armour stops each kind of harm by its own share, and adds its weight', () => {
-  assert.deepEqual(wearing('swat').protection, { blunt: 0.8, cut: 0.6, pierce: 0.4 });
-  assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.9 });
-  assert.deepEqual(wearing('samurai').protection, { blunt: 0.7, cut: 0.9, pierce: 0.8 });
-  assert.deepEqual(wearing('hoplomachus').protection, { blunt: 0.4, cut: 0.4, pierce: 0.2 });
+  assert.deepEqual(wearing('swat').protection, { blunt: 0.8, cut: 0.6, pierce: 0.4, bullet: { head: 0.6, torso: 0.9, limb: 0.5 } });
+  assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } });
+  assert.deepEqual(wearing('samurai').protection, { blunt: 0.7, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0.1 } });
+  assert.deepEqual(wearing('hoplomachus').protection, { blunt: 0.4, cut: 0.4, pierce: 0.2, bullet: { head: 0.3, torso: 0, limb: 0.1 } });
   assert.equal(wearing('knight').extraMass, 0.5);
   assert.equal(wearing('samurai').extraMass, 0.4);
   assert.equal(wearing('hoplomachus').extraMass, 0.3);

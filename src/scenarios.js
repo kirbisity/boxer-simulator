@@ -3,7 +3,7 @@
 // and what they wear differ.
 
 import { FRAMES, normaliseInputs } from './body.js';
-import { caloriesForWeight } from './physiology.js';
+import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
 import { knight, rebel } from './cast.js';
 
@@ -25,6 +25,29 @@ export const SCENARIOS = {
     // The whole cast, made fresh for each visit (the rebels differ every time).
     cast: (random) => ({ red: Array.from({ length: 5 }, (_, index) => knight(random, index)), blue: Array.from({ length: 20 }, () => rebel(random)) }),
     fighters: [],
+  },
+  pride: {
+    title: 'Frye vs. Takayama',
+    place: 'Saitama Super Arena, Japan · 23 June 2002',
+    blurb: 'Two big men, one hand each on the back of the other\'s neck, trading punches face to face until one of them drops.',
+    scene: 'stadium',
+    arena: { halfX: 3, halfZ: 3 },
+    // Stood up again after a knockdown, as the referee would: it ends standing.
+    rules: { noPins: true },
+    camera: { yaw: -0.35, pitch: 0.14, distance: 4.6 },
+    // Bodies given by fat, not weight: the training sets the muscle, and the weight follows.
+    fighters: [
+      {
+        name: 'Don Frye', style: 'clinchBrawl', sex: 'male', heightCm: 185, bodyFat: 0.12, frame: 'large', age: 36, exercise: 0.82,
+        outfit: { kind: 'mma', design: 0, colors: { bottom: '#16161a' } }, accessories: [],
+        look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#3a2a1c', facialHair: 'handlebar', eyeColor: 'brown', faceShape: 'seinen' },
+      },
+      {
+        name: 'Yoshihiro Takayama', style: 'clinchBrawl', sex: 'male', heightCm: 196, bodyFat: 0.14, frame: 'large', age: 35, exercise: 0.65,
+        outfit: { kind: 'mma', design: 0, colors: { bottom: '#1f2a52' } }, accessories: [],
+        look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#c9a25e', facialHair: 'none', eyeColor: 'brown', faceShape: 'seinen' },
+      },
+    ],
   },
   subway: {
     title: 'Last Train',
@@ -63,9 +86,10 @@ export const SCENARIOS = {
 /** Fighter inputs for a scenario: each body fed to its stated weight. */
 export function scenarioFighters(scenario) {
   return scenario.fighters.map((entry, index) => {
-    const { weightKg, ...rest } = entry;
+    const { weightKg, bodyFat, ...rest } = entry;
     const inputs = normaliseInputs(rest);
-    inputs.calories = Math.round(caloriesForWeight(inputs, weightKg, (FRAMES[inputs.frame] ?? FRAMES.medium).lean));
+    const lean = (FRAMES[inputs.frame] ?? FRAMES.medium).lean;
+    inputs.calories = Math.round(bodyFat ? caloriesForBodyFat(inputs, bodyFat, lean) : caloriesForWeight(inputs, weightKg, lean));
     return { inputs, corner: index === 0 ? 'red' : 'blue' };
   });
 }
@@ -81,5 +105,5 @@ export function crewFighter(lead, entry) {
 /** A world for a scenario: its fighters on its floor. */
 export function scenarioWorld(key, seed = 1) {
   const scenario = SCENARIOS[key];
-  return createWorld(scenarioFighters(scenario), { seed, arena: scenario.arena });
+  return createWorld(scenarioFighters(scenario), { seed, arena: scenario.arena, rules: scenario.rules });
 }

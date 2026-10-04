@@ -23,7 +23,7 @@ test('every outfit has its picked design, a movement class, and traits as specif
   assert.ok(gearTraits({ ...male, outfit: { kind: 'swat' } }).balance > 1.3, 'riot gear: hard to fall');
   assert.equal(gearTraits({ ...male, outfit: { kind: 'swat' } }).protection.blunt, 0.8);
   assert.equal(gearTraits({ ...male, outfit: { kind: 'knight' } }).protection.blunt, 0.6);
-  for (const kind of Object.keys(OUTFITS)) assert.deepEqual(Object.keys(gearTraits({ ...male, outfit: { kind } }).protection).sort(), ['blunt', 'cut', 'pierce']);
+  for (const kind of Object.keys(OUTFITS)) assert.deepEqual(Object.keys(gearTraits({ ...male, outfit: { kind } }).protection).sort(), ['blunt', 'bullet', 'cut', 'pierce']);
 });
 
 test('armour is real weight: riot gear adds 20%, plate 50%, and the man inside is the same man', () => {

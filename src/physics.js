@@ -5,11 +5,12 @@
 // A landed punch hands its momentum to the struck part, which flies until
 // the fighter's muscles, after a reflex delay, catch it.
 
-import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
+import { BODY, buildBody, FRAMES, normaliseInputs, P, PARTICLES, PRESETS, SEGMENTS } from './body.js';
+import { caloriesForWeight } from './physiology.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc } from './weapons.js';
+import { BLADES, bulletRegion, GUN, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc, slerpDir } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
 export const WORLD = {
@@ -398,7 +399,7 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
     v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
   });
-  if (fighter.punch?.spec.path === 'blade') fighter.punch = null;
+  if (fighter.punch?.spec.path === 'blade' || fighter.punch?.spec.path === 'aim') fighter.punch = null;
   world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
   if (fighter.state === 'out') return;
   // A backup weapon if he carries one (the hoplomachus's gladius); else he fights mixed.
@@ -450,6 +451,141 @@ function updatePickup(world, fighter, dt) {
   fighter.pickup = null;
   armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
   world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, weapon: debris.weapon, effects: [`picks up the ${WEAPON_LABEL(debris.weapon)}`] });
+}
+
+// ---- Guns ---------------------------------------------------------------------
+
+/**
+ * The gun arm for a shot: up from the guard and out along the line from the
+ * shoulder to the target, which it tracks until the shot; down after.
+ */
+function aimTargets(world, fighter, punch, guard) {
+  const spec = punch.spec;
+  const target = world.fighters[punch.target];
+  if (target && !punch.fired) punch.aim = toLocal(fighter, aimPoint(target, punch.zone));
+  const side = fighter.weapon.main;
+  const shoulder = toLocal(fighter, point(fighter.x, P[`${side}Shoulder`]));
+  const lengths = fighter.body.lengths;
+  const along = vec.normalize(vec.sub(punch.aim, shoulder));
+  const raised = vec.add(shoulder, vec.scale(along, (lengths.upperArm + lengths.forearmToFist) * 0.92));
+  const smooth = (value) => value * value * (3 - 2 * value);
+  const up = Math.min(1, punch.t / spec.windup);
+  const down = punch.t > spec.extendUntil ? Math.min(1, (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil)) : 0;
+  const share = smooth(up) * (1 - smooth(down));
+  return { hand: vec.lerp(guard.hand, raised, share), dir: slerpDir(guard.dir, along, share) };
+}
+
+let referenceSegments = null;
+/** The body parts of the man the gun's numbers are for: 80 kg, average build. */
+function bulletReference() {
+  if (referenceSegments) return referenceSegments;
+  const inputs = normaliseInputs({ ...PRESETS.contender, sex: 'male', heightCm: 178, frame: 'medium', exercise: 0.4, outfit: null, accessories: [] });
+  inputs.calories = caloriesForWeight(inputs, GUN.referenceKg, FRAMES.medium.lean);
+  referenceSegments = buildBody(inputs).segments;
+  return referenceSegments;
+}
+
+/** The first thing a round from `from` to `to` meets: a body part or a shield; null if none. */
+function firstHit(world, shooter, from, to) {
+  const length = vec.length(vec.sub(to, from));
+  const along = vec.scale(vec.sub(to, from), 1 / length);
+  let best = null;
+  for (const other of world.fighters) {
+    if (other === shooter) continue;
+    if (other.shield) {
+      const disc = shieldDisc(other);
+      const facing = vec.dot(along, disc.normal);
+      if (Math.abs(facing) > 1e-6) {
+        const s = vec.dot(vec.sub(disc.centre, from), disc.normal) / facing / length;
+        const at = vec.lerp(from, to, s);
+        if (s > 0 && s < 1 && vec.length(vec.sub(at, disc.centre)) < disc.radius && (!best || s < best.s)) best = { fighter: other, target: 'shield', s, point: at };
+      }
+    }
+    for (const capsule of capsules(other)) {
+      const meet = closestBetween(from, to, point(other.x, capsule.a), point(other.x, capsule.b));
+      const miss = vec.length(vec.sub(meet.onFirst, meet.onSecond));
+      if (miss > capsule.radius) continue;
+      // The trunk's rounded top above the neck is the head's to take, not the chest's.
+      if (capsule.key === 'trunk' && meet.t > 0.98 && meet.onFirst[1] > other.x[P.neck * 3 + 1]) continue;
+      // Back along the line to where it enters the part.
+      const s = Math.max(0, meet.s - Math.sqrt(capsule.radius * capsule.radius - miss * miss) / length);
+      if (!best || s < best.s) best = { fighter: other, capsule, target: capsule.key, s, point: vec.lerp(from, to, s) };
+    }
+  }
+  return best;
+}
+
+/** Whether the barrel has come onto the line from the muzzle to the mark: then he fires. */
+function sightsOn(fighter) {
+  const weapon = fighter.weapon;
+  if (!weapon?.held || !fighter.punch?.aim) return true;
+  const hand = point(fighter.x, P[`${weapon.main}Hand`]);
+  const toMark = vec.normalize(vec.sub(toWorld(fighter, fighter.punch.aim), hand));
+  return vec.dot(toMark, weapon.dir) > Math.cos(GUN.settled);
+}
+
+/** Fire: a round down the barrel's line as it is, give or take the aim's error. */
+function fire(world, fighter) {
+  const punch = fighter.punch;
+  punch.fired = true;
+  const weapon = fighter.weapon;
+  if (!weapon?.held || !weapon.spec.ranged) return;
+  const handIndex = P[`${weapon.main}Hand`];
+  const barrel = weapon.dir;
+  const up = vec.normalize(vec.sub([0, 1, 0], vec.scale(barrel, barrel[1])));
+  const across = vec.normalize(vec.cross(barrel, up));
+  const muzzle = vec.add(vec.add(point(fighter.x, handIndex), vec.scale(barrel, GUN.muzzle[0])), vec.scale(up, GUN.muzzle[1]));
+  const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
+  const spread = (GUN.spread + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
+  const random = world.random;
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
+  // Aimed through the sights at the mark: off by the aim's error, and by
+  // part of however far the barrel itself is off that line.
+  const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(muzzle, barrel);
+  const sighted = vec.normalize(vec.sub(mark, muzzle));
+  const aimed = slerpDir(sighted, barrel, GUN.barrelShare);
+  const dir = vec.normalize(vec.add(aimed, vec.add(vec.scale(up, gauss() * spread), vec.scale(across, gauss() * spread))));
+  const end = vec.add(muzzle, vec.scale(dir, GUN.range));
+  const hit = firstHit(world, fighter, muzzle, end);
+  const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(dir, -1), harm: 0, effects: [] };
+  world.events.push(event);
+  if (hit?.target === 'shield') event.effects.push('stopped by the shield');
+  else if (hit) bulletHit(world, fighter, hit, dir, event);
+  else event.effects.push('missed');
+  // The gun kicks up and back in the hand.
+  world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5]], direction: vec.normalize(vec.add(vec.scale(barrel, -1), up)), impulse: GUN.recoil });
+}
+
+/**
+ * A round in a body part: its harm (by region, through armour, scaled to
+ * the part's weight and how hurt it already is) towards what kills; it
+ * bleeds; to the head or body it staggers him at once; enough and he dies.
+ */
+function bulletHit(world, shooter, hit, dir, event) {
+  const victim = hit.fighter;
+  const key = hit.capsule.key;
+  const region = bulletRegion(key);
+  const armour = victim.body.gear.protection.bullet?.[region] ?? 0;
+  const own = victim.body.segments[key];
+  const reference = bulletReference()[key];
+  const scale = own && reference ? reference.mass / own.mass : 1;
+  const hurt = 1 + GUN.hurtShare * (victim.damage[key] ?? 0);
+  const harm = GUN.lethal[region] * (1 - armour) * scale * hurt;
+  victim.gunshot = (victim.gunshot ?? 0) + harm;
+  victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
+  victim.damageVersion += 1;
+  victim.bleed = (victim.bleed ?? 0) + GUN.bleed[region] * (1 - armour) * scale;
+  Object.assign(event, { harm, armour, region });
+  event.effects.push(armour > 0 ? `${region}: armour took ${Math.round(armour * 100)}%` : `${region}`);
+  shooter.stats.landed += 1;
+  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: GUN.impulse });
+  // A round through the gun arm takes the gun with it.
+  if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key)) dropWeapon(world, victim, 'disarmed', dir);
+  if (victim.gunshot >= 1 && victim.state !== 'out') {
+    knockOut(world, victim, event, region === 'head' ? 'shot through the head' : 'shot dead', 'killed');
+    return;
+  }
+  if (region !== 'limb') stagger(world, victim, WORLD.stagger.startAt + harm * 1.6, event, true);
 }
 
 /** A blow jars the grip; strained past what the hand can hold, the weapon goes. */
@@ -514,7 +650,8 @@ function weaponIntent(world, fighter, intent) {
   } else if (fighter.defence?.name === 'weaponBlock') {
     // Blade across the strike's line, meeting it; or across before the head.
     target = interceptBlock(world, fighter) ?? { hand: vec.scale([0.2, 0.8, -0.08], H), dir: vec.normalize([0.15, 0.3, 1]) };
-  } else target = guardTargets(style, fighter.body);
+  } else if (punch?.spec.path === 'aim' && weapon.spec.ranged) target = aimTargets(world, fighter, punch, guardTargets(style, fighter.body));
+  else target = guardTargets(style, fighter.body);
   const main = weapon.main;
   if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };
   intent[`${main}Hand`] = target.hand;
@@ -698,7 +835,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf } } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf }, rules = {} } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   const fighters = sides.map((side, index) => {
@@ -725,7 +862,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   for (const fighter of fighters) fighter.arena = arena;
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
-  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], clashing: new Set() };
+  // `rules`: a level's own (noPins: a man down gets up again; nobody holds him there).
+  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], clashing: new Set(), rules };
 }
 
 // ---- Frames -------------------------------------------------------------
@@ -828,7 +966,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
     // Who holds on longer is a contest of grip and arm strength.
     const grip = (who) => who.body.strikeForce[P.lHand] + who.body.strikeForce[P.rHand];
     const share = grip(fighter) / (grip(fighter) + grip(target));
-    fighter.clinch = { target: target.id, t: 0, duration: spec.duration * (0.5 + share) };
+    fighter.clinch = { target: target.id, t: 0, duration: spec.duration * (0.5 + share), hands: spec.hands ?? ['l', 'r'] };
     world.events.push({ time: world.time, kind: 'clinch', attacker: fighter.id, defender: target.id, effects: [] });
   } else return false;
   fighter.stamina = Math.max(0, fighter.stamina - spec.cost / fighter.body.aerobic);
@@ -856,6 +994,7 @@ function updateIntent(world, fighter, dt) {
     const punch = fighter.punch;
     punch.t += dt;
     punch.age += dt;
+    if (punch.spec.path === 'aim' && !punch.fired && punch.t >= punch.spec.fireAt && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
     if (punch.heavy) intent.dip += WORLD.heavy.loadDip * Math.max(0, 1 - punch.t / punch.spec.extendUntil);
     const spec = punch.spec;
     // The kinetic chain: hips and shoulders turn first and have finished
@@ -890,9 +1029,9 @@ function updateIntent(world, fighter, dt) {
   }
   if (fighter.clinch) {
     const target = world.fighters[fighter.clinch.target];
-    // Both hands behind the opponent's neck, pulling it down.
+    // The holding hands behind the opponent's neck, pulling it down.
     const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown, 0]);
-    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = vec.add(toLocal(fighter, neck), [0.05, 0.04, sign * 0.07]);
+    for (const [side, sign] of [['l', 1], ['r', -1]]) if ((fighter.clinch.hands ?? ['l', 'r']).includes(side)) intent[`${side}Hand`] = vec.add(toLocal(fighter, neck), [0.05, 0.04, sign * 0.07]);
     intent.lean += 0.08;
   }
   if (fighter.pickup) {
@@ -1128,7 +1267,7 @@ export function step(world, dt) {
 function holdClinch(world, fighter) {
   const target = world.fighters[fighter.clinch.target];
   if (STYLES[fighter.style]?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) driveClinch(world, fighter, target);
-  for (const side of ['l', 'r']) {
+  for (const side of fighter.clinch.hands ?? ['l', 'r']) {
     const hand = P[`${side}Hand`];
     const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown * 0.5, 0]);
     const offset = vec.sub(point(fighter.x, hand), neck);
@@ -2825,9 +2964,9 @@ export function staggerShare(fighter, floor) {
  * Stagger an armoured fighter for a blow of `severity` (1 is what would put
  * him down). A harder blow while already reeling lengthens it. True if he reels.
  */
-function stagger(world, fighter, severity, event) {
+function stagger(world, fighter, severity, event, anyone = false) {
   const spec = WORLD.stagger;
-  if (!armoured(fighter) || fighter.state !== 'up' || severity < spec.startAt) return false;
+  if ((!anyone && !armoured(fighter)) || fighter.state !== 'up' || severity < spec.startAt) return false;
   const share = Math.min(1, (severity - spec.startAt) / (spec.overwhelm - spec.startAt));
   const seconds = spec.minSeconds + (spec.maxSeconds - spec.minSeconds) * share;
   if (seconds <= fighter.stagger) return true;

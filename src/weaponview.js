@@ -92,6 +92,32 @@ export function buildWeaponMesh(kind, envMap) {
   const wood = surface(0x7a5530, { roughness: 0.7 });
   const brass = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
   switch (kind) {
+    case 'pistol': {
+      // A modern striker-fired service pistol: polymer frame, steel slide,
+      // the grip raked back under the hand, the barrel above it (+z is up).
+      const polymer = surface(0x1d1f23, { roughness: 0.75 });
+      const slideSteel = steelMaterial(envMap, { vertexColors: false, color: 0x34363c, roughness: 0.4 });
+      const box = (size, at, material, tilt = 0) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+        mesh.position.set(...at);
+        mesh.rotation.x = tilt;
+        return mesh;
+      };
+      group.add(
+        box([0.026, 0.195, 0.032], [0, 0.0675, 0.05], slideSteel), // slide
+        box([0.024, 0.15, 0.02], [0, 0.055, 0.024], polymer), // frame and rail
+        box([0.028, 0.05, 0.115], [0, -0.012, -0.035], polymer, -0.3), // grip
+        box([0.008, 0.045, 0.005], [0, 0.04, -0.012], polymer), // trigger guard
+        box([0.008, 0.005, 0.02], [0, 0.06, 0], polymer),
+        box([0.004, 0.006, 0.014], [0, 0.03, -0.004], dark), // trigger
+        box([0.006, 0.008, 0.006], [0, 0.157, 0.069], dark), // front sight
+        box([0.02, 0.008, 0.007], [0, -0.022, 0.069], dark), // rear sight
+      );
+      const muzzle = cylinder(0.006, 0.006, 0.16, 0.166, surface(0x050506, { roughness: 1 }), 8);
+      muzzle.position.z = 0.05;
+      group.add(muzzle);
+      break;
+    }
     case 'baton': {
       group.add(cylinder(0.017, 0.016, -spec.handle, spec.length, dark, 12));
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), dark);
@@ -283,7 +309,12 @@ export function updateArms(view, fighterView, time = 0) {
     const hand = point(fighter.x, P[`${weapon.main}Hand`]);
     const along = toVector(weapon.dir).normalize();
     let edge;
-    if (weapon.spec.edgeLeads) edge = leadingEdge(arms, hand, along, weapon.spec.length, time);
+    if (weapon.spec.edgeUp) {
+      // Sights up: the top of the gun to the sky, whichever way it points.
+      edge = new THREE.Vector3(0, 1, 0).sub(along.clone().multiplyScalar(along.y));
+      if (edge.lengthSq() < 1e-6) edge = new THREE.Vector3(1, 0, 0);
+      edge.normalize();
+    } else if (weapon.spec.edgeLeads) edge = leadingEdge(arms, hand, along, weapon.spec.length, time);
     else {
       const forearm = fighterView.frames[BONE[`${weapon.main}Forearm`]];
       const front = toVector(forearm.x);
@@ -518,6 +549,45 @@ export function spawnBlood(view, at, direction, count, speed = 2.2) {
     const velocity = along.clone().add(scatter).normalize().multiplyScalar(speed * (0.4 + Math.random() * 0.8));
     blood.drops.push({ position: toVector(at), velocity, size: GORE.dropRadius * (0.5 + Math.random()) });
   }
+}
+
+// ---- Shots ------------------------------------------------------------------
+
+const SHOT = { flashSeconds: 0.06, tracerSeconds: 0.08 };
+
+/** A shot: the flash at the muzzle, a streak to where it went, and what it hit. */
+export function spawnShot(view, event) {
+  const shots = view.shots ?? (view.shots = []);
+  const from = toVector(event.from);
+  const to = toVector(event.to);
+  const length = from.distanceTo(to);
+  const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, length, 4, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.85, depthWrite: false }));
+  tracer.position.copy(from).lerp(to, 0.5);
+  tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffc35a, transparent: true, opacity: 1, depthWrite: false }));
+  flash.position.copy(from);
+  view.scene.add(tracer, flash);
+  shots.push({ tracer, flash, age: 0 });
+  if (event.harm > 0.02) spawnBlood(view, event.point, event.normal, Math.min(24, 6 + Math.round(event.harm * 20)), 2.2);
+  else if (event.target) spawnSparks(view, event.point, 8);
+}
+
+/** Fade the flashes and streaks out. */
+export function updateShots(view, dt) {
+  if (!view.shots?.length) return;
+  view.shots = view.shots.filter((shot) => {
+    shot.age += dt;
+    shot.flash.material.opacity = Math.max(0, 1 - shot.age / SHOT.flashSeconds);
+    shot.flash.scale.setScalar(1 + shot.age * 12);
+    shot.tracer.material.opacity = 0.85 * Math.max(0, 1 - shot.age / SHOT.tracerSeconds);
+    if (shot.age < Math.max(SHOT.flashSeconds, SHOT.tracerSeconds)) return true;
+    for (const mesh of [shot.tracer, shot.flash]) {
+      view.scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    return false;
+  });
 }
 
 /** Sparks off steel meeting steel or turned by plate. */

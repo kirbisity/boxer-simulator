@@ -64,6 +64,14 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 1, blunt: 0.25, cut: 0.15 }, swing: { blunt: 0.5, cut: 0.2 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.5, grip: 0.5,
   },
+  // A modern 9 mm service pistol: fired, not swung (`ranged`; see GUN). In
+  // the hand a small light thing, very easily knocked away (`grip`); swung
+  // in close, the frame clubs. `edgeUp`: drawn with its sights up.
+  pistol: {
+    label: 'Pistol', hands: 'one', length: 0.19, strikeFrom: 0.04, handle: 0.05, mass: 0.75, balance: 0.04, radius: 0.018,
+    harm: { swing: { blunt: 0.7 }, thrust: { blunt: 0.5 } },
+    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 22, zeta: 0.9 }, threat: 6, grip: 0.12, ranged: true, edgeUp: true,
+  },
   // His backup: a short sword that cuts and stabs.
   gladius: {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
@@ -118,6 +126,40 @@ export const BLADES = {
 };
 
 export const WEAPON_KEYS = Object.keys(WEAPONS);
+
+/**
+ * Pistol shots. `lethal`: what one hit does to an unarmoured 80 kg man
+ * (`referenceKg`), as a share of what kills him — one to the head, two to
+ * the body, five to the arms and legs; a heavier part takes less, a hurt
+ * one more (`hurtShare` per unit of damage). Armour (an outfit's
+ * `protection.bullet`) takes its share off. A hit to head or body staggers
+ * at once, armoured or not; every wound bleeds (`bleed`, per unit of harm).
+ * `muzzle`: the barrel's end from the hand (along, above, m); `spread`:
+ * the aim's error (rad, standard deviation) standing still, more moving or
+ * reeling; `range` (m); `recoil` (N·s on the hand).
+ */
+export const GUN = {
+  referenceKg: 80,
+  lethal: { head: 1, torso: 0.5, limb: 0.2 },
+  hurtShare: 0.5,
+  bleed: { head: 0.02, torso: 0.025, limb: 0.01 },
+  muzzle: [0.17, 0.045],
+  spread: 0.022,
+  barrelShare: 0.15, // of the barrel's own misalignment that goes into the shot
+  settled: 0.08, // rad: the barrel this near the line to the mark, he fires (else at the end of the aim)
+  movingSpread: 0.02, // more per m/s the shooter moves
+  reelingSpread: 2.5, // times, staggered
+  range: 30,
+  recoil: 2.2,
+  impulse: 2.9, // N·s a 9 mm round carries into what it hits
+};
+
+/** What a bullet hit is to: head, torso (the trunk) or limb. */
+export function bulletRegion(capsuleKey) {
+  if (capsuleKey === 'head') return 'head';
+  if (capsuleKey === 'trunk') return 'torso';
+  return 'limb';
+}
 
 /**
  * Where the off hand holds, along the weapon from the main hand (m): a

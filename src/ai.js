@@ -8,6 +8,11 @@ import { chinNow, nearestOpponent, perform, point, reachOf, staggerShare, startP
 import { vec } from './pose.js';
 
 export const AI = {
+  // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
+  // and charge from `chargeFrom` m, this often a second.
+  gunRush: { within: 1.1, weave: 5, chargeFrom: 3, chargePerSecond: 1.5 },
+  // Held in a collar tie, how soon a brawler ties up back (per second).
+  tieBackPerSecond: 3,
   bodyShotShare: 0.2,
   // Seconds between attacks; pros throw ~40–60 strikes a round, in bursts.
   restMin: 0.9,
@@ -199,11 +204,11 @@ function chooseFocus(world, fighter) {
   let hitBy = null;
   for (let index = fighter.aiEventCursor ?? 0; index < events.length; index += 1) {
     const event = events[index];
-    if (event.kind !== 'landed' && event.kind !== 'blocked') continue;
+    if (event.kind !== 'landed' && event.kind !== 'blocked' && event.kind !== 'shot') continue;
     feel(world, fighter, event);
     if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) {
       hitBy = event.attacker;
-      if (event.kind === 'landed') fighter.aiLastHit = event.time;
+      if (event.kind !== 'blocked') fighter.aiLastHit = event.time;
     }
   }
   fighter.aiEventCursor = events.length;
@@ -554,6 +559,7 @@ function holdDown(world, fighter, opponent) {
     fighter.strafe = 0;
     return true;
   }
+  if (world.rules?.noPins) return false;
   const lastOfSide = world.fighters.filter((other) => other.corner === opponent.corner && other.state !== 'out').length === 1;
   if (!lastOfSide || (opponent.state !== 'down' && opponent.state !== 'rising')) return false;
   const holding = world.fighters.filter((other) => other.pin?.target === opponent.id).length;
@@ -572,6 +578,16 @@ function holdDown(world, fighter, opponent) {
   return true;
 }
 
+/** Holding the distance a gun wants, side-stepping, and firing when the line is clear. */
+function gunfight(world, fighter, opponent, distance, gun) {
+  fighter.move = distance < gun.keep - 0.25 ? -1 : distance > gun.keep + 1.2 ? 0.6 : 0;
+  fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.5;
+  if (fighter.punch || fighter.cooldown > 0) return;
+  if (teamSpacing(world, fighter, opponent).blocked) return;
+  const zone = world.random() < gun.headShare ? 'head' : 'body';
+  if (throwPunch(world, fighter, 'shoot', zone)) fighter.cooldown = gun.between[0] + world.random() * gun.between[1];
+}
+
 export function think(world, fighter, dt) {
   const random = world.random;
   fighter.strafe = 0;
@@ -588,7 +604,7 @@ export function think(world, fighter, dt) {
   // A weapon on the floor, and the chance to get it.
   fighter.goTo = null;
   if (goForWeapon(world, fighter, opponent)) return;
-  const style = STYLES[fighter.style];
+  let style = STYLES[fighter.style];
   const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;
   const bold = AI.confidence;
@@ -610,6 +626,25 @@ export function think(world, fighter, dt) {
     fighter.aiCombo = null;
     if (holdDown(world, fighter, opponent)) return;
     fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
+    return;
+  }
+  // A gun: at a distance, keep it and shoot; once he is in close, fight
+  // mixed with the gun held low.
+  const gun = style.ranged && fighter.weapon?.held ? style.ranged : null;
+  if (gun && distance > gun.close) {
+    gunfight(world, fighter, opponent, distance, gun);
+    return;
+  }
+  if (gun) style = STYLES.mix;
+  // Grabbed by the neck, a brawler grabs back: the mutual tie, trading.
+  if (style.attacks.collarTie && !fighter.clinch && !fighter.punch && opponent.clinch?.target === fighter.id && world.random() < AI.tieBackPerSecond * dt) perform(world, fighter, 'collarTie');
+  // Facing a gun at a distance, standing off is death: close in, weaving,
+  // and charge when near enough.
+  const facingGun = !gun && opponent.weapon?.held && opponent.weapon.spec.ranged && opponent.state === 'up';
+  if (facingGun && distance > AI.gunRush.within) {
+    fighter.move = 1;
+    fighter.strafe = Math.sin(world.time * AI.gunRush.weave + fighter.id) * 0.8;
+    if (!fighter.punch && !fighter.rush && distance < AI.gunRush.chargeFrom && world.random() < AI.gunRush.chargePerSecond * dt) perform(world, fighter, 'rush');
     return;
   }
   const spacing = teamSpacing(world, fighter, opponent);
@@ -702,7 +737,9 @@ export function think(world, fighter, dt) {
       continue;
     }
     if (spec.kind === 'clinch') {
-      if (distance < fighter.body.reach * 1.05) choices[name] = weight * 2;
+      // Held by the neck, a brawler grabs back: the mutual tie.
+      const heldByHim = opponent.clinch?.target === fighter.id && spec.hands;
+      if (distance < fighter.body.reach * 1.05) choices[name] = weight * (heldByHim ? 12 : 2);
       continue;
     }
     if (!spacing.kickRoom && spec.limb.match(/Foot|Knee/)) continue;
@@ -711,6 +748,11 @@ export function think(world, fighter, dt) {
     const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius;
     // Close-range moves only when close; long ones only when there is room.
     if (distance <= reach && (spec.reach !== 'leg' || distance > fighter.body.reach * 0.9)) choices[name] = weight;
+  }
+  // Holding him by the neck with one hand, the other hammers.
+  if (fighter.clinch && style.clinchStrikes) {
+    const free = (fighter.clinch.hands ?? ['l', 'r']).length < 2;
+    if (free) for (const [name, weight] of Object.entries(style.clinchStrikes)) if (!fighter.clinch.hands.includes(MOVES[name].limb[0])) choices[name] = weight;
   }
   let move = pick(choices, random);
   if (!move) return;

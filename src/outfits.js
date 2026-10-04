@@ -24,7 +24,8 @@ export const MOVEMENT = {
   limited: { foot: 0.72, accel: 0.62, swing: 0.88 },
 };
 
-const NO_PROTECTION = { blunt: 0, cut: 0, pierce: 0 };
+// `bullet`: share of a pistol round's harm stopped, by region (see GUN).
+const NO_PROTECTION = { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } };
 
 /** Cloth colours by name, for designs' palettes and the builder's pickers. */
 export const CLOTH_COLORS = {
@@ -41,6 +42,15 @@ export const OUTFITS = {
     damageDealt: { hand: 0.9 },
     designs: [
       { label: 'Pro trunks', bottom: { kind: 'trunks', color: 'corner' }, top: { kind: 'sportsBra', color: 'corner', female: true }, feet: { kind: 'boxingBoot', color: '#17171c' } },
+    ],
+  },
+  // Mixed martial arts: fight trunks, barefoot, bare fists (or the thin open
+  // gloves, which spread a blow no more than a fist).
+  mma: {
+    label: 'MMA', movement: 'excellent', fists: 'bare',
+    palette: [[null, 'black'], [null, 'navy'], [null, 'red'], [null, 'white'], [null, 'charcoal']],
+    designs: [
+      { label: 'Fight trunks', bottom: { kind: 'trunks', color: '#16161a' }, top: { kind: 'sportsBra', color: '#16161a', female: true }, feet: { kind: 'bare' } },
     ],
   },
   sports: {
@@ -100,7 +110,7 @@ export const OUTFITS = {
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
     palette: [['charcoal', 'charcoal'], ['olive', 'olive'], ['slate', 'slate']],
     balance: 1.5, extraMass: 0.2,
-    protection: { blunt: 0.8, cut: 0.6, pierce: 0.4 },
+    protection: { blunt: 0.8, cut: 0.6, pierce: 0.4, bullet: { head: 0.6, torso: 0.9, limb: 0.5 } },
     designs: [
       { label: 'Heavy riot', top: { kind: 'longsleeve', color: '#202226' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'heavyRiot', color: '#121316', backPrint: 'SWAT' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
     ],
@@ -113,7 +123,7 @@ export const OUTFITS = {
     extraMass: 0.5,
     // Plate against blunt force spreads it; against an edge it is proof,
     // against a point nearly so, and a blade that meets it glances off.
-    protection: { blunt: 0.6, cut: 1, pierce: 0.9 },
+    protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
     deflects: true,
     designs: [
       // The gothic shape — fluted plate, pointed bascinet — in bright polished steel.
@@ -128,7 +138,7 @@ export const OUTFITS = {
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     extraMass: 0.4,
-    protection: { blunt: 0.7, cut: 0.9, pierce: 0.8 },
+    protection: { blunt: 0.7, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0.1 } },
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743' }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25 }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
@@ -142,7 +152,7 @@ export const OUTFITS = {
     label: 'Hoplomachus', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
-    protection: { blunt: 0.4, cut: 0.4, pierce: 0.2 },
+    protection: { blunt: 0.4, cut: 0.4, pierce: 0.2, bullet: { head: 0.3, torso: 0, limb: 0.1 } },
     designs: [
       { label: 'Hoplomachus', bottom: { kind: 'loincloth', color: '#ece4d0' }, armor: { kind: 'hoplomachus', color: '#b98a3e', lace: '#6a4526' }, head: { kind: 'gladiatorHelm', color: '#b98a3e', plume: '#b81d22' }, feet: { kind: 'sandal', color: '#6a4526' }, top: { kind: 'sportsBra', color: '#ece4d0', female: true } },
     ],

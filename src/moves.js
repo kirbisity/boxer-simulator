@@ -29,6 +29,10 @@ export const MOVES = {
   tsuppariL: { kind: 'strike', limb: 'lHand', path: 'straight', windup: 0, extendUntil: 0.2, duration: 0.34, twist: 0.25, shift: 0.07, cost: 0.014, mass: { arm: 0.65, body: 0.04 }, rotation: 0.4, push: true, shove: 0.6, harm: 0.35, contactSeconds: 0.03, zones: ['body', 'head'], reach: 'arm' },
   tsuppariR: { kind: 'strike', limb: 'rHand', path: 'straight', windup: 0, extendUntil: 0.22, duration: 0.36, twist: -0.3, shift: 0.07, cost: 0.014, mass: { arm: 0.65, body: 0.04 }, rotation: 0.4, push: true, shove: 0.6, harm: 0.35, contactSeconds: 0.03, zones: ['body', 'head'], reach: 'arm' },
   oshi: { kind: 'strike', limb: 'rHand', path: 'pushBoth', windup: 0.08, extendUntil: 0.36, duration: 0.6, twist: 0, shift: 0.12, lean: 0.25, dip: 0.03, step: 1.4, cost: 0.03, mass: { arm: 1.2, body: 0.14 }, rotation: 0.2, push: true, shove: 1.2, harm: 0.2, contactSeconds: 0.05, zones: ['body'], reach: 'arm' },
+  // A pistol shot (path 'aim'): the arm comes up and out along the line to
+  // the target, tracking it, and the round goes at `fireAt` down the
+  // barrel's line as it really is then; the arm comes back down after.
+  shoot: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.34, extendUntil: 0.42, duration: 0.62, twist: -0.25, shift: 0.02, cost: 0.003, mass: { arm: 0.3 }, rotation: 0.5, zones: ['body', 'head', 'legs'], reach: 'gun' },
   // Weapon moves (path 'blade'): the main hand and the blade follow a path
   // from `from` to `to` (hand in heights, local; dir where the weapon points),
   // bent through the aim; `grip` says whether both hands hold it. A thrust
@@ -78,6 +82,11 @@ export const MOVES = {
   // A charge runs until it meets the other body or runs out of steam.
   rush: { kind: 'rush', duration: 1.2, cost: 0.05 },
   clinch: { kind: 'clinch', duration: 3, cost: 0.02 },
+  // The collar tie: one hand (`hands`) clamped on the back of his neck,
+  // pulling his head onto the free hand's punches; held longer.
+  collarTie: { kind: 'clinch', hands: ['l'], duration: 7, cost: 0.016 },
+  // The rear hand looped round: the brawler's hook, in close or held.
+  rHook: { kind: 'strike', limb: 'rHand', path: 'hook', windup: 0.1, extendUntil: 0.32, duration: 0.5, twist: -0.6, shift: 0.02, cost: 0.026, mass: { arm: 0.6, body: 0.014 }, rotation: 1.4, zones: ['head', 'body'], reach: 'close' },
 };
 
 // Bare strikes do blunt harm; a weapon move's harm splits into blunt, cut
@@ -206,6 +215,26 @@ export const STYLES = {
     plans: { pressure: 2.2, brawler: 1.2, outboxer: 0.2, counter: 0.4 },
     pressure: 0.6,
     clinchDrive: true,
+  },
+  // Clinch brawling (Frye–Takayama): square and forward, guard low; grabs
+  // the back of the neck with one hand (`collarTie`) and hammers hooks and
+  // uppercuts with the other (`clinchStrikes`), face to face, trading.
+  clinchBrawl: {
+    label: 'Clinch brawler',
+    cadence: { work: 1.8, move: 0.35, burst: 1, mobility: 0.15 },
+    stance: { blade: 0.25, crouch: 0.03, width: 1.05, lean: 0.1, guardHeight: -0.04 },
+    idle: { bounce: 0.2, sway: 1.1, rock: 0.5 },
+    attacks: { cross: 0.14, hook: 0.14, rHook: 0.22, uppercut: 0.08, collarTie: 0.5, rush: 0.02 },
+    clinchStrikes: { rHook: 0.5, uppercut: 0.3, cross: 0.2 },
+    combos: { 'rHook hook': 0.4, 'cross hook rHook': 0.3, 'hook rHook': 0.3 },
+    comboChance: 0.4,
+    tempo: 0.7,
+    defences: { guard: 0.7, stepBack: 0.3 },
+    defendChance: 0.2,
+    headMovement: 0.05,
+    counter: 0.1,
+    plans: { brawler: 3, pressure: 1.5, outboxer: 0.1, counter: 0.1 },
+    pressure: 0.6,
   },
   // Mixed: switches every so often between the unarmed styles in `mix`, so
   // it boxes for a while, then kicks, then clinches and knees, then pushes.
@@ -345,6 +374,25 @@ export const STYLES = {
     plans: { pressure: 2.2, brawler: 1.6, outboxer: 0.3, counter: 0.4 },
     pressure: 0.55,
   },
+  // A pistol: keeps his distance (`ranged.keep`, m), raises the gun, aims
+  // and fires; with a man inside `ranged.close` he fights mixed with the gun
+  // held low, and losing the gun (it goes easily) he fights mixed.
+  handgun: {
+    label: 'Handgun', weapon: 'pistol', fallback: 'mix',
+    ranged: { keep: 3.4, close: 1.3, headShare: 0.3, between: [0.45, 0.6] },
+    cadence: { work: 1.4, move: 0.6, burst: 0.6, mobility: 0.5 },
+    stance: { blade: 0.3, crouch: 0.04, width: 1.05, lean: 0.04, guardHeight: -0.02 },
+    // Low ready: the gun out before the belly, pointed at the floor ahead.
+    weaponGuard: { hand: [0.2, 0.6, -0.06], dir: [1, -0.6, 0] },
+    idle: { bounce: 0.2, sway: 0.5, rock: 0.2 },
+    attacks: { shoot: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.6, guard: 0.4 },
+    defendChance: 0.45,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
   // The hoplomachus: spear in the right hand, the parma on the left forearm
   // held out before him. Losing the spear, he draws the gladius.
   hoplomachus: {
@@ -459,6 +507,7 @@ export function strikeTargets(move, t, aim, body, followThrough) {
 /** How far a move reaches from the attacker's pelvis, for choosing moves by distance. */
 export function moveRange(move, body, weapon = null) {
   const legReach = body.lengths.thigh + body.lengths.shank;
+  if (move.reach === 'gun') return 30;
   if (move.reach === 'weapon') return body.reach * 1.05 + (weapon?.length ?? 0) * (move.mode === 'thrust' ? 0.9 : 0.85);
   if (move.reach === 'leg') return legReach * 1.25;
   if (move.reach === 'close') return body.reach * 0.95;
