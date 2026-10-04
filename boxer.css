@@ -281,3 +281,30 @@ button.big { padding: 12px 34px; font-size: 18px; }
   .choice .words > span { display: none; }
 }
 .wizard .field > .chip { justify-self: start; }
+
+/* ---- Outside the sandbox: less to read, bigger and clearer ---- */
+.bar.health i { background: linear-gradient(90deg, #e0353b, #ffcf4a 45%, #57d68d); }
+body[data-game="sandbox"] .bar.health { display: none; }
+body:not([data-game="sandbox"]) .card .meta,
+body:not([data-game="sandbox"]) .bar.brain,
+body:not([data-game="sandbox"]) .bar.blood,
+body:not([data-game="sandbox"]) #speeds,
+body:not([data-game="sandbox"]) .log { display: none !important; }
+body:not([data-game="sandbox"]) .card { gap: 7px; padding: 10px 12px; }
+body:not([data-game="sandbox"]) .card .top { font-size: 20px; }
+body:not([data-game="sandbox"]) .bar { height: 9px; border-radius: 5px; }
+/* A side's fighters as dots, no names. */
+body:not([data-game="sandbox"]) .roster { gap: 3px; }
+body:not([data-game="sandbox"]) .roster span { font-size: 0; }
+body:not([data-game="sandbox"]) .roster span::before { font-size: 13px; margin: 0; }
+body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size: 15px; }
+
+/* ---- No sideways scrolling anywhere; levels scroll down on a phone ---- */
+.screen, .builder, .sheet, .wizard-panel { overflow-x: hidden; }
+@media (max-width: 760px) {
+  .choices.levels { grid-template-columns: 1fr; }
+  body:not([data-game="sandbox"]) .card .top { font-size: 16px; }
+}
+/* A long name shrinks and trails off; the card never overflows. */
+.card { overflow: hidden; }
+.card .top .name { min-width: 0; flex: 1; }

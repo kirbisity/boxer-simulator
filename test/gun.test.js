@@ -128,3 +128,24 @@ test('engaging, he holds the gun up in both hands; closed on, he drops it and fi
   assert.equal(gunner.weapon, null, 'closed on, he let the gun go');
   assert.equal(gunner.mixed, 'mix');
 });
+
+test('recoil: the same kick rocks a light shooter more than a heavy one', () => {
+  const kick = (inputs) => {
+    const world = createWorld([{ ...PRESETS.handgun, ...inputs }, man(80)], { seed: 1 });
+    const [gunner, target] = world.fighters;
+    placeFighter(gunner, -2, 0);
+    placeFighter(target, 2, 0);
+    advance(world, 0.6);
+    throwPunch(world, gunner, 'shoot', 'body');
+    // The jump in the gun hand's speed over the frame the shot goes off.
+    for (let frame = 0; frame < 60; frame += 1) {
+      const before = [gunner.v[21], gunner.v[22], gunner.v[23]];
+      advance(world, 1 / 120, null, 1 / 120);
+      if (world.events.some((event) => event.kind === 'shot')) return Math.hypot(gunner.v[21] - before[0], gunner.v[22] - before[1], gunner.v[23] - before[2]);
+    }
+    return 0;
+  };
+  const light = kick({ sex: 'female', heightCm: 160, calories: 2000, exercise: 0.3 });
+  const heavy = kick({ heightCm: 192, frame: 'large', calories: 5200, exercise: 0.7 });
+  assert.ok(light > heavy * 1.15, `hand kick ${light.toFixed(2)} v ${heavy.toFixed(2)} m/s`);
+});

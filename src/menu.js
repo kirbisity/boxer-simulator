@@ -25,12 +25,13 @@ export const EVENTS = {
 };
 
 // What the character creator offers in each kind of fight.
-const UNARMED = STYLE_KEYS.filter((key) => !STYLES[key].weapon);
+// Passive is the sandbox's: nobody makes a fighter who will not fight.
+const UNARMED = STYLE_KEYS.filter((key) => !STYLES[key].weapon && !STYLES[key].passive);
 const ARMED = STYLE_KEYS.filter((key) => STYLES[key].weapon);
 const STYLE_NOTES = {
   boxing: 'Hands only: slips, rolls, combinations.', kickboxing: 'Punches and kicks from range.', street: 'Wild and heavy, little defence.',
   muayThai: 'Kicks, knees, elbows, the clinch.', sumo: 'Pushes and drives men off their feet.', mix: 'Switches between the unarmed styles.',
-  unskilled: 'An ordinary person in a fight.', clinchBrawl: 'Grabs the neck, hammers with the free hand.',
+  unskilled: 'An ordinary person in a fight.', passive: 'Will not fight back: covers up and runs.', clinchBrawl: 'Grabs the neck, hammers with the free hand.',
   handgun: 'Keeps his distance, aims and fires; hand to hand up close.', baton: 'A police baton: hard blunt blows.', longsword: 'Hand-and-a-half sword: cuts and lunges.',
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
@@ -179,7 +180,7 @@ export function installMenus(game) {
     const inputs = normaliseInputs(structuredClone(start));
     if (event === 'boxing') Object.assign(inputs, { outfit: { kind: 'boxing', design: 0 }, accessories: [] });
     let gearTouched = false;
-    const styles = event === 'boxing' ? UNARMED : event === 'gladiator' ? ARMED : STYLE_KEYS;
+    const styles = event === 'boxing' ? UNARMED : event === 'gladiator' ? ARMED : STYLE_KEYS.filter((key) => !STYLES[key].passive);
     const steps = [
       { key: 'who', title: 'Who are they?', render: stepWho },
       { key: 'body', title: 'Their build', render: stepBody },

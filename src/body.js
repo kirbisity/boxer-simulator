@@ -163,6 +163,12 @@ export const PRESETS = {
     outfit: { kind: 'mma', design: 0 },
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#4a3020', facialHair: 'handlebar', eyeColor: 'grey' },
   },
+  // Passive: no fight in him; covers up and gets away.
+  passive: {
+    name: 'Tom Hartley', style: 'passive', sex: 'male', heightCm: 176, frame: 'medium', age: 41, exercise: 0.15, calories: 2600,
+    outfit: { kind: 'business', design: 0 },
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,

@@ -1401,7 +1401,8 @@ function buildSkin(body, style) {
   return buildBodyMesh(body, 'skin');
 }
 
-export function buildFighterView(view, fighter) {
+/** `simple`: drawn as a crowd member (no skeleton, low detail, no soft flesh), whatever his inputs say. */
+export function buildFighterView(view, fighter, { simple: crowd = false } = {}) {
   const body = fighter.body;
   const look = body.inputs.look ?? {};
   const corner = CORNER_COLORS[fighter.corner];
@@ -1418,7 +1419,7 @@ export function buildFighterView(view, fighter) {
   });
   // A crowd character (`simple`) is drawn cheaply: fewer sides to the body,
   // no skeleton or muscle beneath, no springing flesh. Its physics is whole.
-  const simple = Boolean(body.inputs.simple);
+  const simple = crowd || Boolean(body.inputs.simple);
   const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkin(body, look.bodyStyle ?? BODY_STYLE);
   const baseColors = paintBody(built, body, look, corner);
   // Steel is drawn apart, as metal; everything else is the toon body.

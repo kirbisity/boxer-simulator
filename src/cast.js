@@ -80,7 +80,7 @@ function atWeight(inputs, kg) {
 }
 
 // The prize fight's men: anyone unarmed, gloved, fighting mixed.
-const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !preset.simple);
+const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple);
 // The arena's: gladiators, knights, samurai and their kin.
 export const GLADIATORS = ['hoplomachus', 'knight', 'warhammer', 'samurai', 'naginata', 'spear'];
 

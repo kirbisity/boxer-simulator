@@ -197,6 +197,8 @@ export const WORLD = {
   rush: { speedFactor: 2.6, trunkShare: 0.7, minClosing: 0.8 },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
+  // Out this long (s), a body is left where it lies: no more simulation for it.
+  goneSeconds: 20,
   gunStartApart: 2.5, // m each side of the centre, when someone carries a gun
   // The clinch: hands locked behind the neck; it breaks when the defender's
   // strength wins or the time runs out.
@@ -548,7 +550,9 @@ function fire(world, fighter) {
   const across = vec.normalize(vec.cross(barrel, up));
   const muzzle = vec.add(vec.add(point(fighter.x, handIndex), vec.scale(barrel, GUN.muzzle[0])), vec.scale(up, GUN.muzzle[1]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  const spread = (GUN.spread + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
+  // The hand still moving from the last kick (or anything else) throws the shot.
+  const shaking = vec.length(point(fighter.v, handIndex));
+  const spread = (GUN.spread + GUN.movingSpread * moving + GUN.unsettled * shaking) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
   const random = world.random;
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   // Aimed through the sights at the mark: off by the aim's error, and by
@@ -565,7 +569,9 @@ function fire(world, fighter) {
   else if (hit) bulletHit(world, fighter, hit, dir, event);
   else event.effects.push('missed');
   // The gun kicks up and back in the hand.
-  world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5]], direction: vec.normalize(vec.add(vec.scale(barrel, -1), up)), impulse: GUN.recoil });
+  // Into both hands (both on the gun in the stance), the arms and the shoulders: a heavy man barely moves, a light one rocks.
+  const support = fighter.aimAt !== undefined ? [[P[`${weapon.off}Hand`], 0.6], [P[`${weapon.off}Elbow`], 0.3]] : [];
+  world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5], [P[`${weapon.main}Shoulder`], 0.25], ...support], direction: vec.normalize(vec.add(vec.scale(barrel, -1), vec.scale(up, 0.8))), impulse: GUN.recoil });
 }
 
 /**
@@ -1250,6 +1256,8 @@ function rawFootTarget(fighter, foot) {
 /** Advance the world by `dt` seconds (one outer step, several substeps). */
 export function step(world, dt) {
   for (const fighter of world.fighters) {
+    if (fighter.state === 'out') fighter.outFor = (fighter.outFor ?? 0) + dt;
+    if (gone(fighter)) continue;
     moveRoot(world, fighter, dt);
     updateTimers(world, fighter, dt);
     updateIntent(world, fighter, dt);
@@ -1803,7 +1811,12 @@ function settleWhenStill(fighter, h) {
 
 /** Lying still long enough to stop simulating it, until it is touched or gets up. */
 function asleep(fighter) {
-  return isLimp(fighter) && (fighter.stillFor ?? 0) > WORLD.ragdoll.sleepSeconds;
+  return gone(fighter) || (isLimp(fighter) && (fighter.stillFor ?? 0) > WORLD.ragdoll.sleepSeconds);
+}
+
+/** Out of the fight long enough (`WORLD.goneSeconds`) that his body is left lying, unsimulated. */
+function gone(fighter) {
+  return fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds;
 }
 
 /** Hips and shoulders turn against each other about the trunk by at most `limit`. */

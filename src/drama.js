@@ -17,6 +17,8 @@ export const DRAMA = {
   bledOut: { slowest: 0.4, seconds: 1.6, hold: 0.4, shake: 0, pushIn: 0.8, flash: 0 },
   disarmed: { slowest: 0.6, seconds: 0.8, hold: 0.3, shake: 0.02, pushIn: 1, flash: 0 },
   staggered: { slowest: 0.55, seconds: 0.9, hold: 0.3, shake: 0.04, pushIn: 0.85, flash: 0 },
+  panic: { slowest: 1, seconds: 0.6, hold: 0.2, shake: 0, pushIn: 0.95, flash: 0 },
+  rally: { slowest: 1, seconds: 0.6, hold: 0.2, shake: 0, pushIn: 0.95, flash: 0 },
   // Held down: no blow, so no shake or flash; the camera closes in.
   held: { slowest: 1, seconds: 1.2, hold: 0.2, shake: 0, pushIn: 0.85, flash: 0 },
   pinned: { slowest: 0.5, seconds: 1.6, hold: 0.4, shake: 0, pushIn: 0.75, flash: 0 },
@@ -37,6 +39,8 @@ const ICONS = {
   bledOut: { glyph: '🩸', label: 'BLED OUT', tone: 'ko' },
   disarmed: { glyph: '🗡️', label: 'DISARMED', tone: 'gear' },
   staggered: { glyph: '🌀', label: 'STAGGERED', tone: 'down' },
+  panic: { glyph: '😱', label: 'PANIC', tone: 'down' },
+  rally: { glyph: '🔥', label: 'FIGHTS ON', tone: 'gear' },
   held: { glyph: '🤼', label: 'HOLD', tone: 'down' },
   pinned: { glyph: '🤼', label: 'HELD DOWN', tone: 'ko' },
 };
@@ -47,6 +51,7 @@ export function momentFor(event) {
   if (event.kind === 'broken') return { kind: 'broken', fighter: event.fighter, particle: P[event.joint] ?? P.neck, label: event.joint };
   if (event.kind === 'severed') return { kind: 'severed', fighter: event.fighter, particle: event.joint === 'neck' ? P.neck : P[`${event.side}${{ shoulder: 'Shoulder', elbow: 'Elbow', wrist: 'Hand', hip: 'Hip', knee: 'Knee', ankle: 'Foot' }[event.joint]}`] };
   if (event.kind === 'held' || event.kind === 'pinned') return { kind: event.kind, fighter: event.fighter, particle: P.neck };
+  if (event.kind === 'panic' || event.kind === 'rally') return { kind: event.kind, fighter: event.fighter, particle: P.head };
   if (event.kind === 'staggered') return { kind: 'staggered', fighter: event.fighter, particle: P.head };
   if (event.kind === 'killed') return { kind: 'killed', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'bledOut') return { kind: 'bledOut', fighter: event.fighter, particle: P.neck };

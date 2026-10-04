@@ -124,6 +124,7 @@ export const OUTFITS = {
     // Plate against blunt force spreads it; against an edge it is proof,
     // against a point nearly so, and a blade that meets it glances off.
     protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
+    courage: 0.35,
     deflects: true,
     designs: [
       // The gothic shape — fluted plate, pointed bascinet — in bright polished steel.
@@ -139,6 +140,7 @@ export const OUTFITS = {
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     extraMass: 0.4,
     protection: { blunt: 0.7, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0.1 } },
+    courage: 0.3,
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743' }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25 }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
@@ -153,6 +155,7 @@ export const OUTFITS = {
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
     protection: { blunt: 0.4, cut: 0.4, pierce: 0.2, bullet: { head: 0.3, torso: 0, limb: 0.1 } },
+    courage: 0.25,
     designs: [
       { label: 'Hoplomachus', bottom: { kind: 'loincloth', color: '#ece4d0' }, armor: { kind: 'hoplomachus', color: '#b98a3e', lace: '#6a4526' }, head: { kind: 'gladiatorHelm', color: '#b98a3e', plume: '#b81d22' }, feet: { kind: 'sandal', color: '#6a4526' }, top: { kind: 'sportsBra', color: '#ece4d0', female: true } },
     ],
@@ -233,6 +236,8 @@ export function gearTraits(inputs) {
     extraMass: spec.extraMass ?? 0,
     protection: { ...NO_PROTECTION, ...spec.protection },
     deflects: Boolean(spec.deflects),
+    // Courage from good armour: less fear, readier to close (0 to 1).
+    courage: spec.courage ?? 0,
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },
   };
 }

@@ -55,8 +55,9 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, crush: 0.45,
   },
   naginata: {
-    label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 1.9, balance: 0.55, radius: 0.014,
-    harm: { swing: { cut: 1.3, blunt: 0.5 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.2 } },
+    label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 2.35, balance: 0.55, radius: 0.014,
+    // A heavy head on a long shaft (+25% weight, +25% blunt): it knocks men about as it cuts.
+    harm: { swing: { cut: 1.3, blunt: 0.625 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.25 } },
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5,
   },
   longSpear: {
@@ -150,7 +151,11 @@ export const GUN = {
   movingSpread: 0.02, // more per m/s the shooter moves
   reelingSpread: 2.5, // times, staggered
   range: 30,
-  recoil: 2.2,
+  // Recoil (N·s) into the hands, arms and shoulders: the same kick moves a
+  // light arm further, and a shot fired before the gun has settled again
+  // goes wider by `unsettled` rad per m/s the hand is still moving.
+  recoil: 4,
+  unsettled: 0.05,
   impulse: 2.9, // N·s a 9 mm round carries into what it hits
   plated: ['knight', 'samurai', 'swat'], // armour a round is seen to strike, not enter
 };

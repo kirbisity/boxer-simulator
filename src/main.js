@@ -3,7 +3,7 @@
 
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
-import { thinkAll } from './ai.js';
+import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
@@ -79,9 +79,9 @@ function ensureRoster(corner, scenario) {
     const index = roster.length - 1;
     const crew = scenario?.crews?.[corner];
     let mate;
-    // A level's crew; in the sandbox, someone like the lead (the dice re-roll them as anyone).
+    // A level's crew; in the sandbox, the lead again, exactly (the dice re-roll them as anyone).
     if (crew) mate = crewFighter(lead, crew[index % crew.length]);
-    else mate = varyCharacter(lead);
+    else mate = structuredClone(lead);
     // A name already in the fight gets a number.
     const taken = new Set([...state.rosters.red, ...state.rosters.blue].map((fighter) => fighter.name));
     let name = mate.name;
@@ -137,10 +137,17 @@ function newBout() {
 }
 
 /** Rebuild the fighters' models, for a new bout or a new shading style. */
+// A crowd this big (fighters in all) draws everyone but each side's lead
+// simply: no skeleton beneath, fewer rings, no soft flesh. The simulation
+// is the same for all of them.
+const CROWD_DRAWING = 8;
+
 function rebuildViews() {
   for (const view of state.views) disposeFighterView(scene, view);
+  const crowd = state.world.fighters.length > CROWD_DRAWING;
+  const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
   state.views = state.world.fighters.map((fighter) => {
-    const view = buildFighterView(scene, fighter);
+    const view = buildFighterView(scene, fighter, { simple: crowd && !leads.has(fighter.id) });
     setLayer(view, state.layer);
     return view;
   });
@@ -332,10 +339,13 @@ function renderHud() {
     const blood = card.querySelector('.blood');
     blood.hidden = !(fighter.bloodLost > 0);
     blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / collapseAt()) * 100))}%`;
-    card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
+    card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : fighter.panicked ? 'PANIC' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
     const nerve = fighter.aiConfidence ?? 0;
     const mood = nerve > 0.35 ? ' · confident' : nerve < -0.35 ? ' · wary' : '';
-    card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s${mood}`;
+    // The sandbox reads out fear and adrenaline; everywhere else, one health bar says enough.
+    const feeling = ` · fear ${Math.round((fighter.fear ?? 0) * 100)}% · adrenaline ${Math.round((fighter.adrenaline ?? 0) * 100)}%`;
+    card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s${mood}${feeling}`;
+    card.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(fighter)) * 100)}%`;
     let roster = card.querySelector('.roster');
     if (!roster) roster = card.appendChild(Object.assign(document.createElement('div'), { className: 'roster' }));
     roster.hidden = team.length < 2;
@@ -363,6 +373,7 @@ function logEvent(event) {
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'shot') text = `🔫 <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'panic' || event.kind === 'rally') text = `${event.kind === 'panic' ? '😱' : '🔥'} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
   else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
@@ -415,7 +426,7 @@ segmented('#styles', (style) => {
 segmented('#speeds', (speed) => { state.speed = Number(speed); });
 for (const corner of ['red', 'blue']) {
   const select = $(`#team-${corner}`);
-  select.append(...Array.from({ length: 8 }, (_, index) => new Option(String(index + 1), String(index + 1))));
+  select.append(...Array.from({ length: 20 }, (_, index) => new Option(String(index + 1), String(index + 1))));
   select.addEventListener('change', () => {
     state.teamSizes[corner] = Number(select.value);
     refreshBuilder();
@@ -839,7 +850,7 @@ function loadSetup(file) {
   state.rosters = { red: file.teams.red.map(fighter), blue: file.teams.blue.map(fighter) };
   if (state.scenario) state.levelRosters[state.scenario] = state.rosters;
   for (const corner of ['red', 'blue']) {
-    state.teamSizes[corner] = Math.min(8, state.rosters[corner].length);
+    state.teamSizes[corner] = Math.min(20, state.rosters[corner].length);
     state.editing[corner] = 0;
   }
   refreshBuilder();

@@ -236,6 +236,21 @@ export const STYLES = {
     plans: { brawler: 3, pressure: 1.5, outboxer: 0.1, counter: 0.1 },
     pressure: 0.6,
   },
+  // Passive: will not fight back. Covers up and gets away from whoever is
+  // coming at him. Chosen, he stays so; broken by fear (see the AI's
+  // `panic`), a fighter falls into it and may come out again.
+  passive: {
+    label: 'Passive', passive: true,
+    cadence: { work: 0.2, move: 2, burst: 0.1, mobility: 1 },
+    stance: { blade: 0.2, crouch: 0.07, width: 0.95, lean: -0.04, guardHeight: 0.05 },
+    idle: { bounce: 0.1, sway: 1.2, rock: 0.6 },
+    attacks: {},
+    defences: { guard: 0.75, stepBack: 0.25 },
+    defendChance: 0.9,
+    headMovement: 0.3,
+    plans: { outboxer: 1 },
+    pressure: 0,
+  },
   // Mixed: switches every so often between the unarmed styles in `mix`, so
   // it boxes for a while, then kicks, then clinches and knees, then pushes.
   mix: {

@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, dropWeapon, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
+import { chinNow, collapseAt, concussionCapacity, dropWeapon, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 
@@ -14,6 +14,8 @@ export const AI = {
   gunRush: { within: 1.1, weave: 5, chargeFrom: 3, chargePerSecond: 1.5 },
   // Held in a collar tie, how soon a brawler ties up back (per second).
   tieBackPerSecond: 3,
+  // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
+  passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
   // directions, scored by distance from him, room to the edge (weighted)
   // and not running past him (weighted); a fresh choice every `rethink` s.
@@ -68,6 +70,19 @@ export const AI = {
   // how many clean shots felt before experience weighs as much as the look
   // of the man; and what confidence (+1) or fear (−1) does to the fight.
   confidenceRatio: 2.5,
+  // Fear, panic and adrenaline. `fear` 0..1 follows (over `settle` s) a
+  // target made of feeling outmatched (`outmatched` × fear from nerve) and
+  // of being hurt (`hurt` × the worst of brain strain, blood lost, gunshot
+  // harm and knockdowns, `perKnockdown` each), less the armour's courage.
+  // Past `breakAt` he may break (`rate`/s at full fear) into the passive
+  // style — unless adrenaline is over `adrenalineHolds`. He comes out once
+  // fear is under `calmAt` for `calmSeconds`, or adrenaline surges.
+  panic: { settle: 1.5, outmatched: 0.5, hurt: 0.85, perKnockdown: 0.22, breakAt: 0.7, rate: 0.6, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3 },
+  // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
+  // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
+  // fading with `halfLife` s; how much a body surges depends on age, size
+  // and sex (see adrenalineGain), and it takes away `nerve` of his fear.
+  adrenaline: { knockdown: 0.45, hardHit: 0.35, hardFrom: 0.6, halfLife: 35, nerve: 0.6 },
   // Fear per metre of reach the other has on me.
   reachFear: 0.6,
   // His weapon is out of line when it points this far off me (cosine).
@@ -209,6 +224,7 @@ function chooseFocus(world, fighter) {
   let hitBy = null;
   for (let index = fighter.aiEventCursor ?? 0; index < events.length; index += 1) {
     const event = events[index];
+    surge(fighter, event);
     if (event.kind !== 'landed' && event.kind !== 'blocked' && event.kind !== 'shot') continue;
     feel(world, fighter, event);
     if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) {
@@ -304,6 +320,8 @@ export function confidence(fighter, opponent, world = null) {
   const mine = judged(strikeThreat(fighter, opponent), fighter.aiDealt);
   const theirs = judged(strikeThreat(opponent, fighter), fighter.aiFelt);
   let nerve = Math.log(mine / theirs) / Math.log(AI.confidenceRatio);
+  // Good armour is courage.
+  nerve += fighter.body.gear.courage;
   // A longer reach is frightening in itself: he can hit me before I can hit him.
   nerve -= AI.reachFear * Math.max(0, reachOf(opponent) - reachOf(fighter));
   if (world) {
@@ -586,6 +604,97 @@ function holdDown(world, fighter, opponent) {
   return true;
 }
 
+// ---- Fear, panic and adrenaline -------------------------------------------------
+
+/** How much a body surges with adrenaline: young, big and male more; old less. */
+export function adrenalineGain(fighter) {
+  const inputs = fighter.body.inputs;
+  const age = Math.max(0.45, Math.min(1.2, 1.15 - 0.013 * (inputs.age - 25)));
+  const size = ((fighter.body.bodyMassKg ?? fighter.body.massKg) / 75) ** 0.25;
+  return age * size * (inputs.sex === 'female' ? 0.8 : 1);
+}
+
+/** Adrenaline from what just happened to him: a man put down, or a hard blow survived. */
+function surge(fighter, event) {
+  const spec = AI.adrenaline;
+  let rise = 0;
+  const putDown = event.kind === 'knockout' || ((event.kind === 'landed' || event.kind === 'blocked') && event.effects?.some((effect) => effect.startsWith('knockdown')));
+  if (putDown && event.attacker === fighter.id) rise = spec.knockdown;
+  if (event.defender === fighter.id && fighter.state === 'up') {
+    const severity = event.kind === 'shot' ? (event.harm ?? 0) * 2 : event.kind === 'landed' && event.target === 'head' ? (event.harmDeltaV ?? event.headDeltaV ?? 0) / chinNow(fighter) : 0;
+    if (severity > spec.hardFrom) rise = Math.max(rise, spec.hardHit * Math.min(2, severity - spec.hardFrom + 0.5));
+  }
+  if (event.kind === 'staggered' && event.fighter === fighter.id) rise = Math.max(rise, spec.hardHit);
+  if (rise > 0) fighter.adrenaline = Math.min(1, (fighter.adrenaline ?? 0) + rise * adrenalineGain(fighter));
+}
+
+/** How hurt he is, 0 (fresh) to 1 (about to drop): the worst of everything that puts a man down. */
+export function hurtShare(fighter) {
+  return Math.min(1, Math.max(
+    fighter.concussion / concussionCapacity(fighter),
+    (fighter.bloodLost ?? 0) / collapseAt(),
+    fighter.gunshot ?? 0,
+    AI.panic.perKnockdown * fighter.knockdowns,
+  ));
+}
+
+/**
+ * Fear, settling towards what he feels now; past breaking point he may
+ * break (unless adrenaline holds him), and once calm again he recovers.
+ */
+function feelFear(world, fighter, nerve, dt) {
+  const spec = AI.panic;
+  fighter.adrenaline = (fighter.adrenaline ?? 0) * 0.5 ** (dt / AI.adrenaline.halfLife);
+  // Adrenaline drowns fear out (`AI.adrenaline.nerve` of it, at full adrenaline).
+  const target = Math.max(0, Math.min(1, (spec.outmatched * Math.max(0, -nerve) + spec.hurt * hurtShare(fighter)) * (1 - fighter.body.gear.courage) * (1 - AI.adrenaline.nerve * fighter.adrenaline)));
+  fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
+  const held = fighter.adrenaline > spec.adrenalineHolds;
+  if (!fighter.panicked) {
+    if (fighter.fear > spec.breakAt && !held && world.random() < spec.rate * ((fighter.fear - spec.breakAt) / (1 - spec.breakAt)) * dt) {
+      fighter.panicked = true;
+      fighter.calmFor = 0;
+      fighter.punch = null;
+      fighter.clinch = null;
+      // Whatever is in his hands goes: he runs.
+      if (fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
+      world.events.push({ time: world.time, kind: 'panic', fighter: fighter.id, effects: ['breaks and runs'] });
+    }
+    return;
+  }
+  fighter.calmFor = fighter.fear < spec.calmAt ? (fighter.calmFor ?? 0) + dt : 0;
+  if (held || fighter.calmFor > spec.calmSeconds) {
+    fighter.panicked = false;
+    world.events.push({ time: world.time, kind: 'rally', fighter: fighter.id, effects: [held ? 'adrenaline: fights on' : 'steadies'] });
+  }
+}
+
+/** Passive: get away from whoever is nearest, covering up when one swings. */
+function keepAway(world, fighter, opponent, dt) {
+  const at = point(fighter.x, P.pelvis);
+  const enemies = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up');
+  let nearest = opponent;
+  let nearestDistance = Infinity;
+  for (const enemy of enemies) {
+    const distance = Math.hypot(enemy.x[P.pelvis * 3] - at[0], enemy.x[P.pelvis * 3 + 2] - at[2]);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = enemy;
+    }
+  }
+  if (nearestDistance < AI.passive.safeDistance) {
+    fighter.aiEscapeAge = (fighter.aiEscapeAge ?? Infinity) + dt;
+    if (!fighter.aiEscape || fighter.aiEscapeAge > AI.gunKite.rethink) {
+      fighter.aiEscape = escapePoint(world, fighter, nearest);
+      fighter.aiEscapeAge = 0;
+    }
+    fighter.goTo = fighter.aiEscape;
+    fighter.move = 1;
+    fighter.running = fighter.stamina > AI.passive.runWhile;
+  } else fighter.move = 0;
+  // Hands up whenever someone swings at him.
+  if (!fighter.defence && enemies.some((enemy) => enemy.punch?.target === fighter.id)) perform(world, fighter, 'guard');
+}
+
 /**
  * A gun keeps away. Closer than `flee` (m), he turns and runs for the most
  * open ground, round him and never into a corner, until he has `flee` plus
@@ -693,6 +802,12 @@ export function think(world, fighter, dt) {
   let style = STYLES[fighter.style];
   const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;
+  // Fear builds and may break him; broken, or passive by choice, he only covers up and gets away.
+  feelFear(world, fighter, nerve, dt);
+  if (style.passive || fighter.panicked) {
+    keepAway(world, fighter, opponent, dt);
+    return;
+  }
   const bold = AI.confidence;
   const basePlan = chooseStrategy(world, fighter, opponent, dt);
   // Confidence presses: closer, more often inside, quicker to throw, slower
@@ -820,7 +935,7 @@ export function think(world, fighter, dt) {
     }
     if (spec.kind === 'rush') {
       // A charge is its own decision, not a fallback when nothing else reaches.
-      if (distance > range - 0.1 && distance < range + 1.2 && random() < weight * AI.rushPerWeight * dt) {
+      if (distance > range - 0.1 && distance < range + 1.2 && random() < weight * AI.rushPerWeight * (1 + 3 * fighter.body.gear.courage) * dt) {
         if (throwPunch(world, fighter, name)) fighter.cooldown = AI.restMin + random() * AI.restRange;
         return;
       }
