@@ -199,6 +199,17 @@ export const WORLD = {
   run: { speedFactor: 2.3 },
   // Out this long (s), a body is left where it lies: no more simulation for it.
   goneSeconds: 20,
+  // Detail by the size of the fight (fighters in all): up to `full`, every
+  // fighter exactly as in a one-on-one; up to `grid`, the same physics, near
+  // pairs found through a spatial grid; up to `coarse`, a fighter with no
+  // fighter not in an exchange (not striking, struck at, just hit, held or
+  // rising) steps once in `stride[3]` substeps; beyond, once in `stride[4]`,
+  // and if no enemy is within `engageRange` m and he is standing he is a
+  // proxy — no particle physics, his body eased (`proxyFollow` /s) to the
+  // pose his muscles want — until he is engaged again. In both, a hand or
+  // blade not striking is tested for contact every other substep. The
+  // player's fighter (world.keepFull) is always in full.
+  tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12 },
   gunStartApart: 2.5, // m each side of the centre, when someone carries a gun
   // The clinch: hands locked behind the neck; it breaks when the defender's
   // strength wins or the time runs out.
@@ -1392,35 +1403,43 @@ export function step(world, dt) {
     updateIntent(world, fighter, dt);
     updateFeet(fighter, dt);
   }
+  chooseDetail(world);
   const h = dt / WORLD.substeps;
+  const stride = coarseStride(world);
   for (let substep = 0; substep < WORLD.substeps; substep += 1) {
     const time = world.time + substep * h;
-    const moving = world.fighters.filter((fighter) => !asleep(fighter));
+    // A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all.
+    const stepping = (fighter) => fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
+    const span = (fighter) => (fighter.detail === 'coarse' ? stride * h : h);
+    const moving = world.fighters.filter((fighter) => !asleep(fighter) && stepping(fighter));
     for (const fighter of moving) {
-      if (isLimp(fighter)) relaxedTone(fighter, h);
-      integrate(fighter, h, time);
+      if (isLimp(fighter)) relaxedTone(fighter, span(fighter));
+      integrate(fighter, span(fighter), time);
     }
     for (const fighter of moving) {
-      solveConstraints(fighter, h);
+      solveConstraints(fighter, span(fighter));
       solveJointLimits(world, fighter);
-      if (fighter.weapon?.held) updateWeapon(fighter, h);
+      if (fighter.weapon?.held) updateWeapon(fighter, span(fighter));
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
     for (const fighter of world.fighters) if (fighter.pin) holdPin(world, fighter, h);
-    collideFighters(world, h, time);
+    collideFighters(world, h, time, substep);
     for (const fighter of world.fighters) {
+      if (fighter.detail === 'proxy') continue;
       if (asleep(fighter)) {
         fighter.prev.set(fighter.x);
         fighter.v.fill(0);
         continue;
       }
-      collideGround(fighter, h, world.arena);
-      for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / h;
-      settleWhenStill(fighter, h);
+      if (!stepping(fighter)) continue;
+      collideGround(fighter, span(fighter), world.arena);
+      for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / span(fighter);
+      settleWhenStill(fighter, span(fighter));
     }
     for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
     world.pendingImpulses = [];
   }
+  for (const fighter of world.fighters) if (fighter.detail === 'proxy') poseProxy(fighter, dt);
   for (const fighter of world.fighters) {
     trackHandSpeed(fighter);
     checkBalance(world, fighter);
@@ -1587,6 +1606,112 @@ function moveRoot(world, fighter, dt) {
   const { halfX, halfZ } = world.arena;
   fighter.root[0] = Math.max(-(halfX - 0.3), Math.min(halfX - 0.3, fighter.root[0]));
   fighter.root[1] = Math.max(-(halfZ - 0.3), Math.min(halfZ - 0.3, fighter.root[1]));
+}
+
+// ---- Detail by the size of the fight ----------------------------------------------
+
+/** Substeps a coarse fighter takes as one: more, the bigger the fight. */
+function coarseStride(world) {
+  return WORLD.tiers.stride[fightTier(world)] ?? 1;
+}
+
+/** Which tier of detail the fight is in, by its size: 1 (a one-on-one's) to 4. */
+export function fightTier(world) {
+  const count = world.fighters.length;
+  const tiers = WORLD.tiers;
+  return count <= tiers.full ? 1 : count <= tiers.grid ? 2 : count <= tiers.coarse ? 3 : 4;
+}
+
+/**
+ * Each fighter's detail this step. In a big fight (tier 3) anyone not in an
+ * exchange — not striking, struck at, just hit, holding or held, rising or
+ * played — steps at fewer substeps ('coarse', see WORLD.tiers); in a very big one
+ * (tier 4) such a one with no enemy near him, standing, is a 'proxy' (a
+ * pose, no physics). Everyone else is in 'full'.
+ */
+function chooseDetail(world) {
+  const tier = fightTier(world);
+  const previous = world.fighters.map((fighter) => fighter.detail);
+  if (tier < 3) {
+    for (const fighter of world.fighters) fighter.detail = 'full';
+  } else {
+    const hips = world.fighters.map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
+    const grid = spatialGrid(hips, WORLD.tiers.engageRange);
+    const targeted = new Set(world.fighters.filter((fighter) => fighter.punch).map((fighter) => fighter.punch.target));
+    world.fighters.forEach((fighter, index) => {
+      if (gone(fighter)) {
+        fighter.detail = 'coarse';
+        return;
+      }
+      let lastHit = -Infinity;
+      for (const at of fighter.hitAt) lastHit = Math.max(lastHit, at);
+      // In an exchange now: striking, struck at, just hit, holding or held, getting up.
+      const exchanging = world.keepFull?.has(fighter.id) || fighter.punch || fighter.rush || fighter.clinch || fighter.pin || fighter.pickup
+        || targeted.has(fighter.id) || lastHit > world.time - WORLD.tiers.hitMemory || fighter.state === 'rising';
+      if (exchanging) fighter.detail = 'full';
+      else if (tier === 3 || fighter.state !== 'up') fighter.detail = 'coarse';
+      else fighter.detail = grid.near(index).some((other) => world.fighters[other].corner !== fighter.corner && world.fighters[other].state !== 'out') ? 'coarse' : 'proxy';
+    });
+  }
+  // Back into the physics from a pose: moving as the pose was.
+  world.fighters.forEach((fighter, index) => {
+    if (previous[index] === 'proxy' && fighter.detail !== 'proxy') {
+      const h = (world.lastDt ?? 1 / 60) / WORLD.substeps;
+      for (let at = 0; at < fighter.x.length; at += 1) fighter.prev[at] = fighter.x[at] - fighter.v[at] * h;
+    }
+  });
+}
+
+/**
+ * A proxy's body: each part set where its muscles would take it (the stance
+ * and the moves the AI asks for), with no dynamics; the weapon follows.
+ */
+function poseProxy(fighter, dt) {
+  // Eased towards the pose, not snapped to it: he came from wherever the
+  // physics left him.
+  const follow = Math.min(1, dt * WORLD.tiers.proxyFollow);
+  for (let index = 0; index < PARTICLES.length; index += 1) {
+    const { target } = motorTarget(fighter, index);
+    fighter.targets[index] = target;
+    for (let axis = 0; axis < 3; axis += 1) {
+      const at = index * 3 + axis;
+      fighter.prev[at] = fighter.x[at];
+      fighter.x[at] += (target[axis] - fighter.x[at]) * follow;
+      fighter.v[at] = (fighter.x[at] - fighter.prev[at]) / dt;
+    }
+  }
+  solveConstraints(fighter, dt);
+  if (fighter.weapon?.held) updateWeapon(fighter, dt);
+}
+
+/**
+ * Points on the floor binned into square cells of `cell` m: `near(index)`
+ * gives every other point within `cell` of a point, in index order.
+ */
+export function spatialGrid(points, cell) {
+  const cells = new Map();
+  const keyOf = (cx, cz) => cx * 4096 + cz;
+  points.forEach(([x, z], index) => {
+    const key = keyOf(Math.floor(x / cell), Math.floor(z / cell));
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(index);
+  });
+  return {
+    near(index) {
+      const [x, z] = points[index];
+      const cx = Math.floor(x / cell);
+      const cz = Math.floor(z / cell);
+      const found = [];
+      for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dz = -1; dz <= 1; dz += 1) {
+          for (const other of cells.get(keyOf(cx + dx, cz + dz)) ?? []) {
+            if (other !== index && (points[other][0] - x) ** 2 + (points[other][1] - z) ** 2 < cell * cell) found.push(other);
+          }
+        }
+      }
+      return found.sort((a, b) => a - b);
+    },
+  };
 }
 
 function updateTimers(world, fighter, dt) {
@@ -2244,12 +2369,46 @@ function closestOnSegment(p, a, b) {
   return { t, point: vec.add(a, vec.scale(ab, t)) };
 }
 
-function collideFighters(world, h, time) {
+function collideFighters(world, h, time, substep = 0) {
   const fighters = world.fighters;
   // Two bodies whose hips are further apart than a kick and a body can
   // span cannot touch: skip them. In a crowd most pairs are like that.
   const hips = fighters.map((fighter) => point(fighter.x, P.pelvis));
   const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange;
+  for (const fighter of fighters) fighter.reachBound = reachBound(fighter);
+  // A big fight finds its near pairs through a grid, in the same order as
+  // the all-pairs test; a proxy (posed, not simulated) touches nothing.
+  if (fighters.length > WORLD.tiers.full) {
+    const grid = spatialGrid(hips.map((hip) => [hip[0], hip[2]]), WORLD.contactRange);
+    // Two coarse fighters move only on their substeps: they are tested then.
+    const stride = coarseStride(world);
+    const meet = (a, b) => fighters[b].detail !== 'proxy' && (substep % stride === stride - 1 || fighters[a].detail === 'full' || fighters[b].detail === 'full');
+    // In a big fight a hand or blade not striking (guarding, hanging) is
+    // tested on every other substep; the strike in flight on every one.
+    const idleEvery = fightTier(world) >= 3 ? 2 : 1;
+    const neighbours = fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index).filter((other) => meet(index, other))));
+    fighters.forEach((attacker, a) => {
+      if (!neighbours[a].length) return;
+      const limbs = strikers(attacker);
+      for (const d of neighbours[a]) {
+        const defender = fighters[d];
+        if (attacker.corner === defender.corner && !attacker.punch) continue;
+        for (const striker of limbs) {
+          const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
+          if (striking || substep % idleEvery === 0) collideStriker(world, attacker, defender, striker, time);
+        }
+      }
+    });
+    fighters.forEach((first, a) => {
+      for (const b of neighbours[a]) {
+        if (b <= a) continue;
+        const second = fighters[b];
+        pushApart(world, first, second);
+        if (first.weapon?.held && second.weapon?.held && first.corner !== second.corner) clashWeapons(world, first, second);
+      }
+    });
+    return;
+  }
   fighters.forEach((attacker, a) => {
     const limbs = strikers(attacker);
     fighters.forEach((defender, d) => {
@@ -2332,14 +2491,74 @@ function closestBetween(p1, q1, p2, q2) {
   return { s, t, onFirst: vec.add(p1, vec.scale(d1, s)), onSecond: vec.add(p2, vec.scale(d2, t)) };
 }
 
+/**
+ * How far from his hips anything of a fighter a strike can meet reaches:
+ * his body, his shield, his blade. Taken once a substep, with room for the
+ * pushes the substep's contacts can give him.
+ */
+function reachBound(fighter) {
+  const hips = point(fighter.x, P.pelvis);
+  const from = (at) => vec.length(vec.sub(at, hips));
+  // His body as it lies now: its furthest particle, and the fattest capsule
+  // round it (a standing man reaches far less than bodyReach allows).
+  let furthest = 0;
+  for (let index = 0; index < fighter.x.length / 3; index += 1) {
+    const dx = fighter.x[index * 3] - hips[0];
+    const dy = fighter.x[index * 3 + 1] - hips[1];
+    const dz = fighter.x[index * 3 + 2] - hips[2];
+    furthest = Math.max(furthest, dx * dx + dy * dy + dz * dz);
+  }
+  let fattest = 0;
+  for (const capsule of capsules(fighter)) fattest = Math.max(fattest, capsule.radius);
+  let bound = Math.min(WORLD.bodyReach, Math.sqrt(furthest) + fattest);
+  if (fighter.shield && fighter.state !== 'out') {
+    const disc = shieldDisc(fighter);
+    bound = Math.max(bound, from(disc.centre) + disc.radius + 0.012);
+  }
+  const weapon = fighter.weapon;
+  if (weapon?.held && fighter.state === 'up') {
+    const hilt = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));
+    bound = Math.max(bound, Math.max(from(hilt), from(weapon.tip)) + weapon.spec.radius);
+  }
+  return bound + REACH_MARGIN;
+}
+
+// m: what a defender can be pushed in one substep's contacts, and more.
+const REACH_MARGIN = 0.1;
+
 function collideStriker(world, attacker, defender, striker, time) {
   const sa = striker.pa ?? point(attacker.x, striker.a);
   const sb = striker.pb ?? point(attacker.x, striker.b);
+  // Out of reach of all of him, shield and blade too (most pairs in a
+  // crowd): nothing to test, only contacts to forget, as below.
+  if (defender.reachBound !== undefined) {
+    const hips = point(defender.x, P.pelvis);
+    if (vec.length(vec.sub(closestOnSegment(hips, sa, sb).point, hips)) - striker.radius > defender.reachBound) {
+      if (attacker.contacts.size) {
+        const prefix = `${defender.id}:${striker.key}:`;
+        if (defender.shield && defender.state !== 'out') attacker.contacts.delete(`${prefix}shield`);
+        const shieldArm = attacker.shield && (striker.key === 'lHand' || striker.key === 'lForearm');
+        if (!striker.weapon && !shieldArm && defender.weapon?.held && defender.state === 'up') attacker.contacts.delete(`${prefix}blade`);
+        for (const key of attacker.contacts) if (key.startsWith(prefix) && !key.endsWith(':shield') && !key.endsWith(':blade')) attacker.contacts.delete(key);
+      }
+      return;
+    }
+  }
+  // Whether he has any contact with this limb to forget: the keys are only
+  // built when he does (most tests touch nothing and remember nothing).
+  const prefix = `${defender.id}:${striker.key}:`;
+  let touching = false;
+  for (const key of attacker.contacts) {
+    if (key.startsWith(prefix)) {
+      touching = true;
+      break;
+    }
+  }
   if (defender.shield && defender.state !== 'out') {
     // A shield in the way takes it: nothing behind is touched.
     const disc = shieldDisc(defender);
     const hit = segmentToDisc(sa, sb, disc.centre, disc.normal, disc.radius);
-    const shieldKey = `${defender.id}:${striker.key}:shield`;
+    const shieldKey = `${prefix}shield`;
     if (hit.distance < striker.radius + 0.012) {
       const away = hit.distance > 1e-6 ? vec.normalize(vec.sub(hit.from, hit.point)) : disc.normal;
       if (!attacker.contacts.has(shieldKey)) {
@@ -2350,7 +2569,7 @@ function collideStriker(world, attacker, defender, striker, time) {
       for (const index of new Set([striker.a, striker.b])) for (let axis = 0; axis < 3; axis += 1) attacker.x[index * 3 + axis] += away[axis] * push;
       return;
     }
-    attacker.contacts.delete(shieldKey);
+    if (touching) attacker.contacts.delete(shieldKey);
   }
   // The hand and forearm in a shield's grip are behind it: a blade meets the shield.
   const shieldArm = attacker.shield && (striker.key === 'lHand' || striker.key === 'lForearm');
@@ -2361,7 +2580,7 @@ function collideStriker(world, attacker, defender, striker, time) {
     const closest = closestBetween(sa, sb, hilt, weapon.tip);
     const offset = vec.sub(closest.onFirst, closest.onSecond);
     const distance = vec.length(offset);
-    const bladeKey = `${defender.id}:${striker.key}:blade`;
+    const bladeKey = `${prefix}blade`;
     if (distance < striker.radius + weapon.spec.radius) {
       const away = distance > 1e-6 ? vec.scale(offset, 1 / distance) : yawRotate([-1, 0, 0], defender.yaw);
       if (!attacker.contacts.has(bladeKey)) {
@@ -2372,15 +2591,14 @@ function collideStriker(world, attacker, defender, striker, time) {
       for (const index of new Set([striker.a, striker.b])) for (let axis = 0; axis < 3; axis += 1) attacker.x[index * 3 + axis] += away[axis] * push;
       return;
     }
-    attacker.contacts.delete(bladeKey);
+    if (touching) attacker.contacts.delete(bladeKey);
   }
   const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
   // Nowhere near him: no part of his body can be touched (a crowd is mostly
   // this). Forget any contact with him, so the next real one counts.
   const hips = point(defender.x, P.pelvis);
   if (vec.length(vec.sub(closestOnSegment(hips, sa, sb).point, hips)) > WORLD.bodyReach + striker.radius) {
-    if (attacker.contacts.size) {
-      const prefix = `${defender.id}:${striker.key}:`;
+    if (touching) {
       for (const key of attacker.contacts) if (key.startsWith(prefix) && !key.endsWith(':shield') && !key.endsWith(':blade')) attacker.contacts.delete(key);
     }
     return;
@@ -2388,21 +2606,30 @@ function collideStriker(world, attacker, defender, striker, time) {
   // One push out of the body per substep, however many parts it touches
   // (a long weapon can lie across several at once).
   let pushBudget = WORLD.contactStep;
+  // The striker as a ball round its middle: a part further than both
+  // half-lengths and the reach from it cannot be touched (the closest test skipped).
+  const strikerMiddle = [(sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2, (sa[2] + sb[2]) / 2];
+  const strikerHalf = vec.length(vec.sub(sb, sa)) / 2;
   for (const capsule of capsules(defender)) {
     // Kicks and weapons hit legs and bodies; gloves only collide above the waist.
     if (!striker.shin && capsule.leg && !striking) continue;
     const [a, b] = capsuleEnds(defender, capsule);
-    const closest = closestBetween(sa, sb, a, b);
-    closest.t *= capsule.bLength ?? 1;
-    const offset = vec.sub(closest.onFirst, closest.onSecond);
-    const distance = vec.length(offset);
     const reach = capsule.radius + striker.radius;
-    const contactKey = `${defender.id}:${striker.key}:${capsule.key}`;
+    const apart = vec.length([(a[0] + b[0]) / 2 - strikerMiddle[0], (a[1] + b[1]) / 2 - strikerMiddle[1], (a[2] + b[2]) / 2 - strikerMiddle[2]]);
+    const out = apart - strikerHalf - vec.length([b[0] - a[0], b[1] - a[1], b[2] - a[2]]) / 2 >= reach;
+    const closest = out ? null : closestBetween(sa, sb, a, b);
+    if (closest) closest.t *= capsule.bLength ?? 1;
+    const offset = closest ? vec.sub(closest.onFirst, closest.onSecond) : null;
+    const distance = closest ? vec.length(offset) : Infinity;
     if (distance >= reach) {
-      attacker.contacts.delete(contactKey);
-      attacker.contacts.delete(`${contactKey}:through`);
+      if (touching) {
+        const contactKey = `${prefix}${capsule.key}`;
+        attacker.contacts.delete(contactKey);
+        attacker.contacts.delete(`${contactKey}:through`);
+      }
       continue;
     }
+    const contactKey = `${prefix}${capsule.key}`;
     const normal = distance > 1e-9 ? vec.scale(offset, 1 / distance) : [0, 1, 0];
     if (!attacker.contacts.has(contactKey)) {
       attacker.contacts.add(contactKey);

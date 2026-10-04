@@ -13,7 +13,8 @@ import { installMenus } from './menu.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
-import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
+import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -146,6 +147,7 @@ const CROWD_DRAWING = 8;
 
 function rebuildViews() {
   for (const view of state.views) disposeFighterView(scene, view);
+  clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
   const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
   state.views = state.world.fighters.map((fighter) => {
@@ -159,6 +161,8 @@ function rebuildViews() {
 
 function thinkForBout(world, dt) {
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
+  // The one you play is simulated in full however big the fight.
+  world.keepFull = players;
   thinkAll(world, dt, players);
 }
 
@@ -284,6 +288,8 @@ function drawWorld(dt) {
   // A design sheet holds its own framing.
   placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
   dramaCamera(scene, state.drama, world, realSeconds());
+  // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
+  beginCrowdBatches(scene);
   for (const view of state.views) {
     updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
     updateArms(scene, view, drawnTime);
@@ -291,6 +297,7 @@ function drawWorld(dt) {
   }
   updateProps(scene, state.views, world);
   updateDebris(scene, world);
+  endCrowdBatches(scene);
   updateArrows(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));

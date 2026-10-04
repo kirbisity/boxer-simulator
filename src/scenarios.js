@@ -13,6 +13,24 @@ import { footSoldier, nobleKnight, rebel, sengokuWarrior, swatOfficer, yakuza } 
  * given by its weight: the calories that settle at it are worked out when
  * the bout is built, as the builder's slider would.
  */
+// One side at Sekigahara, forty strong: a samurai leads; the ashigaru are
+// mostly yari and bows. Blades and polearms first (the front ranks), bows last.
+const SEKIGAHARA_SIDE = {
+  samurai: { katana: 4, naginata: 3, spear: 3, bow: 2 },
+  ashigaru: { spear: 12, bow: 9, katana: 5, naginata: 2 },
+};
+
+function sekigaharaSide(random, side) {
+  const warriors = [];
+  for (const [rank, styles] of Object.entries(SEKIGAHARA_SIDE)) {
+    for (const [style, count] of Object.entries(styles)) {
+      for (let index = 0; index < count; index += 1) warriors.push(sengokuWarrior(random, side, style, rank));
+    }
+  }
+  const archer = (warrior) => (warrior.style === 'bow' ? 1 : 0);
+  return warriors.sort((a, b) => archer(a) - archer(b));
+}
+
 export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
@@ -35,18 +53,17 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: 'The battle that ends the Sengoku. Ten of the East in red against ten of the West in black and blue: spears and blades in front, bows behind.',
+    blurb: 'The battle that ends the Sengoku. Forty of the East in red against forty of the West in black and blue: spears, blades and polearms in front, bows behind.',
     scene: 'sengoku',
-    arena: { halfX: 11, halfZ: 7 },
-    camera: { yaw: -0.5, pitch: 0.38, distance: 11, maxDistance: 13 },
-    roster: 'Ten a side: samurai with katana and naginata, ashigaru with spears and bows',
-    // Six abreast in front, the rest (the bows among them) behind.
-    formation: { red: { front: 5, spacing: 1.5, rowSpacing: 1.8, perRow: 6, loose: 0.3 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.8, perRow: 6, loose: 0.3 } },
+    arena: { halfX: 17, halfZ: 11 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
+    roster: 'Forty a side: samurai and ashigaru',
+    // Ten abreast: the blades and polearms in the front ranks, the bows behind.
+    formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, perRow: 10, loose: 0.3 } },
     cast: (random) => {
-      const order = ['spear', 'naginata', 'katana', 'spear', 'naginata', 'spear', 'katana', 'bow', 'bow', 'bow'];
       const east = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
       const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
-      return { red: order.map((style) => sengokuWarrior(random, east, style)), blue: order.map((style) => sengokuWarrior(random, west, style)) };
+      return { red: sekigaharaSide(random, east), blue: sekigaharaSide(random, west) };
     },
     fighters: [],
   },

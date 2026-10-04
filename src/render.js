@@ -14,7 +14,8 @@ import { glovedFists, headgearOptions } from './outfits.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
-import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
+import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
+import { bakePieces, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, surface } from './toon.js';
 
@@ -1559,8 +1560,22 @@ function buildSkin(body, style) {
   return buildBodyMesh(body, 'skin');
 }
 
-/** `simple`: drawn as a crowd member (no skeleton, low detail, no soft flesh), whatever his inputs say. */
+/**
+ * `simple`: drawn as a crowd member, whatever his inputs say: one baked
+ * body shared with those who look like him (see crowdview.js).
+ */
 export function buildFighterView(view, fighter, { simple: crowd = false } = {}) {
+  if (crowd || fighter.body.inputs.simple) {
+    view.crowdTemplates ??= new Map();
+    const key = crowdKey(fighter);
+    if (!view.crowdTemplates.has(key)) view.crowdTemplates.set(key, bakeCrowdTemplate(view, fighter));
+    return crowdView(view, fighter, view.crowdTemplates.get(key));
+  }
+  return detailedView(view, fighter, false);
+}
+
+/** `simple`: low detail, no skeleton, no soft flesh (the first of a crowd template, before baking). */
+function detailedView(view, fighter, simple) {
   const body = fighter.body;
   const look = body.inputs.look ?? {};
   const corner = CORNER_COLORS[fighter.corner];
@@ -1575,9 +1590,6 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  // A crowd character (`simple`) is drawn cheaply: fewer sides to the body,
-  // no skeleton or muscle beneath, no springing flesh. Its physics is whole.
-  const simple = crowd || Boolean(body.inputs.simple);
   const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkin(body, look.bodyStyle ?? BODY_STYLE);
   const baseColors = paintBody(built, body, look, corner);
   // Steel is drawn apart, as metal; everything else is the toon body.
@@ -1672,13 +1684,28 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
   if (dress.top?.kind === 'hoodie') dangles.push(...buildHood(body, collar, dress.top.color));
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
-  if (dress.banner) collar.add(buildBanner(body, dress.banner));
+  if (dress.banner) {
+    const banner = buildBanner(body, dress.banner);
+    banner.userData.banner = true;
+    collar.add(banner);
+  }
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig.
   const skeleton = simple ? BONES.map(() => new THREE.Group()) : buildSkeleton(body, built.bindFrames);
   for (const piece of skeleton) layers.bone.add(piece);
 
-  // The physics layer: particles, constraints, motor targets, collision capsules.
+  const physicsLayer = buildPhysicsLayer(fighter, layers);
+  if (simple) thinOut(layers.skin, skinMesh);
+  view.scene.add(group);
+  return {
+    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
+    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh,
+    ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer,
+  };
+}
+
+/** The physics layer: particles, constraints, motor targets, collision capsules. */
+function buildPhysicsLayer(fighter, layers) {
   const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xffd34d });
   const particles = fighter.body.masses.map((mass) => {
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.014 + 0.004 * Math.cbrt(mass), 10, 8), particleMaterial);
@@ -1709,13 +1736,166 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
     layers.physics.add(mesh);
     return { index: P[`${side}Hand`], mesh };
   });
+  return { particles, lines, capsuleMeshes, gloveSpheres };
+}
 
-  if (simple) thinOut(layers.skin, skinMesh);
+/**
+ * A crowd template: the first of a look built in detail at the bind pose,
+ * and everything he wears baked into his skinned body and steel.
+ */
+function bakeCrowdTemplate(view, fighter) {
+  const full = detailedView(view, fighter, true);
+  view.scene.remove(full.group);
+  const { built } = full;
+  const frames = built.bindFrames;
+  const points = built.bindPoints ?? bindPoints(fighter.body);
+  // Head props get knocked off: each fighter wears his own, not baked; a
+  // banner is drawn with the side's others (an instanced batch).
+  for (const prop of full.headProps) prop.worn.parent?.remove(prop.worn);
+  full.group.traverse((object) => {
+    if (object.userData.banner) object.visible = false;
+  });
+  const seat = fighter.body.lengths.headRadius * HEAD_SEAT;
+  const headFrame = frames[BONE.head];
+  full.head.group.matrix.copy(frameAt(headFrame, headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat))).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
+  const pieces = [{ root: full.head.group, bone: BONE.head }];
+  for (const { object, bone, at } of full.attachments) {
+    object.matrix.copy(frameAt(frames[bone], points[at]));
+    pieces.push({ root: object, bone });
+  }
+  const baked = bakePieces(pieces);
+  const own = built.positions.length / 3;
+  const added = baked.positions.length / 3;
+  const join = (Type, first, second) => {
+    const joined = new Type(first.length + second.length);
+    joined.set(first);
+    joined.set(second, first.length);
+    return joined;
+  };
+  // The baked vertices follow the body's own.
+  const after = (indices) => indices.map((index) => index + own);
+  const bakedSkinIndex = baked.skinIndex.flatMap((bone) => [bone, 0, 0, 0]);
+  const bakedSkinWeight = baked.skinIndex.flatMap(() => [1, 0, 0, 0]);
+  const template = {
+    attributes: {
+      position: new THREE.BufferAttribute(join(Float32Array, built.positions, baked.positions), 3),
+      normal: new THREE.BufferAttribute(join(Float32Array, built.normals, baked.normals), 3),
+      skinIndex: new THREE.Uint16BufferAttribute(join(Uint16Array, built.skinIndex, bakedSkinIndex), 4),
+      skinWeight: new THREE.Float32BufferAttribute(join(Float32Array, built.skinWeight, bakedSkinWeight), 4),
+    },
+    colors: join(Float32Array, full.baseColors, baked.colors),
+    bodyIndex: join(Uint32Array, full.skinMesh.geometry.index.array, after(baked.body)),
+    steelIndex: join(Uint32Array, full.steelMesh?.geometry.index.array ?? [], after(baked.steel)),
+    // Ink round the body and the big one-sided pieces only (see CROWD_VIEW.outlineTriangles).
+    bodyOutlineIndex: join(Uint32Array, full.skinMesh.geometry.index.array, after(baked.outlined.body)),
+    steelOutlineIndex: join(Uint32Array, full.steelMesh?.geometry.index.array ?? [], after(baked.outlined.steel)),
+    vertexSegment: [...full.vertexSegment, ...new Array(added).fill(null)],
+    frames,
+    headRadius: fighter.body.lengths.headRadius,
+    lacquer: full.lacquer,
+    shod: full.shod,
+    vertices: own + added,
+  };
+  disposeFighterView(view, full);
+  return template;
+}
+
+/** A crowd fighter's view: the template's baked body over his own bones. */
+function crowdView(view, fighter, template) {
+  const body = fighter.body;
+  const look = body.inputs.look ?? {};
+  const corner = CORNER_COLORS[fighter.corner];
+  const skinColor = SKIN_TONES[look.skinTone ?? 'medium'];
+  const group = new THREE.Group();
+  const layers = Object.fromEntries(LAYERS.map((name) => [name, new THREE.Group()]));
+  for (const layer of Object.values(layers)) group.add(layer);
+  const bones = BONES.map(() => {
+    const bone = new THREE.Bone();
+    bone.matrixAutoUpdate = false;
+    return bone;
+  });
+  const frames = boneFrames(bindPoints(body), body);
+  const skeleton = new THREE.Skeleton(bones, stretchedInverses(template.frames, frames, body.lengths.headRadius / template.headRadius));
+  // His own colours (bruises) and index (a part cut off); the rest is shared.
+  const geometry = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(template.attributes)) geometry.setAttribute(name, attribute);
+  geometry.setAttribute('color', new THREE.BufferAttribute(template.colors.slice(), 3));
+  geometry.setIndex(new THREE.BufferAttribute(template.bodyIndex.slice(), 1));
+  geometry.userData.sharedAttributes = Object.keys(template.attributes);
+  const skinned = (meshGeometry, material) => {
+    const mesh = new THREE.SkinnedMesh(meshGeometry, material);
+    mesh.bind(skeleton, new THREE.Matrix4());
+    mesh.frustumCulled = false;
+    return mesh;
+  };
+  const skinMesh = skinned(geometry, surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }));
+  skinMesh.castShadow = true;
+  // The ink has its own index over the same vertices (and loses a cut-off part with the body).
+  const inked = (meshGeometry, index) => {
+    const outlineGeometry = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(meshGeometry.attributes)) outlineGeometry.setAttribute(name, attribute);
+    outlineGeometry.setIndex(new THREE.BufferAttribute(index.slice(), 1));
+    outlineGeometry.userData.sharedAttributes = Object.keys(meshGeometry.attributes);
+    const outline = outlineFor({ isSkinnedMesh: true, geometry: outlineGeometry, skeleton, bindMatrix: new THREE.Matrix4() });
+    return outline;
+  };
+  const skinOutline = inked(geometry, template.bodyOutlineIndex);
+  skinMesh.userData.ink = skinOutline;
+  layers.skin.add(skinMesh, skinOutline);
+  let steelMesh = null;
+  if (template.steelIndex.length) {
+    const steelGeometry = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(geometry.attributes)) steelGeometry.setAttribute(name, attribute);
+    steelGeometry.setIndex(new THREE.BufferAttribute(template.steelIndex.slice(), 1));
+    // The colour is his own, but the skin's geometry frees it.
+    steelGeometry.userData.sharedAttributes = Object.keys(geometry.attributes);
+    steelMesh = skinned(steelGeometry, steelMaterial(view.steelEnv, { skinning: true, ...template.lacquer }));
+    const steelOutline = inked(steelGeometry, template.steelOutlineIndex);
+    steelMesh.userData.ink = steelOutline;
+    layers.skin.add(steelMesh, steelOutline);
+  }
+  // What is his own: the head props he can lose, and anything painted on cloth.
+  const headGroup = new THREE.Group();
+  headGroup.matrixAutoUpdate = false;
+  layers.skin.add(headGroup);
+  const dress = dressFor(body.inputs, corner);
+  const garmentColors = { ...roleColors(dress, new THREE.Color(skinColor)), accent: dress.feet.accent };
+  const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: garmentColors.steel, ...template.lacquer });
+  const allowed = headgearOptions(dress.kind);
+  const headProps = (body.inputs.accessories ?? []).filter((kind) => allowed.includes(kind)).map((kind) => {
+    const make = () => (kind === 'headset' ? headsetMesh(body) : buildHeadProp(kind, body, dress, garmentColors, plainSteel, corner));
+    const worn = make();
+    if (!worn) return null;
+    headGroup.add(worn);
+    return { kind, worn, loose: make() };
+  }).filter(Boolean);
+  const attachments = [];
+  let banner = null;
+  if (dress.armor?.backPrint || dress.banner) {
+    const collar = new THREE.Group();
+    collar.matrixAutoUpdate = false;
+    layers.skin.add(collar);
+    attachments.push({ object: collar, bone: BONE.chest, at: P.neck });
+    if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
+    if (dress.banner) {
+      // The side's banners are one instanced batch, made at 1.8 m and set
+      // to each man's size and back (see buildBanner).
+      const batch = crowdBatch(view, `banner:${dress.banner}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner));
+      const scale = body.heightM / 1.8;
+      const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
+      const local = new THREE.Matrix4().makeTranslation(back + 0.05 * scale, 0, 0).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
+      banner = { batch, collar, local, matrix: new THREE.Matrix4() };
+    }
+  }
+  const boneGroups = BONES.map(() => new THREE.Group());
+  for (const piece of boneGroups) layers.bone.add(piece);
+  const physicsLayer = buildPhysicsLayer(fighter, layers);
+  thinOut(layers.skin, skinMesh);
   view.scene.add(group);
   return {
-    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
-    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh,
-    particles, lines, capsuleMeshes, gloveSpheres, head: headView, layer: 'skin', frames: built.bindFrames,
+    fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], shod: template.shod,
+    baseColors: template.colors, vertexSegment: template.vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles: [], steelMesh,
+    ...physicsLayer, head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner,
   };
 }
 
@@ -1754,8 +1934,24 @@ export function disposeFighterView(view, fighterView) {
   view.scene.remove(fighterView.group);
   for (const prop of fighterView.headProps ?? []) if (prop.loose.parent) view.scene.remove(prop.loose);
   fighterView.group.traverse((object) => {
-    object.geometry?.dispose();
+    // Shared with the crowd: the template's vertices and merged weapons stay for the others.
+    if (!object.geometry || object.userData.shared) return;
+    for (const name of object.geometry.userData.sharedAttributes ?? []) object.geometry.deleteAttribute(name);
+    object.geometry.dispose();
   });
+}
+
+/** Free the crowd templates and instanced batches, once no view uses them (between bouts). */
+export function clearCrowdTemplates(view) {
+  const release = (attributes) => {
+    const holder = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(attributes)) holder.setAttribute(name, attribute);
+    holder.dispose();
+  };
+  for (const template of view.crowdTemplates?.values() ?? []) release(template.attributes);
+  for (const batch of view.crowdBatches?.values() ?? []) batch.dispose();
+  view.crowdTemplates = new Map();
+  view.crowdBatches = new Map();
 }
 
 function dangleColliders(fighterView, points) {
@@ -1909,6 +2105,13 @@ export function updateFighterView(fighterView, dt, time) {
     object.matrixWorldNeedsUpdate = true;
   }
   if (fighter.damageVersion !== fighterView.damageVersion) paintDamage(fighterView);
+  // A baked crowd fighter has no flesh, face or cloth of his own to move.
+  if (fighterView.baked) {
+    const banner = fighterView.banner;
+    if (banner && banner.collar.visible && fighterView.layers.skin.visible) banner.batch.add(banner.matrix.multiplyMatrices(banner.collar.matrix, banner.local));
+    if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
+    return;
+  }
   const step = Math.min(dt, 1 / 30);
   for (const entry of fighterView.shells) entry.shell.update(step);
   // What hanging hair and cloth rest on: the head, and the trunk with
@@ -2071,6 +2274,8 @@ export function updateProps(view, fighterViews, world) {
 }
 
 /** Show an impact: dent the struck flesh and throw a spray of sweat. */
+const SPRAY = { most: 60, geometry: null };
+
 export function showImpact(view, fighterViews, event) {
   const defenderView = fighterViews.find((entry) => entry.fighter.id === event.defender);
   if (!defenderView) return;
@@ -2088,9 +2293,12 @@ export function showImpact(view, fighterViews, event) {
     defenderView.shells.find((entry) => entry.key === 'body')?.shell.dentLocal(v3(bind), event.impulse);
   }
   const spray = view.spray ?? (view.spray = []);
-  const count = Math.min(14, Math.round(event.impulse / 2));
+  // Every drop is the one sphere, scaled; a melee of a hundred keeps a few at a time.
+  const count = Math.min(14, Math.round(event.impulse / 2), SPRAY.most - spray.length);
+  SPRAY.geometry ??= new THREE.SphereGeometry(1, 6, 4);
   for (let index = 0; index < count; index += 1) {
-    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.008 + Math.random() * 0.006, 6, 4), new THREE.MeshBasicMaterial({ color: 0xdfe9ff, transparent: true, opacity: 0.85 }));
+    const drop = new THREE.Mesh(SPRAY.geometry, new THREE.MeshBasicMaterial({ color: 0xdfe9ff, transparent: true, opacity: 0.85 }));
+    drop.scale.setScalar(0.008 + Math.random() * 0.006);
     drop.position.copy(where);
     const direction = v3(event.normal).multiplyScalar(-1).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5));
     drop.userData = { velocity: direction.normalize().multiplyScalar(1.5 + Math.random() * event.speed * 0.35), life: 0.6 };
@@ -2108,7 +2316,7 @@ export function updateSpray(view, dt) {
     drop.material.opacity = Math.max(0, drop.userData.life / 0.6);
     if (drop.userData.life > 0 && drop.position.y > 0) return true;
     view.scene.remove(drop);
-    drop.geometry.dispose();
+    drop.material.dispose();
     return false;
   });
 }

@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, collapseAt, concussionCapacity, dropWeapon, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
+import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 
@@ -14,6 +14,8 @@ export const AI = {
   gunRush: { within: 1.1, weave: 5, chargeFrom: 3, chargePerSecond: 1.5 },
   // Held in a collar tie, how soon a brawler ties up back (per second).
   tieBackPerSecond: 3,
+  // In a big fight, how often (s) a fighter with nothing happening near him thinks.
+  idleThinkEvery: 0.1,
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
   passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
@@ -162,8 +164,20 @@ function pick(weights, random) {
 
 /** One AI decision tick for every fighter not driven by the player. */
 export function thinkAll(world, dt, playerIds = new Set()) {
+  // In a big fight, a fighter with nothing happening near him thinks ten
+  // times a second (each on his own beat) rather than every step.
+  const staggered = fightTier(world) >= 3;
   for (const fighter of world.fighters) {
-    if (!playerIds.has(fighter.id)) think(world, fighter, dt);
+    if (playerIds.has(fighter.id)) continue;
+    if (!staggered || fighter.detail === 'full' || fighter.detail === undefined) {
+      fighter.aiOwed = 0;
+      think(world, fighter, dt);
+      continue;
+    }
+    fighter.aiOwed = (fighter.aiOwed ?? (fighter.id % 6) * dt) + dt;
+    if (fighter.aiOwed < AI.idleThinkEvery) continue;
+    think(world, fighter, fighter.aiOwed);
+    fighter.aiOwed = 0;
   }
 }
 

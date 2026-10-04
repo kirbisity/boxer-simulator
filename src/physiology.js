@@ -104,11 +104,25 @@ export function dailyExpenditure(inputs, lean, fat) {
   return restingMetabolism(lean, fat) * PHYSIOLOGY.dailyActivityFactor + PHYSIOLOGY.everydayKcalPerKg * weight + exercise;
 }
 
+const settledBodies = new Map();
+
 /**
  * Simulate the body that daily `calories` and `exercise` settle into.
  * @returns {{ lean, fat, weight, bodyFat, bmi, rmr, tdee, weeks, capped }}
  */
 export function settleComposition(inputs, frameLean = 1) {
+  // Fifteen years of weeks is the cost of a body; a crowd of the same few
+  // builds (and every rebuild of one) asks again with the same inputs.
+  const key = `${inputs.sex}|${inputs.heightCm}|${inputs.age}|${inputs.exercise}|${inputs.calories}|${frameLean}`;
+  const known = settledBodies.get(key);
+  if (known) return { ...known };
+  const settled = simulateComposition(inputs, frameLean);
+  if (settledBodies.size > 2000) settledBodies.clear();
+  settledBodies.set(key, settled);
+  return { ...settled };
+}
+
+function simulateComposition(inputs, frameLean) {
   const height = inputs.heightCm / 100;
   const bounds = [PHYSIOLOGY.bmi.min * height * height, PHYSIOLOGY.bmi.max * height * height];
   let { lean, fat } = { lean: baselineLean(inputs, frameLean), fat: scaledBaselineFat(inputs) };

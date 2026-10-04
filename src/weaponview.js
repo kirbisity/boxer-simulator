@@ -10,6 +10,7 @@ import { BONE } from './rig.js';
 import { outlineFor, surface } from './toon.js';
 import { ARROW, WEAPONS } from './weapons.js';
 import { steelMaterial } from './wardrobe.js';
+import { crowdBatch } from './crowdview.js';
 
 export const GORE = {
   // Blood: drops thrown from a wound or a stump, and the stains they leave.
@@ -291,6 +292,26 @@ export function buildShieldMesh(spec, envMap) {
 
 // ---- In the hand ------------------------------------------------------------------
 
+/**
+ * A crowd fighter's weapon or shield: drawn with every other copy of it in
+ * one instanced batch (see crowdview.js), without ink. What moves on it (a
+ * bow's string and nocked arrow) stays his own, in the group returned.
+ */
+function crowdArms(view, key, build) {
+  const batch = crowdBatch(view, key, build);
+  let group = new THREE.Group();
+  if (batch.live) {
+    group = build();
+    const drawn = [];
+    group.traverseVisible((object) => {
+      if (object.isMesh) drawn.push(object);
+    });
+    for (const mesh of drawn) mesh.parent.remove(mesh);
+  }
+  group.userData.batch = batch;
+  return group;
+}
+
 /** Keep a fighter's weapon and shield drawn where the simulation holds them. */
 // A polearm's blade (`edgeLeads`) is not turned by the wrist the way a
 // sword's is: the edge faces down at rest, the curve sweeping up from it,
@@ -325,7 +346,7 @@ export function updateArms(view, fighterView, time = 0) {
   if (weapon?.held) {
     if (arms.kind !== weapon.kind) {
       if (arms.weapon) fighterView.group.remove(arms.weapon);
-      arms.weapon = buildWeaponMesh(weapon.kind, view.steelEnv);
+      arms.weapon = fighterView.baked ? crowdArms(view, weapon.kind, () => buildWeaponMesh(weapon.kind, view.steelEnv)) : buildWeaponMesh(weapon.kind, view.steelEnv);
       arms.kind = weapon.kind;
       fighterView.group.add(arms.weapon);
     }
@@ -357,6 +378,7 @@ export function updateArms(view, fighterView, time = 0) {
     arms.weapon.matrixWorldNeedsUpdate = true;
     arms.weapon.visible = showing;
     if (arms.weapon.userData.bow) drawString(arms.weapon, fighter);
+    if (showing) arms.weapon.userData.batch?.add(arms.weapon.matrix);
   } else if (arms.weapon) {
     fighterView.group.remove(arms.weapon);
     arms.weapon = null;
@@ -364,7 +386,8 @@ export function updateArms(view, fighterView, time = 0) {
   }
   if (fighter.shield) {
     if (!arms.shield) {
-      arms.shield = buildShieldMesh(fighter.shield.spec, view.steelEnv);
+      const build = () => buildShieldMesh(fighter.shield.spec, view.steelEnv);
+      arms.shield = fighterView.baked ? crowdArms(view, `shield:${fighter.shield.spec.radius}`, build) : build();
       fighterView.group.add(arms.shield);
     }
     const disc = shieldDisc(fighter);
@@ -376,6 +399,7 @@ export function updateArms(view, fighterView, time = 0) {
     arms.shield.matrix.makeBasis(across, upright, facing).setPosition(disc.centre[0], disc.centre[1], disc.centre[2]);
     arms.shield.matrixWorldNeedsUpdate = true;
     arms.shield.visible = showing && fighter.state !== 'out' ? true : showing;
+    if (showing) arms.shield.userData.batch?.add(arms.shield.matrix);
   }
 }
 
@@ -393,6 +417,17 @@ export function severView(view, fighterView, event, debris) {
   const origin = new THREE.Vector3(...debris.origin);
   const piece = new THREE.Group();
   for (const mesh of [fighterView.skinMesh, fighterView.steelMesh].filter(Boolean)) {
+    // A crowd fighter's ink has its own index: it loses the part too.
+    const ink = mesh.userData.ink?.geometry;
+    if (ink && ink !== mesh.geometry) {
+      const skinIndex = ink.attributes.skinIndex;
+      const kept = [];
+      const index = ink.index.array;
+      for (let corner = 0; corner < index.length; corner += 3) {
+        if (![0, 1, 2].every((offset) => boneIndices.has(skinIndex.getX(index[corner + offset])))) kept.push(index[corner], index[corner + 1], index[corner + 2]);
+      }
+      ink.setIndex(kept);
+    }
     const lifted = liftTriangles(mesh, boneIndices, origin);
     if (lifted) piece.add(lifted, outlineFor(lifted));
   }
@@ -687,7 +722,9 @@ export function updateArrows(view, world) {
       view.scene.add(mesh);
       drawn.set(arrow, mesh);
     }
-    const along = arrow.landed ? mesh.userData.along : toVector(arrow.v).normalize();
+    // Landed before it was first drawn (frames skipped): it lies as it flew, or points down.
+    const flying = toVector(arrow.v);
+    const along = (arrow.landed ? mesh.userData.along : null) ?? (flying.lengthSq() > 1e-9 ? flying.normalize() : new THREE.Vector3(0, -1, 0));
     mesh.userData.along = along;
     // The nock trails the point by the arrow's length; stuck in the ground, the head is in it.
     mesh.position.set(arrow.x[0], arrow.x[1], arrow.x[2]).addScaledVector(along, -ARROW.length * (arrow.landed ? 0.75 : 1));

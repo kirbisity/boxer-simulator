@@ -153,12 +153,12 @@ export function knight(random = Math.random, index = 0) {
 }
 
 /**
- * A warrior of one side at Sekigahara: a samurai (katana, naginata) in
- * ō-yoroi or tōsei gusoku, or an ashigaru (spear, bow), lacquered in his
- * side's colours with its banner on his back.
+ * A warrior of one side at Sekigahara: a samurai in ō-yoroi or tōsei gusoku,
+ * or an ashigaru (by default, one with a spear or a bow), with any of the
+ * side's weapons, lacquered in its colours with its banner on his back.
  */
-export function sengokuWarrior(random = Math.random, side, style) {
-  const ashigaru = style === 'spear' || style === 'bow';
+export function sengokuWarrior(random = Math.random, side, style, rank = style === 'spear' || style === 'bow' ? 'ashigaru' : 'samurai') {
+  const ashigaru = rank === 'ashigaru';
   const base = varyCharacter(ashigaru ? PRESETS.spear : PRESETS.samurai, random);
   const kind = ashigaru ? 'ashigaru' : pickOne(['samurai', 'samuraiTosei'], random);
   const name = `${pickOne(['Ii', 'Honda', 'Shimazu', 'Kobayakawa', 'Ōtani', 'Ukita', 'Kuroda', 'Hosokawa', 'Katō', 'Fukushima', 'Konishi', 'Sanada'], random)} ${pickOne(['Naomasa', 'Tadakatsu', 'Yoshihiro', 'Hideaki', 'Yoshitsugu', 'Hideie', 'Nagamasa', 'Tadaoki', 'Kiyomasa', 'Masanori', 'Yukimura', 'Takatora'], random)}`;

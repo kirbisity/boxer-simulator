@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics', 'cast', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'render', 'weaponview', 'drama', 'scenarios', 'menu', 'main'];
+const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics', 'cast', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'crowdview', 'render', 'weaponview', 'drama', 'scenarios', 'menu', 'main'];
 const out = process.argv[2] ?? 'dist/gladiator.html';
 
 const html = readFileSync('index.html', 'utf8');

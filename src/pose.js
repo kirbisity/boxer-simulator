@@ -34,9 +34,10 @@ export const vec = {
   scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
   dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
   cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
-  length: (a) => Math.hypot(a[0], a[1], a[2]),
+  // A square root, not Math.hypot: the same length for these sizes, many times cheaper.
+  length: (a) => Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]),
   normalize: (a) => {
-    const length = Math.hypot(a[0], a[1], a[2]) || 1;
+    const length = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) || 1;
     return [a[0] / length, a[1] / length, a[2] / length];
   },
   lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
