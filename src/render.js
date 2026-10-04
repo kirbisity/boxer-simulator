@@ -76,7 +76,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium };
+  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     view.scene.add(view.places[place]);
@@ -100,6 +100,8 @@ const PLACE_LIGHT = {
   subway: { background: 0x10140f, fog: [8, 26], key: 0xf2fff0, keyIntensity: 0.9, rim: 0x9fd8c0 },
   colosseum: { background: 0x9cc4e8, fog: [30, 90], key: 0xfff4e0, keyIntensity: 0.2, rim: 0xbcd4ff, sun: 0.85 },
   meadow: { background: 0xa9cbe6, fog: [25, 70], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xc8e0ff, sun: 0.9 },
+  // A bright summer noon, a clear sky with high cloud, haze in the distance.
+  town: { background: 0xc4dcf2, fog: [40, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.15 },
   // A dark hall, the ring alone under hard white light.
   stadium: { background: 0x040509, fog: [12, 46], key: 0xfff8ee, keyIntensity: 1.75, rim: 0x5a78ff },
 };
@@ -111,6 +113,7 @@ export const PLACE_ARENAS = {
   subway: { halfX: 4.2, halfZ: 1.35 },
   meadow: { halfX: 9, halfZ: 7 },
   stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
+  town: { halfX: 9, halfZ: 7 },
 };
 
 /**
@@ -588,6 +591,355 @@ function buildSubway(arena) {
     const glow = new THREE.PointLight(0xe6ffe8, 0.55, 9, 1.6);
     glow.position.set(x, 3.0, 0);
     place.add(glow);
+  }
+  return place;
+}
+
+/**
+ * A medieval market square at noon: cobbles, timber-framed houses on every
+ * side (jettied upper floors, limewash, steep tiled roofs, chimneys) with
+ * streets running off between them, the church tower and spire over the
+ * roofs, and the market about the edges — stalls, a well, the cross, the
+ * stocks, barrels, crates, a cart, signs and bunting — under a bright sky.
+ */
+function buildTown() {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
+  const shaded = (mesh) => {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+  const box = (size, at, material, turn = 0) => {
+    const mesh = shaded(new THREE.Mesh(new THREE.BoxGeometry(...size), material));
+    mesh.position.set(...at);
+    mesh.rotation.y = turn;
+    return mesh;
+  };
+  const halfX = 12.5;
+  const halfZ = 10.5;
+  /** A pitched roof: a triangular prism `width` across, `length` along z, `pitch` high, centred on its centroid. */
+  const gable = (width, length, pitch, material) => {
+    const radius = width / Math.sqrt(3) * 1.05;
+    const mesh = shaded(new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 3, 1), material));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.scale.z = pitch / (1.5 * radius);
+    return mesh;
+  };
+
+  // The sky: a dome painted from deep blue overhead to pale haze at the
+  // horizon, with soft high cloud; drawn behind everything, out of the fog.
+  const skyTexture = paintedTexture(1024, 512, (g, w, h) => {
+    const gradient = g.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, '#2e6cc2');
+    gradient.addColorStop(0.3, '#4f8fdb');
+    gradient.addColorStop(0.44, '#86b6e6');
+    gradient.addColorStop(0.5, '#cfe2f3');
+    gradient.addColorStop(1, '#dfe9f2');
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 18; index += 1) {
+      const x = Math.random() * w;
+      const y = h * (0.22 + Math.random() * 0.22);
+      const size = 25 + Math.random() * 55;
+      for (let puff = 0; puff < 9; puff += 1) {
+        const glow = g.createRadialGradient(x + (Math.random() - 0.5) * size * 1.6, y + (Math.random() - 0.5) * size * 0.3, 0, x, y, size);
+        glow.addColorStop(0, 'rgba(255,255,255,0.22)');
+        glow.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = glow;
+        g.fillRect(x - size * 2, y - size, size * 4, size * 2);
+      }
+    }
+  });
+  skyTexture.wrapT = THREE.ClampToEdgeWrapping;
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(52, 32, 16), new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide, fog: false, depthWrite: false }));
+  sky.renderOrder = -1;
+  place.add(sky);
+
+  // Cobbles: rounded setts in grey and brown, worn paler down the middle.
+  const cobbles = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#5c564d';
+    g.fillRect(0, 0, w, h);
+    for (let row = 0; row < 40; row += 1) {
+      for (let column = 0; column < 40; column += 1) {
+        const x = (column + (row % 2) * 0.5) * (w / 40) + (Math.random() - 0.5) * 4;
+        const y = row * (h / 40) + (Math.random() - 0.5) * 4;
+        const tone = 120 + Math.random() * 60;
+        g.fillStyle = `rgb(${tone},${tone * 0.95},${tone * 0.86})`;
+        g.beginPath();
+        g.ellipse(x, y, 10 + Math.random() * 3, 9 + Math.random() * 3, Math.random(), 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.12)';
+        g.beginPath();
+        g.ellipse(x - 3, y - 3, 5, 4, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    for (let index = 0; index < 300; index += 1) {
+      g.fillStyle = `rgba(70,60,45,${Math.random() * 0.25})`;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 4 + Math.random() * 20, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, [6, 6]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), lit(0xffffff, { map: cobbles, roughness: 0.85 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  place.add(ground);
+
+  // House fronts: limewash between dark oak framing, leaded windows, a door.
+  const LIMEWASH = ['#efe6d2', '#e8d7a8', '#e9c8b4', '#d8d0bd', '#f2ead8', '#d9b98a'];
+  const facade = (wash, storeys, seed) => paintedTexture(256, 128 * storeys, (g, w, h) => {
+    g.fillStyle = wash;
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 500; index += 1) {
+      g.fillStyle = `rgba(120,100,70,${Math.random() * 0.06})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 3 + Math.random() * 10, 2 + Math.random() * 6);
+    }
+    g.fillStyle = '#3b2a1c';
+    const beam = 9;
+    const floor = h / storeys;
+    for (let level = 0; level <= storeys; level += 1) g.fillRect(0, Math.min(h - beam, level * floor), w, beam);
+    for (const x of [0, w / 3, (2 * w) / 3, w - beam]) g.fillRect(x, 0, beam, h);
+    // Braces and close studding, differing a little house to house.
+    g.lineWidth = 8;
+    g.strokeStyle = '#3b2a1c';
+    for (let level = 0; level < storeys; level += 1) {
+      const top = level * floor;
+      if ((seed + level) % 2 === 0) {
+        g.beginPath();
+        g.moveTo(0, top + floor);
+        g.lineTo(w / 3, top);
+        g.moveTo(w, top + floor);
+        g.lineTo((2 * w) / 3, top);
+        g.stroke();
+      } else {
+        for (let x = 22; x < w; x += 28) g.fillRect(x, top, 6, floor);
+      }
+    }
+    // Windows: small leaded panes, the shop window and door on the ground floor.
+    const pane = (x, y, width, height) => {
+      g.fillStyle = '#2a3440';
+      g.fillRect(x, y, width, height);
+      g.strokeStyle = 'rgba(200,190,150,0.6)';
+      g.lineWidth = 1.5;
+      for (let along = x; along < x + width; along += 7) {
+        g.beginPath();
+        g.moveTo(along, y);
+        g.lineTo(along + height * 0.5, y + height);
+        g.stroke();
+      }
+      g.fillStyle = '#4a3422';
+      g.fillRect(x - 3, y + height, width + 6, 5);
+    };
+    for (let level = 1; level < storeys; level += 1) {
+      pane(w * 0.12, h - (level + 1) * floor + floor * 0.3, w * 0.22, floor * 0.36);
+      pane(w * 0.62, h - (level + 1) * floor + floor * 0.3, w * 0.22, floor * 0.36);
+    }
+    g.fillStyle = '#4a2f1c';
+    g.fillRect(w * 0.4, h - floor * 0.8, w * 0.2, floor * 0.8);
+    g.fillStyle = '#2b1a10';
+    g.fillRect(w * 0.42, h - floor * 0.76, w * 0.16, floor * 0.76);
+    pane(w * 0.08, h - floor * 0.7, w * 0.25, floor * 0.4);
+  });
+  const oak = lit(0x3b2a1c);
+  const roofs = [lit(0x9a4a32), lit(0x8a3f2c), lit(0x5e5a58), lit(0xa45a3a), lit(0x6e4a36)];
+  const plaster = LIMEWASH.map((wash) => lit(wash));
+  const signs = lit(0x6a4a2c);
+  let seed = 0;
+  /** A house fronting the square: width along the frontage, storeys, which way it faces. */
+  const house = (x, z, turn, width, storeys) => {
+    seed += 1;
+    const group = new THREE.Group();
+    const depth = 6;
+    const storey = 2.6;
+    const wash = seed % LIMEWASH.length;
+    const front = lit(0xffffff, { map: facade(LIMEWASH[wash], storeys, seed) });
+    const sides = plaster[wash];
+    const height = storey * storeys;
+    const body = shaded(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), [sides, sides, sides, sides, front, sides]));
+    body.position.set(0, height / 2, 0);
+    group.add(body);
+    // The jetty: the upper storeys oversail the street on a beam.
+    if (storeys > 1) group.add(box([width + 0.1, 0.22, 0.3], [0, storey, depth / 2 + 0.05], oak));
+    // A steep gable roof, ridge running back from the square.
+    const pitch = 0.6 * width + 0.6;
+    const roof = gable(width, depth + 0.6, pitch, roofs[seed % roofs.length]);
+    roof.position.set(0, height + pitch * 0.33, 0);
+    group.add(roof);
+    group.add(box([0.55, 1.6, 0.55], [width * 0.25 * (seed % 2 ? 1 : -1), height + pitch * 0.55, -depth * 0.2], lit(0x7a4a36)));
+    // A hanging sign on a bracket over every other door.
+    if (seed % 2 === 0) {
+      group.add(box([0.06, 0.06, 0.9], [width * 0.3, storey * 0.95, depth / 2 + 0.45], oak));
+      group.add(box([0.05, 0.5, 0.6], [width * 0.3, storey * 0.75, depth / 2 + 0.7], signs));
+    }
+    group.position.set(x, 0, z);
+    group.rotation.y = turn;
+    place.add(group);
+  };
+  // Four rows round the square, each broken by a street running off.
+  const row = (length, build, turn, gapAt) => {
+    let along = -length / 2;
+    while (along < length / 2 - 2) {
+      const width = 3.2 + ((seed * 7) % 5) * 0.4;
+      const middle = along + width / 2;
+      if (Math.abs(middle - gapAt) > 2.6) build(middle, turn, width, 2 + ((seed * 3) % 3 === 0 ? 1 : 0));
+      along += width + 0.05;
+    }
+  };
+  row(halfX * 2 + 8, (along, turn, width, storeys) => house(along, -halfZ - 3, turn, width, storeys), 0, 2);
+  row(halfX * 2 + 8, (along, turn, width, storeys) => house(along, halfZ + 3, turn, width, storeys), Math.PI, -4);
+  row(halfZ * 2, (along, turn, width, storeys) => house(-halfX - 3, along, turn, width, storeys), Math.PI / 2, -1);
+  row(halfZ * 2, (along, turn, width, storeys) => house(halfX + 3, along, turn, width, storeys), -Math.PI / 2, 3);
+  // Beyond the streets: more roofs, the town going on.
+  for (let index = 0; index < 22; index += 1) {
+    const angle = (index / 22) * Math.PI * 2;
+    const reach = 26 + Math.random() * 10;
+    const width = 4 + Math.random() * 3;
+    const tall = 5 + Math.random() * 3;
+    const block = new THREE.Group();
+    block.add(box([width, tall, 6], [0, tall / 2, 0], plaster[index % plaster.length]));
+    const roof = gable(width, 6.4, width * 0.6 + 0.6, roofs[index % roofs.length]);
+    roof.position.y = tall + (width * 0.6 + 0.6) / 3;
+    block.add(roof);
+    block.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.85);
+    block.rotation.y = -angle + Math.PI / 2;
+    place.add(block);
+  }
+
+  // The church over the north roofs: nave, tower with battlements, spire.
+  const stone = lit(0xa49b8a, { roughness: 1 });
+  const church = new THREE.Group();
+  church.add(box([7, 9, 16], [0, 4.5, 0], stone));
+  const naveRoof = gable(7, 16.4, 4.5, lit(0x5e5a58));
+  naveRoof.position.y = 9 + 4.5 / 3;
+  church.add(naveRoof);
+  church.add(box([5, 20, 5], [0, 10, 9], stone));
+  for (const [dx, dz] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2], [0, -2.2], [0, 2.2], [-2.2, 0], [2.2, 0]]) church.add(box([0.6, 0.9, 0.6], [dx, 20.4, 9 + dz], stone));
+  const spire = shaded(new THREE.Mesh(new THREE.ConeGeometry(2.4, 11, 8), lit(0x50575c)));
+  spire.position.set(0, 25.5, 9);
+  church.add(spire);
+  for (const z of [-5, -1, 3]) church.add(box([7.1, 2.6, 0.8], [0, 5, z], lit(0x2c3038)));
+  church.position.set(-4, 0, -halfZ - 22);
+  place.add(church);
+
+  // The market about the edges of the square.
+  const canvasStripes = (a, b) => paintedTexture(128, 64, (g, w, h) => {
+    for (let x = 0; x < w; x += 16) {
+      g.fillStyle = (x / 16) % 2 ? a : b;
+      g.fillRect(x, 0, 16, h);
+    }
+  });
+  const stall = (x, z, turn, colours, goods) => {
+    const group = new THREE.Group();
+    group.add(box([2.4, 0.9, 1.1], [0, 0.45, 0], lit(0x7a5a38)));
+    for (const [dx, dz] of [[-1.15, -0.5], [1.15, -0.5], [-1.15, 0.5], [1.15, 0.5]]) group.add(box([0.08, 2.2, 0.08], [dx, 1.1, dz], oak));
+    const awning = shaded(new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.05, 1.6), lit(0xffffff, { map: canvasStripes(...colours) })));
+    awning.position.set(0, 2.25, 0.15);
+    awning.rotation.x = 0.18;
+    group.add(awning);
+    for (let index = 0; index < 9; index += 1) {
+      const item = shaded(new THREE.Mesh(new THREE.SphereGeometry(0.1 + Math.random() * 0.06, 8, 6), lit(goods[index % goods.length])));
+      item.position.set(-0.9 + (index % 5) * 0.45, 0.98, -0.2 + Math.floor(index / 5) * 0.35);
+      group.add(item);
+    }
+    group.position.set(x, 0, z);
+    group.rotation.y = turn;
+    place.add(group);
+  };
+  stall(-8, -halfZ + 0.9, 0, ['#b8322a', '#efe6d2'], [0xc0392b, 0x8e9a2a, 0xd8a23a]);
+  stall(-4.5, -halfZ + 0.9, 0, ['#2f5a8a', '#efe6d2'], [0xe0c070, 0xb08040, 0xf0e0b0]);
+  stall(7.5, halfZ - 0.9, Math.PI, ['#3a7a3a', '#e8d7a8'], [0x7a9a3a, 0xa04030, 0xe0d090]);
+  stall(halfX - 1, 3.5, -Math.PI / 2, ['#8a3a7a', '#efe6d2'], [0xd0b080, 0x904020, 0x606060]);
+  // The well: a stone drum under a little tiled roof on posts, with its windlass.
+  const well = new THREE.Group();
+  well.add(shaded(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1, 0.9, 16), stone)));
+  well.children[0].position.y = 0.45;
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.75, 16), lit(0x1c2a30, { roughness: 0.2 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.7;
+  well.add(water);
+  for (const dx of [-0.85, 0.85]) well.add(box([0.12, 2.2, 0.12], [dx, 1.1, 0], oak));
+  well.add(box([1.9, 0.1, 0.1], [0, 1.7, 0], oak));
+  // The roof's ridge along the windlass.
+  const wellRoof = gable(1.9, 1.6, 0.8, roofs[0]);
+  wellRoof.position.y = 2.2 + 0.8 / 3;
+  const ridge = new THREE.Group();
+  ridge.rotation.y = Math.PI / 2;
+  ridge.add(wellRoof);
+  well.add(ridge);
+  well.position.set(-halfX + 1.6, 0, halfZ - 1.8);
+  place.add(well);
+  // The market cross: a shaft on stepped stone.
+  const cross = new THREE.Group();
+  cross.add(box([2.4, 0.3, 2.4], [0, 0.15, 0], stone), box([1.7, 0.3, 1.7], [0, 0.45, 0], stone), box([1, 0.3, 1], [0, 0.75, 0], stone));
+  cross.add(box([0.3, 3.2, 0.3], [0, 2.5, 0], stone), box([1.1, 0.25, 0.25], [0, 3.6, 0], stone));
+  cross.position.set(halfX - 1.6, 0, -halfZ + 1.8);
+  place.add(cross);
+  // The stocks.
+  const stocks = new THREE.Group();
+  stocks.add(box([1.8, 0.35, 0.14], [0, 0.55, 0], oak), box([0.12, 0.8, 0.12], [-0.8, 0.4, 0], oak), box([0.12, 0.8, 0.12], [0.8, 0.4, 0], oak), box([1.6, 0.1, 0.4], [0, 0.35, -0.6], oak));
+  stocks.position.set(2, 0, halfZ - 0.8);
+  stocks.rotation.y = Math.PI;
+  place.add(stocks);
+  // Barrels, crates and sacks, a cart, straw.
+  const barrelWood = lit(0x7a5230);
+  const hoop = lit(0x2c2c2e, { metalness: 0.5, roughness: 0.5 });
+  for (const [x, z] of [[-10.6, -3], [-10.8, -2.1], [-10, -2.5], [10.8, -5.5], [3.5, -halfZ + 0.6], [-1.5, halfZ - 0.5]]) {
+    const barrel = shaded(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.9, 12), barrelWood));
+    barrel.position.set(x, 0.45, z);
+    place.add(barrel);
+    for (const y of [0.18, 0.72]) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.02, 4, 16), hoop);
+      band.rotation.x = Math.PI / 2;
+      band.position.set(x, y, z);
+      place.add(band);
+    }
+  }
+  for (const [x, z, size, turn] of [[-11, 4, 0.7, 0.3], [-11.2, 4.9, 0.55, -0.2], [10.6, 6, 0.7, 0.5], [5, -halfZ + 0.6, 0.6, 0.1]]) place.add(box([size, size, size], [x, size / 2, z], lit(0x8a6a44), turn));
+  for (const [x, z] of [[-6.5, halfZ - 0.6], [-6, halfZ - 0.8], [10.9, -6.3]]) {
+    const sack = shaded(new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), lit(0xc8b48a)));
+    sack.scale.y = 1.3;
+    sack.position.set(x, 0.38, z);
+    place.add(sack);
+  }
+  const cart = new THREE.Group();
+  cart.add(box([2.2, 0.15, 1.2], [0, 0.75, 0], barrelWood), box([2.2, 0.4, 0.06], [0, 1, 0.6], barrelWood), box([2.2, 0.4, 0.06], [0, 1, -0.6], barrelWood), box([1.8, 0.08, 0.08], [1.9, 0.75, 0.35], oak), box([1.8, 0.08, 0.08], [1.9, 0.75, -0.35], oak));
+  for (const side of [0.7, -0.7]) {
+    const wheel = shaded(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 6, 16), oak));
+    wheel.position.set(-0.2, 0.55, side);
+    cart.add(wheel);
+    for (let spoke = 0; spoke < 4; spoke += 1) {
+      const rod = box([0.04, 1, 0.04], [-0.2, 0.55, side], oak);
+      rod.rotation.z = (spoke * Math.PI) / 4;
+      cart.add(rod);
+    }
+  }
+  const straw = shaded(new THREE.Mesh(new THREE.SphereGeometry(0.8, 10, 6), lit(0xd8b860)));
+  straw.scale.set(1.2, 0.45, 0.65);
+  straw.position.y = 1.05;
+  cart.add(straw);
+  cart.position.set(halfX - 1.4, 0, -1.5);
+  cart.rotation.y = 0.3;
+  place.add(cart);
+  // Bunting strung across the square, house to house.
+  const flagColours = [0xb8322a, 0xe8d7a8, 0x2f5a8a, 0x3a7a3a, 0xd8a23a].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide }));
+  const flag = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.11, 0, 0), new THREE.Vector3(0.11, 0, 0), new THREE.Vector3(0, -0.22, 0)]);
+  flag.computeVertexNormals();
+  // Strung high, from the upper windows, over the heads of everyone and the camera.
+  for (const [from, to] of [[[-halfX - 0.5, 7.6, -6], [halfX + 0.5, 7.6, -4]], [[-halfX - 0.5, 7.4, 4], [halfX + 0.5, 7.8, 6]], [[-6, 7.6, -halfZ - 0.5], [-3, 7.6, halfZ + 0.5]]]) {
+    const start = new THREE.Vector3(...from);
+    const end = new THREE.Vector3(...to);
+    const count = Math.floor(start.distanceTo(end) / 0.5);
+    for (let index = 1; index < count; index += 1) {
+      const share = index / count;
+      const at = start.clone().lerp(end, share);
+      at.y -= Math.sin(share * Math.PI) * 0.7;
+      const pennant = new THREE.Mesh(flag, flagColours[index % flagColours.length]);
+      pennant.position.copy(at);
+      pennant.lookAt(at.x + (end.z - start.z), at.y, at.z - (end.x - start.x));
+      place.add(pennant);
+    }
   }
   return place;
 }

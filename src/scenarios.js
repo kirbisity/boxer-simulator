@@ -16,11 +16,12 @@ import { knight, rebel } from './cast.js';
 export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
-    place: 'A village green, Kent, June 1381',
-    blurb: 'The village has risen. Five knights ride out to put it down — and meet twenty peasants with spears.',
-    scene: 'meadow',
+    place: 'The market square, Maidstone, Kent · June 1381',
+    blurb: 'The town has risen. Five knights ride in to put it down — and meet twenty peasants with spears in the market square.',
+    scene: 'town',
     arena: { halfX: 9, halfZ: 7 },
-    camera: { yaw: -0.55, pitch: 0.32, distance: 10 },
+    // Never further out than the house fronts.
+    camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
     roster: 'Five knights · twenty rebels with spears',
     // The whole cast, made fresh for each visit (the rebels differ every time).
     cast: (random) => ({ red: Array.from({ length: 5 }, (_, index) => knight(random, index)), blue: Array.from({ length: 20 }, () => rebel(random)) }),

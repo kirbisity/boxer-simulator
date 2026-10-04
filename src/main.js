@@ -266,7 +266,8 @@ function drawWorld(dt) {
   // A crowd needs a wider shot: back off with the spread of the fighters.
   if (world.fighters.length > 2 && !document.body.classList.contains('sheet')) {
     const spread = Math.max(...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - pelvisMid[0], fighter.x[26] - pelvisMid[2])));
-    scene.orbit.distance += (Math.max(5.2, 3.4 + spread * 2.2) - scene.orbit.distance) * 0.03;
+    const furthest = state.scenario ? SCENARIOS[state.scenario].camera?.maxDistance ?? Infinity : Infinity;
+    scene.orbit.distance += (Math.min(furthest, Math.max(5.2, 3.4 + spread * 2.2)) - scene.orbit.distance) * 0.03;
   }
   // A design sheet holds its own framing.
   placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
