@@ -145,6 +145,104 @@ function computeNormals(positions, indices) {
   return normals;
 }
 
+// Armour kinds drawn from a table of pieces. Each slot holds one piece or
+// a list of them, the same both sides or per side ({ l, r }); a piece is
+// [from, to, inflate, paint], along the part (for a forearm, `to` at or
+// below 0 counts back from the wrist). Paint is a role, or a pattern of
+// roles: rows (by ring), mail (rings in a weave), rivets (dots on a base),
+// a front panel, or heraldry (the design's surcoat field).
+const MAIL = { mail: true };
+const LACED = { rows: ['steel', 'lace'] };
+const MANICA = { rows: ['steel', 'lace'] };
+const BALTEUS = [0.04, 0.24, 1.14, { rows: ['steel', 'gold', 'steel'] }];
+export const ARMOR_KINDS = {
+  // Tosei gusoku: a solid cuirass of riveted horizontal steel lames, laced
+  // skirt and sleeves, the war mask on the kabuto.
+  toseiDo: {
+    trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, LACED], collar: 'steel',
+    upperArm: [-0.18, 0.45, 1.62, LACED], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
+  },
+  // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,
+  // cloth sleeves and simple shin guards.
+  okegawa: {
+    trunk: [-0.05, 0.96, 1.17, { mon: [0.68, 0.07, 'gold'], base: 'armor' }], skirt: [0.3, 0.4, 1.2, { rows: ['armor', 'lace'] }],
+    forearm: [-0.04, -0.04, 1.22, 'top'], shin: [0.1, 0.8, 1.3, 'armor'],
+  },
+  // A knight in mail: hauberk to the knees, mail sleeves and chausses, and a
+  // surcoat in his colours over it.
+  mail: {
+    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [[0.62, 0.35, 1.13, MAIL], [0.72, 0.45, 1.32, { heraldry: true }]], collar: 'mail',
+    upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL], thigh: [-0.05, 1.04, 1.1, MAIL], shin: [-0.12, 0.95, 1.1, MAIL],
+  },
+  // A foot soldier: a riveted brigandine over a quilted coat, a short skirt
+  // of lames, spaulders, vambraces and knee cops; the legs otherwise bare of steel.
+  brigandine: {
+    trunk: [-0.06, 0.95, 1.21, { rivets: 3, base: 'cloth' }], skirt: [0.28, 0.35, 1.22, { rows: ['steel', 'steel2'] }],
+    upperArm: [-0.2, 0.36, 1.62, 'steel'], forearm: [0.18, -0.08, 1.3, 'steel'], knee: [0.82, 1.05, 1.45, 'steel'],
+  },
+  // Murmillo: belt, the manica on the sword arm, a short greave on the lead leg over a quilted wrap.
+  murmillo: {
+    belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },
+    thigh: { l: [0.62, 1.0, 1.18, 'pad'] }, shin: { l: [-0.05, 0.55, 1.32, 'steel'] },
+  },
+  // Secutor: like the murmillo, the greave higher.
+  secutor: {
+    belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },
+    thigh: { l: [0.55, 1.0, 1.18, 'pad'] }, shin: { l: [-0.12, 0.9, 1.32, 'steel'] },
+  },
+  // Retiarius: no helmet, no greaves; the galerus standing up from the left shoulder, a manica on that arm.
+  retiarius: {
+    belt: BALTEUS, upperArm: { l: [[-0.32, 0.28, 2.0, 'steel'], [0.2, 1.02, 1.3, MANICA]] }, forearm: { l: [-0.06, -0.02, 1.3, MANICA] },
+  },
+  // Thraex: quilted wraps up both thighs, high greaves over them, the manica.
+  thraex: {
+    belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },
+    thigh: [[0.05, 0.75, 1.2, { rows: ['pad', 'kit'] }], [0.68, 1.05, 1.34, 'steel']], shin: [-0.14, 0.9, 1.32, { rows: ['steel', 'steel', 'gold'] }],
+  },
+};
+
+/** The pieces in a slot of an armour kind, for one side. */
+function armorPieces(kind, slot, side) {
+  const value = kind?.[slot];
+  if (!value) return [];
+  const forSide = Array.isArray(value) ? value : value[side];
+  if (!forSide) return [];
+  return Array.isArray(forSide[0]) ? forSide : [forSide];
+}
+
+/** A paint as the loft wants it: a role, or a function of the ring and its place. */
+function paintFor(paint, armor) {
+  if (typeof paint === 'string') return paint;
+  if (paint.mail) return (ring, angle, index, step) => ((index + step) % 2 ? 'mail' : 'mail2');
+  if (paint.heraldry) return (ring, angle) => heraldry(armor?.heraldry, ring.t, Math.sin(angle), Math.cos(angle));
+  if (paint.mon) {
+    // A round crest on the breast: centred `t` up the trunk, `size` across.
+    const [centre, size, role] = paint.mon;
+    return (ring, angle) => (Math.cos(angle) > 0 && Math.hypot((ring.t - centre) / size, Math.sin(angle) / (size * 2.6)) < 1 ? role : paint.base);
+  }
+  if (paint.panel) {
+    const [from, to, ahead, role] = paint.panel;
+    return (ring, angle) => (ring.t > from && ring.t < to && Math.cos(angle) > ahead ? role : paint.base);
+  }
+  return (ring, angle, index, step) => {
+    if (paint.rivets && index % paint.rivets === 1 && step % 3 === 0) return 'gold';
+    if (paint.rows) return paint.rows[index % paint.rows.length];
+    return paint.base;
+  };
+}
+
+/** A surcoat's field: plain, per pale, quarterly, a cross, a chevron, or a chief. */
+function heraldry(kind, t, across, ahead) {
+  switch (kind) {
+    case 'pale': return across > 0 ? 'cloth' : 'cloth2';
+    case 'quarterly': return (across > 0) !== (t > 0.45) ? 'cloth' : 'cloth2';
+    case 'cross': return ahead > 0 && (Math.abs(across) < 0.16 || Math.abs(t - 0.62) < 0.06) ? 'cloth2' : 'cloth';
+    case 'chevron': return ahead > 0 && Math.abs(t - (0.35 + Math.abs(across) * 0.5)) < 0.07 ? 'cloth2' : 'cloth';
+    case 'chief': return t > 0.74 ? 'cloth2' : 'cloth';
+    default: return 'cloth';
+  }
+}
+
 /** Split every triangle's corners apart so each face shades flat. */
 function facet(positions, indices, colors, bones, weightPositions) {
   const flatPositions = [];
@@ -237,6 +335,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const plate = armor?.kind === 'plate';
   const lamellar = armor?.kind === 'lamellar';
   const hoplomachus = armor?.kind === 'hoplomachus';
+  // A kind drawn from the table of pieces.
+  const kit = ARMOR_KINDS[armor?.kind] ?? null;
+  const tablePiece = (rings, inflate, paint, bones) => loft(mesh, rings, sides, { color: paintFor(paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
   // Lamellar: rows of lacquered scales, laced between rows and down each column.
   const laced = (ring, angle, index) => (index % 3 === 2 ? 'lace' : 'steel');
   const hanging3 = [BONE.pelvis, BONE.lThigh, BONE.rThigh];
@@ -330,18 +431,24 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
     const role = (ring, angle, index, step) => {
       if (plate) return armor.fluted && step % 2 ? 'steel2' : 'steel';
+      // The ō-yoroi's leather front panel, where the bowstring would catch.
+      if (lamellar && armor.panel && ring.t > 0.3 && ring.t < 0.86 && Math.cos(angle) > 0.82) return 'leather';
+      if (lamellar && armor.trim && index % 5 === 0) return 'gold';
       if (lamellar) return laced(ring, angle, index, step);
       if (armor.kind === 'carrier') return Math.abs(Math.sin(angle)) < 0.75 ? 'armor' : 'top';
       return 'armor';
     };
     if (shell) loft(mesh, trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
   }
+  for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
+  for (const [hem, flare, inflate, paint] of armorPieces(kit, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
+  for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) tablePiece(shortsRings(from, to, count(3)), inflate, paint, abdomen);
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
-  const collarFrom = plate || lamellar ? -0.15 : -0.6;
-  const flare = (t) => 1 + (plate || lamellar ? 0 : 0.9 * Math.max(0, -t) / 0.6);
-  if (plate || lamellar || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: plate ? 'steel' : 'armor', capStart: false, capEnd: false });
+  const collarFrom = plate || lamellar || kit?.collar ? -0.15 : -0.6;
+  const flare = (t) => 1 + (plate || lamellar || kit?.collar ? 0 : 0.9 * Math.max(0, -t) / 0.6);
+  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false });
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -394,6 +501,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
         armorPiece(upperArmRings(-0.25, 1.02, count(7)), 1.32, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
         armorPiece(forearmRings(-0.06, wrist - 0.02, count(6)), 1.32, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
       }
+    } else if (kit) {
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'upperArm', side)) tablePiece(upperArmRings(from, to, count(Math.max(3, Math.round(7 * (to - from))))), inflate, paint);
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'forearm', side)) tablePiece(forearmRings(from, to <= 0 ? wrist + to : to, count(5)), inflate, paint);
     } else if (armor && armor.kind !== 'carrier') {
       const big = { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
       armorPiece(upperArmRings(-0.2, 0.38, count(3)), big);
@@ -430,6 +540,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     } else if (hoplomachus) {
       // Ocreae: high greaves, up over the knee.
       armorPiece(thighRings(0.68, 1.05, count(3)), 1.34, 'steel');
+    } else if (kit) {
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'thigh', side)) tablePiece(thighRings(from, to, count(Math.max(2, Math.round(8 * (to - from))))), inflate, paint);
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'knee', side)) tablePiece(thighRings(from, to, count(2)), inflate, paint);
     } else if (armor) {
       if (plate) armorPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
       if (armor.kind === 'heavyRiot') armorPiece(thighRings(0.05, 0.7, count(3)), 1.35);
@@ -453,6 +566,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       armorPiece(shinRings(0.04, 0.86, count(5)), 1.34, 'steel');
     } else if (hoplomachus) {
       armorPiece(shinRings(-0.14, 0.9, count(6)), 1.32, (ring, angle, index) => (index === 0 ? 'gold' : 'steel'));
+    } else if (kit) {
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'shin', side)) tablePiece(shinRings(from, to, count(Math.max(2, Math.round(7 * (to - from))))), inflate, paint);
     } else if (armor) {
       armorPiece(shinRings(-0.12, 0.12, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
       if (plate || armor.kind !== 'carrier') armorPiece(shinRings(0.1, plate ? 0.95 : 0.8, count(4)), plate ? 1.32 : 1.35);

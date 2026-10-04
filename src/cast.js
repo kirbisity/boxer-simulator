@@ -4,7 +4,7 @@
 // from the characters there are, made different the same way.
 
 import { buildBody, FRAMES, normaliseInputs, PRESETS } from './body.js';
-import { randomColors } from './outfits.js';
+import { defaultHeadgear, familyKinds, headgearOptions, OUTFITS, randomColors, randomDesign } from './outfits.js';
 import { caloriesForWeight } from './physiology.js';
 import { STYLES } from './moves.js';
 
@@ -58,7 +58,21 @@ export function varyCharacter(inputs, random = Math.random) {
   };
   const kind = varied.outfit?.kind;
   if (kind) varied.outfit = { ...varied.outfit, colors: randomColors(kind, random) };
-  return normaliseInputs(varied);
+  return normaliseInputs(OUTFITS[kind]?.family ? redress(varied, random) : varied);
+}
+
+/**
+ * The same fighter in another of his armour's designs, among those picked
+ * for the game; with `anyKind`, in any armour of the same family (a knight
+ * in plate, mail or brigandine). Headgear follows the armour.
+ */
+export function redress(inputs, random = Math.random, { anyKind = false } = {}) {
+  const current = inputs.outfit?.kind;
+  const family = OUTFITS[current]?.family;
+  if (!family) return inputs;
+  const kind = anyKind ? pickOne(familyKinds(family), random) : current;
+  const accessories = (inputs.accessories ?? []).filter((item) => headgearOptions(kind).includes(item));
+  return { ...inputs, outfit: { ...inputs.outfit, kind, design: randomDesign(kind, random) }, accessories: kind === current ? inputs.accessories : (accessories.length ? accessories : defaultHeadgear(kind)) };
 }
 
 /** Anyone at all: one of the characters, made a little different. */
@@ -96,10 +110,8 @@ export function randomBoxer(random = Math.random, { weightKg = null, spread = 2.
 
 /** A fighter for the arena: a gladiator, a knight, a samurai, a spearman — any weight. */
 export function randomGladiator(random = Math.random) {
-  const base = varyCharacter(PRESETS[pickOne(GLADIATORS, random)], random);
-  // Samurai come in their five liveries.
-  if (base.outfit?.kind === 'samurai') base.outfit = { ...base.outfit, design: Math.floor(random() * 5) };
-  return base;
+  // Any armour of his kind's family, in one of its picked designs.
+  return normaliseInputs(redress(varyCharacter(PRESETS[pickOne(GLADIATORS, random)], random), random, { anyKind: true }));
 }
 
 /**

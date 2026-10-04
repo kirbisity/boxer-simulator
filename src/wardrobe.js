@@ -60,6 +60,13 @@ export function roleColors(dress, skin) {
     // Lamellar's lacing and gilt; the leather of a gladiator's straps.
     lace: base(armor?.lace, 0x1d2a4f),
     gold: base(armor?.gold, 0xd6a743),
+    // Mail's rings, light and shadow; the leather of a do's front; a
+    // surcoat's or brigandine's cloth and its second (heraldic) colour.
+    mail: base(armor?.mail, 0x8d9097),
+    mail2: darker(base(armor?.mail, 0x8d9097), 0.6),
+    leather: base(armor?.leather, 0x5a3a22),
+    cloth: base(armor?.cloth, 0x8a1f22),
+    cloth2: base(armor?.cloth2, 0xe8e2d2),
   };
 }
 
@@ -347,6 +354,76 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
     case 'gladiatorHelm':
       buildGladiatorHelm(group, head, r, steel, color);
       break;
+    case 'jingasa': {
+      // The ashigaru's war hat: a broad shallow cone of lacquered iron, the mon on the front.
+      const lacquer = metal(steel, color);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(2.1 * r, 0.85 * r, 28, 1, true), lacquer);
+      cone.material = lacquer.clone();
+      cone.material.side = THREE.DoubleSide;
+      cone.position.y = 0.72 * r;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.12 * r, 0.3 * r, 18, 1, true), surface(0x1a1714));
+      band.position.y = 0.32 * r;
+      const mon = new THREE.Mesh(new THREE.CircleGeometry(0.28 * r, 18), metal(steel, head.gold ?? 0xd6a743));
+      mon.position.set(1.32 * r, 0.62 * r, 0);
+      mon.rotation.set(0, Math.PI / 2, -0.38);
+      mon.userData.noOutline = true;
+      for (const side of [1, -1]) {
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 0.9 * r, 0.05 * r), surface(0x2a2420));
+        tie.position.set(0.1 * r, -0.2 * r, side * 0.95 * r);
+        tie.rotation.x = side * 0.15;
+        group.add(tie);
+      }
+      group.add(cone, band, mon);
+      hidesHair = false;
+      break;
+    }
+    case 'kettleHat': {
+      // A foot soldier's chapel de fer: a round steel crown and a broad brim sloping down.
+      const crownSteel = metal(steel, color);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), crownSteel);
+      crown.scale.y = head.tall ? 1.25 : 1.05;
+      crown.position.y = 0.1 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.22 * r, (head.brim ?? 1.9) * r, 0.42 * r, 26, 1, true), crownSteel);
+      brim.material = crownSteel.clone();
+      brim.material.side = THREE.DoubleSide;
+      brim.position.y = -0.08 * r;
+      const ridge = new THREE.Mesh(new THREE.TorusGeometry(1.2 * r, 0.05 * r, 6, 20, Math.PI), crownSteel);
+      ridge.rotation.y = Math.PI / 2;
+      ridge.position.y = 0.1 * r;
+      ridge.scale.y = crown.scale.y;
+      group.add(crown, brim, ridge);
+      if (head.coif) {
+        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.4 * r, 1.1 * r, 18, 1, true), metal(steel, 0x7d8087));
+        coif.position.y = -0.85 * r;
+        group.add(coif);
+      }
+      break;
+    }
+    case 'secutorHelm': {
+      // The secutor's smooth egg of bronze: nothing for a net or a trident
+      // to catch on, two small eyeholes, a low fin.
+      const bronze = metal(steel, color);
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(1.32 * r, 24, 18), bronze);
+      shell.scale.set(1.08, 1.18, 1);
+      shell.position.set(0.05 * r, -0.05 * r, 0);
+      const fin = new THREE.Mesh(new THREE.TorusGeometry(1.42 * r, 0.1 * r, 6, 20, Math.PI * 0.85), bronze);
+      fin.position.y = -0.05 * r;
+      fin.rotation.z = 0.25;
+      fin.scale.set(1.05, 1.15, 1);
+      const dark = surface(0x0c0b09);
+      for (const side of [1, -1]) {
+        const eye = new THREE.Mesh(new THREE.CircleGeometry(0.12 * r, 12), dark);
+        eye.position.set(1.4 * r, 0.12 * r, side * 0.32 * r);
+        eye.rotation.y = Math.PI / 2 - side * 0.25;
+        eye.userData.noOutline = true;
+        group.add(eye);
+      }
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(1.3 * r, 0.06 * r, 6, 24), bronze);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = -1.15 * r;
+      group.add(shell, fin, rim);
+      break;
+    }
     default:
       return null;
   }
@@ -624,6 +701,10 @@ function buildGladiatorHelm(group, head, r, steel, color) {
   roll.rotation.x = Math.PI / 2;
   roll.position.y = -0.38 * r;
   // The visor: a face plate pierced by a grille.
+  if (head.grille === false) {
+    group.add(bowl, brim, roll, ridge);
+    return;
+  }
   const visor = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 18, 10, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.42, Math.PI * 0.4), bronze);
   visor.material = bronze.clone();
   visor.material.side = THREE.DoubleSide;
@@ -639,12 +720,28 @@ function buildGladiatorHelm(group, head, r, steel, color) {
       group.add(hole);
     }
   }
-  // The crest ridge front to back, the plume standing in it.
+  // The crest ridge front to back: a plume standing in it (hoplomachus), a
+  // tall solid fin (murmillo), or a griffin's neck curving forward (thraex).
   const ridge = new THREE.Mesh(new THREE.TorusGeometry(1.25 * r, 0.09 * r, 6, 20, Math.PI), bronze);
   ridge.position.y = 0.05 * r;
   ridge.scale.y = 1.05;
+  if (head.crest === 'fin') {
+    // A half-disc standing up along the crown, front to back (cylinder angles start at +z, here turned up).
+    const fin = new THREE.Mesh(new THREE.CylinderGeometry(1.85 * r, 1.85 * r, 0.09 * r, 24, 1, false, -Math.PI * 0.42, Math.PI * 0.84), bronze);
+    fin.rotation.x = -Math.PI / 2;
+    fin.position.y = 0.05 * r;
+    group.add(fin);
+  } else if (head.crest === 'griffin') {
+    const neck = new THREE.Mesh(new THREE.TorusGeometry(1.5 * r, 0.12 * r, 8, 20, Math.PI * 0.7), bronze);
+    neck.position.y = 0.05 * r;
+    neck.rotation.z = Math.PI * 0.2;
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.16 * r, 0.5 * r, 8), bronze);
+    beak.position.set(1.05 * r, 1.25 * r, 0);
+    beak.rotation.z = -Math.PI * 0.62;
+    group.add(neck, beak);
+  }
   const plume = surface(head.plume ?? 0xb81d22, { roughness: 0.9 });
-  for (let feather = 0; feather < 9; feather += 1) {
+  for (let feather = 0; feather < (head.crest === 'fin' ? 0 : head.crest === 'griffin' ? 5 : 9); feather += 1) {
     const angle = 0.25 + (feather / 8) * (Math.PI - 0.5);
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.2 * r, 1.3 * r, 0.06 * r), plume);
     blade.position.set(Math.cos(angle) * 1.75 * r, 0.05 * r + Math.sin(angle) * 1.75 * r, 0);

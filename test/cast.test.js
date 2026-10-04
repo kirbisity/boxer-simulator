@@ -15,19 +15,21 @@ test('every style has a character, dressed for it; the knight and samurai wear t
   }
 });
 
-test('a team-mate is the lead again, a little different', () => {
+test('a team-mate is the lead again, a little different, his armour in another design', () => {
   const random = seededRandom(5);
   const lead = PRESETS.samurai;
   const mates = Array.from({ length: 12 }, () => varyCharacter(lead, random));
   for (const mate of mates) {
     assert.equal(mate.style, lead.style);
     assert.equal(mate.outfit.kind, lead.outfit.kind);
-    assert.equal(mate.outfit.design, lead.outfit.design);
+    // The same armour, in any of its designs: designs shuffle in the game.
+    assert.ok(mate.outfit.design >= 0 && mate.outfit.design < 5);
     assert.deepEqual(mate.accessories, lead.accessories);
     assert.ok(Math.abs(mate.heightCm - lead.heightCm) <= 20);
   }
   assert.ok(new Set(mates.map((mate) => mate.sex)).size === 2, 'some are the other sex');
   assert.ok(new Set(mates.map((mate) => mate.heightCm)).size > 3, 'builds differ');
+  assert.ok(new Set(mates.map((mate) => mate.outfit.design)).size > 2, 'designs shuffle');
 });
 
 test('the dice make anyone at all', () => {

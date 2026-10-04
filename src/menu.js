@@ -5,7 +5,7 @@
 // the starting, through the hooks it hands over).
 
 import { normaliseInputs, PRESETS } from './body.js';
-import { randomBoxer, randomCharacter, randomGladiator, weightOf } from './cast.js';
+import { randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
 import { HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
 import { SCENARIOS } from './scenarios.js';
@@ -159,8 +159,9 @@ export function installMenus(game) {
       columns.append(el('section', { className: `side ${corner}` }, el('h2', { textContent: corner === 'red' ? 'Red' : 'Blue' }), grid));
     }
     fightButton.onclick = () => {
-      const red = custom.red ?? normaliseInputs(structuredClone(PRESETS[picks.red]));
-      const blue = custom.blue ?? normaliseInputs(structuredClone(PRESETS[picks.blue]));
+      // A character in armour comes in one of its picked designs.
+      const red = custom.red ?? normaliseInputs(redress(structuredClone(PRESETS[picks.red])));
+      const blue = custom.blue ?? normaliseInputs(redress(structuredClone(PRESETS[picks.blue])));
       const armed = [red, blue].some((inputs) => STYLES[inputs.style]?.weapon);
       close();
       const fight = () => game.match({ red: [red], blue: [blue], place: armed ? 'colosseum' : 'ring', game: 'versus', label: 'Deadliest Warrior', next: { text: 'Rematch', run: fight } });

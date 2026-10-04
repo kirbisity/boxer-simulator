@@ -1319,7 +1319,7 @@ function paintBody(mesh, body, look, corner) {
       colors.set([color.r, color.g, color.b], vertex * 3);
     });
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
-    mesh.steelMask = mesh.regions.map((region) => region === 'steel' || region === 'steel2' || region === 'gold');
+    mesh.steelMask = mesh.regions.map((region) => region === 'steel' || region === 'steel2' || region === 'gold' || region === 'mail' || region === 'mail2');
     return colors;
   }
   const hipY = bindPoints[P.pelvis][1];
@@ -1434,7 +1434,7 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
   // Lacquered lamellar is glossy paint over steel: its colour shows, not only reflections.
   const dressLook = dressFor(body.inputs, corner);
-  const lacquer = dressLook.armor?.kind === 'lamellar' ? { metalness: 0.45, roughness: 0.3 } : {};
+  const lacquer = dressLook.armor?.kind === 'lamellar' || dressLook.armor?.kind === 'okegawa' ? { metalness: 0.45, roughness: 0.3 } : {};
   const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
   let steelMesh = null;
   if (steelIndices.length) {
@@ -1849,7 +1849,7 @@ function coveredBones(body) {
   // fighters keep their thighs visible when BMI is low.
   const dress = dressFor(body.inputs, 0);
   // A hoplomachus fights bare-chested: his armour is an arm and two greaves.
-  const covering = dress.armor && dress.armor.kind !== 'hoplomachus' ? dress.armor : null;
+  const covering = dress.armor && !['hoplomachus', 'murmillo', 'secutor', 'retiarius', 'thraex'].includes(dress.armor.kind) ? dress.armor : null;
   const names = [];
   if (dress.bottom) names.push('pelvis');
   if (dress.top || covering) names.push('pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle');
