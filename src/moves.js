@@ -33,6 +33,9 @@ export const MOVES = {
   // the target, tracking it, and the round goes at `fireAt` down the
   // barrel's line as it really is then; the arm comes back down after.
   shoot: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.34, quickFireAt: 0.12, extendUntil: 0.42, duration: 0.62, twist: -0.25, shift: 0.02, cost: 0.003, mass: { arm: 0.3 }, rotation: 0.5, zones: ['body', 'head', 'legs'], reach: 'gun' },
+  // Loosing an arrow (path 'aim', the bow's): the bow arm up on the mark,
+  // the string drawn to the cheek, and loosed; quicker from a bow held up.
+  loose: { kind: 'strike', limb: 'lHand', path: 'aim', windup: 0.5, fireAt: 0.62, quickFireAt: 0.5, extendUntil: 0.75, duration: 0.95, twist: -0.1, shift: 0, cost: 0.006, mass: { arm: 0.2 }, rotation: 0.3, zones: ['body', 'head', 'legs'], reach: 'gun' },
   // Weapon moves (path 'blade'): the main hand and the blade follow a path
   // from `from` to `to` (hand in heights, local; dir where the weapon points),
   // bent through the aim; `grip` says whether both hands hold it. A thrust
@@ -432,6 +435,73 @@ export const STYLES = {
     headMovement: 0.1,
     plans: { outboxer: 1.5, counter: 1.2, pressure: 0.6, brawler: 0.3 },
     pressure: 0.05,
+  },
+  // The bow: side-on, keeps away, draws and looses; drops the bow for his
+  // sidearm (or his fists) once a man is on him.
+  bow: {
+    label: 'Bow', weapon: 'bow', fallback: 'mix',
+    ranged: { flee: 3.2, rest: 1, runFor: 1.5, standFor: 1.6, close: 1.5, shotSeconds: 0.7, headShare: 0.2, between: [0.5, 0.8], move: 'loose' },
+    cadence: { work: 1.3, move: 0.7, burst: 0.4, mobility: 0.5 },
+    stance: { blade: 0.75, crouch: 0.03, width: 1.12, lean: 0.04, guardHeight: -0.02 },
+    // The bow low in the left hand, the stave upright.
+    weaponGuard: { hand: [0.16, 0.55, 0.14], dir: [0.15, 1, 0] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { loose: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.45,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
+  // Sidearms, fought with alone once the main weapon is gone (hidden: not chosen).
+  dagger: {
+    label: 'Dagger', hidden: true, weapon: 'dagger', fallback: 'mix',
+    cadence: { work: 1.6, move: 0.5, burst: 0.9, mobility: 0.6 },
+    stance: { blade: 0.35, crouch: 0.05, width: 1.05, lean: 0.14, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.2, 0.6, -0.09], dir: [1, 0.25, 0.1] },
+    idle: { bounce: 0.5, sway: 1, rock: 0.4 },
+    attacks: { stab: 0.4, upStab: 0.25, highStab: 0.15, jab: 0.1, hook: 0.1 },
+    combos: { 'stab stab': 0.4, 'jab stab': 0.3, 'stab upStab': 0.3 },
+    comboChance: 0.55,
+    tempo: 0.8,
+    defences: { stepBack: 0.35, guard: 0.35, parry: 0.3 },
+    defendChance: 0.45,
+    headMovement: 0.3,
+    plans: { pressure: 2, brawler: 1.4, outboxer: 0.3, counter: 0.4 },
+    pressure: 0.5,
+  },
+  shortSword: {
+    label: 'Short sword', hidden: true, weapon: 'shortSword', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.8, burst: 0.6, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.05, width: 1.1, lean: 0.1, guardHeight: 0 },
+    weaponGuard: { hand: [0.12, 0.6, -0.1], dir: [1, 0.25, 0.05] },
+    idle: { bounce: 0.3, sway: 0.6, rock: 0.3 },
+    attacks: { gladiusThrust: 0.5, gladiusCut: 0.5 },
+    combos: { 'gladiusCut gladiusThrust': 0.6, 'gladiusThrust gladiusCut': 0.4 },
+    comboChance: 0.4,
+    tempo: 1.2,
+    defences: { weaponBlock: 0.6, stepBack: 0.4 },
+    defendChance: 0.65,
+    headMovement: 0.1,
+    plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
+    pressure: 0.2,
+  },
+  wakizashi: {
+    label: 'Wakizashi', hidden: true, weapon: 'wakizashi', fallback: 'mix',
+    cadence: { work: 1.3, move: 0.7, burst: 0.7, mobility: 0.55 },
+    stance: { blade: 0.3, crouch: 0.05, width: 1.1, lean: 0.06, guardHeight: 0 },
+    weaponGuard: { hand: [0.16, 0.62, -0.06], dir: [0.6, 0.8, 0.05] },
+    idle: { bounce: 0.2, sway: 0.4, rock: 0.2 },
+    attacks: { gladiusCut: 0.55, gladiusThrust: 0.25, forehand: 0.2 },
+    combos: { 'gladiusCut forehand': 0.5, 'forehand gladiusThrust': 0.5 },
+    comboChance: 0.45,
+    tempo: 1.1,
+    defences: { weaponBlock: 0.65, stepBack: 0.35 },
+    defendChance: 0.7,
+    headMovement: 0.1,
+    plans: { counter: 1.3, outboxer: 1, pressure: 0.9, brawler: 0.4 },
+    pressure: 0.1,
   },
   gladius: {
     label: 'Gladius and parma', hidden: true, weapon: 'gladius', shield: 'parma', fallback: 'mix',

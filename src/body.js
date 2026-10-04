@@ -169,6 +169,12 @@ export const PRESETS = {
     outfit: { kind: 'business', design: 0 },
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
   },
+  // An archer: the bow, side-on and keeping away; the wakizashi when closed with.
+  bow: {
+    name: 'Nasu no Yoichi', style: 'bow', sex: 'male', heightCm: 168, frame: 'medium', age: 24, exercise: 0.7, calories: 3200,
+    outfit: { kind: 'samurai', design: 2 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,

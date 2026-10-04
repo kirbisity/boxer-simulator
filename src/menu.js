@@ -70,6 +70,46 @@ function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
     el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), el('span', { textContent: text })));
 }
 
+// Deadliest Warrior: every style and every kind of armour, each a named
+// warrior. Built once, from the characters and the armour kinds.
+const preset = (style) => Object.values(PRESETS).find((entry) => entry.style === style);
+const warrior = (key, title, base, changes = {}) => {
+  const inputs = normaliseInputs(structuredClone({ ...base, ...changes, outfit: changes.outfit ?? base.outfit }));
+  const style = STYLES[inputs.style];
+  const armour = OUTFITS[inputs.outfit?.kind]?.label ?? '';
+  return { key, title, inputs, line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
+};
+const WARRIORS = [
+  warrior('plate', 'Sir Edric', PRESETS.knight),
+  warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
+  warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
+  warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
+  warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
+  warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
+  warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
+  warrior('archer', 'Nasu no Yoichi', PRESETS.bow),
+  warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
+  warrior('ashigaruSpear', 'Gonbei', PRESETS.spear, { name: 'Gonbei', outfit: { kind: 'ashigaru', design: 0 }, accessories: [] }),
+  warrior('ashigaruBow', 'Sakuzaemon', PRESETS.spear, { name: 'Sakuzaemon', style: 'bow', outfit: { kind: 'ashigaru', design: 1 }, accessories: [] }),
+  warrior('hoplomachus', 'Priscus', PRESETS.hoplomachus),
+  warrior('murmillo', 'Verus', PRESETS.hoplomachus, { name: 'Verus', style: 'gladius', outfit: { kind: 'murmillo', design: 0 } }),
+  warrior('secutor', 'Flamma', PRESETS.hoplomachus, { name: 'Flamma', style: 'gladius', outfit: { kind: 'secutor', design: 2 } }),
+  warrior('thraex', 'Spiculus', PRESETS.hoplomachus, { name: 'Spiculus', style: 'gladius', outfit: { kind: 'thraex', design: 1 } }),
+  warrior('retiarius', 'Nereus', PRESETS.hoplomachus, { name: 'Nereus', style: 'spear', outfit: { kind: 'retiarius', design: 3 } }),
+  warrior('peasant', 'Hob Miller', PRESETS.spear),
+  warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
+  warrior('baton', 'Officer Reyes', PRESETS.baton),
+  warrior('knife', 'Ryo Kanda', PRESETS.knife),
+  warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),
+  warrior('kickboxer', 'Leo Quickhands', PRESETS.light),
+  warrior('muayThai', preset('muayThai')?.name ?? 'Muay Thai', preset('muayThai') ?? PRESETS.light, { style: 'muayThai' }),
+  warrior('street', preset('street').name, preset('street')),
+  warrior('sumo', preset('sumo').name, preset('sumo')),
+  warrior('brawler', 'Hank Doyle', PRESETS.clinchBrawl),
+  warrior('mix', preset('mix').name, preset('mix')),
+  warrior('unskilled', preset('unskilled').name, preset('unskilled')),
+];
+
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
   const show = (id) => {
@@ -121,54 +161,78 @@ export function installMenus(game) {
     const body = screen('levels-screen', 'Levels', 'Set fights in set places, with their own people.', home);
     body.append(el('div', { className: 'choices levels' }, ...Object.entries(SCENARIOS).map(([key, level]) => {
       const who = level.roster ?? level.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg ? `${fighter.weightKg} kg` : `${Math.round(fighter.bodyFat * 100)}% fat`}`).join(' — ');
-      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
+      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
     })));
     show('levels-screen');
   }
 
   // ---- Deadliest Warrior -------------------------------------------------------
   function versus() {
-    const picks = { red: 'knight', blue: 'samurai' };
+    const at = { red: 0, blue: 1 };
     const custom = { red: null, blue: null };
-    const body = screen('versus', 'Deadliest Warrior', 'Pick one for each side. Who would win?', home);
-    const columns = el('div', { className: 'versus-columns' });
-    const fightButton = el('button', { className: 'primary big', type: 'button', textContent: 'Fight' });
-    const label = el('p', { className: 'matchup' });
-    const nameOf = (corner) => (custom[corner] ?? PRESETS[picks[corner]]).name;
-    const refresh = () => {
-      label.textContent = `${nameOf('red')}  vs  ${nameOf('blue')}`;
-      for (const card of columns.querySelectorAll('.pick')) card.classList.toggle('chosen', !custom[card.dataset.corner] && card.dataset.key === picks[card.dataset.corner]);
-      for (const card of columns.querySelectorAll('.pick.own')) card.classList.toggle('chosen', Boolean(custom[card.dataset.corner]));
-    };
+    const body = screen('versus', 'Deadliest Warrior', null, home);
+    body.parentElement.classList.add('dw');
+    const entry = (corner) => custom[corner] ?? WARRIORS[at[corner]];
+    const sides = {};
     for (const corner of ['red', 'blue']) {
-      const grid = el('div', { className: 'pick-grid' });
-      for (const [key, preset] of Object.entries(PRESETS)) {
-        const style = STYLES[preset.style];
-        const card = el('button', { className: 'pick', type: 'button', onclick: () => { picks[corner] = key; custom[corner] = null; refresh(); } },
-          el('span', { className: 'glyph', textContent: OUTFIT_GLYPH[preset.outfit?.kind ?? 'boxing'] ?? '🥊' }),
-          el('b', { textContent: preset.name }),
-          el('span', { textContent: styleName(style) }));
-        card.dataset.corner = corner;
-        card.dataset.key = key;
-        grid.append(card);
-      }
-      const own = el('button', { className: 'pick own', type: 'button', onclick: () => wizard({ event: 'any', start: randomCharacter(), finish: 'Use this fighter', onDone: (inputs) => { custom[corner] = inputs; game.attract(); show('versus'); refresh(); }, onBack: () => show('versus') }) },
-        el('span', { className: 'glyph', textContent: '🛠️' }), el('b', { textContent: 'Make one' }), el('span', { textContent: 'Your own fighter' }));
-      own.dataset.corner = corner;
-      grid.append(own);
-      columns.append(el('section', { className: `side ${corner}` }, el('h2', { textContent: corner === 'red' ? 'Red' : 'Blue' }), grid));
+      const stage = el('div', { className: 'dw-stage' });
+      const title = el('div', { className: 'dw-name' });
+      const prev = el('button', { className: 'dw-arrow prev', type: 'button', ariaLabel: 'Previous', textContent: '‹', onclick: () => turn(corner, -1) });
+      const next = el('button', { className: 'dw-arrow next', type: 'button', ariaLabel: 'Next', textContent: '›', onclick: () => turn(corner, 1) });
+      const own = el('button', { className: 'dw-own', type: 'button', textContent: '✎ Make your own', onclick: () => wizard({ event: 'any', start: randomCharacter(), finish: 'Use this fighter', onDone: (inputs) => { custom[corner] = { key: `custom-${corner}-${Date.now()}`, title: inputs.name, line: styleName(STYLES[inputs.style]), inputs }; game.attract(); show('versus'); draw(corner); }, onBack: () => show('versus') }) });
+      const cards = WARRIORS.map((warrior, index) => {
+        const image = el('img', { alt: '', draggable: false });
+        const card = el('button', { className: 'dw-card', type: 'button', tabIndex: -1, onclick: () => { const offset = index - at[corner]; if (offset) turn(corner, offset); } }, image);
+        card.dataset.index = String(index);
+        stage.append(card);
+        return { card, image, warrior };
+      });
+      // Swipe across the stage to turn it.
+      let downAt = null;
+      stage.addEventListener('pointerdown', (press) => { downAt = press.clientX; });
+      stage.addEventListener('pointerup', (lift) => {
+        if (downAt === null) return;
+        const moved = lift.clientX - downAt;
+        downAt = null;
+        if (Math.abs(moved) > 36) turn(corner, moved < 0 ? 1 : -1);
+      });
+      const section = el('section', { className: `dw-side ${corner}` }, el('span', { className: 'dw-corner', textContent: corner === 'red' ? 'RED' : 'BLUE' }), prev, stage, next, title, own);
+      sides[corner] = { section, cards, title };
     }
+    function turn(corner, by) {
+      custom[corner] = null;
+      at[corner] = (at[corner] + by + WARRIORS.length) % WARRIORS.length;
+      draw(corner);
+    }
+    function draw(corner) {
+      const side = sides[corner];
+      const count = WARRIORS.length;
+      for (const { card, image, warrior } of side.cards) {
+        let offset = Number(card.dataset.index) - at[corner];
+        if (offset > count / 2) offset -= count;
+        if (offset < -count / 2) offset += count;
+        // The chosen in the middle; the next two coming in on the right, smaller and turned; one behind on the left.
+        card.dataset.slot = String(Math.max(-2, Math.min(3, offset)));
+        card.classList.toggle('chosen', offset === 0 && !custom[corner]);
+        if (offset >= -1 && offset <= 2 && !image.src) game.portrait(warrior.key, warrior.inputs).then((url) => { image.src = url; });
+      }
+      const shown = entry(corner);
+      side.title.replaceChildren(el('b', { textContent: shown.title }), el('span', { textContent: shown.line }));
+      if (custom[corner]) side.title.prepend(el('em', { textContent: 'Your fighter' }));
+    }
+    const fightButton = el('button', { className: 'primary big dw-fight', type: 'button', textContent: 'Fight' });
     fightButton.onclick = () => {
       // A character in armour comes in one of its picked designs.
-      const red = custom.red ?? normaliseInputs(redress(structuredClone(PRESETS[picks.red])));
-      const blue = custom.blue ?? normaliseInputs(redress(structuredClone(PRESETS[picks.blue])));
+      const red = normaliseInputs(redress(structuredClone(entry('red').inputs)));
+      const blue = normaliseInputs(redress(structuredClone(entry('blue').inputs)));
       const armed = [red, blue].some((inputs) => STYLES[inputs.style]?.weapon);
       close();
       const fight = () => game.match({ red: [red], blue: [blue], place: armed ? 'colosseum' : 'ring', game: 'versus', label: 'Deadliest Warrior', next: { text: 'Rematch', run: fight } });
       fight();
     };
-    body.append(columns, el('div', { className: 'versus-foot' }, label, fightButton));
-    refresh();
+    body.append(sides.red.section, el('div', { className: 'dw-middle' }, el('span', { className: 'dw-vs', textContent: 'VS' }), fightButton), sides.blue.section);
+    draw('red');
+    draw('blue');
     show('versus');
   }
 

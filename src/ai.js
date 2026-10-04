@@ -225,7 +225,7 @@ function chooseFocus(world, fighter) {
   for (let index = fighter.aiEventCursor ?? 0; index < events.length; index += 1) {
     const event = events[index];
     surge(fighter, event);
-    if (event.kind !== 'landed' && event.kind !== 'blocked' && event.kind !== 'shot') continue;
+    if (event.kind !== 'landed' && event.kind !== 'blocked' && event.kind !== 'shot' && event.kind !== 'arrow') continue;
     feel(world, fighter, event);
     if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) {
       hitBy = event.attacker;
@@ -621,7 +621,7 @@ function surge(fighter, event) {
   const putDown = event.kind === 'knockout' || ((event.kind === 'landed' || event.kind === 'blocked') && event.effects?.some((effect) => effect.startsWith('knockdown')));
   if (putDown && event.attacker === fighter.id) rise = spec.knockdown;
   if (event.defender === fighter.id && fighter.state === 'up') {
-    const severity = event.kind === 'shot' ? (event.harm ?? 0) * 2 : event.kind === 'landed' && event.target === 'head' ? (event.harmDeltaV ?? event.headDeltaV ?? 0) / chinNow(fighter) : 0;
+    const severity = event.kind === 'shot' || event.kind === 'arrow' ? (event.harm ?? 0) * 2 : event.kind === 'landed' && event.target === 'head' ? (event.harmDeltaV ?? event.headDeltaV ?? 0) / chinNow(fighter) : 0;
     if (severity > spec.hardFrom) rise = Math.max(rise, spec.hardHit * Math.min(2, severity - spec.hardFrom + 0.5));
   }
   if (event.kind === 'staggered' && event.fighter === fighter.id) rise = Math.max(rise, spec.hardHit);
@@ -741,7 +741,7 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   if (fighter.punch || fighter.cooldown > 0) return;
   if (teamSpacing(world, fighter, opponent).blocked) return;
   const zone = world.random() < gun.headShare ? 'head' : 'body';
-  if (throwPunch(world, fighter, 'shoot', zone)) {
+  if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
     // From the stance the gun is already up: the shot goes as soon as the sights settle.
     fighter.punch.quick = true;
     fighter.cooldown = gun.between[0] + world.random() * gun.between[1];

@@ -26,7 +26,12 @@ export function dressFor(inputs, cornerHex) {
   const top = look.top && (!look.top.female || female) ? { ...look.top, color: color(chosen.top ?? look.top.color) } : null;
   const bottom = look.bottom ? { ...look.bottom, color: color(chosen.bottom ?? look.bottom.color) } : null;
   const feet = (female && look.femaleFeet) || look.feet || { kind: 'bare' };
-  return { kind, design, look, top, bottom, armor: look.armor, feet, head: look.head, extras: look.extras ?? [], tattoo: look.tattoo, female, color };
+  // A side's colours over any design (`tint`: the armour's lacquer and
+  // lacing, the helmet), and a banner on the back (sashimono).
+  const tint = inputs.outfit?.tint;
+  const armor = look.armor && tint ? { ...look.armor, color: tint.armor ?? look.armor.color, lace: tint.lace ?? look.armor.lace } : look.armor;
+  const head = look.head && tint?.armor ? { ...look.head, color: tint.armor, lace: tint.lace ?? look.head.lace } : look.head;
+  return { kind, design, look, top, bottom, armor, feet, head, extras: look.extras ?? [], tattoo: look.tattoo, female, color, banner: inputs.outfit?.banner ?? null };
 }
 
 /** The colour of each role the body mesh is painted with, for this dress. */
@@ -802,6 +807,33 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
  * Lettering across the back of the armour ("SWAT"), on the chest bone's
  * frame at the neck: x forward, y up the spine, z to the left.
  */
+/**
+ * A sashimono: the side's banner on a pole up the back, standing clear of
+ * the helmet, a white disc on the field (collar coordinates: x forward, y up).
+ */
+export function buildBanner(body, colorHex) {
+  const scale = body.heightM / 1.8;
+  const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
+  const group = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, 1.0 * scale, 6), surface(0x3a2a1c));
+  pole.position.set(back, 0.25 * scale, 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 128;
+  const g = canvas.getContext('2d');
+  g.fillStyle = colorHex;
+  g.fillRect(0, 0, 64, 128);
+  g.fillStyle = '#f2eee4';
+  g.beginPath();
+  g.arc(32, 40, 17, 0, Math.PI * 2);
+  g.fill();
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.2 * scale, 0.4 * scale), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, roughness: 0.9 }));
+  flag.rotation.y = Math.PI / 2;
+  flag.position.set(back - 0.005, 0.52 * scale, 0.105 * scale);
+  group.add(pole, flag);
+  return group;
+}
+
 export function buildBackPrint(body, text, colorHex = '#e9e2c8') {
   const scale = body.heightM / 1.8;
   const canvas = document.createElement('canvas');

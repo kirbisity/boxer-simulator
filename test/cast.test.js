@@ -54,12 +54,18 @@ test('a prize fight pairs boxers in gloves, within a weight class', async () => 
   }
 });
 
-test('the rebellion: five knights against twenty simply drawn rebels with spears', async () => {
+test('the rebellion: two lords and three foot soldiers against twenty simply drawn rebels with spears', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.rebellion.cast(Math.random);
   assert.equal(cast.red.length, 5);
   assert.equal(cast.blue.length, 20);
-  assert.ok(cast.red.every((fighter) => fighter.outfit.kind === 'knight'));
+  // Two lords in full plate, three foot soldiers each with his own weapon.
+  const lords = cast.red.filter((fighter) => fighter.outfit.kind === 'knight');
+  assert.equal(lords.length, 2);
+  assert.ok(lords.every((lord) => /^(Sir|Lord) /.test(lord.name)), 'named for their rank');
+  const soldiers = cast.red.filter((fighter) => fighter.outfit.kind === 'footman');
+  assert.equal(soldiers.length, 3);
+  assert.equal(new Set(soldiers.map((soldier) => soldier.style)).size, 3, 'different weapons');
   assert.ok(cast.blue.every((fighter) => fighter.style === 'spear' && fighter.simple));
   assert.ok(new Set(cast.blue.map((fighter) => fighter.heightCm)).size > 5, 'rebels differ in build');
 });

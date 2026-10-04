@@ -180,6 +180,14 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.95, 1.21, { rivets: 3, base: 'cloth' }], skirt: [0.28, 0.35, 1.22, { rows: ['steel', 'steel2'] }],
     upperArm: [-0.2, 0.36, 1.62, 'steel'], forearm: [0.18, -0.08, 1.3, 'steel'], knee: [0.82, 1.05, 1.45, 'steel'],
   },
+  // A foot soldier's mail shirt: to the hips, sleeves to the elbow.
+  haubergeon: {
+    trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.3, 0.3, 1.14, MAIL], collar: 'mail', upperArm: [-0.3, 0.5, 1.15, MAIL],
+  },
+  // A foot soldier's breastplate and backplate, a short fauld, knee cops: nothing on the arms.
+  breastplate: {
+    trunk: [-0.04, 0.96, 1.19, 'steel'], skirt: [0.22, 0.3, 1.2, { rows: ['steel', 'steel2'] }], knee: [0.82, 1.05, 1.45, 'steel'],
+  },
   // Murmillo: belt, the manica on the sword arm, a short greave on the lead leg over a quilted wrap.
   murmillo: {
     belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },

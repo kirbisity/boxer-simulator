@@ -151,3 +151,36 @@ export function yakuza(random = Math.random, style = 'knife') {
 export function knight(random = Math.random, index = 0) {
   return varyCharacter(index % 3 === 2 ? PRESETS.warhammer : PRESETS.knight, random);
 }
+
+/**
+ * A warrior of one side at Sekigahara: a samurai (katana, naginata) in
+ * ō-yoroi or tōsei gusoku, or an ashigaru (spear, bow), lacquered in his
+ * side's colours with its banner on his back.
+ */
+export function sengokuWarrior(random = Math.random, side, style) {
+  const ashigaru = style === 'spear' || style === 'bow';
+  const base = varyCharacter(ashigaru ? PRESETS.spear : PRESETS.samurai, random);
+  const kind = ashigaru ? 'ashigaru' : pickOne(['samurai', 'samuraiTosei'], random);
+  const name = `${pickOne(['Ii', 'Honda', 'Shimazu', 'Kobayakawa', 'Ōtani', 'Ukita', 'Kuroda', 'Hosokawa', 'Katō', 'Fukushima', 'Konishi', 'Sanada'], random)} ${pickOne(['Naomasa', 'Tadakatsu', 'Yoshihiro', 'Hideaki', 'Yoshitsugu', 'Hideie', 'Nagamasa', 'Tadaoki', 'Kiyomasa', 'Masanori', 'Yukimura', 'Takatora'], random)}`;
+  return normaliseInputs({
+    ...base, sex: 'male', name, style,
+    outfit: { kind, design: randomDesign(kind, random), tint: side.tint, banner: side.banner },
+    accessories: kind === 'ashigaru' ? [] : ['crest'],
+  });
+}
+
+/** A noble knight in full plate, named for his rank and house, with a long sword or a war hammer. */
+export function nobleKnight(random = Math.random, style = 'longsword') {
+  const base = varyCharacter(style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight, random);
+  const title = pickOne(['Sir', 'Sir', 'Lord'], random);
+  const house = pickOne(['de Beauchamp', 'de Courtenay', 'de Mowbray', 'Montagu', 'de Vere', 'Fitzalan', 'Percy', 'Neville', 'de Clifford', 'Holland'], random);
+  const first = pickOne(['Thomas', 'John', 'William', 'Hugh', 'Robert', 'Richard', 'Ralph', 'Guy', 'Henry', 'Walter'], random);
+  return normaliseInputs({ ...base, sex: 'male', name: `${title} ${first} ${house}`, style, outfit: { kind: 'knight', design: randomDesign('knight', random) }, accessories: ['plume'] });
+}
+
+/** A foot soldier in whatever armour he has, with a spear, a bow, a long sword or a war hammer. */
+export function footSoldier(random = Math.random, style = 'spear') {
+  const base = varyCharacter(PRESETS.contender, random);
+  const name = `${pickOne(['Will', 'Tom', 'Jack', 'Rob', 'Hal', 'Ned', 'Wat', 'Dick'], random)} ${pickOne(['Archer', 'Baker', 'Cotton', 'Fowler', 'Mason', 'Ward', 'Turner', 'Webb'], random)}`;
+  return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'footman', design: randomDesign('footman', random) }, accessories: [] });
+}

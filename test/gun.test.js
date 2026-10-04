@@ -4,7 +4,7 @@ import { FRAMES, normaliseInputs, PRESETS } from '../src/body.js';
 import { caloriesForWeight } from '../src/physiology.js';
 import { AI, thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld, placeFighter, throwPunch, WORLD } from '../src/physics.js';
-import { GUN } from '../src/weapons.js';
+import { ARROW, GUN } from '../src/weapons.js';
 import { scenarioWorld } from '../src/scenarios.js';
 
 const man = (kg, outfit = null) => {
@@ -148,4 +148,42 @@ test('recoil: the same kick rocks a light shooter more than a heavy one', () => 
   const light = kick({ sex: 'female', heightCm: 160, calories: 2000, exercise: 0.3 });
   const heavy = kick({ heightCm: 192, frame: 'large', calories: 5200, exercise: 0.7 });
   assert.ok(light > heavy * 1.15, `hand kick ${light.toFixed(2)} v ${heavy.toFixed(2)} m/s`);
+});
+
+test('sidearms: a disarmed samurai draws his wakizashi, a knight his dagger, once', async () => {
+  const { dropWeapon } = await import('../src/physics.js');
+  const world = createWorld([{ ...PRESETS.samurai }, { ...PRESETS.knight }], { seed: 1 });
+  advance(world, 0.5);
+  const [samurai, knight] = world.fighters;
+  dropWeapon(world, samurai, 'disarmed');
+  dropWeapon(world, knight, 'disarmed');
+  assert.equal(samurai.weapon?.kind, 'wakizashi');
+  assert.equal(knight.weapon?.kind, 'dagger');
+  dropWeapon(world, samurai, 'disarmed');
+  assert.equal(samurai.weapon, null, 'only one sidearm');
+  assert.equal(samurai.mixed, 'mix');
+});
+
+test('arrows fly, wound an unarmoured man, and mostly glance off plate', () => {
+  const shoot = (outfit) => {
+    const spread = ARROW.spread;
+    ARROW.spread = 0;
+    const world = createWorld([{ ...PRESETS.bow, outfit: { kind: 'ashigaru', design: 0 } }, man(80, outfit)], { seed: 5 });
+    const [archer, target] = world.fighters;
+    placeFighter(archer, -3, 0);
+    placeFighter(target, 3, 0);
+    target.handsDown = true;
+    advance(world, 0.5);
+    for (let shot = 0; shot < 6; shot += 1) {
+      throwPunch(world, archer, 'loose', 'body');
+      advance(world, 1.4);
+    }
+    ARROW.spread = spread;
+    const hits = world.events.filter((event) => event.kind === 'arrow');
+    return { wounds: hits.filter((event) => !event.bounced).length, glances: hits.filter((event) => event.bounced).length, target };
+  };
+  const bare = shoot(null);
+  assert.ok(bare.wounds >= 2, `${bare.wounds} wounds`);
+  const plate = shoot('knight');
+  assert.ok(plate.glances > plate.wounds, `plate: ${plate.glances} glanced, ${plate.wounds} through`);
 });

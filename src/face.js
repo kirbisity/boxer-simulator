@@ -621,12 +621,13 @@ function buildFacialHair(group, look, r, shape, material) {
     // Thick over the lip and down past the corners of the mouth to the jaw:
     // the horseshoe a brawler wears.
     for (const side of [1, -1]) {
-      hairLock(group, material, [[SKULL[0] * r * 0.84, -0.47 * r, 0], [SKULL[0] * r * 0.82, -0.52 * r, side * 0.14 * r], [SKULL[0] * r * 0.74, -0.62 * r, side * 0.24 * r], [SKULL[0] * r * 0.68, -0.86 * r, side * 0.27 * r]], 0.14 * r, 0.07 * r, 0.85);
+      // Proud of the drawn face (which sits further out than the skull below the eyes).
+      hairLock(group, material, [[r * 1.02, -0.44 * r, 0], [r * 1.0, -0.5 * r, side * 0.17 * r], [r * 0.92, -0.62 * r, side * 0.3 * r], [r * 0.82, -0.88 * r, side * 0.34 * r]], 0.17 * r, 0.09 * r, 0.7);
     }
   }
   if (style === 'mustache' || style === 'beard') {
     for (const side of [1, -1]) {
-      hairLock(group, material, [[SKULL[0] * r * 0.82, -0.48 * r, 0], [SKULL[0] * r * 0.8, -0.52 * r, side * 0.12 * r], [SKULL[0] * r * 0.7, -0.6 * r, side * 0.2 * r]], 0.1 * r, 0.05 * r, 0.8);
+      hairLock(group, material, [[r * 1.01, -0.45 * r, 0], [r * 0.99, -0.5 * r, side * 0.14 * r], [r * 0.9, -0.58 * r, side * 0.23 * r]], 0.12 * r, 0.06 * r, 0.8);
     }
   }
 }

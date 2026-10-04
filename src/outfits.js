@@ -47,9 +47,9 @@ function mailDesign(label, cloth, cloth2, heraldry) {
   return { label, top: { kind: 'longsleeve', color: '#5a5040' }, bottom: { kind: 'tights', color: '#4a4238' }, armor: { kind: 'mail', color: '#8d9097', mail: '#8d9097', cloth, cloth2, heraldry }, head: { kind: 'greatHelm', color: '#a7adb6' }, feet: { kind: 'compactBoot', color: '#3a2a1c' } };
 }
 
-/** A brigandine in its cloth, over a quilted coat, and a kettle hat. */
-function footmanDesign(label, cloth, quilt, hat) {
-  return { label, top: { kind: 'longsleeve', color: quilt }, bottom: { kind: 'tights', color: '#3a3326' }, armor: { kind: 'brigandine', color: '#9aa0a8', cloth, gold: '#c9a85a' }, head: { kind: 'kettleHat', color: '#9aa0a8', ...hat }, feet: { kind: 'compactBoot', color: '#3a2a1c' } };
+/** A foot soldier's body armour (brigandine, mail shirt or breastplate) in its cloth, over a quilted coat, and a kettle hat. */
+function footmanDesign(label, kind, cloth, quilt, hat) {
+  return { label, top: { kind: 'longsleeve', color: quilt }, bottom: { kind: 'tights', color: '#3a3326' }, armor: { kind, color: '#9aa0a8', cloth, gold: '#c9a85a', mail: '#8d9097' }, head: { kind: 'kettleHat', color: '#9aa0a8', ...hat }, feet: { kind: 'compactBoot', color: '#3a2a1c' } };
 }
 
 /** Tōsei gusoku in a finish, with its crest and war mask. */
@@ -162,6 +162,9 @@ export const OUTFITS = {
   },
   knight: {
     label: 'Knight — full plate',
+    // Arrows glance off it.
+    arrowproof: true,
+    sidearm: 'dagger',
     defaultHeadgear: 'plume', movement: 'limited', fists: 'gauntlet',
     headgear: ['plume'],
     palette: [['brown', 'brown'], ['wine', 'black'], ['navy', 'charcoal'], ['forest', 'brown']],
@@ -172,6 +175,8 @@ export const OUTFITS = {
     courage: 0.35,
     deflects: true,
     family: 'knight',
+    // The designs in play (picked from the five); the game shuffles among them.
+    picked: [0, 1, 2],
     designs: [
       // The gothic shape — fluted plate, pointed bascinet — in bright polished steel.
       { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true }, feet: { kind: 'sabaton', color: '#b7bcc4' } },
@@ -186,6 +191,8 @@ export const OUTFITS = {
   // against a blow; lighter than plate, and an edge bites rather than glances.
   knightMail: {
     label: 'Knight — mail and great helm', family: 'knight', movement: 'good', fists: 'gauntlet',
+    sidearm: 'shortSword',
+    picked: [0, 1, 2, 3],
     extraMass: 0.3,
     protection: { blunt: 0.45, cut: 0.85, pierce: 0.5, bullet: { head: 0.4, torso: 0.25, limb: 0.2 } },
     courage: 0.3,
@@ -197,26 +204,31 @@ export const OUTFITS = {
       mailDesign('Chief', '#2f5a3a', '#e8e2d2', 'chief'),
     ],
   },
-  // A foot soldier: a brigandine (plates riveted inside cloth) over a quilted
-  // coat, spaulders, vambraces, knee cops and a kettle hat. Limited cover,
-  // light enough to march in.
+  // A foot soldier: whatever he could get — a brigandine (plates riveted
+  // inside cloth), a mail shirt, or a breastplate — over a quilted coat,
+  // and a kettle hat. Never full cover; light enough to march in.
   footman: {
-    label: 'Foot soldier — brigandine', family: 'knight', movement: 'good', fists: 'bare',
+    label: 'Foot soldier', family: 'knight', movement: 'good', fists: 'bare',
+    sidearm: 'shortSword',
     extraMass: 0.22,
     protection: { blunt: 0.5, cut: 0.75, pierce: 0.6, bullet: { head: 0.35, torso: 0.35, limb: 0.1 } },
     courage: 0.25,
     designs: [
-      footmanDesign('Red velvet', '#7a1a22', '#c8b48a', { brim: 1.9 }),
-      footmanDesign('Blue', '#1f2f5a', '#b8a888', { brim: 1.75, tall: true }),
-      footmanDesign('Green', '#24402c', '#c8b48a', { brim: 2.0, coif: true }),
-      footmanDesign('Brown leather', '#5a3a22', '#a89070', { brim: 1.8 }),
-      footmanDesign('Black', '#1c1c20', '#8a7a60', { brim: 1.85, tall: true, coif: true }),
+      footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { brim: 1.9 }),
+      footmanDesign('Brigandine, blue', 'brigandine', '#1f2f5a', '#b8a888', { brim: 1.75, tall: true }),
+      footmanDesign('Mail shirt', 'haubergeon', '#5a4a30', '#b8a888', { brim: 2.0, coif: true }),
+      footmanDesign('Breastplate', 'breastplate', '#6a1e22', '#a89070', { brim: 1.8, tall: true }),
+      footmanDesign('Brigandine, black', 'brigandine', '#1c1c20', '#8a7a60', { brim: 1.85, tall: true, coif: true }),
     ],
   },
   // Lamellar: small lacquered steel scales laced in rows, in red. Proof
   // against most cuts, good against points; lighter than plate.
   samurai: {
     label: 'Samurai — ō-yoroi', family: 'samurai', movement: 'good', fists: 'bare',
+    // Arrows glance off it.
+    arrowproof: true,
+    sidearm: 'wakizashi',
+    picked: [0, 1, 2, 3],
     headgear: ['crest'],
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
@@ -236,6 +248,9 @@ export const OUTFITS = {
   // than ō-yoroi against points and bullets, and heavier.
   samuraiTosei: {
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
+    // Arrows glance off it.
+    arrowproof: true,
+    sidearm: 'wakizashi',
     headgear: ['crest'],
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
@@ -254,6 +269,8 @@ export const OUTFITS = {
   // cloth sleeves, the jingasa hat; less protection, lighter, quicker.
   ashigaru: {
     label: 'Ashigaru', family: 'samurai', movement: 'good', fists: 'bare',
+    sidearm: 'wakizashi',
+    picked: [0, 1, 2],
     extraMass: 0.2,
     protection: { blunt: 0.5, cut: 0.7, pierce: 0.55, bullet: { head: 0.2, torso: 0.25, limb: 0.05 } },
     courage: 0.2,
@@ -408,6 +425,9 @@ export function gearTraits(inputs) {
     deflects: Boolean(spec.deflects),
     // Courage from good armour: less fear, readier to close (0 to 1).
     courage: spec.courage ?? 0,
+    // A second weapon carried with this kit (a style key), drawn once when the first is lost.
+    sidearm: spec.sidearm ?? null,
+    arrowproof: Boolean(spec.arrowproof),
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },
   };
 }

@@ -10,7 +10,7 @@ import { caloriesForWeight } from './physiology.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, bulletRegion, GUN, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc, slerpDir } from './weapons.js';
+import { ARROW, BLADES, bulletRegion, GUN, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc, slerpDir } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 
 export const WORLD = {
@@ -407,8 +407,13 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   if (fighter.punch?.spec.path === 'blade' || fighter.punch?.spec.path === 'aim') fighter.punch = null;
   world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
   if (fighter.state === 'out') return;
-  // A backup weapon if he carries one (the hoplomachus's gladius); else he fights mixed.
-  const next = STYLES[fighter.style]?.fallback ?? 'mix';
+  // A backup weapon if he carries one: the hoplomachus's gladius, or his
+  // kit's sidearm (a knight's dagger, a samurai's wakizashi), drawn once;
+  // else he fights mixed.
+  const sidearm = !fighter.sidearmDrawn && fighter.body.gear.sidearm !== weapon.kind ? fighter.body.gear.sidearm : null;
+  const fallback = STYLES[fighter.style]?.fallback;
+  const next = fallback && fallback !== 'mix' ? fallback : sidearm ?? fallback ?? 'mix';
+  if (next === sidearm) fighter.sidearmDrawn = true;
   fighter.weapon = null;
   if (fighter.state === 'down') {
     // Down, he draws the next weapon (if any) as he gets up.
@@ -538,12 +543,135 @@ function sightsOn(fighter) {
   return vec.dot(toMark, weapon.dir) > Math.cos(GUN.settled);
 }
 
+// ---- Bows -------------------------------------------------------------------------
+
+/**
+ * The bow up on the mark: the stave upright across the line of the arrow,
+ * the string hand drawing back to the cheek as the shot comes (`draw` 0..1,
+ * kept on the weapon for the drawing of the string).
+ */
+function drawBow(world, fighter, punch, target, intent) {
+  const weapon = fighter.weapon;
+  const mark = punch?.aim ?? (world.fighters[fighter.aimAt] ? toLocal(fighter, aimPoint(world.fighters[fighter.aimAt], 'body')) : null);
+  if (!mark) return target;
+  const shoulder = toLocal(fighter, point(fighter.x, P[`${weapon.main}Shoulder`]));
+  const along = vec.normalize(vec.sub(mark, shoulder));
+  const smooth = (value) => value * value * (3 - 2 * value);
+  const drawing = punch?.spec.path === 'aim' ? (punch.fired ? 0 : smooth(Math.min(1, punch.t / (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt)))) : 0.12;
+  weapon.draw = drawing;
+  weapon.facing = yawRotate(along, fighter.yaw);
+  // The string hand: from beside the grip back along the arrow to the cheek.
+  const head = toLocal(fighter, point(fighter.x, P.head));
+  const anchor = vec.add(head, [0.02, -0.07, -0.05]);
+  const rest = vec.sub(target.hand, vec.scale(along, 0.12));
+  intent[`${weapon.off}Hand`] = vec.lerp(rest, anchor, drawing);
+  // The stave across the line: upright, canted a little.
+  const up = vec.normalize(vec.sub([0.05, 1, 0], vec.scale(along, along[1])));
+  return { hand: target.hand, dir: up };
+}
+
+/** Loose: an arrow off the bow along the line to the mark, aimed high for the drop. */
+function loose(world, fighter) {
+  const punch = fighter.punch;
+  const weapon = fighter.weapon;
+  const grip = point(fighter.x, P[`${weapon.main}Hand`]);
+  const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(grip, yawRotate([1, 0, 0], fighter.yaw));
+  const line = vec.sub(mark, grip);
+  const distance = vec.length(line);
+  let dir = vec.normalize(line);
+  // Aimed above the mark by the drop over the distance.
+  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / ARROW.speed ** 2)));
+  dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
+  const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
+  const spread = (ARROW.spread + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1);
+  const random = world.random;
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
+  const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
+  const upward = vec.cross(across, dir);
+  dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, 0.08)), v: vec.scale(dir, ARROW.speed), age: 0, landed: false, done: false });
+  world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
+  // The bow kicks forward a little in the hand as the string goes.
+  world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
+}
+
+/** Arrows in the air: they fall, and the first thing on their path takes them. */
+function flyArrows(world, dt) {
+  for (const arrow of world.arrows) {
+    if (arrow.done) continue;
+    arrow.age += dt;
+    if (arrow.landed) {
+      if (arrow.age > ARROW.stays) arrow.done = true;
+      continue;
+    }
+    arrow.v[1] -= ARROW.gravity * dt;
+    const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
+    const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
+    if (hit) {
+      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v));
+      arrow.done = true;
+      arrow.x = hit.point;
+      continue;
+    }
+    arrow.x = to;
+    if (arrow.x[1] <= 0.02 || Math.abs(arrow.x[0]) > 60 || Math.abs(arrow.x[2]) > 60) {
+      arrow.x[1] = Math.max(0.02, arrow.x[1]);
+      arrow.landed = true;
+      arrow.age = 0;
+    }
+  }
+  // Long gone arrows are dropped from the list now and then.
+  if (world.arrows.length > 64 && world.arrows.every((arrow, index) => index > 32 || arrow.done)) world.arrows = world.arrows.filter((arrow) => !arrow.done);
+}
+
+/**
+ * An arrow strikes: off a shield, or off good armour (most of the time),
+ * it glances; otherwise a piercing wound (cut by the armour's pierce
+ * protection), scaled to the part's weight and hurt, bleeding, with a
+ * small knock; enough and he dies.
+ */
+function arrowHit(world, shooter, hit, dir) {
+  const victim = hit.fighter;
+  const event = { time: world.time, kind: 'arrow', attacker: shooter.id, defender: victim.id, point: hit.point, normal: vec.scale(dir, -1), target: hit.target, harm: 0, effects: [] };
+  world.events.push(event);
+  if (hit.target === 'shield') {
+    event.bounced = true;
+    event.effects.push('in the shield');
+    return;
+  }
+  const gear = victim.body.gear;
+  const key = hit.capsule.key;
+  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse });
+  if (gear.arrowproof && world.random() < ARROW.bounce) {
+    event.bounced = true;
+    event.effects.push('glances off the armour');
+    return;
+  }
+  const region = bulletRegion(key);
+  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : gear.protection.pierce ?? 0;
+  const own = victim.body.segments[key];
+  const reference = bulletReference()[key];
+  const scale = own && reference ? reference.mass / own.mass : 1;
+  const harm = ARROW.lethal[region] * (1 - stopped) * scale * (1 + GUN.hurtShare * (victim.damage[key] ?? 0));
+  // The same pool of deadly wounds as a gun's.
+  victim.gunshot = (victim.gunshot ?? 0) + harm;
+  victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
+  victim.damageVersion += 1;
+  victim.bleed = (victim.bleed ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
+  Object.assign(event, { harm, region, pierce: harm * 60 });
+  event.effects.push(gear.arrowproof ? `${region}: through a gap` : `${region}`);
+  shooter.stats.landed += 1;
+  if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key) && world.random() < 0.3) dropWeapon(world, victim, 'disarmed', dir);
+  if (victim.gunshot >= 1 && victim.state !== 'out') knockOut(world, victim, event, region === 'head' ? 'an arrow through the head' : 'shot down by arrows', 'killed');
+}
+
 /** Fire: a round down the barrel's line as it is, give or take the aim's error. */
 function fire(world, fighter) {
   const punch = fighter.punch;
   punch.fired = true;
   const weapon = fighter.weapon;
   if (!weapon?.held || !weapon.spec.ranged) return;
+  if (weapon.spec.bow) return loose(world, fighter);
   const handIndex = P[`${weapon.main}Hand`];
   const barrel = weapon.dir;
   const up = vec.normalize(vec.sub([0, 1, 0], vec.scale(barrel, barrel[1])));
@@ -679,8 +807,9 @@ function weaponIntent(world, fighter, intent) {
   // A pistol up and aimed is held in both hands: the support hand wraps the
   // gun hand from below and behind, its elbow bent — the Chapman triangle.
   if (weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined)) {
-    intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(SUPPORT_GRIP, H));
-  }
+    if (weapon.spec.bow) target = drawBow(world, fighter, punch, target, intent);
+    else intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(SUPPORT_GRIP, H));
+  } else if (weapon.spec.bow) weapon.draw = 0;
   if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };
   intent[`${main}Hand`] = target.hand;
   intent.bladeDir = target.dir;
@@ -878,7 +1007,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // Sides line up in rows facing each other: as many abreast as the floor
   // is wide, the rest in rows behind. The sides need not be the same size.
   // A level's `formation` per side: `front` (m from the centre to the first
-  // row), `spacing` (m apart in a row), `rowSpacing`, and `loose` (m: each
+  // row), `spacing` (m apart in a row), `rowSpacing`, `perRow`, and `loose` (m: each
   // stands up to this far off his place, a crowd rather than a rank).
   for (const corner of ['red', 'blue']) {
     const team = fighters.filter((fighter) => fighter.corner === corner);
@@ -887,7 +1016,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const spacing = order?.spacing ?? WORLD.teamSpacing;
     const rowSpacing = order?.rowSpacing ?? WORLD.teamRowSpacing;
     const front = order?.front ?? (gunFight ? apart : 1.1);
-    const perRow = Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / spacing) + 1);
+    const perRow = order?.perRow ?? Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / spacing) + 1);
     const sign = corner === 'red' ? -1 : 1;
     team.forEach((fighter, index) => {
       const row = Math.floor(index / perRow);
@@ -905,7 +1034,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   // `rules`: a level's own (noPins: a man down gets up again; nobody holds him there).
-  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], clashing: new Set(), rules };
+  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules };
 }
 
 // ---- Frames -------------------------------------------------------------
@@ -1299,6 +1428,7 @@ export function step(world, dt) {
   }
   moveProps(world, dt);
   moveDebris(world, dt);
+  if (world.arrows.length) flyArrows(world, dt);
   world.time += dt;
   world.lastDt = dt;
 }

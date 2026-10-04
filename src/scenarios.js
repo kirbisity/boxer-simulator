@@ -5,7 +5,7 @@
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
-import { knight, rebel, swatOfficer, yakuza } from './cast.js';
+import { footSoldier, nobleKnight, rebel, sengokuWarrior, swatOfficer, yakuza } from './cast.js';
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -17,16 +17,37 @@ export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
     place: 'The market square, Maidstone, Kent · June 1381',
-    blurb: 'The town has risen. Five knights ride in to put it down — and meet twenty peasants with spears in the market square.',
+    blurb: 'The town has risen. Two lords in plate and three of their foot soldiers ride in to put it down — and meet twenty peasants with spears in the market square.',
     scene: 'town',
     arena: { halfX: 9, halfZ: 7 },
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
-    roster: 'Five knights · twenty rebels with spears',
+    roster: 'Two knights and three foot soldiers · twenty rebels with spears',
     // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
     formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
-    cast: (random) => ({ red: Array.from({ length: 5 }, (_, index) => knight(random, index)), blue: Array.from({ length: 20 }, () => rebel(random)) }),
+    cast: (random) => ({
+      red: [nobleKnight(random, 'longsword'), footSoldier(random, 'spear'), nobleKnight(random, 'warhammer'), footSoldier(random, 'bow'), footSoldier(random, 'longsword')],
+      blue: Array.from({ length: 20 }, () => rebel(random)),
+    }),
+    fighters: [],
+  },
+  sekigahara: {
+    title: 'Sekigahara',
+    place: 'Sekigahara, Mino · 21 October 1600',
+    blurb: 'The battle that ends the Sengoku. Ten of the East in red against ten of the West in black and blue: spears and blades in front, bows behind.',
+    scene: 'sengoku',
+    arena: { halfX: 11, halfZ: 7 },
+    camera: { yaw: -0.5, pitch: 0.38, distance: 11, maxDistance: 13 },
+    roster: 'Ten a side: samurai with katana and naginata, ashigaru with spears and bows',
+    // Six abreast in front, the rest (the bows among them) behind.
+    formation: { red: { front: 5, spacing: 1.5, rowSpacing: 1.8, perRow: 6, loose: 0.3 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.8, perRow: 6, loose: 0.3 } },
+    cast: (random) => {
+      const order = ['spear', 'naginata', 'katana', 'spear', 'naginata', 'spear', 'katana', 'bow', 'bow', 'bow'];
+      const east = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
+      const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
+      return { red: order.map((style) => sengokuWarrior(random, east, style)), blue: order.map((style) => sengokuWarrior(random, west, style)) };
+    },
     fighters: [],
   },
   port: {
@@ -58,7 +79,7 @@ export const SCENARIOS = {
       {
         name: 'Don Frye', style: 'clinchBrawl', sex: 'male', heightCm: 185, bodyFat: 0.12, frame: 'large', age: 36, exercise: 0.82,
         outfit: { kind: 'mma', design: 0, colors: { bottom: '#16161a' } }, accessories: [],
-        look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#3a2a1c', facialHair: 'handlebar', eyeColor: 'brown', faceShape: 'seinen' },
+        look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#3a2a1c', facialHair: 'handlebar', eyeColor: 'brown', faceShape: 'seinen' },
       },
       {
         name: 'Yoshihiro Takayama', style: 'clinchBrawl', sex: 'male', heightCm: 196, bodyFat: 0.14, frame: 'large', age: 35, exercise: 0.65,

@@ -14,7 +14,7 @@ import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { buildFighterView, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
-import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateBlood, updateDebris, updateShots, updateStumps, woundBlood } from './weaponview.js';
+import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -28,6 +28,8 @@ const state = {
   views: [],
   layer: 'skin',
   speed: 1,
+  // Which side the player takes in play mode.
+  playSide: 'red',
   paused: false,
   mode: 'watch',
   aimBody: false,
@@ -156,7 +158,7 @@ function rebuildViews() {
 // ---- Loop -------------------------------------------------------------------
 
 function thinkForBout(world, dt) {
-  const players = state.mode === 'play' ? new Set([0]) : new Set();
+  const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
   thinkAll(world, dt, players);
 }
 
@@ -289,6 +291,7 @@ function drawWorld(dt) {
   }
   updateProps(scene, state.views, world);
   updateDebris(scene, world);
+  updateArrows(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
@@ -306,6 +309,7 @@ function consumeEvents() {
     if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked')) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     if (event.kind === 'shot') spawnShot(scene, event);
+    if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : woundBlood(scene, event));
     if (event.kind === 'bladeBlock') (event.cut > 1 ? woundBlood : (view, at) => spawnSparks(view, at.point, 6))(scene, event);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
@@ -372,6 +376,8 @@ function logEvent(event) {
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'loosed') return;
+  else if (event.kind === 'arrow') text = `🏹 <b>${name(event.attacker)}</b> → <b>${name(event.defender)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'shot') text = `🔫 <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'panic' || event.kind === 'rally') text = `${event.kind === 'panic' ? '😱' : '🔥'} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
   else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
@@ -410,7 +416,7 @@ function segmented(selector, onPick) {
     const button = click.target.closest('button[data-value]');
     if (!button) return;
     for (const other of group.querySelectorAll('button')) other.classList.toggle('on', other === button);
-    onPick(button.dataset.value);
+    onPick(button.dataset.value, button);
   });
 }
 
@@ -454,8 +460,9 @@ $('#place').addEventListener('change', (event) => {
   state.place = event.target.value;
   newBout();
 });
-segmented('#modes', (mode) => {
+segmented('#modes', (mode, button) => {
   state.mode = mode;
+  state.playSide = button.dataset.side ?? 'red';
   $('#pad').hidden = mode !== 'play';
   if (mode === 'play') buildPad();
   document.body.classList.toggle('playing', mode === 'play');
@@ -469,7 +476,8 @@ $('#banner-again').addEventListener('click', () => (state.next ? state.next.run(
 $('#banner-menu').addEventListener('click', () => goHome());
 $('#open-menu').addEventListener('click', () => goHome());
 
-const player = () => state.world.fighters[0];
+// The fighter the player controls: his side's lead (the side is chosen with the Play buttons).
+const player = () => state.world.fighters.find((fighter) => fighter.corner === state.playSide) ?? state.world.fighters[0];
 // Keys: punches on the right hand's home row, kicks and knees above and
 // below, defences on the left hand.
 const KEYS = {
@@ -950,6 +958,51 @@ function enterSandbox() {
   newBout();
 }
 
+// ---- Portraits: one fighter drawn alone, for the Deadliest Warrior cards ----------
+
+const portraits = new Map();
+let portraitView = null;
+let portraitQueue = Promise.resolve();
+
+/** A picture of a fighter in his guard, drawn off-screen once and kept (a data URL). */
+function portrait(key, inputs) {
+  if (portraits.has(key)) return portraits.get(key);
+  const made = (portraitQueue = portraitQueue.then(() => new Promise((done) => setTimeout(() => done(drawPortrait(inputs)), 0))));
+  portraits.set(key, made);
+  return made;
+}
+
+function drawPortrait(inputs) {
+  if (!portraitView) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 380;
+    portraitView = createScene(canvas);
+    portraitView.renderer.setPixelRatio(1);
+    resize(portraitView, 300, 380);
+    portraitView.places.ring.visible = false;
+    portraitView.scene.background = new THREE.Color(0x1a1f2c);
+    portraitView.scene.fog = null;
+  }
+  const world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed: 3 });
+  const fighter = world.fighters[0];
+  placeFighter(fighter, 0, 0);
+  fighter.yaw = -0.45;
+  advance(world, 0.7, null, STEP);
+  const view = buildFighterView(portraitView, fighter);
+  setLayer(view, 'skin');
+  updateFighterView(view, 0, world.time);
+  updateArms(portraitView, view, world.time);
+  updateProps(portraitView, [view], world);
+  Object.assign(portraitView.orbit, { distance: 2.35, pitch: 0.08, yaw: 0.15 });
+  portraitView.orbit.target.set(0, 1.0, 0);
+  placeCamera(portraitView, null);
+  render(portraitView);
+  const url = portraitView.renderer.domElement.toDataURL('image/png');
+  disposeFighterView(portraitView, view);
+  return url;
+}
+
 /** The character creator's fighter: standing alone, facing the camera, to one side of the panel. */
 function preview(inputs, event) {
   const place = event === 'boxing' ? 'ring' : 'colosseum';
@@ -987,7 +1040,7 @@ window.addEventListener('resize', fit);
 buildCornerForm('red');
 buildCornerForm('blue');
 const menus = installMenus({
-  attract, match, sandbox: enterSandbox, level: enterLevel, preview,
+  attract, match, sandbox: enterSandbox, level: enterLevel, preview, portrait,
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,

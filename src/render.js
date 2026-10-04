@@ -11,7 +11,7 @@ import { buildLoftBody, TOPS } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions } from './outfits.js';
-import { buildBackPrint, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
+import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -77,7 +77,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort };
+  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     view.scene.add(view.places[place]);
@@ -104,6 +104,8 @@ const PLACE_LIGHT = {
   meadow: { background: 0xa9cbe6, fog: [25, 70], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xc8e0ff, sun: 0.9 },
   // A bright summer noon, a clear sky with high cloud, haze in the distance.
   town: { background: 0xc4dcf2, fog: [40, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.15 },
+  // Autumn morning on an open battlefield: clear, the sun strong, haze on the hills.
+  sengoku: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
   port: { background: 0x060912, fog: [14, 48], key: 0x9fb4ff, keyIntensity: 0.85, rim: 0x5a78c0, hemi: 0.24 },
   // A dark hall, the ring alone under hard white light.
@@ -119,6 +121,7 @@ export const PLACE_ARENAS = {
   stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
   town: { halfX: 9, halfZ: 7 },
   port: { halfX: 10, halfZ: 6 },
+  sengoku: { halfX: 11, halfZ: 7 },
 };
 
 /**
@@ -601,6 +604,188 @@ function buildSubway(arena) {
 }
 
 /**
+ * A Sengoku battlefield: trampled grass between two camps, each with its
+ * white curtain (jin-maku) bearing a crest and its tall nobori banners in
+ * the side's colour; a bamboo palisade, pines, the mountains, and a castle
+ * on a far hill, under a day sky.
+ */
+function buildSengoku() {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
+  const shaded = (mesh) => {
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+  place.add(daySky());
+  // Grass in autumn, trampled to earth across the middle.
+  const field = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#7d8a4a';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 20000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${110 + shade * 70},${120 + shade * 60},${50 + shade * 30},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 5);
+    }
+    for (let index = 0; index < 60; index += 1) {
+      g.fillStyle = `rgba(110,88,58,${0.12 + Math.random() * 0.2})`;
+      g.beginPath();
+      g.ellipse(w * (0.2 + Math.random() * 0.6), h * (0.3 + Math.random() * 0.4), 20 + Math.random() * 90, 10 + Math.random() * 40, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, [5, 5]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 110), lit(0xffffff, { map: field }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  place.add(ground);
+  // Mountains and the castle on its hill, far off.
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (index / 12) * Math.PI * 2 + 0.2;
+    const mountain = new THREE.Mesh(new THREE.ConeGeometry(10 + Math.random() * 6, 9 + Math.random() * 7, 7), lit(0x6a7a88));
+    mountain.position.set(Math.cos(angle) * 46, 3, Math.sin(angle) * 44);
+    place.add(mountain);
+  }
+  const castle = new THREE.Group();
+  const hill = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x5f7040));
+  hill.scale.y = 0.45;
+  castle.add(hill);
+  const white = lit(0xece6d6);
+  const roof = lit(0x30343a);
+  [[6, 2.2, 4.1], [4.6, 1.8, 6.3], [3.2, 1.6, 8.2]].forEach(([size, tall, at]) => {
+    const storey = new THREE.Mesh(new THREE.BoxGeometry(size, tall, size * 0.8), white);
+    storey.position.y = at;
+    const eaves = new THREE.Mesh(new THREE.ConeGeometry(size * 0.85, 1.1, 4), roof);
+    eaves.rotation.y = Math.PI / 4;
+    eaves.scale.z = 0.8;
+    eaves.position.y = at + tall / 2 + 0.4;
+    castle.add(storey, eaves);
+  });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5.6, 2.2, 4), lit(0x8a8478));
+  base.rotation.y = Math.PI / 4;
+  base.position.y = 2.6;
+  castle.add(base);
+  castle.position.set(-6, 0, -40);
+  place.add(castle);
+  // Pines about the field.
+  const needles = lit(0x2a4430);
+  const bark = lit(0x4a3626);
+  for (let index = 0; index < 18; index += 1) {
+    const angle = (index / 18) * Math.PI * 2 + Math.random() * 0.2;
+    const reach = 19 + Math.random() * 9;
+    const tree = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 3.2, 6), bark);
+    trunk.position.y = 1.6;
+    tree.add(trunk);
+    for (let tier = 0; tier < 3; tier += 1) {
+      const crown = shaded(new THREE.Mesh(new THREE.ConeGeometry(1.8 - tier * 0.45, 1.6, 7), needles));
+      crown.position.y = 3 + tier * 1.05;
+      tree.add(crown);
+    }
+    tree.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.8);
+    tree.scale.setScalar(0.8 + Math.random() * 0.6);
+    place.add(tree);
+  }
+  // Each side's camp: the curtain with its crest, and its banners.
+  const crestCurtain = (crest) => paintedTexture(512, 128, (g, w, h) => {
+    g.fillStyle = '#efeadc';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(30,30,34,0.85)';
+    for (const y of [h * 0.08, h * 0.88]) g.fillRect(0, y, w, h * 0.06);
+    for (let x = w / 6; x < w; x += w / 3) {
+      g.beginPath();
+      g.arc(x, h / 2, h * 0.24, 0, Math.PI * 2);
+      g.fillStyle = crest;
+      g.fill();
+      g.fillStyle = '#efeadc';
+      g.beginPath();
+      g.arc(x, h / 2, h * 0.12, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+  const pole = lit(0x3a2a1c);
+  for (const [side, colour] of [[-1, '#b3161b'], [1, '#1f3f8a']]) {
+    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(14, 1.8), new THREE.MeshStandardMaterial({ map: crestCurtain(colour), side: THREE.DoubleSide, roughness: 0.95 }));
+    curtain.position.set(side * 14.5, 1.3, 0);
+    curtain.rotation.y = Math.PI / 2;
+    place.add(curtain);
+    for (let post = -7; post <= 7; post += 3.5) {
+      const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 6), pole);
+      stake.position.set(side * 14.5, 1.2, post);
+      place.add(stake);
+    }
+    // Nobori: tall narrow banners, the side's colour with a white crest.
+    const banner = paintedTexture(64, 256, (g, w, h) => {
+      g.fillStyle = colour;
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = '#efeadc';
+      g.beginPath();
+      g.arc(w / 2, h * 0.18, w * 0.3, 0, Math.PI * 2);
+      g.fill();
+      g.fillRect(w * 0.42, h * 0.32, w * 0.16, h * 0.6);
+    });
+    const cloth = new THREE.MeshStandardMaterial({ map: banner, side: THREE.DoubleSide, roughness: 0.9 });
+    for (let index = 0; index < 7; index += 1) {
+      const z = -9 + index * 3;
+      const x = side * (12.4 + (index % 2) * 0.8);
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 5.2, 6), pole);
+      mast.position.set(x, 2.6, z);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 3), cloth);
+      flag.position.set(x, 3.3, z + 0.4);
+      flag.rotation.y = Math.PI / 2 + side * 0.25;
+      place.add(mast, flag);
+    }
+  }
+  // A bamboo palisade along both flanks, gapped.
+  const bamboo = lit(0x8a8a4a);
+  for (const z of [-9.5, 9.5]) {
+    for (let x = -11; x <= 11; x += 0.32) {
+      if (Math.abs(x) < 1.6) continue;
+      const cane = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6 + Math.random() * 0.3, 5), bamboo);
+      cane.position.set(x, 0.8, z);
+      place.add(cane);
+    }
+    for (const y of [0.5, 1.2]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(22, 0.06, 0.06), bamboo);
+      rail.position.set(0, y, z + (z < 0 ? 0.08 : -0.08));
+      place.add(rail);
+    }
+  }
+  return place;
+}
+
+/** A day sky: a dome painted from deep blue overhead to pale haze at the horizon, with soft high cloud, behind everything and out of the fog. */
+function daySky() {
+  // The sky: a dome painted from deep blue overhead to pale haze at the
+  // horizon, with soft high cloud; drawn behind everything, out of the fog.
+  const skyTexture = paintedTexture(1024, 512, (g, w, h) => {
+    const gradient = g.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, '#2e6cc2');
+    gradient.addColorStop(0.3, '#4f8fdb');
+    gradient.addColorStop(0.44, '#86b6e6');
+    gradient.addColorStop(0.5, '#cfe2f3');
+    gradient.addColorStop(1, '#dfe9f2');
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 18; index += 1) {
+      const x = Math.random() * w;
+      const y = h * (0.22 + Math.random() * 0.22);
+      const size = 25 + Math.random() * 55;
+      for (let puff = 0; puff < 9; puff += 1) {
+        const glow = g.createRadialGradient(x + (Math.random() - 0.5) * size * 1.6, y + (Math.random() - 0.5) * size * 0.3, 0, x, y, size);
+        glow.addColorStop(0, 'rgba(255,255,255,0.22)');
+        glow.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = glow;
+        g.fillRect(x - size * 2, y - size, size * 4, size * 2);
+      }
+    }
+  });
+  skyTexture.wrapT = THREE.ClampToEdgeWrapping;
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(52, 32, 16), new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide, fog: false, depthWrite: false }));
+  sky.renderOrder = -1;
+  return sky;
+}
+
+/**
  * A medieval market square at noon: cobbles, timber-framed houses on every
  * side (jettied upper floors, limewash, steep tiled roofs, chimneys) with
  * streets running off between them, the church tower and spire over the
@@ -632,34 +817,7 @@ function buildTown() {
     return mesh;
   };
 
-  // The sky: a dome painted from deep blue overhead to pale haze at the
-  // horizon, with soft high cloud; drawn behind everything, out of the fog.
-  const skyTexture = paintedTexture(1024, 512, (g, w, h) => {
-    const gradient = g.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, '#2e6cc2');
-    gradient.addColorStop(0.3, '#4f8fdb');
-    gradient.addColorStop(0.44, '#86b6e6');
-    gradient.addColorStop(0.5, '#cfe2f3');
-    gradient.addColorStop(1, '#dfe9f2');
-    g.fillStyle = gradient;
-    g.fillRect(0, 0, w, h);
-    for (let index = 0; index < 18; index += 1) {
-      const x = Math.random() * w;
-      const y = h * (0.22 + Math.random() * 0.22);
-      const size = 25 + Math.random() * 55;
-      for (let puff = 0; puff < 9; puff += 1) {
-        const glow = g.createRadialGradient(x + (Math.random() - 0.5) * size * 1.6, y + (Math.random() - 0.5) * size * 0.3, 0, x, y, size);
-        glow.addColorStop(0, 'rgba(255,255,255,0.22)');
-        glow.addColorStop(1, 'rgba(255,255,255,0)');
-        g.fillStyle = glow;
-        g.fillRect(x - size * 2, y - size, size * 4, size * 2);
-      }
-    }
-  });
-  skyTexture.wrapT = THREE.ClampToEdgeWrapping;
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(52, 32, 16), new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide, fog: false, depthWrite: false }));
-  sky.renderOrder = -1;
-  place.add(sky);
+  place.add(daySky());
 
   // Cobbles: rounded setts in grey and brown, worn paler down the middle.
   const cobbles = paintedTexture(1024, 1024, (g, w, h) => {
@@ -1514,6 +1672,7 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
   if (dress.top?.kind === 'hoodie') dangles.push(...buildHood(body, collar, dress.top.color));
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
+  if (dress.banner) collar.add(buildBanner(body, dress.banner));
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig.
   const skeleton = simple ? BONES.map(() => new THREE.Group()) : buildSkeleton(body, built.bindFrames);

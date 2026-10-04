@@ -73,6 +73,32 @@ export const WEAPONS = {
     harm: { swing: { blunt: 0.7 }, thrust: { blunt: 0.5 } },
     contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 22, zeta: 0.9 }, threat: 6, grip: 0.12, ranged: true, edgeUp: true,
   },
+  // A bow (`bow`): held in the left hand (`hand`), the stave running
+  // `length` up and `handle` down from the grip. It looses arrows (ARROW);
+  // there is no edge to strike with.
+  bow: {
+    label: 'Bow', hands: 'one', hand: 'l', length: 0.95, strikeFrom: 0.95, handle: 0.85, mass: 0.6, balance: 0, radius: 0.014,
+    harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.5, grip: 0.4, ranged: true, bow: true,
+  },
+  // Sidearms, drawn when the main weapon is lost (an outfit's `sidearm`):
+  // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
+  // short sword; a samurai's wakizashi, the short companion of the katana.
+  dagger: {
+    label: 'Dagger', hands: 'one', length: 0.3, strikeFrom: 0.06, handle: 0.11, mass: 0.35, balance: 0, radius: 0.01,
+    harm: { thrust: { pierce: 0.75, blunt: 0.3 }, swing: { cut: 0.35, blunt: 0.2 } },
+    contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 40, zeta: 0.8 }, threat: 2.5,
+  },
+  shortSword: {
+    label: 'Short sword', hands: 'one', length: 0.6, strikeFrom: 0.1, handle: 0.12, mass: 0.85, balance: 0.08, radius: 0.012,
+    harm: { thrust: { pierce: 0.85, cut: 0.2, blunt: 0.15 }, swing: { cut: 0.8, blunt: 0.4 } },
+    contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
+  },
+  wakizashi: {
+    label: 'Wakizashi', hands: 'one', length: 0.5, strikeFrom: 0.08, handle: 0.16, mass: 0.7, balance: 0.08, radius: 0.012,
+    harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.6, cut: 0.15, blunt: 0.1 } },
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 28, zeta: 0.8 }, threat: 3.2,
+  },
   // His backup: a short sword that cuts and stabs.
   gladius: {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
@@ -160,6 +186,21 @@ export const GUN = {
   plated: ['knight', 'samurai', 'swat'], // armour a round is seen to strike, not enter
 };
 
+/**
+ * Arrows: loosed at `speed` (m/s), falling under gravity, aimed a little
+ * high for the drop. Mostly a piercing wound (`lethal`, as for GUN, of what
+ * kills an 80 kg man, cut by the armour's pierce protection) with a small
+ * knock (`impulse`, N·s). Off good plate and lamellar (`arrowproof`) an
+ * arrow glances `bounce` of the time; one that finds a gap does `gapHarm`.
+ * A spent arrow lies `stays` s.
+ */
+export const ARROW = {
+  speed: 55, gravity: 9.81, spread: 0.02, length: 0.8,
+  lethal: { head: 0.85, torso: 0.4, limb: 0.13 },
+  bleed: { head: 0.02, torso: 0.03, limb: 0.012 },
+  impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
+};
+
 /** What a bullet hit is to: head, torso (the trunk) or limb. */
 export function bulletRegion(capsuleKey) {
   if (capsuleKey === 'head') return 'head';
@@ -211,7 +252,7 @@ export function createWeapon(kind) {
   const spec = WEAPONS[kind];
   if (!spec) return null;
   return {
-    kind, spec, main: 'r', off: 'l', held: true, twoHanded: spec.hands !== 'one',
+    kind, spec, main: spec.hand === 'l' ? 'l' : 'r', off: spec.hand === 'l' ? 'r' : 'l', held: true, twoHanded: spec.hands !== 'one',
     dir: [1, 0, 0], spin: [0, 0, 0], tip: [0, 0, 0], tipPrev: null, tipVelocity: [0, 0, 0], strain: 0,
   };
 }

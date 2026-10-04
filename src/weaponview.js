@@ -8,7 +8,7 @@ import { P } from './body.js';
 import { SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { BONE } from './rig.js';
 import { outlineFor, surface } from './toon.js';
-import { WEAPONS } from './weapons.js';
+import { ARROW, WEAPONS } from './weapons.js';
 import { steelMaterial } from './wardrobe.js';
 
 export const GORE = {
@@ -92,6 +92,27 @@ export function buildWeaponMesh(kind, envMap) {
   const wood = surface(0x7a5530, { roughness: 0.7 });
   const brass = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
   switch (kind) {
+    case 'bow': {
+      // A recurved stave bowed towards the mark (+z), bound at the grip; the
+      // string runs tip to tip behind it, drawn to the hand as the shot comes.
+      const bend = 0.16;
+      const stave = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, -spec.handle, -bend * 0.9), new THREE.Vector3(0, -spec.handle * 0.55, -bend * 0.15),
+        new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, spec.length * 0.55, -bend * 0.15), new THREE.Vector3(0, spec.length, -bend * 0.9),
+      ]);
+      group.add(new THREE.Mesh(new THREE.TubeGeometry(stave, 32, 0.012, 6, false), surface(0x2a1c14, { roughness: 0.55 })));
+      group.add(cylinder(0.018, 0.018, -0.06, 0.06, surface(0x6a1e1a, { roughness: 0.8 }), 8));
+      const string = new THREE.Line(new THREE.BufferGeometry().setFromPoints([stave.getPoint(0), new THREE.Vector3(0, 0, -bend * 0.9), stave.getPoint(1)]), new THREE.LineBasicMaterial({ color: 0xe8e2d2 }));
+      string.userData.noOutline = true;
+      string.frustumCulled = false;
+      // The arrow on the string while it is drawn.
+      const nocked = new THREE.Group();
+      nocked.add(arrowMesh());
+      nocked.visible = false;
+      group.add(string, nocked);
+      group.userData.bow = { string, nocked, tips: [stave.getPoint(0), stave.getPoint(1)], rest: new THREE.Vector3(0, 0, -bend * 0.9) };
+      break;
+    }
     case 'pistol': {
       // A modern striker-fired service pistol: polymer frame, steel slide,
       // the grip raked back under the hand, the barrel above it (+z is up).
@@ -134,6 +155,7 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(guard, pommel, cylinder(0.015, 0.016, -spec.handle + 0.02, 0.03, leather));
       break;
     }
+    case 'wakizashi':
     case 'katana': {
       // One curve from the pommel to the point, the hilt carrying it on; zero at the grip.
       const sori = 0.045;
@@ -159,6 +181,7 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(tsuka, tsuba, habaki, kashira);
       break;
     }
+    case 'dagger':
     case 'knife': {
       group.add(bladeMesh(bladeGeometry(0.02, spec.length - 0.02, 0.026, 0.005, 0.07), steel));
       const guard = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.01, 0.05), dark);
@@ -219,6 +242,7 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(ferrule, butt);
       break;
     }
+    case 'shortSword':
     case 'gladius': {
       group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.055, 0.009, 0.12), steel));
       const guard = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.08), wood);
@@ -309,7 +333,12 @@ export function updateArms(view, fighterView, time = 0) {
     const hand = point(fighter.x, P[`${weapon.main}Hand`]);
     const along = toVector(weapon.dir).normalize();
     let edge;
-    if (weapon.spec.edgeUp) {
+    if (weapon.spec.bow && weapon.facing) {
+      // The bow's back to the mark.
+      edge = toVector(weapon.facing).sub(along.clone().multiplyScalar(toVector(weapon.facing).dot(along)));
+      if (edge.lengthSq() < 1e-6) edge = new THREE.Vector3(1, 0, 0);
+      edge.normalize();
+    } else if (weapon.spec.edgeUp) {
       // Sights up: the top of the gun to the sky, whichever way it points.
       edge = new THREE.Vector3(0, 1, 0).sub(along.clone().multiplyScalar(along.y));
       if (edge.lengthSq() < 1e-6) edge = new THREE.Vector3(1, 0, 0);
@@ -327,6 +356,7 @@ export function updateArms(view, fighterView, time = 0) {
     arms.weapon.matrix.makeBasis(flat, along, edge).setPosition(hand[0], hand[1], hand[2]);
     arms.weapon.matrixWorldNeedsUpdate = true;
     arms.weapon.visible = showing;
+    if (arms.weapon.userData.bow) drawString(arms.weapon, fighter);
   } else if (arms.weapon) {
     fighterView.group.remove(arms.weapon);
     arms.weapon = null;
@@ -600,6 +630,74 @@ export function updateShots(view, dt) {
     }
     return false;
   });
+}
+
+// ---- Arrows -----------------------------------------------------------------
+
+/** An arrow along +y from its nock (0) to its head: shaft, fletching, point. */
+function arrowMesh() {
+  const group = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, ARROW.length, 5), surface(0xc8a878, { roughness: 0.7 }));
+  shaft.position.y = ARROW.length / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.05, 6), surface(0x3a3c40, { roughness: 0.4 }));
+  head.position.y = ARROW.length + 0.02;
+  group.add(shaft, head);
+  for (const turn of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) {
+    const vane = new THREE.Mesh(new THREE.PlaneGeometry(0.022, 0.09), new THREE.MeshBasicMaterial({ color: 0xf0ece4, side: THREE.DoubleSide }));
+    vane.position.set(Math.cos(turn) * 0.011, 0.07, Math.sin(turn) * 0.011);
+    vane.rotation.y = -turn;
+    group.add(vane);
+  }
+  return group;
+}
+
+/** The bowstring through the drawing hand (in the bow's own frame), and the arrow on it. */
+function drawString(bowMesh, fighter) {
+  const { string, nocked, tips, rest } = bowMesh.userData.bow;
+  const draw = fighter.weapon?.draw ?? 0;
+  let nock = rest.clone();
+  if (draw > 0.05) {
+    const hand = point(fighter.x, P[`${fighter.weapon.off}Hand`]);
+    const local = new THREE.Vector3(hand[0], hand[1], hand[2]).applyMatrix4(new THREE.Matrix4().copy(bowMesh.matrix).invert());
+    nock = rest.clone().lerp(local, Math.min(1, draw * 1.1));
+  }
+  const positions = string.geometry.attributes.position;
+  positions.setXYZ(0, tips[0].x, tips[0].y, tips[0].z);
+  positions.setXYZ(1, nock.x, nock.y, nock.z);
+  positions.setXYZ(2, tips[1].x, tips[1].y, tips[1].z);
+  positions.needsUpdate = true;
+  nocked.visible = draw > 0.05;
+  if (nocked.visible) {
+    // From the nock past the grip, towards the mark.
+    nocked.position.copy(nock);
+    nocked.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0).sub(nock).add(new THREE.Vector3(0, 0, 0.05)).normalize());
+  }
+}
+
+/** Arrows in flight and spent arrows on the ground, drawn where the world has them. */
+export function updateArrows(view, world) {
+  const drawn = view.arrows ?? (view.arrows = new Map());
+  const live = new Set();
+  for (const arrow of world.arrows ?? []) {
+    if (arrow.done) continue;
+    live.add(arrow);
+    let mesh = drawn.get(arrow);
+    if (!mesh) {
+      mesh = arrowMesh();
+      view.scene.add(mesh);
+      drawn.set(arrow, mesh);
+    }
+    const along = arrow.landed ? mesh.userData.along : toVector(arrow.v).normalize();
+    mesh.userData.along = along;
+    // The nock trails the point by the arrow's length; stuck in the ground, the head is in it.
+    mesh.position.set(arrow.x[0], arrow.x[1], arrow.x[2]).addScaledVector(along, -ARROW.length * (arrow.landed ? 0.75 : 1));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
+  }
+  for (const [arrow, mesh] of drawn) {
+    if (live.has(arrow)) continue;
+    view.scene.remove(mesh);
+    drawn.delete(arrow);
+  }
 }
 
 /** Sparks off steel meeting steel or turned by plate. */
