@@ -568,7 +568,19 @@ export function spawnShot(view, event) {
   flash.position.copy(from);
   view.scene.add(tracer, flash);
   shots.push({ tracer, flash, age: 0 });
-  if (event.harm > 0.02) spawnBlood(view, event.point, event.normal, Math.min(24, 6 + Math.round(event.harm * 20)), 2.2);
+  if (event.plate === 'knight') {
+    // Off plate: a spray of sparks and the round whining away off the steel.
+    spawnSparks(view, event.point, 16);
+    const incoming = to.clone().sub(from).normalize();
+    const normal = toVector(event.normal).normalize();
+    const away = incoming.clone().sub(normal.clone().multiplyScalar(2 * incoming.dot(normal))).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.6, Math.random() - 0.5).multiplyScalar(0.6)).normalize();
+    const ricochet = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 1.2, 4, 1, true), tracer.material.clone());
+    ricochet.position.copy(to).addScaledVector(away, 0.6);
+    ricochet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), away);
+    view.scene.add(ricochet);
+    shots.push({ tracer: ricochet, flash: new THREE.Mesh(), age: 0 });
+  } else if (event.plate) spawnSparks(view, event.point, 5);
+  else if (event.harm > 0.02) spawnBlood(view, event.point, event.normal, Math.min(24, 6 + Math.round(event.harm * 20)), 2.2);
   else if (event.target) spawnSparks(view, event.point, 8);
 }
 

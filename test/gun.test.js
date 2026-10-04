@@ -103,3 +103,28 @@ test('Frye v Takayama: a standing brawl in a mutual clinch, nobody held down', (
   }
   assert.ok(mutual > 1, `mutual clinch ${mutual.toFixed(1)} s`);
 });
+
+test('engaging, he holds the gun up in both hands; closed on, he drops it and fights; he runs for room', () => {
+  const world = createWorld([{ ...PRESETS.handgun }, { ...PRESETS.contender }], { seed: 3, arena: { halfX: 6.5, halfZ: 4.4 } });
+  const [gunner, other] = world.fighters;
+  placeFighter(gunner, -2.5, 0);
+  placeFighter(other, 2.5, 0);
+  advance(world, 0.3, (current, dt) => thinkAll(current, dt, new Set([1])));
+  assert.equal(gunner.aimAt, other.id, 'gun up on him');
+  assert.ok(gunner.intent.lHand, 'the support hand on the gun');
+  // Rushing in from too near for a shot: he runs for room at first, and drops the gun once the man is on him.
+  placeFighter(other, gunner.root[0] + 2, gunner.root[1]);
+  gunner.punch = null;
+  gunner.cooldown = 1;
+  let ran = false;
+  for (let step = 0; step < 30 && gunner.weapon?.held; step += 1) {
+    other.rootVelocity = [-3, 0];
+    advance(world, 1 / 30, (current, dt) => thinkAll(current, dt, new Set([1])));
+    ran ||= gunner.running;
+    const way = Math.sign(gunner.root[0] - other.root[0]) || -1;
+    placeFighter(other, other.root[0] + way * 0.12, gunner.root[1]);
+  }
+  assert.ok(ran, 'he ran');
+  assert.equal(gunner.weapon, null, 'closed on, he let the gun go');
+  assert.equal(gunner.mixed, 'mix');
+});

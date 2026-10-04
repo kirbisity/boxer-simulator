@@ -32,7 +32,7 @@ export const MOVES = {
   // A pistol shot (path 'aim'): the arm comes up and out along the line to
   // the target, tracking it, and the round goes at `fireAt` down the
   // barrel's line as it really is then; the arm comes back down after.
-  shoot: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.34, extendUntil: 0.42, duration: 0.62, twist: -0.25, shift: 0.02, cost: 0.003, mass: { arm: 0.3 }, rotation: 0.5, zones: ['body', 'head', 'legs'], reach: 'gun' },
+  shoot: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.34, quickFireAt: 0.12, extendUntil: 0.42, duration: 0.62, twist: -0.25, shift: 0.02, cost: 0.003, mass: { arm: 0.3 }, rotation: 0.5, zones: ['body', 'head', 'legs'], reach: 'gun' },
   // Weapon moves (path 'blade'): the main hand and the blade follow a path
   // from `from` to `to` (hand in heights, local; dir where the weapon points),
   // bent through the aim; `grip` says whether both hands hold it. A thrust
@@ -379,9 +379,15 @@ export const STYLES = {
   // held low, and losing the gun (it goes easily) he fights mixed.
   handgun: {
     label: 'Handgun', weapon: 'pistol', fallback: 'mix',
-    ranged: { keep: 3.4, close: 1.3, headShare: 0.3, between: [0.45, 0.6] },
+    // `flee`: closer than this he runs for room, until `rest` m more or for
+    // `runFor` s at most, then stands for `standFor` s and shoots; `close`:
+    // he drops the gun and fights.
+    // `shotSeconds`: the time a shot needs; less than that before he is on him, he runs.
+    ranged: { flee: 2.4, rest: 0.8, runFor: 1.5, standFor: 1.2, close: 1.2, shotSeconds: 0.35, headShare: 0.3, between: [0.45, 0.6] },
     cadence: { work: 1.4, move: 0.6, burst: 0.6, mobility: 0.5 },
-    stance: { blade: 0.3, crouch: 0.04, width: 1.05, lean: 0.04, guardHeight: -0.02 },
+    // The Chapman stance: bladed a little, feet staggered, knees bent,
+    // weight forward over the front foot.
+    stance: { blade: 0.42, crouch: 0.06, width: 1.2, lean: 0.14, guardHeight: -0.02 },
     // Low ready: the gun out before the belly, pointed at the floor ahead.
     weaponGuard: { hand: [0.2, 0.6, -0.06], dir: [1, -0.6, 0] },
     idle: { bounce: 0.2, sway: 0.5, rock: 0.2 },

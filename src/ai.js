@@ -4,8 +4,9 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
+import { chinNow, dropWeapon, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
+import { WEAPONS } from './weapons.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -13,6 +14,10 @@ export const AI = {
   gunRush: { within: 1.1, weave: 5, chargeFrom: 3, chargePerSecond: 1.5 },
   // Held in a collar tie, how soon a brawler ties up back (per second).
   tieBackPerSecond: 3,
+  // A gunman running for room: points `stride` m away in `directions`
+  // directions, scored by distance from him, room to the edge (weighted)
+  // and not running past him (weighted); a fresh choice every `rethink` s.
+  gunKite: { stride: 2.5, directions: 16, wallMargin: 0.7, roomWeight: 0.8, pastWeight: 2.5, rethink: 0.4 },
   bodyShotShare: 0.2,
   // Seconds between attacks; pros throw ~40–60 strikes a round, in bursts.
   restMin: 0.9,
@@ -350,6 +355,9 @@ function goForWeapon(world, fighter, opponent) {
     const mine = flat(debris.x, at);
     const theirs = enemies.reduce((least, other) => Math.min(least, flat(debris.x, point(other.x, P.pelvis))), Infinity);
     if (mine > AI.pickup.maxDistance || (mine > AI.pickup.atFeet && mine > theirs - AI.pickup.margin)) return null;
+    // A gun is no use with him on top of you: only with room to raise it.
+    const nearest = enemies.reduce((least, other) => Math.min(least, flat(at, point(other.x, P.pelvis))), Infinity);
+    if (WEAPONS[debris.weapon]?.ranged && nearest < (STYLES.handgun.ranged.flee ?? 2.4)) return null;
     return mine;
   };
   let target = world.debris?.[fighter.aiPickupFor];
@@ -578,19 +586,97 @@ function holdDown(world, fighter, opponent) {
   return true;
 }
 
-/** Holding the distance a gun wants, side-stepping, and firing when the line is clear. */
-function gunfight(world, fighter, opponent, distance, gun) {
-  fighter.move = distance < gun.keep - 0.25 ? -1 : distance > gun.keep + 1.2 ? 0.6 : 0;
-  fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.5;
+/**
+ * A gun keeps away. Closer than `flee` (m), he turns and runs for the most
+ * open ground, round him and never into a corner, until he has `flee` plus
+ * `rest` again; then he turns, takes the stance, gun up on him in both
+ * hands, and fires as he backs away.
+ */
+function gunfight(world, fighter, opponent, distance, gun, dt) {
+  // Shoot while there is time for a shot before he arrives; run when there
+  // is not. Not for ever: a man as fast as you is never outrun, so after a
+  // spell of running, turn and shoot.
+  const me = point(fighter.x, P.pelvis);
+  const toMe = vec.normalize([me[0] - opponent.x[P.pelvis * 3], 0, me[2] - opponent.x[P.pelvis * 3 + 2]]);
+  const theirs = [opponent.rootVelocity[0], 0, opponent.rootVelocity[1]];
+  const mine = [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]];
+  const closing = Math.max(0.3, vec.dot(vec.sub(theirs, mine), toMe));
+  const timeLeft = (distance - gun.close) / closing;
+  const standing = world.time < (fighter.aiStandUntil ?? -1);
+  if (distance < gun.flee && timeLeft < gun.shotSeconds && !standing && !fighter.aiFleeing) {
+    fighter.aiFleeing = true;
+    fighter.aiFleeSince = world.time;
+  } else if (fighter.aiFleeing && (distance > gun.flee + gun.rest || world.time - fighter.aiFleeSince > gun.runFor)) {
+    fighter.aiFleeing = false;
+    fighter.aiStandUntil = world.time + gun.standFor;
+  }
+  if (fighter.aiFleeing && !fighter.punch) {
+    fighter.aimAt = undefined;
+    fighter.aiEscapeAge = (fighter.aiEscapeAge ?? Infinity) + dt;
+    if (!fighter.aiEscape || fighter.aiEscapeAge > AI.gunKite.rethink) {
+      fighter.aiEscape = escapePoint(world, fighter, opponent);
+      fighter.aiEscapeAge = 0;
+    }
+    fighter.goTo = fighter.aiEscape;
+    fighter.move = 1;
+    fighter.running = true;
+    return;
+  }
+  // Stood off: the stance, the gun on him, backing away while he can.
+  fighter.aimAt = opponent.id;
+  const back = point(fighter.x, P.pelvis);
+  const away = [back[0] - opponent.x[P.pelvis * 3], back[2] - opponent.x[P.pelvis * 3 + 2]];
+  const roomBehind = room(world, [back[0] + away[0] / distance, back[2] + away[1] / distance]);
+  fighter.move = roomBehind > AI.gunKite.wallMargin ? -0.6 : 0;
+  fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
   if (fighter.punch || fighter.cooldown > 0) return;
   if (teamSpacing(world, fighter, opponent).blocked) return;
   const zone = world.random() < gun.headShare ? 'head' : 'body';
-  if (throwPunch(world, fighter, 'shoot', zone)) fighter.cooldown = gun.between[0] + world.random() * gun.between[1];
+  if (throwPunch(world, fighter, 'shoot', zone)) {
+    // From the stance the gun is already up: the shot goes as soon as the sights settle.
+    fighter.punch.quick = true;
+    fighter.cooldown = gun.between[0] + world.random() * gun.between[1];
+  }
+}
+
+/** How far a floor point is from the nearest edge of the arena (m). */
+function room(world, at) {
+  return Math.min(world.arena.halfX - Math.abs(at[0]), world.arena.halfZ - Math.abs(at[1]));
+}
+
+/**
+ * Where to run: of the points a stride away all round, the one farthest
+ * from him, with room behind it, and not past him.
+ */
+function escapePoint(world, fighter, opponent) {
+  const kite = AI.gunKite;
+  const me = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  const him = [opponent.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2]];
+  const toHim = vec.normalize([him[0] - me[0], 0, him[1] - me[1]]);
+  let best = null;
+  let bestScore = -Infinity;
+  for (let index = 0; index < kite.directions; index += 1) {
+    const angle = (index / kite.directions) * Math.PI * 2;
+    const way = [Math.cos(angle), Math.sin(angle)];
+    const limitX = world.arena.halfX - kite.wallMargin;
+    const limitZ = world.arena.halfZ - kite.wallMargin;
+    const at = [Math.max(-limitX, Math.min(limitX, me[0] + way[0] * kite.stride)), Math.max(-limitZ, Math.min(limitZ, me[1] + way[1] * kite.stride))];
+    const fromHim = Math.hypot(at[0] - him[0], at[1] - him[1]);
+    const toward = way[0] * toHim[0] + way[1] * toHim[2];
+    const score = fromHim + kite.roomWeight * Math.min(room(world, at), 2) - kite.pastWeight * Math.max(0, toward);
+    if (score > bestScore) {
+      bestScore = score;
+      best = [at[0], 0, at[1]];
+    }
+  }
+  return best;
 }
 
 export function think(world, fighter, dt) {
   const random = world.random;
   fighter.strafe = 0;
+  fighter.running = false;
+  fighter.aimAt = undefined;
   if (fighter.state !== 'up') {
     fighter.move = 0;
     return;
@@ -628,14 +714,16 @@ export function think(world, fighter, dt) {
     fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
     return;
   }
-  // A gun: at a distance, keep it and shoot; once he is in close, fight
-  // mixed with the gun held low.
+  // A gun: keep away and shoot; once he is in close, drop it and fight mixed.
   const gun = style.ranged && fighter.weapon?.held ? style.ranged : null;
   if (gun && distance > gun.close) {
-    gunfight(world, fighter, opponent, distance, gun);
+    gunfight(world, fighter, opponent, distance, gun, dt);
     return;
   }
-  if (gun) style = STYLES.mix;
+  if (gun) {
+    dropWeapon(world, fighter, 'dropped');
+    style = STYLES[fighter.style] ?? STYLES.mix;
+  }
   // Grabbed by the neck, a brawler grabs back: the mutual tie, trading.
   if (style.attacks.collarTie && !fighter.clinch && !fighter.punch && opponent.clinch?.target === fighter.id && world.random() < AI.tieBackPerSecond * dt) perform(world, fighter, 'collarTie');
   // Facing a gun at a distance, standing off is death: close in, weaving,
@@ -643,6 +731,7 @@ export function think(world, fighter, dt) {
   const facingGun = !gun && opponent.weapon?.held && opponent.weapon.spec.ranged && opponent.state === 'up';
   if (facingGun && distance > AI.gunRush.within) {
     fighter.move = 1;
+    fighter.running = distance > AI.gunRush.chargeFrom * 0.6;
     fighter.strafe = Math.sin(world.time * AI.gunRush.weave + fighter.id) * 0.8;
     if (!fighter.punch && !fighter.rush && distance < AI.gunRush.chargeFrom && world.random() < AI.gunRush.chargePerSecond * dt) perform(world, fighter, 'rush');
     return;

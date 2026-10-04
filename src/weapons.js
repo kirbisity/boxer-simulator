@@ -152,6 +152,7 @@ export const GUN = {
   range: 30,
   recoil: 2.2,
   impulse: 2.9, // N·s a 9 mm round carries into what it hits
+  plated: ['knight', 'samurai', 'swat'], // armour a round is seen to strike, not enter
 };
 
 /** What a bullet hit is to: head, torso (the trunk) or limb. */
