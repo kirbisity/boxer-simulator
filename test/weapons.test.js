@@ -243,3 +243,34 @@ test('weapon holders keep their arms forward: elbows seldom fall behind the shou
     assert.ok(row.elbowBack < 0.25, `${style}: elbow behind the shoulder ${(row.elbowBack * 100).toFixed(0)}% of the time`);
   }
 });
+
+test('a war hammer blow on plate staggers the knight: he reels, weaker, rather than falls', async () => {
+  const { applyHeadDamage, armoured, chinNow, staggerShare } = await import('../src/physics.js');
+  let staggered = 0;
+  for (const distance of [1.6, 1.8, 2.0]) {
+    const { world } = strikeAt('warhammer', 'hammerSide', 'body', distance, { outfit: 'knight' });
+    const knight = world.fighters[1];
+    assert.ok(armoured(knight));
+    if (knight.stagger > 0) {
+      staggered += 1;
+      assert.equal(knight.state, 'up', 'reeling, not down');
+      assert.ok(knight.stagger <= WORLD.stagger.maxSeconds);
+      assert.ok(staggerShare(knight, WORLD.stagger.harm) < 1, 'his own blows are weaker');
+    }
+  }
+  assert.ok(staggered >= 1, 'a hammer blow staggers');
+  // A blow that would drop a man staggers one in armour; another while he reels drops him.
+  const world = createWorld([{ ...PRESETS.contender, style: 'warhammer' }, { ...PRESETS.contender, style: 'katana', outfit: { kind: 'knight', design: 0 } }]);
+  const knight = world.fighters[1];
+  const blow = () => ({ attacker: 0, defender: 1, effects: [], harmDeltaV: chinNow(knight) * 1.2 });
+  applyHeadDamage(world, knight, blow());
+  assert.equal(knight.state, 'up');
+  assert.ok(knight.stagger > WORLD.stagger.minSeconds);
+  applyHeadDamage(world, knight, blow());
+  assert.equal(knight.state, 'down');
+  // Unarmoured, the same blow drops him at once.
+  const boxer = createWorld([{ ...PRESETS.contender }, { ...PRESETS.contender }]).fighters[1];
+  applyHeadDamage(world, boxer, { ...blow(), harmDeltaV: chinNow(boxer) * 1.2 });
+  assert.equal(boxer.state, 'down');
+  assert.equal(boxer.stagger, 0);
+});

@@ -52,7 +52,7 @@ export const WEAPONS = {
   warhammer: {
     label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 2.6, balance: 0.85, radius: 0.04,
     harm: { swing: { blunt: 1.6 }, thrust: { blunt: 1, pierce: 0.35 } },
-    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, crush: 0.6,
+    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, crush: 0.45,
   },
   naginata: {
     label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 1.9, balance: 0.55, radius: 0.014,

@@ -166,6 +166,18 @@ export const WORLD = {
     hurtSeconds: 8, hurtPerKnockdown: 4, hurtStrength: 0.65,
     staminaPerTrunkDamage: 0.6, armForcePerDamage: 0.4,
   },
+  // Armour (blunt protection from `armouredFrom`) spreads a heavy blow: a
+  // man in it reels instead of dropping. A blow of `startAt` or more of what
+  // would put him down (head speed change over the chin, or the knock over
+  // what his legs take) staggers him for `minSeconds` to `maxSeconds`, more
+  // the harder it was; one that would put him down staggers him instead,
+  // unless it was overwhelming or he was already reeling. Reeling, his
+  // muscles are at `strength`, his blows carry `harm` of their weight and he
+  // defends `defend` as often, all recovering as the stagger wears off.
+  // A blow's blunt peak force (N) counts as `force` would to put him down;
+  // knocked past his feet just after a blow, he stumbles for `catchSeconds`
+  // to get them back under him.
+  stagger: { armouredFrom: 0.5, startAt: 0.7, overwhelm: 1.6, minSeconds: 2, maxSeconds: 10, strength: 0.7, harm: 0.6, defend: 0.5, force: 5000, catchSeconds: 1, hitWithin: 0.5 },
   rotationalFactor: { jab: 0.85, cross: 1, hook: 1.35, uppercut: 1.25 },
   followThrough: 0.2, // m beyond the target the glove is aimed at
   minImpactSpeed: 2.0,
@@ -301,7 +313,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     feet: null,
     hitAt: new Float64Array(count).fill(-1e9),
     life: lifePhases(random),
-    state: 'up', motorScale: 1, stun: 0, downTimer: 0,
+    state: 'up', motorScale: 1, stun: 0, stagger: 0, staggerFor: 0, downTimer: 0,
     stamina: 1, concussion: 0, knockdowns: 0, injuries: [],
     // A mixed fighter starts in one of his styles and switches as he goes.
     mixed: STYLES[inputs.style]?.mix ? inputs.style : null,
@@ -1170,6 +1182,20 @@ function checkBalance(world, fighter) {
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   const footing = legs * fighter.body.gear.balance;
+  // Knocked about in armour: reeling, not falling, unless it is too much.
+  const pushed = knock / (WORLD.balance.speed * footing);
+  const overreached = outside / (WORLD.balance.reach * legLength * footing);
+  if (pushed > 1 || overreached > 1) {
+    // Driven past his feet by a blow (not by his own lunge): in armour he
+    // stumbles and reels, getting his feet back under him, if it was not too much.
+    const struck = Math.max(...fighter.hitAt) > world.time - WORLD.stagger.hitWithin;
+    if (world.time < (fighter.stumbleUntil ?? -1)) return;
+    if (struck && staggerInstead(world, fighter, Math.max(pushed, overreached), null)) {
+      fighter.knock = [0, 0, 0];
+      fighter.stumbleUntil = world.time + WORLD.stagger.catchSeconds;
+      return;
+    }
+  } else stagger(world, fighter, pushed, null);
   if (knock > WORLD.balance.speed * footing || outside > WORLD.balance.reach * legLength * footing) {
     fighter.knock = [0, 0, 0];
     fighter.state = 'down';
@@ -1265,6 +1291,7 @@ function updateTimers(world, fighter, dt) {
   fighter.slip = Math.max(0, fighter.slip - dt);
   fighter.committed = Math.max(0, (fighter.committed ?? 0) - dt);
   fighter.stun = Math.max(0, fighter.stun - dt);
+  fighter.stagger = Math.max(0, (fighter.stagger ?? 0) - dt);
   if (fighter.clinch) {
     fighter.clinch.t += dt;
     const target = world.fighters[fighter.clinch.target];
@@ -1329,7 +1356,7 @@ function updateTimers(world, fighter, dt) {
     const recovering = fighter.hurt > 0 ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
     // Blood loss: weaker the more is gone.
     const shock = 1 - (1 - BLADES.shockStrength) * Math.min(1, (fighter.bloodLost ?? 0) / collapseAt()) ** 2;
-    fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock;
+    fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock * staggerShare(fighter, WORLD.stagger.strength);
   }
 }
 
@@ -2204,7 +2231,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const limbs = attacker.body.limbKg;
   // Heavy boots put weight behind a kick or a knee.
   const kicking = /Foot|Knee/.test(spec.limb);
-  const strikeMass = ((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1);
+  const strikeMass = ((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1) * staggerShare(attacker, WORLD.stagger.harm);
   const struckMass = struckMassOf(defender, capsule);
   // A collision of two effective masses; flesh and padding make it largely
   // inelastic, so the impulse is the reduced mass times the closing speed.
@@ -2310,6 +2337,9 @@ function pushBack(world, attacker, defender, capsule, closest, contactPoint, nor
   const struck = struckParticles(defender, capsule, closest, contactPoint, spec.push);
   const transferred = ((impulse * (1 + WORLD.transferRestitution)) / (1 + WORLD.restitution)) * share;
   event.transferred = transferred;
+  // A heavy blunt blow on armour: he reels. Its blunt peak force is what
+  // tells a hammer from a glove (a cut's sharp force is no shove).
+  if (event.force) stagger(world, defender, (event.force * Math.min(1, event.bluntMix ?? 1) * share) / WORLD.stagger.force, event);
   const bodyDeltaV = transferred / body.massKg;
   if (defender.state === 'up' && bodyDeltaV * harm > WORLD.knockout.bodyDeltaV * BODY.toughness && !blocked) {
     knockOut(world, defender, event, `knocked out (the blow moved his whole body ${bodyDeltaV.toFixed(1)} m/s)`);
@@ -2441,7 +2471,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const body = defender.body;
   const limbs = attacker.body.limbKg;
   const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
-  const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1);
+  const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
@@ -2465,7 +2495,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id, weapon: weapon.kind, mode: spec.mode,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
-    point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass,
+    point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt,
   };
   const concentration = Math.sqrt(WORLD.contactSeconds / wspec.contactSeconds);
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation, side: weapon.main, concentration });
@@ -2770,8 +2800,55 @@ export function applyHeadDamage(world, defender, event) {
   if (defender.state === 'up' && deltaV > chin * WORLD.knockout.overChin) {
     knockOut(world, defender, event, `knocked out cold (head Δv ${(deltaV / chin).toFixed(1)}× the chin)`);
   } else if (defender.state === 'up' && (deltaV > chin || defender.concussion > capacity)) {
-    knockDown(world, defender, event, deltaV > chin ? 'knockdown (one clean shot)' : 'knockdown (accumulated)');
+    // A clean shot on armour may only stagger; brain strain built up drops him regardless.
+    if (!(deltaV > chin && staggerInstead(world, defender, deltaV / chin, event))) knockDown(world, defender, event, deltaV > chin ? 'knockdown (one clean shot)' : 'knockdown (accumulated)');
+  } else stagger(world, defender, deltaV / chin, event);
+}
+
+// ---- Stagger ------------------------------------------------------------------
+
+/** Whether a fighter's gear spreads blows enough to reel from them rather than drop. */
+export function armoured(fighter) {
+  return (fighter.body.gear.protection.blunt ?? 0) >= WORLD.stagger.armouredFrom;
+}
+
+/**
+ * What remains while staggered: `floor` at the blow, back to 1 as it wears
+ * off (1 when not staggered).
+ */
+export function staggerShare(fighter, floor) {
+  if (!(fighter.stagger > 0)) return 1;
+  return 1 - (1 - floor) * (fighter.stagger / fighter.staggerFor);
+}
+
+/**
+ * Stagger an armoured fighter for a blow of `severity` (1 is what would put
+ * him down). A harder blow while already reeling lengthens it. True if he reels.
+ */
+function stagger(world, fighter, severity, event) {
+  const spec = WORLD.stagger;
+  if (!armoured(fighter) || fighter.state !== 'up' || severity < spec.startAt) return false;
+  const share = Math.min(1, (severity - spec.startAt) / (spec.overwhelm - spec.startAt));
+  const seconds = spec.minSeconds + (spec.maxSeconds - spec.minSeconds) * share;
+  if (seconds <= fighter.stagger) return true;
+  const fresh = !(fighter.stagger > 0);
+  fighter.stagger = seconds;
+  fighter.staggerFor = seconds;
+  if (fresh) {
+    // Reeling: whatever he was throwing is gone, and he stumbles to catch his feet.
+    fighter.punch = null;
+    fighter.rush = null;
+    fighter.stumbleUntil = world.time + spec.catchSeconds;
+    world.events.push({ time: world.time, kind: 'staggered', fighter: fighter.id, seconds, effects: [`reeling for ${seconds.toFixed(0)} s`] });
   }
+  event?.effects.push(`staggered (${seconds.toFixed(0)} s)`);
+  return true;
+}
+
+/** A blow that would drop an armoured man staggers him instead, unless it is overwhelming or he already reels. */
+function staggerInstead(world, fighter, severity, event) {
+  if (!armoured(fighter) || fighter.stagger > 0 || severity >= WORLD.stagger.overwhelm) return false;
+  return stagger(world, fighter, severity, event);
 }
 
 /**
@@ -2985,6 +3062,7 @@ function knockOut(world, defender, event, reason, kind = 'knockout') {
 /** Down, counted: the muscles let go and the count begins. */
 function knockDown(world, defender, event, reason) {
   defender.state = 'down';
+  defender.stagger = 0;
   shakenLoose(world, defender);
   defender.knockdowns += 1;
   defender.punch = null;

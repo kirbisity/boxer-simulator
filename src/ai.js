@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, nearestOpponent, perform, point, reachOf, startPickup, strikeThreat, throwPunch, toLocal } from './physics.js';
+import { chinNow, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
 
 export const AI = {
@@ -654,7 +654,9 @@ export function think(world, fighter, dt) {
   // Seen from when it starts to move, loading included; not while committed.
   if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && (incoming.age ?? incoming.t) >= fighter.reactAt) {
     fighter.reacted = true;
-    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise))) {
+    // Reeling from a blow, he is slow to cover up.
+    const reeling = staggerShare(fighter, WORLD.stagger.defend);
+    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling)) {
       let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
       // A blade coming is got away from, not blocked with an arm.
       if (incoming.spec.path === 'blade' && wary && random() < AI.blade.stepBackChance) name = 'stepBack';
@@ -720,7 +722,7 @@ export function think(world, fighter, dt) {
     if (sequence) [move, ...combo] = sequence.split(' ');
   }
   // Now and then, one big shot instead: a power strike loaded up and thrown alone.
-  const finishing = opponent.hurt > 0;
+  const finishing = opponent.hurt > 0 || opponent.stagger > 0;
   const heavy = !fighter.clinch && random() < plan.heavy + (finishing ? AI.finishingHeavy : 0);
   if (heavy) {
     combo = null;
