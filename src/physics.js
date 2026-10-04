@@ -857,7 +857,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf }, rules = {} } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf }, rules = {}, formation = {} } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
@@ -871,17 +871,28 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   });
   // Sides line up in rows facing each other: as many abreast as the floor
   // is wide, the rest in rows behind. The sides need not be the same size.
+  // A level's `formation` per side: `front` (m from the centre to the first
+  // row), `spacing` (m apart in a row), `rowSpacing`, and `loose` (m: each
+  // stands up to this far off his place, a crowd rather than a rank).
   for (const corner of ['red', 'blue']) {
     const team = fighters.filter((fighter) => fighter.corner === corner);
-    if (team.length < 2) continue;
-    const perRow = Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / WORLD.teamSpacing) + 1);
+    const order = formation[corner];
+    if (team.length < 2 && !order) continue;
+    const spacing = order?.spacing ?? WORLD.teamSpacing;
+    const rowSpacing = order?.rowSpacing ?? WORLD.teamRowSpacing;
+    const front = order?.front ?? (gunFight ? apart : 1.1);
+    const perRow = Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / spacing) + 1);
     const sign = corner === 'red' ? -1 : 1;
     team.forEach((fighter, index) => {
       const row = Math.floor(index / perRow);
       const inRow = Math.min(perRow, team.length - row * perRow);
-      const across = ((index % perRow) - (inRow - 1) / 2) * WORLD.teamSpacing;
-      const x = sign * Math.min(arena.halfX - 0.4, 1.1 + row * WORLD.teamRowSpacing);
-      placeFighter(fighter, x, Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
+      let across = ((index % perRow) - (inRow - 1) / 2) * spacing;
+      let x = sign * Math.min(arena.halfX - 0.4, front + row * rowSpacing);
+      if (order?.loose) {
+        across += (random() * 2 - 1) * order.loose;
+        x += (random() * 2 - 1) * order.loose;
+      }
+      placeFighter(fighter, Math.max(-(arena.halfX - 0.4), Math.min(arena.halfX - 0.4, x)), Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
     });
   }
   for (const fighter of fighters) fighter.arena = arena;

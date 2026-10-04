@@ -731,7 +731,8 @@ export function think(world, fighter, dt) {
   const facingGun = !gun && opponent.weapon?.held && opponent.weapon.spec.ranged && opponent.state === 'up';
   if (facingGun && distance > AI.gunRush.within) {
     fighter.move = 1;
-    fighter.running = distance > AI.gunRush.chargeFrom * 0.6;
+    // Flat out all the way in: every stride slower is another shot.
+    fighter.running = true;
     fighter.strafe = Math.sin(world.time * AI.gunRush.weave + fighter.id) * 0.8;
     if (!fighter.punch && !fighter.rush && distance < AI.gunRush.chargeFrom && world.random() < AI.gunRush.chargePerSecond * dt) perform(world, fighter, 'rush');
     return;

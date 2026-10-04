@@ -61,3 +61,28 @@ test('the rebellion: five knights against twenty simply drawn rebels with spears
   assert.ok(cast.blue.every((fighter) => fighter.style === 'spear' && fighter.simple));
   assert.ok(new Set(cast.blue.map((fighter) => fighter.heightCm)).size > 5, 'rebels differ in build');
 });
+
+test('Pier 9: four SWAT (two pistols, two batons) against six yakuza (four knives, a katana, a pistol)', async () => {
+  const { SCENARIOS } = await import('../src/scenarios.js');
+  const cast = SCENARIOS.port.cast(seededRandom(4));
+  const styles = (side) => side.map((fighter) => fighter.style).sort();
+  assert.deepEqual(styles(cast.red), ['baton', 'baton', 'handgun', 'handgun']);
+  assert.deepEqual(styles(cast.blue), ['handgun', 'katana', 'knife', 'knife', 'knife', 'knife']);
+  assert.ok(cast.red.every((fighter) => fighter.outfit.kind === 'swat'));
+  assert.ok(cast.blue.every((fighter) => fighter.outfit.kind === 'yakuza'));
+});
+
+test('the rebellion opens with the knights in a tight line and the rebels a loose crowd, well apart', async () => {
+  const { SCENARIOS } = await import('../src/scenarios.js');
+  const { createWorld } = await import('../src/physics.js');
+  const level = SCENARIOS.rebellion;
+  const cast = level.cast(seededRandom(2));
+  const world = createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...cast.blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 2, arena: level.arena, formation: level.formation });
+  const knights = world.fighters.filter((fighter) => fighter.corner === 'red');
+  const rebels = world.fighters.filter((fighter) => fighter.corner === 'blue');
+  assert.ok(knights.every((fighter) => Math.abs(fighter.root[0] - knights[0].root[0]) < 0.01), 'one straight line');
+  const gaps = knights.map((fighter) => fighter.root[1]).sort((a, b) => a - b).slice(1).map((z, index, list) => z - (index ? list[index - 1] : knights.map((f) => f.root[1]).sort((a, b) => a - b)[0]));
+  assert.ok(gaps.every((gap) => gap < 1), `shoulder to shoulder: ${gaps.map((gap) => gap.toFixed(2))}`);
+  assert.ok(Math.min(...rebels.map((fighter) => fighter.root[0])) - knights[0].root[0] > 8, 'well apart');
+  assert.ok(new Set(rebels.map((fighter) => fighter.root[0].toFixed(1))).size > 6, 'not in ranks');
+});

@@ -122,6 +122,19 @@ export function rebel(random = Math.random) {
   });
 }
 
+/** A SWAT officer: armed with a pistol or a baton, in the full kit. */
+export function swatOfficer(random = Math.random, style = 'handgun') {
+  const base = varyCharacter(style === 'handgun' ? PRESETS.handgun : PRESETS.baton, random);
+  return normaliseInputs({ ...base, name: `${pickOne(['Officer', 'Sgt.', 'Cpl.'], random)} ${pickOne(['Reyes', 'Cole', 'Novak', 'Burke', 'Ortiz', 'Hale', 'Kowalski', 'Price', 'Walsh', 'Okafor'], random)}`, style, outfit: { kind: 'swat', design: 0 } });
+}
+
+/** A yakuza soldier: bare-backed and tattooed, with a knife, a katana or a pistol. */
+export function yakuza(random = Math.random, style = 'knife') {
+  const base = varyCharacter(PRESETS.knife, random);
+  const name = `${pickOne(['Kenji', 'Takeshi', 'Daisuke', 'Ryota', 'Shin', 'Hiroshi', 'Kazuo', 'Tetsu', 'Goro', 'Masa'], random)} ${pickOne(['Mori', 'Kuroda', 'Ishida', 'Sato', 'Ono', 'Fujita', 'Endo', 'Kanda'], random)}`;
+  return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'yakuza', design: 0 }, accessories: random() < 0.4 ? ['hat'] : [], look: { ...base.look, facialHair: base.look.facialHair, skinTone: pickOne(['lightTan', 'medium', 'light'], random), hairColor: '#120d0a' } });
+}
+
 /** Knights for a sortie: long swords and war hammers, plumed. */
 export function knight(random = Math.random, index = 0) {
   return varyCharacter(index % 3 === 2 ? PRESETS.warhammer : PRESETS.knight, random);

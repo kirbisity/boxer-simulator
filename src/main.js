@@ -54,7 +54,10 @@ const realSeconds = () => performance.now() / 1000;
 /** A short name for crowded places: the first name, and its number if it has one ("Dave 2"). */
 const shortName = (name) => {
   const number = name.match(/ (\d+)$/);
-  return `${name.split(' ')[0]}${number ? ` ${number[1]}` : ''}`;
+  // A rank or title ("Sgt. Cole", "Sir Edric") gives way to the name after it.
+  const words = name.split(' ');
+  const first = /\.$/.test(words[0]) || ['Sir', 'Officer'].includes(words[0]) ? words[1] ?? words[0] : words[0];
+  return `${first}${number ? ` ${number[1]}` : ''}`;
 };
 
 const scene = createScene($('#stage'));
@@ -116,7 +119,7 @@ function newBout() {
   }
   const place = scenario?.scene ?? state.place;
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
-  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules });
+  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
   clearGore(scene);
   setPlace(scene, place, arena);
   // A level frames its own place; anything else starts from the usual ringside view.

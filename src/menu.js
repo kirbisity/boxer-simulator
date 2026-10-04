@@ -120,7 +120,7 @@ export function installMenus(game) {
     const body = screen('levels-screen', 'Levels', 'Set fights in set places, with their own people.', home);
     body.append(el('div', { className: 'choices levels' }, ...Object.entries(SCENARIOS).map(([key, level]) => {
       const who = level.roster ?? level.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg ? `${fighter.weightKg} kg` : `${Math.round(fighter.bodyFat * 100)}% fat`}`).join(' — ');
-      return choice({ glyph: { rebellion: '🌾', pride: '🥊' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
+      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
     })));
     show('levels-screen');
   }

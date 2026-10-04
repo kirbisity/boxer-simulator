@@ -5,7 +5,7 @@
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
-import { knight, rebel } from './cast.js';
+import { knight, rebel, swatOfficer, yakuza } from './cast.js';
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -23,8 +23,25 @@ export const SCENARIOS = {
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
     roster: 'Five knights · twenty rebels with spears',
+    // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
+    formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
     cast: (random) => ({ red: Array.from({ length: 5 }, (_, index) => knight(random, index)), blue: Array.from({ length: 20 }, () => rebel(random)) }),
+    fighters: [],
+  },
+  port: {
+    title: 'Pier 9',
+    place: 'Container port, Yokohama · 2:15 a.m.',
+    blurb: 'A raid on a handover between the containers. Four SWAT officers — two pistols, two batons — against six yakuza: four knives, a katana, and one gun.',
+    scene: 'port',
+    arena: { halfX: 10, halfZ: 6 },
+    camera: { yaw: -0.6, pitch: 0.36, distance: 9, maxDistance: 11 },
+    roster: 'Four SWAT officers · six yakuza',
+    formation: { red: { front: 4.5, spacing: 1.4 }, blue: { front: 4.5, spacing: 1.3, loose: 0.4 } },
+    cast: (random) => ({
+      red: [swatOfficer(random, 'handgun'), swatOfficer(random, 'baton'), swatOfficer(random, 'baton'), swatOfficer(random, 'handgun')],
+      blue: [yakuza(random, 'knife'), yakuza(random, 'katana'), yakuza(random, 'knife'), yakuza(random, 'handgun'), yakuza(random, 'knife'), yakuza(random, 'knife')],
+    }),
     fighters: [],
   },
   pride: {
@@ -106,5 +123,5 @@ export function crewFighter(lead, entry) {
 /** A world for a scenario: its fighters on its floor. */
 export function scenarioWorld(key, seed = 1) {
   const scenario = SCENARIOS[key];
-  return createWorld(scenarioFighters(scenario), { seed, arena: scenario.arena, rules: scenario.rules });
+  return createWorld(scenarioFighters(scenario), { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation });
 }
