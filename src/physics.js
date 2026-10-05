@@ -201,6 +201,27 @@ export const WORLD = {
   goneSeconds: 20,
   // m/s: faster than this, a man cannot go on loading a gun (he waits).
   reloadMaxSpeed: 0.6,
+  // Hitting the floor or another body. A part meeting the floor faster than
+  // `minSpeed` (m/s) takes the speed beyond it: the head as a blow to the
+  // head (`head` of it, the arms and shoulders breaking part of a fall), the
+  // rest as damage to the part (`body` of it), less what armour spreads,
+  // less again for dense bone. A hand or elbow landing faster than
+  // `fractureSpeed` × bone density breaks the joint. Two bodies meeting
+  // faster than `bumpSpeed` (m/s; a charge at any speed) each take their own
+  // speed change (`charge` of it) as damage to the trunk: the lighter man more.
+  impact: { minSpeed: 2.2, head: 0.5, body: 0.7, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.6, bumpEvery: 0.6 },
+  // Firing: the recoil's peak force is its impulse over `seconds` (the
+  // gun's kick spread through a braced hand, or a stock into the shoulder).
+  // Against the gun hand's strength (N; `reference` an average man's) the
+  // aim steadies or shakes (spread × √(reference / strength), between
+  // `steadiest` and `shakiest`); past `snapOver` × his strength the arm may
+  // snap, the likelier the further past (`snapRise` per share beyond it).
+  // Only the frailest: an ordinary man is bruised by a matchlock, not broken.
+  recoil: { seconds: 0.015, longGunSeconds: 0.03, reference: 250, steadiest: 0.75, shakiest: 1.7, snapOver: 3.5, snapRise: 2 },
+  // Running, nobody within `relaxFrom` m: the hands come down from the
+  // guard and swing (`swing`, heights), back up within `guardFrom` m. Running:
+  // flagged so by the AI, or faster than `runningSpeed` m/s.
+  runCarry: { relaxFrom: 4, guardFrom: 2.6, swing: 0.07, ease: 4, runningSpeed: 2.5 },
   // Detail by the size of the fight (fighters in all): up to `full`, every
   // fighter exactly as in a one-on-one; up to `grid`, the same physics, near
   // pairs found through a spatial grid; up to `coarse`, a fighter with no
@@ -768,7 +789,11 @@ function fire(world, fighter) {
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
   // The hand still moving from the last kick (or anything else) throws the shot.
   const shaking = vec.length(point(fighter.v, handIndex));
-  const spread = ((shot?.spread ?? GUN.spread) + (shot?.movingSpread ?? GUN.movingSpread) * moving + GUN.unsettled * shaking) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
+  // A strong man holds a gun steady; a weak one shakes.
+  const strength = fighter.body.strikeForce[handIndex];
+  const recoil = WORLD.recoil;
+  const steadiness = Math.min(recoil.shakiest, Math.max(recoil.steadiest, Math.sqrt(recoil.reference / Math.max(1, strength))));
+  const spread = ((shot?.spread ?? GUN.spread) + (shot?.movingSpread ?? GUN.movingSpread) * moving + GUN.unsettled * shaking) * steadiness * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   // Aimed through the sights at the mark: off by the aim's error, and by
   // part of however far the barrel itself is off that line.
@@ -785,8 +810,18 @@ function fire(world, fighter) {
   else event.effects.push('missed');
   // The gun kicks up and back in the hand.
   // Into both hands (both on the gun in the stance), the arms and the shoulders: a heavy man barely moves, a light one rocks.
-  const support = fighter.aimAt !== undefined ? [[P[`${weapon.off}Hand`], 0.6], [P[`${weapon.off}Elbow`], 0.3]] : [];
-  world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5], [P[`${weapon.main}Shoulder`], 0.25], ...support], direction: vec.normalize(vec.add(vec.scale(barrel, -1), vec.scale(up, 0.8))), impulse: shot?.recoil ?? GUN.recoil });
+  // A long gun's stock drives back into the shoulder and the cheek as well.
+  const support = fighter.aimAt !== undefined || weapon.spec.longGun ? [[P[`${weapon.off}Hand`], 0.6], [P[`${weapon.off}Elbow`], 0.3]] : [];
+  const stock = weapon.spec.longGun ? [[P[`${weapon.main}Shoulder`], 0.9], [P.neck, 0.4], [P.head, 0.25]] : [[P[`${weapon.main}Shoulder`], 0.25]];
+  const kick = shot?.recoil ?? GUN.recoil;
+  world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5], ...stock, ...support], direction: vec.normalize(vec.add(vec.scale(barrel, -1), vec.scale(up, weapon.spec.longGun ? 0.35 : 0.8))), impulse: kick });
+  // More kick than the arm can take: it snaps at the elbow.
+  const peak = kick / (weapon.spec.longGun ? recoil.longGunSeconds : recoil.seconds);
+  const beyond = peak / (recoil.snapOver * strength) - 1;
+  if (beyond > 0 && world.random() < beyond * recoil.snapRise && !fighter.broken.has(`${weapon.main}Elbow`)) {
+    breakJoint(world, fighter, `${weapon.main}Elbow`);
+    world.events.push({ time: world.time, kind: 'recoil', fighter: fighter.id, effects: ['the recoil snapped his arm'] });
+  }
 }
 
 /**
@@ -1350,6 +1385,7 @@ function updateIntent(world, fighter, dt) {
       intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
     }
   }
+  runCarry(world, fighter, intent, dt);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * 0.2 * H];
@@ -1363,6 +1399,38 @@ function updateIntent(world, fighter, dt) {
   }
   fighter.intent = intent;
   fighter.desired = desiredPose(fighter.body, intent);
+}
+
+/**
+ * Running with nobody near (a charge from afar, a flight, a man going to his
+ * place): the hands come down from the guard and swing with the stride; a
+ * weapon or shield hand stays on its weapon. Back into the guard as an
+ * enemy comes near, or for any strike, hold or charge.
+ */
+function runCarry(world, fighter, intent, dt) {
+  const spec = WORLD.runCarry;
+  const speed = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
+  let nearest = Infinity;
+  for (const other of world.fighters) {
+    if (other.corner === fighter.corner || other.state === 'out') continue;
+    nearest = Math.min(nearest, Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
+  }
+  const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.state !== 'up';
+  const running = (fighter.running || speed > spec.runningSpeed) && !busy;
+  const want = running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
+  fighter.carry = (fighter.carry ?? 0) + (want - (fighter.carry ?? 0)) * Math.min(1, spec.ease * dt);
+  if (fighter.carry < 0.02) return;
+  const H = fighter.body.heightM;
+  const held = new Set(intent.weaponArms ?? []);
+  if (fighter.shield) held.add('l');
+  const stride = Math.sin(world.time * Math.PI * 2 * 1.5 + fighter.id);
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    if (held.has(side) || !intent[`${side}Hand`]) continue;
+    // Elbows bent, hands by the hips, swinging opposite to the legs.
+    const swinging = [0.04 * H + sign * stride * spec.swing * H, 0.52 * H, sign * 0.19 * H];
+    intent[`${side}Hand`] = vec.lerp(intent[`${side}Hand`], swinging, fighter.carry);
+  }
+  intent.guardTight = intent.guardTight && fighter.carry < 0.5;
 }
 
 /**
@@ -1539,7 +1607,7 @@ export function step(world, dt) {
         continue;
       }
       if (!stepping(fighter)) continue;
-      collideGround(fighter, span(fighter), world.arena);
+      collideGround(world, fighter, span(fighter), world.arena);
       for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / span(fighter);
       settleWhenStill(fighter, span(fighter));
     }
@@ -2333,12 +2401,14 @@ function foldLimit(fighter, rootIndex, endIndex, minimum) {
   correctJoint(fighter, endIndex, [rootIndex], vec.scale(offset, (minimum - distance) / distance));
 }
 
-function collideGround(fighter, h, arena) {
+function collideGround(world, fighter, h, arena) {
   const friction = Math.exp(-WORLD.groundFriction * h);
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const base = index * 3;
     const floor = fighter.radius[index];
     if (fighter.x[base + 1] < floor) {
+      // Arriving this substep (it was clear of the floor): how fast it hit.
+      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, (fighter.prev[base + 1] - fighter.x[base + 1]) / h);
       fighter.x[base + 1] = floor;
       // Flesh on canvas does not bounce: the push out of the floor must not
       // turn into upward speed, or a falling body springs back up.
@@ -2346,11 +2416,61 @@ function collideGround(fighter, h, arena) {
       fighter.x[base] = fighter.prev[base] + (fighter.x[base] - fighter.prev[base]) * friction;
       fighter.x[base + 2] = fighter.prev[base + 2] + (fighter.x[base + 2] - fighter.prev[base + 2]) * friction;
     }
+    // The arena's edge stops a part, as a wall does: held at the edge, and
+    // its motion into the wall gone (not turned back into a fling inwards).
     for (const axis of [0, 2]) {
       const limit = axis === 0 ? arena.halfX : arena.halfZ;
-      if (fighter.x[base + axis] > limit) fighter.x[base + axis] = limit;
-      if (fighter.x[base + axis] < -limit) fighter.x[base + axis] = -limit;
+      if (fighter.x[base + axis] > limit) {
+        fighter.x[base + axis] = limit;
+        fighter.prev[base + axis] = Math.min(fighter.prev[base + axis], limit);
+      }
+      if (fighter.x[base + axis] < -limit) {
+        fighter.x[base + axis] = -limit;
+        fighter.prev[base + axis] = Math.max(fighter.prev[base + axis], -limit);
+      }
     }
+  }
+}
+
+// The body part a particle meeting the floor bruises; the feet are made for it.
+const IMPACT_PART = {
+  neck: 'trunk', lShoulder: 'trunk', rShoulder: 'trunk', pelvis: 'trunk', lHip: 'trunk', rHip: 'trunk',
+  lElbow: 'lUpperArm', rElbow: 'rUpperArm', lHand: 'lForearm', rHand: 'rForearm', lKnee: 'lThigh', rKnee: 'rThigh',
+};
+// The joint a hard landing on a particle breaks: an arm thrown out to break
+// a fall (the classic fall fracture). A knee drop is bruising, not a break.
+const IMPACT_JOINT = { lHand: 'lElbow', rHand: 'rElbow', lElbow: 'lElbow', rElbow: 'rElbow' };
+
+/**
+ * A part hits the floor at `speed` (m/s, downwards): the head takes it as a
+ * blow (it can stun, drop, knock out); the rest as bruising, worse for
+ * fragile bone and less in armour; a hard landing on a hand, elbow or knee
+ * can break it. A man already out feels nothing more.
+ */
+function groundImpact(world, fighter, index, speed) {
+  const spec = WORLD.impact;
+  if (fighter.state === 'out' || speed <= spec.minSpeed) return;
+  const name = PARTICLES[index];
+  const gear = fighter.body.gear;
+  const through = speed - spec.minSpeed;
+  const spread = 1 - (gear.protection.blunt ?? 0);
+  const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
+  if (name === 'head') {
+    const deltaV = through * spec.head * spread;
+    if (deltaV < 0.5) return;
+    // Credit for what the floor does goes to whoever put him there.
+    const event = { time: world.time, kind: 'impact', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, fighter: fighter.id, defender: fighter.id, target: 'head', speed, headDeltaV: deltaV, harmDeltaV: deltaV, effects: ['head hit the ground'], point: point(fighter.x, index) };
+    world.events.push(event);
+    applyHeadDamage(world, fighter, event);
+    return;
+  }
+  const part = IMPACT_PART[name];
+  if (!part) return;
+  addDamage(fighter, part, (through * spec.body * spread) / bone, false);
+  const joint = IMPACT_JOINT[name];
+  if (joint && !fighter.broken.has(joint) && speed > spec.fractureSpeed * bone) {
+    breakJoint(world, fighter, joint);
+    world.events.push({ time: world.time, kind: 'impact', fighter: fighter.id, target: part, speed, effects: [`${name.slice(1).toLowerCase()} broken in the fall`], point: point(fighter.x, index) });
   }
 }
 
@@ -2816,10 +2936,13 @@ function pushApart(world, first, second) {
 /** A charge landing: the trunks exchange momentum as two effective masses would. */
 function collideBodies(world, first, second, normal) {
   const charger = first.rush && !first.rush.hit ? first : second.rush && !second.rush.hit ? second : null;
-  if (!charger) return;
   const velocity = (fighter) => vec.scale(TRUNK_PARTICLES.reduce((sum, index) => vec.add(sum, vec.scale(point(fighter.v, index), fighter.body.masses[index])), [0, 0, 0]), 1 / TRUNK_PARTICLES.reduce((sum, index) => sum + fighter.body.masses[index], 0));
   // Normal points from second to first; closing speed is how fast they meet.
   const closing = vec.dot(vec.sub(velocity(second), velocity(first)), normal);
+  if (!charger) {
+    bodiesMeet(world, first, second, closing);
+    return;
+  }
   if (closing < WORLD.rush.minClosing) return;
   charger.rush.hit = true;
   charger.rush.t = Math.max(charger.rush.t, charger.rush.duration - 0.15);
@@ -2835,7 +2958,31 @@ function collideBodies(world, first, second, normal) {
   world.pendingImpulses.push({ fighter: second, shares: everywhere, direction: vec.scale(normal, -1), impulse, braced: braced(second, vec.scale(normal, -1)) });
   const struck = charger === first ? second : first;
   struck.stamina = Math.max(0, struck.stamina - impulse / (struck.body.massKg * 2) / struck.body.aerobic);
+  // Both bodies take their own speed change: the lighter one more.
+  for (const fighter of [first, second]) bodyBlow(fighter, impulse / (fighter.body.massKg * WORLD.rush.trunkShare), WORLD.impact.charge);
   world.events.push({ time: world.time, kind: 'collision', attacker: charger.id, defender: struck.id, punch: 'rush', target: 'trunk', speed: closing, impulse, force: 0, headDeltaV: 0, effects: [], point: point(struck.x, P.neck), normal });
+}
+
+/** Two bodies running into each other (no charge): past `bumpSpeed`, both are hurt by it. */
+function bodiesMeet(world, first, second, closing) {
+  const spec = WORLD.impact;
+  if (closing < spec.bumpSpeed) return;
+  const key = first.id < second.id ? `${first.id}:${second.id}` : `${second.id}:${first.id}`;
+  world.bumps ??= new Map();
+  if (world.time - (world.bumps.get(key) ?? -Infinity) < spec.bumpEvery) return;
+  world.bumps.set(key, world.time);
+  const m1 = first.body.massKg * WORLD.rush.trunkShare;
+  const m2 = second.body.massKg * WORLD.rush.trunkShare;
+  const impulse = ((m1 * m2) / (m1 + m2)) * closing;
+  for (const fighter of [first, second]) bodyBlow(fighter, impulse / (fighter.body.massKg * WORLD.rush.trunkShare), spec.charge);
+  world.events.push({ time: world.time, kind: 'bump', attacker: first.id, defender: second.id, speed: closing, impulse, effects: [] });
+}
+
+/** A whole-body blow of `deltaV` (m/s) to the trunk: spread by armour, borne by bone. */
+function bodyBlow(fighter, deltaV, share) {
+  if (fighter.state === 'out') return;
+  const spread = 1 - (fighter.body.gear.protection.blunt ?? 0);
+  addDamage(fighter, 'trunk', (deltaV * share * spread) / Math.max(0.4, fighter.body.boneDensity ?? 1), false);
 }
 
 /** Which of the struck fighter's particles take the blow, and in what share. */

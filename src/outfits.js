@@ -21,7 +21,8 @@ export const DAMAGE_TYPES = ['blunt', 'cut', 'pierce'];
 export const MOVEMENT = {
   excellent: { foot: 1, accel: 1, swing: 1 },
   good: { foot: 0.92, accel: 0.88, swing: 0.97 },
-  limited: { foot: 0.72, accel: 0.62, swing: 0.88 },
+  // Heavy kit (plate, SWAT, a suit): slower, but not far behind (it was 0.72 / 0.62 / 0.88).
+  limited: { foot: 0.82, accel: 0.75, swing: 0.92 },
 };
 
 // `bullet`: share of a pistol round's harm stopped, by region (see GUN).

@@ -165,7 +165,8 @@ test('a sword holds its range against fists, attacks often, and fends punches of
   let fended = 0;
   let attacks = 0;
   let minutes = 0;
-  for (let seed = 1200; seed < 1204; seed += 1) {
+  // Twelve bouts: a sword ends most of them in seconds, so a fended punch is a rare event.
+  for (let seed = 1200; seed < 1212; seed += 1) {
     const world = createWorld([fighterFor('contender:longsword'), fighterFor('contender:street')], { seed });
     let elapsed = 0;
     while (elapsed < 60 && !boutWinner(world)) {
