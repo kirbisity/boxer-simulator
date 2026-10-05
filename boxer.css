@@ -63,10 +63,10 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .banner p { margin: 0 0 12px; font: 700 34px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
 
 .builder { position: absolute; inset: 0; background: rgba(5, 6, 10, 0.72); display: grid; place-items: center; padding: 12px; }
-.sheet { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 16px; width: min(900px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 10px; }
+.sheet { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 16px; width: min(900px, 100%); max-height: 100%; overflow: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .sheet h1 { margin: 0; font: 700 28px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
 .sheet .lede { margin: 0; color: var(--muted); max-width: 65ch; }
-.corners { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.corners { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .corner { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
 .corner h2 { margin: 0; font: 700 18px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
 .corner.red h2 { color: var(--red); }
@@ -100,7 +100,7 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
   .controls { gap: 5px; padding-inline: 8px; }
   .controls button { padding: 6px 9px; font-size: 13px; }
   .log li:nth-child(n + 3) { display: none; }
-  .corners { grid-template-columns: 1fr; }
+  .corners { grid-template-columns: minmax(0, 1fr); }
   .corner-tabs { display: flex; }
   .sheet { padding: 12px; gap: 8px; }
   .corner { gap: 4px; padding: 8px 10px; }
@@ -387,4 +387,44 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
   .dw-middle { flex-direction: column; gap: 8px; }
   .dw-fight { padding: 8px 18px; }
   .dw-tabs { padding: 0 4px; margin-top: 32px; }
+}
+
+/* ---- The fighter builder on a phone: the whole screen, scrolling down,
+   with Fight always in reach at the bottom ---- */
+@media (max-width: 640px) {
+  .builder { padding: 0; place-items: stretch; }
+  .sheet {
+    width: 100%; max-height: none; height: 100%; border: 0; border-radius: 0;
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; align-content: start;
+    /* Rows keep their content's height: a full-height grid would squash the clipped ones (the corner tabs). */
+    grid-auto-rows: max-content;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 0;
+  }
+  .sheet h1 { font-size: 24px; }
+  .corner-tabs { justify-self: stretch; }
+  .corner-tabs button { flex: 1; padding: 10px; font-size: 15px; }
+  .corner { padding: 10px; gap: 8px; }
+  .fields { gap: 6px; }
+  .field { grid-template-columns: 70px minmax(0, 1fr) 64px; font-size: 14px; }
+  .field.wide { grid-template-columns: 70px minmax(0, 1fr); }
+  .field select, .field input:not([type=range]) { padding: 8px; font-size: 16px; }
+  .field input[type=range] { height: 28px; }
+  .looks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+  .look-field { grid-template-columns: 52px minmax(0, 1fr); font-size: 13px; }
+  .look-field select { padding: 7px 4px; font-size: 15px; }
+  .looks .shuffle { grid-column: 1 / -1; padding: 9px; }
+  .derived { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .share { flex-wrap: wrap; }
+  .share .code { flex-basis: 100%; padding: 8px; font-size: 13px; }
+  .share button { flex: 1; padding: 9px; }
+  /* The setup tools scroll with the rest; Fight alone stays pinned to the bottom. */
+  .builder-actions { display: contents; }
+  #setup-code { min-height: 36px; font-size: 13px; }
+  .builder-actions > button { padding: 10px; font-size: 14px; }
+  #close-builder {
+    position: sticky; bottom: 0; z-index: 1; margin: 4px -16px 0; border-radius: 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 17px;
+    box-shadow: 0 -8px 16px rgba(5, 6, 10, 0.5);
+  }
+  /* The sandbox's footer: never more than half the screen; it scrolls down past that. */
+  body[data-game="sandbox"] .controls { max-height: 48%; overflow-y: auto; }
 }
