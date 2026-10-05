@@ -44,6 +44,18 @@ const MOTOR_GROUP = {
   lElbow: 'elbow', rElbow: 'elbow', lHand: 'hand', rHand: 'hand', lKnee: 'knee', rKnee: 'knee',
   pelvis: 'pelvis', lFoot: 'foot', rFoot: 'foot',
 };
+// Each particle, described once: its name, side, what kind of part it is,
+// its muscle group and its anchor (read every substep by the integrator).
+const PARTICLE_INFO = PARTICLES.map((name, index) => ({
+  index, name, side: name[0],
+  arm: name.endsWith('Hand') || name.endsWith('Elbow'),
+  foot: name.endsWith('Foot'), knee: name.endsWith('Knee'),
+  leg: name.endsWith('Foot') || name.endsWith('Knee'),
+  hip: P[`${name[0]}Hip`],
+  anchor: ANCHOR[name] === null ? null : P[ANCHOR[name]],
+  motorGroup: MOTOR_GROUP[name],
+  upperArm: `${name[0]}UpperArm`, forearm: `${name[0]}Forearm`,
+}));
 export const TRUNK_PARTICLES = ['pelvis', 'lHip', 'rHip', 'neck', 'lShoulder', 'rShoulder'].map((name) => P[name]);
 const STRUCK = ['head', 'trunk', 'lForearm', 'rForearm', 'lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShank', 'rShank'];
 export const BLOCKING = new Set(['lForearm', 'rForearm', 'lUpperArm', 'rUpperArm']);
@@ -983,6 +995,9 @@ function rawFootTarget(fighter, foot) {
 
 // ---- Stepping -------------------------------------------------------------
 
+// The fighters stepping this substep, refilled each substep (not reallocated).
+const moving = [];
+
 /** Advance the world by `dt` seconds (one outer step, several substeps). */
 export function step(world, dt) {
   for (const fighter of world.fighters) {
@@ -1001,15 +1016,18 @@ export function step(world, dt) {
     // A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all.
     const stepping = (fighter) => fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
     const span = (fighter) => (fighter.detail === 'coarse' ? stride * h : h);
-    const moving = world.fighters.filter((fighter) => !asleep(fighter) && stepping(fighter));
+    moving.length = 0;
+    for (const fighter of world.fighters) if (!asleep(fighter) && stepping(fighter)) moving.push(fighter);
     for (const fighter of moving) {
-      if (isLimp(fighter)) relaxedTone(fighter, span(fighter));
-      integrate(fighter, span(fighter), time);
+      const own = span(fighter);
+      if (isLimp(fighter)) relaxedTone(fighter, own);
+      integrate(fighter, own, time);
     }
     for (const fighter of moving) {
-      solveConstraints(fighter, span(fighter));
-      solveJointLimits(world, fighter, span(fighter));
-      if (fighter.weapon?.held) updateWeapon(fighter, span(fighter));
+      const own = span(fighter);
+      solveConstraints(fighter, own);
+      solveJointLimits(world, fighter, own);
+      if (fighter.weapon?.held) updateWeapon(fighter, own);
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
     for (const fighter of world.fighters) if (fighter.pin) holdPin(world, fighter, h);
@@ -1022,9 +1040,10 @@ export function step(world, dt) {
         continue;
       }
       if (!stepping(fighter)) continue;
-      collideGround(world, fighter, span(fighter), world.arena);
-      for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / span(fighter);
-      settleWhenStill(fighter, span(fighter));
+      const own = span(fighter);
+      collideGround(world, fighter, own, world.arena);
+      for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / own;
+      settleWhenStill(fighter, own);
     }
     for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
     world.pendingImpulses = [];
@@ -1374,49 +1393,51 @@ function motorTarget(fighter, index) {
 }
 
 function standingTarget(fighter, index) {
-  const name = PARTICLES[index];
+  const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
-  if (fighter.pin && (name.endsWith('Foot') || name.endsWith('Knee'))) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
-  if (name.endsWith('Foot')) return { target: footTarget(fighter, fighter.feet[name[0]]), velocity: [0, 0, 0] };
-  if (name.endsWith('Knee')) {
-    const side = name[0];
-    if (fighter.feet[side].lifted) return { target: toWorld(fighter, desired), velocity: point(fighter.v, P[`${side}Hip`]) };
-    const hip = point(fighter.x, P[`${side}Hip`]);
+  if (fighter.pin && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
+  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: [0, 0, 0] };
+  if (info.knee) {
+    const side = info.side;
+    if (fighter.feet[side].lifted) return { target: toWorld(fighter, desired), velocity: point(fighter.v, info.hip) };
+    const hip = point(fighter.x, info.hip);
     const foot = footTarget(fighter, fighter.feet[side]);
     const pole = yawRotate([1, 0, side === 'l' ? 0.35 : -0.35], fighter.yaw);
     const L = fighter.body.lengths;
-    return { target: twoBoneIK(hip, foot, L.thigh, L.shank, pole), velocity: point(fighter.v, P[`${side}Hip`]) };
+    return { target: twoBoneIK(hip, foot, L.thigh, L.shank, pole), velocity: point(fighter.v, info.hip) };
   }
-  const anchorName = ANCHOR[name];
-  if (anchorName === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
-  const anchor = P[anchorName];
+  if (info.anchor === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
+  const anchor = info.anchor;
   const offset = yawRotate(vec.sub(desired, fighter.desired[anchor]), fighter.yaw);
   return { target: vec.add(point(fighter.x, anchor), offset), velocity: point(fighter.v, anchor) };
 }
+
+// Scratch for the integrator's muscle drive (one particle at a time).
+const want = [0, 0, 0];
 
 function integrate(fighter, h, time) {
   const fatigue = 0.55 + 0.45 * fighter.stamina;
   const alive = fighter.state === 'up' || fighter.state === 'rising';
   const damping = Math.exp(-h * (alive ? WORLD.damping.up : WORLD.damping.down));
+  // A hand's health is the same for both its particles: once per side.
+  const hands = { l: fatigue * handHealth(fighter, 'l'), r: fatigue * handHealth(fighter, 'r') };
   for (let index = 0; index < PARTICLES.length; index += 1) {
-    const name = PARTICLES[index];
+    const info = PARTICLE_INFO[index];
     const base = index * 3;
     const { target, velocity } = motorTarget(fighter, index);
     fighter.targets[index] = target;
     let acceleration = [0, -WORLD.gravity, 0];
-    const arm = name.endsWith('Hand') || name.endsWith('Elbow');
-    const scale = fighter.motorScale * (arm ? fatigue * handHealth(fighter, name) : 1) * reflexShare(fighter, time - fighter.hitAt[index]);
+    const scale = fighter.motorScale * (info.arm ? hands[info.side] : 1) * reflexShare(fighter, time - fighter.hitAt[index]);
     if (scale > 0.01) {
-      const { omega, zeta } = WORLD.motor[MOTOR_GROUP[name]];
-      const want = [];
+      const { omega, zeta } = WORLD.motor[info.motorGroup];
       for (let axis = 0; axis < 3; axis += 1) {
         // Spring towards the target, damper towards its velocity, and hold
         // the part up against gravity — all within the muscle's force.
-        want.push(omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? WORLD.gravity : 0));
+        want[axis] = omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? WORLD.gravity : 0);
       }
       const size = vec.length(want);
-      let cap = motorForceNow(fighter, index, name) * scale * fighter.invMass[index];
+      let cap = motorForceNow(fighter, index, info) * scale * fighter.invMass[index];
       const top = fighter.body.topSpeed[index];
       if (top < Infinity && size > 0) {
         // Hill: the faster the limb already moves the way it is being driven,
@@ -1439,25 +1460,26 @@ function integrate(fighter, h, time) {
  * The force a particle's muscles can apply now: a striking or lifted limb
  * uses the force that drives strikes; damaged legs lose some of theirs.
  */
-function motorForceNow(fighter, index, name) {
+function motorForceNow(fighter, index, info) {
   if (fighter.limp.has(index)) return 0;
   const body = fighter.body;
   let force = body.motorForce[index];
   const punch = fighter.punch;
-  const side = name[0];
-  const legPart = name.endsWith('Foot') || name.endsWith('Knee');
-  if (punch && (punch.limb === index || (legPart && punch.spec.limb.startsWith(side) && punch.spec.limb.match(/Foot|Knee/)))) force = Math.max(force, body.strikeForce[index]);
+  const side = info.side;
+  const legPart = info.leg;
+  if (punch && (punch.limb === index || (legPart && punch.spec.limb.startsWith(side) && (punch.spec.limb.includes('Foot') || punch.spec.limb.includes('Knee'))))) force = Math.max(force, body.strikeForce[index]);
   else if (legPart && fighter.feet[side].lifted) force = body.strikeForce[index];
-  if (legPart || name === 'pelvis') {
-    const damage = name === 'pelvis' ? (fighter.legDamage.l + fighter.legDamage.r) / 2 : fighter.legDamage[side];
+  if (legPart || info.name === 'pelvis') {
+    const damage = info.name === 'pelvis' ? (fighter.legDamage.l + fighter.legDamage.r) / 2 : fighter.legDamage[side];
     force *= 1 - 0.6 * Math.min(1, damage / legCapacity());
   }
   return force;
 }
 
-function handHealth(fighter, name) {
-  const side = name[0];
-  const beaten = Math.max(fighter.damage[`${side}UpperArm`] ?? 0, fighter.damage[`${side}Forearm`] ?? 0);
+const ARM_PARTS = { l: ['lUpperArm', 'lForearm'], r: ['rUpperArm', 'rForearm'] };
+
+function handHealth(fighter, side) {
+  const beaten = Math.max(fighter.damage[ARM_PARTS[side][0]] ?? 0, fighter.damage[ARM_PARTS[side][1]] ?? 0);
   const broken = fighter.injuries.some((injury) => injury.kind === 'hand' && injury.side === side) ? 0.6 : 1;
   return broken * (1 - WORLD.hurt.armForcePerDamage * beaten);
 }

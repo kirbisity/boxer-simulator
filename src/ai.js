@@ -265,11 +265,22 @@ function chooseFocus(world, fighter) {
     return nearestOpponent(world, fighter);
   }
   const at = point(fighter.x, P.pelvis);
-  const score = (other) => {
-    const crowd = world.fighters.filter((mate) => mate !== fighter && mate.corner === fighter.corner && mate.focus === other.id && mate.state === 'up').length;
-    return vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * crowd;
-  };
-  const next = standing.reduce((best, other) => (score(other) < score(best) ? other : best));
+  // How many of his side already go for each man: counted once, not per comparison.
+  const crowds = new Map();
+  for (const mate of world.fighters) {
+    if (mate !== fighter && mate.corner === fighter.corner && mate.state === 'up' && mate.focus !== undefined) crowds.set(mate.focus, (crowds.get(mate.focus) ?? 0) + 1);
+  }
+  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * (crowds.get(other.id) ?? 0);
+  // The nearest, least crowded: each scored once (the first of equals kept, as before).
+  let next = standing[0];
+  let best = score(next);
+  for (let index = 1; index < standing.length; index += 1) {
+    const value = score(standing[index]);
+    if (value < best) {
+      next = standing[index];
+      best = value;
+    }
+  }
   if (next.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: next.id, effects: [] });
   fighter.focus = next.id;
   return next;
