@@ -352,3 +352,38 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
 .screen.dw .screen-body { grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
 .dw-side { grid-template-rows: minmax(0, 1fr) auto; }
 .dw-stage { min-height: 0; }
+
+/* ---- Factions: tabs over each Deadliest Warrior carousel ---- */
+.dw-side { grid-template-rows: auto minmax(0, 1fr) auto; }
+.dw-tabs { grid-column: 1 / -1; display: flex; justify-content: center; gap: 4px; padding: 0 56px; min-width: 0; flex-wrap: nowrap; }
+.dw-tab { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; font-size: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; white-space: nowrap; }
+.dw-tab b { font: 600 12px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.dw-tab.on { border-color: var(--gold); background: rgba(255, 207, 74, 0.14); color: var(--fg); }
+.dw-tab { color: var(--fg); }
+.dw-stage, .dw-arrow { grid-row: 2; }
+.dw-name { grid-row: 3; }
+@media (max-width: 760px) {
+  /* Under the corner and "make your own", a row of their own. */
+  .dw-tabs { padding: 0 4px; gap: 3px; margin-top: 26px; }
+  .dw-tab { padding: 4px 7px; font-size: 15px; }
+  .dw-tab b { display: none; }
+  .dw-tab.on b { display: inline; font-size: 11px; }
+}
+/* The maker's styles, under their factions. */
+.style-group { display: grid; gap: 6px; }
+.style-group + .style-group { margin-top: 10px; }
+.style-faction { font: 600 12px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+/* A phone on its side: little height, so the tabs share the top line and the subtitle goes. */
+@media (max-height: 480px) {
+  .dw-tabs { margin-top: 0; padding: 0 118px 0 54px; }
+  .dw-tab { padding: 2px 6px; font-size: 13px; }
+  .dw-tab b, .dw-tab.on b { display: none; }
+  .dw-name span { display: none; }
+}
+@media (max-height: 480px) and (min-width: 560px) {
+  /* Side by side instead of stacked: each carousel gets the full height. */
+  .screen.dw .screen-body { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); width: 100%; }
+  .dw-middle { flex-direction: column; gap: 8px; }
+  .dw-fight { padding: 8px 18px; }
+  .dw-tabs { padding: 0 4px; margin-top: 32px; }
+}

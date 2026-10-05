@@ -95,7 +95,7 @@ test('the rebellion opens with the knights in a tight line and the rebels a loos
   assert.ok(new Set(rebels.map((fighter) => fighter.root[0].toFixed(1))).size > 6, 'not in ranks');
 });
 
-test('Sekigahara: forty a side, samurai and ashigaru each with several weapons, the bows behind', async () => {
+test('Sekigahara: forty a side, samurai and ashigaru each with several weapons, the bows and teppō behind', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.sekigahara.cast(seededRandom(7));
   for (const side of [cast.red, cast.blue]) {
@@ -104,9 +104,11 @@ test('Sekigahara: forty a side, samurai and ashigaru each with several weapons, 
     const ashigaru = side.filter((fighter) => fighter.outfit.kind === 'ashigaru');
     assert.ok(new Set(samurai.map((fighter) => fighter.style)).size >= 3, 'samurai weapons differ');
     assert.ok(new Set(ashigaru.map((fighter) => fighter.style)).size >= 3, 'ashigaru weapons differ');
-    assert.ok(side.filter((fighter) => fighter.style === 'bow').length >= 8, 'archers');
-    const firstBow = side.findIndex((fighter) => fighter.style === 'bow');
-    assert.ok(side.slice(firstBow).every((fighter) => fighter.style === 'bow'), 'bows in the rear ranks');
+    const shooting = (fighter) => fighter.style === 'bow' || fighter.style === 'matchlock';
+    assert.ok(side.filter((fighter) => fighter.style === 'bow').length >= 5, 'archers');
+    assert.ok(side.some((fighter) => fighter.style === 'matchlock' && fighter.outfit.kind === 'ashigaru'), 'teppō ashigaru');
+    const firstShooter = side.findIndex(shooting);
+    assert.ok(side.slice(firstShooter).every(shooting), 'bows and guns in the rear ranks');
     assert.notEqual(side[0].outfit.kind, 'ashigaru', 'a samurai leads');
   }
 });

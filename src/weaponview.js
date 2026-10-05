@@ -140,6 +140,35 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(muzzle);
       break;
     }
+    case 'matchlock': {
+      // A teppō / arquebus: a long octagonal iron barrel on a slender wooden
+      // stock, brass bands, the serpentine and pan by the trigger hand with
+      // the match smouldering in it, the ramrod under the barrel (+z is up).
+      const barrelIron = steelMaterial(envMap, { vertexColors: false, color: 0x3a3c40, roughness: 0.45 });
+      const barrel = cylinder(0.011, 0.014, 0, spec.length, barrelIron, 8);
+      barrel.position.z = 0.03;
+      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.032, spec.handle + 0.12, 0.05), wood);
+      stock.position.set(0, -spec.handle / 2 + 0.04, -0.005);
+      stock.rotation.x = 0.08;
+      const forestock = new THREE.Mesh(new THREE.BoxGeometry(0.03, spec.length - 0.12, 0.026), wood);
+      forestock.position.set(0, (spec.length - 0.12) / 2 + 0.04, 0.012);
+      const ramrod = cylinder(0.004, 0.004, 0.08, spec.length - 0.04, dark, 6);
+      ramrod.position.z = -0.006;
+      const lock = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.07, 0.02), brass);
+      lock.position.set(0, 0.03, 0.022);
+      const serpentine = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 0.04), brass);
+      serpentine.position.set(0.02, 0.0, 0.045);
+      serpentine.rotation.x = -0.5;
+      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff6a1a }));
+      ember.position.set(0.02, 0.012, 0.064);
+      group.add(barrel, stock, forestock, ramrod, lock, serpentine, ember);
+      for (const at of [0.35, 0.7, 0.96]) {
+        const band = cylinder(0.016, 0.016, at - 0.008, at + 0.008, brass, 8);
+        band.position.z = 0.03;
+        group.add(band);
+      }
+      break;
+    }
     case 'baton': {
       group.add(cylinder(0.017, 0.016, -spec.handle, spec.length, dark, 12));
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), dark);
@@ -618,7 +647,7 @@ export function spawnBlood(view, at, direction, count, speed = 2.2) {
 
 // ---- Shots ------------------------------------------------------------------
 
-const SHOT = { flashSeconds: 0.06, tracerSeconds: 0.08 };
+const SHOT = { flashSeconds: 0.06, tracerSeconds: 0.08, smokeSeconds: 2.5 };
 
 /** A shot: the flash at the muzzle, a streak to where it went, and what it hit. */
 export function spawnShot(view, event) {
@@ -629,10 +658,28 @@ export function spawnShot(view, event) {
   const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, length, 4, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.85, depthWrite: false }));
   tracer.position.copy(from).lerp(to, 0.5);
   tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
-  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffc35a, transparent: true, opacity: 1, depthWrite: false }));
+  const heavy = WEAPONS[event.weapon]?.shot;
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(heavy ? 0.12 : 0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffc35a, transparent: true, opacity: 1, depthWrite: false }));
   flash.position.copy(from);
   view.scene.add(tracer, flash);
   shots.push({ tracer, flash, age: 0 });
+  // Black powder: a cloud of white smoke hangs where the gun went off.
+  if (heavy) {
+    // A few soft puffs, not one ball, sharing one fading material.
+    const material = new THREE.MeshLambertMaterial({ color: 0xe9e6df, transparent: true, opacity: 0.6, depthWrite: false });
+    const smoke = new THREE.Group();
+    smoke.material = material;
+    const ahead = to.clone().sub(from).normalize();
+    for (let puff = 0; puff < 5; puff += 1) {
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.07 + Math.random() * 0.07, 8, 6), material);
+      ball.position.copy(ahead).multiplyScalar(0.1 + puff * 0.08).add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).multiplyScalar(0.12));
+      smoke.add(ball);
+    }
+    smoke.position.copy(from);
+    smoke.geometry = { dispose() { for (const ball of smoke.children) ball.geometry.dispose(); } };
+    view.scene.add(smoke);
+    shots.push({ smoke, age: 0 });
+  }
   if (event.plate === 'knight') {
     // Off plate: a spray of sparks and the round whining away off the steel.
     spawnSparks(view, event.point, 16);
@@ -654,6 +701,18 @@ export function updateShots(view, dt) {
   if (!view.shots?.length) return;
   view.shots = view.shots.filter((shot) => {
     shot.age += dt;
+    if (shot.smoke) {
+      // The smoke swells, drifts up and thins over a couple of seconds.
+      const share = shot.age / SHOT.smokeSeconds;
+      shot.smoke.scale.setScalar(1 + share * 3);
+      shot.smoke.position.y += dt * 0.15;
+      shot.smoke.material.opacity = 0.6 * Math.max(0, 1 - share);
+      if (share < 1) return true;
+      view.scene.remove(shot.smoke);
+      shot.smoke.geometry.dispose();
+      shot.smoke.material.dispose();
+      return false;
+    }
     shot.flash.material.opacity = Math.max(0, 1 - shot.age / SHOT.flashSeconds);
     shot.flash.scale.setScalar(1 + shot.age * 12);
     shot.tracer.material.opacity = 0.85 * Math.max(0, 1 - shot.age / SHOT.tracerSeconds);

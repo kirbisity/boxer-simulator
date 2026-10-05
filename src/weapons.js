@@ -14,6 +14,33 @@
 
 import { vec } from './pose.js';
 
+/**
+ * A matchlock's shot, for its realism. A lead ball of ~13 g leaves the
+ * muzzle at ~400 m/s: ~1 kJ, about twice a 9 mm pistol round, and a soft
+ * ball that flattens in the wound. One in the body nearly always drops a man
+ * (`lethal`, against GUN's); one in an arm or leg usually shatters the bone
+ * (`limbBreak`, the share that breaks the joint, less what armour stops).
+ * Armour stops less of it than of a pistol round (see GUN.rating). Smoothbore,
+ * braced at the cheek: tight at duel range (`spread`, rad) but thrown wide by
+ * moving. Now and then the priming flashes
+ * without firing the charge (`misfire`). A trained
+ * gunner reloads in ~15 s (`reloadSeconds`): powder, ball, ramrod, priming.
+ */
+export const MATCHLOCK = {
+  energy: 1000,
+  // A body hit: past the line that drops a man (1) unless armour proofed against
+  // it (tōsei, plate, a SWAT vest) held a good share.
+  lethal: { head: 1, torso: 1.35, limb: 0.45 },
+  bleed: { head: 0.03, torso: 0.04, limb: 0.02 },
+  limbBreak: 0.75,
+  impulse: 5.2,
+  recoil: 9,
+  spread: 0.014,
+  movingSpread: 0.035,
+  misfire: 0.08,
+  reloadSeconds: 15,
+};
+
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
@@ -72,6 +99,20 @@ export const WEAPONS = {
     label: 'Pistol', hands: 'one', length: 0.19, strikeFrom: 0.04, handle: 0.05, mass: 0.75, balance: 0.04, radius: 0.018,
     harm: { swing: { blunt: 0.7 }, thrust: { blunt: 0.5 } },
     contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 22, zeta: 0.9 }, threat: 6, grip: 0.12, ranged: true, edgeUp: true,
+  },
+  // A matchlock (the Japanese teppō, the European arquebus): a smoothbore
+  // long gun fired by a lit match, the stock to the cheek, the support hand
+  // ahead under the barrel (`supportAhead`). One heavy lead ball (`shot`),
+  // then a long reload; swung in close, the stock clubs. `length` runs to
+  // the muzzle, `handle` back to the butt.
+  matchlock: {
+    label: 'Matchlock', hands: 'two', length: 1.0, strikeFrom: 0.2, handle: 0.32, spacing: 0.42, supportAhead: true, longGun: true,
+    mass: 3.8, balance: 0.3, radius: 0.02,
+    harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 11, zeta: 0.9 }, threat: 5, grip: 0.7, ranged: true, edgeUp: true,
+    // The muzzle from the trigger hand (along the barrel, above it), m.
+    muzzle: [1.0, 0.02],
+    shot: MATCHLOCK,
   },
   // A bow (`bow`): held in the left hand (`hand`), the stave running
   // `length` up and `handle` down from the grip. It looses arrows (ARROW);
@@ -184,7 +225,23 @@ export const GUN = {
   unsettled: 0.05,
   impulse: 2.9, // N·s a 9 mm round carries into what it hits
   plated: ['knight', 'samurai', 'swat'], // armour a round is seen to strike, not enter
+  // An outfit's `bullet` protection is what it stops of this round (J, a
+  // 9 mm's energy). Against a heavier ball it stops that share only up to
+  // what it is proof against (`rating`, J): a SWAT vest (rated against a
+  // .44 Magnum) stops a matchlock ball as well; proofed plate stops about
+  // two thirds as much; the bullet-tested tōsei dō, nine tenths; anything
+  // else, only what it would of a pistol round's worth.
+  energy: 520,
+  rating: { swat: 1500, samuraiTosei: 900, knight: 650 },
+  // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
+  platedHolds: 0.45,
 };
+
+/** The share of an outfit's bullet protection that holds against a shot of `energy` J. */
+export function bulletProof(kind, energy = GUN.energy) {
+  const rating = Math.max(GUN.rating[kind] ?? GUN.energy, GUN.energy);
+  return Math.min(1, rating / energy);
+}
 
 /**
  * Arrows: loosed at `speed` (m/s), falling under gravity, aimed a little
@@ -215,7 +272,7 @@ export function bulletRegion(capsuleKey) {
  * as spears and hammers are held, so neither arm folds back.
  */
 export function offHandAlong(spec) {
-  return spec.leadAhead ? spec.spacing : -spec.spacing;
+  return spec.leadAhead || spec.supportAhead ? spec.spacing : -spec.spacing;
 }
 
 /**
@@ -254,6 +311,8 @@ export function createWeapon(kind) {
   return {
     kind, spec, main: spec.hand === 'l' ? 'l' : 'r', off: spec.hand === 'l' ? 'r' : 'l', held: true, twoHanded: spec.hands !== 'one',
     dir: [1, 0, 0], spin: [0, 0, 0], tip: [0, 0, 0], tipPrev: null, tipVelocity: [0, 0, 0], strain: 0,
+    // A gun with a charge (a matchlock) starts loaded.
+    loaded: true, reloaded: 0,
   };
 }
 

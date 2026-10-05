@@ -11,7 +11,7 @@ import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { installMenus } from './menu.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
-import { CLOTH_COLORS, defaultHeadgear, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, outfitOf, randomColors } from './outfits.js';
+import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
@@ -660,7 +660,13 @@ function buildCornerForm(corner) {
     fillCornerForm(corner);
   });
   const presetSelect = form.querySelector('.preset');
-  presetSelect.replaceChildren(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, key)));
+  // The characters under their factions.
+  presetSelect.replaceChildren(...FACTION_KEYS.map((faction) => {
+    const group = document.createElement('optgroup');
+    group.label = `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}`;
+    group.append(...Object.entries(PRESETS).filter(([, preset]) => factionOf(preset) === faction).map(([key, preset]) => new Option(preset.name, key)));
+    return group;
+  }).filter((group) => group.children.length));
   presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === current(corner).name) ?? 'heavy';
   presetSelect.addEventListener('change', () => {
     const chosen = normaliseInputs(structuredClone(PRESETS[presetSelect.value]));

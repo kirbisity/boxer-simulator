@@ -14,10 +14,11 @@ import { footSoldier, nobleKnight, rebel, sengokuWarrior, swatOfficer, yakuza } 
  * the bout is built, as the builder's slider would.
  */
 // One side at Sekigahara, forty strong: a samurai leads; the ashigaru are
-// mostly yari and bows. Blades and polearms first (the front ranks), bows last.
+// mostly yari, with bows and teppō. Blades and polearms first (the front
+// ranks), the bows and guns last.
 const SEKIGAHARA_SIDE = {
   samurai: { katana: 4, naginata: 3, spear: 3, bow: 2 },
-  ashigaru: { spear: 12, bow: 9, katana: 5, naginata: 2 },
+  ashigaru: { spear: 12, bow: 5, matchlock: 4, katana: 5, naginata: 2 },
 };
 
 function sekigaharaSide(random, side) {
@@ -27,8 +28,8 @@ function sekigaharaSide(random, side) {
       for (let index = 0; index < count; index += 1) warriors.push(sengokuWarrior(random, side, style, rank));
     }
   }
-  const archer = (warrior) => (warrior.style === 'bow' ? 1 : 0);
-  return warriors.sort((a, b) => archer(a) - archer(b));
+  const shooter = (warrior) => (warrior.style === 'bow' || warrior.style === 'matchlock' ? 1 : 0);
+  return warriors.sort((a, b) => shooter(a) - shooter(b));
 }
 
 export const SCENARIOS = {
@@ -53,7 +54,7 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: 'The battle that ends the Sengoku. Forty of the East in red against forty of the West in black and blue: spears, blades and polearms in front, bows behind.',
+    blurb: 'The battle that ends the Sengoku. Forty of the East in red against forty of the West in black and blue: spears, blades and polearms in front, bows and teppō behind.',
     scene: 'sengoku',
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },

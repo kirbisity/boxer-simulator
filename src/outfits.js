@@ -402,6 +402,33 @@ export function familyKinds(family) {
 }
 
 /** The outfit a fighter wears: kind and design, defaulting to boxing's first. */
+// ---- Factions -----------------------------------------------------------------
+
+/**
+ * The factions characters are grouped under, by culture and era: for
+ * choosing them in the menus. A faction has no effect on the fight.
+ */
+export const FACTIONS = {
+  knights: { label: 'Knights', glyph: '🏰', blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
+  japanese: { label: 'Japanese', glyph: '⛩️', blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
+  gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
+  ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
+  street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
+  law: { label: 'Law', glyph: '🚓', blurb: 'Police and SWAT: the baton and the service pistol.' },
+};
+export const FACTION_KEYS = Object.keys(FACTIONS);
+
+// What an outfit says about who wears it; an armour family covers its kinds.
+const FACTION_OF_FAMILY = { knight: 'knights', samurai: 'japanese', gladiator: 'gladiators' };
+const FACTION_OF_OUTFIT = { commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
+
+/** A character's faction: as set (`inputs.faction`), else by what he wears. */
+export function factionOf(inputs) {
+  if (FACTIONS[inputs.faction]) return inputs.faction;
+  const { kind, spec } = outfitOf(inputs);
+  return FACTION_OF_FAMILY[spec.family] ?? FACTION_OF_OUTFIT[kind] ?? 'ring';
+}
+
 export function outfitOf(inputs) {
   const kind = OUTFITS[inputs.outfit?.kind] ? inputs.outfit.kind : 'boxing';
   const design = Math.max(0, Math.min(OUTFITS[kind].designs.length - 1, inputs.outfit?.design ?? 0));

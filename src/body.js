@@ -175,6 +175,13 @@ export const PRESETS = {
     outfit: { kind: 'samurai', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // A teppō gunner of the Saika: an ashigaru's kit, the matchlock, a
+  // wakizashi (the kit's sidearm) for when they close.
+  matchlock: {
+    name: 'Suzuki Magoichi', style: 'matchlock', sex: 'male', heightCm: 165, frame: 'medium', age: 31, exercise: 0.6, calories: 3000,
+    outfit: { kind: 'ashigaru', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,

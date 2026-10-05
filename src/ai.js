@@ -99,6 +99,8 @@ export const AI = {
   // the line to their man as in the line of fire.
   mateSpacing: 1.0,
   lineOfFire: 0.4,
+  // m: a heavy gun holds its shot at a man with a comrade this near him.
+  gunCrowd: 1.2,
   pastTarget: 0.45, // m: a team-mate this close behind my man is in the line too
   kickClearance: 1.3, // m: no kicks or knees with a team-mate this close, beside or ahead
   // Facing a longer reach (a sword, a baton, a spear) or a blade: keep out of
@@ -716,6 +718,32 @@ function keepAway(world, fighter, opponent, dt) {
  * hands, and fires as he backs away.
  */
 function gunfight(world, fighter, opponent, distance, gun, dt) {
+  // A fired matchlock: loaded only with nobody near; with someone coming,
+  // away from him for room to load.
+  const weapon = fighter.weapon;
+  if (weapon.spec.shot && !weapon.loaded) {
+    fighter.aimAt = undefined;
+    const nearest = Math.min(...world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up').map((other) => vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis)))));
+    if (nearest > gun.reloadSafe) {
+      fighter.reloading = true;
+      fighter.goTo = null;
+      fighter.move = 0;
+      fighter.strafe = 0;
+      fighter.running = false;
+      return;
+    }
+    fighter.reloading = false;
+    fighter.aiEscapeAge = (fighter.aiEscapeAge ?? Infinity) + dt;
+    if (!fighter.aiEscape || fighter.aiEscapeAge > AI.gunKite.rethink) {
+      fighter.aiEscape = escapePoint(world, fighter, opponent);
+      fighter.aiEscapeAge = 0;
+    }
+    fighter.goTo = fighter.aiEscape;
+    fighter.move = 1;
+    fighter.running = true;
+    return;
+  }
+  fighter.reloading = false;
   // Shoot while there is time for a shot before he arrives; run when there
   // is not. Not for ever: a man as fast as you is never outrun, so after a
   // spell of running, turn and shoot.
@@ -754,6 +782,11 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
   if (fighter.punch || fighter.cooldown > 0) return;
   if (teamSpacing(world, fighter, opponent).blocked) return;
+  // One slow, heavy shot is not fired into a man with comrades round him.
+  if (weapon.spec.shot && world.fighters.some((mate) => mate !== fighter && mate.corner === fighter.corner && mate.state !== 'out' && vec.length(vec.sub(point(mate.x, P.pelvis), point(opponent.x, P.pelvis))) < AI.gunCrowd)) {
+    if (world.random() < AI.refocusRate * dt) fighter.focus = undefined;
+    return;
+  }
   const zone = world.random() < gun.headShare ? 'head' : 'body';
   if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
     // From the stance the gun is already up: the shot goes as soon as the sights settle.

@@ -33,6 +33,10 @@ export const MOVES = {
   // the target, tracking it, and the round goes at `fireAt` down the
   // barrel's line as it really is then; the arm comes back down after.
   shoot: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.34, quickFireAt: 0.12, extendUntil: 0.42, duration: 0.62, twist: -0.25, shift: 0.02, cost: 0.003, mass: { arm: 0.3 }, rotation: 0.5, zones: ['body', 'head', 'legs'], reach: 'gun' },
+  // A matchlock shot (path 'aim'): the stock up to the cheek, the long
+  // barrel slow to come onto the mark and settle; the trigger lowers the
+  // match, and the charge goes a moment later (MATCHLOCK.hangFire).
+  fireLong: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.7, fireAt: 0.95, quickFireAt: 0.45, extendUntil: 1.1, duration: 1.4, twist: -0.2, shift: 0.02, cost: 0.004, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
   // Loosing an arrow (path 'aim', the bow's): the bow arm up on the mark,
   // the string drawn to the cheek, and loosed; quicker from a bow held up.
   loose: { kind: 'strike', limb: 'lHand', path: 'aim', windup: 0.5, fireAt: 0.62, quickFireAt: 0.5, extendUntil: 0.75, duration: 0.95, twist: -0.1, shift: 0, cost: 0.006, mass: { arm: 0.2 }, rotation: 0.3, zones: ['body', 'head', 'legs'], reach: 'gun' },
@@ -413,6 +417,27 @@ export const STYLES = {
     tempo: 1,
     defences: { stepBack: 0.6, guard: 0.4 },
     defendChance: 0.45,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
+  // A matchlock: one heavy shot, then a long reload, done only with nobody
+  // near (`reloadSafe`, m). Empty, with a man on him (`close`), he lets the
+  // gun go and draws his kit's sidearm (a wakizashi, a short sword), or
+  // fights with his hands.
+  matchlock: {
+    label: 'Matchlock', weapon: 'matchlock', fallback: 'mix',
+    ranged: { flee: 3, rest: 1, runFor: 1.5, standFor: 1.8, close: 1.6, shotSeconds: 0.8, headShare: 0.15, between: [0.4, 0.4], move: 'fireLong', reloadSafe: 5 },
+    cadence: { work: 1.2, move: 0.7, burst: 0.4, mobility: 0.45 },
+    // Side-on behind the gun, feet apart, a little crouched.
+    stance: { blade: 0.6, crouch: 0.07, width: 1.2, lean: 0.06, guardHeight: -0.02 },
+    // Carried at the ready: before the body, the muzzle up and forward.
+    weaponGuard: { hand: [0.14, 0.6, -0.1], dir: [0.8, 0.6, 0.12] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { fireLong: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.4,
     headMovement: 0.1,
     plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
     pressure: 0,

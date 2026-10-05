@@ -7,7 +7,7 @@
 import { normaliseInputs, PRESETS } from './body.js';
 import { randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
-import { HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
+import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
 import { SCENARIOS } from './scenarios.js';
 import { WEAPONS } from './weapons.js';
 import { SKIN_TONES } from './render.js';
@@ -35,6 +35,7 @@ const STYLE_NOTES = {
   handgun: 'Keeps his distance, aims and fires; hand to hand up close.', baton: 'A police baton: hard blunt blows.', longsword: 'Hand-and-a-half sword: cuts and lunges.',
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
+  bow: 'Keeps away and looses arrows; the sidearm up close.', matchlock: 'One heavy shot, a long reload; the sidearm up close.',
 };
 const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
@@ -77,7 +78,12 @@ const warrior = (key, title, base, changes = {}) => {
   const inputs = normaliseInputs(structuredClone({ ...base, ...changes, outfit: changes.outfit ?? base.outfit }));
   const style = STYLES[inputs.style];
   const armour = OUTFITS[inputs.outfit?.kind]?.label ?? '';
-  return { key, title, inputs, line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
+  return { key, title, inputs, faction: factionOf(inputs), line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
+};
+/** Each style's faction, by the character who fights in it (ring if none does): for grouping styles. */
+const STYLE_FACTION = (key) => {
+  const character = Object.values(PRESETS).find((preset) => preset.style === key);
+  return character ? factionOf(character) : 'ring';
 };
 const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
@@ -88,6 +94,8 @@ const WARRIORS = [
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
   warrior('archer', 'Nasu no Yoichi', PRESETS.bow),
+  warrior('teppo', 'Suzuki Magoichi', PRESETS.matchlock),
+  warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
   warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
   warrior('ashigaruSpear', 'Gonbei', PRESETS.spear, { name: 'Gonbei', outfit: { kind: 'ashigaru', design: 0 }, accessories: [] }),
   warrior('ashigaruBow', 'Sakuzaemon', PRESETS.spear, { name: 'Sakuzaemon', style: 'bow', outfit: { kind: 'ashigaru', design: 1 }, accessories: [] }),
@@ -168,25 +176,33 @@ export function installMenus(game) {
 
   // ---- Deadliest Warrior -------------------------------------------------------
   function versus() {
-    const at = { red: 0, blue: 1 };
+    // Each side picks a faction, then turns its carousel through that faction's warriors.
+    const faction = { red: 'knights', blue: 'japanese' };
+    const at = { red: 0, blue: 0 };
     const custom = { red: null, blue: null };
     const body = screen('versus', 'Deadliest Warrior', null, home);
     body.parentElement.classList.add('dw');
-    const entry = (corner) => custom[corner] ?? WARRIORS[at[corner]];
+    const roster = (corner) => WARRIORS.filter((warrior) => warrior.faction === faction[corner]);
+    const entry = (corner) => custom[corner] ?? roster(corner)[at[corner]];
     const sides = {};
     for (const corner of ['red', 'blue']) {
+      const tabs = el('div', { className: 'dw-tabs', role: 'tablist' }, ...FACTION_KEYS.filter((key) => WARRIORS.some((warrior) => warrior.faction === key)).map((key) => {
+        const tab = el('button', { type: 'button', className: 'dw-tab', role: 'tab', title: FACTIONS[key].blurb }, el('span', { textContent: FACTIONS[key].glyph }), el('b', { textContent: FACTIONS[key].label }));
+        tab.dataset.faction = key;
+        tab.onclick = () => {
+          faction[corner] = key;
+          at[corner] = 0;
+          custom[corner] = null;
+          build(corner);
+        };
+        return tab;
+      }));
       const stage = el('div', { className: 'dw-stage' });
       const title = el('div', { className: 'dw-name' });
       const prev = el('button', { className: 'dw-arrow prev', type: 'button', ariaLabel: 'Previous', textContent: '‹', onclick: () => turn(corner, -1) });
       const next = el('button', { className: 'dw-arrow next', type: 'button', ariaLabel: 'Next', textContent: '›', onclick: () => turn(corner, 1) });
       const own = el('button', { className: 'dw-own', type: 'button', textContent: '✎ Make your own', onclick: () => wizard({ event: 'any', start: randomCharacter(), finish: 'Use this fighter', onDone: (inputs) => { custom[corner] = { key: `custom-${corner}-${Date.now()}`, title: inputs.name, line: styleName(STYLES[inputs.style]), inputs }; game.attract(); show('versus'); draw(corner); }, onBack: () => show('versus') }) });
-      const cards = WARRIORS.map((warrior, index) => {
-        const image = el('img', { alt: '', draggable: false });
-        const card = el('button', { className: 'dw-card', type: 'button', tabIndex: -1, onclick: () => { const offset = index - at[corner]; if (offset) turn(corner, offset); } }, image);
-        card.dataset.index = String(index);
-        stage.append(card);
-        return { card, image, warrior };
-      });
+      const portraits = new Map();
       // Swipe across the stage to turn it.
       let downAt = null;
       stage.addEventListener('pointerdown', (press) => { downAt = press.clientX; });
@@ -196,17 +212,33 @@ export function installMenus(game) {
         downAt = null;
         if (Math.abs(moved) > 36) turn(corner, moved < 0 ? 1 : -1);
       });
-      const section = el('section', { className: `dw-side ${corner}` }, el('span', { className: 'dw-corner', textContent: corner === 'red' ? 'RED' : 'BLUE' }), prev, stage, next, title, own);
-      sides[corner] = { section, cards, title };
+      const section = el('section', { className: `dw-side ${corner}` }, el('span', { className: 'dw-corner', textContent: corner === 'red' ? 'RED' : 'BLUE' }), tabs, prev, stage, next, title, own);
+      sides[corner] = { section, cards: [], title, stage, tabs, portraits };
+    }
+    // The faction's warriors as cards on the stage (each portrait made once, kept).
+    function build(corner) {
+      const side = sides[corner];
+      side.stage.replaceChildren();
+      side.cards = roster(corner).map((warrior, index) => {
+        const image = side.portraits.get(warrior.key) ?? el('img', { alt: '', draggable: false });
+        side.portraits.set(warrior.key, image);
+        const card = el('button', { className: 'dw-card', type: 'button', tabIndex: -1, onclick: () => { const offset = index - at[corner]; if (offset) turn(corner, offset); } }, image);
+        card.dataset.index = String(index);
+        side.stage.append(card);
+        return { card, image, warrior };
+      });
+      for (const tab of side.tabs.children) tab.classList.toggle('on', tab.dataset.faction === faction[corner]);
+      draw(corner);
     }
     function turn(corner, by) {
+      const count = roster(corner).length;
       custom[corner] = null;
-      at[corner] = (at[corner] + by + WARRIORS.length) % WARRIORS.length;
+      at[corner] = (at[corner] + by + count) % count;
       draw(corner);
     }
     function draw(corner) {
       const side = sides[corner];
-      const count = WARRIORS.length;
+      const count = side.cards.length;
       for (const { card, image, warrior } of side.cards) {
         let offset = Number(card.dataset.index) - at[corner];
         if (offset > count / 2) offset -= count;
@@ -231,8 +263,8 @@ export function installMenus(game) {
       fight();
     };
     body.append(sides.red.section, el('div', { className: 'dw-middle' }, el('span', { className: 'dw-vs', textContent: 'VS' }), fightButton), sides.blue.section);
-    draw('red');
-    draw('blue');
+    build('red');
+    build('blue');
     show('versus');
   }
 
@@ -362,7 +394,13 @@ export function installMenus(game) {
       );
     }
     function stepStyle(content) {
-      content.append(el('div', { className: 'cards' }, ...styles.map((key) => {
+      const groups = FACTION_KEYS.map((faction) => [faction, styles.filter((key) => STYLE_FACTION(key) === faction)]).filter(([, keys]) => keys.length);
+      content.append(...groups.map(([faction, keys]) => el('div', { className: 'style-group' },
+        el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` }),
+        el('div', { className: 'cards' }, ...keys.map(styleCard)))));
+    }
+    function styleCard(key) {
+      {
         const style = STYLES[key];
         const card = el('button', { type: 'button', className: inputs.style === key ? 'card-choice on' : 'card-choice' },
           el('b', { textContent: style.label }), el('span', { textContent: STYLE_NOTES[key] ?? '' }));
@@ -377,7 +415,7 @@ export function installMenus(game) {
           draw();
         };
         return card;
-      })));
+      }
     }
     function stepGear(content) {
       const kinds = OUTFIT_KEYS;
