@@ -4,7 +4,8 @@
 
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
-import { createWorld } from './physics.js';
+import { createWorld, seededRandom } from './physics.js';
+import { STYLES } from './moves.js';
 import { europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 /**
@@ -13,8 +14,6 @@ import { europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, 
  * given by its weight: the calories that settle at it are worked out when
  * the bout is built, as the builder's slider would.
  */
-// Who stands behind the line: the bows and the long guns.
-const SHOOTERS = ['bow', 'steppeBow', 'matchlock'];
 
 // One side at Sekigahara, forty strong: a samurai leads; the ashigaru are
 // mostly yari, with bows and teppō. Blades and polearms first (the front
@@ -31,7 +30,7 @@ function sekigaharaSide(random, side) {
       for (let index = 0; index < count; index += 1) warriors.push(sengokuWarrior(random, side, style, rank));
     }
   }
-  const shooter = (warrior) => (SHOOTERS.includes(warrior.style) ? 1 : 0);
+  const shooter = (warrior) => (STYLES[warrior.style]?.ranged ? 1 : 0);
   return warriors.sort((a, b) => shooter(a) - shooter(b));
 }
 
@@ -49,7 +48,7 @@ const PYONGYANG_JAPANESE = {
 
 /** Blades and polearms first (the front ranks), bows and guns last. */
 function shootersBehind(warriors) {
-  const shooter = (warrior) => (SHOOTERS.includes(warrior.style) ? 1 : 0);
+  const shooter = (warrior) => (STYLES[warrior.style]?.ranged ? 1 : 0);
   return warriors.sort((a, b) => shooter(a) - shooter(b));
 }
 
@@ -317,5 +316,7 @@ export function crewFighter(lead, entry) {
 /** A world for a scenario: its fighters on its floor. */
 export function scenarioWorld(key, seed = 1) {
   const scenario = SCENARIOS[key];
-  return createWorld(scenarioFighters(scenario), { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation });
+  // A battle's armies are drawn from its cast, at the same seed.
+  const fighters = scenario.cast ? Object.entries(scenario.cast(seededRandom(seed))).flatMap(([corner, side]) => side.map((inputs) => ({ inputs, corner }))) : scenarioFighters(scenario);
+  return createWorld(fighters, { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation });
 }

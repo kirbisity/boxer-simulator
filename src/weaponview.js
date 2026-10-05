@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { BONE } from './rig.js';
-import { outlineFor, surface } from './toon.js';
+import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, WEAPONS } from './weapons.js';
 import { steelMaterial } from './wardrobe.js';
 import { crowdBatch } from './crowdview.js';
@@ -705,7 +705,11 @@ export function updateArms(view, fighterView, time = 0) {
   const showing = fighterView.layers.skin.visible;
   if (weapon?.held) {
     if (arms.kind !== weapon.kind) {
-      if (arms.weapon) fighterView.group.remove(arms.weapon);
+      if (arms.weapon) {
+        fighterView.group.remove(arms.weapon);
+        // A crowd member's weapon is the batch's, shared: only his own is freed.
+        if (!fighterView.baked) disposeObject(arms.weapon);
+      }
       arms.weapon = fighterView.baked ? crowdArms(view, weapon.kind, () => buildWeaponMesh(weapon.kind, view.steelEnv)) : buildWeaponMesh(weapon.kind, view.steelEnv);
       arms.kind = weapon.kind;
       fighterView.group.add(arms.weapon);
@@ -911,6 +915,7 @@ export function updateDebris(view, world) {
     if (debris.taken) {
       if (mesh) {
         view.scene.remove(mesh);
+        disposeObject(mesh);
         view.pieces.delete(debris.id);
       }
       continue;
@@ -933,7 +938,10 @@ export function updateDebris(view, world) {
 
 /** A new bout: clear what lay on the floor. */
 export function clearGore(view) {
-  for (const mesh of view.pieces?.values() ?? []) view.scene.remove(mesh);
+  for (const mesh of view.pieces?.values() ?? []) {
+    view.scene.remove(mesh);
+    disposeObject(mesh);
+  }
   view.pieces = new Map();
   if (view.blood) {
     view.blood.drops = [];
@@ -1123,6 +1131,7 @@ export function updateArrows(view, world) {
   for (const [arrow, mesh] of drawn) {
     if (live.has(arrow)) continue;
     view.scene.remove(mesh);
+    disposeObject(mesh);
     drawn.delete(arrow);
   }
 }

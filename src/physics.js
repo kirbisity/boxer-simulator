@@ -442,7 +442,7 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const centre = vec.add(hand, vec.scale(weapon.dir, (spec.length - spec.handle) / 2));
   const random = world.random;
   world.debris.push({
-    id: world.debris.length, kind: 'weapon', weapon: weapon.kind, owner: fighter.id, x: centre, loaded: weapon.loaded,
+    id: world.debris.length, kind: 'weapon', weapon: weapon.kind, owner: fighter.id, x: centre, loaded: weapon.loaded, charges: weapon.charges,
     v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
   });
@@ -454,7 +454,9 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   // else he fights mixed.
   // A man whose sidearm is the weapon he just lost (a Ming soldier's dao) has his kit's spare.
   const gear = fighter.body.gear;
-  const sidearm = fighter.sidearmDrawn ? null : gear.sidearm !== weapon.kind ? gear.sidearm : gear.spare ?? null;
+  const sidearmKind = fighter.sidearmDrawn ? null : gear.sidearm !== weapon.kind ? gear.sidearm : gear.spare ?? null;
+  // A kit names its sidearm by style; a bare weapon kind is fought in that weapon's style.
+  const sidearm = sidearmKind && !STYLES[sidearmKind] ? styleForWeapon(sidearmKind) ?? null : sidearmKind;
   const fallback = STYLES[fighter.style]?.fallback;
   const next = fallback && fallback !== 'mix' ? fallback : sidearm ?? fallback ?? 'mix';
   if (next === sidearm) fighter.sidearmDrawn = true;
@@ -504,7 +506,8 @@ function updatePickup(world, fighter, dt) {
   debris.taken = true;
   fighter.pickup = null;
   armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
-  // A gun picked up is as it was dropped: fired, it is empty.
+  // A gun picked up is as it was dropped: its rounds left, and fired out, empty.
+  if (fighter.weapon?.spec.shot && debris.charges !== undefined) fighter.weapon.charges = debris.charges;
   if (fighter.weapon?.spec.shot && debris.loaded === false) {
     fighter.weapon.loaded = false;
     emptied(world, fighter);
@@ -590,7 +593,10 @@ function firstHit(world, shooter, from, to) {
       if (capsule.key === 'trunk' && meet.t > 0.98 && meet.onFirst[1] > other.x[P.neck * 3 + 1]) continue;
       // Back along the line to where it enters the part.
       const s = Math.max(0, meet.s - Math.sqrt(capsule.radius * capsule.radius - miss * miss) / length);
-      if (!best || s < best.s) best = { fighter: other, capsule, target: capsule.key, s, point: vec.lerp(from, to, s) };
+      // Above the chest (past the trunk's top as a blow meets it) is the throat:
+      // no vest covers it, and a round there is as deadly as one to the head.
+      const throat = capsule.key === 'trunk' && capsule.bLength && meet.t > capsule.bLength;
+      if (!best || s < best.s) best = { fighter: other, capsule, target: throat ? 'throat' : capsule.key, throat, s, point: vec.lerp(from, to, s) };
     }
   }
   return best;
@@ -714,8 +720,9 @@ function arrowHit(world, shooter, hit, dir, energy = 1) {
     event.effects.push('glances off the armour');
     return;
   }
-  const region = bulletRegion(key);
-  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : protectionAt(gear, key).pierce ?? 0;
+  const region = hit.throat ? 'head' : bulletRegion(key);
+  // Full armour (plate, lamellar) guards the throat with its gorget or aventail; a vest does not.
+  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : hit.throat ? 0 : protectionAt(gear, key).pierce ?? 0;
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
@@ -880,10 +887,12 @@ function fire(world, fighter) {
 function bulletHit(world, shooter, hit, dir, event, shot = null) {
   const victim = hit.fighter;
   const key = hit.capsule.key;
-  const region = bulletRegion(key);
+  const region = hit.throat ? 'head' : bulletRegion(key);
   const kind = outfitOf(victim.body.inputs).kind;
-  // Armour stops its share of a pistol round; of a heavier ball, only as much as it is proof against.
-  const armour = (victim.body.gear.protection.bullet?.[region] ?? 0) * (shot ? bulletProof(kind, shot.energy) : 1);
+  // Armour stops its share of a pistol round; of a heavier ball, only as much
+  // as it is proof against. The throat is covered only by full armour's gorget, as the body.
+  const covered = hit.throat ? (victim.body.gear.arrowproof ? victim.body.gear.protection.bullet?.torso ?? 0 : 0) : victim.body.gear.protection.bullet?.[region] ?? 0;
+  const armour = covered * (shot ? bulletProof(kind, shot.energy) : 1);
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
@@ -1219,7 +1228,6 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const apart = gunFight ? Math.min(WORLD.gunStartApart, arena.halfX - 0.6) : 1.1;
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
-    const sameCorner = sides.slice(0, index).filter((other) => other.corner === side.corner).length;
     const x = (onRed ? -1 : 1) * apart;
     return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
   });
@@ -1321,7 +1329,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     if (fighter.state === 'up' && !fighter.punch) fighter.reloading = true;
     return false;
   }
-  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.stamina < cost) return false;
+  const drain = cost / fighter.body.aerobic;
+  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.stamina < drain) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   const jitter = STYLES[fighter.style]?.aimJitter ?? 0;
@@ -1330,7 +1339,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target.id, landed: false, peakSpeed: 0, limb: P[spec.limb],
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
   };
-  fighter.stamina = Math.max(0, fighter.stamina - cost / fighter.body.aerobic);
+  fighter.stamina = Math.max(0, fighter.stamina - drain);
   fighter.stats.thrown += 1;
   if (heavy) world.events.push({ time: world.time, kind: 'heavy', attacker: fighter.id, punch: type, effects: [] });
   return true;
@@ -1352,7 +1361,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if (name === 'pin') return startPin(world, fighter);
   const spec = MOVES[name];
   const target = opponentFor(world, fighter);
-  if (!spec || !target || fighter.punch || fighter.rush || fighter.stamina < spec.cost) return false;
+  if (!spec || !target || fighter.punch || fighter.rush || fighter.stamina < spec.cost / fighter.body.aerobic) return false;
   if (spec.kind === 'rush') {
     fighter.rush = { t: 0, duration: spec.duration, hit: false };
   } else if (spec.kind === 'clinch') {
@@ -1671,7 +1680,7 @@ export function step(world, dt) {
     }
     for (const fighter of moving) {
       solveConstraints(fighter, span(fighter));
-      solveJointLimits(world, fighter);
+      solveJointLimits(world, fighter, span(fighter));
       if (fighter.weapon?.held) updateWeapon(fighter, span(fighter));
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
@@ -1798,7 +1807,7 @@ function checkBalance(world, fighter) {
     fighter.rush = null;
     fighter.clinch = null;
     fighter.downTimer = WORLD.balance.fallSeconds;
-    world.events.push({ time: world.time, kind: 'fell', fighter: fighter.id, onOneFoot: !planted, effects: [knock > WORLD.balance.speed * legs ? 'knocked off balance' : 'overreached'] });
+    world.events.push({ time: world.time, kind: 'fell', fighter: fighter.id, onOneFoot: !planted, effects: [knock > WORLD.balance.speed * footing ? 'knocked off balance' : 'overreached'] });
   }
 }
 
@@ -2222,7 +2231,12 @@ function correctJoint(fighter, index, others, delta) {
  * Hinges and cones, so a body folds the way a body folds. A joint forced well
  * past its range breaks: from then on it has no limit and its limb no muscle.
  */
-function solveJointLimits(world, fighter) {
+function solveJointLimits(world, fighter, h) {
+  // Strain leaks away every step, whether or not the joint is still over its
+  // range (strain() only adds to it while it is); `h` is this fighter's own
+  // step, longer for a coarse fighter.
+  fighter.limitStep = h;
+  if (fighter.strain) for (const joint in fighter.strain) fighter.strain[joint] *= Math.exp(-WORLD.joint.strainLeak * h);
   const limp = isLimp(fighter);
   const pelvis = point(fighter.x, P.pelvis);
   const neck = point(fighter.x, P.neck);
@@ -2433,10 +2447,10 @@ function breakAngleFor(joint) {
  */
 function strain(world, fighter, joint, overAngle) {
   if (fighter.state === 'rising') return false;
-  const h = world.lastDt / WORLD.substeps;
+  const h = fighter.limitStep;
   const strains = fighter.strain ?? (fighter.strain = {});
   const past = Math.max(0, overAngle - breakAngleFor(joint));
-  strains[joint] = (strains[joint] ?? 0) * Math.exp(-WORLD.joint.strainLeak * h) + past * h;
+  strains[joint] = (strains[joint] ?? 0) + past * h;
   if (strains[joint] <= WORLD.joint.strainToBreak) return false;
   breakJoint(world, fighter, joint);
   return true;
@@ -2459,7 +2473,7 @@ function breakJoint(world, fighter, joint) {
   const event = { time: world.time, kind: 'broken', fighter: fighter.id, joint, effects: [`${jointName(joint)} broken${ending ? ' — cannot continue' : ''}`] };
   world.events.push(event);
   fighter.damageVersion += 1;
-  if (ending) {
+  if (ending && fighter.state !== 'out') {
     fighter.state = 'down';
     fighter.punch = null;
     fighter.rush = null;
@@ -2540,10 +2554,9 @@ function groundImpact(world, fighter, index, speed) {
   const name = PARTICLES[index];
   const gear = fighter.body.gear;
   const through = speed - spec.minSpeed;
-  const spread = 1 - (gear.protection.blunt ?? 0);
   const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
   if (name === 'head') {
-    const deltaV = through * spec.head * spread;
+    const deltaV = through * spec.head * (1 - (protectionAt(gear, 'head').blunt ?? 0));
     if (deltaV < 0.5) return;
     // Credit for what the floor does goes to whoever put him there.
     const event = { time: world.time, kind: 'impact', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, fighter: fighter.id, defender: fighter.id, target: 'head', speed, headDeltaV: deltaV, harmDeltaV: deltaV, effects: ['head hit the ground'], point: point(fighter.x, index) };
@@ -2553,7 +2566,7 @@ function groundImpact(world, fighter, index, speed) {
   }
   const part = IMPACT_PART[name];
   if (!part) return;
-  addDamage(fighter, part, (through * spec.body * spread) / bone, false);
+  addDamage(fighter, part, (through * spec.body * (1 - (protectionAt(gear, part).blunt ?? 0))) / bone, false);
   const joint = IMPACT_JOINT[name];
   if (joint && !fighter.broken.has(joint) && speed > spec.fractureSpeed * bone) {
     breakJoint(world, fighter, joint);
@@ -3166,7 +3179,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     attacker.stats.blocked += 1;
     event.headDeltaV = BLOCKING.has(capsule.key) ? (impulse * 0.12) / body.headEffectiveMass : 0;
     // Kicking into a checked shin hurts the kicker's shin.
-    if (checked) attacker.legDamage[side] += ((impulse * 0.5) / attacker.body.limbKg[`${side}Leg`]) * (1 - attacker.body.gear.protection.blunt);
+    if (checked) attacker.legDamage[side] += ((impulse * 0.5) / attacker.body.limbKg[`${side}Leg`]) * (1 - (protectionAt(attacker.body.gear, `${side}Shank`).blunt ?? 0));
     return;
   }
   attacker.stats.landed += 1;
@@ -3471,9 +3484,9 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away) {
   const mix = harmMix(weapon.spec, 'swing', speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0, closest.t);
   // A padded glove takes some of an edge.
   const padded = striker.key.endsWith('Hand') && glovedFists(attacker.body.inputs) ? 0.6 : 1;
-  const cut = energy * mix.cut * padded * (1 - (attacker.body.gear.protection.cut ?? 0));
   const meets = striker.shin ? { segment: 'Shank', at: closest.s, joint: closest.s > 0.6 ? 'ankle' : 'knee' } : BLADE_MEETS[striker.key.slice(1)];
   const limbKey = `${side}${meets.segment}`;
+  const cut = energy * mix.cut * padded * (1 - (protectionAt(attacker.body.gear, limbKey).cut ?? 0));
   const contactPoint = closest.onSecond;
   const event = {
     time: world.time, kind: 'bladeBlock', attacker: defender.id, defender: attacker.id, punch: punch?.type, target: limbKey, weapon: weapon.kind,
@@ -3514,7 +3527,12 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
     const weapon = attacker.weapon;
     const distance = weapon.spec.strikeFrom + hit.along * (weapon.spec.length - weapon.spec.strikeFrom);
     strikeVelocity = vec.lerp(handVelocityOf(attacker, P[`${weapon.main}Hand`]), weapon.tipVelocity, distance / weapon.spec.length);
-    strikeMass = effectiveMassAt(weapon.spec, (spec.mass.arm ?? 0.6) * attacker.body.limbKg[`${weapon.main}Arm`] + (spec.mass.body ?? 0) * attacker.body.massKg, distance);
+    const arms = attacker.body.limbKg[`${weapon.main}Arm`] + (weapon.twoHanded ? attacker.body.limbKg[`${weapon.off}Arm`] : 0);
+    const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
+    const moving = vec.sub(strikeVelocity, point(defender.v, P.lHand));
+    const speed = vec.length(moving);
+    const along = speed > 1e-6 ? Math.abs(vec.dot(moving, weapon.dir)) / speed : 0;
+    strikeMass = effectiveMassAt(weapon.spec, armMass, distance, attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist, along);
   } else {
     strikeVelocity = vec.lerp(point(attacker.v, striker.a), point(attacker.v, striker.b), hit.along);
     const side = striker.side;
@@ -3589,8 +3607,8 @@ function clashWeapons(world, first, second) {
   const closing = -vec.dot(vec.sub(one.velocity, two.velocity), normal);
   if (world.clashing.has(key) || closing < BLADES.clashSpeed) return;
   world.clashing.add(key);
-  const massA = effectiveMassAt(a.spec, first.body.limbKg[`${a.main}Arm`] * 0.6, one.along);
-  const massB = effectiveMassAt(b.spec, second.body.limbKg[`${b.main}Arm`] * 0.6, two.along);
+  const massA = effectiveMassAt(a.spec, first.body.limbKg[`${a.main}Arm`] * 0.6, one.along, first.body.lengths.upperArm + first.body.lengths.forearmToFist);
+  const massB = effectiveMassAt(b.spec, second.body.limbKg[`${b.main}Arm`] * 0.6, two.along, second.body.lengths.upperArm + second.body.lengths.forearmToFist);
   const impulse = ((massA * massB) / (massA + massB)) * closing * (1 + BLADES.clashRestitution);
   world.pendingImpulses.push({ fighter: first, shares: [[mainA, 1], [P[`${a.main}Elbow`], 0.5]], direction: normal, impulse });
   world.pendingImpulses.push({ fighter: second, shares: [[mainB, 1], [P[`${b.main}Elbow`], 0.5]], direction: vec.scale(normal, -1), impulse });
@@ -3968,15 +3986,17 @@ export function collapseAt() {
 
 /** Out on the spot: the bout is over, no count. */
 function knockOut(world, defender, event, reason, kind = 'knockout') {
+  const standing = defender.state === 'up' || defender.state === 'rising';
   defender.state = 'out';
   dropWeapon(world, defender, 'dropped');
-  defender.knockdowns += 1;
+  // Finished off where he lay, he was already counted down.
+  if (standing) defender.knockdowns += 1;
   defender.punch = null;
   defender.rush = null;
   defender.clinch = null;
   event.effects.push(reason);
   event.knockout = true;
-  world.fighters[event.attacker].stats.knockdownsScored += 1;
+  if (standing) world.fighters[event.attacker].stats.knockdownsScored += 1;
   world.events.push({ time: world.time, kind, fighter: defender.id, attacker: event.attacker, punch: event.punch, point: event.point, effects: [reason] });
 }
 

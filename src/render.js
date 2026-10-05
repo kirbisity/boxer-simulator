@@ -17,7 +17,7 @@ import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.j
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { bakePieces, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
 import { SoftShell } from './soft.js';
-import { outlineFor, surface } from './toon.js';
+import { disposeObject, outlineFor, surface } from './toon.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -2068,13 +2068,16 @@ function ensureMuscle(fighterView) {
 
 export function disposeFighterView(view, fighterView) {
   view.scene.remove(fighterView.group);
-  for (const prop of fighterView.headProps ?? []) if (prop.loose.parent) view.scene.remove(prop.loose);
+  for (const prop of fighterView.headProps ?? []) {
+    if (prop.loose.parent) view.scene.remove(prop.loose);
+    disposeObject(prop.loose);
+  }
   fighterView.group.traverse((object) => {
     // Shared with the crowd: the template's vertices and merged weapons stay for the others.
     if (!object.geometry || object.userData.shared) return;
     for (const name of object.geometry.userData.sharedAttributes ?? []) object.geometry.deleteAttribute(name);
-    object.geometry.dispose();
   });
+  disposeObject(fighterView.group);
 }
 
 /** Free the crowd templates and instanced batches, once no view uses them (between bouts). */
