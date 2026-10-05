@@ -191,6 +191,17 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.96, 1.2, { rivets: 4, base: 'cloth' }], skirt: [0.72, 0.55, 1.32, { rivets: 4, base: 'cloth' }],
     upperArm: [-0.2, 0.5, 1.5, { rivets: 4, base: 'cloth' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
+  // The same men in lamellar: small iron plates laced in rows (`lace`).
+  mingLamellar: {
+    trunk: [-0.06, 0.96, 1.2, { rows: ['steel', 'steel', 'lace'] }], skirt: [0.72, 0.55, 1.32, { rows: ['steel', 'steel', 'lace'] }],
+    upperArm: [-0.2, 0.5, 1.5, { rows: ['steel', 'lace'] }], forearm: [-0.04, -0.03, 1.26, 'steel'],
+  },
+  // The elite in scale armour: overlapping scales from the collar to the
+  // knee, the mirror over the heart, the collar and arm guards as before.
+  mingScale: {
+    trunk: [-0.06, 0.97, 1.22, { scales: true, mirror: [0.62, 0.15, 'gold'] }], skirt: [0.88, 0.6, 1.34, { scales: true }], collar: 'steel',
+    upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+  },
   // Ming elite: the long brigandine coat to the knee with a round steel
   // mirror over the heart, a steel throat collar, segmented steel arm guards.
   mingElite: {
@@ -252,6 +263,9 @@ function paintFor(paint, armor) {
   return (ring, angle, index, step) => {
     // A round plate over the breast (`mirror`: centre up the trunk, size, role), riveted cloth round it.
     if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
+    // Scales: rows of them, each offset by half a scale from the one above,
+    // the lower edge of every third row dark with its lacing so the rows read.
+    if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
     if (paint.rivets && index % paint.rivets === 1 && step % 3 === 0) return 'gold';
     if (paint.rows) return paint.rows[index % paint.rows.length];
     return paint.base;

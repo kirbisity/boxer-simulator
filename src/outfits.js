@@ -67,13 +67,15 @@ function mingGarrisonDesign(label, coat, trousers) {
   return { label, top: { kind: 'longsleeve', color: coat }, bottom: { kind: 'pants', color: trousers }, armor: { kind: 'mingQuilt', color: coat, cloth: coat, cloth2: shade(coat, 0.78) }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Brigandine: the coat's cloth, gilt rivets, the iron hat.
-function mingBrigandineDesign(label, cloth, iron) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, gold: '#a8894e' }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+// `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
+function mingBrigandineDesign(label, cloth, iron, look = {}) {
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, gold: '#a8894e', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
-function mingEliteDesign(label, cloth, coif, steel, helm = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e' }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
+// `look`: the same protection drawn as scale armour (`kind: 'mingScale'`).
+function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // A hex colour darker (or lighter) by a share.
 function shade(hex, share) {
@@ -355,7 +357,9 @@ export const OUTFITS = {
   // protection beyond the padding; quick on his feet.
   mingGarrison: {
     label: 'Ming — garrison', family: 'chinese', movement: 'good', fists: 'bare',
+    // The dao at his side; for the man who fights with the dao, a knife as well.
     sidearm: 'dao',
+    spare: 'dagger',
     extraMass: 0.06,
     protection: { blunt: 0.15, cut: 0.2, pierce: 0.1 },
     courage: 0.1,
@@ -373,6 +377,7 @@ export const OUTFITS = {
   mingBrigandine: {
     label: 'Ming — brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
+    spare: 'dagger',
     extraMass: 0.26,
     protection: { blunt: 0.55, cut: 0.85, pierce: 0.7, bullet: { head: 0.4, torso: 0.45, limb: 0.15 } },
     courage: 0.25,
@@ -380,8 +385,8 @@ export const OUTFITS = {
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b'),
       mingBrigandineDesign('Blue', '#22356a', '#8f949b'),
       mingBrigandineDesign('Black', '#1c1c20', '#6f747c'),
-      mingBrigandineDesign('Green', '#2f5a3a', '#8f949b'),
-      mingBrigandineDesign('Yellow', '#b8922e', '#7f848c'),
+      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }),
+      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a' }),
     ],
   },
   // Ming elite: the long brigandine coat to the knee reinforced with plates,
@@ -392,6 +397,7 @@ export const OUTFITS = {
   mingElite: {
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
+    spare: 'dagger',
     deflects: true,
     arrowproof: true,
     extraMass: 0.45,
@@ -401,8 +407,8 @@ export const OUTFITS = {
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
       mingEliteDesign('Imperial blue, steel neck guard', '#1f2f6a', '#7a1418', '#a7adb6', { neck: 'steel' }),
       mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { neck: 'steel', mask: true }),
-      mingEliteDesign('Vermilion', '#c0381e', '#1c1c20', '#b7bcc4'),
-      mingEliteDesign('Dark green, masked', '#24402c', '#7a1418', '#a7adb6', { neck: 'steel', mask: true }),
+      mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
+      mingEliteDesign('Steel scale, masked', '#1c1c20', '#1f2a4a', '#a7adb6', { neck: 'steel', mask: true }, { kind: 'mingScale', lace: '#1a1c24' }),
     ],
   },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
@@ -529,6 +535,7 @@ export function gearTraits(inputs) {
     courage: spec.courage ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
+    spare: spec.spare ?? null,
     arrowproof: Boolean(spec.arrowproof),
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },
   };

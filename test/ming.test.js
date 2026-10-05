@@ -46,3 +46,20 @@ test('Pyongyang: Ming regulars only, taller and heavier than the Japanese they f
   assert.ok(mean(heights.red) - mean(heights.blue) > 6, `${mean(heights.red).toFixed(1)} v ${mean(heights.blue).toFixed(1)} cm`);
   assert.ok(mean(weights.red) > mean(weights.blue) + 5, `${mean(weights.red).toFixed(1)} v ${mean(weights.blue).toFixed(1)} kg`);
 });
+
+test('a Ming soldier who loses the dao he fights with draws a spare; the spearman draws the dao', async () => {
+  const { PRESETS } = await import('../src/body.js');
+  const { advance, createWorld, dropWeapon } = await import('../src/physics.js');
+  for (const [key, drawn] of [['mingDao', 'dagger'], ['mingSpear', 'dao']]) {
+    const world = createWorld([{ inputs: structuredClone(PRESETS[key]), corner: 'red' }, { inputs: structuredClone(PRESETS.samurai), corner: 'blue' }], { seed: 1 });
+    advance(world, 0.3);
+    dropWeapon(world, world.fighters[0], 'disarmed', [0, 1, 1]);
+    assert.equal(world.fighters[0].weapon?.kind, drawn, key);
+  }
+});
+
+test('Ming brigandine men may wear lamellar and elites scale, with the same protection', () => {
+  const kinds = (outfit) => new Set(OUTFITS[outfit].designs.map((design) => design.armor.kind));
+  assert.deepEqual([...kinds('mingBrigandine')].sort(), ['mingBrigandine', 'mingLamellar']);
+  assert.deepEqual([...kinds('mingElite')].sort(), ['mingElite', 'mingScale']);
+});

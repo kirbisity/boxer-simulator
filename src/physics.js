@@ -423,7 +423,9 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   // A backup weapon if he carries one: the hoplomachus's gladius, or his
   // kit's sidearm (a knight's dagger, a samurai's wakizashi), drawn once;
   // else he fights mixed.
-  const sidearm = !fighter.sidearmDrawn && fighter.body.gear.sidearm !== weapon.kind ? fighter.body.gear.sidearm : null;
+  // A man whose sidearm is the weapon he just lost (a Ming soldier's dao) has his kit's spare.
+  const gear = fighter.body.gear;
+  const sidearm = fighter.sidearmDrawn ? null : gear.sidearm !== weapon.kind ? gear.sidearm : gear.spare ?? null;
   const fallback = STYLES[fighter.style]?.fallback;
   const next = fallback && fallback !== 'mix' ? fallback : sidearm ?? fallback ?? 'mix';
   if (next === sidearm) fighter.sidearmDrawn = true;

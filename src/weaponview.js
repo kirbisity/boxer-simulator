@@ -274,8 +274,12 @@ export function buildWeaponMesh(kind, envMap) {
     }
     case 'dao': {
       // A willow-leaf sabre: a gentle curve to the point, a round guard, a
-      // cord-wrapped grip and a red tassel from the pommel ring.
-      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -0.05 * ((y - 0.04) / (spec.length - 0.04)) ** 2), steel));
+      // cord-wrapped grip and a red tassel from the pommel ring. Held, as a
+      // sabre is, with its edge (and the curve's outside) away from the
+      // wrist's top: the blade turned half round the grip from the katana's.
+      const sabre = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -0.05 * ((y - 0.04) / (spec.length - 0.04)) ** 2), steel);
+      sabre.rotation.y = Math.PI;
+      group.add(sabre);
       const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 18), brass);
       guard.position.y = 0.028;
       const grip = cylinder(0.016, 0.017, -spec.handle + 0.02, 0.022, surface(0x3a1a14, { roughness: 0.8 }));
