@@ -33,6 +33,9 @@ export const TOPS = {
 };
 
 export const LOFT = {
+  // A corset: the waist drawn in by `cinch` of its width and depth, most at
+  // `at` up the trunk (pelvis 0, neck 1), fading over `span` either way.
+  corset: { cinch: 0.2, at: 0.32, span: 0.14 },
   // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
   // how far forward it bulges, and how far below the waistband it hangs,
   // per metre of layer past that.
@@ -196,6 +199,11 @@ export const ARMOR_KINDS = {
   conquistador: {
     trunk: [[-0.06, 0.97, 1.12, MAIL], [0.1, 0.96, 1.22, 'steel']], skirt: [0.3, 0.4, 1.24, { rows: ['steel', 'steel2'] }], collar: 'mail',
     upperArm: [-0.3, 1.04, 1.14, MAIL],
+  },
+  // A corset: boned cloth from the hips to under the bust, laced tight (the
+  // body under it is drawn in; see LOFT.corset).
+  corset: {
+    trunk: [-0.02, 0.68, 1.04, { rows: ['cloth', 'cloth', 'cloth2'] }],
   },
   // Escaupil and ichcahuipilli: quilted cotton, thick, stitched in rows.
   escaupil: {
@@ -370,8 +378,11 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const belly = Math.max(0, fatLayer - LOFT.bellyFrom);
   const bulge = profile([[-0.12, 0.7], [0.15, 1], [0.4, 0.4], [0.6, 0]]);
   const hem = -0.12 - (belly * LOFT.bellyDrop) / vec.length(vec.sub(at('neck'), at('pelvis')));
-  const bodyWidth = (u) => leanWidth(u) + fatLayer * fatWidth(u);
-  const bodyDepth = (u) => leanDepth(u) + fatLayer * fatDepth(u) + belly * LOFT.bellyScale * bulge(u);
+  // A corset cinches the waist: the trunk drawn in round the natural waist.
+  const corseted = outfitOf(body.inputs).look.armor?.kind === 'corset';
+  const cinch = (u) => (corseted ? 1 - LOFT.corset.cinch * Math.exp(-(((u - LOFT.corset.at) / LOFT.corset.span) ** 2)) : 1);
+  const bodyWidth = (u) => (leanWidth(u) + fatLayer * fatWidth(u)) * cinch(u);
+  const bodyDepth = (u) => (leanDepth(u) + fatLayer * fatDepth(u) + belly * LOFT.bellyScale * bulge(u)) * cinch(u);
   const bodyLean = (u) => leanOffset(u) + fatLayer * fatOffset(u) + belly * LOFT.bellyScale * 0.8 * bulge(u);
   // 0 at the hem, 1 at the waistband.
   const apron = (u) => Math.sqrt(Math.max(0, (u - hem) / (-0.12 - hem)));
@@ -483,6 +494,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   if (plate) loft(mesh, skirtRings(skirtTo(0.4), count(5)), sides, { color: (ring, angle, index) => (index % 2 ? 'steel2' : 'steel'), inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
   // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
   if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
+  // A long gown's skirt, belled out from the waist to below the knee.
+  if (bottom?.kind === 'gown') loft(mesh, skirtRings(skirtTo(1.35), count(7), 1.4), sides, { color: 'kit', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
   if (bottom?.kind === 'loincloth') loft(mesh, skirtRings(skirtTo(0.22), count(2), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
   // The balteus: a gladiator's broad bronze belt.
   if (hoplomachus) loft(mesh, shortsRings(0.04, 0.24, count(3)), sides, { color: (ring, angle, index) => (index === 1 ? 'gold' : 'steel'), inflate: 1.14, capStart: false, capEnd: false, bones: abdomen });

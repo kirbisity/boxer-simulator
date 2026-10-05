@@ -108,10 +108,10 @@ const PLACE_LIGHT = {
   // Autumn morning on an open battlefield: clear, the sun strong, haze on the hills.
   sengoku: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
   // The high plain of the Valley of Mexico: thin bright air, a hard sun.
-  plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.2 },
+  plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
   // A tropical shore: bright, hazy over the sea.
-  coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.15 },
-  coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
+  coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
+  coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
   port: { background: 0x060912, fog: [14, 48], key: 0x9fb4ff, keyIntensity: 0.85, rim: 0x5a78c0, hemi: 0.24 },
   // A dark hall, the ring alone under hard white light.
@@ -627,11 +627,11 @@ function buildPlain() {
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   place.add(daySky());
   const field = paintedTexture(1024, 1024, (g, w, h) => {
-    g.fillStyle = '#a49a5a';
+    g.fillStyle = '#7a7442';
     g.fillRect(0, 0, w, h);
     for (let index = 0; index < 18000; index += 1) {
       const shade = Math.random();
-      g.fillStyle = `rgba(${140 + shade * 60},${130 + shade * 50},${70 + shade * 30},${0.2 + Math.random() * 0.3})`;
+      g.fillStyle = `rgba(${100 + shade * 60},${100 + shade * 50},${50 + shade * 30},${0.2 + Math.random() * 0.3})`;
       g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
     }
   }, [5, 5]);
@@ -641,7 +641,7 @@ function buildPlain() {
   place.add(ground);
   // The volcanoes, snow on their crowns, and a ring of lower hills.
   [[-20, -55, 20, 22], [12, -58, 17, 18]].forEach(([x, z, radius, tall]) => {
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, tall, 14), lit(0x6a6f7a));
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, tall, 14), lit(0x55596a));
     cone.position.set(x, tall / 2 - 1, z);
     const snow = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.32, tall * 0.32, 14), lit(0xf2f4f8));
     snow.position.set(x, tall - 1 - tall * 0.16, z);
@@ -649,7 +649,7 @@ function buildPlain() {
   });
   for (let index = 0; index < 10; index += 1) {
     const angle = (index / 10) * Math.PI * 2;
-    const hill = new THREE.Mesh(new THREE.ConeGeometry(9 + Math.random() * 6, 4 + Math.random() * 4, 8), lit(0x8a8a62));
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(9 + Math.random() * 6, 4 + Math.random() * 4, 8), lit(0x5f6448));
     hill.position.set(Math.cos(angle) * 52, 1.5, Math.sin(angle) * 50);
     place.add(hill);
   }
@@ -683,11 +683,11 @@ function buildCoast({ fort }) {
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   place.add(daySky());
   const sandTexture = paintedTexture(1024, 1024, (g, w, h) => {
-    g.fillStyle = '#d8c79a';
+    g.fillStyle = '#a8966a';
     g.fillRect(0, 0, w, h);
     for (let index = 0; index < 16000; index += 1) {
       const shade = Math.random();
-      g.fillStyle = `rgba(${190 + shade * 40},${170 + shade * 40},${120 + shade * 40},${0.25 + Math.random() * 0.3})`;
+      g.fillStyle = `rgba(${150 + shade * 40},${132 + shade * 40},${92 + shade * 30},${0.25 + Math.random() * 0.3})`;
       g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
     }
   }, [5, 5]);

@@ -971,6 +971,8 @@ function weaponIntent(world, fighter, intent) {
   // gun hand from below and behind, its elbow bent — the Chapman triangle.
   if (weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined)) {
     if (weapon.spec.bow) target = drawBow(world, fighter, punch, target, intent);
+    // The duellist: one hand on the gun, the other at the small of his back.
+    else if (style.oneHandAim) intent[`${weapon.off}Hand`] = vec.scale([-0.14, 0.52, weapon.off === 'l' ? 0.06 : -0.06], H);
     else intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(SUPPORT_GRIP, H));
   } else if (weapon.spec.bow) weapon.draw = 0;
   if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };

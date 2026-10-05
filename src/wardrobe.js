@@ -404,6 +404,19 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       }
       break;
     }
+    case 'topHat': {
+      // A tall silk hat: the crown flaring a little to its top, a narrow curled brim, a band.
+      const silk = surface(color, { roughness: 0.35 });
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 0.92 * r, 1.6 * r, 22), silk);
+      crown.position.y = 1.0 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.5 * r, 1.5 * r, 0.06 * r, 26), silk);
+      brim.position.y = 0.22 * r;
+      brim.scale.set(1.08, 1, 0.95);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.94 * r, 0.94 * r, 0.22 * r, 22, 1, true), surface(0x2a2a30));
+      band.position.y = 0.38 * r;
+      group.add(crown, brim, band);
+      break;
+    }
     case 'morion': {
       // The Spanish morion: a round crown with a tall comb front to back and a brim
       // that sweeps up to points before and behind.

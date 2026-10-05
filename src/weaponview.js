@@ -169,6 +169,27 @@ export function buildWeaponMesh(kind, envMap) {
       }
       break;
     }
+    case 'rapier': {
+      // A long, slender blade; a swept hilt of curving bars round the hand, a cup, a long cross.
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.018, 0.006, 0.25), steel));
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.26), steel);
+      cross.position.y = 0.02;
+      const cup = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel);
+      cup.position.y = 0.03;
+      cup.rotation.x = Math.PI;
+      group.add(cross, cup);
+      for (const side of [1, -1]) {
+        const bar = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.004, 6, 14, Math.PI), steel);
+        bar.position.set(0, -0.03, side * 0.02);
+        bar.rotation.y = Math.PI / 2;
+        group.add(bar);
+      }
+      const grip = cylinder(0.013, 0.014, -spec.handle + 0.02, 0.012, surface(0x2a1d14, { roughness: 0.8 }));
+      const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), steel);
+      pommel.position.y = -spec.handle;
+      group.add(grip, pommel);
+      break;
+    }
     case 'espada': {
       // A Spanish cut-and-thrust sword: a narrow straight blade, a cross with
       // long quillons and a side ring, a wire-bound grip, a round pommel.

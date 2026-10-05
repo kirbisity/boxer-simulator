@@ -36,12 +36,13 @@ const STYLE_NOTES = {
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
   bow: 'Keeps away and looses arrows; the sidearm up close.', matchlock: 'One heavy shot, a long reload; the sidearm up close.',
+  rapier: 'A long slender sword: the point is everything.', duelPistol: 'The pistol side-on, one arm straight: the duel.',
   espada: 'A Spanish cut-and-thrust sword: thrust first.', espadaRodela: 'Sword and steel buckler.', macuahuitl: 'An obsidian-edged club and a feathered shield: cuts flesh, chips on steel.', tepoztopilli: 'An obsidian-edged spear: thrusts and cuts.',
   taichi: 'Rooted and soft: deflects nearly everything, answers with palms and pushes.', taekwondo: 'Kicks from range, turning and spinning; little defence.',
   staff: 'A long staff, both ends striking: blunt and quick.', kanabo: 'An iron-studded club: huge slow swings, no thrust.', threeEyed: 'Three barrels fired in turn, then a club.',
   dao: 'A one-handed curved sabre: quick cuts.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -132,6 +133,8 @@ const WARRIORS = [
   warrior('retiarius', 'Nereus', PRESETS.hoplomachus, { name: 'Nereus', style: 'spear', outfit: { kind: 'retiarius', design: 3 } }),
   warrior('peasant', 'Hob Miller', PRESETS.spear),
   warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
+  warrior('ladyAshford', 'Lady Ashford', PRESETS.rapier),
+  warrior('lordAshford', 'Lord Ashford', PRESETS.duelPistol),
   warrior('baton', 'Officer Reyes', PRESETS.baton),
   warrior('knife', 'Ryo Kanda', PRESETS.knife),
   warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),

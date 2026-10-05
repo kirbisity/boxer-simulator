@@ -165,6 +165,13 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 0.95, cut: 0.2, blunt: 0.1 }, swing: { cut: 0.9, blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 24, zeta: 0.8 }, threat: 3.4,
   },
+  // The rapier: a long, slender thrusting sword with a swept hilt. Its point
+  // is everything (`pierce`); its narrow edge cuts a little, it barely bruises.
+  rapier: {
+    label: 'Rapier', hands: 'one', length: 1.05, strikeFrom: 0.1, handle: 0.14, mass: 1.15, balance: 0.1, radius: 0.008,
+    harm: { thrust: { pierce: 1.1, cut: 0.08, blunt: 0.03 }, swing: { cut: 0.35, blunt: 0.05 } },
+    contactSeconds: 0.003, rotation: 0.5, wrist: { omega: 26, zeta: 0.8 }, threat: 3.8,
+  },
   // The macuahuitl: a flat oak club edged both sides with obsidian blades.
   // Obsidian cuts flesh as nothing else does (`cut`), but it is glass: each
   // blow on steel or hard armour chips the edge (`brittle`: what is left of

@@ -544,6 +544,26 @@ export const OUTFITS = {
       { label: 'Blue jacket', top: { kind: 'flannel', color: '#2a3a5a' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'clothWrap', color: '#a3241e' }, feet: { kind: 'bare' } },
     ],
   },
+  // A Victorian lady: a corset over the blouse, a long gown, heeled boots.
+  // The corset's boning turns a little of a cut (30%), nothing of a blow or a point.
+  victorianLady: {
+    label: 'Victorian — corset and gown', movement: 'limited', fists: 'bare',
+    protection: { blunt: 0, cut: 0.3, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    designs: [
+      { label: 'Black corset, plum gown', top: { kind: 'longsleeve', color: '#ece4d8' }, bottom: { kind: 'gown', color: '#5a2a4a' }, armor: { kind: 'corset', color: '#1c1c20', cloth: '#1c1c20', cloth2: '#3a3a40' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
+      { label: 'Red corset, black gown', top: { kind: 'longsleeve', color: '#ece4d8' }, bottom: { kind: 'gown', color: '#1c1c20' }, armor: { kind: 'corset', color: '#8a1418', cloth: '#8a1418', cloth2: '#5a0e10' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
+      { label: 'Ivory corset, blue gown', top: { kind: 'longsleeve', color: '#f2ece0' }, bottom: { kind: 'gown', color: '#22356a' }, armor: { kind: 'corset', color: '#e8e0cc', cloth: '#e8e0cc', cloth2: '#c8bca8' }, feet: { kind: 'heelAnkleBoot', color: '#2a1d14' } },
+    ],
+  },
+  // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.
+  victorianGent: {
+    label: 'Victorian — frock coat and top hat', movement: 'good', fists: 'bare',
+    designs: [
+      { label: 'Black frock coat', top: { kind: 'suit', color: '#1c1c20', shirt: '#f2f2f0', tie: '#1c1c20' }, bottom: { kind: 'pants', color: '#4a4a50' }, head: { kind: 'topHat', color: '#141416' }, feet: { kind: 'dressShoe', color: '#141416' } },
+      { label: 'Grey frock coat', top: { kind: 'suit', color: '#5a5a62', shirt: '#f2f2f0', tie: '#7a1a22' }, bottom: { kind: 'pants', color: '#2a2a30' }, head: { kind: 'topHat', color: '#2a2a30' }, feet: { kind: 'dressShoe', color: '#141416' } },
+      { label: 'Bottle-green frock coat', top: { kind: 'suit', color: '#24402c', shirt: '#f2f2f0', tie: '#d6a743' }, bottom: { kind: 'pants', color: '#3a3326' }, head: { kind: 'topHat', color: '#141416' }, feet: { kind: 'dressShoe', color: '#2a1d14' } },
+    ],
+  },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
   commoner: {
     label: 'Commoner', movement: 'good', fists: 'bare',
@@ -637,7 +657,7 @@ export const FACTION_KEYS = Object.keys(FACTIONS);
 // An armour family's kinds may be swapped for one another when a fighter is redressed;
 // an outfit outside one (a rōnin's kimono, a monk's robe) keeps to itself.
 const FACTION_OF_FAMILY = { knight: 'knights', conquistador: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese', mexica: 'mexica' };
-const FACTION_OF_OUTFIT = { ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
+const FACTION_OF_OUTFIT = { victorianLady: 'street', victorianGent: 'street', ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */
 export function factionOf(inputs) {

@@ -600,6 +600,41 @@ export const STYLES = {
     plans: { outboxer: 1.5, counter: 1, pressure: 0.6, brawler: 0.3 },
     pressure: 0.05,
   },
+  // The rapier: side-on, the sword arm out long in front, lunges (thrusts
+  // with the legs behind them) and the occasional cut; parries with the blade.
+  rapier: {
+    label: 'Rapier', weapon: 'rapier', fallback: 'mix',
+    cadence: { work: 1.1, move: 1, burst: 0.5, mobility: 0.65 },
+    stance: { blade: 0.85, crouch: 0.06, width: 1.25, lean: 0.04, guardHeight: 0 },
+    weaponGuard: { hand: [0.3, 0.68, -0.12], dir: [1, 0.08, 0.02] },
+    idle: { bounce: 0.35, sway: 0.4, rock: 0.25 },
+    attacks: { spearHigh: 0.45, gladiusThrust: 0.35, gladiusCut: 0.2 },
+    combos: { 'gladiusThrust spearHigh': 0.6, 'gladiusCut gladiusThrust': 0.4 },
+    comboChance: 0.35,
+    tempo: 1,
+    defences: { weaponBlock: 0.7, stepBack: 0.3 },
+    defendChance: 0.72,
+    headMovement: 0.1,
+    plans: { counter: 1.5, outboxer: 1.2, pressure: 0.6, brawler: 0.2 },
+    pressure: 0.05,
+  },
+  // The duellist's pistol: the handgun fired side-on, one-handed, the arm
+  // straight out from the shoulder and the other hand at the small of the back.
+  duelPistol: {
+    label: 'Duelling pistol', weapon: 'pistol', fallback: 'mix', oneHandAim: true,
+    ranged: { flee: 2.4, rest: 0.8, runFor: 1.5, standFor: 1.4, close: 1.2, shotSeconds: 0.4, headShare: 0.3, between: [0.6, 0.6] },
+    cadence: { work: 1.2, move: 0.6, burst: 0.5, mobility: 0.4 },
+    stance: { blade: 0.95, crouch: 0, width: 1.0, lean: 0, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.12, 0.55, -0.1], dir: [0.5, -0.85, 0] },
+    idle: { bounce: 0.05, sway: 0.2, rock: 0.1 },
+    attacks: { shoot: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.6, guard: 0.4 },
+    defendChance: 0.35,
+    headMovement: 0.05,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
   // Tai chi: rooted, low, the hands soft before the body; it meets nearly
   // every attack (a parry turns it, a step takes the body off its line) and
   // answers with palms and pushes that carry little harm.

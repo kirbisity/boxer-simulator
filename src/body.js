@@ -263,6 +263,17 @@ export const PRESETS = {
     outfit: { kind: 'mexicaElite', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // Victorians: Lady Ashford with the rapier, her husband with the duelling pistol.
+  rapier: {
+    name: 'Lady Ashford', style: 'rapier', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2000,
+    outfit: { kind: 'victorianLady', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#4a2a1a', facialHair: 'none', eyeColor: 'green' },
+  },
+  duelPistol: {
+    name: 'Lord Ashford', style: 'duelPistol', sex: 'male', heightCm: 178, frame: 'medium', age: 41, exercise: 0.4, calories: 2600,
+    outfit: { kind: 'victorianGent', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'mustache', eyeColor: 'blue' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,
