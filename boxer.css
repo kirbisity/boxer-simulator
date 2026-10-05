@@ -355,7 +355,8 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
 
 /* ---- Factions: tabs over each Deadliest Warrior carousel ---- */
 .dw-side { grid-template-rows: auto minmax(0, 1fr) auto; }
-.dw-tabs { grid-column: 1 / -1; display: flex; justify-content: center; gap: 4px; padding: 0 56px; min-width: 0; flex-wrap: nowrap; }
+/* Under the corner and "make your own": a row of their own (seven factions do not fit beside them). */
+.dw-tabs { grid-column: 1 / -1; display: flex; justify-content: center; gap: 4px; padding: 0 6px; margin-top: 26px; min-width: 0; flex-wrap: nowrap; }
 .dw-tab { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; font-size: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; white-space: nowrap; }
 .dw-tab b { font: 600 12px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .dw-tab.on { border-color: var(--gold); background: rgba(255, 207, 74, 0.14); color: var(--fg); }

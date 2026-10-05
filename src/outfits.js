@@ -62,6 +62,25 @@ function ashigaruDesign(label, lacquer, lace, mon, cloth) {
   return { label, top: { kind: 'longsleeve', color: cloth }, bottom: { kind: 'pants', color: cloth }, armor: { kind: 'okegawa', color: lacquer, lace, gold: mon }, head: { kind: 'jingasa', color: lacquer, gold: mon }, feet: { kind: 'tabi', color: '#1a1b22' } };
 }
 
+// Ming soldiers. Garrison: the padded coat in its colour, the red wrap.
+function mingGarrisonDesign(label, coat, trousers) {
+  return { label, top: { kind: 'longsleeve', color: coat }, bottom: { kind: 'pants', color: trousers }, armor: { kind: 'mingQuilt', color: coat, cloth: coat, cloth2: shade(coat, 0.78) }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+}
+// Brigandine: the coat's cloth, gilt rivets, the iron hat.
+function mingBrigandineDesign(label, cloth, iron) {
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, gold: '#a8894e' }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+}
+// Elite: the coat, the coif's cloth, the steel.
+function mingEliteDesign(label, cloth, coif, steel) {
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e' }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif }, feet: { kind: 'compactBoot', color: '#141416' } };
+}
+// A hex colour darker (or lighter) by a share.
+function shade(hex, share) {
+  const value = parseInt(hex.slice(1), 16);
+  const channel = (offset) => Math.max(0, Math.min(255, Math.round(((value >> offset) & 255) * share)));
+  return `#${[16, 8, 0].map((offset) => channel(offset).toString(16).padStart(2, '0')).join('')}`;
+}
+
 // A gladiator's five looks: his metal, his loincloth, his plume.
 const GLADIATOR_LOOKS = [
   { label: 'Bronze, cream', metal: '#b98a3e', cloth: '#ece4d0', plume: '#b81d22', strap: '#6a4526' },
@@ -331,6 +350,55 @@ export const OUTFITS = {
     courage: 0.25,
     designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('thraex', look, { kind: 'gladiatorHelm', crest: 'griffin', plume: look.plume })),
   },
+  // Ming garrison: a padded cotton coat and a red cloth head wrap. Little
+  // protection beyond the padding; quick on his feet.
+  mingGarrison: {
+    label: 'Ming — garrison', family: 'chinese', movement: 'good', fists: 'bare',
+    sidearm: 'dao',
+    extraMass: 0.06,
+    protection: { blunt: 0.15, cut: 0.2, pierce: 0.1 },
+    courage: 0.1,
+    designs: [
+      mingGarrisonDesign('Red coat', '#a3241e', '#2a2622'),
+      mingGarrisonDesign('Blue coat', '#2a3a6a', '#2a2622'),
+      mingGarrisonDesign('Ochre coat', '#b0862e', '#3a3326'),
+      mingGarrisonDesign('Brown coat', '#6a4428', '#2a2622'),
+      mingGarrisonDesign('Faded red', '#b5574a', '#3a3326'),
+    ],
+  },
+  // Ming brigandine: plates riveted inside a long coat, an iron helmet with a
+  // wide brim; like a European foot soldier's, never full cover.
+  mingBrigandine: {
+    label: 'Ming — brigandine', family: 'chinese', movement: 'good', fists: 'bare',
+    sidearm: 'dao',
+    extraMass: 0.22,
+    protection: { blunt: 0.5, cut: 0.78, pierce: 0.6, bullet: { head: 0.35, torso: 0.35, limb: 0.1 } },
+    courage: 0.25,
+    designs: [
+      mingBrigandineDesign('Red', '#9a1f1a', '#8f949b'),
+      mingBrigandineDesign('Blue', '#22356a', '#8f949b'),
+      mingBrigandineDesign('Black', '#1c1c20', '#6f747c'),
+      mingBrigandineDesign('Green', '#2f5a3a', '#8f949b'),
+      mingBrigandineDesign('Yellow', '#b8922e', '#7f848c'),
+    ],
+  },
+  // Ming elite: the long brigandine coat to the knee with a mirror plate on
+  // the chest, a throat collar, segmented arm guards, a steel bowl helmet
+  // with a padded coif. Covered from head to knee; heavier.
+  mingElite: {
+    label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
+    sidearm: 'dao',
+    extraMass: 0.4,
+    protection: { blunt: 0.6, cut: 0.9, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.25 } },
+    courage: 0.35,
+    designs: [
+      mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
+      mingEliteDesign('Imperial blue', '#1f2f6a', '#7a1418', '#a7adb6'),
+      mingEliteDesign('Black and gold', '#18181c', '#5a1a14', '#8f949b'),
+      mingEliteDesign('Vermilion', '#c0381e', '#1c1c20', '#b7bcc4'),
+      mingEliteDesign('Dark green', '#24402c', '#7a1418', '#a7adb6'),
+    ],
+  },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
   commoner: {
     label: 'Commoner', movement: 'good', fists: 'bare',
@@ -411,6 +479,7 @@ export function familyKinds(family) {
 export const FACTIONS = {
   knights: { label: 'Knights', glyph: '🏰', blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
   japanese: { label: 'Japanese', glyph: '⛩️', blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
+  chinese: { label: 'Chinese', glyph: '🐉', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
@@ -419,7 +488,7 @@ export const FACTIONS = {
 export const FACTION_KEYS = Object.keys(FACTIONS);
 
 // What an outfit says about who wears it; an armour family covers its kinds.
-const FACTION_OF_FAMILY = { knight: 'knights', samurai: 'japanese', gladiator: 'gladiators' };
+const FACTION_OF_FAMILY = { knight: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese' };
 const FACTION_OF_OUTFIT = { commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */

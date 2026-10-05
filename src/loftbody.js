@@ -180,6 +180,23 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.95, 1.21, { rivets: 3, base: 'cloth' }], skirt: [0.28, 0.35, 1.22, { rows: ['steel', 'steel2'] }],
     upperArm: [-0.2, 0.36, 1.62, 'steel'], forearm: [0.18, -0.08, 1.3, 'steel'], knee: [0.82, 1.05, 1.45, 'steel'],
   },
+  // Ming garrison: a padded cotton coat to the knee over trousers, quilted in rows.
+  mingQuilt: {
+    trunk: [-0.05, 0.95, 1.12, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.8, 0.5, 1.24, { rows: ['cloth', 'cloth', 'cloth2'] }],
+    upperArm: [-0.1, 1.0, 1.12, 'cloth'],
+  },
+  // Ming brigandine: plates riveted inside a long cloth coat past the waist,
+  // short riveted sleeves; cloth below.
+  mingBrigandine: {
+    trunk: [-0.06, 0.96, 1.2, { rivets: 4, base: 'cloth' }], skirt: [0.72, 0.55, 1.32, { rivets: 4, base: 'cloth' }],
+    upperArm: [-0.2, 0.5, 1.5, { rivets: 4, base: 'cloth' }],
+  },
+  // Ming elite: the long brigandine coat to the knee with a round steel
+  // mirror over the heart, a steel throat collar, segmented steel arm guards.
+  mingElite: {
+    trunk: [-0.06, 0.97, 1.22, { rivets: 4, base: 'cloth', mirror: [0.62, 0.15, 'steel'] }], skirt: [0.88, 0.6, 1.34, { rivets: 4, base: 'cloth' }], collar: 'steel',
+    upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+  },
   // A foot soldier's mail shirt: to the hips, sleeves to the elbow.
   haubergeon: {
     trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.3, 0.3, 1.14, MAIL], collar: 'mail', upperArm: [-0.3, 0.5, 1.15, MAIL],
@@ -233,6 +250,8 @@ function paintFor(paint, armor) {
     return (ring, angle) => (ring.t > from && ring.t < to && Math.cos(angle) > ahead ? role : paint.base);
   }
   return (ring, angle, index, step) => {
+    // A round plate over the breast (`mirror`: centre up the trunk, size, role), riveted cloth round it.
+    if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
     if (paint.rivets && index % paint.rivets === 1 && step % 3 === 0) return 'gold';
     if (paint.rows) return paint.rows[index % paint.rows.length];
     return paint.base;

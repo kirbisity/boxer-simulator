@@ -272,6 +272,39 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(ferrule, butt);
       break;
     }
+    case 'dao': {
+      // A willow-leaf sabre: a gentle curve to the point, a round guard, a
+      // cord-wrapped grip and a red tassel from the pommel ring.
+      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -0.05 * ((y - 0.04) / (spec.length - 0.04)) ** 2), steel));
+      const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 18), brass);
+      guard.position.y = 0.028;
+      const grip = cylinder(0.016, 0.017, -spec.handle + 0.02, 0.022, surface(0x3a1a14, { roughness: 0.8 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.005, 6, 12), brass);
+      ring.position.y = -spec.handle;
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.09, 8), surface(0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = -spec.handle - 0.06;
+      group.add(guard, grip, ring, tassel);
+      break;
+    }
+    case 'guandao': {
+      // A long red-lacquered shaft, a brass dragon-mouth collar, the broad
+      // crescent blade with a spine notch, a red tassel, an iron butt spike.
+      const bladeStart = spec.strikeFrom - 0.05;
+      const bladeLength = spec.length - bladeStart;
+      group.add(cylinder(0.018, 0.02, -spec.handle, bladeStart + 0.02, surface(0x5a1612, { roughness: 0.55 }), 10));
+      const bend = (y) => -0.09 * ((y - bladeStart) / bladeLength) ** 1.6;
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.085, 0.01, 0.2, bend), steel));
+      const notch = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 6), steel);
+      notch.position.set(0, bladeStart + bladeLength * 0.45, -0.05);
+      notch.rotation.x = -Math.PI / 2;
+      const collar = cylinder(0.03, 0.024, bladeStart - 0.09, bladeStart + 0.01, brass, 10);
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 10), surface(0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = bladeStart - 0.15;
+      tassel.rotation.x = Math.PI;
+      const spike = cylinder(0.002, 0.018, -spec.handle - 0.12, -spec.handle + 0.01, steel, 8);
+      group.add(notch, collar, tassel, spike);
+      break;
+    }
     case 'shortSword':
     case 'gladius': {
       group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.055, 0.009, 0.12), steel));
@@ -301,6 +334,23 @@ export function buildWeaponMesh(kind, envMap) {
 /** The parma: a small, round, convex bronze shield, boss at the centre. Faces +z. */
 export function buildShieldMesh(spec, envMap) {
   const group = new THREE.Group();
+  if (spec.look === 'ming') {
+    // Lacquered red wood, a black ring painted inside an iron rim, a gilt boss.
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius, spec.radius * 0.97, 0.03, 32), surface(0x9a1c18, { roughness: 0.5 }));
+    face.rotation.x = Math.PI / 2;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(spec.radius * 0.66, 0.016, 6, 30), surface(0x151515, { roughness: 0.6 }));
+    ring.position.z = 0.016;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(spec.radius, 0.012, 8, 36), steelMaterial(envMap, { vertexColors: false, color: 0x5a5c62, roughness: 0.45 }));
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.32 }));
+    boss.rotation.x = Math.PI / 2;
+    boss.position.z = 0.015;
+    group.add(face, ring, rim, boss);
+    for (const mesh of [face, rim, boss]) {
+      mesh.castShadow = true;
+      mesh.add(outlineFor(mesh, 0.003));
+    }
+    return group;
+  }
   const bronze = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.32, side: THREE.DoubleSide });
   const dome = 0.35; // rad of a sphere: a shallow bowl
   const sphereRadius = spec.radius / Math.sin(dome);

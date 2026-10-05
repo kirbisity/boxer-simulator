@@ -36,8 +36,9 @@ const STYLE_NOTES = {
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
   bow: 'Keeps away and looses arrows; the sidearm up close.', matchlock: 'One heavy shot, a long reload; the sidearm up close.',
+  dao: 'A one-handed curved sabre: quick cuts.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -95,6 +96,13 @@ const WARRIORS = [
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
   warrior('archer', 'Nasu no Yoichi', PRESETS.bow),
   warrior('teppo', 'Suzuki Magoichi', PRESETS.matchlock),
+  warrior('mingGuandao', 'Liu Ting', PRESETS.guandao),
+  warrior('mingEliteGun', 'Wu Weizhong', PRESETS.guandao, { name: 'Wu Weizhong', style: 'matchlock', outfit: { kind: 'mingElite', design: 1 } }),
+  warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
+  warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),
+  warrior('mingGun', 'Zhao Liu', PRESETS.mingMatchlock),
+  warrior('mingSpear', 'Wang Er', PRESETS.mingSpear),
+  warrior('mingDao', 'Zhang San', PRESETS.mingDao),
   warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
   warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
   warrior('ashigaruSpear', 'Gonbei', PRESETS.spear, { name: 'Gonbei', outfit: { kind: 'ashigaru', design: 0 }, accessories: [] }),
@@ -169,7 +177,7 @@ export function installMenus(game) {
     const body = screen('levels-screen', 'Levels', 'Set fights in set places, with their own people.', home);
     body.append(el('div', { className: 'choices levels' }, ...Object.entries(SCENARIOS).map(([key, level]) => {
       const who = level.roster ?? level.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg ? `${fighter.weightKg} kg` : `${Math.round(fighter.bodyFat * 100)}% fat`}`).join(' — ');
-      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
+      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
     })));
     show('levels-screen');
   }

@@ -88,8 +88,9 @@ test('empty, with a man on him, the gunner draws his own sidearm: a wakizashi fo
   }
 });
 
-test('characters fall into at most six factions, by what they wear: knights, Japanese and gladiators among them', () => {
-  assert.ok(FACTION_KEYS.length <= 6);
+test('characters fall into seven factions, by what they wear: knights, Japanese, Chinese and gladiators among them', () => {
+  assert.ok(FACTION_KEYS.length <= 7);
+  assert.deepEqual(['mingSpear', 'mingDao', 'swordShield', 'mingMatchlock', 'guandao'].map((key) => factionOf(PRESETS[key])), ['chinese', 'chinese', 'chinese', 'chinese', 'chinese']);
   const of = (key) => factionOf(PRESETS[key]);
   assert.deepEqual(['knight', 'warhammer', 'spear', 'unskilled'].map(of), ['knights', 'knights', 'knights', 'knights']);
   assert.deepEqual(['samurai', 'naginata', 'bow', 'matchlock'].map(of), ['japanese', 'japanese', 'japanese', 'japanese']);

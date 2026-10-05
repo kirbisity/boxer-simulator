@@ -140,6 +140,21 @@ export const WEAPONS = {
     harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.6, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 28, zeta: 0.8 }, threat: 3.2,
   },
+  // The Ming dao (a liuyedao, "willow-leaf sabre"): one hand, a gently
+  // curved single edge, a round guard. Cuts first, and thrusts.
+  dao: {
+    label: 'Dao', hands: 'one', length: 0.75, strikeFrom: 0.12, handle: 0.15, mass: 0.95, balance: 0.1, radius: 0.012,
+    harm: { swing: { cut: 1.0, blunt: 0.35 }, thrust: { pierce: 0.78, cut: 0.15, blunt: 0.1 } },
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2,
+  },
+  // The guandao: a broad, heavy crescent blade on a long shaft, fought like
+  // the naginata but a quarter heavier, its weight knocking men about more
+  // (blunt) while its thicker edge cuts and its point pierces a little less.
+  guandao: {
+    label: 'Guandao', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.95, balance: 0.6, radius: 0.016,
+    harm: { swing: { cut: 1.15, blunt: 0.85 }, thrust: { pierce: 0.65, cut: 0.12, blunt: 0.35 } },
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7,
+  },
   // His backup: a short sword that cuts and stabs.
   gladius: {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
@@ -154,6 +169,8 @@ export const WEAPONS = {
 export const SHIELDS = {
   // The parma: small, round, convex bronze — far smaller than a hoplon.
   parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15 },
+  // A Ming soldier's small round shield: lacquered wood with an iron rim and a boss.
+  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, look: 'ming' },
 };
 
 // Cutting and piercing, in joules of a contact's collision energy after

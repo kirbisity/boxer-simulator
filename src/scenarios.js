@@ -5,7 +5,7 @@
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
-import { footSoldier, nobleKnight, rebel, sengokuWarrior, swatOfficer, yakuza } from './cast.js';
+import { footSoldier, mingSoldier, nobleKnight, rebel, sengokuWarrior, swatOfficer, yakuza } from './cast.js';
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -30,6 +30,39 @@ function sekigaharaSide(random, side) {
   }
   const shooter = (warrior) => (warrior.style === 'bow' || warrior.style === 'matchlock' ? 1 : 0);
   return warriors.sort((a, b) => shooter(a) - shooter(b));
+}
+
+// Pyongyang, 1593: the Ming army storms the city held by Konishi
+// Yukinaga. Twenty a side; the Ming led by an elite with the guandao, gun
+// and bow men behind on both sides.
+const PYONGYANG_MING = {
+  elite: { guandao: 2, matchlock: 2 },
+  brigandine: { swordShield: 4, spear: 3, matchlock: 3 },
+  garrison: { spear: 5, dao: 1 },
+};
+const PYONGYANG_JAPANESE = {
+  samurai: { katana: 3, naginata: 1, spear: 1 },
+  ashigaru: { spear: 7, matchlock: 5, bow: 3 },
+};
+
+/** Blades and polearms first (the front ranks), bows and guns last. */
+function shootersBehind(warriors) {
+  const shooter = (warrior) => (warrior.style === 'bow' || warrior.style === 'matchlock' ? 1 : 0);
+  return warriors.sort((a, b) => shooter(a) - shooter(b));
+}
+
+function pyongyangSides(random) {
+  const ming = [];
+  for (const [rank, styles] of Object.entries(PYONGYANG_MING)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) ming.push(mingSoldier(random, style, rank));
+  const japanese = [];
+  const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
+  for (const [rank, styles] of Object.entries(PYONGYANG_JAPANESE)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) japanese.push(sengokuWarrior(random, west, style, rank));
+  const red = shootersBehind(ming);
+  const blue = shootersBehind(japanese);
+  // Led by the two commanders: Li Rusong for the Ming, Konishi Yukinaga in the city.
+  red[0] = { ...red[0], name: 'Li Rusong' };
+  blue[0] = { ...blue[0], name: 'Konishi Yukinaga' };
+  return { red, blue };
 }
 
 export const SCENARIOS = {
@@ -66,6 +99,18 @@ export const SCENARIOS = {
       const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
       return { red: sekigaharaSide(random, east), blue: sekigaharaSide(random, west) };
     },
+    fighters: [],
+  },
+  pyongyang: {
+    title: 'Pyongyang',
+    place: 'Pyongyang, Joseon · 8 February 1593',
+    blurb: 'The Ming army retakes the city from the Japanese. Twenty Ming soldiers — elite guandao and gunners in long brigandine, sword-and-shield men, garrison spearmen — against twenty Japanese samurai and ashigaru.',
+    scene: 'sengoku',
+    arena: { halfX: 14, halfZ: 9 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
+    roster: 'Twenty a side: Ming and Japanese',
+    formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.3 } },
+    cast: (random) => pyongyangSides(random),
     fighters: [],
   },
   port: {

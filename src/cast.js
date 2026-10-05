@@ -169,6 +169,18 @@ export function sengokuWarrior(random = Math.random, side, style, rank = style =
   });
 }
 
+/**
+ * A Ming soldier: a garrison man in his padded coat and red wrap, a
+ * brigandine man in his iron hat, or an elite in the long coat with the
+ * chest mirror; built like the side's other men, in one of his armour's designs.
+ */
+export function mingSoldier(random = Math.random, style = 'spear', rank = 'garrison') {
+  const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' ? PRESETS.swordShield : PRESETS.mingSpear, random);
+  const kind = { garrison: 'mingGarrison', brigandine: 'mingBrigandine', elite: 'mingElite' }[rank];
+  const name = `${pickOne(['Wang', 'Li', 'Zhang', 'Liu', 'Chen', 'Yang', 'Zhao', 'Huang', 'Zhou', 'Wu', 'Qi', 'Luo'], random)} ${pickOne(['Da', 'Er', 'San', 'Si', 'Wu', 'Liu', 'Hu', 'Bao', 'Shun', 'Gui', 'Fu', 'Ming'], random)}`;
+  return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] });
+}
+
 /** A noble knight in full plate, named for his rank and house, with a long sword or a war hammer. */
 export function nobleKnight(random = Math.random, style = 'longsword') {
   const base = varyCharacter(style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight, random);

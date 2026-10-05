@@ -182,6 +182,34 @@ export const PRESETS = {
     outfit: { kind: 'ashigaru', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
+  // Ming soldiers: a garrison spearman in his padded coat and red wrap; a
+  // garrison man with the dao; a brigandine man with sword and shield; a
+  // brigandine gunner; Liu Ting, the general famed for his heavy blade.
+  mingSpear: {
+    name: 'Wang Er', style: 'spear', sex: 'male', heightCm: 168, frame: 'medium', age: 26, exercise: 0.5, calories: 2900,
+    outfit: { kind: 'mingGarrison', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
+  },
+  mingDao: {
+    name: 'Zhang San', style: 'dao', sex: 'male', heightCm: 170, frame: 'medium', age: 29, exercise: 0.55, calories: 3000,
+    outfit: { kind: 'mingGarrison', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  swordShield: {
+    name: 'Chen Bao', style: 'swordShield', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.65, calories: 3200,
+    outfit: { kind: 'mingBrigandine', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  mingMatchlock: {
+    name: 'Zhao Liu', style: 'matchlock', sex: 'male', heightCm: 169, frame: 'medium', age: 33, exercise: 0.55, calories: 3000,
+    outfit: { kind: 'mingBrigandine', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  guandao: {
+    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: 182, frame: 'large', age: 40, exercise: 0.75, calories: 3900,
+    outfit: { kind: 'mingElite', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,

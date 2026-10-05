@@ -404,6 +404,69 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       }
       break;
     }
+    case 'clothWrap': {
+      // A Ming garrison soldier's cloth wrapped round the head and knotted behind.
+      const wrap = cloth;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.47), wrap);
+      cap.position.y = 0.05 * r;
+      const roll = new THREE.Mesh(new THREE.TorusGeometry(1.08 * r, 0.17 * r, 8, 22), wrap);
+      roll.rotation.x = Math.PI / 2;
+      roll.rotation.z = 0.12;
+      roll.position.y = 0.18 * r;
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.22 * r, 10, 8), wrap);
+      knot.position.set(-1.12 * r, 0.22 * r, 0);
+      group.add(cap, roll, knot);
+      for (const side of [1, -1]) {
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.7 * r, 0.22 * r), wrap);
+        tail.position.set(-1.18 * r, -0.12 * r, side * 0.14 * r);
+        tail.rotation.x = side * 0.2;
+        group.add(tail);
+      }
+      break;
+    }
+    case 'mingHat': {
+      // The Ming soldier's iron helmet: a round crown, a wide brim almost
+      // flat, a short spike and a red tassel at its foot.
+      const iron = metal(steel, color);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.17 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      crown.scale.y = 1.1;
+      crown.position.y = 0.12 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.18 * r, 1.78 * r, 0.16 * r, 28, 1, true), iron.clone());
+      brim.material.side = THREE.DoubleSide;
+      brim.position.y = 0.06 * r;
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.1 * r, 0.6 * r, 8), iron);
+      spike.position.y = 1.55 * r;
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.3 * r, 0.35 * r, 10), surface(head.tassel ?? 0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = 1.32 * r;
+      tassel.rotation.x = Math.PI;
+      group.add(crown, brim, spike, tassel);
+      break;
+    }
+    case 'mingHelm': {
+      // A Ming officer's helmet: a tall steel bowl with a brass brow band, a
+      // spike with a red tassel and plume, and a padded coif hanging from
+      // the rim over the neck and shoulders, open at the face.
+      const bowlSteel = metal(steel, color);
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.18 * r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), bowlSteel);
+      bowl.scale.y = 1.3;
+      bowl.position.y = 0.08 * r;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.18 * r, 0.07 * r, 6, 24), metal(steel, head.gold ?? 0xd6a743));
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.12 * r;
+      const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * r, 0.09 * r, 0.9 * r, 8), metal(steel, head.gold ?? 0xd6a743));
+      spike.position.y = 1.95 * r;
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.34 * r, 0.42 * r, 10), surface(head.tassel ?? 0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = 1.62 * r;
+      tassel.rotation.x = Math.PI;
+      const plume = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.7 * r, 6), surface(head.tassel ?? 0xb3161b, { roughness: 0.9 }));
+      plume.position.y = 2.65 * r;
+      // The coif: open over the face (+x), from the rim to the shoulders.
+      const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.75 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
+      coif.material.side = THREE.DoubleSide;
+      coif.position.y = -0.5 * r;
+      group.add(bowl, band, spike, tassel, plume, coif);
+      break;
+    }
     case 'secutorHelm': {
       // The secutor's smooth egg of bronze: nothing for a net or a trident
       // to catch on, two small eyeholes, a low fin.
