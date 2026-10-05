@@ -28,6 +28,9 @@ export const TOPS = {
   waistcoat: { hem: -0.02, neck: 0.93, loose: 1.08, sleeve: 0, inner: 'longsleeve' },
   aloha: { hem: -0.06, neck: 0.98, loose: 1.11, sleeve: 0.55, sleeveLoose: 1.3 },
   haramaki: { hem: -0.02, neck: 0.45, loose: 1.05, sleeve: 0 },
+  // A ball gown's bodice, off the shoulder, with short puffed sleeves; a riding habit's fitted jacket to the hip.
+  bodice: { hem: 0, neck: 0.86, loose: 1.04, sleeve: 0.32, sleeveLoose: 1.55 },
+  habit: { hem: -0.14, neck: 1.0, loose: 1.07, sleeve: 1.85, sleeveLoose: 1.12 },
   // A medieval tunic: to the waist as a shirt, then a skirt to mid-thigh (`skirt`, thigh shares), belted.
   tunic: { hem: -0.1, neck: 0.97, loose: 1.12, sleeve: 1.7, sleeveLoose: 1.26, skirt: 0.5 },
 };
@@ -36,6 +39,16 @@ export const LOFT = {
   // A corset: the waist drawn in by `cinch` of its width and depth, most at
   // `at` up the trunk (pelvis 0, neck 1), fading over `span` either way.
   corset: { cinch: 0.2, at: 0.32, span: 0.14 },
+  // Gown skirts: the hem (thigh lengths below the waist), the bell's flare
+  // out to the sides (`flare`) and front to back (`depthFlare`), and a bustle
+  // standing out behind (a share of the waist's depth) a third of the way down;
+  // a narrow skirt is let out over the hips (`hips`) so a stride stays inside it.
+  gowns: {
+    crinoline: { hem: 1.35, flare: 1.4, depthFlare: 0.98 },
+    ball: { hem: 1.45, flare: 2.3, depthFlare: 4 },
+    bustle: { hem: 1.45, flare: 0.6, depthFlare: 0.8, bustle: 2.2, hips: 0.3 },
+    slim: { hem: 1.45, flare: 0.6, depthFlare: 0.6, hips: 0.3 },
+  },
   // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
   // how far forward it bulges, and how far below the waistband it hangs,
   // per metre of layer past that.
@@ -495,7 +508,18 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
   if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
   // A long gown's skirt, belled out from the waist to below the knee.
-  if (bottom?.kind === 'gown') loft(mesh, skirtRings(skirtTo(1.35), count(7), 1.4), sides, { color: 'kit', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+  if (bottom?.kind === 'gown') {
+    const gown = LOFT.gowns[bottom.shape ?? 'crinoline'];
+    const hemAt = skirtTo(gown.hem);
+    const down = (u) => Math.sqrt(Math.max(0, (-0.12 - u) / (-0.12 - hemAt)));
+    const waistDepth = bodyDepth(-0.12);
+    const bustle = (u) => (u >= -0.12 ? 0 : (gown.bustle ?? 0) * waistDepth * Math.exp(-(((down(u) ** 2 - 0.16) / 0.2) ** 2)));
+    const rings = along(at('pelvis'), at('neck'), forward, count(9), hemAt, 0.2,
+      (u) => (u >= -0.12 ? unbulged(bodyDepth, 1)(u) : waistDepth * (1 + gown.depthFlare * down(u))) + bustle(u),
+      (u) => (u >= -0.12 ? bodyWidth(u) : bodyWidth(-0.12) * (1 + (gown.hips ?? 0) * Math.min(1, 3 * down(u)) + gown.flare * down(u))),
+      (u) => unbulged(bodyLean, 0.8)(Math.max(u, -0.12)) - bustle(u));
+    loft(mesh, rings, sides, { color: 'kit', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+  }
   if (bottom?.kind === 'loincloth') loft(mesh, skirtRings(skirtTo(0.22), count(2), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
   // The balteus: a gladiator's broad bronze belt.
   if (hoplomachus) loft(mesh, shortsRings(0.04, 0.24, count(3)), sides, { color: (ring, angle, index) => (index === 1 ? 'gold' : 'steel'), inflate: 1.14, capStart: false, capEnd: false, bones: abdomen });

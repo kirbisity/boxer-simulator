@@ -553,6 +553,12 @@ export const OUTFITS = {
       { label: 'Black corset, plum gown', top: { kind: 'longsleeve', color: '#ece4d8' }, bottom: { kind: 'gown', color: '#5a2a4a' }, armor: { kind: 'corset', color: '#1c1c20', cloth: '#1c1c20', cloth2: '#3a3a40' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
       { label: 'Red corset, black gown', top: { kind: 'longsleeve', color: '#ece4d8' }, bottom: { kind: 'gown', color: '#1c1c20' }, armor: { kind: 'corset', color: '#8a1418', cloth: '#8a1418', cloth2: '#5a0e10' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
       { label: 'Ivory corset, blue gown', top: { kind: 'longsleeve', color: '#f2ece0' }, bottom: { kind: 'gown', color: '#22356a' }, armor: { kind: 'corset', color: '#e8e0cc', cloth: '#e8e0cc', cloth2: '#c8bca8' }, feet: { kind: 'heelAnkleBoot', color: '#2a1d14' } },
+      // Silhouettes of the reign: a ball gown on the widest hoop, the 1880s
+      // bustle, a riding habit, and the widow's mourning black.
+      { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#e6eef2', cloth: '#e6eef2', cloth2: '#b8ccd8' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4' } },
+      { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#4a1420', cloth: '#4a1420', cloth2: '#2a0a12' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
+      { label: 'Riding habit', top: { kind: 'habit', color: '#1e2a22' }, bottom: { kind: 'gown', shape: 'slim', color: '#1e2a22' }, armor: { kind: 'corset', color: '#1e2a22', cloth: '#1e2a22', cloth2: '#2c3a30' }, head: { kind: 'ridingHat', color: '#141416', veil: '#5a5a62' }, feet: { kind: 'heelAnkleBoot', color: '#2a1d14' } },
+      { label: 'Mourning black', top: { kind: 'longsleeve', color: '#1a1a1e' }, bottom: { kind: 'gown', color: '#141418' }, armor: { kind: 'corset', color: '#1a1a1e', cloth: '#1a1a1e', cloth2: '#2a2a30' }, head: { kind: 'widowCap', color: '#141418', cap: '#f2efe8' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
     ],
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.

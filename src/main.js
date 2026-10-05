@@ -1100,7 +1100,10 @@ const SHEETS = {
 for (const kind of OUTFIT_KEYS) {
   SHEETS[`outfit-${kind}`] = {
     options: OUTFITS[kind].designs.filter((design) => !design.levelOnly).map((design, index) => [{ outfit: { kind, design: index } }, design.label, OUTFITS[kind].label]),
-    rows: [PRESETS.light, PRESETS.contender],
+    // Worn by its own characters where it has any (a gown on the lady), else by a man and a woman.
+    // Gowns stand wider than trousers.
+    spacing: OUTFITS[kind].designs.some((design) => design.bottom?.kind === 'gown') ? 1.1 : undefined,
+    rows: Object.values(PRESETS).filter((preset) => preset.outfit?.kind === kind).slice(0, 2).concat([PRESETS.light, PRESETS.contender]).slice(0, 2),
     // Wider for more designs, and above the ropes.
     camera: { distance: 2.9 + 0.7 * Math.max(0, OUTFITS[kind].designs.length - 3), pitch: 0.08 + 0.03 * Math.max(0, OUTFITS[kind].designs.length - 3), yaw: 0.15, height: 0.95 },
   };
@@ -1124,9 +1127,10 @@ function sheetInputs(sheet, row, value) {
 }
 
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
-function designSheet(kind, row = 0, closeUp = null) {
-  const sheet = SHEETS[kind];
-  const spacing = { faces: 0.55, bodies: 0.8, physiques: 1.15 }[kind] ?? 0.85;
+function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
+  // `pick`: only these columns (a shortlist to choose from).
+  const sheet = pick ? { ...SHEETS[kind], options: pick.map((column) => SHEETS[kind].options[column]) } : SHEETS[kind];
+  const spacing = sheet.spacing ?? { faces: 0.55, bodies: 0.8, physiques: 1.15 }[kind] ?? 0.85;
   const entries = sheet.options.map(([value, label], column) => ({ inputs: { ...sheetInputs(sheet, row, value), name: label }, corner: 'red', column }));
   const middle = (entries.length - 1) / 2;
   state.paused = true;
@@ -1137,7 +1141,7 @@ function designSheet(kind, row = 0, closeUp = null) {
     placeFighter(fighter, 0, (middle - entries[index].column) * spacing);
     fighter.handsDown = true;
     // Turn the bladed stance so the face, not the hips, points at the camera.
-    fighter.yaw = -0.5;
+    fighter.yaw = -0.5 + turn;
   });
   advance(state.world, 0.6, null, STEP);
   rebuildViews();

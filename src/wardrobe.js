@@ -482,6 +482,61 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       group.add(crown, brim, plume);
       break;
     }
+    case 'ridingHat': {
+      // A lady's riding hat: a short silk topper with a veil tied round it, its tails hanging behind.
+      const silk = surface(color, { roughness: 0.35 });
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.88 * r, 0.84 * r, 1.0 * r, 20), silk);
+      crown.position.y = 0.75 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.3 * r, 1.3 * r, 0.06 * r, 24), silk);
+      brim.position.y = 0.26 * r;
+      const veilCloth = surface(head.veil ?? 0x6a6a72);
+      veilCloth.side = THREE.DoubleSide;
+      const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.9 * r, 0.9 * r, 0.24 * r, 20, 1, true), veilCloth);
+      veil.position.y = 0.45 * r;
+      const tails = new THREE.Mesh(new THREE.PlaneGeometry(0.6 * r, 1.5 * r), veilCloth);
+      tails.position.set(-1.0 * r, -0.2 * r, 0);
+      tails.rotation.set(0, Math.PI / 2, 0.15);
+      group.add(crown, brim, veil, tails);
+      hidesHair = false;
+      break;
+    }
+    case 'tiltHat': {
+      // An 1880s hat: a small flat crown tipped forward over the brow, a feather curling back.
+      const felt = cloth;
+      const hat = new THREE.Group();
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.8 * r, 0.45 * r, 18), felt);
+      crown.position.y = 0.3 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.25 * r, 1.25 * r, 0.05 * r, 22), felt);
+      brim.position.y = 0.08 * r;
+      const feather = new THREE.Mesh(new THREE.ConeGeometry(0.16 * r, 1.5 * r, 6), surface(head.plume ?? 0xe8e0cc));
+      feather.position.set(-0.5 * r, 0.6 * r, 0.45 * r);
+      feather.rotation.set(0.3, 0, 1.15);
+      hat.add(crown, brim, feather);
+      hat.position.set(0.25 * r, 0.75 * r, 0);
+      hat.rotation.z = -0.28;
+      group.add(hat);
+      hidesHair = false;
+      break;
+    }
+    case 'widowCap': {
+      // Queen Victoria's widow's cap: white lawn over the crown, dipping to a
+      // point on the brow, and a long black veil hanging behind.
+      const lawn = surface(head.cap ?? 0xf2efe8);
+      lawn.side = THREE.DoubleSide;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(1.1 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), lawn);
+      cap.position.set(-0.12 * r, 0.12 * r, 0);
+      cap.scale.set(1, 0.75, 1.05);
+      const point = new THREE.Mesh(new THREE.ConeGeometry(0.22 * r, 0.6 * r, 4), lawn);
+      point.position.set(0.82 * r, 0.42 * r, 0);
+      point.rotation.z = -Math.PI * 0.62;
+      const veilCloth = surface(color);
+      veilCloth.side = THREE.DoubleSide;
+      const veil = new THREE.Mesh(new THREE.CylinderGeometry(1.05 * r, 1.5 * r, 2.6 * r, 16, 1, true, Math.PI * 0.75, Math.PI * 1.5), veilCloth);
+      veil.position.set(-0.35 * r, -0.75 * r, 0);
+      group.add(cap, point, veil);
+      hidesHair = false;
+      break;
+    }
     case 'featherBand': {
       // A coloured band round the head with a few tall feathers at the back.
       const band = new THREE.Mesh(new THREE.TorusGeometry(1.06 * r, 0.12 * r, 6, 22), cloth);
