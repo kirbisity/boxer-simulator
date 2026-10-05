@@ -5,7 +5,7 @@
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
-import { europeanSoldier, footSoldier, mexicaWarrior, mingSoldier, nobleKnight, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+import { europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -13,6 +13,9 @@ import { europeanSoldier, footSoldier, mexicaWarrior, mingSoldier, nobleKnight, 
  * given by its weight: the calories that settle at it are worked out when
  * the bout is built, as the builder's slider would.
  */
+// Who stands behind the line: the bows and the long guns.
+const SHOOTERS = ['bow', 'steppeBow', 'matchlock'];
+
 // One side at Sekigahara, forty strong: a samurai leads; the ashigaru are
 // mostly yari, with bows and teppō. Blades and polearms first (the front
 // ranks), the bows and guns last.
@@ -28,7 +31,7 @@ function sekigaharaSide(random, side) {
       for (let index = 0; index < count; index += 1) warriors.push(sengokuWarrior(random, side, style, rank));
     }
   }
-  const shooter = (warrior) => (warrior.style === 'bow' || warrior.style === 'matchlock' ? 1 : 0);
+  const shooter = (warrior) => (SHOOTERS.includes(warrior.style) ? 1 : 0);
   return warriors.sort((a, b) => shooter(a) - shooter(b));
 }
 
@@ -46,7 +49,7 @@ const PYONGYANG_JAPANESE = {
 
 /** Blades and polearms first (the front ranks), bows and guns last. */
 function shootersBehind(warriors) {
-  const shooter = (warrior) => (warrior.style === 'bow' || warrior.style === 'matchlock' ? 1 : 0);
+  const shooter = (warrior) => (SHOOTERS.includes(warrior.style) ? 1 : 0);
   return warriors.sort((a, b) => shooter(a) - shooter(b));
 }
 
@@ -94,6 +97,15 @@ const ZEELANDIA = {
 const WOKOU = {
   raiders: { ronin: { katana: 6, naginata: 2 }, wokou: { dao: 9, spear: 5, matchlock: 4 } },
   garrison: { garrison: { spear: 7, dao: 4, matchlock: 1 }, brigandine: { swordShield: 2, spear: 1 } },
+};
+
+// Rhodes, 24 September 1522: Süleyman's general assault on the breaches.
+// The Knights of St John in plate, their sergeants and gunners, hold the
+// Bastion of Aragon against Janissaries, azaps and heavy men in mail-and-plate.
+const RHODES = {
+  hospitallers: { knight: { longsword: 6, warhammer: 2 }, sergeant: { spear: 4, matchlock: 3 } },
+  // The whole army was a hundred thousand, but a breach is narrow: these are the men of one wave who reach the defenders.
+  ottomans: { heavy: { maceShield: 2, saberShield: 1 }, janissary: { yatagan: 4, matchlock: 3 }, azap: { spear: 4, steppeBow: 3 } },
 };
 
 export const SCENARIOS = {
@@ -179,6 +191,21 @@ export const SCENARIOS = {
         blue: shootersBehind([...ironMen, ...regulars, ...garrison, ...company(army.ronin, (style) => roninWarrior(random, style))]),
       };
     },
+    fighters: [],
+  },
+  rhodes: {
+    title: 'Siege of Rhodes',
+    place: 'Bastion of Aragon, Rhodes · 24 September 1522',
+    blurb: "Süleyman's general assault on the breaches. The Knights of St John in plate, with their sergeants and gunners, meet the Janissaries with yatagan and gun, the azaps' spears and bows, and heavy men in mail-and-plate.",
+    scene: 'coastFort',
+    arena: { halfX: 15, halfZ: 10 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
+    roster: 'Fifteen of the Order · a wave of seventeen Ottomans',
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 8, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.4 } },
+    cast: (random) => ({
+      red: shootersBehind([...company(RHODES.hospitallers.knight, (style) => hospitaller(random, style, 'knight')), ...company(RHODES.hospitallers.sergeant, (style) => hospitaller(random, style, 'sergeant'))]),
+      blue: shootersBehind([...company(RHODES.ottomans.heavy, (style) => ottomanSoldier(random, style, 'heavy')), ...company(RHODES.ottomans.janissary, (style) => ottomanSoldier(random, style, 'janissary')), ...company(RHODES.ottomans.azap, (style) => ottomanSoldier(random, style, 'azap'))]),
+    }),
     fighters: [],
   },
   wokou: {

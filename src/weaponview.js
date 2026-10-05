@@ -93,11 +93,16 @@ export function buildWeaponMesh(kind, envMap) {
   const wood = surface(0x7a5530, { roughness: 0.7 });
   const brass = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
   switch (kind) {
-    case 'bow': {
+    case 'bow':
+    case 'compositeBow': {
       // A recurved stave bowed towards the mark (+z), bound at the grip; the
       // string runs tip to tip behind it, drawn to the hand as the shot comes.
+      // The composite bow is short, its stiff ears (siyahs) bent sharply forward.
       const bend = 0.16;
-      const stave = new THREE.CatmullRomCurve3([
+      const stave = new THREE.CatmullRomCurve3(kind === 'compositeBow' ? [
+        new THREE.Vector3(0, -spec.handle, 0.02), new THREE.Vector3(0, -spec.handle * 0.8, -0.12), new THREE.Vector3(0, -spec.handle * 0.45, -0.07),
+        new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, spec.length * 0.45, -0.07), new THREE.Vector3(0, spec.length * 0.8, -0.12), new THREE.Vector3(0, spec.length, 0.02),
+      ] : [
         new THREE.Vector3(0, -spec.handle, -bend * 0.9), new THREE.Vector3(0, -spec.handle * 0.55, -bend * 0.15),
         new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, spec.length * 0.55, -bend * 0.15), new THREE.Vector3(0, spec.length, -bend * 0.9),
       ]);
@@ -408,6 +413,71 @@ export function buildWeaponMesh(kind, envMap) {
       const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.09, 8), surface(0xb3161b, { roughness: 0.9 }));
       tassel.position.y = -spec.handle - 0.06;
       group.add(guard, grip, ring, tassel);
+      break;
+    }
+    case 'langya':
+    case 'flangedMace': {
+      // An iron-bound wooden haft, a leather grip; the head: the wolf-tooth
+      // mace's iron-clad cylinder bristling with teeth, or the flanged mace's
+      // six iron blades round a core.
+      const iron = steelMaterial(envMap, { vertexColors: false, color: 0x55585e, roughness: 0.5 });
+      group.add(cylinder(0.015, 0.016, -spec.handle, spec.strikeFrom, kind === 'langya' ? wood : iron, 10));
+      group.add(cylinder(0.018, 0.018, -spec.handle, 0.0, leather, 10));
+      if (kind === 'langya') {
+        group.add(cylinder(spec.radius, spec.radius, spec.strikeFrom, spec.length, iron, 10));
+        const teeth = new THREE.InstancedMesh(new THREE.ConeGeometry(0.008, 0.03, 5), iron, 6 * 5);
+        const place = new THREE.Object3D();
+        let at = 0;
+        for (let row = 0; row < 5; row += 1) {
+          const y = spec.strikeFrom + 0.03 + ((spec.length - spec.strikeFrom - 0.06) * row) / 4;
+          for (let around = 0; around < 6; around += 1) {
+            const angle = ((around + (row % 2) * 0.5) / 6) * Math.PI * 2;
+            place.position.set(Math.cos(angle) * (spec.radius + 0.012), y, Math.sin(angle) * (spec.radius + 0.012));
+            place.rotation.set(0, -angle, -Math.PI / 2);
+            place.updateMatrix();
+            teeth.setMatrixAt(at, place.matrix);
+            at += 1;
+          }
+        }
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.05, 6), iron);
+        tip.position.y = spec.length + 0.025;
+        group.add(teeth, tip);
+      } else {
+        group.add(cylinder(0.016, 0.016, spec.strikeFrom, spec.length, iron, 10));
+        for (let flange = 0; flange < 6; flange += 1) {
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(spec.radius, spec.length - spec.strikeFrom, 0.006), iron);
+          const angle = (flange / 6) * Math.PI * 2;
+          blade.position.set(Math.cos(angle) * spec.radius * 0.5, (spec.strikeFrom + spec.length) / 2, Math.sin(angle) * spec.radius * 0.5);
+          blade.rotation.y = -angle;
+          group.add(blade);
+        }
+      }
+      break;
+    }
+    case 'saber':
+    case 'yatagan': {
+      // The sabre: a long, gently curved blade, a cross guard, a pistol grip.
+      // The yatagan: shorter, curving forward towards the edge, no guard,
+      // its grip ending in two "ears".
+      const forward = kind === 'yatagan';
+      const curve = (y) => (forward ? 0.04 : -0.06) * ((y - 0.04) / (spec.length - 0.04)) ** (forward ? 1.4 : 2);
+      const blade = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, forward ? 0.034 : 0.032, 0.007, 0.14, curve), steel);
+      blade.rotation.y = Math.PI;
+      group.add(blade);
+      const grip = cylinder(0.015, 0.017, -spec.handle + 0.02, 0.03, surface(forward ? 0xe8e0cc : 0x2a1c14, { roughness: 0.6 }));
+      group.add(grip);
+      if (forward) {
+        for (const side of [1, -1]) {
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), surface(0xe8e0cc, { roughness: 0.6 }));
+          ear.scale.set(1, 0.6, 0.5);
+          ear.position.set(side * 0.018, -spec.handle + 0.01, 0);
+          group.add(ear);
+        }
+      } else {
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.012, 0.018), brass);
+        guard.position.y = 0.032;
+        group.add(guard);
+      }
       break;
     }
     case 'guandao': {

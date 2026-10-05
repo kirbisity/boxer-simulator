@@ -638,7 +638,8 @@ function loose(world, fighter) {
   const distance = vec.length(line);
   let dir = vec.normalize(line);
   // Aimed above the mark by the drop over the distance.
-  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / ARROW.speed ** 2)));
+  const speed = weapon.spec.arrowSpeed ?? ARROW.speed;
+  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
   const spread = (ARROW.spread + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1);
@@ -647,7 +648,7 @@ function loose(world, fighter) {
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
   const upward = vec.cross(across, dir);
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, 0.08)), v: vec.scale(dir, ARROW.speed), age: 0, landed: false, done: false });
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, 0.08)), v: vec.scale(dir, speed), speed, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // The bow kicks forward a little in the hand as the string goes.
   world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
@@ -666,7 +667,7 @@ function flyArrows(world, dt) {
     const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
     const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
     if (hit) {
-      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v));
+      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2);
       arrow.done = true;
       arrow.x = hit.point;
       continue;
@@ -688,7 +689,7 @@ function flyArrows(world, dt) {
  * protection), scaled to the part's weight and hurt, bleeding, with a
  * small knock; enough and he dies.
  */
-function arrowHit(world, shooter, hit, dir) {
+function arrowHit(world, shooter, hit, dir, energy = 1) {
   const victim = hit.fighter;
   const event = { time: world.time, kind: 'arrow', attacker: shooter.id, defender: victim.id, point: hit.point, normal: vec.scale(dir, -1), target: hit.target, harm: 0, effects: [] };
   world.events.push(event);
@@ -710,7 +711,8 @@ function arrowHit(world, shooter, hit, dir) {
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
-  const harm = ARROW.lethal[region] * (1 - stopped) * scale * (1 + GUN.hurtShare * (victim.damage[key] ?? 0));
+  // `energy`: the arrow's kinetic energy against a long bow's (ARROW.speed).
+  const harm = ARROW.lethal[region] * energy * (1 - stopped) * scale * (1 + GUN.hurtShare * (victim.damage[key] ?? 0));
   // The same pool of deadly wounds as a gun's.
   victim.gunshot = (victim.gunshot ?? 0) + harm;
   victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);

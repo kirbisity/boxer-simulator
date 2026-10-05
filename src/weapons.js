@@ -195,6 +195,35 @@ export const WEAPONS = {
     harm: { swing: { blunt: 1.75 }, thrust: { blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
   },
+  // One-handed maces, the horseman's answer to armour (swords skate off it):
+  // a short iron-bound haft and a heavy head, swung with the wrist and arm
+  // (lighter and quicker than a two-handed club, so a little less blunt than
+  // the kanabo). The Jurchen "wolf-tooth" mace (langya bang) is studded with
+  // iron teeth that bite as it crushes; the flanged mace (Mongol, Ottoman
+  // shestopyor and bozdoğan) drives its blow into a flange's narrow edge.
+  langya: {
+    label: 'Wolf-tooth mace', hands: 'one', length: 0.72, strikeFrom: 0.46, handle: 0.13, mass: 2.0, balance: 0.68, radius: 0.042,
+    harm: { swing: { blunt: 1.55, pierce: 0.25 }, thrust: { blunt: 0.4, pierce: 0.15 } },
+    contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, crush: 0.45,
+  },
+  flangedMace: {
+    label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.72, radius: 0.036,
+    harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.35 } },
+    contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, crush: 0.55,
+  },
+  // The steppe and Turkish sabre (Mongol sabre, Ottoman kılıç): a long,
+  // gently curved single edge for the draw cut. The yatagan, the Janissary's
+  // short sword, curves forward instead, its weight out towards the point.
+  saber: {
+    label: 'Sabre', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.14, mass: 1.0, balance: 0.13, radius: 0.012,
+    harm: { swing: { cut: 1.05, blunt: 0.35 }, thrust: { pierce: 0.7, cut: 0.15, blunt: 0.1 } },
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 24, zeta: 0.8 }, threat: 3.3,
+  },
+  yatagan: {
+    label: 'Yatagan', hands: 'one', length: 0.64, strikeFrom: 0.1, handle: 0.13, mass: 0.85, balance: 0.16, radius: 0.012,
+    harm: { swing: { cut: 1.05, blunt: 0.3 }, thrust: { pierce: 0.8, cut: 0.15, blunt: 0.1 } },
+    contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2,
+  },
   // A bow (`bow`): held in the left hand (`hand`), the stave running
   // `length` up and `handle` down from the grip. It looses arrows (ARROW);
   // there is no edge to strike with.
@@ -202,6 +231,15 @@ export const WEAPONS = {
     label: 'Bow', hands: 'one', hand: 'l', length: 0.95, strikeFrom: 0.95, handle: 0.85, mass: 0.6, balance: 0, radius: 0.014,
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.5, grip: 0.4, ranged: true, bow: true,
+  },
+  // The steppe composite bow (Mongol, Turkish): short and sharply recurved,
+  // horn, wood and sinew, a heavy draw; it casts the same arrow faster than
+  // a long wooden bow (`arrowSpeed`, m/s; ARROW.speed otherwise), and the
+  // arrow strikes with its kinetic energy.
+  compositeBow: {
+    label: 'Composite bow', hands: 'one', hand: 'l', length: 0.62, strikeFrom: 0.62, handle: 0.55, mass: 0.7, balance: 0, radius: 0.016,
+    harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.6, grip: 0.4, ranged: true, bow: true, arrowSpeed: 62,
   },
   // Sidearms, drawn when the main weapon is lost (an outfit's `sidearm`):
   // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
@@ -258,6 +296,11 @@ export const SHIELDS = {
   rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, look: 'steel' },
   // The Mexica chimalli: a round shield of wicker or wood faced with feathers and hide.
   chimalli: { label: 'Chimalli', radius: 0.33, mass: 1.6, offset: 0.07, armHarm: 0.2, look: 'feather' },
+  // A small round iron parry shield, held out to meet a blow.
+  buckler: { label: 'Iron buckler', radius: 0.2, mass: 1.4, offset: 0.06, armHarm: 0.12, look: 'steel' },
+  // The kalkan: the Turkish and steppe round shield of wicker bound in
+  // coloured thread round an iron boss; light and springy.
+  kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, look: 'ming' },
 };
 
 // Cutting and piercing, in joules of a contact's collision energy after

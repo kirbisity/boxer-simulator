@@ -78,6 +78,10 @@ function mingBrigandineDesign(label, cloth, iron, look = {}) {
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
   return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
+// The steppe man's kit: his deel (the robe over all), its trim and sash, his hat or helmet.
+function steppeDesign(label, armor, deel, trim, head, feet = '#3a2416') {
+  return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, ...armor }, head, feet: { kind: 'compactBoot', color: feet } };
+}
 // A hex colour darker (or lighter) by a share.
 function shade(hex, share) {
   const value = parseInt(hex.slice(1), 16);
@@ -453,6 +457,133 @@ export const OUTFITS = {
       mingEliteDesign('Steel scale, masked', '#1c1c20', '#1f2a4a', '#a7adb6', { neck: 'steel', mask: true }, { kind: 'mingScale', lace: '#1a1c24' }),
     ],
   },
+  // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the
+  // 1120s–40s, a legend of an earlier age (not in the Ming levels). Iron
+  // scale over the whole trunk and down to the knees, segmented plates down
+  // the arms and shins, a ridged helmet with an iron face plate and a lamed
+  // gorget leaving only an eye slit. Fought here on foot, with the mace.
+  ironPagoda: {
+    label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
+    sidearm: 'dao',
+    spare: 'dagger',
+    deflects: true,
+    arrowproof: true,
+    extraMass: 0.5,
+    protection: { blunt: 0.66, cut: 1, pierce: 0.9, bullet: { head: 0.45, torso: 0.65, limb: 0.35 } },
+    courage: 0.4,
+    designs: [
+      { label: 'Black iron', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#5a5d63', lace: '#2a1c14' }, head: { kind: 'pagodaHelm', color: '#5a5d63' }, feet: { kind: 'sabaton', color: '#5a5d63' } },
+      { label: 'Bright steel, red lacing', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#a7adb6', lace: '#7a1418' }, head: { kind: 'pagodaHelm', color: '#a7adb6' }, feet: { kind: 'sabaton', color: '#a7adb6' } },
+      { label: 'Lacquered black', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#141416' }, armor: { kind: 'ironPagoda', color: '#2c2d31', lace: '#8a6a2a' }, head: { kind: 'pagodaHelm', color: '#2c2d31' }, feet: { kind: 'sabaton', color: '#2c2d31' } },
+    ],
+  },
+  // ---- The steppe, 14th–17th centuries: Mongol, Oirat and Timurid warriors,
+  // from the unarmoured archer in his deel to the iron-clad lancer; and the
+  // legend of the 1200s, Chinggis Khan's guard. Fought on foot here. ----
+  steppeLight: {
+    label: 'Steppe — deel and fur hat', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    designs: [
+      steppeDesign('Blue deel', { kind: 'deel', color: '#2f4a7a' }, '#2f4a7a', '#d6a743', { kind: 'furHat', color: '#2f4a7a' }),
+      steppeDesign('Maroon deel', { kind: 'deel', color: '#6a1f2a' }, '#6a1f2a', '#2a3a5a', { kind: 'furHat', color: '#6a1f2a' }),
+      steppeDesign('Ochre deel', { kind: 'deel', color: '#a8742a' }, '#a8742a', '#3a2416', { kind: 'furHat', color: '#3a2416' }),
+    ],
+  },
+  // Hardened leather lamellar over the deel, an iron helmet: proof against a glancing cut.
+  steppeMedium: {
+    label: 'Steppe — leather lamellar', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    extraMass: 0.15,
+    protection: { blunt: 0.3, cut: 0.6, pierce: 0.45, bullet: { head: 0.1, torso: 0.15, limb: 0.05 } },
+    courage: 0.2,
+    designs: [
+      steppeDesign('Brown leather', { kind: 'steppeLeather', color: '#5a3a22', cloth: '#5a3a22', cloth2: '#3a2416' }, '#2f4a7a', '#3a2416', { kind: 'steppeHelm', color: '#7d8088', coif: '#4a3a2a' }),
+      steppeDesign('Red-lacquered leather', { kind: 'steppeLeather', color: '#7a2418', cloth: '#7a2418', cloth2: '#3a1410' }, '#3a3020', '#1c1a18', { kind: 'steppeHelm', color: '#7d8088', coif: '#3a2a20' }),
+      steppeDesign('Black-lacquered leather', { kind: 'steppeLeather', color: '#24201c', cloth: '#24201c', cloth2: '#6a4a2a' }, '#5a2a1a', '#24201c', { kind: 'steppeHelm', color: '#5a5d63', coif: '#2a2420' }),
+    ],
+  },
+  // Iron lamellar to the knees, iron bracers, a helmet with a lamellar aventail.
+  steppeHeavy: {
+    label: 'Steppe — iron lamellar', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    arrowproof: true,
+    extraMass: 0.32,
+    protection: { blunt: 0.5, cut: 0.88, pierce: 0.72, bullet: { head: 0.3, torso: 0.35, limb: 0.15 } },
+    courage: 0.3,
+    designs: [
+      steppeDesign('Iron, blue laces', { kind: 'steppeLamellar', color: '#7d8088', lace: '#2a3a6a' }, '#2f4a7a', '#d6a743', { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', plume: '#b3161b' }),
+      steppeDesign('Iron, red laces', { kind: 'steppeLamellar', color: '#6a6d73', lace: '#8a1418' }, '#3a3020', '#8a1418', { kind: 'steppeHelm', color: '#6a6d73', coif: '#4a4d52', plume: '#1c1a18' }),
+      steppeDesign('Blackened iron', { kind: 'steppeLamellar', color: '#34363a', lace: '#a8742a' }, '#5a2a1a', '#a8742a', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#e8e0cc' }),
+    ],
+  },
+  // The kheshig: Chinggis Khan's guard of the 1200s, a legend of an earlier
+  // age (not in the levels): gilt-bossed iron scale with broad shoulder
+  // guards, the masked helmet of the Khan's own men.
+  kheshig: {
+    label: 'Kheshig — the Khan\'s guard', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    arrowproof: true,
+    extraMass: 0.38,
+    protection: { blunt: 0.55, cut: 0.92, pierce: 0.8, bullet: { head: 0.4, torso: 0.4, limb: 0.2 } },
+    courage: 0.4,
+    designs: [
+      steppeDesign('Gilt scale, black deel', { kind: 'kheshig', color: '#8f949b', lace: '#1c1a18' }, '#1c1a18', '#d6a743', { kind: 'steppeHelm', color: '#8f949b', coif: '#6a6d73', plume: '#1c1a18', mask: true, gold: '#d6a743' }),
+      steppeDesign('Black scale, red deel', { kind: 'kheshig', color: '#34363a', lace: '#8a1418' }, '#7a1418', '#d6a743', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#b3161b', mask: true, gold: '#d6a743' }),
+    ],
+  },
+  // ---- The Ottomans, 15th–17th centuries: the azap (light infantry, bow
+  // and spear), the Janissary (the Sultan's household infantry, its yatagan
+  // and its guns), the heavy man in mail-and-plate; and the legend of the
+  // 1300s, an alp of Osman's frontier warriors. ----
+  azap: {
+    label: 'Ottoman — azap', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    designs: [
+      { label: 'Red tunic, white turban', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#3a2a22' }, head: { kind: 'turban', color: '#ece4d0', cap: '#8a2a22' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Green tunic', top: { kind: 'tunic', color: '#3a5a32' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'turban', color: '#ece4d0', cap: '#3a5a32' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Undyed tunic, red cap', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#3a2a22' }, head: { kind: 'turban', color: '#b3161b', cap: '#b3161b' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+    ],
+  },
+  janissary: {
+    label: 'Ottoman — Janissary', movement: 'good', fists: 'bare',
+    sidearm: 'yatagan',
+    spare: 'dagger',
+    courage: 0.15,
+    designs: [
+      { label: 'Blue dolama', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#8a1418' }, armor: { kind: 'dolama', color: '#2a3a6a', cloth: '#2a3a6a', cloth2: '#1c2850', lace: '#b3161b' }, head: { kind: 'bork', color: '#f0ece4', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      { label: 'Red dolama', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#2a3a6a' }, armor: { kind: 'dolama', color: '#8a1418', cloth: '#8a1418', cloth2: '#5a0e10', lace: '#2a3a6a' }, head: { kind: 'bork', color: '#f0ece4', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      { label: 'Green dolama', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#e4dcc8' }, armor: { kind: 'dolama', color: '#2f5a3a', cloth: '#2f5a3a', cloth2: '#1c3a24', lace: '#8a1418' }, head: { kind: 'bork', color: '#f0ece4', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#8a1418' } },
+    ],
+  },
+  // Mail-and-plate (krug): rows of small plates riveted into a mail shirt,
+  // mail to the thighs, iron vambraces, and the turban helmet (chichak).
+  ottomanHeavy: {
+    label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    arrowproof: true,
+    extraMass: 0.3,
+    protection: { blunt: 0.5, cut: 0.92, pierce: 0.75, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
+    courage: 0.3,
+    designs: [
+      { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', color: '#a7adb6', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      { label: 'Gilt, blue kaftan', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#1c2238' }, armor: { kind: 'krug', color: '#b8a066' }, head: { kind: 'chichak', color: '#b8a066', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Dark steel, green kaftan', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#1c2a20' }, armor: { kind: 'krug', color: '#6a6d73' }, head: { kind: 'chichak', color: '#6a6d73', gold: '#b8a066' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+    ],
+  },
+  // An alp of Osman's gazi band, c. 1300, a legend of an earlier age (not in
+  // the levels): a mail hauberk, a conical helmet with a mail aventail and a
+  // turban wound round it.
+  gaziAlp: {
+    label: 'Alp — Osman\'s gazi', movement: 'good', fists: 'bare',
+    sidearm: 'saber',
+    extraMass: 0.28,
+    protection: { blunt: 0.45, cut: 0.85, pierce: 0.5, bullet: { head: 0.3, torso: 0.25, limb: 0.2 } },
+    courage: 0.35,
+    designs: [
+      { label: 'Mail, green coat', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#ece4d0' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Mail, red coat', top: { kind: 'longsleeve', color: '#7a1418' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#e8dcc0' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+    ],
+  },
   // A Chinese martial artist's silk suit (tai chi, kung fu): loose jacket and
   // trousers, cloth shoes. No protection; it moves.
   kungfu: {
@@ -677,7 +808,9 @@ export const FACTIONS = {
   knights: { label: 'Knights', glyph: '🏰', blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
   japanese: { label: 'Japanese', glyph: '⛩️', blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
   mexica: { label: 'Mexica', glyph: '🦅', blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
-  chinese: { label: 'Chinese', glyph: '🐉', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao.' },
+  chinese: { label: 'Chinese', glyph: '🐉', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
+  steppe: { label: 'Steppe', glyph: '🐎', blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, leather and iron lamellar, sabre, mace and composite bow; the Khan\'s kheshig of legend.' },
+  ottomans: { label: 'Ottomans', glyph: '🌙', blurb: 'The Sultan\'s army: azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
@@ -689,7 +822,7 @@ export const FACTION_KEYS = Object.keys(FACTIONS);
 // An armour family's kinds may be swapped for one another when a fighter is redressed;
 // an outfit outside one (a rōnin's kimono, a monk's robe) keeps to itself.
 const FACTION_OF_FAMILY = { knight: 'knights', conquistador: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese', mexica: 'mexica' };
-const FACTION_OF_OUTFIT = { victorianLady: 'street', victorianGent: 'street', ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
+const FACTION_OF_OUTFIT = { ironPagoda: 'chinese', steppeLight: 'steppe', steppeMedium: 'steppe', steppeHeavy: 'steppe', kheshig: 'steppe', azap: 'ottomans', janissary: 'ottomans', ottomanHeavy: 'ottomans', gaziAlp: 'ottomans', victorianLady: 'street', victorianGent: 'street', ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */
 export function factionOf(inputs) {

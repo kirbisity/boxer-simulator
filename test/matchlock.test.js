@@ -88,8 +88,8 @@ test('empty, with a man on him, the gunner draws his own sidearm: a wakizashi fo
   }
 });
 
-test('characters fall into eight factions, by what they wear: knights, Japanese, Chinese, Mexica and gladiators among them', () => {
-  assert.ok(FACTION_KEYS.length <= 8);
+test('characters fall into ten factions, by what they wear: knights, Japanese, Chinese, Mexica, steppe, Ottomans and gladiators among them', () => {
+  assert.equal(FACTION_KEYS.length, 10);
   assert.deepEqual(['macuahuitl', 'tepoztopilli'].map((key) => factionOf(PRESETS[key])), ['mexica', 'mexica']);
   assert.deepEqual(['hidalgo', 'rodelero'].map((key) => factionOf(PRESETS[key])), ['knights', 'knights']);
   assert.deepEqual(['staff', 'taichi'].map((key) => factionOf(PRESETS[key])), ['chinese', 'chinese']);

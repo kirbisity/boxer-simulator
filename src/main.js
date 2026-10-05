@@ -1119,6 +1119,8 @@ SHEETS.headgear = {
 
 /** The inputs a sheet option builds: a look field, an outfit, or a body fed to a BMI. */
 function sheetInputs(sheet, row, value) {
+  // A whole character as an option (a lineup of different people).
+  if (value.inputs) return normaliseInputs(structuredClone(value.inputs));
   const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
   if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
   if (value.outfit) return { ...inputs, outfit: value.outfit, accessories: value.accessories ?? defaultHeadgear(value.outfit.kind) };
@@ -1129,7 +1131,9 @@ function sheetInputs(sheet, row, value) {
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
 function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
   // `pick`: only these columns (a shortlist to choose from).
-  const sheet = pick ? { ...SHEETS[kind], options: pick.map((column) => SHEETS[kind].options[column]) } : SHEETS[kind];
+  // `kind`: a sheet's name, or a sheet itself ({ options, rows, camera }).
+  const named = typeof kind === 'string' ? SHEETS[kind] : kind;
+  const sheet = pick ? { ...named, options: pick.map((column) => named.options[column]) } : named;
   const spacing = sheet.spacing ?? { faces: 0.55, bodies: 0.8, physiques: 1.15 }[kind] ?? 0.85;
   const entries = sheet.options.map(([value, label], column) => ({ inputs: { ...sheetInputs(sheet, row, value), name: label }, corner: 'red', column }));
   const middle = (entries.length - 1) / 2;
@@ -1207,6 +1211,7 @@ window.boxer = {
   state,
   scene,
   designSheet,
+  presets: PRESETS,
   fight,
   preview,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),

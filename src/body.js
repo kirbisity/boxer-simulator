@@ -234,6 +234,64 @@ export const PRESETS = {
     outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // Legends of an earlier age, one to a faction: Wanyan Wuzhu, the Jin prince
+  // who led the Iron Pagoda (1140); Subutai, Chinggis Khan's general, in the
+  // kheshig's armour; Turgut Alp, one of Osman's companions (c. 1300).
+  ironPagoda: {
+    name: 'Wanyan Wuzhu', style: 'langyaShield', sex: 'male', heightCm: 174, frame: 'large', age: 38, exercise: 0.8, calories: 4000,
+    outfit: { kind: 'ironPagoda', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  kheshig: {
+    name: 'Subutai', style: 'spear', sex: 'male', heightCm: 166, frame: 'medium', age: 44, exercise: 0.8, calories: 3400,
+    outfit: { kind: 'kheshig', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  gaziAlp: {
+    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 168, frame: 'medium', age: 36, exercise: 0.75, calories: 3300,
+    outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  // The steppe of the 1400s: Esen Taishi of the Oirats, who captured the Ming
+  // emperor at Tumu (1449); Mandukhai Khatun, who led the Mongols in armour in
+  // the 1470s–90s; an Oirat archer and a lancer.
+  maceShield: {
+    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 167, frame: 'large', age: 42, exercise: 0.75, calories: 3600,
+    outfit: { kind: 'steppeHeavy', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  saber: {
+    name: 'Mandukhai Khatun', style: 'saber', sex: 'female', heightCm: 158, frame: 'medium', age: 30, exercise: 0.75, calories: 2600,
+    outfit: { kind: 'steppeMedium', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  steppeBow: {
+    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 164, frame: 'medium', age: 26, exercise: 0.75, calories: 3000,
+    outfit: { kind: 'steppeLight', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  saberShield: {
+    name: 'Ganbold', style: 'saberShield', sex: 'male', heightCm: 165, frame: 'medium', age: 29, exercise: 0.72, calories: 3100,
+    outfit: { kind: 'steppeMedium', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  // The Ottomans: Ulubatlı Hasan, the Janissary who raised the banner on the
+  // walls of Constantinople (1453); an azap archer; a heavy sipahi on foot.
+  yatagan: {
+    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 171, frame: 'large', age: 25, exercise: 0.85, calories: 3600,
+    outfit: { kind: 'janissary', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  azap: {
+    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 165, frame: 'medium', age: 24, exercise: 0.6, calories: 2900,
+    outfit: { kind: 'azap', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  sipahi: {
+    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 168, frame: 'medium', age: 34, exercise: 0.75, calories: 3300,
+    outfit: { kind: 'ottomanHeavy', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
   // A Ming elite with the three-eyed gun.
   threeEyed: {
     name: 'Ma Lin', style: 'threeEyed', sex: 'male', heightCm: 171, frame: 'medium', age: 35, exercise: 0.75, calories: 3500,

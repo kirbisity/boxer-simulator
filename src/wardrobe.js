@@ -520,6 +520,153 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       hidesHair = false;
       break;
     }
+    case 'pagodaHelm': {
+      // The Iron Pagoda's helmet: a rounded iron bowl braced by ridges over
+      // the crown to a knob and spike; an iron face plate over cheeks and jaw
+      // with one narrow eye slit; a gorget of lames closed round the throat.
+      const iron = metal(steel, color);
+      iron.side = THREE.DoubleSide;
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.52), iron);
+      bowl.scale.y = 1.18;
+      bowl.position.y = 0.06 * r;
+      group.add(bowl);
+      for (let ridge = 0; ridge < 4; ridge += 1) {
+        const arc = new THREE.Mesh(new THREE.TorusGeometry(1.21 * r, 0.06 * r, 5, 18, Math.PI), iron);
+        arc.scale.y = 1.18;
+        arc.rotation.y = (ridge * Math.PI) / 4;
+        arc.position.y = 0.06 * r;
+        group.add(arc);
+      }
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.2 * r, 10, 8), iron);
+      knob.position.y = 1.5 * r;
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.07 * r, 0.55 * r, 8), iron);
+      spike.position.y = 1.88 * r;
+      // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
+      const face = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 18, 12, Math.PI * 0.56, Math.PI * 0.88, Math.PI * 0.34, Math.PI * 0.58), iron);
+      const slit = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.08 * r, 1.05 * r), surface(0x0b0b0d));
+      slit.position.set(1.12 * r, 0.2 * r, 0);
+      group.add(knob, spike, face, slit);
+      for (let lame = 0; lame < 3; lame += 1) {
+        const gorget = new THREE.Mesh(new THREE.CylinderGeometry((0.95 + lame * 0.2) * r, (1.15 + lame * 0.2) * r, 0.42 * r, 22, 1, true), iron);
+        gorget.position.y = (-1.0 - lame * 0.36) * r;
+        group.add(gorget);
+      }
+      break;
+    }
+    case 'steppeHelm': {
+      // A steppe helmet: a tall pointed iron bowl, a brow band, a spike with
+      // a plume, a lamellar aventail round the sides and back (open at the
+      // face); the kheshig's with a gilt band and an iron face mask.
+      const iron = metal(steel, color);
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      bowl.scale.y = 1.45;
+      bowl.position.y = 0.06 * r;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.17 * r, 0.08 * r, 6, 24), metal(steel, head.gold ?? color));
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.1 * r;
+      const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * r, 0.08 * r, 0.6 * r, 8), iron);
+      spike.position.y = 1.95 * r;
+      group.add(bowl, band, spike);
+      if (head.plume) {
+        const plume = new THREE.Mesh(new THREE.ConeGeometry(0.09 * r, 0.9 * r, 6), surface(head.plume, { roughness: 0.9 }));
+        plume.position.y = 2.6 * r;
+        group.add(plume);
+      }
+      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.7 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), metal(steel, head.coif ?? color));
+      aventail.material.side = THREE.DoubleSide;
+      aventail.position.y = -0.52 * r;
+      group.add(aventail);
+      if (head.mask) {
+        const mask = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.42, Math.PI * 0.44), iron.clone());
+        mask.material.side = THREE.DoubleSide;
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.12 * r, 1.0 * r), surface(0x0b0b0d));
+        slit.position.set(1.08 * r, 0.14 * r, 0);
+        group.add(mask, slit);
+      }
+      break;
+    }
+    case 'furHat': {
+      // The steppe hat: a cloth crown, peaked, with a thick upturned fur brim.
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.1 * r, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), cloth);
+      crown.scale.y = 1.35;
+      crown.position.y = 0.12 * r;
+      const fur = new THREE.Mesh(new THREE.TorusGeometry(1.12 * r, 0.26 * r, 8, 22), surface(head.fur ?? 0x5a3a22, { roughness: 1 }));
+      fur.rotation.x = Math.PI / 2;
+      fur.position.y = 0.2 * r;
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.14 * r, 8, 6), surface(0xb3161b, { roughness: 0.9 }));
+      knot.position.y = 1.6 * r;
+      group.add(crown, fur, knot);
+      break;
+    }
+    case 'bork': {
+      // The Janissary's börk: a tall white felt hat, its long flap falling
+      // down the back, a brass sheath (for the plume spoon) on the brow.
+      const felt = surface(color, { roughness: 0.9 });
+      const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.92 * r, 1.12 * r, 1.9 * r, 20), felt);
+      hat.position.y = 0.85 * r;
+      const flapFelt = felt.clone();
+      flapFelt.side = THREE.DoubleSide;
+      const flap = new THREE.Mesh(new THREE.PlaneGeometry(1.1 * r, 2.6 * r), flapFelt);
+      flap.position.set(-1.0 * r, 0.3 * r, 0);
+      flap.rotation.set(0, Math.PI / 2, -0.12);
+      const sheath = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * r, 0.16 * r, 1.0 * r, 10), metal(steel, head.gold ?? 0xd6a743));
+      sheath.position.set(1.05 * r, 0.7 * r, 0);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.12 * r, 0.08 * r, 6, 22), metal(steel, head.gold ?? 0xd6a743));
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.0;
+      group.add(hat, flap, sheath, band);
+      break;
+    }
+    case 'turban': {
+      // A turban: cloth wound in coils over a coloured cap.
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(1.08 * r, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), surface(head.cap ?? color, { roughness: 0.9 }));
+      cap.scale.y = 1.3;
+      cap.position.y = 0.2 * r;
+      group.add(cap);
+      for (let coil = 0; coil < 3; coil += 1) {
+        const wrap = new THREE.Mesh(new THREE.TorusGeometry((1.14 - coil * 0.1) * r, 0.22 * r, 8, 22), cloth);
+        wrap.rotation.x = Math.PI / 2;
+        wrap.rotation.z = coil * 0.4;
+        wrap.position.y = (0.15 + coil * 0.3) * r;
+        group.add(wrap);
+      }
+      break;
+    }
+    case 'chichak': {
+      // The Ottoman chichak: a pointed bowl with a gilt band and finial, a
+      // sliding nasal bar, cheek plates and a mail aventail round the neck;
+      // (`turban`) a turban wound round it, as an alp wore it.
+      const iron = metal(steel, color);
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      bowl.scale.y = 1.3;
+      bowl.position.y = 0.08 * r;
+      const gilt = metal(steel, head.gold ?? 0xd6a743);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.17 * r, 0.07 * r, 6, 24), gilt);
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.12 * r;
+      const finial = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.6 * r, 8), gilt);
+      finial.position.y = 1.85 * r;
+      const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 1.0 * r, 0.12 * r), iron);
+      nasal.position.set(1.18 * r, -0.12 * r, 0);
+      group.add(bowl, band, finial, nasal);
+      for (const side of [1, -1]) {
+        const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.6 * r, 0.8 * r, 0.06 * r), iron);
+        cheek.position.set(0.35 * r, -0.45 * r, side * 1.08 * r);
+        group.add(cheek);
+      }
+      const mailCloth = surface(head.mail ?? 0x8d9097, { roughness: 0.55 });
+      mailCloth.side = THREE.DoubleSide;
+      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.15 * r, 1.6 * r, 1.1 * r, 22, 2, true, Math.PI * 0.75, Math.PI * 1.5), mailCloth);
+      aventail.position.y = -0.45 * r;
+      group.add(aventail);
+      if (head.turban) {
+        const wrap = new THREE.Mesh(new THREE.TorusGeometry(1.24 * r, 0.2 * r, 8, 22), surface(head.turban, { roughness: 0.9 }));
+        wrap.rotation.x = Math.PI / 2;
+        wrap.position.y = 0.3 * r;
+        group.add(wrap);
+      }
+      break;
+    }
     case 'featherBand': {
       // A coloured band round the head with a few tall feathers at the back.
       const band = new THREE.Mesh(new THREE.TorusGeometry(1.06 * r, 0.12 * r, 6, 22), cloth);

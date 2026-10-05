@@ -40,9 +40,10 @@ const STYLE_NOTES = {
   espada: 'A Spanish cut-and-thrust sword: thrust first.', espadaRodela: 'Sword and steel buckler.', macuahuitl: 'An obsidian-edged club and a feathered shield: cuts flesh, chips on steel.', tepoztopilli: 'An obsidian-edged spear: thrusts and cuts.',
   taichi: 'Rooted and soft: deflects nearly everything, answers with palms and pushes.', taekwondo: 'Kicks from range, turning and spinning; little defence.',
   staff: 'A long staff, both ends striking: blunt and quick.', kanabo: 'An iron-studded club: huge slow swings, no thrust.', threeEyed: 'Three barrels fired in turn, then a club.',
-  dao: 'A one-handed curved sabre: quick cuts.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
+  dao: 'A one-handed curved sabre: quick cuts.', saber: 'The steppe and Turkish sabre: long draw cuts.', saberShield: 'Sabre and kalkan, the wicker round shield.', yatagan: 'The Janissary\'s forward-curved short sword.',
+  langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -105,6 +106,19 @@ const WARRIORS = [
   warrior('shaolin', 'Tanzong', PRESETS.staff),
   warrior('taichi', 'Chen Fake', PRESETS.taichi),
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
+  warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda),
+  warrior('kheshig', 'Subutai', PRESETS.kheshig),
+  warrior('esen', 'Esen Taishi', PRESETS.maceShield),
+  warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
+  warrior('steppeLancer', 'Temür', PRESETS.maceShield, { name: 'Temür', style: 'spear', outfit: { kind: 'steppeHeavy', design: 1 } }),
+  warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
+  warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
+  warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),
+  warrior('sipahi', 'Davud the sipahi', PRESETS.sipahi),
+  warrior('janissary', 'Ulubatlı Hasan', PRESETS.yatagan),
+  warrior('janissaryGun', 'Mehmed Çavuş', PRESETS.yatagan, { name: 'Mehmed Çavuş', style: 'matchlock', outfit: { kind: 'janissary', design: 1 } }),
+  warrior('azapArcher', 'Ali the azap', PRESETS.azap),
+  warrior('azapSpear', 'Yusuf the azap', PRESETS.azap, { name: 'Yusuf the azap', style: 'spear', outfit: { kind: 'azap', design: 1 } }),
   warrior('ronin', 'Miyamoto Musashi', PRESETS.samurai, { name: 'Miyamoto Musashi', outfit: { kind: 'ronin', design: 2 }, accessories: [] }),
   warrior('wokou', 'Wang Zhi', PRESETS.mingDao, { name: 'Wang Zhi', outfit: { kind: 'wokou', design: 0 } }),
   warrior('hidalgo', 'Hernán Cortés', PRESETS.hidalgo),
@@ -198,7 +212,7 @@ export function installMenus(game) {
     const body = screen('levels-screen', 'Levels', 'Set fights in set places, with their own people.', home);
     body.append(el('div', { className: 'choices levels' }, ...Object.entries(SCENARIOS).map(([key, level]) => {
       const who = level.roster ?? level.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg ? `${fighter.weightKg} kg` : `${Math.round(fighter.bodyFat * 100)}% fat`}`).join(' — ');
-      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
+      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
     })));
     show('levels-screen');
   }

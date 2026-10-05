@@ -253,6 +253,42 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.97, 1.22, { rivets: 4, base: 'cloth', mirror: [0.62, 0.15, 'steel'] }], skirt: [0.88, 0.6, 1.34, { rivets: 4, base: 'cloth' }], collar: 'steel',
     upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
   },
+  // The Iron Pagoda: iron scale over the trunk and down to the knees, broad
+  // shoulder lames and segmented arm tubes, knee cops and lamed greaves.
+  ironPagoda: {
+    trunk: [-0.08, 1.0, 1.24, { scales: true }], skirt: [0.98, 0.65, 1.36, { scales: true }], collar: 'steel',
+    upperArm: [[-0.32, 0.42, 1.62, { rows: ['steel', 'steel2'] }], [0.42, 1.02, 1.4, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.02, 1.34, { rows: ['steel', 'steel2'] }],
+    knee: [0.84, 1.06, 1.46, 'steel'], shin: [0.05, 0.95, 1.3, { rows: ['steel', 'steel2'] }],
+  },
+  // Steppe lamellar: iron plates laced in rows to the knees, iron bracers;
+  // the leather kind the same cut in hardened hide; the kheshig's gilt-bossed scale.
+  steppeLamellar: {
+    trunk: [-0.06, 0.98, 1.2, { scales: true }], skirt: [1.0, 0.6, 1.3, { scales: true }], upperArm: [-0.26, 0.55, 1.44, { scales: true }], forearm: [-0.04, -0.03, 1.28, { rows: ['steel', 'steel2'] }],
+  },
+  steppeLeather: {
+    trunk: [-0.06, 0.96, 1.16, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.9, 0.5, 1.24, { rows: ['cloth', 'cloth2'] }], upperArm: [-0.2, 0.45, 1.32, { rows: ['cloth', 'cloth2'] }],
+  },
+  kheshig: {
+    trunk: [-0.08, 1.0, 1.22, { scales: true, mirror: [0.62, 0.14, 'gold'] }], skirt: [1.05, 0.7, 1.34, { scales: true }], collar: 'steel',
+    upperArm: [[-0.32, 0.45, 1.6, { scales: true }], [0.45, 1.02, 1.36, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.03, 1.3, { rows: ['steel', 'steel2'] }],
+  },
+  // The deel: the steppe robe, crossed over to the right, to below the knee, sashed.
+  deel: {
+    trunk: [-0.06, 0.99, 1.1, { panel: [0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], skirt: [1.05, 0.45, 1.22, 'cloth'], belt: [-0.04, 0.06, 1.16, 'cloth2'],
+  },
+  // The Janissary's dolama: a long coat buttoned down the front, its skirts to the shin, a sash.
+  dolama: {
+    trunk: [-0.06, 0.99, 1.1, { panel: [-0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], skirt: [1.2, 0.5, 1.22, 'cloth'], belt: [-0.05, 0.07, 1.18, 'lace'],
+  },
+  // Mail-and-plate (krug): rows of plates set in a mail shirt, mail to the thighs, iron vambraces.
+  krug: {
+    trunk: [[-0.1, 1.0, 1.12, MAIL], [0.15, 0.85, 1.2, { rows: ['steel', 'steel', 'mail'] }]], skirt: [0.6, 0.45, 1.18, MAIL], collar: 'mail',
+    upperArm: [-0.3, 0.55, 1.15, MAIL], forearm: [-0.04, -0.03, 1.3, 'steel'],
+  },
+  // A mail hauberk to the knees, long-sleeved.
+  hauberk: {
+    trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.75, 0.4, 1.16, MAIL], collar: 'mail', upperArm: [-0.3, 1.0, 1.14, MAIL],
+  },
   // A foot soldier's mail shirt: to the hips, sleeves to the elbow.
   haubergeon: {
     trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.3, 0.3, 1.14, MAIL], collar: 'mail', upperArm: [-0.3, 0.5, 1.15, MAIL],

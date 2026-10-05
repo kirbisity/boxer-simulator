@@ -250,9 +250,42 @@ const PERIOD_BUILD = {
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
   spanish: { soldier: { heightCm: 165, weightKg: 63, exercise: 0.7 }, officer: { heightCm: 167, weightKg: 66, exercise: 0.72 } },
   mexica: { warrior: { heightCm: 160, weightKg: 58, exercise: 0.72 }, elite: { heightCm: 162, weightKg: 60, exercise: 0.82 } },
+  // The Hospitaller knights at Rhodes, nobles of France, Spain, Italy and England, fed and trained
+  // from boyhood; their sergeants and gunners. Ottoman soldiers of the 1500s
+  // about 165–168 cm; the Janissaries picked young (the devşirme) for build.
+  hospitaller: { knight: { heightCm: 170, weightKg: 71, exercise: 0.75 }, sergeant: { heightCm: 167, weightKg: 66, exercise: 0.65 } },
+  ottoman: { azap: { heightCm: 165, weightKg: 60, exercise: 0.6 }, janissary: { heightCm: 169, weightKg: 65, exercise: 0.8 }, heavy: { heightCm: 168, weightKg: 67, exercise: 0.75 } },
+  // Medieval Mongol and Oirat men, from skeletons about 163–167 cm, lean and hard.
+  steppe: { light: { heightCm: 164, weightKg: 60, exercise: 0.75 }, medium: { heightCm: 165, weightKg: 62, exercise: 0.75 }, heavy: { heightCm: 167, weightKg: 66, exercise: 0.78 } },
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };
+
+/** A knight of St John (in plate, sword or hammer) or one of the Order's sergeants (in mail, spear or gun). */
+export function hospitaller(random = Math.random, style = 'longsword', rank = 'knight') {
+  const knightly = rank === 'knight';
+  const base = varyCharacter(knightly ? (style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight) : PRESETS.contender, random);
+  const name = `${knightly ? 'Fra' : pickOne(['Sergeant', 'Brother'], random)} ${pickOne(['Jean', 'Gabriele', 'Antoine', 'Juan', 'Thomas', 'Pierre', 'Andrea', 'Nicholas', 'Diego', 'Louis'], random)} ${pickOne(['de Lorgue', 'Tadini', 'de Bidoux', 'de Barbaran', 'Docwra', 'de Grolée', 'Martinengo', 'Hussey', 'de Toledo', 'de Morel'], random)}`;
+  const kind = knightly ? 'knight' : 'footman';
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: knightly ? randomDesign(kind, random) : style === 'matchlock' ? 1 : 0 }, accessories: knightly ? ['plume'] : [] };
+  return builtLike(soldier, PERIOD_BUILD.hospitaller[rank], random);
+}
+
+/** An Ottoman soldier: an azap, a Janissary or a heavy man in mail-and-plate. */
+export function ottomanSoldier(random = Math.random, style = 'yatagan', rank = 'janissary') {
+  const kind = { azap: 'azap', janissary: 'janissary', heavy: 'ottomanHeavy' }[rank];
+  const base = varyCharacter(rank === 'heavy' ? PRESETS.sipahi : rank === 'azap' ? PRESETS.azap : PRESETS.yatagan, random);
+  const name = `${pickOne(['Mehmed', 'Ahmed', 'Mustafa', 'Hasan', 'Hüseyin', 'Ali', 'Yusuf', 'İbrahim', 'Süleyman', 'Osman', 'Davud', 'İskender'], random)} ${rank === 'janissary' ? pickOne(['Ağa', 'Çavuş', 'Bölükbaşı', ''], random) : ''}`.trim();
+  return builtLike({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] }, PERIOD_BUILD.ottoman[rank], random);
+}
+
+/** A steppe warrior of the 1400s: an archer in his deel, a man in leather lamellar, an iron-clad lancer. */
+export function steppeWarrior(random = Math.random, style = 'steppeBow', rank = 'light') {
+  const kind = { light: 'steppeLight', medium: 'steppeMedium', heavy: 'steppeHeavy' }[rank];
+  const base = varyCharacter(rank === 'heavy' ? PRESETS.maceShield : rank === 'medium' ? PRESETS.saberShield : PRESETS.steppeBow, random);
+  const name = pickOne(['Batu', 'Bayar', 'Ganbold', 'Temür', 'Toghon', 'Bolad', 'Arslan', 'Esen', 'Sübe', 'Khasar', 'Jochi', 'Mönke'], random);
+  return builtLike({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] }, PERIOD_BUILD.steppe[rank], random);
+}
 
 /** This man at a period's build: its height and training, give or take, fed to its weight. */
 function builtLike(inputs, build, random) {
