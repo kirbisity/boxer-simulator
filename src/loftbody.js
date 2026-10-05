@@ -289,6 +289,15 @@ export const ARMOR_KINDS = {
   hauberk: {
     trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.75, 0.4, 1.16, MAIL], collar: 'mail', upperArm: [-0.3, 1.0, 1.14, MAIL],
   },
+  // A patrol officer's vest carrier over the shirt, a badge on the chest, the duty belt.
+  patrolVest: {
+    trunk: [0.32, 0.8, 1.08, { mon: [0.7, 0.07, 'gold'], base: 'cloth' }], belt: [-0.06, 0.04, 1.16, 'cloth'],
+  },
+  // A plate carrier: front and back plates over the torso, a band of magazine
+  // pouches across the belly, a padded belt.
+  plateCarrier: {
+    trunk: [[0.3, 0.84, 1.14, { rows: ['cloth', 'cloth', 'cloth2'] }], [0.3, 0.5, 1.2, { panel: [0.3, 0.5, -0.2, 'cloth2'], base: 'cloth' }]], belt: [-0.06, 0.06, 1.18, 'cloth2'],
+  },
   // A foot soldier's mail shirt: to the hips, sleeves to the elbow.
   haubergeon: {
     trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.3, 0.3, 1.14, MAIL], collar: 'mail', upperArm: [-0.3, 0.5, 1.15, MAIL],

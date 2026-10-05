@@ -223,9 +223,49 @@ export const OUTFITS = {
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
     palette: [['charcoal', 'charcoal'], ['olive', 'olive'], ['slate', 'slate']],
     balance: 1.5, extraMass: 0.2,
-    protection: { blunt: 0.8, cut: 0.6, pierce: 0.4, bullet: { head: 0.6, torso: 0.9, limb: 0.5 } },
+    // The ballistic vest guards the torso: against rounds; against a blade
+    // its fabric turns some of a slash and little of a point. The helmet
+    // takes blows; riot pads on the limbs spread a blow but not an edge.
+    protection: {
+      blunt: 0.5, cut: 0.5, pierce: 0.3, bullet: { head: 0.6, torso: 0.9, limb: 0.1 },
+      regions: { head: { blunt: 0.6, cut: 0.7, pierce: 0.5 }, limb: { blunt: 0.55, cut: 0.3, pierce: 0.1 } },
+    },
     designs: [
       { label: 'Heavy riot', top: { kind: 'longsleeve', color: '#202226' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'heavyRiot', color: '#121316', backPrint: 'SWAT' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
+    ],
+  },
+  // A patrol officer: the uniform, a soft vest (NIJ IIIA) in its carrier
+  // over the shirt, the duty belt, the peaked cap. The vest stops handgun
+  // rounds over the torso and little of a blade; nothing else is covered.
+  police: {
+    label: 'Police — patrol uniform', movement: 'good', fists: 'bare',
+    sidearm: 'baton',
+    protection: {
+      blunt: 0.15, cut: 0.3, pierce: 0.15, bullet: { head: 0, torso: 0.85, limb: 0 },
+      regions: { head: { blunt: 0, cut: 0, pierce: 0 }, limb: { blunt: 0, cut: 0, pierce: 0 } },
+    },
+    designs: [
+      { label: 'Navy uniform', top: { kind: 'longsleeve', color: '#1c2438' }, bottom: { kind: 'slacks', color: '#161c2c' }, armor: { kind: 'patrolVest', color: '#141a28', cloth: '#141a28', gold: '#d6a743' }, head: { kind: 'policeCap', color: '#141a28', gold: '#d6a743' }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
+      { label: 'Black uniform', top: { kind: 'longsleeve', color: '#1a1a1d' }, bottom: { kind: 'slacks', color: '#141416' }, armor: { kind: 'patrolVest', color: '#101012', cloth: '#101012', gold: '#c0c4cc' }, head: { kind: 'policeCap', color: '#101012', gold: '#c0c4cc' }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
+    ],
+  },
+  // Modern special forces: combat uniform, a plate carrier (level IV rifle
+  // plates front and back, soft armour round the sides), a high-cut
+  // ballistic helmet, and the load — magazines, water, radio, aid kit: some
+  // 25–30 kg. Very well protected against bullets over the torso and head;
+  // the limbs bare to a round and nearly so to a blade. Slow under the load.
+  specialForces: {
+    label: 'Special forces — plate carrier', movement: 'limited', fists: 'gloved-tactical',
+    sidearm: 'dagger',
+    extraMass: 0.35,
+    courage: 0.5,
+    protection: {
+      blunt: 0.4, cut: 0.55, pierce: 0.4, bullet: { head: 0.6, torso: 0.97, limb: 0 },
+      regions: { head: { blunt: 0.55, cut: 0.6, pierce: 0.4 }, limb: { blunt: 0.05, cut: 0.1, pierce: 0.05 } },
+    },
+    designs: [
+      { label: 'Coyote carrier, green uniform', top: { kind: 'longsleeve', color: '#5a5e44' }, bottom: { kind: 'cargo', color: '#4e523c' }, armor: { kind: 'plateCarrier', color: '#7a6a4a', cloth: '#7a6a4a', cloth2: '#4a3e2a' }, head: { kind: 'opsHelmet', color: '#6a5e44' }, feet: { kind: 'tacticalBoot', color: '#5a4a32' } },
+      { label: 'Black carrier, grey uniform', top: { kind: 'longsleeve', color: '#4a4c50' }, bottom: { kind: 'cargo', color: '#3a3c40' }, armor: { kind: 'plateCarrier', color: '#1c1d20', cloth: '#1c1d20', cloth2: '#2c2d31' }, head: { kind: 'opsHelmet', color: '#1c1d20' }, feet: { kind: 'tacticalBoot', color: '#141416' } },
     ],
   },
   knight: {
@@ -814,7 +854,7 @@ export const FACTIONS = {
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
-  law: { label: 'Law', glyph: '🚓', blurb: 'Police and SWAT: the baton and the service pistol.' },
+  law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT and special forces: the baton, the service pistol, the shotgun and the AR-15.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
 
@@ -822,7 +862,7 @@ export const FACTION_KEYS = Object.keys(FACTIONS);
 // An armour family's kinds may be swapped for one another when a fighter is redressed;
 // an outfit outside one (a rōnin's kimono, a monk's robe) keeps to itself.
 const FACTION_OF_FAMILY = { knight: 'knights', conquistador: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese', mexica: 'mexica' };
-const FACTION_OF_OUTFIT = { ironPagoda: 'chinese', steppeLight: 'steppe', steppeMedium: 'steppe', steppeHeavy: 'steppe', kheshig: 'steppe', azap: 'ottomans', janissary: 'ottomans', ottomanHeavy: 'ottomans', gaziAlp: 'ottomans', victorianLady: 'street', victorianGent: 'street', ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
+const FACTION_OF_OUTFIT = { police: 'law', specialForces: 'law', ironPagoda: 'chinese', steppeLight: 'steppe', steppeMedium: 'steppe', steppeHeavy: 'steppe', kheshig: 'steppe', azap: 'ottomans', janissary: 'ottomans', ottomanHeavy: 'ottomans', gaziAlp: 'ottomans', victorianLady: 'street', victorianGent: 'street', ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */
 export function factionOf(inputs) {

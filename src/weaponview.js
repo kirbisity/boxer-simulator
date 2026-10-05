@@ -145,6 +145,59 @@ export function buildWeaponMesh(kind, envMap) {
       group.add(muzzle);
       break;
     }
+    case 'rifle': {
+      // An AR-15 carbine: upper and lower receiver, a free-float handguard,
+      // the barrel and flash hider, a curved 30-round magazine, the pistol
+      // grip, the buffer tube and collapsible stock, a red-dot optic (+z up).
+      const polymer = surface(0x1d1f23, { roughness: 0.7 });
+      const anodised = steelMaterial(envMap, { vertexColors: false, color: 0x26282c, roughness: 0.55 });
+      const box = (size, at, material, tilt = 0) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+        mesh.position.set(...at);
+        mesh.rotation.x = tilt;
+        return mesh;
+      };
+      const barrel = cylinder(0.008, 0.008, 0.44, spec.length, anodised, 8);
+      barrel.position.z = 0.04;
+      const buffer = cylinder(0.014, 0.014, -spec.handle + 0.06, -0.02, anodised, 10);
+      buffer.position.z = 0.03;
+      const optic = cylinder(0.018, 0.018, 0.05, 0.14, anodised, 12);
+      optic.position.z = 0.095;
+      group.add(
+        box([0.03, 0.27, 0.05], [0, 0.07, 0.035], anodised), // receivers
+        box([0.038, 0.26, 0.042], [0, 0.32, 0.04], polymer), // handguard
+        box([0.02, 0.05, 0.14], [0, 0.12, -0.04], polymer, 0.2), // magazine
+        box([0.024, 0.035, 0.085], [0, -0.01, -0.03], polymer, -0.35), // pistol grip
+        box([0.032, 0.14, 0.06], [0, -spec.handle + 0.07, 0.02], polymer), // stock
+        box([0.008, 0.03, 0.02], [0, 0.09, 0.07], anodised), // optic mount
+        barrel, buffer, optic,
+      );
+      break;
+    }
+    case 'shotgun': {
+      // A pump shotgun: the receiver, a long barrel over the magazine tube,
+      // the sliding pump (fore-end) under it, a synthetic stock (+z up).
+      const polymer = surface(0x1d1f23, { roughness: 0.7 });
+      const blued = steelMaterial(envMap, { vertexColors: false, color: 0x2c2e33, roughness: 0.45 });
+      const box = (size, at, material, tilt = 0) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+        mesh.position.set(...at);
+        mesh.rotation.x = tilt;
+        return mesh;
+      };
+      const barrel = cylinder(0.011, 0.011, 0.08, spec.length, blued, 10);
+      barrel.position.z = 0.04;
+      const tube = cylinder(0.01, 0.01, 0.12, spec.length - 0.1, blued, 10);
+      tube.position.z = 0.012;
+      group.add(
+        box([0.034, 0.2, 0.06], [0, 0.03, 0.025], blued), // receiver
+        box([0.044, 0.17, 0.046], [0, 0.36, 0.012], polymer), // pump
+        box([0.026, 0.04, 0.085], [0, -0.02, -0.03], polymer, -0.35), // grip
+        box([0.036, spec.handle - 0.02, 0.07], [0, -spec.handle / 2 - 0.02, 0.0], polymer, 0.1), // stock
+        barrel, tube,
+      );
+      break;
+    }
     case 'matchlock': {
       // A teppō / arquebus: a long octagonal iron barrel on a slender wooden
       // stock, brass bands, the serpentine and pan by the trigger hand with

@@ -65,6 +65,55 @@ export const THREE_EYED = {
   reloadSeconds: 40,
 };
 
+/**
+ * The AR-15: a semi-automatic 5.56 mm carbine. A light, very fast round
+ * (~4 g at ~950 m/s, ~1750 J: more than a matchlock ball) that tumbles and
+ * fragments in flesh; an optic and a fixed stock make it very accurate.
+ * The gas system and buffer spring stretch its small kick over a longer
+ * moment (`recoilSeconds`). Thirty rounds a magazine (`rounds`), changed in
+ * a couple of seconds.
+ */
+export const RIFLE = {
+  energy: 1750,
+  lethal: { head: 1.2, torso: 1.7, limb: 0.6 },
+  bleed: { head: 0.04, torso: 0.06, limb: 0.03 },
+  limbBreak: 0.65,
+  impulse: 3.8,
+  recoil: 5,
+  recoilSeconds: 0.06,
+  spread: 0.005,
+  movingSpread: 0.02,
+  misfire: 0.002,
+  rounds: 30,
+  reloadSeconds: 2.5,
+};
+
+/**
+ * A 12-gauge pump shotgun with 00 buckshot: nine pellets of ~3.5 g at
+ * ~400 m/s (~280 J each, half a 9 mm round), in a pattern that opens about
+ * `pellet` rad (~3 cm a metre). Close in nearly all of it lands; at twenty
+ * metres much of it misses. A heavy charge and a heavy shot column: a hard
+ * kick into the shoulder (`recoil`, N·s) that a light, weak shooter cannot
+ * hold. Five shells, each pumped; reloaded one by one.
+ */
+export const SHOTGUN = {
+  energy: 280,
+  pellets: 9,
+  pellet: 0.016,
+  lethal: { head: 0.55, torso: 0.26, limb: 0.1 },
+  bleed: { head: 0.012, torso: 0.016, limb: 0.006 },
+  limbBreak: 0.08,
+  impulse: 1.4,
+  recoil: 16,
+  // Taken by the shoulder through the stock's recoil pad, over a longer moment than a bare kick.
+  recoilSeconds: 0.05,
+  spread: 0.012,
+  movingSpread: 0.03,
+  misfire: 0.002,
+  rounds: 5,
+  reloadSeconds: 4,
+};
+
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
@@ -148,6 +197,24 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 9, zeta: 0.85 }, threat: 4.6, grip: 0.7, ranged: true, edgeUp: true, crush: 0.4,
     muzzle: [0.95, 0],
     shot: THREE_EYED,
+  },
+  // The AR-15 carbine and the pump shotgun: shouldered long guns, the
+  // support hand on the handguard or the pump; swung in close, the stock.
+  rifle: {
+    label: 'AR-15', hands: 'two', length: 0.62, strikeFrom: 0.2, handle: 0.24, spacing: 0.36, supportAhead: true, longGun: true,
+    mass: 3.0, balance: 0.2, radius: 0.025,
+    harm: { swing: { blunt: 0.9 }, thrust: { blunt: 0.7 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 12, zeta: 0.9 }, threat: 7, grip: 0.7, ranged: true, edgeUp: true,
+    muzzle: [0.6, 0.06],
+    shot: RIFLE,
+  },
+  shotgun: {
+    label: 'Shotgun', hands: 'two', length: 0.72, strikeFrom: 0.2, handle: 0.3, spacing: 0.4, supportAhead: true, longGun: true,
+    mass: 3.6, balance: 0.25, radius: 0.024,
+    harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 11, zeta: 0.9 }, threat: 6.5, grip: 0.7, ranged: true, edgeUp: true,
+    muzzle: [0.72, 0.03],
+    shot: SHOTGUN,
   },
   // A long wooden staff (the Shaolin gun): held near its middle, both ends
   // striking (`strikeFrom` reaches back past the hands to the butt). Wood
@@ -364,6 +431,7 @@ export const GUN = {
   spread: 0.022,
   barrelShare: 0.15, // of the barrel's own misalignment that goes into the shot
   settled: 0.08, // rad: the barrel this near the line to the mark, he fires (else at the end of the aim)
+  steadyBelow: 0.35, // m/s: a shouldered gun moving less than this against the shoulder (stopped on the mark)
   movingSpread: 0.02, // more per m/s the shooter moves
   reelingSpread: 2.5, // times, staggered
   range: 30,
@@ -373,7 +441,7 @@ export const GUN = {
   recoil: 4,
   unsettled: 0.05,
   impulse: 2.9, // N·s a 9 mm round carries into what it hits
-  plated: ['knight', 'samurai', 'swat'], // armour a round is seen to strike, not enter
+  plated: ['knight', 'samurai', 'swat', 'specialForces'], // armour a round is seen to strike, not enter
   // An outfit's `bullet` protection is what it stops of this round (J, a
   // 9 mm's energy). Against a heavier ball it stops that share only up to
   // what it is proof against (`rating`, J): a SWAT vest (rated against a
@@ -381,7 +449,8 @@ export const GUN = {
   // two thirds as much; the bullet-tested tōsei dō, nine tenths; anything
   // else, only what it would of a pistol round's worth.
   energy: 520,
-  rating: { swat: 1500, samuraiTosei: 900, knight: 650, mingElite: 650 },
+  // A patrol officer's soft vest (NIJ IIIA) stops handgun rounds up to a .44 Magnum; rifle plates (level IV) stop up to an armour-piercing .30-06.
+  rating: { swat: 1500, police: 1300, specialForces: 4000, samuraiTosei: 900, knight: 650, mingElite: 650 },
   // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
   platedHolds: 0.45,
 };

@@ -23,9 +23,11 @@ test('every outfit has its picked design, a movement class, and traits as specif
   assert.ok(business < 0.8 && business > 0.55, 'business heels: easier to fall');
   assert.ok(gearTraits({ ...female, outfit: { kind: 'victorianLady' } }).balance < business, 'the lady\'s higher heels: easier still');
   assert.ok(gearTraits({ ...male, outfit: { kind: 'swat' } }).balance > 1.3, 'riot gear: hard to fall');
-  assert.equal(gearTraits({ ...male, outfit: { kind: 'swat' } }).protection.blunt, 0.8);
+  // The vest over the torso; the helmet over the head; riot pads on the limbs.
+  assert.equal(gearTraits({ ...male, outfit: { kind: 'swat' } }).protection.regions.head.blunt, 0.6);
   assert.equal(gearTraits({ ...male, outfit: { kind: 'knight' } }).protection.blunt, 0.6);
-  for (const kind of Object.keys(OUTFITS)) assert.deepEqual(Object.keys(gearTraits({ ...male, outfit: { kind } }).protection).sort(), ['blunt', 'bullet', 'cut', 'pierce']);
+  // Every outfit says all four; a modern vest also says where it covers (`regions`).
+  for (const kind of Object.keys(OUTFITS)) assert.deepEqual(Object.keys(gearTraits({ ...male, outfit: { kind } }).protection).filter((key) => key !== 'regions').sort(), ['blunt', 'bullet', 'cut', 'pierce']);
 });
 
 test('armour is real weight: riot gear adds 20%, plate 50%, and the man inside is the same man', () => {
@@ -65,11 +67,12 @@ test('protection takes harm, not physics: the blow lands with the same force, th
   const swat = crossInto('swat');
   assert.ok(bare.hit && swat.hit, 'both landed');
   assert.equal(bare.hit.harm, 1);
-  assert.ok(Math.abs(swat.hit.harm - 0.2) < 1e-9, `riot gear lets ${swat.hit.harm} through`);
+  const covered = { head: 0.6, trunk: 0.5 }[swat.hit.target] ?? 0.55;
+  assert.ok(Math.abs(swat.hit.harm - (1 - covered)) < 1e-9, `riot gear lets ${swat.hit.harm} through on the ${swat.hit.target}`);
   // Same strike into a heavier man: the impulse is within a few percent; the knock is his to take.
   assert.ok(Math.abs(swat.hit.speed - bare.hit.speed) / bare.hit.speed < 0.15, 'the punch arrives the same');
   if (bare.hit.target === 'head' && swat.hit.target === 'head') {
-    assert.ok(swat.hit.harmDeltaV < bare.hit.harmDeltaV * 0.3, 'the brain takes a fifth');
+    assert.ok(swat.hit.harmDeltaV < bare.hit.harmDeltaV * 0.5, 'the helmet takes more than half');
   }
 });
 

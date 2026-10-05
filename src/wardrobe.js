@@ -520,6 +520,43 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       hidesHair = false;
       break;
     }
+    case 'policeCap': {
+      // A police peaked cap: a stiff crown flaring to its flat top, a black
+      // visor, a cap badge.
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(1.25 * r, 1.06 * r, 0.62 * r, 22), cloth);
+      crown.position.y = 0.62 * r;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(1.07 * r, 1.07 * r, 0.22 * r, 22, 1, true), surface(0x0b0b0d, { roughness: 0.6 }));
+      band.material.side = THREE.DoubleSide;
+      band.position.y = 0.38 * r;
+      const visor = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.2 * r, 0.05 * r, 20, 1, false, Math.PI * 0.22, Math.PI * 0.56), surface(0x0b0b0d, { roughness: 0.25 }));
+      visor.position.set(0.3 * r, 0.28 * r, 0);
+      visor.rotation.z = -0.18;
+      const badge = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.3 * r, 0.24 * r), metal(steel, head.gold ?? 0xd6a743));
+      badge.position.set(1.12 * r, 0.7 * r, 0);
+      group.add(crown, band, visor, badge);
+      break;
+    }
+    case 'opsHelmet': {
+      // A high-cut ballistic helmet: the shell cut high over the ears, rails
+      // on the sides, the night-vision mount on the front, electronic ear
+      // defenders under it.
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(1.24 * r, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.46), surface(color, { roughness: 0.75 }));
+      shell.scale.y = 1.05;
+      shell.position.y = 0.1 * r;
+      const dark = surface(0x1a1b1e, { roughness: 0.6 });
+      const mount = new THREE.Mesh(new THREE.BoxGeometry(0.16 * r, 0.32 * r, 0.42 * r), dark);
+      mount.position.set(1.2 * r, 0.62 * r, 0);
+      group.add(shell, mount);
+      for (const side of [1, -1]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.9 * r, 0.12 * r, 0.08 * r), dark);
+        rail.position.set(0, 0.3 * r, side * 1.2 * r);
+        const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.42 * r, 0.42 * r, 0.3 * r, 14), dark);
+        ear.rotation.x = Math.PI / 2;
+        ear.position.set(0, -0.15 * r, side * 1.05 * r);
+        group.add(rail, ear);
+      }
+      break;
+    }
     case 'pagodaHelm': {
       // The Iron Pagoda's helmet: a rounded iron bowl braced by ridges over
       // the crown to a knob and spike; an iron face plate over cheeks and jaw

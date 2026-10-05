@@ -41,9 +41,10 @@ const STYLE_NOTES = {
   taichi: 'Rooted and soft: deflects nearly everything, answers with palms and pushes.', taekwondo: 'Kicks from range, turning and spinning; little defence.',
   staff: 'A long staff, both ends striking: blunt and quick.', kanabo: 'An iron-studded club: huge slow swings, no thrust.', threeEyed: 'Three barrels fired in turn, then a club.',
   dao: 'A one-handed curved sabre: quick cuts.', saber: 'The steppe and Turkish sabre: long draw cuts.', saberShield: 'Sabre and kalkan, the wicker round shield.', yatagan: 'The Janissary\'s forward-curved short sword.',
+  rifle: 'The AR-15: fast, accurate, devastating; thirty rounds, then a magazine change.', shotgun: 'A pump shotgun: slow, a hard kick, nine pellets that devastate up close.',
   langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -150,6 +151,10 @@ const WARRIORS = [
   warrior('ladyAshford', 'Lady Ashford', PRESETS.rapier),
   warrior('lordAshford', 'Lord Ashford', PRESETS.duelPistol),
   warrior('baton', 'Officer Reyes', PRESETS.baton),
+  warrior('police', 'Officer Mike Kowalski', PRESETS.police),
+  warrior('policeBaton', 'Officer Ana Ruiz', PRESETS.police, { name: 'Officer Ana Ruiz', sex: 'female', heightCm: 166, style: 'baton', calories: 2300, outfit: { kind: 'police', design: 1 }, look: { skinTone: 'tan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
+  warrior('swatShotgun', 'Cpl. Marcus Hale', PRESETS.shotgun),
+  warrior('specialForces', 'SSgt. Ryan Brooks', PRESETS.rifle),
   warrior('knife', 'Ryo Kanda', PRESETS.knife),
   warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),
   warrior('kickboxer', 'Leo Quickhands', PRESETS.light),

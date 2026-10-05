@@ -220,7 +220,8 @@ export const WORLD = {
   // `steadiest` and `shakiest`); past `snapOver` × his strength the arm may
   // snap, the likelier the further past (`snapRise` per share beyond it).
   // Only the frailest: an ordinary man is bruised by a matchlock, not broken.
-  recoil: { seconds: 0.015, longGunSeconds: 0.03, reference: 250, steadiest: 0.75, shakiest: 1.7, snapOver: 3.5, snapRise: 2 },
+  // `rockedOver`: a long gun's kick over the shooter's whole mass (m/s) past which it rocks him off balance (a shotgun in a light body); `rocked`: how hard.
+  recoil: { seconds: 0.015, longGunSeconds: 0.03, reference: 250, steadiest: 0.75, shakiest: 1.7, snapOver: 3.5, snapRise: 2, rockedOver: 0.24, rocked: 0.9 },
   // Running, nobody within `relaxFrom` m: the hands come down from the
   // guard and swing (`swing`, heights), back up within `guardFrom` m. Running:
   // flagged so by the AI, or faster than `runningSpeed` m/s.
@@ -598,7 +599,11 @@ function sightsOn(fighter) {
   if (!weapon?.held || !fighter.punch?.aim) return true;
   const hand = point(fighter.x, P[`${weapon.main}Hand`]);
   const toMark = vec.normalize(vec.sub(toWorld(fighter, fighter.punch.aim), hand));
-  return vec.dot(toMark, weapon.dir) > Math.cos(GUN.settled);
+  if (vec.dot(toMark, weapon.dir) <= Math.cos(GUN.settled)) return false;
+  // A shouldered gun is fired once it has stopped swinging onto the mark.
+  if (!weapon.spec.longGun) return true;
+  const swinging = vec.length(vec.sub(point(fighter.v, P[`${weapon.main}Hand`]), point(fighter.v, P[`${weapon.main}Shoulder`])));
+  return swinging < GUN.steadyBelow;
 }
 
 // ---- Bows -------------------------------------------------------------------------
@@ -707,7 +712,7 @@ function arrowHit(world, shooter, hit, dir, energy = 1) {
     return;
   }
   const region = bulletRegion(key);
-  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : gear.protection.pierce ?? 0;
+  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : protectionAt(gear, key).pierce ?? 0;
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
@@ -739,6 +744,7 @@ function reload(world, fighter, dt) {
   weapon.reloaded = (weapon.reloaded ?? 0) + dt;
   if (weapon.reloaded < weapon.spec.shot.reloadSeconds) return;
   weapon.loaded = true;
+  weapon.charges = weapon.spec.shot.rounds ?? weapon.spec.shot.barrels ?? 1;
   fighter.reloading = false;
   world.events.push({ time: world.time, kind: 'reloaded', fighter: fighter.id, effects: [] });
 }
@@ -792,8 +798,8 @@ function fire(world, fighter) {
     if (!weapon.loaded) return;
     // A comrade on the line: he holds the shot (and keeps the charge).
     if (comradeInLine(world, fighter)) return;
-    // Several barrels (the three-eyed gun): each fired in turn, empty after the last.
-    weapon.charges = (weapon.charges ?? shot.barrels ?? 1) - 1;
+    // Several barrels (the three-eyed gun) or a magazine (`rounds`): each shot in turn, empty after the last.
+    weapon.charges = (weapon.charges ?? shot.rounds ?? shot.barrels ?? 1) - 1;
     weapon.loaded = weapon.charges > 0;
     weapon.reloaded = 0;
     if (!weapon.loaded) emptied(world, fighter);
@@ -809,8 +815,11 @@ function fire(world, fighter) {
   const muzzleAt = weapon.spec.muzzle ?? GUN.muzzle;
   const muzzle = vec.add(vec.add(point(fighter.x, handIndex), vec.scale(barrel, muzzleAt[0])), vec.scale(up, muzzleAt[1]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  // The hand still moving from the last kick (or anything else) throws the shot.
-  const shaking = vec.length(point(fighter.v, handIndex));
+  // The hand still moving from the last kick (or anything else) throws the
+  // shot. A long gun is braced in the shoulder and moves with the body (its
+  // walk is `moving`): only its motion against the shoulder throws it.
+  const handVelocity = point(fighter.v, handIndex);
+  const shaking = vec.length(weapon.spec.longGun ? vec.sub(handVelocity, point(fighter.v, P[`${weapon.main}Shoulder`])) : handVelocity);
   // A strong man holds a gun steady; a weak one shakes.
   const strength = fighter.body.strikeForce[handIndex];
   const recoil = WORLD.recoil;
@@ -823,13 +832,17 @@ function fire(world, fighter) {
   const sighted = vec.normalize(vec.sub(mark, muzzle));
   const aimed = slerpDir(sighted, barrel, GUN.barrelShare);
   const dir = vec.normalize(vec.add(aimed, vec.add(vec.scale(up, gauss() * spread), vec.scale(across, gauss() * spread))));
-  const end = vec.add(muzzle, vec.scale(dir, GUN.range));
-  const hit = firstHit(world, fighter, muzzle, end);
-  const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(dir, -1), harm: 0, effects: [] };
-  world.events.push(event);
-  if (hit?.target === 'shield') event.effects.push('stopped by the shield');
-  else if (hit) bulletHit(world, fighter, hit, dir, event, shot);
-  else event.effects.push('missed');
+  // A shotgun's pellets (`pellets`) open out round the aimed line (`pellet` rad); anything else is one round.
+  for (let pellet = 0; pellet < (shot?.pellets ?? 1); pellet += 1) {
+    const flight = shot?.pellets ? vec.normalize(vec.add(dir, vec.add(vec.scale(up, gauss() * shot.pellet), vec.scale(across, gauss() * shot.pellet)))) : dir;
+    const end = vec.add(muzzle, vec.scale(flight, GUN.range));
+    const hit = firstHit(world, fighter, muzzle, end);
+    const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
+    world.events.push(event);
+    if (hit?.target === 'shield') event.effects.push('stopped by the shield');
+    else if (hit) bulletHit(world, fighter, hit, flight, event, shot);
+    else event.effects.push('missed');
+  }
   // The gun kicks up and back in the hand.
   // Into both hands (both on the gun in the stance), the arms and the shoulders: a heavy man barely moves, a light one rocks.
   // A long gun's stock drives back into the shoulder and the cheek as well.
@@ -838,11 +851,21 @@ function fire(world, fighter) {
   const kick = shot?.recoil ?? GUN.recoil;
   world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5], ...stock, ...support], direction: vec.normalize(vec.add(vec.scale(barrel, -1), vec.scale(up, weapon.spec.longGun ? 0.35 : 0.8))), impulse: kick });
   // More kick than the arm can take: it snaps at the elbow.
-  const peak = kick / (weapon.spec.longGun ? recoil.longGunSeconds : recoil.seconds);
+  const peak = kick / (shot?.recoilSeconds ?? (weapon.spec.longGun ? recoil.longGunSeconds : recoil.seconds));
   const beyond = peak / (recoil.snapOver * strength) - 1;
   if (beyond > 0 && world.random() < beyond * recoil.snapRise && !fighter.broken.has(`${weapon.main}Elbow`)) {
     breakJoint(world, fighter, `${weapon.main}Elbow`);
     world.events.push({ time: world.time, kind: 'recoil', fighter: fighter.id, effects: ['the recoil snapped his arm'] });
+  }
+  // A long gun kicks the whole man back through the shoulder: a light body
+  // takes more speed from the same kick, and past `rockedOver` it reels.
+  const rocking = kick / fighter.body.massKg;
+  if (weapon.spec.longGun && rocking > recoil.rockedOver) {
+    const event = { time: world.time, kind: 'recoil', fighter: fighter.id, effects: ['rocked back by the kick'] };
+    world.events.push(event);
+    stagger(world, fighter, WORLD.stagger.startAt + recoil.rocked * (rocking / recoil.rockedOver), event, true);
+    // What his weight could not soak up wrenches at his hands: shot after shot, he loses the gun.
+    strainGrip(world, fighter, kick * (rocking / recoil.rockedOver - 1));
   }
 }
 
@@ -886,6 +909,16 @@ function bulletHit(world, shooter, hit, dir, event, shot = null) {
     return;
   }
   if (region !== 'limb') stagger(world, victim, WORLD.stagger.startAt + harm * 1.6, event, true);
+}
+
+/**
+ * What a fighter's kit stops where it struck: its protection, with what it
+ * says for that region (`regions`: head, torso, limb) over it. Medieval
+ * armour covers the whole man alike; a modern vest guards the torso alone.
+ */
+function protectionAt(gear, capsuleKey) {
+  const own = gear.protection.regions?.[bulletRegion(capsuleKey)];
+  return own ? { ...gear.protection, ...own } : gear.protection;
 }
 
 // The joint a shattered limb bone gives way at.
@@ -2523,11 +2556,11 @@ function groundImpact(world, fighter, index, speed) {
  * stops of this kind of harm (blunt, for fists, feet, knees and elbows),
  * times what the attacker's own gear lets through (a padded glove less).
  */
-export function harmShare(attacker, defender, spec) {
+export function harmShare(attacker, defender, spec, struckKey = 'trunk') {
   const kind = spec.damageType ?? 'blunt';
   const limb = spec.limb.endsWith('Hand') ? 'hand' : 'foot';
   // An open palm pushes more than it hurts (`harm`).
-  return (1 - (defender.body.gear.protection[kind] ?? 0)) * (attacker.body.gear.damageDealt[limb] ?? 1) * (spec.harm ?? 1);
+  return (1 - (protectionAt(defender.body.gear, struckKey)[kind] ?? 0)) * (attacker.body.gear.damageDealt[limb] ?? 1) * (spec.harm ?? 1);
 }
 
 /** Whether the attacker is outside the defender's field of view. */
@@ -3097,7 +3130,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   if (checked) event.effects.push('checked');
   // Harm, apart from physics: what the defender wears takes some of it, and
   // a padded glove gives less. The impulse and the knockback are untouched.
-  const harm = harmShare(attacker, defender, spec);
+  const harm = harmShare(attacker, defender, spec, capsule.key);
   event.harm = harm;
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked, rotation: spec.rotation, cuts: spec.cuts, cutForce: spec.limb.endsWith('Hand') ? fists.cutForce : Infinity, side, push: spec.push });
   if (spec.limb.endsWith('Hand') && peakForce > attacker.body.fracture.hand * fists.handFracture * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
@@ -3142,7 +3175,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     event.harmDeltaV = event.headDeltaV * harm * concentration;
     applyHeadDamage(world, defender, event);
     knockOff(world, defender, event);
-    const cutting = peakForce * (1 - defender.body.gear.protection.cut);
+    const cutting = peakForce * (1 - protectionAt(defender.body.gear, 'head').cut);
     if ((cuts && cutting > 1800) || cutting > cutForce) {
       defender.cuts = (defender.cuts ?? 0) + 1;
       event.effects.push('cut opened');
@@ -3327,7 +3360,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * closing * closing;
   const mix = harmMix(wspec, spec.mode, along, closest.s);
-  const protection = body.gear.protection;
+  const protection = protectionAt(body.gear, capsule.key);
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (wspec.contactSeconds * (1 + 0.6 * (1 - firmness)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));

@@ -338,6 +338,24 @@ export const PRESETS = {
     outfit: { kind: 'swat', design: 0 },
     look: { skinTone: 'light', hairStyle: 'fade', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'blue' },
   },
+  // The patrol officer: uniform and soft vest, the service pistol, the baton on his belt.
+  police: {
+    name: 'Officer Mike Kowalski', style: 'handgun', sex: 'male', heightCm: 178, frame: 'medium', age: 38, exercise: 0.45, calories: 2900,
+    outfit: { kind: 'police', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'mustache', eyeColor: 'blue' },
+  },
+  // A SWAT breacher with the pump shotgun.
+  shotgun: {
+    name: 'Cpl. Marcus Hale', style: 'shotgun', sex: 'male', heightCm: 183, frame: 'large', age: 31, exercise: 0.7, calories: 3900,
+    outfit: { kind: 'swat', design: 0 }, accessories: [],
+    look: { skinTone: 'deep', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  // A special forces operator: the AR-15, a knife in reserve, the plate carrier and its load.
+  rifle: {
+    name: 'SSgt. Ryan Brooks', style: 'rifle', sex: 'male', heightCm: 180, frame: 'large', age: 32, exercise: 0.9, calories: 4000,
+    outfit: { kind: 'specialForces', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#4a3020', facialHair: 'beard', eyeColor: 'green' },
+  },
   baton: {
     name: 'Officer Reyes', style: 'baton', sex: 'male', heightCm: 182, frame: 'medium', age: 33, exercise: 0.6, calories: 3600,
     outfit: { kind: 'swat', design: 0 },

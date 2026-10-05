@@ -39,6 +39,10 @@ export const MOVES = {
   // One barrel of the three-eyed gun: held at the hip, a quick aim, the
   // match to the touch-hole.
   fireVolley: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.35, fireAt: 0.45, quickFireAt: 0.25, extendUntil: 0.6, duration: 0.8, twist: -0.15, shift: 0.02, cost: 0.004, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
+  // The AR-15: up from low ready, the dot on him, a shot (about half a second); fired the moment the gun stops on the mark.
+  fireRifle: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.55, quickFireAt: 0.3, extendUntil: 0.6, duration: 0.68, twist: -0.2, shift: 0.02, cost: 0.002, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
+  // The pump: aim and fire, then rack the slide back and forward for the next shell.
+  firePump: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.3, fireAt: 0.34, quickFireAt: 0.2, extendUntil: 0.5, duration: 1.0, twist: -0.2, shift: 0.02, cost: 0.004, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
   fireLong: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.7, fireAt: 0.95, quickFireAt: 0.45, extendUntil: 1.1, duration: 1.4, twist: -0.2, shift: 0.02, cost: 0.004, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
   // A spinning kick (taekwondo's dwi huryeo chagi): the body turns most of
   // the way round, back to him, before the heel whips through: a big swing
@@ -457,6 +461,40 @@ export const STYLES = {
     weaponGuard: { hand: [0.14, 0.6, -0.1], dir: [0.8, 0.6, 0.12] },
     idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
     attacks: { fireLong: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.4,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
+  // The AR-15: shouldered, sights up, fired as fast as the sights settle;
+  // thirty rounds, then a magazine change with room to make it.
+  rifle: {
+    label: 'AR-15', weapon: 'rifle', fallback: 'mix',
+    ranged: { flee: 2, rest: 0.8, runFor: 1.2, standFor: 2, close: 1.4, shotSeconds: 0.25, headShare: 0.3, between: [0.15, 0.2], move: 'fireRifle', reloadSafe: 3 },
+    cadence: { work: 1.4, move: 0.6, burst: 0.6, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.08, width: 1.15, lean: 0.1, guardHeight: -0.02 },
+    // Low ready: the muzzle down and forward, the stock in the shoulder.
+    weaponGuard: { hand: [0.16, 0.66, -0.12], dir: [0.9, -0.35, 0.05] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { fireRifle: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.4,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
+  // The pump shotgun: a slow shot, a heavy kick, devastating up close.
+  shotgun: {
+    label: 'Shotgun', weapon: 'shotgun', fallback: 'mix',
+    ranged: { flee: 2.2, rest: 0.8, runFor: 1.4, standFor: 1.8, close: 1.4, shotSeconds: 0.4, headShare: 0.1, between: [0.4, 0.3], move: 'firePump', reloadSafe: 4 },
+    cadence: { work: 1.3, move: 0.6, burst: 0.5, mobility: 0.45 },
+    stance: { blade: 0.55, crouch: 0.08, width: 1.2, lean: 0.12, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.16, 0.64, -0.12], dir: [0.9, -0.3, 0.05] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { firePump: 1 },
     tempo: 1,
     defences: { stepBack: 0.7, guard: 0.3 },
     defendChance: 0.4,

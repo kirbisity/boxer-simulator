@@ -79,7 +79,7 @@ function company(styles, make) {
 // Mexica host on the plain. Steel against obsidian and cotton.
 const OTUMBA = {
   spanish: { hidalgo: 4, rodelero: 7, arquebusier: 3 },
-  tlaxcalan: { macuahuitl: 13, tepoztopilli: 9 },
+  tlaxcalan: { macuahuitl: 15, tepoztopilli: 10 },
   mexica: { warrior: { macuahuitl: 18, tepoztopilli: 10, bow: 4 }, elite: { macuahuitl: 5, tepoztopilli: 3 } },
 };
 
@@ -163,7 +163,7 @@ export const SCENARIOS = {
     scene: 'plain',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
-    roster: 'Fourteen conquistadors and twenty-two Tlaxcalans · forty Mexica',
+    roster: 'Fourteen conquistadors and twenty-five Tlaxcalans · forty Mexica',
     formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 10, loose: 0.3 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.5 } },
     cast: (random) => ({
       red: shootersBehind([...company(OTUMBA.spanish, (type) => europeanSoldier(random, type)), ...company(OTUMBA.tlaxcalan, (style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }))]),
