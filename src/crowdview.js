@@ -145,8 +145,14 @@ export class CrowdBatch {
 
   allocate() {
     for (const part of this.parts) {
-      if (part.instanced) this.scene.remove(part.instanced);
+      const old = part.instanced;
       part.instanced = new THREE.InstancedMesh(part.geometry, part.material, this.capacity);
+      // Grown in the middle of a frame: the copies already placed carry over (else they draw at the origin for a frame).
+      if (old) {
+        part.instanced.instanceMatrix.array.set(old.instanceMatrix.array);
+        this.scene.remove(old);
+        old.dispose?.();
+      }
       part.instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       part.instanced.castShadow = part.castShadow;
       // The copies are all over the field: never culled as one.

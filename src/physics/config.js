@@ -95,6 +95,9 @@ export const WORLD = {
   // that corrections are shared by mass).
   limitStep: 0.006, // m
   limitStepLimp: 0.03, // m: firmer corrections inject speed of their own
+  // The stance on the floor: how fast he turns to face (per s), how fast the
+  // stance follows hips pushed off it (per s), how near the arena's edge (m) it may stand.
+  footing: { turnRate: 6, followPushed: 2.5, edgeMargin: 0.3 },
   joint: {
     hipCone: 2.4, // rad from straight down: room for a head kick, not the splits
     // Forced this far past its range in an instant, a joint breaks.
@@ -106,6 +109,8 @@ export const WORLD = {
     // and how fast strain leaks away (per s) once the joint is back in range.
     strainToBreak: 0.05,
     strainLeak: 6,
+    // A leg or neck broken: down this long (s) at most before he is out.
+    brokenDownSeconds: 2,
   },
   // Footwork: a planted foot stays put until the stance has drifted this far
   // from it, then steps; one foot at a time.
@@ -150,6 +155,9 @@ export const WORLD = {
   // up a fighter is hurt (muscles at `hurtStrength` rising back to full)
   // for `hurtSeconds` plus `hurtPerKnockdown` per knockdown so far; a beaten
   // trunk recovers stamina slower and beaten arms punch weaker.
+  // A blow to the head: share of a blocked blow that still reaches it
+  // through the guard; the peak force (N) past which a fist splits the skin.
+  head: { blockedShare: 0.12, cutForce: 1800 },
   hurt: {
     chinPerHeadDamage: 0.35, chinPerKnockdown: 0.1, stunPerDeltaV: 0.6,
     hurtSeconds: 8, hurtPerKnockdown: 4, hurtStrength: 0.65,
@@ -233,7 +241,8 @@ export const WORLD = {
   // strength wins or the time runs out.
   // reachSeconds: time the hands have to get to the neck before the clinch is abandoned.
   // driveShare: of a sumo's leg force (less his man's) that drives his man back in the clinch.
-  clinch: { lockDistance: 0.14, range: 0.95, pullDown: 0.08, reachSeconds: 0.6, driveShare: 0.85 },
+  // `release`: a held hand pulled this far (m) from the neck has lost its grip.
+  clinch: { lockDistance: 0.14, range: 0.95, pullDown: 0.08, reachSeconds: 0.6, driveShare: 0.85, release: 0.55 },
   // Leg kicks add up: the speed change each kick gives the struck leg
   // (m/s, summed) until it gives way — some 20 hard low kicks from a heavy
   // man into a lightweight's thigh, many more the other way. After it first

@@ -40,7 +40,7 @@ export function holdClinch(world, fighter) {
       }
       continue;
     }
-    if (distance > 0.55) {
+    if (distance > WORLD.clinch.release) {
       fighter.clinch = null;
       return;
     }

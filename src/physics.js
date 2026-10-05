@@ -1134,7 +1134,7 @@ function moveRoot(world, fighter, dt) {
     const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    fighter.yaw += turn * Math.min(1, dt * 6);
+    fighter.yaw += turn * Math.min(1, dt * WORLD.footing.turnRate);
   }
   // Footwork has inertia: the stance accelerates and brakes at what the legs
   // can push, rather than starting and stopping dead.
@@ -1169,12 +1169,13 @@ function moveRoot(world, fighter, dt) {
   // A shove moves the stance too: the root drifts to where the pelvis was pushed.
   const pelvis = point(fighter.x, P.pelvis);
   const rootPelvis = toWorld(fighter, fighter.desired[P.pelvis]);
-  const follow = Math.min(1, dt * 2.5);
+  const follow = Math.min(1, dt * WORLD.footing.followPushed);
   fighter.root[0] += (pelvis[0] - rootPelvis[0]) * follow;
   fighter.root[1] += (pelvis[2] - rootPelvis[2]) * follow;
   const { halfX, halfZ } = world.arena;
-  fighter.root[0] = Math.max(-(halfX - 0.3), Math.min(halfX - 0.3, fighter.root[0]));
-  fighter.root[1] = Math.max(-(halfZ - 0.3), Math.min(halfZ - 0.3, fighter.root[1]));
+  const margin = WORLD.footing.edgeMargin;
+  fighter.root[0] = Math.max(-(halfX - margin), Math.min(halfX - margin, fighter.root[0]));
+  fighter.root[1] = Math.max(-(halfZ - margin), Math.min(halfZ - margin, fighter.root[1]));
 }
 
 // ---- Detail by the size of the fight ----------------------------------------------
@@ -1780,7 +1781,7 @@ export function breakJoint(world, fighter, joint) {
     fighter.rush = null;
     fighter.clinch = null;
     fighter.knockdowns = Math.max(fighter.knockdowns, WORLD.knockdownsToStop);
-    fighter.downTimer = Math.min(fighter.downTimer || Infinity, 2);
+    fighter.downTimer = Math.min(fighter.downTimer || Infinity, WORLD.joint.brokenDownSeconds);
     dropWeapon(world, fighter, 'dropped');
   } else if (fighter.weapon?.held && joint === `${fighter.weapon.main}Elbow`) dropWeapon(world, fighter, 'dropped');
 }
@@ -2477,7 +2478,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
   addDamage(defender, capsule.key, (impulse / struckMass) * harm, blocked);
   if (blocked) {
     attacker.stats.blocked += 1;
-    event.headDeltaV = BLOCKING.has(capsule.key) ? (impulse * 0.12) / body.headEffectiveMass : 0;
+    event.headDeltaV = BLOCKING.has(capsule.key) ? (impulse * WORLD.head.blockedShare) / body.headEffectiveMass : 0;
     // Kicking into a checked shin hurts the kicker's shin.
     if (checked) attacker.legDamage[side] += ((impulse * 0.5) / attacker.body.limbKg[`${side}Leg`]) * (1 - (protectionAt(attacker.body.gear, `${side}Shank`).blunt ?? 0));
     return;
@@ -2499,7 +2500,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     applyHeadDamage(world, defender, event);
     knockOff(world, defender, event);
     const cutting = peakForce * (1 - protectionAt(defender.body.gear, 'head').cut);
-    if ((cuts && cutting > 1800) || cutting > cutForce) {
+    if ((cuts && cutting > WORLD.head.cutForce) || cutting > cutForce) {
       defender.cuts = (defender.cuts ?? 0) + 1;
       event.effects.push('cut opened');
     }
