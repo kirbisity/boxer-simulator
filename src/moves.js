@@ -141,6 +141,35 @@ export const DEFENCES = {
  * how upright), `idle` the constant motion, `attacks` and `defences` the
  * AI's mix (relative weights), `rushChance` how often it charges (per s).
  */
+// How a shooter fights: keeps away, steps back from a rush, presses nobody.
+const STAND_OFF = {
+  defences: { stepBack: 0.7, guard: 0.3 },
+  defendChance: 0.4,
+  headMovement: 0.1,
+  plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+  pressure: 0,
+};
+
+// The bow, shared by the long bow and the steppe composite bow (which differ only in the weapon).
+const SHOOTING_STYLES = {
+  bow: {
+    label: 'Bow', weapon: 'bow', fallback: 'mix',
+    ranged: { flee: 3.2, rest: 1, runFor: 1.5, standFor: 1.6, close: 1.5, shotSeconds: 0.7, headShare: 0.2, between: [0.5, 0.8], move: 'loose' },
+    cadence: { work: 1.3, move: 0.7, burst: 0.4, mobility: 0.5 },
+    stance: { blade: 0.75, crouch: 0.03, width: 1.12, lean: 0.04, guardHeight: -0.02 },
+    // The bow low in the left hand, the stave upright.
+    weaponGuard: { hand: [0.16, 0.55, 0.14], dir: [0.15, 1, 0] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { loose: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.45,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+  },
+};
+
 export const STYLES = {
   boxing: {
     label: 'Boxing',
@@ -462,11 +491,7 @@ export const STYLES = {
     idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
     attacks: { fireLong: 1 },
     tempo: 1,
-    defences: { stepBack: 0.7, guard: 0.3 },
-    defendChance: 0.4,
-    headMovement: 0.1,
-    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
-    pressure: 0,
+    ...STAND_OFF,
   },
   // The AR-15: shouldered, sights up, fired as fast as the sights settle;
   // thirty rounds, then a magazine change with room to make it.
@@ -480,11 +505,7 @@ export const STYLES = {
     idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
     attacks: { fireRifle: 1 },
     tempo: 1,
-    defences: { stepBack: 0.7, guard: 0.3 },
-    defendChance: 0.4,
-    headMovement: 0.1,
-    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
-    pressure: 0,
+    ...STAND_OFF,
   },
   // The pump shotgun: a slow shot, a heavy kick, devastating up close.
   shotgun: {
@@ -496,11 +517,7 @@ export const STYLES = {
     idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
     attacks: { firePump: 1 },
     tempo: 1,
-    defences: { stepBack: 0.7, guard: 0.3 },
-    defendChance: 0.4,
-    headMovement: 0.1,
-    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
-    pressure: 0,
+    ...STAND_OFF,
   },
   // The hoplomachus: spear in the right hand, the parma on the left forearm
   // held out before him. Losing the spear, he draws the gladius.
@@ -523,38 +540,9 @@ export const STYLES = {
   },
   // The bow: side-on, keeps away, draws and looses; drops the bow for his
   // sidearm (or his fists) once a man is on him.
-  bow: {
-    label: 'Bow', weapon: 'bow', fallback: 'mix',
-    ranged: { flee: 3.2, rest: 1, runFor: 1.5, standFor: 1.6, close: 1.5, shotSeconds: 0.7, headShare: 0.2, between: [0.5, 0.8], move: 'loose' },
-    cadence: { work: 1.3, move: 0.7, burst: 0.4, mobility: 0.5 },
-    stance: { blade: 0.75, crouch: 0.03, width: 1.12, lean: 0.04, guardHeight: -0.02 },
-    // The bow low in the left hand, the stave upright.
-    weaponGuard: { hand: [0.16, 0.55, 0.14], dir: [0.15, 1, 0] },
-    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
-    attacks: { loose: 1 },
-    tempo: 1,
-    defences: { stepBack: 0.7, guard: 0.3 },
-    defendChance: 0.45,
-    headMovement: 0.1,
-    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
-    pressure: 0,
-  },  // The steppe archer's composite bow: the same loose, a faster arrow.
-  steppeBow: {
-    label: 'Composite bow', weapon: 'compositeBow', fallback: 'mix',
-    ranged: { flee: 3.2, rest: 1, runFor: 1.5, standFor: 1.6, close: 1.5, shotSeconds: 0.7, headShare: 0.2, between: [0.5, 0.8], move: 'loose' },
-    cadence: { work: 1.3, move: 0.7, burst: 0.4, mobility: 0.5 },
-    stance: { blade: 0.75, crouch: 0.03, width: 1.12, lean: 0.04, guardHeight: -0.02 },
-    // The bow low in the left hand, the stave upright.
-    weaponGuard: { hand: [0.16, 0.55, 0.14], dir: [0.15, 1, 0] },
-    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
-    attacks: { loose: 1 },
-    tempo: 1,
-    defences: { stepBack: 0.7, guard: 0.3 },
-    defendChance: 0.45,
-    headMovement: 0.1,
-    plans: { outboxer: 2, counter: 1, pressure: 0.2, brawler: 0.1 },
-    pressure: 0,
-  },
+  bow: SHOOTING_STYLES.bow,
+  // The steppe archer's composite bow: the same loose, a faster arrow.
+  steppeBow: { ...SHOOTING_STYLES.bow, label: 'Composite bow', weapon: 'compositeBow' },
   // The dao: a one-handed curved sabre, used as a short sword is: cut and thrust in turn.
   dao: {
     label: 'Dao', weapon: 'dao', fallback: 'mix',

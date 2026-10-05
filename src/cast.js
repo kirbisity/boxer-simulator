@@ -34,9 +34,11 @@ const jitter = (random) => random() * 2 - 1;
  * Someone like this fighter: same style, outfit and headgear; a slightly
  * different body and face, sometimes the other sex; fresh outfit colours.
  */
-export function varyCharacter(inputs, random = Math.random) {
+export function varyCharacter(inputs, random = Math.random, { sex: wanted = null } = {}) {
   const base = normaliseInputs(structuredClone(inputs));
-  const sex = random() < CAST.otherSex ? (base.sex === 'female' ? 'male' : 'female') : base.sex;
+  // `sex`: a body built as this sex from the start (an army's men), so its
+  // height, weight, hair and beard follow from it rather than being overridden after.
+  const sex = wanted ?? (random() < CAST.otherSex ? (base.sex === 'female' ? 'male' : 'female') : base.sex);
   const sexShift = sex === base.sex ? 0 : sex === 'female' ? -CAST.sexHeight : CAST.sexHeight;
   const looks = CAST.looks;
   const varied = {
@@ -142,9 +144,9 @@ export function swatOfficer(random = Math.random, style = 'handgun') {
 
 /** A yakuza soldier: bare-backed and tattooed, with a knife, a katana or a pistol. */
 export function yakuza(random = Math.random, style = 'knife') {
-  const base = varyCharacter(PRESETS.knife, random);
+  const base = varyCharacter(PRESETS.knife, random, { sex: 'male' });
   const name = `${pickOne(['Kenji', 'Takeshi', 'Daisuke', 'Ryota', 'Shin', 'Hiroshi', 'Kazuo', 'Tetsu', 'Goro', 'Masa'], random)} ${pickOne(['Mori', 'Kuroda', 'Ishida', 'Sato', 'Ono', 'Fujita', 'Endo', 'Kanda'], random)}`;
-  return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'yakuza', design: 0 }, accessories: random() < 0.4 ? ['hat'] : [], look: { ...base.look, facialHair: base.look.facialHair, skinTone: pickOne(['lightTan', 'medium', 'light'], random), hairColor: '#120d0a' } });
+  return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'yakuza', design: 0 }, accessories: random() < 0.4 ? ['hat'] : [], look: { ...base.look, skinTone: pickOne(['lightTan', 'medium', 'light'], random), hairColor: '#120d0a' } });
 }
 
 /** Knights for a sortie: long swords and war hammers, plumed. */
@@ -159,7 +161,7 @@ export function knight(random = Math.random, index = 0) {
  */
 export function sengokuWarrior(random = Math.random, side, style, rank = style === 'spear' || style === 'bow' ? 'ashigaru' : 'samurai') {
   const ashigaru = rank === 'ashigaru';
-  const base = varyCharacter(ashigaru ? PRESETS.spear : PRESETS.samurai, random);
+  const base = varyCharacter(ashigaru ? PRESETS.spear : PRESETS.samurai, random, { sex: 'male' });
   const kind = ashigaru ? 'ashigaru' : pickOne(['samurai', 'samuraiTosei'], random);
   const name = `${pickOne(['Ii', 'Honda', 'Shimazu', 'Kobayakawa', 'Ōtani', 'Ukita', 'Kuroda', 'Hosokawa', 'Katō', 'Fukushima', 'Konishi', 'Sanada'], random)} ${pickOne(['Naomasa', 'Tadakatsu', 'Yoshihiro', 'Hideaki', 'Yoshitsugu', 'Hideie', 'Nagamasa', 'Tadaoki', 'Kiyomasa', 'Masanori', 'Yukimura', 'Takatora'], random)}`;
   return builtLike({
@@ -175,7 +177,7 @@ export function sengokuWarrior(random = Math.random, side, style, rank = style =
  * chest mirror; built like the side's other men, in one of his armour's designs.
  */
 export function mingSoldier(random = Math.random, style = 'spear', rank = 'garrison', { people = 'ming', design = null } = {}) {
-  const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' ? PRESETS.swordShield : PRESETS.mingSpear, random);
+  const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' ? PRESETS.swordShield : PRESETS.mingSpear, random, { sex: 'male' });
   const kind = { garrison: 'mingGarrison', brigandine: 'mingBrigandine', elite: 'mingElite' }[rank];
   const name = `${pickOne(['Wang', 'Li', 'Zhang', 'Liu', 'Chen', 'Yang', 'Zhao', 'Huang', 'Zhou', 'Wu', 'Qi', 'Luo'], random)} ${pickOne(['Da', 'Er', 'San', 'Si', 'Wu', 'Liu', 'Hu', 'Bao', 'Shun', 'Gui', 'Fu', 'Ming'], random)}`;
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random) }, accessories: [] };
@@ -201,7 +203,7 @@ export function europeanSoldier(random = Math.random, type = 'rodelero') {
   const names = people === 'dutch'
     ? [['Jan', 'Pieter', 'Hendrik', 'Willem', 'Cornelis', 'Thomas', 'Jacob', 'Dirk'], ['Pedel', 'Coyett', 'de Vries', 'Jansen', 'van Dam', 'Bakker', 'Visser', 'de Graaf']]
     : [['Pedro', 'Gonzalo', 'Juan', 'Diego', 'Alonso', 'Andrés', 'Francisco', 'Hernán', 'Rodrigo', 'Martín'], ['de Alvarado', 'de Sandoval', 'de Olid', 'Díaz', 'de Ordaz', 'de Ávila', 'de Tapia', 'Velázquez', 'de Lugo', 'Núñez']];
-  const base = varyCharacter(PRESETS.contender, random);
+  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
   const soldier = { ...base, sex: 'male', name: `${pickOne(names[0], random)} ${pickOne(names[1], random)}`, style, outfit: { kind, design: pickOne(designs, random) }, accessories: [], look: { ...base.look, skinTone: pickOne(['light', 'lightTan'], random), facialHair: pickOne(['beard', 'mustache', 'stubble'], random) } };
   return builtLike(soldier, PERIOD_BUILD[people][type === 'hidalgo' || type === 'officer' ? 'officer' : 'soldier'], random);
 }
@@ -209,7 +211,7 @@ export function europeanSoldier(random = Math.random, type = 'rodelero') {
 /** A Mexica warrior (macuahuitl, tepoztopilli, bow), or one of the jaguar and eagle orders (`elite`). */
 export function mexicaWarrior(random = Math.random, style = 'macuahuitl', rank = 'warrior', { people = null, band = null } = {}) {
   const kind = rank === 'elite' ? 'mexicaElite' : 'mexicaWarrior';
-  const base = varyCharacter(PRESETS.contender, random);
+  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
   // `people`: a city of his own (Tlaxcala, the Spaniards' ally), shown by his band's colour (`band`, a design).
   const city = people ? `of ${people}` : pickOne(['of Tlatelolco', 'of Tenochtitlan', 'of Texcoco', 'of Tlacopan', 'of Coyoacan'], random);
   const name = `${pickOne(['Cuauhtli', 'Ocelotl', 'Mazatl', 'Tochtli', 'Yaotl', 'Tecuani', 'Huitzil', 'Matlal', 'Coaxoch', 'Tenoch'], random)} ${city}`;
@@ -219,7 +221,7 @@ export function mexicaWarrior(random = Math.random, style = 'macuahuitl', rank =
 
 /** A masterless samurai (katana, naginata), unarmoured. */
 export function roninWarrior(random = Math.random, style = 'katana') {
-  const base = varyCharacter(PRESETS.samurai, random);
+  const base = varyCharacter(PRESETS.samurai, random, { sex: 'male' });
   const name = `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`;
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: [] };
   return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
@@ -227,7 +229,7 @@ export function roninWarrior(random = Math.random, style = 'katana') {
 
 /** A Chinese sea raider (wokou): dao, spear or matchlock, no armour. */
 export function wokouRaider(random = Math.random, style = 'dao') {
-  const base = varyCharacter(PRESETS.mingDao, random);
+  const base = varyCharacter(PRESETS.mingDao, random, { sex: 'male' });
   const name = `${pickOne(['Xu', 'Wang', 'Lin', 'Chen', 'Huang', 'Ye', 'Mao', 'Hong'], random)} ${pickOne(['Hai', 'Zhi', 'Dong', 'Ma', 'San', 'Bao', 'Lang', 'Shan'], random)}`;
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'wokou', design: randomDesign('wokou', random) }, accessories: [] };
   return builtLike(soldier, PERIOD_BUILD.mingSouth.raider, random);
@@ -264,7 +266,7 @@ const PERIOD_BUILD = {
 /** A knight of St John (in plate, sword or hammer) or one of the Order's sergeants (in mail, spear or gun). */
 export function hospitaller(random = Math.random, style = 'longsword', rank = 'knight') {
   const knightly = rank === 'knight';
-  const base = varyCharacter(knightly ? (style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight) : PRESETS.contender, random);
+  const base = varyCharacter(knightly ? (style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight) : PRESETS.contender, random, { sex: 'male' });
   const name = `${knightly ? 'Fra' : pickOne(['Sergeant', 'Brother'], random)} ${pickOne(['Jean', 'Gabriele', 'Antoine', 'Juan', 'Thomas', 'Pierre', 'Andrea', 'Nicholas', 'Diego', 'Louis'], random)} ${pickOne(['de Lorgue', 'Tadini', 'de Bidoux', 'de Barbaran', 'Docwra', 'de Grolée', 'Martinengo', 'Hussey', 'de Toledo', 'de Morel'], random)}`;
   const kind = knightly ? 'knight' : 'footman';
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: knightly ? randomDesign(kind, random) : style === 'matchlock' ? 1 : 0 }, accessories: knightly ? ['plume'] : [] };
@@ -274,7 +276,7 @@ export function hospitaller(random = Math.random, style = 'longsword', rank = 'k
 /** An Ottoman soldier: an azap, a Janissary or a heavy man in mail-and-plate. */
 export function ottomanSoldier(random = Math.random, style = 'yatagan', rank = 'janissary') {
   const kind = { azap: 'azap', janissary: 'janissary', heavy: 'ottomanHeavy' }[rank];
-  const base = varyCharacter(rank === 'heavy' ? PRESETS.sipahi : rank === 'azap' ? PRESETS.azap : PRESETS.yatagan, random);
+  const base = varyCharacter(rank === 'heavy' ? PRESETS.sipahi : rank === 'azap' ? PRESETS.azap : PRESETS.yatagan, random, { sex: 'male' });
   const name = `${pickOne(['Mehmed', 'Ahmed', 'Mustafa', 'Hasan', 'Hüseyin', 'Ali', 'Yusuf', 'İbrahim', 'Süleyman', 'Osman', 'Davud', 'İskender'], random)} ${rank === 'janissary' ? pickOne(['Ağa', 'Çavuş', 'Bölükbaşı', ''], random) : ''}`.trim();
   return builtLike({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] }, PERIOD_BUILD.ottoman[rank], random);
 }
@@ -282,7 +284,7 @@ export function ottomanSoldier(random = Math.random, style = 'yatagan', rank = '
 /** A steppe warrior of the 1400s: an archer in his deel, a man in leather lamellar, an iron-clad lancer. */
 export function steppeWarrior(random = Math.random, style = 'steppeBow', rank = 'light') {
   const kind = { light: 'steppeLight', medium: 'steppeMedium', heavy: 'steppeHeavy' }[rank];
-  const base = varyCharacter(rank === 'heavy' ? PRESETS.maceShield : rank === 'medium' ? PRESETS.saberShield : PRESETS.steppeBow, random);
+  const base = varyCharacter(rank === 'heavy' ? PRESETS.maceShield : rank === 'medium' ? PRESETS.saberShield : PRESETS.steppeBow, random, { sex: 'male' });
   const name = pickOne(['Batu', 'Bayar', 'Ganbold', 'Temür', 'Toghon', 'Bolad', 'Arslan', 'Esen', 'Sübe', 'Khasar', 'Jochi', 'Mönke'], random);
   return builtLike({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] }, PERIOD_BUILD.steppe[rank], random);
 }
@@ -297,7 +299,7 @@ function builtLike(inputs, build, random) {
 
 /** A noble knight in full plate, named for his rank and house, with a long sword or a war hammer. */
 export function nobleKnight(random = Math.random, style = 'longsword') {
-  const base = varyCharacter(style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight, random);
+  const base = varyCharacter(style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight, random, { sex: 'male' });
   const title = pickOne(['Sir', 'Sir', 'Lord'], random);
   const house = pickOne(['de Beauchamp', 'de Courtenay', 'de Mowbray', 'Montagu', 'de Vere', 'Fitzalan', 'Percy', 'Neville', 'de Clifford', 'Holland'], random);
   const first = pickOne(['Thomas', 'John', 'William', 'Hugh', 'Robert', 'Richard', 'Ralph', 'Guy', 'Henry', 'Walter'], random);
@@ -306,7 +308,7 @@ export function nobleKnight(random = Math.random, style = 'longsword') {
 
 /** A foot soldier in whatever armour he has, with a spear, a bow, a long sword or a war hammer. */
 export function footSoldier(random = Math.random, style = 'spear') {
-  const base = varyCharacter(PRESETS.contender, random);
+  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
   const name = `${pickOne(['Will', 'Tom', 'Jack', 'Rob', 'Hal', 'Ned', 'Wat', 'Dick'], random)} ${pickOne(['Archer', 'Baker', 'Cotton', 'Fowler', 'Mason', 'Ward', 'Turner', 'Webb'], random)}`;
   return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'footman', design: randomDesign('footman', random) }, accessories: [] });
 }

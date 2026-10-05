@@ -49,9 +49,30 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3( position ) + normalize( normal ) * ${width.toFixed(5)};`);
   };
+  // three caches programs by onBeforeCompile's source text, which is the same
+  // for every width: key the program by the width, or all widths share the first.
+  material.customProgramCacheKey = () => `outline-${width.toFixed(5)}`;
   const outline = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, material) : new THREE.Mesh(mesh.geometry, material);
   if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
   outline.userData.outline = true;
   outline.frustumCulled = false;
   return outline;
+}
+
+/**
+ * Free what an object and its children hold on the GPU: geometries,
+ * materials, skeletons' bone textures, and textures drawn for them (a banner's canvas). Anything
+ * marked `userData.shared` (a crowd template, a merged weapon) is left.
+ */
+export function disposeObject(root) {
+  root.traverse((object) => {
+    if (object.userData.shared) return;
+    object.geometry?.dispose?.();
+    // A skinned mesh's bones live in a texture of their own.
+    if (object.isSkinnedMesh) object.skeleton?.dispose?.();
+    for (const material of [].concat(object.material ?? [])) {
+      if (material.map?.isCanvasTexture) material.map.dispose();
+      material.dispose();
+    }
+  });
 }

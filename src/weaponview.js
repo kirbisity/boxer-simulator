@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { BONE } from './rig.js';
-import { outlineFor, surface } from './toon.js';
+import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, WEAPONS } from './weapons.js';
 import { steelMaterial } from './wardrobe.js';
 import { crowdBatch } from './crowdview.js';
@@ -84,6 +84,14 @@ function cylinder(radiusTop, radiusBottom, from, to, material, sides = 10) {
  * A weapon as held: its grip at the origin (the main hand), +y towards the
  * point, the edge towards +z. Steel shares the scene's reflection map.
  */
+/** A box of `size`, centred at `at`, tipped `tilt` rad about x (the guns' frames, grips and magazines). */
+function box(size, at, material, tilt = 0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  mesh.position.set(...at);
+  mesh.rotation.x = tilt;
+  return mesh;
+}
+
 export function buildWeaponMesh(kind, envMap) {
   const spec = WEAPONS[kind];
   const group = new THREE.Group();
@@ -124,12 +132,6 @@ export function buildWeaponMesh(kind, envMap) {
       // the grip raked back under the hand, the barrel above it (+z is up).
       const polymer = surface(0x1d1f23, { roughness: 0.75 });
       const slideSteel = steelMaterial(envMap, { vertexColors: false, color: 0x34363c, roughness: 0.4 });
-      const box = (size, at, material, tilt = 0) => {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-        mesh.position.set(...at);
-        mesh.rotation.x = tilt;
-        return mesh;
-      };
       group.add(
         box([0.026, 0.195, 0.032], [0, 0.0675, 0.05], slideSteel), // slide
         box([0.024, 0.15, 0.02], [0, 0.055, 0.024], polymer), // frame and rail
@@ -151,12 +153,6 @@ export function buildWeaponMesh(kind, envMap) {
       // grip, the buffer tube and collapsible stock, a red-dot optic (+z up).
       const polymer = surface(0x1d1f23, { roughness: 0.7 });
       const anodised = steelMaterial(envMap, { vertexColors: false, color: 0x26282c, roughness: 0.55 });
-      const box = (size, at, material, tilt = 0) => {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-        mesh.position.set(...at);
-        mesh.rotation.x = tilt;
-        return mesh;
-      };
       const barrel = cylinder(0.008, 0.008, 0.44, spec.length, anodised, 8);
       barrel.position.z = 0.04;
       const buffer = cylinder(0.014, 0.014, -spec.handle + 0.06, -0.02, anodised, 10);
@@ -179,12 +175,6 @@ export function buildWeaponMesh(kind, envMap) {
       // the sliding pump (fore-end) under it, a synthetic stock (+z up).
       const polymer = surface(0x1d1f23, { roughness: 0.7 });
       const blued = steelMaterial(envMap, { vertexColors: false, color: 0x2c2e33, roughness: 0.45 });
-      const box = (size, at, material, tilt = 0) => {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-        mesh.position.set(...at);
-        mesh.rotation.x = tilt;
-        return mesh;
-      };
       const barrel = cylinder(0.011, 0.011, 0.08, spec.length, blued, 10);
       barrel.position.z = 0.04;
       const tube = cylinder(0.01, 0.01, 0.12, spec.length - 0.1, blued, 10);
@@ -705,7 +695,11 @@ export function updateArms(view, fighterView, time = 0) {
   const showing = fighterView.layers.skin.visible;
   if (weapon?.held) {
     if (arms.kind !== weapon.kind) {
-      if (arms.weapon) fighterView.group.remove(arms.weapon);
+      if (arms.weapon) {
+        fighterView.group.remove(arms.weapon);
+        // A crowd member's weapon is the batch's, shared: only his own is freed.
+        if (!fighterView.baked) disposeObject(arms.weapon);
+      }
       arms.weapon = fighterView.baked ? crowdArms(view, weapon.kind, () => buildWeaponMesh(weapon.kind, view.steelEnv)) : buildWeaponMesh(weapon.kind, view.steelEnv);
       arms.kind = weapon.kind;
       fighterView.group.add(arms.weapon);
@@ -911,6 +905,7 @@ export function updateDebris(view, world) {
     if (debris.taken) {
       if (mesh) {
         view.scene.remove(mesh);
+        disposeObject(mesh);
         view.pieces.delete(debris.id);
       }
       continue;
@@ -933,7 +928,10 @@ export function updateDebris(view, world) {
 
 /** A new bout: clear what lay on the floor. */
 export function clearGore(view) {
-  for (const mesh of view.pieces?.values() ?? []) view.scene.remove(mesh);
+  for (const mesh of view.pieces?.values() ?? []) {
+    view.scene.remove(mesh);
+    disposeObject(mesh);
+  }
   view.pieces = new Map();
   if (view.blood) {
     view.blood.drops = [];
@@ -1123,6 +1121,7 @@ export function updateArrows(view, world) {
   for (const [arrow, mesh] of drawn) {
     if (live.has(arrow)) continue;
     view.scene.remove(mesh);
+    disposeObject(mesh);
     drawn.delete(arrow);
   }
 }

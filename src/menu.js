@@ -254,12 +254,20 @@ export function installMenus(game) {
       // Swipe across the stage to turn it.
       let downAt = null;
       stage.addEventListener('pointerdown', (press) => { downAt = press.clientX; });
+      // A swipe ends in a click on the card it started on: that click is the swipe's, not a pick.
+      let swiped = false;
       stage.addEventListener('pointerup', (lift) => {
         if (downAt === null) return;
         const moved = lift.clientX - downAt;
         downAt = null;
-        if (Math.abs(moved) > 36) turn(corner, moved < 0 ? 1 : -1);
+        swiped = Math.abs(moved) > 36;
+        if (swiped) turn(corner, moved < 0 ? 1 : -1);
       });
+      stage.addEventListener('click', (click) => {
+        if (!swiped) return;
+        swiped = false;
+        click.stopPropagation();
+      }, true);
       const section = el('section', { className: `dw-side ${corner}` }, el('span', { className: 'dw-corner', textContent: corner === 'red' ? 'RED' : 'BLUE' }), tabs, prev, stage, next, title, own);
       sides[corner] = { section, cards: [], title, stage, tabs, portraits };
     }

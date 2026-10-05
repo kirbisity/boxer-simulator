@@ -150,6 +150,7 @@ export function heelFooting(heels) {
 
 export const OUTFITS = {
   boxing: {
+    faction: 'ring',
     label: 'Boxing', movement: 'excellent', fists: 'gloved',
     // A padded glove spreads the blow: 10% less harm from punches.
     damageDealt: { hand: 0.9 },
@@ -160,6 +161,7 @@ export const OUTFITS = {
   // Mixed martial arts: fight trunks, barefoot, bare fists (or the thin open
   // gloves, which spread a blow no more than a fist).
   mma: {
+    faction: 'ring',
     label: 'MMA', movement: 'excellent', fists: 'bare',
     palette: [[null, 'black'], [null, 'navy'], [null, 'red'], [null, 'white'], [null, 'charcoal']],
     designs: [
@@ -167,6 +169,7 @@ export const OUTFITS = {
     ],
   },
   sports: {
+    faction: 'ring',
     label: 'Sports', movement: 'excellent', fists: 'bare',
     headgear: ['cap'],
     palette: [['sky', 'black'], ['red', 'black'], ['green', 'charcoal'], ['yellow', 'navy'], ['white', 'black'], ['black', 'grey']],
@@ -175,6 +178,7 @@ export const OUTFITS = {
     ],
   },
   sumo: {
+    faction: 'ring',
     label: 'Sumo', movement: 'excellent', fists: 'bare',
     palette: [[null, 'black'], [null, 'purple'], [null, 'wine'], [null, 'navy'], [null, 'brown']],
     designs: [
@@ -182,6 +186,7 @@ export const OUTFITS = {
     ],
   },
   hiking: {
+    faction: 'street',
     label: 'Hiking', movement: 'good', fists: 'bare',
     headgear: ['boonie'],
     palette: [['orange', 'olive'], ['forest', 'brown'], ['sky', 'slate'], ['red', 'charcoal'], ['yellow', 'olive']],
@@ -192,6 +197,7 @@ export const OUTFITS = {
     ],
   },
   casual: {
+    faction: 'street',
     label: 'Casual', movement: 'good', fists: 'bare',
     palette: [['maroon', 'sand'], ['navy', 'denim'], ['forest', 'sand'], ['purple', 'charcoal'], ['rust', 'denim'], ['grey', 'black']],
     designs: [
@@ -202,6 +208,7 @@ export const OUTFITS = {
     ],
   },
   business: {
+    faction: 'street',
     label: 'Business', movement: 'limited', fists: 'bare',
     palette: [['black', 'black'], ['charcoal', 'charcoal'], ['navy', 'navy'], ['slate', 'slate']],
     // Heels (see heelFooting): a woman in them goes over more easily, and kicks with the heel.
@@ -212,6 +219,7 @@ export const OUTFITS = {
     ],
   },
   yakuza: {
+    faction: 'street',
     label: 'Yakuza', movement: 'good', fists: 'bare', kick: 1.1,
     headgear: ['hat'],
     palette: [[null, 'black'], [null, 'charcoal'], [null, 'white'], [null, 'navy']],
@@ -220,6 +228,7 @@ export const OUTFITS = {
     ],
   },
   swat: {
+    faction: 'law', bulletRating: 1500, plated: true,
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
     palette: [['charcoal', 'charcoal'], ['olive', 'olive'], ['slate', 'slate']],
     balance: 1.5, extraMass: 0.2,
@@ -238,6 +247,7 @@ export const OUTFITS = {
   // over the shirt, the duty belt, the peaked cap. The vest stops handgun
   // rounds over the torso and little of a blade; nothing else is covered.
   police: {
+    faction: 'law', bulletRating: 1300,
     label: 'Police — patrol uniform', movement: 'good', fists: 'bare',
     sidearm: 'baton',
     protection: {
@@ -255,6 +265,7 @@ export const OUTFITS = {
   // 25–30 kg. Very well protected against bullets over the torso and head;
   // the limbs bare to a round and nearly so to a blade. Slow under the load.
   specialForces: {
+    faction: 'law', bulletRating: 4000, plated: true,
     label: 'Special forces — plate carrier', movement: 'limited', fists: 'gloved-tactical',
     sidearm: 'dagger',
     extraMass: 0.35,
@@ -269,6 +280,7 @@ export const OUTFITS = {
     ],
   },
   knight: {
+    faction: 'knights', bulletRating: 650, plated: true,
     label: 'Knight — full plate',
     // Arrows glance off it.
     arrowproof: true,
@@ -298,6 +310,7 @@ export const OUTFITS = {
   // colours. Proof against most cuts, poor against a point, little help
   // against a blow; lighter than plate, and an edge bites rather than glances.
   knightMail: {
+    faction: 'knights',
     label: 'Knight — mail and great helm', family: 'knight', movement: 'good', fists: 'gauntlet',
     sidearm: 'shortSword',
     picked: [0, 1, 2, 3],
@@ -316,6 +329,7 @@ export const OUTFITS = {
   // inside cloth), a mail shirt, or a breastplate — over a quilted coat,
   // and a kettle hat. Never full cover; light enough to march in.
   footman: {
+    faction: 'knights',
     label: 'Foot soldier', family: 'knight', movement: 'good', fists: 'bare',
     sidearm: 'shortSword',
     extraMass: 0.22,
@@ -332,6 +346,7 @@ export const OUTFITS = {
   // Lamellar: small lacquered steel scales laced in rows, in red. Proof
   // against most cuts, good against points; lighter than plate.
   samurai: {
+    faction: 'japanese', plated: true,
     label: 'Samurai — ō-yoroi', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
     arrowproof: true,
@@ -355,6 +370,7 @@ export const OUTFITS = {
   // steel lames, laced skirt and sleeves, and the menpo war mask. Better
   // than ō-yoroi against points and bullets, and heavier.
   samuraiTosei: {
+    faction: 'japanese', bulletRating: 900, plated: true,
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
     arrowproof: true,
@@ -376,6 +392,7 @@ export const OUTFITS = {
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,
   // cloth sleeves, the jingasa hat; less protection, lighter, quicker.
   ashigaru: {
+    faction: 'japanese',
     label: 'Ashigaru', family: 'samurai', movement: 'good', fists: 'bare',
     sidearm: 'wakizashi',
     picked: [0, 1, 2],
@@ -392,6 +409,7 @@ export const OUTFITS = {
   },
   // A gladiator armed as a Greek hoplite: little armour over a bare body.
   hoplomachus: {
+    faction: 'gladiators',
     label: 'Gladiator — hoplomachus', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
@@ -403,6 +421,7 @@ export const OUTFITS = {
   // Murmillo: the big fish-crested helmet with its grille, a manica on the
   // sword arm, a short greave: the head well kept, the body bare.
   murmillo: {
+    faction: 'gladiators',
     label: 'Gladiator — murmillo', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.32,
@@ -412,6 +431,7 @@ export const OUTFITS = {
   },
   // Secutor: the smooth egg helmet that nothing catches on, manica, high greave.
   secutor: {
+    faction: 'gladiators',
     label: 'Gladiator — secutor', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.32,
@@ -422,6 +442,7 @@ export const OUTFITS = {
   // Retiarius: the net-fighter, almost naked: no helmet, the galerus on the
   // left shoulder and a manica on that arm. Fast, and easily hurt.
   retiarius: {
+    faction: 'gladiators',
     label: 'Gladiator — retiarius', family: 'gladiator', movement: 'excellent', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.08,
@@ -432,6 +453,7 @@ export const OUTFITS = {
   // Thraex: the griffin-crested brimmed helmet, quilted wraps and high
   // greaves on both legs, manica: the legs best kept of any.
   thraex: {
+    faction: 'gladiators',
     label: 'Gladiator — thraex', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
@@ -442,6 +464,7 @@ export const OUTFITS = {
   // Ming garrison: a padded cotton coat and a red cloth head wrap. Little
   // protection beyond the padding; quick on his feet.
   mingGarrison: {
+    faction: 'chinese',
     label: 'Ming — garrison', family: 'chinese', movement: 'good', fists: 'bare',
     // The dao at his side; for the man who fights with the dao, a knife as well.
     sidearm: 'dao',
@@ -461,6 +484,7 @@ export const OUTFITS = {
   // iron helmet with a wide brim; a regular army's kit, better than a
   // levy's, never full cover.
   mingBrigandine: {
+    faction: 'chinese',
     label: 'Ming — brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
     spare: 'dagger',
@@ -481,6 +505,7 @@ export const OUTFITS = {
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
   mingElite: {
+    faction: 'chinese', bulletRating: 650, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
     spare: 'dagger',
@@ -503,6 +528,7 @@ export const OUTFITS = {
   // the arms and shins, a ridged helmet with an iron face plate and a lamed
   // gorget leaving only an eye slit. Fought here on foot, with the mace.
   ironPagoda: {
+    faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
     sidearm: 'dao',
     spare: 'dagger',
@@ -521,6 +547,7 @@ export const OUTFITS = {
   // from the unarmoured archer in his deel to the iron-clad lancer; and the
   // legend of the 1200s, Chinggis Khan's guard. Fought on foot here. ----
   steppeLight: {
+    faction: 'steppe',
     label: 'Steppe — deel and fur hat', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     designs: [
@@ -531,6 +558,7 @@ export const OUTFITS = {
   },
   // Hardened leather lamellar over the deel, an iron helmet: proof against a glancing cut.
   steppeMedium: {
+    faction: 'steppe',
     label: 'Steppe — leather lamellar', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     extraMass: 0.15,
@@ -544,6 +572,7 @@ export const OUTFITS = {
   },
   // Iron lamellar to the knees, iron bracers, a helmet with a lamellar aventail.
   steppeHeavy: {
+    faction: 'steppe',
     label: 'Steppe — iron lamellar', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
@@ -560,6 +589,7 @@ export const OUTFITS = {
   // age (not in the levels): gilt-bossed iron scale with broad shoulder
   // guards, the masked helmet of the Khan's own men.
   kheshig: {
+    faction: 'steppe',
     label: 'Kheshig — the Khan\'s guard', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
@@ -576,6 +606,7 @@ export const OUTFITS = {
   // and its guns), the heavy man in mail-and-plate; and the legend of the
   // 1300s, an alp of Osman's frontier warriors. ----
   azap: {
+    faction: 'ottomans',
     label: 'Ottoman — azap', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     designs: [
@@ -585,6 +616,7 @@ export const OUTFITS = {
     ],
   },
   janissary: {
+    faction: 'ottomans',
     label: 'Ottoman — Janissary', movement: 'good', fists: 'bare',
     sidearm: 'yatagan',
     spare: 'dagger',
@@ -598,6 +630,7 @@ export const OUTFITS = {
   // Mail-and-plate (krug): rows of small plates riveted into a mail shirt,
   // mail to the thighs, iron vambraces, and the turban helmet (chichak).
   ottomanHeavy: {
+    faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
@@ -614,6 +647,7 @@ export const OUTFITS = {
   // the levels): a mail hauberk, a conical helmet with a mail aventail and a
   // turban wound round it.
   gaziAlp: {
+    faction: 'ottomans',
     label: 'Alp — Osman\'s gazi', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     extraMass: 0.28,
@@ -627,6 +661,7 @@ export const OUTFITS = {
   // A Chinese martial artist's silk suit (tai chi, kung fu): loose jacket and
   // trousers, cloth shoes. No protection; it moves.
   kungfu: {
+    faction: 'chinese',
     label: 'Kung fu suit', movement: 'excellent', fists: 'bare',
     palette: [['white', 'white'], ['black', 'black'], ['navy', 'black'], ['wine', 'black']],
     designs: [
@@ -635,6 +670,7 @@ export const OUTFITS = {
   },
   // A Shaolin monk: the robe, leggings bound at the shin, the head shaven.
   monk: {
+    faction: 'chinese',
     label: 'Shaolin monk', movement: 'excellent', fists: 'bare',
     palette: [['ochre', 'brown'], ['grey', 'grey'], ['rust', 'brown']],
     designs: [
@@ -643,6 +679,7 @@ export const OUTFITS = {
   },
   // A taekwondo dobok: the white uniform, a black belt, bare feet.
   dobok: {
+    faction: 'ring',
     label: 'Taekwondo dobok', movement: 'excellent', fists: 'bare',
     designs: [
       { label: 'Dobok', top: { kind: 'jacket', color: '#f2f2f0' }, bottom: { kind: 'pants', color: '#f2f2f0' }, feet: { kind: 'bare' } },
@@ -652,6 +689,7 @@ export const OUTFITS = {
   // and collar under a morion; a doublet and breeches. Proof against most
   // cuts and points; a gun's ball goes through it unless it is proofed.
   conquistadorPlate: {
+    faction: 'knights', plated: true,
     label: 'Conquistador — breastplate', family: 'conquistador', movement: 'good', fists: 'bare',
     sidearm: 'espada',
     spare: 'dagger',
@@ -670,6 +708,7 @@ export const OUTFITS = {
   // A conquistador in escaupil: the quilted cotton armour taken from the
   // Mexica, good against obsidian and arrows, under a morion or cabasset.
   conquistadorQuilted: {
+    faction: 'knights',
     label: 'Conquistador — escaupil', family: 'conquistador', movement: 'good', fists: 'bare',
     sidearm: 'espada',
     spare: 'dagger',
@@ -688,6 +727,7 @@ export const OUTFITS = {
   // A Mexica warrior: the ichcahuipilli (quilted cotton armour, soaked in
   // brine), a loincloth, sandals, a feathered band. Little against steel.
   mexicaWarrior: {
+    faction: 'mexica',
     label: 'Mexica — warrior', family: 'mexica', movement: 'excellent', fists: 'bare',
     sidearm: 'macuahuitl',
     extraMass: 0.08,
@@ -705,6 +745,7 @@ export const OUTFITS = {
   // jaguar skin or eagle feathers, and a carved wooden helmet: a jaguar's
   // open jaws, an eagle's beak. A little better kept; prized captives.
   mexicaElite: {
+    faction: 'mexica',
     label: 'Mexica — jaguar and eagle', family: 'mexica', movement: 'excellent', fists: 'bare',
     sidearm: 'macuahuitl',
     extraMass: 0.12,
@@ -720,6 +761,7 @@ export const OUTFITS = {
   },
   // A rōnin: no lord, no armour; a kimono and hakama, a headband.
   ronin: {
+    faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
     sidearm: 'wakizashi',
     protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
@@ -733,6 +775,7 @@ export const OUTFITS = {
   // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth
   // round the head, bare feet. Nothing to stop a blade.
   wokou: {
+    faction: 'chinese',
     label: 'Wokou raider', movement: 'excellent', fists: 'bare',
     sidearm: 'dao',
     spare: 'dagger',
@@ -749,6 +792,7 @@ export const OUTFITS = {
   // corset's boning turns a little of a cut (30%), nothing of a blow or a
   // point. The game shuffles her three silhouettes of the reign.
   victorianLady: {
+    faction: 'street',
     label: 'Victorian — corset and gown', movement: 'limited', fists: 'bare',
     protection: { blunt: 0, cut: 0.3, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
     picked: [0, 1, 2],
@@ -760,6 +804,7 @@ export const OUTFITS = {
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.
   victorianGent: {
+    faction: 'street',
     label: 'Victorian — frock coat and top hat', movement: 'good', fists: 'bare',
     designs: [
       { label: 'Black frock coat', top: { kind: 'suit', color: '#1c1c20', shirt: '#f2f2f0', tie: '#1c1c20' }, bottom: { kind: 'pants', color: '#4a4a50' }, head: { kind: 'topHat', color: '#141416' }, feet: { kind: 'dressShoe', color: '#141416' } },
@@ -769,6 +814,7 @@ export const OUTFITS = {
   },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
   commoner: {
+    faction: 'knights',
     label: 'Commoner', movement: 'good', fists: 'bare',
     headgear: ['headWrap'],
     palette: [['undyed', 'brown'], ['linen', 'slate'], ['rust', 'brown'], ['forest', 'undyed'], ['ochre', 'brown'], ['slate', 'undyed'], ['brown', 'grey']],
@@ -858,17 +904,11 @@ export const FACTIONS = {
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
 
-// What an outfit says about who wears it; an armour family covers its kinds.
-// An armour family's kinds may be swapped for one another when a fighter is redressed;
-// an outfit outside one (a rōnin's kimono, a monk's robe) keeps to itself.
-const FACTION_OF_FAMILY = { knight: 'knights', conquistador: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese', mexica: 'mexica' };
-const FACTION_OF_OUTFIT = { police: 'law', specialForces: 'law', ironPagoda: 'chinese', steppeLight: 'steppe', steppeMedium: 'steppe', steppeHeavy: 'steppe', kheshig: 'steppe', azap: 'ottomans', janissary: 'ottomans', ottomanHeavy: 'ottomans', gaziAlp: 'ottomans', victorianLady: 'street', victorianGent: 'street', ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */
 export function factionOf(inputs) {
   if (FACTIONS[inputs.faction]) return inputs.faction;
-  const { kind, spec } = outfitOf(inputs);
-  return FACTION_OF_FAMILY[spec.family] ?? FACTION_OF_OUTFIT[kind] ?? 'ring';
+  return outfitOf(inputs).spec.faction ?? 'ring';
 }
 
 export function outfitOf(inputs) {

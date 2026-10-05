@@ -524,6 +524,8 @@ $('#place').addEventListener('change', (event) => {
   newBout();
 });
 segmented('#modes', (mode, button) => {
+  // Leaving play (or changing sides), the one he played fights with his guard up again.
+  if (player()?.walking) setWalking(false);
   state.mode = mode;
   state.playSide = button.dataset.side ?? 'red';
   $('#pad').hidden = mode !== 'play';
@@ -592,6 +594,7 @@ function buildPad() {
     const button = document.createElement('button');
     button.dataset.command = name;
     button.innerHTML = `${LABELS[name] ?? name} <kbd>${keyFor[name] ?? ''}</kbd>`;
+    if (name === 'body') button.classList.toggle('on', Boolean(state.aimBody));
     pad.append(button);
   }
   const walk = Object.assign(document.createElement('button'), { innerHTML: 'Walk <kbd>V</kbd>' });
@@ -614,8 +617,10 @@ $('#pad').addEventListener('pointerdown', (press) => {
     const stop = () => {
       walkHeld.delete(key);
       window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
     };
     window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
     return;
   }
   if (button.dataset.move) {
@@ -623,12 +628,15 @@ $('#pad').addEventListener('pointerdown', (press) => {
     const stop = () => {
       player().move = 0;
       window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
     };
     window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
   } else command(button.dataset.command);
 });
+const typing = (target) => Boolean(target.closest?.('input, select, textarea, [contenteditable]'));
 window.addEventListener('keydown', (press) => {
-  if (state.mode !== 'play' || press.target.closest('input, select')) return;
+  if (state.mode !== 'play' || typing(press.target) || press.repeat) return;
   const key = press.key.toLowerCase();
   if (key === 'v') return setWalking(!player().walking);
   if (player().walking) {
@@ -641,10 +649,16 @@ window.addEventListener('keydown', (press) => {
   }
   if (press.key === 'a' || press.key === 'ArrowLeft') player().move = -1;
   else if (press.key === 'd' || press.key === 'ArrowRight') player().move = 1;
-  else if (KEYS[press.key]) {
+  else if (KEYS[key]) {
     press.preventDefault();
-    command(KEYS[press.key]);
+    command(KEYS[key]);
   }
+});
+// Away from the window, every held key and button is let go.
+window.addEventListener('blur', () => {
+  walkHeld.clear();
+  state.walkRunning = false;
+  if (state.mode === 'play' && player()) player().move = 0;
 });
 window.addEventListener('keyup', (press) => {
   const key = press.key.toLowerCase();
