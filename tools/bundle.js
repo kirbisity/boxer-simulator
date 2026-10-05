@@ -4,7 +4,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics', 'cast', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'crowdview', 'render', 'weaponview', 'drama', 'scenarios', 'menu', 'main'];
+// In load order: a module's top-level code may use only what comes before it.
+const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics/config', 'physics', 'physics/ranged', 'physics/grappling', 'cast', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'crowdview', 'render', 'weaponview', 'drama', 'scenarios', 'menu', 'main'];
 const out = process.argv[2] ?? 'dist/gladiator.html';
 
 const html = readFileSync('index.html', 'utf8');
@@ -13,10 +14,13 @@ const code = MODULES.map((name) => {
   const source = readFileSync(`src/${name}.js`, 'utf8');
   const stripped = source
     .replace(/^import [^;]+;\n/gm, '')
+    // Re-exports (export { x } from './y.js') name what is already in the shared scope.
+    .replace(/^export \{[^}]*\} from [^;]+;\n/gm, '')
     .replace(/^export (const|function|class|let) /gm, '$1 ');
   if (/^(import|export) /m.test(stripped)) throw new Error(`src/${name}.js: an import or export survived the bundling`);
   // Every local module imported must be on the list, or the page dies at load.
-  for (const [, imported] of source.matchAll(/from '\.\/([\w-]+)\.js'/g)) {
+  for (const [, path] of source.matchAll(/from '(\.{1,2}\/[\w/-]+)\.js'/g)) {
+    const imported = new URL(`${path}.js`, `file:///src/${name}.js`).pathname.replace(/^\/src\//, '').replace(/\.js$/, '');
     if (!MODULES.includes(imported)) throw new Error(`src/${name}.js imports ${imported}.js, which is not in MODULES`);
   }
   return `// ---- src/${name}.js ----\n${stripped}`;
