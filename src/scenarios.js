@@ -36,7 +36,7 @@ function sekigaharaSide(random, side) {
 // Yukinaga. Twenty a side; the Ming regulars only — brigandine and elite —
 // led by an elite with the guandao; gun and bow men behind on both sides.
 const PYONGYANG_MING = {
-  elite: { guandao: 3, matchlock: 2 },
+  elite: { guandao: 2, matchlock: 1, threeEyed: 2 },
   brigandine: { swordShield: 6, spear: 5, matchlock: 4 },
 };
 const PYONGYANG_JAPANESE = {

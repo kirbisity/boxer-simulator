@@ -877,12 +877,18 @@ export function think(world, fighter, dt) {
     return;
   }
   // A gun: keep away and shoot; once he is in close, drop it and fight mixed.
-  const gun = style.ranged && fighter.weapon?.held ? style.ranged : null;
+  const gun = style.ranged && fighter.weapon?.held && !fighter.weapon.spent ? style.ranged : null;
   if (gun && distance > gun.close) {
     gunfight(world, fighter, opponent, distance, gun, dt);
     return;
   }
-  if (gun) {
+  if (gun && style.emptyStyle) {
+    // A gun that is also a club (the three-eyed gun): a man on him, it is a club now.
+    fighter.weapon.spent = true;
+    fighter.style = style.emptyStyle;
+    fighter.aimAt = undefined;
+    style = STYLES[fighter.style];
+  } else if (gun) {
     dropWeapon(world, fighter, 'dropped');
     style = STYLES[fighter.style] ?? STYLES.mix;
   }
@@ -890,7 +896,7 @@ export function think(world, fighter, dt) {
   if (style.attacks.collarTie && !fighter.clinch && !fighter.punch && opponent.clinch?.target === fighter.id && world.random() < AI.tieBackPerSecond * dt) perform(world, fighter, 'collarTie');
   // Facing a gun at a distance, standing off is death: close in, weaving,
   // and charge when near enough.
-  const facingGun = !gun && opponent.weapon?.held && opponent.weapon.spec.ranged && opponent.state === 'up';
+  const facingGun = !gun && opponent.weapon?.held && opponent.weapon.spec.ranged && !opponent.weapon.spent && opponent.state === 'up';
   if (facingGun && distance > AI.gunRush.within) {
     fighter.move = 1;
     // Flat out all the way in: every stride slower is another shot.

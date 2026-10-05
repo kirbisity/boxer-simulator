@@ -412,6 +412,30 @@ export const OUTFITS = {
       mingEliteDesign('Steel scale, masked', '#1c1c20', '#1f2a4a', '#a7adb6', { neck: 'steel', mask: true }, { kind: 'mingScale', lace: '#1a1c24' }),
     ],
   },
+  // A Chinese martial artist's silk suit (tai chi, kung fu): loose jacket and
+  // trousers, cloth shoes. No protection; it moves.
+  kungfu: {
+    label: 'Kung fu suit', family: 'chinese', movement: 'excellent', fists: 'bare',
+    palette: [['white', 'white'], ['black', 'black'], ['navy', 'black'], ['wine', 'black']],
+    designs: [
+      { label: 'Silk suit', top: { kind: 'flannel', color: '#e8e4d8' }, bottom: { kind: 'pants', color: '#e8e4d8' }, feet: { kind: 'compactBoot', color: '#161616' } },
+    ],
+  },
+  // A Shaolin monk: the robe, leggings bound at the shin, the head shaven.
+  monk: {
+    label: 'Shaolin monk', family: 'chinese', movement: 'excellent', fists: 'bare',
+    palette: [['ochre', 'brown'], ['grey', 'grey'], ['rust', 'brown']],
+    designs: [
+      { label: 'Robe', top: { kind: 'tunic', color: '#c47a1e' }, bottom: { kind: 'pants', color: '#6a4428' }, feet: { kind: 'compactBoot', color: '#2a2622' }, hair: 'bald' },
+    ],
+  },
+  // A taekwondo dobok: the white uniform, a black belt, bare feet.
+  dobok: {
+    label: 'Taekwondo dobok', movement: 'excellent', fists: 'bare',
+    designs: [
+      { label: 'Dobok', top: { kind: 'jacket', color: '#f2f2f0' }, bottom: { kind: 'pants', color: '#f2f2f0' }, feet: { kind: 'bare' } },
+    ],
+  },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
   commoner: {
     label: 'Commoner', movement: 'good', fists: 'bare',
@@ -502,7 +526,7 @@ export const FACTION_KEYS = Object.keys(FACTIONS);
 
 // What an outfit says about who wears it; an armour family covers its kinds.
 const FACTION_OF_FAMILY = { knight: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese' };
-const FACTION_OF_OUTFIT = { commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
+const FACTION_OF_OUTFIT = { dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */
 export function factionOf(inputs) {

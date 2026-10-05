@@ -169,6 +169,54 @@ export function buildWeaponMesh(kind, envMap) {
       }
       break;
     }
+    case 'staff': {
+      // A plain wooden staff, a little thicker at the middle; iron ferrules at both ends.
+      group.add(cylinder(0.014, 0.017, -spec.handle, 0, wood, 10), cylinder(0.017, 0.014, 0, spec.length, wood, 10));
+      group.add(cylinder(0.016, 0.016, spec.length - 0.05, spec.length, dark, 10), cylinder(0.016, 0.016, -spec.handle, -spec.handle + 0.05, dark, 10));
+      break;
+    }
+    case 'kanabo': {
+      // An oak club swelling to an eight-sided head, rows of iron studs over its upper half, a grip and a pommel ring.
+      const oak = surface(0x3a2416, { roughness: 0.75 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius * 1.15, spec.radius * 0.45, spec.length + spec.handle, 8), oak);
+      body.position.y = (spec.length - spec.handle) / 2;
+      group.add(body);
+      const studs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.011, 6, 4), steelMaterial(envMap, { vertexColors: false, color: 0x5a5c62, roughness: 0.5 }), 8 * 7);
+      const place = new THREE.Object3D();
+      let at = 0;
+      for (let row = 0; row < 7; row += 1) {
+        const y = spec.strikeFrom + ((spec.length - spec.strikeFrom - 0.04) * row) / 6;
+        const radius = spec.radius * 0.45 + (spec.radius * 0.7 * (y + spec.handle)) / (spec.length + spec.handle);
+        for (let around = 0; around < 8; around += 1) {
+          const angle = ((around + (row % 2) * 0.5) / 8) * Math.PI * 2;
+          place.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+          place.updateMatrix();
+          studs.setMatrixAt(at, place.matrix);
+          at += 1;
+        }
+      }
+      const pommel = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.006, 6, 12), steelMaterial(envMap, { vertexColors: false, color: 0x5a5c62 }));
+      pommel.position.y = -spec.handle;
+      group.add(studs, pommel);
+      break;
+    }
+    case 'threeEyed': {
+      // Three short iron barrels bound in a triangle on the end of a wooden
+      // shaft, iron bands round them, a touch-hole on each.
+      const iron = steelMaterial(envMap, { vertexColors: false, color: 0x3a3c40, roughness: 0.55 });
+      group.add(cylinder(0.018, 0.02, -spec.handle, spec.strikeFrom + 0.02, wood, 10));
+      for (let barrel = 0; barrel < 3; barrel += 1) {
+        const angle = (barrel / 3) * Math.PI * 2;
+        const tube = cylinder(0.019, 0.022, spec.strikeFrom, spec.length, iron, 10);
+        tube.position.x = Math.cos(angle) * 0.022;
+        tube.position.z = Math.sin(angle) * 0.022;
+        const hole = new THREE.Mesh(new THREE.SphereGeometry(0.005, 6, 4), dark);
+        hole.position.set(Math.cos(angle) * 0.04, spec.strikeFrom + 0.06, Math.sin(angle) * 0.04);
+        group.add(tube, hole);
+      }
+      for (const y of [spec.strikeFrom + 0.03, spec.length - 0.02]) group.add(cylinder(0.05, 0.05, y - 0.015, y + 0.015, iron, 12));
+      break;
+    }
     case 'baton': {
       group.add(cylinder(0.017, 0.016, -spec.handle, spec.length, dark, 12));
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), dark);

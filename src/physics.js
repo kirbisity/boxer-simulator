@@ -201,6 +201,9 @@ export const WORLD = {
   goneSeconds: 20,
   // m/s: faster than this, a man cannot go on loading a gun (he waits).
   reloadMaxSpeed: 0.6,
+  // A throw from the hold: `seconds` of the thrower's leg force, the top
+  // of the man pulled across and `down`, his hips pushed back (`hipShare`).
+  throw: { seconds: 0.3, down: 0.6, hipShare: 0.6 },
   // Hitting the floor or another body. A part meeting the floor faster than
   // `minSpeed` (m/s) takes the speed beyond it: the head as a blow to the
   // head (`head` of it, the arms and shoulders breaking part of a fall), the
@@ -497,7 +500,10 @@ function updatePickup(world, fighter, dt) {
   fighter.pickup = null;
   armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
   // A gun picked up is as it was dropped: fired, it is empty.
-  if (fighter.weapon?.spec.shot && debris.loaded === false) fighter.weapon.loaded = false;
+  if (fighter.weapon?.spec.shot && debris.loaded === false) {
+    fighter.weapon.loaded = false;
+    emptied(world, fighter);
+  }
   world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, weapon: debris.weapon, effects: [`picks up the ${WEAPON_LABEL(debris.weapon)}`] });
 }
 
@@ -734,6 +740,16 @@ function reload(world, fighter, dt) {
   world.events.push({ time: world.time, kind: 'reloaded', fighter: fighter.id, effects: [] });
 }
 
+/** Fired out: a style that fights on with the empty gun (`emptyStyle`) takes it up as a club. */
+function emptied(world, fighter) {
+  const next = STYLES[fighter.style]?.emptyStyle;
+  if (!next) return;
+  fighter.weapon.spent = true;
+  fighter.style = next;
+  fighter.aimAt = undefined;
+  world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: ['swings the empty gun as a club'] });
+}
+
 /**
  * Whether the first man on the line the shot would take (through the sights
  * to the mark, as fire() aims it, less its random error), or near it, is on
@@ -773,8 +789,11 @@ function fire(world, fighter) {
     if (!weapon.loaded) return;
     // A comrade on the line: he holds the shot (and keeps the charge).
     if (comradeInLine(world, fighter)) return;
-    weapon.loaded = false;
+    // Several barrels (the three-eyed gun): each fired in turn, empty after the last.
+    weapon.charges = (weapon.charges ?? shot.barrels ?? 1) - 1;
+    weapon.loaded = weapon.charges > 0;
     weapon.reloaded = 0;
+    if (!weapon.loaded) emptied(world, fighter);
     if (random() < shot.misfire) {
       world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['flash in the pan'] });
       return;
@@ -1634,7 +1653,16 @@ export function step(world, dt) {
  */
 function holdClinch(world, fighter) {
   const target = world.fighters[fighter.clinch.target];
-  if (STYLES[fighter.style]?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) driveClinch(world, fighter, target);
+  const style = STYLES[fighter.style];
+  if (style?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) {
+    driveClinch(world, fighter, target);
+    // Held long enough, a throw (sumo's: `throws`).
+    const throws = style.throws;
+    if (throws && fighter.clinch.t > throws.after && target.state === 'up' && world.random() < throws.rate * (world.lastDt / WORLD.substeps)) {
+      throwFromHold(world, fighter, target);
+      return;
+    }
+  }
   for (const side of fighter.clinch.hands ?? ['l', 'r']) {
     const hand = P[`${side}Hand`];
     const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown * 0.5, 0]);
@@ -3817,7 +3845,28 @@ function countPin(world, fighter, dt) {
  * it each substep; what his legs cannot take puts him off his feet.
  */
 function driveClinch(world, fighter, target) {
-  drive(world, fighter, target, yawRotate([1, 0, 0], fighter.yaw), 1);
+  // Holding him, the driver goes with him: the push's reaction goes into the ground through his legs.
+  drive(world, fighter, target, yawRotate([1, 0, 0], fighter.yaw), STYLES[fighter.style]?.clinchDriveShare ?? 1, 0);
+}
+
+/**
+ * A throw from the hold (sumo's nage): the thrower's legs and hips twist
+ * the man over a blocking hip — his neck and shoulders pulled down and
+ * across, his hips pushed the other way — for `seconds` of the thrower's
+ * leg force. Whether he goes over is his own balance's to decide; the
+ * thrower is braced.
+ */
+function throwFromHold(world, fighter, target) {
+  const spec = WORLD.throw;
+  const across = yawRotate([0, 0, world.random() < 0.5 ? 1 : -1], fighter.yaw);
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  const impulse = spec.seconds * fighter.body.motorForce[P.pelvis] * Math.max(0.3, fighter.motorScale);
+  const top = vec.normalize(vec.add(vec.add(across, vec.scale(forward, 0.3)), [0, -spec.down, 0]));
+  world.pendingImpulses.push({ fighter: target, shares: [[P.neck, 1], [P.lShoulder, 0.7], [P.rShoulder, 0.7], [P.head, 0.4]], direction: top, impulse, massShare: WORLD.balance.massShare });
+  world.pendingImpulses.push({ fighter: target, shares: [[P.pelvis, 1], [P.lHip, 0.5], [P.rHip, 0.5]], direction: vec.scale(across, -1), impulse: impulse * spec.hipShare, massShare: WORLD.balance.massShare });
+  world.pendingImpulses.push({ fighter, shares: TRUNK_PARTICLES.map((index) => [index, 1]), direction: vec.scale(across, -1), impulse: impulse * 0.3, braced: 10 });
+  fighter.clinch = null;
+  world.events.push({ time: world.time, kind: 'throw', attacker: fighter.id, defender: target.id, impulse, effects: ['thrown'] });
 }
 
 /**
@@ -3826,14 +3875,14 @@ function driveClinch(world, fighter, target) {
  * absorb it as they absorb any knock (their strength and footing decide
  * whether he goes over). The driver is braced: he means to be going forward.
  */
-function drive(world, fighter, target, direction, share) {
+function drive(world, fighter, target, direction, share, reaction = 0.5) {
   const h = world.lastDt / WORLD.substeps;
   const net = WORLD.clinch.driveShare * share * fighter.body.motorForce[P.pelvis] * Math.max(0.3, fighter.motorScale);
   if (net <= 0) return;
   const flat = vec.normalize([direction[0], 0, direction[2]]);
   const trunk = TRUNK_PARTICLES.map((index) => [index, 1]);
   world.pendingImpulses.push({ fighter: target, shares: trunk, direction: flat, impulse: net * h, massShare: WORLD.balance.massShare });
-  world.pendingImpulses.push({ fighter, shares: trunk, direction: vec.scale(flat, -1), impulse: net * h * 0.5, braced: 10 });
+  if (reaction > 0) world.pendingImpulses.push({ fighter, shares: trunk, direction: vec.scale(flat, -1), impulse: net * h * reaction, braced: 10 });
 }
 
 /** Leg damage (summed m/s) that makes a leg give way, for everyone's toughness. */

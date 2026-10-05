@@ -41,6 +41,30 @@ export const MATCHLOCK = {
   reloadSeconds: 15,
 };
 
+/**
+ * The san yan chong (三眼銃, "three-eyed gun"): three short iron barrels in
+ * a triangle on the end of a wooden shaft, each with its own touch-hole, lit
+ * one after another for a quick volley (`barrels`, `between` s apart). Short
+ * barrels and a small charge: a lighter, slower ball than a matchlock's
+ * (~350 J) that scatters (`spread`). Ming border troops did not reload it in
+ * the press of a fight: they swung it as a club, the iron barrels its head.
+ * Dimensions are estimates (the sources give none): ~1.3 m, ~4 kg.
+ */
+export const THREE_EYED = {
+  energy: 350,
+  lethal: { head: 0.95, torso: 0.6, limb: 0.25 },
+  bleed: { head: 0.02, torso: 0.03, limb: 0.012 },
+  limbBreak: 0.25,
+  impulse: 2.2,
+  recoil: 5,
+  spread: 0.05,
+  movingSpread: 0.06,
+  misfire: 0.12,
+  barrels: 3,
+  between: 0.45,
+  reloadSeconds: 40,
+};
+
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
@@ -113,6 +137,34 @@ export const WEAPONS = {
     // The muzzle from the trigger hand (along the barrel, above it), m.
     muzzle: [1.0, 0.02],
     shot: MATCHLOCK,
+  },
+  // The three-eyed gun (see THREE_EYED): fired from the hip with the shaft
+  // under the arm; empty, a club with an iron head (`crush`: the barrels'
+  // mass drives through armour as a mace's does).
+  threeEyed: {
+    label: 'Three-eyed gun', hands: 'two', length: 0.95, strikeFrom: 0.55, handle: 0.35, spacing: 0.4, supportAhead: true, longGun: true,
+    mass: 4.0, balance: 0.62, radius: 0.04,
+    harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.6 } },
+    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 9, zeta: 0.85 }, threat: 4.6, grip: 0.7, ranged: true, edgeUp: true, crush: 0.4,
+    muzzle: [0.95, 0],
+    shot: THREE_EYED,
+  },
+  // A long wooden staff (the Shaolin gun): held near its middle, both ends
+  // striking (`strikeFrom` reaches back past the hands to the butt). Wood
+  // only: blunt harm, a softer contact than steel; its length makes it quick
+  // at the ends, a little more than a baton.
+  staff: {
+    label: 'Staff', hands: 'two', length: 0.95, strikeFrom: -0.85, handle: 0.85, spacing: 0.5, leadAhead: true, mass: 1.6, balance: 0.05, radius: 0.016,
+    harm: { swing: { blunt: 1 }, thrust: { blunt: 0.8 } },
+    contactSeconds: 0.007, rotation: 0.9, wrist: { omega: 18, zeta: 0.8 }, threat: 3.8, grip: 0.6,
+  },
+  // The kanabo: a long oak club shod with iron studs, swung in two hands.
+  // Heavier than a war hammer and a little harder, struck with its whole
+  // upper half (`strikeFrom`), not a point; no thrust; slow to turn.
+  kanabo: {
+    label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.55, handle: 0.35, spacing: 0.17, mass: 4.5, balance: 0.72, radius: 0.05,
+    harm: { swing: { blunt: 1.75 }, thrust: { blunt: 0.4 } },
+    contactSeconds: 0.004, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
   },
   // A bow (`bow`): held in the left hand (`hand`), the stave running
   // `length` up and `handle` down from the grip. It looses arrows (ARROW);
@@ -355,7 +407,7 @@ export function effectiveMassAt(spec, armMass, distance, armLength = 0.6, along 
   const loose = 1 / (1 / total + (distance - centre) ** 2 / Math.max(1e-4, inertia));
   // A committed blow is struck with the wrist locked: arm and weapon turn
   // as one about the shoulder for the instant of contact.
-  const pivoted = (armMass * (armLength * 0.45) ** 2 + ownInertia + spec.mass * (armLength + spec.balance) ** 2) / (armLength + distance) ** 2;
+  const pivoted = (armMass * (armLength * 0.45) ** 2 + ownInertia + spec.mass * (armLength + spec.balance) ** 2) / (armLength + Math.abs(distance)) ** 2;
   const turning = Math.max(loose, pivoted);
   // Along the blade (a thrust) the arm and weapon push as one mass; across
   // it (a cut) they must turn. Mixed by how the contact moves.

@@ -36,7 +36,18 @@ export const MOVES = {
   // A matchlock shot (path 'aim'): the stock up to the cheek, the long
   // barrel slow to come onto the mark and settle; the trigger lowers the
   // match, and the charge goes a moment later (MATCHLOCK.hangFire).
+  // One barrel of the three-eyed gun: held at the hip, a quick aim, the
+  // match to the touch-hole.
+  fireVolley: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.35, fireAt: 0.45, quickFireAt: 0.25, extendUntil: 0.6, duration: 0.8, twist: -0.15, shift: 0.02, cost: 0.004, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
   fireLong: { kind: 'strike', limb: 'rHand', path: 'aim', windup: 0.7, fireAt: 0.95, quickFireAt: 0.45, extendUntil: 1.1, duration: 1.4, twist: -0.2, shift: 0.02, cost: 0.004, mass: { arm: 0.5 }, rotation: 0.4, zones: ['body', 'head', 'legs'], reach: 'gun' },
+  // A spinning kick (taekwondo's dwi huryeo chagi): the body turns most of
+  // the way round, back to him, before the heel whips through: a big swing
+  // of mass and a long, open windup.
+  spinKick: { kind: 'strike', limb: 'rFoot', path: 'roundhouse', windup: 0.24, extendUntil: 0.5, duration: 0.95, twist: -2.1, lean: -0.3, cost: 0.06, mass: { leg: 0.62, body: 0.05 }, rotation: 1.65, zones: ['head', 'body'], reach: 'leg' },
+  // Tai chi's push (an): both palms from the hips, the whole body behind them, rooted.
+  taichiPush: { kind: 'strike', limb: 'rHand', path: 'pushBoth', windup: 0.18, extendUntil: 0.42, duration: 0.7, twist: 0, shift: 0.1, lean: 0.12, dip: 0.04, step: 0.6, cost: 0.02, mass: { arm: 0.9, body: 0.12 }, rotation: 0.2, push: true, shove: 0.9, harm: 0.15, contactSeconds: 0.06, zones: ['body'], reach: 'arm' },
+  // A palm strike, open hand, short and soft (harm), more push than blow.
+  palm: { kind: 'strike', limb: 'rHand', path: 'straight', windup: 0.06, extendUntil: 0.24, duration: 0.42, twist: -0.35, shift: 0.06, cost: 0.014, mass: { arm: 0.6, body: 0.05 }, rotation: 0.45, push: true, harm: 0.45, contactSeconds: 0.025, zones: ['body', 'head'], reach: 'arm' },
   // Loosing an arrow (path 'aim', the bow's): the bow arm up on the mark,
   // the string drawn to the cheek, and loosed; quicker from a bow held up.
   loose: { kind: 'strike', limb: 'lHand', path: 'aim', windup: 0.5, fireAt: 0.62, quickFireAt: 0.5, extendUntil: 0.75, duration: 0.95, twist: -0.1, shift: 0, cost: 0.006, mass: { arm: 0.2 }, rotation: 0.3, zones: ['body', 'head', 'legs'], reach: 'gun' },
@@ -71,6 +82,9 @@ export const MOVES = {
   // Polearms: the head swung or driven from well back; slow to wind, long in reach.
   hammerOverhead: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.95, -0.1], dir: [-0.5, 0.85, -0.1] }, mid: [0.85, 0.5, 0], to: { hand: [0.3, 0.55, 0.05], dir: [0.6, -0.8, 0.05] }, windup: 0.26, extendUntil: 0.56, duration: 1.0, twist: -0.4, lean: 0.16, shift: 0.08, cost: 0.045, mass: { arm: 0.7, body: 0.06 }, rotation: 1.2, zones: ['head', 'body'], reach: 'weapon', contactAt: 0.88 },
   hammerSide: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.02, 0.7, -0.3], dir: [-0.3, 0.3, -0.9] }, mid: [1, 0.15, 0], to: { hand: [0.22, 0.66, 0.25], dir: [0.2, 0.05, 1] }, windup: 0.24, extendUntil: 0.54, duration: 0.95, twist: -0.9, lean: 0.08, shift: 0.06, cost: 0.045, mass: { arm: 0.7, body: 0.06 }, rotation: 1.4, zones: ['head', 'body'], reach: 'weapon', contactAt: 0.88 },
+  // The staff's butt end: the far end swings back and the butt rises
+  // through him (the staff points away as it passes through the aim).
+  staffButt: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.14, 0.55, -0.12], dir: [0.8, 0.5, -0.2] }, mid: [-0.9, 0.35, 0], to: { hand: [0.18, 0.75, 0.1], dir: [-0.6, -0.7, 0.2] }, windup: 0.1, extendUntil: 0.36, duration: 0.6, twist: 0.5, lean: 0.06, shift: 0.05, cost: 0.03, mass: { arm: 0.55, body: 0.04 }, rotation: 0.9, zones: ['body', 'head'], reach: 'weapon' },
   hammerThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.02, 0.62, -0.08], dir: [1, 0.2, 0] }, windup: 0.18, extendUntil: 0.5, duration: 0.85, twist: -0.3, lean: 0.18, shift: 0.12, depth: 0.25, step: 1.2, cost: 0.035, mass: { arm: 0.7, body: 0.06 }, rotation: 0.8, zones: ['head', 'body'], reach: 'weapon' },
   naginataSweep: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', sweep: true, from: { hand: [0.0, 0.72, -0.3], dir: [-0.3, 0.2, -0.95] }, mid: [1, 0.05, 0], to: { hand: [0.2, 0.66, 0.26], dir: [0.2, 0, 1] }, windup: 0.2, extendUntil: 0.46, duration: 0.85, twist: -0.85, lean: 0.06, shift: 0.05, cost: 0.04, mass: { arm: 0.6, body: 0.04 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.8 },
   naginataCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.92, -0.14], dir: [-0.45, 0.7, -0.5] }, mid: [0.9, 0.2, 0.1], to: { hand: [0.26, 0.45, 0.15], dir: [0.5, -0.65, 0.5] }, windup: 0.2, extendUntil: 0.44, duration: 0.82, twist: -0.5, lean: 0.12, shift: 0.06, cost: 0.038, mass: { arm: 0.6, body: 0.035 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.8 },
@@ -212,7 +226,7 @@ export const STYLES = {
     cadence: { work: 1.5, move: 0.5, burst: 0.75, mobility: 0.2 },
     stance: { blade: 0.05, crouch: 0.07, width: 1.45, lean: 0.22, guardHeight: -0.08 },
     idle: { bounce: 0.1, sway: 0.4, rock: 0.5 },
-    attacks: { tsuppariL: 0.25, tsuppariR: 0.25, oshi: 0.2, clinch: 0.3, rush: 0.04 },
+    attacks: { tsuppariL: 0.12, tsuppariR: 0.12, oshi: 0.12, clinch: 0.55, rush: 0.12 },
     combos: { 'tsuppariL tsuppariR tsuppariL': 0.5, 'tsuppariR tsuppariL oshi': 0.5 },
     comboChance: 0.6,
     tempo: 1,
@@ -222,6 +236,11 @@ export const STYLES = {
     plans: { pressure: 2.2, brawler: 1.2, outboxer: 0.2, counter: 0.4 },
     pressure: 0.6,
     clinchDrive: true,
+    // The belt hold drives hard (`clinchDriveShare`) and throws: once both
+    // hands have held `after` s, a throw comes at `rate` per second (or the
+    // drive puts him down first).
+    clinchDriveShare: 1.35,
+    throws: { after: 0.12, rate: 3 },
   },
   // Clinch brawling (Frye–Takayama): square and forward, guard low; grabs
   // the back of the neck with one hand (`collarTie`) and hammers hooks and
@@ -514,6 +533,112 @@ export const STYLES = {
     headMovement: 0.1,
     plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
     pressure: 0.2,
+  },
+  // Tai chi: rooted, low, the hands soft before the body; it meets nearly
+  // every attack (a parry turns it, a step takes the body off its line) and
+  // answers with palms and pushes that carry little harm.
+  taichi: {
+    label: 'Tai chi',
+    cadence: { work: 0.6, move: 1.2, burst: 0.3, mobility: 0.35 },
+    stance: { blade: 0.5, crouch: 0.12, width: 1.35, lean: 0.02, guardHeight: -0.06 },
+    idle: { bounce: 0.05, sway: 0.9, rock: 0.6 },
+    attacks: { palm: 0.4, taichiPush: 0.4, teep: 0.2 },
+    combos: { 'palm taichiPush': 0.6, 'palm palm': 0.4 },
+    comboChance: 0.35,
+    tempo: 1.4,
+    defences: { parry: 0.6, slip: 0.2, stepBack: 0.2 },
+    defendChance: 0.92,
+    headMovement: 0.35,
+    plans: { counter: 2.2, outboxer: 0.8, pressure: 0.2, brawler: 0.1 },
+    pressure: 0,
+    counter: 0.6,
+  },
+  // Taekwondo: bouncing, side-on, hands low; kick after kick, turning and
+  // spinning ones among them, from out of range. Every big kick leaves him
+  // open, and he defends little.
+  taekwondo: {
+    label: 'Taekwondo',
+    cadence: { work: 1.3, move: 0.8, burst: 0.7, mobility: 0.7 },
+    stance: { blade: 0.7, crouch: 0.01, width: 1.05, lean: 0.02, guardHeight: -0.1 },
+    idle: { bounce: 1.1, sway: 0.6, rock: 0.4 },
+    attacks: { roundhouse: 0.38, spinKick: 0.22, teep: 0.2, jab: 0.12, cross: 0.08 },
+    combos: { 'roundhouse spinKick': 0.4, 'teep roundhouse': 0.35, 'roundhouse roundhouse': 0.25 },
+    comboChance: 0.45,
+    tempo: 0.8,
+    defences: { stepBack: 0.55, leanBack: 0.25, guard: 0.2 },
+    defendChance: 0.24,
+    headMovement: 0.1,
+    plans: { pressure: 1.4, outboxer: 1.2, brawler: 0.6, counter: 0.3 },
+    pressure: 0.3,
+  },
+  // The staff: quick strikes from either end and thrusts from both, the
+  // hands sliding; always moving.
+  staff: {
+    label: 'Staff', weapon: 'staff', fallback: 'mix',
+    cadence: { work: 1.3, move: 0.8, burst: 0.75, mobility: 0.6 },
+    stance: { blade: 0.45, crouch: 0.07, width: 1.25, lean: 0.06, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.58, -0.06], dir: [1, 0.3, 0.05] },
+    idle: { bounce: 0.25, sway: 0.5, rock: 0.3 },
+    attacks: { naginataSweep: 0.25, naginataCut: 0.2, staffButt: 0.25, spearJab: 0.2, naginataRising: 0.1 },
+    combos: { 'naginataCut staffButt': 0.35, 'staffButt naginataSweep': 0.3, 'spearJab staffButt naginataCut': 0.35 },
+    comboChance: 0.6,
+    tempo: 0.85,
+    defences: { weaponBlock: 0.7, stepBack: 0.3 },
+    defendChance: 0.72,
+    headMovement: 0.1,
+    plans: { pressure: 1.2, counter: 1.1, outboxer: 1, brawler: 0.4 },
+    pressure: 0.2,
+  },
+  // The kanabo: big, slow swings from high and from the side; no thrusts.
+  kanabo: {
+    label: 'Kanabo', weapon: 'kanabo',
+    cadence: { work: 0.9, move: 1, burst: 0.4, mobility: 0.4 },
+    stance: { blade: 0.45, crouch: 0.06, width: 1.3, lean: 0.08, guardHeight: 0 },
+    weaponGuard: { hand: [0.14, 0.64, -0.06], dir: [0.4, 0.9, 0] },
+    idle: { bounce: 0.1, sway: 0.4, rock: 0.4 },
+    attacks: { hammerOverhead: 0.55, hammerSide: 0.45 },
+    combos: { 'hammerSide hammerOverhead': 0.6, 'hammerOverhead hammerSide': 0.4 },
+    comboChance: 0.35,
+    tempo: 1.3,
+    defences: { weaponBlock: 0.5, stepBack: 0.5 },
+    defendChance: 0.5,
+    headMovement: 0.05,
+    plans: { pressure: 1.4, brawler: 1, outboxer: 0.6, counter: 0.6 },
+    pressure: 0.25,
+  },
+  // The three-eyed gun: three barrels fired one after another as he
+  // closes; empty, he swings it as a club (`emptyStyle`).
+  threeEyed: {
+    label: 'Three-eyed gun', weapon: 'threeEyed', fallback: 'mix', emptyStyle: 'threeEyedClub',
+    ranged: { flee: 2.2, rest: 0.8, runFor: 1, standFor: 1.2, close: 1.4, shotSeconds: 0.5, headShare: 0.1, between: [0.45, 0.15], move: 'fireVolley', reloadSafe: Infinity },
+    cadence: { work: 1.2, move: 0.7, burst: 0.5, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.07, width: 1.2, lean: 0.06, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.14, 0.6, -0.1], dir: [0.8, 0.6, 0.12] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { fireVolley: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.6, guard: 0.4 },
+    defendChance: 0.45,
+    headMovement: 0.1,
+    plans: { outboxer: 1.5, counter: 1, pressure: 0.4, brawler: 0.3 },
+    pressure: 0,
+  },
+  // The emptied three-eyed gun as a club (hidden: reached only by firing it out).
+  threeEyedClub: {
+    label: 'Three-eyed gun (club)', hidden: true, weapon: 'threeEyed', fallback: 'mix',
+    cadence: { work: 1, move: 0.9, burst: 0.45, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.06, width: 1.25, lean: 0.08, guardHeight: 0 },
+    weaponGuard: { hand: [0.14, 0.64, -0.06], dir: [0.4, 0.9, 0] },
+    idle: { bounce: 0.1, sway: 0.4, rock: 0.4 },
+    attacks: { hammerOverhead: 0.55, hammerSide: 0.45 },
+    combos: { 'hammerSide hammerOverhead': 0.6 },
+    comboChance: 0.35,
+    tempo: 1.2,
+    defences: { weaponBlock: 0.5, stepBack: 0.5 },
+    defendChance: 0.5,
+    headMovement: 0.05,
+    plans: { pressure: 1.3, brawler: 1, outboxer: 0.6, counter: 0.6 },
+    pressure: 0.25,
   },
   // The guandao, fought as the naginata: great sweeping cuts from far off.
   guandao: {

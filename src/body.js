@@ -210,6 +210,36 @@ export const PRESETS = {
     outfit: { kind: 'mingElite', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // Chen Fake, the Chen-style tai chi master: slight, old, rooted.
+  taichi: {
+    name: 'Chen Fake', style: 'taichi', sex: 'male', heightCm: 170, frame: 'medium', age: 52, exercise: 0.55, calories: 2500,
+    outfit: { kind: 'kungfu', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#4a4a48', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  // A taekwondo fighter: long legs, light.
+  taekwondo: {
+    name: 'Kim Min-jun', style: 'taekwondo', sex: 'male', heightCm: 181, frame: 'small', age: 23, exercise: 0.85, calories: 3300,
+    outfit: { kind: 'dobok', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  // Tanzong, one of the thirteen Shaolin monks of the Tang tale, with the staff.
+  staff: {
+    name: 'Tanzong', style: 'staff', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.85, calories: 3200,
+    outfit: { kind: 'monk', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bald', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  // "Oni" Kojima Yatarō, the Uesugi's giant, with a kanabo.
+  kanabo: {
+    name: 'Kojima Yatarō', style: 'kanabo', sex: 'male', heightCm: 180, frame: 'large', age: 34, exercise: 0.75, calories: 4300,
+    outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  // A Ming elite with the three-eyed gun.
+  threeEyed: {
+    name: 'Ma Lin', style: 'threeEyed', sex: 'male', heightCm: 171, frame: 'medium', age: 35, exercise: 0.75, calories: 3500,
+    outfit: { kind: 'mingElite', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,
