@@ -197,6 +197,9 @@ export const WORLD = {
   rush: { speedFactor: 2.6, trunkShare: 0.7, minClosing: 0.8 },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
+  // Walking about (the player's walk mode): upright and square, feet under
+  // the hips, no guard; the arms swing with the stride, more the faster he goes.
+  walk: { stance: { blade: 0, crouch: 0, width: 0.5, lean: 0.03, guardHeight: 0 }, strideHz: 0.9, runStrideHz: 1.5 },
   // Out this long (s), a body is left where it lies: no more simulation for it.
   goneSeconds: 20,
   // m/s: faster than this, a man cannot go on loading a gun (he waits).
@@ -1369,9 +1372,10 @@ function updateIntent(world, fighter, dt) {
   const H = fighter.body.heightM;
   const style = STYLES[fighter.style];
   const idle = idleMotion(fighter, world.time);
+  const walking = fighter.walking && !fighter.punch && !fighter.defence && !fighter.clinch;
   const intent = {
-    stance: style.stance,
-    twist: idle.twist, lean: idle.lean, dip: idle.dip, shift: idle.shift,
+    stance: walking ? WORLD.walk.stance : style.stance,
+    twist: walking ? 0 : idle.twist, lean: walking ? 0 : idle.lean, dip: walking ? 0 : idle.dip, shift: walking ? 0 : idle.shift,
     headOffset: vec.scale(idle.headOffset, H), guardOffset: idle.guardOffset, guardTight: fighter.guardHigh > 0,
   };
   if (fighter.punch?.load > 0) {
@@ -1485,18 +1489,24 @@ function runCarry(world, fighter, intent, dt) {
   }
   const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.state !== 'up';
   const running = (fighter.running || speed > spec.runningSpeed) && !busy;
-  const want = running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
+  // Walking about, the guard is down whoever is near.
+  const want = fighter.walking && !busy ? 1 : running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
   fighter.carry = (fighter.carry ?? 0) + (want - (fighter.carry ?? 0)) * Math.min(1, spec.ease * dt);
   if (fighter.carry < 0.02) return;
   const H = fighter.body.heightM;
   const held = new Set(intent.weaponArms ?? []);
   if (fighter.shield) held.add('l');
-  const stride = Math.sin(world.time * Math.PI * 2 * 1.5 + fighter.id);
+  // The arms swing with the stride: walking, slower and smaller, and still when he stands.
+  const pace = fighter.walking ? Math.min(1, speed / WORLD.footSpeed) : 1;
+  let guard = null;
+  const stride = pace * Math.sin(world.time * Math.PI * 2 * (fighter.walking && !running ? WORLD.walk.strideHz : WORLD.walk.runStrideHz) + fighter.id);
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
-    if (held.has(side) || !intent[`${side}Hand`]) continue;
-    // Elbows bent, hands by the hips, swinging opposite to the legs.
+    if (held.has(side)) continue;
+    // Elbows bent, hands by the hips, swinging opposite to the legs; from
+    // wherever the hand was meant to be (the guard, if nothing else).
     const swinging = [0.04 * H + sign * stride * spec.swing * H, 0.52 * H, sign * 0.19 * H];
-    intent[`${side}Hand`] = vec.lerp(intent[`${side}Hand`], swinging, fighter.carry);
+    guard ??= desiredPose(fighter.body, { stance: intent.stance });
+    intent[`${side}Hand`] = vec.lerp(intent[`${side}Hand`] ?? guard[P[`${side}Hand`]], swinging, fighter.carry);
   }
   intent.guardTight = intent.guardTight && fighter.carry < 0.5;
 }

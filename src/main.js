@@ -164,6 +164,62 @@ function thinkForBout(world, dt) {
   // The one you play is simulated in full however big the fight.
   world.keepFull = players;
   thinkAll(world, dt, players);
+  if (players.size) walkAbout(player());
+}
+
+// ---- Walk mode: the player walks or runs about, guard down ----------------
+
+const WALK_KEYS = { w: [1, 0], arrowup: [1, 0], s: [-1, 0], arrowdown: [-1, 0], a: [0, 1], arrowleft: [0, 1], d: [0, -1], arrowright: [0, -1] };
+const walkHeld = new Set();
+
+/** Steer the walking player: the held directions, taken from where the camera looks; facing the way he goes. */
+function walkAbout(fighter) {
+  if (!fighter.walking) return;
+  const look = [scene.orbit.target.x - scene.camera.position.x, scene.orbit.target.z - scene.camera.position.z];
+  const length = Math.hypot(look[0], look[1]);
+  // A camera straight overhead (or not yet placed) gives no heading: then his own facing does.
+  const ahead = length > 1e-3 ? [look[0] / length, look[1] / length] : [Math.cos(fighter.yaw), -Math.sin(fighter.yaw)];
+  // Left of the camera's view on the floor.
+  const left = [ahead[1], -ahead[0]];
+  let along = 0;
+  let across = 0;
+  for (const key of walkHeld) {
+    const [forward, side] = WALK_KEYS[key] ?? [0, 0];
+    along += forward;
+    across += side;
+  }
+  const pelvis = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  fighter.strafe = 0;
+  if (!along && !across) {
+    // Standing: keep the way he faces.
+    fighter.move = 0;
+    fighter.goTo = [pelvis[0] + Math.cos(fighter.yaw) * 3, 0, pelvis[1] - Math.sin(fighter.yaw) * 3];
+    return;
+  }
+  const way = [ahead[0] * along + left[0] * across, ahead[1] * along + left[1] * across];
+  const size = Math.hypot(way[0], way[1]);
+  // Opposite keys held together cancel out: he stands.
+  if (size < 1e-6) {
+    fighter.move = 0;
+    return;
+  }
+  fighter.goTo = [pelvis[0] + (way[0] / size) * 3, 0, pelvis[1] + (way[1] / size) * 3];
+  fighter.move = 1;
+  fighter.running = state.walkRunning;
+}
+
+/** Into walk mode, or back into the fight (the guard up, the footwork the style's). */
+function setWalking(on) {
+  const fighter = player();
+  if (!fighter) return;
+  fighter.walking = on;
+  if (!on) {
+    fighter.goTo = null;
+    fighter.move = 0;
+    fighter.running = false;
+    walkHeld.clear();
+  }
+  buildPad();
 }
 
 let last = performance.now();
@@ -498,6 +554,8 @@ const LABELS = {
 };
 
 function command(name) {
+  // Any fighting move puts the guard back up.
+  if (player()?.walking) setWalking(false);
   if (name === 'body') {
     state.aimBody = !state.aimBody;
     document.querySelector('[data-command="body"]')?.classList.toggle('on', state.aimBody);
@@ -510,12 +568,23 @@ function command(name) {
   } else perform(state.world, player(), name);
 }
 
-/** The pad shows the moves of the player's own style. */
+/** The pad shows the moves of the player's own style; walking, the four ways, run, and back to the fight. */
 function buildPad() {
+  const pad = $('#pad');
+  if (player()?.walking) {
+    const arrows = [['▲', 'w'], ['◀', 'a'], ['▼', 's'], ['▶', 'd']].map(([text, key]) => Object.assign(document.createElement('button'), { textContent: text, ariaLabel: { w: 'Forward', a: 'Left', s: 'Back', d: 'Right' }[key] }));
+    arrows.forEach((button, index) => (button.dataset.walk = ['w', 'a', 's', 'd'][index]));
+    const run = Object.assign(document.createElement('button'), { innerHTML: 'Run <kbd>⇧</kbd>' });
+    run.dataset.run = '1';
+    run.classList.toggle('on', Boolean(state.walkRunning));
+    const fight = Object.assign(document.createElement('button'), { innerHTML: 'Guard up <kbd>V</kbd>' });
+    fight.dataset.walkToggle = '1';
+    pad.replaceChildren(...arrows, run, fight);
+    return;
+  }
   const style = STYLES[player().style];
   const names = [...Object.keys(style.attacks), ...Object.keys(style.defences), 'body'];
   const keyFor = Object.fromEntries(Object.entries(KEYS).map(([key, name]) => [name, key === ' ' ? '␣' : key.toUpperCase()]));
-  const pad = $('#pad');
   pad.replaceChildren(...['◀', '▶'].map((arrow, index) => Object.assign(document.createElement('button'), { textContent: arrow, ariaLabel: index ? 'Step in' : 'Step back' })));
   pad.children[0].dataset.move = '-1';
   pad.children[1].dataset.move = '1';
@@ -525,11 +594,30 @@ function buildPad() {
     button.innerHTML = `${LABELS[name] ?? name} <kbd>${keyFor[name] ?? ''}</kbd>`;
     pad.append(button);
   }
+  const walk = Object.assign(document.createElement('button'), { innerHTML: 'Walk <kbd>V</kbd>' });
+  walk.dataset.walkToggle = '1';
+  pad.append(walk);
 }
 
 $('#pad').addEventListener('pointerdown', (press) => {
   const button = press.target.closest('button');
   if (!button) return;
+  if (button.dataset.walkToggle) return setWalking(!player().walking);
+  if (button.dataset.run) {
+    state.walkRunning = !state.walkRunning;
+    button.classList.toggle('on', state.walkRunning);
+    return;
+  }
+  if (button.dataset.walk) {
+    const key = button.dataset.walk;
+    walkHeld.add(key);
+    const stop = () => {
+      walkHeld.delete(key);
+      window.removeEventListener('pointerup', stop);
+    };
+    window.addEventListener('pointerup', stop);
+    return;
+  }
   if (button.dataset.move) {
     player().move = Number(button.dataset.move);
     const stop = () => {
@@ -541,6 +629,16 @@ $('#pad').addEventListener('pointerdown', (press) => {
 });
 window.addEventListener('keydown', (press) => {
   if (state.mode !== 'play' || press.target.closest('input, select')) return;
+  const key = press.key.toLowerCase();
+  if (key === 'v') return setWalking(!player().walking);
+  if (player().walking) {
+    if (key === 'shift') state.walkRunning = true;
+    if (WALK_KEYS[key]) {
+      press.preventDefault();
+      walkHeld.add(key);
+      return;
+    }
+  }
   if (press.key === 'a' || press.key === 'ArrowLeft') player().move = -1;
   else if (press.key === 'd' || press.key === 'ArrowRight') player().move = 1;
   else if (KEYS[press.key]) {
@@ -549,7 +647,10 @@ window.addEventListener('keydown', (press) => {
   }
 });
 window.addEventListener('keyup', (press) => {
-  if (state.mode === 'play' && ['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(press.key)) player().move = 0;
+  const key = press.key.toLowerCase();
+  walkHeld.delete(key);
+  if (key === 'shift') state.walkRunning = false;
+  if (state.mode === 'play' && !player()?.walking && ['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(press.key)) player().move = 0;
 });
 
 // Orbit: drag to turn, wheel or pinch to zoom.
