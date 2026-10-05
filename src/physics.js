@@ -5,278 +5,17 @@
 // A landed punch hands its momentum to the struck part, which flies until
 // the fighter's muscles, after a reflex delay, catch it.
 
-import { BODY, buildBody, FRAMES, normaliseInputs, P, PARTICLES, PRESETS, SEGMENTS } from './body.js';
-import { caloriesForWeight } from './physiology.js';
+import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { ARROW, BLADES, bulletProof, bulletRegion, GUN, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc, slerpDir } from './weapons.js';
+import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
-
-export const WORLD = {
-  gravity: 9.81,
-  substeps: 8,
-  // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
-  ringHalf: 2.85,
-  gloveRadius: 0.065,
-  teamSpacing: 1.1, // m between team-mates at the start of a team fight
-  teamRowSpacing: 0.9, // m between rows of a side too big to stand abreast
-  sidestepShare: 0.7, // sidestep speed as a share of footwork speed
-  // A clean power shot lands at about this share of the limb's top speed.
-  threatSpeedShare: 0.6,
-  // Fists, gloved and bare. A 10 oz glove spreads a punch over ~11 ms; a
-  // bare fist lands sooner on a smaller, harder knuckle — peak force some
-  // 20–40% higher for the same impulse — so skin splits, and the hand's own
-  // bones break at a lower load (the boxer's fracture of street fights).
-  fists: {
-    gloved: { radius: 0.065, contactSeconds: 0.011, handFracture: 1, cutForce: Infinity },
-    bare: { radius: 0.042, contactSeconds: 0.008, handFracture: 0.9, cutForce: 2100 },
-  },
-  // Things worn that come off: a headset is knocked away by the first clean
-  // shot to the head (or when its wearer goes down). Free, it flies with the
-  // head's new speed and the blow's direction, tumbles, and settles on the floor.
-  props: { radius: 0.06, flySpeedPerHeadDeltaV: 1.6, flyBase: 1.2, flyUp: 1.5, restitution: 0.35, slide: 0.75, spinMin: 8, spinRange: 8 },
-  contactStep: 0.012, // m a strike contact may separate per substep
-  // Both hands on a weapon turn it this much more stiffly than one wrist.
-  twoHandWrist: 1.7,
-  // Wrists turn a weapon no faster than this (rad/s): real cuts peak near 20–30.
-  weaponTurnLimit: 25,
-  // A blade fending off a strike drives out this far (share of the line to the strike) past where they meet.
-  fendDrive: 0.25,
-  gripStep: 0.006, // m the off hand is drawn onto a two-handed grip per substep
-  // A polearm's front hand slides along the shaft: no closer to the rear
-  // hand than this share of its usual spacing, and this far short of the head (m).
-  grip: { shortest: 0.4, headClear: 0.08 },
-  contactRange: 2.6, // m between hips beyond which two fighters cannot touch
-  bodyReach: 1.3, // m from the hips that any part of a body (standing or lying) can be
-  // A strike from more than this far off the defender's facing (rad) is
-  // unseen; the head moves this much further for it.
-  blindsideAngle: Math.PI / 3,
-  blindsideFactor: 1.6,
-  // Head movement in range: how far past both reaches it starts (m), how
-  // quickly it eases in (/s), its rhythm (Hz), its side-to-side size as a
-  // share of height (~8 cm on a 1.8 m boxer) and the knee bend as it crosses.
-  // Slip and roll targets, as shares of height.
-  headMovement: { slip: { across: 0.14, down: 0.06 }, roll: { across: 0.14, down: 0.04 } },
-  weave: { range: 0.35, easeRate: 4, hz: 0.75, size: 0.045, kneeDip: 0.03 },
-  // Each muscle group is a spring-damper towards its target: natural
-  // frequency ω (rad/s) and damping ratio ζ. Below ζ = 1 a part overshoots a
-  // little and settles, which is what inertia looks like; the force cap from
-  // the muscle bounds it, so a heavy, weak part lags and a light, strong one
-  // snaps. Hands are stiff so the cap, not the spring, sets punch speed.
-  motor: {
-    hand: { omega: 60, zeta: 0.6 },
-    elbow: { omega: 34, zeta: 0.75 },
-    // The neck holds the head steady and on the opponent (stiff, well
-    // damped: it does not bob); a blow still snaps it back before the
-    // reflex delay is up.
-    head: { omega: 20, zeta: 0.85 },
-    trunk: { omega: 13, zeta: 0.5 },
-    pelvis: { omega: 12, zeta: 0.5 },
-    knee: { omega: 22, zeta: 0.7 },
-    foot: { omega: 36, zeta: 0.9 },
-  },
-  // Muscles react to a blow after a reflex delay (~60–90 ms for a startle
-  // response; less when braced), then ramp back to full force. Until then
-  // only passive tone holds (the floor): the share of force a relaxed
-  // muscle and its tendons still give.
-  reflex: { latency: 0.095, trainedSaving: 0.03, bracedSaving: 0.035, ramp: 0.14, floor: 0.12 },
-  // Per-second velocity damping: joints and tissue lose energy; a limp body
-  // less so, which is why it falls rather than sinks.
-  damping: { up: 0.8, down: 0.5 },
-  groundFriction: 14,
-  braceCompliance: 5e-4, // m/N: torso braces give a little so the trunk can twist
-  diagonalCompliance: 3e-3,
-  // Joint limits for the ragdoll: knees bend only forward; the head stays
-  // within this angle of the trunk's axis; elbows and knees cannot fold flat.
-  headCone: 1.2,
-  // The spine's twist: how far the hips may turn against the shoulders
-  // about the trunk (rad). Without it a limp body's hips spin round under
-  // its chest and the legs turn inside out.
-  spineTwist: 1.3,
-  // A body down and limp is a ragdoll: no muscle drive, only the tone of
-  // relaxed muscle damping how its parts move against each other (per s),
-  // its ligaments' tighter range (cones in rad), its limbs kept out of its
-  // own trunk (share of trunk radius), and rest once it lies still.
-  ragdoll: {
-    toneDamping: 7, spineTwist: 0.8, hipCone: 2.0, headCone: 0.9, shoulderCone: 2.8, bodyClearance: 0.85,
-    sleepSpeed: 0.12, sleepSeconds: 0.25, hingeSlack: 0.03,
-  },
-  minFold: { arm: 0.13, leg: 0.16 },
-  // Held firmly: up to this far corrected per substep (more is stable now
-  // that corrections are shared by mass).
-  limitStep: 0.006, // m
-  limitStepLimp: 0.03, // m: firmer corrections inject speed of their own
-  joint: {
-    hipCone: 2.4, // rad from straight down: room for a head kick, not the splits
-    // Forced this far past its range in an instant, a joint breaks.
-    breakAngle: 0.8, // rad past the limit
-    // The neck is braced by the whole shoulder girdle: it takes far more.
-    breakAngles: { neck: 1.5 },
-    straightAllowance: 0.01, // m a hinge may pass straight before it is held
-    // ...held there: rad·s of strain past the break angle before it gives,
-    // and how fast strain leaks away (per s) once the joint is back in range.
-    strainToBreak: 0.05,
-    strainLeak: 6,
-  },
-  // Footwork: a planted foot stays put until the stance has drifted this far
-  // from it, then steps; one foot at a time.
-  step: { threshold: 0.11, seconds: 0.17, lift: 0.05, lead: 0.5 },
-  // Footwork speed and how quickly it can change (m/s, m/s²), for a body
-  // whose leg drive is typical (legStrengthTypical × its weight); stronger
-  // or weaker legs scale both.
-  // Boxers move explosively (push-offs of ~8 m/s²), so the trunk visibly
-  // lags a step in and sways past the stance when it stops.
-  footSpeed: 1.2,
-  footAcceleration: 8,
-  legStrengthTypical: 0.8,
-  // An impact's contact lasts about this long through a 10–12 oz glove;
-  // peak force ≈ (π/2)·impulse / contact time for a half-sine pulse.
-  contactSeconds: 0.011,
-  restitution: 0.1,
-  // How much momentum a blow hands to what it hits, as a restitution: higher
-  // than the damage figure above, because the glove and flesh cushion the
-  // tissue's strain more than they cushion the push. Raised for a sharper,
-  // more visible knockback; damage still uses the cushioned figure.
-  transferRestitution: 0.6,
-  rotationLead: 0.45,
-  // Stamina regained per second at rest, times aerobic fitness: a fit boxer
-  // holds most of it through a round; an unfit one empties in about a minute.
-  staminaRecovery: 0.07,
-  // Accumulated brain strain (Σ(Δv − 1.2)²) a fighter absorbs, per unit of
-  // chin, before going down. The count is against the total, and after each
-  // knockdown only half as much again puts him back down.
-  concussionCapacity: 4,
-  concussionAfterKnockdown: 0.5,
-  // Knocked out outright, no count: a head speed change this many times the
-  // chin (the chin scales with neck and body), or a blow that moves the whole
-  // body faster than this (m/s) — too much force for the mass that took it.
-  knockout: { overChin: 1.8, bodyDeltaV: 2.4 },
-  // A heavy attack: first loaded (seconds sitting down on the legs, turned
-  // away by this share of the strike's own twist), then thrown with more of
-  // the body's weight behind the limb, at a higher stamina cost, and leaving
-  // the thrower committed (unable to defend) for a moment after.
-  heavy: { loadSeconds: 0.2, loadTwist: 0.6, loadDip: 0.045, massFactor: 1.4, costFactor: 2.2, committedSeconds: 0.35 },
-  // Damage that stays. Head damage and knockdowns weaken the chin; a blow
-  // stuns for this many seconds per m/s of head speed change; after getting
-  // up a fighter is hurt (muscles at `hurtStrength` rising back to full)
-  // for `hurtSeconds` plus `hurtPerKnockdown` per knockdown so far; a beaten
-  // trunk recovers stamina slower and beaten arms punch weaker.
-  hurt: {
-    chinPerHeadDamage: 0.35, chinPerKnockdown: 0.1, stunPerDeltaV: 0.6,
-    hurtSeconds: 8, hurtPerKnockdown: 4, hurtStrength: 0.65,
-    staminaPerTrunkDamage: 0.6, armForcePerDamage: 0.4,
-  },
-  // Armour (blunt protection from `armouredFrom`) spreads a heavy blow: a
-  // man in it reels instead of dropping. A blow of `startAt` or more of what
-  // would put him down (head speed change over the chin, or the knock over
-  // what his legs take) staggers him for `minSeconds` to `maxSeconds`, more
-  // the harder it was; one that would put him down staggers him instead,
-  // unless it was overwhelming or he was already reeling. Reeling, his
-  // muscles are at `strength`, his blows carry `harm` of their weight and he
-  // defends `defend` as often, all recovering as the stagger wears off.
-  // A blow's blunt peak force (N) counts as `force` would to put him down;
-  // knocked past his feet just after a blow, he stumbles for `catchSeconds`
-  // to get them back under him.
-  stagger: { armouredFrom: 0.5, startAt: 0.7, overwhelm: 1.6, minSeconds: 2, maxSeconds: 10, strength: 0.7, harm: 0.6, defend: 0.5, force: 5000, catchSeconds: 1, hitWithin: 0.5 },
-  rotationalFactor: { jab: 0.85, cross: 1, hook: 1.35, uppercut: 1.25 },
-  followThrough: 0.2, // m beyond the target the glove is aimed at
-  minImpactSpeed: 2.0,
-  getUpSeconds: 1.6,
-  // Balance: pushed past these, a fighter goes over rather than stepping.
-  // Speed of the hips (m/s) and their distance outside the feet, as a share
-  // of leg length; both scale with how strong the legs are.
-  // The knock speed scales with the transfer above, so the limit does too.
-  // massShare: how much of the body's mass resists a body-to-body knock;
-  // strikeMassShare the same for a strike, brief enough that the planted
-  // legs hold the whole body behind the trunk. legDamageCost: balance lost
-  // to a fully damaged pair of legs.
-  balance: { speed: 2.1, reach: 0.8, fallSeconds: 1.4, absorbPerSecond: 5, massShare: 0.7, strikeMassShare: 1, legDamageCost: 0.3 },
-  // Charging: top speed as a multiple of footwork speed, and how much of the
-  // trunk's mass meets the other body in a collision.
-  rush: { speedFactor: 2.6, trunkShare: 0.7, minClosing: 0.8 },
-  // Running (away from a gun, or after one): footwork speed times this.
-  run: { speedFactor: 2.3 },
-  // Walking about (the player's walk mode): upright and square, feet under
-  // the hips, no guard; the arms swing with the stride, more the faster he goes.
-  walk: { stance: { blade: 0, crouch: 0, width: 0.5, lean: 0.03, guardHeight: 0 }, strideHz: 0.9, runStrideHz: 1.5 },
-  // Out this long (s), a body is left where it lies: no more simulation for it.
-  goneSeconds: 20,
-  // m/s: faster than this, a man cannot go on loading a gun (he waits).
-  reloadMaxSpeed: 0.6,
-  // A throw from the hold: `seconds` of the thrower's leg force, the top
-  // of the man pulled across and `down`, his hips pushed back (`hipShare`).
-  throw: { seconds: 0.3, down: 0.6, hipShare: 0.6 },
-  // Hitting the floor or another body. A part meeting the floor faster than
-  // `minSpeed` (m/s) takes the speed beyond it: the head as a blow to the
-  // head (`head` of it, the arms and shoulders breaking part of a fall), the
-  // rest as damage to the part (`body` of it), less what armour spreads,
-  // less again for dense bone. A hand or elbow landing faster than
-  // `fractureSpeed` × bone density breaks the joint. Two bodies meeting
-  // faster than `bumpSpeed` (m/s; a charge at any speed) each take their own
-  // speed change (`charge` of it) as damage to the trunk: the lighter man more.
-  impact: { minSpeed: 2.2, head: 0.5, body: 0.7, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.6, bumpEvery: 0.6 },
-  // Firing: the recoil's peak force is its impulse over `seconds` (the
-  // gun's kick spread through a braced hand, or a stock into the shoulder).
-  // Against the gun hand's strength (N; `reference` an average man's) the
-  // aim steadies or shakes (spread × √(reference / strength), between
-  // `steadiest` and `shakiest`); past `snapOver` × his strength the arm may
-  // snap, the likelier the further past (`snapRise` per share beyond it).
-  // Only the frailest: an ordinary man is bruised by a matchlock, not broken.
-  // `rockedOver`: a long gun's kick over the shooter's whole mass (m/s) past which it rocks him off balance (a shotgun in a light body); `rocked`: how hard.
-  recoil: { seconds: 0.015, longGunSeconds: 0.03, reference: 250, steadiest: 0.75, shakiest: 1.7, snapOver: 3.5, snapRise: 2, rockedOver: 0.24, rocked: 0.9 },
-  // Running, nobody within `relaxFrom` m: the hands come down from the
-  // guard and swing (`swing`, heights), back up within `guardFrom` m. Running:
-  // flagged so by the AI, or faster than `runningSpeed` m/s.
-  runCarry: { relaxFrom: 4, guardFrom: 2.6, swing: 0.07, ease: 4, runningSpeed: 2.5 },
-  // Detail by the size of the fight (fighters in all): up to `full`, every
-  // fighter exactly as in a one-on-one; up to `grid`, the same physics, near
-  // pairs found through a spatial grid; up to `coarse`, a fighter with no
-  // fighter not in an exchange (not striking, struck at, just hit, held or
-  // rising) steps once in `stride[3]` substeps; beyond, once in `stride[4]`,
-  // and if no enemy is within `engageRange` m and he is standing he is a
-  // proxy — no particle physics, his body eased (`proxyFollow` /s) to the
-  // pose his muscles want — until he is engaged again. In both, a hand or
-  // blade not striking is tested for contact every other substep. The
-  // player's fighter (world.keepFull) is always in full.
-  tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12 },
-  gunStartApart: 2.5, // m each side of the centre, when someone carries a gun
-  // The clinch: hands locked behind the neck; it breaks when the defender's
-  // strength wins or the time runs out.
-  // reachSeconds: time the hands have to get to the neck before the clinch is abandoned.
-  // driveShare: of a sumo's leg force (less his man's) that drives his man back in the clinch.
-  clinch: { lockDistance: 0.14, range: 0.95, pullDown: 0.08, reachSeconds: 0.6, driveShare: 0.85 },
-  // Leg kicks add up: the speed change each kick gives the struck leg
-  // (m/s, summed) until it gives way — some 20 hard low kicks from a heavy
-  // man into a lightweight's thigh, many more the other way. After it first
-  // gives, it buckles again at each further share of capacity, not at every
-  // touch; in between the damaged leg is weaker and the stance less steady.
-  legCapacity: 24,
-  legGivesAgainEvery: 0.6,
-  // Speed change (m/s, summed over blows) a segment takes before it is
-  // seriously hurt and shows fully red: a face about a dozen hard shots,
-  // a trunk two dozen body shots, a forearm a lot of blocking.
-  damageCapacity: { head: 26, trunk: 16, Forearm: 30, UpperArm: 30, Thigh: 12, Shank: 12 },
-  blockedDamageShare: 0.35,
-  downSecondsMin: 3,
-  downSecondsRange: 4,
-  knockdownsToStop: 3,
-  // Weapons on the floor and in the hand: a fall or knockdown shakes the
-  // grip loose this often (a knockout always); a man without a weapon who
-  // reaches one on the floor stoops `pickupSeconds` to take it, and gives
-  // up if he has not got his hand to it (within `pickupReach` m) in `pickupGiveUp` s.
-  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2 },
-  // Holding the last man down. Pinners kneel beside him (hips this share of
-  // height lower, leaning in), lock their hands on his chest and hips once
-  // within `lockDistance` (m), and press with this share of their weight;
-  // the hands let go past `release` m. Held with his trunk below `lowNeck` × his standing neck
-  // height for `seconds`, he is beaten. Trying to rise under the hold and
-  // failing, he tries again after `retry` s. At most `pinners` at once. The
-  // hold presses and holds; it never strikes and adds no harm.
-  // A man held down who is not out fights it: he tries to get up `struggleAfter` s into the hold.
-  // The grip pulls like a spring of `gripStiffness` N/m, up to `gripShare` of the arm's strike force.
-  pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 3, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
-};
+import { WORLD } from './physics/config.js';
+import { aimTargets, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
+import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
+export { WORLD } from './physics/config.js';
+export { pinnedBy } from './physics/grappling.js';
 
 // Every attack and its data live in moves.js; the old name stays for callers.
 export const PUNCHES = MOVES;
@@ -305,9 +44,9 @@ const MOTOR_GROUP = {
   lElbow: 'elbow', rElbow: 'elbow', lHand: 'hand', rHand: 'hand', lKnee: 'knee', rKnee: 'knee',
   pelvis: 'pelvis', lFoot: 'foot', rFoot: 'foot',
 };
-const TRUNK_PARTICLES = ['pelvis', 'lHip', 'rHip', 'neck', 'lShoulder', 'rShoulder'].map((name) => P[name]);
+export const TRUNK_PARTICLES = ['pelvis', 'lHip', 'rHip', 'neck', 'lShoulder', 'rShoulder'].map((name) => P[name]);
 const STRUCK = ['head', 'trunk', 'lForearm', 'rForearm', 'lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShank', 'rShank'];
-const BLOCKING = new Set(['lForearm', 'rForearm', 'lUpperArm', 'rUpperArm']);
+export const BLOCKING = new Set(['lForearm', 'rForearm', 'lUpperArm', 'rUpperArm']);
 // The chain each striking limb pulls on, and how much each link shares the recoil.
 const RECOIL = {
   Hand: [['Hand', 1], ['Elbow', 0.7], ['Shoulder', 0.35]],
@@ -515,426 +254,15 @@ function updatePickup(world, fighter, dt) {
   world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, weapon: debris.weapon, effects: [`picks up the ${WEAPON_LABEL(debris.weapon)}`] });
 }
 
-// ---- Guns ---------------------------------------------------------------------
-
-/**
- * The gun arm for a shot: up from the guard and out along the line from the
- * shoulder to the target, which it tracks until the shot; down after.
- */
-function aimTargets(world, fighter, punch, guard) {
-  const spec = punch.spec;
-  const target = world.fighters[punch.target];
-  if (target && !punch.fired) punch.aim = toLocal(fighter, aimPoint(target, punch.zone));
-  const raised = raisedAim(fighter, punch.aim);
-  const smooth = (value) => value * value * (3 - 2 * value);
-  const up = Math.min(1, punch.t / spec.windup);
-  const down = punch.t > spec.extendUntil ? Math.min(1, (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil)) : 0;
-  const share = smooth(up) * (1 - smooth(down));
-  return { hand: vec.lerp(guard.hand, raised.hand, share), dir: slerpDir(guard.dir, raised.dir, share) };
-}
-
-// The support hand on a two-handed pistol, from the gun hand (heights, local):
-// a little behind, below and to the left, cupping the grip.
-const SUPPORT_GRIP = [-0.012, -0.018, 0.022];
-
-/** The gun arm up on a mark (local): out straight from the shoulder along the line to it, locked. */
-function raisedAim(fighter, mark) {
-  const side = fighter.weapon.main;
-  const shoulder = toLocal(fighter, point(fighter.x, P[`${side}Shoulder`]));
-  const lengths = fighter.body.lengths;
-  const along = vec.normalize(vec.sub(mark, shoulder));
-  // A long gun: the stock at the cheek, the trigger hand just before the
-  // shoulder, the support hand out under the barrel.
-  if (fighter.weapon.spec.longGun) return { hand: vec.add(vec.add(shoulder, vec.scale(along, LONG_GUN.handOut * lengths.upperArm)), [0, LONG_GUN.cheekRise * lengths.upperArm, 0]), dir: along };
-  return { hand: vec.add(shoulder, vec.scale(along, (lengths.upperArm + lengths.forearmToFist) * 0.97)), dir: along };
-}
-
-// `comradeClear` (m): a comrade this near the line of a heavy shot (more at
-// range, as the spread grows) holds it.
-// A long gun held to the cheek, in upper-arm lengths: the trigger hand
-// this far out along the line from the shoulder, and raised this much.
-// Reloading, the gun stands upright before him (`reloadHand`, heights,
-// local; the barrel straight up) while the support hand works the ramrod
-// down the muzzle (`ramFrom` + `ramStroke` × a stroke, m along the barrel,
-// `ramPerSecond` strokes a second).
-const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4 };
-
-let referenceSegments = null;
-/** The body parts of the man the gun's numbers are for: 80 kg, average build. */
-function bulletReference() {
-  if (referenceSegments) return referenceSegments;
-  const inputs = normaliseInputs({ ...PRESETS.contender, sex: 'male', heightCm: 178, frame: 'medium', exercise: 0.4, outfit: null, accessories: [] });
-  inputs.calories = caloriesForWeight(inputs, GUN.referenceKg, FRAMES.medium.lean);
-  referenceSegments = buildBody(inputs).segments;
-  return referenceSegments;
-}
-
-/** The first thing a round from `from` to `to` meets: a body part or a shield; null if none. */
-function firstHit(world, shooter, from, to) {
-  const length = vec.length(vec.sub(to, from));
-  const along = vec.scale(vec.sub(to, from), 1 / length);
-  let best = null;
-  for (const other of world.fighters) {
-    if (other === shooter) continue;
-    if (other.shield) {
-      const disc = shieldDisc(other);
-      const facing = vec.dot(along, disc.normal);
-      if (Math.abs(facing) > 1e-6) {
-        const s = vec.dot(vec.sub(disc.centre, from), disc.normal) / facing / length;
-        const at = vec.lerp(from, to, s);
-        if (s > 0 && s < 1 && vec.length(vec.sub(at, disc.centre)) < disc.radius && (!best || s < best.s)) best = { fighter: other, target: 'shield', s, point: at };
-      }
-    }
-    for (const capsule of capsules(other)) {
-      const meet = closestBetween(from, to, point(other.x, capsule.a), point(other.x, capsule.b));
-      const miss = vec.length(vec.sub(meet.onFirst, meet.onSecond));
-      if (miss > capsule.radius) continue;
-      // The trunk's rounded top above the neck is the head's to take, not the chest's.
-      if (capsule.key === 'trunk' && meet.t > 0.98 && meet.onFirst[1] > other.x[P.neck * 3 + 1]) continue;
-      // Back along the line to where it enters the part.
-      const s = Math.max(0, meet.s - Math.sqrt(capsule.radius * capsule.radius - miss * miss) / length);
-      // Above the chest (past the trunk's top as a blow meets it) is the throat:
-      // no vest covers it, and a round there is as deadly as one to the head.
-      const throat = capsule.key === 'trunk' && capsule.bLength && meet.t > capsule.bLength;
-      if (!best || s < best.s) best = { fighter: other, capsule, target: throat ? 'throat' : capsule.key, throat, s, point: vec.lerp(from, to, s) };
-    }
-  }
-  return best;
-}
-
-/** Whether the barrel has come onto the line from the muzzle to the mark: then he fires. */
-function sightsOn(fighter) {
-  const weapon = fighter.weapon;
-  if (!weapon?.held || !fighter.punch?.aim) return true;
-  const hand = point(fighter.x, P[`${weapon.main}Hand`]);
-  const toMark = vec.normalize(vec.sub(toWorld(fighter, fighter.punch.aim), hand));
-  if (vec.dot(toMark, weapon.dir) <= Math.cos(GUN.settled)) return false;
-  // A shouldered gun is fired once it has stopped swinging onto the mark.
-  if (!weapon.spec.longGun) return true;
-  const swinging = vec.length(vec.sub(point(fighter.v, P[`${weapon.main}Hand`]), point(fighter.v, P[`${weapon.main}Shoulder`])));
-  return swinging < GUN.steadyBelow;
-}
-
-// ---- Bows -------------------------------------------------------------------------
-
-/**
- * The bow up on the mark: the stave upright across the line of the arrow,
- * the string hand drawing back to the cheek as the shot comes (`draw` 0..1,
- * kept on the weapon for the drawing of the string).
- */
-function drawBow(world, fighter, punch, target, intent) {
-  const weapon = fighter.weapon;
-  const mark = punch?.aim ?? (world.fighters[fighter.aimAt] ? toLocal(fighter, aimPoint(world.fighters[fighter.aimAt], 'body')) : null);
-  if (!mark) return target;
-  const shoulder = toLocal(fighter, point(fighter.x, P[`${weapon.main}Shoulder`]));
-  const along = vec.normalize(vec.sub(mark, shoulder));
-  const smooth = (value) => value * value * (3 - 2 * value);
-  const drawing = punch?.spec.path === 'aim' ? (punch.fired ? 0 : smooth(Math.min(1, punch.t / (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt)))) : 0.12;
-  weapon.draw = drawing;
-  weapon.facing = yawRotate(along, fighter.yaw);
-  // The string hand: from beside the grip back along the arrow to the cheek.
-  const head = toLocal(fighter, point(fighter.x, P.head));
-  const anchor = vec.add(head, [0.02, -0.07, -0.05]);
-  const rest = vec.sub(target.hand, vec.scale(along, 0.12));
-  intent[`${weapon.off}Hand`] = vec.lerp(rest, anchor, drawing);
-  // The stave across the line: upright, canted a little.
-  const up = vec.normalize(vec.sub([0.05, 1, 0], vec.scale(along, along[1])));
-  return { hand: target.hand, dir: up };
-}
-
-/** Loose: an arrow off the bow along the line to the mark, aimed high for the drop. */
-function loose(world, fighter) {
-  const punch = fighter.punch;
-  const weapon = fighter.weapon;
-  const grip = point(fighter.x, P[`${weapon.main}Hand`]);
-  const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(grip, yawRotate([1, 0, 0], fighter.yaw));
-  const line = vec.sub(mark, grip);
-  const distance = vec.length(line);
-  let dir = vec.normalize(line);
-  // Aimed above the mark by the drop over the distance.
-  const speed = weapon.spec.arrowSpeed ?? ARROW.speed;
-  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
-  dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
-  const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  const spread = (ARROW.spread + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1);
-  const random = world.random;
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
-  const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
-  const upward = vec.cross(across, dir);
-  dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, 0.08)), v: vec.scale(dir, speed), speed, age: 0, landed: false, done: false });
-  world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
-  // The bow kicks forward a little in the hand as the string goes.
-  world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
-}
-
-/** Arrows in the air: they fall, and the first thing on their path takes them. */
-function flyArrows(world, dt) {
-  for (const arrow of world.arrows) {
-    if (arrow.done) continue;
-    arrow.age += dt;
-    if (arrow.landed) {
-      if (arrow.age > ARROW.stays) arrow.done = true;
-      continue;
-    }
-    arrow.v[1] -= ARROW.gravity * dt;
-    const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
-    const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
-    if (hit) {
-      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2);
-      arrow.done = true;
-      arrow.x = hit.point;
-      continue;
-    }
-    arrow.x = to;
-    if (arrow.x[1] <= 0.02 || Math.abs(arrow.x[0]) > 60 || Math.abs(arrow.x[2]) > 60) {
-      arrow.x[1] = Math.max(0.02, arrow.x[1]);
-      arrow.landed = true;
-      arrow.age = 0;
-    }
-  }
-  // Long gone arrows are dropped from the list now and then.
-  if (world.arrows.length > 64 && world.arrows.every((arrow, index) => index > 32 || arrow.done)) world.arrows = world.arrows.filter((arrow) => !arrow.done);
-}
-
-/**
- * An arrow strikes: off a shield, or off good armour (most of the time),
- * it glances; otherwise a piercing wound (cut by the armour's pierce
- * protection), scaled to the part's weight and hurt, bleeding, with a
- * small knock; enough and he dies.
- */
-function arrowHit(world, shooter, hit, dir, energy = 1) {
-  const victim = hit.fighter;
-  const event = { time: world.time, kind: 'arrow', attacker: shooter.id, defender: victim.id, point: hit.point, normal: vec.scale(dir, -1), target: hit.target, harm: 0, effects: [] };
-  world.events.push(event);
-  if (hit.target === 'shield') {
-    event.bounced = true;
-    event.effects.push('in the shield');
-    return;
-  }
-  const gear = victim.body.gear;
-  const key = hit.capsule.key;
-  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse });
-  if (gear.arrowproof && world.random() < ARROW.bounce) {
-    event.bounced = true;
-    event.effects.push('glances off the armour');
-    return;
-  }
-  const region = hit.throat ? 'head' : bulletRegion(key);
-  // Full armour (plate, lamellar) guards the throat with its gorget or aventail; a vest does not.
-  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : hit.throat ? 0 : protectionAt(gear, key).pierce ?? 0;
-  const own = victim.body.segments[key];
-  const reference = bulletReference()[key];
-  const scale = own && reference ? reference.mass / own.mass : 1;
-  // `energy`: the arrow's kinetic energy against a long bow's (ARROW.speed).
-  const harm = ARROW.lethal[region] * energy * (1 - stopped) * scale * (1 + GUN.hurtShare * (victim.damage[key] ?? 0));
-  // The same pool of deadly wounds as a gun's.
-  victim.gunshot = (victim.gunshot ?? 0) + harm;
-  victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
-  victim.damageVersion += 1;
-  victim.bleed = (victim.bleed ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
-  Object.assign(event, { harm, region, pierce: harm * 60 });
-  event.effects.push(gear.arrowproof ? `${region}: through a gap` : `${region}`);
-  shooter.stats.landed += 1;
-  if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key) && world.random() < 0.3) dropWeapon(world, victim, 'disarmed', dir);
-  if (victim.gunshot >= 1 && victim.state !== 'out') knockOut(world, victim, event, region === 'head' ? 'an arrow through the head' : 'shot down by arrows', 'killed');
-}
-
-/**
- * Reloading a fired gun (a matchlock): only while he means to (`reloading`,
- * set by the AI or the player), standing, and not in the middle of a move;
- * stopped, the work done so far is kept. Done, the gun is loaded.
- */
-function reload(world, fighter, dt) {
-  const weapon = fighter.weapon;
-  if (!weapon?.held || !weapon.spec.shot || weapon.loaded) return;
-  if (!fighter.reloading || fighter.state !== 'up' || fighter.punch) return;
-  // Loading takes both hands and a standing man: walking on, it waits.
-  if (Math.hypot(...(fighter.rootVelocity ?? [0, 0])) > WORLD.reloadMaxSpeed) return;
-  weapon.reloaded = (weapon.reloaded ?? 0) + dt;
-  if (weapon.reloaded < weapon.spec.shot.reloadSeconds) return;
-  weapon.loaded = true;
-  weapon.charges = weapon.spec.shot.rounds ?? weapon.spec.shot.barrels ?? 1;
-  fighter.reloading = false;
-  world.events.push({ time: world.time, kind: 'reloaded', fighter: fighter.id, effects: [] });
-}
-
-/** Fired out: a style that fights on with the empty gun (`emptyStyle`) takes it up as a club. */
-function emptied(world, fighter) {
-  const next = STYLES[fighter.style]?.emptyStyle;
-  if (!next) return;
-  fighter.weapon.spent = true;
-  fighter.style = next;
-  fighter.aimAt = undefined;
-  world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: ['swings the empty gun as a club'] });
-}
-
-/**
- * Whether the first man on the line the shot would take (through the sights
- * to the mark, as fire() aims it, less its random error), or near it, is on
- * his own side.
- */
-function comradeInLine(world, fighter) {
-  const weapon = fighter.weapon;
-  const muzzleAt = weapon.spec.muzzle ?? GUN.muzzle;
-  const from = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, muzzleAt[0]));
-  const mark = fighter.punch?.aim ? toWorld(fighter, fighter.punch.aim) : vec.add(from, weapon.dir);
-  const dir = slerpDir(vec.normalize(vec.sub(mark, from)), weapon.dir, GUN.barrelShare);
-  const hit = firstHit(world, fighter, from, vec.add(from, vec.scale(dir, GUN.range)));
-  if (hit && hit.fighter.corner === fighter.corner && hit.fighter.state !== 'out') return true;
-  // The ball wanders: a comrade close beside the line, short of the mark, is at risk too.
-  const reach = hit ? vec.length(vec.sub(hit.point, from)) : GUN.range;
-  return world.fighters.some((mate) => {
-    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') return false;
-    const offset = vec.sub(point(mate.x, P.pelvis), from);
-    const along = vec.dot(offset, dir);
-    // The ball's spread widens with the range: three of its deviations, beyond a body's breadth.
-    const clear = LONG_GUN.comradeClear + 3 * (weapon.spec.shot?.spread ?? GUN.spread) * along;
-    return along > 0 && along < reach + 0.5 && vec.length(vec.sub(offset, vec.scale(dir, along))) < clear;
-  });
-}
-
-/** Fire: a round down the barrel's line as it is, give or take the aim's error. */
-function fire(world, fighter) {
-  const punch = fighter.punch;
-  punch.fired = true;
-  const weapon = fighter.weapon;
-  if (!weapon?.held || !weapon.spec.ranged) return;
-  if (weapon.spec.bow) return loose(world, fighter);
-  // A gun with a charge to load (a matchlock) fires only loaded, and once.
-  const shot = weapon.spec.shot ?? null;
-  const random = world.random;
-  if (shot) {
-    if (!weapon.loaded) return;
-    // A comrade on the line: he holds the shot (and keeps the charge).
-    if (comradeInLine(world, fighter)) return;
-    // Several barrels (the three-eyed gun) or a magazine (`rounds`): each shot in turn, empty after the last.
-    weapon.charges = (weapon.charges ?? shot.rounds ?? shot.barrels ?? 1) - 1;
-    weapon.loaded = weapon.charges > 0;
-    weapon.reloaded = 0;
-    if (!weapon.loaded) emptied(world, fighter);
-    if (random() < shot.misfire) {
-      world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['flash in the pan'] });
-      return;
-    }
-  }
-  const handIndex = P[`${weapon.main}Hand`];
-  const barrel = weapon.dir;
-  const up = vec.normalize(vec.sub([0, 1, 0], vec.scale(barrel, barrel[1])));
-  const across = vec.normalize(vec.cross(barrel, up));
-  const muzzleAt = weapon.spec.muzzle ?? GUN.muzzle;
-  const muzzle = vec.add(vec.add(point(fighter.x, handIndex), vec.scale(barrel, muzzleAt[0])), vec.scale(up, muzzleAt[1]));
-  const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  // The hand still moving from the last kick (or anything else) throws the
-  // shot. A long gun is braced in the shoulder and moves with the body (its
-  // walk is `moving`): only its motion against the shoulder throws it.
-  const handVelocity = point(fighter.v, handIndex);
-  const shaking = vec.length(weapon.spec.longGun ? vec.sub(handVelocity, point(fighter.v, P[`${weapon.main}Shoulder`])) : handVelocity);
-  // A strong man holds a gun steady; a weak one shakes.
-  const strength = fighter.body.strikeForce[handIndex];
-  const recoil = WORLD.recoil;
-  const steadiness = Math.min(recoil.shakiest, Math.max(recoil.steadiest, Math.sqrt(recoil.reference / Math.max(1, strength))));
-  const spread = ((shot?.spread ?? GUN.spread) + (shot?.movingSpread ?? GUN.movingSpread) * moving + GUN.unsettled * shaking) * steadiness * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
-  // Aimed through the sights at the mark: off by the aim's error, and by
-  // part of however far the barrel itself is off that line.
-  const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(muzzle, barrel);
-  const sighted = vec.normalize(vec.sub(mark, muzzle));
-  const aimed = slerpDir(sighted, barrel, GUN.barrelShare);
-  const dir = vec.normalize(vec.add(aimed, vec.add(vec.scale(up, gauss() * spread), vec.scale(across, gauss() * spread))));
-  // A shotgun's pellets (`pellets`) open out round the aimed line (`pellet` rad); anything else is one round.
-  for (let pellet = 0; pellet < (shot?.pellets ?? 1); pellet += 1) {
-    const flight = shot?.pellets ? vec.normalize(vec.add(dir, vec.add(vec.scale(up, gauss() * shot.pellet), vec.scale(across, gauss() * shot.pellet)))) : dir;
-    const end = vec.add(muzzle, vec.scale(flight, GUN.range));
-    const hit = firstHit(world, fighter, muzzle, end);
-    const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
-    world.events.push(event);
-    if (hit?.target === 'shield') event.effects.push('stopped by the shield');
-    else if (hit) bulletHit(world, fighter, hit, flight, event, shot);
-    else event.effects.push('missed');
-  }
-  // The gun kicks up and back in the hand.
-  // Into both hands (both on the gun in the stance), the arms and the shoulders: a heavy man barely moves, a light one rocks.
-  // A long gun's stock drives back into the shoulder and the cheek as well.
-  const support = fighter.aimAt !== undefined || weapon.spec.longGun ? [[P[`${weapon.off}Hand`], 0.6], [P[`${weapon.off}Elbow`], 0.3]] : [];
-  const stock = weapon.spec.longGun ? [[P[`${weapon.main}Shoulder`], 0.9], [P.neck, 0.4], [P.head, 0.25]] : [[P[`${weapon.main}Shoulder`], 0.25]];
-  const kick = shot?.recoil ?? GUN.recoil;
-  world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5], ...stock, ...support], direction: vec.normalize(vec.add(vec.scale(barrel, -1), vec.scale(up, weapon.spec.longGun ? 0.35 : 0.8))), impulse: kick });
-  // More kick than the arm can take: it snaps at the elbow.
-  const peak = kick / (shot?.recoilSeconds ?? (weapon.spec.longGun ? recoil.longGunSeconds : recoil.seconds));
-  const beyond = peak / (recoil.snapOver * strength) - 1;
-  if (beyond > 0 && world.random() < beyond * recoil.snapRise && !fighter.broken.has(`${weapon.main}Elbow`)) {
-    breakJoint(world, fighter, `${weapon.main}Elbow`);
-    world.events.push({ time: world.time, kind: 'recoil', fighter: fighter.id, effects: ['the recoil snapped his arm'] });
-  }
-  // A long gun kicks the whole man back through the shoulder: a light body
-  // takes more speed from the same kick, and past `rockedOver` it reels.
-  const rocking = kick / fighter.body.massKg;
-  if (weapon.spec.longGun && rocking > recoil.rockedOver) {
-    const event = { time: world.time, kind: 'recoil', fighter: fighter.id, effects: ['rocked back by the kick'] };
-    world.events.push(event);
-    stagger(world, fighter, WORLD.stagger.startAt + recoil.rocked * (rocking / recoil.rockedOver), event, true);
-    // What his weight could not soak up wrenches at his hands: shot after shot, he loses the gun.
-    strainGrip(world, fighter, kick * (rocking / recoil.rockedOver - 1));
-  }
-}
-
-/**
- * A round in a body part: its harm (by region, through armour, scaled to
- * the part's weight and how hurt it already is) towards what kills; it
- * bleeds; to the head or body it staggers him at once; enough and he dies.
- */
-function bulletHit(world, shooter, hit, dir, event, shot = null) {
-  const victim = hit.fighter;
-  const key = hit.capsule.key;
-  const region = hit.throat ? 'head' : bulletRegion(key);
-  const kind = outfitOf(victim.body.inputs).kind;
-  // Armour stops its share of a pistol round; of a heavier ball, only as much
-  // as it is proof against. The throat is covered only by full armour's gorget, as the body.
-  const covered = hit.throat ? (victim.body.gear.arrowproof ? victim.body.gear.protection.bullet?.torso ?? 0 : 0) : victim.body.gear.protection.bullet?.[region] ?? 0;
-  const armour = covered * (shot ? bulletProof(kind, shot.energy) : 1);
-  const own = victim.body.segments[key];
-  const reference = bulletReference()[key];
-  const scale = own && reference ? reference.mass / own.mass : 1;
-  const hurt = 1 + GUN.hurtShare * (victim.damage[key] ?? 0);
-  const harm = (shot?.lethal ?? GUN.lethal)[region] * (1 - armour) * scale * hurt;
-  victim.gunshot = (victim.gunshot ?? 0) + harm;
-  victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
-  victim.damageVersion += 1;
-  victim.bleed = (victim.bleed ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * (1 - armour) * scale;
-  // Hard armour over the part takes the round on its surface: no wound to see.
-  // A heavy ball mostly goes through: seen to strike the surface only where the armour held most of it.
-  Object.assign(event, { harm, armour, region, plate: armour > 0 && GUN.plated.includes(kind) && (!shot || armour >= GUN.platedHolds) ? kind : null });
-  event.effects.push(armour > 0 ? `${region}: armour took ${Math.round(armour * 100)}%` : `${region}`);
-  shooter.stats.landed += 1;
-  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: shot?.impulse ?? GUN.impulse });
-  // A heavy ball in an arm or a leg shatters the bone, most of the time.
-  const joint = region === 'limb' ? BULLET_JOINT[key.slice(1)] : null;
-  if (shot && joint && victim.state !== 'out' && !victim.broken.has(`${key[0]}${joint}`) && world.random() < shot.limbBreak * (1 - armour)) {
-    breakJoint(world, victim, `${key[0]}${joint}`);
-    event.effects.push('the bone shattered');
-  }
-  // A round through the gun arm takes the gun with it.
-  if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key)) dropWeapon(world, victim, 'disarmed', dir);
-  if (victim.gunshot >= 1 && victim.state !== 'out') {
-    knockOut(world, victim, event, region === 'head' ? 'shot through the head' : 'shot dead', 'killed');
-    return;
-  }
-  if (region !== 'limb') stagger(world, victim, WORLD.stagger.startAt + harm * 1.6, event, true);
-}
-
 /**
  * What a fighter's kit stops where it struck: its protection, with what it
  * says for that region (`regions`: head, torso, limb) over it. Medieval
  * armour covers the whole man alike; a modern vest guards the torso alone.
  */
-function protectionAt(gear, capsuleKey) {
+export function protectionAt(gear, capsuleKey) {
   const own = gear.protection.regions?.[bulletRegion(capsuleKey)];
   return own ? { ...gear.protection, ...own } : gear.protection;
 }
-
-// The joint a shattered limb bone gives way at.
-const BULLET_JOINT = { UpperArm: 'Elbow', Forearm: 'Elbow', Thigh: 'Knee', Shank: 'Knee' };
 
 /** A brittle edge (obsidian) loses part of its cut: on armour, a shield or a steel blade. */
 function chip(world, fighter) {
@@ -948,7 +276,7 @@ function chip(world, fighter) {
 }
 
 /** A blow jars the grip; strained past what the hand can hold, the weapon goes. */
-function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
+export function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
   if (!weapon?.held || impulse <= 0) return;
   // A long lever off the hands is easier to tear away (`grip` < 1).
@@ -1309,7 +637,7 @@ export function nearestOpponent(world, fighter) {
 // ---- Commands -----------------------------------------------------------
 
 /** Where on the target a strike aims: the head, the body, or the lead thigh. */
-function aimPoint(target, zone) {
+export function aimPoint(target, zone) {
   if (zone === 'head') return point(target.x, P.head);
   if (zone === 'legs') return vec.lerp(point(target.x, P.lHip), point(target.x, P.lKnee), 0.55);
   return vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.6);
@@ -1712,55 +1040,6 @@ export function step(world, dt) {
   if (world.arrows.length) flyArrows(world, dt);
   world.time += dt;
   world.lastDt = dt;
-}
-
-/**
- * The clinch: each hand is held to the back of the opponent's neck by a
- * constraint shared by inverse mass, so a heavier fighter's head is harder to
- * pull down. A grip pulled too far open lets go.
- */
-function holdClinch(world, fighter) {
-  const target = world.fighters[fighter.clinch.target];
-  const style = STYLES[fighter.style];
-  if (style?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) {
-    driveClinch(world, fighter, target);
-    // Held long enough, a throw (sumo's: `throws`).
-    const throws = style.throws;
-    if (throws && fighter.clinch.t > throws.after && target.state === 'up' && world.random() < throws.rate * (world.lastDt / WORLD.substeps)) {
-      throwFromHold(world, fighter, target);
-      return;
-    }
-  }
-  for (const side of fighter.clinch.hands ?? ['l', 'r']) {
-    const hand = P[`${side}Hand`];
-    const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown * 0.5, 0]);
-    const offset = vec.sub(point(fighter.x, hand), neck);
-    const distance = vec.length(offset);
-    // The hands reach the neck under their own muscles; the grip takes hold
-    // only once they get there, so they are never snapped across the gap.
-    const locked = fighter.clinch.locked ?? (fighter.clinch.locked = {});
-    if (!locked[side]) {
-      if (distance < WORLD.clinch.lockDistance * 1.5) locked[side] = true;
-      else if (fighter.clinch.t > WORLD.clinch.reachSeconds) {
-        fighter.clinch = null;
-        return;
-      }
-      continue;
-    }
-    if (distance > 0.55) {
-      fighter.clinch = null;
-      return;
-    }
-    if (distance <= WORLD.clinch.lockDistance) continue;
-    const correction = vec.scale(offset, (distance - WORLD.clinch.lockDistance) / distance);
-    const wHand = fighter.invMass[hand];
-    const wNeck = target.invMass[P.neck];
-    const total = wHand + wNeck;
-    for (let axis = 0; axis < 3; axis += 1) {
-      fighter.x[hand * 3 + axis] -= correction[axis] * (wHand / total);
-      target.x[P.neck * 3 + axis] += correction[axis] * (wNeck / total);
-    }
-  }
 }
 
 /**
@@ -2465,7 +1744,7 @@ const LIMP_BELOW = {
 };
 
 /** A joint gives: no more limit, no more muscle below it; a leg or neck ends the fight. */
-function breakJoint(world, fighter, joint) {
+export function breakJoint(world, fighter, joint) {
   fighter.broken.add(joint);
   for (const name of LIMP_BELOW[joint]) fighter.limp.add(P[name]);
   fighter.damage[JOINT_SEGMENTS[joint][0]] = Math.max(fighter.damage[JOINT_SEGMENTS[joint][0]] ?? 0, 1);
@@ -2621,7 +1900,6 @@ function knockOff(world, fighter, event) {
     world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: gear.icon, effects: [`${gear.label.toLowerCase()} knocked off`] });
   }
 }
-
 
 /** Worn props ride on the head; free ones fly, tumble, bounce and settle. */
 function moveProps(world, dt) {
@@ -2781,7 +2059,7 @@ function strikers(fighter) {
 }
 
 /** Closest points between two segments: parameters s on the first, t on the second. */
-function closestBetween(p1, q1, p2, q2) {
+export function closestBetween(p1, q1, p2, q2) {
   const d1 = vec.sub(q1, p1);
   const d2 = vec.sub(q2, p2);
   const r = vec.sub(p1, p2);
@@ -3743,7 +3021,7 @@ export function staggerShare(fighter, floor) {
  * Stagger an armoured fighter for a blow of `severity` (1 is what would put
  * him down). A harder blow while already reeling lengthens it. True if he reels.
  */
-function stagger(world, fighter, severity, event, anyone = false) {
+export function stagger(world, fighter, severity, event, anyone = false) {
   const spec = WORLD.stagger;
   if ((!anyone && !armoured(fighter)) || fighter.state !== 'up' || severity < spec.startAt) return false;
   const share = Math.min(1, (severity - spec.startAt) / (spec.overwhelm - spec.startAt));
@@ -3820,160 +3098,6 @@ function addDamage(fighter, key, deltaV, blocked) {
   fighter.damageVersion += 1;
 }
 
-// ---- Holding down ------------------------------------------------------------
-
-/** Where a pin's hands go on a lying man: his upper chest and his hips, on top of him. */
-function pinPoints(target) {
-  const up = (index, radius) => vec.add(point(target.x, index), [0, radius, 0]);
-  const chest = vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.8);
-  return [vec.add(chest, [0, target.body.segments.trunk.skinRadius * 0.7, 0]), up(P.pelvis, target.radius[P.pelvis])];
-}
-
-/** Kneel over the man down and take hold, if there is room for another pair of hands. */
-function startPin(world, fighter) {
-  const target = opponentFor(world, fighter) ?? world.fighters.find((other) => other.corner !== fighter.corner && other.state !== 'out');
-  if (!target || fighter.state !== 'up' || fighter.punch || fighter.pin) return false;
-  if (target.state !== 'down' && target.state !== 'rising') return false;
-  if (pinnedBy(world, target).length >= WORLD.pin.pinners) return false;
-  fighter.pin = { target: target.id, locked: { l: false, r: false } };
-  fighter.clinch = null;
-  fighter.rush = null;
-  world.events.push({ time: world.time, kind: 'pinning', attacker: fighter.id, defender: target.id, effects: [] });
-  return true;
-}
-
-/** Who has hold of this man now. */
-export function pinnedBy(world, target) {
-  return world.fighters.filter((fighter) => fighter.pin?.target === target.id && (fighter.pin.locked.l || fighter.pin.locked.r));
-}
-
-function neckLow(fighter) {
-  const L = fighter.body.lengths;
-  const standing = L.ankle + L.shank + L.thigh + L.trunk;
-  return fighter.x[P.neck * 3 + 1] < standing * WORLD.pin.lowNeck;
-}
-
-/**
- * The hold, each substep: the hands reach him under their own muscles and
- * take hold once there; held, each hand pulls on its place on him as hard
- * as the pinner's arm can (a stiff spring, capped by the arm's strength),
- * and presses him into the floor with a share of the pinner's weight, the
- * same pull and push coming back on the pinner. A strong enough man can
- * lift through it; no blow, so no harm. Pulled too far apart, it breaks.
- */
-function holdPin(world, fighter, h) {
-  const target = world.fighters[fighter.pin.target];
-  const spec = WORLD.pin;
-  const places = pinPoints(target);
-  const held = [P.neck, P.pelvis];
-  const pressEach = (spec.weightShare * fighter.body.massKg * WORLD.gravity * h) / 2;
-  for (const [index, side] of ['l', 'r'].entries()) {
-    const hand = P[`${side}Hand`];
-    const offset = vec.sub(point(fighter.x, hand), places[index]);
-    const distance = vec.length(offset);
-    if (!fighter.pin.locked[side]) {
-      if (distance < spec.lockDistance) fighter.pin.locked[side] = true;
-      continue;
-    }
-    if (distance > spec.release) {
-      fighter.pin.locked[side] = false;
-      continue;
-    }
-    if (distance > 1e-6) {
-      const grip = Math.min(spec.gripStiffness * distance, spec.gripShare * fighter.body.strikeForce[hand]) * h;
-      const along = vec.scale(offset, 1 / distance);
-      world.pendingImpulses.push({ fighter: target, shares: [[held[index], 1]], direction: along, impulse: grip, holding: true });
-      world.pendingImpulses.push({ fighter, shares: [[hand, 1]], direction: vec.scale(along, -1), impulse: grip, holding: true });
-    }
-    // His weight through the hand: down on the man, up on the arm.
-    world.pendingImpulses.push({ fighter: target, shares: [[held[index], 1]], direction: [0, -1, 0], impulse: pressEach, holding: true });
-    world.pendingImpulses.push({ fighter, shares: [[hand, 1]], direction: [0, 1, 0], impulse: pressEach, holding: true });
-  }
-}
-
-/**
- * The clock on a man held down: it runs while someone has hold of him and
- * his trunk is down, restarts if he gets up off the floor under them, and
- * past `seconds` he is beaten. A hold is announced when it starts and when
- * it is broken (no hands on him, or he is back on his feet).
- */
-function countPin(world, fighter, dt) {
-  const holders = fighter.state === 'out' || fighter.state === 'up' ? [] : pinnedBy(world, fighter);
-  if (!holders.length) {
-    if (fighter.heldAnnounced) world.events.push({ time: world.time, kind: 'pinBroken', fighter: fighter.id, effects: ['breaks the hold'] });
-    fighter.heldAnnounced = false;
-    fighter.pinClock = 0;
-    return;
-  }
-  if (!fighter.heldAnnounced) {
-    fighter.heldAnnounced = true;
-    world.events.push({ time: world.time, kind: 'held', fighter: fighter.id, attacker: holders[0].id, effects: ['held down'] });
-  }
-  if (!neckLow(fighter)) {
-    fighter.pinClock = 0;
-    return;
-  }
-  fighter.pinClock = (fighter.pinClock ?? 0) + dt;
-  // Held, he does not wait for the count: he tries to get up.
-  if (fighter.state === 'down' && fighter.knockdowns < WORLD.knockdownsToStop) fighter.downTimer = Math.min(fighter.downTimer, WORLD.pin.struggleAfter);
-  if (fighter.pinClock >= WORLD.pin.seconds) {
-    fighter.state = 'out';
-    fighter.punch = null;
-    fighter.rush = null;
-    fighter.clinch = null;
-    fighter.heldAnnounced = false;
-    dropWeapon(world, fighter, 'dropped');
-    world.events.push({ time: world.time, kind: 'pinned', fighter: fighter.id, attacker: holders[0].id, effects: [`held down ${WORLD.pin.seconds} s`] });
-    for (const holder of holders) holder.pin = null;
-  }
-}
-
-/**
- * Gripped and driven: a sumo walks his man back with his legs. The push on
- * the man's trunk is the driver's leg force less the man's own, a share of
- * it each substep; what his legs cannot take puts him off his feet.
- */
-function driveClinch(world, fighter, target) {
-  // Holding him, the driver goes with him: the push's reaction goes into the ground through his legs.
-  drive(world, fighter, target, yawRotate([1, 0, 0], fighter.yaw), STYLES[fighter.style]?.clinchDriveShare ?? 1, 0);
-}
-
-/**
- * A throw from the hold (sumo's nage): the thrower's legs and hips twist
- * the man over a blocking hip — his neck and shoulders pulled down and
- * across, his hips pushed the other way — for `seconds` of the thrower's
- * leg force. Whether he goes over is his own balance's to decide; the
- * thrower is braced.
- */
-function throwFromHold(world, fighter, target) {
-  const spec = WORLD.throw;
-  const across = yawRotate([0, 0, world.random() < 0.5 ? 1 : -1], fighter.yaw);
-  const forward = yawRotate([1, 0, 0], fighter.yaw);
-  const impulse = spec.seconds * fighter.body.motorForce[P.pelvis] * Math.max(0.3, fighter.motorScale);
-  const top = vec.normalize(vec.add(vec.add(across, vec.scale(forward, 0.3)), [0, -spec.down, 0]));
-  world.pendingImpulses.push({ fighter: target, shares: [[P.neck, 1], [P.lShoulder, 0.7], [P.rShoulder, 0.7], [P.head, 0.4]], direction: top, impulse, massShare: WORLD.balance.massShare });
-  world.pendingImpulses.push({ fighter: target, shares: [[P.pelvis, 1], [P.lHip, 0.5], [P.rHip, 0.5]], direction: vec.scale(across, -1), impulse: impulse * spec.hipShare, massShare: WORLD.balance.massShare });
-  world.pendingImpulses.push({ fighter, shares: TRUNK_PARTICLES.map((index) => [index, 1]), direction: vec.scale(across, -1), impulse: impulse * 0.3, braced: 10 });
-  fighter.clinch = null;
-  world.events.push({ time: world.time, kind: 'throw', attacker: fighter.id, defender: target.id, impulse, effects: ['thrown'] });
-}
-
-/**
- * One body driven into another by the legs, for a substep: a share of the
- * driver's leg force onto the other's trunk as momentum. The other's legs
- * absorb it as they absorb any knock (their strength and footing decide
- * whether he goes over). The driver is braced: he means to be going forward.
- */
-function drive(world, fighter, target, direction, share, reaction = 0.5) {
-  const h = world.lastDt / WORLD.substeps;
-  const net = WORLD.clinch.driveShare * share * fighter.body.motorForce[P.pelvis] * Math.max(0.3, fighter.motorScale);
-  if (net <= 0) return;
-  const flat = vec.normalize([direction[0], 0, direction[2]]);
-  const trunk = TRUNK_PARTICLES.map((index) => [index, 1]);
-  world.pendingImpulses.push({ fighter: target, shares: trunk, direction: flat, impulse: net * h, massShare: WORLD.balance.massShare });
-  if (reaction > 0) world.pendingImpulses.push({ fighter, shares: trunk, direction: vec.scale(flat, -1), impulse: net * h * reaction, braced: 10 });
-}
-
 /** Leg damage (summed m/s) that makes a leg give way, for everyone's toughness. */
 function legCapacity() {
   return WORLD.legCapacity * BODY.toughness;
@@ -3985,7 +3109,7 @@ export function collapseAt() {
 }
 
 /** Out on the spot: the bout is over, no count. */
-function knockOut(world, defender, event, reason, kind = 'knockout') {
+export function knockOut(world, defender, event, reason, kind = 'knockout') {
   const standing = defender.state === 'up' || defender.state === 'rising';
   defender.state = 'out';
   dropWeapon(world, defender, 'dropped');

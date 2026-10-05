@@ -20,7 +20,7 @@ import { vec } from './pose.js';
  * ball that flattens in the wound. One in the body nearly always drops a man
  * (`lethal`, against GUN's); one in an arm or leg usually shatters the bone
  * (`limbBreak`, the share that breaks the joint, less what armour stops).
- * Armour stops less of it than of a pistol round (see GUN.rating). Smoothbore,
+ * Armour stops less of it than of a pistol round (see an outfit's `bulletRating`). Smoothbore,
  * braced at the cheek: tight at duel range (`spread`, rad) but thrown wide by
  * moving. Now and then the priming flashes
  * without firing the charge (`misfire`). A trained
@@ -441,23 +441,20 @@ export const GUN = {
   recoil: 4,
   unsettled: 0.05,
   impulse: 2.9, // N·s a 9 mm round carries into what it hits
-  plated: ['knight', 'samurai', 'swat', 'specialForces'], // armour a round is seen to strike, not enter
   // An outfit's `bullet` protection is what it stops of this round (J, a
   // 9 mm's energy). Against a heavier ball it stops that share only up to
-  // what it is proof against (`rating`, J): a SWAT vest (rated against a
+  // what it is proof against (the outfit's `bulletRating`, J): a SWAT vest (rated against a
   // .44 Magnum) stops a matchlock ball as well; proofed plate stops about
   // two thirds as much; the bullet-tested tōsei dō, nine tenths; anything
   // else, only what it would of a pistol round's worth.
   energy: 520,
-  // A patrol officer's soft vest (NIJ IIIA) stops handgun rounds up to a .44 Magnum; rifle plates (level IV) stop up to an armour-piercing .30-06.
-  rating: { swat: 1500, police: 1300, specialForces: 4000, samuraiTosei: 900, knight: 650, mingElite: 650 },
   // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
   platedHolds: 0.45,
 };
 
 /** The share of an outfit's bullet protection that holds against a shot of `energy` J. */
-export function bulletProof(kind, energy = GUN.energy) {
-  const rating = Math.max(GUN.rating[kind] ?? GUN.energy, GUN.energy);
+export function bulletProof(bulletRating, energy = GUN.energy) {
+  const rating = Math.max(bulletRating ?? GUN.energy, GUN.energy);
   return Math.min(1, rating / energy);
 }
 

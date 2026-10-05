@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normaliseInputs, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
-import { FACTION_KEYS, factionOf, OUTFIT_KEYS } from '../src/outfits.js';
+import { FACTION_KEYS, factionOf, OUTFIT_KEYS, OUTFITS } from '../src/outfits.js';
 import { bulletProof, GUN, MATCHLOCK } from '../src/weapons.js';
 
 const ARQUEBUSIER = { ...PRESETS.contender, name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] };
@@ -22,8 +22,8 @@ function range(gunner, victim, { apart = 6, between = false, seed = 1 } = {}) {
 }
 
 test('against a pistol round every armour stops what it always did; against a matchlock ball, proofed armour more than the rest', () => {
-  for (const kind of OUTFIT_KEYS) assert.equal(bulletProof(kind, GUN.energy), 1, kind);
-  const proof = (kind) => bulletProof(kind, MATCHLOCK.energy);
+  for (const kind of OUTFIT_KEYS) assert.equal(bulletProof(OUTFITS[kind].bulletRating, GUN.energy), 1, kind);
+  const proof = (kind) => bulletProof(OUTFITS[kind].bulletRating, MATCHLOCK.energy);
   assert.ok(proof('swat') >= proof('samuraiTosei') && proof('samuraiTosei') > proof('knight') && proof('knight') > proof('ashigaru'));
   assert.ok(MATCHLOCK.energy > GUN.energy && proof('ashigaru') < 1, 'a heavier ball goes through what stops a pistol round');
 });

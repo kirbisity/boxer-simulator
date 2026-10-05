@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, P, PRESETS } from '../src/body.js';
-import { gearTraits, OUTFITS } from '../src/outfits.js';
+import { FACTIONS, gearTraits, OUTFITS } from '../src/outfits.js';
 import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { footworkDistance } from '../tools/speed-curve.js';
 
@@ -155,4 +155,11 @@ test('three samurai, three knight and five gladiator armours, five designs each,
   assert.ok(OUTFITS.knight.protection.cut > OUTFITS.knightMail.protection.cut);
   assert.ok(OUTFITS.knightMail.protection.pierce < OUTFITS.knight.protection.pierce);
   assert.ok(OUTFITS.ashigaru.extraMass < OUTFITS.samurai.extraMass && OUTFITS.ashigaru.protection.cut < OUTFITS.samurai.protection.cut);
+});
+
+test('every outfit names its own faction, and a known one; armour proofed against bullets says how far', () => {
+  for (const [kind, outfit] of Object.entries(OUTFITS)) {
+    assert.ok(FACTIONS[outfit.faction], `${kind}: ${outfit.faction}`);
+    if (outfit.bulletRating !== undefined) assert.ok(outfit.bulletRating > 0, kind);
+  }
 });
