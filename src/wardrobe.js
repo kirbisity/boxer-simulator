@@ -460,11 +460,31 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       tassel.rotation.x = Math.PI;
       const plume = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.7 * r, 6), surface(head.tassel ?? 0xb3161b, { roughness: 0.9 }));
       plume.position.y = 2.65 * r;
-      // The coif: open over the face (+x), from the rim to the shoulders.
-      const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.75 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
-      coif.material.side = THREE.DoubleSide;
-      coif.position.y = -0.5 * r;
-      group.add(bowl, band, spike, tassel, plume, coif);
+      group.add(bowl, band, spike, tassel, plume);
+      if (head.neck === 'steel') {
+        // A steel neck guard: three lames stepping out from the rim to the
+        // shoulders, open over the face (+x).
+        for (let lame = 0; lame < 3; lame += 1) {
+          const ring = new THREE.Mesh(new THREE.CylinderGeometry((1.18 + lame * 0.18) * r, (1.36 + lame * 0.18) * r, 0.46 * r, 22, 1, true, Math.PI * 0.8, Math.PI * 1.4), bowlSteel.clone());
+          ring.material.side = THREE.DoubleSide;
+          ring.position.y = (-0.08 - lame * 0.4) * r;
+          group.add(ring);
+        }
+      } else {
+        // The coif: open over the face (+x), from the rim to the shoulders.
+        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.75 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
+        coif.material.side = THREE.DoubleSide;
+        coif.position.y = -0.5 * r;
+        group.add(coif);
+      }
+      if (head.mask) {
+        // A steel face mask from the brow to the chin, an eye slit across it.
+        const mask = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.44, Math.PI * 0.42), bowlSteel.clone());
+        mask.material.side = THREE.DoubleSide;
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.12 * r, 1.1 * r), surface(0x0b0b0d));
+        slit.position.set(1.08 * r, 0.12 * r, 0);
+        group.add(mask, slit);
+      }
       break;
     }
     case 'secutorHelm': {

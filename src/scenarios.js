@@ -33,12 +33,11 @@ function sekigaharaSide(random, side) {
 }
 
 // Pyongyang, 1593: the Ming army storms the city held by Konishi
-// Yukinaga. Twenty a side; the Ming led by an elite with the guandao, gun
-// and bow men behind on both sides.
+// Yukinaga. Twenty a side; the Ming regulars only — brigandine and elite —
+// led by an elite with the guandao; gun and bow men behind on both sides.
 const PYONGYANG_MING = {
-  elite: { guandao: 2, matchlock: 2 },
-  brigandine: { swordShield: 4, spear: 3, matchlock: 3 },
-  garrison: { spear: 5, dao: 1 },
+  elite: { guandao: 3, matchlock: 2 },
+  brigandine: { swordShield: 6, spear: 5, matchlock: 4 },
 };
 const PYONGYANG_JAPANESE = {
   samurai: { katana: 3, naginata: 1, spear: 1 },
@@ -104,7 +103,7 @@ export const SCENARIOS = {
   pyongyang: {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
-    blurb: 'The Ming army retakes the city from the Japanese. Twenty Ming soldiers — elite guandao and gunners in long brigandine, sword-and-shield men, garrison spearmen — against twenty Japanese samurai and ashigaru.',
+    blurb: 'The Ming army retakes the city from the Japanese. Twenty Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — against twenty Japanese samurai and ashigaru.',
     scene: 'sengoku',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },

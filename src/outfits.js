@@ -71,8 +71,9 @@ function mingBrigandineDesign(label, cloth, iron) {
   return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, gold: '#a8894e' }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Elite: the coat, the coif's cloth, the steel.
-function mingEliteDesign(label, cloth, coif, steel) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e' }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif }, feet: { kind: 'compactBoot', color: '#141416' } };
+// `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
+function mingEliteDesign(label, cloth, coif, steel, helm = {}) {
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e' }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // A hex colour darker (or lighter) by a share.
 function shade(hex, share) {
@@ -366,13 +367,14 @@ export const OUTFITS = {
       mingGarrisonDesign('Faded red', '#b5574a', '#3a3326'),
     ],
   },
-  // Ming brigandine: plates riveted inside a long coat, an iron helmet with a
-  // wide brim; like a European foot soldier's, never full cover.
+  // Ming brigandine: plates riveted inside a long coat, steel bracers, an
+  // iron helmet with a wide brim; a regular army's kit, better than a
+  // levy's, never full cover.
   mingBrigandine: {
     label: 'Ming — brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
-    extraMass: 0.22,
-    protection: { blunt: 0.5, cut: 0.78, pierce: 0.6, bullet: { head: 0.35, torso: 0.35, limb: 0.1 } },
+    extraMass: 0.26,
+    protection: { blunt: 0.55, cut: 0.85, pierce: 0.7, bullet: { head: 0.4, torso: 0.45, limb: 0.15 } },
     courage: 0.25,
     designs: [
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b'),
@@ -382,21 +384,25 @@ export const OUTFITS = {
       mingBrigandineDesign('Yellow', '#b8922e', '#7f848c'),
     ],
   },
-  // Ming elite: the long brigandine coat to the knee with a mirror plate on
-  // the chest, a throat collar, segmented arm guards, a steel bowl helmet
-  // with a padded coif. Covered from head to knee; heavier.
+  // Ming elite: the long brigandine coat to the knee reinforced with plates,
+  // a mirror plate on the chest, a throat collar, segmented arm guards, a
+  // steel bowl helmet with a padded coif — or a steel neck guard and a steel
+  // face mask. Covered from head to knee: a blade glances off it as off a
+  // knight's plate, and so do arrows.
   mingElite: {
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
-    extraMass: 0.4,
-    protection: { blunt: 0.6, cut: 0.9, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.25 } },
+    deflects: true,
+    arrowproof: true,
+    extraMass: 0.45,
+    protection: { blunt: 0.62, cut: 1, pierce: 0.88, bullet: { head: 0.45, torso: 0.6, limb: 0.3 } },
     courage: 0.35,
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
-      mingEliteDesign('Imperial blue', '#1f2f6a', '#7a1418', '#a7adb6'),
-      mingEliteDesign('Black and gold', '#18181c', '#5a1a14', '#8f949b'),
+      mingEliteDesign('Imperial blue, steel neck guard', '#1f2f6a', '#7a1418', '#a7adb6', { neck: 'steel' }),
+      mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { neck: 'steel', mask: true }),
       mingEliteDesign('Vermilion', '#c0381e', '#1c1c20', '#b7bcc4'),
-      mingEliteDesign('Dark green', '#24402c', '#7a1418', '#a7adb6'),
+      mingEliteDesign('Dark green, masked', '#24402c', '#7a1418', '#a7adb6', { neck: 'steel', mask: true }),
     ],
   },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.

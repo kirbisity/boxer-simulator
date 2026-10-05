@@ -149,11 +149,13 @@ export const WEAPONS = {
   },
   // The guandao: a broad, heavy crescent blade on a long shaft, fought like
   // the naginata but a quarter heavier, its weight knocking men about more
-  // (blunt) while its thicker edge cuts and its point pierces a little less.
+  // (blunt, and some of it through armour) while its thicker edge cuts and
+  // its point pierces a little less.
   guandao: {
     label: 'Guandao', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.95, balance: 0.6, radius: 0.016,
-    harm: { swing: { cut: 1.15, blunt: 0.85 }, thrust: { pierce: 0.65, cut: 0.12, blunt: 0.35 } },
-    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7,
+    harm: { swing: { cut: 1.15, blunt: 1.05 }, thrust: { pierce: 0.65, cut: 0.12, blunt: 0.4 } },
+    // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
   },
   // His backup: a short sword that cuts and stabs.
   gladius: {
@@ -249,7 +251,7 @@ export const GUN = {
   // two thirds as much; the bullet-tested tōsei dō, nine tenths; anything
   // else, only what it would of a pistol round's worth.
   energy: 520,
-  rating: { swat: 1500, samuraiTosei: 900, knight: 650 },
+  rating: { swat: 1500, samuraiTosei: 900, knight: 650, mingElite: 650 },
   // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
   platedHolds: 0.45,
 };

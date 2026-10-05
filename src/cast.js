@@ -162,11 +162,11 @@ export function sengokuWarrior(random = Math.random, side, style, rank = style =
   const base = varyCharacter(ashigaru ? PRESETS.spear : PRESETS.samurai, random);
   const kind = ashigaru ? 'ashigaru' : pickOne(['samurai', 'samuraiTosei'], random);
   const name = `${pickOne(['Ii', 'Honda', 'Shimazu', 'Kobayakawa', 'Ōtani', 'Ukita', 'Kuroda', 'Hosokawa', 'Katō', 'Fukushima', 'Konishi', 'Sanada'], random)} ${pickOne(['Naomasa', 'Tadakatsu', 'Yoshihiro', 'Hideaki', 'Yoshitsugu', 'Hideie', 'Nagamasa', 'Tadaoki', 'Kiyomasa', 'Masanori', 'Yukimura', 'Takatora'], random)}`;
-  return normaliseInputs({
+  return builtLike({
     ...base, sex: 'male', name, style,
     outfit: { kind, design: randomDesign(kind, random), tint: side.tint, banner: side.banner },
     accessories: kind === 'ashigaru' ? [] : ['crest'],
-  });
+  }, PERIOD_BUILD.japanese[ashigaru ? 'ashigaru' : 'samurai'], random);
 }
 
 /**
@@ -178,7 +178,27 @@ export function mingSoldier(random = Math.random, style = 'spear', rank = 'garri
   const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' ? PRESETS.swordShield : PRESETS.mingSpear, random);
   const kind = { garrison: 'mingGarrison', brigandine: 'mingBrigandine', elite: 'mingElite' }[rank];
   const name = `${pickOne(['Wang', 'Li', 'Zhang', 'Liu', 'Chen', 'Yang', 'Zhao', 'Huang', 'Zhou', 'Wu', 'Qi', 'Luo'], random)} ${pickOne(['Da', 'Er', 'San', 'Si', 'Wu', 'Liu', 'Hu', 'Bao', 'Shun', 'Gui', 'Fu', 'Ming'], random)}`;
-  return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] });
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] };
+  return builtLike(soldier, PERIOD_BUILD.ming[rank], random);
+}
+
+/**
+ * Builds of the late sixteenth century, by people and rank: mean height (cm)
+ * and weight (kg), and training. Northern Chinese soldiers stood around
+ * 166–171 cm; Japanese men of the period around 155–160 cm, lighter.
+ * Each man varies by `CAST.height` cm and a few kilograms.
+ */
+const PERIOD_BUILD = {
+  ming: { garrison: { heightCm: 166, weightKg: 64, exercise: 0.6 }, brigandine: { heightCm: 168, weightKg: 67, exercise: 0.68 }, elite: { heightCm: 171, weightKg: 71, exercise: 0.75 } },
+  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 } },
+};
+
+/** This man at a period's build: its height and training, give or take, fed to its weight. */
+function builtLike(inputs, build, random) {
+  const heightCm = Math.round(build.heightCm + jitter(random) * CAST.height * 0.6);
+  const weightKg = build.weightKg * (heightCm / build.heightCm) ** 2 * (1 + jitter(random) * 0.06);
+  const exercise = Math.min(1, Math.max(0.2, build.exercise + jitter(random) * 0.08));
+  return atWeight({ ...inputs, heightCm, exercise }, weightKg);
 }
 
 /** A noble knight in full plate, named for his rank and house, with a long sword or a war hammer. */

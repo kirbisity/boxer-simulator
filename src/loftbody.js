@@ -186,10 +186,10 @@ export const ARMOR_KINDS = {
     upperArm: [-0.1, 1.0, 1.12, 'cloth'],
   },
   // Ming brigandine: plates riveted inside a long cloth coat past the waist,
-  // short riveted sleeves; cloth below.
+  // short riveted sleeves, steel bracers; cloth below.
   mingBrigandine: {
     trunk: [-0.06, 0.96, 1.2, { rivets: 4, base: 'cloth' }], skirt: [0.72, 0.55, 1.32, { rivets: 4, base: 'cloth' }],
-    upperArm: [-0.2, 0.5, 1.5, { rivets: 4, base: 'cloth' }],
+    upperArm: [-0.2, 0.5, 1.5, { rivets: 4, base: 'cloth' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
   // Ming elite: the long brigandine coat to the knee with a round steel
   // mirror over the heart, a steel throat collar, segmented steel arm guards.
