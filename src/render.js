@@ -1786,7 +1786,7 @@ function detailedView(view, fighter, simple) {
     } else hand = buildHand(body, side, hands, skinColor, plainSteel);
     layers.skin.add(hand);
     attachments.push({ object: hand, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
-    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, Boolean(dress.feet.heels));
+    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, dress.feet.heels ?? null);
     layers.skin.add(shoe);
     attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
   }

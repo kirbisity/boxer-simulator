@@ -19,7 +19,9 @@ test('every outfit has its picked design, a movement class, and traits as specif
   assert.equal(gearTraits({ ...male, outfit: { kind: 'yakuza' } }).kick, 1.1);
   assert.equal(gearTraits({ ...female, outfit: { kind: 'business' } }).kick, 1.2);
   assert.equal(gearTraits({ ...male, outfit: { kind: 'business' } }).kick, 1, 'heels are the woman’s');
-  assert.ok(gearTraits({ ...female, outfit: { kind: 'business' } }).balance < 0.6, 'heels: very easy to fall');
+  const business = gearTraits({ ...female, outfit: { kind: 'business' } }).balance;
+  assert.ok(business < 0.8 && business > 0.55, 'business heels: easier to fall');
+  assert.ok(gearTraits({ ...female, outfit: { kind: 'victorianLady' } }).balance < business, 'the lady\'s higher heels: easier still');
   assert.ok(gearTraits({ ...male, outfit: { kind: 'swat' } }).balance > 1.3, 'riot gear: hard to fall');
   assert.equal(gearTraits({ ...male, outfit: { kind: 'swat' } }).protection.blunt, 0.8);
   assert.equal(gearTraits({ ...male, outfit: { kind: 'knight' } }).protection.blunt, 0.6);

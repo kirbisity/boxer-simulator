@@ -231,26 +231,27 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
   if (heels) {
     // A long pointed toe; then the whole boot pitched up at the heel, its
     // toe still on the floor, standing on a slim stiletto.
-    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.95, length * 0.42, 12), upperMaterial);
-    toe.scale.set(spec.width / spec.height * 0.7, 1, 1);
-    toe.position.set(-0.02, length * 0.86, 0);
+    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.95, length * heels.point, 12), upperMaterial);
+    toe.scale.set(spec.width / spec.height * (0.7 - (heels.point - 0.42) * 0.6), 1, 1);
+    toe.position.set(-0.02, length * (0.65 + heels.point / 2), 0);
     shoe.add(toe);
-    const pitch = -0.32;
+    const pitch = -heels.pitch;
     const floor = -(spec.width * 0.95 + 0.009);
-    const toeTip = length * 1.07;
+    const toeTip = length * (0.65 + heels.point);
     const lift = floor * (1 - Math.cos(pitch)) - toeTip * Math.sin(pitch);
     for (const piece of [...shoe.children]) {
       const { x, y } = piece.position;
       piece.position.set(x * Math.cos(pitch) + y * Math.sin(pitch) + lift, -x * Math.sin(pitch) + y * Math.cos(pitch), piece.position.z);
       piece.rotation.z -= pitch;
     }
-    // The heel's back corner, lifted, down to the floor.
-    const heelBack = -length * 0.18;
-    const heelTop = floor * Math.cos(pitch) + heelBack * Math.sin(pitch) + lift;
+    // The stiletto: from under the heel of the sole, lifted, down to the floor
+    // (its top sunk a little into the sole so the two read as one).
+    const heelAt = length * 0.02;
+    const heelTop = floor * Math.cos(pitch) + heelAt * Math.sin(pitch) + lift + 0.012;
     const heelLength = heelTop - floor;
-    const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.004, heelLength, 8), surface(0x0b0b0d));
+    const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.004, heelLength, 8), surface(0x0b0b0d));
     heel.rotation.z = Math.PI / 2;
-    heel.position.set(floor + heelLength / 2, heelBack * Math.cos(pitch) - floor * Math.sin(pitch) + 0.01, 0);
+    heel.position.set(floor + heelLength / 2, heelAt * Math.cos(pitch) - floor * Math.sin(pitch), 0);
     shoe.add(heel);
   }
   if (kind === 'sabaton') {
@@ -480,24 +481,6 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       plume.position.set(-0.3 * r, 0.9 * r, 0.9 * r);
       plume.rotation.x = -0.9;
       group.add(crown, brim, plume);
-      break;
-    }
-    case 'ridingHat': {
-      // A lady's riding hat: a short silk topper with a veil tied round it, its tails hanging behind.
-      const silk = surface(color, { roughness: 0.35 });
-      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.88 * r, 0.84 * r, 1.0 * r, 20), silk);
-      crown.position.y = 0.75 * r;
-      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.3 * r, 1.3 * r, 0.06 * r, 24), silk);
-      brim.position.y = 0.26 * r;
-      const veilCloth = surface(head.veil ?? 0x6a6a72);
-      veilCloth.side = THREE.DoubleSide;
-      const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.9 * r, 0.9 * r, 0.24 * r, 20, 1, true), veilCloth);
-      veil.position.y = 0.45 * r;
-      const tails = new THREE.Mesh(new THREE.PlaneGeometry(0.6 * r, 1.5 * r), veilCloth);
-      tails.position.set(-1.0 * r, -0.2 * r, 0);
-      tails.rotation.set(0, Math.PI / 2, 0.15);
-      group.add(crown, brim, veil, tails);
-      hidesHair = false;
       break;
     }
     case 'tiltHat': {

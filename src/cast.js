@@ -58,7 +58,7 @@ export function varyCharacter(inputs, random = Math.random) {
   };
   const kind = varied.outfit?.kind;
   if (kind) varied.outfit = { ...varied.outfit, colors: randomColors(kind, random) };
-  return normaliseInputs(OUTFITS[kind]?.family ? redress(varied, random) : varied);
+  return normaliseInputs(OUTFITS[kind]?.family || OUTFITS[kind]?.picked ? redress(varied, random) : varied);
 }
 
 /**
@@ -69,8 +69,8 @@ export function varyCharacter(inputs, random = Math.random) {
 export function redress(inputs, random = Math.random, { anyKind = false } = {}) {
   const current = inputs.outfit?.kind;
   const family = OUTFITS[current]?.family;
-  if (!family) return inputs;
-  const kind = anyKind ? pickOne(familyKinds(family), random) : current;
+  if (!family && !OUTFITS[current]?.picked) return inputs;
+  const kind = anyKind && family ? pickOne(familyKinds(family), random) : current;
   const accessories = (inputs.accessories ?? []).filter((item) => headgearOptions(kind).includes(item));
   return { ...inputs, outfit: { ...inputs.outfit, kind, design: randomDesign(kind, random) }, accessories: kind === current ? inputs.accessories : (accessories.length ? accessories : defaultHeadgear(kind)) };
 }

@@ -115,6 +115,19 @@ function gladiatorDesign(kind, look, helmet) {
   };
 }
 
+// Heels: how far the boot is pitched up (radians, toe on the floor) and how
+// long its pointed toe is (a share of the foot). Footing is lost with the
+// pitch: the weight rides on the ball of the foot and a stiletto's tip, and
+// the ankle, pointed, has little range left to catch a sway.
+const BUSINESS_HEELS = { pitch: 0.32, point: 0.42 };
+const LADY_HEELS = { pitch: 0.48, point: 0.56 };
+export const HEEL_FOOTING_PER_RADIAN = 1.1;
+
+/** Footing (1 = flat shoes) in heels pitched this far. */
+export function heelFooting(heels) {
+  return heels ? Math.max(0.3, 1 - HEEL_FOOTING_PER_RADIAN * heels.pitch) : 1;
+}
+
 export const OUTFITS = {
   boxing: {
     label: 'Boxing', movement: 'excellent', fists: 'gloved',
@@ -171,11 +184,11 @@ export const OUTFITS = {
   business: {
     label: 'Business', movement: 'limited', fists: 'bare',
     palette: [['black', 'black'], ['charcoal', 'charcoal'], ['navy', 'navy'], ['slate', 'slate']],
-    // Heels: a woman in them goes over very easily, and kicks with the heel.
-    female: { balance: 0.45, kick: 1.2 },
+    // Heels (see heelFooting): a woman in them goes over more easily, and kicks with the heel.
+    female: { kick: 1.2 },
     designs: [
       // A black suit; for a woman the skirt suit, in black high-heeled ankle boots with pointed toes.
-      { label: 'Black suit', top: { kind: 'suit', color: '#16171b', shirt: '#f2f2f4', tie: '#8a1f2a' }, bottom: { kind: 'slacks', color: '#16171b', skirt: true }, feet: { kind: 'dressShoe', color: '#0e0d0c' }, femaleFeet: { kind: 'heelAnkleBoot', color: '#0b0b0d', heels: true }, extras: [{ kind: 'tie', color: '#8a1f2a' }] },
+      { label: 'Black suit', top: { kind: 'suit', color: '#16171b', shirt: '#f2f2f4', tie: '#8a1f2a' }, bottom: { kind: 'slacks', color: '#16171b', skirt: true }, feet: { kind: 'dressShoe', color: '#0e0d0c' }, femaleFeet: { kind: 'heelAnkleBoot', color: '#0b0b0d', heels: BUSINESS_HEELS }, extras: [{ kind: 'tie', color: '#8a1f2a' }] },
     ],
   },
   yakuza: {
@@ -544,21 +557,18 @@ export const OUTFITS = {
       { label: 'Blue jacket', top: { kind: 'flannel', color: '#2a3a5a' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'clothWrap', color: '#a3241e' }, feet: { kind: 'bare' } },
     ],
   },
-  // A Victorian lady: a corset over the blouse, a long gown, heeled boots.
-  // The corset's boning turns a little of a cut (30%), nothing of a blow or a point.
+  // A Victorian lady: a corset under the bodice, a long gown, high-heeled
+  // pointed boots (their heel sets her footing, see heelFooting). The
+  // corset's boning turns a little of a cut (30%), nothing of a blow or a
+  // point. The game shuffles her three silhouettes of the reign.
   victorianLady: {
     label: 'Victorian — corset and gown', movement: 'limited', fists: 'bare',
     protection: { blunt: 0, cut: 0.3, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    picked: [0, 1, 2],
     designs: [
-      { label: 'Black corset, plum gown', top: { kind: 'longsleeve', color: '#ece4d8' }, bottom: { kind: 'gown', color: '#5a2a4a' }, armor: { kind: 'corset', color: '#1c1c20', cloth: '#1c1c20', cloth2: '#3a3a40' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
-      { label: 'Red corset, black gown', top: { kind: 'longsleeve', color: '#ece4d8' }, bottom: { kind: 'gown', color: '#1c1c20' }, armor: { kind: 'corset', color: '#8a1418', cloth: '#8a1418', cloth2: '#5a0e10' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
-      { label: 'Ivory corset, blue gown', top: { kind: 'longsleeve', color: '#f2ece0' }, bottom: { kind: 'gown', color: '#22356a' }, armor: { kind: 'corset', color: '#e8e0cc', cloth: '#e8e0cc', cloth2: '#c8bca8' }, feet: { kind: 'heelAnkleBoot', color: '#2a1d14' } },
-      // Silhouettes of the reign: a ball gown on the widest hoop, the 1880s
-      // bustle, a riding habit, and the widow's mourning black.
-      { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#e6eef2', cloth: '#e6eef2', cloth2: '#b8ccd8' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4' } },
-      { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#4a1420', cloth: '#4a1420', cloth2: '#2a0a12' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
-      { label: 'Riding habit', top: { kind: 'habit', color: '#1e2a22' }, bottom: { kind: 'gown', shape: 'slim', color: '#1e2a22' }, armor: { kind: 'corset', color: '#1e2a22', cloth: '#1e2a22', cloth2: '#2c3a30' }, head: { kind: 'ridingHat', color: '#141416', veil: '#5a5a62' }, feet: { kind: 'heelAnkleBoot', color: '#2a1d14' } },
-      { label: 'Mourning black', top: { kind: 'longsleeve', color: '#1a1a1e' }, bottom: { kind: 'gown', color: '#141418' }, armor: { kind: 'corset', color: '#1a1a1e', cloth: '#1a1a1e', cloth2: '#2a2a30' }, head: { kind: 'widowCap', color: '#141418', cap: '#f2efe8' }, feet: { kind: 'heelAnkleBoot', color: '#141416' } },
+      { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#e6eef2', cloth: '#e6eef2', cloth2: '#b8ccd8' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4', heels: LADY_HEELS } },
+      { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#4a1420', cloth: '#4a1420', cloth2: '#2a0a12' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
+      { label: 'Mourning black', top: { kind: 'longsleeve', color: '#1a1a1e' }, bottom: { kind: 'gown', color: '#141418' }, armor: { kind: 'corset', color: '#1a1a1e', cloth: '#1a1a1e', cloth2: '#2a2a30' }, head: { kind: 'widowCap', color: '#141418', cap: '#f2efe8' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
     ],
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.
@@ -684,11 +694,13 @@ export function outfitOf(inputs) {
  * from harm by kind, and his own strikes' harm by limb.
  */
 export function gearTraits(inputs) {
-  const { spec } = outfitOf(inputs);
-  const bySex = inputs.sex === 'female' ? spec.female ?? {} : {};
+  const { spec, look } = outfitOf(inputs);
+  const female = inputs.sex === 'female';
+  const bySex = female ? spec.female ?? {} : {};
+  const feet = (female && look.femaleFeet) || look.feet;
   return {
     ...MOVEMENT[spec.movement],
-    balance: bySex.balance ?? spec.balance ?? 1,
+    balance: (bySex.balance ?? spec.balance ?? 1) * heelFooting(feet?.heels),
     kick: bySex.kick ?? spec.kick ?? 1,
     extraMass: spec.extraMass ?? 0,
     protection: { ...NO_PROTECTION, ...spec.protection },

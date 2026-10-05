@@ -28,9 +28,8 @@ export const TOPS = {
   waistcoat: { hem: -0.02, neck: 0.93, loose: 1.08, sleeve: 0, inner: 'longsleeve' },
   aloha: { hem: -0.06, neck: 0.98, loose: 1.11, sleeve: 0.55, sleeveLoose: 1.3 },
   haramaki: { hem: -0.02, neck: 0.45, loose: 1.05, sleeve: 0 },
-  // A ball gown's bodice, off the shoulder, with short puffed sleeves; a riding habit's fitted jacket to the hip.
+  // A ball gown's bodice, off the shoulder, with short puffed sleeves.
   bodice: { hem: 0, neck: 0.86, loose: 1.04, sleeve: 0.32, sleeveLoose: 1.55 },
-  habit: { hem: -0.14, neck: 1.0, loose: 1.07, sleeve: 1.85, sleeveLoose: 1.12 },
   // A medieval tunic: to the waist as a shirt, then a skirt to mid-thigh (`skirt`, thigh shares), belted.
   tunic: { hem: -0.1, neck: 0.97, loose: 1.12, sleeve: 1.7, sleeveLoose: 1.26, skirt: 0.5 },
 };
@@ -47,7 +46,6 @@ export const LOFT = {
     crinoline: { hem: 1.35, flare: 1.4, depthFlare: 0.98 },
     ball: { hem: 1.45, flare: 2.3, depthFlare: 4 },
     bustle: { hem: 1.45, flare: 0.6, depthFlare: 0.8, bustle: 2.2, hips: 0.3 },
-    slim: { hem: 1.45, flare: 0.6, depthFlare: 0.6, hips: 0.3 },
   },
   // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
   // how far forward it bulges, and how far below the waistband it hangs,
