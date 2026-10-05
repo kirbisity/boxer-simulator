@@ -423,6 +423,8 @@ export function buildBody(rawInputs) {
   // What he wears weighs: armour is spread over the body like its own mass,
   // so it is moved by the same muscles and knocked back with the same body.
   const gear = gearTraits(inputs);
+  // In heels the ankle stands on the boot, not the floor: the whole body is lifted.
+  lengths.ankle += gear.heelLift;
   const gearKg = massKg * gear.extraMass;
   const masses = particleMasses(segments, massKg).map((mass) => mass * (1 + gear.extraMass));
   const force = BODY.forcePerMuscleKg;

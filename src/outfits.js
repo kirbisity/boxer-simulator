@@ -123,6 +123,22 @@ const BUSINESS_HEELS = { pitch: 0.32, point: 0.42 };
 const LADY_HEELS = { pitch: 0.48, point: 0.56 };
 export const HEEL_FOOTING_PER_RADIAN = 1.1;
 
+// The heeled boot's sole lies this far below the ankle, and the foot (with
+// its boot) is this long per metre of height; with the toe's point they set
+// how far a heel lifts the body (see heelLift).
+const HEEL_SOLE_BELOW_ANKLE = 0.0565;
+const FOOT_PER_METRE = 0.25 / 1.8;
+
+/**
+ * How far heels lift the body (m): the boot pitched up about the tip of its
+ * pointed toe, which stays on the floor, carrying the ankle up with it.
+ */
+export function heelLift(heels, heightM) {
+  if (!heels) return 0;
+  const toeTip = FOOT_PER_METRE * heightM * (0.65 + heels.point);
+  return toeTip * Math.sin(heels.pitch) - HEEL_SOLE_BELOW_ANKLE * (1 - Math.cos(heels.pitch));
+}
+
 /** Footing (1 = flat shoes) in heels pitched this far. */
 export function heelFooting(heels) {
   return heels ? Math.max(0.3, 1 - HEEL_FOOTING_PER_RADIAN * heels.pitch) : 1;
@@ -566,9 +582,9 @@ export const OUTFITS = {
     protection: { blunt: 0, cut: 0.3, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
     picked: [0, 1, 2],
     designs: [
-      { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#e6eef2', cloth: '#e6eef2', cloth2: '#b8ccd8' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4', heels: LADY_HEELS } },
-      { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#4a1420', cloth: '#4a1420', cloth2: '#2a0a12' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
-      { label: 'Mourning black', top: { kind: 'longsleeve', color: '#1a1a1e' }, bottom: { kind: 'gown', color: '#141418' }, armor: { kind: 'corset', color: '#1a1a1e', cloth: '#1a1a1e', cloth2: '#2a2a30' }, head: { kind: 'widowCap', color: '#141418', cap: '#f2efe8' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
+      { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#5a7ea6', cloth: '#5a7ea6', cloth2: '#e6eef2', lace: '#e6eef2' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4', heels: LADY_HEELS } },
+      { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#16161a', cloth: '#16161a', cloth2: '#6a2234', lace: '#d6c7a3' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
+      { label: 'Mourning black', top: { kind: 'longsleeve', color: '#1a1a1e' }, bottom: { kind: 'gown', color: '#141418' }, armor: { kind: 'corset', color: '#34343c', cloth: '#34343c', cloth2: '#141418', lace: '#8a8a92' }, head: { kind: 'widowCap', color: '#141418', cap: '#f2efe8' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
     ],
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.
@@ -701,6 +717,8 @@ export function gearTraits(inputs) {
   return {
     ...MOVEMENT[spec.movement],
     balance: (bySex.balance ?? spec.balance ?? 1) * heelFooting(feet?.heels),
+    // Heels stand the body higher by this much (m).
+    heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,
     extraMass: spec.extraMass ?? 0,
     protection: { ...NO_PROTECTION, ...spec.protection },

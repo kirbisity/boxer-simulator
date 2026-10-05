@@ -3,7 +3,7 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
-import { outfitOf, resolveColor } from './outfits.js';
+import { heelLift, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
 
 export const WARDROBE = {
@@ -229,29 +229,29 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     shoe.add(swoosh);
   }
   if (heels) {
-    // A long pointed toe; then the whole boot pitched up at the heel, its
-    // toe still on the floor, standing on a slim stiletto.
+    // A long pointed toe; then the whole boot pitched down about the ankle
+    // (the body stands higher by the heel's lift), its toe on the floor and
+    // its heel on a slim stiletto.
     const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.95, length * heels.point, 12), upperMaterial);
     toe.scale.set(spec.width / spec.height * (0.7 - (heels.point - 0.42) * 0.6), 1, 1);
     toe.position.set(-0.02, length * (0.65 + heels.point / 2), 0);
     shoe.add(toe);
     const pitch = -heels.pitch;
     const floor = -(spec.width * 0.95 + 0.009);
-    const toeTip = length * (0.65 + heels.point);
-    const lift = floor * (1 - Math.cos(pitch)) - toeTip * Math.sin(pitch);
+    const ground = floor - heelLift(heels, body.heightM);
     for (const piece of [...shoe.children]) {
       const { x, y } = piece.position;
-      piece.position.set(x * Math.cos(pitch) + y * Math.sin(pitch) + lift, -x * Math.sin(pitch) + y * Math.cos(pitch), piece.position.z);
+      piece.position.set(x * Math.cos(pitch) + y * Math.sin(pitch), -x * Math.sin(pitch) + y * Math.cos(pitch), piece.position.z);
       piece.rotation.z -= pitch;
     }
     // The stiletto: from under the heel of the sole, lifted, down to the floor
     // (its top sunk a little into the sole so the two read as one).
     const heelAt = length * 0.02;
-    const heelTop = floor * Math.cos(pitch) + heelAt * Math.sin(pitch) + lift + 0.012;
-    const heelLength = heelTop - floor;
+    const heelTop = floor * Math.cos(pitch) + heelAt * Math.sin(pitch) + 0.012;
+    const heelLength = heelTop - ground;
     const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.004, heelLength, 8), surface(0x0b0b0d));
     heel.rotation.z = Math.PI / 2;
-    heel.position.set(floor + heelLength / 2, heelAt * Math.cos(pitch) - floor * Math.sin(pitch), 0);
+    heel.position.set(ground + heelLength / 2, heelAt * Math.cos(pitch) - floor * Math.sin(pitch), 0);
     shoe.add(heel);
   }
   if (kind === 'sabaton') {

@@ -337,7 +337,8 @@ function particleRadii(body) {
     if (name.endsWith('Hand')) return fistsOf(body).radius;
     if (name.endsWith('Hip')) return segments[`${side}Thigh`].skinRadius;
     if (name.endsWith('Knee')) return segments[`${side}Shank`].skinRadius;
-    return 0.045;
+    // The ankle: on the floor through the foot, or through a heel under it.
+    return 0.045 + (body.gear?.heelLift ?? 0);
   });
 }
 

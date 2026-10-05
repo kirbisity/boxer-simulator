@@ -37,7 +37,7 @@ export const TOPS = {
 export const LOFT = {
   // A corset: the waist drawn in by `cinch` of its width and depth, most at
   // `at` up the trunk (pelvis 0, neck 1), fading over `span` either way.
-  corset: { cinch: 0.2, at: 0.32, span: 0.14 },
+  corset: { cinch: 0.26, at: 0.32, span: 0.13 },
   // Gown skirts: the hem (thigh lengths below the waist), the bell's flare
   // out to the sides (`flare`) and front to back (`depthFlare`), and a bustle
   // standing out behind (a share of the waist's depth) a third of the way down;
@@ -214,7 +214,7 @@ export const ARMOR_KINDS = {
   // A corset: boned cloth from the hips to under the bust, laced tight (the
   // body under it is drawn in; see LOFT.corset).
   corset: {
-    trunk: [-0.02, 0.68, 1.04, { rows: ['cloth', 'cloth', 'cloth2'] }],
+    trunk: [-0.02, 0.68, 1.1, { boning: true }],
   },
   // Escaupil and ichcahuipilli: quilted cotton, thick, stitched in rows.
   escaupil: {
@@ -310,6 +310,8 @@ function paintFor(paint, armor) {
     if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
     // A big cat's rosettes, scattered: a dark spot every few rings and steps.
     if (paint.spots) return (index * 7 + step * 3) % 5 === 0 ? 'cloth2' : 'cloth';
+    // A corset: laced up the back, a steel busk down the front, a bone every few panels.
+    if (paint.boning) return Math.cos(angle) < -0.93 ? 'lace' : Math.cos(angle) > 0.97 ? 'cloth2' : step % 3 === 0 ? 'cloth2' : 'cloth';
     // Scales: rows of them, each offset by half a scale from the one above,
     // the lower edge of every third row dark with its lacing so the rows read.
     if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
