@@ -169,6 +169,57 @@ export function buildWeaponMesh(kind, envMap) {
       }
       break;
     }
+    case 'espada': {
+      // A Spanish cut-and-thrust sword: a narrow straight blade, a cross with
+      // long quillons and a side ring, a wire-bound grip, a round pommel.
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.03, 0.006, 0.12), steel));
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.22), steel);
+      cross.position.y = 0.022;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.004, 6, 14), steel);
+      ring.position.set(0.03, 0.05, 0);
+      ring.rotation.y = Math.PI / 2;
+      const grip = cylinder(0.014, 0.015, -spec.handle + 0.02, 0.012, surface(0x2a1d14, { roughness: 0.8 }));
+      const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), steel);
+      pommel.position.y = -spec.handle;
+      group.add(cross, ring, grip, pommel);
+      break;
+    }
+    case 'macuahuitl': {
+      // A flat oak paddle, its two edges set with black obsidian teeth.
+      const oak = surface(0x5a3a22, { roughness: 0.7 });
+      const paddle = new THREE.Mesh(new THREE.BoxGeometry(0.016, spec.length - spec.strikeFrom + 0.1, 0.075), oak);
+      paddle.position.y = (spec.length + spec.strikeFrom - 0.1) / 2;
+      group.add(paddle, cylinder(0.016, 0.018, -spec.handle, spec.strikeFrom, oak, 8));
+      const glass = new THREE.MeshStandardMaterial({ color: 0x0b0b10, roughness: 0.08, metalness: 0.3 });
+      for (let tooth = 0; tooth < 7; tooth += 1) {
+        const y = spec.strikeFrom + ((spec.length - spec.strikeFrom - 0.04) * tooth) / 6;
+        for (const side of [1, -1]) {
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.06, 0.025), glass);
+          blade.position.set(0, y, side * 0.045);
+          group.add(blade);
+        }
+      }
+      break;
+    }
+    case 'tepoztopilli': {
+      // A long shaft and a broad wooden head, edged with obsidian.
+      const headStart = spec.length - 0.36;
+      group.add(cylinder(0.015, 0.017, -spec.handle, headStart + 0.02, wood, 8));
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.36, 0.08), surface(0x6a4428, { roughness: 0.7 }));
+      head.position.y = headStart + 0.18;
+      const point = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 4), surface(0x6a4428));
+      point.position.y = spec.length + 0.02;
+      group.add(head, point);
+      const glass = new THREE.MeshStandardMaterial({ color: 0x0b0b10, roughness: 0.08, metalness: 0.3 });
+      for (let tooth = 0; tooth < 5; tooth += 1) {
+        for (const side of [1, -1]) {
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.05, 0.02), glass);
+          blade.position.set(0, headStart + 0.04 + tooth * 0.07, side * 0.048);
+          group.add(blade);
+        }
+      }
+      break;
+    }
     case 'staff': {
       // A plain wooden staff, a little thicker at the middle; iron ferrules at both ends.
       group.add(cylinder(0.014, 0.017, -spec.handle, 0, wood, 10), cylinder(0.017, 0.014, 0, spec.length, wood, 10));
@@ -386,6 +437,40 @@ export function buildWeaponMesh(kind, envMap) {
 /** The parma: a small, round, convex bronze shield, boss at the centre. Faces +z. */
 export function buildShieldMesh(spec, envMap) {
   const group = new THREE.Group();
+  if (spec.look === 'steel' || spec.look === 'feather') {
+    // The rodela: a round steel shield, domed, rimmed and bossed. The
+    // chimalli: a disc of hide and feathers in bands, a fringe of feathers below.
+    const steelFace = spec.look === 'steel';
+    const faceMaterial = steelFace ? steelMaterial(envMap, { vertexColors: false, color: 0x9aa0a8, roughness: 0.35, side: THREE.DoubleSide }) : surface(0xece4d0, { roughness: 0.8 });
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius, spec.radius * 0.97, 0.025, 32), faceMaterial);
+    face.rotation.x = Math.PI / 2;
+    group.add(face);
+    if (steelFace) {
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(spec.radius, 0.012, 8, 36), faceMaterial);
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), faceMaterial);
+      boss.rotation.x = Math.PI / 2;
+      boss.position.z = 0.012;
+      group.add(rim, boss);
+    } else {
+      // Bands of colour: red, turquoise, gold, from the rim in.
+      [[0.86, 0xb3161b], [0.62, 0x2a8a8a], [0.36, 0xd6a743]].forEach(([share, colour]) => {
+        const band = new THREE.Mesh(new THREE.RingGeometry(spec.radius * share * 0.72, spec.radius * share, 28), surface(colour, { roughness: 0.8 }));
+        band.position.z = 0.014;
+        group.add(band);
+      });
+      for (let feather = 0; feather < 7; feather += 1) {
+        const quill = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.16, 5), surface(feather % 2 ? 0x1f8a5a : 0xb3161b));
+        quill.position.set((feather - 3) * 0.06, -spec.radius - 0.06, 0);
+        quill.rotation.z = Math.PI;
+        group.add(quill);
+      }
+    }
+    for (const mesh of group.children) {
+      mesh.castShadow = true;
+      if (mesh === face) mesh.add(outlineFor(mesh, 0.003));
+    }
+    return group;
+  }
   if (spec.look === 'ming') {
     // Lacquered red wood, a black ring painted inside an iron rim, a gilt boss.
     const face = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius, spec.radius * 0.97, 0.03, 32), surface(0x9a1c18, { roughness: 0.5 }));

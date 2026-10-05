@@ -888,6 +888,17 @@ function bulletHit(world, shooter, hit, dir, event, shot = null) {
 // The joint a shattered limb bone gives way at.
 const BULLET_JOINT = { UpperArm: 'Elbow', Forearm: 'Elbow', Thigh: 'Knee', Shank: 'Knee' };
 
+/** A brittle edge (obsidian) loses part of its cut: on armour, a shield or a steel blade. */
+function chip(world, fighter) {
+  const weapon = fighter.weapon;
+  if (!weapon?.spec.brittle) return;
+  weapon.edge = (weapon.edge ?? 1) * weapon.spec.brittle;
+  if (weapon.edge < 0.25 && !weapon.dulled) {
+    weapon.dulled = true;
+    world.events.push({ time: world.time, kind: 'chipped', fighter: fighter.id, effects: ['the obsidian edge is gone'] });
+  }
+}
+
 /** A blow jars the grip; strained past what the hand can hold, the weapon goes. */
 function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
@@ -3318,9 +3329,13 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const blocked = BLOCKING.has(capsule.key);
   // A heavy hard head drives part of its blow through armour (`crush`).
   const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
-  const cut = energy * mix.cut * (1 - (protection.cut ?? 0));
-  const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0));
+  // A brittle edge (obsidian) cuts only as well as it is still sharp.
+  const sharp = weapon.edge ?? 1;
+  const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp;
+  const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0)) * sharp;
   const glanced = Boolean(body.gear.deflects) && mix.cut + mix.pierce > 0.2;
+  // Glass on steel or hard armour chips.
+  if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id, weapon: weapon.kind, mode: spec.mode,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
@@ -3442,6 +3457,8 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   const punch = attacker.punch;
   const weaponStrike = striker.weapon && punch?.spec.path === 'blade';
   if (!punch || punch.landed || (!striker.weapon && punch.spec.path === 'blade') || (!weaponStrike && punch.spec.limb !== striker.key) || punch.t > punch.spec.extendUntil + 0.06 || (weaponStrike && punch.t < punch.spec.windup)) return;
+  // Obsidian on a steel shield chips.
+  if (weaponStrike && defender.shield?.spec.look === 'steel') chip(world, attacker);
   const spec = punch.spec;
   let strikeVelocity;
   let strikeMass;
@@ -3484,6 +3501,11 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
 function clashWeapons(world, first, second) {
   const a = first.weapon;
   const b = second.weapon;
+  // Glass against steel: the brittle one chips at each clash.
+  const chipOnSteel = () => {
+    if (a.spec.brittle && !b.spec.brittle) chip(world, first);
+    if (b.spec.brittle && !a.spec.brittle) chip(world, second);
+  };
   const ends = (fighter, weapon) => {
     const hand = point(fighter.x, P[`${weapon.main}Hand`]);
     return [vec.add(hand, vec.scale(weapon.dir, weapon.spec.strikeFrom * 0.5)), weapon.tip];
@@ -3530,6 +3552,7 @@ function clashWeapons(world, first, second) {
     fighter.punch.stopped = true;
   }
   world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: vec.lerp(closest.onFirst, closest.onSecond, 0.5), normal, impulse, effects: ['blades meet'] });
+  chipOnSteel();
   strainGrip(world, first, impulse, normal);
   strainGrip(world, second, impulse, vec.scale(normal, -1));
 }

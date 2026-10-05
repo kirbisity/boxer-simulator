@@ -404,6 +404,122 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       }
       break;
     }
+    case 'morion': {
+      // The Spanish morion: a round crown with a tall comb front to back and a brim
+      // that sweeps up to points before and behind.
+      const iron = metal(steel, color);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      crown.scale.y = 1.15;
+      crown.position.y = 0.1 * r;
+      const comb = new THREE.Mesh(new THREE.CylinderGeometry(1.25 * r, 1.25 * r, 0.06 * r, 24, 1, false, Math.PI * 0.5, Math.PI), iron);
+      comb.rotation.x = Math.PI / 2;
+      comb.scale.set(1, 1, 0.75);
+      comb.position.y = 0.35 * r;
+      const brim = new THREE.Mesh(new THREE.TorusGeometry(1.35 * r, 0.12 * r, 6, 28), iron);
+      brim.rotation.x = Math.PI / 2;
+      brim.scale.set(1.45, 0.75, 1);
+      brim.position.y = 0.08 * r;
+      // The brim's points rise fore and aft.
+      for (const end of [1, -1]) {
+        const point = new THREE.Mesh(new THREE.ConeGeometry(0.16 * r, 0.6 * r, 8), iron);
+        point.position.set(end * 1.95 * r, 0.3 * r, 0);
+        point.rotation.z = end * -1.1;
+        group.add(point);
+      }
+      group.add(crown, comb, brim);
+      break;
+    }
+    case 'cabasset': {
+      // The cabasset: a tall pear-shaped crown with a little stalk, a narrow flat brim.
+      const iron = metal(steel, color);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.15 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), iron);
+      crown.scale.y = 1.45;
+      crown.position.y = 0.08 * r;
+      const stalk = new THREE.Mesh(new THREE.ConeGeometry(0.12 * r, 0.4 * r, 8), iron);
+      stalk.position.y = 1.85 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.15 * r, 1.45 * r, 0.08 * r, 24, 1, true), iron.clone());
+      brim.material.side = THREE.DoubleSide;
+      brim.position.y = 0.06 * r;
+      group.add(crown, stalk, brim);
+      break;
+    }
+    case 'potHelmet': {
+      // A 17th-century pikeman's pot: a rounded crown, a broad down-turned brim, a ridge.
+      const iron = metal(steel, color);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      crown.scale.y = 1.05;
+      crown.position.y = 0.1 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.17 * r, 1.7 * r, 0.3 * r, 26, 1, true), iron.clone());
+      brim.material.side = THREE.DoubleSide;
+      brim.position.y = -0.02 * r;
+      group.add(crown, brim);
+      break;
+    }
+    case 'feltHat': {
+      // A broad black felt hat, its brim pinned up at one side under a plume.
+      const felt = cloth;
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.95 * r, 1.1 * r, 0.9 * r, 18), felt);
+      crown.position.y = 0.55 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(2.0 * r, 2.0 * r, 0.06 * r, 26), felt);
+      brim.position.y = 0.12 * r;
+      brim.rotation.x = 0.12;
+      const plume = new THREE.Mesh(new THREE.ConeGeometry(0.18 * r, 1.4 * r, 6), surface(head.plume ?? 0xd06a1a));
+      plume.position.set(-0.3 * r, 0.9 * r, 0.9 * r);
+      plume.rotation.x = -0.9;
+      group.add(crown, brim, plume);
+      break;
+    }
+    case 'featherBand': {
+      // A coloured band round the head with a few tall feathers at the back.
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.06 * r, 0.12 * r, 6, 22), cloth);
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.3 * r;
+      group.add(band);
+      for (let feather = 0; feather < 3; feather += 1) {
+        const quill = new THREE.Mesh(new THREE.ConeGeometry(0.12 * r, 1.4 * r, 5), cloth);
+        quill.position.set(-1.0 * r, 1.0 * r, (feather - 1) * 0.25 * r);
+        quill.rotation.z = 0.45;
+        group.add(quill);
+      }
+      hidesHair = false;
+      break;
+    }
+    case 'jaguarHelm': {
+      // A carved wooden jaguar head worn as a helmet: the face looks out of its open jaws.
+      const hide = cloth;
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(1.25 * r, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), hide);
+      skull.position.y = 0.15 * r;
+      const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.55 * r, 12, 8), hide);
+      muzzle.scale.set(1.1, 0.6, 1);
+      muzzle.position.set(1.05 * r, 0.75 * r, 0);
+      const jaw = new THREE.Mesh(new THREE.TorusGeometry(1.15 * r, 0.1 * r, 6, 20, Math.PI), surface(0xece4d0));
+      jaw.rotation.set(0, Math.PI / 2, Math.PI / 2);
+      jaw.position.set(0.95 * r, 0.35 * r, 0);
+      group.add(skull, muzzle, jaw);
+      for (const side of [1, -1]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.22 * r, 0.4 * r, 6), hide);
+        ear.position.set(0.1 * r, 1.45 * r, side * 0.7 * r);
+        group.add(ear);
+        const spot = new THREE.Mesh(new THREE.SphereGeometry(0.16 * r, 8, 6), surface(0x2a1d14));
+        spot.position.set(0.2 * r, 1.05 * r, side * 0.95 * r);
+        group.add(spot);
+      }
+      break;
+    }
+    case 'eagleHelm': {
+      // A carved eagle's head: the beak over the brow, the face in its open mouth, a feather crest.
+      const feathers = cloth;
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(1.25 * r, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), feathers);
+      skull.position.y = 0.15 * r;
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.35 * r, 1.1 * r, 8), surface(0xd6a743));
+      beak.rotation.z = -Math.PI / 2 - 0.35;
+      beak.position.set(1.45 * r, 0.75 * r, 0);
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.25 * r, 1.2 * r, 6), surface(0x6a4428));
+      crest.position.set(-0.6 * r, 1.4 * r, 0);
+      crest.rotation.z = 0.7;
+      group.add(skull, beak, crest);
+      break;
+    }
     case 'clothWrap': {
       // A Ming garrison soldier's cloth wrapped round the head and knotted behind.
       const wrap = cloth;

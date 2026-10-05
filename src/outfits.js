@@ -85,6 +85,18 @@ function shade(hex, share) {
   return `#${[16, 8, 0].map((offset) => channel(offset).toString(16).padStart(2, '0')).join('')}`;
 }
 
+// Conquistadors: the doublet, the breeches, the helmet (morion, cabasset, pot helmet).
+function conquistadorDesign(label, doublet, breeches, helmet, sash = null) {
+  return { label, top: { kind: 'longsleeve', color: doublet }, bottom: { kind: 'pants', color: breeches }, armor: { kind: 'conquistador', color: '#a7adb6', mail: '#8d9097', cloth: doublet, cloth2: sash ?? doublet }, head: { kind: helmet, color: '#a7adb6' }, feet: { kind: 'compactBoot', color: '#2a1d14' } };
+}
+function escaupilDesign(label, quilt, sleeves, helmet) {
+  return { label, top: { kind: 'longsleeve', color: sleeves }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'escaupil', color: quilt, cloth: quilt, cloth2: shade(quilt, 0.82) }, head: { kind: helmet, color: '#9aa0a8' }, feet: { kind: 'compactBoot', color: '#2a1d14' } };
+}
+// The Mexica warrior: the cotton armour, the loincloth, a feathered band (none if `band` is null).
+function mexicaDesign(label, cotton, band) {
+  return { label, bottom: { kind: 'loincloth', color: '#ece4d0' }, armor: { kind: 'ichcahuipilli', color: cotton, cloth: cotton, cloth2: shade(cotton, 0.85) }, head: band ? { kind: 'featherBand', color: band } : null, feet: { kind: 'sandal', color: '#5a3a22' } };
+}
+
 // A gladiator's five looks: his metal, his loincloth, his plume.
 const GLADIATOR_LOOKS = [
   { label: 'Bronze, cream', metal: '#b98a3e', cloth: '#ece4d0', plume: '#b81d22', strap: '#6a4526' },
@@ -415,7 +427,7 @@ export const OUTFITS = {
   // A Chinese martial artist's silk suit (tai chi, kung fu): loose jacket and
   // trousers, cloth shoes. No protection; it moves.
   kungfu: {
-    label: 'Kung fu suit', family: 'chinese', movement: 'excellent', fists: 'bare',
+    label: 'Kung fu suit', movement: 'excellent', fists: 'bare',
     palette: [['white', 'white'], ['black', 'black'], ['navy', 'black'], ['wine', 'black']],
     designs: [
       { label: 'Silk suit', top: { kind: 'flannel', color: '#e8e4d8' }, bottom: { kind: 'pants', color: '#e8e4d8' }, feet: { kind: 'compactBoot', color: '#161616' } },
@@ -423,7 +435,7 @@ export const OUTFITS = {
   },
   // A Shaolin monk: the robe, leggings bound at the shin, the head shaven.
   monk: {
-    label: 'Shaolin monk', family: 'chinese', movement: 'excellent', fists: 'bare',
+    label: 'Shaolin monk', movement: 'excellent', fists: 'bare',
     palette: [['ochre', 'brown'], ['grey', 'grey'], ['rust', 'brown']],
     designs: [
       { label: 'Robe', top: { kind: 'tunic', color: '#c47a1e' }, bottom: { kind: 'pants', color: '#6a4428' }, feet: { kind: 'compactBoot', color: '#2a2622' }, hair: 'bald' },
@@ -434,6 +446,102 @@ export const OUTFITS = {
     label: 'Taekwondo dobok', movement: 'excellent', fists: 'bare',
     designs: [
       { label: 'Dobok', top: { kind: 'jacket', color: '#f2f2f0' }, bottom: { kind: 'pants', color: '#f2f2f0' }, feet: { kind: 'bare' } },
+    ],
+  },
+  // A conquistador of the 1510s–20s: a steel breastplate with mail sleeves
+  // and collar under a morion; a doublet and breeches. Proof against most
+  // cuts and points; a gun's ball goes through it unless it is proofed.
+  conquistadorPlate: {
+    label: 'Conquistador — breastplate', family: 'conquistador', movement: 'good', fists: 'bare',
+    sidearm: 'espada',
+    spare: 'dagger',
+    extraMass: 0.3,
+    protection: { blunt: 0.5, cut: 0.9, pierce: 0.8, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
+    courage: 0.35,
+    designs: [
+      conquistadorDesign('Black doublet', '#1c1c20', '#3a2a22', 'morion'),
+      conquistadorDesign('Crimson doublet', '#7a1a22', '#2a2622', 'morion'),
+      conquistadorDesign('Yellow doublet', '#b8922e', '#3a2a22', 'cabasset'),
+      // The Dutch East India Company's pikemen of the 1660s: breastplate and a pot helmet.
+      conquistadorDesign('VOC pikeman', '#3a3a40', '#2a2622', 'potHelmet', '#d06a1a'),
+      conquistadorDesign('Russet doublet', '#6a3a22', '#2a2622', 'cabasset'),
+    ],
+  },
+  // A conquistador in escaupil: the quilted cotton armour taken from the
+  // Mexica, good against obsidian and arrows, under a morion or cabasset.
+  conquistadorQuilted: {
+    label: 'Conquistador — escaupil', family: 'conquistador', movement: 'good', fists: 'bare',
+    sidearm: 'espada',
+    spare: 'dagger',
+    extraMass: 0.14,
+    protection: { blunt: 0.3, cut: 0.6, pierce: 0.5, bullet: { head: 0.35, torso: 0.15, limb: 0.05 } },
+    courage: 0.3,
+    designs: [
+      escaupilDesign('Undyed escaupil', '#d8cfb8', '#3a2a22', 'morion'),
+      escaupilDesign('Escaupil, red sleeves', '#d8cfb8', '#7a1a22', 'cabasset'),
+      escaupilDesign('Grey escaupil', '#a8a49a', '#2a2622', 'morion'),
+      // A VOC musketeer of the 1660s: a buff coat, an orange sash, a broad felt hat.
+      { label: 'VOC musketeer', top: { kind: 'longsleeve', color: '#b08a5a' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#b08a5a', cloth: '#b08a5a', cloth2: '#d06a1a' }, head: { kind: 'feltHat', color: '#1c1c20', plume: '#d06a1a' }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      escaupilDesign('Escaupil, blue sleeves', '#d8cfb8', '#22356a', 'cabasset'),
+    ],
+  },
+  // A Mexica warrior: the ichcahuipilli (quilted cotton armour, soaked in
+  // brine), a loincloth, sandals, a feathered band. Little against steel.
+  mexicaWarrior: {
+    label: 'Mexica — warrior', family: 'mexica', movement: 'excellent', fists: 'bare',
+    sidearm: 'macuahuitl',
+    extraMass: 0.08,
+    protection: { blunt: 0.2, cut: 0.45, pierce: 0.35, bullet: { head: 0, torso: 0.05, limb: 0 } },
+    courage: 0.3,
+    designs: [
+      mexicaDesign('Ichcahuipilli, quetzal band', '#ece4d0', '#1f8a5a'),
+      mexicaDesign('Ichcahuipilli, red band', '#ece4d0', '#b3161b'),
+      mexicaDesign('Ichcahuipilli, blue band', '#e0d8c4', '#2a5aa8'),
+      mexicaDesign('Ichcahuipilli, yellow band', '#e8e0cc', '#d6a743'),
+      mexicaDesign('Ichcahuipilli, plain', '#d8cfb8', null),
+    ],
+  },
+  // The Mexica's elite orders: the tlahuiztli suit over the cotton armour,
+  // jaguar skin or eagle feathers, and a carved wooden helmet: a jaguar's
+  // open jaws, an eagle's beak. A little better kept; prized captives.
+  mexicaElite: {
+    label: 'Mexica — jaguar and eagle', family: 'mexica', movement: 'excellent', fists: 'bare',
+    sidearm: 'macuahuitl',
+    extraMass: 0.12,
+    protection: { blunt: 0.25, cut: 0.5, pierce: 0.4, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
+    courage: 0.45,
+    designs: [
+      { label: 'Jaguar warrior', top: { kind: 'longsleeve', color: '#c8902e' }, bottom: { kind: 'pants', color: '#c8902e' }, armor: { kind: 'jaguarSuit', color: '#c8902e', cloth: '#c8902e', cloth2: '#2a1d14' }, head: { kind: 'jaguarHelm', color: '#c8902e' }, feet: { kind: 'sandal', color: '#5a3a22' } },
+      { label: 'Eagle warrior', top: { kind: 'longsleeve', color: '#ece4d0' }, bottom: { kind: 'pants', color: '#6a4428' }, armor: { kind: 'featherSuit', color: '#ece4d0', cloth: '#ece4d0', cloth2: '#6a4428' }, head: { kind: 'eagleHelm', color: '#ece4d0' }, feet: { kind: 'sandal', color: '#5a3a22' } },
+      { label: 'Black jaguar', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'jaguarSuit', color: '#2a2622', cloth: '#2a2622', cloth2: '#0f0f0f' }, head: { kind: 'jaguarHelm', color: '#2a2622' }, feet: { kind: 'sandal', color: '#5a3a22' } },
+      { label: 'Brown eagle', top: { kind: 'longsleeve', color: '#8a5a32' }, bottom: { kind: 'pants', color: '#4a3020' }, armor: { kind: 'featherSuit', color: '#8a5a32', cloth: '#8a5a32', cloth2: '#ece4d0' }, head: { kind: 'eagleHelm', color: '#8a5a32' }, feet: { kind: 'sandal', color: '#5a3a22' } },
+      { label: 'Red jaguar', top: { kind: 'longsleeve', color: '#a8401e' }, bottom: { kind: 'pants', color: '#a8401e' }, armor: { kind: 'jaguarSuit', color: '#a8401e', cloth: '#d08a2e', cloth2: '#2a1d14' }, head: { kind: 'jaguarHelm', color: '#d08a2e' }, feet: { kind: 'sandal', color: '#5a3a22' } },
+    ],
+  },
+  // A rōnin: no lord, no armour; a kimono and hakama, a headband.
+  ronin: {
+    label: 'Rōnin', movement: 'excellent', fists: 'bare',
+    sidearm: 'wakizashi',
+    protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.4,
+    designs: [
+      { label: 'Indigo kimono', top: { kind: 'flannel', color: '#1f2a4a' }, bottom: { kind: 'pants', color: '#3a3a40' }, head: { kind: 'clothWrap', color: '#ece4d0' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Grey kimono', top: { kind: 'flannel', color: '#5a5a5e' }, bottom: { kind: 'pants', color: '#1c1c20' }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Brown kimono', top: { kind: 'flannel', color: '#5a3a22' }, bottom: { kind: 'pants', color: '#2a2622' }, feet: { kind: 'tabi', color: '#1a1b22' }, hair: 'topknot' },
+    ],
+  },
+  // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth
+  // round the head, bare feet. Nothing to stop a blade.
+  wokou: {
+    label: 'Wokou raider', movement: 'excellent', fists: 'bare',
+    sidearm: 'dao',
+    spare: 'dagger',
+    protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.25,
+    designs: [
+      { label: 'Black jacket', top: { kind: 'flannel', color: '#1c1c20' }, bottom: { kind: 'pants', color: '#3a3326' }, head: { kind: 'clothWrap', color: '#3a3326' }, feet: { kind: 'bare' } },
+      { label: 'Undyed jacket', top: { kind: 'tee', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'clothWrap', color: '#1c1c20' }, feet: { kind: 'bare' } },
+      { label: 'Blue jacket', top: { kind: 'flannel', color: '#2a3a5a' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'clothWrap', color: '#a3241e' }, feet: { kind: 'bare' } },
     ],
   },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
@@ -516,6 +624,7 @@ export function familyKinds(family) {
 export const FACTIONS = {
   knights: { label: 'Knights', glyph: '🏰', blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
   japanese: { label: 'Japanese', glyph: '⛩️', blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
+  mexica: { label: 'Mexica', glyph: '🦅', blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
   chinese: { label: 'Chinese', glyph: '🐉', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
@@ -525,8 +634,10 @@ export const FACTIONS = {
 export const FACTION_KEYS = Object.keys(FACTIONS);
 
 // What an outfit says about who wears it; an armour family covers its kinds.
-const FACTION_OF_FAMILY = { knight: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese' };
-const FACTION_OF_OUTFIT = { dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
+// An armour family's kinds may be swapped for one another when a fighter is redressed;
+// an outfit outside one (a rōnin's kimono, a monk's robe) keeps to itself.
+const FACTION_OF_FAMILY = { knight: 'knights', conquistador: 'knights', samurai: 'japanese', gladiator: 'gladiators', chinese: 'chinese', mexica: 'mexica' };
+const FACTION_OF_OUTFIT = { ronin: 'japanese', wokou: 'chinese', kungfu: 'chinese', monk: 'chinese', dobok: 'ring', commoner: 'knights', swat: 'law', yakuza: 'street', casual: 'street', business: 'street', hiking: 'street', boxing: 'ring', mma: 'ring', sports: 'ring', sumo: 'ring' };
 
 /** A character's faction: as set (`inputs.faction`), else by what he wears. */
 export function factionOf(inputs) {

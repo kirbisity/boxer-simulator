@@ -5,7 +5,7 @@
 import { FRAMES, normaliseInputs } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld } from './physics.js';
-import { footSoldier, mingSoldier, nobleKnight, rebel, sengokuWarrior, swatOfficer, yakuza } from './cast.js';
+import { europeanSoldier, footSoldier, mexicaWarrior, mingSoldier, nobleKnight, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -64,6 +64,38 @@ function pyongyangSides(random) {
   return { red, blue };
 }
 
+/** `count` men from `make(style)`, for each style. */
+function company(styles, make) {
+  const men = [];
+  for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) men.push(make(style));
+  return men;
+}
+
+// Otumba, 1520: the Spaniards, few and worn from the Noche Triste, with
+// their Tlaxcalan allies (warriors armed as the Mexica were), meet the
+// Mexica host on the plain. Steel against obsidian and cotton.
+const OTUMBA = {
+  spanish: { hidalgo: 4, rodelero: 7, arquebusier: 3 },
+  tlaxcalan: { macuahuitl: 13, tepoztopilli: 9 },
+  mexica: { warrior: { macuahuitl: 18, tepoztopilli: 10, bow: 4 }, elite: { macuahuitl: 5, tepoztopilli: 3 } },
+};
+
+// Baxemboy, Formosa, 1661: the VOC's musketeers and pikemen from Fort
+// Zeelandia against Koxinga's army: his masked "iron men" in scale, his
+// regulars in brigandine, garrison troops, and a few Japanese.
+const ZEELANDIA = {
+  dutch: { musketeer: 9, pikeman: 6, officer: 3 },
+  koxinga: { elite: { guandao: 4, swordShield: 2 }, brigandine: { swordShield: 4, spear: 3, matchlock: 3 }, garrison: { spear: 8, dao: 2, matchlock: 2 }, ronin: { katana: 2 } },
+};
+
+// A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
+// against a garrison with a few brigandine regulars (one in five).
+// The raiding bands were large and the coast garrisons thin: here the raiders outnumber them.
+const WOKOU = {
+  raiders: { ronin: { katana: 6, naginata: 2 }, wokou: { dao: 9, spear: 5, matchlock: 4 } },
+  garrison: { garrison: { spear: 7, dao: 4, matchlock: 1 }, brigandine: { swordShield: 2, spear: 1 } },
+};
+
 export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
@@ -110,6 +142,58 @@ export const SCENARIOS = {
     roster: 'Twenty a side: Ming and Japanese',
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
+    fighters: [],
+  },
+  otumba: {
+    title: 'Otumba',
+    place: 'Otumba, Valley of Mexico · 7 July 1520',
+    blurb: 'Days after the Noche Triste, the Spaniards and their Tlaxcalan allies are caught on the open plain by the Mexica host: steel breastplates, espadas and arquebuses against obsidian blades and quilted cotton.',
+    scene: 'plain',
+    arena: { halfX: 15, halfZ: 10 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
+    roster: 'Fourteen conquistadors and twenty-two Tlaxcalans · forty Mexica',
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 10, loose: 0.3 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.5 } },
+    cast: (random) => ({
+      red: shootersBehind([...company(OTUMBA.spanish, (type) => europeanSoldier(random, type)), ...company(OTUMBA.tlaxcalan, (style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }))]),
+      blue: shootersBehind([...company(OTUMBA.mexica.elite, (style) => mexicaWarrior(random, style, 'elite')), ...company(OTUMBA.mexica.warrior, (style) => mexicaWarrior(random, style, 'warrior'))]),
+    }),
+    fighters: [],
+  },
+  zeelandia: {
+    title: 'Fort Zeelandia',
+    place: 'Baxemboy, Formosa · 1661',
+    blurb: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers and pikemen march out to meet his army on the sand: masked iron men in scale, brigandine regulars, garrison troops and a few Japanese.",
+    scene: 'coastFort',
+    arena: { halfX: 15, halfZ: 10 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
+    roster: 'Eighteen Dutch · thirty-two of Koxinga\'s army',
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.35 } },
+    cast: (random) => {
+      const army = ZEELANDIA.koxinga;
+      // The iron men, every one masked, in scale (the elite's masked scale design).
+      const ironMen = company(army.elite, (style) => mingSoldier(random, style, 'elite', { people: 'mingSouth', design: 4 }));
+      const regulars = company(army.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth' }));
+      const garrison = company(army.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingSouth' }));
+      return {
+        red: shootersBehind(company(ZEELANDIA.dutch, (type) => europeanSoldier(random, type))),
+        blue: shootersBehind([...ironMen, ...regulars, ...garrison, ...company(army.ronin, (style) => roninWarrior(random, style))]),
+      };
+    },
+    fighters: [],
+  },
+  wokou: {
+    title: 'Wokou raid',
+    place: 'Zhejiang coast · 1554',
+    blurb: 'Sea raiders come ashore: rōnin with their swords and Chinese pirates with dao, spears and guns, against the coast garrison and the few brigandine regulars among them.',
+    scene: 'coastVillage',
+    arena: { halfX: 14, halfZ: 9 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
+    roster: 'Twenty-six raiders · fifteen garrison',
+    formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.5 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 } },
+    cast: (random) => ({
+      red: shootersBehind([...company(WOKOU.raiders.ronin, (style) => roninWarrior(random, style)), ...company(WOKOU.raiders.wokou, (style) => wokouRaider(random, style))]),
+      blue: shootersBehind([...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth' })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingSouth' }))]),
+    }),
     fighters: [],
   },
   port: {

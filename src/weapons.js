@@ -158,6 +158,28 @@ export const WEAPONS = {
     harm: { swing: { blunt: 1 }, thrust: { blunt: 0.8 } },
     contactSeconds: 0.007, rotation: 0.9, wrist: { omega: 18, zeta: 0.8 }, threat: 3.8, grip: 0.6,
   },
+  // The Spanish espada: a one-handed cut-and-thrust sword of Toledo steel,
+  // a little longer than a short sword, made for the thrust.
+  espada: {
+    label: 'Espada', hands: 'one', length: 0.85, strikeFrom: 0.12, handle: 0.14, mass: 1.1, balance: 0.12, radius: 0.011,
+    harm: { thrust: { pierce: 0.95, cut: 0.2, blunt: 0.1 }, swing: { cut: 0.9, blunt: 0.35 } },
+    contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 24, zeta: 0.8 }, threat: 3.4,
+  },
+  // The macuahuitl: a flat oak club edged both sides with obsidian blades.
+  // Obsidian cuts flesh as nothing else does (`cut`), but it is glass: each
+  // blow on steel or hard armour chips the edge (`brittle`: what is left of
+  // its cutting after such a blow), while the oak still strikes (`blunt`).
+  macuahuitl: {
+    label: 'Macuahuitl', hands: 'one', length: 0.8, strikeFrom: 0.2, handle: 0.18, mass: 1.4, balance: 0.38, radius: 0.03, brittle: 0.7,
+    harm: { swing: { cut: 1.5, blunt: 0.7 }, thrust: { blunt: 0.5 } },
+    contactSeconds: 0.004, rotation: 0.85, wrist: { omega: 20, zeta: 0.8 }, threat: 3.6,
+  },
+  // The tepoztopilli: a broad wooden spearhead edged with obsidian, for cut and thrust.
+  tepoztopilli: {
+    label: 'Tepoztopilli', hands: 'two', length: 1.5, strikeFrom: 1.15, handle: 0.4, spacing: 0.42, leadAhead: true, mass: 2.0, balance: 0.6, radius: 0.02, brittle: 0.7,
+    harm: { thrust: { pierce: 0.8, cut: 0.5, blunt: 0.25 }, swing: { cut: 1.1, blunt: 0.45 } },
+    contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
+  },
   // The kanabo: a long oak club shod with iron studs, swung in two hands.
   // Heavier than a war hammer and a little harder, struck with its whole
   // upper half (`strikeFrom`), not a point; no thrust; slow to turn.
@@ -225,6 +247,10 @@ export const SHIELDS = {
   parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15 },
   // A Ming soldier's small round shield: lacquered wood with an iron rim and a boss.
   roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, look: 'ming' },
+  // The Spanish rodela: a round steel shield, heavy and proof against cuts and thrusts.
+  rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, look: 'steel' },
+  // The Mexica chimalli: a round shield of wicker or wood faced with feathers and hide.
+  chimalli: { label: 'Chimalli', radius: 0.33, mass: 1.6, offset: 0.07, armHarm: 0.2, look: 'feather' },
 };
 
 // Cutting and piercing, in joules of a contact's collision energy after
@@ -234,6 +260,8 @@ export const SHIELDS = {
 // joule, the bleeding easing as it clots, and a man who has lost this share
 // of his blood collapses.
 export const BLADES = {
+  // Armour this proof against cuts chips a brittle (obsidian) edge.
+  chipsOn: 0.6,
   sever: {
     // joint: [J for a typical limb, the segment whose thickness scales it, typical radius m]
     wrist: [40, 'Forearm', 0.035], elbow: [70, 'Forearm', 0.04], shoulder: [125, 'UpperArm', 0.05],

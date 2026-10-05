@@ -240,6 +240,29 @@ export const PRESETS = {
     outfit: { kind: 'mingElite', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
+  // The conquest of Mexico: Hernán Cortés with the espada; Bernal Díaz,
+  // rodelero and chronicler, with sword and buckler; and two of the Mexica,
+  // an eagle warrior with the macuahuitl and a jaguar with the tepoztopilli.
+  hidalgo: {
+    name: 'Hernán Cortés', style: 'espada', sex: 'male', heightCm: 166, frame: 'medium', age: 35, exercise: 0.7, calories: 2900,
+    outfit: { kind: 'conquistadorPlate', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#2a1d14', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  rodelero: {
+    name: 'Bernal Díaz', style: 'espadaRodela', sex: 'male', heightCm: 164, frame: 'medium', age: 28, exercise: 0.7, calories: 2800,
+    outfit: { kind: 'conquistadorQuilted', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1d14', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  macuahuitl: {
+    name: 'Cuauhtémoc', style: 'macuahuitl', sex: 'male', heightCm: 162, frame: 'medium', age: 25, exercise: 0.82, calories: 2700,
+    outfit: { kind: 'mexicaElite', design: 1 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  tepoztopilli: {
+    name: 'Ocelotl', style: 'tepoztopilli', sex: 'male', heightCm: 161, frame: 'medium', age: 27, exercise: 0.8, calories: 2700,
+    outfit: { kind: 'mexicaElite', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.
   handgun: {
     name: 'Sgt. Dana Cole', style: 'handgun', sex: 'male', heightCm: 180, frame: 'medium', age: 34, exercise: 0.55, calories: 3720,

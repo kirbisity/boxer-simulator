@@ -174,12 +174,63 @@ export function sengokuWarrior(random = Math.random, side, style, rank = style =
  * brigandine man in his iron hat, or an elite in the long coat with the
  * chest mirror; built like the side's other men, in one of his armour's designs.
  */
-export function mingSoldier(random = Math.random, style = 'spear', rank = 'garrison') {
+export function mingSoldier(random = Math.random, style = 'spear', rank = 'garrison', { people = 'ming', design = null } = {}) {
   const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' ? PRESETS.swordShield : PRESETS.mingSpear, random);
   const kind = { garrison: 'mingGarrison', brigandine: 'mingBrigandine', elite: 'mingElite' }[rank];
   const name = `${pickOne(['Wang', 'Li', 'Zhang', 'Liu', 'Chen', 'Yang', 'Zhao', 'Huang', 'Zhou', 'Wu', 'Qi', 'Luo'], random)} ${pickOne(['Da', 'Er', 'San', 'Si', 'Wu', 'Liu', 'Hu', 'Bao', 'Shun', 'Gui', 'Fu', 'Ming'], random)}`;
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] };
-  return builtLike(soldier, PERIOD_BUILD.ming[rank], random);
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random) }, accessories: [] };
+  return builtLike(soldier, PERIOD_BUILD[people][rank], random);
+}
+
+/**
+ * A Spanish conquistador of the 1510s–20s (or, `dutch`, a VOC soldier of
+ * the 1660s in the same kit): a hidalgo in breastplate with the espada, a
+ * rodelero with sword and buckler in quilted cotton, an arquebusier; the
+ * Dutch a musketeer in a buff coat or a pikeman in breastplate and pot.
+ */
+export function europeanSoldier(random = Math.random, type = 'rodelero') {
+  const kit = {
+    hidalgo: ['conquistadorPlate', 'espada', [0, 1, 2, 4], 'spanish'],
+    rodelero: ['conquistadorQuilted', 'espadaRodela', [0, 1, 2, 4], 'spanish'],
+    arquebusier: ['conquistadorQuilted', 'matchlock', [0, 1, 2, 4], 'spanish'],
+    pikeman: ['conquistadorPlate', 'spear', [3], 'dutch'],
+    musketeer: ['conquistadorQuilted', 'matchlock', [3], 'dutch'],
+    officer: ['conquistadorPlate', 'espada', [3], 'dutch'],
+  }[type];
+  const [kind, style, designs, people] = kit;
+  const names = people === 'dutch'
+    ? [['Jan', 'Pieter', 'Hendrik', 'Willem', 'Cornelis', 'Thomas', 'Jacob', 'Dirk'], ['Pedel', 'Coyett', 'de Vries', 'Jansen', 'van Dam', 'Bakker', 'Visser', 'de Graaf']]
+    : [['Pedro', 'Gonzalo', 'Juan', 'Diego', 'Alonso', 'Andrés', 'Francisco', 'Hernán', 'Rodrigo', 'Martín'], ['de Alvarado', 'de Sandoval', 'de Olid', 'Díaz', 'de Ordaz', 'de Ávila', 'de Tapia', 'Velázquez', 'de Lugo', 'Núñez']];
+  const base = varyCharacter(PRESETS.contender, random);
+  const soldier = { ...base, sex: 'male', name: `${pickOne(names[0], random)} ${pickOne(names[1], random)}`, style, outfit: { kind, design: pickOne(designs, random) }, accessories: [], look: { ...base.look, skinTone: pickOne(['light', 'lightTan'], random), facialHair: pickOne(['beard', 'mustache', 'stubble'], random) } };
+  return builtLike(soldier, PERIOD_BUILD[people][type === 'hidalgo' || type === 'officer' ? 'officer' : 'soldier'], random);
+}
+
+/** A Mexica warrior (macuahuitl, tepoztopilli, bow), or one of the jaguar and eagle orders (`elite`). */
+export function mexicaWarrior(random = Math.random, style = 'macuahuitl', rank = 'warrior', { people = null, band = null } = {}) {
+  const kind = rank === 'elite' ? 'mexicaElite' : 'mexicaWarrior';
+  const base = varyCharacter(PRESETS.contender, random);
+  // `people`: a city of his own (Tlaxcala, the Spaniards' ally), shown by his band's colour (`band`, a design).
+  const city = people ? `of ${people}` : pickOne(['of Tlatelolco', 'of Tenochtitlan', 'of Texcoco', 'of Tlacopan', 'of Coyoacan'], random);
+  const name = `${pickOne(['Cuauhtli', 'Ocelotl', 'Mazatl', 'Tochtli', 'Yaotl', 'Tecuani', 'Huitzil', 'Matlal', 'Coaxoch', 'Tenoch'], random)} ${city}`;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: band ?? randomDesign(kind, random) }, accessories: [], look: { ...base.look, skinTone: pickOne(['tan', 'medium'], random), hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none' } };
+  return builtLike(soldier, PERIOD_BUILD.mexica[rank], random);
+}
+
+/** A masterless samurai (katana, naginata), unarmoured. */
+export function roninWarrior(random = Math.random, style = 'katana') {
+  const base = varyCharacter(PRESETS.samurai, random);
+  const name = `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: [] };
+  return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
+}
+
+/** A Chinese sea raider (wokou): dao, spear or matchlock, no armour. */
+export function wokouRaider(random = Math.random, style = 'dao') {
+  const base = varyCharacter(PRESETS.mingDao, random);
+  const name = `${pickOne(['Xu', 'Wang', 'Lin', 'Chen', 'Huang', 'Ye', 'Mao', 'Hong'], random)} ${pickOne(['Hai', 'Zhi', 'Dong', 'Ma', 'San', 'Bao', 'Lang', 'Shan'], random)}`;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'wokou', design: randomDesign('wokou', random) }, accessories: [] };
+  return builtLike(soldier, PERIOD_BUILD.mingSouth.raider, random);
 }
 
 /**
@@ -190,7 +241,17 @@ export function mingSoldier(random = Math.random, style = 'spear', rank = 'garri
  */
 const PERIOD_BUILD = {
   ming: { garrison: { heightCm: 166, weightKg: 64, exercise: 0.6 }, brigandine: { heightCm: 168, weightKg: 67, exercise: 0.68 }, elite: { heightCm: 171, weightKg: 71, exercise: 0.75 } },
-  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 } },
+  // Southern Chinese (Zhejiang, Fujian) stood a little shorter than northern
+  // men. Koxinga picked his "iron men" by strength (they had to lift a stone
+  // lion): his elite is the big men of his army.
+  mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 163, weightKg: 58, exercise: 0.6 } },
+  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 56, exercise: 0.75 } },
+  // Castilian men of the early 1500s about 165 cm; the Mexica a few
+  // centimetres shorter, lean, trained for war from youth in the telpochcalli.
+  spanish: { soldier: { heightCm: 165, weightKg: 63, exercise: 0.7 }, officer: { heightCm: 167, weightKg: 66, exercise: 0.72 } },
+  mexica: { warrior: { heightCm: 160, weightKg: 58, exercise: 0.72 }, elite: { heightCm: 162, weightKg: 60, exercise: 0.82 } },
+  // Dutch soldiers of the 1660s, among Europe's taller men then.
+  dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };
 
 /** This man at a period's build: its height and training, give or take, fed to its weight. */

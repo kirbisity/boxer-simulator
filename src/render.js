@@ -78,7 +78,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku };
+  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     view.scene.add(view.places[place]);
@@ -107,6 +107,11 @@ const PLACE_LIGHT = {
   town: { background: 0xc4dcf2, fog: [40, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.15 },
   // Autumn morning on an open battlefield: clear, the sun strong, haze on the hills.
   sengoku: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
+  // The high plain of the Valley of Mexico: thin bright air, a hard sun.
+  plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.2 },
+  // A tropical shore: bright, hazy over the sea.
+  coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.15 },
+  coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
   port: { background: 0x060912, fog: [14, 48], key: 0x9fb4ff, keyIntensity: 0.85, rim: 0x5a78c0, hemi: 0.24 },
   // A dark hall, the ring alone under hard white light.
@@ -123,6 +128,9 @@ export const PLACE_ARENAS = {
   town: { halfX: 9, halfZ: 7 },
   port: { halfX: 10, halfZ: 6 },
   sengoku: { halfX: 11, halfZ: 7 },
+  plain: { halfX: 12, halfZ: 8 },
+  coastFort: { halfX: 12, halfZ: 8 },
+  coastVillage: { halfX: 12, halfZ: 8 },
 };
 
 /**
@@ -610,6 +618,134 @@ function buildSubway(arena) {
  * the side's colour; a bamboo palisade, pines, the mountains, and a castle
  * on a far hill, under a day sky.
  */
+/**
+ * The plain below the volcanoes: dry grass, maguey and nopal, the snowy
+ * cones of Popocatépetl and Iztaccíhuatl far off.
+ */
+function buildPlain() {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
+  place.add(daySky());
+  const field = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#a49a5a';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 18000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${140 + shade * 60},${130 + shade * 50},${70 + shade * 30},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
+    }
+  }, [5, 5]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(130, 130), lit(0xffffff, { map: field }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  place.add(ground);
+  // The volcanoes, snow on their crowns, and a ring of lower hills.
+  [[-20, -55, 20, 22], [12, -58, 17, 18]].forEach(([x, z, radius, tall]) => {
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, tall, 14), lit(0x6a6f7a));
+    cone.position.set(x, tall / 2 - 1, z);
+    const snow = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.32, tall * 0.32, 14), lit(0xf2f4f8));
+    snow.position.set(x, tall - 1 - tall * 0.16, z);
+    place.add(cone, snow);
+  });
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (index / 10) * Math.PI * 2;
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(9 + Math.random() * 6, 4 + Math.random() * 4, 8), lit(0x8a8a62));
+    hill.position.set(Math.cos(angle) * 52, 1.5, Math.sin(angle) * 50);
+    place.add(hill);
+  }
+  // Maguey (a rosette of spiky leaves) and nopal about the field.
+  const agave = lit(0x6a8a6a);
+  for (let index = 0; index < 22; index += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const reach = 17 + Math.random() * 14;
+    const plant = new THREE.Group();
+    for (let leaf = 0; leaf < 9; leaf += 1) {
+      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.09, 1.2, 4), agave);
+      const turn = (leaf / 9) * Math.PI * 2;
+      blade.position.set(Math.cos(turn) * 0.25, 0.5, Math.sin(turn) * 0.25);
+      blade.rotation.set(Math.sin(turn) * 0.6, 0, -Math.cos(turn) * 0.6);
+      plant.add(blade);
+    }
+    plant.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.8);
+    plant.scale.setScalar(0.8 + Math.random() * 0.8);
+    place.add(plant);
+  }
+  return place;
+}
+
+/**
+ * A sandy shore by the sea: the beach, the water to the horizon, and behind
+ * the fighting either a fort of red brick with bastions (Zeelandia) or a
+ * coastal village of whitewashed houses under grey tile (Zhejiang).
+ */
+function buildCoast({ fort }) {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
+  place.add(daySky());
+  const sandTexture = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#d8c79a';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 16000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${190 + shade * 40},${170 + shade * 40},${120 + shade * 40},${0.25 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+  }, [5, 5]);
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(70, 130), lit(0xffffff, { map: sandTexture }));
+  sand.rotation.x = -Math.PI / 2;
+  sand.position.x = -10;
+  sand.receiveShadow = true;
+  place.add(sand);
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshStandardMaterial({ color: 0x2f6a8a, roughness: 0.25, metalness: 0.1 }));
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.set(95, -0.05, 0);
+  place.add(sea);
+  if (fort) {
+    // The fort on its rise: a square of red brick, bastions at the corners, the flag.
+    const brick = lit(0x9a4a32);
+    const walls = new THREE.Group();
+    const core = new THREE.Mesh(new THREE.BoxGeometry(18, 6, 18), brick);
+    core.position.y = 3;
+    walls.add(core);
+    for (const [x, z] of [[-9, -9], [9, -9], [-9, 9], [9, 9]]) {
+      const bastion = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 6.4, 4), brick);
+      bastion.rotation.y = Math.PI / 4;
+      bastion.position.set(x, 3.2, z);
+      walls.add(bastion);
+    }
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 8, 6), lit(0x3a2a1c));
+    pole.position.set(0, 10, 0);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 2), new THREE.MeshStandardMaterial({ color: 0xd06a1a, side: THREE.DoubleSide }));
+    flag.position.set(1.5, 13, 0);
+    walls.add(pole, flag);
+    walls.position.set(-8, 0, -42);
+    place.add(walls);
+  } else {
+    // A fishing village: low houses, white walls, grey tiled roofs, boats drawn up.
+    const wall = lit(0xe8e2d4);
+    const tile = lit(0x4a4e56);
+    for (let index = 0; index < 9; index += 1) {
+      const house = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), wall);
+      body.position.y = 1.5;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.9, 1.6, 4), tile);
+      roof.rotation.y = Math.PI / 4;
+      roof.scale.set(1.3, 1, 1);
+      roof.position.y = 3.8;
+      house.add(body, roof);
+      house.position.set(-30 + (index % 3) * 8, 0, -30 + Math.floor(index / 3) * 9 + (index % 2) * 2);
+      place.add(house);
+    }
+    for (let index = 0; index < 4; index += 1) {
+      const boat = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 2), lit(0x5a3a22));
+      boat.position.set(24, 0.4, -12 + index * 7);
+      boat.rotation.y = 0.3;
+      place.add(boat);
+    }
+  }
+  return place;
+}
+
 function buildSengoku() {
   const place = new THREE.Group();
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });

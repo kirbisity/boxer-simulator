@@ -191,6 +191,32 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.96, 1.2, { rivets: 4, base: 'cloth' }], skirt: [0.72, 0.55, 1.32, { rivets: 4, base: 'cloth' }],
     upperArm: [-0.2, 0.5, 1.5, { rivets: 4, base: 'cloth' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
+  // A conquistador: the breastplate over the doublet, short tassets, mail
+  // sleeves and collar; the doublet's cloth shows below.
+  conquistador: {
+    trunk: [[-0.06, 0.97, 1.12, MAIL], [0.1, 0.96, 1.22, 'steel']], skirt: [0.3, 0.4, 1.24, { rows: ['steel', 'steel2'] }], collar: 'mail',
+    upperArm: [-0.3, 1.04, 1.14, MAIL],
+  },
+  // Escaupil and ichcahuipilli: quilted cotton, thick, stitched in rows.
+  escaupil: {
+    trunk: [-0.06, 0.96, 1.18, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.42, 0.45, 1.22, { rows: ['cloth', 'cloth', 'cloth2'] }],
+    upperArm: [-0.15, 0.55, 1.15, { rows: ['cloth', 'cloth2'] }],
+  },
+  ichcahuipilli: {
+    trunk: [0.0, 0.94, 1.16, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.22, 0.35, 1.18, { rows: ['cloth', 'cloth', 'cloth2'] }],
+  },
+  // The jaguar knight's suit: the spotted skin over everything, to the wrists and ankles.
+  jaguarSuit: {
+    trunk: [-0.06, 0.98, 1.16, { spots: true }], skirt: [0.3, 0.4, 1.2, { spots: true }],
+    upperArm: [-0.2, 1.02, 1.14, { spots: true }], forearm: [-0.04, -0.02, 1.12, { spots: true }],
+    thigh: [0.0, 1.04, 1.1, { spots: true }], shin: [-0.1, 0.95, 1.1, { spots: true }],
+  },
+  // The eagle knight's suit: rows of feathers.
+  featherSuit: {
+    trunk: [-0.06, 0.98, 1.18, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.32, 0.5, 1.24, { rows: ['cloth', 'cloth2'] }],
+    upperArm: [-0.2, 1.02, 1.16, { rows: ['cloth', 'cloth2'] }], forearm: [-0.04, -0.02, 1.12, 'cloth'],
+    thigh: [0.0, 1.04, 1.12, { rows: ['cloth', 'cloth2'] }],
+  },
   // The same men in lamellar: small iron plates laced in rows (`lace`).
   mingLamellar: {
     trunk: [-0.06, 0.96, 1.2, { rows: ['steel', 'steel', 'lace'] }], skirt: [0.72, 0.55, 1.32, { rows: ['steel', 'steel', 'lace'] }],
@@ -263,6 +289,8 @@ function paintFor(paint, armor) {
   return (ring, angle, index, step) => {
     // A round plate over the breast (`mirror`: centre up the trunk, size, role), riveted cloth round it.
     if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
+    // A big cat's rosettes, scattered: a dark spot every few rings and steps.
+    if (paint.spots) return (index * 7 + step * 3) % 5 === 0 ? 'cloth2' : 'cloth';
     // Scales: rows of them, each offset by half a scale from the one above,
     // the lower edge of every third row dark with its lacing so the rows read.
     if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
