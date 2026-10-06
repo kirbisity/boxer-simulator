@@ -61,8 +61,14 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
 
 /**
  * Free what an object and its children hold on the GPU: geometries,
- * materials, skeletons' bone textures, and textures drawn for them (a banner's canvas). Anything
- * marked `userData.shared` (a crowd template, a merged weapon) is left.
+ * skeletons' bone textures, and textures drawn for them (a banner's canvas).
+ * Anything marked `userData.shared` (a crowd template, a merged weapon) is left.
+ *
+ * Materials are not disposed: a material holds no GPU memory of its own, only
+ * a share of its compiled shader program, and disposing the last material of
+ * a kind deletes that program, to be compiled again (a stall of 50–500 ms on
+ * many GPUs) the next time anything like it is drawn. Kept, each program is
+ * compiled once a session.
  */
 export function disposeObject(root) {
   root.traverse((object) => {
@@ -70,9 +76,6 @@ export function disposeObject(root) {
     object.geometry?.dispose?.();
     // A skinned mesh's bones live in a texture of their own.
     if (object.isSkinnedMesh) object.skeleton?.dispose?.();
-    for (const material of [].concat(object.material ?? [])) {
-      if (material.map?.isCanvasTexture) material.map.dispose();
-      material.dispose();
-    }
+    for (const material of [].concat(object.material ?? [])) if (material.map?.isCanvasTexture) material.map.dispose();
   });
 }
