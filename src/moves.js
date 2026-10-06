@@ -925,6 +925,24 @@ export const STYLES = {
     plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
     pressure: 0.2,
   },
+  // Bearing the standard: held high, the pole only to keep a man off; a
+  // step back sooner than a trade. One style per standard (its weapon).
+  ...Object.fromEntries(['banner', 'lingQi', 'sancak', 'tug', 'nobori'].map((kind) => [kind, {
+    label: 'Standard', hidden: true, weapon: kind,
+    cadence: { work: 0.6, move: 0.8, burst: 0.3, mobility: 0.5 },
+    stance: { blade: 0.4, crouch: 0.04, width: 1.15, lean: 0, guardHeight: 0 },
+    weaponGuard: { hand: [0.08, 0.7, -0.04], dir: [0.35, 1, 0.05] },
+    idle: { bounce: 0.1, sway: 0.4, rock: 0.2 },
+    attacks: { staffButt: 0.5, spearJab: 0.5 },
+    combos: {},
+    comboChance: 0,
+    tempo: 0.7,
+    defences: { weaponBlock: 0.5, stepBack: 0.5 },
+    defendChance: 0.6,
+    headMovement: 0.1,
+    plans: { counter: 1.2, outboxer: 1.2, pressure: 0.3, brawler: 0.2 },
+    pressure: 0.1,
+  }])),
   wakizashi: {
     label: 'Wakizashi', hidden: true, weapon: 'wakizashi', fallback: 'mix',
     cadence: { work: 1.3, move: 0.7, burst: 0.7, mobility: 0.55 },

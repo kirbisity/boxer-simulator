@@ -348,7 +348,27 @@ export const WEAPONS = {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
     harm: { thrust: { pierce: 0.9, cut: 0.2, blunt: 0.15 }, swing: { cut: 0.8, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
-  },
+  },  // Standards: the side's flag on a staff, carried by its leader (see
+  // FACTIONS[...].standard). A bearer wants both hands for it; it is a poor
+  // weapon, a long ash pole heavy at the top with the cloth and finial (~3.5 kg,
+  // ~2.6 m), swung or jabbed only to keep a man off. `flag` names the look.
+  ...Object.fromEntries([
+    // A square knight's banner on a lance-length staff, a spear finial.
+    ['banner', 'Banner', 'knights'],
+    // The Ming command flag (令旗): a triangle with a flame-tongue border.
+    ['lingQi', 'Command flag', 'chinese'],
+    // The Ottoman sancak: a swallow-tailed field on a staff with a brass crescent.
+    ['sancak', 'Sancak', 'ottomans'],
+    // The steppe tug: horse-tail plumes hung under a trident finial, no cloth.
+    ['tug', 'Tug', 'steppe'],
+    // A nobori: tall and narrow, hung from a pole and a crossbar; the leader's
+    // back banner, picked up, is carried in the hands like this.
+    ['nobori', 'Nobori', 'japanese'],
+  ].map(([kind, label, flag]) => [kind, {
+    label, flag, hands: 'two', length: 1.75, strikeFrom: -0.6, handle: 0.85, spacing: 0.45, leadAhead: true, mass: 3.5, balance: 0.75, radius: 0.018,
+    harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7, pierce: 0.3 } },
+    contactSeconds: 0.008, rotation: 1.4, wrist: { omega: 10, zeta: 0.9 }, threat: 2, grip: 0.5,
+  }])),
 };
 
 // Shields strapped to the off forearm: a disc of this radius held off the

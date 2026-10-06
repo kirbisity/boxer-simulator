@@ -4,7 +4,7 @@
 
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, nearestOpponent, perform, point, reachOf, staggerShare, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
+import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 
@@ -16,9 +16,9 @@ export const AI = {
   tieBackPerSecond: 3,
   // In a big fight, how often (s) a fighter with nothing happening near him thinks.
   idleThinkEvery: 0.1,
-  // Cohesion in a group fight (a side of `minSide` or more): each fighter,
-  // deciding for himself as ever, leans slightly towards his side's leader
-  // (see keepLeaders). Within `radius` m, plus `radiusPerSqrt`
+  // Cohesion in a group fight (a side of WORLD.standard.minSide or more):
+  // each fighter, deciding for himself as ever, leans slightly towards his
+  // side's standard (see keepLeaders). Within `radius` m, plus `radiusPerSqrt`
   // × √(men standing), no pull; beyond it a pull growing to full over `ramp`
   // m: a sideways lean towards him (`strafe`, of a full sidestep) and, run
   // out ahead of him, an easing of the advance (`holdBack`, share of the
@@ -27,7 +27,8 @@ export const AI = {
   // counts as `focus` m nearer for each m he is nearer him. A shooter running
   // for room weighs each m a spot lies beyond that ground as `escape` m less
   // distance from his pursuer: the run away still wins, but bends homeward.
-  cohesion: { minSide: 4, radius: 2, radiusPerSqrt: 0.75, ramp: 4, strafe: 0.55, holdBack: 0.7, engaged: 1.2, focus: 0.3, escape: 0.3 },
+  // A man going to take up his fallen standard runs to it from further than `runFor` m.
+  cohesion: { radius: 2, radiusPerSqrt: 0.75, ramp: 4, strafe: 0.55, holdBack: 0.7, engaged: 1.2, focus: 0.3, escape: 0.3, runFor: 1.5 },
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
   passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
@@ -91,6 +92,12 @@ export const AI = {
   // Past `breakAt` he may break (`rate`/s at full fear) into the passive
   // style — unless adrenaline is over `adrenalineHolds`. He comes out once
   // fear is under `calmAt` for `calmSeconds`, or adrenaline surges.
+  // Crawling away: a panicked man hurt past `from` (his worst of hurtShare
+  // and his legs' damage) goes down on his knees at up to `rate` a second
+  // (scaled by how far past), much less with adrenaline in him (`adrenaline`:
+  // the share it takes away at full). Crawling, he keeps going away from the
+  // nearest enemy, `away` m at a time.
+  crawl: { from: 0.55, rate: 0.5, adrenaline: 0.9, away: 3 },
   panic: { settle: 1.5, outmatched: 0.5, hurt: 0.85, perKnockdown: 0.22, breakAt: 0.7, rate: 0.6, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
@@ -203,58 +210,100 @@ export function thinkAll(world, dt, playerIds = new Set()) {
 }
 
 /**
- * Each side's leader, and how many still stand with him. He is chosen once,
- * the man nearest the middle of his side; when he is out of the fight, the
- * man still on his feet nearest where he fell takes over, so the side
- * gathers on much the same ground.
+ * Each side's rallying point (world.leaders), from its standard: the man
+ * bearing it (in his hands or on his back), or, fallen, the standard where
+ * it lies, and the man nearest it, whose first care is to take it up. A
+ * side without a standard follows a leader; when he is out, the man nearest
+ * where he fell takes over. Only sides big enough have one (world.standards).
  */
 function keepLeaders(world) {
-  const sides = {};
-  for (const fighter of world.fighters) {
-    if (fighter.state === 'out') continue;
-    (sides[fighter.corner] ??= []).push(fighter);
-  }
-  world.leaders ??= {};
-  for (const [corner, side] of Object.entries(sides)) {
-    const kept = world.leaders[corner];
-    let leader = kept?.leader;
-    if (!leader || leader.state === 'out') {
-      // Gather on where he stood; at the start, on the middle of the side.
-      let centre = [0, 0];
-      if (leader) centre = [leader.x[P.pelvis * 3], leader.x[P.pelvis * 3 + 2]];
-      else {
-        for (const fighter of side) {
-          centre[0] += fighter.x[P.pelvis * 3] / side.length;
-          centre[1] += fighter.x[P.pelvis * 3 + 2] / side.length;
-        }
-      }
-      const candidates = side.filter((fighter) => fighter.state === 'up');
-      leader = null;
-      let nearest = Infinity;
-      for (const fighter of candidates.length ? candidates : side) {
-        const distance = Math.hypot(fighter.x[P.pelvis * 3] - centre[0], fighter.x[P.pelvis * 3 + 2] - centre[1]);
-        if (distance < nearest) {
-          nearest = distance;
-          leader = fighter;
-        }
+  world.leaders = {};
+  for (const [corner, standard] of Object.entries(world.standards ?? {})) {
+    const side = world.fighters.filter((fighter) => fighter.corner === corner && inFight(fighter));
+    if (!side.length) continue;
+    const leader = world.fighters[standard.leader];
+    let bearer = null;
+    let lying = null;
+    if (standard.kind) {
+      // A fallen leader lets the standard go: from his hands, or off his back.
+      if (leader.state === 'out' && leader.weapon?.held && leader.weapon.spec.flag) dropWeapon(world, leader, 'dropped');
+      if (leader.state === 'out' && leader.wornStandard && !leader.wornStandard.shed) shedStandard(world, leader);
+      bearer = side.find((fighter) => (fighter.weapon?.held && fighter.weapon.kind === standard.kind) || (fighter.wornStandard && !fighter.wornStandard.shed)) ?? null;
+      if (!bearer) {
+        lying = world.debris.find((debris) => debris.weapon === standard.kind && !debris.taken && world.fighters[debris.owner]?.corner === corner) ?? null;
+        // Lost altogether (it never is, but): the leader as without one.
+        if (!lying) standard.kind = null;
       }
     }
-    world.leaders[corner] = { leader, standing: side.length };
+    if (!standard.kind) {
+      bearer = leader.state === 'out' ? nearestTo(side.filter((fighter) => fighter.state === 'up'), point(leader.x, P.pelvis)) ?? leader : leader;
+    }
+    if (bearer) standard.leader = bearer.id;
+    const at = bearer ? point(bearer.x, P.pelvis) : lying.x;
+    // The man going for it keeps going while he can, rather than two turning back and forth.
+    const able = side.filter((fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.clinch && !fighter.pin);
+    const going = lying && able.find((fighter) => fighter.id === standard.taker);
+    const taker = lying ? going ?? nearestTo(able, at) : null;
+    standard.taker = taker?.id;
+    world.leaders[corner] = { leader: bearer, at: [at[0], at[2]], standing: side.length, lying, taker };
   }
-  for (const corner of Object.keys(world.leaders)) if (!sides[corner]) delete world.leaders[corner];
+}
+
+/** Of these fighters, the one nearest a point. */
+function nearestTo(fighters, at) {
+  let nearest = null;
+  let least = Infinity;
+  for (const fighter of fighters) {
+    const distance = Math.hypot(fighter.x[P.pelvis * 3] - at[0], fighter.x[P.pelvis * 3 + 2] - at[2]);
+    if (distance < least) {
+      least = distance;
+      nearest = fighter;
+    }
+  }
+  return nearest;
 }
 
 /**
- * Cohesion: after his own decision, a fighter far from his side's leader
- * leans a little towards him — a sideways lean, and an easier advance if he
- * has run out ahead of him. Each man decides alone; together a side tends to
- * hold together, its rear not drawn into the front's fight.
+ * The standard is down and he is nearest: before anything else, he goes to
+ * it and takes it up, his own weapon let fall. Returns whether he is on it.
+ */
+function takeUpStandard(world, fighter) {
+  const side = world.leaders?.[fighter.corner];
+  if (!side?.lying || side.taker !== fighter) return false;
+  if (fighter.pickup) {
+    fighter.move = 0;
+    fighter.strafe = 0;
+    return true;
+  }
+  // A blow already on its way is finished first.
+  if (fighter.punch) return false;
+  const debris = side.lying;
+  const distance = Math.hypot(debris.x[0] - fighter.x[P.pelvis * 3], debris.x[2] - fighter.x[P.pelvis * 3 + 2]);
+  fighter.goTo = debris.x;
+  fighter.strafe = 0;
+  fighter.aiCombo = null;
+  fighter.aimAt = undefined;
+  if (distance > AI.pickup.stoopAt) {
+    fighter.move = 1;
+    fighter.running = distance > AI.cohesion.runFor;
+    return true;
+  }
+  fighter.move = 0;
+  // Still tumbling: he waits over it.
+  if (debris.resting) startPickup(world, fighter, debris);
+  return true;
+}
+
+/**
+ * Cohesion: after his own decision, a fighter far from his side's standard
+ * (or leader) leans a little towards it: a sideways lean, and an easier
+ * advance if he has run out ahead of it. Each man decides alone; together a
+ * side tends to hold together, its rear not drawn into the front's fight.
  */
 function keepWithLeader(world, fighter) {
   const spec = AI.cohesion;
   const side = world.leaders?.[fighter.corner];
-  const leader = side?.leader;
-  if (!leader || leader === fighter || side.standing < spec.minSide || fighter.state !== 'up') return;
+  if (!side || side.leader === fighter || side.taker === fighter || fighter.state !== 'up') return;
   // Busy with something of his own: a hold, a blow, a weapon to pick up, a gun's room to find.
   if (fighter.clinch || fighter.pin || fighter.punch || fighter.pickup || fighter.goTo || fighter.panicked) return;
   const foe = fighter.focus === undefined ? null : world.fighters[fighter.focus];
@@ -263,7 +312,7 @@ function keepWithLeader(world, fighter) {
   const line = [foe.x[P.pelvis * 3] - at[0], 0, foe.x[P.pelvis * 3 + 2] - at[2]];
   const apart = Math.hypot(line[0], line[2]) || 1e-6;
   if (foe.state === 'up' && apart < reachOf(fighter) + reachOf(foe) + spec.engaged) return;
-  const offset = [leader.x[P.pelvis * 3] - at[0], 0, leader.x[P.pelvis * 3 + 2] - at[2]];
+  const offset = [side.at[0] - at[0], 0, side.at[1] - at[2]];
   const distance = Math.hypot(offset[0], offset[2]);
   const pull = Math.min(1, Math.max(0, (distance - spec.radius - spec.radiusPerSqrt * Math.sqrt(side.standing)) / spec.ramp));
   if (pull <= 0) return;
@@ -272,26 +321,24 @@ function keepWithLeader(world, fighter) {
   const left = [-forward[2], 0, forward[0]];
   const across = vec.dot(offset, left);
   fighter.strafe = Math.max(-1, Math.min(1, (fighter.strafe ?? 0) + Math.sign(across) * spec.strafe * pull * Math.min(1, Math.abs(across) / distance + 0.2)));
-  // Out ahead of his leader, going further: he eases off.
+  // Out ahead of the standard, going further: he eases off.
   if (vec.dot(offset, forward) < 0 && fighter.move > 0) fighter.move *= 1 - spec.holdBack * pull;
 }
 
-/** How far (m) a spot lies beyond the ground a fighter keeps near his leader; 0 within it, or out of a group fight. */
+/** How far (m) a spot ([x, z]) lies beyond the ground a fighter keeps near his standard; 0 within it, or out of a group fight. */
 function strayFromLeader(world, fighter, at) {
   const spec = AI.cohesion;
   const side = world.leaders?.[fighter.corner];
-  const leader = side?.leader;
-  if (!leader || leader === fighter || side.standing < spec.minSide) return 0;
-  const distance = Math.hypot(leader.x[P.pelvis * 3] - at[0], leader.x[P.pelvis * 3 + 2] - at[1]);
+  if (!side || side.leader === fighter) return 0;
+  const distance = Math.hypot(side.at[0] - at[0], side.at[1] - at[1]);
   return Math.max(0, distance - spec.radius - spec.radiusPerSqrt * Math.sqrt(side.standing));
 }
 
-/** How far a target is from my side's leader (m), in a group fight; 0 otherwise. */
+/** How far a target is from my side's standard (m), in a group fight; 0 otherwise. */
 function fromMyLeader(world, fighter, other) {
   const side = world.leaders?.[fighter.corner];
-  const leader = side?.leader;
-  if (!leader || leader === fighter || side.standing < AI.cohesion.minSide) return 0;
-  return Math.hypot(other.x[P.pelvis * 3] - leader.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - leader.x[P.pelvis * 3 + 2]);
+  if (!side || side.leader === fighter) return 0;
+  return Math.hypot(other.x[P.pelvis * 3] - side.at[0], other.x[P.pelvis * 3 + 2] - side.at[1]);
 }
 
 /**
@@ -361,12 +408,13 @@ function chooseFocus(world, fighter) {
   }
   fighter.aiEventCursor = events.length;
   const current = fighter.focus === undefined ? null : world.fighters[fighter.focus];
-  if (hitBy !== null && hitBy !== fighter.focus && world.fighters[hitBy].state === 'up') {
+  // A man crawling away is left to go.
+  if (hitBy !== null && hitBy !== fighter.focus && world.fighters[hitBy].state === 'up' && !world.fighters[hitBy].crawling) {
     fighter.focus = hitBy;
     return world.fighters[hitBy];
   }
-  if (current && current.state === 'up') return current;
-  const standing = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up');
+  if (current && current.state === 'up' && !current.crawling) return current;
+  const standing = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up' && !other.crawling);
   if (!standing.length) {
     fighter.focus = undefined;
     return nearestOpponent(world, fighter);
@@ -465,7 +513,7 @@ export function confidence(fighter, opponent, world = null) {
   nerve -= AI.reachFear * Math.max(0, reachOf(opponent) - reachOf(fighter));
   if (world) {
     // Outnumbering is courage; being outnumbered, fear.
-    const standing = (corner) => world.fighters.filter((other) => other.corner === corner && other.state !== 'out').length;
+    const standing = (corner) => world.fighters.filter((other) => other.corner === corner && inFight(other)).length;
     nerve += AI.numbersConfidence * Math.log2(Math.max(1, standing(fighter.corner)) / Math.max(1, standing(opponent.corner)));
   }
   return Math.max(-1, Math.min(1, nerve));
@@ -508,7 +556,8 @@ function goForWeapon(world, fighter, opponent, dt) {
   const attackingMe = enemies.some((other) => other.punch?.target === fighter.id);
   // Still worth it: loose, on the floor, and nearer me than any of them.
   const worth = (debris) => {
-    if (!debris || debris.kind !== 'weapon' || debris.taken || !debris.resting) return null;
+    // A standard is taken up only by its own side's chosen man (takeUpStandard).
+    if (!debris || debris.kind !== 'weapon' || debris.taken || !debris.resting || WEAPONS[debris.weapon]?.flag) return null;
     const mine = flat(debris.x, at);
     const theirs = enemies.reduce((least, other) => Math.min(least, flat(debris.x, point(other.x, P.pelvis))), Infinity);
     if (mine > AI.pickup.maxDistance || (mine > AI.pickup.atFeet && mine > theirs - AI.pickup.margin)) return null;
@@ -725,7 +774,7 @@ function holdDown(world, fighter, opponent) {
     return true;
   }
   if (world.rules?.noPins) return false;
-  const lastOfSide = world.fighters.filter((other) => other.corner === opponent.corner && other.state !== 'out').length === 1;
+  const lastOfSide = world.fighters.filter((other) => other.corner === opponent.corner && inFight(other)).length === 1;
   if (!lastOfSide || (opponent.state !== 'down' && opponent.state !== 'rising')) return false;
   const holding = world.fighters.filter((other) => other.pin?.target === opponent.id).length;
   if (holding >= AI.pin.pinners) return false;
@@ -799,6 +848,13 @@ function feelFear(world, fighter, nerve, dt) {
       world.events.push({ time: world.time, kind: 'panic', fighter: fighter.id, effects: ['breaks and runs'] });
     }
     return;
+  }
+  // Badly hurt as well as broken: down on his knees, crawling for safety.
+  const crawl = AI.crawl;
+  const severity = Math.max(hurtShare(fighter), legShare(fighter));
+  if (fighter.state === 'up' && !fighter.crawling && severity > crawl.from) {
+    const rate = crawl.rate * ((severity - crawl.from) / (1 - crawl.from)) * (1 - crawl.adrenaline * fighter.adrenaline);
+    if (world.random() < rate * dt) startCrawl(world, fighter, 'crawls away');
   }
   fighter.calmFor = fighter.fear < spec.calmAt ? (fighter.calmFor ?? 0) + dt : 0;
   if (held || fighter.calmFor > spec.calmSeconds) {
@@ -951,6 +1007,28 @@ function escapePoint(world, fighter, opponent) {
   return best;
 }
 
+/** Crawling: away from the nearest of them, on his knees, as long as he can. */
+function crawlAway(world, fighter) {
+  fighter.focus = undefined;
+  fighter.strafe = 0;
+  const at = point(fighter.x, P.pelvis);
+  const enemy = nearestOpponent(world, fighter);
+  if (!enemy) {
+    fighter.goTo = null;
+    fighter.move = 0;
+    return;
+  }
+  const away = [at[0] - enemy.x[P.pelvis * 3], at[2] - enemy.x[P.pelvis * 3 + 2]];
+  const length = Math.hypot(away[0], away[1]) || 1;
+  const { halfX, halfZ } = world.arena;
+  const margin = AI.gunKite.wallMargin;
+  fighter.goTo = [
+    Math.max(-(halfX - margin), Math.min(halfX - margin, at[0] + (away[0] / length) * AI.crawl.away)), 0,
+    Math.max(-(halfZ - margin), Math.min(halfZ - margin, at[2] + (away[1] / length) * AI.crawl.away)),
+  ];
+  fighter.move = 1;
+}
+
 export function think(world, fighter, dt) {
   const random = world.random;
   fighter.strafe = 0;
@@ -958,6 +1036,10 @@ export function think(world, fighter, dt) {
   fighter.aimAt = undefined;
   if (fighter.state !== 'up') {
     fighter.move = 0;
+    return;
+  }
+  if (fighter.crawling) {
+    crawlAway(world, fighter);
     return;
   }
   const opponent = chooseFocus(world, fighter);
@@ -968,6 +1050,8 @@ export function think(world, fighter, dt) {
   switchMix(world, fighter, dt);
   // A weapon on the floor, and the chance to get it.
   fighter.goTo = null;
+  // The side's standard down, and he nearest it: that first.
+  if (takeUpStandard(world, fighter)) return;
   if (goForWeapon(world, fighter, opponent, dt)) return;
   let style = STYLES[fighter.style];
   const nerve = confidence(fighter, opponent, world);

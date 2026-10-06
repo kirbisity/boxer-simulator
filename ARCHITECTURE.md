@@ -29,13 +29,29 @@ limits → weapons → grappling → collisions → ground → velocities → pe
 impulses; then balance, props, debris and arrows. Big fights step distant
 fighters coarsely (`WORLD.tiers`); the AI of idle fighters thinks on a beat.
 
+**Group fights.** A side of `WORLD.standard.minSide` or more has a leader,
+the man nearest its middle at the start (`raiseStandards`). Where his faction
+has a `standard` (FACTIONS), he bears it: in his hands as a weapon with a
+`flag` (banner, ling qi, sancak, tug), or worn on his back (the Japanese great
+sashimono). Fallen, it lies as a loose weapon; the nearest man of his side
+puts taking it up before anything else (`takeUpStandard`), and the enemy
+leaves it. Every other man, deciding for himself, leans slightly towards the
+standard wherever it is (`keepWithLeader`, `AI.cohesion`), so a side tends to
+hold together. A side without a standard follows a leader, the nearest man
+taking over when he is out.
+
+**Crawling.** A man whose leg is broken, or who is badly hurt and has lost his
+nerve (fear, less likely with adrenaline: `AI.crawl`), goes on his knees and
+crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
+
 ## Drawing (browser only)
 
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
 `src/crowdview.js` (instanced crowds), `src/toon.js` (materials, outlines,
-`disposeObject`). `src/main.js` runs the loop and input; `src/menu.js` the
+`disposeObject`). `src/main.js` runs the loop and input (playing, the camera
+follows the player's man from behind: `CAMERA_FOLLOW`); `src/menu.js` the
 menus. Anything removed from the scene is freed with `disposeObject`.
 
 ## Principles

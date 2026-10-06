@@ -5,7 +5,7 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, throwPunch } from './physics.js';
+import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
@@ -236,7 +236,7 @@ function walkAbout(fighter) {
   }
   fighter.goTo = [pelvis[0] + (way[0] / size) * 3, 0, pelvis[1] + (way[1] / size) * 3];
   fighter.move = 1;
-  fighter.running = state.walkRunning;
+  fighter.running = state.walkRunning && !fighter.crawling;
 }
 
 /** Into walk mode, or back into the fight (the guard up, the footwork the style's). */
@@ -245,11 +245,20 @@ function setWalking(on) {
   if (!fighter) return;
   fighter.walking = on;
   if (!on) {
+    fighter.crawling = false;
     fighter.goTo = null;
     fighter.move = 0;
     fighter.running = false;
     walkHeld.clear();
   }
+  buildPad();
+}
+
+/** Walking about on his knees, or back on his feet (the sandbox's look at the crawl). */
+function setCrawling(on) {
+  const fighter = player();
+  if (!fighter?.walking) return;
+  fighter.crawling = on;
   buildPad();
 }
 
@@ -362,6 +371,32 @@ function blendWorld(world, before, share) {
   };
 }
 
+// Third person: `distance` m behind and `pitch` rad above the man played,
+// looking at a point `aboveHips` m over his hips and `shoulder` m to his
+// right (over the shoulder, his man in view); the target keeps up `ease`
+// of the way each frame, and the camera swings round behind him `turn` of
+// the way. Walking, the turn is the player's (drag): the keys go by the camera.
+const CAMERA_FOLLOW = { distance: 3.4, pitch: 0.24, aboveHips: 0.45, shoulder: 0.55, ease: 0.2, turn: 0.05 };
+
+/** Where the following camera looks: beside him, so that he stands left of the picture and his man shows past his right shoulder. */
+function shoulderPoint(fighter) {
+  const pelvis = point(fighter.x, P.pelvis);
+  return [pelvis[0] + Math.sin(fighter.yaw) * CAMERA_FOLLOW.shoulder, pelvis[1], pelvis[2] + Math.cos(fighter.yaw) * CAMERA_FOLLOW.shoulder];
+}
+
+/** Behind the man played, at a fixed distance; in the fight, round behind him as he turns. */
+function followCamera(fighter) {
+  const orbit = scene.orbit;
+  orbit.distance += (CAMERA_FOLLOW.distance - orbit.distance) * 0.1;
+  orbit.pitch += (CAMERA_FOLLOW.pitch - orbit.pitch) * 0.05;
+  // Held by the player's own drag, or walking about: his choice of view.
+  if (fighter.walking || pointers.size) return;
+  // He faces (cos yaw, −sin yaw) on the floor: the camera sits the other way.
+  const behind = Math.atan2(Math.sin(fighter.yaw), -Math.cos(fighter.yaw));
+  const turn = Math.atan2(Math.sin(behind - orbit.yaw), Math.cos(behind - orbit.yaw));
+  orbit.yaw += turn * CAMERA_FOLLOW.turn;
+}
+
 function draw(dt) {
   const restore = blendWorld(state.world, state.before, state.paused ? 1 : state.accumulator / STEP);
   try {
@@ -380,14 +415,19 @@ function drawWorld(dt) {
     pelvisMid[0] += fighter.x[24] / world.fighters.length;
     pelvisMid[2] += fighter.x[26] / world.fighters.length;
   }
+  const sheet = document.body.classList.contains('sheet');
+  // Playing: the camera follows his man from behind (third person).
+  const followed = state.mode === 'play' && !sheet ? player() : null;
+  if (followed) followCamera(followed);
   // A crowd needs a wider shot: back off with the spread of the fighters.
-  if (world.fighters.length > 2 && !document.body.classList.contains('sheet')) {
+  else if (world.fighters.length > 2 && !sheet) {
     const spread = Math.max(...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - pelvisMid[0], fighter.x[26] - pelvisMid[2])));
     const furthest = state.scenario ? SCENARIOS[state.scenario].camera?.maxDistance ?? Infinity : Infinity;
     scene.orbit.distance += (Math.min(furthest, Math.max(5.2, 3.4 + spread * 2.2)) - scene.orbit.distance) * 0.03;
   }
   // A design sheet holds its own framing.
-  placeCamera(scene, document.body.classList.contains('sheet') ? null : pelvisMid);
+  if (followed) placeCamera(scene, shoulderPoint(followed), { ease: CAMERA_FOLLOW.ease, height: followed.x[P.pelvis * 3 + 1] + CAMERA_FOLLOW.aboveHips });
+  else placeCamera(scene, sheet ? null : pelvisMid);
   dramaCamera(scene, state.drama, world, realSeconds());
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
@@ -624,9 +664,12 @@ function buildPad() {
     const run = Object.assign(document.createElement('button'), { innerHTML: 'Run <kbd>⇧</kbd>' });
     run.dataset.run = '1';
     run.classList.toggle('on', Boolean(state.walkRunning));
+    const crawl = Object.assign(document.createElement('button'), { innerHTML: 'Crawl <kbd>C</kbd>' });
+    crawl.dataset.crawl = '1';
+    crawl.classList.toggle('on', Boolean(player().crawling));
     const fight = Object.assign(document.createElement('button'), { innerHTML: 'Guard up <kbd>V</kbd>' });
     fight.dataset.walkToggle = '1';
-    pad.replaceChildren(...arrows, run, fight);
+    pad.replaceChildren(...arrows, run, crawl, fight);
     return;
   }
   const style = STYLES[player().style];
@@ -651,6 +694,7 @@ $('#pad').addEventListener('pointerdown', (press) => {
   const button = press.target.closest('button');
   if (!button) return;
   if (button.dataset.walkToggle) return setWalking(!player().walking);
+  if (button.dataset.crawl) return setCrawling(!player().crawling);
   if (button.dataset.run) {
     state.walkRunning = !state.walkRunning;
     button.classList.toggle('on', state.walkRunning);
@@ -685,6 +729,7 @@ window.addEventListener('keydown', (press) => {
   const key = press.key.toLowerCase();
   if (key === 'v') return setWalking(!player().walking);
   if (player().walking) {
+    if (key === 'c') return setCrawling(!player().crawling);
     if (key === 'shift') state.walkRunning = true;
     if (WALK_KEYS[key]) {
       press.preventDefault();
@@ -1373,10 +1418,14 @@ window.boxer = {
   designSheet,
   presets: PRESETS,
   fight,
+  // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.
+  level: chooseLevel,
   preview,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
+  // Send a fighter crawling away, as a badly hurt man in a panic does.
+  crawl: (who = 0) => startCrawl(state.world, state.world.fighters[who], 'crawls away'),
   // Play `count` real frames of `dt` s each, as the page's own loop would (tests, profiling).
   playFrames: (count, dt = 1 / 60) => {
     for (let index = 0; index < count; index += 1) {

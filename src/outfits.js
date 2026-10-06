@@ -890,13 +890,17 @@ export function familyKinds(family) {
  * The factions characters are grouped under, by culture and era: for
  * choosing them in the menus. A faction has no effect on the fight.
  */
+// A faction's `standard`: what its leader carries in a group fight (a
+// weapon in WEAPONS with a `flag`), in his hands, or `worn` on his back
+// (a samurai commander's great sashimono) leaving his hands to his weapon;
+// `colour`, its field's usual colour (where both sides' would differ).
 export const FACTIONS = {
-  knights: { label: 'Knights', glyph: '🏰', blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
-  japanese: { label: 'Japanese', glyph: '⛩️', blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
+  knights: { label: 'Knights', glyph: '🏰', standard: { weapon: 'banner', colour: '#b3161b' }, blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
+  japanese: { label: 'Japanese', glyph: '⛩️', standard: { weapon: 'nobori', worn: true }, blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
   mexica: { label: 'Mexica', glyph: '🦅', blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
-  chinese: { label: 'Chinese', glyph: '🐉', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
-  steppe: { label: 'Steppe', glyph: '🐎', blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, leather and iron lamellar, sabre, mace and composite bow; the Khan\'s kheshig of legend.' },
-  ottomans: { label: 'Ottomans', glyph: '🌙', blurb: 'The Sultan\'s army: azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
+  chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
+  steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, leather and iron lamellar, sabre, mace and composite bow; the Khan\'s kheshig of legend.' },
+  ottomans: { label: 'Ottomans', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'The Sultan\'s army: azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },

@@ -8,7 +8,7 @@
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
-import { glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
+import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 import { WORLD } from './physics/config.js';
@@ -184,6 +184,14 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
 export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
   if (!weapon?.held) return;
+  releaseWeapon(world, fighter, reason, push);
+  if (fighter.state === 'out') return;
+  rearm(world, fighter, weapon);
+}
+
+/** The weapon leaves his hands and falls as a loose thing (no other drawn in its place). */
+function releaseWeapon(world, fighter, reason, push) {
+  const weapon = fighter.weapon;
   weapon.held = false;
   const shares = handShares(weapon.spec);
   addParticleMass(fighter, P[`${weapon.main}Hand`], -weapon.spec.mass * shares.main);
@@ -194,12 +202,15 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const random = world.random;
   world.debris.push({
     id: world.debris.length, kind: 'weapon', weapon: weapon.kind, owner: fighter.id, x: centre, loaded: weapon.loaded, charges: weapon.charges,
-    v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
+    colour: weapon.colour, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
   });
   if (fighter.punch?.spec.path === 'blade' || fighter.punch?.spec.path === 'aim') fighter.punch = null;
   world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
-  if (fighter.state === 'out') return;
+}
+
+/** After losing a weapon, the next: a backup, his kit's sidearm, or his bare hands. */
+function rearm(world, fighter, weapon) {
   // A backup weapon if he carries one: the hoplomachus's gladius, or his
   // kit's sidearm (a knight's dagger, a samurai's wakizashi), drawn once;
   // else he fights mixed.
@@ -236,7 +247,9 @@ const WEAPON_LABEL = (kind) => WEAPONS[kind].label.toLowerCase();
 
 /** Stoop for a weapon on the floor: he crouches and reaches for it. */
 export function startPickup(world, fighter, debris) {
-  if (fighter.state !== 'up' || fighter.weapon?.held || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
+  // The standard is taken up whatever is in the hands: that is let fall.
+  const standard = WEAPONS[debris.weapon]?.flag;
+  if (fighter.state !== 'up' || (fighter.weapon?.held && !standard) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
   fighter.pickup = { debris: debris.id, t: 0 };
   fighter.clinch = null;
   return true;
@@ -256,7 +269,9 @@ function updatePickup(world, fighter, dt) {
   if (pickup.t < WORLD.weapons.pickupSeconds || reach > WORLD.weapons.pickupReach) return;
   debris.taken = true;
   fighter.pickup = null;
+  if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
+  if (debris.colour) fighter.weapon.colour = debris.colour;
   // A gun picked up is as it was dropped: its rounds left, and fired out, empty.
   if (fighter.weapon?.spec.shot && debris.charges !== undefined) fighter.weapon.charges = debris.charges;
   if (fighter.weapon?.spec.shot && debris.loaded === false) {
@@ -600,8 +615,71 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   for (const fighter of fighters) fighter.arena = arena;
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
+  const standards = raiseStandards(fighters, random);
   // `rules`: a level's own (noPins: a man down gets up again; nobody holds him there).
-  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules };
+  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards };
+}
+
+/**
+ * Each side big enough has a leader: the man nearest its middle. Where his
+ * faction has a standard, he bears it, in his hands in place of his weapon or
+ * worn on his back. Returns { corner: { leader, kind, colour } }.
+ */
+function raiseStandards(fighters, random) {
+  const standards = {};
+  for (const corner of ['red', 'blue']) {
+    const team = fighters.filter((fighter) => fighter.corner === corner);
+    if (team.length < WORLD.standard.minSide) continue;
+    const middle = [0, 0];
+    for (const fighter of team) {
+      middle[0] += fighter.root[0] / team.length;
+      middle[1] += fighter.root[1] / team.length;
+    }
+    let leader = team[0];
+    for (const fighter of team) if (Math.hypot(fighter.root[0] - middle[0], fighter.root[1] - middle[1]) < Math.hypot(leader.root[0] - middle[0], leader.root[1] - middle[1])) leader = fighter;
+    standards[corner] = { leader: leader.id };
+  }
+  // Each flag in its own colour where both sides have one and they differ; else each side's banner, or its corner's.
+  const colours = Object.fromEntries(Object.entries(standards).map(([corner, { leader }]) => [corner, FACTIONS[factionOf(fighters[leader].body.inputs)]?.standard?.colour]));
+  const ownColours = Boolean(colours.red && colours.blue && colours.red !== colours.blue);
+  for (const [corner, entry] of Object.entries(standards)) {
+    const leader = fighters[entry.leader];
+    const standard = FACTIONS[factionOf(leader.body.inputs)]?.standard;
+    const colour = leader.body.inputs.outfit?.banner ?? (ownColours ? colours[corner] : undefined) ?? WORLD.standard.colours[corner];
+    Object.assign(entry, { kind: standard?.weapon ?? null, colour });
+    if (!standard) continue;
+    if (standard.worn) {
+      leader.wornStandard = { kind: standard.weapon, colour };
+      continue;
+    }
+    if (leader.weapon) {
+      const shares = handShares(leader.weapon.spec);
+      addParticleMass(leader, P[`${leader.weapon.main}Hand`], -leader.weapon.spec.mass * shares.main);
+      if (shares.off) addParticleMass(leader, P[`${leader.weapon.off}Hand`], -leader.weapon.spec.mass * shares.off);
+      leader.weapon = null;
+    }
+    armFighter(leader, standard.weapon, { random, shield: false });
+    leader.weapon.colour = colour;
+  }
+  return standards;
+}
+
+/**
+ * A worn standard comes loose from a fallen leader's back and lies where he
+ * fell, to be taken up in the hands.
+ */
+export function shedStandard(world, fighter) {
+  const worn = fighter.wornStandard;
+  if (!worn || worn.shed) return null;
+  worn.shed = true;
+  const spec = WEAPONS[worn.kind];
+  const debris = {
+    id: world.debris.length, kind: 'weapon', weapon: worn.kind, owner: fighter.id, colour: worn.colour, x: vec.add(point(fighter.x, P.neck), [0, 0.2, 0]),
+    v: [...point(fighter.v, P.neck)], q: quatFromTo([0, 1, 0], [0, 1, 0]), spin: [1.5, 0, 1], radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
+  };
+  world.debris.push(debris);
+  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: worn.kind, point: debris.x, effects: [`the ${spec.label.toLowerCase()} falls`] });
+  return debris;
 }
 
 // ---- Frames -------------------------------------------------------------
@@ -628,7 +706,7 @@ export function toLocal(fighter, world) {
  */
 export function opponentFor(world, fighter) {
   const focus = fighter.focus === undefined ? null : world.fighters[fighter.focus];
-  if (focus && focus.corner !== fighter.corner && focus.state !== 'out') return focus;
+  if (focus && focus.corner !== fighter.corner && inFight(focus)) return focus;
   return nearestOpponent(world, fighter);
 }
 
@@ -636,7 +714,7 @@ export function nearestOpponent(world, fighter) {
   let best = null;
   let bestDistance = Infinity;
   for (const other of world.fighters) {
-    if (other.corner === fighter.corner || other.state === 'out') continue;
+    if (other.corner === fighter.corner || !inFight(other)) continue;
     const distance = vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis)));
     if (distance < bestDistance) {
       best = other;
@@ -670,7 +748,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.stamina < drain) return false;
+  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.stamina < drain) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   const jitter = STYLES[fighter.style]?.aimJitter ?? 0;
@@ -806,6 +884,7 @@ function updateIntent(world, fighter, dt) {
       intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
     }
   }
+  if (fighter.crawling) crawlPose(fighter, intent, dt);
   runCarry(world, fighter, intent, dt);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
@@ -823,6 +902,65 @@ function updateIntent(world, fighter, dt) {
 }
 
 /**
+ * On his knees: both down, shins back along the floor, the body low and
+ * forward over the hands on the floor before him. Each step a knee and the
+ * opposite hand go forward together, as far as his pace carries him; a leg
+ * whose joint is broken has no muscle and drags.
+ */
+function crawlPose(fighter, intent, dt) {
+  const spec = WORLD.crawl;
+  const H = fighter.body.heightM;
+  const L = fighter.body.lengths;
+  const pace = Math.min(1, Math.hypot(...fighter.rootVelocity) / (spec.speed * WORLD.footSpeed));
+  fighter.crawlPhase = ((fighter.crawlPhase ?? 0) + Math.PI * 2 * spec.strideHz * pace * dt) % (Math.PI * 2);
+  const swing = Math.sin(fighter.crawlPhase) * spec.stride * H;
+  // Up off the floor while it comes forward, down while it bears.
+  const lift = Math.max(0, Math.cos(fighter.crawlPhase)) * 0.03 * H * pace;
+  intent.dip += spec.dip;
+  intent.lean += spec.lean;
+  intent.twist = 0;
+  intent.twoHanded = false;
+  intent.bladeDir = null;
+  intent.guardTight = false;
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const step = sign * swing;
+    intent[`${side}Knee`] = [0.02 * H + step, L.ankle + 0.02 + (sign > 0 ? lift : 0), sign * 0.1 * H];
+    intent[`${side}Foot`] = [0.02 * H + step - L.shank * 0.95, L.ankle, sign * 0.11 * H];
+    intent[`${side}Hand`] = [0.3 * H - step, 0.05 * H + (sign < 0 ? lift : 0), sign * 0.14 * H];
+  }
+}
+
+/**
+ * Down on his knees to crawl away: what is in his hands is let go (they are
+ * on the floor now), and he is out of the fight. `reason` for the log.
+ */
+export function startCrawl(world, fighter, reason) {
+  if (fighter.crawling || fighter.state === 'out') return false;
+  fighter.crawling = true;
+  fighter.punch = null;
+  fighter.rush = null;
+  fighter.clinch = null;
+  fighter.pin = null;
+  fighter.pickup = null;
+  fighter.defence = null;
+  fighter.running = false;
+  if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
+  world.events.push({ time: world.time, kind: 'crawl', fighter: fighter.id, effects: [reason] });
+  return true;
+}
+
+/** Still in the fight: not out, and not crawling away. */
+export function inFight(fighter) {
+  // A player walking about on his knees (walk mode) has not left it.
+  return fighter.state !== 'out' && !(fighter.crawling && !fighter.walking);
+}
+
+/** A leg that will not bear him: a knee or hip broken. */
+function legBroken(fighter) {
+  return ['lKnee', 'rKnee', 'lHip', 'rHip'].some((joint) => fighter.broken.has(joint));
+}
+
+/**
  * Running with nobody near (a charge from afar, a flight, a man going to his
  * place): the hands come down from the guard and swing with the stride; a
  * weapon or shield hand stays on its weapon. Back into the guard as an
@@ -836,7 +974,7 @@ function runCarry(world, fighter, intent, dt) {
     if (other.corner === fighter.corner || other.state === 'out') continue;
     nearest = Math.min(nearest, Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
   }
-  const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.state !== 'up';
+  const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.crawling || fighter.state !== 'up';
   const running = (fighter.running || speed > spec.runningSpeed) && !busy;
   // Walking about, the guard is down whoever is near.
   const want = fighter.walking && !busy ? 1 : running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
@@ -1068,7 +1206,7 @@ export function step(world, dt) {
  */
 function checkBalance(world, fighter) {
   // Kneeling over a man held down is a base of its own, not a fall.
-  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin) return;
+  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling) return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
   const knock = Math.hypot(fighter.knock[0], fighter.knock[2]);
@@ -1146,6 +1284,8 @@ function moveRoot(world, fighter, dt) {
   const punch = fighter.punch;
   if (punch?.spec.step && !(punch.load > 0) && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   if (fighter.running && !fighter.rush) drive = fighter.move * WORLD.run.speedFactor;
+  // On his knees: slow, and no faster for trying.
+  if (fighter.crawling) drive = Math.max(-0.3, Math.min(1, fighter.move)) * WORLD.crawl.speed;
   if (fighter.rush) {
     // A charge: flat out at the opponent, at what the legs can reach.
     fighter.rush.t += dt;
@@ -1154,13 +1294,13 @@ function moveRoot(world, fighter, dt) {
   }
   // A sidestep (+ to the left), slower than stepping in or out.
   const left = yawRotate([0, 0, 1], fighter.yaw);
-  const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare;
+  const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare * (fighter.crawling ? WORLD.crawl.speed : 1);
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
   const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
-  const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : 1) * dt;
+  const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
   const scale = size > limit ? limit / size : 1;
   fighter.rootVelocity[0] += change[0] * scale;
   fighter.rootVelocity[1] += change[1] * scale;
@@ -1322,12 +1462,15 @@ function updateTimers(world, fighter, dt) {
     fighter.motorScale = 0;
     fighter.downTimer -= dt;
     if (fighter.downTimer <= 0) {
-      if (fighter.knockdowns >= WORLD.knockdownsToStop) {
+      // A broken leg will not stand him up, but a man still conscious drags himself off on his knees.
+      if (legBroken(fighter) && !fighter.broken.has('neck') && !fighter.crawling) startCrawl(world, fighter, 'drags himself away on his knees');
+      if (fighter.knockdowns >= WORLD.knockdownsToStop && !fighter.crawling) {
         fighter.state = 'out';
         world.events.push({ time: world.time, kind: 'stopped', fighter: fighter.id });
       } else {
         fighter.state = 'rising';
-        if (fighter.pendingArm) {
+        // Crawling, his hands are on the floor: nothing drawn.
+        if (fighter.pendingArm && !fighter.crawling) {
           armFighter(fighter, fighter.pendingArm, { random: world.random });
           if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
           fighter.pendingArm = null;
@@ -1397,7 +1540,7 @@ function standingTarget(fighter, index) {
   const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
-  if (fighter.pin && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
+  if ((fighter.pin || fighter.crawling) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
   if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: [0, 0, 0] };
   if (info.knee) {
     const side = info.side;
@@ -3126,6 +3269,12 @@ function legCapacity() {
   return WORLD.legCapacity * BODY.toughness;
 }
 
+/** How far gone his legs are, 0..1: the worse leg's damage against what gives way, and 1 if one is broken. */
+export function legShare(fighter) {
+  if (legBroken(fighter)) return 1;
+  return Math.min(1, Math.max(fighter.legDamage.l, fighter.legDamage.r) / legCapacity());
+}
+
 /** Share of blood lost that collapses a man. */
 export function collapseAt() {
   return BLADES.collapseAt * BODY.toughness;
@@ -3173,7 +3322,7 @@ function trackHandSpeed(fighter) {
 
 /** The winning corner once the other has no fighter able to continue. */
 export function boutWinner(world) {
-  const alive = (corner) => world.fighters.some((fighter) => fighter.corner === corner && fighter.state !== 'out');
+  const alive = (corner) => world.fighters.some((fighter) => fighter.corner === corner && inFight(fighter));
   if (!alive('red')) return 'blue';
   if (!alive('blue')) return 'red';
   return null;

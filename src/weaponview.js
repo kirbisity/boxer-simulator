@@ -92,8 +92,157 @@ function box(size, at, material, tilt = 0) {
   return mesh;
 }
 
-export function buildWeaponMesh(kind, envMap) {
+/**
+ * A standard (WEAPONS[kind].flag): the staff, its finial, and its cloth (or
+ * horse-tails) in the side's `colour`, trailing behind the staff (−z). The
+ * looks follow the period: a knight's square banner, the Ming triangular
+ * command flag with its flame-tongue border, the swallow-tailed Ottoman
+ * sancak under a brass crescent, the steppe tug's horse-tails under a trident,
+ * the tall Japanese nobori on its crossbar.
+ */
+function buildStandard(spec, colour, envMap) {
+  const group = new THREE.Group();
+  const wood = surface(0x6a4a2a, { roughness: 0.75 });
+  const steel = steelMaterial(envMap, { vertexColors: false, color: 0xd9dde4 });
+  const brass = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
+  const top = spec.length;
+  group.add(cylinder(0.016, 0.018, -spec.handle, top, wood, 8));
+  const cloth = (width, height, paint, shape = null) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = Math.round((128 * height) / width);
+    const g = canvas.getContext('2d');
+    g.fillStyle = colour;
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    paint?.(g, canvas.width, canvas.height);
+    const material = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, roughness: 0.9 });
+    let geometry = new THREE.PlaneGeometry(width, height);
+    if (shape) {
+      // A cut outline: drawn as a shape with UVs over its bounding box.
+      geometry = new THREE.ShapeGeometry(shape);
+      const uv = geometry.attributes.uv;
+      const position = geometry.attributes.position;
+      for (let index = 0; index < uv.count; index += 1) uv.setXY(index, position.getX(index) / width + 0.5, position.getY(index) / height + 0.5);
+    }
+    const mesh = new THREE.Mesh(geometry, material);
+    // In the staff's plane, out behind it: x of the cloth along −z.
+    mesh.rotation.y = Math.PI / 2;
+    return mesh;
+  };
+  const spearPoint = () => {
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.16, 6), steel);
+    blade.position.y = top + 0.08;
+    return blade;
+  };
+  switch (spec.flag) {
+    case 'knights': {
+      // Square, nailed along the staff below the point: the field and a pale cross.
+      const flag = cloth(0.6, 0.6, (g, w, h) => {
+        g.fillStyle = '#f2eee4';
+        g.fillRect(w * 0.42, 0, w * 0.16, h);
+        g.fillRect(0, h * 0.42, w, h * 0.16);
+      });
+      flag.position.set(0, top - 0.35, -0.31);
+      group.add(flag, spearPoint());
+      break;
+    }
+    case 'chinese': {
+      // A right triangle off the staff, a border of yellow flame tongues, a red tassel under the point.
+      const shape = new THREE.Shape();
+      shape.moveTo(-0.35, 0.25);
+      shape.lineTo(0.35, -0.25 + 0.5 * 0.15);
+      shape.lineTo(-0.35, -0.25);
+      shape.closePath();
+      const flag = cloth(0.7, 0.5, (g, w, h) => {
+        g.fillStyle = '#e8c23a';
+        for (let tongue = 0; tongue < 7; tongue += 1) {
+          g.beginPath();
+          const x = (tongue / 7) * w;
+          g.moveTo(x, h);
+          g.lineTo(x + w / 14, h * 0.86);
+          g.lineTo(x + w / 7, h);
+          g.fill();
+        }
+        g.beginPath();
+        g.arc(w * 0.28, h * 0.55, h * 0.16, 0, Math.PI * 2);
+        g.fill();
+      }, shape);
+      flag.position.set(0, top - 0.3, -0.36);
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 6), surface(0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = top - 0.02;
+      tassel.rotation.x = Math.PI;
+      group.add(flag, tassel, spearPoint());
+      break;
+    }
+    case 'ottomans': {
+      // Swallow-tailed, a white crescent on the field; a brass crescent on the staff's head.
+      const shape = new THREE.Shape();
+      shape.moveTo(-0.38, 0.25);
+      shape.lineTo(0.38, 0.25);
+      shape.lineTo(0.18, 0);
+      shape.lineTo(0.38, -0.25);
+      shape.lineTo(-0.38, -0.25);
+      shape.closePath();
+      const flag = cloth(0.76, 0.5, (g, w, h) => {
+        g.fillStyle = '#f2eee4';
+        g.beginPath();
+        g.arc(w * 0.32, h * 0.5, h * 0.24, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = colour;
+        g.beginPath();
+        g.arc(w * 0.37, h * 0.5, h * 0.2, 0, Math.PI * 2);
+        g.fill();
+      }, shape);
+      flag.position.set(0, top - 0.32, -0.39);
+      const crescent = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 14, Math.PI * 1.4), brass);
+      crescent.position.y = top + 0.07;
+      crescent.rotation.z = Math.PI * 0.8;
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), brass);
+      knob.position.y = top;
+      group.add(flag, crescent, knob);
+      break;
+    }
+    case 'steppe': {
+      // The tug: no cloth, horse-tails hung in a ring under a brass disc and a trident.
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.015, 12), brass);
+      disc.position.y = top - 0.04;
+      group.add(disc);
+      const hair = surface(0x1d1a17, { roughness: 1 });
+      const pale = surface(0xe8e2d4, { roughness: 1 });
+      for (let tail = 0; tail < 7; tail += 1) {
+        const angle = (tail / 7) * Math.PI * 2;
+        const plume = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.6, 5), tail % 2 ? pale : hair);
+        plume.position.set(Math.cos(angle) * 0.05, top - 0.36, Math.sin(angle) * 0.05);
+        group.add(plume);
+      }
+      for (const side of [-1, 0, 1]) {
+        const prong = new THREE.Mesh(new THREE.ConeGeometry(0.012, side ? 0.12 : 0.18, 5), steel);
+        prong.position.set(0, top + (side ? 0.06 : 0.09), side * 0.04);
+        group.add(prong);
+      }
+      break;
+    }
+    default: {
+      // The nobori: tall and narrow, hung from the staff and a crossbar at the top; a white crest.
+      const flag = cloth(0.36, 1.25, (g, w, h) => {
+        g.fillStyle = '#f2eee4';
+        g.beginPath();
+        g.arc(w * 0.5, h * 0.14, w * 0.3, 0, Math.PI * 2);
+        g.fill();
+      });
+      flag.position.set(0, top - 0.68, -0.19);
+      const bar = cylinder(0.009, 0.009, 0, 0.38, wood, 6);
+      bar.rotation.x = -Math.PI / 2;
+      bar.position.set(0, top - 0.04, -0.19);
+      group.add(flag, bar);
+    }
+  }
+  return group;
+}
+
+export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   const spec = WEAPONS[kind];
+  if (spec.flag) return buildStandard(spec, colour, envMap);
   const group = new THREE.Group();
   const steel = steelMaterial(envMap, { vertexColors: false, color: 0xd9dde4 });
   const dark = surface(0x1b1b1f, { roughness: 0.6 });
@@ -694,14 +843,15 @@ export function updateArms(view, fighterView, time = 0) {
   const arms = fighterView.arms ?? (fighterView.arms = { weapon: null, kind: null, shield: null });
   const showing = fighterView.layers.skin.visible;
   if (weapon?.held) {
-    if (arms.kind !== weapon.kind) {
+    const key = weapon.colour ? `${weapon.kind}:${weapon.colour}` : weapon.kind;
+    if (arms.kind !== key) {
       if (arms.weapon) {
         fighterView.group.remove(arms.weapon);
         // A crowd member's weapon is the batch's, shared: only his own is freed.
         if (!fighterView.baked) disposeObject(arms.weapon);
       }
-      arms.weapon = fighterView.baked ? crowdArms(view, weapon.kind, () => buildWeaponMesh(weapon.kind, view.steelEnv)) : buildWeaponMesh(weapon.kind, view.steelEnv);
-      arms.kind = weapon.kind;
+      arms.weapon = fighterView.baked ? crowdArms(view, key, () => buildWeaponMesh(weapon.kind, view.steelEnv, weapon.colour)) : buildWeaponMesh(weapon.kind, view.steelEnv, weapon.colour);
+      arms.kind = key;
       fighterView.group.add(arms.weapon);
     }
     // Along the blade, the edge turned the way the forearm's front faces.
@@ -913,7 +1063,7 @@ export function updateDebris(view, world) {
     if (!mesh) {
       if (debris.kind !== 'weapon') continue;
       mesh = new THREE.Group();
-      const weapon = buildWeaponMesh(debris.weapon, view.steelEnv);
+      const weapon = buildWeaponMesh(debris.weapon, view.steelEnv, debris.colour);
       // The debris point is the weapon's middle; the mesh's origin is its grip.
       const spec = WEAPONS[debris.weapon];
       weapon.position.y = -(spec.length - spec.handle) / 2;

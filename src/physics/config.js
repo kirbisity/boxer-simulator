@@ -263,6 +263,10 @@ export const WORLD = {
   // reaches one on the floor stoops `pickupSeconds` to take it, and gives
   // up if he has not got his hand to it (within `pickupReach` m) in `pickupGiveUp` s.
   weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2 },
+  // A side of `minSide` or more has a leader, the man nearest its middle at
+  // the start, and he carries its standard if its faction has one (FACTIONS).
+  // Without a banner colour of its own, a side's flag is its corner's.
+  standard: { minSide: 4, colours: { red: '#b3161b', blue: '#1f3f8a' } },
   // Holding the last man down. Pinners kneel beside him (hips this share of
   // height lower, leaning in), lock their hands on his chest and hips once
   // within `lockDistance` (m), and press with this share of their weight;
@@ -272,5 +276,11 @@ export const WORLD = {
   // hold presses and holds; it never strikes and adds no harm.
   // A man held down who is not out fights it: he tries to get up `struggleAfter` s into the hold.
   // The grip pulls like a spring of `gripStiffness` N/m, up to `gripShare` of the arm's strike force.
+  // Crawling on the knees (a broken leg, or a badly hurt man who has lost
+  // his nerve): knees and hands to the floor, a knee-walk of `stride` × height
+  // per step at `strideHz` at full pace, the body low (`dip`) and over the
+  // hands (`lean`); `speed` × footSpeed at most (~0.35 m/s), gathered
+  // at `accel` × footAcceleration. A man crawling is out of the fight.
+  crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1 },
   pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 3, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
 };

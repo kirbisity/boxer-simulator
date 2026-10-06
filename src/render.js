@@ -1854,9 +1854,10 @@ export function resize(view, width, height) {
   view.camera.updateProjectionMatrix();
 }
 
-export function placeCamera(view, focus) {
+/** The camera on its orbit round the target, the target eased towards `focus` (`ease` of the way each frame, at `height` m). */
+export function placeCamera(view, focus, { ease = 0.06, height = 1.1 } = {}) {
   const orbit = view.orbit;
-  if (focus) orbit.target.lerp(new THREE.Vector3(focus[0], 1.1, focus[2]), 0.06);
+  if (focus) orbit.target.lerp(new THREE.Vector3(focus[0], height, focus[2]), ease);
   const { yaw, pitch, distance, target } = orbit;
   view.camera.position.set(
     target.x + Math.cos(pitch) * Math.cos(yaw) * distance,
@@ -1991,6 +1992,12 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
 }
 
 /** `simple`: low detail, no skeleton, no soft flesh (the first of a crowd template, before baking). */
+/** A leader who wears his side's standard (a great sashimono) has it in place of the common banner. */
+function leaderDress(dress, fighter) {
+  if (!fighter.wornStandard) return dress;
+  return { ...dress, banner: fighter.wornStandard.colour, greatBanner: true };
+}
+
 function detailedView(view, fighter, simple) {
   const body = fighter.body;
   const look = body.inputs.look ?? {};
@@ -2033,7 +2040,7 @@ function detailedView(view, fighter, simple) {
   layers.skin.add(skinMesh, skinOutline);
   const shells = simple ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
 
-  const dress = dressFor(body.inputs, corner);
+  const dress = leaderDress(dressFor(body.inputs, corner), fighter);
   // A design may set the hair (a sumo's topknot).
   const headView = buildHead(body, dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look, skinColor, corner);
   headView.group.matrixAutoUpdate = false;
@@ -2101,7 +2108,7 @@ function detailedView(view, fighter, simple) {
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   if (dress.banner) {
-    const banner = buildBanner(body, dress.banner);
+    const banner = buildBanner(body, dress.banner, dress.greatBanner);
     banner.userData.banner = true;
     collar.add(banner);
   }
@@ -2274,7 +2281,7 @@ function crowdView(view, fighter, template) {
   const headGroup = new THREE.Group();
   headGroup.matrixAutoUpdate = false;
   layers.skin.add(headGroup);
-  const dress = dressFor(body.inputs, corner);
+  const dress = leaderDress(dressFor(body.inputs, corner), fighter);
   const garmentColors = { ...roleColors(dress, new THREE.Color(skinColor)), accent: dress.feet.accent };
   const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: garmentColors.steel, ...template.lacquer });
   const allowed = headgearOptions(dress.kind);
@@ -2296,7 +2303,7 @@ function crowdView(view, fighter, template) {
     if (dress.banner) {
       // The side's banners are one instanced batch, made at 1.8 m and set
       // to each man's size and back (see buildBanner).
-      const batch = crowdBatch(view, `banner:${dress.banner}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner));
+      const batch = crowdBatch(view, `banner:${dress.banner}${dress.greatBanner ? ':great' : ''}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner, dress.greatBanner));
       const scale = body.heightM / 1.8;
       const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
       const local = new THREE.Matrix4().makeTranslation(back + 0.05 * scale, 0, 0).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
@@ -2497,6 +2504,14 @@ export function setLayer(fighterView, layer) {
 // ---- Per-frame update -----------------------------------------------------
 
 export function updateFighterView(fighterView, dt, time) {
+  // A shed standard lies on the ground now (a loose weapon), not on his back.
+  if (fighterView.fighter.wornStandard?.shed && !fighterView.standardShed) {
+    fighterView.standardShed = true;
+    fighterView.banner = null;
+    fighterView.group.traverse((object) => {
+      if (object.userData.banner) object.visible = false;
+    });
+  }
   const fighter = fighterView.fighter;
   const points = PARTICLES.map((_, index) => point(fighter.x, index));
   const frames = coherentFrames(boneFrames(points, fighter.body), fighterView.frames);

@@ -1245,12 +1245,14 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
  * A sashimono: the side's banner on a pole up the back, standing clear of
  * the helmet, a white disc on the field (collar coordinates: x forward, y up).
  */
-export function buildBanner(body, colorHex) {
+export function buildBanner(body, colorHex, great = false) {
   const scale = body.heightM / 1.8;
   const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
   const group = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, 1.0 * scale, 6), surface(0x3a2a1c));
-  pole.position.set(back, 0.25 * scale, 0);
+  // A commander's great banner: twice as tall, and a field three times the size.
+  const size = great ? { pole: 1.9, width: 0.34, height: 0.95 } : { pole: 1.0, width: 0.2, height: 0.4 };
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, size.pole * scale, 6), surface(0x3a2a1c));
+  pole.position.set(back, (size.pole / 2 - 0.25) * scale, 0);
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 128;
@@ -1261,9 +1263,17 @@ export function buildBanner(body, colorHex) {
   g.beginPath();
   g.arc(32, 40, 17, 0, Math.PI * 2);
   g.fill();
-  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.2 * scale, 0.4 * scale), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, roughness: 0.9 }));
+  if (great) {
+    // A gold rim round the crest.
+    g.strokeStyle = '#d8a23a';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.arc(32, 40, 19, 0, Math.PI * 2);
+    g.stroke();
+  }
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(size.width * scale, size.height * scale), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, roughness: 0.9 }));
   flag.rotation.y = Math.PI / 2;
-  flag.position.set(back - 0.005, 0.52 * scale, 0.105 * scale);
+  flag.position.set(back - 0.005, (size.pole - 0.25 - size.height / 2 - 0.03) * scale, (size.width / 2 + 0.005) * scale);
   group.add(pole, flag);
   return group;
 }
