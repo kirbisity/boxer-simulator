@@ -229,9 +229,11 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'bald', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   // "Oni" Kojima Yatarō, the Uesugi's giant, with a kanabo.
+  // A giant of a man, built like the oni his armour shows: big-framed and
+  // heavy, very strong, and the slower for his size.
   kanabo: {
-    name: 'Kojima Yatarō', style: 'kanabo', sex: 'male', heightCm: 180, frame: 'large', age: 34, exercise: 0.75, calories: 4300,
-    outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
+    name: 'Kojima Yatarō', style: 'kanabo', sex: 'male', heightCm: 192, frame: 'large', age: 36, exercise: 0.95, calories: 6900,
+    outfit: { kind: 'samuraiTosei', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Legends of an earlier age, one to a faction: Wanyan Wuzhu, the Jin prince

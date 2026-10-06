@@ -69,16 +69,27 @@ function scaledBaselineFat(inputs) {
 
 /** Lean mass that goes with a given fat mass on this body's Forbes curve. */
 function leanForFat(inputs, fat, frameLean) {
+  return leanCurve(inputs, frameLean)(fat);
+}
+
+/**
+ * This body's Forbes curve, fat → lean, with what depends only on the body
+ * worked out once: the composition search asks it tens of thousands of times.
+ */
+function leanCurve(inputs, frameLean) {
   const baseline = baselineLean(inputs, frameLean);
   const sedentary = baselineLean({ ...inputs, exercise: 0 }, frameLean);
-  const lean = baseline + PHYSIOLOGY.forbesC * (inputs.heightCm / 175) ** 2 * Math.log(fat / scaledBaselineFat(inputs));
-  return Math.max(sedentary * PHYSIOLOGY.minimumLeanShare, lean);
+  const slope = PHYSIOLOGY.forbesC * (inputs.heightCm / 175) ** 2;
+  const baselineFat = scaledBaselineFat(inputs);
+  const floor = sedentary * PHYSIOLOGY.minimumLeanShare;
+  return (fat) => Math.max(floor, baseline + slope * Math.log(fat / baselineFat));
 }
 
 /** Split stored energy (kcal above zero) into lean and fat along the curve. */
 function compositionForEnergy(inputs, energy, frameLean) {
   const minFat = PHYSIOLOGY.essentialFatKg[inputs.sex];
-  const stored = (fat) => PHYSIOLOGY.leanKcalPerKg * leanForFat(inputs, fat, frameLean) + PHYSIOLOGY.fatKcalPerKg * fat;
+  const leanAt = leanCurve(inputs, frameLean);
+  const stored = (fat) => PHYSIOLOGY.leanKcalPerKg * leanAt(fat) + PHYSIOLOGY.fatKcalPerKg * fat;
   let low = minFat;
   let high = 400;
   // With the fat spent, starvation burns protein: lean goes on falling
@@ -89,7 +100,7 @@ function compositionForEnergy(inputs, energy, frameLean) {
     if (stored(middle) < energy) low = middle;
     else high = middle;
   }
-  return { lean: leanForFat(inputs, low, frameLean), fat: low };
+  return { lean: leanAt(low), fat: low };
 }
 
 /** Resting metabolic rate, kcal/day. */
@@ -148,15 +159,16 @@ function simulateComposition(inputs, frameLean) {
 }
 
 function scaleToWeight(inputs, weight, frameLean) {
+  const leanAt = leanCurve(inputs, frameLean);
   let low = PHYSIOLOGY.essentialFatKg[inputs.sex];
-  if (leanForFat(inputs, low, frameLean) + low >= weight) return { lean: weight - low, fat: low };
+  if (leanAt(low) + low >= weight) return { lean: weight - low, fat: low };
   let high = 400;
   for (let step = 0; step < 60; step += 1) {
     const middle = (low + high) / 2;
-    if (leanForFat(inputs, middle, frameLean) + middle < weight) low = middle;
+    if (leanAt(middle) + middle < weight) low = middle;
     else high = middle;
   }
-  return { lean: leanForFat(inputs, low, frameLean), fat: low };
+  return { lean: leanAt(low), fat: low };
 }
 
 /** The daily calories at which this body settles at a given weight: for slider bounds and presets. */

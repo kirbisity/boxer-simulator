@@ -93,15 +93,18 @@ test('the gun is easily knocked away, and then he fights mixed', () => {
 });
 
 test('Frye v Takayama: a standing brawl in a mutual clinch, nobody held down', () => {
-  const world = scenarioWorld('pride', 3);
-  assert.deepEqual(world.fighters.map((fighter) => fighter.style), ['clinchBrawl', 'clinchBrawl']);
+  // Over a few bouts (one may end early, a man stopped).
   let mutual = 0;
-  for (let elapsed = 0; elapsed < 60 && !boutWinner(world); elapsed += 0.1) {
-    advance(world, 0.1, (current, dt) => thinkAll(current, dt));
-    if (world.fighters.every((fighter) => fighter.clinch)) mutual += 0.1;
-    assert.ok(world.fighters.every((fighter) => !fighter.pin), 'no holds');
+  for (const seed of [1, 2, 3]) {
+    const world = scenarioWorld('pride', seed);
+    assert.deepEqual(world.fighters.map((fighter) => fighter.style), ['clinchBrawl', 'clinchBrawl']);
+    for (let elapsed = 0; elapsed < 60 && !boutWinner(world); elapsed += 0.1) {
+      advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+      if (world.fighters.every((fighter) => fighter.clinch)) mutual += 0.1;
+      assert.ok(world.fighters.every((fighter) => !fighter.pin), 'no holds');
+    }
   }
-  assert.ok(mutual > 1, `mutual clinch ${mutual.toFixed(1)} s`);
+  assert.ok(mutual > 3, `mutual clinch ${mutual.toFixed(1)} s over three bouts`);
 });
 
 test('engaging, he holds the gun up in both hands; closed on, he drops it and fights; he runs for room', () => {

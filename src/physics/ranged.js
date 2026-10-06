@@ -226,6 +226,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1) {
   victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
   victim.damageVersion += 1;
   victim.bleed = (victim.bleed ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
+  victim.bleedOutside = (victim.bleedOutside ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
   Object.assign(event, { harm, region, pierce: harm * 60 });
   event.effects.push(gear.arrowproof ? `${region}: through a gap` : `${region}`);
   shooter.stats.landed += 1;
@@ -395,6 +396,7 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
   victim.damageVersion += 1;
   victim.bleed = (victim.bleed ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * (1 - armour) * scale;
+  victim.bleedOutside = (victim.bleedOutside ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * (1 - armour) * scale;
   // Hard armour over the part takes the round on its surface: no wound to see.
   // A heavy ball mostly goes through: seen to strike the surface only where the armour held most of it.
   Object.assign(event, { harm, armour, region, plate: armour > 0 && OUTFITS[kind].plated && (!shot || armour >= GUN.platedHolds) ? kind : null });

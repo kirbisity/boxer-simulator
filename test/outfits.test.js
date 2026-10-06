@@ -147,8 +147,10 @@ test('three samurai, three knight and five gladiator armours, five designs each,
     const stats = new Set(kinds.map((kind) => JSON.stringify(OUTFITS[kind].protection)));
     assert.equal(stats.size, count, `${family}: each armour protects differently`);
     for (const kind of kinds) {
-      assert.equal(OUTFITS[kind].designs.length, 5, kind);
-      assert.ok(randomDesign(kind) < 5);
+      // Five to be dealt; a character's own (`special`) beyond them is never dealt.
+      const dealt = OUTFITS[kind].designs.filter((design) => !design.special);
+      assert.equal(dealt.length, 5, kind);
+      for (let draw = 0; draw < 40; draw += 1) assert.ok(!OUTFITS[kind].designs[randomDesign(kind)].special, kind);
     }
   }
   // Plate is proof against the edge; mail is not; the ashigaru is the lightest samurai.

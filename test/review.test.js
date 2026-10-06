@@ -10,6 +10,7 @@ import { advance, createWorld, dropWeapon, seededRandom, throwPunch } from '../s
 import { footSoldier, hospitaller, mexicaWarrior, varyCharacter } from '../src/cast.js';
 import { SCENARIOS, scenarioWorld } from '../src/scenarios.js';
 import { MOVES, STYLES } from '../src/moves.js';
+import { WEAPONS } from '../src/weapons.js';
 
 const duel = (red, blue, options = {}) => createWorld([{ inputs: structuredClone(red), corner: 'red' }, { inputs: structuredClone(blue), corner: 'blue' }], { seed: 3, ...options });
 
@@ -86,4 +87,41 @@ test('the stamina a strike needs is what it costs', () => {
   assert.equal(throwPunch(world, fighter, 'hook', 'head'), false, 'not enough left for the hook');
   fighter.stamina = drain * 1.1;
   assert.equal(throwPunch(world, fighter, 'hook', 'head'), true, 'enough for it');
+});
+
+test('a hard landing on the trunk bleeds inside; enough of it collapses a man', () => {
+  const world = duel(PRESETS.heavy, PRESETS.light);
+  const man = world.fighters[0];
+  man.state = 'down';
+  man.downTimer = 100;
+  // Slammed onto the floor, over and over.
+  for (let fall = 0; fall < 40 && man.state !== 'out'; fall += 1) {
+    for (let index = 0; index < man.v.length / 3; index += 1) man.v[index * 3 + 1] = -7;
+    advance(world, 0.25);
+  }
+  assert.ok(man.bleedInside > 0, 'bleeding inside');
+  assert.equal(man.state, 'out');
+  assert.ok(world.events.some((event) => event.kind === 'bledOut' && /internal injuries/.test(event.effects.join(' '))), 'collapsed from internal injuries');
+});
+
+test('a weapon heavier than heavyFrom is slower to raise and to recover; the blow between is not', async () => {
+  const { WORLD } = await import('../src/physics.js');
+  const windupTime = (preset) => {
+    const world = duel(PRESETS[preset], PRESETS.light, { distance: 1.2 });
+    const fighter = world.fighters[0];
+    const attack = Object.keys(STYLES[fighter.style].attacks)[0];
+    assert.ok(throwPunch(world, fighter, attack), `${preset} swings`);
+    const windup = fighter.punch.spec.windup;
+    let elapsed = 0;
+    while (fighter.punch && fighter.punch.t < windup && elapsed < 2) {
+      advance(world, 1 / 60);
+      elapsed += 1 / 60;
+    }
+    return elapsed / windup;
+  };
+  assert.ok(WEAPONS.kanabo.mass > WORLD.weapons.heavyFrom && WEAPONS.warhammer.mass < WORLD.weapons.heavyFrom);
+  // Against its spec (frames round both up alike): the kanabo's windup stretched, the katana's not.
+  const kanabo = windupTime('kanabo');
+  const katana = windupTime('samurai');
+  assert.ok(kanabo > katana * 1.15, `kanabo windup ${kanabo.toFixed(2)}× its spec, katana ${katana.toFixed(2)}×`);
 });

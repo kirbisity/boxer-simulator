@@ -168,7 +168,8 @@ function rebuildViews({ progressive = false } = {}) {
     return view;
   };
   const order = [...state.world.fighters].sort((a, b) => Number(leads.has(b.id)) - Number(leads.has(a.id)));
-  const now = progressive && crowd ? order.filter((fighter) => leads.has(fighter.id)) : order;
+  // Built a few a frame (the two leads first, a frame each: each is a full model), or all now.
+  const now = progressive && crowd ? [] : order;
   state.views = now.map(build);
   state.viewQueue = order.slice(now.length);
   state.buildView = build;
@@ -669,6 +670,13 @@ const LABELS = {
   leanBack: 'Lean back', check: 'Check', stepBack: 'Step back', body: 'Body', shoot: 'Shoot', rHook: 'Rear hook', collarTie: 'Collar tie',
 };
 
+/** A move's name on a button: its own label, or its key in words ("hammerOverhead" → "Hammer overhead"). */
+function moveLabel(name) {
+  if (LABELS[name]) return LABELS[name];
+  const words = name.replace(/([A-Z])/g, ' $1').toLowerCase();
+  return words[0].toUpperCase() + words.slice(1);
+}
+
 function command(name) {
   // Any fighting move puts the guard back up.
   if (player()?.walking) setWalking(false);
@@ -710,7 +718,7 @@ function buildPad() {
   for (const name of names) {
     const button = document.createElement('button');
     button.dataset.command = name;
-    button.innerHTML = `${LABELS[name] ?? name} <kbd>${keyFor[name] ?? ''}</kbd>`;
+    button.innerHTML = `${moveLabel(name)} <kbd>${keyFor[name] ?? ''}</kbd>`;
     if (name === 'body') button.classList.toggle('on', Boolean(state.aimBody));
     pad.append(button);
   }

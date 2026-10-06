@@ -387,6 +387,10 @@ export const OUTFITS = {
       toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'),
       toseiDesign('Silver', '#9aa0a8', '#1d2a4f', 'sun', 'black', '#23202b'),
       toseiDesign('Blued steel', '#2c3a4a', '#d6a743', 'antlers', 'red', '#16201a'),
+      // Kojima's own (`special`: his alone, never dealt at random): black
+      // lacquer, the kabuto dressed all round in grey yak hair (shaguma, as
+      // Edo-period helmets were), and a black oni face (a full somen).
+      { ...toseiDesign('Oni', '#17171a', '#2a2a2e', null, 'oni', '#141416'), special: true, head: { kind: 'kabuto', color: '#17171a', mask: 'oni', hair: '#7a766f', lace: '#2a2a2e', gold: '#8a7a5a' } },
     ],
   },
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,
@@ -872,7 +876,7 @@ export function randomColors(kind, random = Math.random) {
 export function randomDesign(kind, random = Math.random) {
   const spec = OUTFITS[kind];
   if (!spec) return 0;
-  const pool = spec.picked ?? spec.designs.map((design, index) => (design.levelOnly ? null : index)).filter((index) => index !== null);
+  const pool = spec.picked ?? spec.designs.map((design, index) => (design.levelOnly || design.special ? null : index)).filter((index) => index !== null);
   return pool[Math.floor(random() * pool.length)] ?? 0;
 }
 

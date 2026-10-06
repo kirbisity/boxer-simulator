@@ -741,7 +741,9 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
   const target = opponentFor(world, fighter);
-  const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) : 0;
+  // Raising a weapon heavier than heavyFrom is work in proportion to its mass.
+  const lift = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(1, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom) : 1;
+  const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift : 0;
   // An empty gun is not fired: the same button starts loading it (no mark needed).
   if (spec?.path === 'aim' && fighter.weapon?.held && fighter.weapon.spec.shot && !fighter.weapon.loaded) {
     if (fighter.state === 'up' && !fighter.punch) fighter.reloading = true;
@@ -815,7 +817,9 @@ function updateIntent(world, fighter, dt) {
     intent.dip += WORLD.heavy.loadDip * loaded;
   } else if (fighter.punch) {
     const punch = fighter.punch;
-    punch.t += dt;
+    // A heavy weapon is slow to raise and slow to bring back; the blow between is the muscles'.
+    const heavy = punch.spec.path === 'blade' && fighter.weapon?.held ? Math.max(1, Math.sqrt(fighter.weapon.spec.mass / WORLD.weapons.heavyFrom)) : 1;
+    punch.t += punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt;
     punch.age += dt;
     if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
     if (punch.heavy) intent.dip += WORLD.heavy.loadDip * Math.max(0, 1 - punch.t / punch.spec.extendUntil);
@@ -1433,7 +1437,8 @@ function updateTimers(world, fighter, dt) {
     fighter.bleed *= Math.exp(-dt / BLADES.clotSeconds);
     if (fighter.state !== 'out' && fighter.bloodLost >= collapseAt()) {
       const event = { time: world.time, kind: 'bled', attacker: fighter.lastWoundedBy ?? fighter.id, effects: [] };
-      knockOut(world, fighter, event, 'collapsed from blood loss', 'bledOut');
+      // Mostly from blows that broke nothing open: internal injuries.
+      knockOut(world, fighter, event, (fighter.bleedInside ?? 0) > (fighter.bleedOutside ?? 0) ? 'collapsed from internal injuries' : 'collapsed from blood loss', 'bledOut');
     }
   }
   fighter.cooldown = Math.max(0, fighter.cooldown - dt);
@@ -2011,7 +2016,9 @@ function groundImpact(world, fighter, index, speed) {
   }
   const part = IMPACT_PART[name];
   if (!part) return;
-  addDamage(fighter, part, (through * spec.body * (1 - (protectionAt(gear, part).blunt ?? 0))) / bone, false);
+  const bruise = (through * spec.body * (1 - (protectionAt(gear, part).blunt ?? 0))) / bone;
+  addDamage(fighter, part, bruise, false);
+  if (part === 'trunk') bleedInside(fighter, bruise);
   const joint = IMPACT_JOINT[name];
   if (joint && !fighter.broken.has(joint) && speed > spec.fractureSpeed * bone) {
     breakJoint(world, fighter, joint);
@@ -2151,14 +2158,21 @@ function collideFighters(world, h, time, substep = 0) {
   // A big fight finds its near pairs through a grid, in the same order as
   // the all-pairs test; a proxy (posed, not simulated) touches nothing.
   if (fighters.length > WORLD.tiers.full) {
-    const grid = spatialGrid(hips.map((hip) => [hip[0], hip[2]]), WORLD.contactRange);
+    // Candidates once a step (the grid, its lookups and sorts were a tenth of
+    // a big fight's step when made every substep); the exact range each substep.
+    if (world.contactCache?.time !== world.time || world.contactCache.count !== fighters.length) {
+      const grid = spatialGrid(hips.map((hip) => [hip[0], hip[2]]), WORLD.contactRange + WORLD.contactMargin);
+      world.contactCache = { time: world.time, count: fighters.length, near: fighters.map((_, index) => grid.near(index)) };
+    }
+    const range = WORLD.contactRange * WORLD.contactRange;
+    const within = (a, b) => (hips[a][0] - hips[b][0]) ** 2 + (hips[a][2] - hips[b][2]) ** 2 < range;
     // Two coarse fighters move only on their substeps: they are tested then.
     const stride = coarseStride(world);
     const meet = (a, b) => fighters[b].detail !== 'proxy' && (substep % stride === stride - 1 || fighters[a].detail === 'full' || fighters[b].detail === 'full');
     // In a big fight a hand or blade not striking (guarding, hanging) is
     // tested on every other substep; the strike in flight on every one.
     const idleEvery = fightTier(world) >= 3 ? 2 : 1;
-    const neighbours = fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index).filter((other) => meet(index, other))));
+    const neighbours = fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : world.contactCache.near[index].filter((other) => within(index, other) && meet(index, other))));
     fighters.forEach((attacker, a) => {
       if (!neighbours[a].length) return;
       const limbs = strikers(attacker);
@@ -2526,7 +2540,16 @@ function bodiesMeet(world, first, second, closing) {
 function bodyBlow(fighter, deltaV, share) {
   if (fighter.state === 'out') return;
   const spread = 1 - (fighter.body.gear.protection.blunt ?? 0);
-  addDamage(fighter, 'trunk', (deltaV * share * spread) / Math.max(0.4, fighter.body.boneDensity ?? 1), false);
+  const bruise = (deltaV * share * spread) / Math.max(0.4, fighter.body.boneDensity ?? 1);
+  addDamage(fighter, 'trunk', bruise, false);
+  bleedInside(fighter, bruise);
+}
+
+/** A blunt blow to the trunk (m/s through armour and bone) bleeds inside, as a wound does outside. */
+function bleedInside(fighter, deltaV) {
+  const rate = deltaV * WORLD.impact.internalBleed;
+  fighter.bleed = (fighter.bleed ?? 0) + rate;
+  fighter.bleedInside = (fighter.bleedInside ?? 0) + rate;
 }
 
 /** Which of the struck fighter's particles take the blow, and in what share. */
@@ -2747,7 +2770,9 @@ function vital(defender, capsule, contactPoint) {
 
 function wound(defender, kind, joules, key, attacker) {
   const zone = key === 'head' ? 'head' : key === 'trunk' ? 'trunk' : 'limb';
-  defender.bleed = (defender.bleed ?? 0) + joules * BLADES.bleedPerJoule[kind] * BLADES.bleedZone[zone];
+  const rate = joules * BLADES.bleedPerJoule[kind] * BLADES.bleedZone[zone];
+  defender.bleed = (defender.bleed ?? 0) + rate;
+  defender.bleedOutside = (defender.bleedOutside ?? 0) + rate;
   defender.lastWoundedBy = attacker.id;
 }
 
@@ -2782,6 +2807,7 @@ function sever(world, defender, where, event, bladeVelocity) {
   };
   world.debris.push(debris);
   defender.bleed = (defender.bleed ?? 0) + 0.06;
+  defender.bleedOutside = (defender.bleedOutside ?? 0) + 0.06;
   event.severed = where.joint;
   world.events.push({ time: world.time, kind: 'severed', fighter: defender.id, attacker: event.attacker, joint: where.joint, side: where.side, debris: debris.id, point: base, effects: [part.label] });
   knockOut(world, defender, event, `${part.label}: cannot go on`, 'out');

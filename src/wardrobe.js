@@ -933,8 +933,70 @@ function buildKabuto(group, head, r, steel, color) {
   peak.position.set(0.05 * r, 0.12 * r, 0);
   group.add(peak);
   // The crest (maedate) is headgear of its own (kabutoCrest): it can be knocked off.
+  // Shaguma: the whole helmet dressed in long yak hair, a shaggy cap over the
+  // bowl and a mane over the neck guard to the shoulders, open at the face.
+  if (head.hair) {
+    const hair = surface(head.hair, { roughness: 1, flatShading: true });
+    const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(1.38 * r, 1), hair);
+    cap.scale.set(1, 0.72, 1);
+    cap.position.y = 0.32 * r;
+    // Over the shikoro: a skirt flaring to the shoulders, open at the face (cylinder angles start at +z).
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(1.42 * r, 2.15 * r, 1.45 * r, 14, 1, true, Math.PI * 0.78, Math.PI * 1.44), hair);
+    skirt.material = hair.clone();
+    skirt.material.side = THREE.DoubleSide;
+    skirt.position.y = -0.55 * r;
+    group.add(cap, skirt);
+    // Locks hanging past the skirt's edge, uneven.
+    for (let lock = 0; lock < 22; lock += 1) {
+      const around = Math.PI * 0.78 + ((lock + 0.5) / 22) * Math.PI * 1.44;
+      const length = (0.7 + 0.35 * ((lock * 7) % 5) / 4) * r;
+      const strand = new THREE.Mesh(new THREE.ConeGeometry(0.22 * r, length, 4), hair);
+      strand.rotation.x = Math.PI;
+      // Cylinder angle θ: x = sin θ, z = cos θ.
+      strand.position.set(Math.sin(around) * 2.05 * r, -1.25 * r - length / 2, Math.cos(around) * 2.05 * r);
+      group.add(strand);
+    }
+  }
+  // An oni somen: the whole face in black iron, heavy brows, glaring eye
+  // holes, a snarl with fangs, and two short horns at the brow.
+  if (head.mask === 'oni') {
+    const iron = metal(steel, 0x101012);
+    const face = new THREE.Mesh(new THREE.SphereGeometry(1.08 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.22, Math.PI * 0.62), iron);
+    face.material = iron.clone();
+    face.material.side = THREE.DoubleSide;
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.16 * r, 0.14 * r, 0.95 * r), iron);
+    brow.position.set(1.08 * r, 0.3 * r, 0);
+    const glare = surface(0x8a1a12, { emissive: 0x3a0806 });
+    const eyes = [1, -1].map((side) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09 * r, 8, 6), glare);
+      eye.position.set(1.06 * r, 0.16 * r, side * 0.24 * r);
+      eye.scale.x = 0.5;
+      return eye;
+    });
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.16 * r, 0.3 * r, 6), iron);
+    nose.rotation.z = -Math.PI / 2;
+    nose.position.set(1.14 * r, -0.04 * r, 0);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.12 * r, 0.5 * r), surface(0x2a0a08));
+    mouth.position.set(1.06 * r, -0.36 * r, 0);
+    const bone = surface(0xe8e2d0);
+    const fangs = [0.16, -0.16].map((z) => {
+      const fang = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, 0.2 * r, 5), bone);
+      fang.position.set(1.08 * r, -0.26 * r, z * r);
+      return fang;
+    });
+    const horns = [1, -1].map((side) => {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.42 * r, 6), bone);
+      horn.position.set(0.95 * r, 0.62 * r, side * 0.4 * r);
+      horn.rotation.set(side * -0.35, 0, -0.35);
+      return horn;
+    });
+    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), iron);
+    throat.material = iron.clone();
+    throat.material.side = THREE.DoubleSide;
+    throat.position.y = -1.0 * r;
+    group.add(face, brow, ...eyes, nose, mouth, ...fangs, ...horns, throat);
+  } else if (head.mask) {
   // Menpo: the lower face guard, with a nose and a bristling moustache.
-  if (head.mask) {
     const maskSteel = metal(steel, head.mask === 'red' ? color : 0x141416);
     // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
     const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);

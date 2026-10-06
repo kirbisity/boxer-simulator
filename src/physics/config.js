@@ -36,6 +36,10 @@ export const WORLD = {
   // hand than this share of its usual spacing, and this far short of the head (m).
   grip: { shortest: 0.4, headClear: 0.08 },
   contactRange: 2.6, // m between hips beyond which two fighters cannot touch
+  // A big fight looks for near pairs once a step, out to this much beyond
+  // contactRange (more than two men can close in one step), and checks the
+  // exact distance each substep.
+  contactMargin: 0.6,
   bodyReach: 1.3, // m from the hips that any part of a body (standing or lying) can be
   // A strike from more than this far off the defender's facing (rad) is
   // unseen; the head moves this much further for it.
@@ -216,7 +220,11 @@ export const WORLD = {
   // `fractureSpeed` × bone density breaks the joint. Two bodies meeting
   // faster than `bumpSpeed` (m/s; a charge at any speed) each take their own
   // speed change (`charge` of it) as damage to the trunk: the lighter man more.
-  impact: { minSpeed: 2.2, head: 0.5, body: 0.7, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.6, bumpEvery: 0.6 },
+  // A hard blow to the trunk (a fall on it, a collision) bleeds inside:
+  // `internalBleed` of the blood a second per m/s that got through armour and
+  // bone, clotting as a wound does. One fall is a bruise; fall after fall, or
+  // trampled in a crush, a man can collapse and die of it.
+  impact: { minSpeed: 2.2, head: 0.6, body: 0.85, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.75, bumpEvery: 0.6, internalBleed: 0.0008 },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).
   // Against the gun hand's strength (N; `reference` an average man's) the
@@ -267,7 +275,12 @@ export const WORLD = {
   // grip loose this often (a knockout always); a man without a weapon who
   // reaches one on the floor stoops `pickupSeconds` to take it, and gives
   // up if he has not got his hand to it (within `pickupReach` m) in `pickupGiveUp` s.
-  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2 },
+  // A weapon heavier than `heavyFrom` kg is slower to raise (against gravity)
+  // and to bring back after the blow (its momentum to stop): the windup and
+  // the recovery take √(mass / heavyFrom) as long, and each blow costs
+  // mass / heavyFrom times the stamina. The swing itself is the muscles'
+  // (inertia and Hill already slow it).
+  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2 },
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).
   // Without a banner colour of its own, a side's flag is its corner's.
