@@ -31,6 +31,8 @@ const state = {
   speed: 1,
   // Which side the player takes in play mode.
   playSide: 'red',
+  // Sandbox: a side that stands still (no AI: no guard, no blows, no footwork), a target for testing armour.
+  standStill: '',
   paused: false,
   mode: 'watch',
   aimBody: false,
@@ -193,8 +195,18 @@ function showMustering() {
 function thinkForBout(world, dt) {
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
   // The one you play is simulated in full however big the fight.
-  world.keepFull = players;
-  thinkAll(world, dt, players);
+  world.keepFull = new Set(players);
+  // Standing still: no thinking at all; he stays where he is, guard down, and takes what comes.
+  const still = new Set(players);
+  if (state.standStill && !state.scenario) {
+    for (const fighter of world.fighters) {
+      if (fighter.corner !== state.standStill || players.has(fighter.id)) continue;
+      still.add(fighter.id);
+      world.keepFull.add(fighter.id);
+      Object.assign(fighter, { move: 0, strafe: 0, running: false, goTo: null, defence: null, rush: null });
+    }
+  }
+  thinkAll(world, dt, still);
   if (players.size) walkAbout(player());
 }
 
@@ -604,6 +616,9 @@ for (const corner of ['red', 'blue']) {
     newBout();
   });
 }
+$('#stand-still').addEventListener('change', (event) => {
+  state.standStill = event.target.value;
+});
 $('#place').addEventListener('change', (event) => {
   state.place = event.target.value;
   newBout();
