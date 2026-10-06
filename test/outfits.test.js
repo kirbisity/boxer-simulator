@@ -24,7 +24,7 @@ test('every outfit has its picked design, a movement class, and traits as specif
   assert.ok(gearTraits({ ...female, outfit: { kind: 'victorianLady' } }).balance < business, 'the lady\'s higher heels: easier still');
   assert.ok(gearTraits({ ...male, outfit: { kind: 'swat' } }).balance > 1.3, 'riot gear: hard to fall');
   // The vest over the torso; the helmet over the head; riot pads on the limbs.
-  assert.equal(gearTraits({ ...male, outfit: { kind: 'swat' } }).protection.regions.head.blunt, 0.6);
+  assert.equal(gearTraits({ ...male, outfit: { kind: 'swat' } }).protection.regions.head.blunt, 0.7);
   assert.equal(gearTraits({ ...male, outfit: { kind: 'knight' } }).protection.blunt, 0.6);
   // Every outfit says all four; a modern vest also says where it covers (`regions`).
   for (const kind of Object.keys(OUTFITS)) assert.deepEqual(Object.keys(gearTraits({ ...male, outfit: { kind } }).protection).filter((key) => key !== 'regions').sort(), ['blunt', 'bullet', 'cut', 'pierce']);
@@ -67,7 +67,7 @@ test('protection takes harm, not physics: the blow lands with the same force, th
   const swat = crossInto('swat');
   assert.ok(bare.hit && swat.hit, 'both landed');
   assert.equal(bare.hit.harm, 1);
-  const covered = { head: 0.6, trunk: 0.5 }[swat.hit.target] ?? 0.55;
+  const covered = { head: 0.7, trunk: 0.5 }[swat.hit.target] ?? 0.6;
   assert.ok(Math.abs(swat.hit.harm - (1 - covered)) < 1e-9, `riot gear lets ${swat.hit.harm} through on the ${swat.hit.target}`);
   // Same strike into a heavier man: the impulse is within a few percent; the knock is his to take.
   assert.ok(Math.abs(swat.hit.speed - bare.hit.speed) / bare.hit.speed < 0.15, 'the punch arrives the same');

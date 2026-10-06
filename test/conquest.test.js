@@ -51,7 +51,7 @@ test('the new styles are in their factions, and tai chi and taekwondo stay out o
   assert.ok(!STYLES.mix.mix.includes('taichi') && !STYLES.mix.mix.includes('taekwondo'));
   assert.ok(WEAPONS.staff.harm.swing.cut === undefined && WEAPONS.staff.harm.swing.blunt > 0, 'the staff is all blunt');
   assert.ok(WEAPONS.staff.strikeFrom < 0, 'both ends strike');
-  assert.ok(WEAPONS.kanabo.mass > WEAPONS.warhammer.mass && WEAPONS.kanabo.harm.swing.blunt > WEAPONS.warhammer.harm.swing.blunt);
+  assert.ok(WEAPONS.kanabo.mass > WEAPONS.warhammer.mass);
   assert.ok(!Object.keys(STYLES.kanabo.attacks).some((move) => /Thrust/.test(move)), 'no kanabo thrusts');
   assert.equal(WEAPONS.threeEyed.shot.barrels, 3);
   assert.ok(WEAPONS.threeEyed.shot.energy < WEAPONS.matchlock.shot.energy && WEAPONS.threeEyed.shot.spread > WEAPONS.matchlock.shot.spread);

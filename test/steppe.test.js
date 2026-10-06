@@ -24,9 +24,9 @@ test('the steppe and the Ottomans run from the unarmoured to the heavily armoure
   assert.deepEqual(['azap', 'yatagan', 'sipahi'].map(of), ['ottomans', 'ottomans', 'ottomans']);
 });
 
-test('the one-handed maces: a little less blunt than the two-handed kanabo, with a parry shield', () => {
+test('the one-handed maces: blunt with a pierce, about as hard-hitting as the kanabo, with a parry shield', () => {
   assert.equal(WEAPONS.langya.hands, 'one');
-  assert.ok(WEAPONS.langya.harm.swing.blunt < WEAPONS.kanabo.harm.swing.blunt && WEAPONS.langya.harm.swing.pierce > 0);
+  assert.ok(Math.abs(WEAPONS.langya.harm.swing.blunt - WEAPONS.kanabo.harm.swing.blunt) <= 0.15 && WEAPONS.langya.harm.swing.pierce > 0);
   assert.ok(WEAPONS.flangedMace.crush > WEAPONS.langya.crush);
   assert.equal(STYLES.langyaShield.shield, 'buckler');
   assert.equal(SHIELDS.buckler.look, 'steel');

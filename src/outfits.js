@@ -237,7 +237,7 @@ export const OUTFITS = {
     // takes blows; riot pads on the limbs spread a blow but not an edge.
     protection: {
       blunt: 0.5, cut: 0.5, pierce: 0.3, bullet: { head: 0.6, torso: 0.9, limb: 0.1 },
-      regions: { head: { blunt: 0.6, cut: 0.7, pierce: 0.5 }, limb: { blunt: 0.55, cut: 0.3, pierce: 0.1 } },
+      regions: { head: { blunt: 0.7, cut: 0.8, pierce: 0.7 }, limb: { blunt: 0.6, cut: 0.3, pierce: 0.1 } },
     },
     designs: [
       { label: 'Heavy riot', top: { kind: 'longsleeve', color: '#202226' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'heavyRiot', color: '#121316', backPrint: 'SWAT' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
@@ -247,11 +247,11 @@ export const OUTFITS = {
   // over the shirt, the duty belt, the peaked cap. The vest stops handgun
   // rounds over the torso and little of a blade; nothing else is covered.
   police: {
-    faction: 'law', bulletRating: 1300,
+    faction: 'law', bulletRating: 500,
     label: 'Police — patrol uniform', movement: 'good', fists: 'bare',
     sidearm: 'baton',
     protection: {
-      blunt: 0.15, cut: 0.3, pierce: 0.15, bullet: { head: 0, torso: 0.85, limb: 0 },
+      blunt: 0.1, cut: 0.1, pierce: 0, bullet: { head: 0, torso: 0.5, limb: 0 },
       regions: { head: { blunt: 0, cut: 0, pierce: 0 }, limb: { blunt: 0, cut: 0, pierce: 0 } },
     },
     designs: [
@@ -271,7 +271,7 @@ export const OUTFITS = {
     extraMass: 0.35,
     courage: 0.5,
     protection: {
-      blunt: 0.4, cut: 0.55, pierce: 0.4, bullet: { head: 0.6, torso: 0.97, limb: 0 },
+      blunt: 0.4, cut: 0.55, pierce: 0.2, bullet: { head: 0.6, torso: 0.97, limb: 0 },
       regions: { head: { blunt: 0.55, cut: 0.6, pierce: 0.4 }, limb: { blunt: 0.05, cut: 0.1, pierce: 0.05 } },
     },
     designs: [
@@ -292,7 +292,7 @@ export const OUTFITS = {
     // Plate against blunt force spreads it; against an edge it is proof,
     // against a point nearly so, and a blade that meets it glances off.
     protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
-    courage: 0.35,
+    courage: 0.4,
     deflects: true,
     family: 'knight',
     // The designs in play (picked from the five); the game shuffles among them.
@@ -311,12 +311,12 @@ export const OUTFITS = {
   // against a blow; lighter than plate, and an edge bites rather than glances.
   knightMail: {
     faction: 'knights',
-    label: 'Knight — mail and great helm', family: 'knight', movement: 'good', fists: 'gauntlet',
+    label: 'Knight — mail and great helm', family: 'knight', movement: 'limited', fists: 'gauntlet',
     sidearm: 'shortSword',
     picked: [0, 1, 2, 3],
-    extraMass: 0.3,
-    protection: { blunt: 0.45, cut: 0.85, pierce: 0.5, bullet: { head: 0.4, torso: 0.25, limb: 0.2 } },
-    courage: 0.3,
+    extraMass: 0.4,
+    protection: { blunt: 0.3, cut: 0.9, pierce: 0.5, bullet: { head: 0.3, torso: 0, limb: 0 } },
+    courage: 0.4,
     designs: [
       mailDesign('Gules', '#a2201e', '#e8e2d2', 'plain'),
       mailDesign('Per pale', '#1f3f8a', '#e8e2d2', 'pale'),
@@ -333,7 +333,7 @@ export const OUTFITS = {
     label: 'Foot soldier', family: 'knight', movement: 'good', fists: 'bare',
     sidearm: 'shortSword',
     extraMass: 0.22,
-    protection: { blunt: 0.5, cut: 0.75, pierce: 0.6, bullet: { head: 0.35, torso: 0.35, limb: 0.1 } },
+    protection: { blunt: 0.4, cut: 0.75, pierce: 0.6, bullet: { head: 0.35, torso: 0.35, limb: 0 } },
     courage: 0.25,
     designs: [
       footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { brim: 1.9 }),
@@ -356,8 +356,8 @@ export const OUTFITS = {
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     extraMass: 0.4,
-    protection: { blunt: 0.7, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0.1 } },
-    courage: 0.3,
+    protection: { blunt: 0.7, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } },
+    courage: 0.4,
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
@@ -379,8 +379,8 @@ export const OUTFITS = {
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     extraMass: 0.45,
-    protection: { blunt: 0.75, cut: 0.95, pierce: 0.88, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
-    courage: 0.3,
+    protection: { blunt: 0.75, cut: 0.95, pierce: 0.7, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
+    courage: 0.4,
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
       toseiDesign('Russet', '#6b4a32', '#2a1a10', 'kuwagata', 'red', '#2a1f18'),
@@ -397,7 +397,7 @@ export const OUTFITS = {
     sidearm: 'wakizashi',
     picked: [0, 1, 2],
     extraMass: 0.2,
-    protection: { blunt: 0.5, cut: 0.7, pierce: 0.55, bullet: { head: 0.2, torso: 0.25, limb: 0.05 } },
+    protection: { blunt: 0.5, cut: 0.7, pierce: 0.5, bullet: { head: 0.2, torso: 0.25, limb: 0.05 } },
     courage: 0.2,
     designs: [
       ashigaruDesign('Black', '#16161a', '#3a2a1c', '#d6a743', '#2a2a30'),
@@ -466,12 +466,10 @@ export const OUTFITS = {
   mingGarrison: {
     faction: 'chinese',
     label: 'Ming — garrison', family: 'chinese', movement: 'good', fists: 'bare',
-    // The dao at his side; for the man who fights with the dao, a knife as well.
-    sidearm: 'dao',
-    spare: 'dagger',
+    // No sidearm: a garrison man who loses his weapon fights with his hands.
     extraMass: 0.06,
-    protection: { blunt: 0.15, cut: 0.2, pierce: 0.1 },
-    courage: 0.1,
+    protection: { blunt: 0.1, cut: 0.1, pierce: 0.05 },
+    courage: 0,
     designs: [
       mingGarrisonDesign('Red coat', '#a3241e', '#2a2622'),
       mingGarrisonDesign('Blue coat', '#2a3a6a', '#2a2622'),
@@ -489,8 +487,8 @@ export const OUTFITS = {
     sidearm: 'dao',
     spare: 'dagger',
     extraMass: 0.26,
-    protection: { blunt: 0.55, cut: 0.85, pierce: 0.7, bullet: { head: 0.4, torso: 0.45, limb: 0.15 } },
-    courage: 0.25,
+    protection: { blunt: 0.6, cut: 0.7, pierce: 0.5, bullet: { head: 0.3, torso: 0.5, limb: 0 } },
+    courage: 0.2,
     designs: [
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b'),
       mingBrigandineDesign('Blue', '#22356a', '#8f949b'),
@@ -512,7 +510,7 @@ export const OUTFITS = {
     deflects: true,
     arrowproof: true,
     extraMass: 0.45,
-    protection: { blunt: 0.62, cut: 1, pierce: 0.88, bullet: { head: 0.45, torso: 0.6, limb: 0.3 } },
+    protection: { blunt: 0.65, cut: 0.95, pierce: 0.8, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
     courage: 0.35,
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
@@ -534,8 +532,8 @@ export const OUTFITS = {
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
-    extraMass: 0.5,
-    protection: { blunt: 0.66, cut: 1, pierce: 0.9, bullet: { head: 0.45, torso: 0.65, limb: 0.35 } },
+    extraMass: 0.6,
+    protection: { blunt: 0.66, cut: 0.95, pierce: 0.8, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
     courage: 0.4,
     designs: [
       { label: 'Black iron', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#5a5d63', lace: '#2a1c14' }, head: { kind: 'pagodaHelm', color: '#5a5d63' }, feet: { kind: 'sabaton', color: '#5a5d63' } },
@@ -694,7 +692,7 @@ export const OUTFITS = {
     sidearm: 'espada',
     spare: 'dagger',
     extraMass: 0.3,
-    protection: { blunt: 0.5, cut: 0.9, pierce: 0.8, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
+    protection: { blunt: 0.5, cut: 0.9, pierce: 0.8, bullet: { head: 0.4, torso: 0.55, limb: 0 } },
     courage: 0.35,
     designs: [
       conquistadorDesign('Black doublet', '#1c1c20', '#3a2a22', 'morion'),
@@ -731,7 +729,7 @@ export const OUTFITS = {
     label: 'Mexica — warrior', family: 'mexica', movement: 'excellent', fists: 'bare',
     sidearm: 'macuahuitl',
     extraMass: 0.08,
-    protection: { blunt: 0.2, cut: 0.45, pierce: 0.35, bullet: { head: 0, torso: 0.05, limb: 0 } },
+    protection: { blunt: 0.2, cut: 0.2, pierce: 0.15, bullet: { head: 0, torso: 0.05, limb: 0 } },
     courage: 0.3,
     designs: [
       mexicaDesign('Ichcahuipilli, quetzal band', '#ece4d0', '#1f8a5a'),
@@ -749,7 +747,7 @@ export const OUTFITS = {
     label: 'Mexica — jaguar and eagle', family: 'mexica', movement: 'excellent', fists: 'bare',
     sidearm: 'macuahuitl',
     extraMass: 0.12,
-    protection: { blunt: 0.25, cut: 0.5, pierce: 0.4, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
+    protection: { blunt: 0.2, cut: 0.2, pierce: 0.2, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
     courage: 0.45,
     designs: [
       { label: 'Jaguar warrior', top: { kind: 'longsleeve', color: '#c8902e' }, bottom: { kind: 'pants', color: '#c8902e' }, armor: { kind: 'jaguarSuit', color: '#c8902e', cloth: '#c8902e', cloth2: '#2a1d14' }, head: { kind: 'jaguarHelm', color: '#c8902e' }, feet: { kind: 'sandal', color: '#5a3a22' } },

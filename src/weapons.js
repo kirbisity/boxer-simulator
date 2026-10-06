@@ -135,14 +135,14 @@ export const WEAPONS = {
   },
   knife: {
     label: 'Knife', hands: 'one', length: 0.21, strikeFrom: 0.05, handle: 0.1, mass: 0.22, balance: 0, radius: 0.01,
-    harm: { thrust: { pierce: 0.5, blunt: 0.35 }, swing: { cut: 0.42, blunt: 0.22 } },
+    harm: { thrust: { pierce: 0.65, blunt: 0.35 }, swing: { cut: 0.42, blunt: 0.22 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 45, zeta: 0.8 }, threat: 2.2,
   },
   // The hoplomachus's hasta: held near its balance in one hand, long ahead
   // of the hand and a good way behind it; made to thrust.
   spear: {
     label: 'Spear', hands: 'one', length: 1.3, strikeFrom: 0.9, handle: 0.6, mass: 1.6, balance: 0.18, radius: 0.016,
-    harm: { thrust: { pierce: 1, cut: 0.1, blunt: 0.2 }, swing: { blunt: 0.6 } },
+    harm: { thrust: { pierce: 1.3, cut: 0.1, blunt: 0.2 }, swing: { cut: 0.2, blunt: 0.6 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.5,
   },
   // Polearms, two hands well apart on the shaft. `crush`: the share of
@@ -162,7 +162,7 @@ export const WEAPONS = {
   },
   longSpear: {
     label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.9, balance: 0.55, radius: 0.016,
-    harm: { thrust: { pierce: 1, blunt: 0.25, cut: 0.15 }, swing: { blunt: 0.5, cut: 0.2 } },
+    harm: { thrust: { pierce: 1.3, blunt: 0.25, cut: 0.15 }, swing: { blunt: 0.6, cut: 0.2 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.5, grip: 0.5,
   },
   // A modern 9 mm service pistol: fired, not swung (`ranged`; see GUN). In
@@ -193,7 +193,7 @@ export const WEAPONS = {
   threeEyed: {
     label: 'Three-eyed gun', hands: 'two', length: 0.95, strikeFrom: 0.55, handle: 0.35, spacing: 0.4, supportAhead: true, longGun: true,
     mass: 4.0, balance: 0.62, radius: 0.04,
-    harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.6 } },
+    harm: { swing: { blunt: 1.3 }, thrust: { blunt: 0.6 } },
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 9, zeta: 0.85 }, threat: 4.6, grip: 0.7, ranged: true, edgeUp: true, crush: 0.4,
     muzzle: [0.95, 0],
     shot: THREE_EYED,
@@ -236,7 +236,7 @@ export const WEAPONS = {
   // is everything (`pierce`); its narrow edge cuts a little, it barely bruises.
   rapier: {
     label: 'Rapier', hands: 'one', length: 1.05, strikeFrom: 0.1, handle: 0.14, mass: 1.15, balance: 0.1, radius: 0.008,
-    harm: { thrust: { pierce: 1.1, cut: 0.08, blunt: 0.03 }, swing: { cut: 0.35, blunt: 0.05 } },
+    harm: { thrust: { pierce: 1.6, cut: 0.08, blunt: 0.03 }, swing: { cut: 0.4, blunt: 0.05 } },
     contactSeconds: 0.003, rotation: 0.5, wrist: { omega: 26, zeta: 0.8 }, threat: 3.8,
   },
   // The macuahuitl: a flat oak club edged both sides with obsidian blades.
@@ -259,7 +259,7 @@ export const WEAPONS = {
   // upper half (`strikeFrom`), not a point; no thrust; slow to turn.
   kanabo: {
     label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.55, handle: 0.35, spacing: 0.17, mass: 4.5, balance: 0.72, radius: 0.05,
-    harm: { swing: { blunt: 1.75 }, thrust: { blunt: 0.4 } },
+    harm: { swing: { blunt: 1.4 }, thrust: { blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
   },
   // One-handed maces, the horseman's answer to armour (swords skate off it):
@@ -270,7 +270,7 @@ export const WEAPONS = {
   // shestopyor and bozdoğan) drives its blow into a flange's narrow edge.
   langya: {
     label: 'Wolf-tooth mace', hands: 'one', length: 0.72, strikeFrom: 0.46, handle: 0.13, mass: 2.0, balance: 0.68, radius: 0.042,
-    harm: { swing: { blunt: 1.55, pierce: 0.25 }, thrust: { blunt: 0.4, pierce: 0.15 } },
+    harm: { swing: { blunt: 1.45, pierce: 0.3 }, thrust: { blunt: 0.4, pierce: 0.15 } },
     contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, crush: 0.45,
   },
   flangedMace: {
@@ -313,7 +313,7 @@ export const WEAPONS = {
   // short sword; a samurai's wakizashi, the short companion of the katana.
   dagger: {
     label: 'Dagger', hands: 'one', length: 0.3, strikeFrom: 0.06, handle: 0.11, mass: 0.35, balance: 0, radius: 0.01,
-    harm: { thrust: { pierce: 0.75, blunt: 0.3 }, swing: { cut: 0.35, blunt: 0.2 } },
+    harm: { thrust: { pierce: 0.8, blunt: 0.3 }, swing: { cut: 0.35, blunt: 0.2 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 40, zeta: 0.8 }, threat: 2.5,
   },
   shortSword: {
@@ -330,7 +330,7 @@ export const WEAPONS = {
   // curved single edge, a round guard. Cuts first, and thrusts.
   dao: {
     label: 'Dao', hands: 'one', length: 0.75, strikeFrom: 0.12, handle: 0.15, mass: 0.95, balance: 0.1, radius: 0.012,
-    harm: { swing: { cut: 1.0, blunt: 0.35 }, thrust: { pierce: 0.78, cut: 0.15, blunt: 0.1 } },
+    harm: { swing: { cut: 1.1, blunt: 0.35 }, thrust: { pierce: 0.78, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2,
   },
   // The guandao: a broad, heavy crescent blade on a long shaft, fought like
@@ -339,7 +339,7 @@ export const WEAPONS = {
   // its point pierces a little less.
   guandao: {
     label: 'Guandao', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.95, balance: 0.6, radius: 0.016,
-    harm: { swing: { cut: 1.15, blunt: 1.05 }, thrust: { pierce: 0.65, cut: 0.12, blunt: 0.4 } },
+    harm: { swing: { cut: 1.15, blunt: 1.05 }, thrust: { pierce: 0.55, cut: 0.12, blunt: 0.5 } },
     // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
   },

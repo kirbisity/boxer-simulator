@@ -5,10 +5,10 @@ import { seededRandom } from '../src/physics.js';
 import { OUTFITS } from '../src/outfits.js';
 import { WEAPONS } from '../src/weapons.js';
 
-test('the Ming elite turns blades and arrows as plate does; the brigandine man is better kept than the garrison man', () => {
+test('the Ming elite turns blades and arrows nearly as plate does; the brigandine man is better kept than the garrison man', () => {
   const elite = OUTFITS.mingElite;
   assert.ok(elite.deflects && elite.arrowproof);
-  assert.equal(elite.protection.cut, OUTFITS.knight.protection.cut);
+  assert.ok(elite.protection.cut >= 0.95);
   const brigandine = OUTFITS.mingBrigandine.protection;
   const garrison = OUTFITS.mingGarrison.protection;
   for (const kind of ['blunt', 'cut', 'pierce']) {
@@ -47,10 +47,10 @@ test('Pyongyang: Ming regulars only, taller and heavier than the Japanese they f
   assert.ok(mean(weights.red) > mean(weights.blue) + 5, `${mean(weights.red).toFixed(1)} v ${mean(weights.blue).toFixed(1)} kg`);
 });
 
-test('a Ming soldier who loses the dao he fights with draws a spare; the spearman draws the dao', async () => {
+test('a Ming garrison man who loses his weapon fights with his hands; a brigandine man draws his dao, or his spare', async () => {
   const { PRESETS } = await import('../src/body.js');
   const { advance, createWorld, dropWeapon } = await import('../src/physics.js');
-  for (const [key, drawn] of [['mingDao', 'dagger'], ['mingSpear', 'dao']]) {
+  for (const [key, drawn] of [['mingDao', undefined], ['mingSpear', undefined], ['swordShield', 'dagger'], ['mingMatchlock', 'dao']]) {
     const world = createWorld([{ inputs: structuredClone(PRESETS[key]), corner: 'red' }, { inputs: structuredClone(PRESETS.samurai), corner: 'blue' }], { seed: 1 });
     advance(world, 0.3);
     dropWeapon(world, world.fighters[0], 'disarmed', [0, 1, 1]);
