@@ -387,10 +387,11 @@ export const OUTFITS = {
       toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'),
       toseiDesign('Silver', '#9aa0a8', '#1d2a4f', 'sun', 'black', '#23202b'),
       toseiDesign('Blued steel', '#2c3a4a', '#d6a743', 'antlers', 'red', '#16201a'),
-      // Kojima's own (`special`: his alone, never dealt at random): black
-      // lacquer, the kabuto dressed all round in grey yak hair (shaguma, as
-      // Edo-period helmets were), and a black oni face (a full somen).
-      { ...toseiDesign('Oni', '#17171a', '#2a2a2e', null, 'oni', '#141416'), special: true, head: { kind: 'kabuto', color: '#17171a', mask: 'oni', hair: '#7a766f', lace: '#2a2a2e', gold: '#8a7a5a' } },
+      // Kojima's own (`special`: his alone, never dealt at random; the same
+      // tōsei gusoku, the same protection): red lacquer laced black, the
+      // kabuto dressed all round in grey yak hair (shaguma, as Edo-period
+      // helmets were), and a black oni face (a full somen).
+      { ...toseiDesign('Oni', '#8e1c16', '#141416', null, 'oni', '#2a0c0e'), special: true, head: { kind: 'kabuto', color: '#8e1c16', mask: 'oni', hair: '#7a766f', lace: '#141416', gold: '#c9a24a' } },
     ],
   },
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,

@@ -228,11 +228,11 @@ export const PRESETS = {
     outfit: { kind: 'monk', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bald', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
-  // "Oni" Kojima Yatarō, the Uesugi's giant, with a kanabo.
-  // A giant of a man, built like the oni his armour shows: big-framed and
-  // heavy, very strong, and the slower for his size.
+  // "Oni" Kojima Yatarō of the Uesugi, with a kanabo.
+  // Short and sturdy, built like the oni his armour shows: a wide frame,
+  // a heavy body carrying fat over muscle, and the slower for it.
   kanabo: {
-    name: 'Kojima Yatarō', style: 'kanabo', sex: 'male', heightCm: 192, frame: 'large', age: 36, exercise: 0.95, calories: 6900,
+    name: 'Kojima Yatarō', style: 'kanabo', sex: 'male', heightCm: 165, frame: 'large', age: 36, exercise: 0.7, calories: 4710,
     outfit: { kind: 'samuraiTosei', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
