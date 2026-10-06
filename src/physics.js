@@ -2680,7 +2680,9 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
 function pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, harm, blocked, spec, recoil, time, event, share = 1) {
   const body = defender.body;
   const struck = struckParticles(defender, capsule, closest, contactPoint, spec.push);
-  const transferred = ((impulse * (1 + WORLD.transferRestitution)) / (1 + WORLD.restitution)) * share;
+  // A weapon hands over momentum by what meets the body: an edge sinks in, a hard head rebounds.
+  const bounce = event.edgeShare === undefined ? WORLD.transferRestitution : WORLD.weaponTransferRestitution.blunt + (WORLD.weaponTransferRestitution.edge - WORLD.weaponTransferRestitution.blunt) * event.edgeShare;
+  const transferred = ((impulse * (1 + bounce)) / (1 + WORLD.restitution)) * share;
   event.transferred = transferred;
   // A heavy blunt blow on armour: he reels. Its blunt peak force is what
   // tells a hammer from a glove (a cut's sharp force is no shove).
@@ -2845,6 +2847,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id, weapon: weapon.kind, mode: spec.mode,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
     point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt,
+    edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce),
   };
   const concentration = Math.sqrt(WORLD.contactSeconds / wspec.contactSeconds);
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation, side: weapon.main, concentration });

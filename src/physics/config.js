@@ -132,6 +132,11 @@ export const WORLD = {
   // tissue's strain more than they cushion the push. Raised for a sharper,
   // more visible knockback; damage still uses the cushioned figure.
   transferRestitution: 0.6,
+  // A weapon's blow, by what meets the body: a hard blunt head rebounds and
+  // shoves (`blunt`); an edge or a point sinks in and slides rather than
+  // bouncing off (`edge`), so a cut hands over less momentum than a club.
+  // Mixed by the blow's blunt and cut-and-pierce shares.
+  weaponTransferRestitution: { blunt: 0.5, edge: 0.25 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.

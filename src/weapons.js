@@ -255,12 +255,15 @@ export const WEAPONS = {
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
   },
   // The kanabo: a long oak club shod with iron studs, swung in two hands.
-  // Heavier than a war hammer and a little harder, struck with its whole
-  // upper half (`strikeFrom`), not a point; no thrust; slow to turn.
+  // Heavier than a war hammer (~3.6 kg; surviving war clubs run 2.5–4 kg),
+  // its weight spread along the swelling upper half rather than packed in
+  // a head (`balance`), struck with that half (`strikeFrom`), not a point;
+  // no thrust; slow to turn. Oak gives more than steel: a longer contact
+  // (`contactSeconds`), so a lower peak force for the same blow.
   kanabo: {
-    label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.55, handle: 0.35, spacing: 0.17, mass: 4.5, balance: 0.72, radius: 0.05,
+    label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.55, handle: 0.35, spacing: 0.17, mass: 3.6, balance: 0.65, radius: 0.05,
     harm: { swing: { blunt: 1.4 }, thrust: { blunt: 0.4 } },
-    contactSeconds: 0.004, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
+    contactSeconds: 0.006, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
   },
   // One-handed maces, the horseman's answer to armour (swords skate off it):
   // a short iron-bound haft and a heavy head, swung with the wrist and arm
