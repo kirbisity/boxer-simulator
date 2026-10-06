@@ -16,6 +16,18 @@ export const AI = {
   tieBackPerSecond: 3,
   // In a big fight, how often (s) a fighter with nothing happening near him thinks.
   idleThinkEvery: 0.1,
+  // Cohesion in a group fight (a side of `minSide` or more): each fighter,
+  // deciding for himself as ever, leans slightly towards his side's leader
+  // (see keepLeaders). Within `radius` m, plus `radiusPerSqrt`
+  // × √(men standing), no pull; beyond it a pull growing to full over `ramp`
+  // m: a sideways lean towards him (`strafe`, of a full sidestep) and, run
+  // out ahead of him, an easing of the advance (`holdBack`, share of the
+  // forward step given up). Never within `engaged` m of reach of his man:
+  // the exchange decides then. Choosing whom to fight, a man near my leader
+  // counts as `focus` m nearer for each m he is nearer him. A shooter running
+  // for room weighs each m a spot lies beyond that ground as `escape` m less
+  // distance from his pursuer: the run away still wins, but bends homeward.
+  cohesion: { minSide: 4, radius: 2, radiusPerSqrt: 0.75, ramp: 4, strafe: 0.55, holdBack: 0.7, engaged: 1.2, focus: 0.3, escape: 0.3 },
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
   passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
@@ -168,6 +180,7 @@ function pick(weights, random) {
 
 /** One AI decision tick for every fighter not driven by the player. */
 export function thinkAll(world, dt, playerIds = new Set()) {
+  keepLeaders(world);
   // In a big fight, a fighter with nothing happening near him thinks ten
   // times a second (each on his own beat) rather than every step.
   const staggered = fightTier(world) >= 3;
@@ -177,14 +190,108 @@ export function thinkAll(world, dt, playerIds = new Set()) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
       think(world, fighter, dt);
+      keepWithLeader(world, fighter);
       continue;
     }
     // Each on his own beat (offset by his id), so the thinking is spread over the steps.
     fighter.aiOwed = (fighter.aiOwed ?? (fighter.id % 6) * dt) + dt;
     if (fighter.aiOwed < AI.idleThinkEvery - 1e-9) continue;
     think(world, fighter, fighter.aiOwed);
+    keepWithLeader(world, fighter);
     fighter.aiOwed = 0;
   }
+}
+
+/**
+ * Each side's leader, and how many still stand with him. He is chosen once,
+ * the man nearest the middle of his side; when he is out of the fight, the
+ * man still on his feet nearest where he fell takes over, so the side
+ * gathers on much the same ground.
+ */
+function keepLeaders(world) {
+  const sides = {};
+  for (const fighter of world.fighters) {
+    if (fighter.state === 'out') continue;
+    (sides[fighter.corner] ??= []).push(fighter);
+  }
+  world.leaders ??= {};
+  for (const [corner, side] of Object.entries(sides)) {
+    const kept = world.leaders[corner];
+    let leader = kept?.leader;
+    if (!leader || leader.state === 'out') {
+      // Gather on where he stood; at the start, on the middle of the side.
+      let centre = [0, 0];
+      if (leader) centre = [leader.x[P.pelvis * 3], leader.x[P.pelvis * 3 + 2]];
+      else {
+        for (const fighter of side) {
+          centre[0] += fighter.x[P.pelvis * 3] / side.length;
+          centre[1] += fighter.x[P.pelvis * 3 + 2] / side.length;
+        }
+      }
+      const candidates = side.filter((fighter) => fighter.state === 'up');
+      leader = null;
+      let nearest = Infinity;
+      for (const fighter of candidates.length ? candidates : side) {
+        const distance = Math.hypot(fighter.x[P.pelvis * 3] - centre[0], fighter.x[P.pelvis * 3 + 2] - centre[1]);
+        if (distance < nearest) {
+          nearest = distance;
+          leader = fighter;
+        }
+      }
+    }
+    world.leaders[corner] = { leader, standing: side.length };
+  }
+  for (const corner of Object.keys(world.leaders)) if (!sides[corner]) delete world.leaders[corner];
+}
+
+/**
+ * Cohesion: after his own decision, a fighter far from his side's leader
+ * leans a little towards him — a sideways lean, and an easier advance if he
+ * has run out ahead of him. Each man decides alone; together a side tends to
+ * hold together, its rear not drawn into the front's fight.
+ */
+function keepWithLeader(world, fighter) {
+  const spec = AI.cohesion;
+  const side = world.leaders?.[fighter.corner];
+  const leader = side?.leader;
+  if (!leader || leader === fighter || side.standing < spec.minSide || fighter.state !== 'up') return;
+  // Busy with something of his own: a hold, a blow, a weapon to pick up, a gun's room to find.
+  if (fighter.clinch || fighter.pin || fighter.punch || fighter.pickup || fighter.goTo || fighter.panicked) return;
+  const foe = fighter.focus === undefined ? null : world.fighters[fighter.focus];
+  if (!foe) return;
+  const at = point(fighter.x, P.pelvis);
+  const line = [foe.x[P.pelvis * 3] - at[0], 0, foe.x[P.pelvis * 3 + 2] - at[2]];
+  const apart = Math.hypot(line[0], line[2]) || 1e-6;
+  if (foe.state === 'up' && apart < reachOf(fighter) + reachOf(foe) + spec.engaged) return;
+  const offset = [leader.x[P.pelvis * 3] - at[0], 0, leader.x[P.pelvis * 3 + 2] - at[2]];
+  const distance = Math.hypot(offset[0], offset[2]);
+  const pull = Math.min(1, Math.max(0, (distance - spec.radius - spec.radiusPerSqrt * Math.sqrt(side.standing)) / spec.ramp));
+  if (pull <= 0) return;
+  // His own frame, as he faces his man: the move is along the line, the strafe to its left.
+  const forward = [line[0] / apart, 0, line[2] / apart];
+  const left = [-forward[2], 0, forward[0]];
+  const across = vec.dot(offset, left);
+  fighter.strafe = Math.max(-1, Math.min(1, (fighter.strafe ?? 0) + Math.sign(across) * spec.strafe * pull * Math.min(1, Math.abs(across) / distance + 0.2)));
+  // Out ahead of his leader, going further: he eases off.
+  if (vec.dot(offset, forward) < 0 && fighter.move > 0) fighter.move *= 1 - spec.holdBack * pull;
+}
+
+/** How far (m) a spot lies beyond the ground a fighter keeps near his leader; 0 within it, or out of a group fight. */
+function strayFromLeader(world, fighter, at) {
+  const spec = AI.cohesion;
+  const side = world.leaders?.[fighter.corner];
+  const leader = side?.leader;
+  if (!leader || leader === fighter || side.standing < spec.minSide) return 0;
+  const distance = Math.hypot(leader.x[P.pelvis * 3] - at[0], leader.x[P.pelvis * 3 + 2] - at[1]);
+  return Math.max(0, distance - spec.radius - spec.radiusPerSqrt * Math.sqrt(side.standing));
+}
+
+/** How far a target is from my side's leader (m), in a group fight; 0 otherwise. */
+function fromMyLeader(world, fighter, other) {
+  const side = world.leaders?.[fighter.corner];
+  const leader = side?.leader;
+  if (!leader || leader === fighter || side.standing < AI.cohesion.minSide) return 0;
+  return Math.hypot(other.x[P.pelvis * 3] - leader.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - leader.x[P.pelvis * 3 + 2]);
 }
 
 /**
@@ -270,7 +377,8 @@ function chooseFocus(world, fighter) {
   for (const mate of world.fighters) {
     if (mate !== fighter && mate.corner === fighter.corner && mate.state === 'up' && mate.focus !== undefined) crowds.set(mate.focus, (crowds.get(mate.focus) ?? 0) + 1);
   }
-  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * (crowds.get(other.id) ?? 0);
+  // Nearest, least crowded, and (in a group fight) nearer my side's leader.
+  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * (crowds.get(other.id) ?? 0) + AI.cohesion.focus * fromMyLeader(world, fighter, other);
   // The nearest, least crowded: each scored once (the first of equals kept, as before).
   let next = standing[0];
   let best = score(next);
@@ -834,7 +942,7 @@ function escapePoint(world, fighter, opponent) {
     const at = [Math.max(-limitX, Math.min(limitX, me[0] + way[0] * kite.stride)), Math.max(-limitZ, Math.min(limitZ, me[1] + way[1] * kite.stride))];
     const fromHim = Math.hypot(at[0] - him[0], at[1] - him[1]);
     const toward = way[0] * toHim[0] + way[1] * toHim[2];
-    const score = fromHim + kite.roomWeight * Math.min(room(world, at), 2) - kite.pastWeight * Math.max(0, toward);
+    const score = fromHim + kite.roomWeight * Math.min(room(world, at), 2) - kite.pastWeight * Math.max(0, toward) - AI.cohesion.escape * strayFromLeader(world, fighter, at);
     if (score > bestScore) {
       bestScore = score;
       best = [at[0], 0, at[1]];
