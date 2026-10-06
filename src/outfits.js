@@ -897,7 +897,7 @@ export function familyKinds(family) {
 export const FACTIONS = {
   knights: { label: 'Knights', glyph: '🏰', standard: { weapon: 'banner', colour: '#b3161b' }, blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
   japanese: { label: 'Japanese', glyph: '⛩️', standard: { weapon: 'nobori', worn: true }, blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
-  mexica: { label: 'Mexica', glyph: '🦅', blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
+  mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
   chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
   steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, leather and iron lamellar, sabre, mace and composite bow; the Khan\'s kheshig of legend.' },
   ottomans: { label: 'Ottomans', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'The Sultan\'s army: azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },

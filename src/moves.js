@@ -927,7 +927,7 @@ export const STYLES = {
   },
   // Bearing the standard: held high, the pole only to keep a man off; a
   // step back sooner than a trade. One style per standard (its weapon).
-  ...Object.fromEntries(['banner', 'lingQi', 'sancak', 'tug', 'nobori'].map((kind) => [kind, {
+  ...Object.fromEntries(['banner', 'lingQi', 'sancak', 'tug', 'nobori', 'pamitl'].map((kind) => [kind, {
     label: 'Standard', hidden: true, weapon: kind,
     cadence: { work: 0.6, move: 0.8, burst: 0.3, mobility: 0.5 },
     stance: { blade: 0.4, crouch: 0.04, width: 1.15, lean: 0, guardHeight: 0 },

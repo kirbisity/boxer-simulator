@@ -11,6 +11,7 @@ import { buildLoftBody, TOPS } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions } from './outfits.js';
+import { WEAPONS } from './weapons.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
@@ -1995,7 +1996,7 @@ export function buildFighterView(view, fighter, { simple: crowd = false } = {}) 
 /** A leader who wears his side's standard (a great sashimono) has it in place of the common banner. */
 function leaderDress(dress, fighter) {
   if (!fighter.wornStandard) return dress;
-  return { ...dress, banner: fighter.wornStandard.colour, greatBanner: true };
+  return { ...dress, banner: fighter.wornStandard.colour, greatBanner: true, bannerLook: WEAPONS[fighter.wornStandard.kind]?.flag ?? null };
 }
 
 function detailedView(view, fighter, simple) {
@@ -2108,7 +2109,7 @@ function detailedView(view, fighter, simple) {
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   if (dress.banner) {
-    const banner = buildBanner(body, dress.banner, dress.greatBanner);
+    const banner = buildBanner(body, dress.banner, dress.greatBanner, dress.bannerLook);
     banner.userData.banner = true;
     collar.add(banner);
   }
@@ -2303,7 +2304,7 @@ function crowdView(view, fighter, template) {
     if (dress.banner) {
       // The side's banners are one instanced batch, made at 1.8 m and set
       // to each man's size and back (see buildBanner).
-      const batch = crowdBatch(view, `banner:${dress.banner}${dress.greatBanner ? ':great' : ''}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner, dress.greatBanner));
+      const batch = crowdBatch(view, `banner:${dress.banner}${dress.greatBanner ? `:great:${dress.bannerLook}` : ''}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner, dress.greatBanner, dress.bannerLook));
       const scale = body.heightM / 1.8;
       const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
       const local = new THREE.Matrix4().makeTranslation(back + 0.05 * scale, 0, 0).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));

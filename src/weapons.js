@@ -364,6 +364,9 @@ export const WEAPONS = {
     // A nobori: tall and narrow, hung from a pole and a crossbar; the leader's
     // back banner, picked up, is carried in the hands like this.
     ['nobori', 'Nobori', 'japanese'],
+    // The Mexica pamitl: a captain's device on a frame up his back, a disc of
+    // feather-work under a spray of quetzal plumes; fallen, it is carried in the hands.
+    ['pamitl', 'Pamitl', 'mexica'],
   ].map(([kind, label, flag]) => [kind, {
     label, flag, hands: 'two', length: 1.75, strikeFrom: -0.6, handle: 0.85, spacing: 0.45, leadAhead: true, mass: 3.5, balance: 0.75, radius: 0.018,
     harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7, pierce: 0.3 } },

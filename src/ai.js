@@ -98,7 +98,9 @@ export const AI = {
   // the share it takes away at full). Crawling, he keeps going away from the
   // nearest enemy, `away` m at a time.
   crawl: { from: 0.55, rate: 0.5, adrenaline: 0.9, away: 3 },
-  panic: { settle: 1.5, outmatched: 0.5, hurt: 0.85, perKnockdown: 0.22, breakAt: 0.7, rate: 0.6, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3 },
+  // `standardDown`: fear, for every man of a side, while its standard lies
+  // fallen (or, without one, for `leaderLostFor` s after its leader falls).
+  panic: { settle: 1.5, outmatched: 0.5, hurt: 0.85, perKnockdown: 0.22, breakAt: 0.7, rate: 0.6, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
@@ -237,6 +239,7 @@ function keepLeaders(world) {
     }
     if (!standard.kind) {
       bearer = leader.state === 'out' ? nearestTo(side.filter((fighter) => fighter.state === 'up'), point(leader.x, P.pelvis)) ?? leader : leader;
+      if (bearer !== leader) standard.lostAt = world.time;
     }
     if (bearer) standard.leader = bearer.id;
     const at = bearer ? point(bearer.x, P.pelvis) : lying.x;
@@ -245,7 +248,8 @@ function keepLeaders(world) {
     const going = lying && able.find((fighter) => fighter.id === standard.taker);
     const taker = lying ? going ?? nearestTo(able, at) : null;
     standard.taker = taker?.id;
-    world.leaders[corner] = { leader: bearer, at: [at[0], at[2]], standing: side.length, lying, taker };
+    const shaken = Boolean(lying) || world.time - (standard.lostAt ?? -Infinity) < AI.panic.leaderLostFor;
+    world.leaders[corner] = { leader: bearer, at: [at[0], at[2]], standing: side.length, lying, taker, shaken };
   }
 }
 
@@ -834,7 +838,9 @@ function feelFear(world, fighter, nerve, dt) {
   const spec = AI.panic;
   fighter.adrenaline = (fighter.adrenaline ?? 0) * 0.5 ** (dt / AI.adrenaline.halfLife);
   // Adrenaline drowns fear out (`AI.adrenaline.nerve` of it, at full adrenaline).
-  const target = Math.max(0, Math.min(1, (spec.outmatched * Math.max(0, -nerve) + spec.hurt * hurtShare(fighter)) * (1 - fighter.body.gear.courage) * (1 - AI.adrenaline.nerve * fighter.adrenaline)));
+  // The standard down (or the leader fallen): every man of the side sees it.
+  const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
+  const target = Math.max(0, Math.min(1, (spec.outmatched * Math.max(0, -nerve) + spec.hurt * hurtShare(fighter) + shaken) * (1 - fighter.body.gear.courage) * (1 - AI.adrenaline.nerve * fighter.adrenaline)));
   fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
   const held = fighter.adrenaline > spec.adrenalineHolds;
   if (!fighter.panicked) {

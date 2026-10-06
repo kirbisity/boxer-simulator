@@ -9,7 +9,7 @@ import { SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, WEAPONS } from './weapons.js';
-import { steelMaterial } from './wardrobe.js';
+import { featherDevice, steelMaterial } from './wardrobe.js';
 import { crowdBatch } from './crowdview.js';
 
 export const GORE = {
@@ -220,6 +220,11 @@ function buildStandard(spec, colour, envMap) {
         prong.position.set(0, top + (side ? 0.06 : 0.09), side * 0.04);
         group.add(prong);
       }
+      break;
+    }
+    case 'mexica': {
+      // The pamitl: a disc of feather-work in the side's colour, a gold rim, plumes above.
+      group.add(featherDevice(colour, top));
       break;
     }
     default: {

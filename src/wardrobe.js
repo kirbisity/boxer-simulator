@@ -1242,13 +1242,51 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
  * frame at the neck: x forward, y up the spine, z to the left.
  */
 /**
+ * The Mexica feather device at the top of its staff (at height `top`): a
+ * disc of feather-work in `colour` with a gold rim, facing back and front
+ * (x), and a spray of green quetzal plumes above it.
+ */
+export function featherDevice(colour, top, size = 1) {
+  const group = new THREE.Group();
+  const feathers = surface(new THREE.Color(colour).getHex(), { roughness: 1 });
+  const gold = surface(0xd8a23a, { roughness: 0.5 });
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * size, 0.2 * size, 0.03 * size, 18), feathers);
+  disc.rotation.z = Math.PI / 2;
+  disc.position.y = top - 0.12 * size;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.2 * size, 0.018 * size, 6, 24), gold);
+  rim.rotation.y = Math.PI / 2;
+  rim.position.y = disc.position.y;
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(0.05 * size, 8, 6), gold);
+  boss.position.set(0, disc.position.y, 0);
+  group.add(disc, rim, boss);
+  const quetzal = surface(0x1f8a4a, { roughness: 0.9 });
+  for (let plume = 0; plume < 5; plume += 1) {
+    const spread = (plume - 2) * 0.28;
+    const feather = new THREE.Mesh(new THREE.ConeGeometry(0.03 * size, 0.5 * size, 5), quetzal);
+    feather.position.set(0, top + 0.15 * size, Math.sin(spread) * 0.12 * size);
+    feather.rotation.x = spread;
+    group.add(feather);
+  }
+  return group;
+}
+
+/**
  * A sashimono: the side's banner on a pole up the back, standing clear of
  * the helmet, a white disc on the field (collar coordinates: x forward, y up).
  */
-export function buildBanner(body, colorHex, great = false) {
+export function buildBanner(body, colorHex, great = false, look = null) {
   const scale = body.heightM / 1.8;
   const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
   const group = new THREE.Group();
+  if (look === 'mexica') {
+    // A Mexica captain's pamitl on its frame up the back: feather-work and plumes above the head.
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, 1.5 * scale, 6), surface(0x3a2a1c));
+    pole.position.set(back, 0.5 * scale, 0);
+    const device = featherDevice(colorHex, 1.2 * scale, scale);
+    device.position.x = back;
+    group.add(pole, device);
+    return group;
+  }
   // A commander's great banner: twice as tall, and a field three times the size.
   const size = great ? { pole: 1.9, width: 0.34, height: 0.95 } : { pole: 1.0, width: 0.2, height: 0.4 };
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, size.pole * scale, 6), surface(0x3a2a1c));
