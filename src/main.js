@@ -276,15 +276,26 @@ function setCrawling(on) {
 
 let last = performance.now();
 function frame(now) {
+  // The next frame is asked for first: an error in this one must never stop the game.
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  // A big moment slows the simulation, not the drawing.
-  buildQueuedViews();
-  // While an army is still being drawn, the fight waits for it.
-  if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
-  draw(dt);
-  requestAnimationFrame(frame);
+  try {
+    // A big moment slows the simulation, not the drawing.
+    buildQueuedViews();
+    // While an army is still being drawn, the fight waits for it.
+    if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
+    draw(dt);
+  } catch (error) {
+    // Reported once per kind of error, not sixty times a second.
+    const key = String(error?.stack ?? error);
+    if (!frameErrors.has(key)) {
+      frameErrors.add(key);
+      console.error('Gladiator frame error (the game carries on):', error);
+    }
+  }
 }
+const frameErrors = new Set();
 
 // The most a frame may spend simulating (ms). A big battle at its height
 // can cost more than real time to simulate; past this budget the frame stops
@@ -552,8 +563,10 @@ function logEvent(event) {
   else if (event.kind === 'held') text = `🤼 <b>${name(event.fighter)}</b> is held down`;
   else if (event.kind === 'pinBroken') text = `<b>${name(event.fighter)}</b> breaks the hold`;
   else if (event.kind === 'pinned') text = `🤼 <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'impact') text = `💥 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
-  else if (event.attacker === undefined || event.speed === undefined) return;
+  // A strike's line needs its numbers; anything else without a line of its own is not logged.
+  else if (event.attacker === undefined || event.speed === undefined || event.impulse === undefined || event.force === undefined || !event.effects) return;
   else {
     const where = event.kind === 'blocked' ? `blocked by ${event.target.replace(/^[lr]/, '').toLowerCase()}` : `→ ${event.target}`;
     const head = event.target === 'head' ? ` · head Δv <b>${event.headDeltaV.toFixed(2)}</b> m/s` : '';
@@ -587,7 +600,8 @@ segmented('#layers', (layer) => {
 segmented('#corner-tabs', (corner) => { $('.corners').dataset.showing = corner; });
 segmented('#styles', (style) => {
   STYLE.current = style;
-  rebuildViews();
+  // A few a frame, as at a level's start: an army rebuilt at once stalls the page for seconds.
+  rebuildViews({ progressive: true });
 });
 segmented('#speeds', (speed) => { state.speed = Number(speed); });
 for (const corner of ['red', 'blue']) {

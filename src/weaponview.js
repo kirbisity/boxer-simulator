@@ -1052,6 +1052,13 @@ function stumpPoint(fighter, { base, from, along }) {
 // ---- Loose on the floor ----------------------------------------------------------
 
 /** Dropped weapons and severed parts, where the simulation's debris lies. */
+// Scratch for drawing resting debris into its batch.
+const restMatrix = new THREE.Matrix4();
+const restGrip = new THREE.Matrix4();
+const restAt = new THREE.Vector3();
+const restTurn = new THREE.Quaternion();
+const restScale = new THREE.Vector3(1, 1, 1);
+
 export function updateDebris(view, world) {
   view.pieces ??= new Map();
   for (const debris of world.debris ?? []) {
@@ -1065,12 +1072,26 @@ export function updateDebris(view, world) {
       }
       continue;
     }
+    if (debris.kind !== 'weapon') continue;
+    const spec = WEAPONS[debris.weapon];
+    // At rest on the floor, it is drawn with every other of its kind in one
+    // instanced batch: a battle's dropped weapons cost a few draw calls, not
+    // one per piece per weapon.
+    if (debris.resting && !spec.bow) {
+      if (mesh) {
+        view.scene.remove(mesh);
+        disposeObject(mesh);
+        view.pieces.delete(debris.id);
+      }
+      const batch = crowdBatch(view, `debris:${debris.weapon}:${debris.colour ?? ''}`, () => buildWeaponMesh(debris.weapon, view.steelEnv, debris.colour));
+      restMatrix.compose(restAt.set(debris.x[0], debris.x[1], debris.x[2]), restTurn.set(debris.q[0], debris.q[1], debris.q[2], debris.q[3]), restScale);
+      batch.add(restMatrix.multiply(restGrip.makeTranslation(0, -(spec.length - spec.handle) / 2, 0)));
+      continue;
+    }
     if (!mesh) {
-      if (debris.kind !== 'weapon') continue;
       mesh = new THREE.Group();
       const weapon = buildWeaponMesh(debris.weapon, view.steelEnv, debris.colour);
       // The debris point is the weapon's middle; the mesh's origin is its grip.
-      const spec = WEAPONS[debris.weapon];
       weapon.position.y = -(spec.length - spec.handle) / 2;
       mesh.add(weapon);
       view.scene.add(mesh);
