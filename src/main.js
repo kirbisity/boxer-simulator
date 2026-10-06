@@ -265,12 +265,24 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function tick(seconds) {
+// The most a frame may spend simulating (ms). A big battle at its height
+// can cost more than real time to simulate; past this budget the frame stops
+// and lets the fight run a little slower than real time, rather than trying
+// to catch up and stalling the page (each frame longer than the last).
+const SIM_BUDGET_MS = 20;
+
+function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   state.accumulator += seconds;
+  const started = performance.now();
   while (state.accumulator >= STEP) {
     state.before = snapshot(state.world);
     advance(state.world, STEP, thinkForBout, STEP);
     state.accumulator -= STEP;
+    if (performance.now() - started > budget) {
+      // Out of time: what is left is dropped, not owed to the next frame.
+      state.accumulator = Math.min(state.accumulator, STEP * 0.999);
+      break;
+    }
   }
   consumeEvents();
   const winner = boutWinner(state.world);
@@ -1365,13 +1377,21 @@ window.boxer = {
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
+  // Play `count` real frames of `dt` s each, as the page's own loop would (tests, profiling).
+  playFrames: (count, dt = 1 / 60) => {
+    for (let index = 0; index < count; index += 1) {
+      buildQueuedViews();
+      if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
+      draw(dt);
+    }
+  },
   // Finish an army's models now (tests; the page builds them a few a frame).
   finishBuilding: () => {
     while (state.viewQueue?.length) state.views.push(state.buildView(state.viewQueue.shift()));
     showMustering();
   },
   advance: (seconds) => {
-    tick(seconds);
+    tick(seconds, { budget: Infinity });
     draw(0);
   },
 };
