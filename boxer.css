@@ -428,3 +428,6 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
   /* The sandbox's footer: never more than half the screen; it scrolls down past that. */
   body[data-game="sandbox"] .controls { max-height: 48%; overflow-y: auto; }
 }
+
+/* Building a big army's models a few a frame: a quiet note while it lasts. */
+#mustering { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); padding: 10px 18px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font: 600 15px var(--body); pointer-events: none; }

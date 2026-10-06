@@ -129,7 +129,7 @@ function newBout() {
   Object.assign(scene.orbit, scenario?.camera ?? { yaw: -0.5, pitch: 0.2, distance: 5.2 });
   document.body.dataset.place = place;
   $('#place').closest('label').hidden = Boolean(scenario);
-  rebuildViews();
+  rebuildViews({ progressive: true });
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
@@ -145,16 +145,47 @@ function newBout() {
 // is the same for all of them.
 const CROWD_DRAWING = 8;
 
-function rebuildViews() {
+// Crowd templates kept from bout to bout (a restart reuses them), up to this many.
+const CROWD_TEMPLATE_CAP = 160;
+// Building an army's models is spread over frames, this many ms a frame, so the page never stalls.
+const BUILD_BUDGET_MS = 24;
+
+/**
+ * Build every fighter's model. A big fight (`progressive`) builds its two
+ * leads now and the rest a few each frame (see buildQueuedViews); the
+ * simulation waits until all are drawn.
+ */
+function rebuildViews({ progressive = false } = {}) {
   for (const view of state.views) disposeFighterView(scene, view);
-  clearCrowdTemplates(scene);
+  if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
   const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
-  state.views = state.world.fighters.map((fighter) => {
+  const build = (fighter) => {
     const view = buildFighterView(scene, fighter, { simple: crowd && !leads.has(fighter.id) });
     setLayer(view, state.layer);
     return view;
-  });
+  };
+  const order = [...state.world.fighters].sort((a, b) => Number(leads.has(b.id)) - Number(leads.has(a.id)));
+  const now = progressive && crowd ? order.filter((fighter) => leads.has(fighter.id)) : order;
+  state.views = now.map(build);
+  state.viewQueue = order.slice(now.length);
+  state.buildView = build;
+  showMustering();
+}
+
+/** A few more of an army's models, within this frame's budget; done, the fight goes on. */
+function buildQueuedViews() {
+  if (!state.viewQueue?.length) return;
+  const started = performance.now();
+  while (state.viewQueue.length && performance.now() - started < BUILD_BUDGET_MS) state.views.push(state.buildView(state.viewQueue.shift()));
+  showMustering();
+}
+
+const mustering = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'mustering', hidden: true }));
+function showMustering() {
+  const waiting = state.viewQueue?.length ?? 0;
+  mustering.hidden = waiting === 0;
+  if (waiting) mustering.textContent = `Mustering the armies… ${state.views.length} / ${state.views.length + waiting}`;
 }
 
 // ---- Loop -------------------------------------------------------------------
@@ -227,7 +258,9 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   // A big moment slows the simulation, not the drawing.
-  if (!state.paused) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
+  buildQueuedViews();
+  // While an army is still being drawn, the fight waits for it.
+  if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
   draw(dt);
   requestAnimationFrame(frame);
 }
@@ -1332,6 +1365,11 @@ window.boxer = {
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
+  // Finish an army's models now (tests; the page builds them a few a frame).
+  finishBuilding: () => {
+    while (state.viewQueue?.length) state.views.push(state.buildView(state.viewQueue.shift()));
+    showMustering();
+  },
   advance: (seconds) => {
     tick(seconds);
     draw(0);
