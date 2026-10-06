@@ -81,6 +81,13 @@ export function setPlace(view, place, arena) {
   const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
+    // A wet or polished surface reflects the sky (the steel's environment), faintly.
+    view.places[place].traverse((object) => {
+      const share = object.material?.userData?.reflects;
+      if (!share) return;
+      object.material.envMap = view.steelEnv;
+      object.material.envMapIntensity = share;
+    });
     view.scene.add(view.places[place]);
   }
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
@@ -113,7 +120,8 @@ const PLACE_LIGHT = {
   coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
-  port: { background: 0x060912, fog: [14, 48], key: 0x9fb4ff, keyIntensity: 0.85, rim: 0x5a78c0, hemi: 0.24 },
+  // Rain on the quay: a little more moonlight and fill than a clear night, so the wet reads.
+  port: { background: 0x0b1020, fog: [16, 54], key: 0xa8bcff, keyIntensity: 1.05, rim: 0x6a88d0, hemi: 0.36 },
   // A dark hall, the ring alone under hard white light.
   stadium: { background: 0x040509, fog: [12, 46], key: 0xfff8ee, keyIntensity: 1.75, rim: 0x5a78ff },
 };
@@ -622,7 +630,60 @@ function buildSubway(arena) {
  * The plain below the volcanoes: dry grass, maguey and nopal, the snowy
  * cones of Popocatépetl and Iztaccíhuatl far off.
  */
-function buildPlain() {
+// ---- Scattered detail: many small things in one draw call each ----------
+
+/** A seeded random for scenery, so a place looks the same every time it is built. */
+function scatterRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+/** Copies of one mesh at `spots` ([x, z, scale, turn]) as a single instanced draw; small things cast no shadow. */
+function scatter(geometry, material, spots, { y = 0 } = {}) {
+  const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+  const at = new THREE.Object3D();
+  spots.forEach(([x, z, scale = 1, turn = 0], index) => {
+    at.position.set(x, y * scale, z);
+    at.rotation.set(0, turn, 0);
+    at.scale.setScalar(scale);
+    at.updateMatrix();
+    mesh.setMatrixAt(index, at.matrix);
+  });
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+/** `count` spots over a field `half` m across each way, kept off the fighting floor (`keep` half-sizes). */
+function fieldSpots(random, count, half, keep, [smallest, largest] = [0.7, 1.3], allowed = () => true) {
+  const spots = [];
+  while (spots.length < count) {
+    const x = (random() * 2 - 1) * half[0];
+    const z = (random() * 2 - 1) * half[1];
+    if (Math.abs(x) < keep.halfX + 1 && Math.abs(z) < keep.halfZ + 1) continue;
+    if (!allowed(x, z)) continue;
+    spots.push([x, z, smallest + random() * (largest - smallest), random() * Math.PI * 2]);
+  }
+  return spots;
+}
+
+/** Grass in tufts and stones lying about an open field. */
+function fieldLitter(seed, keep, { grass = 0x7a7a3e, stone = 0x8a8478, tufts = 700, stones = 120, half = [40, 32], allowed = () => true } = {}) {
+  const random = scatterRandom(seed);
+  const tuft = new THREE.ConeGeometry(0.16, 0.38, 5);
+  tuft.translate(0, 0.19, 0);
+  const rock = new THREE.DodecahedronGeometry(0.28, 0);
+  rock.scale(1, 0.55, 0.8);
+  rock.translate(0, 0.08, 0);
+  return [
+    scatter(tuft, new THREE.MeshStandardMaterial({ color: grass, roughness: 1 }), fieldSpots(random, tufts, half, keep, [0.7, 1.3], allowed)),
+    scatter(rock, new THREE.MeshStandardMaterial({ color: stone, roughness: 0.95, flatShading: true }), fieldSpots(random, stones, half, keep, [0.5, 1.8], allowed)),
+  ];
+}
+
+function buildPlain(arena = PLACE_ARENAS.plain) {
   const place = new THREE.Group();
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   place.add(daySky());
@@ -670,6 +731,8 @@ function buildPlain() {
     plant.scale.setScalar(0.8 + Math.random() * 0.8);
     place.add(plant);
   }
+  // Dry bunch grass and volcanic stones over the plain.
+  place.add(...fieldLitter(31, arena, { grass: 0x8a8448, stone: 0x5a524a, tufts: 800, stones: 160, half: [50, 40] }));
   return place;
 }
 
@@ -718,8 +781,49 @@ function buildCoast({ fort }) {
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 2), new THREE.MeshStandardMaterial({ color: 0xd06a1a, side: THREE.DoubleSide }));
     flag.position.set(1.5, 13, 0);
     walls.add(pole, flag);
+    // Guns on the bastions, each looking out over its corner.
+    const gunMetal = lit(0x26282c, { roughness: 0.5, metalness: 0.5 });
+    for (const [x, z] of [[-9, -9], [9, -9], [-9, 9], [9, 9]]) {
+      const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.6, 8), gunMetal);
+      gun.rotation.set(Math.PI / 2, Math.atan2(x, z), 0, 'YXZ');
+      gun.position.set(x * 1.12, 6.8, z * 1.12);
+      walls.add(gun);
+    }
     walls.position.set(-8, 0, -42);
     place.add(walls);
+    // Gabions (earth-filled wicker baskets) thrown up before the fort, and palms along the shore.
+    const gabion = new THREE.CylinderGeometry(0.55, 0.55, 1.1, 10);
+    gabion.translate(0, 0.55, 0);
+    const gabions = Array.from({ length: 14 }, (_, index) => [-20 + index * 1.25, -16 - (index % 2) * 0.5, 1, 0]);
+    const random = scatterRandom(83);
+    const trunk = new THREE.CylinderGeometry(0.16, 0.24, 6, 6);
+    trunk.translate(0, 3, 0);
+    // Palms on the open sand: none inside the fort's walls (x −21…5, z −55…−29).
+    const palms = [];
+    while (palms.length < 18) {
+      const spot = [-38 + random() * 52, (random() < 0.5 ? -1 : 1) * (14 + random() * 40), 0.8 + random() * 0.5, random() * 6];
+      if (spot[0] > -21 && spot[0] < 5 && spot[1] > -55 && spot[1] < -29) continue;
+      palms.push(spot);
+    }
+    // Each crown: six fronds out from the top of the trunk, drooping; all the palms' fronds one draw.
+    const frond = new THREE.BoxGeometry(2.6, 0.05, 0.55);
+    frond.translate(1.3, 0, 0);
+    const fronds = new THREE.InstancedMesh(frond, lit(0x3a6a2e), palms.length * 6);
+    const at = new THREE.Object3D();
+    palms.forEach(([x, z, scale, turn], palm) => {
+      for (let leaf = 0; leaf < 6; leaf += 1) {
+        at.position.set(x, 6 * scale, z);
+        at.rotation.set(0, turn + (leaf * Math.PI) / 3, -0.45 - (leaf % 2) * 0.2, 'YXZ');
+        at.scale.setScalar(scale);
+        at.updateMatrix();
+        fronds.setMatrixAt(palm * 6 + leaf, at.matrix);
+      }
+    });
+    place.add(
+      scatter(gabion, lit(0x7a6240), gabions),
+      scatter(trunk, lit(0x6a5236), palms),
+      fronds,
+    );
   } else {
     // A fishing village: low houses, white walls, grey tiled roofs, boats drawn up.
     const wall = lit(0xe8e2d4);
@@ -737,16 +841,105 @@ function buildCoast({ fort }) {
       place.add(house);
     }
     for (let index = 0; index < 4; index += 1) {
-      const boat = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 2), lit(0x5a3a22));
-      boat.position.set(24, 0.4, -12 + index * 7);
+      const boat = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 2), lit(0x5a3a22));
+      hull.position.y = 0.4;
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6), lit(0x4a3220));
+      mast.position.set(0.8, 2.9, 0);
+      boat.add(hull, mast);
+      boat.position.set(24, 0, -12 + index * 7);
       boat.rotation.y = 0.3;
       place.add(boat);
     }
+    // Nets hung to dry on poles, and a stone pier running out into the sea.
+    const netPost = lit(0x5a4228);
+    const netMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a30, transparent: true, opacity: 0.55, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
+    for (const [x, z] of [[14, -22], [17, -24], [14, 22]]) {
+      const rack = new THREE.Group();
+      for (const end of [-1.5, 1.5]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.2, 5), netPost);
+        post.position.set(0, 1.1, end);
+        rack.add(post);
+      }
+      const net = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6), netMaterial);
+      net.position.y = 1.2;
+      net.rotation.y = Math.PI / 2;
+      rack.add(net);
+      rack.position.set(x, 0, z);
+      place.add(rack);
+    }
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(16, 1, 2.6), lit(0x8a8478));
+    pier.position.set(31, 0.2, 24);
+    pier.receiveShadow = true;
+    place.add(pier);
   }
+  // The shore: the wet sand the tide left, the surf breaking along it.
+  const shoreX = 25;
+  const wetSand = new THREE.Mesh(new THREE.PlaneGeometry(5, 130), lit(0x7c6c4c, { roughness: 0.5 }));
+  wetSand.rotation.x = -Math.PI / 2;
+  wetSand.position.set(shoreX - 2.4, 0.01, 0);
+  wetSand.receiveShadow = true;
+  const foamMaterial = new THREE.MeshBasicMaterial({ color: 0xf2f6f4, transparent: true, opacity: 0.55, depthWrite: false });
+  const surf = [0, 1].map((line) => {
+    const foam = new THREE.Mesh(new THREE.PlaneGeometry(0.6 + line * 0.5, 130), foamMaterial);
+    foam.rotation.x = -Math.PI / 2;
+    foam.position.set(shoreX + 0.4 + line * 2.2, -0.02 + 0.01 * line, 0);
+    return foam;
+  });
+  place.add(wetSand, ...surf);
+  const random = scatterRandom(fort ? 61 : 67);
+  const keep = PLACE_ARENAS[fort ? 'coastFort' : 'coastVillage'];
+  // Rocks and driftwood along the tide line; tufts of beach grass up the sand.
+  const rock = new THREE.DodecahedronGeometry(0.45, 0);
+  rock.scale(1, 0.6, 0.85);
+  const rocks = Array.from({ length: 40 }, () => [shoreX - 6 + random() * 8, (random() * 2 - 1) * 60, 0.4 + random() * 1.6, random() * 6]);
+  const log = new THREE.CylinderGeometry(0.12, 0.16, 2.4, 6);
+  log.rotateZ(Math.PI / 2);
+  log.translate(0, 0.12, 0);
+  const driftwood = Array.from({ length: 14 }, () => [shoreX - 5 + random() * 4, (random() * 2 - 1) * 55, 0.6 + random() * 0.8, random() * Math.PI]);
+  place.add(
+    scatter(rock, lit(0x6a645a, { flatShading: true }), rocks),
+    scatter(log, lit(0x8a7a62), driftwood),
+    // Beach grass stays on the dry sand, short of the tide line.
+    ...fieldLitter(fort ? 71 : 73, keep, { grass: 0x8a9a4a, stone: 0x9a8e74, tufts: 500, stones: 60, half: [40, 48], allowed: (x) => x < shoreX - 5 }),
+  );
+  // Ships at anchor, rising and rolling on the swell.
+  const ships = [];
+  const shipHull = lit(fort ? 0x3a2a1e : 0x5a3a22);
+  const sailcloth = new THREE.MeshStandardMaterial({ color: fort ? 0xe8e0cc : 0x8a5a3a, side: THREE.DoubleSide, roughness: 0.9 });
+  for (const [x, z, masts] of fort ? [[62, -24, 3], [74, 18, 3], [90, -4, 2]] : [[48, -16, 2], [60, 14, 2]]) {
+    const ship = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(14, 3, 4), shipHull);
+    hull.position.y = 0.8;
+    const stern = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 3.8), shipHull);
+    stern.position.set(-5.5, 3.3, 0);
+    ship.add(hull, stern);
+    for (let mast = 0; mast < masts; mast += 1) {
+      const along = -3 + mast * (8 / Math.max(1, masts - 1));
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 12, 6), shipHull);
+      pole.position.set(along, 8, 0);
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(fort ? 4.6 : 3.6, fort ? 5 : 6.4), sailcloth);
+      sail.position.set(along, 8.6, 0);
+      sail.rotation.y = Math.PI / 2;
+      ship.add(pole, sail);
+    }
+    ship.position.set(x, 0, z);
+    ship.rotation.y = 0.4 + x * 0.01;
+    ship.userData.phase = x * 0.13;
+    ships.push(ship);
+    place.add(ship);
+  }
+  place.userData.tick = (time) => {
+    for (const ship of ships) {
+      ship.position.y = Math.sin(time * 0.7 + ship.userData.phase) * 0.18;
+      ship.rotation.z = Math.sin(time * 0.55 + ship.userData.phase) * 0.03;
+    }
+    surf[0].material.opacity = 0.45 + 0.15 * Math.sin(time * 0.9);
+  };
   return place;
 }
 
-function buildSengoku() {
+function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   const place = new THREE.Group();
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   const shaded = (mesh) => {
@@ -887,6 +1080,8 @@ function buildSengoku() {
       place.add(rail);
     }
   }
+  // Autumn grass in tufts and field stones beyond the trampled ground.
+  place.add(...fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] }));
   return place;
 }
 
@@ -1309,7 +1504,27 @@ function buildPort() {
     g.fillStyle = 'rgba(210,180,40,0.55)';
     g.fillRect(0, h * 0.5 - 6, w, 12);
   }, [4, 4]);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), lit(0xffffff, { map: concrete, roughness: 0.55, metalness: 0.1 }));
+  // Wet: the rain leaves the concrete slick, and puddles standing in its low
+  // spots smoother still (roughness ×1 dry, ×0.25 in a puddle).
+  const puddles = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 26; index += 1) {
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      const pool = g.createRadialGradient(x, y, 0, x, y, 30 + Math.random() * 60);
+      pool.addColorStop(0, 'rgb(64,64,64)');
+      pool.addColorStop(0.7, 'rgb(90,90,90)');
+      pool.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = pool;
+      g.beginPath();
+      g.ellipse(x, y, 40 + Math.random() * 80, 20 + Math.random() * 40, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, [4, 4]);
+  const wet = lit(0xffffff, { map: concrete, roughnessMap: puddles, roughness: 0.42, metalness: 0.18 });
+  wet.userData.reflects = 0.45;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), wet);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   place.add(ground);
@@ -1443,11 +1658,47 @@ function buildPort() {
     head.position.set(x, 6.92, z + (z < 0 ? 1.1 : -1.1));
     const halo = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 8), glowMaterial);
     halo.position.copy(head.position);
-    const lamp = new THREE.PointLight(0xffa24a, 1.6, 15, 2);
+    const lamp = new THREE.PointLight(0xffa24a, 2, 16, 2);
     lamp.position.set(head.position.x, 6.6, head.position.z);
     place.add(post, arm, head, halo, lamp);
   }
+  // Rain over the yard, slanting a little with the wind off the water.
+  const rain = buildRain({ halfX: 16, halfZ: 12, height: 14, count: 1600, slant: [0.6, 0, -0.25] });
+  place.add(rain);
+  place.userData.tick = (time) => rain.userData.tick(time);
   return place;
+}
+
+/**
+ * Rain: short streaks in a box, one line mesh drawn twice, the two stacked
+ * and falling together, wrapped back up as they leave the bottom — a single
+ * transform a frame, nothing per drop.
+ */
+function buildRain({ halfX, halfZ, height, count, speed = 9, length = 0.5, slant = [0, 0, 0] }) {
+  const random = scatterRandom(11);
+  const positions = new Float32Array(count * 6);
+  const along = Math.hypot(slant[0], speed, slant[2]);
+  const step = [(slant[0] / along) * length, -(speed / along) * length, (slant[2] / along) * length];
+  for (let drop = 0; drop < count; drop += 1) {
+    const x = (random() * 2 - 1) * halfX;
+    const y = random() * height;
+    const z = (random() * 2 - 1) * halfZ;
+    positions.set([x, y, z, x + step[0], y + step[1], z + step[2]], drop * 6);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.LineBasicMaterial({ color: 0xa8bcd8, transparent: true, opacity: 0.32, depthWrite: false });
+  const group = new THREE.Group();
+  const layers = [new THREE.LineSegments(geometry, material), new THREE.LineSegments(geometry, material)];
+  for (const layer of layers) layer.frustumCulled = false;
+  group.add(...layers);
+  group.userData.tick = (time) => {
+    const fallen = (time * speed) % height;
+    const drift = ((time * slant[0]) % (2 * halfX)) - halfX;
+    layers[0].position.set(drift, -fallen, (time * slant[2]) % halfZ);
+    layers[1].position.set(drift, height - fallen, (time * slant[2]) % halfZ);
+  };
+  return group;
 }
 
 /**
@@ -2461,5 +2712,7 @@ export function updateSpray(view, dt) {
 }
 
 export function render(view) {
+  // A place that moves (rain, a ship at anchor) moves with the clock.
+  view.places?.[view.place]?.userData.tick?.(performance.now() / 1000);
   view.renderer.render(view.scene, view.camera);
 }
