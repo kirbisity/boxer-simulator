@@ -8,7 +8,7 @@ import { P } from './body.js';
 import { SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
-import { ARROW, WEAPONS } from './weapons.js';
+import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
 import { featherDevice, steelMaterial } from './wardrobe.js';
 import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
 import { crowdBatch } from './crowdview.js';
@@ -897,8 +897,15 @@ export function updateArms(view, fighterView, time = 0) {
     arms.weapon = null;
     arms.kind = null;
   }
+  // The shield gone from his arm (dropped, wrenched off) or another taken up: the old drawing goes.
+  if (arms.shield && arms.shieldKind !== fighter.shield?.kind) {
+    fighterView.group.remove(arms.shield);
+    if (!fighterView.baked) disposeObject(arms.shield);
+    arms.shield = null;
+  }
   if (fighter.shield) {
     if (!arms.shield) {
+      arms.shieldKind = fighter.shield.kind;
       const build = () => buildShieldMesh(fighter.shield.spec, view.steelEnv);
       arms.shield = fighterView.baked ? crowdArms(view, `shield:${fighter.shield.kind}`, build) : build();
       fighterView.group.add(arms.shield);
@@ -1074,6 +1081,17 @@ export function updateDebris(view, world) {
         disposeObject(mesh);
         view.pieces.delete(debris.id);
       }
+      continue;
+    }
+    // A dropped shield: its own mesh, turned as it lies (its frame: across, up, facing out).
+    if (debris.kind === 'shield') {
+      if (!mesh) {
+        mesh = buildShieldMesh(SHIELDS[debris.shield], view.steelEnv);
+        view.scene.add(mesh);
+        view.pieces.set(debris.id, mesh);
+      }
+      mesh.position.set(debris.x[0], debris.x[1], debris.x[2]);
+      mesh.quaternion.set(debris.q[0], debris.q[1], debris.q[2], debris.q[3]);
       continue;
     }
     if (debris.kind !== 'weapon') continue;

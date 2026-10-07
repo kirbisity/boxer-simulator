@@ -108,6 +108,10 @@ export const MOVES = {
   sicaHook: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.02, 0.62, -0.34], dir: [-0.3, 0.2, -0.9] }, mid: [1, -0.05, 0.1], to: { hand: [0.28, 0.5, 0.18], dir: [0.4, -0.15, 0.9] }, windup: 0.12, extendUntil: 0.34, duration: 0.52, twist: -0.8, lean: 0.1, shift: 0.05, cost: 0.022, mass: { arm: 0.6, body: 0.015 }, rotation: 1.2, zones: ['body', 'legs'], reach: 'weapon', contactAt: 0.7 },
   // A low thrust past the shield's lower edge.
   sicaThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.08, 0.5, -0.16], dir: [1, -0.05, 0.1] }, windup: 0.06, extendUntil: 0.3, duration: 0.5, twist: -0.6, lean: 0.16, shift: 0.08, depth: 0.22, step: 1.4, cost: 0.02, mass: { arm: 0.6, body: 0.03 }, rotation: 0.6, zones: ['body', 'legs'], reach: 'weapon' },
+  // The shield bash: the shield driven out from the shoulder with a step, its
+  // face (and its weight) into the man: a shove more than a blow (the broad
+  // face spreads it), to knock him back or off his feet.
+  shieldBash: { kind: 'strike', limb: 'lHand', path: 'straight', bash: true, windup: 0.1, extendUntil: 0.3, duration: 0.6, twist: 0.35, lean: 0.14, shift: 0.1, step: 1.3, cost: 0.03, contactSeconds: 0.02, mass: { arm: 0.8, body: 0.3 }, push: true, rotation: 0.4, zones: ['body', 'head'], reach: 'arm' },
   // The scissor's crescent: a short slash with the steel-cased left arm.
   crescentSlash: { kind: 'strike', limb: 'lHand', path: 'hook', windup: 0.1, extendUntil: 0.3, duration: 0.5, twist: 0.45, shift: 0.03, cost: 0.026, mass: { arm: 0.7, body: 0.02 }, rotation: 1.3, cuts: true, zones: ['head', 'body'], reach: 'close' },
   gladiusThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.08, 0.6, -0.14], dir: [1, 0.1, 0.05] }, windup: 0.06, extendUntil: 0.3, duration: 0.5, twist: -0.6, lean: 0.12, shift: 0.08, depth: 0.25, step: 1.5, cost: 0.02, mass: { arm: 0.6, body: 0.03 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
@@ -536,7 +540,7 @@ export const STYLES = {
     // The shield arm: forearm across before the chest.
     shieldGuard: [0.3, 0.72, 0.05],
     idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },
-    attacks: { spearHigh: 0.55, spearLow: 0.45 },
+    attacks: { spearHigh: 0.5, spearLow: 0.4, shieldBash: 0.1 },
     tempo: 1.5,
     defences: { shieldBlock: 0.6, stepBack: 0.4 },
     defendChance: 0.65,
@@ -975,7 +979,7 @@ export const STYLES = {
     weaponGuard: { hand: [0.1, 0.6, -0.18], dir: [1, 0.25, 0.3] },
     shieldGuard: [0.32, 0.66, 0.06],
     idle: { bounce: 0.3, sway: 0.6, rock: 0.3 },
-    attacks: { sicaHook: 0.55, sicaThrust: 0.45 },
+    attacks: { sicaHook: 0.5, sicaThrust: 0.38, shieldBash: 0.12 },
     combos: { 'sicaThrust sicaHook': 0.6, 'sicaHook sicaThrust': 0.4 },
     comboChance: 0.4,
     tempo: 1.3,
@@ -994,7 +998,7 @@ export const STYLES = {
     weaponGuard: { hand: [0.04, 0.64, -0.2], dir: [1, 0.1, 0.05] },
     shieldGuard: [0.34, 0.5, 0.1],
     idle: { bounce: 0.15, sway: 0.4, rock: 0.3 },
-    attacks: { gladiusThrust: 0.7, gladiusCut: 0.3 },
+    attacks: { gladiusThrust: 0.6, gladiusCut: 0.25, shieldBash: 0.15 },
     tempo: 1.4,
     defences: { shieldBlock: 0.8, stepBack: 0.2 },
     defendChance: 0.7,
@@ -1011,7 +1015,7 @@ export const STYLES = {
     weaponGuard: { hand: [0.04, 0.64, -0.2], dir: [1, 0.1, 0.05] },
     shieldGuard: [0.34, 0.52, 0.1],
     idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },
-    attacks: { gladiusThrust: 0.65, gladiusCut: 0.35 },
+    attacks: { gladiusThrust: 0.55, gladiusCut: 0.25, shieldBash: 0.2 },
     tempo: 1.25,
     defences: { shieldBlock: 0.75, stepBack: 0.25 },
     defendChance: 0.68,
@@ -1081,7 +1085,7 @@ export const STYLES = {
     weaponGuard: { hand: [0.08, 0.6, -0.14], dir: [1, 0.2, 0.05] },
     shieldGuard: [0.3, 0.72, 0.05],
     idle: { bounce: 0.3, sway: 0.6, rock: 0.3 },
-    attacks: { gladiusThrust: 0.6, gladiusCut: 0.4 },
+    attacks: { gladiusThrust: 0.55, gladiusCut: 0.33, shieldBash: 0.12 },
     tempo: 1.4,
     defences: { shieldBlock: 0.65, stepBack: 0.35 },
     defendChance: 0.6,

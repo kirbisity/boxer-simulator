@@ -576,9 +576,12 @@ function goForWeapon(world, fighter, opponent, dt) {
     fighter.strafe = 0;
     return true;
   }
-  // Nothing loose on the floor (the usual case): no thought, and no draw on the bout's randomness.
-  const loose = world.debris?.some((debris) => debris.kind === 'weapon' && !debris.taken && debris.resting);
-  if (!loose || fighter.weapon?.held || fighter.clinch || fighter.pin || fighter.punch || !AI.pickup.enabled) {
+  // A man of a shield style who has lost his wants it back, whatever is in his hand.
+  const wantsShield = Boolean(STYLES[fighter.style]?.shield) && !fighter.shield;
+  const wantsWeapon = !fighter.weapon?.held;
+  // Nothing loose on the floor he wants (the usual case): no thought, and no draw on the bout's randomness.
+  const loose = world.debris?.some((debris) => !debris.taken && debris.resting && ((debris.kind === 'weapon' && wantsWeapon) || (debris.kind === 'shield' && wantsShield)));
+  if (!loose || fighter.clinch || fighter.pin || fighter.punch || !AI.pickup.enabled) {
     fighter.aiPickupFor = null;
     return false;
   }
@@ -589,7 +592,8 @@ function goForWeapon(world, fighter, opponent, dt) {
   // Still worth it: loose, on the floor, and nearer me than any of them.
   const worth = (debris) => {
     // A standard is taken up only by its own side's chosen man (takeUpStandard).
-    if (!debris || debris.kind !== 'weapon' || debris.taken || !debris.resting || WEAPONS[debris.weapon]?.flag) return null;
+    if (!debris || debris.taken || !debris.resting) return null;
+    if (debris.kind === 'shield' ? !wantsShield : debris.kind !== 'weapon' || !wantsWeapon || WEAPONS[debris.weapon]?.flag) return null;
     const mine = flat(debris.x, at);
     const theirs = enemies.reduce((least, other) => Math.min(least, flat(debris.x, point(other.x, P.pelvis))), Infinity);
     if (mine > AI.pickup.maxDistance || (mine > AI.pickup.atFeet && mine > theirs - AI.pickup.margin)) return null;

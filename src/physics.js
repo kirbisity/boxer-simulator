@@ -238,6 +238,48 @@ function rearm(world, fighter, weapon) {
 /** Going down shakes the grip: sometimes the weapon goes with the fall. */
 function shakenLoose(world, fighter) {
   if (fighter.weapon?.held && world.random() < WORLD.weapons.dropOnFall) dropWeapon(world, fighter, 'dropped');
+  if (fighter.shield && world.random() < WORLD.shield.dropOnFall) dropShield(world, fighter, 'dropped');
+}
+
+/** A rotation (x, y, z, w) taking the unit axes to these three (a right-handed basis). */
+function quatFromBasis(x, y, z) {
+  const trace = x[0] + y[1] + z[2];
+  let q;
+  if (trace > 0) {
+    const s = 0.5 / Math.sqrt(trace + 1);
+    q = [(y[2] - z[1]) * s, (z[0] - x[2]) * s, (x[1] - y[0]) * s, 0.25 / s];
+  } else if (x[0] > y[1] && x[0] > z[2]) {
+    const s = 2 * Math.sqrt(1 + x[0] - y[1] - z[2]);
+    q = [0.25 * s, (y[0] + x[1]) / s, (z[0] + x[2]) / s, (y[2] - z[1]) / s];
+  } else if (y[1] > z[2]) {
+    const s = 2 * Math.sqrt(1 + y[1] - x[0] - z[2]);
+    q = [(y[0] + x[1]) / s, 0.25 * s, (z[1] + y[2]) / s, (z[0] - x[2]) / s];
+  } else {
+    const s = 2 * Math.sqrt(1 + z[2] - x[0] - y[1]);
+    q = [(z[0] + x[2]) / s, (z[1] + y[2]) / s, 0.25 * s, (x[1] - y[0]) / s];
+  }
+  const length = Math.hypot(...q);
+  return q.map((value) => value / length);
+}
+
+/**
+ * The shield leaves his arm: its weight off the arm, and it falls (or flies,
+ * wrenched) as a plate of its own, to tumble and lie on its face or back.
+ */
+export function dropShield(world, fighter, reason, push = [0, 0, 0]) {
+  if (!fighter.shield) return;
+  const shield = shieldDisc(fighter);
+  const spec = fighter.shield.spec;
+  addParticleMass(fighter, P.lHand, -spec.mass * 0.6);
+  addParticleMass(fighter, P.lElbow, -spec.mass * 0.4);
+  const random = world.random;
+  world.debris.push({
+    id: world.debris.length, kind: 'shield', shield: fighter.shield.kind, owner: fighter.id, x: shield.centre, plate: true,
+    v: vec.add(vec.add(point(fighter.v, P.lHand), push), [0, 0.4, 0]), q: quatFromBasis(shield.across, shield.up, shield.normal),
+    spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (1 + random() * 3)), radius: shieldReach(spec), axis: [0, 0, 1], half: 0.02, resting: false,
+  });
+  fighter.shield = null;
+  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, point: shield.centre, effects: [`${spec.label.toLowerCase()} ${reason === 'wrenched' ? 'torn from his arm' : 'dropped'}`] });
 }
 
 /** Which style a weapon picked up off the floor is fought in. */
@@ -251,7 +293,10 @@ const WEAPON_LABEL = (kind) => WEAPONS[kind].label.toLowerCase();
 export function startPickup(world, fighter, debris) {
   // The standard is taken up whatever is in the hands: that is let fall.
   const standard = WEAPONS[debris.weapon]?.flag;
-  if (fighter.state !== 'up' || (fighter.weapon?.held && !standard) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
+  // A shield is taken up on the other arm, whatever is in the hand.
+  const shield = debris.kind === 'shield';
+  if (shield && fighter.shield) return false;
+  if (fighter.state !== 'up' || (fighter.weapon?.held && !standard && !shield) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
   fighter.pickup = { debris: debris.id, t: 0 };
   fighter.clinch = null;
   return true;
@@ -267,10 +312,18 @@ function updatePickup(world, fighter, dt) {
     fighter.pickup = null;
     return;
   }
-  const reach = vec.length(vec.sub(point(fighter.x, P.rHand), debris.x));
+  const reach = vec.length(vec.sub(point(fighter.x, debris.kind === 'shield' ? P.lHand : P.rHand), debris.x));
   if (pickup.t < WORLD.weapons.pickupSeconds || reach > WORLD.weapons.pickupReach) return;
   debris.taken = true;
   fighter.pickup = null;
+  if (debris.kind === 'shield') {
+    const spec = SHIELDS[debris.shield];
+    fighter.shield = { kind: debris.shield, spec };
+    addParticleMass(fighter, P.lHand, spec.mass * 0.6);
+    addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
+    world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, effects: [`takes up the ${spec.label.toLowerCase()}`] });
+    return;
+  }
   if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
   if (debris.colour) fighter.weapon.colour = debris.colour;
@@ -765,7 +818,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.stamina < drain) return false;
+  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.stamina < drain || (spec.bash && !fighter.shield)) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
@@ -785,6 +838,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
 /** Start a whole-body move (rush, clinch) or a defence. */
 export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1, from = null } = {}) {
   if (fighter.state !== 'up' || fighter.netted) return false;
+  // His shield lost, he covers up with his arms.
+  if (name === 'shieldBlock' && !fighter.shield) name = 'guard';
   if (DEFENCES[name]) {
     // `from`: who the strike comes from, for a block that goes to meet it.
     fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from };
@@ -883,8 +938,10 @@ function updateIntent(world, fighter, dt) {
     const debris = world.debris[fighter.pickup.debris];
     intent.dip += 0.3;
     intent.lean += 0.6;
-    // Just above the grip, never into the floor (the floor and the muscle would fight over the hand).
-    if (debris) intent.rHand = toLocal(fighter, [debris.x[0], Math.max(debris.x[1], fighter.radius[P.rHand]) + 0.05, debris.x[2]]);
+    // Just above the grip, never into the floor (the floor and the muscle would fight over the hand);
+    // a shield with the left hand, the arm it goes on.
+    const hand = debris?.kind === 'shield' ? 'lHand' : 'rHand';
+    if (debris) intent[hand] = toLocal(fighter, [debris.x[0], Math.max(debris.x[1], fighter.radius[P[hand]]) + 0.05, debris.x[2]]);
   }
   if (fighter.pin) {
     // Kneeling beside him, leaning over, hands on his chest and his hips.
@@ -1957,6 +2014,8 @@ const LIMP_BELOW = {
 /** A joint gives: no more limit, no more muscle below it; a leg or neck ends the fight. */
 export function breakJoint(world, fighter, joint) {
   fighter.broken.add(joint);
+  // The shield arm broken: it cannot hold it.
+  if (joint === 'lElbow') dropShield(world, fighter, 'dropped');
   for (const name of LIMP_BELOW[joint]) fighter.limp.add(P[name]);
   fighter.damage[JOINT_SEGMENTS[joint][0]] = Math.max(fighter.damage[JOINT_SEGMENTS[joint][0]] ?? 0, 1);
   const ending = !joint.endsWith('Elbow');
@@ -2262,6 +2321,14 @@ function collideFighters(world, h, time, substep = 0) {
 function strikers(fighter) {
   const fist = fistsOf(fighter.body).radius;
   const list = ['l', 'r'].map((side) => ({ key: `${side}Hand`, a: P[`${side}Hand`], b: P[`${side}Hand`], radius: fist, side }));
+  // A shield bash: the left hand's blow lands with the shield's face, a broad capsule up its middle.
+  if (fighter.punch?.spec.bash && fighter.shield) {
+    const shield = shieldDisc(fighter);
+    const spec = fighter.shield.spec;
+    const reach = (spec.shape ? spec.height / 2 : spec.radius) * 0.75;
+    const face = vec.add(shield.centre, vec.scale(shield.normal, 0.02));
+    list[0] = { key: 'lHand', bash: true, a: P.lHand, b: P.lHand, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)), radius: spec.shape ? spec.width * 0.4 : spec.radius * 0.75, side: 'l' };
+  }
   const weapon = fighter.weapon;
   if (weapon?.held) {
     // The weapon, from where it starts to strike to its tip.
@@ -2639,7 +2706,9 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const limbs = attacker.body.limbKg;
   // Heavy boots put weight behind a kick or a knee.
   const kicking = /Foot|Knee/.test(spec.limb);
-  const strikeMass = ((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1) * staggerShare(attacker, WORLD.stagger.harm);
+  // A bash carries the shield's own weight in front of the arm and body.
+  const shieldMass = striker.bash && attacker.shield ? attacker.shield.spec.mass : 0;
+  const strikeMass = (((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1) + shieldMass) * staggerShare(attacker, WORLD.stagger.harm);
   const struckMass = struckMassOf(defender, capsule);
   // A collision of two effective masses; flesh and padding make it largely
   // inelastic, so the impulse is the reduced mass times the closing speed.
@@ -2663,7 +2732,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const harm = harmShare(attacker, defender, spec, capsule.key);
   event.harm = harm;
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked, rotation: spec.rotation, cuts: spec.cuts, cutForce: spec.limb.endsWith('Hand') ? fists.cutForce : Infinity, side, push: spec.push });
-  if (spec.limb.endsWith('Hand') && peakForce > attacker.body.fracture.hand * fists.handFracture * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
+  if (spec.limb.endsWith('Hand') && !striker.bash && peakForce > attacker.body.fracture.hand * fists.handFracture * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
     attacker.injuries.push({ kind: 'hand', side, time: world.time });
     event.effects.push(`${attacker.body.inputs.name}: broken hand`);
   }
@@ -2827,6 +2896,7 @@ function sever(world, defender, where, event, bladeVelocity) {
   defender.severed ??= [];
   if (defender.severed.some((done) => done.side === where.side && done.joint === where.joint)) return;
   defender.severed.push({ joint: where.joint, side: where.side });
+  if (where.side === 'l' && ['wrist', 'elbow', 'shoulder'].includes(where.joint)) dropShield(world, defender, 'dropped');
   defender.severedCapsules ??= new Set();
   for (const capsule of part.capsules) defender.severedCapsules.add(name(capsule));
   const members = part.particles.length ? part.particles.map((piece) => P[name(piece)]) : [P[name(part.base)]];
@@ -3071,6 +3141,12 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   if (striker.weapon) strainGrip(world, attacker, impulse * 0.25);
   world.events.push(event);
   if (striker.weapon) world.events.push({ time: world.time, kind: 'clash', fighter: defender.id, point: hit.point, normal: away, impulse });
+  // A blow past what his grip can hold may tear the shield off his arm.
+  const grip = WORLD.shield.wrench * (body.motorForce[P.lHand] / WORLD.recoil.reference);
+  if (impulse > grip && world.random() < Math.min(1, (impulse / grip - 1) * WORLD.shield.wrenchRise)) {
+    const shieldMass = defender.shield.spec.mass;
+    dropShield(world, defender, 'wrenched', vec.scale(away, (-impulse * 0.3) / shieldMass));
+  }
 }
 
 /**
@@ -3152,8 +3228,23 @@ function moveDebris(world, dt) {
       piece.q = piece.q.map((value) => value / length);
     }
     const axis = quatRotate(piece.q, piece.axis);
-    const lowest = Math.min(piece.x[1] + axis[1] * piece.half, piece.x[1] - axis[1] * piece.half) - piece.radius;
-    if (lowest < 0) {
+    // A rod's lowest point is an end; a plate's (a shield) the rim, as far down as its face allows.
+    const lowest = piece.plate
+      ? piece.x[1] - piece.radius * Math.sqrt(Math.max(0, 1 - axis[1] * axis[1])) - piece.half * Math.abs(axis[1])
+      : Math.min(piece.x[1] + axis[1] * piece.half, piece.x[1] - axis[1] * piece.half) - piece.radius;
+    if (lowest < 0 && piece.plate) {
+      piece.x[1] -= lowest;
+      piece.v = [piece.v[0] * spec.slide, Math.abs(piece.v[1]) * spec.restitution * 0.5, piece.v[2] * spec.slide];
+      piece.spin = vec.scale(piece.spin, spec.slide);
+      // On its rim it falls over onto its face or its back, whichever it leans to.
+      const down = axis[1] >= 0 ? [0, 1, 0] : [0, -1, 0];
+      piece.q = quatMultiply(quatFromTo(axis, vec.normalize(vec.lerp(axis, down, 0.3))), piece.q);
+      if (Math.abs(piece.v[1]) < 0.35 && Math.hypot(piece.v[0], piece.v[2]) < 0.15) {
+        piece.q = quatMultiply(quatFromTo(quatRotate(piece.q, piece.axis), down), piece.q);
+        piece.x[1] = piece.half;
+        piece.resting = true;
+      }
+    } else if (lowest < 0) {
       piece.x[1] -= lowest;
       piece.v = [piece.v[0] * spec.slide, Math.abs(piece.v[1]) * spec.restitution, piece.v[2] * spec.slide];
       piece.spin = vec.scale(piece.spin, spec.slide);
@@ -3377,6 +3468,7 @@ export function knockOut(world, defender, event, reason, kind = 'knockout') {
   const standing = defender.state === 'up' || defender.state === 'rising';
   defender.state = 'out';
   dropWeapon(world, defender, 'dropped');
+  dropShield(world, defender, 'dropped');
   // Finished off where he lay, he was already counted down.
   if (standing) defender.knockdowns += 1;
   defender.punch = null;

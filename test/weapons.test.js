@@ -319,3 +319,40 @@ test('the retiarius throws his net; a man in it can neither strike nor guard unt
   for (let t = 0; t < 40 && secutor.netted; t += 0.1) advance(world, 0.1);
   assert.ok(!secutor.netted, 'worked free in the end');
 });
+
+test('a shield dropped falls as a plate of its own weight and lies flat; its man takes it up again', async () => {
+  const { dropShield } = await import('../src/physics.js');
+  const { SHIELDS } = await import('../src/weapons.js');
+  const world = createWorld([{ inputs: structuredClone(PRESETS.murmillo), corner: 'red' }, { inputs: { ...structuredClone(PRESETS.contender), style: 'passive' }, corner: 'blue' }], { seed: 5, arena: { halfX: 6.5, halfZ: 4.4 } });
+  const murmillo = world.fighters[0];
+  const before = [...murmillo.body.masses];
+  advance(world, 0.3);
+  dropShield(world, murmillo, 'dropped', [0, 0, 1]);
+  assert.equal(murmillo.shield, null);
+  const lighter = murmillo.body.masses.reduce((sum, mass) => sum + mass, 0);
+  assert.ok(Math.abs(before.reduce((sum, mass) => sum + mass, 0) - lighter - SHIELDS.scutum.mass) < 1e-6, 'its weight off the arm');
+  const shield = world.debris.find((debris) => debris.kind === 'shield');
+  for (let t = 0; t < 3 && !shield.resting; t += 0.05) advance(world, 0.05);
+  assert.ok(shield.resting, 'it comes to rest');
+  assert.ok(shield.x[1] < 0.05, 'lying flat on the floor');
+  // He goes back for it (the other man keeping off: he runs from anyone near).
+  world.fighters[1].style = 'passive';
+  placeFighter(world.fighters[1], 5, 3);
+  for (let t = 0; t < 12 && !murmillo.shield; t += 0.1) advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+  assert.ok(murmillo.shield, 'taken up again');
+});
+
+test('a shield bash lands with the shield and the body behind it: a shove that moves a man bodily', () => {
+  const world = createWorld([{ inputs: structuredClone(PRESETS.secutor), corner: 'red' }, { inputs: structuredClone(PRESETS.contender), corner: 'blue' }], { seed: 4, distance: 1.0 });
+  const [secutor, other] = world.fighters;
+  advance(world, 0.3);
+  let landed = null;
+  for (let attempt = 0; attempt < 30 && !landed; attempt += 1) {
+    throwPunch(world, secutor, 'shieldBash', 'body');
+    advance(world, 0.6);
+    landed = world.events.find((event) => event.punch === 'shieldBash' && (event.kind === 'landed' || event.kind === 'blocked'));
+  }
+  assert.ok(landed, 'the bash met him');
+  assert.ok(landed.impulse > 10, `impulse ${landed.impulse?.toFixed(1)} N·s`);
+  assert.equal(other.state === 'out', false);
+});
