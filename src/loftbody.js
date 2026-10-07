@@ -337,6 +337,20 @@ export const ARMOR_KINDS = {
     upperArm: { l: [[-0.32, 0.22, 1.7, { rows: ['armor', 'lace'] }], [0.15, 0.45, 1.42, { rows: ['armor', 'lace'] }]] },
     forearm: [0.42, -0.02, 1.24, { rows: ['armor', 'lace'] }],
   },
+  // Guan Yu: the green robe crossed over the breast and down to the shins,
+  // its dark green edge, a gilt belt; the gilt scale shows where it is
+  // proud of the robe, over the shoulders and down the arms.
+  guanYu: {
+    trunk: [-0.08, 1.0, 1.24, { panel: [0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], skirt: [1.2, 0.55, 1.3, { rows: ['cloth', 'cloth', 'cloth', 'cloth2'] }], belt: [-0.04, 0.07, 1.28, 'gold'], collar: 'cloth',
+    upperArm: [[-0.32, 0.45, 1.62, { scales: true }], [0.45, 1.02, 1.36, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.03, 1.3, { rows: ['steel', 'steel2'] }],
+  },
+  // A huque: a sleeveless cloth tunic over the armour, to the upper thigh,
+  // open at the sides below the waist (here: the skirt split by its flare).
+  huque: {
+    trunk: [-0.1, 0.94, 1.26, { panel: [0.0, 0.94, 0.995, 'cloth2'], base: 'cloth' }], skirt: [0.34, 0.6, 1.34, 'cloth'],
+  },
+  // Commodus: nothing lofted; the lion's skin is drawn whole (arenaview's buildLionPelt).
+  commodus: {},
   // Scissor: a shirt of bronze scales to the hips, the manica, the left
   // forearm in a steel tube (its crescent blade is the scissores, carried as
   // a shield), greaves on both shins.
@@ -619,6 +633,10 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
   for (const [hem, flare, inflate, paint] of armorPieces(kit, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
   for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) tablePiece(shortsRings(from, to, count(3)), inflate, paint, abdomen);
+  // Cloth worn over the armour (`armor.over`, a kind from the table): Joan's huque over her plate.
+  const over = ARMOR_KINDS[armor?.over] ?? null;
+  for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
+  for (const [hem, flare, inflate, paint] of armorPieces(over, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.

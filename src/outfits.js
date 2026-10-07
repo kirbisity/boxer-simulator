@@ -334,6 +334,21 @@ export const OUTFITS = {
       plateDesign('Russeted', '#7a5a42', false, true, '#2a2622'),
     ],
   },
+  // Joan of Arc: a full white harness (polished, unpainted plate: "armure
+  // blanche", made for her at Tours in 1429), bareheaded as she is painted,
+  // and over the plate the huque of crimson cloth the Duke of Orléans gave
+  // her. The plate's protection, the head bare.
+  joan: {
+    faction: 'knights', bulletRating: 650, plated: true,
+    label: 'Joan of Arc — white harness', arrowproof: true, sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
+    extraMass: 0.45,
+    protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0, torso: 0.7, limb: 0.3 }, regions: { head: ARENA.bare } },
+    courage: 0.6,
+    deflects: true,
+    designs: [
+      { label: 'White harness, crimson huque', special: true, top: { kind: 'longsleeve', color: '#4a1a1e' }, bottom: { kind: 'tights', color: '#2e2420' }, armor: { kind: 'plate', color: '#d4d8de', fluted: false, over: 'huque', cloth: '#8c1c26', cloth2: '#c9a24a' }, feet: { kind: 'sabaton', color: '#d4d8de' } },
+    ],
+  },
   // Mail and a great helm: rings to the knees under a surcoat in his
   // colours. Proof against most cuts, poor against a point, little help
   // against a blow; lighter than plate, and an edge bites rather than glances.
@@ -514,6 +529,20 @@ export const OUTFITS = {
       { label: 'Leather and blue-grey', special: true, top: { kind: 'tunic', color: '#6c7a87' }, bottom: { kind: 'loincloth', color: '#8e9aa6' }, armor: { kind: 'maximus', color: '#2b2420', lace: '#3d3127', gold: '#b98a3e' }, feet: { kind: 'sandal', color: '#2e2016' } },
     ],
   },
+  // Commodus as Hercules Romanus, as his bust on the Capitoline shows him:
+  // the lion's scalp over his head, its upper jaw on his brow, the pelt down
+  // his back and its forelegs knotted on his chest; a white loincloth edged
+  // in gold, gilt sandals. The pelt turns a little; the rest is bare.
+  commodus: {
+    faction: 'gladiators',
+    label: 'Commodus — as Hercules', movement: 'good', fists: 'bare',
+    extraMass: 0.06,
+    protection: { blunt: 0.08, cut: 0.15, pierce: 0.08, bullet: { head: 0, torso: 0, limb: 0 }, regions: { head: { blunt: 0.2, cut: 0.4, pierce: 0.25 }, limb: ARENA.bare } },
+    courage: 0.5,
+    designs: [
+      { label: 'Lion skin and club', special: true, bottom: { kind: 'loincloth', color: '#efe9dc', trim: '#c9a24a' }, armor: { kind: 'commodus', color: '#b8894a', lace: '#6e4a24', gold: '#c9a24a' }, head: { kind: 'lionHead', color: '#b8894a', mane: '#6e4a24' }, feet: { kind: 'sandal', color: '#8a6a32' } },
+    ],
+  },
   // The scissor: a coat of bronze scales to the hips, the smooth helmet, the
   // left arm cased in the steel tube of the scissores, a manica on the sword
   // arm, greaves on both shins; the thighs bare.
@@ -604,6 +633,22 @@ export const OUTFITS = {
       { label: 'Black iron', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#5a5d63', lace: '#2a1c14' }, head: { kind: 'pagodaHelm', color: '#5a5d63' }, feet: { kind: 'sabaton', color: '#5a5d63' } },
       { label: 'Bright steel, red lacing', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#a7adb6', lace: '#7a1418' }, head: { kind: 'pagodaHelm', color: '#a7adb6' }, feet: { kind: 'sabaton', color: '#a7adb6' } },
       { label: 'Lacquered black', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#141416' }, armor: { kind: 'ironPagoda', color: '#2c2d31', lace: '#8a6a2a' }, head: { kind: 'pagodaHelm', color: '#2c2d31' }, feet: { kind: 'sabaton', color: '#2c2d31' } },
+    ],
+  },
+  // Guan Yu, as the temples and the opera show him: the green robe
+  // (zhanpao) over gilt scale armour, the scale at the shoulders and arms, a green soft cap tied at the
+  // back, black boots. The scale is a general's; the head is in cloth.
+  guanYu: {
+    faction: 'chinese', plated: true,
+    label: 'Guan Yu — green robe over gilt scale', movement: 'good', fists: 'bare',
+    sidearm: 'dao',
+    deflects: true,
+    arrowproof: true,
+    extraMass: 0.42,
+    protection: { blunt: 0.62, cut: 0.92, pierce: 0.78, bullet: { head: 0.05, torso: 0.4, limb: 0.15 }, regions: { head: { blunt: 0.08, cut: 0.15, pierce: 0.05 } } },
+    courage: 0.6,
+    designs: [
+      { label: 'Green robe, gilt scale', special: true, top: { kind: 'longsleeve', color: '#2a5636' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'guanYu', color: '#a8853e', cloth: '#2f6a3e', cloth2: '#1f4a2c', lace: '#4a3418', gold: '#d6a743' }, head: { kind: 'guanYuCap', color: '#2f6a3e', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#141416' } },
     ],
   },
   // ---- The steppe, 14th–17th centuries: Mongol, Oirat and Timurid warriors,

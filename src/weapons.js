@@ -346,6 +346,30 @@ export const WEAPONS = {
     // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
   },
+  // Guan Yu's Green Dragon Crescent Blade (qinglong yanyue dao): the guandao
+  // of the legend, its weight a legend too (82 jin); fought here at a real
+  // guandao's, its look its own (a dragon's head at the blade, a red tassel).
+  qinglong: {
+    label: 'Green Dragon Crescent Blade', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.95, balance: 0.6, radius: 0.016,
+    harm: { swing: { cut: 1.15, blunt: 1.05 }, thrust: { pierce: 0.55, cut: 0.12, blunt: 0.5 } },
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
+  },
+  // A knight's arming sword of the 1420s (Joan's, from Sainte-Catherine-de-
+  // Fierbois): one hand, ~0.8 m of stiff tapering blade, a straight cross and
+  // a wheel pommel; made to thrust into the gaps of plate as much as to cut.
+  armingSword: {
+    label: 'Arming sword', hands: 'one', length: 0.8, strikeFrom: 0.12, handle: 0.13, mass: 1.15, balance: 0.12, radius: 0.011,
+    harm: { thrust: { pierce: 1, cut: 0.2, blunt: 0.12 }, swing: { cut: 0.95, blunt: 0.4 } },
+    contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 24, zeta: 0.8 }, threat: 3.4,
+  },
+  // Hercules's club (clava), as Commodus carried it into the arena: a length
+  // of knotted wood thickening to its end, ~0.9 m and 2 kg, no iron on it.
+  // Only blunt; its weight out at the head.
+  clava: {
+    label: 'Club', hands: 'one', length: 0.78, strikeFrom: 0.42, handle: 0.12, mass: 2.0, balance: 0.6, radius: 0.04,
+    harm: { swing: { blunt: 1.35 }, thrust: { blunt: 0.4 } },
+    contactSeconds: 0.005, rotation: 0.95, wrist: { omega: 13, zeta: 0.85 }, threat: 3.6, crush: 0.35,
+  },
   // His backup: a short sword that cuts and stabs.
   gladius: {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,

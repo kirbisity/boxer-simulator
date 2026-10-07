@@ -18,7 +18,7 @@ import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'bald'],
-  facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'beard'],
+  facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'beard', 'longBeard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
 export const DEFAULT_LOOK = { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown', faceShape: null };
@@ -357,7 +357,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   });
 
   const dangles = buildHair(group, look, r, shape, hairMaterial, female);
-  buildFacialHair(group, look, r, shape, hairMaterial);
+  buildFacialHair(group, look, r, shape, hairMaterial, dangles);
 
   // ---- Expression -------------------------------------------------------
   const face = { blinkIn: 1 + Math.random() * 3, blinking: 0, lid: 0, mouth: 0, brow: 0, flush: 0, gaze: [0, 0], gazeIn: 1 };
@@ -601,8 +601,10 @@ function buildHair(group, look, r, shape, material, female) {
   return dangles;
 }
 
-function buildFacialHair(group, look, r, shape, material) {
-  const style = look.facialHair;
+function buildFacialHair(group, look, r, shape, material, dangles) {
+  // A long beard is a full beard with locks hanging from it.
+  const long = look.facialHair === 'longBeard';
+  const style = long ? 'beard' : look.facialHair;
   if (style === 'none') return;
   // Jaw and chin, ear to ear: up to the sideburns at the sides, below the
   // mouth at the front.
@@ -628,6 +630,16 @@ function buildFacialHair(group, look, r, shape, material) {
   if (style === 'mustache' || style === 'beard') {
     for (const side of [1, -1]) {
       hairLock(group, material, [[r * 1.01, -0.45 * r, 0], [r * 0.99, -0.5 * r, side * 0.14 * r], [r * 0.9, -0.58 * r, side * 0.23 * r]], 0.12 * r, 0.06 * r, 0.8);
+    }
+  }
+  if (long) {
+    // Guan Yu's: two chi of beard to the middle of the chest, in one broad
+    // lock from the chin that bends and swings, a narrower one either side
+    // from the jaw, and the moustache's ends drawn down long.
+    flowingLock(group, material, dangles, [r * 0.9, -0.92 * r, 0], [0.3, -1, 0], [1.7 * r, 1.9 * r], 0.62 * r, 0.16 * r);
+    for (const side of [1, -1]) {
+      flowingLock(group, material, dangles, [r * 0.74, -0.86 * r, side * 0.36 * r], [0.22, -1, side * 0.12], [1.4 * r, 1.5 * r], 0.32 * r, 0.12 * r);
+      hairLock(group, material, [[r * 0.9, -0.58 * r, side * 0.23 * r], [r * 0.92, -0.85 * r, side * 0.3 * r], [r * 0.95, -1.2 * r, side * 0.26 * r]], 0.08 * r, 0.05 * r, 0.6);
     }
   }
 }

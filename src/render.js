@@ -12,7 +12,7 @@ import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions } from './outfits.js';
 import { WEAPONS } from './weapons.js';
-import { buildHarness, buildScaleShirt, netCord } from './arenaview.js';
+import { buildHarness, buildLionPelt, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
@@ -2046,7 +2046,9 @@ function detailedView(view, fighter, simple) {
 
   const dress = leaderDress(dressFor(body.inputs, corner), fighter);
   // A design may set the hair (a sumo's topknot).
-  const headView = buildHead(body, dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look, skinColor, corner);
+  // A face may be its own colour (Guan Yu's, the red of a ripe jujube).
+  const faceColor = look.faceColor ? new THREE.Color(look.faceColor).getHex() : skinColor;
+  const headView = buildHead(body, dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look, faceColor, corner);
   headView.group.matrixAutoUpdate = false;
   layers.skin.add(headView.group);
   shells.push({ key: 'head', shell: headView.shell });
@@ -2117,6 +2119,8 @@ function detailedView(view, fighter, simple) {
     collar.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'hips'));
   }
+  // Commodus's lion skin: the hide, the knotted forelegs, the tail.
+  if (dress.armor?.kind === 'commodus') collar.add(buildLionPelt(body, dress.armor));
   if (dress.armor?.kind === 'scissor') {
     collar.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'hips'));

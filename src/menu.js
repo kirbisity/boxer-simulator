@@ -33,7 +33,7 @@ const STYLE_NOTES = {
   muayThai: 'Kicks, knees, elbows, the clinch.', sumo: 'Pushes and drives men off their feet.', mix: 'Switches between the unarmed styles.',
   unskilled: 'An ordinary person in a fight.', passive: 'Will not fight back: covers up and runs.', clinchBrawl: 'Grabs the neck, hammers with the free hand.',
   handgun: 'Keeps his distance, aims and fires; hand to hand up close.', baton: 'A police baton: hard blunt blows.', longsword: 'Hand-and-a-half sword: cuts and lunges.',
-  maximus: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.', thraex: 'Sica and parmula: the curved blade hooks round a shield at the legs and flank.', murmillo: 'Gladius behind the great scutum: patient, stabbing out from cover.', secutor: 'Scutum and gladius, the smooth helmet: always closing.', retiarius: 'Net and trident, no helmet: throws the net to bind, then the trident in both hands.', scissor: 'Scale coat, gladius, and a steel-cased arm ending in a crescent blade.',
+  maximus: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.', commodus: 'The emperor as Hercules: lion skin and club, heavy blows, little defence.', guanYu: 'The Green Dragon Crescent Blade: great sweeping cuts from far off, pressed forward.', joan: 'Arming sword in white plate, bareheaded; bears the standard when she leads.', thraex: 'Sica and parmula: the curved blade hooks round a shield at the legs and flank.', murmillo: 'Gladius behind the great scutum: patient, stabbing out from cover.', secutor: 'Scutum and gladius, the smooth helmet: always closing.', retiarius: 'Net and trident, no helmet: throws the net to bind, then the trident in both hands.', scissor: 'Scale coat, gladius, and a steel-cased arm ending in a crescent blade.',
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
   bow: 'Keeps away and looses arrows; the sidearm up close.', matchlock: 'One heavy shot, a long reload; the sidearm up close.',
@@ -45,7 +45,7 @@ const STYLE_NOTES = {
   rifle: 'The AR-15: fast, accurate, devastating; thirty rounds, then a magazine change.', shotgun: 'A pump shotgun: slow, a hard kick, nine pellets that devastate up close.',
   langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -95,6 +95,7 @@ const STYLE_FACTION = (key) => {
 };
 const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
+  warrior('joan', 'Joan of Arc', PRESETS.joan),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
@@ -109,6 +110,7 @@ const WARRIORS = [
   warrior('taichi', 'Chen Fake', PRESETS.taichi),
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
   warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda),
+  warrior('guanYu', 'Guan Yu', PRESETS.guanYu),
   warrior('kheshig', 'Subutai', PRESETS.kheshig),
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
@@ -149,6 +151,7 @@ const WARRIORS = [
   warrior('retiarius', 'Kalendio', PRESETS.retiarius),
   warrior('scissor', 'Astacius', PRESETS.scissor),
   warrior('maximus', 'Maximus', PRESETS.maximus),
+  warrior('commodus', 'Commodus', PRESETS.commodus),
   warrior('peasant', 'Hob Miller', PRESETS.spear),
   warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
   warrior('ladyAshford', 'Lady Ashford', PRESETS.rapier),

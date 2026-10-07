@@ -254,6 +254,15 @@ export const PRESETS = {
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // Guan Yu (d. 220), the Three Kingdoms general of the Romance: "nine chi
+  // tall", a face the red of a ripe jujube, a beard two chi long, a green
+  // robe over his armour, the Green Dragon Crescent Blade. A legend, like
+  // the Iron Pagoda: tall and heavy here, not nine chi.
+  guanYu: {
+    name: 'Guan Yu', style: 'guanYu', sex: 'male', heightCm: 187, frame: 'large', age: 45, exercise: 0.8, calories: 4500,
+    outfit: { kind: 'guanYu', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', faceColor: '#b23a2a', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'longBeard', eyeColor: 'brown' },
+  },
   // The steppe of the 1400s: Esen Taishi of the Oirats, who captured the Ming
   // emperor at Tumu (1449); Mandukhai Khatun, who led the Mongols in armour in
   // the 1470s–90s; an Oirat archer and a lancer.
@@ -368,6 +377,15 @@ export const PRESETS = {
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
   },
+  // Joan of Arc (1412–31): about 1.58 m, nineteen at Orléans; in a full
+  // white harness, bareheaded in the portraits, her hair cropped round; an
+  // arming sword. She leads: on a side with a standard she bears it, as she
+  // bore her white banner herself.
+  joan: {
+    name: 'Joan of Arc', style: 'joan', sex: 'female', heightCm: 158, frame: 'medium', age: 18, exercise: 0.75, calories: 2700, leads: true, standardColour: '#f1ece0',
+    outfit: { kind: 'joan', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2416', facialHair: 'none', eyeColor: 'brown' },
+  },
   samurai: {
     name: 'Takeda Shingen', style: 'katana', sex: 'male', heightCm: 172, frame: 'medium', age: 34, exercise: 0.8, calories: 3600,
     outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
@@ -434,6 +452,15 @@ export const PRESETS = {
     name: 'Maximus', style: 'maximus', sex: 'male', heightCm: 178, frame: 'large', age: 35, exercise: 0.68, calories: 4610,
     outfit: { kind: 'maximus', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#1c130c', facialHair: 'beard', eyeColor: 'blue' },
+  },
+  // Commodus (161–192), the emperor who fought in the arena as Hercules:
+  // the lion's skin over his head and back, the club; Herodian's golden
+  // hair, strong and practised (he killed beasts by the hundred). Not a
+  // barley-fed gladiator: an athlete's body, not a fighter's fat.
+  commodus: {
+    name: 'Commodus', style: 'commodus', sex: 'male', heightCm: 177, frame: 'large', age: 31, exercise: 0.72, calories: 4150,
+    outfit: { kind: 'commodus', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a8803e', facialHair: 'beard', eyeColor: 'brown' },
   },
   scissor: {
     name: 'Astacius', style: 'scissor', sex: 'male', heightCm: 176, frame: 'large', age: 31, exercise: 0.6, calories: 4590,

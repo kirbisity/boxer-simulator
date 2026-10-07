@@ -902,6 +902,46 @@ export const STYLES = {
     pressure: 0.05,
     rangeInside: 0.2,
   },
+  // Guan Yu with the Green Dragon Crescent Blade: the guandao's sweeps from
+  // far off, more forward than Liu Ting's, the cut that ends it (Yan Liang
+  // at Baima) sought, not waited for.
+  guanYu: {
+    label: 'Guan Yu', weapon: 'qinglong', fallback: 'mix',
+    cadence: { work: 1.15, move: 0.85, burst: 0.65, mobility: 0.55 },
+    stance: { blade: 0.42, crouch: 0.06, width: 1.3, lean: 0.07, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.55, -0.06], dir: [1, 0.5, 0] },
+    idle: { bounce: 0.12, sway: 0.35, rock: 0.25 },
+    attacks: { naginataSweep: 0.4, naginataCut: 0.35, naginataRising: 0.1, naginataThrust: 0.15 },
+    combos: { 'naginataSweep naginataCut': 0.5, 'naginataThrust naginataSweep': 0.25, 'naginataRising naginataCut': 0.25 },
+    comboChance: 0.5,
+    tempo: 1.15,
+    defences: { weaponBlock: 0.65, stepBack: 0.35 },
+    defendChance: 0.72,
+    headMovement: 0.05,
+    plans: { pressure: 1.2, outboxer: 1.2, counter: 1, brawler: 0.4 },
+    pressure: 0.15,
+    rangeInside: 0.2,
+  },
+  // Joan of Arc: the arming sword in one hand, in full plate, no shield (a
+  // harnessed man of the 1420s carried none). She was no trained swordsman
+  // and said she carried her standard so as to kill no one: plain cuts and
+  // thrusts, the blade to parry, more readiness to step off than to trade.
+  joan: {
+    label: 'Joan of Arc', weapon: 'armingSword', fallback: 'mix',
+    cadence: { work: 1.05, move: 0.85, burst: 0.55, mobility: 0.5 },
+    stance: { blade: 0.5, crouch: 0.05, width: 1.12, lean: 0.08, guardHeight: 0 },
+    weaponGuard: { hand: [0.15, 0.64, -0.08], dir: [1, 0.3, 0.04] },
+    idle: { bounce: 0.25, sway: 0.5, rock: 0.3 },
+    attacks: { gladiusCut: 0.45, gladiusThrust: 0.45, forehand: 0.1 },
+    combos: { 'gladiusCut gladiusThrust': 0.55, 'gladiusThrust gladiusCut': 0.45 },
+    comboChance: 0.35,
+    tempo: 1.15,
+    defences: { weaponBlock: 0.55, stepBack: 0.45 },
+    defendChance: 0.64,
+    headMovement: 0.08,
+    plans: { counter: 1.2, outboxer: 1, pressure: 0.9, brawler: 0.3 },
+    pressure: 0.12,
+  },
   // Sidearms, fought with alone once the main weapon is gone (hidden: not chosen).
   dagger: {
     label: 'Dagger', hidden: true, weapon: 'dagger', fallback: 'mix',
@@ -1075,6 +1115,26 @@ export const STYLES = {
     defendChance: 0.74,
     headMovement: 0.15,
     plans: { pressure: 1.3, counter: 1.3, outboxer: 0.8, brawler: 0.4 },
+    pressure: 0.3,
+  },
+  // Commodus as Hercules: the club in one hand, no shield, the lion skin
+  // over him. Herodian has him strong and practised (he killed beasts by the
+  // hundred, fought gladiators in bouts that were not to the death): heavy
+  // overhead and side blows, pressing, little craft in defence.
+  commodus: {
+    label: 'Commodus', weapon: 'clava', fallback: 'mix',
+    cadence: { work: 1, move: 0.85, burst: 0.55, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.06, width: 1.18, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.68, -0.14], dir: [0.45, 0.88, 0] },
+    idle: { bounce: 0.2, sway: 0.5, rock: 0.35 },
+    attacks: { maceOverhead: 0.55, maceSide: 0.35, forehand: 0.1 },
+    combos: { 'maceSide maceOverhead': 0.6, 'maceOverhead maceSide': 0.4 },
+    comboChance: 0.35,
+    tempo: 1.3,
+    defences: { weaponBlock: 0.35, stepBack: 0.5, slip: 0.15 },
+    defendChance: 0.55,
+    headMovement: 0.1,
+    plans: { pressure: 1.5, brawler: 1.1, counter: 0.6, outboxer: 0.4 },
     pressure: 0.3,
   },
   // Scissor: in scale and a smooth helmet, the left arm cased in a steel

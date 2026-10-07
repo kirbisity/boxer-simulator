@@ -689,7 +689,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
 }
 
 /**
- * Each side big enough has a leader: the man nearest its middle. Where his
+ * Each side big enough has a leader: one who leads (`inputs.leads`), else
+ * the man nearest its middle. Where his
  * faction has a standard, he bears it, in his hands in place of his weapon or
  * worn on his back. Returns { corner: { leader, kind, colour } }.
  */
@@ -705,6 +706,8 @@ function raiseStandards(fighters, random) {
     }
     let leader = team[0];
     for (const fighter of team) if (Math.hypot(fighter.root[0] - middle[0], fighter.root[1] - middle[1]) < Math.hypot(leader.root[0] - middle[0], leader.root[1] - middle[1])) leader = fighter;
+    // One who led in life leads here, and bears the standard (Joan her banner).
+    leader = team.find((fighter) => fighter.body.inputs.leads) ?? leader;
     standards[corner] = { leader: leader.id };
   }
   // Each flag in its own colour where both sides have one and they differ; else each side's banner, or its corner's.
@@ -713,7 +716,7 @@ function raiseStandards(fighters, random) {
   for (const [corner, entry] of Object.entries(standards)) {
     const leader = fighters[entry.leader];
     const standard = FACTIONS[factionOf(leader.body.inputs)]?.standard;
-    const colour = leader.body.inputs.outfit?.banner ?? (ownColours ? colours[corner] : undefined) ?? WORLD.standard.colours[corner];
+    const colour = leader.body.inputs.standardColour ?? leader.body.inputs.outfit?.banner ?? (ownColours ? colours[corner] : undefined) ?? WORLD.standard.colours[corner];
     Object.assign(entry, { kind: standard?.weapon ?? null, colour });
     if (!standard) continue;
     if (standard.worn) {

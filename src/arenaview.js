@@ -935,3 +935,179 @@ function dropNetView(view, key) {
   });
   view.nets.delete(key);
 }
+
+// ---- Commodus's lion ----------------------------------------------------------------
+
+/**
+ * The lion's scalp worn as a hood (head coordinates: x forward, y up, z to
+ * the left; r the head's radius): the skull over his crown, the upper jaw and
+ * its fangs over his brow, the eyes and ears, the mane round the back and
+ * sides, the hide down over the nape.
+ */
+export function buildLionHead(group, head, r) {
+  const fur = surface(new THREE.Color(head.color).getHex(), { roughness: 1 });
+  const mane = surface(new THREE.Color(head.mane ?? head.color).getHex(), { roughness: 1 });
+  const maneLight = surface(new THREE.Color(head.mane ?? head.color).lerp(new THREE.Color(head.color), 0.5).getHex(), { roughness: 1 });
+  const dark = surface(0x1e1410, { roughness: 0.8 });
+  const bone = surface(0xeee6d2, { roughness: 0.5 });
+  const inked = [];
+  const part = (geometry, material, scale, at, rotation = null) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.scale.set(...scale);
+    mesh.position.set(...at);
+    if (rotation) mesh.rotation.set(...rotation);
+    group.add(mesh);
+    return mesh;
+  };
+  const ball = new THREE.SphereGeometry(1, 16, 12);
+  // The scalp over his crown, and the hide over the back of his head.
+  inked.push(part(new THREE.SphereGeometry(1.4 * r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), fur, [1.08, 0.72, 1.04], [0, 0.24 * r, 0]));
+  const nape = part(new THREE.SphereGeometry(1.4 * r, 18, 12, -Math.PI / 2, Math.PI, Math.PI * 0.35, Math.PI * 0.5), fur.clone(), [1.05, 1, 1.08], [0, 0.05 * r, 0]);
+  nape.material.side = THREE.DoubleSide;
+  // The lion's face over his brow: a long flat-topped head, a heavy brow, a
+  // broad nose ending in a wide dark pad, the whisker pads either side.
+  inked.push(part(ball, fur, [0.95 * r, 0.34 * r, 0.62 * r], [1.15 * r, 0.82 * r, 0]));
+  inked.push(part(ball, fur, [0.72 * r, 0.26 * r, 0.3 * r], [1.62 * r, 0.8 * r, 0]));
+  for (const side of [1, -1]) inked.push(part(ball, fur, [0.42 * r, 0.3 * r, 0.3 * r], [1.72 * r, 0.56 * r, side * 0.2 * r]));
+  inked.push(part(ball, dark, [0.12 * r, 0.12 * r, 0.24 * r], [2.12 * r, 0.76 * r, 0]));
+  part(new THREE.BoxGeometry(0.02 * r, 0.22 * r, 0.03 * r), dark, [1, 1, 1], [2.13 * r, 0.6 * r, 0]);
+  for (const side of [1, -1]) {
+    // The brow ridge, the amber eye under it, its black pupil.
+    inked.push(part(ball, fur, [0.32 * r, 0.12 * r, 0.3 * r], [1.38 * r, 1.08 * r, side * 0.32 * r], [side * 0.25, 0, 0]));
+    part(ball, surface(0xc08a2a, { roughness: 0.4 }), [0.06 * r, 0.06 * r, 0.11 * r], [1.5 * r, 0.98 * r, side * 0.34 * r]);
+    part(ball, dark, [0.03 * r, 0.05 * r, 0.03 * r], [1.56 * r, 0.98 * r, side * 0.34 * r]);
+    // The fangs of the upper jaw over his brow, and the small front teeth.
+    part(new THREE.ConeGeometry(0.065 * r, 0.36 * r, 6), bone, [1, 1, 1], [1.78 * r, 0.28 * r, side * 0.26 * r], [0, 0, Math.PI]);
+    part(new THREE.ConeGeometry(0.035 * r, 0.12 * r, 5), bone, [1, 1, 1], [1.95 * r, 0.38 * r, side * 0.1 * r], [0, 0, Math.PI]);
+    // Small round ears, set back and half lost in the mane.
+    inked.push(part(ball, fur, [0.1 * r, 0.16 * r, 0.15 * r], [0.25 * r, 1.3 * r, side * 0.78 * r]));
+    // The hide hanging down beside his face to the shoulders, the mane on it.
+    const flap = part(ball, fur, [0.55 * r, 1.25 * r, 0.22 * r], [-0.15 * r, -0.55 * r, side * 1.22 * r], [side * 0.12, 0, 0]);
+    inked.push(flap);
+  }
+  // The mane: a full ruff framing his face from the crown down both sides
+  // to his shoulders and round the back, darker toward the outside.
+  const up = new THREE.Vector3(0, 1, 0);
+  const rings = [
+    { count: 16, radius: 1.45, height: 0.75, droop: 0.55, size: 1, material: maneLight },
+    { count: 18, radius: 1.5, height: 0.15, droop: 0.75, size: 1.15, material: mane },
+    { count: 16, radius: 1.42, height: -0.55, droop: 0.95, size: 1.2, material: mane },
+    { count: 12, radius: 1.3, height: -1.25, droop: 1, size: 1.05, material: mane },
+  ];
+  for (const ring of rings) {
+    for (let index = 0; index < ring.count; index += 1) {
+      // From beside the face (azimuth ±0.32π, x forward) round the back.
+      const around = Math.PI * (0.32 + (1.36 * (index + 0.5)) / ring.count);
+      const out = new THREE.Vector3(Math.cos(around), 0, Math.sin(around));
+      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.3 * r * ring.size, 1.05 * r * ring.size, 6), ring.material);
+      tuft.position.set(out.x * ring.radius * r, ring.height * r, out.z * ring.radius * r);
+      tuft.quaternion.setFromUnitVectors(up, out.clone().multiplyScalar(1 - ring.droop * 0.6).add(new THREE.Vector3(0, -ring.droop, 0)).normalize());
+      group.add(tuft);
+    }
+  }
+  ink(inked, 0.004);
+}
+
+/**
+ * The lion's pelt (the collar's coordinates: x forward, y up the spine from
+ * the neck, z to the left): the hide down his back to the buttocks, ragged
+ * at its edge, the mane on at its top; the forelegs brought over the
+ * shoulders and knotted on the breast, the paws hanging; the tail.
+ */
+export function buildLionPelt(body, armor) {
+  const group = new THREE.Group();
+  const fur = surface(new THREE.Color(armor.color).getHex(), { roughness: 1 });
+  const mane = surface(new THREE.Color(armor.lace ?? armor.color).getHex(), { roughness: 1 });
+  const dark = surface(0x1e1410, { roughness: 0.8 });
+  const skin = body.segments.trunk.skinRadius;
+  const trunk = body.lengths.trunk;
+  const girth = (down, out) => {
+    const waist = 1 - 0.14 * Math.sin(Math.min(1, Math.max(0, (down - 0.35) / 0.5)) * Math.PI);
+    return { depth: skin * 0.74 * waist + out, width: skin * 1.08 * waist + out };
+  };
+  // The hide: a sheet round the back and a little round the sides, from the
+  // neck to below the hips, standing off the body as a stiff hide does.
+  const rows = 14;
+  const columns = 18;
+  const positions = [];
+  const indices = [];
+  for (let row = 0; row <= rows; row += 1) {
+    const down = 0.02 + (1.18 * row) / rows;
+    // Over the shoulders it is narrower; below the waist it hangs free and flares.
+    const { depth, width } = girth(Math.min(down, 1), 0.035 + Math.max(0, down - 0.85) * 0.12);
+    const spread = Math.PI * (0.42 + 0.2 * Math.min(1, down / 0.3));
+    for (let column = 0; column <= columns; column += 1) {
+      const angle = -spread + (2 * spread * column) / columns;
+      // Ragged at the foot: each column's hem a little longer or shorter.
+      const hem = row === rows ? 0.06 * trunk * Math.sin(column * 2.7) : 0;
+      positions.push(-depth * Math.cos(angle), -trunk * down - hem, width * Math.sin(angle));
+    }
+  }
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const a = row * (columns + 1) + column;
+      const b = a + columns + 1;
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const hide = new THREE.Mesh(geometry, fur.clone());
+  hide.material.side = THREE.DoubleSide;
+  group.add(hide);
+  ink([hide], 0.003);
+  // The mane where the scalp joins the hide, falling over the top of the back.
+  const top = girth(0.06, 0.05);
+  for (let index = 0; index < 9; index += 1) {
+    const angle = Math.PI * (-0.4 + (0.8 * index) / 8);
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), mane);
+    tuft.scale.set(0.04, 0.11, 0.05);
+    tuft.position.set(-top.depth * Math.cos(angle), -trunk * (0.1 + (index % 2) * 0.04), top.width * Math.sin(angle) * 0.9);
+    group.add(tuft);
+  }
+  /** A leg of the hide: a furred tube along these points, its paw and claws at the end. */
+  const leg = (points, radius) => {
+    const limb = tube(points, radius, fur, 16);
+    const end = new THREE.Vector3(...points[points.length - 1]);
+    const before = new THREE.Vector3(...points[points.length - 2]);
+    const along = end.clone().sub(before).normalize();
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.5, 10, 8), fur);
+    paw.position.copy(end).addScaledVector(along, radius * 0.8);
+    paw.scale.set(1.1, 0.8, 1.1);
+    group.add(limb, paw);
+    ink([limb, paw], 0.0025);
+    for (let claw = -1; claw <= 1; claw += 1) {
+      const nail = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.22, radius * 0.9, 5), dark);
+      nail.position.copy(paw.position).addScaledVector(along, radius * 1.3).add(new THREE.Vector3(0, 0, claw * radius * 0.7));
+      nail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
+      group.add(nail);
+    }
+  };
+  // The forelegs, over the shoulders to a knot on the breast, the paws hanging below it.
+  const shoulder = body.lengths.shoulderSpan / 2;
+  const breast = girth(0.24, 0.04);
+  for (const side of [1, -1]) {
+    group.add(tube([[-0.02, -0.01, side * shoulder * 0.7], [breast.depth * 0.6, -trunk * 0.05, side * breast.width * 0.72], [breast.depth * 1.0, -trunk * 0.16, side * 0.06], [breast.depth * 1.06, -trunk * 0.22, side * 0.015]], 0.026, fur, 18));
+    leg([[breast.depth * 1.08, -trunk * 0.24, side * 0.02], [breast.depth * 1.1, -trunk * 0.32, side * 0.05], [breast.depth * 1.06, -trunk * 0.4, side * 0.06]], 0.022);
+  }
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), fur);
+  knot.scale.set(0.8, 1, 1.3);
+  knot.position.set(breast.depth * 1.08, -trunk * 0.22, 0);
+  group.add(knot);
+  ink([knot], 0.003);
+  // The hind legs hanging at the hide's lower corners.
+  const low = girth(1, 0.12);
+  for (const side of [1, -1]) {
+    leg([[-low.depth * 0.25, -trunk * 1.12, side * low.width * 0.95], [-low.depth * 0.2, -trunk * 1.3, side * low.width * 1.0], [-low.depth * 0.1, -trunk * 1.45, side * low.width * 0.98]], 0.024);
+  }
+  // The tail from the middle of the hem, a dark tuft at its end.
+  const tail = [[-low.depth * 1.0, -trunk * 1.16, 0], [-low.depth * 1.15, -trunk * 1.4, 0.01], [-low.depth * 1.05, -trunk * 1.62, -0.02], [-low.depth * 0.95, -trunk * 1.78, 0]];
+  group.add(tube(tail, 0.012, fur, 16));
+  const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.09, 7), mane);
+  tassel.rotation.z = Math.PI;
+  tassel.position.set(...tail[tail.length - 1]).add(new THREE.Vector3(0, -0.04, 0));
+  group.add(tassel);
+  return group;
+}

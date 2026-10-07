@@ -5,7 +5,7 @@
 import { Dangle } from './dangle.js';
 import { heelLift, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
-import { buildArenaHelm } from './arenaview.js';
+import { buildArenaHelm, buildLionHead } from './arenaview.js';
 
 export const WARDROBE = {
   // Steel: how metal and how polished; the reflection map is a gradient
@@ -362,6 +362,35 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       // A gladiator's helmet of his kind, in detail (arenaview.js).
       buildArenaHelm(group, head, r, metal(steel, color));
       break;
+    case 'lionHead':
+      // Commodus's lion scalp (arenaview.js); his beard shows below its jaw.
+      buildLionHead(group, head, r);
+      hidesHair = false;
+      break;
+    case 'guanYuCap': {
+      // Guan Yu's green cap: soft cloth over the crown and the topknot, a
+      // gold ornament at the front, two ties hanging down behind.
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), cloth);
+      crown.scale.set(1.04, 0.92, 1.02);
+      crown.position.y = 0.1 * r;
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.48 * r, 14, 10), cloth);
+      knot.position.set(-0.55 * r, 0.86 * r, 0);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(1.17 * r, 1.19 * r, 0.2 * r, 24, 1, true), surface(new THREE.Color(color).multiplyScalar(0.7).getHex()));
+      band.position.y = 0.14 * r;
+      const jewel = new THREE.Mesh(new THREE.SphereGeometry(0.14 * r, 10, 8), surface(new THREE.Color(head.gold ?? '#d6a743').getHex(), { roughness: 0.35 }));
+      jewel.scale.set(0.5, 1, 1.3);
+      jewel.position.set(1.12 * r, 0.42 * r, 0);
+      group.add(crown, knot, band, jewel);
+      for (const side of [1, -1]) {
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.03 * r, 1.4 * r, 0.26 * r), cloth);
+        tie.position.set(-1.12 * r, -0.4 * r, side * 0.22 * r);
+        tie.rotation.set(side * 0.12, 0, -0.18);
+        group.add(tie);
+      }
+      for (const piece of [crown, knot, jewel]) piece.add(outlineFor(piece, 0.003));
+      hidesHair = false;
+      break;
+    }
     case 'gladiatorHelm':
       buildGladiatorHelm(group, head, r, steel, color);
       break;
@@ -1303,9 +1332,10 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       }
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
-        const panel = new Dangle(collar, [facing * 0.17 * scale, -0.05 * scale, 0], [facing * 0.12, -1, 0], 0.75 * scale, { sag: 0.4, damping: 0.25 });
-        const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.012 * scale, 0.75 * scale, 0.36 * scale), surface(color));
-        cloth.position.y = -0.375 * scale;
+        const length = 0.75 * scale;
+        const panel = new Dangle(collar, [facing * 0.17 * scale, -0.05 * scale, 0], [facing * 0.12, -1, 0], length, { sag: 0.4, damping: 0.25 });
+        const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.012 * scale, length, 0.36 * scale), surface(color));
+        cloth.position.y = -length / 2;
         panel.group.add(cloth);
         if (extra.emblem) {
           const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.08 * scale, 3), surface(extra.emblem));

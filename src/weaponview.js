@@ -698,6 +698,84 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(notch, collar, tassel, spike);
       break;
     }
+    case 'qinglong': {
+      // The Green Dragon Crescent Blade: a dark green shaft bound in gold, a
+      // gilt dragon's head at the blade whose jaws hold it, a broad crescent
+      // blade with a spine notch and a curl at its back, a red tassel.
+      const bladeStart = spec.strikeFrom - 0.05;
+      const bladeLength = spec.length - bladeStart;
+      const green = surface(0x1f4a2c, { roughness: 0.5 });
+      const gilt = steelMaterial(envMap, { vertexColors: false, color: 0xc9a24a, roughness: 0.3 });
+      group.add(cylinder(0.018, 0.02, -spec.handle, bladeStart + 0.02, green, 10));
+      for (const y of [-spec.handle + 0.04, bladeStart * 0.3, bladeStart * 0.62, bladeStart - 0.16]) group.add(cylinder(0.021, 0.021, y - 0.012, y + 0.012, gilt, 10));
+      const bend = (y) => -0.1 * ((y - bladeStart) / bladeLength) ** 1.5;
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.1, 0.011, 0.22, bend), steel));
+      const notch = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 6), steel);
+      notch.position.set(0, bladeStart + bladeLength * 0.42, -0.06);
+      notch.rotation.x = -Math.PI / 2;
+      // The curl on the blade's back, near its foot.
+      const curl = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.007, 6, 14, Math.PI * 1.4), steel);
+      curl.rotation.y = Math.PI / 2;
+      curl.position.set(0, bladeStart + 0.1, -0.05);
+      // The dragon's head: a snout along the blade's foot, open jaws, eyes, a horn back.
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), gilt);
+      skull.scale.set(0.034, 0.06, 0.04);
+      skull.position.y = bladeStart - 0.02;
+      const jaw = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.07, 8), gilt);
+      jaw.position.set(0, bladeStart + 0.03, 0.025);
+      jaw.rotation.x = 0.5;
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.07, 6), gilt);
+      horn.position.set(0, bladeStart - 0.05, -0.035);
+      horn.rotation.x = -2.4;
+      for (const side of [1, -1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), surface(0xb3161b));
+        eye.position.set(side * 0.03, bladeStart - 0.005, 0.02);
+        group.add(eye);
+      }
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.2, 10), surface(0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = bladeStart - 0.2;
+      tassel.rotation.x = Math.PI;
+      const spike = cylinder(0.002, 0.018, -spec.handle - 0.12, -spec.handle + 0.01, gilt, 8);
+      group.add(notch, curl, skull, jaw, horn, tassel, spike);
+      break;
+    }
+    case 'armingSword': {
+      // A stiff, tapering blade with a fuller, a straight cross, a leather
+      // grip, a wheel pommel.
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.048, 0.008, 0.2), steel));
+      const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.003, spec.length * 0.55, 0.01), dark);
+      fuller.position.set(0.0045, 0.03 + spec.length * 0.3, 0);
+      fuller.userData.blade = true;
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.22), steel);
+      cross.position.y = 0.02;
+      const pommel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.016, 16), steel);
+      pommel.rotation.x = Math.PI / 2;
+      pommel.position.y = -spec.handle - 0.012;
+      group.add(fuller, cross, pommel, cylinder(0.014, 0.015, -spec.handle, 0.012, leather));
+      break;
+    }
+    case 'clava': {
+      // Hercules's club: a length of wood swelling to its head, the stubs of
+      // branches cut off along it, its butt bound with a cord.
+      const oak = surface(0x5a3a1e, { roughness: 0.85 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius, spec.radius * 0.42, spec.length + spec.handle, 9, 4), oak);
+      body.position.y = (spec.length - spec.handle) / 2;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(spec.radius * 1.05, 10, 8), oak);
+      head.position.y = spec.length - 0.01;
+      group.add(body, head);
+      for (let knot = 0; knot < 9; knot += 1) {
+        const y = spec.strikeFrom * 0.4 + ((spec.length - spec.strikeFrom * 0.4) * knot) / 9;
+        const across = spec.radius * 0.42 + ((spec.radius * 0.58) * (y + spec.handle)) / (spec.length + spec.handle);
+        const angle = knot * 2.4;
+        const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.013, 0.028, 6), oak);
+        stub.position.set(Math.cos(angle) * across, y, Math.sin(angle) * across);
+        stub.lookAt(new THREE.Vector3(Math.cos(angle) * 2, y, Math.sin(angle) * 2));
+        stub.rotateX(Math.PI / 2);
+        group.add(stub);
+      }
+      for (let turn = 0; turn < 4; turn += 1) group.add(cylinder(spec.radius * 0.48, spec.radius * 0.48, -spec.handle + 0.02 + turn * 0.025, -spec.handle + 0.034 + turn * 0.025, leather, 9));
+      break;
+    }
     case 'shortSword':
     case 'gladius': {
       group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.055, 0.009, 0.12), steel));
