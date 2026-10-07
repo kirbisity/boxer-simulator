@@ -255,13 +255,14 @@ export const PRESETS = {
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Guan Yu (d. 220), the Three Kingdoms general of the Romance: "nine chi
-  // tall", a face the red of a ripe jujube, a beard two chi long, a green
-  // robe over his armour, the Green Dragon Crescent Blade. A legend, like
-  // the Iron Pagoda: tall and heavy here, not nine chi.
+  // tall", a face the colour of a ripe jujube (here a ruddy tan, a soldier's
+  // weathered face, not the opera's red), a beard two chi long, a green robe
+  // over his armour, the Green Dragon Crescent Blade. A legend, like the Iron
+  // Pagoda: tall and heavy here, not nine chi.
   guanYu: {
     name: 'Guan Yu', style: 'guanYu', sex: 'male', heightCm: 187, frame: 'large', age: 45, exercise: 0.8, calories: 4500,
     outfit: { kind: 'guanYu', design: 0 }, accessories: [],
-    look: { skinTone: 'lightTan', faceColor: '#b23a2a', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'longBeard', eyeColor: 'brown' },
+    look: { skinTone: 'tan', faceColor: '#b06c48', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'longBeard', eyeColor: 'brown' },
   },
   // The steppe of the 1400s: Esen Taishi of the Oirats, who captured the Ming
   // emperor at Tumu (1449); Mandukhai Khatun, who led the Mongols in armour in
