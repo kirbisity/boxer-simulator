@@ -303,6 +303,65 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(muzzle);
       break;
     }
+    case 'duellingPistol': {
+      // A percussion duelling pistol of about 1840 (+z is up, y toward the
+      // muzzle): a long octagonal barrel, browned, with a silver blade
+      // foresight and a notched breech; a walnut half-stock to near the
+      // muzzle with a silver nose cap; the ramrod in pipes beneath; the back-
+      // action lock on the right, its hammer cocked over the nipple; a
+      // scrolled trigger guard with a finger spur; the rounded, flared
+      // "saw-handle" grip, chequered, with a silver butt cap.
+      const browned = steelMaterial(envMap, { vertexColors: false, color: 0x3d2e24, roughness: 0.45 });
+      const blued = steelMaterial(envMap, { vertexColors: false, color: 0x2a2e38, roughness: 0.35 });
+      const silver = steelMaterial(envMap, { vertexColors: false, color: 0xcfd2d6, roughness: 0.25 });
+      const walnut = surface(0x4a2a16, { roughness: 0.55 });
+      const chequer = surface(0x3a2010, { roughness: 0.85 });
+      const barrelTop = 0.05;
+      const barrel = cylinder(0.0105, 0.0115, -0.01, spec.length, browned, 8);
+      barrel.position.z = barrelTop - 0.006;
+      barrel.rotation.y = Math.PI / 8;
+      const bore = cylinder(0.0065, 0.0065, spec.length - 0.004, spec.length + 0.001, surface(0x050506, { roughness: 1 }), 10);
+      bore.position.z = barrelTop - 0.006;
+      // The half-stock under the barrel, to a nose cap short of the muzzle.
+      const fore = box([0.022, spec.length - 0.07, 0.022], [0, (spec.length - 0.07) / 2 - 0.01, barrelTop - 0.024], walnut);
+      const noseCap = box([0.023, 0.012, 0.023], [0, spec.length - 0.074, barrelTop - 0.024], silver);
+      const ramrod = cylinder(0.0035, 0.0035, 0.02, spec.length - 0.02, walnut, 6);
+      ramrod.position.z = barrelTop - 0.04;
+      const ramrodTip = cylinder(0.005, 0.005, spec.length - 0.03, spec.length - 0.018, silver, 8);
+      ramrodTip.position.z = barrelTop - 0.04;
+      const pipe = cylinder(0.006, 0.006, spec.length * 0.55, spec.length * 0.55 + 0.012, silver, 8);
+      pipe.position.z = barrelTop - 0.04;
+      // The lock on the right (+x): its plate, the hammer cocked back, the nipple on the breech.
+      const lockPlate = box([0.004, 0.07, 0.022], [0.013, -0.005, barrelTop - 0.022], blued);
+      const hammer = box([0.006, 0.012, 0.032], [0.012, -0.03, barrelTop + 0.004], blued, -0.6);
+      const spur = box([0.006, 0.014, 0.008], [0.012, -0.046, barrelTop + 0.018], blued, 0.4);
+      const nipple = cylinder(0.003, 0.004, -0.004, 0.006, blued, 6);
+      nipple.position.set(0.009, 0, barrelTop + 0.004);
+      nipple.rotation.z = -0.6;
+      const cap = cylinder(0.0042, 0.0042, 0.002, 0.007, surface(0xb87333, { roughness: 0.35 }), 8);
+      cap.position.set(0.009, 0, barrelTop + 0.004);
+      cap.rotation.z = -0.6;
+      // Sights: a silver blade at the muzzle, a notch at the breech.
+      const foresight = box([0.002, 0.008, 0.006], [0, spec.length - 0.012, barrelTop + 0.007], silver);
+      const notch = box([0.012, 0.006, 0.006], [0, -0.004, barrelTop + 0.007], blued);
+      // The trigger guard, scrolled, with its spur; the hair trigger inside.
+      const guard = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0028, 6, 14, Math.PI * 1.25), silver);
+      guard.rotation.set(0, Math.PI / 2, Math.PI * 0.95);
+      guard.position.set(0, 0.012, barrelTop - 0.052);
+      const fingerSpur = box([0.004, 0.012, 0.004], [0, -0.012, barrelTop - 0.07], silver, 0.5);
+      const trigger = box([0.003, 0.004, 0.018], [0, 0.008, barrelTop - 0.048], blued, 0.3);
+      // The grip: down and back from the breech, flaring to a rounded butt.
+      const grip = box([0.026, 0.035, 0.1], [0, -0.035, barrelTop - 0.072], walnut, -0.55);
+      const chequering = box([0.0275, 0.024, 0.055], [0, -0.04, barrelTop - 0.078], chequer, -0.55);
+      const butt = new THREE.Mesh(new THREE.SphereGeometry(0.019, 12, 10), walnut);
+      butt.scale.set(0.75, 1.15, 0.9);
+      butt.position.set(0, -0.062, barrelTop - 0.118);
+      const buttCap = new THREE.Mesh(new THREE.SphereGeometry(0.0145, 10, 8, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.45), silver);
+      buttCap.position.set(0, -0.066, barrelTop - 0.122);
+      buttCap.rotation.x = 0.5;
+      group.add(barrel, bore, fore, noseCap, ramrod, ramrodTip, pipe, lockPlate, hammer, spur, nipple, cap, foresight, notch, guard, fingerSpur, trigger, grip, chequering, butt, buttCap);
+      break;
+    }
     case 'rifle': {
       // An AR-15 carbine: upper and lower receiver, a free-float handguard,
       // the barrel and flash hider, a curved 30-round magazine, the pistol

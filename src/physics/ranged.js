@@ -51,9 +51,10 @@ export function raisedAim(fighter, mark) {
 // local; the barrel straight up) while the support hand works the ramrod
 // down the muzzle (`ramFrom` + `ramStroke` × a stroke, m along the barrel,
 // `ramPerSecond` strokes a second).
+// A muzzle-loading pistol is loaded held up before the chest (`pistolReloadHand`).
 // A crossbow is spanned nose-down before him (`spanHand`, along `spanDir`),
 // the string drawn from `spanFrom` m down the tiller up by `spanStroke` m.
-export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4, spanHand: [0.16, 0.5, -0.04], spanDir: [0.35, -1, 0.02], spanFrom: 0.45, spanStroke: 0.3 };
+export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4, spanHand: [0.16, 0.5, -0.04], spanDir: [0.35, -1, 0.02], spanFrom: 0.45, spanStroke: 0.3, pistolReloadHand: [0.2, 0.6, 0.02] };
 
 export let referenceSegments = null;
 

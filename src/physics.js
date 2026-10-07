@@ -456,9 +456,11 @@ function weaponIntent(world, fighter, intent) {
       target = { hand: vec.scale(LONG_GUN.spanHand, H), dir: vec.normalize(LONG_GUN.spanDir) };
       intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.spanFrom - LONG_GUN.spanStroke * stroke));
     } else {
-      // Reloading: the gun upright, the support hand ramming the ball home.
-      target = { hand: vec.scale(LONG_GUN.reloadHand, H), dir: [0.08, 1, 0] };
-      intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.ramFrom + LONG_GUN.ramStroke * stroke));
+      // Reloading: the gun upright, the support hand ramming the ball home (a pistol held up before the chest, its short rod).
+      const pistol = weapon.spec.hands === 'one';
+      target = { hand: vec.scale(pistol ? LONG_GUN.pistolReloadHand : LONG_GUN.reloadHand, H), dir: [0.08, 1, 0] };
+      const rod = pistol ? weapon.spec.length / LONG_GUN.ramFrom : 1;
+      intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, (LONG_GUN.ramFrom + LONG_GUN.ramStroke * stroke) * rod));
     }
     intent[`${main}Hand`] = target.hand;
     intent.bladeDir = target.dir;
