@@ -330,6 +330,13 @@ export const ARMOR_KINDS = {
   retiarius: {
     belt: BALTEUS, upperArm: { l: [[-0.32, 0.28, 2.0, 'steel'], [0.2, 1.02, 1.3, MANICA]] }, forearm: { l: [-0.06, -0.02, 1.3, MANICA] },
   },
+  // Maximus: the leather under his harness (the detail is arenaview's
+  // buildHarness): the cuirass's layers, the left shoulder guard, the bracers.
+  maximus: {
+    trunk: [-0.06, 0.96, 1.13, { rows: ['armor', 'armor', 'lace'] }],
+    upperArm: { l: [[-0.32, 0.22, 1.7, { rows: ['armor', 'lace'] }], [0.15, 0.45, 1.42, { rows: ['armor', 'lace'] }]] },
+    forearm: [0.42, -0.02, 1.24, { rows: ['armor', 'lace'] }],
+  },
   // Scissor: a shirt of bronze scales to the hips, the manica, the left
   // forearm in a steel tube (its crescent blade is the scissores, carried as
   // a shield), greaves on both shins.

@@ -1059,6 +1059,24 @@ export const STYLES = {
     pressure: 0.05,
     rangeInside: 0.06,
   },
+  // Maximus: a legion's swordsman in the arena, no shield: the gladius
+  // thrust and cut, a sword-and-dagger fighter's footwork, the blade to parry.
+  maximus: {
+    label: 'Maximus', weapon: 'gladius', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.9, burst: 0.7, mobility: 0.55 },
+    stance: { blade: 0.5, crouch: 0.08, width: 1.2, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.12, 0.62, -0.14], dir: [1, 0.25, 0.05] },
+    idle: { bounce: 0.25, sway: 0.5, rock: 0.3 },
+    attacks: { gladiusThrust: 0.45, gladiusCut: 0.4, forehand: 0.15 },
+    combos: { 'gladiusCut gladiusThrust': 0.5, 'forehand gladiusThrust': 0.3, 'gladiusThrust gladiusCut': 0.2 },
+    comboChance: 0.5,
+    tempo: 1.25,
+    defences: { weaponBlock: 0.55, stepBack: 0.3, slip: 0.15 },
+    defendChance: 0.74,
+    headMovement: 0.15,
+    plans: { pressure: 1.3, counter: 1.3, outboxer: 0.8, brawler: 0.4 },
+    pressure: 0.3,
+  },
   // Scissor: in scale and a smooth helmet, the left arm cased in a steel
   // tube ending in a crescent blade that parries and slashes, the gladius in the right.
   scissor: {

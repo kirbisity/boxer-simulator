@@ -499,6 +499,21 @@ export const OUTFITS = {
     courage: 0.25,
     designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('thraex', look, { kind: 'arenaHelm', style: 'thraex', plume: look.plume, feather: look.plume }, { barefoot: true })),
   },
+  // Maximus: a cuirass of dark leather, layered and strapped, buckled at
+  // the shoulders and across the chest; a leather guard on the left
+  // shoulder; three straps for a belt over studded hanging strips
+  // (pteruges); a blue-grey tunic to the thigh; leather bracers. Leather
+  // turns a cut, less a point, and a blow hardly at all; the head bare.
+  maximus: {
+    faction: 'gladiators',
+    label: 'Gladiator — the general', movement: 'good', fists: 'bare',
+    extraMass: 0.12,
+    protection: { blunt: 0.3, cut: 0.6, pierce: 0.42, bullet: { head: 0, torso: 0.1, limb: 0 }, regions: { head: ARENA.bare, limb: ARENA.bare, lUpperArm: { blunt: 0.35, cut: 0.65, pierce: 0.45 }, Forearm: { blunt: 0.25, cut: 0.5, pierce: 0.3 }, Thigh: { blunt: 0.1, cut: 0.25, pierce: 0.1 } } },
+    courage: 0.45,
+    designs: [
+      { label: 'Leather and blue-grey', special: true, top: { kind: 'tunic', color: '#6c7a87' }, bottom: { kind: 'loincloth', color: '#8e9aa6' }, armor: { kind: 'maximus', color: '#2b2420', lace: '#3d3127', gold: '#b98a3e' }, feet: { kind: 'sandal', color: '#2e2016' } },
+    ],
+  },
   // The scissor: a coat of bronze scales to the hips, the smooth helmet, the
   // left arm cased in the steel tube of the scissores, a manica on the sword
   // arm, greaves on both shins; the thighs bare.

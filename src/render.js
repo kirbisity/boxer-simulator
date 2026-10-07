@@ -12,7 +12,7 @@ import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions } from './outfits.js';
 import { WEAPONS } from './weapons.js';
-import { buildScaleShirt, netCord } from './arenaview.js';
+import { buildHarness, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
@@ -2112,6 +2112,11 @@ function detailedView(view, fighter, simple) {
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   // The scissor's coat of scales, plate by plate over the painted shirt.
+  // Maximus's harness: the straps, buckles, plates and belt over the loft.
+  if (dress.armor?.kind === 'maximus') {
+    collar.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'chest'));
+    hips.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'hips'));
+  }
   if (dress.armor?.kind === 'scissor') {
     collar.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'hips'));

@@ -473,6 +473,119 @@ export function buildScaleShirt(body, colorHex, envMap, steelMaterial, part) {
   return mesh;
 }
 
+// ---- Maximus's harness ------------------------------------------------------------
+
+/**
+ * The general's leather harness, piece by piece over the loft beneath it:
+ * on the chest bone (`part` 'chest', collar coordinates: x forward, y up the
+ * spine from the neck, z left) a moulded breast and back plate, the layered
+ * belly bands, the straps over both shoulders and the buckled strap across
+ * the chest; on the pelvis ('hips') the three-strap belt with its brass
+ * buckles and the studded leather strips (pteruges) hanging over the tunic.
+ */
+export function buildHarness(body, armor, envMap, steelMaterial, part) {
+  const group = new THREE.Group();
+  const leather = surface(new THREE.Color(armor.color).getHex(), { roughness: 0.85 });
+  const edge = surface(new THREE.Color(armor.lace ?? armor.color).getHex(), { roughness: 0.9 });
+  const brass = steelMaterial(envMap, { vertexColors: false, color: new THREE.Color(armor.gold ?? '#b98a3e').getHex(), roughness: 0.32 });
+  const skin = body.segments.trunk.skinRadius;
+  const trunk = body.lengths.trunk;
+  // The trunk's half-depth (x) and half-width (z) over the loft, from the collar down.
+  const girth = (down, out = 0.02) => {
+    const waist = 1 - 0.14 * Math.sin(Math.min(1, Math.max(0, (down - 0.35) / 0.5)) * Math.PI);
+    return { depth: skin * 0.74 * waist + out, width: skin * 1.08 * waist + out };
+  };
+  /** A band of leather round the trunk at `y`, `height` tall, with a stitched edge. */
+  const band = (y, height, girthAt, material) => {
+    const { depth, width } = girthAt;
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, height, 36, 1, true), material);
+    ring.material = material.clone();
+    ring.material.side = THREE.DoubleSide;
+    ring.scale.set(depth, 1, width);
+    ring.position.y = y;
+    const seam = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 4, 36), edge);
+    seam.rotation.x = Math.PI / 2;
+    seam.scale.set(depth + 0.002, width + 0.002, 0.08);
+    seam.position.y = y - height / 2;
+    group.add(ring, seam);
+  };
+  /** A brass buckle: frame and tongue, facing `normal` at `at`. */
+  const buckle = (at, normal, size = 0.028) => {
+    const frame = new THREE.Mesh(new THREE.TorusGeometry(size * 0.6, size * 0.16, 4, 4), brass);
+    frame.position.set(...at);
+    frame.lookAt(frame.position.clone().add(normal));
+    frame.rotation.z += Math.PI / 4;
+    const tongue = new THREE.Mesh(new THREE.BoxGeometry(size * 0.12, size * 0.9, size * 0.12), brass);
+    tongue.position.copy(frame.position);
+    tongue.quaternion.copy(frame.quaternion);
+    group.add(frame, tongue);
+  };
+  if (part === 'chest') {
+    // The breast and back plates: moulded leather over the chest and shoulder blades.
+    for (const [start, sign] of [[Math.PI * 0.55, 1], [-Math.PI * 0.45, -1]]) {
+      const plate = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 12, start, Math.PI * 0.9, Math.PI * 0.18, Math.PI * 0.56), leather);
+      plate.material = leather.clone();
+      plate.material.side = THREE.DoubleSide;
+      const { depth, width } = girth(0.3, 0.026);
+      plate.scale.set(depth * 1.04, trunk * 0.36, width * 1.02);
+      plate.position.y = -trunk * 0.28;
+      group.add(plate);
+      ink([plate], 0.003);
+      // A ridge down the middle of each.
+      const ridge = tube([[sign * depth * 1.07, -trunk * 0.12, 0], [sign * depth * 1.1, -trunk * 0.3, 0], [sign * depth * 1.05, -trunk * 0.46, 0]], 0.006, edge, 12);
+      group.add(ridge);
+    }
+    // The belly: layered bands, each a little proud of the one below.
+    for (let row = 0; row < 5; row += 1) {
+      const down = 0.5 + row * 0.085;
+      band(-trunk * down, trunk * 0.08, girth(down, 0.024 + (4 - row) * 0.003), leather);
+    }
+    // The straps over the shoulders, front to back, and their buckles on the breast.
+    const shoulder = body.lengths.shoulderSpan / 2;
+    for (const side of [1, -1]) {
+      const { depth } = girth(0.15, 0.03);
+      const strap = tube([[depth * 1.05, -trunk * 0.22, side * shoulder * 0.42], [depth * 0.7, -0.01, side * shoulder * 0.55], [0, 0.035, side * shoulder * 0.6], [-depth * 0.7, -0.01, side * shoulder * 0.55], [-depth * 1.05, -trunk * 0.22, side * shoulder * 0.42]], 0.011, leather, 30);
+      strap.scale.set(1, 1, 1);
+      group.add(strap);
+      buckle([depth * 1.12, -trunk * 0.2, side * shoulder * 0.42], new THREE.Vector3(1, 0, 0));
+    }
+    // The strap across the chest, left shoulder to right side, its buckle at the breastbone.
+    const { depth } = girth(0.3, 0.034);
+    group.add(tube([[depth * 0.95, -trunk * 0.12, shoulder * 0.45], [depth * 1.1, -trunk * 0.3, 0], [depth * 0.95, -trunk * 0.5, -shoulder * 0.5]], 0.013, leather, 20));
+    buckle([depth * 1.16, -trunk * 0.3, 0], new THREE.Vector3(1, 0, 0), 0.034);
+    return group;
+  }
+  // The hips: the three-strap belt, a buckle each at the front, the strips hanging below.
+  const hip = (out) => ({ depth: skin * 0.8 + out, width: skin * 1.12 + out });
+  for (let strap = 0; strap < 3; strap += 1) {
+    const y = 0.075 - strap * 0.034;
+    band(y, 0.03, hip(0.03 + strap * 0.002), leather);
+    const { depth, width } = hip(0.034);
+    const angle = 0.35;
+    buckle([Math.cos(angle) * depth, y, Math.sin(angle) * width], new THREE.Vector3(Math.cos(angle) / depth, 0, Math.sin(angle) / width).normalize(), 0.03);
+  }
+  // Pteruges: studded leather strips round the front and sides.
+  for (let strip = 0; strip < 9; strip += 1) {
+    const angle = (strip - 4) * 0.3;
+    const { depth, width } = hip(0.04);
+    const normal = new THREE.Vector3(Math.cos(angle) / depth, 0, Math.sin(angle) / width).normalize();
+    const length = strip % 2 ? 0.26 : 0.3;
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.055, length, 0.007), leather);
+    const at = new THREE.Vector3(Math.cos(angle) * depth, 0.0 - length / 2, Math.sin(angle) * width);
+    flap.position.copy(at);
+    flap.lookAt(at.clone().add(normal));
+    flap.rotateX(-0.08);
+    group.add(flap);
+    ink([flap], 0.002);
+    for (const down of [0.55, 0.85]) {
+      const stud = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), brass);
+      stud.position.copy(at).add(new THREE.Vector3(0, length / 2 - length * down, 0)).addScaledVector(normal, 0.006);
+      group.add(stud);
+    }
+  }
+  return group;
+}
+
 // ---- Shields ----------------------------------------------------------------------
 
 /**
