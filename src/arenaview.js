@@ -7,6 +7,7 @@
 import { P } from './body.js';
 import { point } from './physics.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
+import { holdingHand, layCloth, makeCloth, NET_DESIGNS, pinCloth, shedCloth, steerCloth, stepCloth, tangleCloth } from './netcloth.js';
 import { NET } from './weapons.js';
 
 const DARK = 0x0c0b09;
@@ -777,6 +778,9 @@ export function buildArenaWeapon(kind, spec, envMap, steelMaterial) {
 }
 
 // ---- The net ----------------------------------------------------------------------
+// Each net is a soft body (netcloth.js) stepped as it is drawn: hung from the
+// retiarius's hand, opened in the throw, fouled on the man it catches, slid
+// off him into the sand. NET.design picks the weave and how it is drawn.
 
 let netMaterial = null;
 /** The net's cord, drawn as lines (its program kept compiled by the scene's warmers). */
@@ -785,64 +789,217 @@ export function netCord() {
   return netMaterial;
 }
 
-/** A net's mesh by its state: a bundle in the hand, a dome in flight, a shroud on a man, a heap on the floor. */
-function netMesh(kind) {
-  const shape = kind === 'held' ? new THREE.IcosahedronGeometry(1, 1)
-    : kind === 'wrapped' ? new THREE.SphereGeometry(1, 12, 9)
-      : new THREE.SphereGeometry(1, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.45);
-  const mesh = new THREE.LineSegments(new THREE.WireframeGeometry(shape), netCord());
-  shape.dispose();
-  mesh.userData.kind = kind;
+// Thrown nets open from a bundle this fraction of their size.
+const NET_GATHER = 0.22;
+const LEAD = 0x5d5f63;
+const UP = new THREE.Vector3(0, 1, 0);
+const scratch = { matrix: new THREE.Matrix4(), position: new THREE.Vector3(), direction: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3() };
+
+/** A net's mesh pattern for the sheet weave: square holes in a cord, as an alpha map. */
+function meshPattern() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, 64, 64);
+  context.strokeStyle = '#fff';
+  context.lineWidth = 7;
+  context.beginPath();
+  context.moveTo(0, 0); context.lineTo(64, 64); context.moveTo(64, 0); context.lineTo(0, 64);
+  context.stroke();
+  context.fillStyle = '#fff';
+  for (const [x, y] of [[0, 0], [64, 0], [0, 64], [64, 64], [32, 32]]) context.fillRect(x - 5, y - 5, 10, 10);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/** Instanced rods along `pairs` of knots (cords) of radius `radius`. */
+function rods(count, radius, color) {
+  const mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 5, 1, true), surface(color, { roughness: 0.9 }), count);
+  mesh.userData.radius = radius;
   return mesh;
 }
 
-/** Draw every net: those thrown (flying, on a man, on the floor) and those still in a retiarius's hand. */
-export function updateNets(view, world) {
-  const drawn = view.nets ?? (view.nets = new Map());
-  const live = new Set();
-  const show = (key, kind) => {
-    live.add(key);
-    let mesh = drawn.get(key);
-    if (mesh && mesh.userData.kind !== kind) {
-      view.scene.remove(mesh);
-      disposeObject(mesh);
-      mesh = null;
-    }
-    if (!mesh) {
-      mesh = netMesh(kind);
-      view.scene.add(mesh);
-      drawn.set(key, mesh);
-    }
-    return mesh;
-  };
-  for (const net of world.nets ?? []) {
-    if (net.state === 'ground' && net.age > NET.lies) continue;
-    const kind = net.state === 'wrapped' ? 'wrapped' : net.state === 'flying' ? 'open' : 'ground';
-    const mesh = show(`net:${net.id}`, kind);
-    mesh.position.set(net.x[0], net.x[1], net.x[2]);
-    if (kind === 'open') {
-      const open = NET.radius * Math.min(1, 0.25 + net.age / NET.open);
-      mesh.scale.set(open, open * 0.5, open);
-      mesh.rotation.set(Math.PI, net.age * 4, 0);
-    } else if (kind === 'wrapped') {
-      mesh.scale.set(0.34, 0.5, 0.34);
-      mesh.rotation.set(0, net.id, 0);
-    } else {
-      mesh.scale.set(NET.radius * 0.8, 0.06, NET.radius * 0.8);
-      mesh.rotation.set(0, net.id, 0);
-    }
+/** Instanced balls at knots (beads, sinkers). */
+function balls(count, color, roughness = 0.9) {
+  return new THREE.InstancedMesh(new THREE.SphereGeometry(1, 7, 5), surface(color, { roughness }), count);
+}
+
+/** A net's drawing for its cloth: its parts and how each follows the knots. */
+function buildNetView(cloth) {
+  const design = cloth.design;
+  const { cords, rim, faces, rest } = cloth.woven;
+  const group = new THREE.Group();
+  const parts = { group, cloth };
+  if (design.look === 'lines') {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(cords.length * 6), 3));
+    parts.lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: design.color }));
+    group.add(parts.lines);
   }
+  if (design.look === 'tubes' || design.look === 'knotted') {
+    parts.cords = { mesh: rods(cords.length, design.cord, design.color), pairs: cords };
+    group.add(parts.cords.mesh);
+  }
+  if (design.look === 'knotted' || design.look === 'tubes') {
+    parts.knots = { mesh: balls(rest.length, design.color), size: design.knot * (design.look === 'tubes' ? 0.45 : 0.5), all: true };
+    group.add(parts.knots.mesh);
+  }
+  if (design.look === 'sheet') {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(rest.length * 3), 3));
+    const repeat = 1 / 0.045;
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(rest.flatMap(([u, v]) => [u * repeat, v * repeat]), 2));
+    geometry.setIndex(faces.flat());
+    const material = new THREE.MeshLambertMaterial({ color: design.color, alphaMap: meshPattern(), alphaTest: 0.5, side: THREE.DoubleSide });
+    parts.sheet = new THREE.Mesh(geometry, material);
+    group.add(parts.sheet);
+    const rimSet = new Set(rim);
+    const rimCords = cords.filter(([a, b]) => rimSet.has(a) && rimSet.has(b));
+    parts.cords = { mesh: rods(rimCords.length, design.cord, design.color), pairs: rimCords };
+    group.add(parts.cords.mesh);
+  }
+  if (design.sinkers ?? (design.rim >= 0.05 && design.look !== 'tubes')) {
+    parts.sinkers = { mesh: balls(rim.length, LEAD, 0.4), size: 0.013, knots: rim };
+    group.add(parts.sinkers.mesh);
+  }
+  group.traverse((object) => { object.frustumCulled = false; });
+  return parts;
+}
+
+/** Move a net's drawing to its cloth's knots. */
+function drawNet(parts) {
+  const { x } = parts.cloth;
+  if (parts.lines) {
+    const array = parts.lines.geometry.attributes.position.array;
+    parts.cloth.woven.cords.forEach(([a, b], cord) => {
+      for (let axis = 0; axis < 3; axis += 1) {
+        array[cord * 6 + axis] = x[a * 3 + axis];
+        array[cord * 6 + 3 + axis] = x[b * 3 + axis];
+      }
+    });
+    parts.lines.geometry.attributes.position.needsUpdate = true;
+  }
+  if (parts.cords) {
+    const { mesh, pairs } = parts.cords;
+    const radius = mesh.userData.radius;
+    pairs.forEach(([a, b], cord) => {
+      scratch.position.set((x[a * 3] + x[b * 3]) / 2, (x[a * 3 + 1] + x[b * 3 + 1]) / 2, (x[a * 3 + 2] + x[b * 3 + 2]) / 2);
+      scratch.direction.set(x[b * 3] - x[a * 3], x[b * 3 + 1] - x[a * 3 + 1], x[b * 3 + 2] - x[a * 3 + 2]);
+      const length = scratch.direction.length();
+      if (length > 1e-6) scratch.quaternion.setFromUnitVectors(UP, scratch.direction.divideScalar(length));
+      scratch.scale.set(radius, Math.max(length, 1e-4), radius);
+      mesh.setMatrixAt(cord, scratch.matrix.compose(scratch.position, scratch.quaternion, scratch.scale));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+  for (const beads of [parts.knots, parts.sinkers]) {
+    if (!beads) continue;
+    const knots = beads.knots ?? parts.cloth.woven.rest.map((_, index) => index);
+    scratch.quaternion.identity();
+    scratch.scale.setScalar(beads.size);
+    knots.forEach((knot, index) => {
+      scratch.position.set(x[knot * 3], x[knot * 3 + 1], x[knot * 3 + 2]);
+      beads.mesh.setMatrixAt(index, scratch.matrix.compose(scratch.position, scratch.quaternion, scratch.scale));
+    });
+    beads.mesh.instanceMatrix.needsUpdate = true;
+  }
+  if (parts.sheet) {
+    const array = parts.sheet.geometry.attributes.position.array;
+    array.set(x);
+    parts.sheet.geometry.attributes.position.needsUpdate = true;
+    parts.sheet.geometry.computeVertexNormals();
+  }
+}
+
+/**
+ * Draw every net, stepping each as a soft body `dt` s: those in a
+ * retiarius's hand, and those thrown (flying, on a man, on the floor).
+ */
+export function updateNets(view, world, dt = 1 / 60) {
+  const drawn = view.nets ?? (view.nets = new Map());
+  // A new fight's nets are new nets, though they share the old ones' keys.
+  if (view.netsWorld !== world) {
+    for (const key of [...drawn.keys()]) dropNetView(view, key);
+    view.netsWorld = world;
+  }
+  const design = NET_DESIGNS[NET.design] ?? NET_DESIGNS.iaculum;
+  const live = new Set();
+  const add = (key) => {
+    const parts = buildNetView(makeCloth(design));
+    view.scene.add(parts.group);
+    drawn.set(key, parts);
+    return parts;
+  };
   for (const fighter of world.fighters) {
     if (!fighter.net?.held || fighter.state === 'out') continue;
-    const mesh = show(`held:${fighter.id}`, 'held');
-    const hand = point(fighter.x, P.lHand);
-    mesh.position.set(hand[0], hand[1] - 0.12, hand[2]);
-    mesh.scale.set(0.11, 0.17, 0.11);
+    const key = `held:${fighter.id}`;
+    live.add(key);
+    let parts = drawn.get(key);
+    const hand = holdingHand(fighter);
+    if (!parts || parts.cloth.design !== design) {
+      if (parts) dropNetView(view, key);
+      parts = add(key);
+      layCloth(parts.cloth, hand, { hang: true });
+    }
+    pinCloth(parts.cloth, hand);
   }
-  for (const [key, mesh] of drawn) {
-    if (live.has(key)) continue;
-    view.scene.remove(mesh);
-    disposeObject(mesh);
-    drawn.delete(key);
+  for (const net of world.nets ?? []) {
+    if (net.state === 'ground' && net.age > NET.lies) continue;
+    const key = `net:${net.id}`;
+    live.add(key);
+    let parts = drawn.get(key);
+    if (!parts || parts.cloth.design !== design) {
+      if (parts) dropNetView(view, key);
+      // The net in his hand is the one thrown.
+      const held = drawn.get(`held:${net.owner}`);
+      if (held?.cloth.design === design) {
+        drawn.delete(`held:${net.owner}`);
+        drawn.set(key, held);
+        parts = held;
+      } else parts = add(key);
+      const spread = (NET.radius * (1 - NET_GATHER)) / NET.open;
+      layCloth(parts.cloth, net.x, { gather: NET_GATHER, velocity: net.v, spread, yaw: net.id * 1.3, dt: 1 / 60 });
+      pinCloth(parts.cloth, null);
+      parts.thrown = true;
+    }
+    const cloth = parts.cloth;
+    if (net.state === 'wrapped') {
+      const man = world.fighters[net.target];
+      if (cloth.tangled?.fighter !== man) tangleCloth(cloth, man);
+      // Until it has caught on him, it is carried onto him.
+      if (cloth.tangled.knots.size === 0) steerCloth(cloth, vec3Above(net.x, 0.35), dt, 0.12);
+    } else {
+      // Freed, he throws it off; dead, it stays lying over him.
+      if (cloth.tangled) {
+        if (cloth.tangled.fighter.state === 'out') tangleCloth(cloth, null);
+        else shedCloth(cloth, cloth.tangled.fighter);
+      }
+      if (net.state === 'flying') steerCloth(cloth, net.x, dt, 0.06);
+    }
   }
+  for (const [key, parts] of drawn) {
+    if (!live.has(key)) {
+      dropNetView(view, key);
+      continue;
+    }
+    stepCloth(parts.cloth, dt, world.fighters);
+    drawNet(parts);
+  }
+}
+
+const vec3Above = (p, rise) => [p[0], p[1] + rise, p[2]];
+
+function dropNetView(view, key) {
+  const parts = view.nets.get(key);
+  view.scene.remove(parts.group);
+  parts.group.traverse((object) => {
+    object.geometry?.dispose?.();
+    for (const material of [].concat(object.material ?? [])) {
+      material.alphaMap?.dispose?.();
+      material.dispose?.();
+    }
+  });
+  view.nets.delete(key);
 }

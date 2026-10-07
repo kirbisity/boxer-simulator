@@ -465,7 +465,7 @@ function drawWorld(dt) {
   updateDebris(scene, world);
   endCrowdBatches(scene);
   updateArrows(scene, world);
-  updateNets(scene, world);
+  updateNets(scene, world, dt * (state.paused ? 0 : state.speed));
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
