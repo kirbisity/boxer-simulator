@@ -330,6 +330,14 @@ export const ARMOR_KINDS = {
   retiarius: {
     belt: BALTEUS, upperArm: { l: [[-0.32, 0.28, 2.0, 'steel'], [0.2, 1.02, 1.3, MANICA]] }, forearm: { l: [-0.06, -0.02, 1.3, MANICA] },
   },
+  // Scissor: a shirt of bronze scales to the hips, the manica, the left
+  // forearm in a steel tube (its crescent blade is the scissores, carried as
+  // a shield), greaves on both shins.
+  scissor: {
+    trunk: [-0.16, 0.98, 1.16, { scales: true }], belt: BALTEUS, collar: 'steel',
+    upperArm: { r: [-0.25, 1.02, 1.32, MANICA], l: [-0.2, 0.5, 1.4, { scales: true }] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA], l: [-0.1, 0.06, 1.55, 'steel'] },
+    shin: [-0.1, 0.88, 1.32, 'steel'],
+  },
   // Thraex: quilted wraps up both thighs, high greaves over them, the manica.
   thraex: {
     belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },

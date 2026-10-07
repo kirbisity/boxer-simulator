@@ -10,6 +10,7 @@ import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, WEAPONS } from './weapons.js';
 import { featherDevice, steelMaterial } from './wardrobe.js';
+import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
 import { crowdBatch } from './crowdview.js';
 
 export const GORE = {
@@ -248,6 +249,7 @@ function buildStandard(spec, colour, envMap) {
 export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   const spec = WEAPONS[kind];
   if (spec.flag) return buildStandard(spec, colour, envMap);
+  if (kind === 'sica' || kind === 'trident') return buildArenaWeapon(kind, spec, envMap, steelMaterial);
   const group = new THREE.Group();
   const steel = steelMaterial(envMap, { vertexColors: false, color: 0xd9dde4 });
   const dark = surface(0x1b1b1f, { roughness: 0.6 });
@@ -724,6 +726,8 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
 
 /** The parma: a small, round, convex bronze shield, boss at the centre. Faces +z. */
 export function buildShieldMesh(spec, envMap) {
+  // The arena's shaped shields and the scissor's crescent, in detail.
+  if (spec.shape || spec.look === 'scissores') return buildArenaShield(spec, envMap, steelMaterial);
   const group = new THREE.Group();
   if (spec.look === 'steel' || spec.look === 'feather') {
     // The rodela: a round steel shield, domed, rimmed and bossed. The
@@ -896,7 +900,7 @@ export function updateArms(view, fighterView, time = 0) {
   if (fighter.shield) {
     if (!arms.shield) {
       const build = () => buildShieldMesh(fighter.shield.spec, view.steelEnv);
-      arms.shield = fighterView.baked ? crowdArms(view, `shield:${fighter.shield.spec.radius}`, build) : build();
+      arms.shield = fighterView.baked ? crowdArms(view, `shield:${fighter.shield.kind}`, build) : build();
       fighterView.group.add(arms.shield);
     }
     const disc = shieldDisc(fighter);

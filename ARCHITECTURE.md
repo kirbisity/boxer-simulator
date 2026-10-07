@@ -19,6 +19,7 @@ logic.
 | `src/physics/config.js` | `WORLD`: every physical constant of the fight, each with what it is set against. Tune here. |
 | `src/physics/ranged.js` | Guns and bows: aim, fire (rounds, pellets, recoil, rocking), reload, arrows in flight, what a round or arrow does to a body. |
 | `src/physics/grappling.js` | The clinch (holding, driving, throws) and holding a man down. |
+| `src/physics/net.js` | The retiarius's net: thrown, binding a man (no blows, no guard, short steps) until he works or cuts free. |
 | `src/ai.js` | Decisions: target, game plan, range, when to strike, defend, pick up a weapon, shoot or reload. `AI` holds its tunables. |
 | `src/cast.js` | Generators for armies (`mingSoldier`, `ottomanSoldier`, `steppeWarrior`, …) and `PERIOD_BUILD`: historical body sizes by people and rank. |
 | `src/scenarios.js` | Levels: place, arena, formation, and the armies (troop tables) set from history. |
@@ -49,7 +50,7 @@ crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
-`src/crowdview.js` (instanced crowds), `src/toon.js` (materials, outlines,
+`src/crowdview.js` (instanced crowds), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
 `disposeObject`). `src/main.js` runs the loop and input (playing, the camera
 follows the player's man from behind: `CAMERA_FOLLOW`); `src/menu.js` the
 menus. Anything removed from the scene is freed with `disposeObject`.
@@ -76,7 +77,9 @@ in `buildWeaponMesh`, a style in `STYLES` that wields it, a character in
 `PRESETS` with that style, an entry in `menu.js` `WARRIORS` and `STYLE_NOTES`.
 
 **An outfit or armour:** an entry in `OUTFITS` with `faction`, `movement`,
-`protection` (and `regions` if it covers only part of the body),
+`protection` (and `regions` for what covers only part of the body: a region
+(head, torso, limb), a part on both sides (Forearm), or one part (rShank),
+each with `deflects` if it is plate that turns a blade),
 `bulletRating`/`plated` if proofed; an `ARMOR_KINDS` entry in `loftbody.js`
 for its pieces; any new helmet as a `buildHeadgear` case; a glyph in
 `OUTFIT_GLYPH`.

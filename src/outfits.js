@@ -102,6 +102,32 @@ function mexicaDesign(label, cotton, band) {
 }
 
 // A gladiator's five looks: his metal, his loincloth, his plume.
+// The arena's armour, part by part: gladiators fought with the chest bare
+// and the limbs most exposed in their stance covered, each kind differently
+// (`regions` in an outfit's protection). Plate turns a blade (`deflects`).
+const ARENA = {
+  // A bronze helmet with a grilled visor over the whole head and face.
+  helm: { blunt: 0.65, cut: 0.95, pierce: 0.85, deflects: true },
+  // The secutor's and scissor's smooth egg: nothing to catch a trident's prong or an edge.
+  smoothHelm: { blunt: 0.7, cut: 0.97, pierce: 0.9, deflects: true },
+  // The manica: overlapping metal or hardened leather lames over padding.
+  manica: { blunt: 0.45, cut: 0.85, pierce: 0.7, deflects: true },
+  // A quilted manica or legging: thick linen, no metal.
+  quilt: { blunt: 0.35, cut: 0.55, pierce: 0.35 },
+  // A bronze greave (ocrea) from instep to knee.
+  greave: { blunt: 0.55, cut: 0.95, pierce: 0.85, deflects: true },
+  // The thraex's greaves run up over the quilted thigh.
+  highGreave: { blunt: 0.45, cut: 0.8, pierce: 0.6, deflects: true },
+  // The retiarius's galerus: a bronze plate standing up off the shoulder, guarding neck and arm.
+  galerus: { blunt: 0.6, cut: 0.95, pierce: 0.85, deflects: true },
+  // Wrappings (fasciae) round a shin: little.
+  wrap: { blunt: 0.15, cut: 0.25, pierce: 0.15 },
+  // The scissor's scale shirt over the trunk, and the steel tube over his left arm.
+  scale: { blunt: 0.4, cut: 0.85, pierce: 0.6 },
+  tube: { blunt: 0.7, cut: 1, pierce: 0.95, deflects: true },
+  bare: { blunt: 0, cut: 0, pierce: 0 },
+};
+
 const GLADIATOR_LOOKS = [
   { label: 'Bronze, cream', metal: '#b98a3e', cloth: '#ece4d0', plume: '#b81d22', strap: '#6a4526' },
   { label: 'Brass, red', metal: '#c9a25a', cloth: '#8a1f22', plume: '#f0ece4', strap: '#4a2e1a' },
@@ -111,10 +137,10 @@ const GLADIATOR_LOOKS = [
 ];
 
 /** A gladiator of a kind in one of the looks; `helmet` null for none. */
-function gladiatorDesign(kind, look, helmet) {
+function gladiatorDesign(kind, look, helmet, { barefoot = false } = {}) {
   return {
     label: look.label, bottom: { kind: 'loincloth', color: look.cloth }, top: { kind: 'sportsBra', color: look.cloth, female: true },
-    armor: { kind, color: look.metal, lace: look.strap, gold: '#d6b45a' }, feet: { kind: 'sandal', color: look.strap },
+    armor: { kind, color: look.metal, lace: look.strap, gold: '#d6b45a' }, feet: barefoot ? { kind: 'bare' } : { kind: 'sandal', color: look.strap },
     ...(helmet ? { head: { ...helmet, color: look.metal } } : {}),
   };
 }
@@ -420,10 +446,11 @@ export const OUTFITS = {
     label: 'Gladiator — hoplomachus', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
-    protection: { blunt: 0.4, cut: 0.4, pierce: 0.2, bullet: { head: 0.3, torso: 0, limb: 0.1 } },
+    // A quilted manica on the spear arm, quilted leggings and two high greaves; the chest bare.
+    protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0.3, torso: 0, limb: 0.15 }, regions: { head: ARENA.helm, rUpperArm: ARENA.quilt, rForearm: ARENA.quilt, Thigh: ARENA.quilt, Shank: ARENA.greave } },
     courage: 0.25,
     family: 'gladiator',
-    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('hoplomachus', look, { kind: 'gladiatorHelm', plume: look.plume })),
+    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('hoplomachus', look, { kind: 'arenaHelm', style: 'hoplomachus', plume: look.plume, feather: '#f0ece4' }, { barefoot: true })),
   },
   // Murmillo: the big fish-crested helmet with its grille, a manica on the
   // sword arm, a short greave: the head well kept, the body bare.
@@ -432,9 +459,10 @@ export const OUTFITS = {
     label: 'Gladiator — murmillo', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.32,
-    protection: { blunt: 0.45, cut: 0.5, pierce: 0.3, bullet: { head: 0.45, torso: 0, limb: 0.15 } },
+    // The great helmet, the manica on the sword arm, one greave on the forward (left) leg; the rest bare.
+    protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0.35, torso: 0, limb: 0.1 }, regions: { head: ARENA.helm, rUpperArm: ARENA.manica, rForearm: ARENA.manica, lShank: ARENA.greave, lThigh: ARENA.quilt, rShank: ARENA.wrap } },
     courage: 0.25,
-    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('murmillo', look, { kind: 'gladiatorHelm', crest: 'fin' })),
+    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('murmillo', look, { kind: 'arenaHelm', style: 'murmillo', plume: look.plume })),
   },
   // Secutor: the smooth egg helmet that nothing catches on, manica, high greave.
   secutor: {
@@ -442,9 +470,10 @@ export const OUTFITS = {
     label: 'Gladiator — secutor', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.32,
-    protection: { blunt: 0.5, cut: 0.5, pierce: 0.35, bullet: { head: 0.5, torso: 0, limb: 0.15 } },
+    // The smooth helmet, the manica, one greave higher up the forward leg; the rest bare.
+    protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0.4, torso: 0, limb: 0.1 }, regions: { head: ARENA.smoothHelm, rUpperArm: ARENA.manica, rForearm: ARENA.manica, lShank: ARENA.greave, lThigh: ARENA.quilt, rShank: ARENA.wrap } },
     courage: 0.25,
-    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('secutor', look, { kind: 'secutorHelm' })),
+    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('secutor', look, { kind: 'arenaHelm', style: 'secutor' })),
   },
   // Retiarius: the net-fighter, almost naked: no helmet, the galerus on the
   // left shoulder and a manica on that arm. Fast, and easily hurt.
@@ -453,9 +482,10 @@ export const OUTFITS = {
     label: 'Gladiator — retiarius', family: 'gladiator', movement: 'excellent', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.08,
-    protection: { blunt: 0.15, cut: 0.2, pierce: 0.1, bullet: { head: 0, torso: 0, limb: 0.05 } },
+    // No helmet: the galerus standing up from the left shoulder, a manica on that arm, wrapped shins; nothing else.
+    protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0, torso: 0, limb: 0.05 }, regions: { lUpperArm: ARENA.galerus, lForearm: ARENA.manica, Shank: ARENA.wrap } },
     courage: 0.15,
-    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('retiarius', look, null)),
+    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('retiarius', look, null, { barefoot: true })),
   },
   // Thraex: the griffin-crested brimmed helmet, quilted wraps and high
   // greaves on both legs, manica: the legs best kept of any.
@@ -464,9 +494,22 @@ export const OUTFITS = {
     label: 'Gladiator — thraex', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
     extraMass: 0.3,
-    protection: { blunt: 0.4, cut: 0.45, pierce: 0.25, bullet: { head: 0.35, torso: 0, limb: 0.2 } },
+    // The griffin helmet, the manica, quilted thighs under two high greaves; the chest bare.
+    protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0.3, torso: 0, limb: 0.2 }, regions: { head: ARENA.helm, rUpperArm: ARENA.manica, rForearm: ARENA.manica, Thigh: ARENA.highGreave, Shank: ARENA.greave } },
     courage: 0.25,
-    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('thraex', look, { kind: 'gladiatorHelm', crest: 'griffin', plume: look.plume })),
+    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('thraex', look, { kind: 'arenaHelm', style: 'thraex', plume: look.plume, feather: look.plume }, { barefoot: true })),
+  },
+  // The scissor: a coat of bronze scales to the hips, the smooth helmet, the
+  // left arm cased in the steel tube of the scissores, a manica on the sword
+  // arm, greaves on both shins; the thighs bare.
+  scissor: {
+    faction: 'gladiators',
+    label: 'Gladiator — scissor', family: 'gladiator', movement: 'good', fists: 'bare',
+    palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
+    extraMass: 0.38,
+    protection: { ...ARENA.scale, bullet: { head: 0.4, torso: 0.3, limb: 0.1 }, regions: { head: ARENA.smoothHelm, limb: ARENA.bare, rUpperArm: ARENA.manica, rForearm: ARENA.manica, lForearm: ARENA.tube, lUpperArm: ARENA.manica, Shank: ARENA.greave } },
+    courage: 0.3,
+    designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('scissor', look, { kind: 'arenaHelm', style: 'scissor' })),
   },
   // Ming garrison: a padded cotton coat and a red cloth head wrap. Little
   // protection beyond the padding; quick on his feet.

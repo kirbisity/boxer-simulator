@@ -398,6 +398,36 @@ export const PRESETS = {
     name: 'Priscus', style: 'hoplomachus', sex: 'male', heightCm: 178, frame: 'medium', age: 28, exercise: 0.8, calories: 3900,
     outfit: { kind: 'hoplomachus', design: 0 },
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#1c130c', facialHair: 'beard', eyeColor: 'brown' },
+  },  // The other five of the arena's kinds. Gladiators were fed fat on barley
+  // and beans (hordearii): a layer over the muscle against shallow cuts.
+  // Spartacus, a Thracian, fought as a thraex; Flamma, a secutor, won
+  // twenty-one bouts; Verus and his rival Priscus fought to a draw before
+  // Titus; Kalendio is the retiarius of the Zliten mosaic; Astacius, a
+  // name from the arena's lists, fights in the scissor's tube and scale.
+  thraex: {
+    name: 'Spartacus', style: 'thraex', sex: 'male', heightCm: 174, frame: 'medium', age: 30, exercise: 0.82, calories: 3900,
+    outfit: { kind: 'thraex', design: 0 },
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2416', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  murmillo: {
+    name: 'Verus', style: 'murmillo', sex: 'male', heightCm: 180, frame: 'large', age: 29, exercise: 0.8, calories: 4300,
+    outfit: { kind: 'murmillo', design: 1 },
+    look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#1c130c', facialHair: 'stubble', eyeColor: 'brown' },
+  },
+  secutor: {
+    name: 'Flamma', style: 'secutor', sex: 'male', heightCm: 176, frame: 'large', age: 27, exercise: 0.85, calories: 4100,
+    outfit: { kind: 'secutor', design: 3 },
+    look: { skinTone: 'medium', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  retiarius: {
+    name: 'Kalendio', style: 'retiarius', sex: 'male', heightCm: 175, frame: 'small', age: 24, exercise: 0.85, calories: 3400,
+    outfit: { kind: 'retiarius', design: 2 },
+    look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  scissor: {
+    name: 'Astacius', style: 'scissor', sex: 'male', heightCm: 179, frame: 'large', age: 31, exercise: 0.8, calories: 4200,
+    outfit: { kind: 'scissor', design: 4 },
+    look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'brown' },
   },
 };
 

@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 // In load order: a module's top-level code may use only what comes before it.
-const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics/config', 'physics', 'physics/ranged', 'physics/grappling', 'cast', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'crowdview', 'render', 'weaponview', 'drama', 'scenarios', 'menu', 'main'];
+const MODULES = ['outfits', 'physiology', 'body', 'pose', 'weapons', 'moves', 'life', 'physics/config', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'cast', 'ai', 'rig', 'bodymesh', 'loftbody', 'toon', 'arenaview', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'crowdview', 'render', 'weaponview', 'drama', 'scenarios', 'menu', 'main'];
 const out = process.argv[2] ?? 'dist/gladiator.html';
 
 const html = readFileSync('index.html', 'utf8');

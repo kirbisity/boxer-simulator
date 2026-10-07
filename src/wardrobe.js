@@ -5,6 +5,7 @@
 import { Dangle } from './dangle.js';
 import { heelLift, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
+import { buildArenaHelm } from './arenaview.js';
 
 export const WARDROBE = {
   // Steel: how metal and how polished; the reflection map is a gradient
@@ -356,6 +357,10 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
     }
     case 'kabuto':
       buildKabuto(group, head, r, steel, color);
+      break;
+    case 'arenaHelm':
+      // A gladiator's helmet of his kind, in detail (arenaview.js).
+      buildArenaHelm(group, head, r, metal(steel, color));
       break;
     case 'gladiatorHelm':
       buildGladiatorHelm(group, head, r, steel, color);

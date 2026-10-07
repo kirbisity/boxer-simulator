@@ -9,11 +9,12 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToDisc } from './weapons.js';
+import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToShield, shieldReach, NET } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { aimTargets, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
+import { flyNets } from './physics/net.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -165,6 +166,7 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
   }
+  if (style.net && !fighter.net) fighter.net = { held: true };
   if (!style.weapon) return;
   const weapon = createWeapon(style.weapon);
   const shares = handShares(weapon.spec);
@@ -287,8 +289,13 @@ function updatePickup(world, fighter, dt) {
  * armour covers the whole man alike; a modern vest guards the torso alone.
  */
 export function protectionAt(gear, capsuleKey) {
-  const own = gear.protection.regions?.[bulletRegion(capsuleKey)];
-  return own ? { ...gear.protection, ...own } : gear.protection;
+  // Most particular first: this very part (rForearm), the part on either side
+  // (Forearm), then its region (head, torso, limb). A region may say whether
+  // it is plate that turns a blade (`deflects`); else the kit says.
+  const regions = gear.protection.regions;
+  const own = regions && (regions[capsuleKey] ?? regions[capsuleKey.replace(/^[lr](?=[A-Z])/, '')] ?? regions[bulletRegion(capsuleKey)]);
+  if (!own) return gear.deflects === undefined ? gear.protection : { ...gear.protection, deflects: gear.deflects };
+  return { ...gear.protection, deflects: gear.deflects, ...own };
 }
 
 /** A brittle edge (obsidian) loses part of its cut: on armour, a shield or a steel blade. */
@@ -350,6 +357,8 @@ function weaponIntent(world, fighter, intent) {
     const guard = style.shieldGuard ?? [0.3, 0.72, 0.05];
     intent.lHand = vec.scale(blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard, H);
   }
+  // The net held out in the off hand, ready to throw.
+  if (fighter.net?.held && style.netGuard && !fighter.shield) intent.lHand = vec.scale(style.netGuard, H);
   const weapon = fighter.weapon;
   intent.bladeDir = null;
   intent.weaponArms = null;
@@ -381,7 +390,7 @@ function weaponIntent(world, fighter, intent) {
   if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };
   intent[`${main}Hand`] = target.hand;
   intent.bladeDir = target.dir;
-  const oneHanded = weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil);
+  const oneHanded = weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && (fighter.net?.held || (punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil)));
   intent.twoHanded = !oneHanded;
   if (!oneHanded) intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, offHandAlong(weapon.spec)));
   if (fighter.reloading && weapon.spec.shot && !weapon.loaded && !punch) {
@@ -542,7 +551,13 @@ export function shieldDisc(fighter) {
   const forward = yawRotate([1, 0, 0], fighter.yaw);
   let normal = vec.sub(forward, vec.scale(forearm, vec.dot(forward, forearm)));
   normal = vec.length(normal) > 1e-6 ? vec.normalize(normal) : forward;
-  return { centre: vec.add(vec.lerp(elbow, hand, 0.55), vec.scale(normal, spec.offset)), normal, radius: spec.radius };
+  // Upright (a shaped shield is held so), and across it: the frame it is drawn and struck in.
+  let up = vec.sub([0, 1, 0], vec.scale(normal, normal[1]));
+  up = vec.length(up) > 1e-6 ? vec.normalize(up) : [0, 1, 0];
+  const across = vec.cross(up, normal);
+  // A shaped shield is gripped at its middle; a round one rides the forearm.
+  const centre = spec.shape ? vec.add(hand, vec.scale(normal, spec.offset)) : vec.add(vec.lerp(elbow, hand, 0.55), vec.scale(normal, spec.offset));
+  return { centre, normal, up, across, radius: shieldReach(spec), spec };
 }
 
 /** Move a fighter bodily to stand with its root at (x, z), feet replanted. */
@@ -750,7 +765,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.stamina < drain) return false;
+  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.stamina < drain) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
@@ -769,7 +784,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
 
 /** Start a whole-body move (rush, clinch) or a defence. */
 export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1, from = null } = {}) {
-  if (fighter.state !== 'up') return false;
+  if (fighter.state !== 'up' || fighter.netted) return false;
   if (DEFENCES[name]) {
     // `from`: who the strike comes from, for a block that goes to meet it.
     fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from };
@@ -891,6 +906,11 @@ function updateIntent(world, fighter, dt) {
     }
   }
   if (fighter.crawling) crawlPose(fighter, intent, dt);
+  if (fighter.netted) {
+    // Bound: the arms pinned in close to the chest, the weapon with them.
+    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.16 * H, 0.62 * H, sign * 0.1 * H];
+    intent.bladeDir = null;
+  }
   runCarry(world, fighter, intent, dt);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
@@ -1204,6 +1224,7 @@ export function step(world, dt) {
   moveProps(world, dt);
   moveDebris(world, dt);
   if (world.arrows.length) flyArrows(world, dt);
+  if (world.nets?.length) flyNets(world, dt);
   world.time += dt;
   world.lastDt = dt;
 }
@@ -1229,7 +1250,7 @@ function checkBalance(world, fighter) {
   const outside = planted ? Math.hypot(pelvis[0] - feet[0], pelvis[2] - feet[2]) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
-  const footing = legs * fighter.body.gear.balance;
+  const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
   // Knocked about in armour: reeling, not falling, unless it is too much.
   const pushed = knock / (WORLD.balance.speed * footing);
   const overreached = outside / (WORLD.balance.reach * legLength * footing);
@@ -1304,6 +1325,8 @@ function moveRoot(world, fighter, dt) {
   if (fighter.running && !fighter.rush) drive = fighter.move * WORLD.run.speedFactor;
   // On his knees: slow, and no faster for trying.
   if (fighter.crawling) drive = Math.max(-0.3, Math.min(1, fighter.move)) * WORLD.crawl.speed;
+  // In the net: short steps, stumbling.
+  if (fighter.netted) drive *= NET.step;
   if (fighter.rush) {
     // A charge: flat out at the opponent, at what the legs can reach.
     fighter.rush.t += dt;
@@ -1312,7 +1335,7 @@ function moveRoot(world, fighter, dt) {
   }
   // A sidestep (+ to the left), slower than stepping in or out.
   const left = yawRotate([0, 0, 1], fighter.yaw);
-  const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare * (fighter.crawling ? WORLD.crawl.speed : 1);
+  const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare * (fighter.crawling ? WORLD.crawl.speed : 1) * (fighter.netted ? NET.step : 1);
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
   const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
@@ -2360,7 +2383,7 @@ function collideStriker(world, attacker, defender, striker, time) {
   if (defender.shield && defender.state !== 'out') {
     // A shield in the way takes it: nothing behind is touched.
     const disc = shieldDisc(defender);
-    const hit = segmentToDisc(sa, sb, disc.centre, disc.normal, disc.radius);
+    const hit = segmentToShield(sa, sb, disc);
     const shieldKey = `${prefix}shield`;
     if (hit.distance < striker.radius + 0.012) {
       const away = hit.distance > 1e-6 ? vec.normalize(vec.sub(hit.from, hit.point)) : disc.normal;
@@ -2883,7 +2906,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const sharp = weapon.edge ?? 1;
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp;
   const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0)) * sharp;
-  const glanced = Boolean(body.gear.deflects) && mix.cut + mix.pierce > 0.2;
+  const glanced = Boolean(protection.deflects) && mix.cut + mix.pierce > 0.2;
   // Glass on steel or hard armour chips.
   if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
   const event = {

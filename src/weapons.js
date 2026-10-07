@@ -351,7 +351,22 @@ export const WEAPONS = {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
     harm: { thrust: { pierce: 0.9, cut: 0.2, blunt: 0.15 }, swing: { cut: 0.8, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
-  },  // Standards: the side's flag on a staff, carried by its leader (see
+  },  // The thraex's sica: a short sword curved like a sickle (~0.42 m of blade),
+  // made to reach round a shield's edge into the back and the legs.
+  sica: {
+    label: 'Sica', hands: 'one', length: 0.46, strikeFrom: 0.08, handle: 0.12, mass: 0.7, balance: 0.14, radius: 0.012, curved: true,
+    harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.7, cut: 0.25, blunt: 0.1 } },
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 26, zeta: 0.8 }, threat: 3.1,
+  },
+  // The retiarius's trident (fuscina): ~1.7 m of ash with three iron prongs.
+  // One hand while the other holds the net; both once it is thrown. The
+  // prongs are short and spread: they wound wide rather than deep.
+  trident: {
+    label: 'Trident', hands: 'hybrid', length: 1.15, strikeFrom: 0.95, handle: 0.55, spacing: 0.4, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.016, tines: 3,
+    harm: { thrust: { pierce: 0.85, cut: 0.2, blunt: 0.3 }, swing: { blunt: 0.55 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.8, grip: 0.5,
+  },
+  // Standards: the side's flag on a staff, carried by its leader (see
   // FACTIONS[...].standard). A bearer wants both hands for it; it is a poor
   // weapon, a long ash pole heavy at the top with the cloth and finial (~3.5 kg,
   // ~2.6 m), swung or jabbed only to keep a man off. `flag` names the look.
@@ -394,7 +409,70 @@ export const SHIELDS = {
   // The kalkan: the Turkish and steppe round shield of wicker bound in
   // coloured thread round an iron boss; light and springy.
   kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, look: 'ming' },
+  // Shaped shields (`shape: 'curved'`): a rectangle `width` × `height` (m)
+  // bent round a vertical axis (`curve`, the bend's radius), held upright by
+  // a grip at its middle. The scutum of the murmillo and the secutor: plywood
+  // faced with leather, an iron boss, about 0.6 × 0.95 m and 6 kg (an arena
+  // scutum was smaller than a legionary's); shoulder to shin, curved round
+  // the body: blows go round it to the head or the forward leg.
+  scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, look: 'scutum' },
+  // The thraex's parmula: small and nearly square (~0.36 × 0.42 m), flat-ish.
+  parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, look: 'parmula' },
+  // The scissor's arm: a steel tube over the left forearm and fist, ending in
+  // a crescent blade (~0.13 m round): it parries like a small shield.
+  scissores: { label: 'Scissores', radius: 0.13, mass: 2, offset: 0.12, armHarm: 0.04, look: 'scissores' },
 };
+
+/**
+ * The retiarius's net (rete): weighted at the edge with lead, ~3 m across,
+ * thrown open over a man (`speed` m/s, opening to `radius` m over `open` s).
+ * On him it binds his arms and weapon: his blows and guard are gone, his
+ * steps short (`step` of his pace), his footing poorer (`footing`), until
+ * he works free: at `freeRate` a second, `bladeFree` times that with an
+ * edge in his hand to cut it. On the floor, past `lies` s, it is done.
+ */
+export const NET = { speed: 8.5, radius: 0.75, open: 0.25, flightMax: 1.2, step: 0.35, footing: 0.7, freeRate: 0.22, bladeFree: 2.2, lies: 30 };
+
+/** A shield's outer bound (m from its centre): its radius, or a shaped shield's half-diagonal. */
+export function shieldReach(spec) {
+  return spec.shape ? Math.hypot(spec.width / 2, spec.height / 2) : spec.radius;
+}
+
+/**
+ * The point of a shield nearest `p` (shield from shieldDisc: centre, normal,
+ * up, across, spec). A round shield is a flat disc; a shaped one a curved
+ * rectangle, its middle at the centre, bending back round an upright axis.
+ */
+export function shieldClosest(p, shield) {
+  const spec = shield.spec;
+  if (!spec?.shape) {
+    const offset = vec.sub(p, shield.centre);
+    const height = vec.dot(offset, shield.normal);
+    const flat = vec.sub(offset, vec.scale(shield.normal, height));
+    const out = vec.length(flat);
+    return out <= shield.radius ? vec.add(shield.centre, flat) : vec.add(shield.centre, vec.scale(flat, shield.radius / out));
+  }
+  const axis = vec.sub(shield.centre, vec.scale(shield.normal, spec.curve));
+  const d = vec.sub(p, axis);
+  const up = Math.max(-spec.height / 2, Math.min(spec.height / 2, vec.dot(d, shield.up)));
+  const most = spec.width / 2 / spec.curve;
+  const angle = Math.max(-most, Math.min(most, Math.atan2(vec.dot(d, shield.across), vec.dot(d, shield.normal))));
+  const round = vec.add(vec.scale(shield.normal, Math.cos(angle) * spec.curve), vec.scale(shield.across, Math.sin(angle) * spec.curve));
+  return vec.add(axis, vec.add(vec.scale(shield.up, up), round));
+}
+
+/** Where a segment comes nearest a shield, sampled along it: { distance, point, along, from }. */
+export function segmentToShield(a, b, shield, samples = 10) {
+  let best = { distance: Infinity, point: shield.centre, along: 0 };
+  for (let index = 0; index <= samples; index += 1) {
+    const along = index / samples;
+    const p = vec.lerp(a, b, along);
+    const onShield = shieldClosest(p, shield);
+    const distance = vec.length(vec.sub(p, onShield));
+    if (distance < best.distance) best = { distance, point: onShield, along, from: p };
+  }
+  return best;
+}
 
 // Cutting and piercing, in joules of a contact's collision energy after
 // armour. A cut this deep within `zone` of a joint takes the limb off there

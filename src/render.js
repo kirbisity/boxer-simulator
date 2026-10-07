@@ -12,6 +12,7 @@ import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions } from './outfits.js';
 import { WEAPONS } from './weapons.js';
+import { buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
@@ -162,8 +163,10 @@ function shaderWarmers() {
   const drops = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ color: 0x8a0d12 }), 1);
   const stains = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ color: 0x5a0a0d, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -2 }), 1);
   const vane = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xf0ece4, side: THREE.DoubleSide }));
+  // A retiarius's net: cord drawn as lines.
+  const cord = new THREE.LineSegments(geometry, netCord());
   for (const instanced of [drops, stains]) instanced.setMatrixAt(0, new THREE.Matrix4());
-  group.add(severed, outlineFor(severed), smoke, drops, stains, vane);
+  group.add(severed, outlineFor(severed), smoke, drops, stains, vane, cord);
   group.traverse((object) => {
     object.frustumCulled = false;
     object.userData.shared = true;
@@ -2108,6 +2111,11 @@ function detailedView(view, fighter, simple) {
   if (dress.top?.kind === 'hoodie') dangles.push(...buildHood(body, collar, dress.top.color));
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
+  // The scissor's coat of scales, plate by plate over the painted shirt.
+  if (dress.armor?.kind === 'scissor') {
+    collar.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'chest'));
+    hips.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'hips'));
+  }
   if (dress.banner) {
     const banner = buildBanner(body, dress.banner, dress.greatBanner, dress.bannerLook);
     banner.userData.banner = true;

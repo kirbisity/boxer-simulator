@@ -77,7 +77,10 @@ export function firstHit(world, shooter, from, to) {
       if (Math.abs(facing) > 1e-6) {
         const s = vec.dot(vec.sub(disc.centre, from), disc.normal) / facing / length;
         const at = vec.lerp(from, to, s);
-        if (s > 0 && s < 1 && vec.length(vec.sub(at, disc.centre)) < disc.radius && (!best || s < best.s)) best = { fighter: other, target: 'shield', s, point: at };
+        // On its face: within the disc, or a shaped shield's rectangle (its bend is small beside a round's flight).
+        const offset = vec.sub(at, disc.centre);
+        const onFace = disc.spec?.shape ? Math.abs(vec.dot(offset, disc.up)) < disc.spec.height / 2 && Math.abs(vec.dot(offset, disc.across)) < disc.spec.width / 2 : vec.length(offset) < disc.radius;
+        if (s > 0 && s < 1 && onFace && (!best || s < best.s)) best = { fighter: other, target: 'shield', s, point: at };
       }
     }
     for (const capsule of capsules(other)) {

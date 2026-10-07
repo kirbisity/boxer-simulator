@@ -104,6 +104,12 @@ export const MOVES = {
   // underhand at the belly; then, with the spear gone, the gladius.
   spearHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [-0.02, 0.86, -0.18], dir: [1, -0.05, 0.05] }, windup: 0.1, extendUntil: 0.36, duration: 0.6, twist: -0.6, lean: 0.14, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.026, mass: { arm: 0.6, body: 0.04 }, rotation: 0.5, zones: ['head', 'body'], reach: 'weapon' },
   spearLow: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [-0.04, 0.5, -0.18], dir: [1, 0.12, 0.05] }, windup: 0.08, extendUntil: 0.34, duration: 0.56, twist: -0.5, lean: 0.12, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.024, mass: { arm: 0.6, body: 0.04 }, rotation: 0.5, zones: ['body'], reach: 'weapon' },
+  // The sica round the shield: from wide on the sword side, hooking in at the flank and the back of the leg.
+  sicaHook: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.02, 0.62, -0.34], dir: [-0.3, 0.2, -0.9] }, mid: [1, -0.05, 0.1], to: { hand: [0.28, 0.5, 0.18], dir: [0.4, -0.15, 0.9] }, windup: 0.12, extendUntil: 0.34, duration: 0.52, twist: -0.8, lean: 0.1, shift: 0.05, cost: 0.022, mass: { arm: 0.6, body: 0.015 }, rotation: 1.2, zones: ['body', 'legs'], reach: 'weapon', contactAt: 0.7 },
+  // A low thrust past the shield's lower edge.
+  sicaThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.08, 0.5, -0.16], dir: [1, -0.05, 0.1] }, windup: 0.06, extendUntil: 0.3, duration: 0.5, twist: -0.6, lean: 0.16, shift: 0.08, depth: 0.22, step: 1.4, cost: 0.02, mass: { arm: 0.6, body: 0.03 }, rotation: 0.6, zones: ['body', 'legs'], reach: 'weapon' },
+  // The scissor's crescent: a short slash with the steel-cased left arm.
+  crescentSlash: { kind: 'strike', limb: 'lHand', path: 'hook', windup: 0.1, extendUntil: 0.3, duration: 0.5, twist: 0.45, shift: 0.03, cost: 0.026, mass: { arm: 0.7, body: 0.02 }, rotation: 1.3, cuts: true, zones: ['head', 'body'], reach: 'close' },
   gladiusThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.08, 0.6, -0.14], dir: [1, 0.1, 0.05] }, windup: 0.06, extendUntil: 0.3, duration: 0.5, twist: -0.6, lean: 0.12, shift: 0.08, depth: 0.25, step: 1.5, cost: 0.02, mass: { arm: 0.6, body: 0.03 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
   gladiusCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.0, 0.88, -0.2], dir: [-0.55, 0.65, -0.4] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.28, 0.5, 0.12], dir: [0.5, -0.6, 0.45] }, windup: 0.1, extendUntil: 0.3, duration: 0.6, twist: -0.6, lean: 0.12, shift: 0.05, cost: 0.024, mass: { arm: 0.6, body: 0.02 }, rotation: 0.7, zones: ['body', 'head'], reach: 'weapon' },
   // Whole-body moves.
@@ -958,6 +964,115 @@ export const STYLES = {
     headMovement: 0.1,
     plans: { counter: 1.3, outboxer: 1, pressure: 0.9, brawler: 0.4 },
     pressure: 0.1,
+  },
+  // The arena's pairings, each kit made to answer another's.
+  // Thraex: crouched behind the small parmula, the sica hooking round a
+  // shield into the flank and the legs; high greaves guard his own.
+  thraex: {
+    label: 'Thraex', weapon: 'sica', shield: 'parmula', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.9, burst: 0.6, mobility: 0.55 },
+    stance: { blade: 0.45, crouch: 0.11, width: 1.25, lean: 0.16, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.6, -0.18], dir: [1, 0.25, 0.3] },
+    shieldGuard: [0.32, 0.66, 0.06],
+    idle: { bounce: 0.3, sway: 0.6, rock: 0.3 },
+    attacks: { sicaHook: 0.55, sicaThrust: 0.45 },
+    combos: { 'sicaThrust sicaHook': 0.6, 'sicaHook sicaThrust': 0.4 },
+    comboChance: 0.4,
+    tempo: 1.3,
+    defences: { shieldBlock: 0.6, stepBack: 0.4 },
+    defendChance: 0.65,
+    headMovement: 0.1,
+    plans: { pressure: 1.2, counter: 1.1, outboxer: 0.8, brawler: 0.5 },
+    pressure: 0.25,
+  },
+  // Murmillo: heavy, behind the great scutum from shoulder to shin, the
+  // gladius stabbing out from behind it; patient, giving little ground.
+  murmillo: {
+    label: 'Murmillo', weapon: 'gladius', shield: 'scutum', fallback: 'mix',
+    cadence: { work: 1, move: 1, burst: 0.5, mobility: 0.3 },
+    stance: { blade: 0.4, crouch: 0.12, width: 1.25, lean: 0.18, guardHeight: 0 },
+    weaponGuard: { hand: [0.04, 0.64, -0.2], dir: [1, 0.1, 0.05] },
+    shieldGuard: [0.34, 0.5, 0.1],
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.3 },
+    attacks: { gladiusThrust: 0.7, gladiusCut: 0.3 },
+    tempo: 1.4,
+    defences: { shieldBlock: 0.8, stepBack: 0.2 },
+    defendChance: 0.7,
+    headMovement: 0.05,
+    plans: { counter: 1.4, pressure: 1, outboxer: 0.6, brawler: 0.4 },
+    pressure: 0.2,
+  },
+  // Secutor: the murmillo's kit and his smooth helmet, made to run the
+  // retiarius down: always closing.
+  secutor: {
+    label: 'Secutor', weapon: 'gladius', shield: 'scutum', fallback: 'mix',
+    cadence: { work: 1.1, move: 1, burst: 0.6, mobility: 0.45 },
+    stance: { blade: 0.4, crouch: 0.1, width: 1.2, lean: 0.16, guardHeight: 0 },
+    weaponGuard: { hand: [0.04, 0.64, -0.2], dir: [1, 0.1, 0.05] },
+    shieldGuard: [0.34, 0.52, 0.1],
+    idle: { bounce: 0.2, sway: 0.5, rock: 0.3 },
+    attacks: { gladiusThrust: 0.65, gladiusCut: 0.35 },
+    tempo: 1.25,
+    defences: { shieldBlock: 0.75, stepBack: 0.25 },
+    defendChance: 0.68,
+    headMovement: 0.05,
+    plans: { pressure: 1.6, brawler: 0.8, counter: 0.8, outboxer: 0.3 },
+    pressure: 0.4,
+  },
+  // Retiarius: no helmet, light and quick; the net in one hand, the trident
+  // in the other, kept at a distance; the net thrown to bind, then the
+  // trident in both hands (tridentTwo); the dagger last.
+  retiarius: {
+    label: 'Retiarius', weapon: 'trident', net: true, fallback: 'dagger',
+    cadence: { work: 1.1, move: 0.7, burst: 0.6, mobility: 0.8 },
+    stance: { blade: 0.55, crouch: 0.05, width: 1.25, lean: 0.06, guardHeight: 0 },
+    weaponGuard: { hand: [-0.02, 0.78, -0.18], dir: [1, -0.05, 0.03], reach: 0 },
+    netGuard: [0.18, 0.6, 0.2],
+    idle: { bounce: 0.35, sway: 0.6, rock: 0.3 },
+    attacks: { spearHigh: 0.5, spearLow: 0.5 },
+    tempo: 1.3,
+    defences: { stepBack: 0.7, weaponBlock: 0.3 },
+    defendChance: 0.72,
+    headMovement: 0.15,
+    plans: { outboxer: 2, counter: 1.2, pressure: 0.4, brawler: 0.2 },
+    pressure: 0.02,
+    rangeInside: 0.1,
+  },
+  tridentTwo: {
+    label: 'Trident', hidden: true, weapon: 'trident', fallback: 'dagger',
+    cadence: { work: 1.2, move: 0.8, burst: 0.7, mobility: 0.6 },
+    stance: { blade: 0.6, crouch: 0.06, width: 1.3, lean: 0.06, guardHeight: 0 },
+    weaponGuard: { hand: [0.04, 0.62, -0.08], dir: [1, 0.12, 0] },
+    idle: { bounce: 0.25, sway: 0.4, rock: 0.3 },
+    attacks: { spearThrust: 0.5, spearJab: 0.5 },
+    combos: { 'spearJab spearThrust': 0.5, 'spearJab spearJab spearThrust': 0.3 },
+    comboChance: 0.5,
+    tempo: 1,
+    defences: { weaponBlock: 0.4, stepBack: 0.6 },
+    defendChance: 0.72,
+    headMovement: 0.1,
+    plans: { outboxer: 1.6, counter: 1.2, pressure: 0.6, brawler: 0.2 },
+    pressure: 0.05,
+    rangeInside: 0.06,
+  },
+  // Scissor: in scale and a smooth helmet, the left arm cased in a steel
+  // tube ending in a crescent blade that parries and slashes, the gladius in the right.
+  scissor: {
+    label: 'Scissor', weapon: 'gladius', shield: 'scissores', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.9, burst: 0.6, mobility: 0.4 },
+    stance: { blade: 0.45, crouch: 0.08, width: 1.2, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.08, 0.6, -0.14], dir: [1, 0.2, 0.05] },
+    shieldGuard: [0.36, 0.78, 0.06],
+    idle: { bounce: 0.25, sway: 0.5, rock: 0.3 },
+    attacks: { gladiusThrust: 0.4, gladiusCut: 0.3, crescentSlash: 0.3 },
+    combos: { 'crescentSlash gladiusThrust': 0.6, 'gladiusThrust crescentSlash': 0.4 },
+    comboChance: 0.45,
+    tempo: 1.3,
+    defences: { shieldBlock: 0.55, weaponBlock: 0.15, stepBack: 0.3 },
+    defendChance: 0.62,
+    headMovement: 0.08,
+    plans: { pressure: 1.3, brawler: 0.8, counter: 1, outboxer: 0.5 },
+    pressure: 0.3,
   },
   gladius: {
     label: 'Gladius and parma', hidden: true, weapon: 'gladius', shield: 'parma', fallback: 'mix',

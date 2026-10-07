@@ -138,9 +138,9 @@ test('a fall shakes headgear off, even a crest', async () => {
   assert.equal(world.props.find((prop) => prop.kind === 'crest').attached, false);
 });
 
-test('three samurai, three knight and five gladiator armours, five designs each, each with its own protection', async () => {
+test('three samurai, three knight and six gladiator armours, five designs each, each with its own protection', async () => {
   const { familyKinds, randomDesign } = await import('../src/outfits.js');
-  const counts = { samurai: 3, knight: 3, gladiator: 5 };
+  const counts = { samurai: 3, knight: 3, gladiator: 6 };
   for (const [family, count] of Object.entries(counts)) {
     const kinds = familyKinds(family);
     assert.equal(kinds.length, count, family);

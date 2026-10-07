@@ -14,6 +14,7 @@ import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
+import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, woundBlood } from './weaponview.js';
 
@@ -464,6 +465,7 @@ function drawWorld(dt) {
   updateDebris(scene, world);
   endCrowdBatches(scene);
   updateArrows(scene, world);
+  updateNets(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));

@@ -13,14 +13,20 @@ import { measureStyle } from '../tools/aggression.js';
 
 const wearing = (kind) => gearTraits({ ...PRESETS.contender, outfit: { kind, design: 0 } });
 
-test('armour stops each kind of harm by its own share, and adds its weight', () => {
+test('armour stops each kind of harm by its own share, and adds its weight', async () => {
   // A ballistic vest guards the torso against rounds, and little against a blade; the limbs hardly at all.
   assert.deepEqual(wearing('swat').protection, { blunt: 0.5, cut: 0.5, pierce: 0.3, bullet: { head: 0.6, torso: 0.9, limb: 0.1 }, regions: { head: { blunt: 0.7, cut: 0.8, pierce: 0.7 }, limb: { blunt: 0.6, cut: 0.3, pierce: 0.1 } } });
   assert.ok(wearing('specialForces').protection.bullet.torso > wearing('swat').protection.bullet.torso);
   assert.ok(wearing('specialForces').protection.cut < wearing('knight').protection.cut && wearing('specialForces').protection.regions.limb.cut < 0.2);
   assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } });
   assert.deepEqual(wearing('samurai').protection, { blunt: 0.7, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } });
-  assert.deepEqual(wearing('hoplomachus').protection, { blunt: 0.4, cut: 0.4, pierce: 0.2, bullet: { head: 0.3, torso: 0, limb: 0.1 } });
+  // A gladiator: the chest bare, the helmet, the arm and the legs covered, each its own way.
+  const { protectionAt } = await import('../src/physics.js');
+  const hoplomachus = wearing('hoplomachus');
+  assert.equal(protectionAt(hoplomachus, 'trunk').cut, 0);
+  assert.ok(protectionAt(hoplomachus, 'head').cut > 0.9 && protectionAt(hoplomachus, 'head').deflects);
+  assert.ok(protectionAt(hoplomachus, 'lShank').deflects && !protectionAt(hoplomachus, 'lThigh').deflects);
+  assert.ok(protectionAt(hoplomachus, 'rForearm').cut > 0.4 && protectionAt(hoplomachus, 'lForearm').cut === 0, 'the spear arm quilted, the shield arm bare');
   assert.equal(wearing('knight').extraMass, 0.5);
   assert.equal(wearing('samurai').extraMass, 0.4);
   assert.equal(wearing('hoplomachus').extraMass, 0.3);
@@ -277,4 +283,39 @@ test('a war hammer blow on plate staggers the knight: he reels, weaker, rather t
   applyHeadDamage(world, boxer, { ...blow(), harmDeltaV: chinNow(boxer) * 1.2 });
   assert.equal(boxer.state, 'down');
   assert.equal(boxer.stagger, 0);
+});
+
+test('the arena: six kinds, each with its own kit; a shaped shield covers by its true shape', async () => {
+  const { protectionAt, shieldDisc, createWorld: make } = await import('../src/physics.js');
+  const { SHIELDS, shieldClosest, NET } = await import('../src/weapons.js');
+  for (const kind of ['thraex', 'hoplomachus', 'murmillo', 'retiarius', 'scissor', 'secutor']) assert.ok(PRESETS[kind] && STYLES[PRESETS[kind].style], kind);
+  // The retiarius bare-headed, the secutor's smooth helmet turning blades, the scissor in scale.
+  const gear = (kind) => createWorld([{ ...PRESETS[kind] }, { ...PRESETS.contender }]).fighters[0].body.gear;
+  assert.equal(protectionAt(gear('retiarius'), 'head').cut, 0);
+  assert.ok(protectionAt(gear('secutor'), 'head').deflects);
+  assert.ok(protectionAt(gear('scissor'), 'trunk').cut > 0.8 && protectionAt(gear('scissor'), 'lThigh').cut === 0);
+  // The scutum: tall and curved; a point beside the middle at shin height is on it, one past its edge is not.
+  const world = make([{ ...PRESETS.murmillo }, { ...PRESETS.contender }]);
+  const shield = shieldDisc(world.fighters[0]);
+  assert.equal(shield.spec, SHIELDS.scutum);
+  const below = shieldClosest([shield.centre[0], shield.centre[1] - 0.45, shield.centre[2]].map((v, i) => v + shield.normal[i] * 0.05), shield);
+  assert.ok(Math.abs(below[1] - (shield.centre[1] - 0.45)) < 0.02, 'reaches down the leg');
+  const above = shieldClosest([shield.centre[0], shield.centre[1] + 0.8, shield.centre[2]], shield);
+  assert.ok(above[1] < shield.centre[1] + 0.48, 'stops at its top edge');
+  assert.ok(NET.radius > 0.5);
+});
+
+test('the retiarius throws his net; a man in it can neither strike nor guard until he is free', async () => {
+  const { castNet } = await import('../src/physics/net.js');
+  const world = createWorld([{ inputs: structuredClone(PRESETS.retiarius), corner: 'red' }, { inputs: structuredClone(PRESETS.secutor), corner: 'blue' }], { seed: 2, distance: 2.2 });
+  const [retiarius, secutor] = world.fighters;
+  advance(world, 0.3);
+  assert.ok(retiarius.net?.held);
+  assert.ok(castNet(world, retiarius, secutor));
+  assert.equal(retiarius.style, 'tridentTwo', 'both hands on the trident now');
+  for (let t = 0; t < 1.5 && !secutor.netted; t += 1 / 60) advance(world, 1 / 60);
+  assert.ok(secutor.netted, 'caught');
+  assert.equal(throwPunch(world, secutor, 'gladiusThrust'), false, 'no blows in the net');
+  for (let t = 0; t < 40 && secutor.netted; t += 0.1) advance(world, 0.1);
+  assert.ok(!secutor.netted, 'worked free in the end');
 });

@@ -7,6 +7,7 @@ import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
+import { castNet } from './physics/net.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -27,6 +28,8 @@ export const AI = {
   // counts as `focus` m nearer for each m he is nearer him. A shooter running
   // for room weighs each m a spot lies beyond that ground as `escape` m less
   // distance from his pursuer: the run away still wins, but bends homeward.
+  // The retiarius's net: thrown from `from` to `to` m, at `rate` a second while there.
+  net: { from: 1.3, to: 3.2, rate: 1.2 },
   // A man going to take up his fallen standard runs to it from further than `runFor` m.
   cohesion: { radius: 2, radiusPerSqrt: 0.75, ramp: 4, strafe: 0.55, holdBack: 0.7, engaged: 1.2, focus: 0.3, escape: 0.3, runFor: 1.5 },
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
@@ -1113,6 +1116,11 @@ export function think(world, fighter, dt) {
   fighter.goTo = null;
   // The side's standard down, and he nearest it: that first.
   if (takeUpStandard(world, fighter)) return;
+  // The net: thrown once he is in range of a man not already in one.
+  if (fighter.net?.held && opponent.state === 'up' && !opponent.netted) {
+    const apart = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+    if (apart > AI.net.from && apart < AI.net.to && random() < AI.net.rate * dt) castNet(world, fighter, opponent);
+  }
   if (goForWeapon(world, fighter, opponent, dt)) return;
   let style = STYLES[fighter.style];
   const nerve = confidence(fighter, opponent, world);
