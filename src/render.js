@@ -17,7 +17,7 @@ import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, b
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
-import { bakePieces, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
+import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
 import { SoftShell } from './soft.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 
@@ -2536,6 +2536,23 @@ export function updateFighterView(fighterView, dt, time) {
     });
   }
   const fighter = fighterView.fighter;
+  // A crowd fighter lying still (out, his body asleep) is drawn as he was:
+  // nothing of him has moved since (his hips and head are where they were).
+  if (fighterView.baked && fighter.state === 'out') {
+    const still = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 1], fighter.x[P.pelvis * 3 + 2], fighter.x[P.head * 3], fighter.x[P.head * 3 + 1], fighter.x[P.head * 3 + 2]];
+    const was = fighterView.lyingAt;
+    fighterView.lyingAt = still;
+    if (was && still.every((value, index) => value === was[index])) return;
+  }
+  // A crowd fighter standing posed in the ranks (a proxy) is redrawn every
+  // other frame: his pose barely moves, and a big battle has a hundred of him.
+  if (fighterView.baked && fighter.detail === 'proxy') {
+    fighterView.restFrame = !fighterView.restFrame;
+    if (fighterView.restFrame) {
+      addBanner(fighterView);
+      return;
+    }
+  }
   const points = PARTICLES.map((_, index) => point(fighter.x, index));
   const frames = coherentFrames(boneFrames(points, fighter.body), fighterView.frames);
   fighterView.frames = frames;
@@ -2564,8 +2581,7 @@ export function updateFighterView(fighterView, dt, time) {
   if (fighter.damageVersion !== fighterView.damageVersion) paintDamage(fighterView);
   // A baked crowd fighter has no flesh, face or cloth of his own to move.
   if (fighterView.baked) {
-    const banner = fighterView.banner;
-    if (banner && banner.collar.visible && fighterView.layers.skin.visible) banner.batch.add(banner.matrix.multiplyMatrices(banner.collar.matrix, banner.local));
+    addBanner(fighterView);
     if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
     return;
   }
@@ -2577,6 +2593,31 @@ export function updateFighterView(fighterView, dt, time) {
   if (!fighterView.headDetached) fighterView.head.update(step, fighter, time, colliders);
   for (const dangle of fighterView.dangles) dangle.update(step, colliders.slice(1));
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
+}
+
+/**
+ * Ink on crowd fighters only near the camera: beyond CROWD_VIEW.inkDistance
+ * an outline is a pixel or two, and in a big battle each costs a draw call
+ * (two with its shadow) for every man.
+ */
+export function inkNearCamera(view, fighterViews) {
+  const camera = view.camera.position;
+  const far = CROWD_VIEW.inkDistance * CROWD_VIEW.inkDistance;
+  for (const fighterView of fighterViews) {
+    if (!fighterView.baked) continue;
+    const fighter = fighterView.fighter;
+    const dx = fighter.x[P.pelvis * 3] - camera.x;
+    const dy = fighter.x[P.pelvis * 3 + 1] - camera.y;
+    const dz = fighter.x[P.pelvis * 3 + 2] - camera.z;
+    const near = dx * dx + dy * dy + dz * dz < far;
+    for (const mesh of [fighterView.skinMesh, fighterView.steelMesh]) if (mesh?.userData.ink) mesh.userData.ink.visible = near;
+  }
+}
+
+/** A baked crowd fighter's banner, into its side's batch for this frame. */
+function addBanner(fighterView) {
+  const banner = fighterView.banner;
+  if (banner && banner.collar.visible && fighterView.layers.skin.visible) banner.batch.add(banner.matrix.multiplyMatrices(banner.collar.matrix, banner.local));
 }
 
 function updatePhysicsLayer(fighterView) {

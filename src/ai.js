@@ -2,6 +2,7 @@
 // starting, its own stamina) and issues the same commands a player would,
 // choosing from its style's moves those that reach from where it stands.
 
+import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
@@ -201,6 +202,7 @@ function pick(weights, random) {
 /** One AI decision tick for every fighter not driven by the player. */
 export function thinkAll(world, dt, playerIds = new Set()) {
   keepLeaders(world);
+  moveFormations(world, dt);
   // In a big fight, a fighter with nothing happening near him thinks ten
   // times a second (each on his own beat) rather than every step.
   const staggered = fightTier(world) >= 3;
@@ -210,14 +212,14 @@ export function thinkAll(world, dt, playerIds = new Set()) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
       think(world, fighter, dt);
-      keepWithLeader(world, fighter);
+      keepPlace(world, fighter);
       continue;
     }
     // Each on his own beat (offset by his id), so the thinking is spread over the steps.
     fighter.aiOwed = (fighter.aiOwed ?? (fighter.id % 6) * dt) + dt;
     if (fighter.aiOwed < AI.idleThinkEvery - 1e-9) continue;
     think(world, fighter, fighter.aiOwed);
-    keepWithLeader(world, fighter);
+    keepPlace(world, fighter);
     fighter.aiOwed = 0;
   }
 }
@@ -306,6 +308,62 @@ function takeUpStandard(world, fighter) {
   fighter.move = 0;
   // Still tumbling: he waits over it.
   if (debris.resting) startPickup(world, fighter, debris);
+  return true;
+}
+
+/**
+ * After his own decision: a man in the ranks keeps to his slot (not out
+ * past his leash after a blow); anyone else keeps near his side's standard.
+ */
+function keepPlace(world, fighter) {
+  const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
+  if (!formation) {
+    keepWithLeader(world, fighter);
+    return;
+  }
+  if (fighter.state !== 'up' || fighter.clinch || fighter.pin || fighter.pickup || fighter.panicked || fighter.crawling) return;
+  // Out past his leash (after a man, or carried on by a blow): back to his place,
+  // still facing them and free to strike and guard as he goes.
+  if (aheadOfSlot(fighter, formation) > DRILL.leash) {
+    const opponent = fighter.focus === undefined ? null : world.fighters[fighter.focus];
+    walkToSlot(fighter, formation, opponent);
+    fighter.running = false;
+  }
+}
+
+/**
+ * In the ranks: unless the enemy is on his slot (the front rank's to fight,
+ * or anyone's once they are through), he stands in his place facing them.
+ * A loaded shooter in the front rank shoots from it; one who has loosed
+ * spans again in his place. Returns whether that is what he does.
+ */
+function holdRank(world, fighter, opponent, style, dt) {
+  const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
+  if (!formation) return false;
+  const distance = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+  const weapon = fighter.weapon;
+  const gun = style.ranged && weapon?.held && weapon.spec.ranged && !weapon.spent ? style.ranged : null;
+  if (gun) {
+    // Close enough to need the sword: the ordinary way (the crossbow let fall, the sidearm drawn).
+    if (distance <= gun.close) return false;
+    const away = walkToSlot(fighter, formation, opponent);
+    if (weapon.spec.shot && !weapon.loaded) {
+      fighter.reloading = true;
+      return true;
+    }
+    if (!fighter.inFront || fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    const zone = world.random() < gun.headShare ? 'head' : 'body';
+    if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
+      fighter.punch.quick = true;
+      fighter.cooldown = gun.between[0] + world.random() * gun.between[1];
+    }
+    return true;
+  }
+  const reach = reachOf(fighter) + reachOf(opponent);
+  const onHim = opponent.state === 'up' && distance < reach + 0.3;
+  const onSlot = opponent.state === 'up' && fromSlot(fighter, formation, opponent) < reach + DRILL.engage;
+  if (onHim || (fighter.inFront && onSlot)) return false;
+  walkToSlot(fighter, formation, opponent);
   return true;
 }
 
@@ -1138,6 +1196,8 @@ export function think(world, fighter, dt) {
     keepAway(world, fighter, opponent, dt);
     return;
   }
+  // In the ranks: his place first.
+  if (holdRank(world, fighter, opponent, style, dt)) return;
   const bold = AI.confidence;
   const basePlan = chooseStrategy(world, fighter, opponent, dt);
   // Confidence presses: closer, more often inside, quicker to throw, slower
@@ -1179,7 +1239,8 @@ export function think(world, fighter, dt) {
   if (style.attacks.collarTie && !fighter.clinch && !fighter.punch && opponent.clinch?.target === fighter.id && world.random() < AI.tieBackPerSecond * dt) perform(world, fighter, 'collarTie');
   // Facing a gun at a distance, standing off is death: close in, weaving,
   // and charge when near enough.
-  const facingGun = !gun && opponent.weapon?.held && opponent.weapon.spec.ranged && !opponent.weapon.spent && opponent.state === 'up';
+  // (A man in the ranks keeps his place under their shooting: no charge.)
+  const facingGun = !gun && !fighter.slot && opponent.weapon?.held && opponent.weapon.spec.ranged && !opponent.weapon.spent && opponent.state === 'up';
   if (facingGun && distance > AI.gunRush.within) {
     fighter.move = 1;
     // Flat out all the way in: every stride slower is another shot.

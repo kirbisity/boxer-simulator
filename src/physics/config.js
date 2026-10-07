@@ -255,7 +255,8 @@ export const WORLD = {
   // pose his muscles want — until he is engaged again. In both, a hand or
   // blade not striking is tested for contact every other substep. The
   // player's fighter (world.keepFull) is always in full.
-  tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12 },
+  // `proxyEvery`: a proxy's pose is worked out every this many steps (spread over them), for that span.
+  tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12, proxyEvery: 2 },
   gunStartApart: 2.5, // m each side of the centre, when someone carries a gun
   // The clinch: hands locked behind the neck; it breaks when the defender's
   // strength wins or the time runs out.

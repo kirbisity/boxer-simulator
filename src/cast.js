@@ -64,6 +64,24 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
 }
 
 /**
+ * A drilled soldier of a regular army: the preset's man, varied in build
+ * only (height, weight, age, fitness), his kit and looks those of his unit.
+ * One look to a unit keeps a big army to a few crowd templates (bodies are
+ * shared by look and rounded build), so it draws cheaply.
+ */
+export function drilledSoldier(preset, random = Math.random, { name = null } = {}) {
+  const base = normaliseInputs(structuredClone(preset));
+  return normaliseInputs({
+    ...base,
+    name: name ?? pickOne(CAST.names[base.sex], random),
+    heightCm: Math.round(Math.min(200, Math.max(150, base.heightCm + jitter(random) * CAST.height))),
+    calories: Math.round(base.calories * (1 + jitter(random) * CAST.calories)),
+    age: Math.round(Math.min(45, Math.max(18, base.age + jitter(random) * CAST.age))),
+    exercise: Math.min(1, Math.max(0.05, base.exercise + jitter(random) * CAST.exercise)),
+  });
+}
+
+/**
  * The same fighter in another of his armour's designs, among those picked
  * for the game; with `anyKind`, in any armour of the same family (a knight
  * in plate, mail or brigandine). Headgear follows the armour.

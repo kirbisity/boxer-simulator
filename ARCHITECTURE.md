@@ -19,6 +19,7 @@ logic.
 | `src/physics/config.js` | `WORLD`: every physical constant of the fight, each with what it is set against. Tune here. |
 | `src/physics/ranged.js` | Guns, bows and crossbows: aim, fire (rounds, pellets, recoil, rocking), reload (a crossbow is spanned; its `shot.bolt` looses an arrow-like bolt with its own energy), arrows in flight, what a round or arrow does to a body. |
 | `src/physics/grappling.js` | The clinch (holding, driving, throws) and holding a man down. |
+| `src/formation.js` | Drill: a kit with `drill` ({ advance, charge }) fights in ranks. Each drilled man keeps a slot (ahead, across) relative to his side's leader; the anchor walks up (dressing the line, the last `charge` m at a run) or holds; the front rank fights on a leash, the rest stand in their slots (posed: no physics). Fallen men's places are filled from behind in the file; a shooter who has loosed swaps with a loaded man behind. Nothing names a unit. |
 | `src/physics/net.js` | The retiarius's net: thrown, binding a man (no blows, no guard, short steps) until he works or cuts free. Drawn as a soft body by `src/netcloth.js` (cords that only pull, contact with bodies and sand; the physics alone decides who is caught). |
 | `src/ai.js` | Decisions: target, game plan, range, when to strike, defend, pick up a weapon, shoot or reload. `AI` holds its tunables. |
 | `src/cast.js` | Generators for armies (`mingSoldier`, `ottomanSoldier`, `steppeWarrior`, …) and `PERIOD_BUILD`: historical body sizes by people and rank. |
@@ -110,3 +111,9 @@ and adjust only the numbers of each side.
   and belong in `WORLD`.
 - No horses: battles decided from horseback (most steppe battles) cannot be
   recreated faithfully yet.
+- Big battles: 100 a side of drilled troops (`tools/legion.js`) costs ~0.3 s of
+  work per simulated second before contact and ~0.6–0.9 s at contact (Node,
+  M-series); in the browser ~50 fps before contact, ~25 fps at contact, the
+  drawing (one skinned body per man) about half of it. Crowd views draw
+  posed men every other frame, still bodies not at all, and ink only within
+  `CROWD_VIEW.inkDistance` of the camera.

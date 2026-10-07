@@ -66,6 +66,9 @@ export function bulletReference() {
   return referenceSegments;
 }
 
+// A man whose hips are further than this (m) from a round's path has no part of him, or his shield, on it.
+const FAR_OFF_LINE = 1.6;
+
 /** The first thing a round from `from` to `to` meets: a body part or a shield; null if none. */
 export function firstHit(world, shooter, from, to) {
   const length = vec.length(vec.sub(to, from));
@@ -73,6 +76,10 @@ export function firstHit(world, shooter, from, to) {
   let best = null;
   for (const other of world.fighters) {
     if (other === shooter) continue;
+    // Far off the line (his hips more than a body's reach from it, a shield's included): nothing of him is on it.
+    const hips = [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 1], other.x[P.pelvis * 3 + 2]];
+    const along2 = Math.max(0, Math.min(length, vec.dot(vec.sub(hips, from), along)));
+    if (vec.length(vec.sub(hips, vec.add(from, vec.scale(along, along2)))) > FAR_OFF_LINE) continue;
     if (other.shield) {
       const disc = shieldDisc(other);
       const facing = vec.dot(along, disc.normal);

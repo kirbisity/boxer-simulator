@@ -792,7 +792,7 @@ export function netCord() {
 
 // Thrown nets open from a bundle this fraction of their size.
 const NET_GATHER = 0.22;
-const UP = new THREE.Vector3(0, 1, 0);
+const NET_UP = new THREE.Vector3(0, 1, 0);
 const scratch = { matrix: new THREE.Matrix4(), position: new THREE.Vector3(), direction: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3() };
 
 /** Instanced rods along `pairs` of knots (cords) of radius `radius`. */
@@ -830,7 +830,7 @@ function drawNet(parts) {
       scratch.position.set((x[a * 3] + x[b * 3]) / 2, (x[a * 3 + 1] + x[b * 3 + 1]) / 2, (x[a * 3 + 2] + x[b * 3 + 2]) / 2);
       scratch.direction.set(x[b * 3] - x[a * 3], x[b * 3 + 1] - x[a * 3 + 1], x[b * 3 + 2] - x[a * 3 + 2]);
       const length = scratch.direction.length();
-      if (length > 1e-6) scratch.quaternion.setFromUnitVectors(UP, scratch.direction.divideScalar(length));
+      if (length > 1e-6) scratch.quaternion.setFromUnitVectors(NET_UP, scratch.direction.divideScalar(length));
       scratch.scale.set(radius, Math.max(length, 1e-4), radius);
       mesh.setMatrixAt(cord, scratch.matrix.compose(scratch.position, scratch.quaternion, scratch.scale));
     });

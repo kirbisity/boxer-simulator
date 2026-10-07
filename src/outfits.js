@@ -686,6 +686,8 @@ export const OUTFITS = {
   hanSoldier: {
     faction: 'chinese',
     label: 'Han soldier — iron lamellar', movement: 'good', fists: 'bare',
+    // Han crossbowmen stood in ranks and shot, the ranks relieving each other; they held their ground.
+    drill: { advance: false },
     sidearm: 'jian',
     extraMass: 0.18,
     protection: { blunt: 0.4, cut: 0.82, pierce: 0.62, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.05, cut: 0.1, pierce: 0.05 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
@@ -713,6 +715,8 @@ export const OUTFITS = {
   legionary: {
     faction: 'romans', plated: true,
     label: 'Legionary — lorica segmentata', movement: 'good', fists: 'bare',
+    // The legion walked up in its ranks and went in at a run for the last stretch (Caesar, Gallic War I.52).
+    drill: { advance: true, charge: 8 },
     sidearm: 'dagger',
     deflects: true,
     extraMass: 0.28,
@@ -728,6 +732,7 @@ export const OUTFITS = {
   centurion: {
     faction: 'romans', plated: true,
     label: 'Centurion — mail and phalerae', movement: 'good', fists: 'bare',
+    drill: { advance: true, charge: 8 },
     sidearm: 'dagger',
     extraMass: 0.3,
     protection: { blunt: 0.4, cut: 0.92, pierce: 0.55, bullet: { head: 0.3, torso: 0.2, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 }, Shank: { blunt: 0.5, cut: 0.95, pierce: 0.8, deflects: true } } },
@@ -1166,6 +1171,8 @@ export function gearTraits(inputs) {
     deflects: Boolean(spec.deflects),
     // Courage from good armour: less fear, readier to close (0 to 1).
     courage: spec.courage ?? 0,
+    // Trained to fight in ranks (formation.js): { advance, charge } — the line moves up to the enemy (the last `charge` m at a run), or holds.
+    drill: spec.drill ?? null,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
     spare: spec.spare ?? null,

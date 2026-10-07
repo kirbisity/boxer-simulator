@@ -15,6 +15,7 @@ import { WORLD } from './physics/config.js';
 import { aimTargets, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
+import { formUp } from './formation.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -693,7 +694,10 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   const standards = raiseStandards(fighters, random);
   // `rules`: a level's own (noPins: a man down gets up again; nobody holds him there).
-  return { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards };
+  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards };
+  // Drilled men form up on their side's leader (formation.js).
+  formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
+  return world;
 }
 
 /**
@@ -1066,11 +1070,7 @@ function legBroken(fighter) {
 function runCarry(world, fighter, intent, dt) {
   const spec = WORLD.runCarry;
   const speed = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  let nearest = Infinity;
-  for (const other of world.fighters) {
-    if (other.corner === fighter.corner || other.state === 'out') continue;
-    nearest = Math.min(nearest, Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
-  }
+  const nearest = fighter.nearestFoe ?? Infinity;
   const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.crawling || fighter.state !== 'up';
   const running = (fighter.running || speed > spec.runningSpeed) && !busy;
   // Walking about, the guard is down whoever is near.
@@ -1235,13 +1235,18 @@ const moving = [];
 
 /** Advance the world by `dt` seconds (one outer step, several substeps). */
 export function step(world, dt) {
+  measureNearestFoes(world);
+  world.steps = (world.steps ?? 0) + 1;
   for (const fighter of world.fighters) {
     if (fighter.state === 'out') fighter.outFor = (fighter.outFor ?? 0) + dt;
     if (gone(fighter)) continue;
     moveRoot(world, fighter, dt);
     updateTimers(world, fighter, dt);
-    updateIntent(world, fighter, dt);
-    updateFeet(fighter, dt);
+    // A pose (a proxy) is worked out on its own beat, every WORLD.tiers.proxyEvery steps, for that long.
+    if (fighter.detail === 'proxy' && !proxyBeat(world, fighter)) continue;
+    const span = fighter.detail === 'proxy' ? dt * WORLD.tiers.proxyEvery : dt;
+    updateIntent(world, fighter, span);
+    updateFeet(fighter, span);
   }
   chooseDetail(world);
   const h = dt / WORLD.substeps;
@@ -1283,7 +1288,7 @@ export function step(world, dt) {
     for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
     world.pendingImpulses = [];
   }
-  for (const fighter of world.fighters) if (fighter.detail === 'proxy') poseProxy(fighter, dt);
+  for (const fighter of world.fighters) if (fighter.detail === 'proxy' && proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
   for (const fighter of world.fighters) {
     trackHandSpeed(fighter);
     checkBalance(world, fighter);
@@ -1446,7 +1451,8 @@ export function fightTier(world) {
  * exchange — not striking, struck at, just hit, holding or held, rising or
  * played — steps at fewer substeps ('coarse', see WORLD.tiers); in a very big one
  * (tier 4) such a one with no enemy near him, standing, is a 'proxy' (a
- * pose, no physics). Everyone else is in 'full'.
+ * pose, no physics), as is a man standing in the ranks behind the front
+ * (in tier 3 too). Everyone else is in 'full'.
  */
 function chooseDetail(world) {
   const tier = fightTier(world);
@@ -1468,6 +1474,8 @@ function chooseDetail(world) {
       const exchanging = world.keepFull?.has(fighter.id) || fighter.punch || fighter.rush || fighter.clinch || fighter.pin || fighter.pickup
         || targeted.has(fighter.id) || lastHit > world.time - WORLD.tiers.hitMemory || fighter.state === 'rising';
       if (exchanging) fighter.detail = 'full';
+      // A man standing in the ranks behind the front (formation.js) is only a pose, enemy near or not.
+      else if (fighter.slot && !fighter.inFront && fighter.state === 'up' && world.formations?.[fighter.formation]) fighter.detail = 'proxy';
       else if (tier === 3 || fighter.state !== 'up') fighter.detail = 'coarse';
       else fighter.detail = grid.near(index).some((other) => world.fighters[other].corner !== fighter.corner && world.fighters[other].state !== 'out') ? 'coarse' : 'proxy';
     });
@@ -1479,6 +1487,11 @@ function chooseDetail(world) {
       for (let at = 0; at < fighter.x.length; at += 1) fighter.prev[at] = fighter.x[at] - fighter.v[at] * h;
     }
   });
+}
+
+/** Whether this step is a proxy's beat (each on his own, spread by his id). */
+function proxyBeat(world, fighter) {
+  return (world.steps + fighter.id) % WORLD.tiers.proxyEvery === 0;
 }
 
 /**
@@ -1501,6 +1514,43 @@ function poseProxy(fighter, dt) {
   }
   solveConstraints(fighter, dt);
   if (fighter.weapon?.held) updateWeapon(fighter, dt);
+}
+
+/**
+ * Each running fighter's distance to the nearest enemy not out
+ * (`nearestFoe`, m), as far as WORLD.runCarry.relaxFrom; beyond it, or not
+ * running, Infinity (all a running man's arms need to know). A grid, not every pair: a big battle has
+ * thousands of pairs.
+ */
+function measureNearestFoes(world) {
+  const fighters = world.fighters;
+  const reach = WORLD.runCarry.relaxFrom;
+  if (fighters.length <= WORLD.tiers.full) {
+    for (const fighter of fighters) {
+      let nearest = Infinity;
+      for (const other of fighters) {
+        if (other.corner === fighter.corner || other.state === 'out') continue;
+        nearest = Math.min(nearest, Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
+      }
+      fighter.nearestFoe = nearest;
+    }
+    return;
+  }
+  const grid = spatialGrid(fighters.map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]), reach);
+  fighters.forEach((fighter, index) => {
+    let nearest = Infinity;
+    // Only a running man's arms ask (see runCarry).
+    if (!fighter.running && Math.hypot(...(fighter.rootVelocity ?? [0, 0])) <= WORLD.runCarry.runningSpeed) {
+      fighter.nearestFoe = Infinity;
+      return;
+    }
+    for (const other of grid.near(index)) {
+      const foe = fighters[other];
+      if (foe.corner === fighter.corner || foe.state === 'out') continue;
+      nearest = Math.min(nearest, Math.hypot(foe.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], foe.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
+    }
+    fighter.nearestFoe = nearest;
+  });
 }
 
 /**
@@ -2264,7 +2314,9 @@ function collideFighters(world, h, time, substep = 0) {
   // span cannot touch: skip them. In a crowd most pairs are like that.
   const hips = fighters.map((fighter) => point(fighter.x, P.pelvis));
   const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange;
-  for (const fighter of fighters) fighter.reachBound = reachBound(fighter);
+  // (A proxy touches nothing in a big fight: no bound needed.)
+  const big = fighters.length > WORLD.tiers.full;
+  for (const fighter of fighters) if (!big || fighter.detail !== 'proxy') fighter.reachBound = reachBound(fighter);
   // A big fight finds its near pairs through a grid, in the same order as
   // the all-pairs test; a proxy (posed, not simulated) touches nothing.
   if (fighters.length > WORLD.tiers.full) {
@@ -2272,7 +2324,7 @@ function collideFighters(world, h, time, substep = 0) {
     // a big fight's step when made every substep); the exact range each substep.
     if (world.contactCache?.time !== world.time || world.contactCache.count !== fighters.length) {
       const grid = spatialGrid(hips.map((hip) => [hip[0], hip[2]]), WORLD.contactRange + WORLD.contactMargin);
-      world.contactCache = { time: world.time, count: fighters.length, near: fighters.map((_, index) => grid.near(index)) };
+      world.contactCache = { time: world.time, count: fighters.length, near: fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index))) };
     }
     const range = WORLD.contactRange * WORLD.contactRange;
     const within = (a, b) => (hips[a][0] - hips[b][0]) ** 2 + (hips[a][2] - hips[b][2]) ** 2 < range;

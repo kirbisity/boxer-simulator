@@ -2,11 +2,22 @@
 // same bodies, physics and AI as the sandbox — only the place, the people
 // and what they wear differ.
 
-import { FRAMES, normaliseInputs } from './body.js';
+import { FRAMES, normaliseInputs, PRESETS } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
-import { europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+import { drilledSoldier, europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+
+// Rome against Han: a hundred a side, twenty to a rank; a centurion to every
+// eighty legionaries (a century), Li Ling among his crossbowmen.
+export const LEGION = { perSide: 100, arena: { halfX: 30, halfZ: 16 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 20 }, romanFront: 14, hanFront: 3, century: 80 };
+
+/** The two armies of Rome against Han, `count` a side. */
+export function legionSides(random, count = LEGION.perSide) {
+  const red = Array.from({ length: count }, (_, index) => drilledSoldier(index % LEGION.century === 0 ? PRESETS.centurion : PRESETS.legionary, random, index === 0 ? { name: PRESETS.centurion.name } : {}));
+  const blue = Array.from({ length: count }, (_, index) => drilledSoldier(PRESETS.hanCrossbow, random, index === Math.floor(LEGION.ranks.perRow / 2) ? { name: PRESETS.hanCrossbow.name } : {}));
+  return { red, blue };
+}
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -110,6 +121,23 @@ const RHODES = {
 };
 
 export const SCENARIOS = {
+  // A what-if, not a battle that was: a legion of the early Empire against
+  // a Han army of crossbowmen, as Li Ling's five thousand (99 BC) stood
+  // against the Xiongnu. Two drilled armies of a hundred, in ranks
+  // (formation.js): the legion walks up in its lines, the Han hold theirs
+  // and shoot, the ranks relieving each other.
+  legion: {
+    title: 'Rome against Han',
+    place: 'A what-if · the 1st century',
+    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: a hundred legionaries in segmented iron with scutum and gladius, walking up in their ranks under a hundred crossbows; the front ranks meet, the rest hold their places.',
+    scene: 'plain',
+    arena: LEGION.arena,
+    camera: { yaw: -0.5, pitch: 0.45, distance: 26, maxDistance: 34 },
+    roster: 'A hundred a side: legionaries and Han crossbowmen',
+    formation: { red: { ...LEGION.ranks, front: LEGION.romanFront }, blue: { ...LEGION.ranks, front: LEGION.hanFront } },
+    cast: (random) => legionSides(random),
+    fighters: [],
+  },
   rebellion: {
     title: 'Peasant Rebellion',
     place: 'The market square, Maidstone, Kent · June 1381',

@@ -17,6 +17,8 @@ export const CROWD_VIEW = {
   // Only pieces this big (triangles), seen from one side, keep their ink: a
   // small or two-sided piece's outline shows through what lies over it.
   outlineTriangles: 600,
+  // Crowd fighters further than this (m) from the camera are drawn without ink.
+  inkDistance: 16,
   // Copies an instanced batch starts with room for (it doubles when full).
   batchCapacity: 64,
 };
