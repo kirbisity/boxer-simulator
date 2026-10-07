@@ -21,6 +21,11 @@ export const DRILL = {
   contact: 1.1,
   // Inside the kit's `charge` distance (m of gap) the line goes in at a run.
   chargePace: 3,
+  // The testudo (a kit's `drill.testudo`): advancing under their missiles, out
+  // beyond the charge, the ranks close to `close` of their spacing (eased in
+  // at `ease` a second), the front rank's shields square before it, the
+  // rest raised overhead as a roof; it walks at `pace`.
+  testudo: { close: 0.7, ease: 1.2, pace: 0.7 },
   // The line dresses as it goes: the anchor waits while its men are on
   // average further than this (m) from their slots.
   dressed: 0.8,
@@ -83,11 +88,12 @@ export function formUp(world, leaderOf = () => null) {
   }
 }
 
-/** Where a slot is on the floor ([x, z]). */
+/** Where a slot is on the floor ([x, z]): closed up toward the anchor as the formation is (`close`). */
 export function slotAt(formation, slot) {
+  const close = formation.close ?? 1;
   return [
-    formation.anchor[0] + formation.forward[0] * slot.ahead + formation.left[0] * slot.across,
-    formation.anchor[1] + formation.forward[1] * slot.ahead + formation.left[1] * slot.across,
+    formation.anchor[0] + (formation.forward[0] * slot.ahead + formation.left[0] * slot.across) * close,
+    formation.anchor[1] + (formation.forward[1] * slot.ahead + formation.left[1] * slot.across) * close,
   ];
 }
 
@@ -119,12 +125,21 @@ export function moveFormations(world, dt) {
     }
     formation.lag = lag;
     const charging = formation.drill.charge && gap < formation.drill.charge;
+    // The testudo while they come on under the missiles, opened for the charge (or at contact).
+    formation.testudo = Boolean(formation.drill.testudo) && !charging && gap > DRILL.contact;
+    const closeTo = formation.testudo ? DRILL.testudo.close : 1;
+    formation.close = (formation.close ?? 1) + (closeTo - (formation.close ?? 1)) * Math.min(1, DRILL.testudo.ease * dt);
     if (formation.drill.advance && gap > DRILL.contact && (charging || lag < DRILL.dressed)) {
-      const step = Math.min((charging ? DRILL.chargePace : DRILL.pace) * dt, gap - DRILL.contact);
+      const pace = charging ? DRILL.chargePace : formation.testudo ? DRILL.testudo.pace : DRILL.pace;
+      const step = Math.min(pace * dt, gap - DRILL.contact);
       formation.anchor = [formation.anchor[0] + formation.forward[0] * step, formation.anchor[1] + formation.forward[1] * step];
     }
     formation.gap = gap;
-    for (const fighter of members) fighter.inFront = holding(fighter) && fighter.slot.ahead >= front - DRILL.frontDepth;
+    for (const fighter of members) {
+      fighter.inFront = holding(fighter) && fighter.slot.ahead >= front - DRILL.frontDepth;
+      // In the testudo: the front rank's shields a wall, the rest a roof.
+      fighter.shieldPose = formation.testudo && fighter.shield ? (fighter.inFront ? 'wall' : 'roof') : null;
+    }
     formation.review -= dt;
     if (formation.review > 0) continue;
     formation.review = DRILL.reviewEvery;

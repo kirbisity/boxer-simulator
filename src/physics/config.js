@@ -296,7 +296,10 @@ export const WORLD = {
   // the likelier the further past), or with the arm that held it broken or
   // gone. On the floor it is a plate of its own weight; a man of a shield
   // style without his takes it up again.
-  shield: { dropOnFall: 0.75, wrench: 42, wrenchRise: 1.5 },
+  // `wall` and `roof`: where the shield hand goes (heights) in a testudo
+  // (formation.js): square before the chest, or up over the head; `roofTilt`,
+  // how far forward a raised shield leans (of its facing).
+  shield: { dropOnFall: 0.75, wrench: 42, wrenchRise: 1.5, wall: [0.36, 0.7, 0.1], roof: [0.26, 0.96, 0.03], roofTilt: 1.1 },
   weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).

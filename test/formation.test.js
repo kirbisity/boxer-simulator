@@ -44,7 +44,8 @@ test('the legion walks up in its ranks and the Han hold theirs; nobody runs on d
       for (const id of formation.members) {
         const fighter = world.fighters[id];
         if (fighter.state !== 'up') continue;
-        deepest = Math.max(deepest, aheadOfSlot(fighter, formation));
+        // A shooter just relieved walks back to his new place: not out of place.
+        if (world.time - (fighter.swappedAt ?? -Infinity) > 4) deepest = Math.max(deepest, aheadOfSlot(fighter, formation));
         if (!fighter.inFront && !fighter.punch) {
           behind += 1;
           if (fighter.detail === 'proxy') posedBehind += 1;
@@ -72,4 +73,28 @@ test('a fallen man in the front rank: the man behind him in his file steps into 
   formation.review = 0;
   moveFormations(world, 1 / 60);
   assert.deepEqual(behind.slot, place);
+});
+
+test('the testudo: closed up on the approach, the front rank\'s shields a wall, the rest a roof; opened for the charge', async () => {
+  const { shieldDisc } = await import('../src/physics.js');
+  const world = battle(40);
+  const formation = world.formations.red;
+  let closed = false;
+  let opened = false;
+  for (let second = 0; second < 30 && !opened; second += 1) {
+    advance(world, 1, (current, dt) => thinkAll(current, dt));
+    if (formation.testudo && formation.close < 0.75) {
+      closed = true;
+      const men = formation.members.map((id) => world.fighters[id]).filter((fighter) => fighter.state === 'up' && fighter.shield && !fighter.defence);
+      const roofs = men.filter((fighter) => fighter.shieldPose === 'roof');
+      const walls = men.filter((fighter) => fighter.shieldPose === 'wall');
+      assert.ok(roofs.length && walls.length, 'a roof and a wall');
+      assert.ok(roofs.every((fighter) => shieldDisc(fighter).normal[1] > 0.5), 'the roof faces up');
+      assert.ok(walls.every((fighter) => Math.abs(shieldDisc(fighter).normal[1]) < 0.5), 'the wall faces forward');
+    }
+    if (closed && !formation.testudo) opened = true;
+  }
+  assert.ok(closed, 'it closed up into the testudo');
+  assert.ok(opened, 'and opened out for the charge');
+  assert.ok(formation.gap > 0, 'before the lines met');
 });

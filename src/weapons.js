@@ -491,6 +491,9 @@ export const WEAPONS = {
     // The Mexica pamitl: a captain's device on a frame up his back, a disc of
     // feather-work under a spray of quetzal plumes; fallen, it is carried in the hands.
     ['pamitl', 'Pamitl', 'mexica'],
+    // The Roman vexillum: a square red cloth hung from a crossbar under the
+    // point, a gold fringe, the legion's name in gold.
+    ['vexillum', 'Vexillum', 'romans'],
   ].map(([kind, label, flag]) => [kind, {
     label, flag, hands: 'two', length: 1.75, strikeFrom: -0.6, handle: 0.85, spacing: 0.45, leadAhead: true, mass: 3.5, balance: 0.75, radius: 0.018,
     harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7, pierce: 0.3 } },

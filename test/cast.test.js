@@ -99,7 +99,7 @@ test('Sekigahara: forty a side, samurai and ashigaru each with several weapons, 
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.sekigahara.cast(seededRandom(7));
   for (const side of [cast.red, cast.blue]) {
-    assert.equal(side.length, 40);
+    assert.equal(side.length, 30);
     const samurai = side.filter((fighter) => fighter.outfit.kind !== 'ashigaru');
     const ashigaru = side.filter((fighter) => fighter.outfit.kind === 'ashigaru');
     assert.ok(new Set(samurai.map((fighter) => fighter.style)).size >= 3, 'samurai weapons differ');

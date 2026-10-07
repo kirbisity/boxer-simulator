@@ -147,6 +147,34 @@ function buildStandard(spec, colour, envMap) {
       group.add(flag, spearPoint());
       break;
     }
+    case 'romans': {
+      // The vexillum: a crossbar under the point, the cloth hung square from
+      // it (in the staff's plane, both sides of it), a gold fringe along the
+      // foot, the legion in gold letters; gilt finials at the bar's ends.
+      const gold = steelMaterial(envMap, { vertexColors: false, color: 0xc9a24a, roughness: 0.3 });
+      const bar = cylinder(0.009, 0.009, -0.3, 0.3, wood, 6);
+      bar.rotation.x = Math.PI / 2;
+      bar.position.y = top - 0.06;
+      const flag = cloth(0.56, 0.5, (g, w, h) => {
+        g.fillStyle = '#d6a743';
+        g.fillRect(0, h * 0.9, w, h * 0.1);
+        for (let tassel = 0; tassel < 9; tassel += 1) g.fillRect((tassel + 0.3) * (w / 9), h * 0.86, w / 30, h * 0.14);
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.font = `bold ${Math.round(h * 0.2)}px serif`;
+        g.fillText('LEG', w / 2, h * 0.36);
+        g.fillText('XVIII', w / 2, h * 0.62);
+      });
+      // Hung below the bar, centred on the staff (the cloth's x runs along the bar).
+      flag.position.set(0, top - 0.32, 0);
+      group.add(bar, flag, spearPoint());
+      for (const side of [1, -1]) {
+        const finial = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), gold);
+        finial.position.set(0, top - 0.06, side * 0.3);
+        group.add(finial);
+      }
+      break;
+    }
     case 'chinese': {
       // A right triangle off the staff, a border of yellow flame tongues, a red tassel under the point.
       const shape = new THREE.Shape();

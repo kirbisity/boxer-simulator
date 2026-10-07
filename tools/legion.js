@@ -2,11 +2,11 @@
 // How fast the simulation runs (ms of work per simulated second, in
 // windows), how many bodies are in full physics, coarse or posed, how far
 // the ranks hold, and how the battle goes.
-// Usage: node tools/legion.js [perSide=100] [seconds=60] [seed=1]
+// Usage: node tools/legion.js [perSide=50 (the level's)] [seconds=60] [seed=1]
 
 import { thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld, seededRandom } from '../src/physics.js';
-import { legionSides, SCENARIOS } from '../src/scenarios.js';
+import { LEGION, legionSides, SCENARIOS } from '../src/scenarios.js';
 import { P } from '../src/body.js';
 import { aheadOfSlot, slotAt } from '../src/formation.js';
 
@@ -60,7 +60,7 @@ export function runBattle(world, { seconds = 60, window = 5, log = console.log }
 }
 
 if (typeof process !== 'undefined' && import.meta.url === `file://${process.argv[1]}`) {
-  const count = Number(process.argv[2] ?? 100);
+  const count = Number(process.argv[2] ?? LEGION.perSide);
   const seconds = Number(process.argv[3] ?? 60);
   const seed = Number(process.argv[4] ?? 1);
   const result = runBattle(legionBattle(count, { seed }), { seconds });

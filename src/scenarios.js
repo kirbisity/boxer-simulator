@@ -8,9 +8,9 @@ import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { drilledSoldier, europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
-// Rome against Han: a hundred a side, twenty to a rank; a centurion to every
+// Rome against Han: fifty a side, ten to a rank; a centurion to every
 // eighty legionaries (a century), Li Ling among his crossbowmen.
-export const LEGION = { perSide: 100, arena: { halfX: 30, halfZ: 16 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 20 }, romanFront: 14, hanFront: 3, century: 80 };
+export const LEGION = { perSide: 50, arena: { halfX: 26, halfZ: 12 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 10 }, romanFront: 14, hanFront: 3, century: 80 };
 
 /** The two armies of Rome against Han, `count` a side. */
 export function legionSides(random, count = LEGION.perSide) {
@@ -26,12 +26,12 @@ export function legionSides(random, count = LEGION.perSide) {
  * the bout is built, as the builder's slider would.
  */
 
-// One side at Sekigahara, forty strong: a samurai leads; the ashigaru are
+// One side at Sekigahara, thirty strong: a samurai leads; the ashigaru are
 // mostly yari, with bows and teppō. Blades and polearms first (the front
 // ranks), the bows and guns last.
 const SEKIGAHARA_SIDE = {
-  samurai: { katana: 4, naginata: 3, spear: 3, bow: 2 },
-  ashigaru: { spear: 12, bow: 5, matchlock: 4, katana: 5, naginata: 2 },
+  samurai: { katana: 3, naginata: 2, spear: 2, bow: 2 },
+  ashigaru: { spear: 9, bow: 4, matchlock: 3, katana: 4, naginata: 1 },
 };
 
 function sekigaharaSide(random, side) {
@@ -123,17 +123,17 @@ const RHODES = {
 export const SCENARIOS = {
   // A what-if, not a battle that was: a legion of the early Empire against
   // a Han army of crossbowmen, as Li Ling's five thousand (99 BC) stood
-  // against the Xiongnu. Two drilled armies of a hundred, in ranks
+  // against the Xiongnu. Two drilled armies of fifty, in ranks
   // (formation.js): the legion walks up in its lines, the Han hold theirs
   // and shoot, the ranks relieving each other.
   legion: {
     title: 'Rome against Han',
     place: 'A what-if · the 1st century',
-    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: a hundred legionaries in segmented iron with scutum and gladius, walking up in their ranks under a hundred crossbows; the front ranks meet, the rest hold their places.',
+    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: fifty legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into fifty crossbows; the front ranks meet, the rest hold their places.',
     scene: 'plain',
     arena: LEGION.arena,
-    camera: { yaw: -0.5, pitch: 0.45, distance: 26, maxDistance: 34 },
-    roster: 'A hundred a side: legionaries and Han crossbowmen',
+    camera: { yaw: -0.5, pitch: 0.45, distance: 20, maxDistance: 26 },
+    roster: 'Fifty a side: legionaries and Han crossbowmen',
     formation: { red: { ...LEGION.ranks, front: LEGION.romanFront }, blue: { ...LEGION.ranks, front: LEGION.hanFront } },
     cast: (random) => legionSides(random),
     fighters: [],
@@ -159,11 +159,11 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: 'The battle that ends the Sengoku. Forty of the East in red against forty of the West in black and blue: spears, blades and polearms in front, bows and teppō behind.',
+    blurb: 'The battle that ends the Sengoku. Thirty of the East in red against thirty of the West in black and blue: spears, blades and polearms in front, bows and teppō behind.',
     scene: 'sengoku',
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
-    roster: 'Forty a side: samurai and ashigaru',
+    roster: 'Thirty a side: samurai and ashigaru',
     // Ten abreast: the blades and polearms in the front ranks, the bows behind.
     formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, perRow: 10, loose: 0.3 } },
     cast: (random) => {

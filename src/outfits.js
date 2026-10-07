@@ -715,8 +715,8 @@ export const OUTFITS = {
   legionary: {
     faction: 'romans', plated: true,
     label: 'Legionary — lorica segmentata', movement: 'good', fists: 'bare',
-    // The legion walked up in its ranks and went in at a run for the last stretch (Caesar, Gallic War I.52).
-    drill: { advance: true, charge: 8 },
+    // The legion walked up in its ranks (under missiles, in the testudo: shields locked in front and overhead) and went in at a run for the last stretch (Caesar, Gallic War I.52; Cassius Dio 49.30).
+    drill: { advance: true, charge: 8, testudo: true },
     sidearm: 'dagger',
     deflects: true,
     extraMass: 0.28,
@@ -732,7 +732,7 @@ export const OUTFITS = {
   centurion: {
     faction: 'romans', plated: true,
     label: 'Centurion — mail and phalerae', movement: 'good', fists: 'bare',
-    drill: { advance: true, charge: 8 },
+    drill: { advance: true, charge: 8, testudo: true },
     sidearm: 'dagger',
     extraMass: 0.3,
     protection: { blunt: 0.4, cut: 0.92, pierce: 0.55, bullet: { head: 0.3, torso: 0.2, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 }, Shank: { blunt: 0.5, cut: 0.95, pierce: 0.8, deflects: true } } },
@@ -1132,7 +1132,7 @@ export const FACTIONS = {
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
-  romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'banner', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
+  romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
   law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT and special forces: the baton, the service pistol, the shotgun and the AR-15.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
@@ -1171,7 +1171,7 @@ export function gearTraits(inputs) {
     deflects: Boolean(spec.deflects),
     // Courage from good armour: less fear, readier to close (0 to 1).
     courage: spec.courage ?? 0,
-    // Trained to fight in ranks (formation.js): { advance, charge } — the line moves up to the enemy (the last `charge` m at a run), or holds.
+    // Trained to fight in ranks (formation.js): { advance, charge, testudo } — the line moves up to the enemy (closed under its shields if `testudo`; the last `charge` m at a run), or holds.
     drill: spec.drill ?? null,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,

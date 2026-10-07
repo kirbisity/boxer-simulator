@@ -409,7 +409,9 @@ function weaponIntent(world, fighter, intent) {
     // The shield arm before the chest, punched out to meet a strike.
     const blocking = fighter.defence?.name === 'shieldBlock';
     const guard = style.shieldGuard ?? [0.3, 0.72, 0.05];
-    intent.lHand = vec.scale(blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard, H);
+    // In a testudo the shield is the formation's: a wall before him or a roof over him.
+    const pose = !blocking && fighter.shieldPose ? WORLD.shield[fighter.shieldPose] : null;
+    intent.lHand = vec.scale(pose ?? (blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard), H);
   }
   // The net held out in the off hand, ready to throw.
   if (fighter.net?.held && style.netGuard && !fighter.shield) intent.lHand = vec.scale(style.netGuard, H);
@@ -618,6 +620,16 @@ export function shieldDisc(fighter) {
   // Upright (a shaped shield is held so), and across it: the frame it is drawn and struck in.
   let up = vec.sub([0, 1, 0], vec.scale(normal, normal[1]));
   up = vec.length(up) > 1e-6 ? vec.normalize(up) : [0, 1, 0];
+  // Locked in a wall (a testudo's front): square to the front, upright.
+  if (fighter.shieldPose === 'wall' && fighter.defence?.name !== 'shieldBlock') {
+    normal = forward;
+    up = [0, 1, 0];
+  }
+  // Raised as a roof (a testudo): facing up, leaning forward; its length runs forward.
+  if (fighter.shieldPose === 'roof' && fighter.defence?.name !== 'shieldBlock') {
+    normal = vec.normalize(vec.add([0, 1, 0], vec.scale(forward, WORLD.shield.roofTilt)));
+    up = vec.normalize(vec.sub(forward, vec.scale(normal, vec.dot(forward, normal))));
+  }
   const across = vec.cross(up, normal);
   // A shaped shield is gripped at its middle; a round one rides the forearm.
   const centre = spec.shape ? vec.add(hand, vec.scale(normal, spec.offset)) : vec.add(vec.lerp(elbow, hand, 0.55), vec.scale(normal, spec.offset));
