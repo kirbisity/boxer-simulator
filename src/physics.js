@@ -3028,7 +3028,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * closing * closing;
   const mix = harmMix(wspec, spec.mode, along, closest.s);
-  const protection = protectionAt(body.gear, capsule.key);
+  const covered = protectionAt(body.gear, capsule.key);
+  // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
+  const gaps = BLADES.gaps;
+  const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < (spec.mode === 'thrust' ? gaps.thrust : gaps.swing) * attacker.body.technique;
+  const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (wspec.contactSeconds * (1 + 0.6 * (1 - firmness)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
@@ -3057,6 +3061,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     event.effects.push('glanced off the plate');
     world.events.push({ time: world.time, kind: 'glance', fighter: defender.id, point: contactPoint, normal });
   }
+  if (intoGap) event.effects.push('into a gap in the armour');
   if (cut > 0.5) {
     wound(defender, 'cut', cut, capsule.key, attacker);
     addDamage(defender, capsule.key, cut / 6, false);

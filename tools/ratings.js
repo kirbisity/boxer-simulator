@@ -70,42 +70,100 @@ function records(warrior, bouts) {
   return { key: warrior.key, title: warrior.title, type: `${warrior.inputs.style}|${warrior.inputs.outfit?.kind ?? 'boxing'}`, records: Object.fromEntries(Object.entries(RATING.references).map(([name, reference]) => [name, record(warrior.inputs, reference, bouts)])) };
 }
 
+/**
+ * Every strength at once from all the bouts (Bradley-Terry by Hunter's MM
+ * steps): `games` [{ a, b, record }] of a's record against b. Half a bout
+ * either way is added to each pairing; `anchor` is held at `at`.
+ */
+export function fitAll(games, anchor, at = 100, steps = 2000) {
+  const names = [...new Set(games.flatMap((game) => [game.a, game.b]))];
+  const strength = Object.fromEntries(names.map((name) => [name, 1]));
+  const won = Object.fromEntries(names.map((name) => [name, 0]));
+  for (const { a, b, record } of games) {
+    won[a] += record.wins + record.draws / 2 + 0.5;
+    won[b] += record.losses + record.draws / 2 + 0.5;
+  }
+  for (let step = 0; step < steps; step += 1) {
+    const sums = Object.fromEntries(names.map((name) => [name, 0]));
+    for (const { a, b, record } of games) {
+      const bouts = record.wins + record.losses + record.draws + 1;
+      const share = bouts / (strength[a] + strength[b]);
+      sums[a] += share;
+      sums[b] += share;
+    }
+    for (const name of names) strength[name] = won[name] / sums[name];
+    const scale = at / strength[anchor];
+    for (const name of names) strength[name] *= scale;
+  }
+  return strength;
+}
+
+/** Fork `workers` children, each given a share of `jobs` (with `mode`); gather what they send back. */
+async function inParallel(mode, jobs, bouts, workers) {
+  const share = Math.ceil(jobs.length / workers);
+  const parts = await Promise.all(Array.from({ length: workers }, (_, index) => new Promise((resolve, reject) => {
+    const slice = jobs.slice(index * share, (index + 1) * share);
+    if (!slice.length) return resolve([]);
+    const child = fork(fileURLToPath(import.meta.url), [mode, JSON.stringify(slice), bouts]);
+    child.on('message', resolve);
+    child.on('error', reject);
+  })));
+  return parts.flat();
+}
+
+const rounded = (value) => (value < 10 ? Math.round(value * 10) / 10 : Math.round(value));
+
 const [mode, ...args] = process.argv.slice(2);
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  if (mode === 'worker') {
-    const [from, to, bouts] = args.map(Number);
-    process.send(WARRIORS.slice(from, to).map((warrior) => records(warrior, bouts)));
+  const byKey = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, warrior]));
+  if (mode === 'references') {
+    // A share of the roster against the references.
+    const [keys, bouts] = [JSON.parse(args[0]), Number(args[1])];
+    process.send(keys.map((key) => records(byKey[key], bouts)));
+  } else if (mode === 'pairs') {
+    // A share of the cross pairs: each [a, b], a's record against b.
+    const [pairs, bouts] = [JSON.parse(args[0]), Number(args[1])];
+    process.send(pairs.map(([a, b]) => ({ a, b, record: record(byKey[a].inputs, byKey[b].inputs, bouts) })));
   } else {
     const bouts = Number(mode ?? 16);
     const workers = Number(args[0] ?? 10);
-    const share = Math.ceil(WARRIORS.length / workers);
+    const crossBouts = Number(args[1] ?? Math.max(4, bouts / 2));
     const started = Date.now();
-    const parts = await Promise.all(Array.from({ length: workers }, (_, index) => new Promise((resolve, reject) => {
-      const child = fork(fileURLToPath(import.meta.url), ['worker', index * share, Math.min(WARRIORS.length, (index + 1) * share), bouts]);
-      child.on('message', resolve);
-      child.on('error', reject);
-    })));
-    // The references' strengths: Maximus 100, the monk by Maximus's record against him.
-    const all = parts.flat();
-    const maximusRecord = all.find((entry) => entry.key === 'maximus').records.monk;
-    const strengths = { maximus: 100, monk: 100 / kd(maximusRecord) };
-    const rated = all.map((entry) => {
-      const strength = fitStrength(Object.entries(entry.records).map(([name, tally]) => ({ record: tally, strength: strengths[name] })));
-      // Whole numbers, but a tenth below 10 (the weak end is told apart there).
-      return { ...entry, score: strength < 10 ? Math.round(strength * 10) / 10 : Math.round(strength), kd: Object.fromEntries(Object.entries(entry.records).map(([name, tally]) => [name, Number(kd(tally).toFixed(3))])) };
+    // First, everyone against the two references.
+    const first = await inParallel('references', WARRIORS.map((warrior) => warrior.key), bouts, workers);
+    const referenceKey = { maximus: 'maximus', monk: 'shaolin' };
+    const games = first.flatMap((entry) => Object.entries(entry.records).map(([name, tally]) => ({ a: entry.key, b: referenceKey[name], record: tally })))
+      // A reference against himself is no evidence.
+      .filter((game) => game.a !== game.b);
+    const provisional = fitAll(games, 'maximus');
+    // Then each against the two rated nearest him (on the log scale): neighbours checked directly, not only through the references.
+    const order = Object.keys(provisional).sort((a, b) => provisional[a] - provisional[b]);
+    const pairs = new Map();
+    order.forEach((key, index) => {
+      const near = order.filter((other) => other !== key).sort((x, y) => Math.abs(Math.log(provisional[x] / provisional[key])) - Math.abs(Math.log(provisional[y] / provisional[key]))).slice(0, 2);
+      for (const other of near) {
+        const pair = [key, other].sort();
+        pairs.set(pair.join('|'), pair);
+      }
     });
+    const cross = await inParallel('pairs', [...pairs.values()], crossBouts, workers);
+    const strength = fitAll([...games, ...cross], 'maximus');
+    const rated = first.map((entry) => ({
+      ...entry,
+      score: rounded(strength[entry.key]),
+      provisional: rounded(provisional[entry.key]),
+      kd: Object.fromEntries(Object.entries(entry.records).map(([name, tally]) => [name, Number(kd(tally).toFixed(3))])),
+    }));
     const characters = Object.fromEntries(rated.map(({ key, ...rest }) => [key, rest]));
     // A type (style and armour) is rated by its characters' geometric mean.
     const byType = {};
-    for (const entry of rated) (byType[entry.type] ??= []).push(entry.score);
-    const types = Object.fromEntries(Object.entries(byType).map(([type, scores]) => {
-      const mean = Math.exp(scores.reduce((sum, value) => sum + Math.log(value), 0) / scores.length);
-      return [type, mean < 10 ? Math.round(mean * 10) / 10 : Math.round(mean)];
-    }));
-    const header = `// GENERATED by tools/ratings.js (${bouts} bouts from each corner against each reference) — do not edit by hand; re-run the tool.\n// Score = fitted strength (Bradley-Terry) from records against Maximus (100) and Tanzong the staff monk: ∝ inferred K/D.\n`;
-    const body = `export const RATINGS = ${JSON.stringify({ references: Object.keys(RATING.references), strengths, bouts, characters, types }, null, 1)};\n`;
+    for (const entry of rated) (byType[entry.type] ??= []).push(strength[entry.key]);
+    const types = Object.fromEntries(Object.entries(byType).map(([type, values]) => [type, rounded(Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length))]));
+    const crossRecords = cross.map(({ a, b, record: tally }) => ({ a, b, ...tally }));
+    const header = `// GENERATED by tools/ratings.js (${bouts} bouts a corner against each reference, ${crossBouts} against each of two nearest-rated) — do not edit by hand; re-run the tool.\n// Score = strength fitted to all those bouts at once (Bradley-Terry), Maximus held at 100: ∝ inferred K/D.\n`;
+    const body = `export const RATINGS = ${JSON.stringify({ references: Object.keys(RATING.references), bouts, crossBouts, characters, types, cross: crossRecords }, null, 1)};\n`;
     writeFileSync(new URL('../src/ratings.js', import.meta.url), header + body);
-    for (const entry of [...rated].sort((a, b) => b.score - a.score)) console.log(`${String(entry.score).padStart(6)}  ${entry.title.padEnd(26)} ${entry.type.padEnd(30)} K/D ${entry.kd.maximus} / ${entry.kd.monk}`);
-    console.log(`${rated.length} characters, ${((Date.now() - started) / 1000).toFixed(0)} s`);
+    for (const entry of [...rated].sort((a, b) => strength[b.key] - strength[a.key])) console.log(`${String(entry.score).padStart(6)}  (was ${String(entry.provisional).padStart(5)})  ${entry.title.padEnd(26)} ${entry.type.padEnd(30)} K/D ${entry.kd.maximus} / ${entry.kd.monk}`);
+    console.log(`${rated.length} characters, ${pairs.size} cross pairs, ${((Date.now() - started) / 1000).toFixed(0)} s`);
   }
 }

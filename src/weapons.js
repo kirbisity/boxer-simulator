@@ -564,6 +564,13 @@ export function segmentToShield(a, b, shield, samples = 10) {
 export const BLADES = {
   // Armour this proof against cuts chips a brittle (obsidian) edge.
   chipsOn: 0.6,
+  // Rigid armour (proof against cuts from `rigidFrom`) has gaps: the
+  // armpits, the inside of the elbow, the groin, the visor's slit, the
+  // lacing between lamellae. A blow finds one this often (a point far more
+  // than an edge; × the striker's technique), and meets there only what is
+  // under it (`under`: the arming doublet, a mail voider), and does not
+  // glance. Fighting in armour was largely the art of finding them.
+  gaps: { rigidFrom: 0.75, thrust: 0.25, swing: 0.06, under: { blunt: 0.25, cut: 0.3, pierce: 0.2 } },
   sever: {
     // joint: [J for a typical limb, the segment whose thickness scales it, typical radius m]
     wrist: [40, 'Forearm', 0.035], elbow: [70, 'Forearm', 0.04], shoulder: [125, 'UpperArm', 0.05],

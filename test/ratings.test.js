@@ -4,7 +4,7 @@ import { PRESETS } from '../src/body.js';
 import { RATINGS } from '../src/ratings.js';
 import { pairedOpponent, ratingOf, WARRIORS } from '../src/roster.js';
 import { seededRandom } from '../src/physics.js';
-import { fitStrength, kd } from '../tools/ratings.js';
+import { fitAll, fitStrength, kd } from '../tools/ratings.js';
 
 test('every character in the roster has a rating, and every rating comes from the generated table', () => {
   for (const warrior of WARRIORS) {
@@ -14,18 +14,19 @@ test('every character in the roster has a rating, and every rating comes from th
   assert.deepEqual(RATINGS.references, ['maximus', 'monk']);
 });
 
-test('a score is proportional to inferred K/D: even with Maximus is 100, twice his K/D is 200; the monk places the weak', () => {
-  const strengths = RATINGS.strengths;
-  assert.equal(strengths.maximus, 100);
-  const even = fitStrength([{ record: { wins: 16, losses: 16, draws: 0 }, strength: strengths.maximus }, { record: { wins: 32, losses: 0, draws: 0 }, strength: strengths.monk }]);
-  assert.ok(Math.abs(even - 100) < 8, `even with Maximus: ${even.toFixed(1)}`);
-  const twice = fitStrength([{ record: { wins: 1000, losses: 500, draws: 0 }, strength: 100 }]);
-  assert.ok(Math.abs(twice - 200) < 2, `twice his K/D: ${twice.toFixed(1)}`);
-  // Beaten every time by Maximus, the monk's record tells the weak apart.
-  const weak = fitStrength([{ record: { wins: 0, losses: 32, draws: 0 }, strength: strengths.maximus }, { record: { wins: 16, losses: 16, draws: 0 }, strength: strengths.monk }]);
-  const weaker = fitStrength([{ record: { wins: 0, losses: 32, draws: 0 }, strength: strengths.maximus }, { record: { wins: 4, losses: 28, draws: 0 }, strength: strengths.monk }]);
-  assert.ok(weak > weaker && weak < 10, `${weak.toFixed(2)} above ${weaker.toFixed(2)}`);
+test('a score is proportional to inferred K/D: fitted to every bout at once, Maximus held at 100', () => {
+  assert.equal(RATINGS.characters.maximus.score, 100);
+  // Twice as many wins as losses against Maximus is twice his strength.
+  const twice = fitAll([{ a: 'x', b: 'maximus', record: { wins: 1000, losses: 500, draws: 0 } }], 'maximus');
+  assert.ok(Math.abs(twice.x - 200) < 2, `twice his K/D: ${twice.x.toFixed(1)}`);
+  // Through a chain: x even with y, y twice Maximus: x about twice too.
+  const chain = fitAll([{ a: 'x', b: 'y', record: { wins: 500, losses: 500, draws: 0 } }, { a: 'y', b: 'maximus', record: { wins: 1000, losses: 500, draws: 0 } }], 'maximus');
+  assert.ok(Math.abs(chain.x - 200) < 5, `through a chain: ${chain.x.toFixed(1)}`);
+  // The provisional fit against a single known strength agrees.
+  assert.ok(Math.abs(fitStrength([{ record: { wins: 1000, losses: 500, draws: 0 }, strength: 100 }]) - 200) < 2);
   assert.ok(kd({ wins: 3, losses: 1, draws: 0 }) === 3.5 / 1.5);
+  // Cross pairs were fought between near neighbours.
+  assert.ok(RATINGS.cross.length > WARRIORS.length / 2);
 });
 
 test('the ratings order as the fights do: armed above bare-handed, the armoured knight above the man in his shirt', () => {
