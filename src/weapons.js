@@ -431,7 +431,7 @@ export const SHIELDS = {
  * he works free: at `freeRate` a second, `bladeFree` times that with an
  * edge in his hand to cut it. On the floor, past `lies` s, it is done.
  */
-export const NET = { design: 'iaculum', speed: 8.5, radius: 0.75, open: 0.25, flightMax: 1.2, step: 0.35, footing: 0.7, freeRate: 0.22, bladeFree: 2.2, lies: 30 };
+export const NET = { speed: 8.5, radius: 0.75, open: 0.25, flightMax: 1.2, step: 0.35, footing: 0.7, freeRate: 0.22, bladeFree: 2.2, lies: 30 };
 
 /** A shield's outer bound (m from its centre): its radius, or a shaped shield's half-diagonal. */
 export function shieldReach(spec) {

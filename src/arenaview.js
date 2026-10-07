@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { point } from './physics.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
-import { holdingHand, layCloth, makeCloth, NET_DESIGNS, pinCloth, shedCloth, steerCloth, stepCloth, tangleCloth } from './netcloth.js';
+import { holdingHand, layCloth, makeCloth, pinCloth, ROPE_NET, shedCloth, steerCloth, stepCloth, tangleCloth } from './netcloth.js';
 import { NET } from './weapons.js';
 
 const DARK = 0x0c0b09;
@@ -780,7 +780,7 @@ export function buildArenaWeapon(kind, spec, envMap, steelMaterial) {
 // ---- The net ----------------------------------------------------------------------
 // Each net is a soft body (netcloth.js) stepped as it is drawn: hung from the
 // retiarius's hand, opened in the throw, fouled on the man it catches, slid
-// off him into the sand. NET.design picks the weave and how it is drawn.
+// off him into the sand: thick hemp cords as rods, a knot at every crossing.
 
 let netMaterial = null;
 /** The net's cord, drawn as lines (its program kept compiled by the scene's warmers). */
@@ -791,28 +791,8 @@ export function netCord() {
 
 // Thrown nets open from a bundle this fraction of their size.
 const NET_GATHER = 0.22;
-const LEAD = 0x5d5f63;
 const UP = new THREE.Vector3(0, 1, 0);
 const scratch = { matrix: new THREE.Matrix4(), position: new THREE.Vector3(), direction: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3() };
-
-/** A net's mesh pattern for the sheet weave: square holes in a cord, as an alpha map. */
-function meshPattern() {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 64;
-  const context = canvas.getContext('2d');
-  context.fillStyle = '#000';
-  context.fillRect(0, 0, 64, 64);
-  context.strokeStyle = '#fff';
-  context.lineWidth = 7;
-  context.beginPath();
-  context.moveTo(0, 0); context.lineTo(64, 64); context.moveTo(64, 0); context.lineTo(0, 64);
-  context.stroke();
-  context.fillStyle = '#fff';
-  for (const [x, y] of [[0, 0], [64, 0], [0, 64], [64, 64], [32, 32]]) context.fillRect(x - 5, y - 5, 10, 10);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
 
 /** Instanced rods along `pairs` of knots (cords) of radius `radius`. */
 function rods(count, radius, color) {
@@ -821,7 +801,7 @@ function rods(count, radius, color) {
   return mesh;
 }
 
-/** Instanced balls at knots (beads, sinkers). */
+/** Instanced balls at the knots. */
 function balls(count, color, roughness = 0.9) {
   return new THREE.InstancedMesh(new THREE.SphereGeometry(1, 7, 5), surface(color, { roughness }), count);
 }
@@ -829,41 +809,12 @@ function balls(count, color, roughness = 0.9) {
 /** A net's drawing for its cloth: its parts and how each follows the knots. */
 function buildNetView(cloth) {
   const design = cloth.design;
-  const { cords, rim, faces, rest } = cloth.woven;
+  const { cords, rest } = cloth.woven;
   const group = new THREE.Group();
   const parts = { group, cloth };
-  if (design.look === 'lines') {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(cords.length * 6), 3));
-    parts.lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: design.color }));
-    group.add(parts.lines);
-  }
-  if (design.look === 'tubes' || design.look === 'knotted') {
-    parts.cords = { mesh: rods(cords.length, design.cord, design.color), pairs: cords };
-    group.add(parts.cords.mesh);
-  }
-  if (design.look === 'knotted' || design.look === 'tubes') {
-    parts.knots = { mesh: balls(rest.length, design.color), size: design.knot * (design.look === 'tubes' ? 0.45 : 0.5), all: true };
-    group.add(parts.knots.mesh);
-  }
-  if (design.look === 'sheet') {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(rest.length * 3), 3));
-    const repeat = 1 / 0.045;
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(rest.flatMap(([u, v]) => [u * repeat, v * repeat]), 2));
-    geometry.setIndex(faces.flat());
-    const material = new THREE.MeshLambertMaterial({ color: design.color, alphaMap: meshPattern(), alphaTest: 0.5, side: THREE.DoubleSide });
-    parts.sheet = new THREE.Mesh(geometry, material);
-    group.add(parts.sheet);
-    const rimSet = new Set(rim);
-    const rimCords = cords.filter(([a, b]) => rimSet.has(a) && rimSet.has(b));
-    parts.cords = { mesh: rods(rimCords.length, design.cord, design.color), pairs: rimCords };
-    group.add(parts.cords.mesh);
-  }
-  if (design.sinkers ?? (design.rim >= 0.05 && design.look !== 'tubes')) {
-    parts.sinkers = { mesh: balls(rim.length, LEAD, 0.4), size: 0.013, knots: rim };
-    group.add(parts.sinkers.mesh);
-  }
+  parts.cords = { mesh: rods(cords.length, design.cord, design.color), pairs: cords };
+  parts.knots = { mesh: balls(rest.length, design.color), size: design.knot * 0.45 };
+  group.add(parts.cords.mesh, parts.knots.mesh);
   group.traverse((object) => { object.frustumCulled = false; });
   return parts;
 }
@@ -871,17 +822,7 @@ function buildNetView(cloth) {
 /** Move a net's drawing to its cloth's knots. */
 function drawNet(parts) {
   const { x } = parts.cloth;
-  if (parts.lines) {
-    const array = parts.lines.geometry.attributes.position.array;
-    parts.cloth.woven.cords.forEach(([a, b], cord) => {
-      for (let axis = 0; axis < 3; axis += 1) {
-        array[cord * 6 + axis] = x[a * 3 + axis];
-        array[cord * 6 + 3 + axis] = x[b * 3 + axis];
-      }
-    });
-    parts.lines.geometry.attributes.position.needsUpdate = true;
-  }
-  if (parts.cords) {
+  {
     const { mesh, pairs } = parts.cords;
     const radius = mesh.userData.radius;
     pairs.forEach(([a, b], cord) => {
@@ -894,23 +835,14 @@ function drawNet(parts) {
     });
     mesh.instanceMatrix.needsUpdate = true;
   }
-  for (const beads of [parts.knots, parts.sinkers]) {
-    if (!beads) continue;
-    const knots = beads.knots ?? parts.cloth.woven.rest.map((_, index) => index);
-    scratch.quaternion.identity();
-    scratch.scale.setScalar(beads.size);
-    knots.forEach((knot, index) => {
-      scratch.position.set(x[knot * 3], x[knot * 3 + 1], x[knot * 3 + 2]);
-      beads.mesh.setMatrixAt(index, scratch.matrix.compose(scratch.position, scratch.quaternion, scratch.scale));
-    });
-    beads.mesh.instanceMatrix.needsUpdate = true;
+  const knots = parts.knots;
+  scratch.quaternion.identity();
+  scratch.scale.setScalar(knots.size);
+  for (let knot = 0; knot < parts.cloth.count; knot += 1) {
+    scratch.position.set(x[knot * 3], x[knot * 3 + 1], x[knot * 3 + 2]);
+    knots.mesh.setMatrixAt(knot, scratch.matrix.compose(scratch.position, scratch.quaternion, scratch.scale));
   }
-  if (parts.sheet) {
-    const array = parts.sheet.geometry.attributes.position.array;
-    array.set(x);
-    parts.sheet.geometry.attributes.position.needsUpdate = true;
-    parts.sheet.geometry.computeVertexNormals();
-  }
+  knots.mesh.instanceMatrix.needsUpdate = true;
 }
 
 /**
@@ -924,7 +856,7 @@ export function updateNets(view, world, dt = 1 / 60) {
     for (const key of [...drawn.keys()]) dropNetView(view, key);
     view.netsWorld = world;
   }
-  const design = NET_DESIGNS[NET.design] ?? NET_DESIGNS.iaculum;
+  const design = ROPE_NET;
   const live = new Set();
   const add = (key) => {
     const parts = buildNetView(makeCloth(design));
