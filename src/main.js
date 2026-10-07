@@ -9,6 +9,7 @@ import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, create
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
+import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
@@ -510,7 +511,9 @@ function renderHud() {
     // The card follows the lead; a team fight lists everyone under it.
     const fighter = team[0];
     const card = $(`#hud-${corner}`);
-    card.querySelector('.name').textContent = fighter.body.inputs.name;
+    // The sandbox shows each lead's fighting rating (roster.js: ∝ inferred K/D; Maximus is 100).
+    const rating = state.game === 'sandbox' ? ratingOf(fighter.body.inputs) : null;
+    card.querySelector('.name').textContent = rating ? `${fighter.body.inputs.name} · ⚔ ${rating}` : fighter.body.inputs.name;
     card.querySelector('.stamina i').style.width = `${Math.round(fighter.stamina * 100)}%`;
     const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;

@@ -131,9 +131,8 @@ export function randomBoxer(random = Math.random, { weightKg = null, spread = 2.
 }
 
 /** A fighter for the arena: a gladiator, a knight, a samurai, a spearman — any weight. */
-export function randomGladiator(random = Math.random) {
+export function randomGladiator(random = Math.random, key = pickOne(GLADIATORS, random)) {
   // Any armour of his kind's family, in one of its picked designs; a gladiator keeps his own kind's (it goes with his arms).
-  const key = pickOne(GLADIATORS, random);
   const gladiator = OUTFITS[PRESETS[key].outfit?.kind]?.family === 'gladiator';
   return normaliseInputs(redress(varyCharacter(PRESETS[key], random), random, { anyKind: !gladiator }));
 }

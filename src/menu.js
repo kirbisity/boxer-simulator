@@ -5,10 +5,11 @@
 // the starting, through the hooks it hands over).
 
 import { normaliseInputs, PRESETS } from './body.js';
-import { randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
+import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
 import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
 import { SCENARIOS } from './scenarios.js';
+import { pairedOpponent, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { SKIN_TONES } from './render.js';
 
@@ -50,7 +51,6 @@ const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
 /** A style's name, and its weapon when the name does not already say it. */
-const styleName = (style) => (style.weapon && WEAPONS[style.weapon].label.toLowerCase() !== style.label.toLowerCase() ? `${style.label} · ${WEAPONS[style.weapon].label}` : style.label);
 const words = (key) => key.replace(/([A-Z])/g, ' $1').toLowerCase();
 
 const el = (tag, props = {}, ...children) => {
@@ -79,107 +79,11 @@ function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
     el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), el('span', { textContent: text })));
 }
 
-// Deadliest Warrior: every style and every kind of armour, each a named
-// warrior. Built once, from the characters and the armour kinds.
-const preset = (style) => Object.values(PRESETS).find((entry) => entry.style === style);
-const warrior = (key, title, base, changes = {}) => {
-  const inputs = normaliseInputs(structuredClone({ ...base, ...changes, outfit: changes.outfit ?? base.outfit }));
-  const style = STYLES[inputs.style];
-  const armour = OUTFITS[inputs.outfit?.kind]?.label ?? '';
-  return { key, title, inputs, faction: factionOf(inputs), line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
-};
 /** Each style's faction, by the character who fights in it (ring if none does): for grouping styles. */
 const STYLE_FACTION = (key) => {
   const character = Object.values(PRESETS).find((preset) => preset.style === key);
   return character ? factionOf(character) : 'ring';
 };
-const WARRIORS = [
-  warrior('plate', 'Sir Edric', PRESETS.knight),
-  warrior('joan', 'Joan of Arc', PRESETS.joan),
-  warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
-  warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
-  warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
-  warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
-  warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
-  warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
-  warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
-  warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
-  warrior('archer', 'Nasu no Yoichi', PRESETS.bow),
-  warrior('teppo', 'Suzuki Magoichi', PRESETS.matchlock),
-  warrior('mingGuandao', 'Liu Ting', PRESETS.guandao),
-  warrior('mingThreeEyed', 'Ma Lin', PRESETS.threeEyed),
-  warrior('shaolin', 'Tanzong', PRESETS.staff),
-  warrior('taichi', 'Chen Fake', PRESETS.taichi),
-  warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
-  warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda),
-  warrior('guanYu', 'Guan Yu', PRESETS.guanYu),
-  warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
-  warrior('wuxia', 'Pei Min', PRESETS.wuxia),
-  warrior('kheshig', 'Subutai', PRESETS.kheshig),
-  warrior('esen', 'Esen Taishi', PRESETS.maceShield),
-  warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
-  warrior('steppeLancer', 'Temür', PRESETS.maceShield, { name: 'Temür', style: 'spear', outfit: { kind: 'steppeHeavy', design: 1 } }),
-  warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
-  warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
-  warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),
-  warrior('sipahi', 'Davud the sipahi', PRESETS.sipahi),
-  warrior('janissary', 'Ulubatlı Hasan', PRESETS.yatagan),
-  warrior('janissaryGun', 'Mehmed Çavuş', PRESETS.yatagan, { name: 'Mehmed Çavuş', style: 'matchlock', outfit: { kind: 'janissary', design: 1 } }),
-  warrior('azapArcher', 'Ali the azap', PRESETS.azap),
-  warrior('azapSpear', 'Yusuf the azap', PRESETS.azap, { name: 'Yusuf the azap', style: 'spear', outfit: { kind: 'azap', design: 1 } }),
-  warrior('ronin', 'Miyamoto Musashi', PRESETS.samurai, { name: 'Miyamoto Musashi', outfit: { kind: 'ronin', design: 2 }, accessories: [] }),
-  warrior('wokou', 'Wang Zhi', PRESETS.mingDao, { name: 'Wang Zhi', outfit: { kind: 'wokou', design: 0 } }),
-  warrior('hidalgo', 'Hernán Cortés', PRESETS.hidalgo),
-  warrior('rodelero', 'Bernal Díaz', PRESETS.rodelero),
-  warrior('arquebusier', 'Diego de Ordaz', PRESETS.knight, { name: 'Diego de Ordaz', style: 'matchlock', outfit: { kind: 'conquistadorQuilted', design: 1 }, accessories: [] }),
-  warrior('vocMusketeer', 'Hans Pedel', PRESETS.knight, { name: 'Hans Pedel', style: 'matchlock', outfit: { kind: 'conquistadorQuilted', design: 3 }, accessories: [] }),
-  warrior('vocPikeman', 'Jan de Vries', PRESETS.knight, { name: 'Jan de Vries', style: 'spear', outfit: { kind: 'conquistadorPlate', design: 3 }, accessories: [] }),
-  warrior('eagle', 'Cuauhtémoc', PRESETS.macuahuitl),
-  warrior('jaguar', 'Ocelotl', PRESETS.tepoztopilli),
-  warrior('mexica', 'Yaotl', PRESETS.contender, { name: 'Yaotl', sex: 'male', style: 'macuahuitl', outfit: { kind: 'mexicaWarrior', design: 0 }, accessories: [], look: { skinTone: 'medium', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
-  warrior('taekwondo', 'Kim Min-jun', PRESETS.taekwondo),
-  warrior('mingEliteGun', 'Wu Weizhong', PRESETS.guandao, { name: 'Wu Weizhong', style: 'matchlock', outfit: { kind: 'mingElite', design: 1 } }),
-  warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
-  warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),
-  warrior('mingGun', 'Zhao Liu', PRESETS.mingMatchlock),
-  warrior('mingCrossbow', 'Li Si', PRESETS.mingCrossbow),
-  warrior('mingSpear', 'Wang Er', PRESETS.mingSpear),
-  warrior('mingDao', 'Zhang San', PRESETS.mingDao),
-  warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
-  warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
-  warrior('ashigaruSpear', 'Gonbei', PRESETS.spear, { name: 'Gonbei', outfit: { kind: 'ashigaru', design: 0 }, accessories: [] }),
-  warrior('ashigaruBow', 'Sakuzaemon', PRESETS.spear, { name: 'Sakuzaemon', style: 'bow', outfit: { kind: 'ashigaru', design: 1 }, accessories: [] }),
-  warrior('hoplomachus', 'Priscus', PRESETS.hoplomachus),
-  warrior('murmillo', 'Verus', PRESETS.murmillo),
-  warrior('secutor', 'Flamma', PRESETS.secutor),
-  warrior('thraex', 'Spartacus', PRESETS.thraex),
-  warrior('retiarius', 'Kalendio', PRESETS.retiarius),
-  warrior('scissor', 'Astacius', PRESETS.scissor),
-  warrior('maximus', 'Maximus', PRESETS.maximus),
-  warrior('commodus', 'Commodus', PRESETS.commodus),
-  warrior('legionary', 'Gaius Valerius Crispus', PRESETS.legionary),
-  warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
-  warrior('peasant', 'Hob Miller', PRESETS.spear),
-  warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
-  warrior('ladyAshford', 'Lady Ashford', PRESETS.rapier),
-  warrior('lordAshford', 'Lord Ashford', PRESETS.duelPistol),
-  warrior('baton', 'Officer Reyes', PRESETS.baton),
-  warrior('riot', 'Officer Dale Burke', PRESETS.riot),
-  warrior('police', 'Officer Mike Kowalski', PRESETS.police),
-  warrior('policeBaton', 'Officer Ana Ruiz', PRESETS.police, { name: 'Officer Ana Ruiz', sex: 'female', heightCm: 166, style: 'baton', calories: 2300, outfit: { kind: 'police', design: 1 }, look: { skinTone: 'tan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
-  warrior('swatShotgun', 'Cpl. Marcus Hale', PRESETS.shotgun),
-  warrior('specialForces', 'SSgt. Ryan Brooks', PRESETS.rifle),
-  warrior('knife', 'Ryo Kanda', PRESETS.knife),
-  warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),
-  warrior('kickboxer', 'Leo Quickhands', PRESETS.light),
-  warrior('muayThai', preset('muayThai')?.name ?? 'Muay Thai', preset('muayThai') ?? PRESETS.light, { style: 'muayThai' }),
-  warrior('street', preset('street').name, preset('street')),
-  warrior('sumo', preset('sumo').name, preset('sumo')),
-  warrior('bat', 'Tony Marchetti', PRESETS.bat),
-  warrior('brawler', 'Hank Doyle', PRESETS.clinchBrawl),
-  warrior('mix', preset('mix').name, preset('mix')),
-  warrior('unskilled', preset('unskilled').name, preset('unskilled')),
-];
 
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
@@ -221,7 +125,13 @@ export function installMenus(game) {
 
   function startQuick(eventKey, player) {
     const event = EVENTS[eventKey];
-    const opponent = () => (eventKey === 'boxing' ? randomBoxer(Math.random, { weightKg: weightOf(player) }) : randomGladiator());
+    // The prize fight pairs by weight (every man fights mixed, gloved); the arena by rating: one of each kind of man, the nearer his rating to yours the likelier.
+    const arenaOpponent = () => {
+      const kinds = GLADIATORS.map((key) => ({ key, inputs: PRESETS[key] }));
+      const { key } = pairedOpponent(player, kinds.map((kind) => ({ ...kind.inputs, key: kind.key })));
+      return randomGladiator(Math.random, key);
+    };
+    const opponent = () => (eventKey === 'boxing' ? randomBoxer(Math.random, { weightKg: weightOf(player) }) : arenaOpponent());
     close();
     const fight = () => game.match({ red: [player], blue: [opponent()], place: event.place, game: 'quick', label: event.title, next: { text: 'Next opponent', run: fight } });
     fight();
