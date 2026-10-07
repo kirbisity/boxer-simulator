@@ -124,7 +124,9 @@ function gladiatorDesign(kind, look, helmet) {
 // pitch: the weight rides on the ball of the foot and a stiletto's tip, and
 // the ankle, pointed, has little range left to catch a sway.
 const BUSINESS_HEELS = { pitch: 0.32, point: 0.42 };
-const LADY_HEELS = { pitch: 0.48, point: 0.56 };
+// The lady's boot: a Louis heel, higher and more pointed than the business
+// heel, so she goes over more easily, but not so high she cannot fight in it.
+const LADY_HEELS = { pitch: 0.36, point: 0.56 };
 export const HEEL_FOOTING_PER_RADIAN = 1.1;
 
 // The heeled boot's sole lies this far below the ankle, and the foot (with
