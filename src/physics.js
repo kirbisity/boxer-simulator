@@ -917,7 +917,9 @@ function crawlPose(fighter, intent, dt) {
   const spec = WORLD.crawl;
   const H = fighter.body.heightM;
   const L = fighter.body.lengths;
-  const pace = Math.min(1, Math.hypot(...fighter.rootVelocity) / (spec.speed * WORLD.footSpeed));
+  // Turning keeps the knees stepping even where he stands.
+  const turning = Math.max(-1, Math.min(1, fighter.crawlTurn ?? 0));
+  const pace = Math.max(Math.min(1, Math.hypot(...fighter.rootVelocity) / (spec.speed * WORLD.footSpeed)), Math.abs(turning) * spec.turnOnSpot * 2);
   fighter.crawlPhase = ((fighter.crawlPhase ?? 0) + Math.PI * 2 * spec.strideHz * pace * dt) % (Math.PI * 2);
   const swing = Math.sin(fighter.crawlPhase) * spec.stride * H;
   // Up off the floor while it comes forward, down while it bears.
@@ -929,7 +931,8 @@ function crawlPose(fighter, intent, dt) {
   intent.bladeDir = null;
   intent.guardTight = false;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
-    const step = sign * swing;
+    // Turning right (yaw growing), the left knee is on the outside: its stride the longer.
+    const step = sign * swing * (1 + sign * turning * spec.turnStride);
     intent[`${side}Knee`] = [0.02 * H + step, L.ankle + 0.02 + (sign > 0 ? lift : 0), sign * 0.1 * H];
     intent[`${side}Foot`] = [0.02 * H + step - L.shank * 0.95, L.ankle, sign * 0.11 * H];
     intent[`${side}Hand`] = [0.3 * H - step, 0.05 * H + (sign < 0 ? lift : 0), sign * 0.14 * H];
@@ -1278,7 +1281,16 @@ function moveRoot(world, fighter, dt) {
     const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    fighter.yaw += turn * Math.min(1, dt * WORLD.footing.turnRate);
+    let change = turn * Math.min(1, dt * WORLD.footing.turnRate);
+    if (fighter.crawling) {
+      // On his knees he turns only as fast as his steps carry him round.
+      const spec = WORLD.crawl;
+      const pace = Math.min(1, Math.hypot(...fighter.rootVelocity) / (spec.speed * WORLD.footSpeed));
+      const most = spec.turnSpeed * Math.max(spec.turnOnSpot, pace) * dt;
+      change = Math.max(-most, Math.min(most, change));
+      fighter.crawlTurn = change / Math.max(dt, 1e-6) / spec.turnSpeed;
+    }
+    fighter.yaw += change;
   }
   // Footwork has inertia: the stance accelerates and brakes at what the legs
   // can push, rather than starting and stopping dead.

@@ -103,7 +103,9 @@ export const AI = {
   // (scaled by how far past), much less with adrenaline in him (`adrenaline`:
   // the share it takes away at full). Crawling, he keeps going away from the
   // nearest enemy, `away` m at a time.
-  crawl: { from: 0.55, rate: 0.5, adrenaline: 0.9, away: 3 },
+  // He keeps the way he chose for `rethink` s, or till within `arrived` m of it.
+  // At a wall he crawls along it only with an enemy within `pressed` m.
+  crawl: { from: 0.55, rate: 0.5, adrenaline: 0.9, away: 3, rethink: 1.5, arrived: 0.6, pressed: 2 },
   // `standardDown`: fear, for every man of a side, while its standard lies
   // fallen (or, without one, for `leaderLostFor` s after its leader falls).
   panic: { settle: 1.5, outmatched: 0.5, hurt: 0.85, perKnockdown: 0.22, breakAt: 0.7, rate: 0.6, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6 },
@@ -1037,7 +1039,7 @@ function escapePoint(world, fighter, opponent) {
 }
 
 /** Crawling: away from the nearest of them, on his knees, as long as he can. */
-function crawlAway(world, fighter) {
+function crawlAway(world, fighter, dt) {
   fighter.focus = undefined;
   fighter.strafe = 0;
   const at = point(fighter.x, P.pelvis);
@@ -1047,15 +1049,45 @@ function crawlAway(world, fighter) {
     fighter.move = 0;
     return;
   }
-  const away = [at[0] - enemy.x[P.pelvis * 3], at[2] - enemy.x[P.pelvis * 3 + 2]];
-  const length = Math.hypot(away[0], away[1]) || 1;
+  // A way chosen is kept a while: a crawl is no place for second thoughts.
+  fighter.aiCrawlAge = (fighter.aiCrawlAge ?? Infinity) + dt;
+  if (!fighter.aiCrawlTo || fighter.aiCrawlAge > AI.crawl.rethink || Math.hypot(fighter.aiCrawlTo[0] - at[0], fighter.aiCrawlTo[2] - at[2]) < AI.crawl.arrived) {
+    const away = [at[0] - enemy.x[P.pelvis * 3], at[2] - enemy.x[P.pelvis * 3 + 2]];
+    fighter.aiCrawlTo = crawlTarget(world, at, away, Math.hypot(away[0], away[1]) < AI.crawl.pressed);
+    fighter.aiCrawlAge = 0;
+  }
+  if (!fighter.aiCrawlTo) {
+    // At the wall with nobody on him, or cornered: he stays as he is, facing the way he was going.
+    fighter.goTo = [at[0] + Math.cos(fighter.yaw) * 2, 0, at[2] - Math.sin(fighter.yaw) * 2];
+    fighter.move = 0;
+    return;
+  }
+  fighter.goTo = fighter.aiCrawlTo;
+  fighter.move = 1;
+}
+
+/**
+ * Where to crawl: straight away from him; with a wall in the way and him
+ * close (`pressed`), along the wall (whichever way has more room); else, or
+ * cornered, nowhere (null): he stays at the wall.
+ */
+function crawlTarget(world, at, away, pressed) {
   const { halfX, halfZ } = world.arena;
   const margin = AI.gunKite.wallMargin;
-  fighter.goTo = [
-    Math.max(-(halfX - margin), Math.min(halfX - margin, at[0] + (away[0] / length) * AI.crawl.away)), 0,
-    Math.max(-(halfZ - margin), Math.min(halfZ - margin, at[2] + (away[1] / length) * AI.crawl.away)),
-  ];
-  fighter.move = 1;
+  const length = Math.hypot(away[0], away[1]) || 1;
+  const ahead = [away[0] / length, away[1] / length];
+  const clamp = (way) => [Math.max(-(halfX - margin), Math.min(halfX - margin, at[0] + way[0] * AI.crawl.away)), 0, Math.max(-(halfZ - margin), Math.min(halfZ - margin, at[2] + way[1] * AI.crawl.away))];
+  const room = (point) => Math.hypot(point[0] - at[0], point[2] - at[2]);
+  const straight = clamp(ahead);
+  if (room(straight) > AI.crawl.away * 0.5) return straight;
+  if (!pressed) return null;
+  // Along the wall, whichever way has more room.
+  let best = null;
+  for (const way of [[-ahead[1], ahead[0]], [ahead[1], -ahead[0]]]) {
+    const along = clamp([way[0] * 0.8 + ahead[0] * 0.2, way[1] * 0.8 + ahead[1] * 0.2]);
+    if (room(along) > AI.crawl.away * 0.5 && (!best || room(along) > room(best))) best = along;
+  }
+  return best;
 }
 
 export function think(world, fighter, dt) {
@@ -1068,7 +1100,7 @@ export function think(world, fighter, dt) {
     return;
   }
   if (fighter.crawling) {
-    crawlAway(world, fighter);
+    crawlAway(world, fighter, dt);
     return;
   }
   const opponent = chooseFocus(world, fighter);

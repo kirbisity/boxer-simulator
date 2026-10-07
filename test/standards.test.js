@@ -124,3 +124,25 @@ test('adrenaline makes a badly hurt man in a panic far less likely to crawl', ()
   assert.ok(calm > 10, `without adrenaline ${calm} of 30 crawled`);
   assert.ok(surging < calm / 3, `with adrenaline ${surging} of 30 crawled (without: ${calm})`);
 });
+
+test('a man crawling turns slowly, by stepping round, and does not spin at a wall', async () => {
+  const { placeFighter, WORLD } = await import('../src/physics.js');
+  const world = createWorld([{ inputs: structuredClone(PRESETS.heavy), corner: 'red' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 3, arena: { halfX: 4, halfZ: 3 } });
+  placeFighter(world.fighters[0], 2.5, 1.5);
+  placeFighter(world.fighters[1], 0.5, 0);
+  advance(world, 0.3);
+  const crawler = world.fighters[0];
+  startCrawl(world, crawler, 'test');
+  let previous = crawler.yaw;
+  let fastest = 0;
+  let turned = 0;
+  for (let frame = 0; frame < 60 * 20; frame += 1) {
+    advance(world, 1 / 60, think);
+    const change = Math.abs(Math.atan2(Math.sin(crawler.yaw - previous), Math.cos(crawler.yaw - previous)));
+    previous = crawler.yaw;
+    fastest = Math.max(fastest, change * 60);
+    turned += change;
+  }
+  assert.ok(fastest <= WORLD.crawl.turnSpeed + 1e-6, `turned at ${fastest.toFixed(2)} rad/s`);
+  assert.ok(turned < Math.PI * 2, `turned ${turned.toFixed(1)} rad in 20 s: spinning`);
+});
