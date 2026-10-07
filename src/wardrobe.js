@@ -755,6 +755,24 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       group.add(skull, beak, crest);
       break;
     }
+    case 'hachimaki': {
+      // A cloth band tied round the brow, knotted behind, the ends hanging; the hair shows.
+      hidesHair = false;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.06 * r, 0.11 * r, 6, 22), cloth);
+      band.rotation.x = Math.PI / 2;
+      band.rotation.z = -0.18;
+      band.position.y = 0.32 * r;
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.17 * r, 8, 6), cloth);
+      knot.position.set(-1.06 * r, 0.24 * r, 0);
+      group.add(band, knot);
+      for (const side of [1, -1]) {
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 0.55 * r, 0.16 * r), cloth);
+        tail.position.set(-1.12 * r, -0.04 * r, side * 0.12 * r);
+        tail.rotation.x = side * 0.25;
+        group.add(tail);
+      }
+      break;
+    }
     case 'clothWrap': {
       // A Ming garrison soldier's cloth wrapped round the head and knotted behind.
       const wrap = cloth;

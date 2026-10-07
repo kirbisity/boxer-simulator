@@ -777,6 +777,28 @@ export const OUTFITS = {
   },
   // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth
   // round the head, bare feet. Nothing to stop a blade.
+  // A raider in a piece of samurai armour: a laced dō-maru (and some, the
+  // great shoulder plates) over a tucked-up robe, arms and legs bare, the
+  // feet bare. The armour covers the trunk alone (`regions`): head and limbs
+  // as a raider's.
+  wokouArmoured: {
+    faction: 'chinese',
+    label: 'Wokou in a dō-maru', movement: 'good', fists: 'bare',
+    sidearm: 'dao',
+    spare: 'dagger',
+    extraMass: 0.13,
+    protection: {
+      blunt: 0.45, cut: 0.7, pierce: 0.5, bullet: { head: 0, torso: 0.25, limb: 0 },
+      regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 } },
+    },
+    courage: 0.3,
+    designs: [
+      { label: 'Black dō, red robe', top: { kind: 'tunic', color: '#a8402a' }, bottom: { kind: 'loincloth', color: '#e8e2d0' }, armor: { kind: 'doMaru', color: '#1c1c20', lace: '#a3241e' }, head: { kind: 'hachimaki', color: '#ece6d6' }, feet: { kind: 'bare' } },
+      { label: 'Striped dō', top: { kind: 'tunic', color: '#2a3a5a' }, bottom: { kind: 'loincloth', color: '#e8e2d0' }, armor: { kind: 'doMaruSode', color: '#5a6a3a', lace: '#c9a23a' }, head: { kind: 'hachimaki', color: '#a3241e' }, feet: { kind: 'bare' } },
+      { label: 'Russet dō, iron hat', top: { kind: 'tunic', color: '#6a4a30' }, bottom: { kind: 'loincloth', color: '#d8cfb8' }, armor: { kind: 'doMaru', color: '#6b4a32', lace: '#1d2a4f' }, head: { kind: 'jingasa', color: '#2a2622', gold: '#c9a23a' }, feet: { kind: 'bare' } },
+      { label: 'Red dō, sode', top: { kind: 'tank', color: '#c9a23a' }, bottom: { kind: 'loincloth', color: '#e8e2d0' }, armor: { kind: 'doMaruSode', color: '#a8261c', lace: '#1a1a1d' }, head: { kind: 'clothWrap', color: '#1c1c20' }, feet: { kind: 'bare' } },
+    ],
+  },
   wokou: {
     faction: 'chinese',
     label: 'Wokou raider', movement: 'excellent', fists: 'bare',
@@ -785,9 +807,17 @@ export const OUTFITS = {
     protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
     courage: 0.25,
     designs: [
-      { label: 'Black jacket', top: { kind: 'flannel', color: '#1c1c20' }, bottom: { kind: 'pants', color: '#3a3326' }, head: { kind: 'clothWrap', color: '#3a3326' }, feet: { kind: 'bare' } },
-      { label: 'Undyed jacket', top: { kind: 'tee', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'clothWrap', color: '#1c1c20' }, feet: { kind: 'bare' } },
-      { label: 'Blue jacket', top: { kind: 'flannel', color: '#2a3a5a' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'clothWrap', color: '#a3241e' }, feet: { kind: 'bare' } },
+      // Mostly barefoot and bare-legged: a short robe tucked up over a
+      // loincloth, a sleeveless shirt, a hide, or nothing above the waist;
+      // a headband (hachimaki) or a cloth round the head. A few keep the
+      // Chinese sailor's jacket and trousers.
+      { label: 'Red robe', top: { kind: 'tunic', color: '#a8402a' }, bottom: { kind: 'loincloth', color: '#e8e2d0' }, head: { kind: 'hachimaki', color: '#ece6d6' }, feet: { kind: 'bare' } },
+      { label: 'Yellow robe', top: { kind: 'tunic', color: '#c9a23a' }, bottom: { kind: 'loincloth', color: '#e8e2d0' }, feet: { kind: 'bare' }, hair: 'topknot' },
+      { label: 'Indigo robe', top: { kind: 'tunic', color: '#2a3a5a' }, bottom: { kind: 'loincloth', color: '#e8e2d0' }, head: { kind: 'hachimaki', color: '#a3241e' }, feet: { kind: 'bare' } },
+      { label: 'Hide', top: { kind: 'tunic', color: '#6a4a30' }, bottom: { kind: 'loincloth', color: '#5a4a38' }, feet: { kind: 'bare' } },
+      { label: 'Bare chest', bottom: { kind: 'loincloth', color: '#e8e2d0' }, head: { kind: 'hachimaki', color: '#ece6d6' }, feet: { kind: 'bare' } },
+      { label: 'Sleeveless', top: { kind: 'tank', color: '#8a3a2a' }, bottom: { kind: 'loincloth', color: '#d8cfb8' }, head: { kind: 'clothWrap', color: '#3a3326' }, feet: { kind: 'bare' } },
+      { label: 'Sailor', top: { kind: 'flannel', color: '#1c1c20' }, bottom: { kind: 'pants', color: '#3a3326' }, head: { kind: 'clothWrap', color: '#3a3326' }, feet: { kind: 'bare' } },
     ],
   },
   // A Victorian lady: a corset under the bodice, a long gown, high-heeled

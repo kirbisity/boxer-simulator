@@ -229,12 +229,25 @@ export function roninWarrior(random = Math.random, style = 'katana') {
   return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
 }
 
-/** A Chinese sea raider (wokou): dao, spear or matchlock, no armour. */
-export function wokouRaider(random = Math.random, style = 'dao') {
-  const base = varyCharacter(PRESETS.mingDao, random, { sex: 'male' });
-  const name = `${pickOne(['Xu', 'Wang', 'Lin', 'Chen', 'Huang', 'Ye', 'Mao', 'Hong'], random)} ${pickOne(['Hai', 'Zhi', 'Dong', 'Ma', 'San', 'Bao', 'Lang', 'Shan'], random)}`;
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'wokou', design: randomDesign('wokou', random) }, accessories: [] };
-  return builtLike(soldier, PERIOD_BUILD.mingSouth.raider, random);
+// What a sea raider has on (shares, summing to 1): most nothing but a robe
+// or a loincloth; some a piece of samurai armour; a few the whole of it.
+const WOKOU_KIT = { none: 0.62, piece: 0.26, ashigaru: 0.07, samurai: 0.05 };
+
+/**
+ * A sea raider of the 1550s (wokou): Chinese (dao, spear, matchlock) or
+ * Japanese (katana, naginata, bow), `people`. Most go barefoot in a robe or
+ * a loincloth; some in a captured dō-maru; a few in full armour.
+ */
+export function wokouRaider(random = Math.random, style = 'dao', people = 'chinese') {
+  const japanese = people === 'japanese';
+  const base = varyCharacter(japanese ? PRESETS.samurai : PRESETS.mingDao, random, { sex: 'male' });
+  const name = japanese
+    ? `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`
+    : `${pickOne(['Xu', 'Wang', 'Lin', 'Chen', 'Huang', 'Ye', 'Mao', 'Hong'], random)} ${pickOne(['Hai', 'Zhi', 'Dong', 'Ma', 'San', 'Bao', 'Lang', 'Shan'], random)}`;
+  const roll = random();
+  const kind = roll < WOKOU_KIT.none ? 'wokou' : roll < WOKOU_KIT.none + WOKOU_KIT.piece ? 'wokouArmoured' : roll < 1 - WOKOU_KIT.samurai ? 'ashigaru' : 'samurai';
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] };
+  return builtLike(soldier, japanese ? PERIOD_BUILD.japanese.ronin : PERIOD_BUILD.mingSouth.raider, random);
 }
 
 /**

@@ -182,6 +182,16 @@ export const ARMOR_KINDS = {
     trunk: [-0.05, 0.96, 1.17, { mon: [0.68, 0.07, 'gold'], base: 'armor' }], skirt: [0.3, 0.4, 1.2, { rows: ['armor', 'lace'] }],
     forearm: [-0.04, -0.04, 1.22, 'top'], shin: [0.1, 0.8, 1.3, 'armor'],
   },
+  // A sea raider's dō-maru: laced lames round the trunk and a laced skirt,
+  // nothing on the arms or legs (often a captured or cast-off piece).
+  doMaru: {
+    trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'] }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'] }],
+  },
+  // The same with the great shoulder plates (sode) over bare arms.
+  doMaruSode: {
+    trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'] }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'] }],
+    upperArm: [-0.18, 0.36, 1.6, { rows: ['armor', 'lace'] }],
+  },
   // A knight in mail: hauberk to the knees, mail sleeves and chausses, and a
   // surcoat in his colours over it.
   mail: {

@@ -39,10 +39,19 @@ test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin amon
   assert.ok(cast.red.every((fighter) => factionOf(fighter) === 'knights'));
 });
 
-test('Wokou raid: rōnin and Chinese raiders against a garrison with about one brigandine man in five', async () => {
+test('Wokou raid: Japanese and Chinese raiders, mostly barefoot and unarmoured, some in a dō-maru, against a garrison with about one brigandine man in five', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
+  const { OUTFITS } = await import('../src/outfits.js');
+  // Over a few casts: most raiders unarmoured, some in a piece, a few in full armour.
+  const kinds = {};
+  for (const seed of [1, 2, 3, 4, 5]) for (const fighter of SCENARIOS.wokou.cast(seededRandom(seed)).red) kinds[fighter.outfit.kind] = (kinds[fighter.outfit.kind] ?? 0) + 1;
+  const total = Object.values(kinds).reduce((sum, count) => sum + count, 0);
+  assert.ok(kinds.wokou / total > 0.45 && kinds.wokouArmoured > 0, JSON.stringify(kinds));
+  assert.ok((kinds.ashigaru ?? 0) + (kinds.samurai ?? 0) > 0, 'a few in full armour');
+  assert.ok(OUTFITS.wokou.designs.filter((design) => design.feet.kind === 'bare').length >= OUTFITS.wokou.designs.length - 1, 'barefoot');
+  // The dō-maru guards the trunk only.
+  assert.ok(OUTFITS.wokouArmoured.protection.cut > 0.5 && OUTFITS.wokouArmoured.protection.regions.limb.cut < 0.1);
   const cast = SCENARIOS.wokou.cast(seededRandom(3));
-  assert.ok(cast.red.some((fighter) => fighter.outfit.kind === 'ronin') && cast.red.some((fighter) => fighter.outfit.kind === 'wokou'));
   const regulars = cast.blue.filter((fighter) => fighter.outfit.kind === 'mingBrigandine').length;
   assert.ok(regulars / cast.blue.length > 0.12 && regulars / cast.blue.length < 0.28, `${regulars} of ${cast.blue.length}`);
 });

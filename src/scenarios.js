@@ -94,7 +94,9 @@ const ZEELANDIA = {
 // against a garrison with a few brigandine regulars (one in five).
 // The raiding bands were large and the coast garrisons thin: here the raiders outnumber them.
 const WOKOU = {
-  raiders: { ronin: { katana: 6, naginata: 2 }, wokou: { dao: 9, spear: 5, matchlock: 4 } },
+  // Japanese and Chinese together, as the raids were: Japanese swords,
+  // a naginata and bows; the Chinese with dao, spears and matchlocks.
+  raiders: { japanese: { katana: 7, naginata: 1, bow: 3 }, chinese: { dao: 6, spear: 5, matchlock: 4 } },
   garrison: { garrison: { spear: 7, dao: 4, matchlock: 1 }, brigandine: { swordShield: 2, spear: 1 } },
 };
 
@@ -210,14 +212,14 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'Zhejiang coast · 1554',
-    blurb: 'Sea raiders come ashore: rōnin with their swords and Chinese pirates with dao, spears and guns, against the coast garrison and the few brigandine regulars among them.',
+    blurb: 'Sea raiders come ashore, Japanese and Chinese together, barefoot, some in pieces of samurai armour: swords, bows, dao, spears and guns, against the coast garrison and the few brigandine regulars among them.',
     scene: 'coastVillage',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: 'Twenty-six raiders · fifteen garrison',
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.5 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 } },
     cast: (random) => ({
-      red: shootersBehind([...company(WOKOU.raiders.ronin, (style) => roninWarrior(random, style)), ...company(WOKOU.raiders.wokou, (style) => wokouRaider(random, style))]),
+      red: shootersBehind([...company(WOKOU.raiders.japanese, (style) => wokouRaider(random, style, 'japanese')), ...company(WOKOU.raiders.chinese, (style) => wokouRaider(random, style, 'chinese'))]),
       blue: shootersBehind([...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth' })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingSouth' }))]),
     }),
     fighters: [],
