@@ -356,3 +356,23 @@ test('a shield bash lands with the shield and the body behind it: a shove that m
   assert.ok(landed.impulse > 10, `impulse ${landed.impulse?.toFixed(1)} N·s`);
   assert.equal(other.state === 'out', false);
 });
+
+test('weapon first: a man who has lost both takes up his weapon before his shield, and the shield only with nobody near', async () => {
+  const { dropShield } = await import('../src/physics.js');
+  const world = createWorld([{ inputs: structuredClone(PRESETS.murmillo), corner: 'red' }, { inputs: { ...structuredClone(PRESETS.contender), style: 'passive' }, corner: 'blue' }], { seed: 6, arena: { halfX: 6.5, halfZ: 4.4 } });
+  const murmillo = world.fighters[0];
+  placeFighter(world.fighters[1], 5, 3);
+  advance(world, 0.3);
+  // The shield dropped to one side, the gladius to the other, a step each.
+  dropShield(world, murmillo, 'dropped', [0, 0, 1.2]);
+  dropWeapon(world, murmillo, 'disarmed', [0, 0, -1.2]);
+  murmillo.sidearmDrawn = true;
+  if (murmillo.weapon?.held) dropWeapon(world, murmillo, 'disarmed', [0.5, 0, -1]);
+  const order = [];
+  for (let t = 0; t < 20 && order.length < 2; t += 0.1) {
+    advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+    if (murmillo.weapon?.held && !order.includes('weapon')) order.push('weapon');
+    if (murmillo.shield && !order.includes('shield')) order.push('shield');
+  }
+  assert.equal(order[0], 'weapon', `took up ${order.join(' then ')}`);
+});

@@ -289,13 +289,13 @@ export const WORLD = {
   // (inertia and Hill already slow it). It is harder to steer, too: its aim
   // wanders `heavyAimJitter` m (each way, per unit of mass over heavyFrom), so
   // a great club finds the head less often than the shoulder.
-  // A shield lost: in a fall (`dropOnFall`, less than a weapon: it is
-  // gripped and often strapped), or wrenched off the arm by a blow on it
+  // A shield lost: in a fall, most likely (`dropOnFall`: the arm goes out to
+  // break the fall and lets go of the grip), or wrenched off the arm by a blow on it
   // whose impulse passes `wrench` N·s (for an arm of the reference strength;
   // the likelier the further past), or with the arm that held it broken or
   // gone. On the floor it is a plate of its own weight; a man of a shield
   // style without his takes it up again.
-  shield: { dropOnFall: 0.2, wrench: 42, wrenchRise: 1.5 },
+  shield: { dropOnFall: 0.75, wrench: 42, wrenchRise: 1.5 },
   weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).

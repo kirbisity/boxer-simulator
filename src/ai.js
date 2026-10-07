@@ -84,7 +84,7 @@ export const AI = {
   // much nearer him than any of them (unless it is at his feet), and not
   // with a blow coming at him; he stoops for it this near (hips to weapon, m).
   // `eagerness`: chance per second, when one is there for the taking, that he goes for it.
-  pickup: { enabled: true, maxDistance: 3.5, margin: 0.3, atFeet: 0.7, stoopAt: 0.55, eagerness: 1.5 },
+  pickup: { enabled: true, maxDistance: 3.5, margin: 0.3, atFeet: 0.7, stoopAt: 0.55, eagerness: 1.5, shieldClear: 2.5 },
   // A mixed fighter's spells in one style (s, give or take half).
   mix: { seconds: 10 },
   // Holding the last man down: how near his chest (m, hips to chest) to kneel, and how many hold at once.
@@ -600,6 +600,9 @@ function goForWeapon(world, fighter, opponent, dt) {
     // A gun is no use with him on top of you: only with room to raise it.
     const nearest = enemies.reduce((least, other) => Math.min(least, flat(at, point(other.x, P.pelvis))), Infinity);
     if (WEAPONS[debris.weapon]?.ranged && nearest < (STYLES.handgun.ranged.flee ?? 2.4)) return null;
+    // A shield only when there is time for it: nobody within `shieldClear` m,
+    // no blow coming, and a weapon in his hand (a weapon on the floor first).
+    if (debris.kind === 'shield' && (nearest < AI.pickup.shieldClear || attackingMe || wantsWeapon)) return null;
     return mine;
   };
   let target = world.debris?.[fighter.aiPickupFor];
