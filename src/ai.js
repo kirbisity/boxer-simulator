@@ -60,6 +60,12 @@ export const AI = {
   // How much more often a straight punch to the head is slipped than the
   // style's overall mix says (the mix includes body shots, which cannot be).
   slipPreference: 3,
+  // A heavy blow (a weapon of `heavyMass` kg or more counts as fully heavy;
+  // a loaded heavy strike as `loaded`) is seen and got out of the way of:
+  // up to `defend` more likely to be answered, and answered by moving (slip,
+  // lean back, step back; weighted up to `move` times, and open to anyone)
+  // rather than by blocking (weighted down to `block` of itself).
+  evadeHeavy: { heavyMass: 4, loaded: 0.6, defend: 0.6, move: 3, block: 0.4 },
   // A game plan lasts this long (s, plus up to `strategyRange`) before a rethink.
   strategySeconds: 20,
   strategyRange: 20,
@@ -359,14 +365,31 @@ function chooseDefence(fighter, attacker, style, incoming, random) {
   const root = spec.limb.replace(/Hand|Elbow/, 'Shoulder').replace(/Foot|Knee/, 'Hip');
   const lateral = toLocal(fighter, point(attacker.x, P[root]))[2] - head[2];
   const away = Math.abs(lateral) > 0.02 ? -Math.sign(lateral) : random() < 0.5 ? 1 : -1;
-  const name = pickDefence(style, incoming, random);
+  const name = pickDefence(style, incoming, random, heaviness(attacker, incoming));
   // A roll starts on the side the hook comes from and ducks across with it.
   return { name, side: name === 'roll' ? -away : away };
 }
 
-function pickDefence(style, incoming, random) {
+/** How heavy an incoming blow is, 0 (a jab) to 1 (a great club, or a strike loaded up). */
+function heaviness(striker, incoming) {
+  const spec = AI.evadeHeavy;
+  const weapon = incoming.spec.path === 'blade' && striker.weapon?.held ? striker.weapon.spec.mass / spec.heavyMass : 0;
+  return Math.min(1, Math.max(weapon, incoming.heavy ? spec.loaded : 0));
+}
+
+function pickDefence(style, incoming, random, heavy = 0) {
   const answers = { ...style.defences };
   const spec = incoming.spec;
+  if (heavy > 0) {
+    // A heavy blow: anyone takes his body out of its way rather than meet it.
+    const evade = AI.evadeHeavy;
+    answers.stepBack = (answers.stepBack ?? 0.25) * (1 + (evade.move - 1) * heavy);
+    if (incoming.zone === 'head') {
+      answers.slip = (answers.slip ?? 0.25) * (1 + (evade.move - 1) * heavy);
+      answers.leanBack = (answers.leanBack ?? 0.2) * (1 + (evade.move - 1) * heavy);
+    }
+    for (const block of ['guard', 'weaponBlock', 'parry']) if (answers[block]) answers[block] *= 1 - (1 - evade.block) * heavy;
+  }
   if (incoming.zone === 'legs') return answers.check ? 'check' : answers.stepBack ? 'stepBack' : 'guard';
   if (incoming.zone !== 'head') {
     // Head movement does not take a body shot away: elbows and distance do.
@@ -1163,7 +1186,9 @@ export function think(world, fighter, dt) {
     fighter.reacted = true;
     // Reeling from a blow, he is slow to cover up.
     const reeling = staggerShare(fighter, WORLD.stagger.defend);
-    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling)) {
+    // A heavy blow is watched for, and got out of the way of, more than a light one.
+    const heavy = 1 + AI.evadeHeavy.defend * heaviness(striker, incoming);
+    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling * heavy)) {
       let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
       // A blade coming is got away from, not blocked with an arm.
       if (incoming.spec.path === 'blade' && wary && random() < AI.blade.stepBackChance) name = 'stepBack';

@@ -279,8 +279,10 @@ export const WORLD = {
   // and to bring back after the blow (its momentum to stop): the windup and
   // the recovery take √(mass / heavyFrom) as long, and each blow costs
   // mass / heavyFrom times the stamina. The swing itself is the muscles'
-  // (inertia and Hill already slow it).
-  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2 },
+  // (inertia and Hill already slow it). It is harder to steer, too: its aim
+  // wanders `heavyAimJitter` m (each way, per unit of mass over heavyFrom), so
+  // a great club finds the head less often than the shoulder.
+  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).
   // Without a banner colour of its own, a side's flag is its corner's.

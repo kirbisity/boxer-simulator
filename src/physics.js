@@ -753,7 +753,9 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
   if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.stamina < drain) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
-  const jitter = STYLES[fighter.style]?.aimJitter ?? 0;
+  // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
+  const heft = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(0, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
+  const jitter = (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft;
   const aimed = jitter > 0 ? vec.add(aimPoint(target, aimZone), [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : aimPoint(target, aimZone);
   fighter.punch = {
     type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target.id, landed: false, peakSpeed: 0, limb: P[spec.limb],
