@@ -362,14 +362,14 @@ export const PRESETS = {
     look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   // Victorians: Lord Ashford with the rapier (a gentleman's fencing sword),
-  // his wife with a percussion duelling pistol.
+  // his wife with an Adams revolver (1851).
   rapier: {
     name: 'Lord Ashford', style: 'rapier', sex: 'male', heightCm: 178, frame: 'medium', age: 41, exercise: 0.4, calories: 2600,
     outfit: { kind: 'victorianGent', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'mustache', eyeColor: 'blue' },
   },
-  duelPistol: {
-    name: 'Lady Ashford', style: 'duelPistol', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2000,
+  revolver: {
+    name: 'Lady Ashford', style: 'revolver', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2000,
     outfit: { kind: 'victorianLady', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#4a2a1a', facialHair: 'none', eyeColor: 'green' },
   },

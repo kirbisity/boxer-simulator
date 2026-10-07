@@ -38,7 +38,7 @@ const STYLE_NOTES = {
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
   bow: 'Keeps away and looses arrows; the sidearm up close.', matchlock: 'One heavy shot, a long reload; the sidearm up close.',
-  rapier: 'A long slender sword: the point is everything.', duelPistol: 'A percussion duelling pistol, side-on, one arm straight: one shot, then the long reload.',
+  rapier: 'A long slender sword: the point is everything.', revolver: 'An Adams revolver, side-on, one arm straight: five shots double action, then the long reload.',
   espada: 'A Spanish cut-and-thrust sword: thrust first.', espadaRodela: 'Sword and steel buckler.', macuahuitl: 'An obsidian-edged club and a feathered shield: cuts flesh, chips on steel.', tepoztopilli: 'An obsidian-edged spear: thrusts and cuts.',
   taichi: 'Rooted and soft: deflects nearly everything, answers with palms and pushes.', taekwondo: 'Kicks from range, turning and spinning; little defence.',
   staff: 'A long staff, both ends striking: blunt and quick.', kanabo: 'An iron-studded club: huge slow swings, no thrust.', threeEyed: 'Three barrels fired in turn, then a club.',

@@ -699,13 +699,12 @@ export const STYLES = {
     plans: { counter: 1.5, outboxer: 1.2, pressure: 0.6, brawler: 0.2 },
     pressure: 0.05,
   },
-  // The duellist's pistol (a percussion duelling pistol): fired side-on,
-  // one-handed, the arm straight out from the shoulder and the other hand at
-  // the small of the back; one shot, then the long reload.
-  duelPistol: {
-    label: 'Duelling pistol', weapon: 'duellingPistol', fallback: 'mix', oneHandAim: true,
-    // One shot, then reloaded down the muzzle with room to do it (`reloadSafe` m clear).
-    ranged: { flee: 2.4, rest: 0.8, runFor: 1.5, standFor: 1.4, close: 1.2, shotSeconds: 0.4, headShare: 0.3, between: [0.6, 0.6], reloadSafe: 5 },
+  // The revolver (the Adams of 1851): fired side-on, one-handed, the arm
+  // straight out, double action: a shot as fast as the sights come back on;
+  // five, then the long reload with room to make it.
+  revolver: {
+    label: 'Revolver', weapon: 'adams', fallback: 'mix', oneHandAim: true,
+    ranged: { flee: 2.4, rest: 0.8, runFor: 1.5, standFor: 1.6, close: 1.2, shotSeconds: 0.35, headShare: 0.25, between: [0.45, 0.35], reloadSafe: 6 },
     cadence: { work: 1.2, move: 0.6, burst: 0.5, mobility: 0.4 },
     stance: { blade: 0.95, crouch: 0, width: 1.0, lean: 0, guardHeight: -0.02 },
     weaponGuard: { hand: [0.12, 0.55, -0.1], dir: [0.5, -0.85, 0] },

@@ -4,7 +4,7 @@ import { normaliseInputs, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { FACTION_KEYS, factionOf, OUTFIT_KEYS, OUTFITS } from '../src/outfits.js';
-import { bulletProof, CROSSBOW, GUN, MATCHLOCK, NU } from '../src/weapons.js';
+import { ADAMS, bulletProof, CROSSBOW, GUN, MATCHLOCK, NU } from '../src/weapons.js';
 
 const ARQUEBUSIER = { ...PRESETS.contender, name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] };
 const target = (outfit = null) => normaliseInputs({ ...structuredClone(PRESETS.contender), sex: 'male', heightCm: 176, style: 'unskilled', outfit, accessories: [] });
@@ -65,6 +65,23 @@ test('a crossbow looses one bolt, a short heavy one that flies and drops like an
     assert.equal(shooter.weapon.loaded, true);
   }
   assert.ok(CROSSBOW.reloadSeconds > NU.reloadSeconds && CROSSBOW.energy > NU.energy);
+});
+
+test('the Adams revolver fires five, double action, then is empty until its chambers are loaded again', () => {
+  // At a man in plate (it turns a ~280 J ball), so he is still there to be shot at.
+  const world = range(PRESETS.revolver, target({ kind: 'knight', design: 0 }), { apart: 12 });
+  const shooter = world.fighters[0];
+  let pulls = 0;
+  for (let attempt = 0; attempt < 40 && shooter.weapon.loaded; attempt += 1) {
+    if (throwPunch(world, shooter, 'shoot', 'body')) pulls += 1;
+    advance(world, 0.7);
+  }
+  assert.equal(pulls, ADAMS.rounds, 'five pulls of the trigger');
+  assert.equal(shooter.weapon.loaded, false);
+  assert.equal(throwPunch(world, shooter, 'shoot', 'body'), false, 'nothing left');
+  advance(world, ADAMS.reloadSeconds + 1);
+  assert.equal(shooter.weapon.loaded, true, 'reloaded');
+  assert.equal(shooter.weapon.charges, ADAMS.rounds);
 });
 
 test('a ball in the body drops an unarmoured man; proofed plate takes it and he stays up', () => {

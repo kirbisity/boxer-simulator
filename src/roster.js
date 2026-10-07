@@ -89,7 +89,7 @@ export const WARRIORS = [
   warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
   warrior('peasant', 'Hob Miller', PRESETS.spear),
   warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
-  warrior('ladyAshford', 'Lady Ashford', PRESETS.duelPistol),
+  warrior('ladyAshford', 'Lady Ashford', PRESETS.revolver),
   warrior('lordAshford', 'Lord Ashford', PRESETS.rapier),
   warrior('baton', 'Officer Reyes', PRESETS.baton),
   warrior('riot', 'Officer Dale Burke', PRESETS.riot),

@@ -37,23 +37,25 @@ export const NU = { ...CROSSBOW, speed: 48, energy: 1.45, length: 0.42, bounce: 
  * without firing the charge (`misfire`). A trained
  * gunner reloads in ~15 s (`reloadSeconds`): powder, ball, ramrod, priming.
  */
-// A percussion-cap duelling pistol of the 1840s (a cased pair by Wogdon's
-// heirs or Manton): one heavy round ball (~.50, ~14 g at ~220 m/s: ~350 J),
-// smoothbore but made to shoot true at twenty paces, a hair trigger; the cap
-// rarely fails (a flint far more often); then the long reload down the
-// muzzle: powder, ball and patch, ramrod, a new cap.
-export const DUELLING = {
-  energy: 350,
-  lethal: { head: 1, torso: 1.1, limb: 0.35 },
+// The Adams revolver of 1851 (Robert Adams, London): five chambers, a solid
+// frame, double action (each pull of the trigger cocks and fires: no thumbing
+// of the hammer). 54-bore (~.44), a ~14 g ball at ~200 m/s: ~280 J, a little
+// under a duelling pistol's. Short-barrelled, so a little wider in its
+// shot. Its five fired, every chamber is loaded again from the muzzle (powder
+// or a combustible cartridge, the ball rammed home, a new cap on each
+// nipple): ~40 s.
+export const ADAMS = {
+  energy: 280,
+  lethal: { head: 1, torso: 1.05, limb: 0.32 },
   bleed: { head: 0.03, torso: 0.035, limb: 0.018 },
-  limbBreak: 0.6,
-  impulse: 3.2,
-  recoil: 5,
-  spread: 0.009,
+  limbBreak: 0.55,
+  impulse: 2.8,
+  recoil: 4.5,
+  spread: 0.013,
   movingSpread: 0.035,
-  misfire: 0.02,
-  reloadSeconds: 25,
-  rounds: 1,
+  misfire: 0.03,
+  reloadSeconds: 40,
+  rounds: 5,
 };
 
 export const MATCHLOCK = {
@@ -203,14 +205,15 @@ export const WEAPONS = {
     harm: { swing: { blunt: 0.7 }, thrust: { blunt: 0.5 } },
     contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 22, zeta: 0.9 }, threat: 6, grip: 0.12, ranged: true, edgeUp: true,
   },
-  // The duelling pistol (DUELLING): a long octagonal barrel on a walnut
-  // half-stock, the rounded grip; one shot, then muzzle-loading. Swung, the butt clubs.
-  duellingPistol: {
-    label: 'Duelling pistol', hands: 'one', length: 0.3, strikeFrom: 0.2, handle: 0.07, mass: 1.2, balance: 0.12, radius: 0.016,
+  // The Adams revolver (ADAMS): an octagonal barrel and solid frame, the
+  // five-chambered cylinder, a spurless double-action hammer, a chequered
+  // walnut grip. Swung, the butt clubs.
+  adams: {
+    label: 'Adams revolver', hands: 'one', length: 0.26, strikeFrom: 0.16, handle: 0.07, mass: 1.25, balance: 0.08, radius: 0.016,
     harm: { swing: { blunt: 0.8 }, thrust: { blunt: 0.5 } },
-    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 20, zeta: 0.9 }, threat: 5, grip: 0.15, ranged: true, edgeUp: true,
-    muzzle: [0.3, 0.045],
-    shot: DUELLING,
+    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 20, zeta: 0.9 }, threat: 6, grip: 0.15, ranged: true, edgeUp: true,
+    muzzle: [0.26, 0.045],
+    shot: ADAMS,
   },
   // A matchlock (the Japanese teppō, the European arquebus): a smoothbore
   // long gun fired by a lit match, the stock to the cheek, the support hand
