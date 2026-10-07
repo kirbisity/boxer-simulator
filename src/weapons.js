@@ -405,11 +405,12 @@ export const WEAPONS = {
     // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
   },
-  // The jian: the Chinese straight sword, double-edged, one hand, its blade
-  // ~0.8 m (Han jian were long: to ~0.9). Quick in the hand, light at the
-  // point: the thrust and the flicking cut, not the chop.
+  // The jian: the Chinese straight sword, double-edged, one hand. The Han's
+  // were long: excavated iron jian run 0.85-1 m of blade and more (to ~1.1 m
+  // overall and beyond), with a long grip; this one has 0.95 m. Light at the
+  // point for its length: the thrust and the flicking cut, not the chop.
   jian: {
-    label: 'Jian', hands: 'one', length: 0.8, strikeFrom: 0.1, handle: 0.17, mass: 0.85, balance: 0.09, radius: 0.01,
+    label: 'Jian', hands: 'one', length: 0.95, strikeFrom: 0.1, handle: 0.21, mass: 1.0, balance: 0.1, radius: 0.01,
     harm: { thrust: { pierce: 1.05, cut: 0.2, blunt: 0.08 }, swing: { cut: 0.9, blunt: 0.25 } },
     contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 30, zeta: 0.78 }, threat: 3.6,
   },
