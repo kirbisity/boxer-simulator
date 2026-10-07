@@ -100,7 +100,7 @@ function atWeight(inputs, kg) {
 // The prize fight's men: anyone unarmed, gloved, fighting mixed.
 const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple);
 // The arena's: gladiators, knights, samurai and their kin.
-export const GLADIATORS = ['hoplomachus', 'knight', 'warhammer', 'samurai', 'naginata', 'spear'];
+export const GLADIATORS = ['thraex', 'hoplomachus', 'murmillo', 'retiarius', 'scissor', 'secutor', 'knight', 'warhammer', 'samurai', 'naginata', 'spear'];
 
 /**
  * A boxer for a prize fight: in trunks and gloves, fighting mixed, and —
@@ -114,8 +114,10 @@ export function randomBoxer(random = Math.random, { weightKg = null, spread = 2.
 
 /** A fighter for the arena: a gladiator, a knight, a samurai, a spearman — any weight. */
 export function randomGladiator(random = Math.random) {
-  // Any armour of his kind's family, in one of its picked designs.
-  return normaliseInputs(redress(varyCharacter(PRESETS[pickOne(GLADIATORS, random)], random), random, { anyKind: true }));
+  // Any armour of his kind's family, in one of its picked designs; a gladiator keeps his own kind's (it goes with his arms).
+  const key = pickOne(GLADIATORS, random);
+  const gladiator = OUTFITS[PRESETS[key].outfit?.kind]?.family === 'gladiator';
+  return normaliseInputs(redress(varyCharacter(PRESETS[key], random), random, { anyKind: !gladiator }));
 }
 
 /**
