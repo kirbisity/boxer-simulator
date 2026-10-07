@@ -1455,6 +1455,7 @@ function updateTimers(world, fighter, dt) {
       knockOut(world, fighter, event, (fighter.bleedInside ?? 0) > (fighter.bleedOutside ?? 0) ? 'collapsed from internal injuries' : 'collapsed from blood loss', 'bledOut');
     }
   }
+  if (fighter.trauma && fighter.state !== 'out') sufferInjuries(world, fighter);
   fighter.cooldown = Math.max(0, fighter.cooldown - dt);
   fighter.guardHigh = Math.max(0, fighter.guardHigh - dt);
   fighter.slip = Math.max(0, fighter.slip - dt);
@@ -1528,7 +1529,9 @@ function updateTimers(world, fighter, dt) {
     const recovering = fighter.hurt > 0 ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
     // Blood loss: weaker the more is gone.
     const shock = 1 - (1 - BLADES.shockStrength) * Math.min(1, (fighter.bloodLost ?? 0) / collapseAt()) ** 2;
-    fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock * staggerShare(fighter, WORLD.stagger.strength);
+    // A battered trunk saps him as blood loss does.
+    const battered = 1 - (1 - WORLD.injury.shockStrength) * Math.min(1, (fighter.trauma?.trunk ?? 0) / WORLD.injury.trunkFatal) ** 2;
+    fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock * battered * staggerShare(fighter, WORLD.stagger.strength);
   }
 }
 
@@ -3304,7 +3307,30 @@ function addDamage(fighter, key, deltaV, blocked) {
   const capacity = (WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20) * BODY.toughness;
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
+  // The injury itself, uncapped (in the part's capacities): what breaks a limb or kills.
+  fighter.trauma ??= {};
+  fighter.trauma[key] = (fighter.trauma[key] ?? 0) + share;
   fighter.damageVersion += 1;
+}
+
+// The joint that goes when a segment is broken: the arm hangs from the elbow, the leg gives at the knee or hip.
+const BREAKS_AT = { Forearm: 'Elbow', UpperArm: 'Elbow', Shank: 'Knee', Thigh: 'Hip' };
+
+/**
+ * Injury piled up past what a part can take: a limb breaks; the trunk or
+ * the skull past the fatal mark, and he dies of it. Each happens once.
+ */
+function sufferInjuries(world, fighter) {
+  const spec = WORLD.injury;
+  const trauma = fighter.trauma;
+  const credit = { time: world.time, kind: 'injuries', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, effects: [] };
+  if ((trauma.trunk ?? 0) >= spec.trunkFatal) return knockOut(world, fighter, credit, 'died of his injuries', 'killed');
+  if ((trauma.head ?? 0) >= spec.headFatal) return knockOut(world, fighter, credit, 'skull broken', 'killed');
+  for (const [key, amount] of Object.entries(trauma)) {
+    const segment = key.replace(/^[lr](?=[A-Z])/, '');
+    const joint = BREAKS_AT[segment] && `${key[0]}${BREAKS_AT[segment]}`;
+    if (joint && amount >= spec.limbBreak && !fighter.broken.has(joint)) breakJoint(world, fighter, joint);
+  }
 }
 
 /** Leg damage (summed m/s) that makes a leg give way, for everyone's toughness. */

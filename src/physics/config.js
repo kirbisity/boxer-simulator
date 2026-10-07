@@ -224,7 +224,14 @@ export const WORLD = {
   // `internalBleed` of the blood a second per m/s that got through armour and
   // bone, clotting as a wound does. One fall is a bruise; fall after fall, or
   // trampled in a crush, a man can collapse and die of it.
-  impact: { minSpeed: 2.2, head: 0.6, body: 0.85, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.75, bumpEvery: 0.6, internalBleed: 0.0008 },
+  impact: { minSpeed: 2.2, head: 0.6, body: 1.0, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.75, bumpEvery: 0.6, internalBleed: 0.0003 },
+  // Injury piling up, from blows, falls and collisions alike (in each part's
+  // damage capacity, uncapped): the trunk past `trunkFatal` and he dies of
+  // his injuries; the head past `headFatal`, the skull breaks; an arm or leg
+  // past `limbBreak`, it breaks (a leg: down, then crawling). Before that,
+  // a battered trunk saps him, as blood loss does (to `shockStrength` of his
+  // strength at the fatal mark). Knockdowns and bleeding still end most fights.
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, shockStrength: 0.6 },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).
   // Against the gun hand's strength (N; `reference` an average man's) the

@@ -89,7 +89,7 @@ test('the stamina a strike needs is what it costs', () => {
   assert.equal(throwPunch(world, fighter, 'hook', 'head'), true, 'enough for it');
 });
 
-test('a hard landing on the trunk bleeds inside; enough of it collapses a man', () => {
+test('a hard landing hurts the body; fall after fall a man dies of his injuries (bleeding a little inside)', () => {
   const world = duel(PRESETS.heavy, PRESETS.light);
   const man = world.fighters[0];
   man.state = 'down';
@@ -100,8 +100,9 @@ test('a hard landing on the trunk bleeds inside; enough of it collapses a man', 
     advance(world, 0.25);
   }
   assert.ok(man.bleedInside > 0, 'bleeding inside');
+  assert.ok(man.trauma.trunk > 0, 'the trunk hurt');
   assert.equal(man.state, 'out');
-  assert.ok(world.events.some((event) => event.kind === 'bledOut' && /internal injuries/.test(event.effects.join(' '))), 'collapsed from internal injuries');
+  assert.ok(world.events.some((event) => /injuries/.test(event.effects?.join(' ') ?? '')), 'died of his injuries');
 });
 
 test('a weapon heavier than heavyFrom is slower to raise and to recover; the blow between is not', async () => {
@@ -124,4 +125,18 @@ test('a weapon heavier than heavyFrom is slower to raise and to recover; the blo
   const kanabo = windupTime('kanabo');
   const katana = windupTime('samurai');
   assert.ok(kanabo > katana * 1.15, `kanabo windup ${kanabo.toFixed(2)}× its spec, katana ${katana.toFixed(2)}×`);
+});
+
+test('injury piling up breaks a limb, and past the fatal mark on the trunk, kills', async () => {
+  const { WORLD } = await import('../src/physics.js');
+  const world = duel(PRESETS.heavy, PRESETS.light);
+  const man = world.fighters[0];
+  man.trauma = { lShank: WORLD.injury.limbBreak + 0.01 };
+  advance(world, 0.1);
+  assert.ok(man.broken.has('lKnee'), 'the shin broken at the knee');
+  const second = duel(PRESETS.heavy, PRESETS.light);
+  second.fighters[0].trauma = { trunk: WORLD.injury.trunkFatal + 0.01 };
+  advance(second, 0.1);
+  assert.equal(second.fighters[0].state, 'out');
+  assert.ok(second.events.some((event) => event.kind === 'killed' && event.effects.includes('died of his injuries')));
 });
