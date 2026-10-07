@@ -14,6 +14,17 @@
 
 import { vec } from './pose.js';
 
+// Crossbows: spanned once and loaded like a gun (`shot`, one at a time, no
+// misfire), they loose a bolt that flies as an arrow does (`bolt`), shorter
+// and heavier: `energy` against a long bow's arrow, `bounce` the chance it
+// glances off proof armour (an arrow's ARROW.bounce). A 15th-century
+// steel or composite crossbow spanned with a belt hook or goat's foot:
+// ~100–200 J against a war bow's ~80–100; ~8 s a shot. The Chinese nu, the
+// Han's spanned with the feet (jue zhang) and the Ming's with the waist: a
+// little less, quicker to span.
+export const CROSSBOW = { bolt: true, speed: 50, energy: 1.7, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8 };
+export const NU = { ...CROSSBOW, speed: 48, energy: 1.45, length: 0.42, bounce: 0.78, reloadSeconds: 6 };
+
 /**
  * A matchlock's shot, for its realism. A lead ball of ~13 g leaves the
  * muzzle at ~400 m/s: ~1 kJ, about twice a 9 mm pistol round, and a soft
@@ -198,6 +209,26 @@ export const WEAPONS = {
     muzzle: [0.95, 0],
     shot: THREE_EYED,
   },
+  // The crossbow: a stock (tiller) held to the cheek, the prod across its
+  // nose, a stirrup to span it by; swung in close, the tiller clubs.
+  crossbow: {
+    label: 'Crossbow', hands: 'two', length: 0.72, strikeFrom: 0.3, handle: 0.22, spacing: 0.36, supportAhead: true, longGun: true,
+    mass: 4.2, balance: 0.35, radius: 0.025,
+    harm: { swing: { blunt: 0.9 }, thrust: { blunt: 0.6 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 11, zeta: 0.9 }, threat: 4.6, grip: 0.7, ranged: true, edgeUp: true,
+    muzzle: [0.66, 0.05],
+    shot: CROSSBOW,
+  },
+  // The Chinese crossbow (nu): a wooden stock, a bronze trigger lock, a
+  // long composite prod; lighter than the steel crossbow.
+  nu: {
+    label: 'Crossbow (nu)', hands: 'two', length: 0.7, strikeFrom: 0.3, handle: 0.18, spacing: 0.34, supportAhead: true, longGun: true,
+    mass: 3.0, balance: 0.35, radius: 0.022,
+    harm: { swing: { blunt: 0.8 }, thrust: { blunt: 0.5 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 12, zeta: 0.9 }, threat: 4.4, grip: 0.7, ranged: true, edgeUp: true,
+    muzzle: [0.64, 0.05],
+    shot: NU,
+  },
   // The AR-15 carbine and the pump shotgun: shouldered long guns, the
   // support hand on the handguard or the pump; swung in close, the stock.
   rifle: {
@@ -346,6 +377,29 @@ export const WEAPONS = {
     // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
   },
+  // The jian: the Chinese straight sword, double-edged, one hand, its blade
+  // ~0.8 m (Han jian were long: to ~0.9). Quick in the hand, light at the
+  // point: the thrust and the flicking cut, not the chop.
+  jian: {
+    label: 'Jian', hands: 'one', length: 0.8, strikeFrom: 0.1, handle: 0.17, mass: 0.85, balance: 0.09, radius: 0.01,
+    harm: { thrust: { pierce: 1.05, cut: 0.2, blunt: 0.08 }, swing: { cut: 0.9, blunt: 0.25 } },
+    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 30, zeta: 0.78 }, threat: 3.6,
+  },
+  // The ōdachi (nodachi): a field sword of a metre of blade and more, a long
+  // grip for two hands; carried by a strong man at Anegawa (1570) to cut at
+  // horse and men. Heavy for a sword, long in the reach, slow to recover.
+  odachi: {
+    label: 'Ōdachi', hands: 'two', length: 1.08, strikeFrom: 0.15, handle: 0.42, spacing: 0.26, mass: 2.3, balance: 0.24, radius: 0.013,
+    harm: { swing: { cut: 1.4, blunt: 0.6 }, thrust: { pierce: 0.65, cut: 0.15, blunt: 0.2 } },
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 14, zeta: 0.82 }, threat: 4.9,
+  },
+  // A wooden baseball bat (~84 cm, ~0.9 kg), swung two-handed: all its
+  // harm blunt, its weight out in the barrel.
+  bat: {
+    label: 'Baseball bat', hands: 'two', length: 0.6, strikeFrom: 0.32, handle: 0.24, spacing: 0.09, mass: 0.9, balance: 0.42, radius: 0.033,
+    harm: { swing: { blunt: 1.25 }, thrust: { blunt: 0.4 } },
+    contactSeconds: 0.005, rotation: 1.0, wrist: { omega: 16, zeta: 0.85 }, threat: 3.4,
+  },
   // Guan Yu's Green Dragon Crescent Blade (qinglong yanyue dao): the guandao
   // of the legend, its weight a legend too (82 jin); fought here at a real
   // guandao's, its look its own (a dragon's head at the blade, a red tassel).
@@ -439,6 +493,9 @@ export const SHIELDS = {
   // faced with leather, an iron boss, about 0.6 × 0.95 m and 6 kg (an arena
   // scutum was smaller than a legionary's); shoulder to shin, curved round
   // the body: blows go round it to the head or the forward leg.
+  // A police riot shield: clear polycarbonate, ~0.6 × 1.05 m, slightly
+  // curved; it stops blows, thrown things and edges, not rounds.
+  riotShield: { label: 'Riot shield', shape: 'curved', width: 0.6, height: 1.05, curve: 1.2, mass: 4, offset: 0.1, armHarm: 0.07, look: 'riot' },
   scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, look: 'scutum' },
   // The thraex's parmula: small and nearly square (~0.36 × 0.42 m), flat-ish.
   parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, look: 'parmula' },

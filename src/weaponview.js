@@ -373,6 +373,65 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'crossbow':
+    case 'nu': {
+      // A crossbow (+z is up, y along the tiller): the tiller from the butt
+      // to the nose, the prod across the nose, the string drawn back to the
+      // nut, the trigger under it. The European one has a steel prod and a
+      // stirrup at the nose to span it by; the Chinese nu a long lacquered
+      // composite prod, a bronze lock box with its sighting post, no stirrup.
+      const chinese = kind === 'nu';
+      const nose = spec.length;
+      const tiller = new THREE.Mesh(new THREE.BoxGeometry(0.034, nose + spec.handle, 0.044), wood);
+      tiller.position.set(0, (nose - spec.handle) / 2, 0);
+      group.add(tiller);
+      const span = chinese ? 0.44 : 0.33;
+      const prodMaterial = chinese ? surface(0x1c1612, { roughness: 0.45 }) : steelMaterial(envMap, { vertexColors: false, color: 0x8a8e96, roughness: 0.35 });
+      // Drawn: the prod's arms bent back toward the nut.
+      const tips = [-1, 1].map((side) => new THREE.Vector3(side * span, nose - (chinese ? 0.13 : 0.11), 0.03));
+      const prod = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([tips[0], new THREE.Vector3(-span * 0.5, nose - 0.04, 0.03), new THREE.Vector3(0, nose - 0.02, 0.03), new THREE.Vector3(span * 0.5, nose - 0.04, 0.03), tips[1]]), 20, chinese ? 0.01 : 0.008, 6, false), prodMaterial);
+      group.add(prod);
+      const nut = new THREE.Vector3(0, chinese ? 0.03 : 0.06, 0.03);
+      const cord = surface(0xe8e0c8, { roughness: 0.9 });
+      for (const tip of tips) {
+        const length = tip.distanceTo(nut);
+        const string = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, length, 4), cord);
+        string.position.copy(tip).add(nut).multiplyScalar(0.5);
+        string.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), nut.clone().sub(tip).normalize());
+        group.add(string);
+      }
+      if (chinese) {
+        // The bronze lock box under the nut, its sighting post (wangshan), the trigger hanging below.
+        const lock = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.05), brass);
+        lock.position.set(0, 0.02, 0.01);
+        const sight = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.012, 0.05), brass);
+        sight.position.set(0, -0.02, 0.055);
+        const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.014, 0.07), brass);
+        trigger.position.set(0, -0.02, -0.045);
+        // Bindings round the prod's middle and arms.
+        for (const x of [-span * 0.55, 0, span * 0.55]) {
+          const binding = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.02, 8), surface(0x8a1a14, { roughness: 0.8 }));
+          binding.rotation.z = Math.PI / 2;
+          binding.position.set(x, nose - (x === 0 ? 0.02 : 0.045), 0.03);
+          group.add(binding);
+        }
+        group.add(lock, sight, trigger);
+      } else {
+        // The steel nut, the long trigger lever under the tiller, the stirrup at the nose.
+        const nutMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 10), steel);
+        nutMesh.rotation.z = Math.PI / 2;
+        nutMesh.position.copy(nut);
+        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.2, 0.01), steel);
+        lever.position.set(0, -0.06, -0.035);
+        lever.rotation.x = 0.12;
+        const stirrup = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.007, 6, 16), steel);
+        stirrup.position.set(0, nose + 0.05, 0);
+        const binding = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.06), surface(0x3a2416, { roughness: 0.8 }));
+        binding.position.set(0, nose - 0.02, 0.02);
+        group.add(nutMesh, lever, stirrup, binding);
+      }
+      break;
+    }
     case 'rapier': {
       // A long, slender blade; a swept hilt of curving bars round the hand, a cup, a long cross.
       group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.018, 0.006, 0.25), steel));
@@ -510,6 +569,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       break;
     }
     case 'wakizashi':
+    case 'odachi':
     case 'katana': {
       // One curve from the pommel to the point, the hilt carrying it on; zero at the grip.
       const sori = 0.045;
@@ -737,6 +797,36 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       tassel.rotation.x = Math.PI;
       const spike = cylinder(0.002, 0.018, -spec.handle - 0.12, -spec.handle + 0.01, gilt, 8);
       group.add(notch, curl, skull, jaw, horn, tassel, spike);
+      break;
+    }
+    case 'jian': {
+      // The straight double-edged jian: a ridged blade tapering to its
+      // point, a small bronze guard, a cord-wound grip, a bronze pommel, a
+      // silk tassel from it.
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.036, 0.007, 0.12), steel));
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.004, spec.length * 0.85, 0.004), steel);
+      ridge.position.set(0.004, 0.03 + spec.length * 0.42, 0);
+      ridge.userData.blade = true;
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.024, 0.075), brass);
+      guard.position.y = 0.012;
+      const pommel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.016, 0.03, 10), brass);
+      pommel.position.y = -spec.handle - 0.008;
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.12, 8), surface(0xb3161b, { roughness: 0.9 }));
+      tassel.position.y = -spec.handle - 0.09;
+      tassel.rotation.x = Math.PI;
+      group.add(ridge, guard, pommel, tassel, cylinder(0.014, 0.015, -spec.handle, 0.0, surface(0x1c1a20, { roughness: 0.9 })));
+      break;
+    }
+    case 'bat': {
+      // A wooden bat: knob, taped handle thickening to the barrel, a rounded end.
+      const ash = surface(0xc9a26a, { roughness: 0.55 });
+      const taper = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius, 0.0125, spec.length + spec.handle - 0.02, 14), ash);
+      taper.position.y = (spec.length - spec.handle) / 2 - 0.01;
+      const end = new THREE.Mesh(new THREE.SphereGeometry(spec.radius, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), ash);
+      end.position.y = spec.length - 0.02;
+      const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.016, 14), ash);
+      knob.position.y = -spec.handle;
+      group.add(taper, end, knob, cylinder(0.0145, 0.0155, -spec.handle + 0.01, -spec.handle + 0.2, surface(0x1a1a1c, { roughness: 0.9 }), 12));
       break;
     }
     case 'armingSword': {
@@ -1334,16 +1424,18 @@ export function updateShots(view, dt) {
 // ---- Arrows -----------------------------------------------------------------
 
 /** An arrow along +y from its nock (0) to its head: shaft, fletching, point. */
-function arrowMesh() {
+function arrowMesh(length = ARROW.length, bolt = false) {
+  // A crossbow's bolt: short and thick, a square iron head, two stiff vanes of leather or wood.
   const group = new THREE.Group();
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, ARROW.length, 5), surface(0xc8a878, { roughness: 0.7 }));
-  shaft.position.y = ARROW.length / 2;
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.05, 6), surface(0x3a3c40, { roughness: 0.4 }));
-  head.position.y = ARROW.length + 0.02;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(bolt ? 0.006 : 0.004, bolt ? 0.006 : 0.004, length, 5), surface(0xc8a878, { roughness: 0.7 }));
+  shaft.position.y = length / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(bolt ? 0.011 : 0.009, bolt ? 0.04 : 0.05, bolt ? 4 : 6), surface(0x3a3c40, { roughness: 0.4 }));
+  head.position.y = length + 0.02;
   group.add(shaft, head);
-  for (const turn of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) {
-    const vane = new THREE.Mesh(new THREE.PlaneGeometry(0.022, 0.09), new THREE.MeshBasicMaterial({ color: 0xf0ece4, side: THREE.DoubleSide }));
-    vane.position.set(Math.cos(turn) * 0.011, 0.07, Math.sin(turn) * 0.011);
+  const vanes = bolt ? [0, Math.PI] : [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3];
+  for (const turn of vanes) {
+    const vane = new THREE.Mesh(new THREE.PlaneGeometry(bolt ? 0.018 : 0.022, bolt ? 0.06 : 0.09), new THREE.MeshBasicMaterial({ color: bolt ? 0x6a4a2a : 0xf0ece4, side: THREE.DoubleSide }));
+    vane.position.set(Math.cos(turn) * 0.011, bolt ? 0.045 : 0.07, Math.sin(turn) * 0.011);
     vane.rotation.y = -turn;
     group.add(vane);
   }
@@ -1382,7 +1474,7 @@ export function updateArrows(view, world) {
     live.add(arrow);
     let mesh = drawn.get(arrow);
     if (!mesh) {
-      mesh = arrowMesh();
+      mesh = arrowMesh(arrow.length ?? ARROW.length, arrow.bolt);
       view.scene.add(mesh);
       drawn.set(arrow, mesh);
     }
@@ -1391,7 +1483,7 @@ export function updateArrows(view, world) {
     const along = (arrow.landed ? mesh.userData.along : null) ?? (flying.lengthSq() > 1e-9 ? flying.normalize() : new THREE.Vector3(0, -1, 0));
     mesh.userData.along = along;
     // The nock trails the point by the arrow's length; stuck in the ground, the head is in it.
-    mesh.position.set(arrow.x[0], arrow.x[1], arrow.x[2]).addScaledVector(along, -ARROW.length * (arrow.landed ? 0.75 : 1));
+    mesh.position.set(arrow.x[0], arrow.x[1], arrow.x[2]).addScaledVector(along, -(arrow.length ?? ARROW.length) * (arrow.landed ? 0.75 : 1));
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
   }
   for (const [arrow, mesh] of drawn) {

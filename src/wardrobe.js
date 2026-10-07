@@ -5,7 +5,7 @@
 import { Dangle } from './dangle.js';
 import { heelLift, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
-import { buildArenaHelm, buildLionHead } from './arenaview.js';
+import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 
 export const WARDROBE = {
   // Steel: how metal and how polished; the reflection map is a gradient
@@ -362,6 +362,10 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       // A gladiator's helmet of his kind, in detail (arenaview.js).
       buildArenaHelm(group, head, r, metal(steel, color));
       break;
+    case 'galea':
+      // The legion's Imperial Gallic helmet (arenaview.js).
+      buildGalea(group, head, r, metal(steel, color));
+      break;
     case 'lionHead':
       // Commodus's lion scalp (arenaview.js); his beard shows below its jaw.
       buildLionHead(group, head, r);
@@ -380,7 +384,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       const jewel = new THREE.Mesh(new THREE.SphereGeometry(0.14 * r, 10, 8), surface(new THREE.Color(head.gold ?? '#d6a743').getHex(), { roughness: 0.35 }));
       jewel.scale.set(0.5, 1, 1.3);
       jewel.position.set(1.12 * r, 0.42 * r, 0);
-      group.add(crown, knot, band, jewel);
+      group.add(crown, knot, band);
+      // A plain soldier's cap has no ornament.
+      if (!head.plain) group.add(jewel);
       for (const side of [1, -1]) {
         const tie = new THREE.Mesh(new THREE.BoxGeometry(0.03 * r, 1.4 * r, 0.26 * r), cloth);
         tie.position.set(-1.12 * r, -0.4 * r, side * 0.22 * r);

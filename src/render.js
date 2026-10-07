@@ -12,7 +12,7 @@ import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions } from './outfits.js';
 import { WEAPONS } from './weapons.js';
-import { buildHarness, buildLionPelt, buildScaleShirt, netCord } from './arenaview.js';
+import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
@@ -2121,6 +2121,11 @@ function detailedView(view, fighter, simple) {
   }
   // Commodus's lion skin: the hide, the knotted forelegs, the tail.
   if (dress.armor?.kind === 'commodus') collar.add(buildLionPelt(body, dress.armor));
+  // A legionary's apron of studded strips; a centurion's phalerae as well.
+  if (dress.armor?.kind === 'segmentata' || dress.armor?.kind === 'centurion') {
+    collar.add(buildRomanKit(body, dress.armor, view.steelEnv, steelMaterial, 'chest'));
+    hips.add(buildRomanKit(body, dress.armor, view.steelEnv, steelMaterial, 'hips'));
+  }
   if (dress.armor?.kind === 'scissor') {
     collar.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'hips'));

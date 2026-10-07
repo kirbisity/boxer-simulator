@@ -447,10 +447,18 @@ function weaponIntent(world, fighter, intent) {
   intent.twoHanded = !oneHanded;
   if (!oneHanded) intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, offHandAlong(weapon.spec)));
   if (fighter.reloading && weapon.spec.shot && !weapon.loaded && !punch) {
-    // Reloading: the gun upright, the support hand ramming the ball home.
-    target = { hand: vec.scale(LONG_GUN.reloadHand, H), dir: [0.08, 1, 0] };
+    const spanning = weapon.spec.shot.bolt;
     const stroke = 0.5 - 0.5 * Math.cos(2 * Math.PI * LONG_GUN.ramPerSecond * (weapon.reloaded ?? 0));
-    intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.ramFrom + LONG_GUN.ramStroke * stroke));
+    if (spanning) {
+      // Spanning a crossbow: its nose down before his feet, the hand on the
+      // tiller, the other drawing the string up the stock to the nut.
+      target = { hand: vec.scale(LONG_GUN.spanHand, H), dir: vec.normalize(LONG_GUN.spanDir) };
+      intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.spanFrom - LONG_GUN.spanStroke * stroke));
+    } else {
+      // Reloading: the gun upright, the support hand ramming the ball home.
+      target = { hand: vec.scale(LONG_GUN.reloadHand, H), dir: [0.08, 1, 0] };
+      intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.ramFrom + LONG_GUN.ramStroke * stroke));
+    }
     intent[`${main}Hand`] = target.hand;
     intent.bladeDir = target.dir;
     // The support hand is off the gun, on the ramrod.

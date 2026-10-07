@@ -4,7 +4,7 @@ import { normaliseInputs, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { FACTION_KEYS, factionOf, OUTFIT_KEYS, OUTFITS } from '../src/outfits.js';
-import { bulletProof, GUN, MATCHLOCK } from '../src/weapons.js';
+import { bulletProof, CROSSBOW, GUN, MATCHLOCK, NU } from '../src/weapons.js';
 
 const ARQUEBUSIER = { ...PRESETS.contender, name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] };
 const target = (outfit = null) => normaliseInputs({ ...structuredClone(PRESETS.contender), sex: 'male', heightCm: 176, style: 'unskilled', outfit, accessories: [] });
@@ -43,6 +43,28 @@ test('a matchlock fires once, then is empty: the shoot button loads it, in its r
   advance(world, 1.5);
   assert.equal(gunner.weapon.loaded, true);
   assert.ok(world.events.some((event) => event.kind === 'reloaded'));
+});
+
+test('a crossbow looses one bolt, a short heavy one that flies and drops like an arrow; then it is spanned again, the European slower than the nu', () => {
+  for (const [preset, spec] of [[PRESETS.crossbow, CROSSBOW], [PRESETS.hanCrossbow, NU]]) {
+    const world = range(preset, target(), { apart: 10 });
+    const shooter = world.fighters[0];
+    assert.ok(shooter.weapon.loaded);
+    assert.ok(throwPunch(world, shooter, 'fireLong', 'body'));
+    advance(world, 2);
+    const bolt = world.arrows.find((arrow) => arrow.bolt);
+    assert.ok(bolt, `${preset.name} loosed a bolt`);
+    assert.equal(bolt.energy, spec.energy);
+    assert.ok(bolt.length < 0.5, 'a bolt, not an arrow');
+    assert.ok(!world.events.some((event) => event.kind === 'shot'), 'no bullet');
+    assert.equal(shooter.weapon.loaded, false);
+    assert.equal(throwPunch(world, shooter, 'fireLong', 'body'), false, 'spanned again first');
+    advance(world, spec.reloadSeconds - 1);
+    assert.equal(shooter.weapon.loaded, false, 'still spanning');
+    advance(world, 1.5);
+    assert.equal(shooter.weapon.loaded, true);
+  }
+  assert.ok(CROSSBOW.reloadSeconds > NU.reloadSeconds && CROSSBOW.energy > NU.energy);
 });
 
 test('a ball in the body drops an unarmoured man; proofed plate takes it and he stays up', () => {
@@ -88,8 +110,10 @@ test('empty, with a man on him, the gunner draws his own sidearm: a wakizashi fo
   }
 });
 
-test('characters fall into ten factions, by what they wear: knights, Japanese, Chinese, Mexica, steppe, Ottomans and gladiators among them', () => {
-  assert.equal(FACTION_KEYS.length, 10);
+test('characters fall into eleven factions, by what they wear: knights, Japanese, Chinese, Mexica, steppe, Ottomans, gladiators and Rome among them', () => {
+  assert.equal(FACTION_KEYS.length, 11);
+  assert.deepEqual(['legionary', 'centurion'].map((key) => factionOf(PRESETS[key])), ['romans', 'romans']);
+  assert.deepEqual(['hanCrossbow', 'mingCrossbow', 'wuxia', 'guanYu'].map((key) => factionOf(PRESETS[key])), ['chinese', 'chinese', 'chinese', 'chinese']);
   assert.deepEqual(['macuahuitl', 'tepoztopilli'].map((key) => factionOf(PRESETS[key])), ['mexica', 'mexica']);
   assert.deepEqual(['hidalgo', 'rodelero'].map((key) => factionOf(PRESETS[key])), ['knights', 'knights']);
   assert.deepEqual(['staff', 'taichi'].map((key) => factionOf(PRESETS[key])), ['chinese', 'chinese']);

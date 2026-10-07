@@ -503,6 +503,32 @@ export const STYLES = {
     tempo: 1,
     ...STAND_OFF,
   },
+  // The crossbow: shouldered, laid on the mark, loosed once; then spanned
+  // again (~8 s) with room to do it; a man on him, it is dropped for the
+  // sidearm. The nu the same, quicker to span.
+  crossbow: {
+    label: 'Crossbow', weapon: 'crossbow', fallback: 'mix',
+    ranged: { flee: 3, rest: 1, runFor: 1.5, standFor: 1.8, close: 1.6, shotSeconds: 0.7, headShare: 0.15, between: [0.4, 0.4], move: 'fireLong', reloadSafe: 4 },
+    cadence: { work: 1.2, move: 0.7, burst: 0.4, mobility: 0.45 },
+    stance: { blade: 0.55, crouch: 0.07, width: 1.2, lean: 0.06, guardHeight: -0.02 },
+    // At the ready: before the body, the nose low and forward.
+    weaponGuard: { hand: [0.14, 0.6, -0.1], dir: [0.9, -0.3, 0.1] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { fireLong: 1 },
+    tempo: 1,
+    ...STAND_OFF,
+  },
+  nu: {
+    label: 'Crossbow (nu)', weapon: 'nu', fallback: 'mix',
+    ranged: { flee: 3, rest: 1, runFor: 1.5, standFor: 1.8, close: 1.6, shotSeconds: 0.7, headShare: 0.15, between: [0.4, 0.4], move: 'fireLong', reloadSafe: 3.5 },
+    cadence: { work: 1.2, move: 0.7, burst: 0.4, mobility: 0.45 },
+    stance: { blade: 0.55, crouch: 0.07, width: 1.2, lean: 0.06, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.14, 0.6, -0.1], dir: [0.9, -0.3, 0.1] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { fireLong: 1 },
+    tempo: 1,
+    ...STAND_OFF,
+  },
   // The AR-15: shouldered, sights up, fired as fast as the sights settle;
   // thirty rounds, then a magazine change with room to make it.
   rifle: {
@@ -901,6 +927,138 @@ export const STYLES = {
     plans: { outboxer: 1.4, counter: 1.1, pressure: 0.8, brawler: 0.4 },
     pressure: 0.05,
     rangeInside: 0.2,
+  },
+  // The jian as a soldier fights it (a Han crossbowman's sidearm, named by
+  // this style in his kit): thrust and cut, the blade to parry.
+  jian: {
+    label: 'Jian', hidden: true, weapon: 'jian', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.85, burst: 0.6, mobility: 0.55 },
+    stance: { blade: 0.55, crouch: 0.05, width: 1.12, lean: 0.08, guardHeight: 0 },
+    weaponGuard: { hand: [0.16, 0.66, -0.08], dir: [1, 0.2, 0.05] },
+    idle: { bounce: 0.3, sway: 0.5, rock: 0.3 },
+    attacks: { gladiusThrust: 0.55, gladiusCut: 0.35, forehand: 0.1 },
+    combos: { 'gladiusThrust gladiusCut': 0.5, 'gladiusCut gladiusThrust': 0.5 },
+    comboChance: 0.4,
+    tempo: 1.15,
+    defences: { weaponBlock: 0.6, stepBack: 0.4 },
+    defendChance: 0.66,
+    headMovement: 0.1,
+    plans: { counter: 1.3, pressure: 1, outboxer: 1, brawler: 0.4 },
+    pressure: 0.15,
+  },
+  // The wuxia swordsman of the tales (Pei Min, the Tang Sword Saint): no
+  // armour, very quick;
+  // the jian's thrust and flicking cuts in quick runs, slipping and
+  // stepping away rather than blocking, always moving.
+  wuxia: {
+    label: 'Wuxia', weapon: 'jian', fallback: 'mix',
+    cadence: { work: 1.3, move: 0.95, burst: 0.75, mobility: 0.7 },
+    stance: { blade: 0.58, crouch: 0.08, width: 1.16, lean: 0.07, guardHeight: 0 },
+    weaponGuard: { hand: [0.17, 0.68, -0.07], dir: [1, 0.18, 0.06] },
+    idle: { bounce: 0.4, sway: 0.6, rock: 0.35 },
+    attacks: { gladiusThrust: 0.5, gladiusCut: 0.38, forehand: 0.12 },
+    combos: { 'gladiusThrust gladiusCut': 0.4, 'gladiusCut gladiusThrust gladiusCut': 0.3, 'forehand gladiusThrust': 0.3 },
+    comboChance: 0.5,
+    // Short rests between runs (tempo scales the rest after a blow).
+    tempo: 0.85,
+    defences: { weaponBlock: 0.55, stepBack: 0.4, slip: 0.05 },
+    defendChance: 0.78,
+    headMovement: 0.15,
+    plans: { counter: 1.4, outboxer: 1.1, pressure: 1, brawler: 0.3 },
+    pressure: 0.18,
+  },
+
+  // The ōdachi: great two-handed cuts, the sweep across to keep men off,
+  // from further out than a katana; slow to come back, so he keeps his range.
+  odachi: {
+    label: 'Ōdachi', weapon: 'odachi', fallback: 'mix',
+    cadence: { work: 1.05, move: 0.85, burst: 0.55, mobility: 0.5 },
+    stance: { blade: 0.45, crouch: 0.06, width: 1.25, lean: 0.06, guardHeight: 0 },
+    weaponGuard: { hand: [0.14, 0.58, -0.04], dir: [1, 0.7, 0] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.3 },
+    attacks: { shomen: 0.3, kesagiri: 0.3, yokogiri: 0.25, kiriage: 0.1, tsuki: 0.05 },
+    combos: { 'kesagiri gyakuKesa': 0.4, 'yokogiri shomen': 0.35, 'shomen yokogiri': 0.25 },
+    comboChance: 0.35,
+    // Long rests: the great blade is slow to bring back.
+    tempo: 1.35,
+    defences: { weaponBlock: 0.5, stepBack: 0.5 },
+    defendChance: 0.66,
+    headMovement: 0.05,
+    plans: { outboxer: 1.4, counter: 1.1, pressure: 0.8, brawler: 0.3 },
+    pressure: 0.1,
+    rangeInside: 0.15,
+  },
+  // A thug with a baseball bat: wild two-handed swings, the side swing most,
+  // little defence beyond getting out of the way.
+  bat: {
+    label: 'Baseball bat', weapon: 'bat', fallback: 'street',
+    cadence: { work: 1.1, move: 0.9, burst: 0.6, mobility: 0.5 },
+    stance: { blade: 0.5, crouch: 0.05, width: 1.15, lean: 0.1, guardHeight: 0 },
+    weaponGuard: { hand: [0.06, 0.74, -0.16], dir: [0.2, 0.95, -0.2] },
+    idle: { bounce: 0.3, sway: 0.6, rock: 0.4 },
+    attacks: { hammerSide: 0.6, hammerOverhead: 0.4 },
+    combos: { 'hammerSide hammerOverhead': 0.5, 'hammerSide hammerSide': 0.5 },
+    comboChance: 0.35,
+    tempo: 1.2,
+    defences: { stepBack: 0.6, guard: 0.4 },
+    defendChance: 0.4,
+    headMovement: 0.1,
+    plans: { brawler: 1.5, pressure: 1.3, counter: 0.5, outboxer: 0.3 },
+    pressure: 0.35,
+  },
+  // A riot officer: the baton behind the clear shield, the shield pushed
+  // into a man, the baton over and round it.
+  riot: {
+    label: 'Riot shield and baton', weapon: 'baton', shield: 'riotShield', fallback: 'mix',
+    cadence: { work: 1, move: 0.85, burst: 0.5, mobility: 0.4 },
+    stance: { blade: 0.4, crouch: 0.08, width: 1.2, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.06, 0.72, -0.18], dir: [0.3, 0.9, -0.1] },
+    shieldGuard: [0.34, 0.55, 0.08],
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.3 },
+    attacks: { overhand: 0.45, forehand: 0.3, shieldBash: 0.25 },
+    tempo: 1.2,
+    defences: { shieldBlock: 0.8, stepBack: 0.2 },
+    defendChance: 0.72,
+    headMovement: 0.05,
+    plans: { pressure: 1.4, counter: 1, brawler: 0.7, outboxer: 0.4 },
+    pressure: 0.3,
+  },
+  // A legionary: the scutum held square, the gladius stabbing out past its
+  // edge, the boss punched into a man (Vegetius: the point, not the edge).
+  legionary: {
+    label: 'Legionary', weapon: 'gladius', shield: 'scutum', fallback: 'mix',
+    cadence: { work: 1.1, move: 0.85, burst: 0.55, mobility: 0.4 },
+    stance: { blade: 0.38, crouch: 0.12, width: 1.22, lean: 0.16, guardHeight: 0 },
+    weaponGuard: { hand: [0.04, 0.62, -0.2], dir: [1, 0.08, 0.05] },
+    shieldGuard: [0.34, 0.52, 0.1],
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.25 },
+    attacks: { gladiusThrust: 0.65, gladiusCut: 0.1, shieldBash: 0.25 },
+    combos: { 'shieldBash gladiusThrust': 0.6, 'gladiusThrust gladiusThrust': 0.4 },
+    comboChance: 0.4,
+    tempo: 1.2,
+    defences: { shieldBlock: 0.8, stepBack: 0.2 },
+    defendChance: 0.72,
+    headMovement: 0.05,
+    plans: { pressure: 1.4, counter: 1, brawler: 0.6, outboxer: 0.3 },
+    pressure: 0.3,
+  },
+  // A centurion: the legionary's way, forward, first into the line.
+  centurion: {
+    label: 'Centurion', weapon: 'gladius', shield: 'scutum', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.9, burst: 0.6, mobility: 0.45 },
+    stance: { blade: 0.4, crouch: 0.1, width: 1.2, lean: 0.16, guardHeight: 0 },
+    weaponGuard: { hand: [0.04, 0.62, -0.2], dir: [1, 0.08, 0.05] },
+    shieldGuard: [0.34, 0.52, 0.1],
+    idle: { bounce: 0.2, sway: 0.45, rock: 0.3 },
+    attacks: { gladiusThrust: 0.55, gladiusCut: 0.2, shieldBash: 0.25 },
+    combos: { 'shieldBash gladiusThrust': 0.55, 'gladiusThrust gladiusCut': 0.45 },
+    comboChance: 0.45,
+    tempo: 1.25,
+    defences: { shieldBlock: 0.75, stepBack: 0.25 },
+    defendChance: 0.74,
+    headMovement: 0.05,
+    plans: { pressure: 1.6, counter: 1, brawler: 0.7, outboxer: 0.3 },
+    pressure: 0.4,
   },
   // Guan Yu with the Green Dragon Crescent Blade: the guandao's sweeps from
   // far off, more forward than Liu Ting's, the cut that ends it (Yan Liang

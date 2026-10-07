@@ -33,7 +33,7 @@ const STYLE_NOTES = {
   muayThai: 'Kicks, knees, elbows, the clinch.', sumo: 'Pushes and drives men off their feet.', mix: 'Switches between the unarmed styles.',
   unskilled: 'An ordinary person in a fight.', passive: 'Will not fight back: covers up and runs.', clinchBrawl: 'Grabs the neck, hammers with the free hand.',
   handgun: 'Keeps his distance, aims and fires; hand to hand up close.', baton: 'A police baton: hard blunt blows.', longsword: 'Hand-and-a-half sword: cuts and lunges.',
-  maximus: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.', commodus: 'The emperor as Hercules: lion skin and club, heavy blows, little defence.', guanYu: 'The Green Dragon Crescent Blade: great sweeping cuts from far off, pressed forward.', joan: 'Arming sword in white plate, bareheaded; bears the standard when she leads.', thraex: 'Sica and parmula: the curved blade hooks round a shield at the legs and flank.', murmillo: 'Gladius behind the great scutum: patient, stabbing out from cover.', secutor: 'Scutum and gladius, the smooth helmet: always closing.', retiarius: 'Net and trident, no helmet: throws the net to bind, then the trident in both hands.', scissor: 'Scale coat, gladius, and a steel-cased arm ending in a crescent blade.',
+  maximus: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.', commodus: 'The emperor as Hercules: lion skin and club, heavy blows, little defence.', crossbow: 'Shouldered and loosed: a heavy bolt, then a slow spanning; the sidearm when they close.', nu: 'The Chinese crossbow: a bolt, spanned quicker; the sword when they close.', jian: 'The straight sword: thrust and flick.', wuxia: 'Unarmoured and very quick: runs of thrusts and cuts, slipping away.', odachi: 'A great field sword: wide two-handed cuts from far off.', bat: 'Wild two-handed swings.', riot: 'Baton behind a clear riot shield; shoves with it.', legionary: 'Scutum and gladius: the boss punched in, the point past the edge.', centurion: 'The legionary\'s way, harder forward.', guanYu: 'The Green Dragon Crescent Blade: great sweeping cuts from far off, pressed forward.', joan: 'Arming sword in white plate, bareheaded; bears the standard when she leads.', thraex: 'Sica and parmula: the curved blade hooks round a shield at the legs and flank.', murmillo: 'Gladius behind the great scutum: patient, stabbing out from cover.', secutor: 'Scutum and gladius, the smooth helmet: always closing.', retiarius: 'Net and trident, no helmet: throws the net to bind, then the trident in both hands.', scissor: 'Scale coat, gladius, and a steel-cased arm ending in a crescent blade.',
   katana: 'Two hands, held upright: deep cuts.', knife: 'Close in, stab fast, bleed them.', hoplomachus: 'Spear and round shield; a gladius in reserve.',
   warhammer: 'Long and heavy: crushes through armour.', naginata: 'Long curved blade: great cuts from far off.', spear: 'Long reach: back off, thrust from the point.',
   bow: 'Keeps away and looses arrows; the sidearm up close.', matchlock: 'One heavy shot, a long reload; the sidearm up close.',
@@ -45,7 +45,7 @@ const STYLE_NOTES = {
   rifle: 'The AR-15: fast, accurate, devastating; thirty rounds, then a magazine change.', shotgun: 'A pump shotgun: slow, a hard kick, nine pellets that devastate up close.',
   langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', knight: '🏰', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', steppeHeavy: '🐎', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁', hanSoldier: '🏮', wuxia: '🗡️', riot: '🛡️', thug: '🧢', legionary: '🦅', centurion: '🦅' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -96,11 +96,13 @@ const STYLE_FACTION = (key) => {
 const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
   warrior('joan', 'Joan of Arc', PRESETS.joan),
+  warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
   warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
+  warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
   warrior('archer', 'Nasu no Yoichi', PRESETS.bow),
   warrior('teppo', 'Suzuki Magoichi', PRESETS.matchlock),
@@ -111,6 +113,8 @@ const WARRIORS = [
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
   warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda),
   warrior('guanYu', 'Guan Yu', PRESETS.guanYu),
+  warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
+  warrior('wuxia', 'Pei Min', PRESETS.wuxia),
   warrior('kheshig', 'Subutai', PRESETS.kheshig),
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
@@ -138,6 +142,7 @@ const WARRIORS = [
   warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
   warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),
   warrior('mingGun', 'Zhao Liu', PRESETS.mingMatchlock),
+  warrior('mingCrossbow', 'Li Si', PRESETS.mingCrossbow),
   warrior('mingSpear', 'Wang Er', PRESETS.mingSpear),
   warrior('mingDao', 'Zhang San', PRESETS.mingDao),
   warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
@@ -152,11 +157,14 @@ const WARRIORS = [
   warrior('scissor', 'Astacius', PRESETS.scissor),
   warrior('maximus', 'Maximus', PRESETS.maximus),
   warrior('commodus', 'Commodus', PRESETS.commodus),
+  warrior('legionary', 'Gaius Valerius Crispus', PRESETS.legionary),
+  warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
   warrior('peasant', 'Hob Miller', PRESETS.spear),
   warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
   warrior('ladyAshford', 'Lady Ashford', PRESETS.rapier),
   warrior('lordAshford', 'Lord Ashford', PRESETS.duelPistol),
   warrior('baton', 'Officer Reyes', PRESETS.baton),
+  warrior('riot', 'Officer Dale Burke', PRESETS.riot),
   warrior('police', 'Officer Mike Kowalski', PRESETS.police),
   warrior('policeBaton', 'Officer Ana Ruiz', PRESETS.police, { name: 'Officer Ana Ruiz', sex: 'female', heightCm: 166, style: 'baton', calories: 2300, outfit: { kind: 'police', design: 1 }, look: { skinTone: 'tan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
   warrior('swatShotgun', 'Cpl. Marcus Hale', PRESETS.shotgun),
@@ -167,6 +175,7 @@ const WARRIORS = [
   warrior('muayThai', preset('muayThai')?.name ?? 'Muay Thai', preset('muayThai') ?? PRESETS.light, { style: 'muayThai' }),
   warrior('street', preset('street').name, preset('street')),
   warrior('sumo', preset('sumo').name, preset('sumo')),
+  warrior('bat', 'Tony Marchetti', PRESETS.bat),
   warrior('brawler', 'Hank Doyle', PRESETS.clinchBrawl),
   warrior('mix', preset('mix').name, preset('mix')),
   warrior('unskilled', preset('unskilled').name, preset('unskilled')),

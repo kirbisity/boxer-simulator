@@ -344,6 +344,28 @@ export const ARMOR_KINDS = {
     trunk: [-0.08, 1.0, 1.24, { panel: [0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], skirt: [1.2, 0.55, 1.3, { rows: ['cloth', 'cloth', 'cloth', 'cloth2'] }], belt: [-0.04, 0.07, 1.28, 'gold'], collar: 'cloth',
     upperArm: [[-0.32, 0.45, 1.62, { scales: true }], [0.45, 1.02, 1.36, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.03, 1.3, { rows: ['steel', 'steel2'] }],
   },
+  // A Han soldier: a vest of small iron lamellae to the waist, with short
+  // lamellar flaps over the shoulders, over a red robe to the knee.
+  hanLamellar: {
+    trunk: [-0.06, 0.95, 1.18, { scales: true }], skirt: [0.95, 0.5, 1.2, { rows: ['cloth', 'cloth', 'cloth', 'cloth2'] }], belt: [-0.04, 0.05, 1.22, 'lace'],
+    upperArm: [-0.3, 0.2, 1.42, { scales: true }],
+  },
+  // The wuxia robe: crossed over the breast, to the shins, a sash.
+  wuxiaRobe: {
+    trunk: [-0.06, 0.99, 1.12, { panel: [0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], skirt: [1.15, 0.55, 1.22, 'cloth'], belt: [-0.05, 0.08, 1.18, 'cloth2'],
+  },
+  // The lorica segmentata: iron hoops round the trunk from the armpits to
+  // the waist, each lapping the one below, girth plates and the collar of
+  // plates over the shoulders; lames over the upper arm; a studded belt.
+  segmentata: {
+    trunk: [-0.02, 0.97, 1.22, { rows: ['steel', 'steel', 'steel2'] }], collar: 'steel',
+    upperArm: [-0.32, 0.4, 1.6, { rows: ['steel', 'steel', 'steel2'] }], belt: [0.02, 0.18, 1.26, { rows: ['lace', 'gold', 'lace'] }],
+  },
+  // A centurion's mail to the thigh, doubled over the shoulders, a belt; greaves.
+  centurion: {
+    trunk: [-0.12, 0.98, 1.14, MAIL], skirt: [0.32, 0.4, 1.18, MAIL], upperArm: [-0.32, 0.3, 1.2, MAIL],
+    belt: [0.02, 0.16, 1.2, { rows: ['lace', 'gold', 'lace'] }], shin: [-0.12, 0.88, 1.3, 'steel'],
+  },
   // A huque: a sleeveless cloth tunic over the armour, to the upper thigh,
   // open at the sides below the waist (here: the skirt split by its flare).
   huque: {

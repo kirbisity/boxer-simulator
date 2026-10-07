@@ -254,6 +254,34 @@ export const PRESETS = {
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // Crossbowmen. Ottone Doria led the Genoese crossbowmen at Crécy (1346);
+  // Li Si, a Ming garrison crossbowman (the plain "John Doe" of Chinese
+  // names); Li Ling, the Han general whose five thousand foot crossbowmen
+  // held off the Xiongnu for days in 99 BC, with the jian at his side.
+  crossbow: {
+    name: 'Ottone Doria', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 34, exercise: 0.6, calories: 3100,
+    outfit: { kind: 'footman', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
+  },
+  mingCrossbow: {
+    name: 'Li Si', style: 'nu', sex: 'male', heightCm: 168, frame: 'medium', age: 29, exercise: 0.55, calories: 2900,
+    outfit: { kind: 'mingGarrison', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
+  hanCrossbow: {
+    name: 'Li Ling', style: 'nu', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.7, calories: 3200,
+    outfit: { kind: 'hanSoldier', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  // Pei Min (8th century), the Tang general called the Sword Saint: his
+  // sword dance was one of the "three wonders" of Xuanzong's court (with Li
+  // Bai's poems and Zhang Xu's script), and he fought with the jian on the
+  // frontier. The wuxia hero: no armour, tall, strong, very quick.
+  wuxia: {
+    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'large', age: 30, exercise: 0.95, calories: 3800,
+    outfit: { kind: 'wuxia', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
   // Guan Yu (d. 220), the Three Kingdoms general of the Romance: "nine chi
   // tall", a face the colour of a ripe jujube (here a ruddy tan, a soldier's
   // weathered face, not the opera's red), a beard two chi long, a green robe
@@ -377,6 +405,39 @@ export const PRESETS = {
     name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 183, frame: 'large', age: 30, exercise: 0.75, calories: 4200,
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
+  },
+  // Makara Naotaka of the Asakura, who at Anegawa (1570) fought with a
+  // five-shaku ōdachi (the Tarōtachi, ~1.75 m) against the Tokugawa: a big
+  // man, as the sword wanted.
+  odachi: {
+    name: 'Makara Naotaka', style: 'odachi', sex: 'male', heightCm: 177, frame: 'large', age: 34, exercise: 0.8, calories: 3900,
+    outfit: { kind: 'samuraiTosei', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  // A street thug with a baseball bat; a riot officer behind his shield.
+  bat: {
+    name: 'Tony Marchetti', style: 'bat', sex: 'male', heightCm: 180, frame: 'medium', age: 27, exercise: 0.45, calories: 3400,
+    outfit: { kind: 'thug', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
+  },
+  riot: {
+    name: 'Officer Dale Burke', style: 'riot', sex: 'male', heightCm: 183, frame: 'medium', age: 32, exercise: 0.6, calories: 3500,
+    outfit: { kind: 'riot', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
+  },
+  // Rome, the early Empire: Gaius Valerius Crispus of the Eighth Legion (his
+  // tombstone at Wiesbaden); Marcus Caelius, centurion of the Eighteenth,
+  // fallen in the Teutoburg Forest (AD 9) aged 53, his tombstone showing
+  // him in his mail, phalerae and torcs. Romans of the legions ran ~1.68 m.
+  legionary: {
+    name: 'Gaius Valerius Crispus', style: 'legionary', sex: 'male', heightCm: 170, frame: 'medium', age: 28, exercise: 0.8, calories: 3600,
+    outfit: { kind: 'legionary', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'brown' },
+  },
+  centurion: {
+    name: 'Marcus Caelius', style: 'centurion', sex: 'male', heightCm: 172, frame: 'medium', age: 53, exercise: 0.75, calories: 3400,
+    outfit: { kind: 'centurion', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#5a4a3a', facialHair: 'none', eyeColor: 'brown' },
   },
   // Joan of Arc (1412–31): about 1.58 m, nineteen at Orléans; in a full
   // white harness, bareheaded in the portraits, her hair cropped round; an

@@ -51,7 +51,9 @@ export function raisedAim(fighter, mark) {
 // local; the barrel straight up) while the support hand works the ramrod
 // down the muzzle (`ramFrom` + `ramStroke` × a stroke, m along the barrel,
 // `ramPerSecond` strokes a second).
-export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4 };
+// A crossbow is spanned nose-down before him (`spanHand`, along `spanDir`),
+// the string drawn from `spanFrom` m down the tiller up by `spanStroke` m.
+export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4, spanHand: [0.16, 0.5, -0.04], spanDir: [0.35, -1, 0.02], spanFrom: 0.45, spanStroke: 0.3 };
 
 export let referenceSegments = null;
 
@@ -138,8 +140,11 @@ export function drawBow(world, fighter, punch, target, intent) {
   return { hand: target.hand, dir: up };
 }
 
-/** Loose: an arrow off the bow along the line to the mark, aimed high for the drop. */
-export function loose(world, fighter) {
+/**
+ * Loose: an arrow off the bow along the line to the mark, aimed high for
+ * the drop; or a crossbow's bolt (`bolt`: its speed, spread, weight).
+ */
+export function loose(world, fighter, bolt = null) {
   const punch = fighter.punch;
   const weapon = fighter.weapon;
   const grip = point(fighter.x, P[`${weapon.main}Hand`]);
@@ -148,17 +153,19 @@ export function loose(world, fighter) {
   const distance = vec.length(line);
   let dir = vec.normalize(line);
   // Aimed above the mark by the drop over the distance.
-  const speed = weapon.spec.arrowSpeed ?? ARROW.speed;
+  const speed = bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed;
   const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  const spread = (ARROW.spread + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1);
+  const spread = ((bolt?.spread ?? ARROW.spread) + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1);
   const random = world.random;
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
   const upward = vec.cross(across, dir);
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, 0.08)), v: vec.scale(dir, speed), speed, age: 0, landed: false, done: false });
+  // Its energy against a long bow's arrow: by its speed, or a bolt's own weight.
+  const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2;
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.scale(dir, speed), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // The bow kicks forward a little in the hand as the string goes.
   world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
@@ -177,7 +184,7 @@ export function flyArrows(world, dt) {
     const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
     const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
     if (hit) {
-      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2);
+      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2, arrow.bounce ?? ARROW.bounce);
       arrow.done = true;
       arrow.x = hit.point;
       continue;
@@ -199,7 +206,7 @@ export function flyArrows(world, dt) {
  * protection), scaled to the part's weight and hurt, bleeding, with a
  * small knock; enough and he dies.
  */
-export function arrowHit(world, shooter, hit, dir, energy = 1) {
+export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bounce) {
   const victim = hit.fighter;
   const event = { time: world.time, kind: 'arrow', attacker: shooter.id, defender: victim.id, point: hit.point, normal: vec.scale(dir, -1), target: hit.target, harm: 0, effects: [] };
   world.events.push(event);
@@ -211,7 +218,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1) {
   const gear = victim.body.gear;
   const key = hit.capsule.key;
   world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse });
-  if (gear.arrowproof && world.random() < ARROW.bounce) {
+  if (gear.arrowproof && world.random() < bounce) {
     event.bounced = true;
     event.effects.push('glances off the armour');
     return;
@@ -315,6 +322,8 @@ export function fire(world, fighter) {
       return;
     }
   }
+  // A crossbow looses its bolt.
+  if (shot?.bolt) return loose(world, fighter, shot);
   const handIndex = P[`${weapon.main}Hand`];
   const barrel = weapon.dir;
   const up = vec.normalize(vec.sub([0, 1, 0], vec.scale(barrel, barrel[1])));

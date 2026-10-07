@@ -17,9 +17,9 @@ logic.
 | `src/moves.js` | `MOVES` (every strike and defence as a timed path) and `STYLES` (how a fighter fights: weapon, stance, attacks, defences, ranged behaviour). |
 | `src/physics.js` | The world and its step: fighters, intent → pose → muscles → integration (XPBD constraints, joint limits), feet, balance, contact between bodies and weapons, blunt and blade harm, wounds, stagger, knockdowns. |
 | `src/physics/config.js` | `WORLD`: every physical constant of the fight, each with what it is set against. Tune here. |
-| `src/physics/ranged.js` | Guns and bows: aim, fire (rounds, pellets, recoil, rocking), reload, arrows in flight, what a round or arrow does to a body. |
+| `src/physics/ranged.js` | Guns, bows and crossbows: aim, fire (rounds, pellets, recoil, rocking), reload (a crossbow is spanned; its `shot.bolt` looses an arrow-like bolt with its own energy), arrows in flight, what a round or arrow does to a body. |
 | `src/physics/grappling.js` | The clinch (holding, driving, throws) and holding a man down. |
-| `src/physics/net.js` | The retiarius's net: thrown, binding a man (no blows, no guard, short steps) until he works or cuts free. |
+| `src/physics/net.js` | The retiarius's net: thrown, binding a man (no blows, no guard, short steps) until he works or cuts free. Drawn as a soft body by `src/netcloth.js` (cords that only pull, contact with bodies and sand; the physics alone decides who is caught). |
 | `src/ai.js` | Decisions: target, game plan, range, when to strike, defend, pick up a weapon, shoot or reload. `AI` holds its tunables. |
 | `src/cast.js` | Generators for armies (`mingSoldier`, `ottomanSoldier`, `steppeWarrior`, …) and `PERIOD_BUILD`: historical body sizes by people and rank. |
 | `src/scenarios.js` | Levels: place, arena, formation, and the armies (troop tables) set from history. |

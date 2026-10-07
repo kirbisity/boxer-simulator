@@ -235,6 +235,16 @@ export const OUTFITS = {
       { label: 'Hoodie & joggers', levelOnly: true, top: { kind: 'hoodie', color: '#7a2230' }, bottom: { kind: 'joggers', color: '#26262b' }, feet: { kind: 'trainer', color: '#e9e9ec' } },
     ],
   },
+  // A street thug: a zipped track jacket, joggers, trainers, a beanie.
+  thug: {
+    faction: 'street',
+    label: 'Street thug', movement: 'good', fists: 'bare',
+    palette: [['black', 'black'], ['navy', 'charcoal'], ['maroon', 'black']],
+    designs: [
+      { label: 'Black track jacket', top: { kind: 'jacket', color: '#16171b', zip: true, trim: '#e9e9ec' }, bottom: { kind: 'joggers', color: '#1c1c20' }, head: { kind: 'beanie', color: '#26262b' }, feet: { kind: 'trainer', color: '#e9e9ec' } },
+      { label: 'Red track jacket', top: { kind: 'jacket', color: '#7a1a20', zip: true, trim: '#e9e9ec' }, bottom: { kind: 'joggers', color: '#26262b' }, head: { kind: 'beanie', color: '#16171b' }, feet: { kind: 'trainer', color: '#16171b' } },
+    ],
+  },
   business: {
     faction: 'street',
     label: 'Business', movement: 'limited', fists: 'bare',
@@ -285,6 +295,24 @@ export const OUTFITS = {
     designs: [
       { label: 'Navy uniform', top: { kind: 'longsleeve', color: '#1c2438' }, bottom: { kind: 'slacks', color: '#161c2c' }, armor: { kind: 'patrolVest', color: '#141a28', cloth: '#141a28', gold: '#d6a743' }, head: { kind: 'policeCap', color: '#141a28', gold: '#d6a743' }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
       { label: 'Black uniform', top: { kind: 'longsleeve', color: '#1a1a1d' }, bottom: { kind: 'slacks', color: '#141416' }, armor: { kind: 'patrolVest', color: '#101012', cloth: '#101012', gold: '#c0c4cc' }, head: { kind: 'policeCap', color: '#101012', gold: '#c0c4cc' }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
+    ],
+  },
+  // A riot officer: a helmet with a clear visor and a neck guard, a padded
+  // riot suit over a stab vest (torso, shoulders, forearms and shins padded
+  // hard), heavy boots. It spreads a blow and turns an edge; not a round.
+  riot: {
+    faction: 'law', bulletRating: 300,
+    label: 'Riot officer', movement: 'limited', fists: 'gloved-tactical',
+    sidearm: 'baton',
+    extraMass: 0.18,
+    protection: {
+      blunt: 0.55, cut: 0.6, pierce: 0.4, bullet: { head: 0.2, torso: 0.3, limb: 0 },
+      regions: { head: { blunt: 0.7, cut: 0.85, pierce: 0.7 }, limb: { blunt: 0.55, cut: 0.35, pierce: 0.15 } },
+    },
+    courage: 0.4,
+    designs: [
+      { label: 'Black riot suit', top: { kind: 'longsleeve', color: '#1a1b1f' }, bottom: { kind: 'cargo', color: '#1a1b1f' }, armor: { kind: 'riot', color: '#121316', backPrint: 'POLICE' }, head: { kind: 'riotHelmet', color: '#121316', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
+      { label: 'Navy riot suit', top: { kind: 'longsleeve', color: '#1c2438' }, bottom: { kind: 'cargo', color: '#161c2c' }, armor: { kind: 'riot', color: '#141a28', backPrint: 'POLICE' }, head: { kind: 'riotHelmet', color: '#141a28', neck: true }, feet: { kind: 'tacticalBoot', color: '#0e0e10' } },
     ],
   },
   // Modern special forces: combat uniform, a plate carrier (level IV rifle
@@ -649,6 +677,63 @@ export const OUTFITS = {
     courage: 0.6,
     designs: [
       { label: 'Green robe, gilt scale', special: true, top: { kind: 'longsleeve', color: '#2a5636' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'guanYu', color: '#a8853e', cloth: '#2f6a3e', cloth2: '#1f4a2c', lace: '#4a3418', gold: '#d6a743' }, head: { kind: 'guanYuCap', color: '#2f6a3e', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#141416' } },
+    ],
+  },
+  // A Han soldier (2nd–1st century BC), as the Yangjiawan figures and the
+  // tomb finds show him: a vest of small iron lamellae over a red robe to
+  // the knee, a black cloth cap over the topknot, trousers and shoes. The
+  // lamellae turn cuts and most points over the trunk; the rest is cloth.
+  hanSoldier: {
+    faction: 'chinese',
+    label: 'Han soldier — iron lamellar', movement: 'good', fists: 'bare',
+    sidearm: 'jian',
+    extraMass: 0.18,
+    protection: { blunt: 0.4, cut: 0.82, pierce: 0.62, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.05, cut: 0.1, pierce: 0.05 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    courage: 0.3,
+    designs: [
+      { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'guanYuCap', color: '#1a1a1c', plain: true }, feet: { kind: 'compactBoot', color: '#1a1614' } },
+    ],
+  },
+  // The wuxia swordsman's dress: a light robe crossed over the breast and
+  // open below the waist for the legs, a sash, cloth shoes; no armour.
+  wuxia: {
+    faction: 'chinese',
+    label: 'Wuxia — robe and sash', movement: 'good', fists: 'bare',
+    protection: { blunt: 0, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.6,
+    designs: [
+      { label: 'White robe, blue sash', special: true, top: { kind: 'longsleeve', color: '#e9e4d8' }, bottom: { kind: 'pants', color: '#d9d3c4' }, armor: { kind: 'wuxiaRobe', color: '#e9e4d8', cloth: '#ebe6da', cloth2: '#3f5f82' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
+    ],
+  },
+  // ---- Rome: the legions of the early Empire (1st century AD) ----
+  // A legionary: the segmented iron cuirass (lorica segmentata) over a red
+  // tunic, the Imperial Gallic helmet with its cheek pieces and deep neck
+  // guard, the belt and its studded apron, hobnailed caligae. Iron over the
+  // trunk and shoulders, the head in iron; the arms and legs bare.
+  legionary: {
+    faction: 'romans', plated: true,
+    label: 'Legionary — lorica segmentata', movement: 'good', fists: 'bare',
+    sidearm: 'dagger',
+    deflects: true,
+    extraMass: 0.28,
+    protection: { blunt: 0.55, cut: 0.95, pierce: 0.8, bullet: { head: 0.3, torso: 0.3, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.45, cut: 0.85, pierce: 0.6 } } },
+    courage: 0.4,
+    designs: [
+      { label: 'Segmentata, red tunic', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'loincloth', color: '#8a2a22' }, armor: { kind: 'segmentata', color: '#a7adb6', gold: '#b98a3e', lace: '#3a2416' }, head: { kind: 'galea', color: '#a7adb6', gold: '#b98a3e' }, feet: { kind: 'sandal', color: '#3a2416' } },
+    ],
+  },
+  // A centurion, as Marcus Caelius's tombstone shows one: a mail shirt
+  // (lorica hamata) to the thigh, on his harness the phalerae (his medals)
+  // and torcs, greaves, the helmet with its crest worn side to side.
+  centurion: {
+    faction: 'romans', plated: true,
+    label: 'Centurion — mail and phalerae', movement: 'good', fists: 'bare',
+    sidearm: 'dagger',
+    extraMass: 0.3,
+    protection: { blunt: 0.4, cut: 0.92, pierce: 0.55, bullet: { head: 0.3, torso: 0.2, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 }, Shank: { blunt: 0.5, cut: 0.95, pierce: 0.8, deflects: true } } },
+    courage: 0.55,
+    designs: [
+      { label: 'Mail, phalerae, transverse crest', top: { kind: 'tunic', color: '#7a1a1e' }, bottom: { kind: 'loincloth', color: '#7a1a1e' }, armor: { kind: 'centurion', color: '#a7adb6', mail: '#8d9097', gold: '#c9a24a', lace: '#3a2416' }, head: { kind: 'galea', color: '#b8bec6', gold: '#c9a24a', crest: 'transverse', plume: '#b3161b' }, feet: { kind: 'sandal', color: '#3a2416' } },
     ],
   },
   // ---- The steppe, 14th–17th centuries: Mongol, Oirat and Timurid warriors,
@@ -1042,6 +1127,7 @@ export const FACTIONS = {
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
+  romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'banner', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
   law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT and special forces: the baton, the service pistol, the shotgun and the AR-15.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);

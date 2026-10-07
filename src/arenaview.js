@@ -595,6 +595,7 @@ export function buildHarness(body, armor, envMap, steelMaterial, part) {
  */
 export function buildArenaShield(spec, envMap, steelMaterial) {
   if (spec.look === 'scissores') return crescent(spec, envMap, steelMaterial);
+  if (spec.look === 'riot') return riotShield(spec);
   const group = new THREE.Group();
   const scutum = spec.look === 'scutum';
   const R = spec.curve;
@@ -1109,5 +1110,204 @@ export function buildLionPelt(body, armor) {
   tassel.rotation.z = Math.PI;
   tassel.position.set(...tail[tail.length - 1]).add(new THREE.Vector3(0, -0.04, 0));
   group.add(tassel);
+  return group;
+}
+
+/**
+ * A police riot shield: a clear, slightly curved polycarbonate sheet
+ * (seen through, a little tinted), a black rim, POLICE across it in white
+ * and a black band, the handle and arm strap behind.
+ */
+function riotShield(spec) {
+  const group = new THREE.Group();
+  const R = spec.curve;
+  const half = spec.width / 2 / R;
+  const sheet = new THREE.Mesh(new THREE.CylinderGeometry(R, R, spec.height, 24, 1, true, -half, half * 2), new THREE.MeshStandardMaterial({ color: 0xcfe0ea, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }));
+  sheet.position.z = -R;
+  const black = surface(0x141416, { roughness: 0.6 });
+  for (const y of [spec.height / 2, -spec.height / 2]) {
+    const edge = new THREE.Mesh(new THREE.TorusGeometry(R, 0.012, 5, 24, half * 2), black);
+    edge.rotation.set(Math.PI / 2, 0, Math.PI / 2 - half);
+    edge.position.set(0, y, -R);
+    group.add(edge);
+  }
+  for (const side of [1, -1]) {
+    const edge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, spec.height, 5), black);
+    edge.position.set(Math.sin(half) * R * side, 0, Math.cos(half) * R - R);
+    group.add(edge);
+  }
+  // POLICE on a band across the upper third, painted on the curve.
+  const texture = painted(256, 48, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = 'rgba(20,20,24,0.85)';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#f4f4f4';
+    g.font = 'bold 34px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('POLICE', w / 2, h / 2 + 2);
+  });
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.002, R + 0.002, 0.11, 24, 1, true, -half, half * 2), new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide }));
+  band.position.set(0, spec.height * 0.22, -R);
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.03), black);
+  handle.position.set(0, 0, -0.04);
+  const strap = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.012), black);
+  strap.position.set(0, 0.16, -0.03);
+  group.add(sheet, band, handle, strap);
+  return group;
+}
+
+// ---- Rome --------------------------------------------------------------------------
+
+/**
+ * The legion's helmet, the Imperial Gallic type (head coordinates: x
+ * forward, y up, z left): an iron bowl with a brow guard standing out over
+ * the face, embossed brows on the forehead, broad hinged cheek pieces, a
+ * deep neck guard flaring out behind, brass trim and bosses; on top the
+ * crest knob, or a centurion's crest of red horsehair worn side to side.
+ */
+export function buildGalea(outer, head, r, iron) {
+  // Worn up on the forehead, clear of the eyes (the drawn head is large): all but the cheek pieces lifted.
+  const group = new THREE.Group();
+  group.position.y = 0.22 * r;
+  outer.add(group);
+  const brass = surface(new THREE.Color(head.gold ?? '#b98a3e').getHex(), { roughness: 0.35 });
+  const inked = [];
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.3 * r, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.55), iron);
+  bowl.scale.set(1.04, 1, 1.02);
+  bowl.position.y = 0.1 * r;
+  inked.push(bowl);
+  // The brow guard: a flat peak out over the forehead.
+  const peak = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 6), iron);
+  peak.scale.set(0.32 * r, 0.05 * r, 0.95 * r);
+  peak.position.set(1.22 * r, 0.32 * r, 0);
+  inked.push(peak);
+  // Brass trim round the rim.
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.33 * r, 0.035 * r, 5, 30), brass);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 0.12 * r;
+  // The neck guard: a deep plate flaring out and down behind (cylinder angle π..2π is x < 0).
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.32 * r, 1.95 * r, 0.42 * r, 24, 1, true, Math.PI * 1.08, Math.PI * 0.84), iron);
+  neck.material = iron.clone();
+  neck.material.side = THREE.DoubleSide;
+  neck.position.y = -0.08 * r;
+  inked.push(neck);
+  // Ribs across the neck guard.
+  for (const y of [0.04, -0.12]) {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(1.45 * r + (0.04 - y) * 1.2 * r, 0.025 * r, 4, 20, Math.PI * 0.8), brass);
+    rib.rotation.set(Math.PI / 2, 0, Math.PI * 0.6);
+    rib.position.y = y * r;
+    group.add(rib);
+  }
+  // The embossed "eyebrows" on the bowl's front.
+  for (const side of [1, -1]) {
+    const brow = new THREE.Mesh(new THREE.TorusGeometry(0.4 * r, 0.018 * r, 4, 12, Math.PI * 0.6), iron);
+    brow.rotation.set(0, Math.PI / 2, Math.PI * 0.2);
+    brow.position.set(1.3 * r, 0.36 * r, side * 0.4 * r);
+    group.add(brow);
+  }
+  // The cheek pieces, hinged at the rim, curving in to the jaw, a brass boss on each.
+  for (const side of [1, -1]) {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), iron);
+    cheek.scale.set(0.58 * r, 0.88 * r, 0.09 * r);
+    cheek.position.set(0.42 * r, -0.36 * r, side * 1.18 * r);
+    cheek.rotation.set(side * -0.18, 0, -0.12);
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.08 * r, 8, 6), brass);
+    boss.position.set(0.47 * r, -0.3 * r, side * 1.28 * r);
+    const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * r, 0.04 * r, 0.3 * r, 6), brass);
+    hinge.rotation.z = Math.PI / 2;
+    hinge.position.set(0.45 * r, 0.3 * r, side * 1.3 * r);
+    outer.add(cheek, boss, hinge);
+    inked.push(cheek);
+  }
+  // The crest: its knob, and a centurion's horsehair across the crown.
+  const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * r, 0.12 * r, 0.22 * r, 10), brass);
+  knob.position.y = 1.5 * r;
+  group.add(bowl, peak, rim, neck, knob);
+  if (head.crest === 'transverse') {
+    const hair = surface(new THREE.Color(head.plume ?? '#b3161b').getHex(), { roughness: 1 });
+    const crest = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), hair);
+    crest.scale.set(0.16 * r, 1.0 * r, 1.55 * r);
+    crest.position.y = 1.45 * r;
+    const holder = new THREE.Mesh(new THREE.BoxGeometry(0.1 * r, 0.1 * r, 2.4 * r), brass);
+    holder.position.y = 1.5 * r;
+    group.add(crest, holder);
+    inked.push(crest);
+  }
+  ink(inked, 0.004);
+}
+
+/**
+ * A Roman soldier's kit off the loft (collar or hips coordinates, as
+ * buildHarness): on a centurion's chest the harness of his phalerae, nine
+ * gilt discs and torcs at the shoulders; on the hips of both, the belt's
+ * apron of studded leather strips hanging over the groin.
+ */
+export function buildRomanKit(body, armor, envMap, steelMaterial, part) {
+  const group = new THREE.Group();
+  const gilt = steelMaterial(envMap, { vertexColors: false, color: new THREE.Color(armor.gold ?? '#c9a24a').getHex(), roughness: 0.3 });
+  const leather = surface(new THREE.Color(armor.lace ?? '#3a2416').getHex(), { roughness: 0.85 });
+  const skin = body.segments.trunk.skinRadius;
+  const trunk = body.lengths.trunk;
+  if (part === 'chest') {
+    if (armor.kind !== 'centurion') return group;
+    const depth = skin * 0.74 + 0.03;
+    const width = skin * 1.08;
+    // The harness: straps in a grid over the mail, a disc at each crossing.
+    for (let row = 0; row < 3; row += 1) {
+      for (let column = -1; column <= 1; column += 1) {
+        const down = 0.24 + row * 0.13;
+        const across = column * 0.36;
+        const at = new THREE.Vector3(Math.cos(across) * depth * (1 - 0.06 * row), -trunk * down, Math.sin(across) * width * 0.9);
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 18), gilt);
+        disc.position.copy(at);
+        disc.lookAt(at.clone().add(new THREE.Vector3(Math.cos(across), 0, Math.sin(across))));
+        disc.rotateX(Math.PI / 2);
+        const face = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), gilt);
+        face.position.copy(at).add(new THREE.Vector3(Math.cos(across), 0, Math.sin(across)).multiplyScalar(0.005));
+        face.lookAt(at.clone().add(new THREE.Vector3(Math.cos(across), 0, Math.sin(across)).multiplyScalar(2)));
+        face.rotateX(Math.PI / 2);
+        group.add(disc, face);
+      }
+    }
+    for (const column of [-1, 0, 1]) {
+      const across = column * 0.36;
+      group.add(tube([[Math.cos(across) * depth * 1.0, -trunk * 0.2, Math.sin(across) * width * 0.9], [Math.cos(across) * depth * 0.95, -trunk * 0.52, Math.sin(across) * width * 0.88]], 0.006, leather, 8));
+    }
+    for (const down of [0.24, 0.37, 0.5]) {
+      group.add(tube([[Math.cos(-0.4) * depth, -trunk * down, Math.sin(-0.4) * width * 0.9], [depth * 1.02, -trunk * down, 0], [Math.cos(0.4) * depth, -trunk * down, Math.sin(0.4) * width * 0.9]], 0.006, leather, 10));
+    }
+    // A torc at each shoulder, hung from the harness.
+    const shoulder = body.lengths.shoulderSpan / 2;
+    for (const side of [1, -1]) {
+      const torc = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.007, 6, 16, Math.PI * 1.7), gilt);
+      torc.position.set(depth * 0.7, -trunk * 0.12, side * shoulder * 0.55);
+      torc.rotation.set(0, Math.PI / 2, Math.PI * 0.65);
+      group.add(torc);
+    }
+    return group;
+  }
+  // The apron: eight leather strips from the belt's front, iron studs down them, pendants at their ends.
+  const hip = (out) => ({ depth: skin * 0.8 + out, width: skin * 1.12 + out });
+  for (let strip = 0; strip < 8; strip += 1) {
+    const angle = (strip - 3.5) * 0.09;
+    const { depth, width } = hip(0.045);
+    const normal = new THREE.Vector3(Math.cos(angle) / depth, 0, Math.sin(angle) / width).normalize();
+    const length = 0.24;
+    const at = new THREE.Vector3(Math.cos(angle) * depth, 0.06 - length / 2, Math.sin(angle) * width);
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.016, length, 0.005), leather);
+    flap.position.copy(at);
+    flap.lookAt(at.clone().add(normal));
+    group.add(flap);
+    for (let stud = 0; stud < 5; stud += 1) {
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), gilt);
+      boss.position.copy(at).add(new THREE.Vector3(0, length / 2 - 0.02 - stud * 0.045, 0)).addScaledVector(normal, 0.004);
+      group.add(boss);
+    }
+    const pendant = new THREE.Mesh(new THREE.ConeGeometry(0.01, 0.025, 6), gilt);
+    pendant.position.copy(at).add(new THREE.Vector3(0, -length / 2 - 0.012, 0));
+    pendant.rotation.z = Math.PI;
+    group.add(pendant);
+  }
   return group;
 }
