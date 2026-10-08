@@ -355,7 +355,7 @@ export function installMenus(game) {
           if (!HAIR_STYLES[sex].includes(inputs.look.hairStyle)) inputs.look.hairStyle = HAIR_STYLES[sex][0];
           if (sex === 'female') inputs.look.facialHair = 'none';
         }, (sex) => (sex === 'male' ? 'Man' : 'Woman'))),
-        slider({ label: 'Age', min: 18, max: 60, step: 1, get: () => inputs.age, set: (value) => { inputs.age = value; }, show: (value) => `${value} years` }),
+        slider({ label: 'Age', min: 18, max: 100, step: 1, get: () => inputs.age, set: (value) => { inputs.age = value; }, show: (value) => `${value} years` }),
       );
     }
     function stepBody(content) {

@@ -837,7 +837,7 @@ const FIELDS = [
   { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female'] },
   { key: 'heightCm', label: 'Height', type: 'range', min: 150, max: 210, step: 1, unit: 'cm' },
   { key: 'frame', label: 'Frame', type: 'select', options: ['small', 'medium', 'large'] },
-  { key: 'age', label: 'Age', type: 'range', min: 18, max: 60, step: 1, unit: 'yr' },
+  { key: 'age', label: 'Age', type: 'range', min: 18, max: 100, step: 1, unit: 'yr' },
   { key: 'exercise', label: 'Exercise', type: 'range', min: 0, max: 1, step: 0.01, format: (value) => `${Math.round(exerciseHours(value))} h/wk` },
   // Body fat is not set but settles from what goes in and what is burnt; the
   // slider spans the intakes that settle between BMI 10 and BMI 100.

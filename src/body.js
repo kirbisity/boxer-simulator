@@ -2,6 +2,7 @@
 // physical quantities the simulation runs on (particle masses, motor forces,
 // collision radii). Every coefficient is a dial with its source beside it.
 
+import { ageing } from './aging.js';
 import { boneTScore, caloriesForBodyFat, settleComposition, starvation } from './physiology.js';
 import { gearTraits } from './outfits.js';
 
@@ -72,7 +73,8 @@ export const BODY = {
   // Muscle is lost at ~0.5%/yr after thirty and fast fibres faster, so force
   // per kilogram falls too (Janssen 2000; Lexell 1995).
   muscleLossPerYear: 0.005,
-  qualityLossPerYear: 0.007,
+  // Stiff joints slow a limb: at worst (joints 0) to this share of its speed.
+  jointSpeedFloor: 0.7,
   boneLossPerYear: { male: 0.004, female: 0.008 },
   agingFrom: 30,
   // Peak motor force per kilogram of muscle that drives the particle. Set so
@@ -589,7 +591,10 @@ export function buildBody(rawInputs) {
   const otherKg = BODY.organShareOfLean * leanKg + BODY.organPerFatKg * fatKg;
   const muscleKg = Math.max(0.05 * leanKg, leanKg - boneKg - otherKg);
   const ffmi = leanKg / (heightM * heightM);
-  const muscleQuality = 1 - BODY.qualityLossPerYear * yearsAging;
+  // What the years (and the feeding) have left (aging.js): strength falls
+  // faster than muscle, so each kilo left is weaker too.
+  const aged = ageing(inputs, { bodyFat: composition.bodyFat, starving: starvation(inputs, composition.bodyFat) });
+  const muscleQuality = aged.strength / aged.muscle ** BODY.allometryExponent;
 
   const lengths = {};
   for (const [key, fraction] of Object.entries(LENGTH)) lengths[key] = fraction * heightM;
@@ -650,7 +655,8 @@ export function buildBody(rawInputs) {
   const allometric = (muscle, reference) => reference * (muscle / reference) ** BODY.allometryExponent;
   const strikeForce = new Array(PARTICLES.length).fill(0);
   const topSpeed = new Array(PARTICLES.length).fill(Infinity);
-  const fastFibres = (0.72 + 0.38 * inputs.training) * muscleQuality;
+  // Fast fibres: training builds them; old age wastes them most (aging.js).
+  const fastFibres = (0.72 + 0.38 * inputs.training) * aged.fast;
   const legLength = lengths.thigh + lengths.shank;
   // The trunk turns the shoulders into a punch: the same cross-section law.
   const trunkForce = allometric(trunkMuscle, BODY.referenceMuscleKg.trunk) * force.trunk * muscleQuality;
@@ -679,17 +685,20 @@ export function buildBody(rawInputs) {
   motorForce[P.neck] = trunkForce;
   motorForce[P.pelvis] = allometric(leg('l') + leg('r'), BODY.referenceMuscleKg.leg * 2) * force.leg * 1.5 * muscleQuality;
   motorForce[P.head] = segments.head.tissue.muscle * force.neck * (0.5 + neckIndex);
-  // Armour and tight tailoring keep the limbs from swinging as fast.
-  for (let index = 0; index < topSpeed.length; index += 1) topSpeed[index] *= gear.swing;
+  // Armour and tight tailoring keep the limbs from swinging as fast; so do stiff, worn joints.
+  const jointFreedom = BODY.jointSpeedFloor + (1 - BODY.jointSpeedFloor) * aged.joints;
+  for (let index = 0; index < topSpeed.length; index += 1) topSpeed[index] *= gear.swing * jointFreedom;
   // A motor must at least hold its own particle up, or the fighter sags.
   for (let index = 0; index < motorForce.length; index += 1) motorForce[index] = Math.max(motorForce[index], masses[index] * 9.81 * 2.2);
 
   const armKg = (side) => segments[`${side}UpperArm`].mass + segments[`${side}Forearm`].mass + BODY.gloveKg;
   const technique = 0.75 + 0.25 * inputs.training;
-  const aerobic = clamp(0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15) - 0.008 * yearsAging, 0.15, 1.1);
+  const aerobic = clamp((0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15)) * aged.aerobic, 0.1, 1.1);
 
   return {
     inputs, heightM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
+    // The years: shares of a young body's (aging.js); joints 1 young; stoop, the back's forward lean (rad).
+    aged, joints: aged.joints, stoop: aged.stoop,
     lengths, segments, masses, motorForce, strikeForce, topSpeed, aerobic,
     limbKg: {
       lArm: segments.lUpperArm.mass + segments.lForearm.mass + BODY.gloveKg,
@@ -713,7 +722,7 @@ export function buildBody(rawInputs) {
       uppercut: (armKg('r') * 0.6 + massKg * 0.01) * technique,
     },
     // Head speed change that drops this fighter, ~3–4.5 m/s ("chin").
-    chin: 3.1 * (0.8 + 0.25 * neckIndex) * (1 - 0.004 * yearsAging) * BODY.toughness,
+    chin: 3.1 * (0.8 + 0.25 * neckIndex) * Math.max(0.6, 1 - 0.004 * yearsAging) * BODY.toughness,
     // A man's own hand breaking on a punch is the attacker's risk, not his health: it stays.
     fracture: {
       face: BODY.fractureN.face * boneDensity * BODY.toughness,

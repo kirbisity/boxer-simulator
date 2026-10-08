@@ -10,6 +10,8 @@
 // sprint, impact tolerance — each a curve calibrated against measured
 // profiles (REFERENCE_PROFILES), which the tests hold it to.
 
+import { ageing } from './aging.js';
+
 export const PHYSIOLOGY = {
   // Resting metabolism (kcal/day) = lean·a + fat·b + c, fitted to the
   // reference profiles; it also lands on the starving profile's ~700.
@@ -58,8 +60,8 @@ export function baselineLean(inputs, frameLean = 1) {
   const [base, linear, steep] = PHYSIOLOGY.ffmi[inputs.sex] ?? PHYSIOLOGY.ffmi.male;
   const level = Math.max(0, Math.min(1, inputs.exercise));
   const height = inputs.heightCm / 100;
-  const ageing = Math.max(0, inputs.age - 30) * 0.003;
-  return (base + linear * level + steep * level ** 5) * height * height * frameLean * (1 - ageing);
+  // What the years have left of the muscle (aging.js).
+  return (base + linear * level + steep * level ** 5) * height * height * frameLean * ageing(inputs).muscle;
 }
 
 function scaledBaselineFat(inputs) {
@@ -201,8 +203,9 @@ export function boneTScore(inputs, weight, bodyFat) {
   const height = inputs.heightCm / 100;
   const referenceWeight = bone.referenceBmi[inputs.sex] * height * height;
   const starvation = bone.starvation * Math.max(0, (bone.lowFat[inputs.sex] - bodyFat) / 0.06);
-  const ageing = Math.max(0, inputs.age - 35) * (inputs.sex === 'female' ? 0.03 : 0.015);
-  return (inputs.sex === 'female' ? bone.female : 0) + bone.exercise * (inputs.exercise - 0.3) + bone.weight * Math.log(weight / referenceWeight) - starvation - ageing;
+  // The years' loss (aging.js): a man's slow and steady, a woman's fast at menopause.
+  const aged = ageing(inputs, { bodyFat }).bone;
+  return (inputs.sex === 'female' ? bone.female : 0) + bone.exercise * (inputs.exercise - 0.3) + bone.weight * Math.log(weight / referenceWeight) - starvation + aged;
 }
 
 // ---- Measured references, standardised to 175 cm ----------------------------

@@ -911,6 +911,8 @@ function updateIntent(world, fighter, dt) {
     twist: walking ? 0 : idle.twist, lean: walking ? 0 : idle.lean, dip: walking ? 0 : idle.dip, shift: walking ? 0 : idle.shift,
     headOffset: vec.scale(idle.headOffset, H), guardOffset: idle.guardOffset, guardTight: fighter.guardHigh > 0,
   };
+  // An old back stoops (aging.js).
+  intent.lean += fighter.body.stoop ?? 0;
   if (fighter.punch?.load > 0) {
     // Loading a heavy attack: sit down on the legs, turn away from it.
     const punch = fighter.punch;
@@ -1361,7 +1363,8 @@ function checkBalance(world, fighter) {
   // Kneeling over a man held down is a base of its own, not a fall.
   if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling) return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
-  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
+  // Worn joints step less sharply (aging.js).
+  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
   const knock = Math.hypot(fighter.knock[0], fighter.knock[2]);
   // The legs soak the knock up over a few tenths of a second, stepping.
   const decay = Math.exp(-WORLD.balance.absorbPerSecond * world.lastDt);
@@ -1439,7 +1442,7 @@ function moveRoot(world, fighter, dt) {
   // Footwork has inertia: the stance accelerates and brakes at what the legs
   // can push, rather than starting and stopping dead.
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
-  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical));
+  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1));
   const forward = yawRotate([1, 0, 0], fighter.yaw);
   let drive = fighter.move;
   // A lunge: the legs drive the body in behind the point while it travels.

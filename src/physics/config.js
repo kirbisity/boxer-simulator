@@ -4,6 +4,8 @@
 export const WORLD = {
   gravity: 9.81,
   substeps: 8,
+  // Footwork with worn joints (body.joints 0): this share of a young man's.
+  jointFootwork: 0.55,
   // Half the inside of a 20 ft ring (6.1 m), less a margin for the ropes.
   ringHalf: 2.85,
   gloveRadius: 0.065,
