@@ -440,6 +440,11 @@ body.playing .hud .card { visibility: hidden; }
 body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sheet .fight-ui { display: none; }
 .fight-ui { position: absolute; inset: 0; pointer-events: none; }
 .touch-surface { position: absolute; inset: 0; pointer-events: auto; touch-action: none; cursor: crosshair; }
+/* The attack pad's labels: faint, out of the fight's way; the one thrown flashes. */
+.attack-pad { position: absolute; left: 0; right: 130px; top: 0; bottom: var(--controls-height, 56px); pointer-events: none; }
+.pad-move { position: absolute; translate: -50% -50%; font: 600 10px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.24); white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.pad-move.flash { animation: pad-flash 0.5s ease-out; }
+@keyframes pad-flash { from { color: var(--gold); scale: 1.4; } to { color: rgba(255, 255, 255, 0.24); scale: 1; } }
 .tap-mark { position: fixed; left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); pointer-events: none; z-index: 2; animation: tap-mark 0.35s ease-out forwards; }
 .tap-mark.press { border-color: var(--gold); width: 64px; height: 64px; box-shadow: 0 0 18px rgba(255, 207, 74, 0.5); }
 @keyframes tap-mark { from { opacity: 1; scale: 0.6; } to { opacity: 0; scale: 1.25; } }
@@ -453,10 +458,11 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .fight-button span { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .guard-button { right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 12px); width: 96px; height: 96px; }
 .guard-button.on { background: rgba(120, 190, 255, 0.4); border-color: #9cd0ff; }
-.action-button { right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); width: 76px; height: 76px; }
+/* The buttons' column at the right edge, bottom to top: Guard, Lock, the special action. */
+.action-button { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 212px); width: 76px; height: 76px; }
 .action-button.idle { opacity: 0.3; }
 /* Lock: big and gold-edged above the guard, under the thumb; gold, with his name, while on. */
-.lock-button { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 124px); width: 80px; height: 80px; border: 3px solid var(--gold); background: rgba(40, 32, 6, 0.55); color: var(--gold); box-shadow: 0 0 14px rgba(255, 207, 74, 0.35); }
+.lock-button { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 120px); width: 80px; height: 80px; border: 3px solid var(--gold); background: rgba(40, 32, 6, 0.55); color: var(--gold); box-shadow: 0 0 14px rgba(255, 207, 74, 0.35); }
 .lock-button b { font-size: 30px; }
 .lock-button .who { font: 600 10px var(--mono); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lock-button.on { background: var(--gold); color: #191300; box-shadow: 0 0 22px rgba(255, 207, 74, 0.8); }
@@ -470,8 +476,8 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .target-marker.locked .name { color: var(--gold); }
 @media (max-width: 560px), (max-height: 480px) {
   .guard-button { width: 84px; height: 84px; }
-  .action-button { right: calc(106px + env(safe-area-inset-right, 0px)); width: 66px; height: 66px; }
-  .lock-button { bottom: calc(var(--controls-height, 56px) + 106px); width: 70px; height: 70px; }
+  .action-button { right: calc(23px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 186px); width: 66px; height: 66px; }
+  .lock-button { right: calc(21px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 106px); width: 70px; height: 70px; }
 }
 /* The fight HUD shows health in every mode (the sandbox's cards read out the rest). */
 body[data-game="sandbox"] .player-status .bar.health, body[data-game="sandbox"] .target-marker .bar.health { display: block; }

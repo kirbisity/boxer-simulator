@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { MOVES } from '../src/moves.js';
+import { MOVES, STYLES } from '../src/moves.js';
 import { advance, createWorld, point } from '../src/physics.js';
-import { chooseAttack, contextAction, CONTROL, directFighter, doAction, holdDistance, newOrders, stickPace } from '../src/control.js';
+import { attackAt, attackLayout, chooseAttack, contextAction, CONTROL, directFighter, doAction, holdDistance, newOrders, stickPace } from '../src/control.js';
 import { createRecognizer, GESTURE } from '../src/gesture.js';
 
 /** A bout with red played: the AI thinks for blue only, the orders drive red. */
@@ -176,4 +176,36 @@ test('the special button: reload an empty gun, fire a loaded one, pick up a weap
   disarmed.me.weapon.held = false;
   assert.equal(contextAction(disarmed.world, disarmed.me), 'pickUp');
   assert.ok(CONTROL.pickupFrom > 1);
+});
+
+test('the attack pad: every attack of every style has its own place on the screen, where a tap throws it', () => {
+  for (const [key, style] of Object.entries(STYLES)) {
+    const pad = attackLayout(key);
+    const wanted = Object.keys(style.attacks ?? {}).filter((name) => MOVES[name] && MOVES[name].kind !== 'clinch');
+    assert.deepEqual(pad.map((place) => place.move).sort(), wanted.sort(), `${key}: every attack but the clinch is on the pad`);
+    for (const place of pad) assert.equal(attackAt(key, place.x, place.y).move, place.move, `${key}: a tap on ${place.move}'s place throws it`);
+  }
+  // Seen from behind: the jab on the left, the cross on the right, the hook out wide, the uppercut low; a katana's overhead cut on top.
+  const boxing = Object.fromEntries(attackLayout('boxing').map((place) => [place.move, place]));
+  assert.ok(boxing.jab.x < 0 && boxing.cross.x > 0 && Math.abs(boxing.hook.x) > Math.abs(boxing.jab.x) && boxing.uppercut.y < boxing.cross.y);
+  const katana = Object.fromEntries(attackLayout('katana').map((place) => [place.move, place]));
+  assert.ok(katana.shomen.y > 0.7 && Math.abs(katana.shomen.x) < 0.2 && katana.kiriage.y < 0);
+  // The height of the tap picks the zone: a cross high is at the head, lower at the body.
+  assert.equal(attackAt('boxing', 0.3, 0.6).zone, 'head');
+  assert.equal(attackAt('boxing', 0.3, 0.05).zone, 'body');
+});
+
+test('a pad attack goes at his man in reach, and into the air before him when nobody is there', () => {
+  const { world, orders, me, him, step } = played(PRESETS.heavy, PRESETS.light, { still: true });
+  orders.requests.push({ move: 'cross', zone: 'head', strength: 'quick', at: world.time });
+  step(1 / 60);
+  assert.equal(me.punch?.type, 'cross');
+  assert.equal(me.punch.target, null, 'across the ring: at the air');
+  step(1);
+  orders.lock = him.id;
+  step(3);
+  orders.requests.push({ move: 'uppercut', zone: 'head', strength: 'quick', at: world.time });
+  step(1 / 60);
+  assert.equal(me.punch?.type, 'uppercut');
+  assert.equal(me.punch.target, him.id, 'in reach: at him');
 });

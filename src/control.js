@@ -25,6 +25,9 @@ export const CONTROL = {
   bufferSeconds: 0.35,
   // He turns to face the place he strikes at for this long (s).
   faceSeconds: 0.6,
+  // A pad attack goes at his man within its reach (m more for each unit of a lunge's step, and this slack), else at the air.
+  padStepReach: 0.5,
+  padSlack: 0.3,
   // An aimed attack: a man this far (m) past his reach is lunged at; a point this high on his own
   // body (share of the shoulder's height) or higher is high, below this share of the hip's, low.
   lungeBeyond: 0.35,
@@ -112,6 +115,90 @@ function steer(world, fighter, orders, opponent, dt) {
   const off = distance - hold;
   if (Math.abs(off) <= CONTROL.hold.slack) fighter.move *= Math.exp(-dt * 6);
   else fighter.move = Math.max(-1, Math.min(1, off * 2)) * slow;
+}
+
+// ---- The attack pad ----------------------------------------------------------
+//
+// Every attack of a style has its own place on the screen, where it would be
+// seen to come from by a man behind the fighter: a jab on the left, a cross
+// on the right, a hook out wide, an uppercut from below, kicks low on their
+// side, a cut from wherever its swing starts, a thrust down the middle. A tap
+// throws the move whose place is nearest (screen x right and y up, −1 to 1
+// from the centre), so every move a style has can be thrown.
+
+export const ATTACK_PAD = {
+  // Places by the way a move travels: [x for the right side (mirrored for the left), y].
+  paths: { straight: [0.3, 0.3], hook: [0.85, 0.35], upper: [0.4, -0.2], elbow: [0.65, 0.62], upElbow: [0.3, 0.75], knee: [0.3, -0.45], teep: [0.15, -0.62], pushBoth: [0, -0.1], aim: [0, 0.1] },
+  // A kick: at the body and head mid-low on its side; at the legs at the very bottom.
+  kick: [0.82, -0.35],
+  lowKick: [0.72, -0.85],
+  // A blade: a swing from where it starts (its hand's place beside and above the hip, scaled to the screen); a thrust down the middle.
+  swingSide: 3,
+  swingHeight: 3,
+  swingMiddle: 0.65,
+  thrust: [0, 0.05],
+  rush: [0, -0.92],
+  // Places nearer than this are spread apart so that each keeps a patch of its own.
+  apart: 0.32,
+  // How high the tap is picks the zone of a move that has more than one: head above `headFrom`, legs below `legsBelow`.
+  headFrom: 0.25,
+  legsBelow: -0.55,
+};
+
+const clampPad = (value) => Math.max(-0.95, Math.min(0.95, value));
+
+/** Where on the pad a move sits: [x, y], or null for one the pad does not throw (the clinch: the special button). */
+function padPlace(spec) {
+  if (spec.kind === 'rush') return [...ATTACK_PAD.rush];
+  if (spec.kind !== 'strike') return null;
+  const side = spec.limb?.[0] === 'l' ? -1 : 1;
+  if (spec.path === 'blade') {
+    if (spec.mode === 'thrust' || !spec.from) return [...ATTACK_PAD.thrust];
+    // Local z is to his left: the right of the screen is −z.
+    return [clampPad(-spec.from.hand[2] * ATTACK_PAD.swingSide), clampPad((spec.from.hand[1] - ATTACK_PAD.swingMiddle) * ATTACK_PAD.swingHeight)];
+  }
+  if (spec.path === 'roundhouse') {
+    const [x, y] = spec.zones.length === 1 && spec.zones[0] === 'legs' ? ATTACK_PAD.lowKick : ATTACK_PAD.kick;
+    return [x * side, y];
+  }
+  const [x, y] = ATTACK_PAD.paths[spec.path] ?? [0.5, 0];
+  return [x * side, y];
+}
+
+/** The pad of a style: each of its attacks and its place, spread so that none hides another. */
+export function attackLayout(styleKey) {
+  const style = STYLES[styleKey];
+  const pad = [];
+  for (const name of Object.keys(style?.attacks ?? {})) {
+    const spec = MOVES[name];
+    const place = spec ? padPlace(spec) : null;
+    if (!place) continue;
+    // Too near one already placed: moved aside, then down, until it has room.
+    for (let tries = 0; tries < 12 && pad.some((other) => Math.hypot(other.x - place[0], other.y - place[1]) < ATTACK_PAD.apart); tries += 1) {
+      place[0] = clampPad(place[0] + (place[0] >= 0 ? 1 : -1) * ATTACK_PAD.apart * (tries % 2 === 0 ? 1 : -2));
+      if (tries % 4 === 3) place[1] = clampPad(place[1] - ATTACK_PAD.apart);
+    }
+    pad.push({ move: name, x: place[0], y: place[1] });
+  }
+  return pad;
+}
+
+/** The attack a tap at (x, y) on the pad throws, and at which zone of him: { move, zone }, or null. */
+export function attackAt(styleKey, x, y) {
+  const pad = attackLayout(styleKey);
+  let best = null;
+  let bestDistance = Infinity;
+  for (const place of pad) {
+    const distance = Math.hypot(place.x - x, place.y - y);
+    if (distance < bestDistance) {
+      best = place;
+      bestDistance = distance;
+    }
+  }
+  if (!best) return null;
+  const zones = MOVES[best.move].zones ?? [];
+  const zone = y > ATTACK_PAD.headFrom && zones.includes('head') ? 'head' : y < ATTACK_PAD.legsBelow && zones.includes('legs') ? 'legs' : zones.includes('body') ? 'body' : zones[0] ?? null;
+  return { move: best.move, zone };
 }
 
 // ---- Attacks ----------------------------------------------------------------
@@ -217,6 +304,11 @@ function attack(world, fighter, orders, opponent) {
     return;
   }
   if (fighter.punch || fighter.rush || fighter.pickup || fighter.pin || fighter.state !== 'up') return;
+  if (request.move) {
+    padAttack(world, fighter, request, opponent);
+    requests.shift();
+    return;
+  }
   const aim = request.point ?? null;
   const man = aim ? manNear(world, fighter, aim, WORLD.aimedAtWithin) : opponent;
   const line = aim ? lineFor(fighter, aim, man) : request.line;
@@ -230,6 +322,37 @@ function attack(world, fighter, orders, opponent) {
     fighter.orderCombo = chosen.combo;
     fighter.orderComboZone = chosen.zone;
     fighter.orderComboAt = aim;
+    fighter.orderAt = world.time;
+  }
+}
+
+/**
+ * A move from the pad: at his man if he is within its reach (a lunge's or a
+ * charge's further), else into the air before him at the zone's height.
+ */
+function padAttack(world, fighter, request, opponent) {
+  const spec = MOVES[request.move];
+  const style = STYLES[fighter.style];
+  if (!spec) return;
+  const held = fighter.weapon?.held ? fighter.weapon.spec : null;
+  const hips = point(fighter.x, P.pelvis);
+  let at = null;
+  if (spec.kind === 'strike') {
+    const reach = moveRange(spec, fighter.body, held) + fighter.body.lengths.headRadius + (spec.step ?? 0) * CONTROL.padStepReach;
+    const near = opponent && opponent.state === 'up' && Math.hypot(opponent.x[P.pelvis * 3] - hips[0], opponent.x[P.pelvis * 3 + 2] - hips[2]) <= reach + CONTROL.padSlack;
+    // A gun fires at its man wherever he is; with nobody there, it fires ahead.
+    if (!near && (spec.path !== 'aim' || !opponent)) {
+      const forward = yawRotate([1, 0, 0], fighter.yaw);
+      const height = request.zone === 'head' ? fighter.x[P.head * 3 + 1] : request.zone === 'legs' ? hips[1] * 0.6 : fighter.x[P.neck * 3 + 1] - 0.3;
+      at = [hips[0] + forward[0] * reach, height, hips[2] + forward[2] * reach];
+    }
+  } else if (!opponent) return;
+  const combo = request.strength === 'combo' && spec.kind === 'strike' ? comboAfter(style, request.move, []) : null;
+  const thrown = spec.kind === 'strike' ? throwPunch(world, fighter, request.move, request.zone, { at }) : throwPunch(world, fighter, request.move);
+  if (thrown) {
+    fighter.orderCombo = combo;
+    fighter.orderComboZone = request.zone;
+    fighter.orderComboAt = at;
     fighter.orderAt = world.time;
   }
 }

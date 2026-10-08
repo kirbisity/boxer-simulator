@@ -1,5 +1,6 @@
 // The fight's controls on screen, for a finger or a mouse: the game surface
-// (drag anywhere for a floating stick; tap anywhere to strike that way;
+// (drag anywhere for a floating stick; tap anywhere for an attack, which
+// one by where: every move of his style has its place on the screen;
 // press and hold to shove, or to hold down a man on the floor), a big Guard
 // button, a Lock button above it, one special button in a fixed place, and
 // the fight-mode HUD (the player's status low down, his man's over his head).
@@ -8,7 +9,7 @@
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, contextAction } from './control.js';
+import { ACTIONS, attackAt, attackLayout, contextAction } from './control.js';
 import { createRecognizer, GESTURE } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 
@@ -24,6 +25,8 @@ export const TOUCH = {
   markerAwake: 2.5,
   // The ring where a tap or press landed fades over this (s).
   markSeconds: 0.35,
+  // The pad keeps clear of the buttons' column at the right edge (px).
+  padRight: 130,
 };
 
 const uiElement = (tag, className, text) => Object.assign(document.createElement(tag), { className, ...(text ? { textContent: text } : {}) });
@@ -37,10 +40,14 @@ const uiElement = (tag, className, text) => Object.assign(document.createElement
 export function installFightControls(root, hooks) {
   const gestures = createRecognizer();
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
-  surface.setAttribute('aria-label', 'Fight: drag to move, tap to strike that way, press and hold to shove or hold a man down');
+  surface.setAttribute('aria-label', 'Fight: drag to move, tap for an attack (each move has its place on the screen), press and hold to shove or hold a man down');
   const stick = root.appendChild(uiElement('div', 'stick'));
   stick.appendChild(uiElement('i', 'knob'));
   stick.hidden = true;
+  // The pad's labels: each move of his style, faintly, where a tap throws it.
+  const pad = root.appendChild(uiElement('div', 'attack-pad'));
+  pad.setAttribute('aria-hidden', 'true');
+  let padStyle = null;
   const mark = root.appendChild(uiElement('div', 'tap-mark'));
   mark.hidden = true;
   const guard = root.appendChild(uiElement('button', 'fight-button guard-button'));
@@ -130,11 +137,15 @@ export function installFightControls(root, hooks) {
         orders.stick = null;
         stick.hidden = true;
       } else if (event.type === 'tap') {
-        // Always a strike, the way the tap points, whoever is (or is not) there.
-        const aim = aimAt(event.at[0], event.at[1]);
-        orders.requests.push({ point: aim, strength: event.double ? 'combo' : 'quick', at: world.time });
+        // Always an attack, at once: the move whose place on the pad the tap is nearest.
+        const [x, y] = padCoordinates(event.at[0], event.at[1]);
+        const chosen = attackAt(hooks.player().style, x, y);
+        if (!chosen) continue;
+        orders.requests.push({ move: chosen.move, zone: chosen.zone, strength: event.double ? 'combo' : 'quick', at: world.time });
         showMark(event.at, 'strike');
-        wakeNear(aim);
+        flashLabel(chosen.move);
+        const target = orders.lock ?? opponentFor(world, hooks.player())?.id;
+        if (target !== undefined && target !== null) awake.set(target, hooks.now());
       } else if (event.type === 'hold') {
         const aim = aimAt(event.at[0], event.at[1]);
         (orders.holds ??= []).push(aim);
@@ -143,6 +154,35 @@ export function installFightControls(root, hooks) {
         wakeNear(aim);
       }
     }
+  }
+
+  /** A point on the screen as a place on the pad: x right and y up, −1 to 1 about the middle of the fight (above the footer). */
+  function padCoordinates(px, py) {
+    const box = surface.getBoundingClientRect();
+    const footer = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--controls-height')) || 0;
+    const height = Math.max(1, box.height - footer);
+    const width = Math.max(1, box.width - TOUCH.padRight);
+    return [((px - box.left) / width) * 2 - 1, 1 - ((py - box.top) / height) * 2];
+  }
+
+  /** The pad's labels for his style, placed as the pad places its moves. */
+  function drawPad(styleKey) {
+    padStyle = styleKey;
+    pad.replaceChildren(...attackLayout(styleKey).map((place) => {
+      const label = uiElement('span', 'pad-move', moveWords(place.move));
+      label.dataset.move = place.move;
+      label.style.left = `${50 + place.x * 50}%`;
+      label.style.top = `${50 - place.y * 50}%`;
+      return label;
+    }));
+  }
+
+  function flashLabel(move) {
+    const label = pad.querySelector(`[data-move="${move}"]`);
+    if (!label) return;
+    label.classList.remove('flash');
+    void label.offsetWidth;
+    label.classList.add('flash');
   }
 
   function showStick(event) {
@@ -240,6 +280,7 @@ export function installFightControls(root, hooks) {
     const me = hooks.player();
     const orders = hooks.orders();
     if (!world || !me) return;
+    if (me.style !== padStyle) drawPad(me.style);
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
     // The special button: one place, its label what it would do now.
     const name = contextAction(world, me);
@@ -293,6 +334,7 @@ export function installFightControls(root, hooks) {
     mark.hidden = true;
     guard.classList.remove('on');
     awake.clear();
+    padStyle = null;
   }
 
   return { update, setActive, reset };
@@ -308,6 +350,12 @@ function capture(element, pointerId) {
 }
 
 const firstNameOf = (fighter) => fighter.body.inputs.name.split(' ')[0];
+
+/** A move's name in words: "hammerOverhead" → "Hammer overhead". */
+function moveWords(name) {
+  const words = name.replace(/([A-Z])/g, ' $1').toLowerCase();
+  return words[0].toUpperCase() + words.slice(1);
+}
 
 /** The nearest approach of a line of sight (origin + t·dir, t ≥ 0) to a segment a–b: how far, and the point on the segment. */
 function rayToSegment(origin, dir, a, b) {
