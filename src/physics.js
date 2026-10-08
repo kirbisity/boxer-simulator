@@ -1399,10 +1399,10 @@ function checkBalance(world, fighter) {
   const decay = Math.exp(-WORLD.balance.absorbPerSecond * world.lastDt);
   fighter.knock = fighter.knock.map((value) => value * decay);
   // Carried outside a two-footed base counts too (one foot up is a kick).
+  // The base is the ground between the feet: hips over the front foot of a
+  // long lunge are on it; what counts is how far outside it they are.
   const planted = Object.values(fighter.feet).every((foot) => !foot.lifted);
-  const pelvis = point(fighter.x, P.pelvis);
-  const feet = vec.lerp(point(fighter.x, P.lFoot), point(fighter.x, P.rFoot), 0.5);
-  const outside = planted ? Math.hypot(pelvis[0] - feet[0], pelvis[2] - feet[2]) : 0;
+  const outside = planted ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
@@ -1430,6 +1430,14 @@ function checkBalance(world, fighter) {
     fighter.downTimer = WORLD.balance.fallSeconds;
     world.events.push({ time: world.time, kind: 'fell', fighter: fighter.id, onOneFoot: !planted, effects: [knock > WORLD.balance.speed * footing ? 'knocked off balance' : 'overreached'] });
   }
+}
+
+/** How far a point is outside the base between two feet (m, on the floor): from the nearest point on the line joining them. */
+function outsideBase(at, first, second) {
+  const across = [second[0] - first[0], second[2] - first[2]];
+  const lengthSquared = across[0] * across[0] + across[1] * across[1];
+  const share = lengthSquared > 1e-9 ? Math.max(0, Math.min(1, ((at[0] - first[0]) * across[0] + (at[2] - first[2]) * across[1]) / lengthSquared)) : 0;
+  return Math.hypot(at[0] - (first[0] + across[0] * share), at[2] - (first[2] + across[1] * share));
 }
 
 /** Advance by any number of seconds at the fixed step: the manual test hook. */

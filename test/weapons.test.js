@@ -381,14 +381,18 @@ test('the whip: its thong a rope whose tip outruns the hand; a lash bleeds bare 
   const { WARRIORS } = await import('../src/roster.js');
   const { WHIP } = await import('../src/weapons.js');
   const by = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, warrior.inputs]));
-  const bout = (opponent, seed) => {
+  // `still`: the opponent stands and takes it (as the sandbox's stand-still), to see what his armour does.
+  const bout = (opponent, seed, still = false) => {
     const world = createWorld([{ inputs: structuredClone(by.lorarius), corner: 'red' }, { inputs: structuredClone(by[opponent]), corner: 'blue' }], { seed });
     let tipFastest = 0;
     let handFastest = 0;
     let knelt = false;
     let rose = false;
     for (let step = 0; step < 60 * 40; step += 1) {
-      advance(world, 1 / 60, (current, dt) => thinkAll(current, dt));
+      advance(world, 1 / 60, (current, dt) => {
+        if (still) Object.assign(current.fighters[1], { move: 0, strafe: 0, running: false, defence: null, rush: null });
+        thinkAll(current, dt, still ? new Set([1]) : undefined);
+      });
       const lorarius = world.fighters[0];
       const rope = lorarius.weapon?.rope;
       if (rope) {
@@ -407,7 +411,7 @@ test('the whip: its thong a rope whose tip outruns the hand; a lash bleeds bare 
   assert.ok(bare.some((run) => run.lashes.some((event) => event.cut > WHIP.painFrom)), 'lashes through bare skin');
   assert.ok(bare.some((run) => run.knelt), 'a hard lash put him on his knees');
   assert.ok(bare.filter((run) => run.knelt).every((run) => run.rose), 'and he got up again');
-  const onPlate = [1, 2, 3, 4].flatMap((seed) => bout('plate', seed).lashes);
+  const onPlate = [1, 2, 3, 4].flatMap((seed) => bout('plate', seed, true).lashes);
   assert.ok(onPlate.length > 0 && onPlate.every((event) => event.effects.some((effect) => effect.includes('turned'))), `plate turns every lash (${onPlate.length})`);
 });
 
