@@ -44,7 +44,7 @@ export const AGEING = {
 };
 
 /** A curve's value at `age` for training level `exercise` (0 sedentary, 1 trained). */
-function curve(points, age, exercise) {
+function ageCurve(points, age, exercise) {
   const t = Math.max(0, Math.min(1, exercise));
   const at = Math.max(points[0][0], Math.min(points[points.length - 1][0], age));
   for (let index = 1; index < points.length; index += 1) {
