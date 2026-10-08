@@ -105,26 +105,28 @@ test('a hard landing hurts the body; fall after fall a man dies of his injuries 
   assert.ok(world.events.some((event) => /injuries/.test(event.effects?.join(' ') ?? '')), 'died of his injuries');
 });
 
-test('a weapon heavier than heavyFrom is slower to raise and to recover; the blow between is not', async () => {
-  const { WORLD } = await import('../src/physics.js');
-  const windupTime = (preset) => {
-    const world = duel(PRESETS[preset], PRESETS.light, { distance: 1.2 });
+test('a heavy weapon is slower to raise than a light one in the same hands, and slower in weak hands than in strong ones', async () => {
+  const windupTime = (inputs) => {
+    const world = duel(inputs, PRESETS.light, { distance: 1.2 });
     const fighter = world.fighters[0];
     const attack = Object.keys(STYLES[fighter.style].attacks)[0];
-    assert.ok(throwPunch(world, fighter, attack), `${preset} swings`);
+    assert.ok(throwPunch(world, fighter, attack), `${inputs.name} swings`);
     const windup = fighter.punch.spec.windup;
     let elapsed = 0;
-    while (fighter.punch && fighter.punch.t < windup && elapsed < 2) {
+    while (fighter.punch && fighter.punch.t < windup && elapsed < 3) {
       advance(world, 1 / 60);
       elapsed += 1 / 60;
     }
     return elapsed / windup;
   };
-  assert.ok(WEAPONS.kanabo.mass > WORLD.weapons.heavyFrom && WEAPONS.warhammer.mass < WORLD.weapons.heavyFrom);
-  // Against its spec (frames round both up alike): the kanabo's windup stretched, the katana's not.
-  const kanabo = windupTime('kanabo');
-  const katana = windupTime('samurai');
-  assert.ok(kanabo > katana * 1.15, `kanabo windup ${kanabo.toFixed(2)}× its spec, katana ${katana.toFixed(2)}×`);
+  // A man of ordinary strength (Sir Edric): the kanabo comes up slower than a katana.
+  const kanabo = windupTime({ ...PRESETS.knight, style: 'kanabo' });
+  const katana = windupTime({ ...PRESETS.knight, style: 'katana' });
+  assert.ok(kanabo > katana * 1.2, `the kanabo ${kanabo.toFixed(2)}x its spec, a katana in the same hands ${katana.toFixed(2)}x`);
+  // The same kanabo: slower in Lady Ashford's hands, quicker in Kojima's (strong enough to swing it briskly).
+  const weak = windupTime({ ...PRESETS.revolver, style: 'kanabo' });
+  const strong = windupTime(PRESETS.kanabo);
+  assert.ok(weak > kanabo * 1.1 && kanabo > strong * 1.1, `weak ${weak.toFixed(2)}x, ordinary ${kanabo.toFixed(2)}x, strong ${strong.toFixed(2)}x`);
 });
 
 test('injury piling up breaks a limb, and past the fatal mark on the trunk, kills', async () => {

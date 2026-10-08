@@ -134,11 +134,14 @@ function lashHit(world, attacker, defender, key, tipKg, speed, at, dir) {
   event.effects.push(through > spec.painSure * 0.6 ? 'a hard lash' : 'lashed');
   wound(defender, 'cut', through * spec.cutShare, key, attacker);
   addDamage(defender, key, through / 40, false);
+  // The tip's momentum into the part it struck.
+  const capsule = capsules(defender).find((entry) => entry.key === key);
+  if (capsule) world.pendingImpulses.push({ fighter: defender, shares: [[capsule.a, 0.5], [capsule.b, 0.5]], direction: dir, impulse: tipKg * speed * spec.impact });
   world.events.push(event);
-  // The pain: likelier to put him down the harder it was.
+  // The pain: likelier to put him on his knees the harder it was; short of that, he reels from it.
   const chance = Math.max(0, Math.min(0.9, (through - spec.painFrom) / (spec.painSure - spec.painFrom)));
   if (defender.state === 'up' && !defender.pain && world.random() < chance) startPain(world, defender, key);
-  else if (through > spec.painFrom * 0.5) stagger(world, defender, spec.stingStagger, event);
+  else if (through > spec.painFrom * spec.staggerFrom) stagger(world, defender, spec.staggerSeverity + spec.staggerPerPain * (through / spec.painFrom), event, true);
 }
 
 /** Down on his knees with the pain, a hand to where it struck; he will get up (WHIP.kneelSeconds, riseSeconds). */

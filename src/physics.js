@@ -16,6 +16,7 @@ import { aimTargets, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, rel
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { formUp } from './formation.js';
+import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
@@ -170,7 +171,15 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   }
   if (style.net && !fighter.net) fighter.net = { held: true };
   if (!style.weapon) return;
+  // Too heavy for him to hold out (handling.js): he fights without it.
+  const handled = handling(fighter.body, WEAPONS[style.weapon]);
+  if (!handled.canHold) {
+    fighter.cannotWield = style.weapon;
+    if (style.fallback && style.fallback !== styleKey) armFighter(fighter, style.fallback, { random, shield: false });
+    return;
+  }
   const weapon = createWeapon(style.weapon);
+  weapon.handling = handled;
   const shares = handShares(weapon.spec);
   addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * shares.main);
   if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * shares.off);
@@ -506,7 +515,8 @@ function updateWeapon(fighter, h) {
   const sin = vec.length(axis);
   const angle = Math.atan2(sin, vec.dot(previous, want));
   const unit = sin > 1e-6 ? vec.scale(axis, 1 / sin) : [0, 0, 0];
-  const omega = spec.wrist.omega * (twoHands ? WORLD.twoHandWrist : 1);
+  // As fast as his arms turn it (handling.js: a heavy weapon slowly in weak hands).
+  const omega = spec.wrist.omega * (twoHands ? WORLD.twoHandWrist : 1) * (weapon.handling?.speed ?? 1);
   const zeta = spec.wrist.zeta;
   const strength = Math.max(0, fighter.motorScale);
   const reach = spec.length + spec.handle;
@@ -842,7 +852,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
   const target = opponentFor(world, fighter);
   // Raising a weapon heavier than heavyFrom is work in proportion to its mass.
-  const lift = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(1, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom) : 1;
+  // (and the harder, the weaker he is for it: handling.js)
+  const lift = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(1, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom) / (fighter.weapon.handling?.speed ?? 1) : 1;
   const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift : 0;
   // An empty gun is not fired: the same button starts loading it (no mark needed).
   if (spec?.path === 'aim' && fighter.weapon?.held && fighter.weapon.spec.shot && !fighter.weapon.loaded) {
@@ -925,7 +936,10 @@ function updateIntent(world, fighter, dt) {
     const punch = fighter.punch;
     // A heavy weapon is slow to raise and slow to bring back; the blow between is the muscles'.
     const heavy = punch.spec.path === 'blade' && fighter.weapon?.held ? Math.max(1, Math.sqrt(fighter.weapon.spec.mass / WORLD.weapons.heavyFrom)) : 1;
-    punch.t += punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt;
+    // The stroke at the pace his arms give the weapon; a bow drawn as fast as he can pull it (handling.js).
+    const held = fighter.weapon?.held ? fighter.weapon : null;
+    const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
+    punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace;
     punch.age += dt;
     if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
     if (punch.heavy) intent.dip += WORLD.heavy.loadDip * Math.max(0, 1 - punch.t / punch.spec.extendUntil);

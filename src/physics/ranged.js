@@ -161,7 +161,8 @@ export function loose(world, fighter, bolt = null) {
   const distance = vec.length(line);
   let dir = vec.normalize(line);
   // Aimed above the mark by the drop over the distance.
-  const speed = bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed;
+  // A bow drawn only part way (too heavy for him: handling.js) casts the arrow that much slower.
+  const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
   const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));

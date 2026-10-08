@@ -9,6 +9,7 @@ import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, inFight
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
+import { handling } from './handling.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -652,6 +653,8 @@ function goForWeapon(world, fighter, opponent, dt) {
     // A standard is taken up only by its own side's chosen man (takeUpStandard).
     if (!debris || debris.taken || !debris.resting) return null;
     if (debris.kind === 'shield' ? !wantsShield : debris.kind !== 'weapon' || !wantsWeapon || WEAPONS[debris.weapon]?.flag) return null;
+    // Not a weapon he cannot lift (handling.js).
+    if (debris.kind === 'weapon' && !handling(fighter.body, WEAPONS[debris.weapon]).canHold) return null;
     const mine = flat(debris.x, at);
     const theirs = enemies.reduce((least, other) => Math.min(least, flat(debris.x, point(other.x, P.pelvis))), Infinity);
     if (mine > AI.pickup.maxDistance || (mine > AI.pickup.atFeet && mine > theirs - AI.pickup.margin)) return null;

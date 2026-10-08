@@ -64,14 +64,18 @@ export const ADAMS = {
 // of falling mass to the tip, so a snap of the handle runs out along it and
 // the tip goes many times faster than the hand. What strikes is the tip's
 // small mass (`tipLinks` links of the `massKg`), fast: it lashes the skin
-// (cut, shallow) and stings, little more. Against armour it does almost
+// (cut, shallow), stings and shoves; the pain makes an unarmoured man reel,
+// and a hard lash may put him on his knees. Against armour it does almost
 // nothing (its cut protection takes it). `lashFrom`: m/s of the tip before
 // a touch is a lash; `painFrom`: joules through the skin before a man may
 // drop to his knees with it (likelier the harder, to `painSure`), for
 // `kneelSeconds` and `riseSeconds` back up.
 export const WHIP = {
   length: 2.4, links: 16, massKg: 0.28, taper: 0.15, drag: 1.2, passes: 10, tipLinks: 3,
-  lashFrom: 14, cutShare: 0.6, painFrom: 6, painSure: 30, kneelSeconds: 1.6, riseSeconds: 0.9, stingStagger: 0.6,
+  lashFrom: 14, cutShare: 0.6, painFrom: 5, painSure: 22, kneelSeconds: 1.6, riseSeconds: 0.9,
+  // The lash's push: the tip's momentum into the part it strikes (×`impact`); and the pain's flinch: from
+  // `staggerFrom` of painFrom through the skin he reels (a stagger of `staggerSeverity` + `staggerPerPain` × through/painFrom).
+  impact: 1.5, staggerFrom: 0.4, staggerSeverity: 0.72, staggerPerPain: 0.12,
 };
 
 export const MATCHLOCK = {
@@ -388,6 +392,8 @@ export const WEAPONS = {
     label: 'Bow', hands: 'one', hand: 'l', length: 0.95, strikeFrom: 0.95, handle: 0.85, mass: 0.6, balance: 0, radius: 0.014,
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.5, grip: 0.4, ranged: true, bow: true,
+    // A war bow's draw weight (a yumi of ~26 kgf).
+    drawN: 260,
   },
   // The steppe composite bow (Mongol, Turkish): short and sharply recurved,
   // horn, wood and sinew, a heavy draw; it casts the same arrow faster than
@@ -397,6 +403,8 @@ export const WEAPONS = {
     label: 'Composite bow', hands: 'one', hand: 'l', length: 0.62, strikeFrom: 0.62, handle: 0.55, mass: 0.7, balance: 0, radius: 0.016,
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.6, grip: 0.4, ranged: true, bow: true, arrowSpeed: 62,
+    // The steppe bow's heavier draw (~34 kgf, ~75 lb).
+    drawN: 330,
   },
   // Sidearms, drawn when the main weapon is lost (an outfit's `sidearm`):
   // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
