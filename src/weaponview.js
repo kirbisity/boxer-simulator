@@ -1085,23 +1085,34 @@ function crowdArms(view, key, build) {
 /** Keep a fighter's weapon and shield drawn where the simulation holds them. */
 // A polearm's blade (`edgeLeads`) is not turned by the wrist the way a
 // sword's is: the edge faces down at rest, the curve sweeping up from it,
-// and in a cut it leads, facing the way the blade travels. Turned gradually,
-// so it never flips edge for spine in a frame.
-const EDGE = { leadsAbove: 1.5, turn: 0.35 }; // m/s of the tip; share turned a frame
+// and in a cut it leads, facing the way the blade sweeps. The sweep is the
+// blade's own turn (the simulation's spin), not the tip's travel, which
+// carries every step and sway of the body; the edge eases from down to
+// leading as the sweep quickens, and turns at a rate per second, so it
+// neither twitches between the two nor flips edge for spine.
+const EDGE = {
+  // The tip's sweep about the hand (m/s): below `leadsFrom` the edge hangs down; past `leadsFully` it leads.
+  leadsFrom: 2,
+  leadsFully: 6,
+  // The edge turns to where it should face with this time constant (s): quick enough to lead a cut from its start.
+  turnSeconds: 0.03,
+};
 
-function leadingEdge(arms, hand, along, length, now) {
-  const tip = new THREE.Vector3(hand[0], hand[1], hand[2]).addScaledVector(along, length);
+function leadingEdge(arms, weapon, along, now) {
   const across = (vector) => vector.sub(along.clone().multiplyScalar(vector.dot(along)));
-  let wanted = across(new THREE.Vector3(0, -1, 0));
-  if (arms.tip && now > arms.tipAt) {
-    const travel = across(tip.clone().sub(arms.tip));
-    if (travel.length() / (now - arms.tipAt) > EDGE.leadsAbove) wanted = travel;
-  }
-  arms.tip = tip;
-  arms.tipAt = now;
-  if (wanted.lengthSq() < 1e-8) wanted = new THREE.Vector3(0, 1, 0).cross(along);
+  const down = across(new THREE.Vector3(0, -1, 0));
+  if (down.lengthSq() < 1e-8) down.copy(new THREE.Vector3(0, 1, 0).cross(along));
+  down.normalize();
+  const sweep = across(toVector(weapon.spin).cross(along).multiplyScalar(weapon.spec.length));
+  const share = Math.max(0, Math.min(1, (sweep.length() - EDGE.leadsFrom) / (EDGE.leadsFully - EDGE.leadsFrom)));
+  const lead = share * share * (3 - 2 * share);
+  const wanted = down.clone().multiplyScalar(1 - lead);
+  if (lead > 0) wanted.addScaledVector(sweep.normalize(), lead);
+  if (wanted.lengthSq() < 1e-8) wanted.copy(down);
   wanted.normalize();
-  const edge = arms.edge ? across(arms.edge.clone().lerp(wanted, EDGE.turn)) : wanted;
+  const elapsed = arms.edgeAt === undefined ? Infinity : Math.max(0, now - arms.edgeAt);
+  arms.edgeAt = now;
+  const edge = arms.edge ? across(arms.edge.clone().lerp(wanted, 1 - Math.exp(-elapsed / EDGE.turnSeconds))) : wanted;
   if (edge.lengthSq() < 1e-8) edge.copy(wanted);
   arms.edge = edge.normalize();
   return arms.edge.clone();
@@ -1139,7 +1150,7 @@ export function updateArms(view, fighterView, time = 0) {
       edge = new THREE.Vector3(0, 1, 0).sub(along.clone().multiplyScalar(along.y));
       if (edge.lengthSq() < 1e-6) edge = new THREE.Vector3(1, 0, 0);
       edge.normalize();
-    } else if (weapon.spec.edgeLeads) edge = leadingEdge(arms, hand, along, weapon.spec.length, time);
+    } else if (weapon.spec.edgeLeads) edge = leadingEdge(arms, weapon, along, time);
     else {
       const forearm = fighterView.frames[BONE[`${weapon.main}Forearm`]];
       const front = toVector(forearm.x);
