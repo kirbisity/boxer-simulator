@@ -48,7 +48,7 @@ export const FACE_SHAPES = {
 export const MAKEUP = { shadow: 0x1a1316, shadowOpacity: 0.82, wing: 0.16, linerWeight: 1.8, lowerWeight: 0.03 };
 
 // Ringlets: corkscrew curls, `coil` (of r) about their line, `turns` along a lock.
-const RINGLET = { coil: 0.1, turns: 3.5, thickness: 0.085 };
+const RINGLET = { coil: 0.17, turns: 3.5, thickness: 0.17 };
 
 const FACE = {
   eyeLine: -0.06, // eyes sit a little below the middle of the head, as drawn
@@ -651,8 +651,12 @@ function buildHair(group, look, r, shape, material, female) {
     for (let index = 0; index < 14; index += 1) {
       const azimuth = Math.PI * 0.42 + (index / 13) * Math.PI * 1.16;
       const back = -Math.cos(azimuth);
-      const root = onScalp(r, 1.1 + 0.12 * back, azimuth, 1.06);
-      ringletLock(group, material, dangles, root, [Math.cos(azimuth) * 0.2, -1, Math.sin(azimuth) * 0.2], (2.4 + 1.2 * Math.max(0, back)) * r, r, { turns: 4.5 });
+      // Rooted lower towards the nape, and hanging a little out from the head,
+      // so the ones at the back fall down the back rather than through the neck.
+      const root = onScalp(r, 1.15 + 0.65 * Math.max(0, back), azimuth, 1.05);
+      // The ones behind hang out further: the drawn back stands proud of the body the hair collides with.
+      const out = 0.35 + 0.55 * Math.max(0, back);
+      ringletLock(group, material, dangles, root, [Math.cos(azimuth) * out, -1, Math.sin(azimuth) * out], (2.4 + 1.2 * Math.max(0, back)) * r, r, { turns: 4.5, sag: 0.25 });
     }
   } else if (style === 'ringletUpdo') {
     // Swept up into a knot at the back of the crown, ringlets falling from it,

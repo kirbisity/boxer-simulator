@@ -1052,7 +1052,8 @@ export const OUTFITS = {
     faction: 'street',
     label: 'Victorian — corset and gown', movement: 'limited', fists: 'bare',
     protection: { blunt: 0, cut: 0.3, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
-    picked: [0, 1, 2],
+    // Dealt: the three silhouettes of the reign, and the gothic high-low (design 4, chosen 2026-10-08).
+    picked: [0, 1, 2, 4],
     designs: [
       { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#5a7ea6', cloth: '#5a7ea6', cloth2: '#e6eef2', lace: '#e6eef2' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4', heels: LADY_HEELS } },
       { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#16161a', cloth: '#16161a', cloth2: '#6a2234', lace: '#d6c7a3' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
@@ -1060,9 +1061,9 @@ export const OUTFITS = {
       // Victorian Gothic, all in black: a strapless overbust corset (brocade,
       // a steel busk's clasps, laced behind), platform Mary Janes, a beaded
       // lace choker; porcelain powder, smoky eyes, black lips (`face`, laid
-      // over her own look). Three takes, for one to be chosen: not dealt yet.
+      // over her own look). Three takes were drawn; B (the high-low) was chosen and is dealt, A and C are kept.
       { label: 'Gothic A — bubble bloomers, ringlet pigtails', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'bubble', color: '#141417', trim: '#2c2c33' }, head: { kind: 'fascinator', color: '#111114', side: 1 }, extras: [GOTHIC_CHOKER, { kind: 'ribbons', color: '#0e0e11', count: 10, length: 0.55 }], hair: 'ringletPigtails' },
-      { label: 'Gothic B — high-low train, long ringlets', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'drape', color: '#131316', trim: '#2a2a31' }, head: { kind: 'fascinator', color: '#111114', side: -1 }, extras: [GOTHIC_CHOKER, { kind: 'train', color: '#121215', length: 1.0 }, { kind: 'ribbons', color: '#0e0e11', count: 4, length: 0.4 }], hair: 'ringlets' },
+      { label: 'Gothic B — high-low train, long ringlets', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'drape', color: '#131316', trim: '#2a2a31' }, head: { kind: 'fascinator', color: '#111114', side: -1 }, extras: [GOTHIC_CHOKER, { kind: 'train', color: '#121215', length: 0.62 }, { kind: 'ribbons', color: '#0e0e11', count: 4, length: 0.4 }], hair: 'ringlets' },
       { label: 'Gothic C — lace sleeves, tiered skirt, mini top hat', ...GOTHIC, armor: { ...GOTHIC.armor, kind: 'overbustSleeved' }, bottom: { kind: 'bloomers', gown: 'tiered', color: '#141417', trim: '#33333b' }, head: { kind: 'miniTopHat', color: '#0f0f12', lace: '#2e2e36', side: 1 }, extras: [GOTHIC_CHOKER], hair: 'ringletUpdo' },
     ],
   },

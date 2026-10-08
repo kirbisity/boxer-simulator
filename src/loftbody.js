@@ -52,8 +52,8 @@ export const LOFT = {
     // A tiered skirt to mid-thigh: `tiers` ruffles, each flaring out from
     // under the one above (a lolita's petticoated skirt).
     tiered: { hem: 0.62, flare: 0.75, depthFlare: 0.9, tiers: 3, hips: 0.2 },
-    // A short draped skirt, falling straight from the hips (a train behind it makes a high-low hem).
-    drape: { hem: 0.48, flare: 0.5, depthFlare: 0.55, hips: 0.2 },
+    // A mini draped skirt, falling straight from the hips (a train behind it makes a high-low hem).
+    drape: { hem: 0.26, flare: 0.5, depthFlare: 0.55, hips: 0.2 },
   },
   // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
   // how far forward it bulges, and how far below the waistband it hangs,
@@ -235,17 +235,18 @@ export const ARMOR_KINDS = {
     cinch: true,
     trunk: [-0.02, 0.68, 1.1, { boning: true }],
   },
-  // An overbust corset, worn alone: from the hips over the bust, the
+  // An overbust corset, worn alone: from the hips to just over the bust
+  // (below the shoulders' width, so arms at the sides hang clear of it), the
   // shoulders bare; brocade, a steel busk with its clasps down the front,
   // laced up the back, a lace edge along the top.
   overbust: {
     cinch: true,
-    trunk: [[-0.04, 0.8, 1.13, { boning: true, busk: true, brocade: true }], [0.76, 0.81, 1.145, 'lace']],
+    trunk: [[-0.04, 0.74, 1.13, { boning: true, busk: true, brocade: true }], [0.7, 0.75, 1.145, 'lace']],
   },
   // The same with sheer lace sleeves, shoulder to wrist (a lolita's mourning dress).
   overbustSleeved: {
     cinch: true,
-    trunk: [[-0.04, 0.8, 1.13, { boning: true, busk: true, brocade: true }], [0.76, 0.81, 1.145, 'lace']],
+    trunk: [[-0.04, 0.74, 1.13, { boning: true, busk: true, brocade: true }], [0.7, 0.75, 1.145, 'lace']],
     upperArm: [-0.12, 1.02, 1.08, { lacework: true }], forearm: [-0.04, -0.02, 1.08, { lacework: true }],
   },
   // Escaupil and ichcahuipilli: quilted cotton, thick, stitched in rows.
@@ -786,7 +787,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       profile([[0, 0], [0.5, thighR * 0.08], [1, 0]]));
     loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
-    const legReach = { bloomers: [0.62, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
+    const legReach = { bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
     const legLoose = { bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
     const legPattern = (ring, angle) => {
