@@ -123,8 +123,8 @@ test('a heavy weapon is slower to raise than a light one in the same hands, and 
   const kanabo = windupTime({ ...PRESETS.spear, style: 'kanabo' });
   const katana = windupTime({ ...PRESETS.spear, style: 'katana' });
   assert.ok(kanabo > katana * 1.1, `the kanabo ${kanabo.toFixed(2)}x its spec, a katana in the same hands ${katana.toFixed(2)}x`);
-  // The same kanabo: slower in Lady Ashford's hands, quicker in Kojima's (strong enough to swing it briskly).
-  const weak = windupTime({ ...PRESETS.revolver, style: 'kanabo' });
+  // The same kanabo: slower in an untrained woman's hands (Lady Ashford, never trained), quicker in Kojima's (strong enough to swing it briskly).
+  const weak = windupTime({ ...PRESETS.revolver, exercise: 0.1, style: 'kanabo' });
   const strong = windupTime(PRESETS.kanabo);
   assert.ok(weak > kanabo * 1.1 && kanabo > strong * 1.1, `weak ${weak.toFixed(2)}x, ordinary ${kanabo.toFixed(2)}x, strong ${strong.toFixed(2)}x`);
 });

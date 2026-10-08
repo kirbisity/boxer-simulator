@@ -47,7 +47,7 @@ test('handling a weapon is strength: a frail body cannot wield the kanabo or dra
   assert.equal(handling(frail, WEAPONS.bow).canHold, false, 'she cannot draw the bow half way');
   assert.ok(handling(frail, WEAPONS.knife).canHold, 'a knife she can hold');
   const strong = buildBody(PRESETS.kanabo);
-  const weak = buildBody(PRESETS.revolver);
+  const weak = buildBody({ ...PRESETS.revolver, exercise: 0.1 });
   assert.ok(handling(strong, WEAPONS.kanabo).speed > 1.1 && handling(weak, WEAPONS.kanabo).speed < 0.8, 'a heavy club: brisk in strong hands, slow in weak');
   assert.ok(Math.abs(handling(strong, WEAPONS.knife).speed - handling(weak, WEAPONS.knife).speed) < 0.1, 'a knife: much the same in any hand');
   // Given the kanabo to wield, she fights without it.

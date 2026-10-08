@@ -727,6 +727,42 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(socket);
       break;
     }
+    case 'yari': {
+      // A jūmonji yari: a long straight head, and below the point a cross
+      // blade, its two arms swept slightly forward; a lacquered shaft with
+      // a bound collar under the socket.
+      const lacquer = surface(0x2a1612, { roughness: 0.45 });
+      const headStart = spec.length - 0.3;
+      group.add(cylinder(0.015, 0.017, -spec.handle, headStart - 0.05, lacquer, 8));
+      group.add(cylinder(0.019, 0.019, headStart - 0.09, headStart - 0.03, surface(0x8a6a2a, { roughness: 0.6 }), 8));
+      group.add(cylinder(0.012, 0.017, headStart - 0.05, headStart + 0.02, steel, 8));
+      group.add(bladeMesh(bladeGeometry(headStart, 0.3, 0.035, 0.012, 0.14), steel));
+      for (const side of [1, -1]) {
+        const arm = bladeMesh(bladeGeometry(0, 0.13, 0.026, 0.008, 0.07), steel);
+        arm.position.y = headStart + 0.05;
+        arm.rotation.z = -side * (Math.PI / 2 - 0.25);
+        group.add(arm);
+      }
+      break;
+    }
+    case 'pitchfork': {
+      // A hay fork: a rough wooden shaft, an iron bow across its end, and
+      // two long tines rising from it.
+      const iron = steelMaterial(envMap, { vertexColors: false, color: 0x4a4b4e, roughness: 0.7 });
+      const crown = spec.length - 0.34;
+      group.add(cylinder(0.016, 0.018, -spec.handle, crown + 0.02, wood, 8));
+      group.add(cylinder(0.02, 0.016, crown - 0.08, crown + 0.01, iron, 8));
+      const bow = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.007, 6, 12, Math.PI), iron);
+      bow.position.y = crown + 0.06;
+      bow.rotation.z = Math.PI;
+      group.add(bow);
+      for (const side of [1, -1]) {
+        const tine = new THREE.Mesh(new THREE.ConeGeometry(0.007, 0.3, 6), iron);
+        tine.position.set(side * 0.06, crown + 0.21, 0);
+        group.add(tine);
+      }
+      break;
+    }
     case 'spear': {
       group.add(cylinder(0.014, 0.015, -spec.handle, spec.length - 0.24, wood, 8));
       group.add(bladeMesh(bladeGeometry(spec.length - 0.26, 0.26, 0.05, 0.012, 0.16), steel));

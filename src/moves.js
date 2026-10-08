@@ -1355,6 +1355,10 @@ export const STYLES = {
   },
 };
 
+// The spear's ways with a people's own spear: the ashigaru's yari, the rebel's pitchfork.
+STYLES.yari = { ...STYLES.spear, label: 'Yari', weapon: 'yari' };
+STYLES.pitchfork = { ...STYLES.spear, label: 'Pitchfork', weapon: 'pitchfork' };
+
 /** Styles a player can pick (a fallback such as the drawn gladius is not one). */
 export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden);
 

@@ -214,10 +214,28 @@ export const WEAPONS = {
     harm: { swing: { cut: 1.3, blunt: 0.625 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.25 } },
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5,
   },
+  // The war spear: a stout ash shaft and a long socketed iron head, ~2.3 kg;
+  // its weight behind a narrow point drives the thrust deep.
   longSpear: {
-    label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.9, balance: 0.55, radius: 0.016,
-    harm: { thrust: { pierce: 1.3, blunt: 0.25, cut: 0.15 }, swing: { blunt: 0.6, cut: 0.2 } },
-    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.5, grip: 0.5,
+    label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
+    harm: { thrust: { pierce: 1.5, blunt: 0.3, cut: 0.15 }, swing: { blunt: 0.65, cut: 0.2 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
+  },
+  // The yari, as the ashigaru carried it: the war spear's long straight head
+  // with a cross blade (jūmonji) below the point. The side blades cut and
+  // hook a little better; the slimmer head knocks a man about a little less.
+  yari: {
+    label: 'Yari', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
+    harm: { thrust: { pierce: 1.5, blunt: 0.22, cut: 0.3 }, swing: { blunt: 0.5, cut: 0.4 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, grip: 0.5,
+  },
+  // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
+  // made to fight. Blunt tines that pierce poorly and knock a man about;
+  // a farm tool held loosely, easily knocked from the hands.
+  pitchfork: {
+    label: 'Pitchfork', hands: 'two', length: 1.6, strikeFrom: 1.3, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.017,
+    harm: { thrust: { pierce: 0.85, blunt: 0.45, cut: 0.03 }, swing: { blunt: 0.7, cut: 0.05 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3, grip: 0.3,
   },
   // A modern 9 mm service pistol: fired, not swung (`ranged`; see GUN). In
   // the hand a small light thing, very easily knocked away (`grip`); swung

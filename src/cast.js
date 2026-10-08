@@ -118,7 +118,7 @@ function atWeight(inputs, kg) {
 // The prize fight's men: anyone unarmed, gloved, fighting mixed.
 const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple);
 // The arena's: gladiators, knights, samurai and their kin.
-export const GLADIATORS = ['thraex', 'hoplomachus', 'murmillo', 'retiarius', 'scissor', 'secutor', 'maximus', 'commodus', 'knight', 'warhammer', 'samurai', 'naginata', 'spear'];
+export const GLADIATORS = ['thraex', 'hoplomachus', 'murmillo', 'retiarius', 'scissor', 'secutor', 'maximus', 'commodus', 'knight', 'warhammer', 'samurai', 'naginata', 'yari'];
 
 /**
  * A boxer for a prize fight: in trunks and gloves, fighting mixed, and —
@@ -138,7 +138,7 @@ export function randomGladiator(random = Math.random, key = pickOne(GLADIATORS, 
 }
 
 /**
- * A rebel peasant: a commoner with a spear, anyone from a boy to a greybeard,
+ * A rebel peasant: a commoner with a pitchfork, anyone from a boy to a greybeard,
  * thin or stout. Drawn simply (`simple`): no skeleton or muscle beneath, the
  * same body and physics as anyone.
  */
@@ -182,6 +182,8 @@ export function knight(random = Math.random, index = 0) {
  */
 export function sengokuWarrior(random = Math.random, side, style, rank = style === 'spear' || style === 'bow' ? 'ashigaru' : 'samurai') {
   const ashigaru = rank === 'ashigaru';
+  // A Japanese spear is a yari.
+  if (style === 'spear') style = 'yari';
   const base = varyCharacter(ashigaru ? PRESETS.spear : PRESETS.samurai, random, { sex: 'male' });
   const kind = ashigaru ? 'ashigaru' : pickOne(['samurai', 'samuraiTosei'], random);
   const name = `${pickOne(['Ii', 'Honda', 'Shimazu', 'Kobayakawa', 'Ōtani', 'Ukita', 'Kuroda', 'Hosokawa', 'Katō', 'Fukushima', 'Konishi', 'Sanada'], random)} ${pickOne(['Naomasa', 'Tadakatsu', 'Yoshihiro', 'Hideaki', 'Yoshitsugu', 'Hideie', 'Nagamasa', 'Tadaoki', 'Kiyomasa', 'Masanori', 'Yukimura', 'Takatora'], random)}`;

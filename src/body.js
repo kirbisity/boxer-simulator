@@ -150,7 +150,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   mix: {
-    name: 'Kai Moana', style: 'mix', sex: 'male', heightCm: 180, frame: 'medium', age: 26, exercise: 0.8, calories: 4000,
+    name: 'Kai Moana', style: 'mix', sex: 'male', heightCm: 180, frame: 'medium', age: 26, exercise: 0.72, calories: 4400,
     outfit: { kind: 'sports', design: 0 },
     look: { skinTone: 'tan', hairStyle: 'spiky', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -173,7 +173,7 @@ export const PRESETS = {
   },
   // An archer: the bow, side-on and keeping away; the wakizashi when closed with.
   bow: {
-    name: 'Nasu no Yoichi', style: 'bow', sex: 'male', heightCm: 168, frame: 'medium', age: 24, exercise: 0.7, calories: 3200,
+    name: 'Nasu no Yoichi', style: 'bow', sex: 'male', heightCm: 168, frame: 'medium', age: 24, exercise: 0.7, calories: 4025,
     outfit: { kind: 'samurai', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -198,7 +198,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   swordShield: {
-    name: 'Chen Bao', style: 'swordShield', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.65, calories: 3200,
+    name: 'Chen Bao', style: 'swordShield', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.65, calories: 4000,
     outfit: { kind: 'mingBrigandine', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -208,25 +208,25 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   guandao: {
-    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: 182, frame: 'large', age: 40, exercise: 0.75, calories: 3900,
+    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: 182, frame: 'medium', age: 40, exercise: 0.6, calories: 3625,
     outfit: { kind: 'mingElite', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Chen Fake, the Chen-style tai chi master: slight, old, rooted.
   taichi: {
-    name: 'Chen Fake', style: 'taichi', sex: 'male', heightCm: 170, frame: 'medium', age: 52, exercise: 0.55, calories: 2500,
+    name: 'Chen Fake', style: 'taichi', sex: 'male', heightCm: 170, frame: 'medium', age: 52, exercise: 0.55, calories: 3250,
     outfit: { kind: 'kungfu', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#4a4a48', facialHair: 'beard', eyeColor: 'brown' },
   },
   // A taekwondo fighter: long legs, light.
   taekwondo: {
-    name: 'Kim Min-jun', style: 'taekwondo', sex: 'male', heightCm: 181, frame: 'small', age: 23, exercise: 0.85, calories: 3300,
+    name: 'Kim Min-jun', style: 'taekwondo', sex: 'male', heightCm: 181, frame: 'small', age: 23, exercise: 0.78, calories: 4325,
     outfit: { kind: 'dobok', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   // Tanzong, one of the thirteen Shaolin monks of the Tang tale, with the staff.
   staff: {
-    name: 'Tanzong', style: 'staff', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.85, calories: 3200,
+    name: 'Tanzong', style: 'staff', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.74, calories: 4125,
     outfit: { kind: 'monk', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bald', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -253,7 +253,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
-    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 168, frame: 'medium', age: 36, exercise: 0.75, calories: 3300,
+    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 168, frame: 'medium', age: 36, exercise: 0.75, calories: 3975,
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -262,7 +262,7 @@ export const PRESETS = {
   // names); Li Ling, the Han general whose five thousand foot crossbowmen
   // held off the Xiongnu for days in 99 BC, with the jian at his side.
   crossbow: {
-    name: 'Ottone Doria', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 34, exercise: 0.6, calories: 3100,
+    name: 'Ottone Doria', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 34, exercise: 0.6, calories: 3700,
     outfit: { kind: 'footman', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
@@ -272,7 +272,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   hanCrossbow: {
-    name: 'Li Ling', style: 'nu', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.7, calories: 3200,
+    name: 'Li Ling', style: 'nu', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.7, calories: 4125,
     outfit: { kind: 'hanSoldier', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -281,7 +281,7 @@ export const PRESETS = {
   // Bai's poems and Zhang Xu's script), and he fought with the jian on the
   // frontier. The wuxia hero: no armour, tall, strong, very quick.
   wuxia: {
-    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'large', age: 30, exercise: 0.95, calories: 3800,
+    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'large', age: 30, exercise: 0.67, calories: 4500,
     outfit: { kind: 'wuxia', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -291,7 +291,7 @@ export const PRESETS = {
   // over his armour, the Green Dragon Crescent Blade. A legend, like the Iron
   // Pagoda: tall and heavy here, not nine chi.
   guanYu: {
-    name: 'Guan Yu', style: 'guanYu', sex: 'male', heightCm: 187, frame: 'large', age: 45, exercise: 0.8, calories: 4500,
+    name: 'Guan Yu', style: 'guanYu', sex: 'male', heightCm: 187, frame: 'large', age: 45, exercise: 0.58, calories: 4200,
     outfit: { kind: 'guanYu', design: 0 }, accessories: [],
     look: { skinTone: 'tan', faceColor: '#b06c48', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'longBeard', eyeColor: 'brown' },
   },
@@ -321,7 +321,7 @@ export const PRESETS = {
   // The Ottomans: Ulubatlı Hasan, the Janissary who raised the banner on the
   // walls of Constantinople (1453); an azap archer; a heavy sipahi on foot.
   yatagan: {
-    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 171, frame: 'large', age: 25, exercise: 0.85, calories: 3600,
+    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 171, frame: 'large', age: 25, exercise: 0.7, calories: 4175,
     outfit: { kind: 'janissary', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -331,13 +331,13 @@ export const PRESETS = {
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   sipahi: {
-    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 168, frame: 'medium', age: 34, exercise: 0.75, calories: 3300,
+    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 168, frame: 'medium', age: 34, exercise: 0.75, calories: 3975,
     outfit: { kind: 'ottomanHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // A Ming elite with the three-eyed gun.
   threeEyed: {
-    name: 'Ma Lin', style: 'threeEyed', sex: 'male', heightCm: 171, frame: 'medium', age: 35, exercise: 0.75, calories: 3500,
+    name: 'Ma Lin', style: 'threeEyed', sex: 'male', heightCm: 171, frame: 'medium', age: 35, exercise: 0.74, calories: 4075,
     outfit: { kind: 'mingElite', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -345,34 +345,34 @@ export const PRESETS = {
   // rodelero and chronicler, with sword and buckler; and two of the Mexica,
   // an eagle warrior with the macuahuitl and a jaguar with the tepoztopilli.
   hidalgo: {
-    name: 'Hernán Cortés', style: 'espada', sex: 'male', heightCm: 166, frame: 'medium', age: 35, exercise: 0.7, calories: 2900,
+    name: 'Hernán Cortés', style: 'espada', sex: 'male', heightCm: 166, frame: 'medium', age: 35, exercise: 0.7, calories: 3950,
     outfit: { kind: 'conquistadorPlate', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#2a1d14', facialHair: 'beard', eyeColor: 'brown' },
   },
   rodelero: {
-    name: 'Bernal Díaz', style: 'espadaRodela', sex: 'male', heightCm: 164, frame: 'medium', age: 28, exercise: 0.7, calories: 2800,
+    name: 'Bernal Díaz', style: 'espadaRodela', sex: 'male', heightCm: 164, frame: 'medium', age: 28, exercise: 0.7, calories: 3875,
     outfit: { kind: 'conquistadorQuilted', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1d14', facialHair: 'beard', eyeColor: 'brown' },
   },
   macuahuitl: {
-    name: 'Cuauhtémoc', style: 'macuahuitl', sex: 'male', heightCm: 162, frame: 'medium', age: 25, exercise: 0.82, calories: 2700,
+    name: 'Cuauhtémoc', style: 'macuahuitl', sex: 'male', heightCm: 162, frame: 'medium', age: 25, exercise: 0.77, calories: 3775,
     outfit: { kind: 'mexicaElite', design: 1 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   tepoztopilli: {
-    name: 'Ocelotl', style: 'tepoztopilli', sex: 'male', heightCm: 161, frame: 'medium', age: 27, exercise: 0.8, calories: 2700,
+    name: 'Ocelotl', style: 'tepoztopilli', sex: 'male', heightCm: 161, frame: 'medium', age: 27, exercise: 0.77, calories: 3725,
     outfit: { kind: 'mexicaElite', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   // Victorians: Lord Ashford with the rapier (a gentleman's fencing sword),
   // his wife with an Adams revolver (1851).
   rapier: {
-    name: 'Lord Ashford', style: 'rapier', sex: 'male', heightCm: 178, frame: 'medium', age: 41, exercise: 0.4, calories: 2600,
+    name: 'Lord Ashford', style: 'rapier', sex: 'male', heightCm: 178, frame: 'medium', age: 41, exercise: 0.4, calories: 3175,
     outfit: { kind: 'victorianGent', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'mustache', eyeColor: 'blue' },
   },
   revolver: {
-    name: 'Lady Ashford', style: 'revolver', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2000,
+    name: 'Lady Ashford', style: 'revolver', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2550,
     outfit: { kind: 'victorianLady', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#4a2a1a', facialHair: 'none', eyeColor: 'green' },
   },
@@ -390,24 +390,24 @@ export const PRESETS = {
   },
   // A SWAT breacher with the pump shotgun.
   shotgun: {
-    name: 'Cpl. Marcus Hale', style: 'shotgun', sex: 'male', heightCm: 183, frame: 'large', age: 31, exercise: 0.7, calories: 3900,
+    name: 'Cpl. Marcus Hale', style: 'shotgun', sex: 'male', heightCm: 180, frame: 'large', age: 31, exercise: 0.66, calories: 4425,
     outfit: { kind: 'swat', design: 0 }, accessories: [],
     look: { skinTone: 'deep', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // A special forces operator: the AR-15, a knife in reserve, the plate carrier and its load.
   rifle: {
-    name: 'SSgt. Ryan Brooks', style: 'rifle', sex: 'male', heightCm: 180, frame: 'large', age: 32, exercise: 0.9, calories: 4000,
+    name: 'SSgt. Ryan Brooks', style: 'rifle', sex: 'male', heightCm: 178, frame: 'large', age: 32, exercise: 0.59, calories: 3975,
     outfit: { kind: 'specialForces', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#4a3020', facialHair: 'beard', eyeColor: 'green' },
   },
   baton: {
-    name: 'Officer Reyes', style: 'baton', sex: 'male', heightCm: 182, frame: 'medium', age: 33, exercise: 0.6, calories: 3600,
+    name: 'Officer Reyes', style: 'baton', sex: 'male', heightCm: 182, frame: 'medium', age: 33, exercise: 0.6, calories: 4250,
     outfit: { kind: 'swat', design: 0 },
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
-  // A knight, trained to arms from boyhood and fed to it: strong, lean, ~95 kg.
+  // A knight, trained to arms from boyhood and fed to it: strong, lean, ~85 kg.
   knight: {
-    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 178, frame: 'large', age: 30, exercise: 0.88, calories: 5400,
+    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 178, frame: 'large', age: 30, exercise: 0.68, calories: 4425,
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
   },
@@ -415,7 +415,7 @@ export const PRESETS = {
   // five-shaku ōdachi (the Tarōtachi, ~1.75 m) against the Tokugawa: a big
   // man, as the sword wanted.
   odachi: {
-    name: 'Makara Naotaka', style: 'odachi', sex: 'male', heightCm: 177, frame: 'large', age: 34, exercise: 0.8, calories: 3900,
+    name: 'Makara Naotaka', style: 'odachi', sex: 'male', heightCm: 177, frame: 'large', age: 34, exercise: 0.68, calories: 4375,
     outfit: { kind: 'samuraiTosei', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -426,7 +426,7 @@ export const PRESETS = {
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
   riot: {
-    name: 'Officer Dale Burke', style: 'riot', sex: 'male', heightCm: 183, frame: 'medium', age: 32, exercise: 0.6, calories: 3500,
+    name: 'Officer Dale Burke', style: 'riot', sex: 'male', heightCm: 183, frame: 'medium', age: 32, exercise: 0.6, calories: 4300,
     outfit: { kind: 'riot', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'blue' },
   },
@@ -435,12 +435,12 @@ export const PRESETS = {
   // fallen in the Teutoburg Forest (AD 9) aged 53, his tombstone showing
   // him in his mail, phalerae and torcs. Romans of the legions ran ~1.68 m.
   legionary: {
-    name: 'Gaius Valerius Crispus', style: 'legionary', sex: 'male', heightCm: 170, frame: 'medium', age: 28, exercise: 0.8, calories: 3600,
+    name: 'Gaius Valerius Crispus', style: 'legionary', sex: 'male', heightCm: 170, frame: 'medium', age: 28, exercise: 0.75, calories: 4050,
     outfit: { kind: 'legionary', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'brown' },
   },
   centurion: {
-    name: 'Marcus Caelius', style: 'centurion', sex: 'male', heightCm: 172, frame: 'medium', age: 53, exercise: 0.75, calories: 3400,
+    name: 'Marcus Caelius', style: 'centurion', sex: 'male', heightCm: 172, frame: 'medium', age: 53, exercise: 0.75, calories: 4150,
     outfit: { kind: 'centurion', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#5a4a3a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -454,7 +454,7 @@ export const PRESETS = {
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2416', facialHair: 'none', eyeColor: 'brown' },
   },
   samurai: {
-    name: 'Takeda Shingen', style: 'katana', sex: 'male', heightCm: 172, frame: 'medium', age: 34, exercise: 0.8, calories: 3600,
+    name: 'Takeda Shingen', style: 'katana', sex: 'male', heightCm: 172, frame: 'medium', age: 34, exercise: 0.74, calories: 4125,
     outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -464,18 +464,25 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   warhammer: {
-    name: 'Gunnar Holt', style: 'warhammer', sex: 'male', heightCm: 190, frame: 'large', age: 36, exercise: 0.7, calories: 4800,
+    name: 'Gunnar Holt', style: 'warhammer', sex: 'male', heightCm: 190, frame: 'large', age: 36, exercise: 0.65, calories: 4875,
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'long', hairColor: '#8a3a1c', facialHair: 'beard', eyeColor: 'grey' },
   },
   naginata: {
-    name: 'Tomoe Gozen', style: 'naginata', sex: 'female', heightCm: 165, frame: 'medium', age: 27, exercise: 0.85, calories: 3200,
+    name: 'Tomoe Gozen', style: 'naginata', sex: 'female', heightCm: 165, frame: 'medium', age: 27, exercise: 0.85, calories: 3975,
     outfit: { kind: 'samurai', design: 3 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // A peasant up in arms with his hay fork (the rebels are built on him).
   spear: {
-    name: 'Hob Miller', style: 'spear', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
+    name: 'Hob Miller', style: 'pitchfork', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
     outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'hazel' },
+  },
+  // An ashigaru spearman with his yari: Hob Miller's build, a foot soldier's drill.
+  yari: {
+    name: 'Gonbei', style: 'yari', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
+    outfit: { kind: 'ashigaru', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'hazel' },
   },
   // A gladiator armed as a Greek hoplite: spear, parma, a gladius in reserve
@@ -525,13 +532,13 @@ export const PRESETS = {
   // hair, strong and practised (he killed beasts by the hundred). Not a
   // barley-fed gladiator: an athlete's body, not a fighter's fat.
   commodus: {
-    name: 'Commodus', style: 'commodus', sex: 'male', heightCm: 177, frame: 'large', age: 31, exercise: 0.72, calories: 4150,
+    name: 'Commodus', style: 'commodus', sex: 'male', heightCm: 177, frame: 'large', age: 31, exercise: 0.68, calories: 4375,
     outfit: { kind: 'commodus', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a8803e', facialHair: 'beard', eyeColor: 'brown' },
   },
   // A lorarius of the arena, with the whip (the name a common slave's).
   whip: {
-    name: 'Felix the lorarius', style: 'whip', sex: 'male', heightCm: 172, frame: 'medium', age: 33, exercise: 0.6, calories: 3000,
+    name: 'Felix the lorarius', style: 'whip', sex: 'male', heightCm: 172, frame: 'medium', age: 33, exercise: 0.6, calories: 3775,
     outfit: { kind: 'lorarius', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
