@@ -73,17 +73,17 @@ export function ageing(inputs, { bodyFat = 0.15, starving = 0 } = {}) {
   const age = (inputs.age ?? 27) + AGEING.starvedYears * starving;
   const overFat = Math.max(0, bodyFat - AGEING.fatFrom);
   const midlife = Math.max(0, Math.min(1, (age - 40) / 30));
-  const muscle = curve(AGEING.muscle, age, exercise);
-  const strength = curve(AGEING.strength, age, exercise) * (1 - AGEING.starvedStrength * starving) * (1 - AGEING.fatQuality * overFat * midlife);
+  const muscle = ageCurve(AGEING.muscle, age, exercise);
+  const strength = ageCurve(AGEING.strength, age, exercise) * (1 - AGEING.starvedStrength * starving) * (1 - AGEING.fatQuality * overFat * midlife);
   const jointAge = age + AGEING.fatJointYears * overFat;
   const stoop = AGEING.stoop.at100 * Math.max(0, (age - AGEING.stoop.from) / (100 - AGEING.stoop.from)) * (1 - 0.6 * exercise);
   return {
     muscle,
     strength,
-    fast: curve(AGEING.fast, age, exercise),
-    joints: curve(AGEING.joints, jointAge, exercise),
-    aerobic: curve(AGEING.aerobic, age, exercise),
-    bone: curve(AGEING.bone[inputs.sex === 'female' ? 'female' : 'male'], age, exercise),
+    fast: ageCurve(AGEING.fast, age, exercise),
+    joints: ageCurve(AGEING.joints, jointAge, exercise),
+    aerobic: ageCurve(AGEING.aerobic, age, exercise),
+    bone: ageCurve(AGEING.bone[inputs.sex === 'female' ? 'female' : 'male'], age, exercise),
     stoop,
   };
 }
