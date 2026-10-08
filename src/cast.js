@@ -292,7 +292,8 @@ const PERIOD_BUILD = {
   hospitaller: { knight: { heightCm: 170, weightKg: 71, exercise: 0.75 }, sergeant: { heightCm: 167, weightKg: 66, exercise: 0.65 } },
   ottoman: { azap: { heightCm: 165, weightKg: 60, exercise: 0.6 }, janissary: { heightCm: 169, weightKg: 65, exercise: 0.8 }, heavy: { heightCm: 168, weightKg: 67, exercise: 0.75 } },
   // Medieval Mongol and Oirat men, from skeletons about 163–167 cm, lean and hard.
-  steppe: { light: { heightCm: 164, weightKg: 60, exercise: 0.75 }, medium: { heightCm: 165, weightKg: 62, exercise: 0.75 }, heavy: { heightCm: 167, weightKg: 66, exercise: 0.78 } },
+  // Steppe men: short and squat, heavy for their height (riders' bodies, fed on meat and milk).
+  steppe: { light: { heightCm: 163, weightKg: 72, exercise: 0.7 }, medium: { heightCm: 164, weightKg: 77, exercise: 0.66 }, heavy: { heightCm: 166, weightKg: 83, exercise: 0.62 } },
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };

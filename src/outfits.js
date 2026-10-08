@@ -348,6 +348,8 @@ export const OUTFITS = {
     // Plate against blunt force spreads it; against an edge it is proof,
     // against a point nearly so, and a blade that meets it glances off.
     protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
+    // A full harness leaves no gap an edge can find (its gaps are for a point: BLADES.gaps).
+    cutProof: true,
     courage: 0.4,
     deflects: true,
     family: 'knight',
@@ -369,6 +371,7 @@ export const OUTFITS = {
   joan: {
     faction: 'knights', bulletRating: 650, plated: true,
     label: 'Joan of Arc — white harness', arrowproof: true, sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
+    cutProof: true,
     extraMass: 0.45,
     protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0, torso: 0.7, limb: 0.3 }, regions: { head: ARENA.bare } },
     courage: 0.6,
@@ -1185,6 +1188,8 @@ export function gearTraits(inputs) {
     courage: spec.courage ?? 0,
     // Trained to fight in ranks (formation.js): { advance, charge, testudo } — the line moves up to the enemy (closed under its shields if `testudo`; the last `charge` m at a run), or holds.
     drill: spec.drill ?? null,
+    // A full plate harness: no gap for an edge (a point may still find one).
+    cutProof: Boolean(spec.cutProof),
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
     spare: spec.spare ?? null,

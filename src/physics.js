@@ -942,6 +942,21 @@ function updateIntent(world, fighter, dt) {
     punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace;
     punch.age += dt;
     if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
+    // Automatic fire: the trigger held, a round at the gun's cyclic rate until the burst is spent (or the gun).
+    const automatic = punch.spec.path === 'aim' && fighter.weapon?.held ? fighter.weapon.spec.shot?.automatic : null;
+    if (automatic && punch.fired) {
+      punch.burst ??= { left: automatic.burst[0] + Math.floor(world.random() * (automatic.burst[1] - automatic.burst[0] + 1)) - 1, next: 1 / automatic.rate };
+      if (punch.burst.left > 0 && fighter.weapon.loaded) {
+        // The stroke is held at full aim while the rounds go.
+        punch.t = Math.min(punch.t, punch.spec.extendUntil);
+        punch.burst.next -= dt;
+        if (punch.burst.next <= 0) {
+          fire(world, fighter);
+          punch.burst.left -= 1;
+          punch.burst.next += 1 / automatic.rate;
+        }
+      }
+    }
     if (punch.heavy) intent.dip += WORLD.heavy.loadDip * Math.max(0, 1 - punch.t / punch.spec.extendUntil);
     const spec = punch.spec;
     // The kinetic chain: hips and shoulders turn first and have finished
@@ -3104,7 +3119,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const covered = protectionAt(body.gear, capsule.key);
   // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
   const gaps = BLADES.gaps;
-  const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < (spec.mode === 'thrust' ? gaps.thrust : gaps.swing) * attacker.body.technique;
+  // (A full plate harness has no gap for an edge: `cutProof`.)
+  const gapChance = spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing;
+  const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique;
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (wspec.contactSeconds * (1 + 0.6 * (1 - firmness)));

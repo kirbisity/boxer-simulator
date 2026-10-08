@@ -28,7 +28,8 @@ export const WARRIORS = [
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
-  warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
+  // Sir Aldous: a squat, heavy man-at-arms (~92 kg on 172 cm), hard to put down.
+  warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', heightCm: 172, frame: 'large', exercise: 0.6, calories: 4300, outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
   warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),

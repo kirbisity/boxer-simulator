@@ -138,6 +138,8 @@ export const RIFLE = {
   misfire: 0.002,
   rounds: 30,
   reloadSeconds: 2.5,
+  // Fully automatic (the M16/M4 family's select fire): ~12 rounds a second (~720 a minute), in bursts of 3-6.
+  automatic: { rate: 12, burst: [3, 6] },
 };
 
 /**

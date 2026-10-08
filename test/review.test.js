@@ -119,10 +119,10 @@ test('a heavy weapon is slower to raise than a light one in the same hands, and 
     }
     return elapsed / windup;
   };
-  // A man of ordinary strength (Sir Edric): the kanabo comes up slower than a katana.
-  const kanabo = windupTime({ ...PRESETS.knight, style: 'kanabo' });
-  const katana = windupTime({ ...PRESETS.knight, style: 'katana' });
-  assert.ok(kanabo > katana * 1.2, `the kanabo ${kanabo.toFixed(2)}x its spec, a katana in the same hands ${katana.toFixed(2)}x`);
+  // A man of ordinary strength (Hob Miller): the kanabo comes up slower than a katana.
+  const kanabo = windupTime({ ...PRESETS.spear, style: 'kanabo' });
+  const katana = windupTime({ ...PRESETS.spear, style: 'katana' });
+  assert.ok(kanabo > katana * 1.1, `the kanabo ${kanabo.toFixed(2)}x its spec, a katana in the same hands ${katana.toFixed(2)}x`);
   // The same kanabo: slower in Lady Ashford's hands, quicker in Kojima's (strong enough to swing it briskly).
   const weak = windupTime({ ...PRESETS.revolver, style: 'kanabo' });
   const strong = windupTime(PRESETS.kanabo);

@@ -548,7 +548,8 @@ export const STYLES = {
   // The pump shotgun: a slow shot, a heavy kick, devastating up close.
   shotgun: {
     label: 'Shotgun', weapon: 'shotgun', fallback: 'mix',
-    ranged: { flee: 2.2, rest: 0.8, runFor: 1.4, standFor: 1.8, close: 1.4, shotSeconds: 0.4, headShare: 0.1, between: [0.4, 0.3], move: 'firePump', reloadSafe: 4 },
+    // The pump worked between shots: about one a second.
+    ranged: { flee: 2.2, rest: 0.8, runFor: 1.4, standFor: 1.8, close: 1.4, shotSeconds: 0.4, headShare: 0.1, between: [0.9, 0.5], move: 'firePump', reloadSafe: 4 },
     cadence: { work: 1.3, move: 0.6, burst: 0.5, mobility: 0.45 },
     stance: { blade: 0.55, crouch: 0.08, width: 1.2, lean: 0.12, guardHeight: -0.02 },
     weaponGuard: { hand: [0.16, 0.64, -0.12], dir: [0.9, -0.3, 0.05] },

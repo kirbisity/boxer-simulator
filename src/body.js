@@ -239,15 +239,16 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Legends of an earlier age, one to a faction: Wanyan Wuzhu, the Jin prince
+  // (squat and massive, ~94 kg on 168 cm, an iron pagoda of a man),
   // who led the Iron Pagoda (1140); Subutai, Chinggis Khan's general, in the
   // kheshig's armour; Turgut Alp, one of Osman's companions (c. 1300).
   ironPagoda: {
-    name: 'Wanyan Wuzhu', style: 'langyaShield', sex: 'male', heightCm: 174, frame: 'large', age: 38, exercise: 0.8, calories: 4000,
+    name: 'Wanyan Wuzhu', style: 'langyaShield', sex: 'male', heightCm: 168, frame: 'large', age: 38, exercise: 0.6, calories: 4280,
     outfit: { kind: 'ironPagoda', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   kheshig: {
-    name: 'Subutai', style: 'spear', sex: 'male', heightCm: 166, frame: 'medium', age: 44, exercise: 0.8, calories: 3400,
+    name: 'Subutai', style: 'spear', sex: 'male', heightCm: 164, frame: 'large', age: 44, exercise: 0.65, calories: 3900,
     outfit: { kind: 'kheshig', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -298,22 +299,22 @@ export const PRESETS = {
   // emperor at Tumu (1449); Mandukhai Khatun, who led the Mongols in armour in
   // the 1470s–90s; an Oirat archer and a lancer.
   maceShield: {
-    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 167, frame: 'large', age: 42, exercise: 0.75, calories: 3600,
+    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 166, frame: 'large', age: 42, exercise: 0.6, calories: 3980,
     outfit: { kind: 'steppeHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   saber: {
-    name: 'Mandukhai Khatun', style: 'saber', sex: 'female', heightCm: 158, frame: 'medium', age: 30, exercise: 0.75, calories: 2600,
+    name: 'Mandukhai Khatun', style: 'saber', sex: 'female', heightCm: 158, frame: 'large', age: 30, exercise: 0.7, calories: 3050,
     outfit: { kind: 'steppeMedium', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   steppeBow: {
-    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 164, frame: 'medium', age: 26, exercise: 0.75, calories: 3000,
+    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 163, frame: 'large', age: 26, exercise: 0.7, calories: 3850,
     outfit: { kind: 'steppeLight', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   saberShield: {
-    name: 'Ganbold', style: 'saberShield', sex: 'male', heightCm: 165, frame: 'medium', age: 29, exercise: 0.72, calories: 3100,
+    name: 'Ganbold', style: 'saberShield', sex: 'male', heightCm: 164, frame: 'large', age: 29, exercise: 0.65, calories: 3860,
     outfit: { kind: 'steppeMedium', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -404,8 +405,9 @@ export const PRESETS = {
     outfit: { kind: 'swat', design: 0 },
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
+  // A knight, trained to arms from boyhood and fed to it: strong, lean, ~95 kg.
   knight: {
-    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 183, frame: 'large', age: 30, exercise: 0.75, calories: 4200,
+    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 183, frame: 'large', age: 30, exercise: 0.88, calories: 5700,
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
   },

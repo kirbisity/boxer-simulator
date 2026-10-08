@@ -410,3 +410,17 @@ test('the whip: its thong a rope whose tip outruns the hand; a lash bleeds bare 
   const onPlate = [1, 2, 3, 4].flatMap((seed) => bout('plate', seed).lashes);
   assert.ok(onPlate.length > 0 && onPlate.every((event) => event.effects.some((effect) => effect.includes('turned'))), `plate turns every lash (${onPlate.length})`);
 });
+
+test('plate is cut-proof: no edge finds a gap in a full harness; a point still can', () => {
+  const gapsBy = { swing: 0, thrust: 0 };
+  for (let seed = 1; seed <= 4; seed += 1) {
+    const world = createWorld([{ inputs: structuredClone(PRESETS.samurai), corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }], { seed });
+    for (let second = 0; second < 60 && !boutWinner(world); second += 1) advance(world, 1, (current, dt) => thinkAll(current, dt));
+    for (const event of world.events) {
+      if (event.defender !== 1 || !event.effects?.includes('into a gap in the armour')) continue;
+      gapsBy[event.mode === 'thrust' ? 'thrust' : 'swing'] += 1;
+    }
+  }
+  assert.equal(gapsBy.swing, 0, 'no cut into the knight\'s plate');
+  assert.ok(gapsBy.thrust > 0, `thrusts found gaps (${gapsBy.thrust})`);
+});
