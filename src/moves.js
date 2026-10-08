@@ -518,9 +518,11 @@ export const STYLES = {
     tempo: 1,
     ...STAND_OFF,
   },
+  // The nu: a man coming on gets the sword well before he arrives (`close`
+  // 4 m: some 1.5 s of a running man), not the crossbow in his face.
   nu: {
     label: 'Crossbow (nu)', weapon: 'nu', fallback: 'mix',
-    ranged: { flee: 3, rest: 1, runFor: 1.5, standFor: 1.8, close: 1.6, shotSeconds: 0.7, headShare: 0.15, between: [0.4, 0.4], move: 'fireLong', reloadSafe: 3.5 },
+    ranged: { flee: 3, rest: 1, runFor: 1.5, standFor: 1.8, close: 4, shotSeconds: 0.7, headShare: 0.15, between: [0.4, 0.4], move: 'fireLong', reloadSafe: 3.5 },
     cadence: { work: 1.2, move: 0.7, burst: 0.4, mobility: 0.45 },
     stance: { blade: 0.55, crouch: 0.07, width: 1.2, lean: 0.06, guardHeight: -0.02 },
     weaponGuard: { hand: [0.14, 0.6, -0.1], dir: [0.9, -0.3, 0.1] },
