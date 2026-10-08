@@ -15,10 +15,12 @@ The home screen (`src/menu.js`) has four ways in, over a fight between two rando
 
 Every fight is watched by default; **Play red** takes control of the red lead. **☰ Menu** goes back home.
 
+- **Choosing a side.** Entering any part of the game (a quick battle, Deadliest Warrior, a level, the sandbox) asks which side you take, or to watch; the choice holds for its rematches and next bouts. Battles have no side buttons in the footer; the sandbox keeps them.
 - **Fight controls** (`src/touch.js`, `src/gesture.js`, `src/control.js`; finger or mouse). You say what you want; his style, weapon, stance, range and injuries choose the move.
-  - **Lock on:** long-press a man (or **◎ Lock**) to lock him: a gold ring at his feet. You face him and hold the range your style and weapon want (a gun's room to shoot). Long-press him again, or **Unlock**, to let go.
-  - **Move:** drag anywhere open for a floating stick, centred where the touch began. Further means faster: a walk, then a run. A drag stays a drag; it never turns into a tap.
-  - **Attack:** tap the right half — top **high**, middle **body**, bottom **low**, the outer strip **lunge**, on him **close/clinch**. Tap for a quick one, press and release for a heavy one, double-tap for a combination.
+  - **Lock on:** the big gold **◎ Lock** button above Guard locks the man he is on: a gold ring at his feet. You face him and hold the range your style and weapon want (a gun's room to shoot). Press it again (**Unlock**) to let go.
+  - **Move:** drag anywhere for a floating stick, centred where the touch began. Further means faster: a walk, then a run. A drag stays a drag; it never turns into a tap. Walking free, the camera comes round behind him.
+  - **Attack:** tap anywhere: always a strike, at once, the way you tapped — at the man if he is there (high, body or legs by where on him), at the air if not, a lunge at a man beyond reach. Double-tap for a combination.
+  - **Press and hold:** a shove (a shield's bash, or both hands); on a man down, he goes to him and holds him down.
   - **Guard:** hold to block (shield, weapon or arms); tap to get out of the way (slip, parry, check, step back, by what is coming).
   - **Special:** one fixed button for **Clinch**, **Throw**, **Reload**, **Fire**, **Pick up**, **Draw sidearm** or **Disengage**, as the fight allows.
   - **HUD:** watching, both sides' bars at the top. Fighting, your own status low down and your man's over his head, faded when nothing is happening.

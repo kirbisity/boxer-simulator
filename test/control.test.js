@@ -32,22 +32,20 @@ test('gestures: past the drag threshold a touch is a stick for good, never a tap
   assert.deepEqual(gestures.up(1, [100, 100], 2).map((event) => event.type), ['stickEnd']);
 });
 
-test('gestures: a tap, a double tap, a press-and-release, and a long press on a man', () => {
+test('gestures: a tap, a double tap near it, and a press held still (acting the moment it is long enough)', () => {
   const gestures = createRecognizer();
-  gestures.down(1, [300, 50], 0, { line: 'high' });
+  gestures.down(1, [300, 50], 0);
   const [tap] = gestures.up(1, [300, 50], 0.1);
-  assert.deepEqual([tap.type, tap.region.line, tap.double], ['tap', 'high', false]);
-  gestures.down(2, [302, 52], 0.2, { line: 'high' });
-  assert.equal(gestures.up(2, [302, 52], 0.25)[0].double, true, 'the second tap on the line soon after');
-  gestures.down(3, [300, 200], 1, { line: 'mid' });
-  assert.equal(gestures.tick(1 + GESTURE.heavyFrom + 0.05)[0].type, 'charge');
-  assert.equal(gestures.up(3, [300, 200], 1.6)[0].type, 'heavy');
-  gestures.down(4, [200, 200], 3, { line: 'close', man: 1 });
-  assert.deepEqual(gestures.tick(3 + GESTURE.longPressFrom).map((event) => event.type), ['longPress']);
-  assert.deepEqual(gestures.up(4, [200, 200], 4), [], 'released after the lock: nothing more');
-  gestures.down(5, [200, 200], 5, { line: 'close', man: 1 });
-  assert.deepEqual(gestures.up(5, [200, 200], 5 + GESTURE.heavyFrom + 0.05), [], 'a press on a man short of the lock is nothing');
-  gestures.down(6, [0, 0], 6, { line: 'mid' });
+  assert.deepEqual([tap.type, tap.double], ['tap', false]);
+  gestures.down(2, [310, 60], 0.2);
+  assert.equal(gestures.up(2, [310, 60], 0.25)[0].double, true, 'the second tap soon after, near the first');
+  gestures.down(3, [600, 400], 0.4);
+  assert.equal(gestures.up(3, [600, 400], 0.45)[0].double, false, 'far from the last: a tap of its own');
+  gestures.down(4, [300, 200], 1);
+  assert.deepEqual(gestures.tick(1 + GESTURE.holdFrom - 0.05), [], 'not yet');
+  assert.deepEqual(gestures.tick(1 + GESTURE.holdFrom + 0.01).map((event) => event.type), ['hold'], 'held: a press, at once');
+  assert.deepEqual(gestures.up(4, [300, 200], 2), [], 'let go after: nothing more');
+  gestures.down(6, [0, 0], 6);
   assert.deepEqual(gestures.cancel(6), [], 'a cancelled touch is nothing at all');
 });
 
@@ -103,13 +101,42 @@ test('an attack line picks a move of his own style that fits it', () => {
   assert.ok((MOVES[lunge.move].step ?? 0) > 0 || MOVES[lunge.move].kind === 'rush', `the edge of the screen lunges (${lunge.move})`);
 });
 
-test('tapped attacks land as the style throws them, and out of reach he closes in first', () => {
-  const { world, orders, me, him, step } = played(PRESETS.heavy, PRESETS.light, { distance: 2.4, still: true });
+test('a tap always strikes, at once, the way it points: at empty air, or at the man standing there', () => {
+  const { world, orders, me, him, step } = played(PRESETS.samurai, PRESETS.light, { still: true });
+  const hips = point(me.x, P.pelvis);
+  // Off to his side, nobody there: a swing anyway, and he turns to it.
+  const air = [hips[0], 1.3, hips[2] + 1];
+  orders.requests.push({ point: air, strength: 'quick', at: world.time });
+  step(1 / 60);
+  assert.ok(me.punch, 'thrown the moment it was asked');
+  assert.equal(me.punch.target, null, 'at nobody');
+  assert.equal(MOVES[me.punch.type].reach, 'weapon', 'a swordsman swings his sword');
+  step(0.5);
+  const facing = [Math.cos(me.yaw), -Math.sin(me.yaw)];
+  assert.ok(facing[1] > 0.5, `he turned to the place (${facing.map((value) => value.toFixed(2))})`);
+  step(1);
+  // At the man's head: aimed at him, high.
+  orders.requests.push({ point: point(him.x, P.head), strength: 'quick', at: world.time });
+  step(1 / 60);
+  assert.equal(me.punch?.target, him.id);
+});
+
+test('press and hold: a shove at a man standing; a man on the floor is held down', () => {
+  const sumo = Object.values(PRESETS).find((preset) => preset.style === 'sumo');
+  const { world, orders, me, him, step } = played(sumo, PRESETS.light, { still: true });
   orders.lock = him.id;
-  orders.requests.push({ line: 'high', strength: 'quick', at: world.time });
-  step(1.8);
-  assert.ok(me.stats.thrown >= 1, 'he closed and threw');
-  assert.ok(apart(me, him) < 1.6);
+  step(3);
+  orders.holds = [point(him.x, P.pelvis)];
+  step(1 / 60);
+  assert.ok(me.punch && MOVES[me.punch.type].push, `a shove (${me.punch?.type})`);
+  step(1);
+  him.state = 'down';
+  him.motorScale = 0;
+  him.downTimer = 10;
+  orders.holds = [point(him.x, P.pelvis)];
+  step(2);
+  assert.ok(me.pin && me.pin.target === him.id, 'he went to him and took hold');
+  assert.ok(world.time > 5);
 });
 
 test('the guard held stays up; a tap of it gets out of the way', () => {

@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { AI, chooseDefence } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
-import { dropWeapon, inFight, opponentFor, perform, point, reachOf, startPickup, throwPunch, WORLD } from './physics.js';
+import { dropWeapon, inFight, manNear, opponentFor, perform, point, reachOf, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
@@ -21,10 +21,18 @@ export const CONTROL = {
   // Locked on, the stick idle: he keeps to the edge of his reach (m of slack
   // either way), or, with a gun or bow, `gunRoom` m beyond where he must drop it.
   hold: { slack: 0.15, inside: 0.08, gunRoom: 1.5 },
-  // An attack asked for while busy waits this long (s) for the hands to come back;
-  // out of reach, he closes in for up to `approachSeconds` before throwing.
+  // An attack asked for while busy waits this long (s) for the hands to come back.
   bufferSeconds: 0.35,
-  approachSeconds: 1.6,
+  // He turns to face the place he strikes at for this long (s).
+  faceSeconds: 0.6,
+  // An aimed attack: a man this far (m) past his reach is lunged at; a point this high on his own
+  // body (share of the shoulder's height) or higher is high, below this share of the hip's, low.
+  lungeBeyond: 0.35,
+  highFrom: 0.9,
+  lowBelow: 0.75,
+  // A press held on a man down within this (m) of where it points: he goes to hold him down.
+  pinFrom: 1.6,
+  pinSeconds: 2.5,
   // A second tap this soon after a quick attack makes it a combination.
   comboWithin: 0.45,
   // Holding the guard, the footwork slows to this share.
@@ -122,11 +130,14 @@ function limbLost(fighter, spec) {
  * has, with his weapon, his limbs and from where he stands. Returns
  * { move, zone, heavy, combo, reaches } or null when he has none.
  */
-export function chooseAttack(world, fighter, opponent, line, strength = 'quick') {
+export function chooseAttack(world, fighter, opponent, line, strength = 'quick', at = null) {
   const style = STYLES[fighter.style];
-  if (!style || !opponent) return null;
+  if (!style || (!opponent && !at)) return null;
   const held = fighter.weapon?.held ? fighter.weapon.spec : null;
-  const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
+  const hips = point(fighter.x, P.pelvis);
+  const mark = opponent ? point(opponent.x, P.pelvis) : at;
+  const distance = Math.hypot(mark[0] - hips[0], mark[2] - hips[2]);
+  const headRadius = opponent?.body.lengths.headRadius ?? fighter.body.lengths.headRadius;
   const zone = LINE_ZONE[line] ?? 'body';
   const pool = { ...(fighter.clinch ? {} : style.attacks), ...(fighter.clinch ? style.clinchStrikes ?? {} : {}) };
   if (fighter.clinch && style.attacks.knee) pool.knee = style.attacks.knee;
@@ -135,16 +146,16 @@ export function chooseAttack(world, fighter, opponent, line, strength = 'quick')
     const spec = MOVES[name];
     if (!spec || weight <= 0) continue;
     if (spec.kind === 'rush') {
-      if (line === 'lunge' && !fighter.clinch) scored.push({ name, score: 1.2, reaches: true, spec });
+      if (line === 'lunge' && !fighter.clinch && opponent) scored.push({ name, score: 1.2, reaches: true, spec });
       continue;
     }
     if (spec.kind === 'clinch') {
-      if (line === 'close' && !fighter.clinch && vec.length(vec.sub(point(opponent.x, P.neck), point(fighter.x, P.neck))) < fighter.body.reach * WORLD.clinch.range) scored.push({ name, score: 1.5, reaches: true, spec });
+      if (line === 'close' && !fighter.clinch && opponent && vec.length(vec.sub(point(opponent.x, P.neck), point(fighter.x, P.neck))) < fighter.body.reach * WORLD.clinch.range) scored.push({ name, score: 1.5, reaches: true, spec });
       continue;
     }
     if (spec.kind !== 'strike' || (spec.reach === 'weapon' && !held) || (spec.bash && !fighter.shield) || limbLost(fighter, spec)) continue;
     // A gun or bow is aimed at the body or the head; the lines low and close mean nothing to it.
-    const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius;
+    const reach = moveRange(spec, fighter.body, held) + headRadius;
     const reaches = distance <= reach + (spec.step ?? 0) * 0.12;
     let score = Math.sqrt(weight);
     score *= spec.zones.includes(zone) ? 1 : zone === 'legs' ? 0.15 : 0.35;
@@ -176,39 +187,50 @@ function comboAfter(style, opener, scored) {
   return [quick[0].name, quick[Math.min(1, quick.length - 1)].name];
 }
 
-/** Carry out the first attack request that can be: thrown now, or kept a moment while busy or closing in. */
+/** The line of an attack aimed at a place: a lunge at a man beyond reach, else high, body or low by its height on him. */
+export function lineFor(fighter, at, man) {
+  const hips = point(fighter.x, P.pelvis);
+  if (man && Math.hypot(at[0] - hips[0], at[2] - hips[2]) > reachOf(fighter) + CONTROL.lungeBeyond) return 'lunge';
+  const shoulder = (fighter.x[P.lShoulder * 3 + 1] + fighter.x[P.rShoulder * 3 + 1]) / 2;
+  if (at[1] >= shoulder * CONTROL.highFrom) return 'high';
+  if (at[1] < hips[1] * CONTROL.lowBelow) return 'low';
+  return 'mid';
+}
+
+/**
+ * Carry out the first attack asked for: thrown at once, wherever it is aimed,
+ * a man there or not (kept a moment only while the hands are busy). A request
+ * carries `at` (a place in the world) or a `line` (at his man).
+ */
 function attack(world, fighter, orders, opponent) {
   const requests = orders.requests;
-  while (requests.length && world.time - requests[0].at > (requests[0].approach ? CONTROL.approachSeconds : CONTROL.bufferSeconds)) requests.shift();
+  while (requests.length && world.time - requests[0].at > CONTROL.bufferSeconds) requests.shift();
   const request = requests[0];
   if (!request) return;
-  // The rest of a combination already under way: queued after the strike in hand.
-  if (request.strength === 'combo' && fighter.punch && fighter.orderLine === request.line && world.time - (fighter.orderAt ?? -Infinity) < CONTROL.comboWithin) {
+  // A second tap while the first is still going: the rest of a combination after it.
+  if (request.strength === 'combo' && fighter.punch && world.time - (fighter.orderAt ?? -Infinity) < CONTROL.comboWithin) {
     const style = STYLES[fighter.style];
     fighter.orderCombo = comboAfter(style, fighter.punch.type, []) ?? [fighter.punch.type];
     fighter.orderComboZone = fighter.punch.zone;
+    fighter.orderComboAt = request.point ?? null;
     requests.shift();
     return;
   }
-  if (fighter.punch || fighter.rush || fighter.pickup || fighter.state !== 'up' || !opponent) return;
-  const chosen = chooseAttack(world, fighter, opponent, request.line, request.strength);
-  if (!chosen) {
-    requests.shift();
-    return;
-  }
-  if (!chosen.reaches && request.line !== 'lunge') {
-    // Out of reach: close in for it, then throw.
-    request.approach = true;
-    fighter.move = Math.max(fighter.move, 1);
-    fighter.goTo = null;
-    return;
-  }
-  if (throwPunch(world, fighter, chosen.move, chosen.zone, { heavy: chosen.heavy })) {
+  if (fighter.punch || fighter.rush || fighter.pickup || fighter.pin || fighter.state !== 'up') return;
+  const aim = request.point ?? null;
+  const man = aim ? manNear(world, fighter, aim, WORLD.aimedAtWithin) : opponent;
+  const line = aim ? lineFor(fighter, aim, man) : request.line;
+  const chosen = chooseAttack(world, fighter, man, line, request.strength, aim);
+  requests.shift();
+  if (!chosen) return;
+  if (aim) fighter.faceAt = { at: aim, until: world.time + CONTROL.faceSeconds };
+  // A rush or a clinch goes at the man; a strike at the place.
+  const thrown = MOVES[chosen.move].kind === 'strike' ? throwPunch(world, fighter, chosen.move, chosen.zone, { heavy: chosen.heavy, at: aim }) : throwPunch(world, fighter, chosen.move);
+  if (thrown) {
     fighter.orderCombo = chosen.combo;
     fighter.orderComboZone = chosen.zone;
-    fighter.orderLine = request.line;
+    fighter.orderComboAt = aim;
     fighter.orderAt = world.time;
-    requests.shift();
   }
 }
 
@@ -216,7 +238,52 @@ function attack(world, fighter, orders, opponent) {
 function continueCombo(world, fighter) {
   if (!fighter.orderCombo?.length || fighter.punch || fighter.state !== 'up') return;
   const next = fighter.orderCombo.shift();
-  if (!throwPunch(world, fighter, next, fighter.orderComboZone)) fighter.orderCombo = null;
+  if (!throwPunch(world, fighter, next, fighter.orderComboZone, { at: fighter.orderComboAt ?? null })) fighter.orderCombo = null;
+}
+
+// ---- Push and hold down ------------------------------------------------------
+
+/** A press held: a man down near where it points is held down; otherwise a shove (a shield's bash, or both hands). */
+function pressHeld(world, fighter, at) {
+  const down = world.fighters.find((other) => other.corner !== fighter.corner && (other.state === 'down' || other.state === 'rising') && Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]) < CONTROL.pinFrom);
+  if (down && !world.rules?.noPins) {
+    fighter.orderPin = { target: down.id, until: world.time + CONTROL.pinSeconds };
+    return;
+  }
+  if (fighter.punch || fighter.state !== 'up') return;
+  fighter.faceAt = { at, until: world.time + CONTROL.faceSeconds };
+  const style = STYLES[fighter.style];
+  const push = fighter.shield ? 'shieldBash' : Object.keys(style?.attacks ?? {}).find((name) => MOVES[name]?.push) ?? 'oshi';
+  // At his chest's height: a shove goes into the body, wherever the press pointed.
+  throwPunch(world, fighter, push, 'body', { at: [at[0], fighter.x[P.neck * 3 + 1] - 0.25, at[2]] });
+}
+
+/** Going to hold a man down: beside his chest, then the hold (the same as anyone's: grappling.js). */
+function goPin(world, fighter) {
+  if (fighter.pin) {
+    fighter.move = 0;
+    fighter.strafe = 0;
+    return true;
+  }
+  const order = fighter.orderPin;
+  const target = order ? world.fighters[order.target] : null;
+  if (!target || world.time > order.until || (target.state !== 'down' && target.state !== 'rising')) {
+    fighter.orderPin = null;
+    return false;
+  }
+  const chest = vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.6);
+  const at = point(fighter.x, P.pelvis);
+  const apart = Math.hypot(chest[0] - at[0], chest[2] - at[2]);
+  fighter.strafe = 0;
+  fighter.goTo = chest;
+  if (apart > AI.pin.reach) {
+    fighter.move = Math.min(1, (apart - AI.pin.reach) * 2 + 0.3);
+    return true;
+  }
+  fighter.move = 0;
+  fighter.focus = target.id;
+  if (perform(world, fighter, 'pin')) fighter.orderPin = null;
+  return true;
 }
 
 // ---- Defence ----------------------------------------------------------------
@@ -425,6 +492,9 @@ export function directFighter(world, fighter, orders, dt) {
   }
   for (const action of orders.actions ?? []) doAction(world, fighter, action);
   orders.actions = [];
+  for (const press of orders.holds ?? []) pressHeld(world, fighter, press);
+  orders.holds = [];
+  if (goPin(world, fighter)) return;
   if (fighter.orderPickup !== undefined && fighter.orderPickup !== null && goPickUp(world, fighter)) return;
   if (!goClinch(world, fighter, opponent)) steer(world, fighter, orders, opponent, dt);
   defend(world, fighter, orders);

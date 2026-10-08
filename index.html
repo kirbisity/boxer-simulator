@@ -50,6 +50,12 @@
 
   <!-- The fight's controls in play mode (touch.js): the game surface, stick, Guard, special action, lock, and the fight HUD. -->
   <div class="fight-ui" id="fight-ui" hidden></div>
+  <!-- Which side the player takes (or to watch), asked as a part of the game starts. -->
+  <div class="side-pick" id="side-pick" hidden>
+    <h2>Choose your side</h2>
+    <div class="sides"><button data-side="red" class="side red"></button><button data-side="blue" class="side blue"></button></div>
+    <button data-side="watch" class="watch">Just watch</button>
+  </div>
 
   <footer class="controls">
     <button id="open-menu" class="menu-button">☰ Menu</button>

@@ -84,6 +84,13 @@ const fightControls = installFightControls($('#fight-ui'), {
     const box = scene.renderer.domElement.getBoundingClientRect();
     return [box.left + ((projected.x + 1) / 2) * box.width, box.top + ((1 - projected.y) / 2) * box.height, projected.z < 1 && Math.abs(projected.x) < 1.2 && Math.abs(projected.y) < 1.2];
   },
+  ray: (x, y) => {
+    const box = scene.renderer.domElement.getBoundingClientRect();
+    const through = new THREE.Vector3(((x - box.left) / box.width) * 2 - 1, -((y - box.top) / box.height) * 2 + 1, 0.5).unproject(scene.camera);
+    const origin = scene.camera.position;
+    const dir = through.sub(origin).normalize();
+    return { origin: [origin.x, origin.y, origin.z], dir: [dir.x, dir.y, dir.z] };
+  },
   floorAxes: () => {
     const look = [scene.orbit.target.x - scene.camera.position.x, scene.orbit.target.z - scene.camera.position.z];
     const length = Math.hypot(look[0], look[1]) || 1;
@@ -445,7 +452,8 @@ function blendWorld(world, before, share) {
 // the way. Walking, the turn is the player's (drag): the keys go by the camera.
 // Locked on, the view is of both men: aimed `lockAt` of the way from him to his man, from
 // `lockAngle` (rad) off the line between them, further back the further apart they stand.
-const CAMERA_FOLLOW = { distance: 3.4, pitch: 0.24, aboveHips: 0.45, shoulder: 0.55, ease: 0.2, turn: 0.05, lockAt: 0.45, lockAngle: 0.55, lockBack: 0.6 };
+// Walking free (the stick unlocked, or walk mode), the view comes round behind him more gently (`walkTurn`).
+const CAMERA_FOLLOW = { distance: 4.2, pitch: 0.26, aboveHips: 0.45, shoulder: 0.55, ease: 0.2, turn: 0.05, walkTurn: 0.03, lockAt: 0.45, lockAngle: 0.55, lockBack: 0.6 };
 
 /** The man the player has locked on, in play mode. */
 const lockedTarget = () => (state.mode === 'play' && state.orders.lock !== null ? state.world.fighters[state.orders.lock] ?? null : null);
@@ -468,16 +476,16 @@ function followCamera(fighter) {
   const apart = locked ? Math.hypot(locked.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], locked.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) : 0;
   orbit.distance += (CAMERA_FOLLOW.distance + apart * CAMERA_FOLLOW.lockBack - orbit.distance) * 0.1;
   orbit.pitch += (CAMERA_FOLLOW.pitch - orbit.pitch) * 0.05;
-  // Held by the player's own drag, or walking about: his choice of view.
-  // Steering free with the stick: the view holds still, so the stick's ways stay put.
-  if (fighter.walking || pointers.size || (state.orders.stick && state.orders.lock === null)) return;
+  // Held by the player's own drag: his choice of view.
+  if (pointers.size) return;
+  const free = fighter.walking || (state.orders.stick && state.orders.lock === null);
   // He faces (cos yaw, −sin yaw) on the floor: the camera sits the other way.
   // Locked on: behind him along the line from his man, swung off it so neither hides the other.
   const behind = locked
     ? Math.atan2(fighter.x[P.pelvis * 3 + 2] - locked.x[P.pelvis * 3 + 2], fighter.x[P.pelvis * 3] - locked.x[P.pelvis * 3]) + CAMERA_FOLLOW.lockAngle
     : Math.atan2(Math.sin(fighter.yaw), -Math.cos(fighter.yaw));
   const turn = Math.atan2(Math.sin(behind - orbit.yaw), Math.cos(behind - orbit.yaw));
-  orbit.yaw += turn * CAMERA_FOLLOW.turn;
+  orbit.yaw += turn * (free ? CAMERA_FOLLOW.walkTurn : CAMERA_FOLLOW.turn);
 }
 
 function draw(dt) {
@@ -1128,6 +1136,7 @@ function loadSetup(file) {
   }
   refreshBuilder();
   newBout();
+  askSide();
 }
 
 $('#copy-setup').addEventListener('click', async () => {
@@ -1194,11 +1203,48 @@ function match({ red, blue, place, game, next }) {
   state.editing = { red: 0, blue: 0 };
   state.place = place;
   newBout();
+  if (game !== 'home') askSide();
 }
+
+// ---- Choosing a side ------------------------------------------------------------
+
+/**
+ * Which side the player takes, or to watch: asked once as a part of the game
+ * is entered from the menus (kept for its rematches and next bouts), the
+ * fight held still until it is answered.
+ */
+function askSide() {
+  if (state.sideAsked) return;
+  state.sideAsked = true;
+  const pick = $('#side-pick');
+  for (const corner of ['red', 'blue']) {
+    const team = state.world.fighters.filter((fighter) => fighter.corner === corner);
+    const lead = team[0]?.body.inputs;
+    if (!lead) continue;
+    const faction = FACTIONS[factionOf(lead)]?.label ?? '';
+    pick.querySelector(`[data-side="${corner}"]`).innerHTML = `<b>${lead.name}</b><span>${[faction, team.length > 1 ? `${team.length} fighters` : STYLES[lead.style]?.label].filter(Boolean).join(' · ')}</span>`;
+  }
+  pick.hidden = false;
+  state.paused = true;
+}
+
+$('#side-pick').addEventListener('click', (press) => {
+  const side = press.target.closest('button')?.dataset.side;
+  if (!side) return;
+  $('#side-pick').hidden = true;
+  state.paused = false;
+  $('#pause').textContent = 'Pause';
+  // The footer's own buttons do the switching (hidden in a battle, there in the sandbox).
+  const button = side === 'watch' ? $('#modes button[data-value="watch"]') : $(`#modes button[data-value="play"]${side === 'blue' ? '[data-side="blue"]' : ':not([data-side])'}`);
+  button.click();
+});
 
 /** The fight behind the menus: two random gladiators in the Colosseum, one after another. */
 function attract() {
   if (state.mode === 'play') $('#modes button[data-value="watch"]').click();
+  // Back at the menus: the next part of the game entered asks for a side again.
+  state.sideAsked = false;
+  $('#side-pick').hidden = true;
   match({ red: [randomGladiator()], blue: [randomGladiator()], place: 'colosseum', game: 'home', next: { text: 'Next bout', run: attract } });
   Object.assign(scene.orbit, { distance: 4.6, pitch: 0.12 });
 }
@@ -1206,6 +1252,7 @@ function attract() {
 function enterLevel(key) {
   setGame('level', { text: 'Again', run: () => chooseLevel(key) });
   chooseLevel(key);
+  askSide();
 }
 
 /** The sandbox as it was left: its own fighters, sides and place. */

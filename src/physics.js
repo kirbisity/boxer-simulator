@@ -847,10 +847,11 @@ export function aimPoint(target, zone) {
  * Throw a strike (any attack in MOVES) at the opponent. The zone defaults to
  * the move's first. Returns false if the fighter cannot throw it now.
  */
-export function throwPunch(world, fighter, type, zone = null, { heavy = false } = {}) {
+export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null } = {}) {
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
-  const target = opponentFor(world, fighter);
+  // Thrown at a place (`at`, the player's aim): at whoever stands there, or at the empty air.
+  const target = at ? manNear(world, fighter, at, WORLD.aimedAtWithin) : opponentFor(world, fighter);
   // Raising a weapon heavier than heavyFrom is work in proportion to its mass.
   // (and the harder, the weaker he is for it: handling.js)
   const lift = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(1, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom) / (fighter.weapon.handling?.speed ?? 1) : 1;
@@ -861,21 +862,39 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.pain || fighter.stamina < drain || (spec.bash && !fighter.shield)) return false;
+  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.pain || fighter.stamina < drain || (spec.bash && !fighter.shield)) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
   const heft = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(0, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
   const jitter = (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft;
-  const aimed = jitter > 0 ? vec.add(aimPoint(target, aimZone), [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : aimPoint(target, aimZone);
+  const mark = at ?? aimPoint(target, aimZone);
+  const aimed = jitter > 0 ? vec.add(mark, [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : mark;
   fighter.punch = {
-    type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target.id, landed: false, peakSpeed: 0, limb: P[spec.limb],
+    type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target?.id ?? null, landed: false, peakSpeed: 0, limb: P[spec.limb],
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
+    // A place in the world: the strike follows it as he turns to it.
+    at: at ? aimed : null,
   };
   fighter.stamina = Math.max(0, fighter.stamina - drain);
   fighter.stats.thrown += 1;
   if (heavy) world.events.push({ time: world.time, kind: 'heavy', attacker: fighter.id, punch: type, effects: [] });
   return true;
+}
+
+/** The man of the other side nearest a place, within `within` m of it (on the floor), or null. */
+export function manNear(world, fighter, at, within) {
+  let best = null;
+  let bestDistance = within;
+  for (const other of world.fighters) {
+    if (other.corner === fighter.corner || !inFight(other)) continue;
+    const distance = Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
+    if (distance < bestDistance) {
+      best = other;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
 
 /** Start a whole-body move (rush, clinch) or a defence. */
@@ -967,6 +986,7 @@ function updateIntent(world, fighter, dt) {
     intent.dip += (spec.dip ?? 0) * shape;
     intent.lean += (spec.lean ?? 0.12) * shape;
     intent.shift += (spec.shift ?? 0) * shape;
+    if (punch.at) punch.aim = toLocal(fighter, punch.at);
     if (punch.t < spec.extendUntil) Object.assign(intent, strikeTargets(spec, punch.t, punch.aim, fighter.body, WORLD.followThrough));
     else if (spec.limb.endsWith('Foot') || spec.limb.endsWith('Knee')) {
       // Recovering a kick: the leg comes back down under the hip.
@@ -1458,7 +1478,9 @@ function moveRoot(world, fighter, dt) {
     return;
   }
   // Facing his man, or the place he is going (a weapon on the floor).
-  const facePoint = fighter.goTo ?? (opponent ? point(opponent.x, P.pelvis) : null);
+  // A place he means to strike (faceAt, for a moment) first; then where he is going; then his man.
+  const facing = fighter.faceAt && world.time < fighter.faceAt.until ? fighter.faceAt.at : null;
+  const facePoint = facing ?? fighter.goTo ?? (opponent ? point(opponent.x, P.pelvis) : null);
   if (facePoint) {
     const from = point(fighter.x, P.pelvis);
     const to = facePoint;

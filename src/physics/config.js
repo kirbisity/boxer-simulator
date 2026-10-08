@@ -103,6 +103,8 @@ export const WORLD = {
   limitStepLimp: 0.03, // m: firmer corrections inject speed of their own
   // The stance on the floor: how fast he turns to face (per s), how fast the
   // stance follows hips pushed off it (per s), how near the arena's edge (m) it may stand.
+  // A strike thrown at a place is aimed at a man of the other side standing within this (m) of it.
+  aimedAtWithin: 0.7,
   footing: { turnRate: 6, followPushed: 2.5, edgeMargin: 0.3 },
   joint: {
     hipCone: 2.4, // rad from straight down: room for a head kick, not the splits

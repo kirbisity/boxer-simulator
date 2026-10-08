@@ -440,10 +440,9 @@ body.playing .hud .card { visibility: hidden; }
 body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sheet .fight-ui { display: none; }
 .fight-ui { position: absolute; inset: 0; pointer-events: none; }
 .touch-surface { position: absolute; inset: 0; pointer-events: auto; touch-action: none; cursor: crosshair; }
-.zone-hints { position: absolute; top: 18%; bottom: calc(var(--controls-height, 56px) + 90px); right: 0; width: 50%; pointer-events: none; }
-.zone-hints .hint { position: absolute; right: calc(max(64px, 22%) + 14px); font: 600 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.22); }
-.zone-hints .high { top: 8%; } .zone-hints .mid { top: 45%; } .zone-hints .low { bottom: 6%; }
-.zone-hints .hint.lunge { right: 0; top: 0; bottom: 0; width: max(64px, 22%); display: grid; place-items: center; writing-mode: vertical-rl; border-left: 1px dashed rgba(255, 255, 255, 0.12); }
+.tap-mark { position: fixed; left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); pointer-events: none; z-index: 2; animation: tap-mark 0.35s ease-out forwards; }
+.tap-mark.press { border-color: var(--gold); width: 64px; height: 64px; box-shadow: 0 0 18px rgba(255, 207, 74, 0.5); }
+@keyframes tap-mark { from { opacity: 1; scale: 0.6; } to { opacity: 0; scale: 1.25; } }
 .stick { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 2; }
 .stick::before { content: ''; position: absolute; left: -70px; top: -70px; width: 140px; height: 140px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.05); }
 .stick .knob { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
@@ -456,8 +455,11 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .guard-button.on { background: rgba(120, 190, 255, 0.4); border-color: #9cd0ff; }
 .action-button { right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); width: 76px; height: 76px; }
 .action-button.idle { opacity: 0.3; }
-.lock-button { position: absolute; pointer-events: auto; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); background: rgba(10, 12, 18, 0.35); border-color: rgba(255, 255, 255, 0.3); font-weight: 600; }
-.lock-button.on { background: var(--gold); color: #191300; }
+/* Lock: big and gold-edged above the guard, under the thumb; gold, with his name, while on. */
+.lock-button { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 124px); width: 80px; height: 80px; border: 3px solid var(--gold); background: rgba(40, 32, 6, 0.55); color: var(--gold); box-shadow: 0 0 14px rgba(255, 207, 74, 0.35); }
+.lock-button b { font-size: 30px; }
+.lock-button .who { font: 600 10px var(--mono); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lock-button.on { background: var(--gold); color: #191300; box-shadow: 0 0 22px rgba(255, 207, 74, 0.8); }
 .player-status { position: absolute; left: calc(14px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 10px); width: min(220px, 34vw); display: grid; gap: 4px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 .player-status .top { display: flex; justify-content: space-between; gap: 8px; font: 600 13px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .player-status .tag { color: var(--gold); }
@@ -469,6 +471,19 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 @media (max-width: 560px), (max-height: 480px) {
   .guard-button { width: 84px; height: 84px; }
   .action-button { right: calc(106px + env(safe-area-inset-right, 0px)); width: 66px; height: 66px; }
+  .lock-button { bottom: calc(var(--controls-height, 56px) + 106px); width: 70px; height: 70px; }
 }
 /* The fight HUD shows health in every mode (the sandbox's cards read out the rest). */
 body[data-game="sandbox"] .player-status .bar.health, body[data-game="sandbox"] .target-marker .bar.health { display: block; }
+
+/* Choosing a side: over the fight, which waits for it. In a battle the footer has no side buttons. */
+body:not([data-game="sandbox"]) #modes { display: none; }
+.side-pick { position: absolute; inset: 0; z-index: 7; display: grid; place-content: center; justify-items: center; gap: 16px; padding: 16px; background: radial-gradient(ellipse at 50% 45%, rgba(8, 9, 14, 0.55), rgba(5, 6, 10, 0.9)); }
+.side-pick h2 { margin: 0; font: 700 clamp(24px, 5vw, 40px) var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.side-pick .sides { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.side-pick .side { display: grid; gap: 4px; min-width: min(240px, 80vw); padding: 16px 20px; text-align: left; border-width: 2px; border-radius: 14px; background: rgba(16, 19, 29, 0.85); }
+.side-pick .side b { font: 700 22px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+.side-pick .side span { color: var(--muted); font-size: 13px; }
+.side-pick .side.red { border-color: var(--red); }
+.side-pick .side.blue { border-color: var(--blue); }
+.side-pick .watch { background: transparent; }

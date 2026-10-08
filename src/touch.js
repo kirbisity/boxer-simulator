@@ -1,55 +1,54 @@
 // The fight's controls on screen, for a finger or a mouse: the game surface
-// (drag anywhere open for a floating stick; tap the right side to attack a
-// line; long-press a man to lock him), a big Guard button, one special
-// button in a fixed place, a Lock button, and the fight-mode HUD (the
-// player's status low down, his man's over his head). Only this surface
-// takes the browser's gestures from it: menus and text elsewhere stay
-// selectable and scroll as usual.
+// (drag anywhere for a floating stick; tap anywhere to strike that way;
+// press and hold to shove, or to hold down a man on the floor), a big Guard
+// button, a Lock button above it, one special button in a fixed place, and
+// the fight-mode HUD (the player's status low down, his man's over his head).
+// Only this surface takes the browser's gestures from it: menus and text
+// elsewhere stay selectable and scroll as usual.
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
 import { ACTIONS, contextAction } from './control.js';
 import { createRecognizer, GESTURE } from './gesture.js';
-import { inFight, opponentFor, point } from './physics.js';
+import { inFight, opponentFor, point, reachOf } from './physics.js';
 
 export const TOUCH = {
-  // The right side's share of the screen that takes attacks; its outer strip (px, at least) lunges.
-  attackFrom: 0.5,
-  lungeStrip: 0.11,
-  lungeMinPx: 64,
-  // A finger within this (px) of a man's drawn body is on him.
-  manRadius: 44,
+  // A tap's line of sight passing within this (m) of a man's body is aimed at him.
+  manWithin: 0.35,
+  // Otherwise it strikes the air this share of his reach before him, where the line of sight crosses it.
+  airReach: 0.9,
   // A press on the guard shorter than this (s) is a tap: an evasion, not a block.
   guardTap: 0.18,
   // The marker over his man fades to this, this long (s) after anything last happened to either.
   markerIdle: 0.3,
   markerAwake: 2.5,
+  // The ring where a tap or press landed fades over this (s).
+  markSeconds: 0.35,
 };
 
 const uiElement = (tag, className, text) => Object.assign(document.createElement(tag), { className, ...(text ? { textContent: text } : {}) });
 
 /**
  * Put the fight's controls in `root`. `hooks`: world(), player(), orders(),
- * project([x, y, z]) → [px, py, inFront], floorAxes() → { ahead, right }
+ * project([x, y, z]) → [px, py, inFront], ray(px, py) → { origin, dir } (the
+ * line of sight through a point on the screen), floorAxes() → { ahead, right }
  * (the camera's on the floor), now() (s). Returns { update, setActive, reset }.
  */
 export function installFightControls(root, hooks) {
   const gestures = createRecognizer();
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
-  surface.setAttribute('aria-label', 'Fight: drag to move, tap the right side to attack, long-press a man to lock on');
-  const hints = surface.appendChild(uiElement('div', 'zone-hints'));
-  hints.setAttribute('aria-hidden', 'true');
-  for (const [line, label] of [['high', 'High'], ['mid', 'Body'], ['low', 'Low'], ['lunge', 'Lunge']]) hints.appendChild(uiElement('span', `hint ${line}`, label));
+  surface.setAttribute('aria-label', 'Fight: drag to move, tap to strike that way, press and hold to shove or hold a man down');
   const stick = root.appendChild(uiElement('div', 'stick'));
   stick.appendChild(uiElement('i', 'knob'));
   stick.hidden = true;
-  const charge = root.appendChild(uiElement('div', 'charge'));
-  charge.hidden = true;
+  const mark = root.appendChild(uiElement('div', 'tap-mark'));
+  mark.hidden = true;
   const guard = root.appendChild(uiElement('button', 'fight-button guard-button'));
   guard.innerHTML = '<b>🛡</b><span>Guard</span>';
   const action = root.appendChild(uiElement('button', 'fight-button action-button'));
   action.innerHTML = '<b></b><span></span>';
-  const lock = root.appendChild(uiElement('button', 'lock-button'));
+  const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
+  lock.innerHTML = '<b>◎</b><span class="label">Lock</span><span class="who"></span>';
   const status = root.appendChild(uiElement('div', 'player-status'));
   status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div>';
   const marker = root.appendChild(uiElement('div', 'target-marker'));
@@ -58,34 +57,47 @@ export function installFightControls(root, hooks) {
   let stickId = null;
   let guardDown = null;
   let lastAction = null;
+  let markAt = -Infinity;
   const awake = new Map();
   let active = false;
 
-  /** What a touch at (x, y) starts on: a man, an attack line, or open floor. */
-  function regionAt(x, y) {
+  /**
+   * The place in the world a point on the screen means: on a man if the line
+   * of sight passes by his body, else in the air at striking distance before
+   * the player, where the line of sight crosses it.
+   */
+  function aimAt(x, y) {
     const world = hooks.world();
     const me = hooks.player();
-    const box = surface.getBoundingClientRect();
-    let man;
-    let nearest = TOUCH.manRadius;
+    const { origin, dir } = hooks.ray(x, y);
+    let best = null;
+    let bestDistance = TOUCH.manWithin;
     for (const other of world?.fighters ?? []) {
       if (!me || other.corner === me.corner || !inFight(other)) continue;
-      // His drawn body: a line from the head to between the feet.
-      const head = hooks.project(vec3(point(other.x, P.head), 0.12));
-      const feet = hooks.project(vec3(point(other.x, P.pelvis), 0, true));
-      if (!head[2] || !feet[2]) continue;
-      const away = screenSegmentDistance([x, y], head, feet);
-      if (away < nearest) {
-        nearest = away;
-        man = other.id;
+      const near = rayToSegment(origin, dir, point(other.x, P.pelvis), point(other.x, P.head));
+      if (near.distance < bestDistance) {
+        bestDistance = near.distance;
+        best = near.onSegment;
       }
     }
-    if (man !== undefined) return { man, line: 'close' };
-    const across = (x - box.left) / box.width;
-    if (across < TOUCH.attackFrom) return { line: null };
-    if (box.right - x < Math.max(TOUCH.lungeMinPx, box.width * TOUCH.lungeStrip)) return { line: 'lunge' };
-    const down = (y - box.top) / box.height;
-    return { line: down < 0.4 ? 'high' : down < 0.68 ? 'mid' : 'low' };
+    if (best) return best;
+    // The air before him: where the line of sight comes within his reach of him, at its far side.
+    const hips = point(me.x, P.pelvis);
+    const radius = reachOf(me) * TOUCH.airReach;
+    const flat = [dir[0], dir[2]];
+    const flatLength = Math.hypot(flat[0], flat[1]) || 1e-6;
+    const unit = [flat[0] / flatLength, flat[1] / flatLength];
+    const along = (hips[0] - origin[0]) * unit[0] + (hips[2] - origin[2]) * unit[1];
+    const across = Math.hypot(origin[0] + unit[0] * along - hips[0], origin[2] + unit[1] * along - hips[2]);
+    const beyond = Math.sqrt(Math.max(0, radius * radius - across * across));
+    const run = Math.max(0, along + beyond) / flatLength;
+    const at = [origin[0] + dir[0] * run, origin[1] + dir[1] * run, origin[2] + dir[2] * run];
+    // A tap off past the edge of his reach is still struck within it.
+    const off = [at[0] - hips[0], at[2] - hips[2]];
+    const offLength = Math.hypot(off[0], off[1]) || 1;
+    const scale = Math.min(1, radius / offLength);
+    const top = me.x[P.head * 3 + 1] + 0.1;
+    return [hips[0] + off[0] * scale, Math.max(0.15, Math.min(top, at[1])), hips[2] + off[1] * scale];
   }
 
   /** The stick's screen way, as a way on the floor: up the screen is where the camera looks. */
@@ -94,6 +106,13 @@ export function installFightControls(root, hooks) {
     const way = [right[0] * dx - ahead[0] * dy, right[1] * dx - ahead[1] * dy];
     const length = Math.hypot(way[0], way[1]) || 1;
     return [way[0] / length, way[1] / length];
+  }
+
+  function showMark(at, kind) {
+    mark.hidden = false;
+    mark.className = `tap-mark ${kind}`;
+    mark.style.transform = `translate(${at[0]}px, ${at[1]}px) translate(-50%, -50%)`;
+    markAt = hooks.now();
   }
 
   function handle(events) {
@@ -110,22 +129,18 @@ export function installFightControls(root, hooks) {
         stickId = null;
         orders.stick = null;
         stick.hidden = true;
-      } else if (event.type === 'charge') {
-        charge.hidden = false;
-        charge.style.transform = `translate(${event.at[0]}px, ${event.at[1]}px) translate(-50%, -50%) scale(${0.6 + 0.6 * event.share})`;
-      } else if (event.type === 'longPress') {
-        const man = event.region.man;
-        orders.lock = orders.lock === man ? null : man;
-        navigator.vibrate?.(15);
-        wake(man);
-      } else if (event.type === 'tap' || event.type === 'heavy') {
-        charge.hidden = true;
-        const line = event.region?.line;
-        if (!line) continue;
-        const strength = event.type === 'heavy' ? 'heavy' : event.double ? 'combo' : 'quick';
-        orders.requests.push({ line, strength, at: world.time });
-        const target = orders.lock ?? opponentFor(world, hooks.player())?.id;
-        if (target !== undefined && target !== null) wake(target);
+      } else if (event.type === 'tap') {
+        // Always a strike, the way the tap points, whoever is (or is not) there.
+        const aim = aimAt(event.at[0], event.at[1]);
+        orders.requests.push({ point: aim, strength: event.double ? 'combo' : 'quick', at: world.time });
+        showMark(event.at, 'strike');
+        wakeNear(aim);
+      } else if (event.type === 'hold') {
+        const aim = aimAt(event.at[0], event.at[1]);
+        (orders.holds ??= []).push(aim);
+        showMark(event.at, 'press');
+        navigator.vibrate?.(12);
+        wakeNear(aim);
       }
     }
   }
@@ -146,31 +161,24 @@ export function installFightControls(root, hooks) {
     press.preventDefault();
     capture(surface, press.pointerId);
     touches.set(press.pointerId, true);
-    handle(gestures.down(press.pointerId, [press.clientX, press.clientY], hooks.now(), regionAt(press.clientX, press.clientY)));
+    handle(gestures.down(press.pointerId, [press.clientX, press.clientY], hooks.now()));
   });
   surface.addEventListener('pointermove', (move) => {
     if (!touches.has(move.pointerId)) return;
     handle(gestures.move(move.pointerId, [move.clientX, move.clientY]));
   });
-  const lift = (up) => {
+  surface.addEventListener('pointerup', (up) => {
     if (!touches.has(up.pointerId)) return;
     touches.delete(up.pointerId);
     handle(gestures.up(up.pointerId, [up.clientX, up.clientY], hooks.now()));
-    if (!touches.size) charge.hidden = true;
-  };
-  surface.addEventListener('pointerup', lift);
-  surface.addEventListener('pointercancel', (cancel) => {
+  });
+  const drop = (cancel) => {
     if (!touches.has(cancel.pointerId)) return;
     touches.delete(cancel.pointerId);
     handle(gestures.cancel(cancel.pointerId));
-    charge.hidden = true;
-  });
-  surface.addEventListener('lostpointercapture', (lost) => {
-    if (touches.has(lost.pointerId)) {
-      touches.delete(lost.pointerId);
-      handle(gestures.cancel(lost.pointerId));
-    }
-  });
+  };
+  surface.addEventListener('pointercancel', drop);
+  surface.addEventListener('lostpointercapture', drop);
   // No callout, selection, context menu or page zoom from the fight.
   for (const kind of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) {
     for (const target of [surface, guard, action, lock]) target.addEventListener(kind, (event) => event.preventDefault());
@@ -201,20 +209,25 @@ export function installFightControls(root, hooks) {
     (hooks.orders().actions ??= []).push(lastAction);
     navigator.vibrate?.(10);
   });
-  lock.addEventListener('click', () => {
+  // Lock: on the man he is on (the nearest), or off.
+  lock.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    if (!active) return;
     const orders = hooks.orders();
     if (orders.lock !== null) orders.lock = null;
     else {
       const target = opponentFor(hooks.world(), hooks.player());
       if (target) {
         orders.lock = target.id;
-        wake(target.id);
+        awake.set(target.id, hooks.now());
       }
     }
+    navigator.vibrate?.(15);
   });
 
-  function wake(id) {
-    awake.set(id, hooks.now());
+  /** Anything aimed near a man wakes his marker. */
+  function wakeNear(at) {
+    for (const other of hooks.world()?.fighters ?? []) if (Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]) < 1.2) awake.set(other.id, hooks.now());
   }
 
   /** Each frame: held touches age, the buttons and the HUD follow the fight. */
@@ -222,6 +235,7 @@ export function installFightControls(root, hooks) {
     if (!active) return;
     const now = hooks.now();
     handle(gestures.tick(now));
+    if (now - markAt > TOUCH.markSeconds) mark.hidden = true;
     const world = hooks.world();
     const me = hooks.player();
     const orders = hooks.orders();
@@ -237,21 +251,22 @@ export function installFightControls(root, hooks) {
       action.querySelector('span').textContent = name ? ACTIONS[name].label : 'Action';
     }
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
-    lock.textContent = locked ? `◎ Unlock ${firstNameOf(locked)}` : '◎ Lock';
     lock.classList.toggle('on', Boolean(locked));
+    lock.querySelector('.label').textContent = locked ? 'Unlock' : 'Lock';
+    lock.querySelector('.who').textContent = locked ? firstNameOf(locked) : '';
     // The player's own status, compact, low down.
     status.querySelector('.name').textContent = firstNameOf(me);
-    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
+    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
     status.querySelector('.stamina i').style.width = `${Math.round(me.stamina * 100)}%`;
     // His man: the one locked, or the one he is on; a marker over his head.
     const target = locked ?? opponentFor(world, me);
-    for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) wake(event.defender);
+    for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) awake.set(event.defender, now);
     if (!target) {
       marker.hidden = true;
       return;
     }
-    const at = hooks.project(vec3(point(target.x, P.head), 0.42));
+    const at = hooks.project([target.x[P.head * 3], target.x[P.head * 3 + 1] + 0.42, target.x[P.head * 3 + 2]]);
     marker.hidden = !at[2];
     if (!at[2]) return;
     marker.style.transform = `translate(${at[0]}px, ${at[1]}px) translate(-50%, -100%)`;
@@ -275,7 +290,7 @@ export function installFightControls(root, hooks) {
     guardDown = null;
     lastAction = undefined;
     stick.hidden = true;
-    charge.hidden = true;
+    mark.hidden = true;
     guard.classList.remove('on');
     awake.clear();
   }
@@ -292,13 +307,24 @@ function capture(element, pointerId) {
   }
 }
 
-const vec3 = (at, up = 0, floor = false) => [at[0], floor ? 0.05 : at[1] + up, at[2]];
 const firstNameOf = (fighter) => fighter.body.inputs.name.split(' ')[0];
 
-/** Distance (px) from a point to the segment a–b. */
-function screenSegmentDistance(p, a, b) {
-  const ab = [b[0] - a[0], b[1] - a[1]];
-  const lengthSquared = ab[0] * ab[0] + ab[1] * ab[1] || 1;
-  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / lengthSquared));
-  return Math.hypot(p[0] - (a[0] + ab[0] * t), p[1] - (a[1] + ab[1] * t));
+/** The nearest approach of a line of sight (origin + t·dir, t ≥ 0) to a segment a–b: how far, and the point on the segment. */
+function rayToSegment(origin, dir, a, b) {
+  const u = dir;
+  const v = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const w = [origin[0] - a[0], origin[1] - a[1], origin[2] - a[2]];
+  const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+  const uu = dot(u, u);
+  const uv = dot(u, v);
+  const vv = dot(v, v) || 1e-9;
+  const uw = dot(u, w);
+  const vw = dot(v, w);
+  const denominator = uu * vv - uv * uv;
+  let s = denominator > 1e-9 ? (uv * vw - vv * uw) / denominator : 0;
+  s = Math.max(0, s);
+  const t = Math.max(0, Math.min(1, (vw + s * uv) / vv));
+  const onRay = [origin[0] + u[0] * s, origin[1] + u[1] * s, origin[2] + u[2] * s];
+  const onSegment = [a[0] + v[0] * t, a[1] + v[1] * t, a[2] + v[2] * t];
+  return { distance: Math.hypot(onRay[0] - onSegment[0], onRay[1] - onSegment[1], onRay[2] - onSegment[2]), onSegment };
 }
