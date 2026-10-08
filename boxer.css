@@ -323,6 +323,7 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
 .dw-card { position: absolute; left: 50%; top: 50%; height: 92%; aspect-ratio: 300 / 380; padding: 0; border-radius: 14px; overflow: hidden; background: #1a1f2c; border: 2px solid transparent;
   transform: translate(-50%, -50%) translateX(var(--x, 0)) scale(var(--s, 1)) rotateY(var(--r, 0deg)); opacity: var(--o, 1);
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s, border-color 0.3s; z-index: var(--z, 1); }
+.dw-name .dw-stars { color: #f2c94c; letter-spacing: 2px; font-size: 1.05em; }
 .dw-card img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .dw-card[data-slot="0"] { --x: 0%; --s: 1; --r: 0deg; --o: 1; --z: 5; }
 .dw-card[data-slot="1"] { --x: 72%; --s: 0.64; --r: -32deg; --o: 0.85; --z: 4; }

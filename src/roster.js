@@ -151,3 +151,32 @@ export function pairedOpponent(player, candidates, random = Math.random) {
   }
   return candidates[candidates.length - 1];
 }
+
+// ---- Stars and order (Deadliest Warrior) ----------------------------------------
+
+// A rating as one to five stars: each band about three times the last
+// (ratings are proportional to K/D, so a log scale). Maximus (100) has four.
+export const STARS = { bands: [5, 20, 60, 150] };
+
+/** A fighter's strength as 1-5 stars (by his rating); 0 if unrated. */
+export function starsOf(inputs) {
+  const rating = ratingOf(inputs);
+  if (!rating) return 0;
+  return 1 + STARS.bands.filter((band) => rating >= band).length;
+}
+
+// A kit is armour if it weighs this share of the body or more, or turns this much of a cut.
+const ARMOURED = { mass: 0.1, cut: 0.5 };
+
+/** How heavily a fighter is armoured: his kit's weight (share of his body's); 0 for no armour. */
+export function armourWeight(inputs) {
+  const outfit = OUTFITS[inputs.outfit?.kind];
+  if (!outfit) return 0;
+  const mass = outfit.extraMass ?? 0;
+  const cut = outfit.protection?.cut ?? 0;
+  return mass >= ARMOURED.mass || cut >= ARMOURED.cut ? Math.max(mass, 0.01) : 0;
+}
+
+// The roster's order: the armoured first, heaviest armour to lightest (the stronger first at a weight);
+// then the unarmoured, strongest to weakest.
+WARRIORS.sort((a, b) => armourWeight(b.inputs) - armourWeight(a.inputs) || (ratingOf(b.inputs) ?? 0) - (ratingOf(a.inputs) ?? 0));

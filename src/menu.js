@@ -9,7 +9,7 @@ import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, wei
 import { STYLE_KEYS, STYLES } from './moves.js';
 import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
 import { SCENARIOS } from './scenarios.js';
-import { pairedOpponent, styleName, WARRIORS } from './roster.js';
+import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { SKIN_TONES } from './render.js';
 
@@ -230,7 +230,10 @@ export function installMenus(game) {
         if (offset >= -1 && offset <= 2 && !image.src) game.portrait(warrior.key, warrior.inputs).then((url) => { image.src = url; });
       }
       const shown = entry(corner);
-      side.title.replaceChildren(el('b', { textContent: shown.title }), el('span', { textContent: shown.line }));
+      // His strength in stars (roster.js), the rating behind them on hover.
+      const stars = starsOf(shown.inputs);
+      const starLine = el('span', { className: 'dw-stars', textContent: stars ? '★'.repeat(stars) + '☆'.repeat(5 - stars) : '', title: stars ? `Fighting rating ${ratingOf(shown.inputs)} (Maximus 100)` : '' });
+      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }));
       if (custom[corner]) side.title.prepend(el('em', { textContent: 'Your fighter' }));
     }
     const fightButton = el('button', { className: 'primary big dw-fight', type: 'button', textContent: 'Fight' });
