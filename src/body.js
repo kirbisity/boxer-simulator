@@ -239,11 +239,11 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Legends of an earlier age, one to a faction: Wanyan Wuzhu, the Jin prince
-  // (squat and massive, ~94 kg on 168 cm, an iron pagoda of a man),
+  // (squat and massive, ~100 kg on 173 cm, an iron pagoda of a man),
   // who led the Iron Pagoda (1140); Subutai, Chinggis Khan's general, in the
   // kheshig's armour; Turgut Alp, one of Osman's companions (c. 1300).
   ironPagoda: {
-    name: 'Wanyan Wuzhu', style: 'langyaShield', sex: 'male', heightCm: 168, frame: 'large', age: 38, exercise: 0.6, calories: 4280,
+    name: 'Wanyan Wuzhu', style: 'langyaShield', sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550,
     outfit: { kind: 'ironPagoda', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -407,7 +407,7 @@ export const PRESETS = {
   },
   // A knight, trained to arms from boyhood and fed to it: strong, lean, ~95 kg.
   knight: {
-    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 183, frame: 'large', age: 30, exercise: 0.88, calories: 5700,
+    name: 'Sir Edric', style: 'longsword', sex: 'male', heightCm: 178, frame: 'large', age: 30, exercise: 0.88, calories: 5400,
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
   },
