@@ -46,6 +46,14 @@ export const LOFT = {
     crinoline: { hem: 1.35, flare: 1.4, depthFlare: 0.98 },
     ball: { hem: 1.45, flare: 2.3, depthFlare: 4 },
     bustle: { hem: 1.45, flare: 0.6, depthFlare: 0.8, bustle: 2.2, hips: 0.3 },
+    // A gothic bubble skirt: short, puffed out round the hips (`balloon`: the
+    // flare swells and is gathered back in at the hem) over bloomers.
+    bubble: { hem: 0.5, flare: 0.75, depthFlare: 1.3, balloon: true, hips: 0.25 },
+    // A tiered skirt to mid-thigh: `tiers` ruffles, each flaring out from
+    // under the one above (a lolita's petticoated skirt).
+    tiered: { hem: 0.62, flare: 0.75, depthFlare: 0.9, tiers: 3, hips: 0.2 },
+    // A short draped skirt, falling straight from the hips (a train behind it makes a high-low hem).
+    drape: { hem: 0.48, flare: 0.5, depthFlare: 0.55, hips: 0.2 },
   },
   // Belly: fat layer thickness (m) past which the abdomen bulges and hangs;
   // how far forward it bulges, and how far below the waistband it hangs,
@@ -222,9 +230,23 @@ export const ARMOR_KINDS = {
     upperArm: [-0.3, 1.04, 1.14, MAIL],
   },
   // A corset: boned cloth from the hips to under the bust, laced tight (the
-  // body under it is drawn in; see LOFT.corset).
+  // body under it is drawn in, `cinch`; see LOFT.corset).
   corset: {
+    cinch: true,
     trunk: [-0.02, 0.68, 1.1, { boning: true }],
+  },
+  // An overbust corset, worn alone: from the hips over the bust, the
+  // shoulders bare; brocade, a steel busk with its clasps down the front,
+  // laced up the back, a lace edge along the top.
+  overbust: {
+    cinch: true,
+    trunk: [[-0.04, 0.8, 1.13, { boning: true, busk: true, brocade: true }], [0.76, 0.81, 1.145, 'lace']],
+  },
+  // The same with sheer lace sleeves, shoulder to wrist (a lolita's mourning dress).
+  overbustSleeved: {
+    cinch: true,
+    trunk: [[-0.04, 0.8, 1.13, { boning: true, busk: true, brocade: true }], [0.76, 0.81, 1.145, 'lace']],
+    upperArm: [-0.12, 1.02, 1.08, { lacework: true }], forearm: [-0.04, -0.02, 1.08, { lacework: true }],
   },
   // Escaupil and ichcahuipilli: quilted cotton, thick, stitched in rows.
   escaupil: {
@@ -416,8 +438,17 @@ function paintFor(paint, armor) {
     if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
     // A big cat's rosettes, scattered: a dark spot every few rings and steps.
     if (paint.spots) return (index * 7 + step * 3) % 5 === 0 ? 'cloth2' : 'cloth';
-    // A corset: laced up the back, a steel busk down the front, a bone every few panels.
-    if (paint.boning) return Math.cos(angle) < -0.93 ? 'lace' : Math.cos(angle) > 0.97 ? 'cloth2' : step % 3 === 0 ? 'cloth2' : 'cloth';
+    // Sheer lace: the skin showing through an open mesh.
+    if (paint.lacework) return index % 2 === 0 || step % 3 === 0 ? 'lace' : 'skin';
+    // A corset: laced up the back, a steel busk down the front (its clasps
+    // in pairs, `busk`), a bone every few panels, brocade between them.
+    if (paint.boning) {
+      if (Math.cos(angle) < -0.93) return 'lace';
+      if (Math.cos(angle) > 0.97) return paint.busk && index % 3 === 1 ? 'gold' : 'cloth2';
+      if (step % 3 === 0) return 'cloth2';
+      if (paint.brocade && (index * 5 + step * 3) % 7 === 0) return 'cloth2';
+      return 'cloth';
+    }
     // Scales: rows of them, each offset by half a scale from the one above,
     // the lower edge of every third row dark with its lacing so the rows read.
     if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
@@ -498,7 +529,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const bulge = profile([[-0.12, 0.7], [0.15, 1], [0.4, 0.4], [0.6, 0]]);
   const hem = -0.12 - (belly * LOFT.bellyDrop) / vec.length(vec.sub(at('neck'), at('pelvis')));
   // A corset cinches the waist: the trunk drawn in round the natural waist.
-  const corseted = outfitOf(body.inputs).look.armor?.kind === 'corset';
+  const corseted = Boolean(ARMOR_KINDS[outfitOf(body.inputs).look.armor?.kind]?.cinch);
   const cinch = (u) => (corseted ? 1 - LOFT.corset.cinch * Math.exp(-(((u - LOFT.corset.at) / LOFT.corset.span) ** 2)) : 1);
   const bodyWidth = (u) => (leanWidth(u) + fatLayer * fatWidth(u)) * cinch(u);
   const bodyDepth = (u) => (leanDepth(u) + fatLayer * fatDepth(u) + belly * LOFT.bellyScale * bulge(u)) * cinch(u);
@@ -614,17 +645,32 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
   if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
   // A long gown's skirt, belled out from the waist to below the knee.
-  if (bottom?.kind === 'gown') {
-    const gown = LOFT.gowns[bottom.shape ?? 'crinoline'];
+  // A gown, or a skirt over another bottom (`gown`: bloomers under a bubble skirt).
+  const gownShape = bottom?.kind === 'gown' ? bottom.shape ?? 'crinoline' : bottom?.gown ?? null;
+  if (gownShape) {
+    const gown = LOFT.gowns[gownShape];
     const hemAt = skirtTo(gown.hem);
-    const down = (u) => Math.sqrt(Math.max(0, (-0.12 - u) / (-0.12 - hemAt)));
+    const linear = (u) => Math.max(0, (-0.12 - u) / (-0.12 - hemAt));
+    // The flare's growth down the skirt: a bell's (on to the hem), a bubble's
+    // (swelling, then gathered back in), or tiers (each ruffle stands out from under the last).
+    const down = (u) => {
+      const d = linear(u);
+      if (gown.balloon) return Math.sin(Math.min(1, d) * Math.PI * 0.82) * 0.9;
+      if (gown.tiers) return Math.sqrt(d) * 0.7 + 0.3 * ((d * gown.tiers) % 1);
+      return Math.sqrt(d);
+    };
     const waistDepth = bodyDepth(-0.12);
     const bustle = (u) => (u >= -0.12 ? 0 : (gown.bustle ?? 0) * waistDepth * Math.exp(-(((down(u) ** 2 - 0.16) / 0.2) ** 2)));
     const rings = along(at('pelvis'), at('neck'), forward, count(9), hemAt, 0.2,
       (u) => (u >= -0.12 ? unbulged(bodyDepth, 1)(u) : waistDepth * (1 + gown.depthFlare * down(u))) + bustle(u),
       (u) => (u >= -0.12 ? bodyWidth(u) : bodyWidth(-0.12) * (1 + (gown.hips ?? 0) * Math.min(1, 3 * down(u)) + gown.flare * down(u))),
       (u) => unbulged(bodyLean, 0.8)(Math.max(u, -0.12)) - bustle(u));
-    loft(mesh, rings, sides, { color: 'kit', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+    // Gathered cloth: darker folds every few steps; tiers, a darker hem to each ruffle.
+    const gathered = (ring, angle, index, step) => {
+      if (gown.tiers && (linear(ring.t) * gown.tiers) % 1 > 0.82) return 'trim2';
+      return (gown.balloon || gown.tiers) && step % 3 === 0 ? 'trim2' : 'kit';
+    };
+    loft(mesh, rings, sides, { color: gathered, inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
   }
   if (bottom?.kind === 'loincloth') loft(mesh, skirtRings(skirtTo(0.22), count(2), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
   // The balteus: a gladiator's broad bronze belt.
@@ -740,8 +786,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       profile([[0, 0], [0.5, thighR * 0.08], [1, 0]]));
     loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
-    const legReach = { trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
-    const legLoose = { tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
+    const legReach = { bloomers: [0.62, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
+    const legLoose = { bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
     const legPattern = (ring, angle) => {
       if (bottom?.stripe && Math.abs(Math.sin(angle)) > 0.9) return 'trim2';
@@ -750,6 +796,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     };
     if (bottom?.under) loft(mesh, thighRings(-0.05, 0.4, count(3)), sides, { color: 'under', inflate: 1.05, capStart: false, capEnd: false });
     if (legReach[0] > 0 && !skirted) loft(mesh, thighRings(-0.05, legReach[0], count(Math.max(3, Math.round(9 * legReach[0])))), sides, { color: legPattern, inflate: legLoose, capStart: false, capEnd: false });
+    // Bloomers end in a lace frill round the thigh.
+    if (bottom?.kind === 'bloomers') loft(mesh, thighRings(legReach[0] - 0.02, legReach[0] + 0.06, 2), sides, { color: 'trim2', inflate: legLoose + 0.08, capStart: false, capEnd: false });
     if (lamellar) {
       // Haidate: laced apron plates down the thigh.
       armorPiece(thighRings(0.25, 0.85, count(5)), 1.3, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));

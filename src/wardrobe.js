@@ -197,6 +197,8 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     tacticalBoot: { width: 0.06, height: 0.056, sole: 0x111111 },
     compactBoot: { width: 0.054, height: 0.05, sole: 0x111111 },
     heelAnkleBoot: { width: 0.05, height: 0.042, sole: 0x0b0b0d },
+    // A patent platform shoe: a round toe, straps over the instep and ankle.
+    platformShoe: { width: 0.05, height: 0.046, sole: 0x0b0b0d, patent: true },
     dressShoe: { width: 0.045, height: 0.038, sole: 0x2a1d14 },
     // Split-toed socks on straw sandals; a gladiator's leather sandal.
     tabi: { width: 0.046, height: 0.045, sole: 0xc8b27a },
@@ -204,7 +206,7 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     sabaton: { width: 0.058, height: 0.05 },
     bare: { width: 0.042, height: 0.032 },
   }[kind] ?? { width: 0.05, height: 0.045, sole: 0x17171c };
-  const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: 0.5 });
+  const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: spec.patent ? 0.12 : 0.5 });
   const upper = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), upperMaterial);
   upper.scale.set(spec.width, length / 2, spec.height);
   upper.position.set(-0.012, length * 0.28, 0);
@@ -233,10 +235,29 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     // A long pointed toe; then the whole boot pitched down about the ankle
     // (the body stands higher by the heel's lift), its toe on the floor and
     // its heel on a slim stiletto.
-    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.95, length * heels.point, 12), upperMaterial);
-    toe.scale.set(spec.width / spec.height * (0.7 - (heels.point - 0.42) * 0.6), 1, 1);
-    toe.position.set(-0.02, length * (0.65 + heels.point / 2), 0);
-    shoe.add(toe);
+    if (heels.round) {
+      // A round toe, blunt and broad.
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), upperMaterial);
+      toe.scale.set(spec.width * 0.95, length * heels.point * 0.9, spec.height * 1.05);
+      toe.position.set(-0.016, length * 0.66, 0);
+      shoe.add(toe);
+    } else {
+      const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.95, length * heels.point, 12), upperMaterial);
+      toe.scale.set(spec.width / spec.height * (0.7 - (heels.point - 0.42) * 0.6), 1, 1);
+      toe.position.set(-0.02, length * (0.65 + heels.point / 2), 0);
+      shoe.add(toe);
+    }
+    // Mary Jane straps over the instep and round the ankle, each with a buckle.
+    for (let strap = 0; strap < (heels.straps ?? 0); strap += 1) {
+      const along = 0.34 - strap * 0.17;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(spec.height * (1.08 + strap * 0.06), 0.006, 5, 16, Math.PI), upperMaterial);
+      band.rotation.y = Math.PI / 2;
+      band.rotation.z = Math.PI / 2;
+      band.position.set(-0.008 + strap * 0.012, length * along, 0);
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.004), steel);
+      buckle.position.set(-0.008 + strap * 0.012, length * along, spec.height * (1.08 + strap * 0.06));
+      shoe.add(band, buckle);
+    }
     const pitch = -heels.pitch;
     const floor = -(spec.width * 0.95 + 0.009);
     const ground = floor - heelLift(heels, body.heightM);
@@ -250,10 +271,22 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     const heelAt = length * 0.02;
     const heelTop = floor * Math.cos(pitch) + heelAt * Math.sin(pitch) + 0.012;
     const heelLength = heelTop - ground;
-    const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.004, heelLength, 8), surface(0x0b0b0d));
-    heel.rotation.z = Math.PI / 2;
+    // A stiletto, or a chunky block heel.
+    const heel = heels.block
+      ? new THREE.Mesh(new THREE.BoxGeometry(heelLength, 0.042, spec.height * 1.7), upperMaterial)
+      : new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.004, heelLength, 8), surface(0x0b0b0d));
+    if (!heels.block) heel.rotation.z = Math.PI / 2;
     heel.position.set(ground + heelLength / 2, heelAt * Math.cos(pitch) - floor * Math.sin(pitch), 0);
     shoe.add(heel);
+    if (heels.platform) {
+      // The platform: a thick sole under the forefoot, from the floor up to the pitched toe.
+      const platformAt = length * 0.62;
+      const toeFloor = floor * Math.cos(pitch) + platformAt * Math.sin(pitch);
+      const thickness = toeFloor - ground + 0.006;
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(thickness, length * 0.62, spec.height * 2.05), upperMaterial);
+      slab.position.set(ground + thickness / 2, platformAt * Math.cos(pitch) - floor * Math.sin(pitch), 0);
+      shoe.add(slab);
+    }
   }
   if (kind === 'sabaton') {
     // Overlapping lames over the toes.
@@ -537,6 +570,66 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       hat.add(crown, brim, feather);
       hat.position.set(0.25 * r, 0.75 * r, 0);
       hat.rotation.z = -0.28;
+      group.add(hat);
+      hidesHair = false;
+      break;
+    }
+    case 'fascinator': {
+      // A small black lace fascinator perched on one side of the head: a
+      // rosette of lace petals round a jet bead, spiky lace leaves fanning
+      // up and back from it.
+      const lace = surface(color, { roughness: 0.8 });
+      lace.side = THREE.DoubleSide;
+      const piece = new THREE.Group();
+      for (let petal = 0; petal < 7; petal += 1) {
+        const angle = (petal / 7) * Math.PI * 2;
+        const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.16 * r, 6), lace);
+        leaf.position.set(Math.cos(angle) * 0.14 * r, Math.sin(angle) * 0.14 * r, 0);
+        leaf.rotation.set(0.25 * Math.sin(angle), 0.25 * Math.cos(angle), angle);
+        piece.add(leaf);
+      }
+      for (let spray = 0; spray < 6; spray += 1) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05 * r, 0.6 * r, 4), lace);
+        const angle = -0.4 + spray * 0.28;
+        spike.position.set(Math.cos(angle) * 0.3 * r, Math.sin(angle) * 0.3 * r + 0.15 * r, -0.02 * r);
+        spike.rotation.z = angle - Math.PI / 2;
+        piece.add(spike);
+      }
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.08 * r, 10, 8), surface(head.bead ?? 0x2a2a30, { roughness: 0.1 }));
+      bead.position.z = 0.04 * r;
+      piece.add(bead);
+      // On the left side of the crown, facing out and tipped up.
+      piece.position.set(0.05 * r, 0.8 * r, (head.side ?? 1) * 0.75 * r);
+      piece.rotation.set((head.side ?? 1) * -0.6, 0, 0.2);
+      group.add(piece);
+      hidesHair = false;
+      break;
+    }
+    case 'miniTopHat': {
+      // A doll-sized top hat pinned at a tilt on the side of the head: a lace
+      // band and bow, a short veil of netting over the brim.
+      const felt = surface(color, { roughness: 0.4 });
+      const hat = new THREE.Group();
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * r, 0.3 * r, 0.62 * r, 16), felt);
+      crown.position.y = 0.34 * r;
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * r, 0.35 * r, 0.03 * r, 16), felt);
+      top.position.y = 0.66 * r;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.56 * r, 0.56 * r, 0.04 * r, 18), felt);
+      brim.position.y = 0.03 * r;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.315 * r, 0.315 * r, 0.12 * r, 16, 1, true), surface(head.lace ?? 0x3a3a42));
+      band.position.y = 0.12 * r;
+      const bow = new THREE.Mesh(new THREE.SphereGeometry(0.12 * r, 8, 6), surface(head.lace ?? 0x3a3a42));
+      bow.scale.set(0.5, 0.8, 1.6);
+      bow.position.set(0, 0.14 * r, 0.33 * r);
+      const net = surface(color, { roughness: 1 });
+      net.side = THREE.DoubleSide;
+      net.transparent = true;
+      net.opacity = 0.55;
+      const veil = new THREE.Mesh(new THREE.CylinderGeometry(0.56 * r, 0.62 * r, 0.32 * r, 16, 1, true, -Math.PI * 0.35, Math.PI * 0.7), net);
+      veil.position.y = -0.14 * r;
+      hat.add(crown, top, brim, band, bow, veil);
+      hat.position.set(0.1 * r, 0.92 * r, (head.side ?? 1) * 0.42 * r);
+      hat.rotation.x = (head.side ?? 1) * -0.45;
       group.add(hat);
       hidesHair = false;
       break;
@@ -1336,6 +1429,56 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
         sagari.group.add(cord);
         dangles.push(sagari);
       }
+    } else if (extra.kind === 'choker') {
+      // A lace choker round the neck, jet beads hanging from it in front on short strings that swing.
+      const lace = surface(color, { roughness: 0.7 });
+      const neck = body.lengths.headRadius * 0.5;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(neck * 1.12, 0.009 * scale, 6, 24), lace);
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 0.075 * scale;
+      collar.add(band);
+      const jet = surface(extra.beads ?? 0x2a2a30, { roughness: 0.1 });
+      for (let drop = 0; drop < 5; drop += 1) {
+        const across = (drop - 2) * 0.35;
+        const length = (0.03 + 0.025 * (2 - Math.abs(drop - 2))) * scale;
+        const string = new Dangle(collar, [Math.cos(across) * neck * 1.15, 0.07 * scale, Math.sin(across) * neck * 1.15], [0.15, -1, 0], length, { sag: 0.6, damping: 0.25 });
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(0.007 * scale, 8, 6), jet);
+        bead.position.y = -length;
+        const thread = new THREE.Mesh(new THREE.CylinderGeometry(0.0012 * scale, 0.0012 * scale, length, 4), jet);
+        thread.position.y = -length / 2;
+        string.group.add(bead, thread);
+        dangles.push(string);
+      }
+    } else if (extra.kind === 'ribbons') {
+      // Thin ribbon ties falling from the waist round the hips, swinging as she moves.
+      const ribbon = surface(color, { roughness: 0.6 });
+      ribbon.side = THREE.DoubleSide;
+      const around = body.lengths.hipSpan / 2 + 0.1 * scale;
+      for (let index = 0; index < (extra.count ?? 8); index += 1) {
+        // Down both sides, front to back, none down the middle front or back.
+        const side = index % 2 ? 1 : -1;
+        const angle = side * (0.55 + (Math.floor(index / 2) / Math.max(1, (extra.count ?? 8) / 2 - 1)) * 1.9);
+        const length = (extra.length ?? 0.5) * scale * (0.8 + 0.4 * ((index * 7) % 5) / 4);
+        const tie = new Dangle(hips, [Math.cos(angle) * around, 0.02 * scale, Math.sin(angle) * around], [Math.cos(angle) * 0.15, -1, Math.sin(angle) * 0.15], length, { sag: 0.85, damping: 0.12 });
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.004 * scale, length, 0.012 * scale), ribbon);
+        strip.position.y = -length / 2;
+        strip.rotation.y = angle;
+        tie.group.add(strip);
+        dangles.push(tie);
+      }
+    } else if (extra.kind === 'train') {
+      // A train behind: draped cloth from the waist, open in front, to the
+      // floor at the back (with a short skirt in front, a high-low hem).
+      const length = (extra.length ?? 0.95) * scale;
+      const drape = new Dangle(hips, [-0.04 * scale, 0.04 * scale, 0], [-0.25, -1, 0], length, { sag: 0.35, damping: 0.3 });
+      const cloth = surface(color, { roughness: 0.7 });
+      cloth.side = THREE.DoubleSide;
+      // CylinderGeometry's angle 0 is +z (her left); behind her is 3π/2.
+      const arc = Math.PI * 1.15;
+      const skirt = new THREE.Mesh(new THREE.CylinderGeometry(body.lengths.hipSpan * 0.95, body.lengths.hipSpan * 1.9, length, 20, 4, true, Math.PI * 1.5 - arc / 2, arc), cloth);
+      skirt.position.y = -length / 2;
+      drape.group.add(skirt);
+      dangles.push(drape);
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;

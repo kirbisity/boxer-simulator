@@ -153,7 +153,20 @@ const BUSINESS_HEELS = { pitch: 0.32, point: 0.42 };
 // The lady's boot: a Louis heel, higher and more pointed than the business
 // heel, so she goes over more easily, but not so high she cannot fight in it.
 const LADY_HEELS = { pitch: 0.36, point: 0.56 };
+// Gothic platforms: a thick sole under the whole foot (`platform`, m) and a
+// chunky block heel, so the foot is pitched far less for the height it
+// gains: steadier than the Louis heel. A round toe and Mary Jane straps
+// with buckles (`round`, `block`, `straps`: how they are drawn).
+const PLATFORM_HEELS = { pitch: 0.24, point: 0.28, platform: 0.045, round: true, block: true, straps: 3 };
 export const HEEL_FOOTING_PER_RADIAN = 1.1;
+
+// What the gothic designs share: the corset, the platforms, the face.
+const GOTHIC = {
+  armor: { kind: 'overbust', color: '#0f0f12', cloth: '#121216', cloth2: '#26262d', lace: '#2e2e36', gold: '#b8bcc4' },
+  feet: { kind: 'platformShoe', color: '#0b0b0d', heels: PLATFORM_HEELS },
+  face: { skinTone: 'porcelain', hairColor: '#0c0a0c', makeup: { eyes: 'smoky', liner: 'winged', lowerLash: 'heavy', lips: '#0b090b' } },
+};
+const GOTHIC_CHOKER = { kind: 'choker', color: '#111114', beads: '#24242b' };
 
 // The heeled boot's sole lies this far below the ankle, and the foot (with
 // its boot) is this long per metre of height; with the toe's point they set
@@ -168,7 +181,8 @@ const FOOT_PER_METRE = 0.25 / 1.8;
 export function heelLift(heels, heightM) {
   if (!heels) return 0;
   const toeTip = FOOT_PER_METRE * heightM * (0.65 + heels.point);
-  return toeTip * Math.sin(heels.pitch) - HEEL_SOLE_BELOW_ANKLE * (1 - Math.cos(heels.pitch));
+  // A platform sole lifts the whole foot by its thickness as well.
+  return toeTip * Math.sin(heels.pitch) - HEEL_SOLE_BELOW_ANKLE * (1 - Math.cos(heels.pitch)) + (heels.platform ?? 0);
 }
 
 /** Footing (1 = flat shoes) in heels pitched this far. */
@@ -1043,6 +1057,13 @@ export const OUTFITS = {
       { label: 'Ball gown (1860s)', top: { kind: 'bodice', color: '#e6eef2' }, bottom: { kind: 'gown', shape: 'ball', color: '#9ab8d0' }, armor: { kind: 'corset', color: '#5a7ea6', cloth: '#5a7ea6', cloth2: '#e6eef2', lace: '#e6eef2' }, feet: { kind: 'heelAnkleBoot', color: '#e6e0d4', heels: LADY_HEELS } },
       { label: 'Bustle dress (1880s)', top: { kind: 'longsleeve', color: '#5a1a2a' }, bottom: { kind: 'gown', shape: 'bustle', color: '#6a2234' }, armor: { kind: 'corset', color: '#16161a', cloth: '#16161a', cloth2: '#6a2234', lace: '#d6c7a3' }, head: { kind: 'tiltHat', color: '#2a0a12', plume: '#e8e0cc' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
       { label: 'Mourning black', top: { kind: 'longsleeve', color: '#1a1a1e' }, bottom: { kind: 'gown', color: '#141418' }, armor: { kind: 'corset', color: '#34343c', cloth: '#34343c', cloth2: '#141418', lace: '#8a8a92' }, head: { kind: 'widowCap', color: '#141418', cap: '#f2efe8' }, feet: { kind: 'heelAnkleBoot', color: '#141416', heels: LADY_HEELS } },
+      // Victorian Gothic, all in black: a strapless overbust corset (brocade,
+      // a steel busk's clasps, laced behind), platform Mary Janes, a beaded
+      // lace choker; porcelain powder, smoky eyes, black lips (`face`, laid
+      // over her own look). Three takes, for one to be chosen: not dealt yet.
+      { label: 'Gothic A — bubble bloomers, ringlet pigtails', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'bubble', color: '#141417', trim: '#2c2c33' }, head: { kind: 'fascinator', color: '#111114', side: 1 }, extras: [GOTHIC_CHOKER, { kind: 'ribbons', color: '#0e0e11', count: 10, length: 0.55 }], hair: 'ringletPigtails' },
+      { label: 'Gothic B — high-low train, long ringlets', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'drape', color: '#131316', trim: '#2a2a31' }, head: { kind: 'fascinator', color: '#111114', side: -1 }, extras: [GOTHIC_CHOKER, { kind: 'train', color: '#121215', length: 1.0 }, { kind: 'ribbons', color: '#0e0e11', count: 4, length: 0.4 }], hair: 'ringlets' },
+      { label: 'Gothic C — lace sleeves, tiered skirt, mini top hat', ...GOTHIC, armor: { ...GOTHIC.armor, kind: 'overbustSleeved' }, bottom: { kind: 'bloomers', gown: 'tiered', color: '#141417', trim: '#33333b' }, head: { kind: 'miniTopHat', color: '#0f0f12', lace: '#2e2e36', side: 1 }, extras: [GOTHIC_CHOKER], hair: 'ringletUpdo' },
     ],
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.

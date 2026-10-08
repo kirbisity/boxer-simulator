@@ -17,7 +17,7 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
-  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'bald'],
+  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'beard', 'longBeard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
@@ -42,6 +42,14 @@ export const FACE_SHAPES = {
   shojo: { jawWidth: 0.9, jawAt: 0.38, chinWidth: 0.16, chinLength: 0.9, chinForward: 0.7, faceFront: 0.88, cheek: 0.07, crown: 1.06, eye: { width: 0.38, height: 0.42, slant: 0, lash: 0.07 } },
   seinen: { jawWidth: 0.88, jawAt: 0.62, chinWidth: 0.32, chinLength: 1.14, chinForward: 0.8, faceFront: 0.86, cheek: 0, crown: 0.97, eye: { width: 0.3, height: 0.19, slant: 0.06, lash: 0.04 } },
 };
+// Makeup (look.makeup): `eyes` 'smoky' (a dark shadow round the eye),
+// `liner` 'winged' (a heavy upper line flicked out), `lowerLash` 'heavy',
+// `lips` a colour; and the shadow's own colour and strength.
+export const MAKEUP = { shadow: 0x1a1316, shadowOpacity: 0.82, wing: 0.16, linerWeight: 1.8, lowerWeight: 0.03 };
+
+// Ringlets: corkscrew curls, `coil` (of r) about their line, `turns` along a lock.
+const RINGLET = { coil: 0.1, turns: 3.5, thickness: 0.085 };
+
 const FACE = {
   eyeLine: -0.06, // eyes sit a little below the middle of the head, as drawn
   eyeSpread: 0.36,
@@ -288,6 +296,12 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     const mirror = new THREE.Group();
     mirror.scale.x = side > 0 ? -1 : 1;
     holder.add(mirror);
+    const makeup = look.makeup ?? {};
+    // Smoky shadow: a dark, soft wash round and above the eye, under the drawn eye.
+    if (makeup.eyes === 'smoky') {
+      const wash = flat(ellipseShape(eyeWidth * 1.5, eyeHeight * 2.1, eyeWidth * 0.05, eyeHeight * 0.18), MAKEUP.shadow, -0.0004, MAKEUP.shadowOpacity);
+      mirror.add(wash);
+    }
     const ball = new THREE.Group();
     ball.add(flat(ellipseShape(eyeWidth, eyeHeight), 0xfbfaf6, 0));
     const iris = new THREE.Group();
@@ -299,10 +313,12 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     iris.add(flat(ellipseShape(eyeWidth * 0.08, eyeWidth * 0.08, eyeWidth * 0.1, -eyeHeight * 0.18), 0xffffff, 0.0012));
     ball.add(iris);
     mirror.add(ball);
-    const upperLash = flat(lashShape(eyeWidth, eyeHeight, shape.eye.lash * r, (female ? 0.05 : 0.02) * r), ink, 0.0016);
+    // Winged liner: the upper line heavier and flicked well out past the corner.
+    const winged = makeup.liner === 'winged';
+    const upperLash = flat(lashShape(eyeWidth, eyeHeight, shape.eye.lash * r * (winged ? MAKEUP.linerWeight : 1), (winged ? MAKEUP.wing : female ? 0.05 : 0.02) * r), winged ? 0x050405 : ink, 0.0016);
     // Slant: outer corners up for a sharp look (mirroring turns it outward on both eyes).
     mirror.rotation.z = (side > 0 ? -1 : 1) * shape.eye.slant;
-    const lowerLash = flat(lashShape(eyeWidth * 0.7, eyeHeight * 0.8, 0.012 * r, 0), ink, 0.0016);
+    const lowerLash = flat(lashShape(eyeWidth * 0.7, eyeHeight * 0.8, (makeup.lowerLash === 'heavy' ? MAKEUP.lowerWeight : 0.012) * r, makeup.lowerLash === 'heavy' ? 0.04 * r : 0), ink, 0.0016);
     lowerLash.rotation.z = Math.PI;
     lowerLash.position.x = -eyeWidth * 0.12;
     mirror.add(upperLash, lowerLash);
@@ -319,7 +335,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     const holder = onSurface(new THREE.Group(), probe, raycaster, r, FACE.eyeLine + 0.3, side * FACE.eyeSpread * 1.02, 0.008 * r);
     const mirror = new THREE.Group();
     mirror.scale.x = side > 0 ? -1 : 1;
-    const stroke = flat(browShape, new THREE.Color(look.hairColor).multiplyScalar(0.85).getHex(), 0);
+    const stroke = flat(browShape, look.makeup?.eyes ? 0x0a0809 : new THREE.Color(look.hairColor).multiplyScalar(0.85).getHex(), 0);
     stroke.scale.y = female ? 0.8 : 1.3;
     mirror.add(stroke);
     holder.add(mirror);
@@ -341,7 +357,17 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   lineShape.quadraticCurveTo(0, -0.012 * r, 0.12 * r, 0.01 * r);
   lineShape.lineTo(0.12 * r, 0.0);
   lineShape.quadraticCurveTo(0, -0.026 * r, -0.12 * r, 0);
-  const mouthLine = flat(lineShape, 0x6a2c2c, 0.001);
+  const lipColor = look.makeup?.lips ?? null;
+  const mouthLine = flat(lineShape, lipColor ?? 0x6a2c2c, 0.001);
+  // Painted lips: a full, crisp mouth in the lipstick's colour while it is closed.
+  if (lipColor) {
+    const lips = new THREE.Shape();
+    lips.moveTo(-0.13 * r, 0.004 * r);
+    lips.quadraticCurveTo(-0.06 * r, 0.05 * r, 0, 0.026 * r);
+    lips.quadraticCurveTo(0.06 * r, 0.05 * r, 0.13 * r, 0.004 * r);
+    lips.quadraticCurveTo(0, -0.07 * r, -0.13 * r, 0.004 * r);
+    mouthLine.add(flat(lips, lipColor, -0.0002));
+  }
   const opening = flat(ellipseShape(0.2 * r, 0.12 * r), 0x4a1518, 0.0008);
   const guard = flat(ellipseShape(0.17 * r, 0.035 * r, 0, 0.03 * r), cornerHex, 0.0011);
   mouth.add(mouthLine, opening, guard);
@@ -467,6 +493,31 @@ function flowingLock(group, material, dangles, root, rest, lengths, width, thick
   dangles.push(first, second);
 }
 
+/**
+ * A ringlet: a corkscrew curl hung from the scalp at `root`, resting along
+ * `rest`, that bounces and swings with the head (a coiled tube along a helix,
+ * tapering to its end).
+ */
+function ringletLock(group, material, dangles, root, rest, length, r, { coil = RINGLET.coil, turns = RINGLET.turns, sag = 0.4 } = {}) {
+  const dangle = new Dangle(group, root, rest, length, { sag, damping: 0.22 });
+  const points = [];
+  const steps = Math.round(turns * 10);
+  for (let step = 0; step <= steps; step += 1) {
+    const u = step / steps;
+    const angle = u * turns * Math.PI * 2;
+    // The coil opens out below the root and draws in a little at the end.
+    const radius = coil * r * Math.min(1, u * 5) * (1 - 0.3 * u);
+    points.push(new THREE.Vector3(Math.cos(angle) * radius, -u * length, Math.sin(angle) * radius));
+  }
+  const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), steps * 2, RINGLET.thickness * r * 0.5, 6, false);
+  const curl = new THREE.Mesh(tube, material);
+  curl.castShadow = true;
+  curl.add(outlineFor(curl, 0.0022));
+  dangle.group.add(curl);
+  dangles.push(dangle);
+  return dangle;
+}
+
 function buildHair(group, look, r, shape, material, female) {
   const style = look.hairStyle;
   const dangles = [];
@@ -576,6 +627,48 @@ function buildHair(group, look, r, shape, material, female) {
       const length = (2.0 + 2.6 * Math.max(0, back)) * r;
       flowingLock(group, material, dangles, root, out, [length * 0.48, length * 0.52], 0.46 * r, 0.11 * r);
     }
+  } else if (style === 'ringletPigtails') {
+    // Victorian ringlet pigtails: a blunt fringe, the hair gathered high at
+    // each side of the head and falling there in bunches of ringlets.
+    cap(1.06, 1.05, 2.0);
+    bangs(7, 0.46, 0);
+    for (const side of [1, -1]) {
+      const gather = onScalp(r, 0.95, side * 1.55, 1.12);
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.26 * r, 12, 10), material);
+      knot.position.set(...gather);
+      knot.add(outlineFor(knot, 0.004));
+      group.add(knot);
+      for (let curl = 0; curl < 5; curl += 1) {
+        const spread = (curl - 2) * 0.13;
+        const root = [gather[0] + spread * r, gather[1] - 0.1 * r, gather[2] + side * 0.08 * r];
+        ringletLock(group, material, dangles, root, [spread * 0.6 - 0.1, -1, side * 0.3], (2.0 + 0.35 * (2 - Math.abs(curl - 2))) * r, r);
+      }
+    }
+  } else if (style === 'ringlets') {
+    // Long ringlets all round the sides and back, to below the shoulders, under a side-swept fringe.
+    cap(1.06, 1.05, 2.0);
+    bangs(5, 0.48, 0.16);
+    for (let index = 0; index < 14; index += 1) {
+      const azimuth = Math.PI * 0.42 + (index / 13) * Math.PI * 1.16;
+      const back = -Math.cos(azimuth);
+      const root = onScalp(r, 1.1 + 0.12 * back, azimuth, 1.06);
+      ringletLock(group, material, dangles, root, [Math.cos(azimuth) * 0.2, -1, Math.sin(azimuth) * 0.2], (2.4 + 1.2 * Math.max(0, back)) * r, r, { turns: 4.5 });
+    }
+  } else if (style === 'ringletUpdo') {
+    // Swept up into a knot at the back of the crown, ringlets falling from it,
+    // and one ringlet at each temple framing the face.
+    cap(1.05, 1.06, 1.85);
+    bangs(4, 0.42, -0.1);
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.4 * r, 16, 12), material);
+    bun.position.set(-0.62 * r, 0.82 * r, 0);
+    bun.add(outlineFor(bun, 0.006));
+    group.add(bun);
+    for (let curl = 0; curl < 4; curl += 1) {
+      const across = (curl - 1.5) * 0.18 * r;
+      ringletLock(group, material, dangles, [-0.85 * r, 0.62 * r, across], [-0.3, -1, across * 2], 1.5 * r, r, { turns: 3 });
+    }
+    // In front of the ears, falling clear of the cheek.
+    for (const side of [1, -1]) ringletLock(group, material, dangles, onScalp(r, 1.2, side * 1.4, 1.08), [0.05, -1, side * 0.3], 1.45 * r, r, { turns: 3 });
   } else if (style === 'dreads') {
     // Locs from all over the scalp, hanging heavy to the shoulders, a few
     // pushed back off the face.

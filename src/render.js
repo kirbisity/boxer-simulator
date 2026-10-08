@@ -10,7 +10,7 @@ import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
-import { glovedFists, headgearOptions } from './outfits.js';
+import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
@@ -25,7 +25,8 @@ const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
 // Skin tones, lightest to deepest. Light tan is a warm, yellow-leaning
 // light skin: a shade under light, nowhere near medium.
-export const SKIN_TONES = { light: 0xe8b796, lightTan: 0xcc9a66, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
+// porcelain: a pale, cold-toned complexion (powdered, gothic).
+export const SKIN_TONES = { porcelain: 0xd9c4c2, light: 0xe8b796, lightTan: 0xcc9a66, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
 
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
@@ -2002,9 +2003,15 @@ function leaderDress(dress, fighter) {
   return { ...dress, banner: fighter.wornStandard.colour, greatBanner: true, bannerLook: WEAPONS[fighter.wornStandard.kind]?.flag ?? null };
 }
 
+/** A fighter's look, with any its outfit's design sets over it (`face`: a powdered complexion, hair colour, makeup). */
+function lookOf(inputs) {
+  const face = outfitOf(inputs).look.face;
+  return face ? { ...(inputs.look ?? {}), ...face } : inputs.look ?? {};
+}
+
 function detailedView(view, fighter, simple) {
   const body = fighter.body;
-  const look = body.inputs.look ?? {};
+  const look = lookOf(body.inputs);
   const corner = CORNER_COLORS[fighter.corner];
   const skinColor = SKIN_TONES[look.skinTone ?? 'medium'];
   const group = new THREE.Group();
@@ -2249,7 +2256,7 @@ function bakeCrowdTemplate(view, fighter) {
 /** A crowd fighter's view: the template's baked body over his own bones. */
 function crowdView(view, fighter, template) {
   const body = fighter.body;
-  const look = body.inputs.look ?? {};
+  const look = lookOf(body.inputs);
   const corner = CORNER_COLORS[fighter.corner];
   const skinColor = SKIN_TONES[look.skinTone ?? 'medium'];
   const group = new THREE.Group();
