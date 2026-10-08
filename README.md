@@ -15,6 +15,16 @@ The home screen (`src/menu.js`) has four ways in, over a fight between two rando
 
 Every fight is watched by default; **Play red** takes control of the red lead. **☰ Menu** goes back home.
 
+- **Fight controls** (`src/touch.js`, `src/gesture.js`, `src/control.js`; finger or mouse). You say what you want; his style, weapon, stance, range and injuries choose the move.
+  - **Lock on:** long-press a man (or **◎ Lock**) to lock him: a gold ring at his feet. You face him and hold the range your style and weapon want (a gun's room to shoot). Long-press him again, or **Unlock**, to let go.
+  - **Move:** drag anywhere open for a floating stick, centred where the touch began. Further means faster: a walk, then a run. A drag stays a drag; it never turns into a tap.
+  - **Attack:** tap the right half — top **high**, middle **body**, bottom **low**, the outer strip **lunge**, on him **close/clinch**. Tap for a quick one, press and release for a heavy one, double-tap for a combination.
+  - **Guard:** hold to block (shield, weapon or arms); tap to get out of the way (slip, parry, check, step back, by what is coming).
+  - **Special:** one fixed button for **Clinch**, **Throw**, **Reload**, **Fire**, **Pick up**, **Draw sidearm** or **Disengage**, as the fight allows.
+  - **HUD:** watching, both sides' bars at the top. Fighting, your own status low down and your man's over his head, faded when nothing is happening.
+  - **Keys:** A/D in and out, Space to guard, Tab to lock, the move keys as before, V to walk about.
+  - Only the game surface takes the browser's gestures: menus, names, settings and exported JSON stay selectable.
+
 - **Physiology** (`src/physiology.js`). The player sets daily calories and exercise; body fat is an outcome. An energy-balance simulation (780 weekly steps, stored energy split along the Forbes curve, RMR from lean and fat mass, everyday cost by the kilogram, exercise by the hour) settles weight, lean and fat, held between BMI 10 and 100. Bone density (T-score), squat, bench, grip, 30 m sprint, arm girth and impact tolerance follow from curves calibrated against six reference profiles (`node tools/physiology.js` prints the comparison; `test/physiology.test.js` holds them within tolerance).
 - **Body model** (`src/body.js`). Sex, height, frame, age and the settled composition become bone, muscle and fat for each body part. From those come the particle masses, the muscle force limits, the collision radii, punch masses, chin and fracture thresholds. Every coefficient is in config with its source beside it.
 - **Physics** (`src/physics.js`). Each fighter is 15 particles held by XPBD distance constraints (bones rigid, torso braces compliant). Motors pull each particle towards a desired pose with a force cap taken from the muscle, so hand speed comes from the body. Punches are hand targets. Landed punches are momentum exchanges between effective masses, and head speed change accumulates into knockdowns. A knocked-down fighter's motors cut out and the body falls as a ragdoll.

@@ -420,7 +420,7 @@ function fromMyLeader(world, fighter, other) {
  * off a straight punch's line, under a hook in the direction it travels,
  * back from an uppercut. Returns { name, side } (side +1 = to the left).
  */
-function chooseDefence(fighter, attacker, style, incoming, random) {
+export function chooseDefence(fighter, attacker, style, incoming, random) {
   const spec = incoming.spec;
   // The strike comes from its shoulder (or hip): the head goes to the other
   // side of that line, outside the arm. The glove itself starts too near the

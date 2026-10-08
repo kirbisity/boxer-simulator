@@ -48,17 +48,8 @@
     <div class="banner-actions"><button id="banner-menu">Menu</button><button id="banner-again" class="primary">Next bout</button></div>
   </div>
 
-  <div class="pad" id="pad" hidden>
-    <button data-move="-1" aria-label="Step back">◀</button>
-    <button data-move="1" aria-label="Step in">▶</button>
-    <button data-command="jab">Jab <kbd>J</kbd></button>
-    <button data-command="cross">Cross <kbd>K</kbd></button>
-    <button data-command="hook">Hook <kbd>H</kbd></button>
-    <button data-command="uppercut">Upper <kbd>U</kbd></button>
-    <button data-command="guard">Guard <kbd>␣</kbd></button>
-    <button data-command="slip">Slip <kbd>S</kbd></button>
-    <button data-command="body">Body <kbd>B</kbd></button>
-  </div>
+  <!-- The fight's controls in play mode (touch.js): the game surface, stick, Guard, special action, lock, and the fight HUD. -->
+  <div class="fight-ui" id="fight-ui" hidden></div>
 
   <footer class="controls">
     <button id="open-menu" class="menu-button">☰ Menu</button>

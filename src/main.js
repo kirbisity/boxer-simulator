@@ -5,12 +5,14 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch } from './physics.js';
+import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, opponentFor, perform, placeFighter, point, startCrawl, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
+import { directFighter, newOrders } from './control.js';
+import { installFightControls } from './touch.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -38,6 +40,8 @@ const state = {
   paused: false,
   mode: 'watch',
   aimBody: false,
+  // The player's orders (control.js): his lock, stick, guard, attacks asked for.
+  orders: newOrders(),
   seed: 7,
   eventCursor: 0,
   accumulator: 0,
@@ -68,6 +72,41 @@ const shortName = (name) => {
 };
 
 const scene = createScene($('#stage'));
+
+// The fight's controls (touch.js): drawn over the fight in play mode only.
+const fightControls = installFightControls($('#fight-ui'), {
+  world: () => state.world,
+  player: () => player(),
+  orders: () => state.orders,
+  now: realSeconds,
+  project: (at) => {
+    const projected = new THREE.Vector3(at[0], at[1], at[2]).project(scene.camera);
+    const box = scene.renderer.domElement.getBoundingClientRect();
+    return [box.left + ((projected.x + 1) / 2) * box.width, box.top + ((1 - projected.y) / 2) * box.height, projected.z < 1 && Math.abs(projected.x) < 1.2 && Math.abs(projected.y) < 1.2];
+  },
+  floorAxes: () => {
+    const look = [scene.orbit.target.x - scene.camera.position.x, scene.orbit.target.z - scene.camera.position.z];
+    const length = Math.hypot(look[0], look[1]) || 1;
+    const ahead = [look[0] / length, look[1] / length];
+    return { ahead, right: [-ahead[1], ahead[0]] };
+  },
+});
+
+// The ring on the floor round the man locked on.
+const lockRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+lockRing.rotation.x = -Math.PI / 2;
+lockRing.renderOrder = 2;
+lockRing.visible = false;
+scene.scene.add(lockRing);
+
+/** The lock's ring under his man's feet, turning slowly. */
+function placeLockRing() {
+  const locked = state.mode === 'play' && state.orders.lock !== null ? state.world.fighters[state.orders.lock] : null;
+  lockRing.visible = Boolean(locked);
+  if (!locked) return;
+  lockRing.position.set(locked.x[P.pelvis * 3], 0.025, locked.x[P.pelvis * 3 + 2]);
+  lockRing.rotation.z = realSeconds() * 0.8;
+}
 
 /** The fighter of a side the builder is editing, and replacing it. */
 const current = (corner) => state.rosters[corner][state.editing[corner]];
@@ -140,7 +179,8 @@ function newBout() {
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   renderHud();
-  if (state.mode === 'play') buildPad();
+  state.orders = newOrders();
+  fightControls.reset();
 }
 
 /** Rebuild the fighters' models, for a new bout or a new shading style. */
@@ -210,7 +250,10 @@ function thinkForBout(world, dt) {
     }
   }
   thinkAll(world, dt, still);
-  if (players.size) walkAbout(player());
+  if (!players.size) return;
+  // Walking about (V), the keys steer him; otherwise he does as the orders say.
+  if (player().walking) walkAbout(player());
+  else directFighter(world, player(), state.orders, dt);
 }
 
 // ---- Walk mode: the player walks or runs about, guard down ----------------
@@ -266,7 +309,6 @@ function setWalking(on) {
     fighter.running = false;
     walkHeld.clear();
   }
-  buildPad();
 }
 
 /** Walking about on his knees, or back on his feet (the sandbox's look at the crawl). */
@@ -274,7 +316,6 @@ function setCrawling(on) {
   const fighter = player();
   if (!fighter?.walking) return;
   fighter.crawling = on;
-  buildPad();
 }
 
 let last = performance.now();
@@ -402,23 +443,39 @@ function blendWorld(world, before, share) {
 // right (over the shoulder, his man in view); the target keeps up `ease`
 // of the way each frame, and the camera swings round behind him `turn` of
 // the way. Walking, the turn is the player's (drag): the keys go by the camera.
-const CAMERA_FOLLOW = { distance: 3.4, pitch: 0.24, aboveHips: 0.45, shoulder: 0.55, ease: 0.2, turn: 0.05 };
+// Locked on, the view is of both men: aimed `lockAt` of the way from him to his man, from
+// `lockAngle` (rad) off the line between them, further back the further apart they stand.
+const CAMERA_FOLLOW = { distance: 3.4, pitch: 0.24, aboveHips: 0.45, shoulder: 0.55, ease: 0.2, turn: 0.05, lockAt: 0.45, lockAngle: 0.55, lockBack: 0.6 };
+
+/** The man the player has locked on, in play mode. */
+const lockedTarget = () => (state.mode === 'play' && state.orders.lock !== null ? state.world.fighters[state.orders.lock] ?? null : null);
 
 /** Where the following camera looks: beside him, so that he stands left of the picture and his man shows past his right shoulder. */
 function shoulderPoint(fighter) {
   const pelvis = point(fighter.x, P.pelvis);
+  const locked = lockedTarget();
+  if (locked) {
+    const his = point(locked.x, P.pelvis);
+    return [pelvis[0] + (his[0] - pelvis[0]) * CAMERA_FOLLOW.lockAt, pelvis[1], pelvis[2] + (his[2] - pelvis[2]) * CAMERA_FOLLOW.lockAt];
+  }
   return [pelvis[0] + Math.sin(fighter.yaw) * CAMERA_FOLLOW.shoulder, pelvis[1], pelvis[2] + Math.cos(fighter.yaw) * CAMERA_FOLLOW.shoulder];
 }
 
 /** Behind the man played, at a fixed distance; in the fight, round behind him as he turns. */
 function followCamera(fighter) {
   const orbit = scene.orbit;
-  orbit.distance += (CAMERA_FOLLOW.distance - orbit.distance) * 0.1;
+  const locked = lockedTarget();
+  const apart = locked ? Math.hypot(locked.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], locked.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) : 0;
+  orbit.distance += (CAMERA_FOLLOW.distance + apart * CAMERA_FOLLOW.lockBack - orbit.distance) * 0.1;
   orbit.pitch += (CAMERA_FOLLOW.pitch - orbit.pitch) * 0.05;
   // Held by the player's own drag, or walking about: his choice of view.
-  if (fighter.walking || pointers.size) return;
+  // Steering free with the stick: the view holds still, so the stick's ways stay put.
+  if (fighter.walking || pointers.size || (state.orders.stick && state.orders.lock === null)) return;
   // He faces (cos yaw, −sin yaw) on the floor: the camera sits the other way.
-  const behind = Math.atan2(Math.sin(fighter.yaw), -Math.cos(fighter.yaw));
+  // Locked on: behind him along the line from his man, swung off it so neither hides the other.
+  const behind = locked
+    ? Math.atan2(fighter.x[P.pelvis * 3 + 2] - locked.x[P.pelvis * 3 + 2], fighter.x[P.pelvis * 3] - locked.x[P.pelvis * 3]) + CAMERA_FOLLOW.lockAngle
+    : Math.atan2(Math.sin(fighter.yaw), -Math.cos(fighter.yaw));
   const turn = Math.atan2(Math.sin(behind - orbit.yaw), Math.cos(behind - orbit.yaw));
   orbit.yaw += turn * CAMERA_FOLLOW.turn;
 }
@@ -472,9 +529,11 @@ function drawWorld(dt) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
+  placeLockRing();
   render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
+  fightControls.update();
 }
 
 function consumeEvents() {
@@ -651,8 +710,8 @@ segmented('#modes', (mode, button) => {
   if (player()?.walking) setWalking(false);
   state.mode = mode;
   state.playSide = button.dataset.side ?? 'red';
-  $('#pad').hidden = mode !== 'play';
-  if (mode === 'play') buildPad();
+  state.orders = newOrders();
+  fightControls.setActive(mode === 'play');
   document.body.classList.toggle('playing', mode === 'play');
 });
 $('#pause').addEventListener('click', () => {
@@ -700,74 +759,6 @@ function command(name) {
   } else perform(state.world, player(), name);
 }
 
-/** The pad shows the moves of the player's own style; walking, the four ways, run, and back to the fight. */
-function buildPad() {
-  const pad = $('#pad');
-  if (player()?.walking) {
-    const arrows = [['▲', 'w'], ['◀', 'a'], ['▼', 's'], ['▶', 'd']].map(([text, key]) => Object.assign(document.createElement('button'), { textContent: text, ariaLabel: { w: 'Forward', a: 'Left', s: 'Back', d: 'Right' }[key] }));
-    arrows.forEach((button, index) => (button.dataset.walk = ['w', 'a', 's', 'd'][index]));
-    const run = Object.assign(document.createElement('button'), { innerHTML: 'Run <kbd>⇧</kbd>' });
-    run.dataset.run = '1';
-    run.classList.toggle('on', Boolean(state.walkRunning));
-    const crawl = Object.assign(document.createElement('button'), { innerHTML: 'Crawl <kbd>C</kbd>' });
-    crawl.dataset.crawl = '1';
-    crawl.classList.toggle('on', Boolean(player().crawling));
-    const fight = Object.assign(document.createElement('button'), { innerHTML: 'Guard up <kbd>V</kbd>' });
-    fight.dataset.walkToggle = '1';
-    pad.replaceChildren(...arrows, run, crawl, fight);
-    return;
-  }
-  const style = STYLES[player().style];
-  const names = [...Object.keys(style.attacks), ...Object.keys(style.defences), 'body'];
-  const keyFor = Object.fromEntries(Object.entries(KEYS).map(([key, name]) => [name, key === ' ' ? '␣' : key.toUpperCase()]));
-  pad.replaceChildren(...['◀', '▶'].map((arrow, index) => Object.assign(document.createElement('button'), { textContent: arrow, ariaLabel: index ? 'Step in' : 'Step back' })));
-  pad.children[0].dataset.move = '-1';
-  pad.children[1].dataset.move = '1';
-  for (const name of names) {
-    const button = document.createElement('button');
-    button.dataset.command = name;
-    button.innerHTML = `${moveLabel(name)} <kbd>${keyFor[name] ?? ''}</kbd>`;
-    if (name === 'body') button.classList.toggle('on', Boolean(state.aimBody));
-    pad.append(button);
-  }
-  const walk = Object.assign(document.createElement('button'), { innerHTML: 'Walk <kbd>V</kbd>' });
-  walk.dataset.walkToggle = '1';
-  pad.append(walk);
-}
-
-$('#pad').addEventListener('pointerdown', (press) => {
-  const button = press.target.closest('button');
-  if (!button) return;
-  if (button.dataset.walkToggle) return setWalking(!player().walking);
-  if (button.dataset.crawl) return setCrawling(!player().crawling);
-  if (button.dataset.run) {
-    state.walkRunning = !state.walkRunning;
-    button.classList.toggle('on', state.walkRunning);
-    return;
-  }
-  if (button.dataset.walk) {
-    const key = button.dataset.walk;
-    walkHeld.add(key);
-    const stop = () => {
-      walkHeld.delete(key);
-      window.removeEventListener('pointerup', stop);
-      window.removeEventListener('pointercancel', stop);
-    };
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
-    return;
-  }
-  if (button.dataset.move) {
-    player().move = Number(button.dataset.move);
-    const stop = () => {
-      player().move = 0;
-      window.removeEventListener('pointerup', stop);
-      window.removeEventListener('pointercancel', stop);
-    };
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
-  } else command(button.dataset.command);
-});
 const typing = (target) => Boolean(target.closest?.('input, select, textarea, [contenteditable]'));
 window.addEventListener('keydown', (press) => {
   if (state.mode !== 'play' || typing(press.target) || press.repeat) return;
@@ -782,9 +773,17 @@ window.addEventListener('keydown', (press) => {
       return;
     }
   }
-  if (press.key === 'a' || press.key === 'ArrowLeft') player().move = -1;
-  else if (press.key === 'd' || press.key === 'ArrowRight') player().move = 1;
-  else if (KEYS[key]) {
+  if (press.key === 'a' || press.key === 'ArrowLeft') state.orders.keyMove = -1;
+  else if (press.key === 'd' || press.key === 'ArrowRight') state.orders.keyMove = 1;
+  else if (press.key === ' ') {
+    // Held, the guard stays up.
+    press.preventDefault();
+    state.orders.guard = true;
+  } else if (press.key === 'Tab') {
+    press.preventDefault();
+    const target = state.orders.lock === null ? opponentFor(state.world, player()) : null;
+    state.orders.lock = target ? target.id : null;
+  } else if (KEYS[key]) {
     press.preventDefault();
     command(KEYS[key]);
   }
@@ -794,12 +793,15 @@ window.addEventListener('blur', () => {
   walkHeld.clear();
   state.walkRunning = false;
   if (state.mode === 'play' && player()) player().move = 0;
+  state.orders.keyMove = 0;
+  state.orders.guard = false;
 });
 window.addEventListener('keyup', (press) => {
   const key = press.key.toLowerCase();
   walkHeld.delete(key);
   if (key === 'shift') state.walkRunning = false;
-  if (state.mode === 'play' && !player()?.walking && ['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(press.key)) player().move = 0;
+  if (['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(press.key)) state.orders.keyMove = 0;
+  if (press.key === ' ') state.orders.guard = false;
 });
 
 // Orbit: drag to turn, wheel or pinch to zoom.
@@ -1300,6 +1302,8 @@ function fit() {
   document.documentElement.style.setProperty('--controls-height', `${$('.controls').getBoundingClientRect().height}px`);
 }
 window.addEventListener('resize', fit);
+// The footer wraps to more rows in some modes (the sandbox's): what sits above it follows.
+new ResizeObserver(fit).observe($('.controls'));
 buildCornerForm('red');
 buildCornerForm('blue');
 const menus = installMenus({
