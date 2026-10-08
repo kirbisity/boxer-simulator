@@ -322,6 +322,8 @@ export const WORLD = {
   // turns only by stepping round, the outer knee taking the longer stride:
   // at most `turnSpeed` rad/s at full pace, `turnOnSpot` of that shuffling
   // round where he is; `turnStride`: how much longer the outer knee's step.
+  // On his knees with the pain (a lash, physics/whip.js): how far the hips drop and the trunk bows.
+  pain: { dip: 0.27, lean: 0.35 },
   crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6 },
   pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 3, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
 };

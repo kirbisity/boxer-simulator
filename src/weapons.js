@@ -58,6 +58,22 @@ export const ADAMS = {
   rounds: 5,
 };
 
+// A whip: the Roman flagellum as the arena's lorarii used it to drive men on
+// (or a drover's bullwhip): a short stiff handle and a plaited leather thong
+// tapering to a fall, ~2.4 m. The thong is a rope (physics/whip.js): links
+// of falling mass to the tip, so a snap of the handle runs out along it and
+// the tip goes many times faster than the hand. What strikes is the tip's
+// small mass (`tipLinks` links of the `massKg`), fast: it lashes the skin
+// (cut, shallow) and stings, little more. Against armour it does almost
+// nothing (its cut protection takes it). `lashFrom`: m/s of the tip before
+// a touch is a lash; `painFrom`: joules through the skin before a man may
+// drop to his knees with it (likelier the harder, to `painSure`), for
+// `kneelSeconds` and `riseSeconds` back up.
+export const WHIP = {
+  length: 2.4, links: 16, massKg: 0.28, taper: 0.15, drag: 1.2, passes: 10, tipLinks: 3,
+  lashFrom: 14, cutShare: 0.6, painFrom: 6, painSure: 30, kneelSeconds: 1.6, riseSeconds: 0.9, stingStagger: 0.6,
+};
+
 export const MATCHLOCK = {
   energy: 1000,
   // A body hit: past the line that drops a man (1) unless armour proofed against
@@ -214,6 +230,15 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 20, zeta: 0.9 }, threat: 6, grip: 0.15, ranged: true, edgeUp: true,
     muzzle: [0.26, 0.045],
     shot: ADAMS,
+  },
+  // The whip (WHIP): the handle is what the hand holds and moves; the thong
+  // is a rope hung from its end, and only its tip strikes (`rope`). `reach`:
+  // how far it strikes, beyond the handle's own length.
+  whip: {
+    label: 'Whip', hands: 'one', length: 0.3, strikeFrom: 0.3, handle: 0.05, mass: 0.45, balance: 0.1, radius: 0.012,
+    harm: { swing: { blunt: 0.2 }, thrust: { blunt: 0.2 } },
+    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 34, zeta: 0.6 }, threat: 2.6, grip: 0.3,
+    rope: WHIP, reach: 0.3 + WHIP.length * 0.85,
   },
   // A matchlock (the Japanese teppō, the European arquebus): a smoothbore
   // long gun fired by a lit match, the stock to the cheek, the support hand

@@ -16,6 +16,7 @@ import { aimTargets, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, rel
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { formUp } from './formation.js';
+import { painShare, stepWhips } from './physics/whip.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -196,6 +197,8 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
 function releaseWeapon(world, fighter, reason, push) {
   const weapon = fighter.weapon;
   weapon.held = false;
+  // A whip let go: its thong is no longer swung (it lies with the handle).
+  weapon.rope = null;
   const shares = handShares(weapon.spec);
   addParticleMass(fighter, P[`${weapon.main}Hand`], -weapon.spec.mass * shares.main);
   if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], -weapon.spec.mass * shares.off);
@@ -847,7 +850,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false } 
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.stamina < drain || (spec.bash && !fighter.shield)) return false;
+  if (!spec || spec.kind !== 'strike' || !target || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.pain || fighter.stamina < drain || (spec.bash && !fighter.shield)) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
@@ -992,6 +995,7 @@ function updateIntent(world, fighter, dt) {
     }
   }
   if (fighter.crawling) crawlPose(fighter, intent, dt);
+  if (fighter.pain) painPose(fighter, intent);
   if (fighter.netted) {
     // Bound: the arms pinned in close to the chest, the weapon with them.
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.16 * H, 0.62 * H, sign * 0.1 * H];
@@ -1019,6 +1023,37 @@ function updateIntent(world, fighter, dt) {
  * opposite hand go forward together, as far as his pace carries him; a leg
  * whose joint is broken has no muscle and drags.
  */
+/**
+ * On his knees with the pain (a lash): the hips down, the trunk bowed over a
+ * little, the free hand pressed to where it struck, the weapon hand low;
+ * down quickly and up again as painShare says.
+ */
+function painPose(fighter, intent) {
+  const share = painShare(fighter);
+  if (share <= 0) return;
+  const H = fighter.body.heightM;
+  const L = fighter.body.lengths;
+  const spec = WORLD.pain;
+  intent.dip += spec.dip * share;
+  intent.lean += spec.lean * share;
+  intent.twist = 0;
+  intent.guardTight = false;
+  // Knees to the floor once well down; up through a crouch on the way back.
+  if (share > 0.5) {
+    for (const [side, sign] of [['l', 1], ['r', -1]]) {
+      intent[`${side}Knee`] = [0.08 * H, L.ankle + 0.02, sign * 0.1 * H];
+      intent[`${side}Foot`] = [0.08 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
+    }
+  }
+  // The free hand to the hurt: where the lash landed, as he stands.
+  const free = fighter.weapon?.held ? (fighter.weapon.main === 'r' ? 'l' : 'r') : 'l';
+  const capsule = capsules(fighter).find((entry) => entry.key === fighter.pain.key) ?? capsules(fighter).find((entry) => entry.key === 'trunk');
+  const [a, b] = capsuleEnds(fighter, capsule);
+  const hurt = toLocal(fighter, vec.lerp(a, b, 0.5));
+  intent[`${free}Hand`] = vec.lerp(intent[`${free}Hand`] ?? hurt, hurt, share);
+  if (fighter.weapon?.held) intent.bladeDir = [0.4, -1, 0];
+}
+
 function crawlPose(fighter, intent, dt) {
   const spec = WORLD.crawl;
   const H = fighter.body.heightM;
@@ -1286,6 +1321,7 @@ export function step(world, dt) {
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
     for (const fighter of world.fighters) if (fighter.pin) holdPin(world, fighter, h);
     collideFighters(world, h, time, substep);
+    stepWhips(world, h);
     for (const fighter of world.fighters) {
       if (fighter.detail === 'proxy') continue;
       if (asleep(fighter)) {
@@ -1599,6 +1635,11 @@ export function spatialGrid(points, cell) {
 
 function updateTimers(world, fighter, dt) {
   if (fighter.weapon?.held) fighter.weapon.strain = Math.max(0, fighter.weapon.strain - BLADES.gripLeak * dt);
+  // On his knees with the pain (physics/whip.js): until he is up again.
+  if (fighter.pain) {
+    fighter.pain.t += dt;
+    if (fighter.state !== 'up' || painShare(fighter) <= 0 && fighter.pain.t > 0.3) fighter.pain = null;
+  }
   reload(world, fighter, dt);
   if (fighter.bleed > 0) {
     // Wounds bleed, easing as they clot; lose enough blood and you go down.
@@ -2407,7 +2448,8 @@ function strikers(fighter) {
     list[0] = { key: 'lHand', bash: true, a: P.lHand, b: P.lHand, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)), radius: spec.shape ? spec.width * 0.4 : spec.radius * 0.75, side: 'l' };
   }
   const weapon = fighter.weapon;
-  if (weapon?.held) {
+  // (A whip's handle strikes nothing: its thong's tip does, in physics/whip.js.)
+  if (weapon?.held && !weapon.spec.rope) {
     // The weapon, from where it starts to strike to its tip.
     const hand = P[`${weapon.main}Hand`];
     list.push({ key: 'weapon', weapon: true, a: hand, b: hand, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip, radius: weapon.spec.radius, side: weapon.main });
@@ -2954,7 +2996,7 @@ function vital(defender, capsule, contactPoint) {
   return along > 0.45;
 }
 
-function wound(defender, kind, joules, key, attacker) {
+export function wound(defender, kind, joules, key, attacker) {
   const zone = key === 'head' ? 'head' : key === 'trunk' ? 'trunk' : 'limb';
   const rate = joules * BLADES.bleedPerJoule[kind] * BLADES.bleedZone[zone];
   defender.bleed = (defender.bleed ?? 0) + rate;
@@ -3480,7 +3522,9 @@ export function strikeThreat(attacker, defender) {
 
 /** How far a fighter's attacks reach: the arm, and whatever is in the hand. */
 export function reachOf(fighter) {
-  return fighter.body.reach + (fighter.weapon?.held ? fighter.weapon.spec.length * 0.75 : 0);
+  if (!fighter.weapon?.held) return fighter.body.reach;
+  // A whip reaches with its thong.
+  return fighter.body.reach + (fighter.weapon.spec.reach ?? fighter.weapon.spec.length * 0.75);
 }
 
 /** Total brain strain that puts this fighter down, given knockdowns so far. */
@@ -3499,7 +3543,7 @@ export function chinNow(fighter) {
  * against what that tissue takes before it is seriously hurt. Blocked blows
  * count for a little. The view reddens a segment as this rises.
  */
-function addDamage(fighter, key, deltaV, blocked) {
+export function addDamage(fighter, key, deltaV, blocked) {
   const capacity = (WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20) * BODY.toughness;
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);

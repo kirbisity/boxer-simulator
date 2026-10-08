@@ -1171,6 +1171,11 @@ export function think(world, fighter, dt) {
     crawlAway(world, fighter, dt);
     return;
   }
+  // On his knees with the pain: nothing until he is up.
+  if (fighter.pain) {
+    fighter.move = 0;
+    return;
+  }
   const opponent = chooseFocus(world, fighter);
   if (!opponent) {
     fighter.move = 0;

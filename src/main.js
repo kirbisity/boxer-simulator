@@ -17,7 +17,7 @@ import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
 import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
-import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, woundBlood } from './weaponview.js';
+import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -468,6 +468,7 @@ function drawWorld(dt) {
   endCrowdBatches(scene);
   updateArrows(scene, world);
   updateNets(scene, world, dt * (state.paused ? 0 : state.speed));
+  updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
@@ -571,6 +572,7 @@ function logEvent(event) {
   else if (event.kind === 'pinBroken') text = `<b>${name(event.fighter)}</b> breaks the hold`;
   else if (event.kind === 'pinned') text = `🤼 <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'impact') text = `💥 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'pain') text = `😣 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   // A strike's line needs its numbers; anything else without a line of its own is not logged.
   else if (event.attacker === undefined || event.speed === undefined || event.impulse === undefined || event.force === undefined || !event.effects) return;

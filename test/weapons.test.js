@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESETS } from '../src/body.js';
+import { P, PRESETS } from '../src/body.js';
 import { gearTraits } from '../src/outfits.js';
 import { STYLES, STYLE_KEYS } from '../src/moves.js';
 import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, dropWeapon, perform, placeFighter, throwPunch, WORLD } from '../src/physics.js';
@@ -375,4 +375,38 @@ test('weapon first: a man who has lost both takes up his weapon before his shiel
     if (murmillo.shield && !order.includes('shield')) order.push('shield');
   }
   assert.equal(order[0], 'weapon', `took up ${order.join(' then ')}`);
+});
+
+test('the whip: its thong a rope whose tip outruns the hand; a lash bleeds bare skin and may put a man on his knees, from which he gets up; plate turns it', async () => {
+  const { WARRIORS } = await import('../src/roster.js');
+  const { WHIP } = await import('../src/weapons.js');
+  const by = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, warrior.inputs]));
+  const bout = (opponent, seed) => {
+    const world = createWorld([{ inputs: structuredClone(by.lorarius), corner: 'red' }, { inputs: structuredClone(by[opponent]), corner: 'blue' }], { seed });
+    let tipFastest = 0;
+    let handFastest = 0;
+    let knelt = false;
+    let rose = false;
+    for (let step = 0; step < 60 * 40; step += 1) {
+      advance(world, 1 / 60, (current, dt) => thinkAll(current, dt));
+      const lorarius = world.fighters[0];
+      const rope = lorarius.weapon?.rope;
+      if (rope) {
+        const n = (rope.count - 1) * 3;
+        tipFastest = Math.max(tipFastest, Math.hypot(rope.x[n] - rope.prev[n], rope.x[n + 1] - rope.prev[n + 1], rope.x[n + 2] - rope.prev[n + 2]) / (1 / 60 / 8));
+        handFastest = Math.max(handFastest, Math.hypot(...[0, 1, 2].map((axis) => lorarius.v[P.rHand * 3 + axis])));
+      }
+      if (world.fighters[1].pain) knelt = true;
+      if (knelt && !world.fighters[1].pain && world.fighters[1].state === 'up') rose = true;
+    }
+    const lashes = world.events.filter((event) => event.weapon === 'whip' && event.kind === 'landed');
+    return { world, tipFastest, handFastest, knelt, rose, lashes };
+  };
+  const bare = [1, 2, 3, 4].map((seed) => bout('shaolin', seed));
+  assert.ok(bare.every((run) => run.tipFastest > 3 * run.handFastest), 'the tip far outruns the hand');
+  assert.ok(bare.some((run) => run.lashes.some((event) => event.cut > WHIP.painFrom)), 'lashes through bare skin');
+  assert.ok(bare.some((run) => run.knelt), 'a hard lash put him on his knees');
+  assert.ok(bare.filter((run) => run.knelt).every((run) => run.rose), 'and he got up again');
+  const onPlate = [1, 2, 3, 4].flatMap((seed) => bout('plate', seed).lashes);
+  assert.ok(onPlate.length > 0 && onPlate.every((event) => event.effects.some((effect) => effect.includes('turned'))), `plate turns every lash (${onPlate.length})`);
 });

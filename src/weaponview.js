@@ -910,6 +910,19 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(taper, end, knob, cylinder(0.0145, 0.0155, -spec.handle + 0.01, -spec.handle + 0.2, surface(0x1a1a1c, { roughness: 0.9 }), 12));
       break;
     }
+    case 'whip': {
+      // The handle: a stiff stock bound in plaited leather, a knob at the butt, the thong's root at its end (the thong is drawn from the rope).
+      const plait = surface(0x3a2416, { roughness: 0.8 });
+      group.add(cylinder(0.014, 0.016, -spec.handle, spec.length, plait, 8));
+      for (let band = 0; band < 5; band += 1) {
+        const y = -spec.handle + 0.02 + band * ((spec.length + spec.handle - 0.04) / 4);
+        group.add(cylinder(0.0175, 0.0175, y - 0.006, y + 0.006, surface(0x2a180e, { roughness: 0.9 }), 8));
+      }
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), plait);
+      knob.position.y = -spec.handle - 0.01;
+      group.add(knob);
+      break;
+    }
     case 'armingSword': {
       // A stiff, tapering blade with a fuller, a straight cross, a leather
       // grip, a wheel pommel.
@@ -1665,5 +1678,54 @@ export function updateBlood(view, world, dt) {
     if (!debris || debris.kind !== 'piece') continue;
     piece.position.set(debris.x[0], debris.x[1], debris.x[2]);
     piece.quaternion.set(debris.q[0], debris.q[1], debris.q[2], debris.q[3]);
+  }
+}
+
+// ---- Whips ------------------------------------------------------------------------
+
+const WHIP_LEATHER = 0x3a2416;
+const WHIP_RADIUS = { root: 0.009, tip: 0.0025 };
+const whipScratch = { matrix: new THREE.Matrix4(), position: new THREE.Vector3(), direction: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), up: new THREE.Vector3(0, 1, 0) };
+
+/**
+ * Every whip's thong, drawn where its rope is (physics/whip.js): a tapering
+ * chain of plaited leather from the handle's end to the fall.
+ */
+export function updateWhips(view, world) {
+  const drawn = view.whips ?? (view.whips = new Map());
+  const live = new Set();
+  for (const fighter of world.fighters) {
+    const rope = fighter.weapon?.held ? fighter.weapon.rope : null;
+    if (!rope) continue;
+    live.add(fighter.id);
+    let mesh = drawn.get(fighter.id);
+    if (!mesh || mesh.count !== rope.count - 1) {
+      if (mesh) view.scene.remove(mesh);
+      mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), surface(WHIP_LEATHER, { roughness: 0.8 }), rope.count - 1);
+      mesh.frustumCulled = false;
+      view.scene.add(mesh);
+      drawn.set(fighter.id, mesh);
+    }
+    const { x } = rope;
+    for (let link = 0; link < rope.count - 1; link += 1) {
+      const a = link * 3;
+      const b = a + 3;
+      const s = whipScratch;
+      s.position.set((x[a] + x[b]) / 2, (x[a + 1] + x[b + 1]) / 2, (x[a + 2] + x[b + 2]) / 2);
+      s.direction.set(x[b] - x[a], x[b + 1] - x[a + 1], x[b + 2] - x[a + 2]);
+      const length = s.direction.length();
+      if (length > 1e-6) s.quaternion.setFromUnitVectors(s.up, s.direction.divideScalar(length));
+      const radius = WHIP_RADIUS.root + (WHIP_RADIUS.tip - WHIP_RADIUS.root) * (link / (rope.count - 2));
+      // A little longer than the link, so the joints do not open.
+      s.scale.set(radius, length * 1.08, radius);
+      mesh.setMatrixAt(link, s.matrix.compose(s.position, s.quaternion, s.scale));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+  for (const [id, mesh] of drawn) {
+    if (live.has(id)) continue;
+    view.scene.remove(mesh);
+    mesh.geometry.dispose();
+    drawn.delete(id);
   }
 }

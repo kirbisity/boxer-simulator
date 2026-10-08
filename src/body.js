@@ -525,6 +525,12 @@ export const PRESETS = {
     outfit: { kind: 'commodus', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a8803e', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // A lorarius of the arena, with the whip (the name a common slave's).
+  whip: {
+    name: 'Felix the lorarius', style: 'whip', sex: 'male', heightCm: 172, frame: 'medium', age: 33, exercise: 0.6, calories: 3000,
+    outfit: { kind: 'lorarius', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
+  },
   scissor: {
     name: 'Astacius', style: 'scissor', sex: 'male', heightCm: 176, frame: 'large', age: 31, exercise: 0.6, calories: 4590,
     outfit: { kind: 'scissor', design: 4 },

@@ -85,6 +85,7 @@ export const WARRIORS = [
   warrior('scissor', 'Astacius', PRESETS.scissor),
   warrior('maximus', 'Maximus', PRESETS.maximus),
   warrior('commodus', 'Commodus', PRESETS.commodus),
+  warrior('lorarius', 'Felix the lorarius', PRESETS.whip),
   warrior('legionary', 'Gaius Valerius Crispus', PRESETS.legionary),
   warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
   warrior('peasant', 'Hob Miller', PRESETS.spear),

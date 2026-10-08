@@ -571,6 +571,18 @@ export const OUTFITS = {
       { label: 'Lion skin and club', special: true, bottom: { kind: 'loincloth', color: '#efe9dc', trim: '#c9a24a' }, armor: { kind: 'commodus', color: '#b8894a', lace: '#6e4a24', gold: '#c9a24a' }, head: { kind: 'lionHead', color: '#b8894a', mane: '#6e4a24' }, feet: { kind: 'sandal', color: '#8a6a32' } },
     ],
   },
+  // A lorarius: one of the arena's attendants who drove reluctant fighters
+  // on with the lash; a plain belted tunic, sandals, no armour.
+  lorarius: {
+    faction: 'gladiators',
+    label: 'Lorarius — the arena\'s whip-man', movement: 'good', fists: 'bare',
+    sidearm: 'dagger',
+    protection: { blunt: 0.02, cut: 0.04, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.2,
+    designs: [
+      { label: 'Undyed tunic', special: true, top: { kind: 'tunic', color: '#b9a57e' }, bottom: { kind: 'loincloth', color: '#a8936c' }, feet: { kind: 'sandal', color: '#3a2416' } },
+    ],
+  },
   // The scissor: a coat of bronze scales to the hips, the smooth helmet, the
   // left arm cased in the steel tube of the scissores, a manica on the sword
   // arm, greaves on both shins; the thighs bare.

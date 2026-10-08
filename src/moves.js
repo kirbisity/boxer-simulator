@@ -1278,6 +1278,26 @@ export const STYLES = {
     plans: { pressure: 1.3, counter: 1.3, outboxer: 0.8, brawler: 0.4 },
     pressure: 0.3,
   },
+  // The whip (a lorarius's): kept at the thong's length, the arm snapping
+  // overhead and across so the tip cracks into the man; stepping away
+  // rather than letting him close.
+  whip: {
+    label: 'Whip', weapon: 'whip', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.9, burst: 0.6, mobility: 0.6 },
+    stance: { blade: 0.55, crouch: 0.04, width: 1.1, lean: 0.04, guardHeight: 0 },
+    weaponGuard: { hand: [0.08, 0.62, -0.16], dir: [0.2, 0.9, -0.25] },
+    idle: { bounce: 0.25, sway: 0.5, rock: 0.3 },
+    attacks: { overhand: 0.6, forehand: 0.4 },
+    combos: { 'overhand forehand': 0.5, 'forehand overhand': 0.5 },
+    comboChance: 0.3,
+    tempo: 1.1,
+    defences: { stepBack: 0.75, guard: 0.25 },
+    defendChance: 0.55,
+    headMovement: 0.1,
+    plans: { outboxer: 2, counter: 0.8, pressure: 0.3, brawler: 0.1 },
+    pressure: 0.02,
+    rangeInside: 0.5,
+  },
   // Commodus as Hercules: the club in one hand, no shield, the lion skin
   // over him. Herodian has him strong and practised (he killed beasts by the
   // hundred, fought gladiators in bouts that were not to the death): heavy
@@ -1413,6 +1433,8 @@ export function strikeTargets(move, t, aim, body, followThrough) {
 export function moveRange(move, body, weapon = null) {
   const legReach = body.lengths.thigh + body.lengths.shank;
   if (move.reach === 'gun') return 30;
+  // A whip strikes with its thong's tip: its own `reach`, not its handle's length.
+  if (move.reach === 'weapon' && weapon?.reach) return body.reach * 1.05 + weapon.reach;
   if (move.reach === 'weapon') return body.reach * 1.05 + (weapon?.length ?? 0) * (move.mode === 'thrust' ? 0.9 : 0.85);
   if (move.reach === 'leg') return legReach * 1.25;
   if (move.reach === 'close') return body.reach * 0.95;
