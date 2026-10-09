@@ -145,14 +145,15 @@ export const WORLD = {
   // shoves (`blunt`); an edge or a point sinks in and does not bounce off
   // (`edge`: a perfectly inelastic contact), so a cut hands over less
   // momentum than a club. Mixed by the blow's blunt and cut-and-pierce shares.
-  weaponTransferRestitution: { blunt: 0.5, edge: 0 },
+  // A body is no hard ball: flesh, clothing and padding soak a club's rebound, so even a blunt head hands over little more than its momentum.
+  weaponTransferRestitution: { blunt: 0.2, edge: 0 },
   // An edge or point that goes in keeps going: the tissue's resistance, not
   // the blade's whole momentum, is what pushes the man. Of the momentum an
   // edge would hand over, this share is spent cutting (scaled by how much of
   // the blow's energy went into the cut or the stab, against armour that
   // stopped it): a sword barely moves a man; a club, whose blow is all blunt,
   // shoves him.
-  edgeCarriesOn: 0.7,
+  edgeCarriesOn: 0.85,
   // Poise: armour against being moved by a blow. Its weight is more mass to
   // shift (already in the body's mass); its rigid shell and padding spread
   // the blow over the whole trunk and into braced legs, so the same momentum

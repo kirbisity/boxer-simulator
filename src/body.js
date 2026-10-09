@@ -469,7 +469,7 @@ export const PRESETS = {
   // strength the chronicles made legend; ō-yoroi, the yumi, and the ōdachi
   // when a man came close.
   tametomo: {
-    name: 'Minamoto no Tametomo', style: 'yumi', sex: 'male', heightCm: 183, frame: 'large', age: 18, exercise: 0.74, calories: 4675,
+    name: 'Minamoto no Tametomo', style: 'yumi', sex: 'male', heightCm: 177, frame: 'large', age: 18, exercise: 0.74, calories: 4400,
     outfit: { kind: 'oyoroi', design: 0 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },

@@ -683,6 +683,13 @@ export const BLADES = {
     wrist: [34, 'Forearm', 0.035], elbow: [60, 'Forearm', 0.04], shoulder: [105, 'UpperArm', 0.05],
     ankle: [55, 'Shank', 0.045], knee: [94, 'Shank', 0.055], hip: [195, 'Thigh', 0.08], neck: [120, null, 0],
   },
+  // A cut or a stab in a limb breaks the bone only if it reaches it: the
+  // flesh takes the first `fleshJ` of it, all past `fullJ` gets to the bone;
+  // and a blow that only grazes the side of the limb (its line passing far
+  // from the axis, the bone) carries `grazeShare` of that, a square one all
+  // of it. So force and precision both decide; short of the bone it bleeds.
+  // Below the sever energies: a hard square cut breaks a limb before it takes it off.
+  bone: { fleshJ: 15, fullJ: 60, grazeShare: 0.3 },
   zone: 0.32, // share of the segment's length from its end that counts as at the joint
   lethalPierce: 45,
   // Edge alignment: a cut needs the edge moving across the blade, not along it.

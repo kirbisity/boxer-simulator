@@ -3274,18 +3274,21 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     world.events.push({ time: world.time, kind: 'glance', fighter: defender.id, point: contactPoint, normal });
   }
   if (intoGap) event.effects.push('into a gap in the armour');
-  // An edge or a point opens a wound: it bleeds. On a limb it does not break
-  // the bone nor end him on the spot (unless it takes the limb off): he
-  // bleeds, fast from a deep one, until he collapses.
-  const limbWound = capsule.key !== 'head' && capsule.key !== 'trunk';
+  // An edge or a point opens a wound: it bleeds. On a limb it breaks the
+  // bone only as far as it reaches it (BLADES.bone: by its force, and by how
+  // squarely across the limb it came); short of that he bleeds, fast from a
+  // deep one, until he collapses, unless it takes the limb off.
+  const limb = capsule.key !== 'head' && capsule.key !== 'trunk';
+  const square = Math.max(0, 1 - vec.length(vec.sub(closest.onFirst, closest.onSecond)) / capsule.radius);
+  const toBone = (joules) => (limb ? boneShare(joules, square) : 1);
   if (cut > 0.5) {
     wound(defender, 'cut', cut, capsule.key, attacker);
-    addDamage(defender, capsule.key, cut / 6, false, limbWound);
+    addDamage(defender, capsule.key, cut / 6, false, toBone(cut));
     event.effects.push(cut > 40 ? 'deep cut' : 'cut');
   }
   if (pierce > 0.5) {
     wound(defender, 'pierce', pierce, capsule.key, attacker);
-    addDamage(defender, capsule.key, pierce / 4, false, limbWound);
+    addDamage(defender, capsule.key, pierce / 4, false, toBone(pierce));
     event.effects.push(pierce > 25 ? 'run through' : 'stabbed');
   }
   let through = false;
@@ -3703,16 +3706,23 @@ export function chinNow(fighter) {
  * against what that tissue takes before it is seriously hurt. Blocked blows
  * count for a little. The view reddens a segment as this rises.
  */
-export function addDamage(fighter, key, deltaV, blocked, woundOnly = false) {
+export function addDamage(fighter, key, deltaV, blocked, toBone = 1) {
   const capacity = (WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20) * BODY.toughness;
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
   fighter.damageVersion += 1;
-  // A wound in the flesh (`woundOnly`: a cut or a stab in a limb) bleeds; it breaks nothing.
-  if (woundOnly) return;
   // The injury itself, uncapped (in the part's capacities): what breaks a limb or kills.
+  // `toBone`: of a cut or a stab in a limb, the share that reaches the bone (the rest only bleeds).
+  if (toBone <= 0) return;
   fighter.trauma ??= {};
-  fighter.trauma[key] = (fighter.trauma[key] ?? 0) + share;
+  fighter.trauma[key] = (fighter.trauma[key] ?? 0) + share * toBone;
+}
+
+/** Of a limb wound of `joules` (past the armour), the share that reaches the bone; `square` 0 (a graze) to 1 (across the axis). */
+function boneShare(joules, square) {
+  const spec = BLADES.bone;
+  const deep = Math.max(0, Math.min(1, (joules - spec.fleshJ) / (spec.fullJ - spec.fleshJ)));
+  return deep * (spec.grazeShare + (1 - spec.grazeShare) * square);
 }
 
 // The joint that goes when a segment is broken: the arm hangs from the elbow, the leg gives at the knee or hip.
