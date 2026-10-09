@@ -1046,8 +1046,9 @@ const PAGODA_HELM = {
   spikeTop: 3.9,
   // Tiers bottom to top: [height of the plates' middle, radius out from the neck, how far each tier rolls out at its foot].
   aventail: [[-1.92, 1.95, 0.32], [-1.5, 1.78, 0.3], [-1.08, 1.6, 0.28], [-0.66, 1.46, 0.24], [-0.26, 1.38, 0.2]],
-  // The top tier rises from under the eyes in front to the bowl's rim at the sides and behind (head radii at the back).
-  riseBehind: 0.7,
+  // Above them, round the back and sides only (the front left open for the eyes), tiers up under the bowl's rim:
+  // [height, radius, roll, open where the angle's cosine from the front is above this].
+  crown: [[0.14, 1.36, 0.12, 0.5], [0.5, 1.28, 0.08, 0.5]],
   plates: 30,
   plate: [0.32, 0.5],
 };
@@ -1140,20 +1141,23 @@ function buildPagodaHelm(group, head, r, steel, color) {
   // Behind each tier its leather backing, dark, so the gaps between plates show lacing, not the face.
   const backing = surface(head.lace ?? 0x141416);
   backing.side = THREE.DoubleSide;
-  spec.aventail.forEach(([y, radius, roll], tier) => {
-    const top = tier === spec.aventail.length - 1;
+  // The tiers round the neck and chin, then those up the back of the head to the rim.
+  const tiers = [...spec.aventail.map(([y, radius, roll]) => [y, radius, roll, 2]), ...spec.crown];
+  tiers.forEach(([y, radius, roll, openFrom], tier) => {
+    const partial = openFrom <= 1;
     // Just inside the plates, rolled out at the foot as they are.
     const flare = Math.sin(roll) * (spec.plate[1] / 2);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry((radius - flare - 0.07) * r, (radius + flare - 0.07) * r, spec.plate[1] * r, 28, 1, true), backing);
+    // A part tier's backing runs round the back only (cylinder angle 0 is +z; the front, +x, is at π/2).
+    const open = partial ? Math.acos(openFrom) : 0;
+    const band = new THREE.Mesh(new THREE.CylinderGeometry((radius - flare - 0.07) * r, (radius + flare - 0.07) * r, spec.plate[1] * r, 28, 1, true, Math.PI / 2 + open, Math.PI * 2 - open * 2), backing);
     band.position.y = y * r;
     band.userData.noOutline = true;
     group.add(band);
     for (let index = 0; index < spec.plates; index += 1) {
       const angle = ((index + (tier % 2) * 0.5) / spec.plates) * Math.PI * 2;
       const ahead = Math.cos(angle);
-      // At the back and sides the tiers climb to the rim; the top tier in front stops under the eyes.
-      const rise = top ? ((1 - ahead) / 2) ** 0.6 * spec.riseBehind : 0;
-      holder.position.set(ahead * radius * r, (y + rise) * r, -Math.sin(angle) * radius * r);
+      if (ahead > openFrom) continue;
+      holder.position.set(ahead * radius * r, y * r, -Math.sin(angle) * radius * r);
       // Face outward, the foot rolled out from the neck.
       holder.rotation.set(0, angle + Math.PI / 2, 0);
       holder.rotateX(-roll);
