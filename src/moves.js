@@ -520,6 +520,23 @@ export const STYLES = {
   },
   // The nu: a man coming on gets the sword well before he arrives (`close`
   // 4 m: some 1.5 s of a running man), not the crossbow in his face.
+  // The mounted archer's way (kyūba no michi) on foot: the yumi from as far
+  // off as he can; with a man close (`ranged.close`), the bow let fall and
+  // the ōdachi drawn (`fallback`), as the great archers of the Hōgen and
+  // Heiji wars carried both.
+  yumi: {
+    label: 'Yumi', weapon: 'yumi', fallback: 'odachi',
+    ranged: { flee: 4, rest: 1, runFor: 1.5, standFor: 1.8, close: 3.2, shotSeconds: 0.75, headShare: 0.2, between: [0.5, 0.8], move: 'loose' },
+    cadence: { work: 1.3, move: 0.7, burst: 0.4, mobility: 0.5 },
+    stance: { blade: 0.75, crouch: 0.04, width: 1.14, lean: 0.04, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.16, 0.55, 0.14], dir: [0.15, 1, 0] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { loose: 1 },
+    tempo: 1,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.45,
+    headMovement: 0.1,
+  },
   nu: {
     label: 'Crossbow (nu)', weapon: 'nu', fallback: 'mix',
     ranged: { flee: 3, rest: 1, runFor: 1.5, standFor: 1.8, close: 4, shotSeconds: 0.7, headShare: 0.15, between: [0.4, 0.4], move: 'fireLong', reloadSafe: 3.5 },

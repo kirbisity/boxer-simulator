@@ -286,6 +286,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   const brass = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
   switch (kind) {
     case 'bow':
+    case 'yumi':
     case 'compositeBow': {
       // A recurved stave bowed towards the mark (+z), bound at the grip; the
       // string runs tip to tip behind it, drawn to the hand as the shot comes.
@@ -298,7 +299,18 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
         new THREE.Vector3(0, -spec.handle, -bend * 0.9), new THREE.Vector3(0, -spec.handle * 0.55, -bend * 0.15),
         new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, spec.length * 0.55, -bend * 0.15), new THREE.Vector3(0, spec.length, -bend * 0.9),
       ]);
-      group.add(new THREE.Mesh(new THREE.TubeGeometry(stave, 32, 0.012, 6, false), surface(0x2a1c14, { roughness: 0.55 })));
+      group.add(new THREE.Mesh(new THREE.TubeGeometry(stave, 32, 0.012, 6, false), surface(kind === 'yumi' ? 0x141210 : 0x2a1c14, { roughness: 0.55 })));
+      // The yumi's rattan bindings: pale bands all along the black-lacquered stave.
+      if (kind === 'yumi') {
+        const rattan = surface(0xd8b860, { roughness: 0.7 });
+        for (let band = 1; band < 24; band += 1) {
+          const at = band / 24;
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(0.0135, 0.004, 4, 8), rattan);
+          ring.position.copy(stave.getPoint(at));
+          ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), stave.getTangent(at));
+          group.add(ring);
+        }
+      }
       group.add(cylinder(0.018, 0.018, -0.06, 0.06, surface(0x6a1e1a, { roughness: 0.8 }), 8));
       const string = new THREE.Line(new THREE.BufferGeometry().setFromPoints([stave.getPoint(0), new THREE.Vector3(0, 0, -bend * 0.9), stave.getPoint(1)]), new THREE.LineBasicMaterial({ color: 0xe8e2d2 }));
       string.userData.noOutline = true;

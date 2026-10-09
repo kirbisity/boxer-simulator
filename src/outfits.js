@@ -54,6 +54,23 @@ function footmanDesign(label, kind, cloth, quilt, hat) {
 }
 
 /** Tōsei gusoku in a finish, with its crest and war mask. */
+/**
+ * An ō-yoroi design: the lacquer of the plates, the silk lacing, gilt
+ * fittings, the stencilled leather breast (`leather`, `stencil`), the robe
+ * (hitatare: its sleeves; `sleeve` a brocade one on the bow arm) and hakama,
+ * and the kabuto's crest.
+ */
+function oyoroiDesign(label, { lacquer, lace, gold, leather, stencil, robe, hakama, sleeve = robe, crest }) {
+  return {
+    label,
+    top: { kind: 'longsleeve', color: robe },
+    bottom: { kind: 'pants', color: hakama },
+    armor: { kind: 'oyoroi', color: lacquer, lace, gold, leather, stencil, cloth2: sleeve, mail: '#34343a' },
+    head: { kind: 'kabuto', color: lacquer, crest, lace, gold, flare: 0.16, tiers: 5, fukigaeshi: 1.5 },
+    feet: { kind: 'tabi', color: '#2a1d14' },
+  };
+}
+
 function toseiDesign(label, steel, lace, crest, mask, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'pants', color: under }, armor: { kind: 'toseiDo', color: steel, lace, gold: '#d6a743' }, head: { kind: 'kabuto', color: steel, crest, mask, lace, gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } };
 }
@@ -454,6 +471,47 @@ export const OUTFITS = {
       { label: 'Sun disc', top: { kind: 'longsleeve', color: '#2a2a30' }, bottom: { kind: 'pants', color: '#2a2a30' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#e8e4da', gold: '#d6a743', panel: true, leather: '#6a4a2a', trim: true }, head: { kind: 'kabuto', color: '#17171a', crest: 'sun', lace: '#e8e4da', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#e8e4da' } },
       { label: 'Daimyo', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#2a0c0e' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#d6a743', gold: '#d6a743', sode: 1.3, panel: true, leather: '#2a3a5a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'tall', mask: 'red', lace: '#d6a743', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Antlers', top: { kind: 'longsleeve', color: '#16201a' }, bottom: { kind: 'pants', color: '#1a221c' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#2f5a3a', gold: '#d6a743', panel: true, leather: '#4a3a1a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'antlers', mask: 'black', lace: '#2f5a3a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#16201a' } },
+    ],
+  },
+  // Ō-yoroi, the great armour of the Heian and Kamakura mounted archer: a
+  // box of lacquered lamellae laced in silk (odoshi) round the trunk, its
+  // right side a separate plate (waidate); four great square skirt panels
+  // (kusazuri); two broad flat shoulder boards (sode) hung from the shoulder
+  // straps to shield the arms when the bow is drawn; a kabuto with a wide
+  // flaring neck guard and its turnbacks. Made to turn arrows on a horse, not
+  // to close every opening: the sword arm is in its robe sleeve alone, the
+  // bow arm in a mailed sleeve (kote), the thighs bare under the skirt
+  // (no haidate yet), only shin guards (suneate) below. So: the box and the
+  // helmet proof against most cuts, the limbs open (`regions`), and a blade
+  // finds the openings of the box (armpits, the waidate's seam, under the
+  // skirt) more often than in later armour (`gaps`).
+  oyoroi: {
+    faction: 'japanese', plated: true,
+    // No `family`: never dealt to a samurai at random (it is the flagship's own, too detailed for a crowd).
+    label: 'Ō-yoroi (great armour)', movement: 'good', fists: 'bare',
+    arrowproof: true,
+    sidearm: 'wakizashi',
+    headgear: ['crest'],
+    defaultHeadgear: 'crest',
+    extraMass: 0.42,
+    protection: {
+      blunt: 0.7, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 },
+      regions: {
+        head: { blunt: 0.62, cut: 0.88, pierce: 0.55 },
+        // The sode over the upper arms: a board hung beside the arm, not round it.
+        UpperArm: { blunt: 0.3, cut: 0.45, pierce: 0.25 },
+        lForearm: { blunt: 0.2, cut: 0.6, pierce: 0.3 },
+        rForearm: { blunt: 0.05, cut: 0.08, pierce: 0.04 },
+        Thigh: { blunt: 0.05, cut: 0.08, pierce: 0.04 },
+        Shank: { blunt: 0.4, cut: 0.75, pierce: 0.4 },
+      },
+    },
+    gaps: { thrust: 0.35, swing: 0.12 },
+    courage: 0.45,
+    designs: [
+      oyoroiDesign('Scarlet laced (aka-ito)', { lacquer: '#16141a', lace: '#c0281e', gold: '#d6a743', leather: '#5a4430', stencil: '#d8c08a', robe: '#b83a1c', hakama: '#8e2a16', crest: 'kuwagataTall' }),
+      oyoroiDesign('Gold and orange', { lacquer: '#3a2210', lace: '#d9822b', gold: '#e3b34c', leather: '#7a5636', stencil: '#e8c890', robe: '#5a2414', hakama: '#4a1c10', crest: 'kuwagataTall' }),
+      oyoroiDesign('Red with a white breast', { lacquer: '#8e1c16', lace: '#c42a20', gold: '#d6a743', leather: '#f0ece0', stencil: '#7088b0', robe: '#d0562a', hakama: '#c4502a', sleeve: '#5f9a4a', crest: 'kuwagataTall' }),
     ],
   },
   // Tōsei gusoku: the later armour, a solid riveted cuirass of horizontal
@@ -1109,7 +1167,8 @@ export const HEADGEAR = {
   hat: { label: 'Hat', knock: 0.25, falls: true, icon: '🎩' },
   headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: '🧣' },
   plume: { label: 'Plume', knock: 0.45, falls: true, icon: '🪶' },
-  crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙' },
+  // A cut on the helmet carrying at least `cutFrom` J of edge takes the crest off with it.
+  crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6 },
 };
 
 /** What can be worn on the head with this outfit: a headset unless there is a helmet, and its own. */
@@ -1217,6 +1276,8 @@ export function gearTraits(inputs) {
     drill: spec.drill ?? null,
     // A full plate harness: no gap for an edge (a point may still find one).
     cutProof: Boolean(spec.cutProof),
+    // How often a blade finds a gap in the rigid armour (BLADES.gaps), when the kit has more (or fewer) than most.
+    gaps: spec.gaps ?? null,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
     spare: spec.spare ?? null,

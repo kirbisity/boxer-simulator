@@ -151,11 +151,13 @@ export function installMenus(game) {
   function versus() {
     // Each side picks a faction, then turns its carousel through that faction's warriors.
     const faction = { red: 'knights', blue: 'japanese' };
-    const at = { red: 0, blue: 0 };
     const custom = { red: null, blue: null };
     const body = screen('versus', 'Deadliest Warrior', null, home);
     body.parentElement.classList.add('dw');
     const roster = (corner) => WARRIORS.filter((warrior) => warrior.faction === faction[corner]);
+    // A faction opens on its flagship (`flagship` in the roster), else on its first.
+    const opening = (corner) => Math.max(0, roster(corner).findIndex((warrior) => warrior.flagship));
+    const at = { red: opening('red'), blue: opening('blue') };
     const entry = (corner) => custom[corner] ?? roster(corner)[at[corner]];
     const sides = {};
     for (const corner of ['red', 'blue']) {
@@ -164,7 +166,7 @@ export function installMenus(game) {
         tab.dataset.faction = key;
         tab.onclick = () => {
           faction[corner] = key;
-          at[corner] = 0;
+          at[corner] = opening(corner);
           custom[corner] = null;
           build(corner);
         };

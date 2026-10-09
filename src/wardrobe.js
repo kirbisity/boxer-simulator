@@ -134,7 +134,7 @@ export function steelEnvironment(renderer) {
 // ---- Pieces off the body mesh -------------------------------------------------
 
 /** Shadows and ink outlines for a group's meshes (gathered first: an outline is a mesh too). */
-function inkAll(group, width = 0.003) {
+export function inkAll(group, width = 0.003) {
   const meshes = [];
   group.traverse((piece) => {
     if (piece.isMesh && !piece.userData.outline) meshes.push(piece);
@@ -1214,10 +1214,12 @@ function buildKabuto(group, head, r, steel, color) {
   crown.rotation.x = Math.PI / 2;
   crown.position.y = 1.22 * r;
   group.add(bowl, crown);
-  // Shikoro: tiers widening down and out, open at the face.
-  for (let tier = 0; tier < 4; tier += 1) {
-    const top = 1.2 * r + tier * 0.18 * r;
-    const bottom = top + 0.2 * r;
+  // Shikoro: tiers widening down and out, open at the face (`flare`: the
+  // early great armour's flared out wide over the shoulders, `tiers` of it).
+  const flare = head.flare ?? 0;
+  for (let tier = 0; tier < (head.tiers ?? 4); tier += 1) {
+    const top = 1.2 * r + tier * (0.18 + flare) * r;
+    const bottom = top + (0.2 + flare) * r;
     // Cylinder angles start at +z (the left); the open part faces +x, the front.
     const lame = new THREE.Mesh(new THREE.CylinderGeometry(top, bottom, 0.26 * r, 22, 1, true, Math.PI * 0.82, Math.PI * 1.36), bowlSteel);
     lame.material = bowlSteel.clone();
@@ -1229,13 +1231,14 @@ function buildKabuto(group, head, r, steel, color) {
     cord.position.y = lame.position.y - 0.13 * r;
     group.add(lame, cord);
   }
-  // Fukigaeshi: the top lame turned back beside the face.
+  // Fukigaeshi: the top lame turned back beside the face (larger on the early helmets).
+  const turnback = head.fukigaeshi ?? 1;
   for (const side of [1, -1]) {
-    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.45 * r, 0.42 * r, 0.06 * r), bowlSteel);
-    flap.position.set(0.55 * r, -0.05 * r, side * 1.3 * r);
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.45 * r * turnback, 0.42 * r * turnback, 0.06 * r), bowlSteel);
+    flap.position.set(0.55 * r, -0.05 * r, side * (1.3 + 0.25 * (turnback - 1)) * r);
     flap.rotation.y = side * -0.6;
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.47 * r, 0.06 * r, 0.07 * r), gold);
-    edge.position.copy(flap.position).add(new THREE.Vector3(0, 0.2 * r, 0));
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.47 * r * turnback, 0.06 * r, 0.07 * r), gold);
+    edge.position.copy(flap.position).add(new THREE.Vector3(0, 0.2 * r * turnback, 0));
     edge.rotation.y = flap.rotation.y;
     group.add(flap, edge);
   }
@@ -1359,6 +1362,32 @@ export function kabutoCrest(head, r, steel) {
         disc.position.y = 0.2 * r;
         crest.add(disc);
       }
+      break;
+    }
+    case 'kuwagataTall': {
+      // The ō-yoroi's kuwagata: two tall flat gilt blades rising from a
+      // holder at the brow, widening to a squared tip, a gilt crest between.
+      for (const side of [1, -1]) {
+        const blade = new THREE.Shape();
+        blade.moveTo(-0.07 * r, 0);
+        blade.lineTo(0.07 * r, 0);
+        blade.lineTo(0.13 * r, 1.95 * r);
+        blade.lineTo(0.2 * r, 2.15 * r);
+        blade.lineTo(-0.16 * r, 2.2 * r);
+        blade.lineTo(-0.1 * r, 1.95 * r);
+        blade.closePath();
+        const horn = new THREE.Mesh(new THREE.ExtrudeGeometry(blade, { depth: 0.03 * r, bevelEnabled: false }), crestMetal);
+        // The blade's flat faces forward (+x): turned about y from the shape's +z face.
+        horn.rotation.set(side * 0.24, Math.PI / 2, 0);
+        horn.position.set(0, 0.12 * r, side * 0.34 * r);
+        crest.add(horn);
+      }
+      const holder = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.28 * r, 0.9 * r), crestMetal);
+      holder.position.y = 0.1 * r;
+      const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * r, 0.18 * r, 0.05 * r, 16), surface(0x16141a, { roughness: 0.4 }));
+      badge.rotation.z = Math.PI / 2;
+      badge.position.set(0.04 * r, 0.3 * r, 0);
+      crest.add(holder, badge);
       break;
     }
     case 'sun': {

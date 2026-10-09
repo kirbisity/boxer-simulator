@@ -5,6 +5,7 @@
 // place, so a punch leaves a dent that springs back at the tissue's speed.
 
 /* global THREE */
+import { buildOyoroiBox, buildOyoroiHanging } from './oyoroi.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
@@ -2125,6 +2126,11 @@ function detailedView(view, fighter, simple) {
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   // The scissor's coat of scales, plate by plate over the painted shirt.
   // Maximus's harness: the straps, buckles, plates and belt over the loft.
+  // The ō-yoroi: its box on the chest, its shoulder boards and skirt panels hung to swing (fixed in a crowd).
+  if (dress.armor?.kind === 'oyoroi') {
+    collar.add(buildOyoroiBox(body, dress.armor));
+    dangles.push(...buildOyoroiHanging(body, dress.armor, collar, hips, simple));
+  }
   if (dress.armor?.kind === 'maximus') {
     collar.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'hips'));

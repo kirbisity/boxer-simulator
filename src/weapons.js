@@ -426,6 +426,16 @@ export const WEAPONS = {
     // The steppe bow's heavier draw (~34 kgf, ~75 lb).
     drawN: 330,
   },
+  // The yumi: the Japanese war bow, over two metres of laminated bamboo
+  // and wood bound in rattan, gripped a third of the way up (`handle` the
+  // short lower limb, `length` the long upper). A great archer's heavy draw
+  // (~35 kgf): drawn full only by a strong back (handling.js).
+  yumi: {
+    label: 'Yumi', hands: 'one', hand: 'l', length: 1.45, strikeFrom: 1.45, handle: 0.75, mass: 0.75, balance: 0.2, radius: 0.014,
+    harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
+    drawN: 340,
+  },
   // Sidearms, drawn when the main weapon is lost (an outfit's `sidearm`):
   // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
   // short sword; a samurai's wakizashi, the short companion of the katana.

@@ -28,6 +28,8 @@ export const WARRIORS = [
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
+  // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
+  { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true },
   // Sir Aldous: a big, heavy man-at-arms (~94 kg on 185 cm), hard to put down.
   warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', heightCm: 185, frame: 'large', exercise: 0.63, calories: 4675, outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),

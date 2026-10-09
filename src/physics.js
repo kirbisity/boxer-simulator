@@ -2335,20 +2335,42 @@ function knockOff(world, fighter, event) {
     // A blow moves the head hard enough to send it flying, or a fall shakes it off.
     const gear = HEADGEAR[prop.kind] ?? HEADGEAR.headset;
     if (event ? (event.headDeltaV ?? 0) < gear.knock : !gear.falls) continue;
-    const spec = WORLD.props;
-    const head = point(fighter.x, P.head);
-    prop.attached = false;
-    prop.x = vec.add(head, [0, fighter.body.lengths.headRadius * 0.6, 0]);
-    const headVelocity = point(fighter.v, P.head);
-    if (event) {
-      const along = vec.scale(event.normal, -1);
-      const speed = spec.flyBase + spec.flySpeedPerHeadDeltaV * event.headDeltaV;
-      prop.v = vec.add(vec.add(headVelocity, vec.scale(along, speed)), [0, spec.flyUp, 0]);
-    } else prop.v = vec.add(headVelocity, [0, 0.4, 0]);
-    const random = world.random;
-    prop.spin = [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (spec.spinMin + random() * spec.spinRange));
-    world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: gear.icon, effects: [`${gear.label.toLowerCase()} knocked off`] });
+    launchProp(world, fighter, prop, event, event ? event.headDeltaV : 0, `${gear.label.toLowerCase()} knocked off`);
   }
+}
+
+/**
+ * A blade across the top of the helmet: what is fixed there and can be cut
+ * (`HEADGEAR[kind].cutFrom`, J of edge) comes away with the stroke. Only a
+ * cut landing high on the head reaches the crest standing above it.
+ */
+function cutOffHeadgear(world, fighter, event, edgeJoules, contact) {
+  const crown = fighter.x[P.head * 3 + 1];
+  if (contact[1] < crown) return;
+  for (const prop of world.props ?? []) {
+    if (prop.owner !== fighter.id || !prop.attached) continue;
+    const gear = HEADGEAR[prop.kind];
+    if (!gear?.cutFrom || edgeJoules < gear.cutFrom) continue;
+    launchProp(world, fighter, prop, event, WORLD.props.cutHeadDeltaV, `${gear.label.toLowerCase()} cut away`);
+  }
+}
+
+/** A prop leaves the head: along the blow (or simply dropped), spinning, with the event that did it. */
+function launchProp(world, fighter, prop, event, headDeltaV, effect) {
+  const gear = HEADGEAR[prop.kind] ?? HEADGEAR.headset;
+  const spec = WORLD.props;
+  const head = point(fighter.x, P.head);
+  prop.attached = false;
+  prop.x = vec.add(head, [0, fighter.body.lengths.headRadius * 0.6, 0]);
+  const headVelocity = point(fighter.v, P.head);
+  if (event) {
+    const along = vec.scale(event.normal, -1);
+    const speed = spec.flyBase + spec.flySpeedPerHeadDeltaV * headDeltaV;
+    prop.v = vec.add(vec.add(headVelocity, vec.scale(along, speed)), [0, spec.flyUp, 0]);
+  } else prop.v = vec.add(headVelocity, [0, 0.4, 0]);
+  const random = world.random;
+  prop.spin = [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (spec.spinMin + random() * spec.spinRange));
+  world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: gear.icon, effects: [effect] });
 }
 
 /** Worn props ride on the head; free ones fly, tumble, bounce and settle. */
@@ -3148,7 +3170,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const mix = harmMix(wspec, spec.mode, along, closest.s);
   const covered = protectionAt(body.gear, capsule.key);
   // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
-  const gaps = BLADES.gaps;
+  const gaps = body.gear.gaps ? { ...BLADES.gaps, ...body.gear.gaps } : BLADES.gaps;
   // (A full plate harness has no gap for an edge: `cutProof`.)
   const gapChance = spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing;
   const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique;
@@ -3172,6 +3194,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt,
     edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce),
   };
+  // A cut on the helmet takes what is fixed on it (a crest) away, whatever the helmet turns.
+  if (capsule.key === 'head') cutOffHeadgear(world, defender, event, energy * mix.cut, contactPoint);
   const concentration = Math.sqrt(WORLD.contactSeconds / wspec.contactSeconds);
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation, side: weapon.main, concentration });
   if (glanced) {

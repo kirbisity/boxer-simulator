@@ -293,6 +293,14 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.97, 1.22, { rivets: 4, base: 'cloth', mirror: [0.62, 0.15, 'steel'] }], skirt: [0.88, 0.6, 1.34, { rivets: 4, base: 'cloth' }], collar: 'steel',
     upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
   },
+  // Ō-yoroi: its box, skirt panels and shoulder boards are rigid pieces of
+  // their own (oyoroi.js); on the body only what is worn on the limbs: the
+  // bow arm's brocade sleeve and mailed kote, and the black-lacquered suneate.
+  oyoroi: {
+    upperArm: { l: [-0.15, 1.02, 1.16, 'cloth2'] },
+    forearm: { l: [[-0.06, -0.02, 1.2, MAIL], [-0.04, 0.3, 1.26, 'gold']] },
+    shin: [[0.02, 0.86, 1.3, 'steel'], [0.02, 0.1, 1.33, 'gold']],
+  },
   // The Iron Pagoda (as reconstructed): lamellar of small dotted iron plates
   // laced in rows, a cuirass to the waist under crossed leather straps, a
   // buckled belt and a braided cord sash with cords hanging; a long skirt of

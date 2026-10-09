@@ -8,7 +8,7 @@ import { OUTFITS, outfitOf } from '../outfits.js';
 import { aimPoint, BLOCKING, breakJoint, capsules, closestBetween, dropWeapon, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
-import { ARROW, bulletProof, bulletRegion, GUN, slerpDir } from '../weapons.js';
+import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir } from '../weapons.js';
 import { WORLD } from './config.js';
 
 /**
@@ -227,14 +227,16 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   const gear = victim.body.gear;
   const key = hit.capsule.key;
   world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse });
-  if (gear.arrowproof && world.random() < bounce) {
+  // Proof against arrows only where it is rigid (cut-proof plate or lamellar): an arm or leg left open is not.
+  const proof = gear.arrowproof && (hit.throat || (protectionAt(gear, key).cut ?? 0) >= BLADES.gaps.rigidFrom);
+  if (proof && world.random() < bounce) {
     event.bounced = true;
     event.effects.push('glances off the armour');
     return;
   }
   const region = hit.throat ? 'head' : bulletRegion(key);
   // Full armour (plate, lamellar) guards the throat with its gorget or aventail; a vest does not.
-  const stopped = gear.arrowproof ? 1 - ARROW.gapHarm : hit.throat ? 0 : protectionAt(gear, key).pierce ?? 0;
+  const stopped = proof ? 1 - ARROW.gapHarm : hit.throat ? 0 : protectionAt(gear, key).pierce ?? 0;
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
@@ -247,7 +249,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   victim.bleed = (victim.bleed ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
   victim.bleedOutside = (victim.bleedOutside ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
   Object.assign(event, { harm, region, pierce: harm * 60 });
-  event.effects.push(gear.arrowproof ? `${region}: through a gap` : `${region}`);
+  event.effects.push(proof ? `${region}: through a gap` : `${region}`);
   shooter.stats.landed += 1;
   if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key) && world.random() < 0.3) dropWeapon(world, victim, 'disarmed', dir);
   if (victim.gunshot >= 1 && victim.state !== 'out') knockOut(world, victim, event, region === 'head' ? 'an arrow through the head' : 'shot down by arrows', 'killed');

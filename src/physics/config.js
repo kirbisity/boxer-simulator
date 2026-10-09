@@ -25,7 +25,8 @@ export const WORLD = {
   // Things worn that come off: a headset is knocked away by the first clean
   // shot to the head (or when its wearer goes down). Free, it flies with the
   // head's new speed and the blow's direction, tumbles, and settles on the floor.
-  props: { radius: 0.06, flySpeedPerHeadDeltaV: 1.6, flyBase: 1.2, flyUp: 1.5, restitution: 0.35, slide: 0.75, spinMin: 8, spinRange: 8 },
+  // cutHeadDeltaV: how hard a crest cut away flies, as if the head had been knocked this hard (m/s).
+  props: { radius: 0.06, cutHeadDeltaV: 1.5, flySpeedPerHeadDeltaV: 1.6, flyBase: 1.2, flyUp: 1.5, restitution: 0.35, slide: 0.75, spinMin: 8, spinRange: 8 },
   contactStep: 0.012, // m a strike contact may separate per substep
   // Both hands on a weapon turn it this much more stiffly than one wrist.
   twoHandWrist: 1.7,
