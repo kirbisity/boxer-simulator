@@ -965,8 +965,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       profile([[0, 0], [0.5, thighR * 0.08], [1, 0]]));
     loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
-    const legReach = { bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
-    const legLoose = { bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
+    const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
+    const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
     const legPattern = (ring, angle) => {
       if (bottom?.stripe && Math.abs(Math.sin(angle)) > 0.9) return 'trim2';
@@ -975,6 +975,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     };
     if (bottom?.under) loft(mesh, thighRings(-0.05, 0.4, count(3)), sides, { color: 'under', inflate: 1.05, capStart: false, capEnd: false });
     if (legReach[0] > 0 && !skirted) loft(mesh, thighRings(-0.05, legReach[0], count(Math.max(3, Math.round(9 * legReach[0])))), sides, { color: legPattern, inflate: legLoose, capStart: false, capEnd: false });
+    // Hakama (the hitatare's trousers): full, bloused out at the knee where they are tied over the shin guards.
+    if (bottom?.kind === 'hakama' && !skirted) loft(mesh, thighRings(0.72, 1.06, count(3)), sides, { color: 'kit', inflate: 1.48, capStart: false, capEnd: false });
     // Bloomers end in a lace frill round the thigh.
     if (bottom?.kind === 'bloomers') loft(mesh, thighRings(legReach[0] - 0.02, legReach[0] + 0.06, 2), sides, { color: 'trim2', inflate: legLoose + 0.08, capStart: false, capEnd: false });
     if (lamellar) {

@@ -1275,9 +1275,49 @@ function buildKabuto(group, head, r, steel, color) {
     cord.position.y = lame.position.y - 0.13 * r;
     group.add(lame, cord);
   }
+  // The early great helmets' fukigaeshi: big wings turned back from the front
+  // of the neck guard either side of the face, flaring out and back like ear
+  // guards, faced with stencilled leather, a gilt edge and a gilt rosette.
+  if (head.greatWings) {
+    const facing = surface(new THREE.Color(head.leather ?? '#5a4430').getHex(), { roughness: 0.8 });
+    facing.side = THREE.DoubleSide;
+    const rim = metal(steel, head.gold ?? 0xd6a743);
+    const wing = new THREE.Shape();
+    const w = 1.7 * r;
+    const h = 1.35 * r;
+    // A broad wing, its outer corners rounded, narrowing where it turns back from the neck guard.
+    wing.moveTo(0, -h * 0.35);
+    wing.lineTo(w * 0.85, -h * 0.5);
+    wing.quadraticCurveTo(w, -h * 0.5, w, -h * 0.3);
+    wing.lineTo(w, h * 0.35);
+    wing.quadraticCurveTo(w, h * 0.5, w * 0.85, h * 0.5);
+    wing.lineTo(0, h * 0.42);
+    wing.closePath();
+    for (const side of [1, -1]) {
+      const holder = new THREE.Group();
+      // At the front of the neck guard beside the cheek, turned out and back (about y), leaning back a little.
+      holder.position.set(0.62 * r, -0.3 * r, side * 1.2 * r);
+      holder.rotation.set(0, side * -0.62, 0);
+      const face = new THREE.Mesh(new THREE.ShapeGeometry(wing, 6), facing);
+      // The shape lies in x–y; turned so it stands out to the side (+z for the left wing), its face forward.
+      face.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      face.scale.x = 1;
+      const edge = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(wing.getPoints(18).map((p) => new THREE.Vector3(p.x, p.y, 0)), true), 36, 0.05 * r, 5, true), rim);
+      edge.rotation.copy(face.rotation);
+      const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * r, 0.2 * r, 0.06 * r, 14), rim);
+      rosette.rotation.x = Math.PI / 2;
+      const rosetteHolder = new THREE.Group();
+      rosetteHolder.rotation.copy(face.rotation);
+      rosette.position.set(w * 0.62, 0, 0.03 * r);
+      rosetteHolder.add(rosette);
+      holder.add(face, edge, rosetteHolder);
+      group.add(holder);
+    }
+  }
   // Fukigaeshi: the top lame turned back beside the face (larger on the early helmets).
-  const turnback = head.fukigaeshi ?? 1;
+  const turnback = head.greatWings ? 0 : head.fukigaeshi ?? 1;
   for (const side of [1, -1]) {
+    if (!turnback) break;
     const flap = new THREE.Mesh(new THREE.BoxGeometry(0.45 * r * turnback, 0.42 * r * turnback, 0.06 * r), bowlSteel);
     flap.position.set(0.55 * r, -0.05 * r, side * (1.3 + 0.25 * (turnback - 1)) * r);
     flap.rotation.y = side * -0.6;

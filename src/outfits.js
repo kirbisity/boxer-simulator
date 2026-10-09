@@ -64,9 +64,10 @@ function oyoroiDesign(label, { lacquer, lace, gold, leather, stencil, robe, haka
   return {
     label,
     top: { kind: 'longsleeve', color: robe },
-    bottom: { kind: 'pants', color: hakama },
+    bottom: { kind: 'hakama', color: hakama },
     armor: { kind: 'oyoroi', color: lacquer, lace, gold, leather, stencil, cloth2: sleeve, mail: '#34343a' },
-    head: { kind: 'kabuto', color: lacquer, crest, lace, gold, flare: 0.16, tiers: 5, fukigaeshi: 1.5 },
+    // The great fukigaeshi faced with the breast's stencilled leather (`leather`), gilt-edged.
+    head: { kind: 'kabuto', color: lacquer, crest, lace, gold, flare: 0.16, tiers: 5, fukigaeshi: 1.5, leather, greatWings: true },
     feet: { kind: 'tabi', color: '#2a1d14' },
   };
 }
