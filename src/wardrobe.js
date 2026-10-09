@@ -372,13 +372,15 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       break;
     }
     case 'greatHelm': {
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.22 * r, 2.1 * r, 20, 1, false), steel);
-      barrel.position.y = -0.15 * r;
-      // The early (12th–13th c.) helm is flat on top, a plate riveted over the barrel; the later one a low dome.
+      // The early (12th–13th c.) helm is a tall flat-topped can: well above the sights and down to the chin;
+      // the later one shorter under a low dome.
+      const tall = head.flatTop ? 0.45 : 0;
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.22 * r, (2.1 + tall) * r, 20, 1, false), steel);
+      barrel.position.y = (-0.15 + tall * 0.25) * r;
       const crown = head.flatTop
         ? new THREE.Mesh(new THREE.CylinderGeometry(1.14 * r, 1.2 * r, 0.12 * r, 20), steel)
         : new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.32), steel);
-      crown.position.y = head.flatTop ? 0.93 * r : 0.55 * r;
+      crown.position.y = head.flatTop ? (0.93 + tall * 0.75) * r : 0.55 * r;
       const dark = surface(0x050506);
       // The sights: two slits either side of the nasal.
       for (const side of [1, -1]) {
@@ -388,8 +390,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
         group.add(slit);
       }
       // The cross of reinforcing bands: a brow band across above the sights and the nasal down the middle.
-      const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, 1.45 * r, 0.16 * r), steel);
-      nasal.position.set(1.24 * r, -0.15 * r, 0);
+      const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, (1.45 + tall) * r, 0.16 * r), steel);
+      nasal.position.set(1.24 * r, (-0.15 - tall * 0.25) * r, 0);
       const brow = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, 0.14 * r, 1.7 * r), steel);
       brow.position.set(1.18 * r, 0.28 * r, 0);
       brow.rotation.y = 0;
@@ -420,7 +422,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
         const angle = -0.5;
         for (const [w, h] of [[0.05, 0.22], [0.05, 0.08]]) {
           const piece = new THREE.Mesh(new THREE.BoxGeometry(0.04 * r, h * r, (h === 0.22 ? 0.07 : 0.2) * r), dark);
-          piece.position.set(Math.cos(angle) * 1.22 * r, -1.0 * r, Math.sin(angle) * 1.22 * r);
+          piece.position.set(Math.cos(angle) * 1.22 * r, (-1.0 - tall * 0.3) * r, Math.sin(angle) * 1.22 * r);
           piece.rotation.y = -angle;
           piece.userData.noOutline = true;
           group.add(piece);
@@ -1296,8 +1298,9 @@ function buildKabuto(group, head, r, steel, color) {
     for (const side of [1, -1]) {
       const holder = new THREE.Group();
       // At the front of the neck guard beside the cheek, turned out and back (about y), leaning back a little.
-      holder.position.set(0.62 * r, -0.3 * r, side * 1.2 * r);
-      holder.rotation.set(0, side * -0.62, 0);
+      // Hinged at the front edge of the neck guard and turned forward and out, clear of its tiers behind.
+      holder.position.set(0.82 * r, -0.18 * r, side * 1.0 * r);
+      holder.rotation.set(0, side * 0.6, 0);
       const face = new THREE.Mesh(new THREE.ShapeGeometry(wing, 6), facing);
       // The shape lies in x–y; turned so it stands out to the side (+z for the left wing), its face forward.
       face.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
@@ -1677,6 +1680,56 @@ function buildGladiatorHelm(group, head, r, steel, color) {
 }
 
 /**
+ * Soft cloth hung round a body part: a cloak from the shoulders, a skirt from
+ * the waist. Split into `columns` round the hang (an arc of `arc` rad centred
+ * on `centre`: angle 0 is +z, the left; behind is 3π/2), each a chain of
+ * `links` pendulums (Dangle) carrying its band of the cloth, from radius `top`
+ * at `y` to `hem` at `length` below. The chains sway, swing out on a turn,
+ * fold over a stepping leg and settle; the body's colliders hold them off it.
+ * `paint(column)` gives each band its material. Returns the Dangles, parents
+ * before children (the order they are stepped in).
+ */
+export function softDrape(anchor, { columns, links, top, hem, y, length, centre, arc, sag = 0.2, damping = 0.7, collides = ['trunk', 'leg'], paint }) {
+  const dangles = [];
+  const link = length / links;
+  const share = arc / columns;
+  // Each band a little wider than its share and a little longer than its link: no gaps between them as they swing.
+  const overlap = 1.18;
+  const lap = 0.12;
+  const radiusAt = (down) => top + (hem - top) * down;
+  for (let column = 0; column < columns; column += 1) {
+    const theta = centre - arc / 2 + share * (column + 0.5);
+    const out = [Math.sin(theta), Math.cos(theta)];
+    let parent = anchor;
+    let pivot = [out[0] * top, y, out[1] * top];
+    // Hanging down and a little out, as cloth falls from round a body.
+    let rest = [out[0] * (hem - top) / length, -1, out[1] * (hem - top) / length];
+    for (let index = 0; index < links; index += 1) {
+      const upper = radiusAt(index / links);
+      const lower = radiusAt((index + 1) / links);
+      const dangle = new Dangle(parent, pivot, rest, link, { sag, damping, collides });
+      const height = link * (1 + lap);
+      const geometry = new THREE.CylinderGeometry(upper, lower, height, 4, 2, true, theta - (share * overlap) / 2, share * overlap);
+      // Hung by the middle of its top edge (a little above the joint).
+      geometry.translate(-out[0] * upper, -height / 2 + link * lap, -out[1] * upper);
+      const band = new THREE.Mesh(geometry, paint(column));
+      // (Shadow and ink outline come with the rest of what swings: inkAll.)
+      dangle.group.add(band);
+      dangles.push(dangle);
+      parent = dangle.group;
+      pivot = [out[0] * (lower - upper), -link, out[1] * (lower - upper)];
+      rest = [0, -1, 0];
+    }
+  }
+  const depth = (dangle) => {
+    let count = 0;
+    for (let at = dangle.anchor; at && at !== anchor; at = at.parent) count += 1;
+    return count;
+  };
+  return dangles.sort((a, b) => depth(a) - depth(b));
+}
+
+/**
  * The things that swing: a tie from the collar, a sumo's sagari strings
  * from the mawashi, a knight's tabard front and back. Each is a Dangle on
  * the collar or the hips.
@@ -1753,34 +1806,40 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       drape.group.add(skirt);
       dangles.push(drape);
     } else if (extra.kind === 'mantle') {
-      // A great mantle from the shoulders to the ankles: open in front, round
-      // the shoulders and down the back, swinging as one; a cross on its left shoulder.
+      // A great mantle from the shoulders to the ankles, open in front, soft
+      // (softDrape: chains round the shoulders and down the back), a cross on
+      // its left shoulder. Drawn in a crowd (`still`), the band hangs rigid instead.
       const length = (extra.length ?? 1.3) * scale;
-      const cloak = new Dangle(collar, [-0.03 * scale, 0.0, 0], [-0.12, -1, 0], length, { sag: 0.3, damping: 0.35 });
+      const shoulders = body.lengths.shoulderSpan ?? 0.4 * scale;
       const cloth = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
       cloth.side = THREE.DoubleSide;
-      // Cylinder angle θ: x = sin θ, z = cos θ; behind is 3π/2. The arc runs from the front of
-      // the right shoulder round the back to the front of the left.
-      const arc = Math.PI * 1.3;
-      const shoulders = body.lengths.shoulderSpan ?? 0.4 * scale;
-      const top = shoulders * 0.62;
-      const mantle = new THREE.Mesh(new THREE.CylinderGeometry(top, shoulders * 1.25, length, 28, 6, true, Math.PI * 1.5 - arc / 2, arc), cloth);
-      mantle.position.y = -length / 2 + 0.04 * scale;
-      cloak.group.add(mantle);
+      const drape = softDrape(collar, { columns: 7, links: 3, top: shoulders * 0.62, hem: shoulders * 1.2, y: 0.02 * scale, length, centre: Math.PI * 1.5, arc: Math.PI * 1.3, sag: 0.18, damping: 0.75, paint: () => cloth });
       if (extra.cross) {
+        // On the band at the left front of the shoulders (the last column's top link).
         const red = surface(new THREE.Color(extra.cross).getHex(), { roughness: 0.8 });
-        const angle = Math.PI * 1.5 + arc / 2 - 0.35;
-        // The cloak's radius where the cross sits (it widens linearly down its length), just proud of the cloth.
-        const radius = top + (shoulders * 1.25 - top) * ((0.2 * scale) / length) + 0.006 * scale;
-        const at = new THREE.Vector3(Math.sin(angle) * radius, -0.16 * scale, Math.cos(angle) * radius);
+        const topLink = drape.filter((dangle) => dangle.anchor === collar).at(-1);
+        const theta = Math.PI * 1.5 + Math.PI * 0.65 - (Math.PI * 1.3) / 14;
         for (const [w, h] of [[0.035, 0.12], [0.1, 0.035]]) {
           const bar = new THREE.Mesh(new THREE.BoxGeometry(w * scale, h * scale, 0.004 * scale), red);
-          bar.position.copy(at);
-          bar.rotation.y = angle;
-          cloak.group.add(bar);
+          bar.position.set(Math.sin(theta) * 0.01 * scale, -0.14 * scale, Math.cos(theta) * 0.01 * scale);
+          bar.rotation.y = theta;
+          topLink.group.add(bar);
         }
       }
-      dangles.push(cloak);
+      dangles.push(...drape);
+    } else if (extra.kind === 'surcoatSkirt') {
+      // The surcoat below the belt, to the shins: soft, slit front and back
+      // for riding (two halves round the hips); halved in two colours for the
+      // Beauséant (`second`: the right side's).
+      const length = (extra.length ?? 0.75) * scale;
+      const waist = body.lengths.hipSpan * 1.05;
+      const left = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
+      left.side = THREE.DoubleSide;
+      const right = extra.second ? surface(new THREE.Color(extra.second).getHex(), { roughness: 0.85 }) : left;
+      if (right !== left) right.side = THREE.DoubleSide;
+      for (const [centre, material] of [[0, left], [Math.PI, right]]) {
+        dangles.push(...softDrape(hips, { columns: 4, links: 2, top: waist, hem: waist * 1.45, y: 0.08 * scale, length, centre, arc: Math.PI * 0.92, sag: 0.2, damping: 0.75, paint: () => material }));
+      }
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;

@@ -218,7 +218,8 @@ export const ARMOR_KINDS = {
   // to the shins (its cross on the chest); a sword belt; plain steel greaves
   // and knee cops over the chausses.
   templar: {
-    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [[0.62, 0.35, 1.13, MAIL], [1.35, 0.5, 1.32, { heraldry: true }]], collar: 'mail',
+    // (The surcoat below the belt is soft cloth hung from the hips: the extra `surcoatSkirt`.)
+    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [0.62, 0.35, 1.13, MAIL], collar: 'mail',
     belt: [0.0, 0.08, 1.25, 'leather'],
     upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL], thigh: [-0.05, 1.04, 1.1, MAIL], knee: [0.84, 1.04, 1.32, 'steel'],
     shin: [[-0.12, 0.95, 1.1, MAIL], [0.05, 0.85, 1.22, 'steel']],

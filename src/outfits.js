@@ -86,7 +86,10 @@ function templarDesign(label, cloth, cloth2, heraldry) {
     head: { kind: 'greatHelm', color: '#b8bec6', flatTop: true, breaths: true, crossCut: true },
     feet: { kind: 'compactBoot', color: '#4a2e1a' },
     // The mantle in the surcoat's cloth (white for a knight, black for a sergeant), the red cross on its left shoulder.
-    extras: [{ kind: 'mantle', color: cloth, cross: '#a2201e', length: 1.32 }],
+    extras: [
+      { kind: 'surcoatSkirt', color: cloth, second: heraldry === 'pale' ? cloth2 : null, length: 0.78 },
+      { kind: 'mantle', color: cloth, cross: '#a2201e', length: 1.32 },
+    ],
   };
 }
 

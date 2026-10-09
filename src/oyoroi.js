@@ -19,16 +19,18 @@ export const OYOROI = {
   // The dō round the trunk: half-depth and half-width as shares of the trunk's skin
   // radius plus a margin (m at 1.8 m tall); `square` the superellipse's power (2 an
   // ellipse, higher a squarer box); `waist` how much it is drawn in at the waist.
-  box: { depth: 0.8, width: 1.12, margin: 0.05, top: 0.06, bottom: 0.84, square: 3.2, waist: 0.07 },
+  // `chest`/`waist`: the swell at the breast and the draw at the waist (shares of the half-depth, half-width).
+  box: { depth: 0.8, width: 1.12, margin: 0.05, top: 0.06, bottom: 0.84, square: 2.5, chest: 0.08, waist: 0.1 },
   // Laced rows per metre of height, and the width (m) of one repeat of the plates across.
   rowsPerMetre: 34,
   plateRepeat: 0.09,
   // Sode: a large guard hung from each shoulder strap, curved round the arm (its
-  // radius), standing out from it (`tilt`, rad); laced boards are stiff: little sag, much damping.
-  sode: { width: 0.3, height: 0.36, radius: 0.42, out: 0.05, tilt: 0.28, sag: 0.08, damping: 0.85 },
+  // radius), standing out from it (`tilt`, rad). Hung on cords, it and the kusazuri
+  // swing a little with each step and blow and settle (moderate sag and damping), held off the arms and thighs.
+  sode: { width: 0.3, height: 0.36, radius: 0.42, out: 0.05, tilt: 0.28, sag: 0.14, damping: 0.5 },
   // Kusazuri: four flaring panels (front, back, both sides) from the dō's lower edge, each a
   // quarter-turn round less a gap, flaring out (`flare`: the hem's radius over the top's).
-  kusazuri: { height: 0.36, span: 1.3, flare: 1.3, sag: 0.08, damping: 0.85 },
+  kusazuri: { height: 0.36, span: 1.3, flare: 1.3, sag: 0.14, damping: 0.5 },
   quiverArrows: 14,
 };
 
@@ -153,8 +155,8 @@ function doGeometry(depth, width, top, bottom, spec) {
   for (let row = 0; row <= down; row += 1) {
     const v = row / down;
     const y = top + (bottom - top) * v;
-    // Drawn in most two-thirds of the way down, a little out again at the hem.
-    const pinch = 1 - spec.waist * Math.sin(Math.min(1, v / 0.85) * Math.PI) ** 2;
+    // A swell at the breast, drawn in at the waist, a little out again over the hips.
+    const pinch = 1 + spec.chest * Math.exp(-(((v - 0.22) / 0.2) ** 2)) - spec.waist * Math.exp(-(((v - 0.7) / 0.18) ** 2));
     for (let column = 0; column <= around; column += 1) {
       // From just past the right side, round the front, the left and the back, to just short of it again.
       const t = -Math.PI / 2 + gap / 2 + (column / around) * (Math.PI * 2 - gap);
@@ -290,7 +292,7 @@ export function buildOyoroiHanging(body, armor, collar, hips, still = false) {
   const { scale, trunk, depth, width } = doSize(body);
   const box = OYOROI.box;
   const dangles = [];
-  const hang = (anchor, pivot, rest, length, spec, piece) => {
+  const hang = (anchor, pivot, rest, length, spec, piece, collides) => {
     if (still) {
       const holder = new THREE.Group();
       holder.position.set(...pivot);
@@ -298,7 +300,7 @@ export function buildOyoroiHanging(body, armor, collar, hips, still = false) {
       anchor.add(holder);
       return;
     }
-    const dangle = new Dangle(anchor, pivot, rest, length, { sag: spec.sag, damping: spec.damping });
+    const dangle = new Dangle(anchor, pivot, rest, length, { sag: spec.sag, damping: spec.damping, collides });
     dangle.group.add(piece);
     dangles.push(dangle);
   };
@@ -314,7 +316,7 @@ export function buildOyoroiHanging(body, armor, collar, hips, still = false) {
     crown.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
     crown.position.y = -0.0175 * scale;
     piece.add(crown);
-    hang(collar, [0, -0.02 * scale, side * (width + sode.out * scale)], [0, -1, side * Math.tan(sode.tilt)], sode.height * scale, sode, piece);
+    hang(collar, [0, -0.02 * scale, side * (width + sode.out * scale)], [0, -1, side * Math.tan(sode.tilt)], sode.height * scale, sode, piece, ['arm', 'shoulders']);
   }
   // Kusazuri: front, back and both sides, each a quarter of a flaring skirt less a gap, hung from the dō's hem.
   const spec = OYOROI.kusazuri;
@@ -329,7 +331,7 @@ export function buildOyoroiHanging(body, armor, collar, hips, still = false) {
     const radius = panel.radius * 1.04;
     const piece = curvedPanel(radius, radius * spec.flare, spec.height * scale, panel.facing, spec.span, armor);
     const pivot = [Math.sin(panel.facing) * radius, from, Math.cos(panel.facing) * radius];
-    hang(hips, pivot, panel.rest, spec.height * scale, spec, piece);
+    hang(hips, pivot, panel.rest, spec.height * scale, spec, piece, ['leg']);
   }
   for (const dangle of dangles) inkAll(dangle.group, 0.0022);
   return dangles;

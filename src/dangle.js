@@ -38,8 +38,11 @@ export class Dangle {
    *   of its length: stiff gelled hair little, a loose hood a lot
    * @param damping share of critical damping: low swings on, high settles
    */
-  constructor(anchor, pivot, rest, length, { sag = 0.35, damping = 0.25 } = {}) {
+  constructor(anchor, pivot, rest, length, { sag = 0.35, damping = 0.25, collides = null } = {}) {
     this.anchor = anchor;
+    // Which colliders it rests on (their `part`: 'trunk', 'shoulders', 'arm', 'leg'); null, all of them.
+    // A cloak is held off the trunk and legs but not flung by an arm swinging inside it.
+    this.collides = collides;
     this.length = length;
     this.sag = sag;
     this.dampingShare = damping;
@@ -85,7 +88,7 @@ export class Dangle {
       tmp.subVectors(this.tip, pivot);
       const distance = tmp.length() || 1e-6;
       this.tip.copy(pivot).addScaledVector(tmp, length / distance);
-      for (const capsule of colliders) pushOutOfCapsule(this.tip, capsule);
+      for (const capsule of colliders) if (!this.collides || this.collides.includes(capsule.part)) pushOutOfCapsule(this.tip, capsule);
       tmp.subVectors(this.tip, pivot);
       this.tip.copy(pivot).addScaledVector(tmp, length / (tmp.length() || 1e-6));
       if (h > 0) this.velocity.subVectors(this.tip, before).divideScalar(h);
