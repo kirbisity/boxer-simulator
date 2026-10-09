@@ -867,7 +867,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
   const heft = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(0, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
-  const jitter = (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft;
+  // His skill: how near the mark his blow goes (a point needs it most; a gun aims by its own spread).
+  const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft);
   const mark = at ?? aimPoint(target, aimZone);
   const aimed = jitter > 0 ? vec.add(mark, [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : mark;
   fighter.punch = {
@@ -880,6 +881,22 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   fighter.stats.thrown += 1;
   if (heavy) world.events.push({ time: world.time, kind: 'heavy', attacker: fighter.id, punch: type, effects: [] });
   return true;
+}
+
+/**
+ * How far off the mark (m, each way) a blow of this kind goes in his hands,
+ * from the scatter it has anyway (`scatter`: a wild swinger's, a heavy
+ * weapon's) and his skill: as it is at an ordinary 0.5, narrowing to none at
+ * 1; below 0.5 a novice's error is added, up to WORLD.skill.aimError at 0 (a
+ * point, a thrust with a spear or a rapier, wants the most precision). A
+ * gun's spread answers to skill where it is fired (ranged.js).
+ */
+export function skillScatter(fighter, spec, scatter) {
+  if (!spec || spec.path === 'aim') return scatter;
+  const skill = fighter.body.skill ?? 0.5;
+  const held = spec.path === 'blade' && fighter.weapon?.held ? fighter.weapon.spec : null;
+  const kind = !held ? 'hand' : spec.mode === 'thrust' ? 'point' : held.harm?.swing?.cut ? 'blade' : 'blunt';
+  return scatter * Math.min(1, 2 * (1 - skill)) + WORLD.skill.aimError[kind] * Math.max(0, 1 - 2 * skill);
 }
 
 /** The man of the other side nearest a place, within `within` m of it (on the floor), or null. */
@@ -1434,7 +1451,14 @@ function checkBalance(world, fighter) {
     // stumbles and reels, getting his feet back under him, if it was not too much.
     const struck = Math.max(...fighter.hitAt) > world.time - WORLD.stagger.hitWithin;
     if (world.time < (fighter.stumbleUntil ?? -1)) return;
-    if (struck && staggerInstead(world, fighter, Math.max(pushed, overreached), null)) {
+    // His poise takes the blow's share of it: in heavy armour a step catches him without his reeling.
+    const severity = Math.max(pushed, overreached) / poiseOf(fighter);
+    if (struck && severity < WORLD.stagger.startAt && armoured(fighter)) {
+      fighter.knock = [0, 0, 0];
+      fighter.stumbleUntil = world.time + WORLD.stagger.catchSeconds;
+      return;
+    }
+    if (struck && staggerInstead(world, fighter, severity, null)) {
       fighter.knock = [0, 0, 0];
       fighter.stumbleUntil = world.time + WORLD.stagger.catchSeconds;
       return;
@@ -3007,6 +3031,17 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
 }
 
 /**
+ * Poise: how much a fighter's armour keeps a blow from moving him (1 for a
+ * man in his clothes). Its weight against his own, and how rigidly its shell
+ * and padding spread a blow over him (WORLD.poise).
+ */
+export function poiseOf(fighter) {
+  const body = fighter.body;
+  const share = body.bodyMassKg > 0 ? (body.gearKg ?? 0) / body.bodyMassKg : 0;
+  return 1 + WORLD.poise.mass * share + WORLD.poise.shell * (protectionAt(body.gear, 'trunk').blunt ?? 0);
+}
+
+/**
  * Momentum is conserved: the struck part takes the impulse, the striking
  * limb takes it back. Both sides' muscles there are caught off guard for a
  * reflex delay, so the part flies before it is caught. A blow too big for
@@ -3014,19 +3049,25 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
  */
 function pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, harm, blocked, spec, recoil, time, event, share = 1) {
   const body = defender.body;
+  const poise = poiseOf(defender);
   const struck = struckParticles(defender, capsule, closest, contactPoint, spec.push);
+  // A rigid shell carries a blow on the trunk to the whole trunk: the same momentum, less of a fling where it landed.
+  if (poise > 1 && capsule.key === 'trunk') for (const entry of struck) entry[1] += (poise - 1) / poise;
   // A weapon hands over momentum by what meets the body: an edge sinks in, a hard head rebounds.
   const bounce = event.edgeShare === undefined ? WORLD.transferRestitution : WORLD.weaponTransferRestitution.blunt + (WORLD.weaponTransferRestitution.edge - WORLD.weaponTransferRestitution.blunt) * event.edgeShare;
-  const transferred = ((impulse * (1 + bounce)) / (1 + WORLD.restitution)) * share;
+  // An edge or point that went in spent its blow cutting: only the tissue's resistance pushed him.
+  const goneIn = event.energy > 0 ? Math.min(1, ((event.cut ?? 0) + (event.pierce ?? 0)) / event.energy) : 0;
+  const carriedOn = WORLD.edgeCarriesOn * goneIn * (event.edgeShare ?? 0);
+  const transferred = ((impulse * (1 + bounce)) / (1 + WORLD.restitution)) * share * (1 - carriedOn);
   event.transferred = transferred;
   // A heavy blunt blow on armour: he reels. Its blunt peak force is what
-  // tells a hammer from a glove (a cut's sharp force is no shove).
-  if (event.force) stagger(world, defender, (event.force * Math.min(1, event.bluntMix ?? 1) * share) / WORLD.stagger.force, event);
-  const bodyDeltaV = transferred / body.massKg;
+  // tells a hammer from a glove (a cut's sharp force is no shove); his poise spreads it.
+  if (event.force) stagger(world, defender, (event.force * Math.min(1, event.bluntMix ?? 1) * share) / WORLD.stagger.force / poise, event);
+  const bodyDeltaV = transferred / body.massKg / poise;
   if (defender.state === 'up' && bodyDeltaV * harm > WORLD.knockout.bodyDeltaV * BODY.toughness && !blocked) {
     knockOut(world, defender, event, `knocked out (the blow moved his whole body ${bodyDeltaV.toFixed(1)} m/s)`);
   }
-  world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse: transferred, massShare: WORLD.balance.strikeMassShare });
+  world.pendingImpulses.push({ fighter: defender, shares: struck, direction: vec.scale(normal, -1), impulse: transferred, massShare: WORLD.balance.strikeMassShare * poise });
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: normal, impulse: transferred });
   for (const [index, weight] of struck) if (weight > 0.2) defender.hitAt[index] = time;
   if (capsule.key === 'head') defender.hitAt[P.neck] = time;
@@ -3206,14 +3247,18 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     world.events.push({ time: world.time, kind: 'glance', fighter: defender.id, point: contactPoint, normal });
   }
   if (intoGap) event.effects.push('into a gap in the armour');
+  // An edge or a point opens a wound: it bleeds. On a limb it does not break
+  // the bone nor end him on the spot (unless it takes the limb off): he
+  // bleeds, fast from a deep one, until he collapses.
+  const limbWound = capsule.key !== 'head' && capsule.key !== 'trunk';
   if (cut > 0.5) {
     wound(defender, 'cut', cut, capsule.key, attacker);
-    addDamage(defender, capsule.key, cut / 6, false);
+    addDamage(defender, capsule.key, cut / 6, false, limbWound);
     event.effects.push(cut > 40 ? 'deep cut' : 'cut');
   }
   if (pierce > 0.5) {
     wound(defender, 'pierce', pierce, capsule.key, attacker);
-    addDamage(defender, capsule.key, pierce / 4, false);
+    addDamage(defender, capsule.key, pierce / 4, false, limbWound);
     event.effects.push(pierce > 25 ? 'run through' : 'stabbed');
   }
   let through = false;
@@ -3631,14 +3676,16 @@ export function chinNow(fighter) {
  * against what that tissue takes before it is seriously hurt. Blocked blows
  * count for a little. The view reddens a segment as this rises.
  */
-export function addDamage(fighter, key, deltaV, blocked) {
+export function addDamage(fighter, key, deltaV, blocked, woundOnly = false) {
   const capacity = (WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20) * BODY.toughness;
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
+  fighter.damageVersion += 1;
+  // A wound in the flesh (`woundOnly`: a cut or a stab in a limb) bleeds; it breaks nothing.
+  if (woundOnly) return;
   // The injury itself, uncapped (in the part's capacities): what breaks a limb or kills.
   fighter.trauma ??= {};
   fighter.trauma[key] = (fighter.trauma[key] ?? 0) + share;
-  fighter.damageVersion += 1;
 }
 
 // The joint that goes when a segment is broken: the arm hangs from the elbow, the leg gives at the knee or hip.

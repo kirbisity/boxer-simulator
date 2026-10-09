@@ -113,6 +113,8 @@ export const BODY = {
 export const DEFAULT_INPUTS = {
   name: 'Fighter', sex: 'male', heightCm: 180, frame: 'medium', age: 27,
   exercise: 0.4, calories: 2800, style: 'boxing',
+  // How precisely he places his blows, apart from his body (0..1; 0.5 an ordinary trained man).
+  skill: 0.5,
   look: { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' },
 };
 
@@ -733,6 +735,7 @@ export function buildBody(rawInputs) {
       rLeg: segments.rThigh.mass + segments.rShank.mass,
     },
     technique,
+    skill: inputs.skill ?? 0.5,
     reach: lengths.upperArm + lengths.forearmToFist,
     headMass,
     // Effective head mass at impact: a strong neck braces the head to the

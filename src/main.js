@@ -852,6 +852,8 @@ const FIELDS = [
   // Body fat is not set but settles from what goes in and what is burnt; the
   // slider spans the intakes that settle between BMI 10 and BMI 100.
   { key: 'calories', label: 'Calories', type: 'range', step: 10, range: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean), format: (value) => `${Math.round(value).toLocaleString('en')} kcal` },
+  // How precisely he places his blows, apart from his body (WORLD.skill).
+  { key: 'skill', label: 'Skill', type: 'range', min: 0, max: 1, step: 0.05, format: (value) => `${Math.round((value ?? 0.5) * 100)}%` },
 ];
 const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 // The compact grid: the fighting style first, then the look.

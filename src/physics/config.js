@@ -142,10 +142,31 @@ export const WORLD = {
   // more visible knockback; damage still uses the cushioned figure.
   transferRestitution: 0.6,
   // A weapon's blow, by what meets the body: a hard blunt head rebounds and
-  // shoves (`blunt`); an edge or a point sinks in and slides rather than
-  // bouncing off (`edge`), so a cut hands over less momentum than a club.
-  // Mixed by the blow's blunt and cut-and-pierce shares.
-  weaponTransferRestitution: { blunt: 0.5, edge: 0.25 },
+  // shoves (`blunt`); an edge or a point sinks in and does not bounce off
+  // (`edge`: a perfectly inelastic contact), so a cut hands over less
+  // momentum than a club. Mixed by the blow's blunt and cut-and-pierce shares.
+  weaponTransferRestitution: { blunt: 0.5, edge: 0 },
+  // An edge or point that goes in keeps going: the tissue's resistance, not
+  // the blade's whole momentum, is what pushes the man. Of the momentum an
+  // edge would hand over, this share is spent cutting (scaled by how much of
+  // the blow's energy went into the cut or the stab, against armour that
+  // stopped it): a sword barely moves a man; a club, whose blow is all blunt,
+  // shoves him.
+  edgeCarriesOn: 0.7,
+  // Poise: armour against being moved by a blow. Its weight is more mass to
+  // shift (already in the body's mass); its rigid shell and padding spread
+  // the blow over the whole trunk and into braced legs, so the same momentum
+  // knocks him less and staggers him less. Poise = 1 + `mass` × (armour kg ÷
+  // body kg) + `shell` × (its blunt protection on the trunk); the push his
+  // legs must take and a blow's stagger are divided by it.
+  poise: { mass: 1.2, shell: 1.2 },
+  // Skill: how precisely a fighter places his blows (0..1), apart from his
+  // body. 0.5 is an ordinary trained man and fights as before: above it the
+  // scatter he has (a wild swinger's, a heavy weapon's) narrows, to none at 1;
+  // below it a novice's error is added, up to `aimError` (m, each way) at 0,
+  // by what he strikes with: points (spear, rapier) need precision most. A
+  // gun's or a bow's spread scales by 1 ± `gunSpread` × (0.5 − skill).
+  skill: { aimError: { hand: 0.02, blunt: 0.05, blade: 0.04, point: 0.06 }, gunSpread: 1 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -153,12 +174,12 @@ export const WORLD = {
   // Accumulated brain strain (Σ(Δv − 1.2)²) a fighter absorbs, per unit of
   // chin, before going down. The count is against the total, and after each
   // knockdown only half as much again puts him back down.
-  concussionCapacity: 4,
+  concussionCapacity: 4.1,
   concussionAfterKnockdown: 0.5,
   // Knocked out outright, no count: a head speed change this many times the
   // chin (the chin scales with neck and body), or a blow that moves the whole
   // body faster than this (m/s) — too much force for the mass that took it.
-  knockout: { overChin: 1.8, bodyDeltaV: 2.4 },
+  knockout: { overChin: 1.85, bodyDeltaV: 2.45 },
   // A heavy attack: first loaded (seconds sitting down on the legs, turned
   // away by this share of the strike's own twist), then thrown with more of
   // the body's weight behind the limb, at a higher stamina cost, and leaving
