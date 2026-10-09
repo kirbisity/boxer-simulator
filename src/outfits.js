@@ -674,10 +674,11 @@ export const OUTFITS = {
     ],
   },
   // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the
-  // 1120s–40s, a legend of an earlier age (not in the Ming levels). Iron
-  // scale over the whole trunk and down to the knees, segmented plates down
-  // the arms and shins, a ridged helmet with an iron face plate and a lamed
-  // gorget leaving only an eye slit. Fought here on foot, with the mace.
+  // 1120s–40s, a legend of an earlier age (not in the Ming levels). As the
+  // reconstructions show it: lamellar of small dotted iron plates from the
+  // shoulders to below the knee over a red robe, a tall pointed helmet with
+  // a plume, and an aventail rolled up round the face so only the eyes show.
+  // Fought here on foot, with the mace. The flagship of its faction, drawn in full.
   ironPagoda: {
     faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
@@ -689,9 +690,10 @@ export const OUTFITS = {
     protection: { blunt: 0.66, cut: 0.95, pierce: 0.8, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
     courage: 0.4,
     designs: [
-      { label: 'Black iron', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#5a5d63', lace: '#2a1c14' }, head: { kind: 'pagodaHelm', color: '#5a5d63' }, feet: { kind: 'sabaton', color: '#5a5d63' } },
-      { label: 'Bright steel, red lacing', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#a7adb6', lace: '#7a1418' }, head: { kind: 'pagodaHelm', color: '#a7adb6' }, feet: { kind: 'sabaton', color: '#a7adb6' } },
-      { label: 'Lacquered black', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#141416' }, armor: { kind: 'ironPagoda', color: '#2c2d31', lace: '#8a6a2a' }, head: { kind: 'pagodaHelm', color: '#2c2d31' }, feet: { kind: 'sabaton', color: '#2c2d31' } },
+      // Lamellar of dotted iron plates over a red robe, brown riding boots; the helmet a tall bowl with a plume or a horsehair tassel.
+      { label: 'Polished steel, black plume', top: { kind: 'longsleeve', color: '#6a1418' }, bottom: { kind: 'pants', color: '#2a1a14' }, armor: { kind: 'ironPagoda', color: '#c3c8d0', lace: '#121214', leather: '#5a3a22', cloth: '#6a1418', cloth2: '#d8c89a', gold: '#9ea4ad' }, head: { kind: 'pagodaHelm', color: '#c3c8d0', gold: '#9ea4ad', plume: 'feathers', plumeColor: '#16161a', lace: '#111114' }, feet: { kind: 'jinBoot', color: '#4a2e1c' } },
+      { label: 'Blued steel, brass edging', top: { kind: 'longsleeve', color: '#5a1014' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'ironPagoda', color: '#2f3846', lace: '#0e0e12', leather: '#3a2416', cloth: '#5a1014', cloth2: '#c9b27a', gold: '#c9a23a' }, head: { kind: 'pagodaHelm', color: '#2f3846', gold: '#c9a23a', plume: 'feathers', plumeColor: '#141416', lace: '#0e0e12' }, feet: { kind: 'jinBoot', color: '#3a2416' } },
+      { label: 'Red horsehair tassel', top: { kind: 'longsleeve', color: '#7a1418' }, bottom: { kind: 'pants', color: '#2a1a14' }, armor: { kind: 'ironPagoda', color: '#b4bac3', lace: '#141416', leather: '#4a2e1c', cloth: '#7a1418', cloth2: '#d8c89a', gold: '#c9a23a' }, head: { kind: 'pagodaHelm', color: '#b4bac3', gold: '#c9a23a', plume: 'tassel', plumeColor: '#b3161b', lace: '#141416' }, feet: { kind: 'jinBoot', color: '#4a2e1c' } },
     ],
   },
   // Guan Yu, as the temples and the opera show him: the green robe

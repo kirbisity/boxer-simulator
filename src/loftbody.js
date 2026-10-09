@@ -69,6 +69,13 @@ export const LOFT = {
   facetedSides: 7,
   // Rings per unit of each part's count; above 1 is denser along the limbs.
   rowDensity: 1.4,
+  // Lamellae drawn as plates (a flagship's armour, drawn in full): each a
+  // rounded-top plate standing `lift` (share of the radius) off the piece,
+  // its foot a further `tilt` out so the rows overlap like scales; `width`
+  // of its column (the rest a dark gap of lacing), reaching `overlap` of a
+  // row down over the next; two punched holes (`holes`: heights up the plate,
+  // `hole`: size as a share of the plate's width and height).
+  lamellae: { lift: 0.035, tilt: 0.03, width: 0.86, overlap: 0.3, shoulder: 0.78, holes: [0.62, 0.36], hole: [0.26, 0.11] },
   // A light relaxation rounds the ring edges without losing the shapes.
   relaxPasses: 2,
   relaxAmount: 0.3,
@@ -286,12 +293,19 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.97, 1.22, { rivets: 4, base: 'cloth', mirror: [0.62, 0.15, 'steel'] }], skirt: [0.88, 0.6, 1.34, { rivets: 4, base: 'cloth' }], collar: 'steel',
     upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
   },
-  // The Iron Pagoda: iron scale over the trunk and down to the knees, broad
-  // shoulder lames and segmented arm tubes, knee cops and lamed greaves.
+  // The Iron Pagoda (as reconstructed): lamellar of small dotted iron plates
+  // laced in rows, a cuirass to the waist under crossed leather straps, a
+  // buckled belt and a braided cord sash with cords hanging; a long skirt of
+  // the same to below the knee, split front and sides over a red robe;
+  // layered lamellar over the shoulders, the red sleeve at the elbow, lamellar
+  // guards to the wrist. Drawn plate by plate (lamellae) but in a crowd.
   ironPagoda: {
-    trunk: [-0.08, 1.0, 1.24, { scales: true }], skirt: [0.98, 0.65, 1.36, { scales: true }], collar: 'steel',
-    upperArm: [[-0.32, 0.42, 1.62, { rows: ['steel', 'steel2'] }], [0.42, 1.02, 1.4, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.02, 1.34, { rows: ['steel', 'steel2'] }],
-    knee: [0.84, 1.06, 1.46, 'steel'], shin: [0.05, 0.95, 1.3, { rows: ['steel', 'steel2'] }],
+    trunk: [[-0.08, 1.0, 1.24, { lamellae: 34 }], [0.2, 0.26, 1.37, { buckle: 'gold', base: 'leather' }], [0.13, 0.18, 1.39, { braid: 'leather', base: 'cloth2' }]],
+    skirt: [[1.32, 0.55, 1.28, 'cloth'], [0.98, 0.6, 1.36, { lamellae: 30, gaps: [0, Math.PI / 2, -Math.PI / 2], gapWidth: 0.07, edge: 'gold' }]],
+    collar: 'steel',
+    upperArm: [[-0.32, 0.5, 1.62, { lamellae: 22 }], [0.45, 0.82, 1.44, { lamellae: 18, shade: 1 }]], forearm: [0.12, -0.02, 1.36, { lamellae: 16 }],
+    straps: [[0.98, 0.55, 0.32, -0.75, 0.12, 1.37, 'leather'], [0.98, -0.55, 0.32, 0.75, 0.12, 1.37, 'leather'], [0.98, Math.PI - 0.55, 0.32, Math.PI + 0.75, 0.12, 1.37, 'leather'], [0.98, Math.PI + 0.55, 0.32, Math.PI - 0.75, 0.12, 1.37, 'leather']],
+    tassels: [[0.55, 0.75, 0.05, 1.5, 'cloth2'], [0.68, 0.62, 0.05, 1.5, 'cloth2']],
   },
   // Steppe lamellar: iron plates laced in rows to the knees, iron bracers;
   // the leather kind the same cut in hardened hide; the kheshig's gilt-bossed scale.
@@ -453,10 +467,127 @@ function paintFor(paint, armor) {
     // Scales: rows of them, each offset by half a scale from the one above,
     // the lower edge of every third row dark with its lacing so the rows read.
     if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
+    // Lamellae drawn plainly (a crowd): rows of plates and their lacing; the robe in the splits.
+    if (paint.lamellae) return inLamellaGap(paint, angle) ? 'cloth' : index % 3 === 2 ? 'lace' : 'steel';
+    // A belt with its buckle in front; a braided cord.
+    if (paint.buckle) return Math.cos(angle) > 0.96 ? paint.buckle : paint.base;
+    if (paint.braid) return (index + step) % 2 ? paint.braid : paint.base;
     if (paint.rivets && index % paint.rivets === 1 && step % 3 === 0) return 'gold';
     if (paint.rows) return paint.rows[index % paint.rows.length];
     return paint.base;
   };
+}
+
+/** Whether an angle round a piece (0 at the front) falls in one of its lamellar splits (`gaps`: centres and a half-width, rad). */
+function inLamellaGap(paint, angle) {
+  const half = paint.gapWidth ?? 0;
+  return (paint.gaps ?? []).some((centre) => Math.abs(Math.atan2(Math.sin(angle - centre), Math.cos(angle - centre))) < half);
+}
+
+/** A ring at a fractional place along a run of rings: its centre, axes and size between its neighbours. */
+function ringAt(rings, place) {
+  const index = Math.max(0, Math.min(rings.length - 2, Math.floor(place)));
+  const share = place - index;
+  const a = rings[index];
+  const b = rings[index + 1];
+  const mix = (x, y) => x + (y - x) * share;
+  return {
+    t: mix(a.t, b.t), center: vec.lerp(a.center, b.center, share), depthAxis: a.depthAxis, widthAxis: a.widthAxis,
+    depth: mix(a.depth, b.depth), width: mix(a.width, b.width),
+  };
+}
+
+/** A point on a ring's surface at `angle` (0 at the front), `out` times its radius. */
+function onRing(ring, angle, out) {
+  return vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * out), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * out)));
+}
+
+/**
+ * Add a flat polygon to the mesh, lying on a piece of the body: its corners
+ * as [place along the rings, angle, out], wound to face outward, each
+ * weighted where the body's surface is beneath it.
+ */
+function addPatch(mesh, rings, corners, role, bones) {
+  const start = mesh.positions.length / 3;
+  const points = corners.map(([place, angle, out]) => onRing(ringAt(rings, place), angle, out));
+  for (const [index, [place, angle]] of corners.entries()) {
+    const ring = ringAt(rings, place);
+    mesh.positions.push(...points[index]);
+    mesh.weightPositions.push(...onRing(ring, angle, 1));
+    mesh.colors.push(role);
+    mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
+  }
+  // Wound so its face looks away from the piece's axis.
+  const [place0, angle0] = corners[0];
+  const outward = vec.sub(points[0], ringAt(rings, place0).center);
+  const normal = vec.cross(vec.sub(points[1], points[0]), vec.sub(points[2], points[0]));
+  const flip = vec.dot(normal, outward) < 0;
+  for (let corner = 1; corner < corners.length - 1; corner += 1) {
+    if (flip) mesh.indices.push(start, start + corner + 1, start + corner);
+    else mesh.indices.push(start, start + corner, start + corner + 1);
+  }
+  return angle0;
+}
+
+/**
+ * Lamellae as plates: a row of small rounded-top plates between each pair
+ * of rings, `paint.lamellae` round, each row offset half a plate from the
+ * next, their rounded tops up (towards the shoulder on an arm), each with
+ * two dark punched holes; none in the piece's splits (`gaps`). The bottom
+ * row is `paint.edge` (a brass-edged hem) if given.
+ */
+function lamellaeOn(mesh, rings, inflate, paint, bones) {
+  const spec = LOFT.lamellae;
+  const columns = paint.lamellae;
+  // Which way along the rings is up in the bind pose: the plates' tops go that way.
+  const rising = rings.at(-1).center[1] >= rings[0].center[1];
+  const rows = rings.length - 1;
+  for (let row = 0; row < rows; row += 1) {
+    // The plate's foot and top as places along the rings.
+    const foot = rising ? row : row + 1;
+    const way = rising ? 1 : -1;
+    const lowest = rising ? row === 0 : row === rows - 1;
+    const role = lowest && paint.edge ? paint.edge : (row + (paint.shade ?? 0)) % 4 === 3 ? 'steel2' : 'steel';
+    for (let column = 0; column < columns; column += 1) {
+      const angle = ((column + (row % 2) * 0.5) / columns) * Math.PI * 2;
+      if (inLamellaGap(paint, angle)) continue;
+      const half = (Math.PI / columns) * spec.width;
+      const along = (u) => foot + way * u;
+      const out = (u) => inflate + spec.lift + spec.tilt * Math.max(0, 1 - u);
+      const bottom = -spec.overlap;
+      addPatch(mesh, rings, [
+        [along(bottom), angle - half, out(bottom)], [along(bottom), angle + half, out(bottom)],
+        [along(spec.shoulder), angle + half, out(spec.shoulder)], [along(1), angle, out(1)], [along(spec.shoulder), angle - half, out(spec.shoulder)],
+      ], role, bones);
+      // The holes: small dark squares a hair out from the plate.
+      const [across, high] = spec.hole;
+      for (const at of spec.holes) {
+        const u = bottom + (1 - bottom) * at;
+        const lift = out(u) + 0.006;
+        addPatch(mesh, rings, [
+          [along(u - high / 2), angle - half * across, lift], [along(u - high / 2), angle + half * across, lift],
+          [along(u + high / 2), angle + half * across, lift], [along(u + high / 2), angle - half * across, lift],
+        ], 'lace', bones);
+      }
+    }
+  }
+}
+
+/**
+ * A strap or a cord laid over a piece: from [place along the rings, angle]
+ * to another, `width` (rad round the piece), `out` times its radius.
+ */
+function stripOn(mesh, rings, from, to, width, out, role, bones) {
+  const steps = 8;
+  for (let step = 0; step < steps; step += 1) {
+    const a = step / steps;
+    const b = (step + 1) / steps;
+    const placeA = from[0] + (to[0] - from[0]) * a;
+    const placeB = from[0] + (to[0] - from[0]) * b;
+    const angleA = from[1] + (to[1] - from[1]) * a;
+    const angleB = from[1] + (to[1] - from[1]) * b;
+    addPatch(mesh, rings, [[placeA, angleA - width / 2, out], [placeA, angleA + width / 2, out], [placeB, angleB + width / 2, out], [placeB, angleB - width / 2, out]], role, bones);
+  }
 }
 
 /** A surcoat's field: plain, per pale, quarterly, a cross, a chevron, or a chief. */
@@ -568,7 +699,15 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const hoplomachus = armor?.kind === 'hoplomachus';
   // A kind drawn from the table of pieces.
   const kit = ARMOR_KINDS[armor?.kind] ?? null;
-  const tablePiece = (rings, inflate, paint, bones) => loft(mesh, rings, sides, { color: paintFor(paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+  const tablePiece = (rings, inflate, paint, bones) => {
+    // Lamellae drawn as plates over a backing of their dark lacing (the robe showing in the splits), except in a crowd.
+    if (paint?.lamellae && !lowDetail) {
+      loft(mesh, rings, sides, { color: (ring, angle) => (inLamellaGap(paint, angle) ? 'cloth' : 'lace'), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+      lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
+      return;
+    }
+    loft(mesh, rings, sides, { color: paintFor(paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+  };
   // Lamellar: rows of lacquered scales, laced between rows and down each column.
   const laced = (ring, angle, index) => (index % 3 === 2 ? 'lace' : 'steel');
   const hanging3 = [BONE.pelvis, BONE.lThigh, BONE.rThigh];
@@ -702,6 +841,19 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
   for (const [hem, flare, inflate, paint] of armorPieces(kit, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
   for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) tablePiece(shortsRings(from, to, count(3)), inflate, paint, abdomen);
+  // Straps across the trunk ([from t, from angle, to t, to angle, width rad, out, role]) and cords hanging down the skirt.
+  if (kit?.straps && !lowDetail) {
+    const rings = trunkRings(0, 1, 20);
+    const place = (t) => t * 20;
+    for (const [fromT, fromAngle, toT, toAngle, width, out, role] of kit.straps) stripOn(mesh, rings, [place(fromT), fromAngle], [place(toT), toAngle], width, out, role, abdomen);
+  }
+  if (kit?.tassels && !lowDetail) {
+    // [angle, how far down (thigh lengths below the waist), width rad, out, role]
+    for (const [angle, length, width, out, role] of kit.tassels) {
+      const rings = skirtRings(skirtTo(length), 8, 0.3);
+      stripOn(mesh, rings, [8, angle], [0, angle + 0.05], width, out, role, () => hanging3);
+    }
+  }
   // Cloth worn over the armour (`armor.over`, a kind from the table): Joan's huque over her plate.
   const over = ARMOR_KINDS[armor?.over] ?? null;
   for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
@@ -840,7 +992,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     // Boot shafts up the shin; heels for a woman in business dress.
     const feet = (female && look.femaleFeet) || look.feet || {};
     // Shafts up the shin: an ankle boot just over the ankle bone.
-    const shaft = { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36], heelAnkleBoot: [0.74, 1.2] }[feet.kind];
+    const shaft = { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36], heelAnkleBoot: [0.74, 1.2], jinBoot: [0.3, 1.28] }[feet.kind];
     if (shaft && !plate) loft(mesh, shinRings(shaft[0], 0.98, count(3)), sides, { color: 'boot', inflate: shaft[1], capStart: false, capEnd: false });
     if (feet.socks) loft(mesh, shinRings(0.66, 0.75, 1), sides, { color: 'sock', inflate: 1.28, capStart: false, capEnd: false });
   }

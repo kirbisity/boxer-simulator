@@ -200,6 +200,8 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     // A patent platform shoe: a round toe, straps over the instep and ankle.
     platformShoe: { width: 0.05, height: 0.046, sole: 0x0b0b0d, patent: true },
     dressShoe: { width: 0.045, height: 0.038, sole: 0x2a1d14 },
+    // A Song and Jin rider's leather boot: soft, its toe turned up.
+    jinBoot: { width: 0.056, height: 0.05, sole: 0x2a1d14 },
     // Split-toed socks on straw sandals; a gladiator's leather sandal.
     tabi: { width: 0.046, height: 0.045, sole: 0xc8b27a },
     sandal: { width: 0.036, height: 0.044, sole: 0x5a3a22, skin: true },
@@ -225,6 +227,15 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
       strap.position.set(-0.01, length * along, 0);
       shoe.add(strap);
     }
+  }
+  if (kind === 'jinBoot') {
+    // The toe drawn out and turned up (+x is up from the sole).
+    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.9, length * 0.34, 10), upperMaterial);
+    toe.geometry.translate(0, length * 0.17, 0);
+    toe.scale.set(spec.width / spec.height, 1, 1);
+    toe.position.set(-0.012, length * 0.62, 0);
+    toe.rotation.z = -0.55;
+    shoe.add(toe);
   }
   if (kind === 'trainer' && colors.accent) {
     const swoosh = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.6, length * 0.5, spec.height * 2.02), surface(colors.accent));
@@ -724,39 +735,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       }
       break;
     }
-    case 'pagodaHelm': {
-      // The Iron Pagoda's helmet: a rounded iron bowl braced by ridges over
-      // the crown to a knob and spike; an iron face plate over cheeks and jaw
-      // with one narrow eye slit; a gorget of lames closed round the throat.
-      const iron = metal(steel, color);
-      iron.side = THREE.DoubleSide;
-      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.52), iron);
-      bowl.scale.y = 1.18;
-      bowl.position.y = 0.06 * r;
-      group.add(bowl);
-      for (let ridge = 0; ridge < 4; ridge += 1) {
-        const arc = new THREE.Mesh(new THREE.TorusGeometry(1.21 * r, 0.06 * r, 5, 18, Math.PI), iron);
-        arc.scale.y = 1.18;
-        arc.rotation.y = (ridge * Math.PI) / 4;
-        arc.position.y = 0.06 * r;
-        group.add(arc);
-      }
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.2 * r, 10, 8), iron);
-      knob.position.y = 1.5 * r;
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.07 * r, 0.55 * r, 8), iron);
-      spike.position.y = 1.88 * r;
-      // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
-      const face = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 18, 12, Math.PI * 0.56, Math.PI * 0.88, Math.PI * 0.34, Math.PI * 0.58), iron);
-      const slit = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.08 * r, 1.05 * r), surface(0x0b0b0d));
-      slit.position.set(1.12 * r, 0.2 * r, 0);
-      group.add(knob, spike, face, slit);
-      for (let lame = 0; lame < 3; lame += 1) {
-        const gorget = new THREE.Mesh(new THREE.CylinderGeometry((0.95 + lame * 0.2) * r, (1.15 + lame * 0.2) * r, 0.42 * r, 22, 1, true), iron);
-        gorget.position.y = (-1.0 - lame * 0.36) * r;
-        group.add(gorget);
-      }
+    case 'pagodaHelm':
+      buildPagodaHelm(group, head, r, steel, color);
       break;
-    }
     case 'steppeHelm': {
       // A steppe helmet: a tall pointed iron bowl, a brow band, a spike with
       // a plume, a lamellar aventail round the sides and back (open at the
@@ -1053,6 +1034,147 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
   }
   inkAll(group);
   return { group, hidesHair };
+}
+
+// The Iron Pagoda's helmet, in head radii (WARDROBE-style dials): the bowl's
+// lathe profile bottom-up, the aventail's tiers rolled round the neck and
+// chin up to just under the eyes, the plates in each tier.
+const PAGODA_HELM = {
+  // The bowl sits from the brow (`brow`, above the eyes) up to its point; the spike rises from there.
+  brow: 0.38,
+  bowl: [[1.2, -0.02], [1.22, 0.14], [1.17, 0.52], [1.04, 0.9], [0.82, 1.3], [0.52, 1.66], [0.22, 1.98], [0.06, 2.16]],
+  spikeTop: 3.9,
+  // Tiers bottom to top: [height of the plates' middle, radius out from the neck, how far each tier rolls out at its foot].
+  aventail: [[-1.92, 1.95, 0.32], [-1.5, 1.78, 0.3], [-1.08, 1.6, 0.28], [-0.66, 1.46, 0.24], [-0.26, 1.38, 0.2]],
+  // The top tier rises from under the eyes in front to the bowl's rim at the sides and behind (head radii at the back).
+  riseBehind: 0.7,
+  plates: 30,
+  plate: [0.32, 0.5],
+};
+
+/**
+ * The Iron Pagoda's helmet (the Jin heavy horse of the 1120s–40s, as
+ * reconstructed): a tall steel bowl rising to a point, a spike finial with
+ * a plume (dark feathers) or a horsehair tassel falling behind, a riveted
+ * brow peak; and the aventail, tiers of small dotted iron plates rolled up
+ * round the neck and chin to just under the eyes, so only the eyes show.
+ * The aventail's plates are instanced: dozens of them for the cost of two meshes.
+ */
+function buildPagodaHelm(group, head, r, steel, color) {
+  const spec = PAGODA_HELM;
+  const iron = metal(steel, color);
+  iron.side = THREE.DoubleSide;
+  const trim = metal(steel, head.gold ?? color);
+  const brow = spec.brow;
+  const bowl = new THREE.Mesh(new THREE.LatheGeometry(spec.bowl.map(([x, y]) => new THREE.Vector2(x * r, (y + brow) * r)), 28), iron);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.22 * r, 0.07 * r, 6, 30), trim);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = (brow + 0.02) * r;
+  group.add(bowl, rim);
+  // The brow peak: a curved plate out over the eyes, riveted to the rim.
+  const peak = new THREE.Mesh(new THREE.CylinderGeometry(1.32 * r, 1.42 * r, 0.16 * r, 20, 1, true, Math.PI * 0.32, Math.PI * 0.36), trim);
+  peak.material = trim.clone();
+  peak.material.side = THREE.DoubleSide;
+  peak.position.y = (brow - 0.02) * r;
+  group.add(peak);
+  for (let rivet = -2; rivet <= 2; rivet += 1) {
+    const angle = rivet * 0.22;
+    const stud = new THREE.Mesh(new THREE.SphereGeometry(0.045 * r, 6, 4), trim);
+    stud.position.set(Math.cos(angle) * 1.25 * r, (brow + 0.12) * r, Math.sin(angle) * 1.25 * r);
+    group.add(stud);
+  }
+  // The finial: a cup on the point and a slender spike above it.
+  const cup = new THREE.Mesh(new THREE.SphereGeometry(0.12 * r, 10, 8), trim);
+  const point = 2.12 + brow;
+  cup.position.y = point * r;
+  const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.018 * r, 0.05 * r, (spec.spikeTop - point) * r, 8), iron);
+  spike.position.y = ((spec.spikeTop + point) / 2) * r;
+  group.add(cup, spike);
+  if (head.plume === 'tassel') {
+    // A horsehair tassel: long red hair from the cup, falling back and down behind.
+    const hair = surface(head.plumeColor ?? 0xb3161b, { roughness: 0.95 });
+    for (let lock = 0; lock < 24; lock += 1) {
+      const spread = (lock / 23 - 0.5) * 1.3;
+      const length = (2.4 + (lock % 3) * 0.35) * r;
+      const strand = new THREE.Mesh(new THREE.ConeGeometry(0.12 * r, length, 5), hair);
+      // Hanging from its top: the cone points down along −y from the cup.
+      strand.geometry.rotateZ(Math.PI);
+      strand.geometry.translate(0, -length / 2, 0);
+      strand.position.set(-0.04 * r, (point + 0.06) * r, spread * 0.2 * r);
+      // Falling back over the bowl and down behind, fanned a little side to side (a −z turn swings the foot back, −x).
+      strand.rotation.set(spread * 0.45, 0, -0.95 - (lock % 2) * 0.12);
+      group.add(strand);
+    }
+  } else if (head.plume) {
+    // Feathers standing up from the spike, fanned a little.
+    const feather = surface(head.plumeColor ?? 0x1a1a1c, { roughness: 0.9 });
+    for (let quill = 0; quill < 4; quill += 1) {
+      const lean = (quill / 3 - 0.5) * 0.55;
+      const length = (1.8 + (quill % 2) * 0.4) * r;
+      const vane = new THREE.Mesh(new THREE.ConeGeometry(0.15 * r, length, 4), feather);
+      vane.scale.z = 0.3;
+      vane.geometry.translate(0, length / 2, 0);
+      vane.position.y = (spec.spikeTop - 0.75) * r;
+      vane.rotation.set(lean * 0.6, quill * 0.5, lean);
+      group.add(vane);
+    }
+  }
+  // The aventail: tiers of plates round the neck and chin, each rolled out at its foot.
+  const [width, height] = spec.plate;
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, -height / 2);
+  shape.lineTo(width / 2, -height / 2);
+  shape.lineTo(width / 2, height * 0.22);
+  shape.quadraticCurveTo(width / 2, height / 2, 0, height / 2);
+  shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height * 0.22);
+  shape.closePath();
+  const plateGeometry = new THREE.ShapeGeometry(shape, 3);
+  plateGeometry.scale(r, r, r);
+  const plateMaterial = metal(steel, head.aventail ?? color);
+  plateMaterial.side = THREE.DoubleSide;
+  const dotGeometry = new THREE.CircleGeometry(0.045 * r, 6);
+  const dotMaterial = surface(head.lace ?? 0x141416);
+  dotMaterial.side = THREE.DoubleSide;
+  const placements = [];
+  const holder = new THREE.Object3D();
+  // Behind each tier its leather backing, dark, so the gaps between plates show lacing, not the face.
+  const backing = surface(head.lace ?? 0x141416);
+  backing.side = THREE.DoubleSide;
+  spec.aventail.forEach(([y, radius, roll], tier) => {
+    const top = tier === spec.aventail.length - 1;
+    // Just inside the plates, rolled out at the foot as they are.
+    const flare = Math.sin(roll) * (spec.plate[1] / 2);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry((radius - flare - 0.07) * r, (radius + flare - 0.07) * r, spec.plate[1] * r, 28, 1, true), backing);
+    band.position.y = y * r;
+    band.userData.noOutline = true;
+    group.add(band);
+    for (let index = 0; index < spec.plates; index += 1) {
+      const angle = ((index + (tier % 2) * 0.5) / spec.plates) * Math.PI * 2;
+      const ahead = Math.cos(angle);
+      // At the back and sides the tiers climb to the rim; the top tier in front stops under the eyes.
+      const rise = top ? ((1 - ahead) / 2) ** 0.6 * spec.riseBehind : 0;
+      holder.position.set(ahead * radius * r, (y + rise) * r, -Math.sin(angle) * radius * r);
+      // Face outward, the foot rolled out from the neck.
+      holder.rotation.set(0, angle + Math.PI / 2, 0);
+      holder.rotateX(-roll);
+      holder.updateMatrix();
+      placements.push(holder.matrix.clone());
+    }
+  });
+  const plates = new THREE.InstancedMesh(plateGeometry, plateMaterial, placements.length);
+  const dots = new THREE.InstancedMesh(dotGeometry, dotMaterial, placements.length * 2);
+  const dotOffset = new THREE.Matrix4();
+  placements.forEach((matrix, index) => {
+    plates.setMatrixAt(index, matrix);
+    // Two punched holes down each plate, their lacing dark in them.
+    for (const [slot, rise] of [[0, 0.12], [1, -0.1]]) {
+      dotOffset.makeTranslation(0, rise * r, 0.004 * r);
+      dots.setMatrixAt(index * 2 + slot, matrix.clone().multiply(dotOffset));
+    }
+  });
+  plates.userData.noOutline = true;
+  dots.userData.noOutline = true;
+  group.add(plates, dots);
 }
 
 /** Steel of another colour, polished like the rest. */
