@@ -1019,7 +1019,11 @@ export const STYLES = {
     label: 'Ōdachi', weapon: 'odachi', fallback: 'mix',
     cadence: { work: 1.05, move: 0.85, burst: 0.55, mobility: 0.5 },
     stance: { blade: 0.45, crouch: 0.06, width: 1.25, lean: 0.06, guardHeight: 0 },
-    weaponGuard: { hand: [0.14, 0.58, -0.04], dir: [1, 0.7, 0] },
+    // Hassō no kamae, as the great sword is shown carried: the right hand at
+    // the tsuba by the right shoulder, the left low on the long tsuka at the
+    // pommel before the chest, the blade standing up and back over the right
+    // shoulder — the downward cuts (shomen, kesagiri) start from just above it.
+    weaponGuard: { hand: [0.07, 0.8, -0.13], dir: [-0.55, 0.72, -0.42] },
     idle: { bounce: 0.15, sway: 0.4, rock: 0.3 },
     attacks: { shomen: 0.3, kesagiri: 0.3, yokogiri: 0.25, kiriage: 0.1, tsuki: 0.05 },
     combos: { 'kesagiri gyakuKesa': 0.4, 'yokogiri shomen': 0.35, 'shomen yokogiri': 0.25 },

@@ -383,39 +383,51 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       break;
     }
     case 'greatHelm': {
-      // The early (12th–13th c.) helm is a tall flat-topped can: well above the sights and down to the chin;
-      // the later one shorter under a low dome.
-      const tall = head.flatTop ? 0.45 : 0;
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.22 * r, (2.1 + tall) * r, 20, 1, false), steel);
-      barrel.position.y = (-0.15 + tall * 0.25) * r;
-      const crown = head.flatTop
-        ? new THREE.Mesh(new THREE.CylinderGeometry(1.14 * r, 1.2 * r, 0.12 * r, 20), steel)
-        : new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.32), steel);
-      crown.position.y = head.flatTop ? (0.93 + tall * 0.75) * r : 0.55 * r;
+      // The great helm of the Templars' day (c. 1220–1250): a tall can over
+      // the whole head, its sides drawing in a little towards a rounded crown,
+      // its lower edge flaring a little over the mail coif; a raised strip
+      // down the middle of the front to the sight, one sight across, rows of
+      // breaths in the faceplate below it.
+      // Its outline (radius at height, in head radii), from the lower edge up to where the crown rounds over.
+      const sides = [[-1.31, 1.29], [-1.2, 1.22], [-0.9, 1.2], [0.3, 1.16], [0.95, 1.08]];
+      const crownFrom = 0.95;
+      const crownRise = 0.47;
+      const radiusAt = (y) => {
+        if (y >= crownFrom) return sides.at(-1)[1] * Math.sqrt(Math.max(0, 1 - ((y - crownFrom) / crownRise) ** 2));
+        const upper = sides.findIndex(([at]) => at >= y);
+        if (upper <= 0) return sides[0][1];
+        const [y0, r0] = sides[upper - 1];
+        const [y1, r1] = sides[upper];
+        return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0);
+      };
+      const profile = sides.map(([y, radius]) => new THREE.Vector2(radius * r, y * r));
+      for (let step = 1; step <= 8; step += 1) {
+        const angle = (step / 8) * (Math.PI / 2);
+        profile.push(new THREE.Vector2(Math.max(1e-3, sides.at(-1)[1] * Math.cos(angle)) * r, (crownFrom + crownRise * Math.sin(angle)) * r));
+      }
+      const shellSteel = steel.clone();
+      shellSteel.side = THREE.DoubleSide;
+      const shell = new THREE.Mesh(new THREE.LatheGeometry(profile, 28), shellSteel);
+      group.add(shell);
       const dark = surface(0x050506);
-      // The sights: two slits either side of the nasal.
-      for (const side of [1, -1]) {
-        const slit = new THREE.Mesh(new THREE.BoxGeometry(0.2 * r, 0.08 * r, 0.72 * r), dark);
-        slit.position.set(1.17 * r, 0.12 * r, side * 0.44 * r);
-        slit.userData.noOutline = true;
-        group.add(slit);
-      }
-      // The cross of reinforcing bands: a brow band across above the sights and the nasal down the middle.
-      const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, (1.45 + tall) * r, 0.16 * r), steel);
-      nasal.position.set(1.24 * r, (-0.15 - tall * 0.25) * r, 0);
-      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, 0.14 * r, 1.7 * r), steel);
-      brow.position.set(1.18 * r, 0.28 * r, 0);
-      brow.rotation.y = 0;
-      group.add(barrel, crown, nasal, brow);
-      // The mail coif under it, from inside its rim down over the neck to the shoulders (`coif`: its colour).
-      if (head.coif) {
-        const rim = (-0.15 + tall * 0.25 - (2.1 + tall) / 2) * r;
-        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.3 * r, 0.75 * r, 20, 1, true), surface(new THREE.Color(head.coif).getHex(), { roughness: 0.9 }));
-        coif.material.side = THREE.DoubleSide;
-        coif.position.y = rim - 0.22 * r;
-        group.add(coif);
-      }
-      // Breaths: rows of holes punched in the lower face, either side of the nasal.
+      // On the shell at height y, `angle` round from the front (+x) towards the left (+z), standing `out` off it.
+      const onShell = (object, y, angle, out = 0) => {
+        const radius = radiusAt(y) + out;
+        object.position.set(Math.cos(angle) * radius * r, y * r, Math.sin(angle) * radius * r);
+        object.rotation.y = -angle;
+        return object;
+      };
+      // The raised strip down the front, from over the crown to the sight.
+      const ridgePath = [];
+      for (let y = crownFrom + crownRise * 0.92; y >= 0.2; y -= 0.05) ridgePath.push(new THREE.Vector3((radiusAt(y) + 0.015) * r, y * r, 0));
+      group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ridgePath), 24, 0.045 * r, 5, false), steel));
+      // The sight: one slit across the front.
+      const sightAt = 0.12;
+      const sight = new THREE.Mesh(new THREE.CylinderGeometry((radiusAt(sightAt) + 0.004) * r, (radiusAt(sightAt) + 0.004) * r, 0.08 * r, 16, 1, true, Math.PI / 2 - 0.62, 1.24), dark);
+      sight.position.y = sightAt * r;
+      sight.userData.noOutline = true;
+      group.add(sight);
+      // Breaths: rows of holes punched in the faceplate, either side of its middle.
       if (head.breaths) {
         const holes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04 * r, 0.06 * r, 0.06 * r), dark, 36);
         const place = new THREE.Object3D();
@@ -423,10 +435,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
         for (const side of [1, -1]) {
           for (let row = 0; row < 6; row += 1) {
             for (let column = 0; column < 3; column += 1) {
-              // On the barrel, angle from the front: x = cos, z = sin.
-              const angle = side * (0.22 + column * 0.17);
-              place.position.set(Math.cos(angle) * 1.215 * r, (-0.15 - row * 0.16) * r, Math.sin(angle) * 1.215 * r);
-              place.rotation.set(0, -angle, 0);
+              onShell(place, -0.12 - row * 0.15, side * (0.14 + column * 0.15), 0.003);
               place.updateMatrix();
               holes.setMatrixAt(at, place.matrix);
               at += 1;
@@ -436,16 +445,20 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
         holes.userData.noOutline = true;
         group.add(holes);
       }
-      // A small cross cut through the lower right of the face.
+      // A small cross cut through the lower left of the face.
       if (head.crossCut) {
-        const angle = -0.5;
-        for (const [w, h] of [[0.05, 0.22], [0.05, 0.08]]) {
-          const piece = new THREE.Mesh(new THREE.BoxGeometry(0.04 * r, h * r, (h === 0.22 ? 0.07 : 0.2) * r), dark);
-          piece.position.set(Math.cos(angle) * 1.22 * r, (-1.0 - tall * 0.3) * r, Math.sin(angle) * 1.22 * r);
-          piece.rotation.y = -angle;
+        for (const [h, w] of [[0.2, 0.06], [0.06, 0.18]]) {
+          const piece = onShell(new THREE.Mesh(new THREE.BoxGeometry(0.04 * r, h * r, w * r), dark), -1.02, 0.5, 0.003);
           piece.userData.noOutline = true;
           group.add(piece);
         }
+      }
+      // The mail coif under it, from inside its lower edge down over the neck to the shoulders (`coif`: its colour).
+      if (head.coif) {
+        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.3 * r, 0.75 * r, 20, 1, true), surface(new THREE.Color(head.coif).getHex(), { roughness: 0.9 }));
+        coif.material.side = THREE.DoubleSide;
+        coif.position.y = (sides[0][0] - 0.22) * r;
+        group.add(coif);
       }
       break;
     }
@@ -1940,7 +1953,7 @@ function clothSheet(anchor, chains, { closed, link, paint, folds }) {
         // Folds: the hem is wider than where it hangs from, so the cloth falls in
         // flutes, shallow at the top and deeper down (out from the anchor's axis).
         const outward = Math.hypot(point.x, point.z) || 1;
-        const fold = folds * (0.25 + 0.75 * (v / (height - 1))) * Math.sin((u / across) * Math.PI * 2);
+        const fold = folds * (0.1 + 0.9 * (v / (height - 1))) * Math.sin((u / across) * Math.PI * 2);
         positions.set([point.x + (point.x / outward) * fold, point.y, point.z + (point.z / outward) * fold], (v * width + u) * 3);
       }
     }
@@ -2043,25 +2056,12 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
         const theta = Math.PI * 1.5 + Math.PI * 0.65 - (Math.PI * 1.3) / 18;
         for (const [w, h] of [[0.035, 0.12], [0.1, 0.035]]) {
           const bar = new THREE.Mesh(new THREE.BoxGeometry(w * scale, h * scale, 0.004 * scale), red);
-          bar.position.set(Math.sin(theta) * 0.01 * scale, -0.14 * scale, Math.cos(theta) * 0.01 * scale);
+          bar.position.set(Math.sin(theta) * 0.02 * scale, -0.14 * scale, Math.cos(theta) * 0.02 * scale);
           bar.rotation.y = theta;
           topLink.group.add(bar);
         }
       }
       dangles.push(...drape);
-    } else if (extra.kind === 'surcoatSkirt') {
-      // The surcoat below the belt, to the shins: one soft skirt round the
-      // hips; halved in two colours for the Beauséant (`second`: the right side's).
-      const length = (extra.length ?? 0.75) * scale;
-      const waist = body.lengths.hipSpan * 0.95;
-      const left = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
-      left.side = THREE.DoubleSide;
-      const right = extra.second ? surface(new THREE.Color(extra.second).getHex(), { roughness: 0.85 }) : left;
-      if (right !== left) right.side = THREE.DoubleSide;
-      const columns = 12;
-      // Columns from the back round by the right, the front and the left (angle 0 is the left, +z).
-      const paint = (column) => (Math.cos(-Math.PI + (Math.PI * 2 * (column + 0.5)) / columns) > 0 ? left : right);
-      dangles.push(...softDrape(hips, { columns, links: 3, top: waist, hem: waist * 1.55, y: 0.08 * scale, length, centre: 0, arc: Math.PI * 2, sag: 0.2, damping: 0.75, paint }));
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;

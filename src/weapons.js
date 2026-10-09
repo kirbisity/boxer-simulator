@@ -488,8 +488,9 @@ export const WEAPONS = {
   // The ōdachi (nodachi): a field sword of a metre of blade and more, a long
   // grip for two hands; carried by a strong man at Anegawa (1570) to cut at
   // horse and men. Heavy for a sword, long in the reach, slow to recover.
+  // The hands well apart on the long tsuka: the right at the tsuba, the left at the pommel.
   odachi: {
-    label: 'Ōdachi', hands: 'two', length: 1.08, strikeFrom: 0.15, handle: 0.42, spacing: 0.26, mass: 2.3, balance: 0.24, radius: 0.013,
+    label: 'Ōdachi', hands: 'two', length: 1.08, strikeFrom: 0.15, handle: 0.42, spacing: 0.36, mass: 2.3, balance: 0.24, radius: 0.013,
     harm: { swing: { cut: 1.4, blunt: 0.6 }, thrust: { pierce: 0.65, cut: 0.15, blunt: 0.2 } },
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 14, zeta: 0.82 }, threat: 4.9,
   },
