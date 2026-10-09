@@ -69,20 +69,21 @@ function oyoroiDesign(label, { lacquer, lace, gold, leather, stencil, robe, haka
 
 /**
  * A Templar's design: the surcoat and mantle's cloth, the second colour (the
- * cross, or the other half of the Beauséant), and how it is laid out
- * (`pattee`: a cross on the chest; `pale`: halved down the middle).
+ * other half of the Beauséant), and how the field is laid out (`pale`:
+ * halved down the middle; null: plain); on every one the red cross pattée
+ * on the chest (`charge`: drawn sharp-edged over the field).
  */
 function templarDesign(label, cloth, cloth2, heraldry) {
   return {
     label,
     top: { kind: 'longsleeve', color: '#4a4238' },
     bottom: { kind: 'tights', color: '#3a342c' },
-    armor: { kind: 'templar', color: '#8d9097', mail: '#8d9097', cloth, cloth2, heraldry, leather: '#5a3a22' },
+    armor: { kind: 'templar', color: '#8d9097', mail: '#8d9097', cloth, cloth2, heraldry, charge: { kind: 'pattee', color: '#b0181a' }, leather: '#5a3a22' },
     head: { kind: 'greatHelm', color: '#b8bec6', breaths: true, crossCut: true, coif: '#4e5157' },
     feet: { kind: 'compactBoot', color: '#4a2e1a' },
     // The mantle in the surcoat's cloth (white for a knight, black for a sergeant), the red cross on its left shoulder.
     extras: [
-      { kind: 'mantle', color: cloth, cross: '#a2201e', length: 1.32 },
+      { kind: 'mantle', color: cloth, cross: '#b0181a', length: 1.32 },
     ],
   };
 }
@@ -456,8 +457,8 @@ export const OUTFITS = {
     },
     courage: 0.55,
     designs: [
-      templarDesign('Knight brother (white)', '#ece8dc', '#a2201e', 'pattee'),
-      templarDesign('Sergeant brother (black)', '#1c1a1c', '#a2201e', 'pattee'),
+      templarDesign('Knight brother (white)', '#ece8dc', '#a2201e', null),
+      templarDesign('Sergeant brother (black)', '#1c1a1c', '#a2201e', null),
       templarDesign('Beauséant (black and white)', '#ece8dc', '#1c1a1c', 'pale'),
     ],
   },

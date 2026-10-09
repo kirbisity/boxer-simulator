@@ -73,6 +73,8 @@ export function roleColors(dress, skin) {
     leather: base(armor?.leather, 0x5a3a22),
     cloth: base(armor?.cloth, 0x8a1f22),
     cloth2: base(armor?.cloth2, 0xe8e2d2),
+    // A device over the field (a Templar's cross), drawn sharp-edged.
+    charge: base(armor?.charge?.color, 0xa2201e),
   };
 }
 
@@ -384,31 +386,33 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
     }
     case 'greatHelm': {
       // The great helm of the Templars' day (c. 1220–1250): a tall can over
-      // the whole head, its sides drawing in a little towards a rounded crown,
-      // its lower edge flaring a little over the mail coif; a raised strip
-      // down the middle of the front to the sight, one sight across, rows of
-      // breaths in the faceplate below it.
-      // Its outline (radius at height, in head radii), from the lower edge up to where the crown rounds over.
-      const sides = [[-1.31, 1.29], [-1.2, 1.22], [-0.9, 1.2], [0.3, 1.16], [0.95, 1.08]];
-      const crownFrom = 0.95;
-      const crownRise = 0.47;
+      // the whole head, its sides drawing in a little to a sharp shoulder and
+      // a low pointed crown, its lower edge flaring a little over the mail
+      // coif; a raised strip down the middle of the front to the sight, one
+      // sight across, rows of breaths in the faceplate below it.
+      // Its outline (radius at height, in head radii), from the lower edge up to the shoulder.
+      const sides = [[-1.31, 1.29], [-1.2, 1.22], [-0.9, 1.2], [0.3, 1.16], [1.12, 1.08]];
+      const crownFrom = 1.12;
+      const crownRise = 0.26;
       const radiusAt = (y) => {
-        if (y >= crownFrom) return sides.at(-1)[1] * Math.sqrt(Math.max(0, 1 - ((y - crownFrom) / crownRise) ** 2));
+        if (y >= crownFrom) return sides.at(-1)[1] * Math.max(0, 1 - (y - crownFrom) / crownRise);
         const upper = sides.findIndex(([at]) => at >= y);
         if (upper <= 0) return sides[0][1];
         const [y0, r0] = sides[upper - 1];
         const [y1, r1] = sides[upper];
         return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0);
       };
-      const profile = sides.map(([y, radius]) => new THREE.Vector2(radius * r, y * r));
-      for (let step = 1; step <= 8; step += 1) {
-        const angle = (step / 8) * (Math.PI / 2);
-        profile.push(new THREE.Vector2(Math.max(1e-3, sides.at(-1)[1] * Math.cos(angle)) * r, (crownFrom + crownRise * Math.sin(angle)) * r));
-      }
+      // The shoulder twice over, so the sides and the crown each keep their own
+      // shading and meet at a crisp edge; then the cone to its point.
+      const profile = [...sides, sides.at(-1), [crownFrom + crownRise, 0.001]].map(([y, radius]) => new THREE.Vector2(radius * r, y * r));
       const shellSteel = steel.clone();
       shellSteel.side = THREE.DoubleSide;
       const shell = new THREE.Mesh(new THREE.LatheGeometry(profile, 28), shellSteel);
-      group.add(shell);
+      // A riveted seam along the shoulder, where the crown plate meets the sides.
+      const seam = new THREE.Mesh(new THREE.TorusGeometry(sides.at(-1)[1] * r, 0.025 * r, 5, 28), steel);
+      seam.rotation.x = Math.PI / 2;
+      seam.position.y = (crownFrom - 0.01) * r;
+      group.add(shell, seam);
       const dark = surface(0x050506);
       // On the shell at height y, `angle` round from the front (+x) towards the left (+z), standing `out` off it.
       const onShell = (object, y, angle, out = 0) => {
@@ -419,7 +423,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       };
       // The raised strip down the front, from over the crown to the sight.
       const ridgePath = [];
-      for (let y = crownFrom + crownRise * 0.92; y >= 0.2; y -= 0.05) ridgePath.push(new THREE.Vector3((radiusAt(y) + 0.015) * r, y * r, 0));
+      for (let y = crownFrom + crownRise * 0.85; y >= 0.2; y -= 0.04) ridgePath.push(new THREE.Vector3((radiusAt(y) + 0.015) * r, y * r, 0));
       group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ridgePath), 24, 0.045 * r, 5, false), steel));
       // The sight: one slit across the front.
       const sightAt = 0.12;

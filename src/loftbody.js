@@ -219,8 +219,8 @@ export const ARMOR_KINDS = {
   // and knee cops over the chausses.
   templar: {
     // The surcoat is worn clothing, front and back alike, carried by the body
-    // (only the mantle over it swings): to the shins, flared for the stride.
-    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [[0.62, 0.35, 1.13, MAIL], [1.45, 0.6, 1.3, { heraldry: true }]], collar: 'mail',
+    // (only the mantle over it swings): to the knee, flared for the stride.
+    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [[0.62, 0.35, 1.13, MAIL], [0.95, 0.5, 1.3, { heraldry: true }]], collar: 'mail',
     belt: [0.0, 0.08, 1.25, 'leather'],
     upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL], thigh: [-0.05, 1.04, 1.1, MAIL], knee: [0.84, 1.04, 1.32, 'steel'],
     shin: [[-0.12, 0.95, 1.1, MAIL], [0.05, 0.85, 1.22, 'steel']],
@@ -610,20 +610,66 @@ function stripOn(mesh, rings, from, to, width, out, role, bones) {
   }
 }
 
+/** Where along the rings (a place, as ringAt takes) the piece reaches t. */
+function placeAt(rings, t) {
+  for (let index = 0; index < rings.length - 1; index += 1) {
+    const [a, b] = [rings[index].t, rings[index + 1].t];
+    if ((t - a) * (t - b) <= 0) return index + (a === b ? 0 : (t - a) / (b - a));
+  }
+  return Math.abs(t - rings[0].t) < Math.abs(t - rings.at(-1).t) ? 0 : rings.length - 1;
+}
+
+/**
+ * A device laid over a surcoat's field as its own faces, so its edges are
+ * sharp (vertex colours would blur them across the cloth's triangles):
+ * `pattee`, the Temple's cross pattée centred high on the breast, its four
+ * arms widening to their ends. Sizes as shares of the trunk (up it) and of
+ * its half-width (across it).
+ */
+function chargeOn(mesh, rings, kind, out, role, bones) {
+  if (kind !== 'pattee') return;
+  const centre = 0.65;
+  const steps = 12;
+  const angle = (across) => Math.asin(Math.max(-0.95, Math.min(0.95, across)));
+  const patch = (corners) => addPatch(mesh, rings, corners.map(([t, across]) => [placeAt(rings, t), angle(across), out]), role, bones);
+  // The upright: half as wide at the middle as at its ends (up and down the chest).
+  const upright = { reach: 0.2, middle: 0.07, end: 0.17 };
+  // The arms across: as long, in metres, as the upright's (a share of the half-width), as narrow and as flared.
+  const beam = { reach: 0.62, middle: 0.035, end: 0.085 };
+  for (const way of [1, -1]) {
+    for (let step = 0; step < steps; step += 1) {
+      const [a, b] = [step / steps, (step + 1) / steps];
+      const wide = (u) => upright.middle + (upright.end - upright.middle) * u * u;
+      const t = (u) => centre + way * upright.reach * u;
+      patch([[t(a), -wide(a)], [t(a), wide(a)], [t(b), wide(b)], [t(b), -wide(b)]]);
+      const high = (u) => beam.middle + (beam.end - beam.middle) * u * u;
+      const across = (u) => way * beam.reach * u;
+      patch([[centre - high(a), across(a)], [centre + high(a), across(a)], [centre + high(b), across(b)], [centre - high(b), across(b)]]);
+    }
+  }
+}
+
+/**
+ * A field halved per pale, sharp down the middle: the second colour laid over
+ * the right half (`across` below 0) as its own faces, a hair out from the cloth.
+ */
+function paleOn(mesh, rings, out, role, bones) {
+  // Fine enough round that its flat faces do not sink into the curved cloth beneath.
+  const steps = 24;
+  for (let index = 0; index < rings.length - 1; index += 1) {
+    for (let step = 0; step < steps; step += 1) {
+      const [a, b] = [-Math.PI + (Math.PI * step) / steps, -Math.PI + (Math.PI * (step + 1)) / steps];
+      addPatch(mesh, rings, [[index, a, out], [index, b, out], [index + 1, b, out], [index + 1, a, out]], role, bones);
+    }
+  }
+}
+
 /** A surcoat's field: plain, per pale, quarterly, a cross, a chevron, or a chief. */
 function heraldry(kind, t, across, ahead) {
   switch (kind) {
     case 'pale': return across > 0 ? 'cloth' : 'cloth2';
     case 'quarterly': return (across > 0) !== (t > 0.45) ? 'cloth' : 'cloth2';
     case 'cross': return ahead > 0 && (Math.abs(across) < 0.16 || Math.abs(t - 0.62) < 0.06) ? 'cloth2' : 'cloth';
-    // The Temple's cross pattée on the chest: its arms widening to their ends, centred high on the breast.
-    case 'pattee': {
-      if (ahead <= 0.3) return 'cloth';
-      const dt = t - 0.66;
-      const upright = Math.abs(dt) < 0.22 && Math.abs(across) < 0.08 + 0.25 * Math.abs(dt);
-      const beam = Math.abs(across) < 0.42 && Math.abs(dt) < 0.045 + 0.1 * Math.abs(across);
-      return upright || beam ? 'cloth2' : 'cloth';
-    }
     case 'chevron': return ahead > 0 && Math.abs(t - (0.35 + Math.abs(across) * 0.5)) < 0.07 ? 'cloth2' : 'cloth';
     case 'chief': return t > 0.74 ? 'cloth2' : 'cloth';
     default: return 'cloth';
@@ -866,8 +912,19 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     };
     if (shell) loft(mesh, trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
   }
-  for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
-  for (const [hem, flare, inflate, paint] of armorPieces(kit, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
+  // A field per pale is drawn sharp down the middle (paleOn), except in a crowd; a device over it (chargeOn) likewise.
+  const sharpPale = (paint) => paint?.heraldry && armor?.heraldry === 'pale' && !lowDetail;
+  for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) {
+    const rings = trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from)))));
+    tablePiece(rings, inflate, sharpPale(paint) ? 'cloth' : paint, abdomen);
+    if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', abdomen);
+    if (paint?.heraldry && armor?.charge && !lowDetail) chargeOn(mesh, rings, armor.charge.kind, inflate * 1.06, 'charge', abdomen);
+  }
+  for (const [hem, flare, inflate, paint] of armorPieces(kit, 'skirt', 'l')) {
+    const rings = skirtRings(skirtTo(hem), count(6), flare);
+    tablePiece(rings, inflate, sharpPale(paint) ? 'cloth' : paint, () => hanging3);
+    if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', () => hanging3);
+  }
   for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) tablePiece(shortsRings(from, to, count(3)), inflate, paint, abdomen);
   // Straps across the trunk ([from t, from angle, to t, to angle, width rad, out, role]) and cords hanging down the skirt.
   if (kit?.straps && !lowDetail) {
