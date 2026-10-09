@@ -594,6 +594,10 @@ export const SHIELDS = {
   // A police riot shield: clear polycarbonate, ~0.6 × 1.05 m, slightly
   // curved; it stops blows, thrown things and edges, not rounds.
   riotShield: { label: 'Riot shield', shape: 'curved', width: 0.6, height: 1.05, curve: 1.2, mass: 4, offset: 0.1, armHarm: 0.07, look: 'riot' },
+  // The heater: the knight's shield of the 12th–13th century, ~0.6 × 0.8 m,
+  // flat at the top and curving to a point below, a little bent round the
+  // arm; wood faced with leather, painted (the Temple's white with its red cross).
+  heater: { label: 'Heater shield', shape: 'curved', width: 0.56, height: 0.8, curve: 0.75, mass: 4, offset: 0.1, armHarm: 0.08, look: 'heater' },
   scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, look: 'scutum' },
   // The thraex's parmula: small and nearly square (~0.36 × 0.42 m), flat-ish.
   parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, look: 'parmula' },

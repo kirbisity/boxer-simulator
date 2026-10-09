@@ -71,6 +71,24 @@ function oyoroiDesign(label, { lacquer, lace, gold, leather, stencil, robe, haka
   };
 }
 
+/**
+ * A Templar's design: the surcoat and mantle's cloth, the second colour (the
+ * cross, or the other half of the Beauséant), and how it is laid out
+ * (`pattee`: a cross on the chest; `pale`: halved down the middle).
+ */
+function templarDesign(label, cloth, cloth2, heraldry) {
+  return {
+    label,
+    top: { kind: 'longsleeve', color: '#4a4238' },
+    bottom: { kind: 'tights', color: '#3a342c' },
+    armor: { kind: 'templar', color: '#8d9097', mail: '#8d9097', cloth, cloth2, heraldry, leather: '#5a3a22' },
+    head: { kind: 'greatHelm', color: '#b8bec6', flatTop: true, breaths: true, crossCut: true },
+    feet: { kind: 'compactBoot', color: '#4a2e1a' },
+    // The mantle in the surcoat's cloth (white for a knight, black for a sergeant), the red cross on its left shoulder.
+    extras: [{ kind: 'mantle', color: cloth, cross: '#a2201e', length: 1.32 }],
+  };
+}
+
 function toseiDesign(label, steel, lace, crest, mask, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'pants', color: under }, armor: { kind: 'toseiDo', color: steel, lace, gold: '#d6a743' }, head: { kind: 'kabuto', color: steel, crest, mask, lace, gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } };
 }
@@ -430,6 +448,36 @@ export const OUTFITS = {
       mailDesign('Quarterly', '#d6a743', '#1a1a1d', 'quarterly'),
       mailDesign('Crusader cross', '#e8e2d2', '#a2201e', 'cross'),
       mailDesign('Chief', '#2f5a3a', '#e8e2d2', 'chief'),
+    ],
+  },
+  // A brother-knight of the Temple (c. 1180–1300): a full mail hauberk with
+  // its coif and mittens over a quilted gambeson, mail chausses with plain
+  // steel greaves and knee cops, under the Order's long surcoat with its red
+  // cross and the great mantle; on the head a padded arming cap, the coif,
+  // and over all the flat-topped great helm. So: the head guarded against
+  // everything (a steel box over padding and mail); the body and limbs well
+  // against an edge (mail turns a cut), less against a point (rings part to
+  // it), poorly against a blow (mail moves with it: only the gambeson takes
+  // a little); the legs a little better for the greaves.
+  templar: {
+    faction: 'knights',
+    // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
+    label: 'Knights Templar — mail, surcoat and great helm', movement: 'limited', fists: 'gauntlet',
+    arrowproof: true,
+    sidearm: 'dagger',
+    extraMass: 0.4,
+    protection: {
+      blunt: 0.3, cut: 0.88, pierce: 0.5, bullet: { head: 0.35, torso: 0.05, limb: 0 },
+      regions: {
+        head: { blunt: 0.7, cut: 0.97, pierce: 0.85, deflects: true },
+        Shank: { blunt: 0.45, cut: 0.95, pierce: 0.7 },
+      },
+    },
+    courage: 0.55,
+    designs: [
+      templarDesign('Knight brother (white)', '#ece8dc', '#a2201e', 'pattee'),
+      templarDesign('Sergeant brother (black)', '#1c1a1c', '#a2201e', 'pattee'),
+      templarDesign('Beauséant (black and white)', '#ece8dc', '#1c1a1c', 'pale'),
     ],
   },
   // A foot soldier: whatever he could get — a brigandine (plates riveted

@@ -453,6 +453,14 @@ export const PRESETS = {
     outfit: { kind: 'joan', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2416', facialHair: 'none', eyeColor: 'brown' },
   },
+  // Odo de Saint-Amand (d. 1179), Marshal of the Kingdom of Jerusalem and
+  // Grand Master of the Temple, taken at Marj Ayyun and dead in Saladin's
+  // prison rather than ransomed: a brother-knight of the Order in its prime.
+  templar: {
+    name: 'Odo de Saint-Amand', style: 'templar', sex: 'male', heightCm: 178, frame: 'large', age: 34, exercise: 0.68, calories: 4425,
+    outfit: { kind: 'templar', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2a1c', facialHair: 'beard', eyeColor: 'brown' },
+  },
   // Minamoto no Tametomo (1139–1170), the great archer of the Hōgen
   // rebellion (1156): at seventeen a giant for his day, his bow drawn by a
   // strength the chronicles made legend; ō-yoroi, the yumi, and the ōdachi

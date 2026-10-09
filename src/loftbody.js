@@ -213,6 +213,16 @@ export const ARMOR_KINDS = {
     trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [[0.62, 0.35, 1.13, MAIL], [0.72, 0.45, 1.32, { heraldry: true }]], collar: 'mail',
     upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL], thigh: [-0.05, 1.04, 1.1, MAIL], shin: [-0.12, 0.95, 1.1, MAIL],
   },
+  // A brother-knight of the Temple: the mail hauberk to the knee with mail
+  // sleeves, chausses and a coif at the neck; the Order's long surcoat over it
+  // to the shins (its cross on the chest); a sword belt; plain steel greaves
+  // and knee cops over the chausses.
+  templar: {
+    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.94, 1.22, { heraldry: true }]], skirt: [[0.62, 0.35, 1.13, MAIL], [1.35, 0.5, 1.32, { heraldry: true }]], collar: 'mail',
+    belt: [0.0, 0.08, 1.25, 'leather'],
+    upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL], thigh: [-0.05, 1.04, 1.1, MAIL], knee: [0.84, 1.04, 1.32, 'steel'],
+    shin: [[-0.12, 0.95, 1.1, MAIL], [0.05, 0.85, 1.22, 'steel']],
+  },
   // A foot soldier: a riveted brigandine over a quilted coat, a short skirt
   // of lames, spaulders, vambraces and knee cops; the legs otherwise bare of steel.
   brigandine: {
@@ -604,6 +614,14 @@ function heraldry(kind, t, across, ahead) {
     case 'pale': return across > 0 ? 'cloth' : 'cloth2';
     case 'quarterly': return (across > 0) !== (t > 0.45) ? 'cloth' : 'cloth2';
     case 'cross': return ahead > 0 && (Math.abs(across) < 0.16 || Math.abs(t - 0.62) < 0.06) ? 'cloth2' : 'cloth';
+    // The Temple's cross pattée on the chest: its arms widening to their ends, centred high on the breast.
+    case 'pattee': {
+      if (ahead <= 0.3) return 'cloth';
+      const dt = t - 0.66;
+      const upright = Math.abs(dt) < 0.22 && Math.abs(across) < 0.08 + 0.25 * Math.abs(dt);
+      const beam = Math.abs(across) < 0.42 && Math.abs(dt) < 0.045 + 0.1 * Math.abs(across);
+      return upright || beam ? 'cloth2' : 'cloth';
+    }
     case 'chevron': return ahead > 0 && Math.abs(t - (0.35 + Math.abs(across) * 0.5)) < 0.07 ? 'cloth2' : 'cloth';
     case 'chief': return t > 0.74 ? 'cloth2' : 'cloth';
     default: return 'cloth';

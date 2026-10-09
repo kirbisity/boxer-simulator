@@ -374,14 +374,58 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
     case 'greatHelm': {
       const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.22 * r, 2.1 * r, 20, 1, false), steel);
       barrel.position.y = -0.15 * r;
-      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.32), steel);
-      crown.position.y = 0.55 * r;
-      const slit = new THREE.Mesh(new THREE.BoxGeometry(0.2 * r, 0.08 * r, 1.6 * r), surface(0x050506));
-      slit.position.set(1.17 * r, 0.12 * r, 0);
-      slit.userData.noOutline = true;
-      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 1.0 * r, 0.12 * r), steel);
-      cross.position.set(1.22 * r, -0.3 * r, 0);
-      group.add(barrel, crown, slit, cross);
+      // The early (12th–13th c.) helm is flat on top, a plate riveted over the barrel; the later one a low dome.
+      const crown = head.flatTop
+        ? new THREE.Mesh(new THREE.CylinderGeometry(1.14 * r, 1.2 * r, 0.12 * r, 20), steel)
+        : new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.32), steel);
+      crown.position.y = head.flatTop ? 0.93 * r : 0.55 * r;
+      const dark = surface(0x050506);
+      // The sights: two slits either side of the nasal.
+      for (const side of [1, -1]) {
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(0.2 * r, 0.08 * r, 0.72 * r), dark);
+        slit.position.set(1.17 * r, 0.12 * r, side * 0.44 * r);
+        slit.userData.noOutline = true;
+        group.add(slit);
+      }
+      // The cross of reinforcing bands: a brow band across above the sights and the nasal down the middle.
+      const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, 1.45 * r, 0.16 * r), steel);
+      nasal.position.set(1.24 * r, -0.15 * r, 0);
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, 0.14 * r, 1.7 * r), steel);
+      brow.position.set(1.18 * r, 0.28 * r, 0);
+      brow.rotation.y = 0;
+      group.add(barrel, crown, nasal, brow);
+      // Breaths: rows of holes punched in the lower face, either side of the nasal.
+      if (head.breaths) {
+        const holes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04 * r, 0.06 * r, 0.06 * r), dark, 36);
+        const place = new THREE.Object3D();
+        let at = 0;
+        for (const side of [1, -1]) {
+          for (let row = 0; row < 6; row += 1) {
+            for (let column = 0; column < 3; column += 1) {
+              // On the barrel, angle from the front: x = cos, z = sin.
+              const angle = side * (0.22 + column * 0.17);
+              place.position.set(Math.cos(angle) * 1.215 * r, (-0.15 - row * 0.16) * r, Math.sin(angle) * 1.215 * r);
+              place.rotation.set(0, -angle, 0);
+              place.updateMatrix();
+              holes.setMatrixAt(at, place.matrix);
+              at += 1;
+            }
+          }
+        }
+        holes.userData.noOutline = true;
+        group.add(holes);
+      }
+      // A small cross cut through the lower right of the face.
+      if (head.crossCut) {
+        const angle = -0.5;
+        for (const [w, h] of [[0.05, 0.22], [0.05, 0.08]]) {
+          const piece = new THREE.Mesh(new THREE.BoxGeometry(0.04 * r, h * r, (h === 0.22 ? 0.07 : 0.2) * r), dark);
+          piece.position.set(Math.cos(angle) * 1.22 * r, -1.0 * r, Math.sin(angle) * 1.22 * r);
+          piece.rotation.y = -angle;
+          piece.userData.noOutline = true;
+          group.add(piece);
+        }
+      }
       break;
     }
     case 'bascinet': {
@@ -1668,6 +1712,35 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       skirt.position.y = -length / 2;
       drape.group.add(skirt);
       dangles.push(drape);
+    } else if (extra.kind === 'mantle') {
+      // A great mantle from the shoulders to the ankles: open in front, round
+      // the shoulders and down the back, swinging as one; a cross on its left shoulder.
+      const length = (extra.length ?? 1.3) * scale;
+      const cloak = new Dangle(collar, [-0.03 * scale, 0.0, 0], [-0.12, -1, 0], length, { sag: 0.3, damping: 0.35 });
+      const cloth = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
+      cloth.side = THREE.DoubleSide;
+      // Cylinder angle θ: x = sin θ, z = cos θ; behind is 3π/2. The arc runs from the front of
+      // the right shoulder round the back to the front of the left.
+      const arc = Math.PI * 1.3;
+      const shoulders = body.lengths.shoulderSpan ?? 0.4 * scale;
+      const top = shoulders * 0.62;
+      const mantle = new THREE.Mesh(new THREE.CylinderGeometry(top, shoulders * 1.25, length, 28, 6, true, Math.PI * 1.5 - arc / 2, arc), cloth);
+      mantle.position.y = -length / 2 + 0.04 * scale;
+      cloak.group.add(mantle);
+      if (extra.cross) {
+        const red = surface(new THREE.Color(extra.cross).getHex(), { roughness: 0.8 });
+        const angle = Math.PI * 1.5 + arc / 2 - 0.35;
+        // The cloak's radius where the cross sits (it widens linearly down its length), just proud of the cloth.
+        const radius = top + (shoulders * 1.25 - top) * ((0.2 * scale) / length) + 0.006 * scale;
+        const at = new THREE.Vector3(Math.sin(angle) * radius, -0.16 * scale, Math.cos(angle) * radius);
+        for (const [w, h] of [[0.035, 0.12], [0.1, 0.035]]) {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(w * scale, h * scale, 0.004 * scale), red);
+          bar.position.copy(at);
+          bar.rotation.y = angle;
+          cloak.group.add(bar);
+        }
+      }
+      dangles.push(cloak);
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;

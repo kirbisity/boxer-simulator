@@ -596,6 +596,7 @@ export function buildHarness(body, armor, envMap, steelMaterial, part) {
 export function buildArenaShield(spec, envMap, steelMaterial) {
   if (spec.look === 'scissores') return crescent(spec, envMap, steelMaterial);
   if (spec.look === 'riot') return riotShield(spec);
+  if (spec.look === 'heater') return heaterShield(spec, envMap, steelMaterial);
   const group = new THREE.Group();
   const scutum = spec.look === 'scutum';
   const R = spec.curve;
@@ -632,6 +633,67 @@ export function buildArenaShield(spec, envMap, steelMaterial) {
     group.add(spine);
   }
   ink([face, boss], 0.003);
+  return group;
+}
+
+/**
+ * The heater: a curved board, its outline (flat top, sides curving down to
+ * the point) cut from the painted face, white with the Temple's red cross
+ * pattée; a dark rim painted round its edge, a few nail heads.
+ */
+function heaterShield(spec, envMap, steelMaterial) {
+  const group = new THREE.Group();
+  const R = spec.curve;
+  const half = spec.width / 2 / R;
+  const texture = painted(256, Math.round((256 * spec.height) / spec.width), (g, w, h) => {
+    const outline = () => {
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(w, 0);
+      g.lineTo(w, h * 0.3);
+      g.quadraticCurveTo(w * 0.98, h * 0.78, w / 2, h);
+      g.quadraticCurveTo(w * 0.02, h * 0.78, 0, h * 0.3);
+      g.closePath();
+    };
+    g.clearRect(0, 0, w, h);
+    outline();
+    g.fillStyle = '#ece8dc';
+    g.fill();
+    g.lineWidth = w * 0.05;
+    g.strokeStyle = '#4a3a2a';
+    g.stroke();
+    // The cross pattée: arms widening to their ends.
+    g.fillStyle = '#a2201e';
+    const cx = w / 2;
+    const cy = h * 0.4;
+    const arm = (angle, length) => {
+      g.save();
+      g.translate(cx, cy);
+      g.rotate(angle);
+      g.beginPath();
+      g.moveTo(-w * 0.03, 0);
+      g.lineTo(w * 0.03, 0);
+      g.lineTo(w * 0.09, -length);
+      g.lineTo(-w * 0.09, -length);
+      g.closePath();
+      g.fill();
+      g.restore();
+    };
+    arm(0, h * 0.34);
+    arm(Math.PI, h * 0.5);
+    arm(Math.PI / 2, w * 0.4);
+    arm(-Math.PI / 2, w * 0.4);
+    g.fillStyle = '#6a6a6e';
+    for (const [x, y] of [[0.12, 0.06], [0.88, 0.06], [0.5, 0.06], [0.1, 0.3], [0.9, 0.3]]) {
+      g.beginPath();
+      g.arc(x * w, y * h, w * 0.015, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(R, R, spec.height, 28, 1, true, -half, half * 2), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75, side: THREE.DoubleSide, alphaTest: 0.5, transparent: false }));
+  // Cylinder angle 0 is +z: the face's middle; the axis behind it.
+  face.position.z = -R;
+  group.add(face);
   return group;
 }
 

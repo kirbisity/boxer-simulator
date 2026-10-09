@@ -23,6 +23,8 @@ const warrior = (key, title, base, changes = {}) => {
 
 export const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
+  // The knights' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
+  { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true },
   warrior('joan', 'Joan of Arc', PRESETS.joan),
   warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
