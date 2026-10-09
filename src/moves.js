@@ -526,7 +526,8 @@ export const STYLES = {
   // Heiji wars carried both.
   yumi: {
     label: 'Yumi', weapon: 'yumi', fallback: 'odachi',
-    ranged: { flee: 4, rest: 1, runFor: 1.5, standFor: 1.8, close: 3.2, shotSeconds: 0.75, headShare: 0.2, between: [0.5, 0.8], move: 'loose' },
+    // He stands and shoots (`holdGround`: no backing off, no running), and once a man is in close he charges him (`charge` s at most).
+    ranged: { flee: 4, rest: 1, runFor: 1.5, standFor: 1.8, close: 3.2, shotSeconds: 0.75, headShare: 0.2, between: [0.5, 0.8], move: 'loose', holdGround: true, charge: 2.5 },
     cadence: { work: 1.3, move: 0.7, burst: 0.4, mobility: 0.5 },
     stance: { blade: 0.75, crouch: 0.04, width: 1.14, lean: 0.04, guardHeight: -0.02 },
     weaponGuard: { hand: [0.16, 0.55, 0.14], dir: [0.15, 1, 0] },

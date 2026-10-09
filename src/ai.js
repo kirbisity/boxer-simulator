@@ -33,7 +33,8 @@ export const AI = {
   // The retiarius's net: thrown from `from` to `to` m, at `rate` a second while there.
   net: { from: 1.3, to: 3.2, rate: 1.2 },
   // A man going to take up his fallen standard runs to it from further than `runFor` m.
-  cohesion: { radius: 2, radiusPerSqrt: 0.75, ramp: 4, strafe: 0.55, holdBack: 0.7, engaged: 1.2, focus: 0.3, escape: 0.3, runFor: 1.5 },
+  // Weighted heavily: a man keeps with his leader (and picks men near him) before going off on his own fight.
+  cohesion: { radius: 1.6, radiusPerSqrt: 0.6, ramp: 2.5, strafe: 0.8, holdBack: 0.9, engaged: 0.8, focus: 0.6, escape: 0.5, runFor: 1.5 },
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
   passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
@@ -53,6 +54,10 @@ export const AI = {
   // Charges per second at range, per unit of the style's rush weight: at
   // 0.006 about one every two minutes, more for the charging styles.
   rushPerWeight: 1.5,
+  // A charge after the bow (ranged.charge) runs until he is within this share of the sword's reach.
+  chargeInto: 1.1,
+  // A man who charges (inputs.charging) runs in from this far (m) beyond his reach.
+  charging: { runFrom: 1.5 },
   // Pressure spells: how long one lasts, and how often they start per
   // second per unit of the style's pressure share.
   pressureSeconds: 4,
@@ -1035,7 +1040,9 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   const closing = Math.max(0.3, vec.dot(vec.sub(theirs, mine), toMe));
   const timeLeft = (distance - gun.close) / closing;
   const standing = world.time < (fighter.aiStandUntil ?? -1);
-  if (distance < gun.flee && timeLeft < gun.shotSeconds && !standing && !fighter.aiFleeing) {
+  // A style that holds its ground (`ranged.holdGround`): shoots where he stands, never runs or backs off.
+  if (gun.holdGround) fighter.aiFleeing = false;
+  else if (distance < gun.flee && timeLeft < gun.shotSeconds && !standing && !fighter.aiFleeing) {
     fighter.aiFleeing = true;
     fighter.aiFleeSince = world.time;
   } else if (fighter.aiFleeing && (distance > gun.flee + gun.rest || world.time - fighter.aiFleeSince > gun.runFor)) {
@@ -1059,7 +1066,7 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   const back = point(fighter.x, P.pelvis);
   const away = [back[0] - opponent.x[P.pelvis * 3], back[2] - opponent.x[P.pelvis * 3 + 2]];
   const roomBehind = room(world, [back[0] + away[0] / distance, back[2] + away[1] / distance]);
-  fighter.move = roomBehind > AI.gunKite.wallMargin ? -0.6 : 0;
+  fighter.move = !gun.holdGround && roomBehind > AI.gunKite.wallMargin ? -0.6 : 0;
   fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
   if (fighter.punch || fighter.cooldown > 0) return;
   if (teamSpacing(world, fighter, opponent).blocked) return;
@@ -1242,6 +1249,18 @@ export function think(world, fighter, dt) {
   } else if (gun) {
     dropWeapon(world, fighter, 'dropped');
     style = STYLES[fighter.style] ?? STYLES.mix;
+    // A style that charges in once the bow is down (`ranged.charge` s): straight at him with the sword drawn.
+    if (gun.charge) fighter.aiCharge = { until: world.time + gun.charge };
+  }
+  // Charging in after the bow: flat out until he is within the sword's reach, then the fight.
+  if (fighter.aiCharge && !fighter.slot) {
+    if (world.time < fighter.aiCharge.until && distance > reachOf(fighter) * AI.chargeInto) {
+      fighter.move = 1;
+      fighter.running = true;
+      fighter.strafe = 0;
+      return;
+    }
+    fighter.aiCharge = null;
   }
   // Grabbed by the neck, a brawler grabs back: the mutual tie, trading.
   if (style.attacks.collarTie && !fighter.clinch && !fighter.punch && opponent.clinch?.target === fighter.id && world.random() < AI.tieBackPerSecond * dt) perform(world, fighter, 'collarTie');
@@ -1255,6 +1274,14 @@ export function think(world, fighter, dt) {
     fighter.running = true;
     fighter.strafe = Math.sin(world.time * AI.gunRush.weave + fighter.id) * 0.8;
     if (!fighter.punch && !fighter.rush && distance < AI.gunRush.chargeFrom && world.random() < AI.gunRush.chargePerSecond * dt) perform(world, fighter, 'rush');
+    return;
+  }
+  // A man who charges (`inputs.charging`, a raider): from well out, he comes on at a run.
+  const charging = fighter.body.inputs.charging ?? 1;
+  if (charging > 1 && !fighter.slot && !fighter.clinch && distance > reachOf(fighter) + AI.charging.runFrom) {
+    fighter.move = 1;
+    fighter.running = true;
+    fighter.strafe = 0;
     return;
   }
   const spacing = teamSpacing(world, fighter, opponent);
@@ -1343,7 +1370,7 @@ export function think(world, fighter, dt) {
     }
     if (spec.kind === 'rush') {
       // A charge is its own decision, not a fallback when nothing else reaches.
-      if (distance > range - 0.1 && distance < range + 1.2 && random() < weight * AI.rushPerWeight * (1 + 3 * fighter.body.gear.courage) * dt) {
+      if (distance > range - 0.1 && distance < range + 1.2 && random() < weight * AI.rushPerWeight * (1 + 3 * fighter.body.gear.courage) * charging * dt) {
         if (throwPunch(world, fighter, name)) fighter.cooldown = AI.restMin + random() * AI.restRange;
         return;
       }

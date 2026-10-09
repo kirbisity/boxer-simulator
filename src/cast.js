@@ -250,9 +250,13 @@ export function roninWarrior(random = Math.random, style = 'katana') {
   return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
 }
 
-// What a sea raider has on (shares, summing to 1): most nothing but a robe
-// or a loincloth; some a piece of samurai armour; a few the whole of it.
-const WOKOU_KIT = { none: 0.62, piece: 0.26, ashigaru: 0.07, samurai: 0.05 };
+// What a sea raider has on (shares, summing to 1): many nothing but a robe
+// or a loincloth; many a piece of armour taken in earlier raids; some the
+// whole of it (the big bands of the 1550s were well equipped from plunder).
+const WOKOU_KIT = { none: 0.45, piece: 0.36, ashigaru: 0.11, samurai: 0.08 };
+
+// Raiders come on at a run and throw themselves in: the charge sooner, and more eagerly (AI `charging`).
+const RAIDER_CHARGING = 2;
 
 /**
  * A sea raider of the 1550s (wokou): Chinese (dao, spear, matchlock) or
@@ -267,8 +271,8 @@ export function wokouRaider(random = Math.random, style = 'dao', people = 'chine
     : `${pickOne(['Xu', 'Wang', 'Lin', 'Chen', 'Huang', 'Ye', 'Mao', 'Hong'], random)} ${pickOne(['Hai', 'Zhi', 'Dong', 'Ma', 'San', 'Bao', 'Lang', 'Shan'], random)}`;
   const roll = random();
   const kind = roll < WOKOU_KIT.none ? 'wokou' : roll < WOKOU_KIT.none + WOKOU_KIT.piece ? 'wokouArmoured' : roll < 1 - WOKOU_KIT.samurai ? 'ashigaru' : 'samurai';
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] };
-  return builtLike(soldier, japanese ? PERIOD_BUILD.japanese.ronin : PERIOD_BUILD.mingSouth.raider, random);
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [], charging: RAIDER_CHARGING };
+  return builtLike(soldier, japanese ? PERIOD_BUILD.japanese.raider : PERIOD_BUILD.mingSouth.raider, random);
 }
 
 /**
@@ -282,11 +286,14 @@ const PERIOD_BUILD = {
   // Southern Chinese (Zhejiang, Fujian) stood a little shorter than northern
   // men. Koxinga picked his "iron men" by strength (they had to lift a stone
   // lion): his elite is the big men of his army.
-  mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 163, weightKg: 58, exercise: 0.6 } },
-  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 56, exercise: 0.75 } },
+  // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
+  mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 160, weightKg: 64, exercise: 0.66 } },
+  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 56, exercise: 0.75 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
-  spanish: { soldier: { heightCm: 165, weightKg: 63, exercise: 0.7 }, officer: { heightCm: 167, weightKg: 66, exercise: 0.72 } },
+  // The men who crossed to the Indies were picked and hardened (veterans of
+  // Italy, hidalgos raised to arms): a little above the Castilian mean, and strong.
+  spanish: { soldier: { heightCm: 168, weightKg: 70, exercise: 0.76 }, officer: { heightCm: 170, weightKg: 73, exercise: 0.78 } },
   mexica: { warrior: { heightCm: 160, weightKg: 58, exercise: 0.72 }, elite: { heightCm: 162, weightKg: 60, exercise: 0.82 } },
   // The Hospitaller knights at Rhodes, nobles of France, Spain, Italy and England, fed and trained
   // from boyhood; their sergeants and gunners. Ottoman soldiers of the 1500s

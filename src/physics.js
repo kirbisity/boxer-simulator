@@ -695,6 +695,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // A level's `formation` per side: `front` (m from the centre to the first
   // row), `spacing` (m apart in a row), `rowSpacing`, `perRow`, and `loose` (m: each
   // stands up to this far off his place, a crowd rather than a rank).
+  // `shootersFront` (m): the bows and guns form the front rows, the rest
+  // behind them this far back (a gap to shoot over and fall back through).
   for (const corner of ['red', 'blue']) {
     const team = fighters.filter((fighter) => fighter.corner === corner);
     const order = formation[corner];
@@ -704,17 +706,24 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const front = order?.front ?? (gunFight ? apart : 1.1);
     const perRow = order?.perRow ?? Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / spacing) + 1);
     const sign = corner === 'red' ? -1 : 1;
-    team.forEach((fighter, index) => {
+    const placeRows = (group, back) => group.forEach((fighter, index) => {
       const row = Math.floor(index / perRow);
-      const inRow = Math.min(perRow, team.length - row * perRow);
+      const inRow = Math.min(perRow, group.length - row * perRow);
       let across = ((index % perRow) - (inRow - 1) / 2) * spacing;
-      let x = sign * Math.min(arena.halfX - 0.4, front + row * rowSpacing);
+      let x = sign * Math.min(arena.halfX - 0.4, front + back + row * rowSpacing);
       if (order?.loose) {
         across += (random() * 2 - 1) * order.loose;
         x += (random() * 2 - 1) * order.loose;
       }
       placeFighter(fighter, Math.max(-(arena.halfX - 0.4), Math.min(arena.halfX - 0.4, x)), Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
     });
+    if (order?.shootersFront !== undefined) {
+      const shooting = (fighter) => Boolean(STYLES[fighter.style]?.ranged);
+      const shooters = team.filter(shooting);
+      const rest = team.filter((fighter) => !shooting(fighter));
+      placeRows(shooters, 0);
+      placeRows(rest, shooters.length ? Math.ceil(shooters.length / perRow) * rowSpacing + order.shootersFront : 0);
+    } else placeRows(team, 0);
   }
   for (const fighter of fighters) fighter.arena = arena;
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
