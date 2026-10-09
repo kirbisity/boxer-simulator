@@ -740,8 +740,10 @@ export function buildBody(rawInputs) {
     reach: lengths.upperArm + lengths.forearmToFist,
     headMass,
     // Effective head mass at impact: a strong neck braces the head to the
-    // trunk, and a trained fighter tucks the chin and tenses it in time.
-    headEffectiveMass: headMass * (1 + 0.9 * neckIndex) * (0.75 + 0.35 * inputs.training),
+    // trunk, and a trained fighter tucks the chin and tenses it in time; a
+    // fitted helmet moves with the head, so its mass is the head's too
+    // (outfits.js HELMETS): the same impulse moves head and helmet less.
+    headEffectiveMass: headMass * (1 + 0.9 * neckIndex) * (0.75 + 0.35 * inputs.training) + gear.helmet.mass,
     // Effective striking mass by punch: arm mass, plus trunk mass brought in by
     // rotation, scaled by technique. Lands near Walilko et al. (2005)'s 2.9 kg
     // mean for Olympic boxers' straight punches.

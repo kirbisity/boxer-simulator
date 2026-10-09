@@ -1290,6 +1290,71 @@ export function outfitOf(inputs) {
  * balance, kick strength, gear weight (share of body weight), protection
  * from harm by kind, and his own strikes' harm by limb.
  */
+/**
+ * What a fighter wears on his head does three things to a blow there:
+ * - `mass` (kg): a fitted helmet moves with the head, so a blow's impulse
+ *   must speed up head and helmet together (Δv = J / (head + helmet)): a
+ *   2.5 kg helm on a ~5 kg head takes a third off the head's speed change.
+ * - `padding` (0–1): the arming cap, lining, quilting or suspension under it
+ *   draws the blow out over a longer contact (WORLD.helmet.paddingStretch):
+ *   the same momentum, a lower peak, and peak acceleration is what strains
+ *   the brain (head-injury criteria are peak-acceleration measures).
+ * - `curve` (0–1): how much of it is smooth, rounded steel: a blow that is
+ *   not square to it skids off (only its part along the surface normal goes
+ *   in) and the slide does not wrench the head round, where skin would grip.
+ *   A domed or pointed bowl is high; a flat-sided can or a soft cap low.
+ * Masses from surviving pieces and reconstructions; kinds not listed are no helmet.
+ */
+export const HELMETS = {
+  // Boxing headgear: foam, light, thick.
+  headguard: { mass: 0.45, padding: 0.9, curve: 0.3 },
+  // Modern: a riot helmet (thick liner, smooth shell); a combat helmet (pads, rounded aramid shell).
+  riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75 },
+  opsHelmet: { mass: 1.4, padding: 0.85, curve: 0.85 },
+  // The great helm (2–3 kg) over a mail coif and a padded arming cap: the best padded of all; flat sides, a low crown.
+  greatHelm: { mass: 2.6, padding: 0.85, curve: 0.35 },
+  // The bascinet: a pointed globular bowl on a padded lining and a mail aventail.
+  bascinet: { mass: 2.3, padding: 0.65, curve: 0.85 },
+  // A kabuto: a riveted bowl (2.5–3 kg with its neck guard) on a cloth lining and a hachimaki.
+  kabuto: { mass: 2.8, padding: 0.55, curve: 0.7 },
+  jingasa: { mass: 1.0, padding: 0.3, curve: 0.85 },
+  // Gladiators' helmets were heavy (3–4 kg, Pompeii finds), brimmed and grilled; the secutor's smooth egg made to turn the trident.
+  arenaHelm: { mass: 3.0, padding: 0.5, curve: 0.55 },
+  gladiatorHelm: { mass: 3.0, padding: 0.5, curve: 0.55 },
+  secutorHelm: { mass: 3.2, padding: 0.5, curve: 0.95 },
+  galea: { mass: 1.6, padding: 0.4, curve: 0.7 },
+  // Sixteenth-century infantry: the combed morion, the almond cabasset, the pot helmet, the kettle hat.
+  morion: { mass: 2.0, padding: 0.4, curve: 0.75 },
+  cabasset: { mass: 1.8, padding: 0.4, curve: 0.8 },
+  potHelmet: { mass: 2.2, padding: 0.4, curve: 0.7 },
+  kettleHat: { mass: 2.0, padding: 0.45, curve: 0.6 },
+  // The Iron Pagoda: a tall bowl and its rolled lamellar aventail (~4 kg together) over a padded cap.
+  pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8 },
+  // Steppe and Ottoman pointed bowls (the chichak with its brim and nasal).
+  steppeHelm: { mass: 1.8, padding: 0.45, curve: 0.85 },
+  chichak: { mass: 2.0, padding: 0.45, curve: 0.85 },
+  // Ming: the brimmed iron hat of the brigandine man; the elite's tall bowl. Han: an iron lamellar cap (Linzi), lightly lined.
+  mingHat: { mass: 1.4, padding: 0.35, curve: 0.7 },
+  mingHelm: { mass: 2.0, padding: 0.45, curve: 0.85 },
+  hanHelm: { mass: 1.5, padding: 0.3, curve: 0.6 },
+  // Mexica war helmets: carved wood and quilted cotton, animal-headed (flat planes, little curve).
+  jaguarHelm: { mass: 1.0, padding: 0.45, curve: 0.35 },
+  eagleHelm: { mass: 1.0, padding: 0.45, curve: 0.35 },
+  // Soft headwear: little mass; a turban's many wraps and a fur hat pad a little.
+  lionHead: { mass: 0.6, padding: 0.3, curve: 0.15 },
+  turban: { mass: 0.6, padding: 0.45, curve: 0.2 },
+  furHat: { mass: 0.4, padding: 0.4, curve: 0 },
+  bork: { mass: 0.4, padding: 0.3, curve: 0 },
+  guanYuCap: { mass: 0.2, padding: 0.15, curve: 0 },
+  beanie: { mass: 0.1, padding: 0.1, curve: 0 },
+  clothWrap: { mass: 0.1, padding: 0.1, curve: 0 },
+  hachimaki: { mass: 0.05, padding: 0.05, curve: 0 },
+  policeCap: { mass: 0.2, padding: 0.1, curve: 0 },
+  topHat: { mass: 0.15, padding: 0.1, curve: 0 },
+  feltHat: { mass: 0.15, padding: 0.1, curve: 0 },
+};
+const NO_HELMET = { mass: 0, padding: 0, curve: 0 };
+
 export function gearTraits(inputs) {
   const { spec, look } = outfitOf(inputs);
   const female = inputs.sex === 'female';
@@ -1314,6 +1379,8 @@ export function gearTraits(inputs) {
     gaps: spec.gaps ?? null,
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
     headBulk: spec.headBulk ?? 1,
+    // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve.
+    helmet: HELMETS[look.head?.kind] ?? NO_HELMET,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
     spare: spec.spare ?? null,

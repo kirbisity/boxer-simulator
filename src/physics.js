@@ -116,7 +116,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     feet: null,
     hitAt: new Float64Array(count).fill(-1e9),
     life: lifePhases(random),
-    state: 'up', motorScale: 1, stun: 0, stagger: 0, staggerFor: 0, downTimer: 0,
+    state: 'up', motorScale: 1, stun: 0, stagger: 0, staggerFor: 0, dazed: 0, dazedFor: 0, downTimer: 0,
     stamina: 1, concussion: 0, knockdowns: 0, injuries: [],
     // A mixed fighter starts in one of his styles and switches as he goes.
     mixed: STYLES[inputs.style]?.mix ? inputs.style : null,
@@ -986,6 +986,15 @@ function updateIntent(world, fighter, dt) {
   };
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
+  // Dazed: the head lolls and he sways, unsteady, his guard pulled in.
+  const dazed = dazedShare(fighter);
+  if (dazed > 0) {
+    const sway = WORLD.daze.sway * dazed;
+    intent.headOffset = vec.add(intent.headOffset, [0, -sway * H, Math.sin(world.time * 3.1 + fighter.id) * sway * H]);
+    intent.lean += Math.sin(world.time * 2.3 + fighter.id) * sway * 2;
+    intent.shift += Math.sin(world.time * 1.7) * sway;
+    intent.guardTight = true;
+  }
   if (fighter.punch?.load > 0) {
     // Loading a heavy attack: sit down on the legs, turn away from it.
     const punch = fighter.punch;
@@ -1770,6 +1779,7 @@ function updateTimers(world, fighter, dt) {
   fighter.committed = Math.max(0, (fighter.committed ?? 0) - dt);
   fighter.stun = Math.max(0, fighter.stun - dt);
   fighter.stagger = Math.max(0, (fighter.stagger ?? 0) - dt);
+  fighter.dazed = Math.max(0, (fighter.dazed ?? 0) - dt);
   if (fighter.clinch) {
     fighter.clinch.t += dt;
     const target = world.fighters[fighter.clinch.target];
@@ -1839,7 +1849,7 @@ function updateTimers(world, fighter, dt) {
     const shock = 1 - (1 - BLADES.shockStrength) * Math.min(1, (fighter.bloodLost ?? 0) / collapseAt()) ** 2;
     // A battered trunk saps him as blood loss does.
     const battered = 1 - (1 - WORLD.injury.shockStrength) * Math.min(1, (fighter.trauma?.trunk ?? 0) / WORLD.injury.trunkFatal) ** 2;
-    fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock * battered * staggerShare(fighter, WORLD.stagger.strength);
+    fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock * battered * staggerShare(fighter, WORLD.stagger.strength) * (1 - WORLD.daze.strength * dazedShare(fighter));
   }
 }
 
@@ -2930,6 +2940,24 @@ function struckParticles(defender, capsule, closest, contactPoint, push) {
   return [[capsule.a, 1 - closest.t], [capsule.b, closest.t], [P[`${side}Shoulder`], 0.8], [P.neck, 0.5], [P.pelvis, 0.3]];
 }
 
+/**
+ * A blow on a curved helmet (HELMETS `curve`) that is not square to it:
+ * the bowl's surface tilts away from it, so it skids, and only part of its
+ * closing speed goes in (`share`); and smooth steel lets the sideways part
+ * slide where skin would grip, so it twists the head round less (`twist`,
+ * on the blow's rotational factor). `square` is the cosine between the
+ * blow and the surface normal: a blow square on lands in full. Off the head,
+ * or bare-headed, nothing changes.
+ */
+function helmetGlance(defender, capsule, relative, closing) {
+  const curve = capsule.key === 'head' ? defender.body.gear.helmet?.curve ?? 0 : 0;
+  if (!(curve > 0)) return { share: 1, twist: 1 };
+  const speed = vec.length(relative);
+  const square = speed > 1e-6 ? Math.min(1, Math.max(0, closing / speed)) : 1;
+  const off = curve * (1 - square);
+  return { share: Math.max(0, 1 - WORLD.helmet.glance * off), twist: Math.max(0, 1 - WORLD.helmet.slide * off) };
+}
+
 /** The mass a struck part brings to a collision: the part, and what is braced behind it. */
 function struckMassOf(defender, capsule) {
   const body = defender.body;
@@ -2949,6 +2977,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const closing = -vec.dot(vec.sub(strikeVelocity, struckVelocity), normal);
   if (closing < WORLD.minImpactSpeed) return;
   punch.landed = true;
+  const glance = helmetGlance(defender, capsule, vec.sub(strikeVelocity, struckVelocity), closing);
 
   const body = defender.body;
   const side = striker.side;
@@ -2967,7 +2996,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   // A collision of two effective masses; flesh and padding make it largely
   // inelastic, so the impulse is the reduced mass times the closing speed.
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
-  const impulse = reducedMass * closing * (1 + WORLD.restitution);
+  const impulse = reducedMass * closing * glance.share * (1 + WORLD.restitution);
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   // Gloved strikes spread over the glove's contact time; kicks, knees and
   // elbows over the general one; bare fists over their own short one.
@@ -2981,11 +3010,12 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
     point: contactPoint, normal,
   };
   if (checked) event.effects.push('checked');
+  if (glance.share < WORLD.helmet.glancedBelow) event.effects.push('glanced off the helmet');
   // Harm, apart from physics: what the defender wears takes some of it, and
   // a padded glove gives less. The impulse and the knockback are untouched.
   const harm = harmShare(attacker, defender, spec, capsule.key);
   event.harm = harm;
-  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked, rotation: spec.rotation, cuts: spec.cuts, cutForce: spec.limb.endsWith('Hand') ? fists.cutForce : Infinity, side, push: spec.push });
+  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked, rotation: spec.rotation * glance.twist, cuts: spec.cuts, cutForce: spec.limb.endsWith('Hand') ? fists.cutForce : Infinity, side, push: spec.push });
   if (spec.limb.endsWith('Hand') && !striker.bash && peakForce > attacker.body.fracture.hand * fists.handFracture * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
     attacker.injuries.push({ kind: 'hand', side, time: world.time });
     event.effects.push(`${attacker.body.inputs.name}: broken hand`);
@@ -3024,8 +3054,11 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
       event.effects.push('blindsided');
     }
     // A hard weapon's blow lands over a shorter contact: the same speed change
-    // with a sharper peak, which is what strains the brain.
-    event.harmDeltaV = event.headDeltaV * harm * concentration;
+    // with a sharper peak, which is what strains the brain. A helmet's
+    // padding draws any blow out longer (HELMETS `padding`): the peak falls
+    // as the square root of the contact time, as `concentration` does.
+    const padded = 1 + WORLD.helmet.paddingStretch * (body.gear.helmet?.padding ?? 0);
+    event.harmDeltaV = (event.headDeltaV * harm * concentration) / Math.sqrt(padded);
     applyHeadDamage(world, defender, event);
     knockOff(world, defender, event);
     const cutting = peakForce * (1 - protectionAt(defender.body.gear, 'head').cut);
@@ -3221,6 +3254,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (closing < WORLD.minImpactSpeed) return false;
   punch.hits.add(defender.id);
   punch.landed = true;
+  // On a curved helmet a blow not square to it skids: less of it goes in, edge and point and weight alike.
+  const glance = helmetGlance(defender, capsule, relative, closing);
+  const goingIn = closing * glance.share;
 
   const body = defender.body;
   const limbs = attacker.body.limbKg;
@@ -3232,9 +3268,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const strikeMass = effectiveMassAt(wspec, armMass, distance, armLength, along);
   const struckMass = struckMassOf(defender, capsule);
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
-  const impulse = reducedMass * closing * (1 + WORLD.restitution);
+  const impulse = reducedMass * goingIn * (1 + WORLD.restitution);
   // The energy the collision takes up: what an edge or a point spends going in.
-  const energy = 0.5 * reducedMass * closing * closing;
+  const energy = 0.5 * reducedMass * goingIn * goingIn;
   const mix = harmMix(wspec, spec.mode, along, closest.s);
   const covered = protectionAt(body.gear, capsule.key);
   // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
@@ -3265,7 +3301,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // A cut on the helmet takes what is fixed on it (a crest) away, whatever the helmet turns.
   if (capsule.key === 'head') cutOffHeadgear(world, defender, event, energy * mix.cut, contactPoint);
   const concentration = Math.sqrt(WORLD.contactSeconds / wspec.contactSeconds);
-  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation, side: weapon.main, concentration });
+  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration });
   if (glanced) {
     // Off the plate: the blade is turned along it.
     const across = vec.sub(relative, vec.scale(normal, vec.dot(relative, normal)));
@@ -3274,6 +3310,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     world.events.push({ time: world.time, kind: 'glance', fighter: defender.id, point: contactPoint, normal });
   }
   if (intoGap) event.effects.push('into a gap in the armour');
+  if (glance.share < WORLD.helmet.glancedBelow) event.effects.push('glanced off the helmet');
   // An edge or a point opens a wound: it bleeds. On a limb it breaks the
   // bone only as far as it reaches it (BLADES.bone: by its force, and by how
   // squarely across the limb it came); short of that he bleeds, fast from a
@@ -3612,6 +3649,29 @@ export function applyHeadDamage(world, defender, event) {
     // A clean shot on armour may only stagger; brain strain built up drops him regardless.
     if (!(deltaV > chin && staggerInstead(world, defender, deltaV / chin, event))) knockDown(world, defender, event, deltaV > chin ? 'knockdown (one clean shot)' : 'knockdown (accumulated)');
   } else stagger(world, defender, deltaV / chin, event);
+  // Short of being dropped, a hard one to the head leaves anyone dazed (and it adds to the strain above, so dazes pile up to a knockdown).
+  if (defender.state === 'up' && deltaV > chin * WORLD.daze.from) daze(world, defender, (deltaV / chin - WORLD.daze.from) / (WORLD.knockout.overChin - WORLD.daze.from), event);
+}
+
+/**
+ * Dazed by a blow to the head: for a few seconds (more the nearer the blow
+ * came to dropping him, `share` 0..1) slower to react, weaker, covering up,
+ * readier to reel, the head lolling. Everyone, armoured or not.
+ */
+export function daze(world, fighter, share, event = null) {
+  const spec = WORLD.daze;
+  const seconds = spec.minSeconds + (spec.maxSeconds - spec.minSeconds) * Math.min(1, Math.max(0, share));
+  if (seconds <= (fighter.dazed ?? 0)) return;
+  const fresh = !(fighter.dazed > 0);
+  fighter.dazed = seconds;
+  fighter.dazedFor = seconds;
+  if (fresh) world.events.push({ time: world.time, kind: 'dazed', fighter: fighter.id, seconds, effects: [`dazed for ${seconds.toFixed(0)} s`] });
+  event?.effects.push('dazed');
+}
+
+/** How dazed he still is: 1 at the blow, falling to 0 as it wears off. */
+export function dazedShare(fighter) {
+  return fighter.dazed > 0 && fighter.dazedFor > 0 ? fighter.dazed / fighter.dazedFor : 0;
 }
 
 // ---- Stagger ------------------------------------------------------------------
@@ -3636,6 +3696,8 @@ export function staggerShare(fighter, floor) {
  */
 export function stagger(world, fighter, severity, event, anyone = false) {
   const spec = WORLD.stagger;
+  // Dazed, a lesser blow sets him reeling.
+  severity *= 1 + WORLD.daze.staggerMore * dazedShare(fighter);
   if ((!anyone && !armoured(fighter)) || fighter.state !== 'up' || severity < spec.startAt) return false;
   const share = Math.min(1, (severity - spec.startAt) / (spec.overwhelm - spec.startAt));
   const seconds = spec.minSeconds + (spec.maxSeconds - spec.minSeconds) * share;

@@ -297,7 +297,7 @@ export function installFightControls(root, hooks) {
     lock.querySelector('.who').textContent = locked ? firstNameOf(locked) : '';
     // The player's own status, compact, low down.
     status.querySelector('.name').textContent = firstNameOf(me);
-    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
+    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
     status.querySelector('.stamina i').style.width = `${Math.round(me.stamina * 100)}%`;
     // His man: the one locked, or the one he is on; a marker over his head.

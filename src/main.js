@@ -589,7 +589,7 @@ function renderHud() {
     const blood = card.querySelector('.blood');
     blood.hidden = !(fighter.bloodLost > 0);
     blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / collapseAt()) * 100))}%`;
-    card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : fighter.panicked ? 'PANIC' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
+    card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : fighter.panicked ? 'PANIC' : fighter.dazed > 0 ? 'DAZED' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
     const nerve = fighter.aiConfidence ?? 0;
     const mood = nerve > 0.35 ? ' · confident' : nerve < -0.35 ? ' · wary' : '';
     // The sandbox reads out fear and adrenaline; everywhere else, one health bar says enough.
@@ -619,6 +619,7 @@ function logEvent(event) {
   else if (event.kind === 'focus') return;
   else if (event.kind === 'strategy') text = `<b>${name(event.fighter)}</b> switches to ${STRATEGIES[event.strategy]?.label ?? event.strategy}`;
   else if (event.kind === 'accessory') text = `${event.icon} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
+  else if (event.kind === 'dazed') text = `💫 <b>${name(event.fighter)}</b> is dazed · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;

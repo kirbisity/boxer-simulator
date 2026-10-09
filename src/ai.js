@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, collapseAt, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
+import { chinNow, collapseAt, dazedShare, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -1323,7 +1323,7 @@ export function think(world, fighter, dt) {
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;
     const skill = fighter.body.inputs.exercise;
-    fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter + (style.reactionSlow ?? 0);
+    fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter + (style.reactionSlow ?? 0) + WORLD.daze.reaction * dazedShare(fighter);
     fighter.reacted = false;
   }
   // Seen from when it starts to move, loading included; not while committed.
@@ -1346,6 +1346,13 @@ export function think(world, fighter, dt) {
     }
   }
 
+  // Dazed: he covers up, gives ground a little, and holds his own blows back, the more the more dazed.
+  const dazed = dazedShare(fighter);
+  if (dazed > 0) {
+    if (!fighter.defence && !fighter.punch) perform(world, fighter, 'guard');
+    fighter.move *= 1 - 0.5 * dazed;
+    if (fighter.cooldown < 0.05 && random() < dazed) fighter.cooldown = 0.3;
+  }
   if (fighter.punch || fighter.rush || !mayAttack) return;
   // Never through a team-mate, and not while waiting a turn.
   if (spacing.blocked || waiting) {

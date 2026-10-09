@@ -104,6 +104,18 @@ export const WORLD = {
   limitStepLimp: 0.03, // m: firmer corrections inject speed of their own
   // The stance on the floor: how fast he turns to face (per s), how fast the
   // stance follows hips pushed off it (per s), how near the arena's edge (m) it may stand.
+  // Helmets (outfits.js HELMETS). `paddingStretch`: full padding (1) draws a
+  // blow's contact out this many times longer again (an arming cap and liner
+  // turn a ~3 ms steel-on-skull knock into ~10 ms). `glance`: on a fully
+  // curved bowl, the share of a blow that skids off as it turns from square
+  // to grazing; `slide`: the share of its twist that slides off instead of
+  // turning the head. `glancedBelow`: a blow keeping less than this is told as glancing.
+  helmet: { paddingStretch: 2.5, glance: 0.9, slide: 0.8, glancedBelow: 0.75 },
+  // Dazed: a head blow past `from` of the chin (short of a knockdown) leaves
+  // him dazed for `minSeconds`–`maxSeconds` by how near the knockdown it
+  // came: slower to react (`reaction` s), his muscles at (1 − `strength`),
+  // covering up, reeling sooner (`staggerMore`× the blow), the head lolling.
+  daze: { from: 0.5, minSeconds: 1.5, maxSeconds: 6, reaction: 0.2, strength: 0.3, staggerMore: 0.5, sway: 0.03 },
   // A strike thrown at a place is aimed at a man of the other side standing within this (m) of it.
   aimedAtWithin: 0.7,
   footing: { turnRate: 6, followPushed: 2.5, edgeMargin: 0.3 },
