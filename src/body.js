@@ -465,11 +465,11 @@ export const PRESETS = {
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2a1c', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Minamoto no Tametomo (1139–1170), the great archer of the Hōgen
-  // rebellion (1156): at seventeen a giant for his day, his bow drawn by a
+  // rebellion (1156): at seventeen strong beyond his size (168 cm, about the tallest of samurai of his day), his bow drawn by a
   // strength the chronicles made legend; ō-yoroi, the yumi, and the ōdachi
   // when a man came close.
   tametomo: {
-    name: 'Minamoto no Tametomo', style: 'yumi', sex: 'male', heightCm: 177, frame: 'large', age: 18, exercise: 0.74, calories: 4400,
+    name: 'Minamoto no Tametomo', style: 'yumi', sex: 'male', heightCm: 168, frame: 'large', age: 18, exercise: 0.74, calories: 3950,
     outfit: { kind: 'oyoroi', design: 0 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },

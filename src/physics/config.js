@@ -160,7 +160,7 @@ export const WORLD = {
   // knocks him less and staggers him less. Poise = 1 + `mass` × (armour kg ÷
   // body kg) + `shell` × (its blunt protection on the trunk); the push his
   // legs must take and a blow's stagger are divided by it.
-  poise: { mass: 1.2, shell: 1.2 },
+  poise: { mass: 2.5, shell: 2.5 },
   // Skill: how precisely a fighter places his blows (0..1), apart from his
   // body. 0.5 is an ordinary trained man and fights as before: above it the
   // scatter he has (a wild swinger's, a heavy weapon's) narrows, to none at 1;
