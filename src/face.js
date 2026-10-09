@@ -60,6 +60,12 @@ const RINGLET = { coil: 0.17, turns: 3.5, thickness: 0.17 };
 // to a point at the middle of the back (`point`, of r).
 // The hime cut: its bangs, and how far down the back of the skull the hair on the head runs (polar, rad).
 const HIME = { bangs: 9, nape: 2.8 };
+// Soft hair down the back (hairCurtainSoft): `columns` chains of `links`
+// pendulums round the back; each column's band a little wider than its share
+// (`overlap`) and reaching a little above its joint (`lap`, of a link), so
+// no gap shows between them as they sway apart or bend; side columns splay
+// out only `splay` of the way, so they fall together down the back.
+const SOFT_HAIR = { columns: 6, links: 3, overlap: 1.7, lap: 0.12, splay: 0.25, sag: [0.3, 0.5, 0.7], damping: [0.35, 0.28, 0.22] };
 const WAIST_HAIR = { length: 5.4, top: 1.12, hem: 1.85, arc: Math.PI * 1.2, nape: 1.6, hang: 0.33, strands: 24, strandDepth: 0.04, point: 0.55 };
 
 const FACE = {
@@ -547,23 +553,7 @@ export function hairCurtain(anchor, material, r, { length = WAIST_HAIR.length } 
   // Hung back from the nape: its end must start behind the back, or the trunk's collider pushes it out through the front.
   const dangle = new Dangle(anchor, pivot, [-WAIST_HAIR.hang, -1, 0], reach, { sag: 0.3, damping: 0.32 });
   const geometry = new THREE.CylinderGeometry(WAIST_HAIR.top * r, WAIST_HAIR.hem * r, reach, 32, 14, true, Math.PI * 1.5 - WAIST_HAIR.arc / 2, WAIST_HAIR.arc);
-  const position = geometry.attributes.position;
-  for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index);
-    const y = position.getY(index);
-    const z = position.getZ(index);
-    // 0 at the nape, 1 at the hem; the angle round from the middle of the back.
-    const down = 0.5 - y / reach;
-    const angle = Math.atan2(x, z);
-    const fromBack = Math.abs(Math.atan2(Math.sin(angle + Math.PI / 2), Math.cos(angle + Math.PI / 2)));
-    // Strands: fine grooves, every third deeper, opening out as it falls.
-    const groove = Math.sin(angle * WAIST_HAIR.strands);
-    const ripple = 1 + WAIST_HAIR.strandDepth * (0.4 + down) * (groove + (Math.round(angle * WAIST_HAIR.strands / Math.PI) % 3 === 0 ? 0.6 * groove : 0));
-    // The hem: cut straight, dipping to a point at the middle of the back.
-    const dip = down > 0.97 ? WAIST_HAIR.point * r * Math.max(0, 1 - fromBack / (WAIST_HAIR.arc / 2)) : 0;
-    position.setXYZ(index, x * ripple, y - dip, z * ripple);
-  }
-  geometry.computeVertexNormals();
+  curtainShape(geometry, r, reach, 0, 1, true);
   const sheet = new THREE.Mesh(geometry, material);
   // Its axis up the spine, its top at the nape.
   sheet.position.set(-pivot[0], -reach / 2, 0);
@@ -571,6 +561,81 @@ export function hairCurtain(anchor, material, r, { length = WAIST_HAIR.length } 
   sheet.add(outlineFor(sheet, 0.003));
   dangle.group.add(sheet);
   return dangle;
+}
+
+/** A curtain's strands and hem, worked into one band of it (angles about the spine, `down` 0 at the nape to 1 at the hem). */
+function curtainShape(geometry, r, reach, downFrom, downTo, hemmed) {
+  const position = geometry.attributes.position;
+  const height = geometry.parameters.height;
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const down = downFrom + (downTo - downFrom) * (0.5 - y / height);
+    const angle = Math.atan2(x, z);
+    const fromBack = Math.abs(Math.atan2(Math.sin(angle + Math.PI / 2), Math.cos(angle + Math.PI / 2)));
+    const groove = Math.sin(angle * WAIST_HAIR.strands);
+    const ripple = 1 + WAIST_HAIR.strandDepth * (0.4 + down) * (groove + (Math.round(angle * WAIST_HAIR.strands / Math.PI) % 3 === 0 ? 0.6 * groove : 0));
+    const dip = hemmed && down > 0.97 ? WAIST_HAIR.point * r * Math.max(0, 1 - fromBack / (WAIST_HAIR.arc / 2)) : 0;
+    position.setXYZ(index, x * ripple, y - dip, z * ripple);
+  }
+  geometry.computeVertexNormals();
+}
+
+/**
+ * The same curtain, soft: `SOFT_HAIR.columns` columns round the back, each a
+ * chain of pendulums (a Dangle hung from the tip of the one above), so the
+ * hair sways, swings out on a turn and settles, its links held off the back
+ * and shoulders by the body's colliders like any hair. Each link carries its
+ * band of the curtain. Returns the Dangles, parents before children (the
+ * order they must be stepped in).
+ */
+export function hairCurtainSoft(anchor, material, r, { length = WAIST_HAIR.length } = {}) {
+  const dangles = [];
+  const reach = length * r;
+  const link = reach / SOFT_HAIR.links;
+  const share = WAIST_HAIR.arc / SOFT_HAIR.columns;
+  const radiusAt = (down) => (WAIST_HAIR.top + (WAIST_HAIR.hem - WAIST_HAIR.top) * down) * r;
+  for (let column = 0; column < SOFT_HAIR.columns; column += 1) {
+    // The column's middle, round from the middle of the back (CylinderGeometry: angle 0 is +z, her left; behind her is 3π/2).
+    const theta = Math.PI * 1.5 - WAIST_HAIR.arc / 2 + share * (column + 0.5);
+    const out = [Math.sin(theta), Math.cos(theta)];
+    let parent = anchor;
+    let pivot = [out[0] * WAIST_HAIR.top * r, WAIST_HAIR.nape * r, out[1] * WAIST_HAIR.top * r];
+    // The first link hangs back from the nape, as the rigid curtain does, splaying only a little to the
+    // side (`splay`), so the columns fall together; the rest straight on.
+    let rest = [-Math.abs(out[0]) * WAIST_HAIR.hang - (1 - Math.abs(out[0])) * WAIST_HAIR.hang * 0.6, -1, out[1] * WAIST_HAIR.hang * SOFT_HAIR.splay];
+    for (let index = 0; index < SOFT_HAIR.links; index += 1) {
+      const from = index / SOFT_HAIR.links;
+      const to = (index + 1) / SOFT_HAIR.links;
+      const top = radiusAt(from);
+      const bottom = radiusAt(to);
+      const dangle = new Dangle(parent, pivot, rest, link, { sag: SOFT_HAIR.sag[index], damping: SOFT_HAIR.damping[index] });
+      const height = link * (1 + SOFT_HAIR.lap);
+      const geometry = new THREE.CylinderGeometry(top, bottom, height, 6, 4, true, theta - (share * SOFT_HAIR.overlap) / 2, share * SOFT_HAIR.overlap);
+      curtainShape(geometry, r, reach, from - SOFT_HAIR.lap / SOFT_HAIR.links, to, index === SOFT_HAIR.links - 1);
+      // Hung by the middle of its top edge (a little above the joint).
+      geometry.translate(-out[0] * top, -height / 2 + link * SOFT_HAIR.lap, -out[1] * top);
+      const band = new THREE.Mesh(geometry, material);
+      band.castShadow = true;
+      band.add(outlineFor(band, 0.003));
+      dangle.group.add(band);
+      dangles.push(dangle);
+      // The next link hangs from where this band's lower edge is, straight on along it.
+      parent = dangle.group;
+      pivot = [out[0] * (bottom - top), -link, out[1] * (bottom - top)];
+      rest = [0, -1, 0];
+    }
+  }
+  // Stepped top link first, then down each column: parents before children.
+  return dangles.sort((a, b) => depthOf(a, anchor) - depthOf(b, anchor));
+}
+
+/** How many links down from the anchor a Dangle hangs. */
+function depthOf(dangle, anchor) {
+  let depth = 0;
+  for (let at = dangle.anchor; at && at !== anchor; at = at.parent) depth += 1;
+  return depth;
 }
 
 function buildHair(group, look, r, shape, material, female, curtains = []) {

@@ -574,6 +574,40 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       hidesHair = false;
       break;
     }
+    case 'flower': {
+      // A small flower worn in the hair on one side: dark red petals round a
+      // black heart on a scrap of black lace. It sits just off the skull,
+      // above the ear, on any hair (or none) and clear of hair falling below.
+      const petals = surface(color, { roughness: 0.55 });
+      petals.side = THREE.DoubleSide;
+      const flower = new THREE.Group();
+      const lace = new THREE.Mesh(new THREE.CircleGeometry(0.2 * r, 8), surface(head.lace ?? 0x0d0c0f, { roughness: 0.9 }));
+      lace.material.side = THREE.DoubleSide;
+      lace.position.z = -0.03 * r;
+      flower.add(lace);
+      for (const [ring, count, size, lift] of [[0.1, 6, 0.1, 0], [0.05, 5, 0.075, 0.025]]) {
+        for (let petal = 0; petal < count; petal += 1) {
+          const angle = (petal / count) * Math.PI * 2 + ring * 10;
+          const leaf = new THREE.Mesh(new THREE.SphereGeometry(size * r, 8, 6), petals);
+          leaf.scale.set(1, 0.75, 0.45);
+          leaf.position.set(Math.cos(angle) * ring * r, Math.sin(angle) * ring * r, lift * r);
+          flower.add(leaf);
+        }
+      }
+      const heart = new THREE.Mesh(new THREE.SphereGeometry(0.04 * r, 8, 6), surface(0x0b0a0c, { roughness: 0.3 }));
+      heart.position.z = 0.05 * r;
+      flower.add(heart);
+      // Above the ear, a little forward, facing out from the head (its +z out).
+      const side = head.side ?? 1;
+      const polar = 0.95;
+      const azimuth = side * 1.35;
+      const out = [Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth)];
+      flower.position.set(out[0] * 1.2 * r, out[1] * 1.2 * r, out[2] * 1.2 * r);
+      flower.lookAt(out[0] * 3 * r, out[1] * 3 * r, out[2] * 3 * r);
+      group.add(flower);
+      hidesHair = false;
+      break;
+    }
     case 'fascinator': {
       // A small black lace fascinator perched on one side of the head: a
       // rosette of lace petals round a jet bead, spiky lace leaves fanning

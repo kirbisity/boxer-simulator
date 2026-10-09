@@ -162,9 +162,11 @@ export const HEEL_FOOTING_PER_RADIAN = 1.1;
 
 // What the gothic designs share: the corset, the platforms, the face.
 const GOTHIC = {
+  // A small dark-red flower on one side of the head, over whatever her hair is.
+  head: { kind: 'flower', color: '#5c0b16', lace: '#0d0c0f', side: 1 },
   armor: { kind: 'overbust', color: '#0f0f12', cloth: '#121216', cloth2: '#26262d', lace: '#2e2e36', gold: '#b8bcc4' },
   feet: { kind: 'platformShoe', color: '#0b0b0d', heels: PLATFORM_HEELS },
-  face: { skinTone: 'porcelain', hairColor: '#0c0a0c', makeup: { eyes: 'smoky', liner: 'winged', lowerLash: 'heavy', lips: '#0b090b' } },
+  face: { skinTone: 'porcelain', makeup: { eyes: 'smoky', liner: 'winged', lowerLash: 'heavy', lips: '#0b090b' } },
 };
 const GOTHIC_CHOKER = { kind: 'choker', color: '#111114', beads: '#24242b' };
 
@@ -1061,10 +1063,11 @@ export const OUTFITS = {
       // Victorian Gothic, all in black: a strapless overbust corset (brocade,
       // a steel busk's clasps, laced behind), platform Mary Janes, a beaded
       // lace choker; porcelain powder, smoky eyes, black lips (`face`, laid
-      // over her own look). Three takes were drawn; B (the high-low) was chosen and is dealt, A and C are kept.
-      { label: 'Gothic A — bubble bloomers, ringlet pigtails', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'bubble', color: '#141417', trim: '#2c2c33' }, head: { kind: 'fascinator', color: '#111114', side: 1 }, extras: [GOTHIC_CHOKER, { kind: 'ribbons', color: '#0e0e11', count: 10, length: 0.55 }], hair: 'ringletPigtails' },
-      { label: 'Gothic B — high-low train, long ringlets', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'drape', color: '#131316', trim: '#2a2a31' }, head: { kind: 'fascinator', color: '#111114', side: -1 }, extras: [GOTHIC_CHOKER, { kind: 'train', color: '#121215', length: 0.62 }, { kind: 'ribbons', color: '#0e0e11', count: 4, length: 0.4 }], hair: 'ringlets' },
-      { label: 'Gothic C — lace sleeves, tiered skirt, mini top hat', ...GOTHIC, armor: { ...GOTHIC.armor, kind: 'overbustSleeved' }, bottom: { kind: 'bloomers', gown: 'tiered', color: '#141417', trim: '#33333b' }, head: { kind: 'miniTopHat', color: '#0f0f12', lace: '#2e2e36', side: 1 }, extras: [GOTHIC_CHOKER], hair: 'ringletUpdo' },
+      // over her own look: her hair stays her own), a small dark-red flower in
+      // the hair. Three takes were drawn; B (the high-low) was chosen and is dealt, A and C are kept.
+      { label: 'Gothic A — bubble bloomers', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'bubble', color: '#141417', trim: '#2c2c33' }, extras: [GOTHIC_CHOKER, { kind: 'ribbons', color: '#0e0e11', count: 10, length: 0.55 }] },
+      { label: 'Gothic B — high-low train', ...GOTHIC, bottom: { kind: 'bloomers', gown: 'drape', color: '#131316', trim: '#2a2a31' }, extras: [GOTHIC_CHOKER, { kind: 'train', color: '#121215', length: 0.62 }, { kind: 'ribbons', color: '#0e0e11', count: 4, length: 0.4 }] },
+      { label: 'Gothic C — lace sleeves, tiered skirt', ...GOTHIC, armor: { ...GOTHIC.armor, kind: 'overbustSleeved' }, bottom: { kind: 'bloomers', gown: 'tiered', color: '#141417', trim: '#33333b' }, extras: [GOTHIC_CHOKER] },
     ],
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.

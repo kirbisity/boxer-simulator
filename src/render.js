@@ -14,7 +14,7 @@ import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
-import { buildHead, hairCurtain } from './face.js';
+import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
@@ -2120,7 +2120,8 @@ function detailedView(view, fighter, simple) {
   if (dress.top?.kind === 'hoodie') dangles.push(...buildHood(body, collar, dress.top.color));
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   // Long hair down the back hangs from the upper back (unless a helmet hides the hair).
-  if (!headgear?.hidesHair) for (const curtain of headView.curtains ?? []) dangles.push(hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain));
+  // Soft (chains of links) for a fighter drawn in full; one rigid sheet for a crowd.
+  if (!headgear?.hidesHair) for (const curtain of headView.curtains ?? []) dangles.push(...(simple ? [hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain)] : hairCurtainSoft(collar, headView.hairMaterial, body.lengths.headRadius, curtain)));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   // The scissor's coat of scales, plate by plate over the painted shirt.
   // Maximus's harness: the straps, buckles, plates and belt over the loft.
