@@ -858,7 +858,7 @@ const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a
 const LOOK_FIELDS = [
   { key: 'style', label: 'Style', options: STYLE_KEYS, names: Object.fromEntries(STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
   { key: 'skinTone', label: 'Skin', options: Object.keys(SKIN_TONES), names: { porcelain: 'porcelain', light: 'light', lightTan: 'light tan', medium: 'medium', tan: 'tan', deep: 'deep' } },
-  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long', long: 'long', ringletPigtails: 'ringlet pigtails', ringlets: 'ringlets', ringletUpdo: 'ringlet updo', waistLongA: 'waist-long, side fringe', waistLongB: 'waist-long, centre part', waistLongC: 'waist-long waves, peek-a-boo', waistLongD: 'waist-long hime cut', waistLongE: 'waist-long, tousled' } },
+  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long', long: 'long', ringletPigtails: 'ringlet pigtails', ringlets: 'ringlets', ringletUpdo: 'ringlet updo', hime: 'hime cut (waist length)' } },
   { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
   { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair },
   { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor },
