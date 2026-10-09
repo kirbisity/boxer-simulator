@@ -17,7 +17,7 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 
 export const LOOK_OPTIONS = {
-  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'bald'],
+  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'waistLongA', 'waistLongB', 'waistLongC', 'waistLongD', 'waistLongE', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'beard', 'longBeard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
@@ -49,6 +49,14 @@ export const MAKEUP = { shadow: 0x1a1316, shadowOpacity: 0.82, wing: 0.16, liner
 
 // Ringlets: corkscrew curls, `coil` (of r) about their line, `turns` along a lock.
 const RINGLET = { coil: 0.17, turns: 3.5, thickness: 0.17 };
+
+// Hair to the waist: the curtain down the back is this long (of r) from the
+// nape (`nape`, of r above the base of the neck); at the top it wraps the
+// head (`top`, of r), at the hem it stands off the back (`hem`, leaning back
+// `lean`), round `arc` of the way about (behind and the sides); it hangs
+// back from the nape at `hang` (back per unit down), grooved by `strands`
+// fine ridges `strandDepth` deep.
+const WAIST_HAIR = { length: 5.0, top: 1.1, hem: 1.85, arc: Math.PI * 1.15, lean: 0, nape: 1.15, hang: 0.33, strands: 22, strandDepth: 0.035 };
 
 const FACE = {
   eyeLine: -0.06, // eyes sit a little below the middle of the head, as drawn
@@ -382,7 +390,9 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     return disc;
   });
 
-  const dangles = buildHair(group, look, r, shape, hairMaterial, female);
+  // Hair down the back hangs from the upper back, not the head (render.js hangs it: hairCurtain).
+  const curtains = [];
+  const dangles = buildHair(group, look, r, shape, hairMaterial, female, curtains);
   buildFacialHair(group, look, r, shape, hairMaterial, dangles);
 
   // ---- Expression -------------------------------------------------------
@@ -449,7 +459,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     });
     dangles.length = 0;
   }
-  return { group, shell: skull, update, dangles, hideHair };
+  return { group, shell: skull, update, dangles, hideHair, curtains, hairMaterial };
 }
 
 function hairLock(group, material, points, width, thickness, taper = 1) {
@@ -518,7 +528,46 @@ function ringletLock(group, material, dangles, root, rest, length, r, { coil = R
   return dangle;
 }
 
-function buildHair(group, look, r, shape, material, female) {
+/**
+ * A curtain of hair down the back, to the waist: one curved sheet hung at the
+ * nape from the upper back (`anchor`: the collar, its x forward and y up the
+ * spine, at the base of the neck), so it lies down the back whichever way the
+ * head turns, and swings as a piece (a Dangle). It wraps the back of the head
+ * at the top and stands off the back as it falls, so it hangs behind the body
+ * rather than inside it. `waves`: soft waves through it; `ragged`: a layered,
+ * uneven hem. `r`: the head's radius (m).
+ */
+export function hairCurtain(anchor, material, r, { length = WAIST_HAIR.length, waves = 0, ragged = 0 } = {}) {
+  const reach = length * r;
+  const pivot = [-WAIST_HAIR.top * r, WAIST_HAIR.nape * r, 0];
+  // Hung well back from the nape: its end must start behind the back, or the trunk's collider pushes it out through the front.
+  const dangle = new Dangle(anchor, pivot, [-WAIST_HAIR.hang, -1, 0], reach, { sag: 0.3, damping: 0.32 });
+  const geometry = new THREE.CylinderGeometry(WAIST_HAIR.top * r, WAIST_HAIR.hem * r, reach, 26, 14, true, Math.PI * 1.5 - WAIST_HAIR.arc / 2, WAIST_HAIR.arc);
+  const position = geometry.attributes.position;
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    // 0 at the nape, 1 at the hem.
+    const down = 0.5 - y / reach;
+    const angle = Math.atan2(x, z);
+    // Waves ripple round and down it; a layered hem is cut uneven.
+    // Strands: fine grooves down it, so it reads as hair and not a sheet.
+    const ripple = 1 + waves * 0.07 * Math.sin(down * 16 + angle * 5) + WAIST_HAIR.strandDepth * Math.sin(angle * WAIST_HAIR.strands);
+    const cut = ragged * r * (down > 0.75 ? Math.abs(Math.sin(angle * 7.3) + 0.5 * Math.sin(angle * 13.1)) * (down - 0.75) * 4 : 0);
+    position.setXYZ(index, x * ripple - WAIST_HAIR.lean * r * down, y + cut, z * ripple);
+  }
+  geometry.computeVertexNormals();
+  const sheet = new THREE.Mesh(geometry, material);
+  // Its axis up the spine, its top at the nape.
+  sheet.position.set(-pivot[0], -reach / 2, 0);
+  sheet.castShadow = true;
+  sheet.add(outlineFor(sheet, 0.003));
+  dangle.group.add(sheet);
+  return dangle;
+}
+
+function buildHair(group, look, r, shape, material, female, curtains = []) {
   const style = look.hairStyle;
   const dangles = [];
   if (style === 'bald') return dangles;
@@ -673,6 +722,8 @@ function buildHair(group, look, r, shape, material, female) {
     }
     // In front of the ears, falling clear of the cheek.
     for (const side of [1, -1]) ringletLock(group, material, dangles, onScalp(r, 1.2, side * 1.4, 1.08), [0.05, -1, side * 0.3], 1.45 * r, r, { turns: 3 });
+  } else if (style.startsWith('waistLong')) {
+    buildWaistHair(style, group, dangles, r, cap, lock, bangs, material, curtains);
   } else if (style === 'dreads') {
     // Locs from all over the scalp, hanging heavy to the shoulders, a few
     // pushed back off the face.
@@ -696,6 +747,80 @@ function buildHair(group, look, r, shape, material, female) {
     }
   }
   return dangles;
+}
+
+/**
+ * Hair to the waist, five ways, each with some of it over the face: a curtain
+ * down the back, locks at the sides, and what falls over the eyes or cheeks.
+ * Locks over the face are drawn on the head (they do not swing into it).
+ */
+function buildWaistHair(style, group, dangles, r, cap, lock, bangs, material, curtains) {
+  // A point before the face: `y` and `z` as the face's own coordinates (of r), `out` off the skin.
+  const onFace = (y, z, out = 1.06) => {
+    // On the skull's surface (an ellipsoid; the drawn face is pressed a little flatter), `out` off it.
+    const across = z / SKULL[2];
+    const up = y / SKULL[1];
+    const depth = Math.sqrt(Math.max(0.05, 1 - across * across - up * up * 0.8));
+    return [SKULL[0] * r * depth * out, y * r, z * r * out];
+  };
+  const eye = FACE.eyeLine;
+  const right = -FACE.eyeSpread;
+  cap(1.06, 1.05, 2.05);
+  if (style === 'waistLongA') {
+    // A: straight, with a heavy fringe swept from a side parting across one eye.
+    for (let index = 0; index < 5; index += 1) {
+      const from = onScalp(r, 0.28 + index * 0.06, 0.55 - index * 0.06, 1.05);
+      lock(from, onFace(eye - 0.3 - index * 0.05, right + 0.12 - index * 0.08, 1.1), 0.42 * r, 0.09 * r, [0.25 * r, 0.1 * r, -0.05 * r], 0.55);
+    }
+    curtains.push({});
+    for (const side of [1, -1]) flowingLock(group, material, dangles, onScalp(r, 1.15, side * 1.25, 1.05), [0.15, -1, side * 0.3], [2.4 * r, 2.4 * r], 0.5 * r, 0.1 * r);
+  } else if (style === 'waistLongB') {
+    // B: straight, parted in the middle, long front locks falling over the cheeks and down the chest.
+    for (const side of [1, -1]) {
+      for (let index = 0; index < 3; index += 1) lock(onScalp(r, 0.12, side * (0.6 + index * 0.25), 1.05), onScalp(r, 0.95, side * (1.0 - index * 0.06), 1.12), 0.4 * r, 0.08 * r, [0.05 * r, 0.12 * r, side * 0.05 * r]);
+      // Over the cheek, from the temple to below the jaw: drawn on the face.
+      hairLock(group, material, [onScalp(r, 0.85, side * 0.85, 1.07), onFace(-0.2, side * 0.6, 1.1), onFace(-0.62, side * 0.58, 1.12)], 0.36 * r, 0.09 * r, 0.2);
+      flowingLock(group, material, dangles, onFace(-0.6, side * 0.62, 1.1), [0.3, -1, side * 0.2], [2.0 * r, 2.2 * r], 0.42 * r, 0.1 * r);
+    }
+    curtains.push({});
+  } else if (style === 'waistLongC') {
+    // C: soft waves, a peek-a-boo fringe falling over one eye to the chin.
+    hairLock(group, material, [onScalp(r, 0.3, -0.05, 1.05), onFace(eye + 0.4, right + 0.2, 1.12), onFace(eye, right + 0.12, 1.15), onFace(eye - 0.35, right + 0.08, 1.15), onFace(-0.66, right + 0.1, 1.15)], 0.66 * r, 0.12 * r, 0.6);
+    bangs(4, 0.4, 0.2);
+    curtains.push({ waves: 1 });
+    for (const side of [1, -1]) {
+      for (let index = 0; index < 2; index += 1) flowingLock(group, material, dangles, onScalp(r, 1.1 + index * 0.15, side * (1.2 + index * 0.3), 1.06), [0.1, -1, side * 0.35], [2.5 * r, 2.6 * r], 0.48 * r, 0.12 * r);
+    }
+  } else if (style === 'waistLongD') {
+    // D: a hime cut: blunt bangs straight across the brow, cheek-length side
+    // locks cut straight beside the face, the rest straight to the waist.
+    for (let index = 0; index < 9; index += 1) {
+      const across = (index / 8 - 0.5) * 1.35;
+      hairLock(group, material, [onScalp(r, 0.32, across * 0.8, 1.05), [SKULL[0] * r * 1.0, 0.45 * r, across * 0.62 * r], onFace(eye + 0.2, across * 0.6, 1.06)], 0.3 * r, 0.08 * r, 0.05);
+    }
+    for (const side of [1, -1]) {
+      // Beside the face, cut straight at the jaw, over the edges of the cheeks.
+      for (let index = 0; index < 2; index += 1) {
+        const z = side * (0.7 + index * 0.1);
+        hairLock(group, material, [onScalp(r, 0.62, side * (0.95 + index * 0.2), 1.06), onFace(0.0, z, 1.1), onFace(-0.68, z, 1.12)], 0.36 * r, 0.1 * r, 0.05);
+      }
+    }
+    curtains.push({});
+  } else {
+    // E: layered and wind-tousled: locks of many lengths flying out, a few strands across the face.
+    for (let index = 0; index < 4; index += 1) {
+      const from = onScalp(r, 0.25 + index * 0.05, 0.45 - index * 0.3, 1.05);
+      const z = 0.4 - index * 0.32;
+      lock(from, onFace(eye - 0.25 - (index % 2) * 0.35, z, 1.12), 0.16 * r, 0.05 * r, [0.2 * r, 0.05 * r, (index - 1.5) * 0.08 * r], 0.6);
+    }
+    bangs(5, 0.44, -0.18);
+    curtains.push({ ragged: 1.2 });
+    for (let index = 0; index < 8; index += 1) {
+      const azimuth = Math.PI * 0.5 + (index / 7) * Math.PI;
+      const length = (1.6 + ((index * 5) % 4) * 0.6) * r;
+      flowingLock(group, material, dangles, onScalp(r, 1.0 + (index % 3) * 0.15, azimuth, 1.06), [Math.cos(azimuth) * 0.45, -1, Math.sin(azimuth) * 0.45 + (index % 2 ? 0.2 : -0.2)], [length, length], 0.36 * r, 0.09 * r);
+    }
+  }
 }
 
 function buildFacialHair(group, look, r, shape, material, dangles) {
