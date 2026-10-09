@@ -58,6 +58,10 @@ const PYONGYANG_JAPANESE = {
 };
 
 /** Blades and polearms first (the front ranks), bows and guns last. */
+// Where the bows and guns open a battle: in the front rows, shooting, the
+// blades and spears this far (m) behind them, to go through when it comes to hand strokes.
+const SHOOTERS_FRONT_GAP = 2.2;
+
 function shootersBehind(warriors) {
   const shooter = (warrior) => (STYLES[warrior.style]?.ranged ? 1 : 0);
   return warriors.sort((a, b) => shooter(a) - shooter(b));
@@ -159,13 +163,13 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: 'The battle that ends the Sengoku. Thirty of the East in red against thirty of the West in black and blue: spears, blades and polearms in front, bows and teppō behind.',
+    blurb: 'The battle that ends the Sengoku. Thirty of the East in red against thirty of the West in black and blue: bows and teppō in front, spears, blades and polearms behind.',
     scene: 'sengoku',
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
     roster: 'Thirty a side: samurai and ashigaru',
-    // Ten abreast: the blades and polearms in the front ranks, the bows behind.
-    formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, perRow: 10, loose: 0.3 } },
+    // Ten abreast: the bows and teppō in the front rows, the blades and polearms behind them.
+    formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 } },
     cast: (random) => {
       const east = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
       const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
@@ -181,7 +185,7 @@ export const SCENARIOS = {
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: 'Twenty a side: Ming and Japanese',
-    formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.3 } },
+    formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
     fighters: [],
   },
@@ -208,7 +212,7 @@ export const SCENARIOS = {
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
     roster: 'Eighteen Dutch · thirty-two of Koxinga\'s army',
-    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.35 } },
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35 } },
     cast: (random) => {
       const army = ZEELANDIA.koxinga;
       // The iron men, every one masked, in scale (the elite's masked scale design).
@@ -230,7 +234,7 @@ export const SCENARIOS = {
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
     roster: 'Fifteen of the Order · a wave of seventeen Ottomans',
-    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 8, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.4 } },
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.4 } },
     cast: (random) => ({
       red: shootersBehind([...company(RHODES.hospitallers.knight, (style) => hospitaller(random, style, 'knight')), ...company(RHODES.hospitallers.sergeant, (style) => hospitaller(random, style, 'sergeant'))]),
       blue: shootersBehind([...company(RHODES.ottomans.heavy, (style) => ottomanSoldier(random, style, 'heavy')), ...company(RHODES.ottomans.janissary, (style) => ottomanSoldier(random, style, 'janissary')), ...company(RHODES.ottomans.azap, (style) => ottomanSoldier(random, style, 'azap'))]),
