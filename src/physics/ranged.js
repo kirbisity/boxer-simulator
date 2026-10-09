@@ -56,6 +56,15 @@ export function raisedAim(fighter, mark) {
 // the string drawn from `spanFrom` m down the tiller up by `spanStroke` m.
 export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4, spanHand: [0.16, 0.5, -0.04], spanDir: [0.35, -1, 0.02], spanFrom: 0.45, spanStroke: 0.3, pistolReloadHand: [0.2, 0.6, 0.02] };
 
+// A revolver loaded at the cylinder (`shot.cylinder`): held at the waist, above a gown's hoop, before the
+// body (`hand`, heights), the muzzle tipped forward and down (`dir`); for
+// each chamber the support hand goes to the pouch at the belt (`pouch`),
+// to the chamber's mouth beside the barrel (`mouth`, m along the barrel and
+// up from it), then works the rammer lever beneath (`rammer`, m along and
+// below), over each chamber's share of the reload: `phases` are where in that
+// share it reaches each place.
+export const CYLINDER_LOAD = { hand: [0.3, 0.6, 0.02], dir: [0.65, -0.5, -0.12], pouch: [0.12, 0.58, 0.16], mouth: [0.07, 0.035], rammer: [0.13, -0.04], phases: [0.25, 0.5, 0.75] };
+
 export let referenceSegments = null;
 
 /** The body parts of the man the gun's numbers are for: 80 kg, average build. */

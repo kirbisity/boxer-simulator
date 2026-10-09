@@ -138,9 +138,9 @@ test('a fall shakes headgear off, even a crest', async () => {
   assert.equal(world.props.find((prop) => prop.kind === 'crest').attached, false);
 });
 
-test('three samurai, three knight and six gladiator armours, five designs each, each with its own protection', async () => {
+test('three samurai, two knight and six gladiator armours, five designs each, each with its own protection', async () => {
   const { familyKinds, randomDesign } = await import('../src/outfits.js');
-  const counts = { samurai: 3, knight: 3, gladiator: 6 };
+  const counts = { samurai: 3, knight: 2, gladiator: 6 };
   for (const [family, count] of Object.entries(counts)) {
     const kinds = familyKinds(family);
     assert.equal(kinds.length, count, family);
@@ -153,9 +153,9 @@ test('three samurai, three knight and six gladiator armours, five designs each, 
       for (let draw = 0; draw < 40; draw += 1) assert.ok(!OUTFITS[kind].designs[randomDesign(kind)].special, kind);
     }
   }
-  // Plate is proof against the edge; mail is not; the ashigaru is the lightest samurai.
-  assert.ok(OUTFITS.knight.protection.cut > OUTFITS.knightMail.protection.cut);
-  assert.ok(OUTFITS.knightMail.protection.pierce < OUTFITS.knight.protection.pierce);
+  // Plate is proof against the edge and the point; the Templar's mail less so; the ashigaru is the lightest samurai.
+  assert.ok(OUTFITS.knight.protection.cut > OUTFITS.templar.protection.cut);
+  assert.ok(OUTFITS.templar.protection.pierce < OUTFITS.knight.protection.pierce);
   assert.ok(OUTFITS.ashigaru.extraMass < OUTFITS.samurai.extraMass && OUTFITS.ashigaru.protection.cut < OUTFITS.samurai.protection.cut);
 });
 

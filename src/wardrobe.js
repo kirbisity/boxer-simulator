@@ -317,6 +317,17 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
  * headguard, a beanie, a riot helmet with its visor, a knight's great helm
  * or bascinet. Returns the group and whether it hides the hair.
  */
+// The Han lamellar helmet's rows (in head radii): the cap's [bottom radius,
+// top radius, height, centre y] from the brow up, and the curtain's [top
+// radius, bottom radius, height, centre y] from the rim down; plates round a
+// row, and the face's opening in the curtain (rad, centred on the front).
+const HAN_HELM = {
+  plates: 22,
+  cap: [[1.2, 1.12, 0.42, 0.32], [1.12, 0.98, 0.4, 0.66], [0.98, 0.76, 0.36, 0.98], [0.76, 0.44, 0.3, 1.22]],
+  curtain: [[1.18, 1.3, 0.46, 0.04], [1.28, 1.42, 0.46, -0.32], [1.4, 1.56, 0.46, -0.68]],
+  faceOpen: 1.5,
+};
+
 export function buildHeadgear(body, head, colors, steel, cornerHex) {
   if (!head) return null;
   const r = body.lengths.headRadius;
@@ -1001,6 +1012,41 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       tassel.position.y = 1.32 * r;
       tassel.rotation.x = Math.PI;
       group.add(crown, brim, spike, tassel);
+      break;
+    }
+    case 'hanHelm': {
+      // A Western Han iron helmet (doumou), as the one from the King of Qi's
+      // tomb at Linzi (2nd c. BC): a rounded cap of small iron lamellae laced
+      // in overlapping rows to an iron crown boss, and a lamellar curtain over
+      // the neck and cheeks, open at the face. Each row is a ring of flat
+      // facets (one plate a facet), each set a little inside the row below.
+      const iron = metal(steel, color).clone();
+      iron.flatShading = true;
+      const lacing = surface(head.lace ?? 0x3a2a20, { roughness: 0.9 });
+      const plates = HAN_HELM.plates;
+      // The cap: rows from the brow up to the crown, along a dome's profile.
+      HAN_HELM.cap.forEach(([bottomRadius, topRadius, height, y], row) => {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(topRadius * r, bottomRadius * r, height * r, plates, 1, true, row % 2 ? Math.PI / plates : 0), iron);
+        ring.material.side = THREE.DoubleSide;
+        ring.position.y = y * r;
+        const lace = new THREE.Mesh(new THREE.TorusGeometry(bottomRadius * r * 0.99, 0.025 * r, 4, plates * 2), lacing);
+        lace.rotation.x = Math.PI / 2;
+        lace.position.y = (y - height * 0.32) * r;
+        group.add(ring, lace);
+      });
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(0.42 * r, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      crown.position.y = 1.28 * r;
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.14 * r, 10, 8), iron);
+      boss.position.y = 1.7 * r;
+      group.add(crown, boss);
+      // The curtain: rows flaring from the rim down over the nape and cheeks, open over the face (+x).
+      HAN_HELM.curtain.forEach(([topRadius, bottomRadius, height, y], row) => {
+        const open = HAN_HELM.faceOpen;
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(topRadius * r, bottomRadius * r, height * r, plates, 1, true, Math.PI / 2 + open / 2 + (row % 2 ? Math.PI / plates : 0), Math.PI * 2 - open), iron);
+        ring.material.side = THREE.DoubleSide;
+        ring.position.y = y * r;
+        group.add(ring);
+      });
       break;
     }
     case 'mingHelm': {

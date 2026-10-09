@@ -43,11 +43,6 @@ function plateDesign(label, steel, fluted, pointed, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed }, feet: { kind: 'sabaton', color: steel } };
 }
 
-/** Mail under a surcoat in a coat of arms. */
-function mailDesign(label, cloth, cloth2, heraldry) {
-  return { label, top: { kind: 'longsleeve', color: '#5a5040' }, bottom: { kind: 'tights', color: '#4a4238' }, armor: { kind: 'mail', color: '#8d9097', mail: '#8d9097', cloth, cloth2, heraldry }, head: { kind: 'greatHelm', color: '#a7adb6' }, feet: { kind: 'compactBoot', color: '#3a2a1c' } };
-}
-
 /** A foot soldier's body armour (brigandine, mail shirt or breastplate) in its cloth, over a quilted coat, and a kettle hat. */
 function footmanDesign(label, kind, cloth, quilt, hat) {
   return { label, top: { kind: 'longsleeve', color: quilt }, bottom: { kind: 'tights', color: '#3a3326' }, armor: { kind, color: '#9aa0a8', cloth, gold: '#c9a85a', mail: '#8d9097' }, head: { kind: 'kettleHat', color: '#9aa0a8', ...hat }, feet: { kind: 'compactBoot', color: '#3a2a1c' } };
@@ -432,25 +427,6 @@ export const OUTFITS = {
       { label: 'White harness, crimson huque', special: true, top: { kind: 'longsleeve', color: '#4a1a1e' }, bottom: { kind: 'tights', color: '#2e2420' }, armor: { kind: 'plate', color: '#d4d8de', fluted: false, over: 'huque', cloth: '#8c1c26', cloth2: '#c9a24a' }, feet: { kind: 'sabaton', color: '#d4d8de' } },
     ],
   },
-  // Mail and a great helm: rings to the knees under a surcoat in his
-  // colours. Proof against most cuts, poor against a point, little help
-  // against a blow; lighter than plate, and an edge bites rather than glances.
-  knightMail: {
-    faction: 'knights',
-    label: 'Knight — mail and great helm', family: 'knight', movement: 'limited', fists: 'gauntlet',
-    sidearm: 'shortSword',
-    picked: [0, 1, 2, 3],
-    extraMass: 0.4,
-    protection: { blunt: 0.3, cut: 0.9, pierce: 0.5, bullet: { head: 0.3, torso: 0, limb: 0 } },
-    courage: 0.4,
-    designs: [
-      mailDesign('Gules', '#a2201e', '#e8e2d2', 'plain'),
-      mailDesign('Per pale', '#1f3f8a', '#e8e2d2', 'pale'),
-      mailDesign('Quarterly', '#d6a743', '#1a1a1d', 'quarterly'),
-      mailDesign('Crusader cross', '#e8e2d2', '#a2201e', 'cross'),
-      mailDesign('Chief', '#2f5a3a', '#e8e2d2', 'chief'),
-    ],
-  },
   // A brother-knight of the Temple (c. 1180–1300): a full mail hauberk with
   // its coif and mittens over a quilted gambeson, mail chausses with plain
   // steel greaves and knee cops, under the Order's long surcoat with its red
@@ -830,10 +806,14 @@ export const OUTFITS = {
     drill: { advance: false },
     sidearm: 'jian',
     extraMass: 0.18,
-    protection: { blunt: 0.4, cut: 0.82, pierce: 0.62, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.05, cut: 0.1, pierce: 0.05 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    // The head: an iron lamellar helmet over a padded cap (the Linzi helmet):
+    // iron plates turn an edge almost as the coat does; a point finds the
+    // lacing a little more often, and a blow is felt through the small
+    // plates more than through a one-piece bowl. The face is open.
+    protection: { blunt: 0.4, cut: 0.82, pierce: 0.62, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.5 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
     courage: 0.3,
     designs: [
-      { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'guanYuCap', color: '#1a1a1c', plain: true }, feet: { kind: 'compactBoot', color: '#1a1614' } },
+      { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'hanHelm', color: '#5d6066', lace: '#3a2a20' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
     ],
   },
   // The wuxia swordsman's dress: a light robe crossed over the breast and

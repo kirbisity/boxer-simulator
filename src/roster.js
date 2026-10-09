@@ -32,8 +32,6 @@ export const WARRIORS = [
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
   // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
   { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true },
-  // Sir Aldous: a big, heavy man-at-arms (~94 kg on 185 cm), hard to put down.
-  warrior('mail', 'Sir Aldous', PRESETS.knight, { name: 'Sir Aldous', heightCm: 185, frame: 'large', exercise: 0.63, calories: 4675, outfit: { kind: 'knightMail', design: 0 }, accessories: [] }),
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
   warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', calories: 4050, exercise: 0.75, sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
@@ -51,7 +49,8 @@ export const WARRIORS = [
   warrior('kheshig', 'Subutai', PRESETS.kheshig),
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
-  warrior('steppeLancer', 'Temür', PRESETS.maceShield, { name: 'Temür', style: 'spear', outfit: { kind: 'steppeHeavy', design: 1 } }),
+  // An iron-clad horse archer: the bow, then the sabre (his kit's sidearm) up close.
+  warrior('steppeLancer', 'Temür', PRESETS.maceShield, { name: 'Temür', style: 'steppeBow', outfit: { kind: 'steppeHeavy', design: 1 } }),
   warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
   warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
   warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),

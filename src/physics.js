@@ -12,7 +12,7 @@ import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf }
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToShield, shieldReach, NET } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 import { WORLD } from './physics/config.js';
-import { aimTargets, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
+import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { formUp } from './formation.js';
@@ -469,6 +469,23 @@ function weaponIntent(world, fighter, intent) {
       // tiller, the other drawing the string up the stock to the nut.
       target = { hand: vec.scale(LONG_GUN.spanHand, H), dir: vec.normalize(LONG_GUN.spanDir) };
       intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.spanFrom - LONG_GUN.spanStroke * stroke));
+    } else if (weapon.spec.shot.cylinder) {
+      // A revolver: held low, muzzle down; for each chamber the support hand
+      // to the pouch, to the chamber's mouth, then down on the rammer lever.
+      const load = CYLINDER_LOAD;
+      target = { hand: vec.scale(load.hand, H), dir: vec.normalize(load.dir) };
+      const perChamber = weapon.spec.shot.reloadSeconds / (weapon.spec.shot.rounds ?? 1);
+      const phase = ((weapon.reloaded ?? 0) / perChamber) % 1;
+      const pouch = vec.scale(load.pouch, H);
+      const mouth = vec.add(vec.add(target.hand, vec.scale(target.dir, load.mouth[0])), [0, load.mouth[1], 0]);
+      const rammer = vec.add(vec.add(target.hand, vec.scale(target.dir, load.rammer[0])), [0, load.rammer[1], 0]);
+      const ease = (value) => value * value * (3 - 2 * value);
+      const [toMouth, toRammer, back] = load.phases;
+      const offHand = phase < toMouth ? vec.lerp(pouch, mouth, ease(phase / toMouth))
+        : phase < toRammer ? vec.lerp(mouth, rammer, ease((phase - toMouth) / (toRammer - toMouth)))
+          : phase < back ? rammer
+            : vec.lerp(rammer, pouch, ease((phase - back) / (1 - back)));
+      intent[`${weapon.off}Hand`] = offHand;
     } else {
       // Reloading: the gun upright, the support hand ramming the ball home (a pistol held up before the chest, its short rod).
       const pistol = weapon.spec.hands === 'one';

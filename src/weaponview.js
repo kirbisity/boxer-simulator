@@ -348,12 +348,15 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       // octagonal barrel forged with a solid frame and its top strap; the
       // five-chambered cylinder in the frame's window, the chamber mouths in
       // front, a cap on each nipple behind; the spurless double-action
-      // hammer; the trigger guard and trigger; the chequered walnut grip
-      // raked back, a steel butt cap. Blued steel, case-hardened colours on the frame.
+      // hammer; the trigger guard and trigger; the grip raked back, a steel
+      // butt cap. A lady's cased presentation piece: blued steel with gilt
+      // lines down the barrel and gilt bands, the frame engraved with gilt
+      // scrollwork, a gilt guard, ivory grip scales.
       const blued = steelMaterial(envMap, { vertexColors: false, color: 0x262a34, roughness: 0.32 });
       const frameSteel = steelMaterial(envMap, { vertexColors: false, color: 0x4a4038, roughness: 0.38 });
-      const walnut = surface(0x4a2a16, { roughness: 0.55 });
-      const chequer = surface(0x3a2010, { roughness: 0.85 });
+      const gilt = steelMaterial(envMap, { vertexColors: false, color: 0xd4af37, roughness: 0.28 });
+      const walnut = surface(0xebe2cc, { roughness: 0.4 });
+      const chequer = surface(0xf4eedf, { roughness: 0.3 });
       const hole = surface(0x050506, { roughness: 1 });
       const copper = surface(0xb87333, { roughness: 0.35 });
       const bore = 0.05;
@@ -394,6 +397,31 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       const chequering = box([0.0275, 0.022, 0.05], [0, -0.034, axis - 0.066], chequer, -0.5);
       const buttCap = box([0.027, 0.034, 0.008], [0, -0.054, axis - 0.104], blued, -0.5);
       group.add(hammer, foresight, guard, trigger, grip, chequering, buttCap);
+      // The decoration: gilt lines down the barrel's top flats, gilt bands at
+      // the muzzle, the barrel's root and both ends of the cylinder, gilt
+      // scrolls engraved on each side of the frame, the guard gilt.
+      guard.material = gilt;
+      for (const side of [1, -1]) {
+        const line = box([0.0012, spec.length - 0.07, 0.0012], [side * 0.0042, (spec.length + 0.066) / 2, bore + 0.0086], gilt);
+        group.add(line);
+        for (let scroll = 0; scroll < 3; scroll += 1) {
+          const curl = new THREE.Mesh(new THREE.TorusGeometry(0.0055 - scroll * 0.0009, 0.0008, 4, 12, Math.PI * 1.4), gilt);
+          curl.rotation.set(0, side * Math.PI / 2, scroll * 1.9);
+          curl.position.set(side * 0.0112, 0.012 + scroll * 0.014, axis - 0.012 + (scroll % 2) * 0.008);
+          group.add(curl);
+        }
+      }
+      for (const [y, radius] of [[spec.length - 0.004, 0.0099], [0.068, 0.0101]]) {
+        const band = cylinder(radius, radius, y - 0.004, y, gilt, 8);
+        band.position.z = bore;
+        band.rotation.y = Math.PI / 8;
+        group.add(band);
+      }
+      for (const y of [0.0095, 0.0545]) {
+        const band = cylinder(0.019, 0.019, y - 0.0015, y + 0.0015, gilt, 15);
+        band.position.z = axis;
+        group.add(band);
+      }
       break;
     }
     case 'rifle': {

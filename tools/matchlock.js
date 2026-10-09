@@ -14,7 +14,7 @@ import { advance, boutWinner, createWorld, placeFighter, throwPunch } from '../s
 
 const ARMOURS = [
   ['none', null], ['ashigaru', { kind: 'ashigaru', design: 0 }], ['ō-yoroi', { kind: 'samurai', design: 0 }], ['tōsei', { kind: 'samuraiTosei', design: 0 }],
-  ['foot soldier', { kind: 'footman', design: 0 }], ['mail', { kind: 'knightMail', design: 0 }], ['plate', { kind: 'knight', design: 0 }], ['SWAT', { kind: 'swat', design: 0 }],
+  ['foot soldier', { kind: 'footman', design: 0 }], ['mail', { kind: 'templar', design: 0 }], ['plate', { kind: 'knight', design: 0 }], ['SWAT', { kind: 'swat', design: 0 }],
 ];
 
 const ARQUEBUSIER = { ...PRESETS.contender, name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] };
