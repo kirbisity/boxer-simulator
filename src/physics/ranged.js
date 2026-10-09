@@ -15,6 +15,16 @@ import { WORLD } from './config.js';
  * The gun arm for a shot: up from the guard and out along the line from the
  * shoulder to the target, which it tracks until the shot; down after.
  */
+
+/**
+ * A shooter's skill on his spread: an ordinary 0.5 shoots as the weapon's
+ * own figures say; a master (1) halves it, a novice (0) half again as wide
+ * (× WORLD.skill.gunSpread).
+ */
+function skillSpread(fighter) {
+  return 1 + WORLD.skill.gunSpread * (0.5 - (fighter.body.skill ?? 0.5));
+}
+
 export function aimTargets(world, fighter, punch, guard) {
   const spec = punch.spec;
   const target = world.fighters[punch.target];
@@ -166,7 +176,7 @@ export function loose(world, fighter, bolt = null) {
   const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  const spread = ((bolt?.spread ?? ARROW.spread) + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1);
+  const spread = ((bolt?.spread ?? ARROW.spread) + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * skillSpread(fighter);
   const random = world.random;
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
@@ -351,7 +361,7 @@ export function fire(world, fighter) {
   const strength = fighter.body.strikeForce[handIndex];
   const recoil = WORLD.recoil;
   const steadiness = Math.min(recoil.shakiest, Math.max(recoil.steadiest, Math.sqrt(recoil.reference / Math.max(1, strength))));
-  const spread = ((shot?.spread ?? GUN.spread) + (shot?.movingSpread ?? GUN.movingSpread) * moving + GUN.unsettled * shaking) * steadiness * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1);
+  const spread = ((shot?.spread ?? GUN.spread) + (shot?.movingSpread ?? GUN.movingSpread) * moving + GUN.unsettled * shaking) * steadiness * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * (STYLES[fighter.style]?.aimJitter ? 2 : 1) * skillSpread(fighter);
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   // Aimed through the sights at the mark: off by the aim's error, and by
   // part of however far the barrel itself is off that line.

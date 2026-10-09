@@ -97,7 +97,8 @@ export const MOVES = {
   naginataCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.92, -0.14], dir: [-0.45, 0.7, -0.5] }, mid: [0.9, 0.2, 0.1], to: { hand: [0.26, 0.45, 0.15], dir: [0.5, -0.65, 0.5] }, windup: 0.2, extendUntil: 0.44, duration: 0.82, twist: -0.5, lean: 0.12, shift: 0.06, cost: 0.038, mass: { arm: 0.6, body: 0.035 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.8 },
   naginataRising: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.12, 0.42, -0.2], dir: [0.5, -0.6, -0.55] }, mid: [0.9, 0.1, 0], to: { hand: [0.12, 0.85, 0.12], dir: [0.35, 0.8, 0.45] }, windup: 0.16, extendUntil: 0.42, duration: 0.78, twist: 0.3, lean: 0.05, shift: 0.04, cost: 0.034, mass: { arm: 0.55, body: 0.03 }, rotation: 0.8, zones: ['body'], reach: 'weapon', contactAt: 0.8 },
   naginataThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.05, 0.6, -0.06], dir: [1, 0.12, 0] }, windup: 0.1, extendUntil: 0.36, duration: 0.65, twist: -0.3, lean: 0.16, shift: 0.1, depth: 0.25, step: 1.5, cost: 0.03, mass: { arm: 0.6, body: 0.05 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
-  spearThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.04, 0.6, -0.08], dir: [1, 0.08, 0] }, windup: 0.08, extendUntil: 0.32, duration: 0.6, twist: -0.4, lean: 0.16, shift: 0.12, depth: 0.25, step: 1.7, cost: 0.026, mass: { arm: 0.6, body: 0.05 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
+  // The spear's thrust: both arms and a step drive the point, the body's weight behind it.
+  spearThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.04, 0.6, -0.08], dir: [1, 0.08, 0] }, windup: 0.08, extendUntil: 0.32, duration: 0.6, twist: -0.4, lean: 0.16, shift: 0.12, depth: 0.25, step: 1.7, cost: 0.026, extendShare: 0.35, mass: { arm: 0.75, body: 0.12 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
   spearJab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.02, 0.62, -0.08], dir: [1, 0.1, 0] }, windup: 0.04, extendUntil: 0.22, duration: 0.42, twist: -0.2, lean: 0.08, shift: 0.06, depth: 0.2, step: 1.2, cost: 0.016, mass: { arm: 0.55, body: 0.03 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
   spearSweep: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.7, -0.25], dir: [-0.1, 0.25, -1] }, mid: [1, 0, 0], to: { hand: [0.18, 0.62, 0.2], dir: [0.3, -0.1, 1] }, windup: 0.16, extendUntil: 0.42, duration: 0.75, twist: -0.7, lean: 0.06, shift: 0.04, cost: 0.03, mass: { arm: 0.55, body: 0.03 }, rotation: 1, zones: ['legs', 'body'], reach: 'weapon', contactAt: 0.85 },
   // Hoplomachus: the spear thrust overhand at the face and throat, or
@@ -443,6 +444,9 @@ export const STYLES = {
     plans: { outboxer: 1.8, counter: 1.2, pressure: 0.5, brawler: 0.2 },
     pressure: 0.02,
     rangeInside: 0.06,
+    // The spearman keeps his man where the point lands, near his full reach:
+    // too close, the shaft, not the point, meets him.
+    keepPoint: 0.88,
   },
   knife: {
     label: 'Knife', weapon: 'knife',

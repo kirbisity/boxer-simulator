@@ -73,9 +73,11 @@ export const ADAMS = {
 export const WHIP = {
   length: 2.4, links: 16, massKg: 0.28, taper: 0.15, drag: 1.2, passes: 10, tipLinks: 3,
   lashFrom: 14, cutShare: 0.6, painFrom: 5, painSure: 22, kneelSeconds: 1.6, riseSeconds: 0.9,
-  // The lash's push: the tip's momentum into the part it strikes (×`impact`); and the pain's flinch: from
+  // The lash's push: the tip's momentum into the part it strikes, ×`impact` for the rest of the thong
+  // that wraps on after the tip and the haul of the arm through it (a lash shoves a man as a club
+  // does, without its weight); and the pain's flinch: from
   // `staggerFrom` of painFrom through the skin he reels (a stagger of `staggerSeverity` + `staggerPerPain` × through/painFrom).
-  impact: 1.5, staggerFrom: 0.4, staggerSeverity: 0.72, staggerPerPain: 0.12,
+  impact: 4, staggerFrom: 0.4, staggerSeverity: 0.72, staggerPerPain: 0.12,
 };
 
 export const MATCHLOCK = {
@@ -675,8 +677,8 @@ export const BLADES = {
   gaps: { rigidFrom: 0.75, thrust: 0.25, swing: 0.06, under: { blunt: 0.25, cut: 0.3, pierce: 0.2 } },
   sever: {
     // joint: [J for a typical limb, the segment whose thickness scales it, typical radius m]
-    wrist: [40, 'Forearm', 0.035], elbow: [70, 'Forearm', 0.04], shoulder: [125, 'UpperArm', 0.05],
-    ankle: [65, 'Shank', 0.045], knee: [110, 'Shank', 0.055], hip: [230, 'Thigh', 0.08], neck: [140, null, 0],
+    wrist: [34, 'Forearm', 0.035], elbow: [60, 'Forearm', 0.04], shoulder: [105, 'UpperArm', 0.05],
+    ankle: [55, 'Shank', 0.045], knee: [94, 'Shank', 0.055], hip: [195, 'Thigh', 0.08], neck: [120, null, 0],
   },
   zone: 0.32, // share of the segment's length from its end that counts as at the joint
   lethalPierce: 45,
@@ -685,7 +687,9 @@ export const BLADES = {
   // A thrust pierces only with the point: contact this far out along the striking length.
   pointShare: 0.78,
   bleedPerJoule: { cut: 0.00006, pierce: 0.00012 },
-  bleedZone: { head: 1.4, trunk: 1.5, limb: 0.7 },
+  // A limb's great vessels (the femoral, the brachial) bleed a man out fast:
+  // a deep cut there ends a fight by blood loss, not on the spot.
+  bleedZone: { head: 1.4, trunk: 1.5, limb: 1.6 },
   clotSeconds: 25,
   collapseAt: 0.38,
   // Blood loss weakens: muscles at this share at the point of collapse.
@@ -921,8 +925,10 @@ export function bladeTargets(move, t, aim, body, spec, reachShare = 1) {
     const u = Math.min(1, (t - move.windup) / (move.extendUntil - move.windup));
     // Accelerating all the way in, as a punch does, not easing to a stop at the skin.
     const end = vec.sub(aim, vec.scale(dir, spec.length * reachShare - (move.depth ?? 0.25)));
-    // Fully out by three quarters of the way, then held there for the hand to arrive.
-    const out = Math.min(1, u / 0.75);
+    // Fully out by `extendShare` of the way (three quarters by default), then
+    // held there for the hand to arrive: a spear driven hard is out sooner,
+    // its pace then the arms' and the step's (the muscles' cap), not the path's.
+    const out = Math.min(1, u / (move.extendShare ?? 0.75));
     return { hand: vec.lerp(from.hand, end, out * out), dir };
   }
   const to = { hand: scale3(move.to.hand, H), dir: vec.normalize(move.to.dir) };

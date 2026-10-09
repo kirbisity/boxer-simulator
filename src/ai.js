@@ -824,7 +824,9 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
   const spec = AI.range;
   const mine = reachOf(fighter) + opponent.body.lengths.headRadius;
   const his = reachOf(opponent) + fighter.body.lengths.headRadius;
-  const hold = Math.min(mine - (STYLES[fighter.style]?.rangeInside ?? spec.inside), Math.max(his + spec.outside, mine * 0.6));
+  const style = STYLES[fighter.style];
+  // A point weapon (`keepPoint`) is held off where its point, not its shaft, arrives: at that share of my reach.
+  const hold = Math.max(Math.min(mine - (style?.rangeInside ?? spec.inside), Math.max(his + spec.outside, mine * 0.6)), mine * (style?.keepPoint ?? 0));
   if (distance < his) fighter.move = -1;
   else if (distance < hold - AI.blade.slack) fighter.move = -0.6;
   else if (distance > hold + AI.blade.slack) fighter.move = 0.8;

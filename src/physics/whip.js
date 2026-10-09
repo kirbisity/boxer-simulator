@@ -9,7 +9,7 @@ import { P } from '../body.js';
 import { vec } from '../pose.js';
 import { WHIP } from '../weapons.js';
 import { WORLD } from './config.js';
-import { addDamage, capsuleEnds, capsules, closestBetween, point, protectionAt, shieldDisc, stagger, wound } from '../physics.js';
+import { addDamage, capsuleEnds, capsules, closestBetween, point, poiseOf, protectionAt, shieldDisc, stagger, wound } from '../physics.js';
 
 /** A thong hung from the handle's end, straight down off it, at rest. */
 function makeRope(weapon, spec) {
@@ -136,7 +136,8 @@ function lashHit(world, attacker, defender, key, tipKg, speed, at, dir) {
   addDamage(defender, key, through / 40, false);
   // The tip's momentum into the part it struck.
   const capsule = capsules(defender).find((entry) => entry.key === key);
-  if (capsule) world.pendingImpulses.push({ fighter: defender, shares: [[capsule.a, 0.5], [capsule.b, 0.5]], direction: dir, impulse: tipKg * speed * spec.impact });
+  event.transferred = tipKg * speed * spec.impact;
+  if (capsule) world.pendingImpulses.push({ fighter: defender, shares: [[capsule.a, 0.5], [capsule.b, 0.5]], direction: dir, impulse: event.transferred, massShare: WORLD.balance.strikeMassShare * poiseOf(defender) });
   world.events.push(event);
   // The pain: likelier to put him on his knees the harder it was; short of that, he reels from it.
   const chance = Math.max(0, Math.min(0.9, (through - spec.painFrom) / (spec.painSure - spec.painFrom)));
