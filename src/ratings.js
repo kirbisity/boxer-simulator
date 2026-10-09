@@ -13,8 +13,8 @@ export const RATINGS = {
    "type": "langyaShield|ironPagoda",
    "records": {
     "maximus": {
-     "wins": 31,
-     "losses": 1,
+     "wins": 30,
+     "losses": 2,
      "draws": 0
     },
     "monk": {
@@ -23,10 +23,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 1195,
-   "provisional": 1743,
+   "score": 936,
+   "provisional": 1126,
    "kd": {
-    "maximus": 21,
+    "maximus": 12.2,
     "monk": 65
    }
   },
@@ -40,16 +40,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 31,
-     "losses": 1,
+     "wins": 32,
+     "losses": 0,
      "draws": 0
     }
    },
-   "score": 724,
-   "provisional": 522,
+   "score": 720,
+   "provisional": 639,
    "kd": {
     "maximus": 6.333,
-    "monk": 21
+    "monk": 65
    }
   },
   "plate": {
@@ -62,21 +62,65 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 32,
-     "losses": 0,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 499,
-   "provisional": 1132,
+   "score": 981,
+   "provisional": 822,
    "kd": {
     "maximus": 12.2,
-    "monk": 65
+    "monk": 21
    }
   },
   "mingThreeEyed": {
    "title": "Ma Lin",
    "type": "threeEyed|mingElite",
+   "records": {
+    "maximus": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 961,
+   "provisional": 3558,
+   "kd": {
+    "maximus": 65,
+    "monk": 65
+   }
+  },
+  "kanabo": {
+   "title": "Kojima Yatarō",
+   "type": "kanabo|samuraiTosei",
+   "records": {
+    "maximus": {
+     "wins": 25,
+     "losses": 7,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 1045,
+   "provisional": 367,
+   "kd": {
+    "maximus": 3.4,
+    "monk": 65
+   }
+  },
+  "mingGuandao": {
+   "title": "Liu Ting",
+   "type": "guandao|mingElite",
    "records": {
     "maximus": {
      "wins": 30,
@@ -89,55 +133,11 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 1200,
-   "provisional": 1132,
+   "score": 415,
+   "provisional": 1126,
    "kd": {
     "maximus": 12.2,
     "monk": 65
-   }
-  },
-  "mingGuandao": {
-   "title": "Liu Ting",
-   "type": "guandao|mingElite",
-   "records": {
-    "maximus": {
-     "wins": 31,
-     "losses": 1,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 32,
-     "losses": 0,
-     "draws": 0
-    }
-   },
-   "score": 736,
-   "provisional": 1743,
-   "kd": {
-    "maximus": 21,
-    "monk": 65
-   }
-  },
-  "kanabo": {
-   "title": "Kojima Yatarō",
-   "type": "kanabo|samuraiTosei",
-   "records": {
-    "maximus": {
-     "wins": 24,
-     "losses": 8,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 31,
-     "losses": 1,
-     "draws": 0
-    }
-   },
-   "score": 1137,
-   "provisional": 278,
-   "kd": {
-    "maximus": 2.882,
-    "monk": 21
    }
   },
   "odachi": {
@@ -150,16 +150,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 32,
-     "losses": 0,
+     "wins": 29,
+     "losses": 3,
      "draws": 0
     }
    },
-   "score": 666,
-   "provisional": 3577,
+   "score": 592,
+   "provisional": 822,
    "kd": {
     "maximus": 65,
-    "monk": 65
+    "monk": 8.429
    }
   },
   "mingEliteGun": {
@@ -167,30 +167,8 @@ export const RATINGS = {
    "type": "matchlock|mingElite",
    "records": {
     "maximus": {
-     "wins": 26,
-     "losses": 6,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 31,
-     "losses": 1,
-     "draws": 0
-    }
-   },
-   "score": 418,
-   "provisional": 369,
-   "kd": {
-    "maximus": 4.077,
-    "monk": 21
-   }
-  },
-  "tosei": {
-   "title": "Date Masamune",
-   "type": "katana|samuraiTosei",
-   "records": {
-    "maximus": {
-     "wins": 21,
-     "losses": 11,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     },
     "monk": {
@@ -199,10 +177,32 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 267,
-   "provisional": 218,
+   "score": 354,
+   "provisional": 639,
    "kd": {
-    "maximus": 1.87,
+    "maximus": 6.333,
+    "monk": 65
+   }
+  },
+  "tosei": {
+   "title": "Date Masamune",
+   "type": "katana|samuraiTosei",
+   "records": {
+    "maximus": {
+     "wins": 19,
+     "losses": 13,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 300,
+   "provisional": 173,
+   "kd": {
+    "maximus": 1.444,
     "monk": 65
    }
   },
@@ -211,43 +211,21 @@ export const RATINGS = {
    "type": "joan|joan",
    "records": {
     "maximus": {
-     "wins": 8,
-     "losses": 24,
+     "wins": 7,
+     "losses": 25,
      "draws": 0
     },
     "monk": {
-     "wins": 16,
-     "losses": 16,
+     "wins": 14,
+     "losses": 18,
      "draws": 0
     }
    },
-   "score": 47,
-   "provisional": 17,
+   "score": 31,
+   "provisional": 13,
    "kd": {
-    "maximus": 0.347,
-    "monk": 1
-   }
-  },
-  "tametomo": {
-   "title": "Minamoto no Tametomo",
-   "type": "yumi|oyoroi",
-   "records": {
-    "maximus": {
-     "wins": 27,
-     "losses": 5,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 31,
-     "losses": 1,
-     "draws": 0
-    }
-   },
-   "score": 219,
-   "provisional": 434,
-   "kd": {
-    "maximus": 5,
-    "monk": 21
+    "maximus": 0.294,
+    "monk": 0.784
    }
   },
   "guanYu": {
@@ -265,20 +243,20 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 509,
-   "provisional": 644,
+   "score": 367,
+   "provisional": 639,
    "kd": {
     "maximus": 12.2,
     "monk": 12.2
    }
   },
-  "templar": {
-   "title": "Knights Templar",
-   "type": "templar|templar",
+  "tametomo": {
+   "title": "Minamoto no Tametomo",
+   "type": "yumi|oyoroi",
    "records": {
     "maximus": {
-     "wins": 24,
-     "losses": 8,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     },
     "monk": {
@@ -287,10 +265,32 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 655,
-   "provisional": 278,
+   "score": 153,
+   "provisional": 518,
    "kd": {
-    "maximus": 2.882,
+    "maximus": 6.333,
+    "monk": 21
+   }
+  },
+  "templar": {
+   "title": "Knights Templar",
+   "type": "templar|templar",
+   "records": {
+    "maximus": {
+     "wins": 25,
+     "losses": 7,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 31,
+     "losses": 1,
+     "draws": 0
+    }
+   },
+   "score": 391,
+   "provisional": 316,
+   "kd": {
+    "maximus": 3.4,
     "monk": 21
    }
   },
@@ -299,8 +299,8 @@ export const RATINGS = {
    "type": "naginata|samurai",
    "records": {
     "maximus": {
-     "wins": 31,
-     "losses": 1,
+     "wins": 29,
+     "losses": 3,
      "draws": 0
     },
     "monk": {
@@ -309,32 +309,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 521,
-   "provisional": 1743,
+   "score": 684,
+   "provisional": 822,
    "kd": {
-    "maximus": 21,
-    "monk": 65
-   }
-  },
-  "oyoroi": {
-   "title": "Takeda Shingen",
-   "type": "katana|samurai",
-   "records": {
-    "maximus": {
-     "wins": 16,
-     "losses": 16,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 32,
-     "losses": 0,
-     "draws": 0
-    }
-   },
-   "score": 205,
-   "provisional": 129,
-   "kd": {
-    "maximus": 1,
+    "maximus": 8.429,
     "monk": 65
    }
   },
@@ -343,43 +321,43 @@ export const RATINGS = {
    "type": "bow|samurai",
    "records": {
     "maximus": {
-     "wins": 20,
-     "losses": 12,
+     "wins": 19,
+     "losses": 13,
      "draws": 0
     },
     "monk": {
-     "wins": 31,
-     "losses": 1,
+     "wins": 32,
+     "losses": 0,
      "draws": 0
     }
    },
-   "score": 305,
-   "provisional": 175,
+   "score": 289,
+   "provisional": 173,
    "kd": {
-    "maximus": 1.64,
-    "monk": 21
+    "maximus": 1.444,
+    "monk": 65
    }
   },
-  "scissor": {
-   "title": "Astacius",
-   "type": "scissor|scissor",
+  "oyoroi": {
+   "title": "Takeda Shingen",
+   "type": "katana|samurai",
    "records": {
     "maximus": {
-     "wins": 14,
-     "losses": 18,
+     "wins": 21,
+     "losses": 11,
      "draws": 0
     },
     "monk": {
-     "wins": 24,
-     "losses": 8,
+     "wins": 32,
+     "losses": 0,
      "draws": 0
     }
    },
-   "score": 87,
-   "provisional": 54,
+   "score": 262,
+   "provisional": 216,
    "kd": {
-    "maximus": 0.784,
-    "monk": 2.882
+    "maximus": 1.87,
+    "monk": 65
    }
   },
   "kheshig": {
@@ -392,16 +370,38 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 29,
-     "losses": 3,
+     "wins": 30,
+     "losses": 2,
      "draws": 0
     }
    },
-   "score": 421,
-   "provisional": 434,
+   "score": 381,
+   "provisional": 518,
    "kd": {
     "maximus": 8.429,
-    "monk": 8.429
+    "monk": 12.2
+   }
+  },
+  "scissor": {
+   "title": "Astacius",
+   "type": "scissor|scissor",
+   "records": {
+    "maximus": {
+     "wins": 15,
+     "losses": 17,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 21,
+     "losses": 11,
+     "draws": 0
+    }
+   },
+   "score": 148,
+   "provisional": 45,
+   "kd": {
+    "maximus": 0.886,
+    "monk": 1.87
    }
   },
   "specialForces": {
@@ -419,8 +419,8 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 6541,
-   "provisional": 3577,
+   "score": 1302,
+   "provisional": 3558,
    "kd": {
     "maximus": 65,
     "monk": 65
@@ -431,8 +431,52 @@ export const RATINGS = {
    "type": "maceShield|steppeHeavy",
    "records": {
     "maximus": {
+     "wins": 31,
+     "losses": 1,
+     "draws": 0
+    },
+    "monk": {
      "wins": 32,
      "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 1099,
+   "provisional": 1734,
+   "kd": {
+    "maximus": 21,
+    "monk": 65
+   }
+  },
+  "steppeLancer": {
+   "title": "Temür",
+   "type": "steppeBow|steppeHeavy",
+   "records": {
+    "maximus": {
+     "wins": 24,
+     "losses": 8,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 30,
+     "losses": 2,
+     "draws": 0
+    }
+   },
+   "score": 287,
+   "provisional": 243,
+   "kd": {
+    "maximus": 2.882,
+    "monk": 12.2
+   }
+  },
+  "secutor": {
+   "title": "Flamma",
+   "type": "secutor|secutor",
+   "records": {
+    "maximus": {
+     "wins": 19,
+     "losses": 13,
      "draws": 0
     },
     "monk": {
@@ -441,10 +485,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 987,
-   "provisional": 1743,
+   "score": 130,
+   "provisional": 156,
    "kd": {
-    "maximus": 65,
+    "maximus": 1.444,
     "monk": 21
    }
   },
@@ -453,8 +497,8 @@ export const RATINGS = {
    "type": "murmillo|murmillo",
    "records": {
     "maximus": {
-     "wins": 16,
-     "losses": 16,
+     "wins": 21,
+     "losses": 11,
      "draws": 0
     },
     "monk": {
@@ -463,55 +507,11 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 91,
-   "provisional": 90,
+   "score": 111,
+   "provisional": 141,
    "kd": {
-    "maximus": 1,
+    "maximus": 1.87,
     "monk": 6.333
-   }
-  },
-  "secutor": {
-   "title": "Flamma",
-   "type": "secutor|secutor",
-   "records": {
-    "maximus": {
-     "wins": 18,
-     "losses": 14,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 29,
-     "losses": 3,
-     "draws": 0
-    }
-   },
-   "score": 118,
-   "provisional": 118,
-   "kd": {
-    "maximus": 1.276,
-    "monk": 8.429
-   }
-  },
-  "steppeLancer": {
-   "title": "Temür",
-   "type": "steppeBow|steppeHeavy",
-   "records": {
-    "maximus": {
-     "wins": 23,
-     "losses": 9,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 32,
-     "losses": 0,
-     "draws": 0
-    }
-   },
-   "score": 278,
-   "provisional": 278,
-   "kd": {
-    "maximus": 2.474,
-    "monk": 65
    }
   },
   "sipahi": {
@@ -519,8 +519,30 @@ export const RATINGS = {
    "type": "maceShield|ottomanHeavy",
    "records": {
     "maximus": {
+     "wins": 31,
+     "losses": 1,
+     "draws": 0
+    },
+    "monk": {
      "wins": 32,
      "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 1204,
+   "provisional": 1734,
+   "kd": {
+    "maximus": 21,
+    "monk": 65
+   }
+  },
+  "hidalgo": {
+   "title": "Hernán Cortés",
+   "type": "espada|conquistadorPlate",
+   "records": {
+    "maximus": {
+     "wins": 21,
+     "losses": 11,
      "draws": 0
     },
     "monk": {
@@ -529,10 +551,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 1857,
-   "provisional": 1743,
+   "score": 394,
+   "provisional": 193,
    "kd": {
-    "maximus": 65,
+    "maximus": 1.87,
     "monk": 21
    }
   },
@@ -551,33 +573,33 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 262,
-   "provisional": 218,
+   "score": 285,
+   "provisional": 216,
    "kd": {
     "maximus": 5,
     "monk": 4.077
    }
   },
-  "hidalgo": {
-   "title": "Hernán Cortés",
-   "type": "espada|conquistadorPlate",
+  "vocPikeman": {
+   "title": "Jan de Vries",
+   "type": "spear|conquistadorPlate",
    "records": {
     "maximus": {
-     "wins": 25,
-     "losses": 7,
+     "wins": 21,
+     "losses": 11,
      "draws": 0
     },
     "monk": {
-     "wins": 29,
-     "losses": 3,
+     "wins": 32,
+     "losses": 0,
      "draws": 0
     }
    },
-   "score": 298,
-   "provisional": 245,
+   "score": 293,
+   "provisional": 216,
    "kd": {
-    "maximus": 3.4,
-    "monk": 8.429
+    "maximus": 1.87,
+    "monk": 65
    }
   },
   "thraex": {
@@ -585,21 +607,21 @@ export const RATINGS = {
    "type": "thraex|thraex",
    "records": {
     "maximus": {
-     "wins": 16,
-     "losses": 16,
+     "wins": 21,
+     "losses": 11,
      "draws": 0
     },
     "monk": {
-     "wins": 29,
-     "losses": 3,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 123,
-   "provisional": 98,
+   "score": 165,
+   "provisional": 193,
    "kd": {
-    "maximus": 1,
-    "monk": 8.429
+    "maximus": 1.87,
+    "monk": 21
    }
   },
   "centurion": {
@@ -612,60 +634,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 23,
-     "losses": 9,
-     "draws": 0
-    }
-   },
-   "score": 96,
-   "provisional": 90,
-   "kd": {
-    "maximus": 1.87,
-    "monk": 2.474
-   }
-  },
-  "vocPikeman": {
-   "title": "Jan de Vries",
-   "type": "spear|conquistadorPlate",
-   "records": {
-    "maximus": {
-     "wins": 24,
-     "losses": 8,
-     "draws": 0
-    },
-    "monk": {
      "wins": 29,
      "losses": 3,
      "draws": 0
     }
    },
-   "score": 257,
-   "provisional": 218,
+   "score": 112,
+   "provisional": 156,
    "kd": {
-    "maximus": 2.882,
+    "maximus": 1.87,
     "monk": 8.429
-   }
-  },
-  "legionary": {
-   "title": "Gaius Valerius Crispus",
-   "type": "legionary|legionary",
-   "records": {
-    "maximus": {
-     "wins": 28,
-     "losses": 4,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 31,
-     "losses": 1,
-     "draws": 0
-    }
-   },
-   "score": 349,
-   "provisional": 522,
-   "kd": {
-    "maximus": 6.333,
-    "monk": 21
    }
   },
   "gaziAlp": {
@@ -673,26 +651,26 @@ export const RATINGS = {
    "type": "saberShield|gaziAlp",
    "records": {
     "maximus": {
-     "wins": 22,
-     "losses": 10,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     },
     "monk": {
-     "wins": 31,
-     "losses": 1,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     }
    },
-   "score": 405,
-   "provisional": 218,
+   "score": 485,
+   "provisional": 316,
    "kd": {
-    "maximus": 2.143,
-    "monk": 21
+    "maximus": 6.333,
+    "monk": 6.333
    }
   },
-  "mingShield": {
-   "title": "Chen Bao",
-   "type": "swordShield|mingBrigandine",
+  "legionary": {
+   "title": "Gaius Valerius Crispus",
+   "type": "legionary|legionary",
    "records": {
     "maximus": {
      "wins": 23,
@@ -705,10 +683,32 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 361,
-   "provisional": 278,
+   "score": 344,
+   "provisional": 276,
    "kd": {
     "maximus": 2.474,
+    "monk": 65
+   }
+  },
+  "mingShield": {
+   "title": "Chen Bao",
+   "type": "swordShield|mingBrigandine",
+   "records": {
+    "maximus": {
+     "wins": 26,
+     "losses": 6,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 644,
+   "provisional": 431,
+   "kd": {
+    "maximus": 4.077,
     "monk": 65
    }
   },
@@ -717,30 +717,8 @@ export const RATINGS = {
    "type": "matchlock|mingBrigandine",
    "records": {
     "maximus": {
-     "wins": 22,
-     "losses": 10,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 31,
-     "losses": 1,
-     "draws": 0
-    }
-   },
-   "score": 202,
-   "provisional": 218,
-   "kd": {
-    "maximus": 2.143,
-    "monk": 21
-   }
-  },
-  "mingBrigSpear": {
-   "title": "Sun Qi",
-   "type": "spear|mingBrigandine",
-   "records": {
-    "maximus": {
-     "wins": 9,
-     "losses": 23,
+     "wins": 23,
+     "losses": 9,
      "draws": 0
     },
     "monk": {
@@ -749,11 +727,33 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 59,
-   "provisional": 70,
+   "score": 196,
+   "provisional": 276,
    "kd": {
-    "maximus": 0.404,
+    "maximus": 2.474,
     "monk": 65
+   }
+  },
+  "mingBrigSpear": {
+   "title": "Sun Qi",
+   "type": "spear|mingBrigandine",
+   "records": {
+    "maximus": {
+     "wins": 12,
+     "losses": 20,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 30,
+     "losses": 2,
+     "draws": 0
+    }
+   },
+   "score": 107,
+   "provisional": 75,
+   "kd": {
+    "maximus": 0.61,
+    "monk": 12.2
    }
   },
   "arquebus": {
@@ -771,8 +771,8 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 276,
-   "provisional": 644,
+   "score": 233,
+   "provisional": 639,
    "kd": {
     "maximus": 6.333,
     "monk": 65
@@ -783,21 +783,21 @@ export const RATINGS = {
    "type": "bow|footman",
    "records": {
     "maximus": {
-     "wins": 26,
-     "losses": 6,
+     "wins": 24,
+     "losses": 8,
      "draws": 0
     },
     "monk": {
-     "wins": 30,
-     "losses": 2,
+     "wins": 29,
+     "losses": 3,
      "draws": 0
     }
    },
-   "score": 202,
-   "provisional": 319,
+   "score": 239,
+   "provisional": 216,
    "kd": {
-    "maximus": 4.077,
-    "monk": 12.2
+    "maximus": 2.882,
+    "monk": 8.429
    }
   },
   "crossbowman": {
@@ -805,8 +805,8 @@ export const RATINGS = {
    "type": "crossbow|footman",
    "records": {
     "maximus": {
-     "wins": 21,
-     "losses": 11,
+     "wins": 22,
+     "losses": 10,
      "draws": 0
     },
     "monk": {
@@ -815,10 +815,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 121,
-   "provisional": 194,
+   "score": 184,
+   "provisional": 216,
    "kd": {
-    "maximus": 1.87,
+    "maximus": 2.143,
     "monk": 21
    }
   },
@@ -827,8 +827,8 @@ export const RATINGS = {
    "type": "spear|footman",
    "records": {
     "maximus": {
-     "wins": 11,
-     "losses": 21,
+     "wins": 16,
+     "losses": 16,
      "draws": 0
     },
     "monk": {
@@ -837,10 +837,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 97,
-   "provisional": 76,
+   "score": 155,
+   "provisional": 116,
    "kd": {
-    "maximus": 0.535,
+    "maximus": 1,
     "monk": 21
    }
   },
@@ -854,15 +854,37 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
+     "wins": 31,
+     "losses": 0,
+     "draws": 1
+    }
+   },
+   "score": 1644,
+   "provisional": 720,
+   "kd": {
+    "maximus": 8.429,
+    "monk": 32
+   }
+  },
+  "teppo": {
+   "title": "Suzuki Magoichi",
+   "type": "matchlock|ashigaru",
+   "records": {
+    "maximus": {
+     "wins": 23,
+     "losses": 9,
+     "draws": 0
+    },
+    "monk": {
      "wins": 32,
      "losses": 0,
      "draws": 0
     }
    },
-   "score": 1620,
-   "provisional": 827,
+   "score": 277,
+   "provisional": 276,
    "kd": {
-    "maximus": 8.429,
+    "maximus": 2.474,
     "monk": 65
    }
   },
@@ -871,8 +893,8 @@ export const RATINGS = {
    "type": "handgun|swat",
    "records": {
     "maximus": {
-     "wins": 21,
-     "losses": 11,
+     "wins": 22,
+     "losses": 10,
      "draws": 0
     },
     "monk": {
@@ -881,33 +903,11 @@ export const RATINGS = {
      "draws": 2
     }
    },
-   "score": 231,
-   "provisional": 194,
+   "score": 274,
+   "provisional": 216,
    "kd": {
-    "maximus": 1.87,
+    "maximus": 2.143,
     "monk": 21
-   }
-  },
-  "teppo": {
-   "title": "Suzuki Magoichi",
-   "type": "matchlock|ashigaru",
-   "records": {
-    "maximus": {
-     "wins": 24,
-     "losses": 8,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 32,
-     "losses": 0,
-     "draws": 0
-    }
-   },
-   "score": 283,
-   "provisional": 319,
-   "kd": {
-    "maximus": 2.882,
-    "monk": 65
    }
   },
   "ashigaruBow": {
@@ -920,16 +920,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 30,
-     "losses": 2,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 95,
-   "provisional": 83,
+   "score": 110,
+   "provisional": 89,
    "kd": {
     "maximus": 0.692,
-    "monk": 12.2
+    "monk": 21
    }
   },
   "ashigaruSpear": {
@@ -937,21 +937,21 @@ export const RATINGS = {
    "type": "yari|ashigaru",
    "records": {
     "maximus": {
-     "wins": 10,
-     "losses": 22,
+     "wins": 12,
+     "losses": 20,
      "draws": 0
     },
     "monk": {
-     "wins": 30,
-     "losses": 2,
+     "wins": 32,
+     "losses": 0,
      "draws": 0
     }
    },
-   "score": 74,
-   "provisional": 64,
+   "score": 108,
+   "provisional": 89,
    "kd": {
-    "maximus": 0.467,
-    "monk": 12.2
+    "maximus": 0.61,
+    "monk": 65
    }
   },
   "baton": {
@@ -959,8 +959,8 @@ export const RATINGS = {
    "type": "baton|swat",
    "records": {
     "maximus": {
-     "wins": 1,
-     "losses": 31,
+     "wins": 0,
+     "losses": 32,
      "draws": 0
     },
     "monk": {
@@ -969,10 +969,10 @@ export const RATINGS = {
      "draws": 11
     }
    },
-   "score": 30,
-   "provisional": 23,
+   "score": 26,
+   "provisional": 21,
    "kd": {
-    "maximus": 0.048,
+    "maximus": 0.015,
     "monk": 4.5
    }
   },
@@ -981,21 +981,21 @@ export const RATINGS = {
    "type": "nu|hanSoldier",
    "records": {
     "maximus": {
-     "wins": 17,
-     "losses": 15,
+     "wins": 19,
+     "losses": 13,
      "draws": 0
     },
     "monk": {
-     "wins": 29,
-     "losses": 3,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     }
    },
-   "score": 104,
-   "provisional": 108,
+   "score": 95,
+   "provisional": 116,
    "kd": {
-    "maximus": 1.129,
-    "monk": 8.429
+    "maximus": 1.444,
+    "monk": 6.333
    }
   },
   "riot": {
@@ -1003,21 +1003,21 @@ export const RATINGS = {
    "type": "riot|riot",
    "records": {
     "maximus": {
-     "wins": 7,
-     "losses": 24,
-     "draws": 1
+     "wins": 11,
+     "losses": 21,
+     "draws": 0
     },
     "monk": {
-     "wins": 26,
-     "losses": 0,
-     "draws": 6
+     "wins": 24,
+     "losses": 5,
+     "draws": 3
     }
    },
-   "score": 45,
-   "provisional": 48,
+   "score": 41,
+   "provisional": 47,
    "kd": {
-    "maximus": 0.32,
-    "monk": 8.429
+    "maximus": 0.535,
+    "monk": 3.714
    }
   },
   "steppeShield": {
@@ -1025,8 +1025,8 @@ export const RATINGS = {
    "type": "saberShield|steppeMedium",
    "records": {
     "maximus": {
-     "wins": 25,
-     "losses": 7,
+     "wins": 29,
+     "losses": 3,
      "draws": 0
     },
     "monk": {
@@ -1035,10 +1035,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 297,
-   "provisional": 319,
+   "score": 495,
+   "provisional": 639,
    "kd": {
-    "maximus": 3.4,
+    "maximus": 8.429,
     "monk": 21
    }
   },
@@ -1047,21 +1047,21 @@ export const RATINGS = {
    "type": "saber|steppeMedium",
    "records": {
     "maximus": {
-     "wins": 6,
-     "losses": 26,
+     "wins": 7,
+     "losses": 25,
      "draws": 0
     },
     "monk": {
-     "wins": 26,
-     "losses": 6,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     }
    },
-   "score": 43,
-   "provisional": 33,
+   "score": 57,
+   "provisional": 42,
    "kd": {
-    "maximus": 0.245,
-    "monk": 4.077
+    "maximus": 0.294,
+    "monk": 6.333
    }
   },
   "arquebusier": {
@@ -1079,8 +1079,8 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 368,
-   "provisional": 827,
+   "score": 397,
+   "provisional": 822,
    "kd": {
     "maximus": 8.429,
     "monk": 65
@@ -1091,8 +1091,8 @@ export const RATINGS = {
    "type": "matchlock|conquistadorQuilted",
    "records": {
     "maximus": {
-     "wins": 29,
-     "losses": 3,
+     "wins": 28,
+     "losses": 4,
      "draws": 0
     },
     "monk": {
@@ -1101,10 +1101,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 313,
-   "provisional": 827,
+   "score": 288,
+   "provisional": 639,
    "kd": {
-    "maximus": 8.429,
+    "maximus": 6.333,
     "monk": 65
    }
   },
@@ -1113,8 +1113,8 @@ export const RATINGS = {
    "type": "espadaRodela|conquistadorQuilted",
    "records": {
     "maximus": {
-     "wins": 23,
-     "losses": 9,
+     "wins": 20,
+     "losses": 12,
      "draws": 0
     },
     "monk": {
@@ -1123,10 +1123,10 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 298,
-   "provisional": 278,
+   "score": 363,
+   "provisional": 193,
    "kd": {
-    "maximus": 2.474,
+    "maximus": 1.64,
     "monk": 65
    }
   },
@@ -1140,16 +1140,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 31,
-     "losses": 1,
+     "wins": 32,
+     "losses": 0,
      "draws": 0
     }
    },
-   "score": 598,
-   "provisional": 644,
+   "score": 383,
+   "provisional": 822,
    "kd": {
     "maximus": 8.429,
-    "monk": 21
+    "monk": 65
    }
   },
   "jaguar": {
@@ -1162,16 +1162,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 30,
-     "losses": 2,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 162,
-   "provisional": 369,
+   "score": 193,
+   "provisional": 431,
    "kd": {
     "maximus": 5,
-    "monk": 12.2
+    "monk": 21
    }
   },
   "maximus": {
@@ -1184,8 +1184,8 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 28,
-     "losses": 4,
+     "wins": 27,
+     "losses": 5,
      "draws": 0
     }
    },
@@ -1193,7 +1193,51 @@ export const RATINGS = {
    "provisional": 100,
    "kd": {
     "maximus": 1,
-    "monk": 6.333
+    "monk": 5
+   }
+  },
+  "mexica": {
+   "title": "Yaotl",
+   "type": "macuahuitl|mexicaWarrior",
+   "records": {
+    "maximus": {
+     "wins": 28,
+     "losses": 4,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 320,
+   "provisional": 639,
+   "kd": {
+    "maximus": 6.333,
+    "monk": 65
+   }
+  },
+  "janissaryGun": {
+   "title": "Mehmed Çavuş",
+   "type": "matchlock|janissary",
+   "records": {
+    "maximus": {
+     "wins": 28,
+     "losses": 4,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 32,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 204,
+   "provisional": 639,
+   "kd": {
+    "maximus": 6.333,
+    "monk": 65
    }
   },
   "ladyAshford": {
@@ -1211,20 +1255,20 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 277,
-   "provisional": 522,
+   "score": 528,
+   "provisional": 518,
    "kd": {
     "maximus": 6.333,
     "monk": 21
    }
   },
-  "mexica": {
-   "title": "Yaotl",
-   "type": "macuahuitl|mexicaWarrior",
+  "steppeArcher": {
+   "title": "Bayar",
+   "type": "steppeBow|steppeLight",
    "records": {
     "maximus": {
-     "wins": 29,
-     "losses": 3,
+     "wins": 16,
+     "losses": 16,
      "draws": 0
     },
     "monk": {
@@ -1233,33 +1277,55 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 649,
-   "provisional": 827,
+   "score": 121,
+   "provisional": 128,
    "kd": {
-    "maximus": 8.429,
+    "maximus": 1,
     "monk": 65
    }
   },
-  "janissaryGun": {
-   "title": "Mehmed Çavuş",
-   "type": "matchlock|janissary",
+  "commodus": {
+   "title": "Commodus",
+   "type": "commodus|commodus",
    "records": {
     "maximus": {
-     "wins": 24,
-     "losses": 8,
+     "wins": 12,
+     "losses": 20,
      "draws": 0
     },
     "monk": {
-     "wins": 32,
-     "losses": 0,
+     "wins": 30,
+     "losses": 2,
      "draws": 0
     }
    },
-   "score": 277,
-   "provisional": 319,
+   "score": 65,
+   "provisional": 75,
    "kd": {
-    "maximus": 2.882,
-    "monk": 65
+    "maximus": 0.61,
+    "monk": 12.2
+   }
+  },
+  "police": {
+   "title": "Officer Mike Kowalski",
+   "type": "handgun|police",
+   "records": {
+    "maximus": {
+     "wins": 18,
+     "losses": 14,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 29,
+     "losses": 3,
+     "draws": 0
+    }
+   },
+   "score": 148,
+   "provisional": 116,
+   "kd": {
+    "maximus": 1.276,
+    "monk": 8.429
    }
   },
   "wuxia": {
@@ -1272,38 +1338,38 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 32,
-     "losses": 0,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 72,
-   "provisional": 157,
+   "score": 80,
+   "provisional": 141,
    "kd": {
     "maximus": 1.276,
-    "monk": 65
+    "monk": 21
    }
   },
-  "police": {
-   "title": "Officer Mike Kowalski",
-   "type": "handgun|police",
+  "janissary": {
+   "title": "Ulubatlı Hasan",
+   "type": "yatagan|janissary",
    "records": {
     "maximus": {
-     "wins": 19,
-     "losses": 13,
+     "wins": 11,
+     "losses": 21,
      "draws": 0
     },
     "monk": {
-     "wins": 26,
-     "losses": 6,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 102,
-   "provisional": 98,
+   "score": 74,
+   "provisional": 75,
    "kd": {
-    "maximus": 1.444,
-    "monk": 4.077
+    "maximus": 0.535,
+    "monk": 21
    }
   },
   "ronin": {
@@ -1321,77 +1387,33 @@ export const RATINGS = {
      "draws": 0
     }
    },
-   "score": 63,
-   "provisional": 90,
+   "score": 84,
+   "provisional": 89,
    "kd": {
     "maximus": 0.61,
     "monk": 65
    }
   },
-  "janissary": {
-   "title": "Ulubatlı Hasan",
-   "type": "yatagan|janissary",
+  "azapArcher": {
+   "title": "Ali the azap",
+   "type": "steppeBow|azap",
    "records": {
     "maximus": {
-     "wins": 10,
-     "losses": 22,
+     "wins": 7,
+     "losses": 25,
      "draws": 0
     },
     "monk": {
-     "wins": 32,
-     "losses": 0,
+     "wins": 31,
+     "losses": 1,
      "draws": 0
     }
    },
-   "score": 68,
-   "provisional": 76,
+   "score": 78,
+   "provisional": 53,
    "kd": {
-    "maximus": 0.467,
-    "monk": 65
-   }
-  },
-  "commodus": {
-   "title": "Commodus",
-   "type": "commodus|commodus",
-   "records": {
-    "maximus": {
-     "wins": 11,
-     "losses": 21,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 32,
-     "losses": 0,
-     "draws": 0
-    }
-   },
-   "score": 104,
-   "provisional": 83,
-   "kd": {
-    "maximus": 0.535,
-    "monk": 65
-   }
-  },
-  "steppeArcher": {
-   "title": "Bayar",
-   "type": "steppeBow|steppeLight",
-   "records": {
-    "maximus": {
-     "wins": 17,
-     "losses": 15,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 32,
-     "losses": 0,
-     "draws": 0
-    }
-   },
-   "score": 111,
-   "provisional": 143,
-   "kd": {
-    "maximus": 1.129,
-    "monk": 65
+    "maximus": 0.294,
+    "monk": 21
    }
   },
   "retiarius": {
@@ -1404,16 +1426,82 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 23,
-     "losses": 9,
+     "wins": 21,
+     "losses": 11,
      "draws": 0
     }
    },
-   "score": 39,
-   "provisional": 46,
+   "score": 28,
+   "provisional": 38,
    "kd": {
     "maximus": 0.692,
-    "monk": 2.474
+    "monk": 1.87
+   }
+  },
+  "azapSpear": {
+   "title": "Yusuf the azap",
+   "type": "spear|azap",
+   "records": {
+    "maximus": {
+     "wins": 12,
+     "losses": 20,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 28,
+     "losses": 4,
+     "draws": 0
+    }
+   },
+   "score": 42,
+   "provisional": 63,
+   "kd": {
+    "maximus": 0.61,
+    "monk": 6.333
+   }
+  },
+  "boxer": {
+   "title": "Marcus \"The Wall\"",
+   "type": "boxing|boxing",
+   "records": {
+    "maximus": {
+     "wins": 10,
+     "losses": 22,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 24,
+     "losses": 7,
+     "draws": 1
+    }
+   },
+   "score": 32,
+   "provisional": 40,
+   "kd": {
+    "maximus": 0.467,
+    "monk": 3.125
+   }
+  },
+  "wokou": {
+   "title": "Wang Zhi",
+   "type": "dao|wokou",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 32,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 21,
+     "losses": 11,
+     "draws": 0
+    }
+   },
+   "score": 22,
+   "provisional": 13,
+   "kd": {
+    "maximus": 0.015,
+    "monk": 1.87
    }
   },
   "mingDao": {
@@ -1426,104 +1514,16 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 25,
-     "losses": 7,
-     "draws": 0
-    }
-   },
-   "score": 24,
-   "provisional": 22,
-   "kd": {
-    "maximus": 0.082,
-    "monk": 3.4
-   }
-  },
-  "boxer": {
-   "title": "Marcus \"The Wall\"",
-   "type": "boxing|boxing",
-   "records": {
-    "maximus": {
-     "wins": 8,
-     "losses": 24,
-     "draws": 0
-    },
-    "monk": {
      "wins": 23,
-     "losses": 8,
-     "draws": 1
-    }
-   },
-   "score": 35,
-   "provisional": 32,
-   "kd": {
-    "maximus": 0.347,
-    "monk": 2.667
-   }
-  },
-  "azapSpear": {
-   "title": "Yusuf the azap",
-   "type": "spear|azap",
-   "records": {
-    "maximus": {
-     "wins": 14,
-     "losses": 18,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 21,
-     "losses": 11,
-     "draws": 0
-    }
-   },
-   "score": 36,
-   "provisional": 43,
-   "kd": {
-    "maximus": 0.784,
-    "monk": 1.87
-   }
-  },
-  "azapArcher": {
-   "title": "Ali the azap",
-   "type": "steppeBow|azap",
-   "records": {
-    "maximus": {
-     "wins": 6,
-     "losses": 26,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 25,
-     "losses": 7,
-     "draws": 0
-    }
-   },
-   "score": 42,
-   "provisional": 31,
-   "kd": {
-    "maximus": 0.245,
-    "monk": 3.4
-   }
-  },
-  "wokou": {
-   "title": "Wang Zhi",
-   "type": "dao|wokou",
-   "records": {
-    "maximus": {
-     "wins": 3,
-     "losses": 29,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 28,
-     "losses": 4,
+     "losses": 9,
      "draws": 0
     }
    },
    "score": 27,
-   "provisional": 31,
+   "provisional": 18,
    "kd": {
-    "maximus": 0.119,
-    "monk": 6.333
+    "maximus": 0.082,
+    "monk": 2.474
    }
   },
   "brawler": {
@@ -1531,87 +1531,65 @@ export const RATINGS = {
    "type": "clinchBrawl|mma",
    "records": {
     "maximus": {
-     "wins": 8,
-     "losses": 24,
+     "wins": 6,
+     "losses": 26,
      "draws": 0
     },
     "monk": {
-     "wins": 18,
-     "losses": 9,
-     "draws": 5
-    }
-   },
-   "score": 23,
-   "provisional": 25,
-   "kd": {
-    "maximus": 0.347,
-    "monk": 1.75
-   }
-  },
-  "taekwondo": {
-   "title": "Kim Min-jun",
-   "type": "taekwondo|dobok",
-   "records": {
-    "maximus": {
-     "wins": 0,
-     "losses": 32,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 25,
-     "losses": 4,
-     "draws": 3
-    }
-   },
-   "score": 13,
-   "provisional": 21,
-   "kd": {
-    "maximus": 0.015,
-    "monk": 4.5
-   }
-  },
-  "mix": {
-   "title": "Kai Moana",
-   "type": "mix|sports",
-   "records": {
-    "maximus": {
-     "wins": 0,
-     "losses": 32,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 20,
-     "losses": 10,
-     "draws": 2
+     "wins": 19,
+     "losses": 12,
+     "draws": 1
     }
    },
    "score": 16,
-   "provisional": 13,
+   "provisional": 19,
    "kd": {
-    "maximus": 0.015,
-    "monk": 1.87
+    "maximus": 0.245,
+    "monk": 1.538
    }
   },
-  "kickboxer": {
-   "title": "Leo Quickhands",
-   "type": "kickboxing|boxing",
+  "peasant": {
+   "title": "Hob Miller",
+   "type": "pitchfork|commoner",
    "records": {
     "maximus": {
-     "wins": 0,
-     "losses": 32,
+     "wins": 7,
+     "losses": 25,
      "draws": 0
     },
     "monk": {
-     "wins": 23,
-     "losses": 9,
+     "wins": 14,
+     "losses": 17,
+     "draws": 1
+    }
+   },
+   "score": 16,
+   "provisional": 14,
+   "kd": {
+    "maximus": 0.294,
+    "monk": 0.833
+   }
+  },
+  "mingSpear": {
+   "title": "Wang Er",
+   "type": "spear|mingGarrison",
+   "records": {
+    "maximus": {
+     "wins": 2,
+     "losses": 30,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 15,
+     "losses": 17,
      "draws": 0
     }
    },
-   "score": 14,
-   "provisional": 16,
+   "score": 22,
+   "provisional": 9.1,
    "kd": {
-    "maximus": 0.015,
-    "monk": 2.474
+    "maximus": 0.082,
+    "monk": 0.886
    }
   },
   "lordAshford": {
@@ -1625,20 +1603,20 @@ export const RATINGS = {
     },
     "monk": {
      "wins": 9,
-     "losses": 23,
-     "draws": 0
+     "losses": 22,
+     "draws": 1
     }
    },
-   "score": 16,
-   "provisional": 13,
+   "score": 21,
+   "provisional": 14,
    "kd": {
     "maximus": 0.61,
-    "monk": 0.404
+    "monk": 0.435
    }
   },
-  "lorarius": {
-   "title": "Felix the lorarius",
-   "type": "whip|lorarius",
+  "mix": {
+   "title": "Kai Moana",
+   "type": "mix|sports",
    "records": {
     "maximus": {
      "wins": 0,
@@ -1646,60 +1624,38 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 11,
-     "losses": 8,
-     "draws": 13
+     "wins": 19,
+     "losses": 11,
+     "draws": 2
     }
    },
-   "score": 10,
-   "provisional": 9.9,
+   "score": 13,
+   "provisional": 12,
    "kd": {
     "maximus": 0.015,
-    "monk": 1.2
+    "monk": 1.64
    }
   },
-  "shaolin": {
-   "title": "Tanzong",
-   "type": "staff|monk",
+  "kickboxer": {
+   "title": "Leo Quickhands",
+   "type": "kickboxing|boxing",
    "records": {
     "maximus": {
-     "wins": 4,
-     "losses": 28,
+     "wins": 0,
+     "losses": 32,
      "draws": 0
     },
     "monk": {
-     "wins": 13,
-     "losses": 13,
-     "draws": 6
-    }
-   },
-   "score": 13,
-   "provisional": 11,
-   "kd": {
-    "maximus": 0.158,
-    "monk": 1
-   }
-  },
-  "knife": {
-   "title": "Ryo Kanda",
-   "type": "knife|yakuza",
-   "records": {
-    "maximus": {
-     "wins": 1,
-     "losses": 31,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 11,
-     "losses": 21,
+     "wins": 24,
+     "losses": 8,
      "draws": 0
     }
    },
-   "score": 13,
-   "provisional": 5.7,
+   "score": 9.7,
+   "provisional": 17,
    "kd": {
-    "maximus": 0.048,
-    "monk": 0.535
+    "maximus": 0.015,
+    "monk": 2.882
    }
   },
   "muayThai": {
@@ -1718,7 +1674,7 @@ export const RATINGS = {
     }
    },
    "score": 14,
-   "provisional": 15,
+   "provisional": 14,
    "kd": {
     "maximus": 0.048,
     "monk": 1.87
@@ -1729,26 +1685,48 @@ export const RATINGS = {
    "type": "bat|thug",
    "records": {
     "maximus": {
-     "wins": 3,
-     "losses": 29,
+     "wins": 0,
+     "losses": 32,
      "draws": 0
     },
     "monk": {
-     "wins": 8,
-     "losses": 22,
-     "draws": 2
+     "wins": 14,
+     "losses": 18,
+     "draws": 0
     }
    },
-   "score": 14,
-   "provisional": 5.7,
+   "score": 22,
+   "provisional": 6.8,
    "kd": {
-    "maximus": 0.119,
-    "monk": 0.404
+    "maximus": 0.015,
+    "monk": 0.784
    }
   },
-  "taichi": {
-   "title": "Chen Fake",
-   "type": "taichi|kungfu",
+  "shaolin": {
+   "title": "Tanzong",
+   "type": "staff|monk",
+   "records": {
+    "maximus": {
+     "wins": 5,
+     "losses": 27,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 13,
+     "losses": 13,
+     "draws": 6
+    }
+   },
+   "score": 12,
+   "provisional": 11,
+   "kd": {
+    "maximus": 0.2,
+    "monk": 1
+   }
+  },
+  "taekwondo": {
+   "title": "Kim Min-jun",
+   "type": "taekwondo|dobok",
    "records": {
     "maximus": {
      "wins": 0,
@@ -1756,16 +1734,38 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 17,
-     "losses": 14,
-     "draws": 1
+     "wins": 25,
+     "losses": 5,
+     "draws": 2
     }
    },
-   "score": 7,
-   "provisional": 9.9,
+   "score": 13,
+   "provisional": 20,
    "kd": {
     "maximus": 0.015,
-    "monk": 1.2
+    "monk": 4.077
+   }
+  },
+  "knife": {
+   "title": "Ryo Kanda",
+   "type": "knife|yakuza",
+   "records": {
+    "maximus": {
+     "wins": 1,
+     "losses": 31,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 8,
+     "losses": 24,
+     "draws": 0
+    }
+   },
+   "score": 9.9,
+   "provisional": 3.8,
+   "kd": {
+    "maximus": 0.048,
+    "monk": 0.347
    }
   },
   "sumo": {
@@ -1779,59 +1779,59 @@ export const RATINGS = {
     },
     "monk": {
      "wins": 3,
-     "losses": 26,
-     "draws": 3
-    }
-   },
-   "score": 11,
-   "provisional": 2.8,
-   "kd": {
-    "maximus": 0.082,
-    "monk": 0.179
-   }
-  },
-  "mingSpear": {
-   "title": "Wang Er",
-   "type": "spear|mingGarrison",
-   "records": {
-    "maximus": {
-     "wins": 2,
-     "losses": 30,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 10,
-     "losses": 19,
-     "draws": 3
-    }
-   },
-   "score": 18,
-   "provisional": 6.7,
-   "kd": {
-    "maximus": 0.082,
-    "monk": 0.571
-   }
-  },
-  "peasant": {
-   "title": "Hob Miller",
-   "type": "pitchfork|commoner",
-   "records": {
-    "maximus": {
-     "wins": 7,
      "losses": 25,
+     "draws": 4
+    }
+   },
+   "score": 8.8,
+   "provisional": 2.9,
+   "kd": {
+    "maximus": 0.082,
+    "monk": 0.2
+   }
+  },
+  "lorarius": {
+   "title": "Felix the lorarius",
+   "type": "whip|lorarius",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 32,
      "draws": 0
     },
     "monk": {
-     "wins": 14,
-     "losses": 15,
-     "draws": 3
+     "wins": 11,
+     "losses": 8,
+     "draws": 13
     }
    },
-   "score": 20,
-   "provisional": 15,
+   "score": 6.4,
+   "provisional": 9.5,
    "kd": {
-    "maximus": 0.294,
-    "monk": 0.941
+    "maximus": 0.015,
+    "monk": 1.2
+   }
+  },
+  "taichi": {
+   "title": "Chen Fake",
+   "type": "taichi|kungfu",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 32,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 16,
+     "losses": 16,
+     "draws": 0
+    }
+   },
+   "score": 5,
+   "provisional": 8.3,
+   "kd": {
+    "maximus": 0.015,
+    "monk": 1
    }
   },
   "street": {
@@ -1849,33 +1849,11 @@ export const RATINGS = {
      "draws": 3
     }
    },
-   "score": 3.4,
+   "score": 2,
    "provisional": 0.8,
    "kd": {
     "maximus": 0.015,
     "monk": 0.065
-   }
-  },
-  "policeBaton": {
-   "title": "Officer Ana Ruiz",
-   "type": "baton|police",
-   "records": {
-    "maximus": {
-     "wins": 0,
-     "losses": 32,
-     "draws": 0
-    },
-    "monk": {
-     "wins": 1,
-     "losses": 31,
-     "draws": 0
-    }
-   },
-   "score": 2,
-   "provisional": 0.6,
-   "kd": {
-    "maximus": 0.015,
-    "monk": 0.048
    }
   },
   "mingCrossbow": {
@@ -1888,16 +1866,38 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 8,
-     "losses": 15,
-     "draws": 9
+     "wins": 9,
+     "losses": 18,
+     "draws": 5
     }
    },
-   "score": 3.3,
-   "provisional": 6.1,
+   "score": 4.9,
+   "provisional": 5.2,
    "kd": {
     "maximus": 0.015,
-    "monk": 0.65
+    "monk": 0.571
+   }
+  },
+  "policeBaton": {
+   "title": "Officer Ana Ruiz",
+   "type": "baton|police",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 32,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 0,
+     "losses": 32,
+     "draws": 0
+    }
+   },
+   "score": 2.3,
+   "provisional": 0.3,
+   "kd": {
+    "maximus": 0.015,
+    "monk": 0.015
    }
   },
   "unskilled": {
@@ -1910,128 +1910,128 @@ export const RATINGS = {
      "draws": 0
     },
     "monk": {
-     "wins": 0,
-     "losses": 31,
+     "wins": 1,
+     "losses": 30,
      "draws": 1
     }
    },
-   "score": 0.7,
-   "provisional": 0.5,
+   "score": 1.3,
+   "provisional": 0.8,
    "kd": {
     "maximus": 0.015,
-    "monk": 0.031
+    "monk": 0.065
    }
   }
  },
  "types": {
-  "langyaShield|ironPagoda": 1195,
-  "warhammer|knight": 724,
-  "longsword|knight": 499,
-  "threeEyed|mingElite": 1200,
-  "guandao|mingElite": 736,
-  "kanabo|samuraiTosei": 1137,
-  "odachi|samuraiTosei": 666,
-  "matchlock|mingElite": 418,
-  "katana|samuraiTosei": 267,
-  "joan|joan": 47,
-  "yumi|oyoroi": 219,
-  "guanYu|guanYu": 509,
-  "templar|templar": 655,
-  "naginata|samurai": 521,
-  "katana|samurai": 205,
-  "bow|samurai": 305,
-  "scissor|scissor": 87,
-  "steppeBow|kheshig": 421,
-  "rifle|specialForces": 6541,
-  "maceShield|steppeHeavy": 987,
-  "murmillo|murmillo": 91,
-  "secutor|secutor": 118,
-  "steppeBow|steppeHeavy": 278,
-  "maceShield|ottomanHeavy": 1857,
-  "hoplomachus|hoplomachus": 262,
-  "espada|conquistadorPlate": 298,
-  "thraex|thraex": 123,
-  "centurion|centurion": 96,
-  "spear|conquistadorPlate": 257,
-  "legionary|legionary": 349,
-  "saberShield|gaziAlp": 405,
-  "swordShield|mingBrigandine": 361,
-  "matchlock|mingBrigandine": 202,
-  "spear|mingBrigandine": 59,
-  "matchlock|footman": 276,
-  "bow|footman": 202,
-  "crossbow|footman": 121,
-  "spear|footman": 97,
-  "shotgun|swat": 1620,
-  "handgun|swat": 231,
-  "matchlock|ashigaru": 283,
-  "bow|ashigaru": 95,
-  "yari|ashigaru": 74,
-  "baton|swat": 30,
-  "nu|hanSoldier": 104,
-  "riot|riot": 45,
-  "saberShield|steppeMedium": 297,
-  "saber|steppeMedium": 43,
-  "matchlock|conquistadorQuilted": 339,
-  "espadaRodela|conquistadorQuilted": 298,
-  "macuahuitl|mexicaElite": 598,
-  "tepoztopilli|mexicaElite": 162,
+  "langyaShield|ironPagoda": 936,
+  "warhammer|knight": 720,
+  "longsword|knight": 981,
+  "threeEyed|mingElite": 961,
+  "kanabo|samuraiTosei": 1045,
+  "guandao|mingElite": 415,
+  "odachi|samuraiTosei": 592,
+  "matchlock|mingElite": 354,
+  "katana|samuraiTosei": 300,
+  "joan|joan": 31,
+  "guanYu|guanYu": 367,
+  "yumi|oyoroi": 153,
+  "templar|templar": 391,
+  "naginata|samurai": 684,
+  "bow|samurai": 289,
+  "katana|samurai": 262,
+  "steppeBow|kheshig": 381,
+  "scissor|scissor": 148,
+  "rifle|specialForces": 1302,
+  "maceShield|steppeHeavy": 1099,
+  "steppeBow|steppeHeavy": 287,
+  "secutor|secutor": 130,
+  "murmillo|murmillo": 111,
+  "maceShield|ottomanHeavy": 1204,
+  "espada|conquistadorPlate": 394,
+  "hoplomachus|hoplomachus": 285,
+  "spear|conquistadorPlate": 293,
+  "thraex|thraex": 165,
+  "centurion|centurion": 112,
+  "saberShield|gaziAlp": 485,
+  "legionary|legionary": 344,
+  "swordShield|mingBrigandine": 644,
+  "matchlock|mingBrigandine": 196,
+  "spear|mingBrigandine": 107,
+  "matchlock|footman": 233,
+  "bow|footman": 239,
+  "crossbow|footman": 184,
+  "spear|footman": 155,
+  "shotgun|swat": 1644,
+  "matchlock|ashigaru": 277,
+  "handgun|swat": 274,
+  "bow|ashigaru": 110,
+  "yari|ashigaru": 108,
+  "baton|swat": 26,
+  "nu|hanSoldier": 95,
+  "riot|riot": 41,
+  "saberShield|steppeMedium": 495,
+  "saber|steppeMedium": 57,
+  "matchlock|conquistadorQuilted": 338,
+  "espadaRodela|conquistadorQuilted": 363,
+  "macuahuitl|mexicaElite": 383,
+  "tepoztopilli|mexicaElite": 193,
   "maximus|maximus": 100,
-  "revolver|victorianLady": 277,
-  "macuahuitl|mexicaWarrior": 649,
-  "matchlock|janissary": 277,
-  "wuxia|wuxia": 72,
-  "handgun|police": 102,
-  "katana|ronin": 63,
-  "yatagan|janissary": 68,
-  "commodus|commodus": 104,
-  "steppeBow|steppeLight": 111,
-  "retiarius|retiarius": 39,
-  "dao|mingGarrison": 24,
-  "boxing|boxing": 35,
-  "spear|azap": 36,
-  "steppeBow|azap": 42,
-  "dao|wokou": 27,
-  "clinchBrawl|mma": 23,
-  "taekwondo|dobok": 13,
-  "mix|sports": 16,
-  "kickboxing|boxing": 14,
-  "rapier|victorianGent": 16,
-  "whip|lorarius": 10,
-  "staff|monk": 13,
-  "knife|yakuza": 13,
+  "macuahuitl|mexicaWarrior": 320,
+  "matchlock|janissary": 204,
+  "revolver|victorianLady": 528,
+  "steppeBow|steppeLight": 121,
+  "commodus|commodus": 65,
+  "handgun|police": 148,
+  "wuxia|wuxia": 80,
+  "yatagan|janissary": 74,
+  "katana|ronin": 84,
+  "steppeBow|azap": 78,
+  "retiarius|retiarius": 28,
+  "spear|azap": 42,
+  "boxing|boxing": 32,
+  "dao|wokou": 22,
+  "dao|mingGarrison": 27,
+  "clinchBrawl|mma": 16,
+  "pitchfork|commoner": 16,
+  "spear|mingGarrison": 22,
+  "rapier|victorianGent": 21,
+  "mix|sports": 13,
+  "kickboxing|boxing": 9.7,
   "muayThai|boxing": 14,
-  "bat|thug": 14,
-  "taichi|kungfu": 7,
-  "sumo|sumo": 11,
-  "spear|mingGarrison": 18,
-  "pitchfork|commoner": 20,
-  "street|casual": 3.4,
-  "baton|police": 2,
-  "nu|mingGarrison": 3.3,
-  "unskilled|commoner": 0.7
+  "bat|thug": 22,
+  "staff|monk": 12,
+  "taekwondo|dobok": 13,
+  "knife|yakuza": 9.9,
+  "sumo|sumo": 8.8,
+  "whip|lorarius": 6.4,
+  "taichi|kungfu": 5,
+  "street|casual": 2,
+  "nu|mingGarrison": 4.9,
+  "baton|police": 2.3,
+  "unskilled|commoner": 1.3
  },
  "cross": [
   {
    "a": "policeBaton",
+   "b": "street",
+   "wins": 5,
+   "losses": 6,
+   "draws": 5
+  },
+  {
+   "a": "policeBaton",
    "b": "unskilled",
-   "wins": 12,
-   "losses": 1,
+   "wins": 13,
+   "losses": 0,
    "draws": 3
   },
   {
    "a": "street",
    "b": "unskilled",
-   "wins": 14,
-   "losses": 2,
+   "wins": 11,
+   "losses": 5,
    "draws": 0
-  },
-  {
-   "a": "policeBaton",
-   "b": "street",
-   "wins": 2,
-   "losses": 13,
-   "draws": 1
   },
   {
    "a": "knife",
@@ -2041,24 +2041,17 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "bat",
+   "a": "mingCrossbow",
    "b": "sumo",
-   "wins": 5,
-   "losses": 9,
-   "draws": 2
-  },
-  {
-   "a": "bat",
-   "b": "knife",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
+   "wins": 0,
+   "losses": 15,
+   "draws": 1
   },
   {
    "a": "knife",
    "b": "mingCrossbow",
-   "wins": 16,
-   "losses": 0,
+   "wins": 13,
+   "losses": 3,
    "draws": 0
   },
   {
@@ -2069,17 +2062,17 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "mingCrossbow",
-   "b": "mingSpear",
-   "wins": 0,
-   "losses": 16,
+   "a": "bat",
+   "b": "taichi",
+   "wins": 11,
+   "losses": 5,
    "draws": 0
   },
   {
-   "a": "knife",
-   "b": "mingSpear",
-   "wins": 2,
-   "losses": 14,
+   "a": "mingSpear",
+   "b": "taichi",
+   "wins": 16,
+   "losses": 0,
    "draws": 0
   },
   {
@@ -2091,63 +2084,42 @@ export const RATINGS = {
   },
   {
    "a": "lorarius",
+   "b": "mingSpear",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "lorarius",
    "b": "shaolin",
-   "wins": 3,
-   "losses": 6,
-   "draws": 7
-  },
-  {
-   "a": "shaolin",
-   "b": "taichi",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "mix",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
+   "wins": 5,
+   "losses": 5,
+   "draws": 6
   },
   {
    "a": "mix",
-   "b": "muayThai",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "muayThai",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "muayThai",
-   "b": "peasant",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "kickboxer",
-   "b": "muayThai",
+   "b": "shaolin",
    "wins": 11,
    "losses": 5,
    "draws": 0
   },
   {
-   "a": "kickboxer",
-   "b": "peasant",
-   "wins": 1,
-   "losses": 15,
+   "a": "joan",
+   "b": "mix",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "mix",
+   "b": "wokou",
+   "wins": 3,
+   "losses": 13,
    "draws": 0
   },
   {
    "a": "joan",
-   "b": "kickboxer",
+   "b": "wokou",
    "wins": 14,
    "losses": 2,
    "draws": 0
@@ -2157,6 +2129,55 @@ export const RATINGS = {
    "b": "peasant",
    "wins": 15,
    "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "peasant",
+   "b": "wokou",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "lordAshford",
+   "b": "peasant",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "muayThai",
+   "b": "peasant",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "lordAshford",
+   "b": "muayThai",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "kickboxer",
+   "b": "mingDao",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "brawler",
+   "b": "kickboxer",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "brawler",
+   "b": "mingDao",
+   "wins": 7,
+   "losses": 9,
    "draws": 0
   },
   {
@@ -2167,129 +2188,101 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "baton",
-   "b": "taekwondo",
-   "wins": 11,
-   "losses": 0,
-   "draws": 5
-  },
-  {
-   "a": "baton",
-   "b": "mingDao",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "brawler",
-   "wins": 12,
-   "losses": 0,
-   "draws": 4
-  },
-  {
    "a": "brawler",
-   "b": "mingDao",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "wokou",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "boxer",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "boxer",
-   "b": "wokou",
+   "b": "taekwondo",
    "wins": 12,
    "losses": 4,
    "draws": 0
   },
   {
+   "a": "baton",
+   "b": "taekwondo",
+   "wins": 10,
+   "losses": 0,
+   "draws": 6
+  },
+  {
+   "a": "baton",
+   "b": "brawler",
+   "wins": 13,
+   "losses": 0,
+   "draws": 3
+  },
+  {
    "a": "boxer",
-   "b": "mandukhai",
-   "wins": 7,
-   "losses": 9,
+   "b": "retiarius",
+   "wins": 5,
+   "losses": 11,
    "draws": 0
   },
   {
-   "a": "azapArcher",
-   "b": "mandukhai",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
+   "a": "mandukhai",
    "b": "retiarius",
    "wins": 15,
    "losses": 1,
    "draws": 0
   },
   {
-   "a": "azapSpear",
-   "b": "riot",
+   "a": "boxer",
+   "b": "mandukhai",
    "wins": 1,
    "losses": 15,
    "draws": 0
   },
   {
-   "a": "retiarius",
+   "a": "riot",
+   "b": "scissor",
+   "wins": 4,
+   "losses": 11,
+   "draws": 1
+  },
+  {
+   "a": "mandukhai",
+   "b": "scissor",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "riot",
+   "wins": 8,
+   "losses": 7,
+   "draws": 1
+  },
+  {
+   "a": "azapArcher",
    "b": "riot",
    "wins": 11,
    "losses": 5,
    "draws": 0
   },
   {
-   "a": "riot",
+   "a": "azapArcher",
    "b": "scissor",
    "wins": 2,
    "losses": 14,
    "draws": 0
   },
   {
-   "a": "retiarius",
-   "b": "scissor",
-   "wins": 6,
-   "losses": 10,
+   "a": "azapArcher",
+   "b": "azapSpear",
+   "wins": 16,
+   "losses": 0,
    "draws": 0
   },
   {
-   "a": "ashigaruSpear",
+   "a": "azapSpear",
    "b": "mingBrigSpear",
-   "wins": 6,
-   "losses": 9,
-   "draws": 1
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "scissor",
-   "wins": 12,
-   "losses": 3,
-   "draws": 1
-  },
-  {
-   "a": "footSpear",
-   "b": "mingBrigSpear",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "footSpear",
-   "b": "janissary",
    "wins": 8,
    "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "commodus",
+   "b": "mingBrigSpear",
+   "wins": 4,
+   "losses": 12,
    "draws": 0
   },
   {
@@ -2300,171 +2293,801 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "ashigaruBow",
-   "b": "commodus",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "footSpear",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
    "a": "commodus",
-   "b": "footSpear",
+   "b": "janissary",
    "wins": 9,
    "losses": 7,
    "draws": 0
   },
   {
-   "a": "centurion",
-   "b": "murmillo",
-   "wins": 9,
-   "losses": 7,
+   "a": "ashigaruBow",
+   "b": "ashigaruSpear",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
-   "a": "murmillo",
+   "a": "ashigaruBow",
+   "b": "ronin",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
    "b": "ronin",
    "wins": 12,
    "losses": 4,
    "draws": 0
   },
   {
-   "a": "centurion",
-   "b": "ronin",
-   "wins": 10,
-   "losses": 6,
+   "a": "ashigaruBow",
+   "b": "maximus",
+   "wins": 8,
+   "losses": 8,
    "draws": 0
   },
   {
-   "a": "police",
-   "b": "thraex",
-   "wins": 5,
-   "losses": 11,
+   "a": "ashigaruSpear",
+   "b": "maximus",
+   "wins": 6,
+   "losses": 10,
    "draws": 0
   },
   {
-   "a": "maximus",
-   "b": "thraex",
+   "a": "footSpear",
+   "b": "hanCrossbow",
    "wins": 7,
    "losses": 9,
    "draws": 0
   },
   {
-   "a": "maximus",
+   "a": "footSpear",
    "b": "police",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "hanCrossbow",
+   "b": "police",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "footSpear",
+   "b": "steppeArcher",
    "wins": 6,
    "losses": 10,
    "draws": 0
   },
   {
    "a": "hanCrossbow",
-   "b": "maximus",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "hanCrossbow",
-   "b": "thraex",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "hanCrossbow",
-   "b": "secutor",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "oyoroi",
-   "b": "secutor",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "oyoroi",
    "b": "steppeArcher",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "steppeArcher",
-   "b": "wuxia",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "wuxia",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "crossbowman",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "crossbowman",
-   "b": "pistol",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "pistol",
    "wins": 2,
    "losses": 14,
    "draws": 0
   },
   {
-   "a": "hoplomachus",
-   "b": "tosei",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "tosei",
-   "b": "vocPikeman",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
-   "b": "vocPikeman",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "gaziAlp",
-   "b": "tosei",
+   "a": "murmillo",
+   "b": "wuxia",
    "wins": 10,
    "losses": 6,
    "draws": 0
   },
   {
-   "a": "gaziAlp",
-   "b": "hoplomachus",
+   "a": "murmillo",
+   "b": "steppeArcher",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "steppeArcher",
+   "b": "wuxia",
    "wins": 9,
    "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
+   "b": "secutor",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "murmillo",
+   "b": "secutor",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
+   "b": "murmillo",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "tosei",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "secutor",
+   "b": "tosei",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "secutor",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "thraex",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "rodelero",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "rodelero",
+   "b": "thraex",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "oyoroi",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "oyoroi",
+   "b": "vocPikeman",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "vocPikeman",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "footBow",
+   "b": "oyoroi",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "footBow",
+   "b": "hoplomachus",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "crossbowman",
+   "b": "oyoroi",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "crossbowman",
+   "b": "hoplomachus",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "oyoroi",
+   "b": "pistol",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "pistol",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "oyoroi",
+   "b": "steppeLancer",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "steppeLancer",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "legionary",
+   "b": "mingGun",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "legionary",
+   "b": "teppo",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "mingGun",
+   "b": "teppo",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "gaziAlp",
+   "b": "templar",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "legionary",
+   "b": "templar",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "gaziAlp",
+   "b": "legionary",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "kanabo",
+   "b": "templar",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "gaziAlp",
+   "b": "kanabo",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "mingShield",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "kanabo",
+   "b": "mingShield",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "kanabo",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "kheshig",
+   "b": "tametomo",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "ladyAshford",
+   "b": "tametomo",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "kheshig",
+   "b": "ladyAshford",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "mingEliteGun",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "guanYu",
+   "b": "hammer",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "guanYu",
+   "b": "mingEliteGun",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "hammer",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "mingEliteGun",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "steppeShield",
+   "wins": 13,
+   "losses": 2,
+   "draws": 1
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "steppeShield",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "vocMusketeer",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "vocMusketeer",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "mexica",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "mexica",
+   "b": "mingEliteGun",
+   "wins": 3,
+   "losses": 12,
+   "draws": 1
+  },
+  {
+   "a": "hammer",
+   "b": "janissaryGun",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "janissaryGun",
+   "b": "mingEliteGun",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "swatShotgun",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "swatShotgun",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "odachi",
+   "b": "plate",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "naginata",
+   "b": "plate",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "naginata",
+   "b": "odachi",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "plate",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "odachi",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "eagle",
+   "b": "plate",
+   "wins": 1,
+   "losses": 12,
+   "draws": 3
+  },
+  {
+   "a": "eagle",
+   "b": "odachi",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "mingGuandao",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "plate",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "mingGuandao",
+   "b": "plate",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "esen",
+   "b": "sipahi",
+   "wins": 11,
+   "losses": 4,
+   "draws": 1
+  },
+  {
+   "a": "esen",
+   "b": "ironPagoda",
+   "wins": 7,
+   "losses": 8,
+   "draws": 1
+  },
+  {
+   "a": "ironPagoda",
+   "b": "sipahi",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "mingThreeEyed",
+   "b": "specialForces",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "esen",
+   "b": "mingThreeEyed",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "esen",
+   "b": "specialForces",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "taekwondo",
+   "wins": 15,
+   "losses": 0,
+   "draws": 1
+  },
+  {
+   "a": "ironPagoda",
+   "b": "kheshig",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "mandukhai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "vocMusketeer",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "mingShield",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "hammer",
+   "wins": 2,
+   "losses": 13,
+   "draws": 1
+  },
+  {
+   "a": "esen",
+   "b": "hammer",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "mingGuandao",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "plate",
+   "b": "retiarius",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "baton",
+   "b": "plate",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "plate",
+   "b": "steppeArcher",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "plate",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "mingThreeEyed",
+   "b": "murmillo",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "mingThreeEyed",
+   "b": "wuxia",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "mingThreeEyed",
+   "b": "scissor",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
+   "b": "mingThreeEyed",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "kanabo",
+   "b": "mingThreeEyed",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "kanabo",
+   "b": "sipahi",
+   "wins": 9,
+   "losses": 6,
+   "draws": 1
+  },
+  {
+   "a": "kanabo",
+   "b": "steppeLancer",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "kanabo",
+   "b": "kheshig",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "azapArcher",
+   "b": "mingGuandao",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "mingGuandao",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "mingGuandao",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "mingGuandao",
+   "b": "muayThai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "odachi",
+   "b": "templar",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "mingThreeEyed",
+   "b": "odachi",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "odachi",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "odachi",
+   "b": "swatShotgun",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "plate",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "pistol",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "rodelero",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "wokou",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mix",
+   "b": "tosei",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "retiarius",
+   "b": "tosei",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "tosei",
+   "b": "wuxia",
+   "wins": 13,
+   "losses": 3,
    "draws": 0
   },
   {
@@ -2475,843 +3098,269 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "hoplomachus",
-   "b": "mingGun",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "hidalgo",
-   "b": "tosei",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "hidalgo",
-   "b": "hoplomachus",
+   "a": "baton",
+   "b": "joan",
    "wins": 9,
    "losses": 7,
    "draws": 0
   },
   {
-   "a": "kanabo",
-   "b": "templar",
+   "a": "hoplomachus",
+   "b": "joan",
    "wins": 12,
    "losses": 4,
    "draws": 0
   },
   {
-   "a": "kanabo",
-   "b": "steppeLancer",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "steppeLancer",
-   "b": "templar",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "kanabo",
-   "b": "mingShield",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "mingShield",
-   "b": "templar",
+   "a": "centurion",
+   "b": "joan",
    "wins": 10,
    "losses": 6,
    "draws": 0
   },
   {
-   "a": "kanabo",
-   "b": "rodelero",
-   "wins": 16,
-   "losses": 0,
+   "a": "joan",
+   "b": "sipahi",
+   "wins": 0,
+   "losses": 16,
    "draws": 0
   },
   {
-   "a": "rodelero",
+   "a": "guanYu",
+   "b": "rodelero",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "guanYu",
+   "b": "steppeArcher",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
+   "b": "guanYu",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "guanYu",
+   "b": "sipahi",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "baton",
+   "b": "tametomo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "tametomo",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "peasant",
+   "b": "tametomo",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "steppeLancer",
+   "b": "tametomo",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "esen",
+   "b": "templar",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "boxer",
+   "b": "templar",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "footSpear",
    "b": "templar",
    "wins": 7,
    "losses": 9,
    "draws": 0
   },
   {
-   "a": "footBow",
-   "b": "teppo",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "steppeShield",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "steppeShield",
-   "b": "teppo",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "janissaryGun",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "janissaryGun",
-   "b": "teppo",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "jaguar",
-   "b": "mingEliteGun",
+   "a": "arquebus",
+   "b": "templar",
    "wins": 2,
    "losses": 14,
    "draws": 0
   },
   {
-   "a": "footBow",
-   "b": "mingEliteGun",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "jaguar",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "kheshig",
-   "b": "tametomo",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "mingEliteGun",
-   "b": "tametomo",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "kheshig",
-   "b": "mingEliteGun",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "legionary",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "ladyAshford",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "ladyAshford",
-   "b": "legionary",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "guanYu",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "guanYu",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "eagle",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "arquebusier",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "swatShotgun",
-   "b": "vocMusketeer",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "arquebusier",
-   "b": "vocMusketeer",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
-  },
-  {
-   "a": "mexica",
-   "b": "swatShotgun",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "arquebusier",
-   "b": "mexica",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "mingThreeEyed",
-   "b": "plate",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "plate",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mingThreeEyed",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "mingGuandao",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
+   "a": "hidalgo",
    "b": "naginata",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "mingGuandao",
-   "b": "naginata",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "esen",
-   "b": "ironPagoda",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "esen",
-   "b": "mingGuandao",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "sipahi",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "mingGuandao",
-   "b": "sipahi",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "odachi",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "odachi",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "bat",
-   "b": "ironPagoda",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "scissor",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "mandukhai",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "vocMusketeer",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "mingShield",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "oyoroi",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "esen",
-   "b": "hammer",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "kanabo",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "mingDao",
-   "b": "plate",
    "wins": 2,
    "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "plate",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "plate",
-   "b": "wuxia",
-   "wins": 15,
-   "losses": 1,
    "draws": 0
   },
   {
    "a": "hoplomachus",
-   "b": "plate",
+   "b": "naginata",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "naginata",
    "wins": 2,
    "losses": 14,
    "draws": 0
   },
   {
-   "a": "mingThreeEyed",
-   "b": "steppeLancer",
+   "a": "naginata",
+   "b": "rodelero",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "murmillo",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "commodus",
    "wins": 14,
    "losses": 2,
    "draws": 0
   },
   {
-   "a": "janissary",
-   "b": "mingThreeEyed",
-   "wins": 0,
-   "losses": 16,
+   "a": "archer",
+   "b": "mexica",
+   "wins": 12,
+   "losses": 4,
    "draws": 0
   },
   {
-   "a": "kheshig",
-   "b": "mingThreeEyed",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "mingThreeEyed",
-   "b": "vocPikeman",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "mingGuandao",
-   "b": "mingThreeEyed",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "mingGuandao",
-   "b": "murmillo",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "mingGuandao",
-   "b": "scissor",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "mingGuandao",
+   "a": "archer",
    "b": "retiarius",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "kanabo",
-   "b": "mandukhai",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "kanabo",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "kanabo",
-   "b": "shaolin",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "kanabo",
-   "b": "mingThreeEyed",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "odachi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "odachi",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "odachi",
-   "b": "plate",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "odachi",
-   "b": "teppo",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "mingEliteGun",
-   "b": "rodelero",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "mingEliteGun",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "mingEliteGun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mingDao",
-   "b": "mingEliteGun",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "janissary",
-   "b": "tosei",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "tosei",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "sipahi",
-   "b": "tosei",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "rodelero",
-   "b": "tosei",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "joan",
-   "b": "wuxia",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "joan",
-   "wins": 2,
-   "losses": 12,
-   "draws": 2
-  },
-  {
-   "a": "joan",
-   "b": "sipahi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "joan",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
    "a": "oyoroi",
-   "b": "tametomo",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "taekwondo",
-   "b": "tametomo",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "murmillo",
-   "b": "tametomo",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "esen",
-   "b": "tametomo",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
-   "b": "guanYu",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "footSpear",
-   "b": "guanYu",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "hoplomachus",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "hidalgo",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "jaguar",
-   "b": "templar",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "police",
-   "b": "templar",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "ladyAshford",
-   "b": "templar",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mingDao",
-   "b": "templar",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "naginata",
    "b": "unskilled",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "naginata",
-   "b": "teppo",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "mix",
-   "b": "naginata",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mingCrossbow",
-   "b": "naginata",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
+   "a": "mingSpear",
    "b": "oyoroi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "naginata",
-   "b": "oyoroi",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "arquebusier",
-   "b": "oyoroi",
-   "wins": 14,
-   "losses": 2,
+   "wins": 1,
+   "losses": 15,
    "draws": 0
   },
   {
    "a": "oyoroi",
-   "b": "police",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "ashigaruBow",
+   "b": "policeBaton",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "archer",
-   "b": "footBow",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "taekwondo",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "knife",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "scissor",
+   "a": "oyoroi",
    "b": "wokou",
    "wins": 15,
    "losses": 1,
    "draws": 0
   },
   {
-   "a": "ladyAshford",
-   "b": "scissor",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "scissor",
-   "b": "street",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "scissor",
-   "b": "thraex",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
    "a": "kheshig",
-   "b": "vocPikeman",
+   "b": "naginata",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "kheshig",
    "wins": 8,
    "losses": 8,
    "draws": 0
   },
   {
-   "a": "kheshig",
-   "b": "knife",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
+   "a": "commodus",
    "b": "kheshig",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "hanCrossbow",
+   "a": "ashigaruBow",
    "b": "kheshig",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "azapArcher",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
+   "a": "footBow",
+   "b": "scissor",
+   "wins": 7,
+   "losses": 9,
    "draws": 0
   },
   {
-   "a": "naginata",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
+   "a": "peasant",
+   "b": "scissor",
+   "wins": 2,
+   "losses": 14,
    "draws": 0
   },
   {
-   "a": "brawler",
+   "a": "bat",
+   "b": "scissor",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "mingDao",
+   "b": "scissor",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "mexica",
    "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "specialForces",
+   "b": "street",
+   "wins": 16,
+   "losses": 0,
    "draws": 0
   },
   {
@@ -3322,882 +3371,889 @@ export const RATINGS = {
    "draws": 0
   },
   {
+   "a": "centurion",
+   "b": "specialForces",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "bat",
+   "b": "esen",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "boxer",
+   "b": "esen",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
    "a": "esen",
-   "b": "policeBaton",
+   "b": "hanCrossbow",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "esen",
+   "b": "wokou",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "esen",
+   "a": "naginata",
+   "b": "steppeLancer",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "brawler",
+   "b": "steppeLancer",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
+   "b": "steppeLancer",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "mingCrossbow",
+   "b": "steppeLancer",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "secutor",
    "b": "sipahi",
-   "wins": 10,
-   "losses": 6,
+   "wins": 4,
+   "losses": 12,
    "draws": 0
   },
   {
-   "a": "esen",
-   "b": "kickboxer",
-   "wins": 16,
-   "losses": 0,
+   "a": "lordAshford",
+   "b": "secutor",
+   "wins": 5,
+   "losses": 11,
    "draws": 0
   },
   {
-   "a": "esen",
+   "a": "secutor",
    "b": "unskilled",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
+   "a": "knife",
+   "b": "secutor",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "murmillo",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
    "a": "murmillo",
+   "b": "vocPikeman",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "footBow",
+   "b": "murmillo",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "murmillo",
+   "b": "sumo",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "rodelero",
+   "b": "sipahi",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "lordAshford",
+   "b": "sipahi",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
+   "b": "sipahi",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "sipahi",
+   "b": "vocMusketeer",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "police",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "sipahi",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "tametomo",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "ironPagoda",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "guanYu",
+   "b": "hoplomachus",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "mingCrossbow",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "mingShield",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "templar",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "lordAshford",
+   "b": "vocPikeman",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "vocPikeman",
+   "wins": 11,
+   "losses": 4,
+   "draws": 1
+  },
+  {
+   "a": "secutor",
+   "b": "vocPikeman",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "vocPikeman",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "street",
+   "b": "thraex",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "ronin",
+   "b": "thraex",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "janissaryGun",
+   "b": "thraex",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "thraex",
+   "b": "wokou",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
+   "b": "mandukhai",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "azapSpear",
+   "b": "centurion",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "centurion",
    "b": "taichi",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "arquebusier",
-   "b": "murmillo",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "murmillo",
-   "b": "thraex",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "murmillo",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "secutor",
-   "b": "sumo",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "rodelero",
-   "b": "secutor",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "kickboxer",
-   "b": "secutor",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "secutor",
-   "b": "vocPikeman",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "steppeLancer",
-   "b": "vocMusketeer",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "ronin",
-   "b": "steppeLancer",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "sipahi",
-   "b": "steppeLancer",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "steppeLancer",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "sipahi",
-   "b": "tametomo",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "policeBaton",
-   "b": "sipahi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mingShield",
-   "b": "sipahi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "sipahi",
-   "b": "templar",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
-   "b": "kickboxer",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
-   "b": "secutor",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "hoplomachus",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
-   "b": "street",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "hidalgo",
-   "b": "steppeArcher",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "hidalgo",
-   "b": "mexica",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "hidalgo",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "hidalgo",
-   "b": "mandukhai",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "steppeLancer",
-   "b": "thraex",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "boxer",
-   "b": "thraex",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "peasant",
-   "b": "thraex",
-   "wins": 2,
-   "losses": 13,
-   "draws": 1
-  },
-  {
-   "a": "muayThai",
-   "b": "thraex",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
    "a": "centurion",
    "b": "shaolin",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "esen",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "pistol",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "teppo",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "sipahi",
-   "b": "vocPikeman",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "commodus",
-   "b": "vocPikeman",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "vocPikeman",
-   "b": "wuxia",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "naginata",
-   "b": "vocPikeman",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "legionary",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "legionary",
-   "b": "wuxia",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "legionary",
-   "b": "shaolin",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "legionary",
-   "b": "ronin",
    "wins": 15,
    "losses": 1,
    "draws": 0
   },
   {
    "a": "gaziAlp",
-   "b": "ronin",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "gaziAlp",
-   "b": "steppeShield",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "gaziAlp",
-   "b": "pistol",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "gaziAlp",
-   "b": "kanabo",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "lorarius",
-   "b": "mingShield",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "gaziAlp",
-   "b": "mingShield",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "mingShield",
-   "b": "shaolin",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "mingShield",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "mingGun",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "mingGun",
-   "b": "secutor",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "mingGun",
-   "b": "mingShield",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "mingGun",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "janissaryGun",
-   "b": "mingBrigSpear",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "mandukhai",
-   "b": "mingBrigSpear",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "mingBrigSpear",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "mingBrigSpear",
-   "b": "street",
-   "wins": 15,
-   "losses": 0,
-   "draws": 1
-  },
-  {
-   "a": "arquebus",
-   "b": "mingCrossbow",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "baton",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "templar",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "steppeShield",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "mingBrigSpear",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "footBow",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "naginata",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "footBow",
-   "b": "vocMusketeer",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "crossbowman",
-   "b": "janissaryGun",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "crossbowman",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "crossbowman",
-   "b": "shaolin",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "crossbowman",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "footSpear",
    "b": "muayThai",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "footSpear",
-   "b": "janissaryGun",
-   "wins": 2,
-   "losses": 14,
+   "a": "esen",
+   "b": "gaziAlp",
+   "wins": 14,
+   "losses": 2,
    "draws": 0
   },
   {
-   "a": "footSpear",
-   "b": "kanabo",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "footSpear",
-   "b": "swatShotgun",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "swatShotgun",
-   "b": "taekwondo",
+   "a": "gaziAlp",
+   "b": "teppo",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "brawler",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "swatShotgun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "janissary",
-   "b": "swatShotgun",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
+   "a": "gaziAlp",
    "b": "pistol",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "pistol",
-   "b": "police",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "pistol",
-   "b": "shaolin",
-   "wins": 15,
-   "losses": 0,
-   "draws": 1
-  },
-  {
-   "a": "pistol",
-   "b": "templar",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "maximus",
-   "b": "teppo",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "teppo",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "commodus",
-   "b": "teppo",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
-   "b": "teppo",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "vocMusketeer",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "hidalgo",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "steppeLancer",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "mingCrossbow",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "secutor",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "legionary",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "mexica",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "ironPagoda",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "jaguar",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "pistol",
-   "wins": 1,
-   "losses": 10,
-   "draws": 5
-  },
-  {
-   "a": "baton",
-   "b": "mingBrigSpear",
-   "wins": 0,
-   "losses": 15,
-   "draws": 1
-  },
-  {
-   "a": "baton",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "hanCrossbow",
-   "b": "specialForces",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "hanCrossbow",
-   "b": "vocMusketeer",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "baton",
-   "b": "hanCrossbow",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "hanCrossbow",
-   "b": "oyoroi",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "riot",
    "wins": 15,
    "losses": 1,
    "draws": 0
   },
   {
-   "a": "mingCrossbow",
-   "b": "riot",
+   "a": "legionary",
+   "b": "sipahi",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "janissary",
+   "b": "legionary",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "legionary",
+   "b": "steppeArcher",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "legionary",
+   "b": "naginata",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "eagle",
+   "b": "mingShield",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "mingShield",
+   "b": "steppeArcher",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "mingShield",
+   "b": "muayThai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mingShield",
+   "b": "police",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mingGun",
+   "b": "police",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "mingGun",
+   "b": "steppeShield",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
    "a": "mingGuandao",
-   "b": "riot",
-   "wins": 15,
-   "losses": 1,
+   "b": "mingGun",
+   "wins": 7,
+   "losses": 9,
    "draws": 0
   },
   {
-   "a": "kheshig",
-   "b": "riot",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "sipahi",
-   "b": "steppeShield",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "murmillo",
-   "b": "steppeShield",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "steppeShield",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "mingShield",
-   "b": "steppeShield",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "mandukhai",
-   "b": "police",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "mandukhai",
-   "b": "naginata",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "mandukhai",
-   "b": "mingThreeEyed",
+   "a": "kickboxer",
+   "b": "mingGun",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "mandukhai",
-   "b": "mingCrossbow",
-   "wins": 15,
-   "losses": 1,
+   "a": "legionary",
+   "b": "mingBrigSpear",
+   "wins": 10,
+   "losses": 6,
    "draws": 0
   },
   {
-   "a": "arquebusier",
+   "a": "mingBrigSpear",
+   "b": "muayThai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mingBrigSpear",
+   "b": "thraex",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "mingBrigSpear",
+   "b": "secutor",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "mingShield",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "swatShotgun",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "ladyAshford",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "mandukhai",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "footBow",
+   "b": "mingBrigSpear",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "footBow",
    "b": "wuxia",
    "wins": 14,
    "losses": 2,
    "draws": 0
   },
   {
-   "a": "arquebusier",
-   "b": "commodus",
-   "wins": 15,
-   "losses": 1,
+   "a": "ashigaruBow",
+   "b": "footBow",
+   "wins": 2,
+   "losses": 14,
    "draws": 0
   },
   {
-   "a": "arquebusier",
-   "b": "mingGun",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "arquebusier",
-   "b": "plate",
-   "wins": 11,
-   "losses": 5,
-   "draws": 0
-  },
-  {
-   "a": "crossbowman",
-   "b": "vocMusketeer",
+   "a": "footBow",
+   "b": "ladyAshford",
    "wins": 3,
    "losses": 13,
    "draws": 0
   },
   {
-   "a": "taichi",
-   "b": "vocMusketeer",
+   "a": "crossbowman",
+   "b": "street",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "crossbowman",
+   "b": "policeBaton",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "baton",
+   "b": "crossbowman",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "crossbowman",
+   "b": "templar",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "hoplomachus",
+   "a": "footSpear",
+   "b": "steppeShield",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "footSpear",
+   "b": "mingBrigSpear",
+   "wins": 11,
+   "losses": 4,
+   "draws": 1
+  },
+  {
+   "a": "eagle",
+   "b": "footSpear",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "footSpear",
+   "b": "naginata",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "swatShotgun",
    "b": "vocMusketeer",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "ladyAshford",
+   "b": "swatShotgun",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "swatShotgun",
+   "b": "thraex",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "muayThai",
+   "b": "swatShotgun",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "swatShotgun",
+   "b": "teppo",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "shaolin",
+   "b": "teppo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "ladyAshford",
+   "b": "teppo",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "mingGuandao",
+   "b": "teppo",
    "wins": 7,
    "losses": 9,
    "draws": 0
   },
   {
-   "a": "mandukhai",
+   "a": "pistol",
+   "b": "wuxia",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "pistol",
+   "b": "swatShotgun",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "peasant",
+   "b": "pistol",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "brawler",
+   "b": "pistol",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "mix",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "wuxia",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "hidalgo",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "commodus",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
+   "b": "muayThai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
+   "b": "templar",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
+   "b": "tametomo",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
+   "b": "janissary",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "baton",
+   "b": "hidalgo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "baton",
    "b": "vocMusketeer",
    "wins": 1,
    "losses": 15,
    "draws": 0
   },
   {
-   "a": "gaziAlp",
-   "b": "rodelero",
-   "wins": 9,
-   "losses": 7,
+   "a": "baton",
+   "b": "hoplomachus",
+   "wins": 1,
+   "losses": 15,
    "draws": 0
   },
   {
-   "a": "muayThai",
+   "a": "baton",
+   "b": "murmillo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "hanCrossbow",
+   "b": "policeBaton",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "hanCrossbow",
+   "b": "secutor",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "gaziAlp",
+   "b": "hanCrossbow",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "hanCrossbow",
+   "b": "janissaryGun",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "riot",
+   "wins": 14,
+   "losses": 1,
+   "draws": 1
+  },
+  {
+   "a": "jaguar",
+   "b": "riot",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "riot",
+   "b": "teppo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "baton",
+   "b": "riot",
+   "wins": 0,
+   "losses": 0,
+   "draws": 16
+  },
+  {
+   "a": "mingBrigSpear",
+   "b": "steppeShield",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "joan",
+   "b": "steppeShield",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "specialForces",
+   "b": "steppeShield",
+   "wins": 7,
+   "losses": 9,
+   "draws": 0
+  },
+  {
+   "a": "steppeShield",
+   "b": "vocMusketeer",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "baton",
+   "b": "mandukhai",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "archer",
+   "b": "mandukhai",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "tametomo",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "policeBaton",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "kanabo",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "scissor",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "sipahi",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "steppeLancer",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "tametomo",
+   "b": "vocMusketeer",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "mingShield",
+   "b": "vocMusketeer",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "commodus",
+   "b": "vocMusketeer",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "naginata",
+   "b": "vocMusketeer",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "mingThreeEyed",
+   "b": "rodelero",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "policeBaton",
    "b": "rodelero",
    "wins": 0,
    "losses": 16,
@@ -4205,177 +4261,149 @@ export const RATINGS = {
   },
   {
    "a": "rodelero",
-   "b": "scissor",
-   "wins": 12,
-   "losses": 4,
+   "b": "steppeArcher",
+   "wins": 13,
+   "losses": 3,
    "draws": 0
   },
   {
-   "a": "hidalgo",
+   "a": "janissary",
    "b": "rodelero",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "ladyAshford",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "muayThai",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "mix",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "eagle",
-   "b": "jaguar",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "jaguar",
-   "b": "mingGun",
-   "wins": 4,
-   "losses": 12,
-   "draws": 0
-  },
-  {
-   "a": "jaguar",
-   "b": "mingCrossbow",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "jaguar",
-   "b": "taekwondo",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
-   "b": "jaguar",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "maximus",
-   "b": "secutor",
-   "wins": 6,
-   "losses": 10,
-   "draws": 0
-  },
-  {
-   "a": "maximus",
-   "b": "policeBaton",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "maximus",
-   "b": "swatShotgun",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "joan",
-   "b": "maximus",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "jaguar",
-   "b": "ladyAshford",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "ladyAshford",
-   "b": "street",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "ladyAshford",
-   "b": "mingShield",
    "wins": 2,
    "losses": 14,
    "draws": 0
   },
   {
-   "a": "ladyAshford",
-   "b": "taekwondo",
+   "a": "eagle",
+   "b": "mingGun",
    "wins": 14,
    "losses": 2,
    "draws": 0
   },
   {
-   "a": "mexica",
-   "b": "templar",
-   "wins": 3,
-   "losses": 13,
+   "a": "crossbowman",
+   "b": "eagle",
+   "wins": 6,
+   "losses": 10,
    "draws": 0
   },
   {
-   "a": "mexica",
-   "b": "mingGun",
-   "wins": 15,
-   "losses": 1,
+   "a": "eagle",
+   "b": "murmillo",
+   "wins": 12,
+   "losses": 4,
    "draws": 0
   },
   {
-   "a": "mandukhai",
-   "b": "mexica",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mexica",
-   "b": "mingGuandao",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "janissaryGun",
+   "a": "eagle",
    "b": "knife",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "ashigaruBow",
-   "b": "janissaryGun",
-   "wins": 6,
-   "losses": 10,
+   "a": "hidalgo",
+   "b": "jaguar",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "mandukhai",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "secutor",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "legionary",
+   "wins": 2,
+   "losses": 14,
+   "draws": 0
+  },
+  {
+   "a": "maximus",
+   "b": "shaolin",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "kheshig",
+   "b": "maximus",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "hoplomachus",
+   "b": "maximus",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "maximus",
+   "b": "mexica",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "mexica",
+   "b": "shaolin",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mexica",
+   "b": "mingSpear",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "gaziAlp",
+   "b": "mexica",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "jaguar",
+   "b": "mexica",
+   "wins": 2,
+   "losses": 14,
    "draws": 0
   },
   {
    "a": "janissaryGun",
-   "b": "wuxia",
-   "wins": 11,
-   "losses": 5,
+   "b": "mingGun",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "janissaryGun",
+   "b": "policeBaton",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "janissaryGun",
+   "b": "peasant",
+   "wins": 16,
+   "losses": 0,
    "draws": 0
   },
   {
@@ -4386,66 +4414,178 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "footBow",
-   "b": "wuxia",
-   "wins": 13,
-   "losses": 3,
+   "a": "ladyAshford",
+   "b": "secutor",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
-   "a": "azapArcher",
-   "b": "wuxia",
-   "wins": 9,
-   "losses": 7,
+   "a": "ladyAshford",
+   "b": "mingCrossbow",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
-   "a": "taekwondo",
-   "b": "wuxia",
-   "wins": 0,
-   "losses": 16,
+   "a": "joan",
+   "b": "ladyAshford",
+   "wins": 3,
+   "losses": 13,
    "draws": 0
   },
   {
-   "a": "riot",
-   "b": "wuxia",
-   "wins": 4,
-   "losses": 12,
+   "a": "jaguar",
+   "b": "ladyAshford",
+   "wins": 3,
+   "losses": 13,
    "draws": 0
   },
   {
-   "a": "police",
-   "b": "tosei",
-   "wins": 2,
-   "losses": 14,
+   "a": "mexica",
+   "b": "steppeArcher",
+   "wins": 11,
+   "losses": 5,
    "draws": 0
   },
   {
-   "a": "kickboxer",
-   "b": "police",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "police",
-   "b": "taichi",
+   "a": "steppeArcher",
+   "b": "street",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "lordAshford",
-   "b": "police",
-   "wins": 2,
-   "losses": 14,
+   "a": "peasant",
+   "b": "steppeArcher",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "steppeArcher",
+   "b": "templar",
+   "wins": 0,
+   "losses": 16,
    "draws": 0
   },
   {
    "a": "commodus",
+   "b": "mingGun",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "commodus",
+   "b": "mandukhai",
+   "wins": 9,
+   "losses": 7,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "commodus",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "commodus",
+   "b": "kanabo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "bat",
+   "b": "police",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "footBow",
+   "b": "police",
+   "wins": 11,
+   "losses": 5,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "police",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "police",
+   "b": "steppeArcher",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "guanYu",
+   "b": "wuxia",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "wokou",
+   "b": "wuxia",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "peasant",
+   "b": "wuxia",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "riot",
+   "b": "wuxia",
+   "wins": 3,
+   "losses": 12,
+   "draws": 1
+  },
+  {
+   "a": "janissary",
+   "b": "tosei",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "janissary",
+   "b": "lordAshford",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "janissary",
+   "b": "knife",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "janissary",
+   "b": "mix",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "janissary",
    "b": "ronin",
-   "wins": 8,
-   "losses": 8,
+   "wins": 7,
+   "losses": 9,
    "draws": 0
   },
   {
@@ -4456,91 +4596,98 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "ronin",
-   "b": "vocPikeman",
-   "wins": 1,
-   "losses": 15,
+   "a": "centurion",
+   "b": "ronin",
+   "wins": 13,
+   "losses": 3,
    "draws": 0
   },
   {
-   "a": "janissaryGun",
+   "a": "ladyAshford",
    "b": "ronin",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "azapArcher",
+   "b": "knife",
    "wins": 14,
    "losses": 2,
    "draws": 0
   },
   {
-   "a": "janissary",
-   "b": "taichi",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "janissary",
+   "a": "azapArcher",
    "b": "vocMusketeer",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "janissary",
-   "b": "peasant",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "janissary",
-   "b": "mandukhai",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "commodus",
-   "b": "wuxia",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "commodus",
-   "b": "tametomo",
    "wins": 6,
    "losses": 10,
    "draws": 0
   },
   {
-   "a": "arquebus",
-   "b": "commodus",
+   "a": "azapArcher",
+   "b": "taichi",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "azapArcher",
+   "b": "mandukhai",
+   "wins": 8,
+   "losses": 8,
+   "draws": 0
+  },
+  {
+   "a": "retiarius",
+   "b": "steppeArcher",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "retiarius",
    "wins": 15,
    "losses": 1,
    "draws": 0
   },
   {
-   "a": "commodus",
+   "a": "guanYu",
+   "b": "retiarius",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "arquebus",
+   "b": "retiarius",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "azapSpear",
    "b": "specialForces",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "secutor",
-   "b": "steppeArcher",
-   "wins": 7,
-   "losses": 9,
+   "a": "azapSpear",
+   "b": "secutor",
+   "wins": 3,
+   "losses": 13,
    "draws": 0
   },
   {
-   "a": "ironPagoda",
-   "b": "steppeArcher",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
+   "a": "azapSpear",
+   "b": "ironPagoda",
+   "wins": 0,
+   "losses": 15,
+   "draws": 1
   },
   {
-   "a": "steppeArcher",
+   "a": "azapSpear",
    "b": "steppeShield",
    "wins": 3,
    "losses": 13,
@@ -4548,189 +4695,105 @@ export const RATINGS = {
   },
   {
    "a": "arquebus",
-   "b": "steppeArcher",
-   "wins": 11,
-   "losses": 5,
+   "b": "boxer",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
-   "a": "retiarius",
-   "b": "shaolin",
+   "a": "boxer",
+   "b": "muayThai",
    "wins": 12,
    "losses": 4,
    "draws": 0
   },
   {
-   "a": "mingEliteGun",
-   "b": "retiarius",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "oyoroi",
-   "b": "retiarius",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "janissary",
-   "b": "retiarius",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "mingDao",
-   "b": "naginata",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "joan",
-   "b": "mingDao",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "mingDao",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "mingDao",
-   "b": "odachi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
    "a": "boxer",
-   "b": "naginata",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "boxer",
-   "b": "tosei",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "boxer",
-   "b": "kanabo",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "boxer",
-   "b": "teppo",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
-   "b": "esen",
-   "wins": 1,
-   "losses": 15,
+   "b": "mingEliteGun",
+   "wins": 4,
+   "losses": 12,
    "draws": 0
   },
   {
    "a": "archer",
-   "b": "azapSpear",
-   "wins": 16,
-   "losses": 0,
+   "b": "boxer",
+   "wins": 14,
+   "losses": 2,
    "draws": 0
   },
   {
-   "a": "azapSpear",
-   "b": "footSpear",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "azapSpear",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "retiarius",
-   "wins": 9,
-   "losses": 7,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "joan",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "baton",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "esen",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "guanYu",
+   "a": "naginata",
    "b": "wokou",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "hanCrossbow",
+   "a": "ironPagoda",
    "b": "wokou",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "odachi",
+   "b": "wokou",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "tosei",
+   "b": "wokou",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "mingDao",
    "wins": 13,
    "losses": 3,
    "draws": 0
   },
   {
-   "a": "commodus",
-   "b": "wokou",
-   "wins": 14,
-   "losses": 2,
+   "a": "mingDao",
+   "b": "mingGuandao",
+   "wins": 0,
+   "losses": 16,
    "draws": 0
   },
   {
    "a": "mingDao",
-   "b": "wokou",
-   "wins": 7,
-   "losses": 9,
+   "b": "pistol",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "esen",
+   "b": "mingDao",
+   "wins": 16,
+   "losses": 0,
    "draws": 0
   },
   {
    "a": "brawler",
-   "b": "knife",
-   "wins": 14,
-   "losses": 2,
+   "b": "scissor",
+   "wins": 0,
+   "losses": 16,
    "draws": 0
   },
   {
    "a": "brawler",
-   "b": "vocPikeman",
+   "b": "oyoroi",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "brawler",
+   "b": "footSpear",
    "wins": 0,
    "losses": 16,
    "draws": 0
@@ -4743,318 +4806,45 @@ export const RATINGS = {
    "draws": 0
   },
   {
-   "a": "brawler",
-   "b": "wokou",
-   "wins": 7,
-   "losses": 9,
+   "a": "azapArcher",
+   "b": "peasant",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
-   "a": "azapSpear",
-   "b": "taekwondo",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "kheshig",
-   "b": "taekwondo",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "steppeArcher",
-   "b": "taekwondo",
+   "a": "mandukhai",
+   "b": "peasant",
    "wins": 12,
    "losses": 4,
    "draws": 0
   },
   {
-   "a": "maximus",
-   "b": "taekwondo",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "mexica",
-   "b": "mix",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "mix",
-   "b": "police",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
-   "b": "mix",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "arquebus",
-   "b": "mix",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "hanCrossbow",
-   "b": "kickboxer",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "kickboxer",
-   "b": "odachi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "kickboxer",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "boxer",
-   "b": "kickboxer",
-   "wins": 12,
-   "losses": 3,
-   "draws": 1
-  },
-  {
-   "a": "lordAshford",
-   "b": "unskilled",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "secutor",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "steppeLancer",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "mandukhai",
-   "wins": 3,
-   "losses": 13,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "lorarius",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "lorarius",
-   "b": "retiarius",
-   "wins": 2,
-   "losses": 13,
-   "draws": 1
-  },
-  {
-   "a": "lorarius",
-   "b": "mingEliteGun",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruSpear",
-   "b": "lorarius",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "policeBaton",
-   "b": "shaolin",
-   "wins": 1,
-   "losses": 15,
-   "draws": 0
-  },
-  {
-   "a": "shaolin",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "lordAshford",
-   "b": "shaolin",
-   "wins": 5,
-   "losses": 11,
-   "draws": 0
-  },
-  {
-   "a": "shaolin",
-   "b": "wokou",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "knife",
-   "b": "odachi",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "knife",
-   "b": "specialForces",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "ashigaruBow",
-   "b": "knife",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "knife",
-   "b": "steppeArcher",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "hoplomachus",
-   "b": "muayThai",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "muayThai",
-   "b": "unskilled",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "muayThai",
-   "b": "steppeShield",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "muayThai",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "bat",
-   "b": "joan",
-   "wins": 12,
-   "losses": 4,
-   "draws": 0
-  },
-  {
-   "a": "bat",
-   "b": "legionary",
-   "wins": 2,
-   "losses": 14,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
-   "b": "bat",
-   "wins": 8,
-   "losses": 8,
-   "draws": 0
-  },
-  {
-   "a": "bat",
-   "b": "taichi",
+   "a": "baton",
+   "b": "peasant",
    "wins": 11,
    "losses": 5,
    "draws": 0
   },
   {
-   "a": "mandukhai",
-   "b": "taichi",
-   "wins": 16,
-   "losses": 0,
+   "a": "esen",
+   "b": "peasant",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
-   "a": "footSpear",
-   "b": "taichi",
-   "wins": 16,
-   "losses": 0,
+   "a": "mingSpear",
+   "b": "tametomo",
+   "wins": 3,
+   "losses": 13,
    "draws": 0
   },
   {
-   "a": "mingDao",
-   "b": "taichi",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "centurion",
-   "b": "taichi",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "archer",
-   "b": "sumo",
-   "wins": 14,
-   "losses": 2,
-   "draws": 0
-  },
-  {
-   "a": "azapArcher",
-   "b": "sumo",
-   "wins": 10,
-   "losses": 6,
-   "draws": 0
-  },
-  {
-   "a": "janissaryGun",
-   "b": "sumo",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "arquebusier",
-   "b": "sumo",
-   "wins": 13,
-   "losses": 3,
+   "a": "hanCrossbow",
+   "b": "mingSpear",
+   "wins": 15,
+   "losses": 1,
    "draws": 0
   },
   {
@@ -5066,160 +4856,426 @@ export const RATINGS = {
   },
   {
    "a": "mingSpear",
-   "b": "pistol",
-   "wins": 0,
-   "losses": 16,
+   "b": "retiarius",
+   "wins": 13,
+   "losses": 3,
    "draws": 0
   },
   {
-   "a": "mingSpear",
-   "b": "wuxia",
-   "wins": 6,
-   "losses": 10,
+   "a": "bat",
+   "b": "lordAshford",
+   "wins": 8,
+   "losses": 8,
    "draws": 0
   },
   {
-   "a": "mingSpear",
-   "b": "wokou",
-   "wins": 7,
-   "losses": 9,
-   "draws": 0
-  },
-  {
-   "a": "hammer",
-   "b": "peasant",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "knife",
-   "b": "peasant",
+   "a": "centurion",
+   "b": "lordAshford",
    "wins": 9,
    "losses": 7,
    "draws": 0
   },
   {
-   "a": "peasant",
-   "b": "shaolin",
-   "wins": 8,
-   "losses": 6,
-   "draws": 2
+   "a": "ashigaruBow",
+   "b": "lordAshford",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
   },
   {
-   "a": "peasant",
-   "b": "steppeArcher",
+   "a": "lordAshford",
+   "b": "mingDao",
+   "wins": 4,
+   "losses": 12,
+   "draws": 0
+  },
+  {
+   "a": "boxer",
+   "b": "mix",
+   "wins": 12,
+   "losses": 3,
+   "draws": 1
+  },
+  {
+   "a": "mix",
+   "b": "scissor",
    "wins": 1,
    "losses": 15,
    "draws": 0
   },
   {
-   "a": "street",
-   "b": "tametomo",
+   "a": "mix",
+   "b": "ronin",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "gaziAlp",
-   "b": "street",
+   "a": "maximus",
+   "b": "mix",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "hammer",
-   "b": "street",
+   "a": "janissaryGun",
+   "b": "kickboxer",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "commodus",
+   "b": "kickboxer",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "boxer",
+   "b": "kickboxer",
+   "wins": 12,
+   "losses": 3,
+   "draws": 1
+  },
+  {
+   "a": "arquebus",
+   "b": "kickboxer",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "hanCrossbow",
+   "b": "muayThai",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
    "a": "muayThai",
-   "b": "street",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "azapSpear",
-   "b": "policeBaton",
-   "wins": 13,
-   "losses": 3,
-   "draws": 0
-  },
-  {
-   "a": "ironPagoda",
-   "b": "policeBaton",
-   "wins": 16,
-   "losses": 0,
-   "draws": 0
-  },
-  {
-   "a": "footSpear",
-   "b": "policeBaton",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "policeBaton",
-   "b": "secutor",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "mingCrossbow",
-   "b": "muayThai",
-   "wins": 1,
-   "losses": 14,
-   "draws": 1
-  },
-  {
-   "a": "mingCrossbow",
-   "b": "mix",
-   "wins": 0,
-   "losses": 16,
-   "draws": 0
-  },
-  {
-   "a": "joan",
-   "b": "mingCrossbow",
-   "wins": 15,
-   "losses": 1,
-   "draws": 0
-  },
-  {
-   "a": "mingCrossbow",
    "b": "odachi",
    "wins": 0,
    "losses": 16,
    "draws": 0
   },
   {
-   "a": "sipahi",
+   "a": "hidalgo",
+   "b": "muayThai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "ironPagoda",
+   "b": "muayThai",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "bat",
+   "b": "joan",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "azapSpear",
+   "b": "bat",
+   "wins": 6,
+   "losses": 10,
+   "draws": 0
+  },
+  {
+   "a": "bat",
+   "b": "unskilled",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "bat",
+   "b": "secutor",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "murmillo",
+   "b": "shaolin",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "shaolin",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "shaolin",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "azapArcher",
+   "b": "shaolin",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "mingEliteGun",
+   "b": "taekwondo",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruSpear",
+   "b": "taekwondo",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "mingCrossbow",
+   "b": "taekwondo",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "specialForces",
+   "b": "taekwondo",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "knife",
+   "b": "mix",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "knife",
+   "b": "mingDao",
+   "wins": 5,
+   "losses": 11,
+   "draws": 0
+  },
+  {
+   "a": "knife",
+   "b": "odachi",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "knife",
+   "b": "specialForces",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "ashigaruBow",
+   "b": "sumo",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "ronin",
+   "b": "sumo",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "hidalgo",
+   "b": "sumo",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "mingSpear",
+   "b": "sumo",
+   "wins": 10,
+   "losses": 6,
+   "draws": 0
+  },
+  {
+   "a": "lorarius",
+   "b": "unskilled",
+   "wins": 1,
+   "losses": 0,
+   "draws": 15
+  },
+  {
+   "a": "lorarius",
+   "b": "steppeShield",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "lorarius",
+   "b": "thraex",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "joan",
+   "b": "lorarius",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "gaziAlp",
+   "b": "taichi",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "boxer",
+   "b": "taichi",
+   "wins": 15,
+   "losses": 1,
+   "draws": 0
+  },
+  {
+   "a": "knife",
+   "b": "taichi",
+   "wins": 13,
+   "losses": 3,
+   "draws": 0
+  },
+  {
+   "a": "mandukhai",
+   "b": "taichi",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "footSpear",
+   "b": "street",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "retiarius",
+   "b": "street",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "oyoroi",
+   "b": "street",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "street",
+   "b": "wokou",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "arquebusier",
+   "b": "mingCrossbow",
+   "wins": 12,
+   "losses": 4,
+   "draws": 0
+  },
+  {
+   "a": "mingCrossbow",
+   "b": "wuxia",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "mingCrossbow",
+   "b": "teppo",
+   "wins": 3,
+   "losses": 13,
+   "draws": 0
+  },
+  {
+   "a": "mingCrossbow",
+   "b": "steppeArcher",
+   "wins": 1,
+   "losses": 15,
+   "draws": 0
+  },
+  {
+   "a": "mingDao",
+   "b": "policeBaton",
+   "wins": 14,
+   "losses": 2,
+   "draws": 0
+  },
+  {
+   "a": "hammer",
+   "b": "policeBaton",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "bat",
+   "b": "policeBaton",
+   "wins": 16,
+   "losses": 0,
+   "draws": 0
+  },
+  {
+   "a": "policeBaton",
+   "b": "vocPikeman",
+   "wins": 0,
+   "losses": 16,
+   "draws": 0
+  },
+  {
+   "a": "muayThai",
    "b": "unskilled",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "janissary",
+   "a": "ronin",
    "b": "unskilled",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "swatShotgun",
+   "a": "guanYu",
    "b": "unskilled",
    "wins": 16,
    "losses": 0,
    "draws": 0
   },
   {
-   "a": "kheshig",
+   "a": "legionary",
    "b": "unskilled",
    "wins": 16,
    "losses": 0,
