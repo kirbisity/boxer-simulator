@@ -56,6 +56,9 @@ export const ADAMS = {
   misfire: 0.03,
   reloadSeconds: 40,
   rounds: 5,
+  // Loaded at the front of the cylinder, chamber by chamber, the rammer lever
+  // under the barrel pressing each ball home (the reload pose: physics weaponIntent).
+  cylinder: true,
 };
 
 // A whip: the Roman flagellum as the arena's lorarii used it to drive men on
