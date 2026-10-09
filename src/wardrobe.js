@@ -396,6 +396,14 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       brow.position.set(1.18 * r, 0.28 * r, 0);
       brow.rotation.y = 0;
       group.add(barrel, crown, nasal, brow);
+      // The mail coif under it, from inside its rim down over the neck to the shoulders (`coif`: its colour).
+      if (head.coif) {
+        const rim = (-0.15 + tall * 0.25 - (2.1 + tall) / 2) * r;
+        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.3 * r, 0.75 * r, 20, 1, true), surface(new THREE.Color(head.coif).getHex(), { roughness: 0.9 }));
+        coif.material.side = THREE.DoubleSide;
+        coif.position.y = rim - 0.22 * r;
+        group.add(coif);
+      }
       // Breaths: rows of holes punched in the lower face, either side of the nasal.
       if (head.breaths) {
         const holes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04 * r, 0.06 * r, 0.06 * r), dark, 36);
@@ -1277,44 +1285,68 @@ function buildKabuto(group, head, r, steel, color) {
     cord.position.y = lame.position.y - 0.13 * r;
     group.add(lame, cord);
   }
-  // The early great helmets' fukigaeshi: big wings turned back from the front
-  // of the neck guard either side of the face, flaring out and back like ear
-  // guards, faced with stencilled leather, a gilt edge and a gilt rosette.
+  // The early great helmets' fukigaeshi: the top tiers' front ends turned
+  // back into big wings either side of the face. Each is hinged on the neck
+  // guard's front edge and folded out and back, so it lies along the side of
+  // the head facing forward and out (about 45°), bowed a little, outside the
+  // tiers behind it; faced with stencilled leather, gilt-edged, a gilt rosette.
   if (head.greatWings) {
     const facing = surface(new THREE.Color(head.leather ?? '#5a4430').getHex(), { roughness: 0.8 });
     facing.side = THREE.DoubleSide;
     const rim = metal(steel, head.gold ?? 0xd6a743);
-    const wing = new THREE.Shape();
-    const w = 1.7 * r;
-    const h = 1.35 * r;
-    // A broad wing, its outer corners rounded, narrowing where it turns back from the neck guard.
-    wing.moveTo(0, -h * 0.35);
-    wing.lineTo(w * 0.85, -h * 0.5);
-    wing.quadraticCurveTo(w, -h * 0.5, w, -h * 0.3);
-    wing.lineTo(w, h * 0.35);
-    wing.quadraticCurveTo(w, h * 0.5, w * 0.85, h * 0.5);
-    wing.lineTo(0, h * 0.42);
-    wing.closePath();
+    const size = head.fukigaeshi ?? 1;
+    // The shikoro's open front edge (cylinder angle 0.18π on the left), from
+    // just under the bowl's rim down to the foot of the third tier.
+    const edgeX = Math.sin(Math.PI * 0.18);
+    const edgeZ = Math.cos(Math.PI * 0.18);
+    const hingeTop = { radius: 1.28 * r, y: 0.05 * r };
+    const hingeFoot = { radius: 1.2 * r + 2 * (0.18 + flare) * r + (0.2 + flare) * r + 0.1 * r, y: -0.68 * r };
+    const width = 0.95 * r * size;
+    const bow = 0.12 * r;
+    const across = 10;
+    const tall = 6;
     for (const side of [1, -1]) {
-      const holder = new THREE.Group();
-      // At the front of the neck guard beside the cheek, turned out and back (about y), leaning back a little.
-      // Hinged at the front edge of the neck guard and turned forward and out, clear of its tiers behind.
-      holder.position.set(0.82 * r, -0.18 * r, side * 1.0 * r);
-      holder.rotation.set(0, side * 0.6, 0);
-      const face = new THREE.Mesh(new THREE.ShapeGeometry(wing, 6), facing);
-      // The shape lies in x–y; turned so it stands out to the side (+z for the left wing), its face forward.
-      face.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-      face.scale.x = 1;
-      const edge = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(wing.getPoints(18).map((p) => new THREE.Vector3(p.x, p.y, 0)), true), 36, 0.05 * r, 5, true), rim);
-      edge.rotation.copy(face.rotation);
-      const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * r, 0.2 * r, 0.06 * r, 14), rim);
-      rosette.rotation.x = Math.PI / 2;
-      const rosetteHolder = new THREE.Group();
-      rosetteHolder.rotation.copy(face.rotation);
-      rosette.position.set(w * 0.62, 0, 0.03 * r);
-      rosetteHolder.add(rosette);
-      holder.add(face, edge, rosetteHolder);
-      group.add(holder);
+      const hinge = (share) => {
+        const radius = hingeTop.radius + (hingeFoot.radius - hingeTop.radius) * share;
+        return new THREE.Vector3(edgeX * radius, hingeTop.y + (hingeFoot.y - hingeTop.y) * share, side * edgeZ * radius);
+      };
+      // Folded back 45° from facing forward: it runs back and out, its face forward and out.
+      const back = new THREE.Vector3(-Math.SQRT1_2, 0, side * Math.SQRT1_2);
+      const outward = new THREE.Vector3(Math.SQRT1_2, 0, side * Math.SQRT1_2);
+      // A point on the wing: `along` from the hinge (0) to its outer edge (1),
+      // `down` from its top (0) to its foot (1); the outer corners rounded.
+      const at = (along, down) => {
+        const corner = Math.max(0, (along - 0.7) / 0.3);
+        const round = 1 - Math.sqrt(Math.max(0, 1 - corner * corner));
+        const share = 0.5 + (down - 0.5) * (1 - 0.35 * round);
+        return hinge(share).addScaledVector(back, width * along).addScaledVector(outward, bow * Math.sin(Math.PI * along));
+      };
+      const positions = [];
+      for (let row = 0; row <= tall; row += 1) for (let column = 0; column <= across; column += 1) positions.push(...at(column / across, row / tall).toArray());
+      const indices = [];
+      for (let row = 0; row < tall; row += 1) {
+        for (let column = 0; column < across; column += 1) {
+          const a = row * (across + 1) + column;
+          indices.push(a, a + across + 1, a + 1, a + 1, a + across + 1, a + across + 2);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      const face = new THREE.Mesh(geometry, facing);
+      // Gilt round its edge: along the top, round the outer end, back along the foot (the hinge edge is the neck guard's).
+      const border = [];
+      for (let k = 0; k <= across; k += 1) border.push(at(k / across, 0));
+      for (let k = 1; k < tall; k += 1) border.push(at(1, k / tall));
+      for (let k = across; k >= 0; k -= 1) border.push(at(k / across, 1));
+      const edge = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(border), 48, 0.045 * r, 5, false), rim);
+      // The rosette on its face, a little out from it.
+      const middle = at(0.55, 0.5);
+      const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.17 * r, 0.17 * r, 0.05 * r, 14), rim);
+      rosette.position.copy(middle).addScaledVector(outward, 0.03 * r);
+      rosette.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), outward);
+      group.add(face, edge, rosette);
     }
   }
   // Fukigaeshi: the top lame turned back beside the face (larger on the early helmets).
@@ -1681,22 +1713,23 @@ function buildGladiatorHelm(group, head, r, steel, color) {
 
 /**
  * Soft cloth hung round a body part: a cloak from the shoulders, a skirt from
- * the waist. Split into `columns` round the hang (an arc of `arc` rad centred
- * on `centre`: angle 0 is +z, the left; behind is 3π/2), each a chain of
- * `links` pendulums (Dangle) carrying its band of the cloth, from radius `top`
- * at `y` to `hem` at `length` below. The chains sway, swing out on a turn,
- * fold over a stepping leg and settle; the body's colliders hold them off it.
- * `paint(column)` gives each band its material. Returns the Dangles, parents
- * before children (the order they are stepped in).
+ * the waist. One sheet of cloth over an arc of `arc` rad centred on `centre`
+ * (angle 0 is +z, the left; behind is 3π/2; a full turn closes it round),
+ * from radius `top` at `y` to `hem` at `length` below. Under it, `columns`
+ * chains of `links` pendulums (Dangle) round the hang: they sway, swing out
+ * on a turn, fold over a stepping leg and settle, and the body's colliders
+ * hold them off it. Neighbouring chains are held together (the cloth between
+ * them stretches little: `stretch`), and the sheet is drawn through all the
+ * chains' joints each frame, so it bends as one cloth. `paint(column)` gives
+ * each column's material. Returns what is stepped each frame, in order: the
+ * Dangles a level at a time, each level then held to its neighbours, and last
+ * the sheet itself. (Each has `update` and a `group`.)
  */
-export function softDrape(anchor, { columns, links, top, hem, y, length, centre, arc, sag = 0.2, damping = 0.7, collides = ['trunk', 'leg'], paint }) {
-  const dangles = [];
+export function softDrape(anchor, { columns, links, top, hem, y, length, centre, arc, sag = 0.2, damping = 0.7, collides = ['trunk', 'leg'], paint, stretch = 1.12 }) {
+  const closed = arc >= Math.PI * 2 - 1e-6;
   const link = length / links;
   const share = arc / columns;
-  // Each band a little wider than its share and a little longer than its link: no gaps between them as they swing.
-  const overlap = 1.18;
-  const lap = 0.12;
-  const radiusAt = (down) => top + (hem - top) * down;
+  const chains = [];
   for (let column = 0; column < columns; column += 1) {
     const theta = centre - arc / 2 + share * (column + 0.5);
     const out = [Math.sin(theta), Math.cos(theta)];
@@ -1704,29 +1737,172 @@ export function softDrape(anchor, { columns, links, top, hem, y, length, centre,
     let pivot = [out[0] * top, y, out[1] * top];
     // Hanging down and a little out, as cloth falls from round a body.
     let rest = [out[0] * (hem - top) / length, -1, out[1] * (hem - top) / length];
+    const chain = [];
     for (let index = 0; index < links; index += 1) {
-      const upper = radiusAt(index / links);
-      const lower = radiusAt((index + 1) / links);
-      const dangle = new Dangle(parent, pivot, rest, link, { sag, damping, collides });
-      const height = link * (1 + lap);
-      const geometry = new THREE.CylinderGeometry(upper, lower, height, 4, 2, true, theta - (share * overlap) / 2, share * overlap);
-      // Hung by the middle of its top edge (a little above the joint).
-      geometry.translate(-out[0] * upper, -height / 2 + link * lap, -out[1] * upper);
-      const band = new THREE.Mesh(geometry, paint(column));
-      // (Shadow and ink outline come with the rest of what swings: inkAll.)
-      dangle.group.add(band);
-      dangles.push(dangle);
+      const dangle = new Dangle(parent, pivot, rest, link, { sag, damping, collides, outward: [out[0], 0, out[1]] });
+      // At rest before it first moves (a figure that never steps, a design sheet's first frame).
+      dangle.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dangle.rest);
+      dangle.group.updateMatrix();
+      chain.push(dangle);
       parent = dangle.group;
-      pivot = [out[0] * (lower - upper), -link, out[1] * (lower - upper)];
+      pivot = [0, -link, 0];
       rest = [0, -1, 0];
     }
+    chains.push(chain);
   }
-  const depth = (dangle) => {
-    let count = 0;
-    for (let at = dangle.anchor; at && at !== anchor; at = at.parent) count += 1;
-    return count;
+  const steps = [];
+  const gap = new THREE.Vector3();
+  for (let index = 0; index < links; index += 1) {
+    const level = chains.map((chain) => chain[index]);
+    steps.push(...level);
+    // The cloth between two chains at this level, as hung, and how far it may stretch.
+    const limit = 2 * (top + ((hem - top) * (index + 1)) / links) * Math.sin(share / 2) * stretch;
+    steps.push({
+      group: new THREE.Group(),
+      update() {
+        if (level.some((dangle) => !dangle.tip)) return;
+        const scale = anchor.matrixWorld.getMaxScaleOnAxis();
+        for (let pass = 0; pass < 2; pass += 1) {
+          for (let column = 0; column < (closed ? columns : columns - 1); column += 1) {
+            const a = level[column].tip;
+            const b = level[(column + 1) % columns].tip;
+            gap.subVectors(b, a);
+            const distance = gap.length();
+            if (distance <= limit * scale) continue;
+            gap.multiplyScalar((distance - limit * scale) / (2 * distance));
+            a.add(gap);
+            b.sub(gap);
+          }
+        }
+        for (const dangle of level) {
+          const { pivot, length: reach } = dangle.placeInWorld();
+          dangle.aim(pivot, reach);
+        }
+      },
+    });
+  }
+  steps.push(clothSheet(anchor, chains, { closed, link, paint, folds: hem * 0.06 }));
+  return steps;
+}
+
+/** Uniform Catmull–Rom through p1 and p2, at t from p1 (0) to p2 (1). */
+function catmullRom(p0, p1, p2, p3, t, out) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  for (const axis of ['x', 'y', 'z']) {
+    out[axis] = 0.5 * (2 * p1[axis] + (p2[axis] - p0[axis]) * t + (2 * p0[axis] - 5 * p1[axis] + 4 * p2[axis] - p3[axis]) * t2 + (3 * p1[axis] - p0[axis] - 3 * p2[axis] + p3[axis]) * t3);
+  }
+  return out;
+}
+
+/**
+ * softDrape's cloth: a smooth sheet through the joints of its chains (the
+ * pivots across the top, each link's tip below), in the anchor's frame,
+ * redrawn each frame, falling in a fold to each column (`folds` deep at the
+ * hem). An open sheet runs half a column past its outer chains.
+ */
+function clothSheet(anchor, chains, { closed, link, paint, folds }) {
+  const columns = chains.length;
+  const links = chains[0].length;
+  const across = 6;
+  const down = 3;
+  const spans = closed ? columns : columns + 1;
+  const width = closed ? spans * across : spans * across + 1;
+  const height = links * down + 1;
+  const joints = Array.from({ length: links + 1 }, () => Array.from({ length: columns + 2 }, () => new THREE.Vector3()));
+  const rows = Array.from({ length: links + 1 }, () => Array.from({ length: width }, () => new THREE.Vector3()));
+  const positions = new Float32Array(width * height * 3);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  // Faces, sorted by their column's material (a two-coloured surcoat).
+  const materials = [];
+  const buckets = [];
+  const cell = (u) => {
+    const span = Math.floor(u / across);
+    const column = (closed ? span : span - 1) + ((u % across) < across / 2 ? 0 : 1);
+    return closed ? column % columns : Math.max(0, Math.min(columns - 1, column));
   };
-  return dangles.sort((a, b) => depth(a) - depth(b));
+  for (let u = 0; u < spans * across; u += 1) {
+    const material = paint(cell(u));
+    let slot = materials.indexOf(material);
+    if (slot < 0) {
+      slot = materials.push(material) - 1;
+      buckets.push([]);
+    }
+    const next = closed ? (u + 1) % width : u + 1;
+    for (let v = 0; v < height - 1; v += 1) {
+      const a = v * width + u;
+      const b = v * width + next;
+      const c = (v + 1) * width + u;
+      const d = (v + 1) * width + next;
+      buckets[slot].push(a, c, b, b, c, d);
+    }
+  }
+  const indices = [];
+  buckets.forEach((bucket, slot) => {
+    geometry.addGroup(indices.length, bucket.length, slot);
+    indices.push(...bucket);
+  });
+  geometry.setIndex(indices);
+  const sheet = new THREE.Mesh(geometry, materials.length > 1 ? materials : materials[0]);
+  // Its bounds move with the cloth every frame.
+  sheet.frustumCulled = false;
+  anchor.add(sheet);
+  const matrix = new THREE.Matrix4();
+  const foot = new THREE.Vector3();
+  const point = new THREE.Vector3();
+  const update = () => {
+    // Each chain's joints in the anchor's frame, from the links' own matrices.
+    chains.forEach((chain, column) => {
+      matrix.identity();
+      joints[0][column + 1].copy(chain[0].group.position);
+      chain.forEach((dangle, index) => {
+        matrix.multiply(dangle.group.matrix);
+        joints[index + 1][column + 1].copy(foot.set(0, -link, 0).applyMatrix4(matrix));
+      });
+    });
+    for (const row of joints) {
+      if (closed) {
+        row[0].copy(row[columns]);
+        row[columns + 1].copy(row[1]);
+      } else {
+        // Half a column past the outer chains, as the cloth runs on.
+        row[0].copy(row[1]).multiplyScalar(1.5).addScaledVector(row[2], -0.5);
+        row[columns + 1].copy(row[columns]).multiplyScalar(1.5).addScaledVector(row[columns - 1], -0.5);
+      }
+    }
+    // Across each row through its joints, then down each column of the sheet.
+    const at = (row, k) => row[Math.max(0, Math.min(columns + 1, k))];
+    joints.forEach((row, r) => {
+      for (let u = 0; u < width; u += 1) {
+        const span = Math.min(Math.floor(u / across), spans - 1);
+        const t = u / across - span;
+        if (closed) {
+          const k = (n) => row[((span + n) % columns) + 1];
+          catmullRom(k(-1 + columns), k(0), k(1), k(2), t, rows[r][u]);
+        } else {
+          catmullRom(at(row, span - 1), at(row, span), at(row, span + 1), at(row, span + 2), t, rows[r][u]);
+        }
+      }
+    });
+    for (let v = 0; v < height; v += 1) {
+      const span = Math.min(Math.floor(v / down), links - 1);
+      const t = v / down - span;
+      for (let u = 0; u < width; u += 1) {
+        const k = (n) => rows[Math.max(0, Math.min(links, span + n))][u];
+        catmullRom(k(-1), k(0), k(1), k(2), t, point);
+        // Folds: the hem is wider than where it hangs from, so the cloth falls in
+        // flutes, shallow at the top and deeper down (out from the anchor's axis).
+        const outward = Math.hypot(point.x, point.z) || 1;
+        const fold = folds * (0.25 + 0.75 * (v / (height - 1))) * Math.sin((u / across) * Math.PI * 2);
+        positions.set([point.x + (point.x / outward) * fold, point.y, point.z + (point.z / outward) * fold], (v * width + u) * 3);
+      }
+    }
+    geometry.attributes.position.needsUpdate = true;
+    geometry.computeVertexNormals();
+  };
+  update();
+  return { group: sheet, update };
 }
 
 /**
@@ -1813,12 +1989,12 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       const shoulders = body.lengths.shoulderSpan ?? 0.4 * scale;
       const cloth = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
       cloth.side = THREE.DoubleSide;
-      const drape = softDrape(collar, { columns: 7, links: 3, top: shoulders * 0.62, hem: shoulders * 1.2, y: 0.02 * scale, length, centre: Math.PI * 1.5, arc: Math.PI * 1.3, sag: 0.18, damping: 0.75, paint: () => cloth });
+      const drape = softDrape(collar, { columns: 9, links: 3, top: shoulders * 0.62, hem: shoulders * 1.2, y: 0.02 * scale, length, centre: Math.PI * 1.5, arc: Math.PI * 1.3, sag: 0.18, damping: 0.75, paint: () => cloth });
       if (extra.cross) {
-        // On the band at the left front of the shoulders (the last column's top link).
+        // On the cloth at the left front of the shoulders (riding on the last chain's top link).
         const red = surface(new THREE.Color(extra.cross).getHex(), { roughness: 0.8 });
         const topLink = drape.filter((dangle) => dangle.anchor === collar).at(-1);
-        const theta = Math.PI * 1.5 + Math.PI * 0.65 - (Math.PI * 1.3) / 14;
+        const theta = Math.PI * 1.5 + Math.PI * 0.65 - (Math.PI * 1.3) / 18;
         for (const [w, h] of [[0.035, 0.12], [0.1, 0.035]]) {
           const bar = new THREE.Mesh(new THREE.BoxGeometry(w * scale, h * scale, 0.004 * scale), red);
           bar.position.set(Math.sin(theta) * 0.01 * scale, -0.14 * scale, Math.cos(theta) * 0.01 * scale);
@@ -1828,18 +2004,18 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       }
       dangles.push(...drape);
     } else if (extra.kind === 'surcoatSkirt') {
-      // The surcoat below the belt, to the shins: soft, slit front and back
-      // for riding (two halves round the hips); halved in two colours for the
-      // Beauséant (`second`: the right side's).
+      // The surcoat below the belt, to the shins: one soft skirt round the
+      // hips; halved in two colours for the Beauséant (`second`: the right side's).
       const length = (extra.length ?? 0.75) * scale;
-      const waist = body.lengths.hipSpan * 1.05;
+      const waist = body.lengths.hipSpan * 0.95;
       const left = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
       left.side = THREE.DoubleSide;
       const right = extra.second ? surface(new THREE.Color(extra.second).getHex(), { roughness: 0.85 }) : left;
       if (right !== left) right.side = THREE.DoubleSide;
-      for (const [centre, material] of [[0, left], [Math.PI, right]]) {
-        dangles.push(...softDrape(hips, { columns: 4, links: 2, top: waist, hem: waist * 1.45, y: 0.08 * scale, length, centre, arc: Math.PI * 0.92, sag: 0.2, damping: 0.75, paint: () => material }));
-      }
+      const columns = 12;
+      // Columns from the back round by the right, the front and the left (angle 0 is the left, +z).
+      const paint = (column) => (Math.cos(-Math.PI + (Math.PI * 2 * (column + 0.5)) / columns) > 0 ? left : right);
+      dangles.push(...softDrape(hips, { columns, links: 3, top: waist, hem: waist * 1.55, y: 0.08 * scale, length, centre: 0, arc: Math.PI * 2, sag: 0.2, damping: 0.75, paint }));
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;

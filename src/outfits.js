@@ -83,7 +83,7 @@ function templarDesign(label, cloth, cloth2, heraldry) {
     top: { kind: 'longsleeve', color: '#4a4238' },
     bottom: { kind: 'tights', color: '#3a342c' },
     armor: { kind: 'templar', color: '#8d9097', mail: '#8d9097', cloth, cloth2, heraldry, leather: '#5a3a22' },
-    head: { kind: 'greatHelm', color: '#b8bec6', flatTop: true, breaths: true, crossCut: true },
+    head: { kind: 'greatHelm', color: '#b8bec6', flatTop: true, breaths: true, crossCut: true, coif: '#8d9097' },
     feet: { kind: 'compactBoot', color: '#4a2e1a' },
     // The mantle in the surcoat's cloth (white for a knight, black for a sergeant), the red cross on its left shoulder.
     extras: [
@@ -470,6 +470,8 @@ export const OUTFITS = {
     arrowproof: true,
     sidearm: 'dagger',
     extraMass: 0.4,
+    // The great helm: another man's head stays outside it in a clinch.
+    headBulk: 1.45,
     protection: {
       blunt: 0.3, cut: 0.88, pierce: 0.5, bullet: { head: 0.35, torso: 0.05, limb: 0 },
       regions: {
@@ -1330,6 +1332,8 @@ export function gearTraits(inputs) {
     cutProof: Boolean(spec.cutProof),
     // How often a blade finds a gap in the rigid armour (BLADES.gaps), when the kit has more (or fewer) than most.
     gaps: spec.gaps ?? null,
+    // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
+    headBulk: spec.headBulk ?? 1,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
     spare: spec.spare ?? null,

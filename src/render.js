@@ -2438,10 +2438,13 @@ function dangleColliders(fighterView, points) {
     { a: head, b: head, radius: body.lengths.headRadius * HEAD_SCALE * 1.02 },
     { a: pelvis, b: top, radius: trunkRadius, part: 'trunk' },
     { a: v(points[P.lShoulder]), b: v(points[P.rShoulder]), radius: body.segments.lUpperArm.skinRadius * 1.25 * cloth, part: 'shoulders' },
-    // The upper arms and thighs: a hung shoulder guard rides on the arm, a skirt panel or a cloak on the legs.
+    // The upper arms and the legs: a hung shoulder guard rides on the arm, a
+    // skirt panel or a cloak on the legs (the shins too, so a knee raised in a
+    // step pushes a long skirt forward instead of coming through it).
     ...['l', 'r'].flatMap((side) => [
       { a: v(points[P[`${side}Shoulder`]]), b: v(points[P[`${side}Elbow`]]), radius: body.segments[`${side}UpperArm`].skinRadius * 1.15 * cloth, part: 'arm' },
-      { a: v(points[P[`${side}Hip`]]), b: v(points[P[`${side}Knee`]]), radius: body.segments[`${side}Thigh`].skinRadius * 1.15, part: 'leg' },
+      { a: v(points[P[`${side}Hip`]]), b: v(points[P[`${side}Knee`]]), radius: body.segments[`${side}Thigh`].skinRadius * 1.15 * (dress.armor ? 1.1 : 1), part: 'leg' },
+      { a: v(points[P[`${side}Knee`]]), b: v(points[P[`${side}Foot`]]), radius: body.segments[`${side}Shank`].skinRadius * 1.3 * (dress.armor ? 1.1 : 1), part: 'leg' },
     ]),
   ];
 }

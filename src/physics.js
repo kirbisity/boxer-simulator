@@ -2785,7 +2785,8 @@ function pushApart(world, first, second) {
     const closest = closestBetween(a1, b1, a2, b2);
     const offset = vec.sub(closest.onFirst, closest.onSecond);
     const distance = vec.length(offset);
-    const reach = one.radius + two.radius;
+    // A head meets another in whatever it wears (a great helm is a can well wider than the head).
+    const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
     if (distance >= reach || distance < 1e-9) continue;
     const normal = vec.scale(offset, 1 / distance);
     if (firstKey === 'trunk' && secondKey === 'trunk') collideBodies(world, first, second, normal);
