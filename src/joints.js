@@ -63,6 +63,9 @@ export function limbTwist(axes, kind, side, root, middle, end) {
   const outward = side === 'l' ? axes.left : vec.scale(axes.left, -1);
   const angle = LIMB_BIND[kind];
   const bind = vec.add(vec.scale(axes.up, -Math.cos(angle)), vec.scale(outward, Math.sin(angle)));
+  // Swung up near the opposite of hanging, the swing from hanging has no
+  // one way round, and the turn no meaning.
+  if (vec.dot(u, bind) < -WORLD.limbTwist.reversed) return null;
   const flexes = kind === 'arm' ? axes.forward : vec.scale(axes.forward, -1);
   // Inward is positive whichever side: the sign a turn of the bent part
   // towards the midline makes about the hanging bone.

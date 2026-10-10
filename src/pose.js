@@ -160,7 +160,9 @@ export function desiredPose(body, intent = {}) {
     const pole = weaponArm ? [POSE.weaponPole[0], POSE.weaponPole[1], POSE.weaponPole[2] * (side === 'l' ? 1 : -1)] : [-0.4, -1, side === 'l' ? 0.5 : -0.5];
     // A weapon's hand also turns its forearm so the wrist can point the blade.
     const elbow = twoBoneIK(shoulder, target, L.upperArm, L.forearmToFist, pole);
-    out[P[`${side}Elbow`]] = swivelIntoRange(shoulderAxes, 'arm', side, shoulder, elbow, target, { bladeDir: weaponArm ? intent.bladeDir : null, margin });
+    // Not mid-stroke: a swing's own path through the arm is what drives the blade.
+    // A shield arm's forearm lies where the shield's straps put it.
+    out[P[`${side}Elbow`]] = (weaponArm && (intent.swinging || intent.windingUp)) || intent.shieldArm === side ? elbow : swivelIntoRange(shoulderAxes, 'arm', side, shoulder, elbow, target, { bladeDir: weaponArm ? intent.bladeDir : null, margin: weaponArm ? margin : 0 });
   }
   return out;
 }

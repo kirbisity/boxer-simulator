@@ -249,14 +249,17 @@ export function updateRise(fighter, dt) {
   const spec = WORLD.rise;
   rise.t += dt;
   rise.elapsed += dt;
-  fighter.motorScale = Math.min(1, spec.strengthFrom + rise.elapsed / WORLD.getUpSeconds);
+  // Hurt from the fall as he will be once up (physics.js: recovering), the muscles coming back as he goes.
+  const hurt = fighter.hurt > 0 && fighter.hurtFor ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
+  fighter.motorScale = Math.min(1, spec.strengthFrom + rise.elapsed / WORLD.getUpSeconds) * hurt;
   const seconds = rise.stage === 'stand' ? spec.seconds.stand : rise.seconds ?? spec.seconds[rise.stage];
   rise.seconds = seconds;
   if (rise.t < seconds) return null;
   const wanted = rise.stage === 'stand' ? toWorld(fighter, fighter.desired[P.pelvis])[1] : rise.to?.[P.pelvis]?.[1] ?? 0;
   const there = pelvisHeight(fighter) >= wanted * (rise.stage === 'stand' ? spec.stood : spec.reached) || rise.stage === 'gather' || rise.stage === 'roll' || rise.stage === 'step';
   if (!there && rise.t < seconds + spec.patience) return null;
-  if (!there) return 'beaten';
+  // Long at it and up on his feet, if not quite straight, he is up.
+  if (!there) return rise.stage === 'stand' && pelvisHeight(fighter) >= wanted * spec.reached ? 'stood' : 'beaten';
   const current = rise.roll === null && rise.to ? rise.to : PARTICLES.map((_, index) => riseTarget(fighter, index).target);
   const next = (stage, to, roll = null) => {
     Object.assign(rise, { stage, t: 0, from: current, to, roll, seconds: stage === 'roll' ? spec.seconds.roll * Math.max(0.4, Math.abs(roll) / Math.PI) : spec.seconds[stage] });
@@ -304,7 +307,7 @@ export function supportLimit(fighter, acceleration) {
       support += kg * WORLD.gravity;
       continue;
     }
-    const strength = push.muscles.reduce((sum, [part, share]) => sum + force[part] * share, 0) * scale;
+    const strength = push.muscles.reduce((sum, [part, share]) => sum + force[part] * share, 0) * scale * (push.standing ? 1 : spec.pushShare);
     const root = point(fighter.x, push.root);
     const contact = point(fighter.x, index);
     const reach = vec.length(vec.sub(root, contact));
@@ -316,11 +319,12 @@ export function supportLimit(fighter, acceleration) {
   for (let index = 0; index < COUNT; index += 1) acceleration[index * 3 + 1] -= sag;
 }
 
-// What pushes through a part on the floor: the joint it pushes from, and the
-// muscles that do it (share of each particle's motor force).
+// What pushes through a part on the floor: the joint it pushes from, the
+// muscles that do it (share of each particle's motor force), and whether it
+// is a foot under a leg straightening as it stands (all of the leg's force).
 const PUSHES = Object.fromEntries(SIDES.flatMap(([side]) => [
   [P[`${side}Hand`], { root: P[`${side}Shoulder`], muscles: [[P[`${side}Hand`], 1], [P[`${side}Elbow`], 1]] }],
   [P[`${side}Elbow`], { root: P[`${side}Shoulder`], muscles: [[P[`${side}Elbow`], 1], [P[`${side}Shoulder`], 0.5]] }],
   [P[`${side}Knee`], { root: P[`${side}Hip`], muscles: [[P.pelvis, 0.5], [P[`${side}Hip`], 1]] }],
-  [P[`${side}Foot`], { root: P[`${side}Hip`], muscles: [[P.pelvis, 0.5], [P[`${side}Hip`], 1], [P[`${side}Knee`], 1]] }],
+  [P[`${side}Foot`], { root: P[`${side}Hip`], muscles: [[P.pelvis, 0.5], [P[`${side}Hip`], 1], [P[`${side}Knee`], 1]], standing: true }],
 ]));

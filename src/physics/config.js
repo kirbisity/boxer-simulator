@@ -157,16 +157,27 @@ export const WORLD = {
     arm: { low: { inward: 1.95, outward: 1.55 }, high: { inward: 2.8, outward: 2.6 }, lowAt: -0.8, highAt: 0.8 },
     leg: { low: { inward: 1.3, outward: 1.2 }, high: { inward: 1.3, outward: 1.2 }, lowAt: -0.8, highAt: 0.8 },
     softBand: 0.35,
+    // On his feet, his muscles hold a limb in range and the band where the
+    // ligaments resist is this narrow (rad): a swing goes as it is thrown.
+    standingBand: 0.05,
     // Of a turn out of range, the share taken off each substep (all of it, at
     // the limit, within a few substeps: a firm stop without ringing); past the
     // limit, turned back at this many rad/s per rad over, up to `restoreMax` rad/s.
     resistShare: 0.3,
     // Strain counts while the limb is still being wrenched out past its limit
-    // faster than this (m/s at the hand or foot), not while it lies there.
-    wrenchSpeed: 0.2,
+    // faster than this (m/s at the hand or foot: a wrench, not a body
+    // settling onto a folded limb), not while it lies there.
+    wrenchSpeed: 1,
+    // A turn breaks this much (rad) further past its limit than a hinge
+    // does (joint.breakAngle): the measured turn of a limb folded under a
+    // falling body reads up to ~1 rad past its limit without anything giving.
+    breakFurther: 0.8,
     restoreRate: 2,
     restoreMax: 0.6,
     from: 0.35,
+    // An upper bone pointing within ~45° of straight up from where it hangs
+    // (cos of that) has no defined turn: the swing from hanging is singular there.
+    reversed: 0.7,
     wristBack: 2.6,
   },
   // Footwork: a planted foot stays put until the stance has drifted this far
@@ -276,11 +287,15 @@ export const WORLD = {
   // the knees are `kneesBack` of his height behind where he will stand;
   // kneeling, the trunk leans `kneelLean` rad forward; standing from it, the
   // rear foot slides in to stay within `legReach` of the leg's length. A part within
-  // `contact` m of the floor is on it: the floor pushes back through it.
+  // `contact` m of the floor is on it: the floor pushes back through it,
+  // a hand or knee with at most `pushShare` of its limb's muscle force (the
+  // rest holds the limb's own joints: on hands and knees a man lifts about
+  // twice his weight, not the sum of every muscle's); a foot under a
+  // straightening leg with all of it.
   rise: {
     restSpeed: 0.3, restSeconds: 0.3, waitMost: 1.5, strengthFrom: 0.4,
     seconds: { gather: 0.3, roll: 0.5, push: 0.5, step: 0.35, kneel: 0.4, stand: 0.55 },
-    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03,
+    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03, pushShare: 0.6,
   },
   // Balance: pushed past these, a fighter goes over rather than stepping.
   // Speed of the hips (m/s) and their distance outside the feet, as a share

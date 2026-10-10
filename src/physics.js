@@ -428,6 +428,7 @@ function weaponIntent(world, fighter, intent) {
     // In a testudo the shield is the formation's: a wall before him or a roof over him.
     const pose = !blocking && fighter.shieldPose ? WORLD.shield[fighter.shieldPose] : null;
     intent.lHand = vec.scale(pose ?? (blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard), H);
+    intent.shieldArm = 'l';
   }
   // The net held out in the off hand, ready to throw.
   if (fighter.net?.held && style.netGuard && !fighter.shield) intent.lHand = vec.scale(style.netGuard, H);
@@ -520,6 +521,8 @@ function weaponIntent(world, fighter, intent) {
   intent.weaponReach = style.weaponGuard.reach ?? null;
   intent.polearmRear = weapon.spec.leadAhead && !oneHanded ? main : null;
   intent.windingUp = punch?.spec.path === 'blade' && (punch.load > 0 || punch.t < punch.spec.windup);
+  // Swinging through, the arm goes as the stroke throws it (pose.js).
+  intent.swinging = punch?.spec.path === 'blade' && !intent.windingUp && punch.t <= punch.spec.extendUntil;
 }
 
 /**
@@ -1852,9 +1855,17 @@ function updateTimers(world, fighter, dt) {
     }
   } else if (fighter.state === 'rising') {
     const stage = fighter.rise?.stage;
-    const result = fighter.rise ? updateRise(fighter, dt) : 'stood';
-    // Standing up from his knees, his feet are where the kneel put them.
-    if (fighter.rise?.stage === 'stand' && stage !== 'stand') plantFeet(fighter);
+    let result = fighter.rise ? updateRise(fighter, dt) : 'stood';
+    if (fighter.rise?.stage === 'stand' && stage !== 'stand') {
+      // Standing up from his knees, his feet are where the kneel put them.
+      plantFeet(fighter);
+      // Held, he stands only if his legs drive up harder than the weight
+      // the men on him bear down with; then no hold from the floor keeps him.
+      const holders = pinnedBy(world, fighter);
+      const bearing = holders.reduce((sum, holder) => sum + WORLD.pin.weightShare * holder.body.massKg * WORLD.gravity, 0);
+      if (holders.length && fighter.body.motorForce[P.pelvis] * fighter.motorScale < bearing) result = 'beaten';
+      else for (const holder of holders) holder.pin = null;
+    }
     // Held down, if the hold kept his trunk low he did not get up; nor did
     // he if his limbs could not lift him. He sinks back and tries again in a moment.
     if (result === 'beaten' || (result === 'stood' && pinnedBy(world, fighter).length && neckLow(fighter))) {
@@ -1929,6 +1940,7 @@ const accelerations = new Float64Array(PARTICLES.length * 3);
 function integrate(fighter, h, time) {
   const fatigue = 0.55 + 0.45 * fighter.stamina;
   const alive = fighter.state === 'up' || fighter.state === 'rising';
+  const rising = fighter.state === 'rising';
   const damping = Math.exp(-h * (alive ? WORLD.damping.up : WORLD.damping.down));
   // A hand's health is the same for both its particles: once per side.
   const hands = { l: fatigue * handHealth(fighter, 'l'), r: fatigue * handHealth(fighter, 'r') };
@@ -1959,16 +1971,22 @@ function integrate(fighter, h, time) {
       acceleration = vec.add(acceleration, vec.scale(want, limit));
     }
     for (let axis = 0; axis < 3; axis += 1) accelerations[base + axis] = acceleration[axis];
+    // Each part moves as soon as it is driven (the next one's target reads
+    // it); getting up, all wait for what the floor allows them together.
+    if (!rising) moveParticle(fighter, index, h, damping);
   }
+  if (!rising) return;
   // Getting up, only the floor lifts him.
-  if (fighter.state === 'rising') supportLimit(fighter, accelerations);
-  for (let index = 0; index < PARTICLES.length; index += 1) {
-    const base = index * 3;
-    for (let axis = 0; axis < 3; axis += 1) {
-      fighter.v[base + axis] = (fighter.v[base + axis] + accelerations[base + axis] * h) * damping;
-      fighter.prev[base + axis] = fighter.x[base + axis];
-      fighter.x[base + axis] += fighter.v[base + axis] * h;
-    }
+  supportLimit(fighter, accelerations);
+  for (let index = 0; index < PARTICLES.length; index += 1) moveParticle(fighter, index, h, damping);
+}
+
+function moveParticle(fighter, index, h, damping) {
+  const base = index * 3;
+  for (let axis = 0; axis < 3; axis += 1) {
+    fighter.v[base + axis] = (fighter.v[base + axis] + accelerations[base + axis] * h) * damping;
+    fighter.prev[base + axis] = fighter.x[base + axis];
+    fighter.x[base + axis] += fighter.v[base + axis] * h;
   }
 }
 
@@ -2247,6 +2265,8 @@ const TWISTING = ['l', 'r'].flatMap((side) => [
  */
 function resistLimbTwist(world, fighter) {
   const spec = WORLD.limbTwist;
+  // On his feet his muscles keep a limb in range; only its limit's ligaments resist.
+  const band = fighter.state === 'up' ? spec.standingBand : spec.softBand;
   const pelvis = point(fighter.x, P.pelvis);
   const neck = point(fighter.x, P.neck);
   const axesFor = {
@@ -2260,7 +2280,7 @@ function resistLimbTwist(world, fighter) {
     const b = point(fighter.x, limb.middle);
     const c = point(fighter.x, limb.end);
     const turn = limbTwist(axes, limb.kind, limb.side, a, b, c);
-    const excess = twistExcess(limb.kind, turn, spec.softBand);
+    const excess = twistExcess(limb.kind, turn, band);
     if (!excess) continue;
     const over = Math.abs(excess);
     const axis = vec.normalize(vec.sub(b, a));
@@ -2279,11 +2299,11 @@ function resistLimbTwist(world, fighter) {
     // A limb only just bent has little twist to speak of: no step as it
     // straightens, and no strain from a turn the bend barely defines.
     const bent = Math.min(1, (turn.bend - spec.from) / spec.from);
-    if (over > spec.softBand && bent >= 1 && -spin > spec.wrenchSpeed && strain(world, fighter, limb.joint, over - spec.softBand)) continue;
-    let push = Math.max(0, -spin) * Math.min(1, over / spec.softBand) * bent * spec.resistShare;
+    if (over > band && bent >= 1 && -spin > spec.wrenchSpeed && strain(world, fighter, limb.joint, over - band - spec.breakFurther)) continue;
+    let push = Math.max(0, -spin) * Math.min(1, over / band) * bent * spec.resistShare;
     // Past the limit and clear of the floor, eased back at a gentle speed (set, not added).
-    if (over > spec.softBand && c[1] > fighter.radius[limb.end] + 0.01) {
-      push = Math.max(push, Math.min(spec.restoreMax, spec.restoreRate * (over - spec.softBand)) * bent * radius - spin);
+    if (over > band && c[1] > fighter.radius[limb.end] + 0.01) {
+      push = Math.max(push, Math.min(spec.restoreMax, spec.restoreRate * (over - band)) * bent * radius - spin);
     }
     if (push < 1e-6) continue;
     // On the lower bone alone: the turn's other half is a torque about the

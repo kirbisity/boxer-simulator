@@ -68,6 +68,8 @@ export function startPin(world, fighter) {
   const target = opponentFor(world, fighter) ?? world.fighters.find((other) => other.corner !== fighter.corner && other.state !== 'out');
   if (!target || fighter.state !== 'up' || fighter.punch || fighter.pin) return false;
   if (target.state !== 'down' && target.state !== 'rising') return false;
+  // Up off his knee and standing, he is no longer a man on the floor.
+  if (target.rise?.stage === 'stand') return false;
   if (pinnedBy(world, target).length >= WORLD.pin.pinners) return false;
   fighter.pin = { target: target.id, locked: { l: false, r: false } };
   fighter.clinch = null;
