@@ -1014,6 +1014,29 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(fuller, cross, pommel, cylinder(0.014, 0.015, -spec.handle, 0.012, leather));
       break;
     }
+    case 'sayf': {
+      // A broad straight blade, two-edged, a wide fuller to near the point; a
+      // short cross with its langets running up the blade's flats; a grip
+      // bound in leather with a gilt ferrule and a cap pommel.
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.052, 0.008, 0.12), steel));
+      const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.003, spec.length * 0.7, 0.016), dark);
+      fuller.position.set(0.0045, 0.04 + spec.length * 0.35, 0);
+      fuller.userData.blade = true;
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.016, 0.15), steel);
+      cross.position.y = 0.02;
+      group.add(fuller, cross);
+      for (const side of [1, -1]) {
+        const langet = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.05, 0.02), steel);
+        langet.position.set(side * 0.006, 0.05, 0);
+        group.add(langet);
+      }
+      const ferrule = cylinder(0.016, 0.016, 0.0, 0.012, brass);
+      const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.6), brass);
+      pommel.rotation.x = Math.PI;
+      pommel.position.y = -spec.handle + 0.004;
+      group.add(ferrule, pommel, cylinder(0.014, 0.015, -spec.handle, 0.0, leather));
+      break;
+    }
     case 'clava': {
       // Hercules's club: a length of wood swelling to its head, the stubs of
       // branches cut off along it, its butt bound with a cord.
@@ -1098,6 +1121,43 @@ export function buildShieldMesh(spec, envMap) {
     for (const mesh of group.children) {
       mesh.castShadow = true;
       if (mesh === face) mesh.add(outlineFor(mesh, 0.003));
+    }
+    return group;
+  }
+  if (spec.look === 'turs') {
+    // A shallow dome of boards faced with dark leather, a rawhide rim, a ring
+    // of iron studs, a gilt band painted round, and a high iron boss.
+    const leatherFace = surface(0x3a2416, { roughness: 0.75 });
+    leatherFace.side = THREE.DoubleSide;
+    const dome = 0.3;
+    const sphereRadius = spec.radius / Math.sin(dome);
+    const face = new THREE.Mesh(new THREE.SphereGeometry(sphereRadius, 32, 8, 0, Math.PI * 2, 0, dome), leatherFace);
+    face.rotation.x = Math.PI / 2;
+    face.position.z = -sphereRadius * Math.cos(dome);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(spec.radius, 0.014, 8, 40), surface(0x8a6a44, { roughness: 0.7 }));
+    const iron = steelMaterial(envMap, { vertexColors: false, color: 0x6a6e76, roughness: 0.4 });
+    const gilt = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
+    // Heights of the dome above the rim's plane at a radius, so what lies on it sits on it.
+    const onDome = (radius) => Math.sqrt(sphereRadius ** 2 - radius ** 2) - sphereRadius * Math.cos(dome);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(spec.radius * 0.6, 0.008, 6, 40), gilt);
+    band.position.z = onDome(spec.radius * 0.6);
+    const boss = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.07, 16), iron);
+    boss.rotation.x = Math.PI / 2;
+    boss.position.z = onDome(0) + 0.03;
+    const bossFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.085, 0.012, 20), iron);
+    bossFoot.rotation.x = Math.PI / 2;
+    bossFoot.position.z = onDome(0);
+    group.add(face, rim, band, boss, bossFoot);
+    for (let stud = 0; stud < 12; stud += 1) {
+      const angle = (stud / 12) * Math.PI * 2;
+      const at = spec.radius * 0.84;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.011, 6, 4), iron);
+      head.position.set(Math.cos(angle) * at, Math.sin(angle) * at, onDome(at));
+      group.add(head);
+    }
+    for (const mesh of [face, rim, boss]) {
+      mesh.castShadow = true;
+      mesh.add(outlineFor(mesh, 0.003));
     }
     return group;
   }

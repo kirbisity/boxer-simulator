@@ -917,6 +917,26 @@ export const STYLES = {
     plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
     pressure: 0.25,
   },
+  // Saladin on foot: the straight sayf and the round turs, a horseman's way
+  // with them (long cuts swung from the shoulder, the point when an opening
+  // shows), patient behind the shield and quick to answer.
+  saladin: {
+    label: 'Sayf and turs', weapon: 'sayf', shield: 'turs', fallback: 'mix',
+    cadence: { work: 1.05, move: 0.9, burst: 0.55, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.07, width: 1.15, lean: 0.1, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.62, -0.12], dir: [1, 0.3, 0.05] },
+    shieldGuard: [0.3, 0.72, 0.05],
+    idle: { bounce: 0.25, sway: 0.5, rock: 0.3 },
+    attacks: { gladiusCut: 0.55, gladiusThrust: 0.3, forehand: 0.15 },
+    combos: { 'gladiusCut gladiusThrust': 0.5, 'gladiusCut gladiusCut': 0.5 },
+    comboChance: 0.35,
+    tempo: 1.25,
+    defences: { shieldBlock: 0.65, stepBack: 0.35 },
+    defendChance: 0.64,
+    headMovement: 0.08,
+    plans: { counter: 1.3, pressure: 1, outboxer: 0.9, brawler: 0.4 },
+    pressure: 0.15,
+  },
   yatagan: {
     label: 'Yatagan', weapon: 'yatagan', fallback: 'mix',
     cadence: { work: 1.3, move: 0.8, burst: 0.7, mobility: 0.5 },

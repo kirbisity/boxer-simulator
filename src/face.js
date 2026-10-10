@@ -403,7 +403,9 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // Hair down the back hangs from the upper back, not the head (render.js hangs it: hairCurtain).
   const curtains = [];
   const dangles = buildHair(group, look, r, shape, hairMaterial, female, curtains);
-  buildFacialHair(group, look, r, shape, hairMaterial, dangles);
+  // The beard in a material of its own: an open-faced helmet hides the hair, not the beard.
+  const beardMaterial = hairMaterial.clone();
+  buildFacialHair(group, look, r, shape, beardMaterial, dangles);
 
   // ---- Expression -------------------------------------------------------
   const face = { blinkIn: 1 + Math.random() * 3, blinking: 0, lid: 0, mouth: 0, brow: 0, flush: 0, gaze: [0, 0], gazeIn: 1 };
@@ -462,10 +464,11 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     skinMaterial.color.copy(baseSkin).lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare);
   }
 
-  // Under a helmet: no hair, and no locks swinging through the steel.
-  function hideHair() {
+  // Under a helmet: no hair, and no locks swinging through the steel; the
+  // beard too, unless the helmet leaves the face open (`beard`).
+  function hideHair({ beard = false } = {}) {
     group.traverse((object) => {
-      if (object.isMesh && object.material === hairMaterial) object.visible = false;
+      if (object.isMesh && (object.material === hairMaterial || (!beard && object.material === beardMaterial))) object.visible = false;
     });
     dangles.length = 0;
   }

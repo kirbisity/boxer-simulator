@@ -19,6 +19,30 @@ test('each faction\'s legend of an earlier age: the Iron Pagoda, the kheshig, th
   }
 });
 
+test('Saladin: the sultanates\' flagship (Ayyubids and Ottomans under one faction), in no level; mail under a padded coat turns an edge best, a point fairly, a blow least', async () => {
+  const { FACTIONS, OUTFITS, gearTraits } = await import('../src/outfits.js');
+  const { WARRIORS } = await import('../src/roster.js');
+  assert.equal(of('saladin'), 'ottomans');
+  assert.equal(FACTIONS.ottomans.label, 'Sultanates');
+  assert.match(FACTIONS.ottomans.blurb, /Ayyubid/);
+  const flagships = WARRIORS.filter((warrior) => warrior.faction === 'ottomans' && warrior.flagship);
+  assert.deepEqual(flagships.map((warrior) => warrior.key), ['saladin']);
+  const { protection } = OUTFITS.saladin;
+  assert.ok(protection.cut > protection.pierce && protection.pierce > protection.blunt);
+  // Padding over the mail takes more of a blow than the Templar's bare mail and surcoat, less than plate.
+  assert.ok(protection.blunt > OUTFITS.templar.protection.blunt && protection.blunt < OUTFITS.knight.protection.blunt);
+  assert.ok(gearTraits(PRESETS.saladin).helmet.mass > 2);
+  assert.equal(STYLES.saladin.weapon, 'sayf');
+  assert.equal(STYLES.saladin.shield, 'turs');
+  assert.ok(SHIELDS.turs.mass > SHIELDS.kalkan.mass, 'boards and leather outweigh wicker');
+  const { SCENARIOS } = await import('../src/scenarios.js');
+  for (const [key, level] of Object.entries(SCENARIOS)) {
+    if (!level.cast) continue;
+    const cast = level.cast(seededRandom(1));
+    for (const fighter of [...cast.red, ...cast.blue]) assert.notEqual(fighter.outfit?.kind, 'saladin', key);
+  }
+});
+
 test('the steppe and the Ottomans run from the unarmoured to the heavily armoured', () => {
   assert.deepEqual(['steppeBow', 'saberShield', 'maceShield', 'saber'].map(of), ['steppe', 'steppe', 'steppe', 'steppe']);
   assert.deepEqual(['azap', 'yatagan', 'sipahi'].map(of), ['ottomans', 'ottomans', 'ottomans']);

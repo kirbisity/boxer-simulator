@@ -646,6 +646,28 @@ export const RATINGS = {
     "monk": 8.429
    }
   },
+  "saladin": {
+   "title": "Saladin",
+   "type": "saladin|saladin",
+   "records": {
+    "maximus": {
+     "wins": 21,
+     "losses": 11,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 31,
+     "losses": 1,
+     "draws": 0
+    }
+   },
+   "score": 200,
+   "provisional": 200,
+   "kd": {
+    "maximus": 1.87,
+    "monk": 21
+   }
+  },
   "gaziAlp": {
    "title": "Turgut Alp",
    "type": "saberShield|gaziAlp",
@@ -1954,6 +1976,7 @@ export const RATINGS = {
   "thraex|thraex": 192,
   "centurion|centurion": 139,
   "saberShield|gaziAlp": 493,
+  "saladin|saladin": 200,
   "legionary|legionary": 323,
   "swordShield|mingBrigandine": 335,
   "matchlock|mingBrigandine": 210,

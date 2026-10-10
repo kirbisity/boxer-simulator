@@ -2098,7 +2098,7 @@ function detailedView(view, fighter, simple) {
   const headgear = buildHeadgear(body, dress.head, garmentColors, plainSteel, corner);
   if (headgear) {
     headView.group.add(headgear.group);
-    if (headgear.hidesHair) headView.hideHair();
+    if (headgear.hidesHair) headView.hideHair({ beard: headgear.showsBeard });
   }
   const dangles = [];
   // Headgear: worn on the head, and a loose copy for when it is knocked off.
