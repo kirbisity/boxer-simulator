@@ -128,7 +128,7 @@ function mingBrigandineDesign(label, cloth, iron, look = {}) {
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
 // `look`: the same protection drawn as scale armour (`kind: 'mingScale'`).
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // The steppe man's kit: his deel (the robe over all) and the robe under it
 // at the hem (`trim`), his hat or helmet, the tall black boots (gutal).
@@ -900,8 +900,8 @@ export const OUTFITS = {
     ],
   },
   // ---- The steppe, 14th–17th centuries: Mongol, Oirat and Timurid warriors,
-  // from the unarmoured archer in his deel to the iron-clad lancer; and the
-  // legend of the 1200s, Chinggis Khan's guard. Fought on foot here. ----
+  // the archer in his deel, the man in leather lamellar; and the Khan's own
+  // guard in gilt iron scale. Fought on foot here. ----
   steppeLight: {
     faction: 'steppe',
     label: 'Steppe — deel and fur hat', movement: 'good', fists: 'bare',
@@ -923,15 +923,17 @@ export const OUTFITS = {
     protection: { blunt: 0.3, cut: 0.6, pierce: 0.45, bullet: { head: 0, torso: 0.15, limb: 0.05 }, regions: { head: { blunt: 0.15, cut: 0.25, pierce: 0.1 } } },
     courage: 0.2,
     designs: [
-      steppeDesign('Gilt leather, maroon deel', { kind: 'mongolLamellar', color: '#a8874a', lace: '#2a1a12', fur: '#8a6438' }, '#6a1f2a', '#c41e22', { kind: 'loovuuz', color: '#b3161b' }),
-      steppeDesign('Brown leather, blue deel', { kind: 'mongolLamellar', color: '#6a4a2a', lace: '#1c1410', fur: '#5a4030' }, '#2f4a7a', '#7a2418', { kind: 'loovuuz', color: '#b3161b', fur: 0x4a3420 }),
-      steppeDesign('Black leather, red deel', { kind: 'mongolLamellar', color: '#2a2420', lace: '#8a1418', fur: '#3a3028' }, '#8a1418', '#24201c', { kind: 'loovuuz', color: '#d6a743' }),
+      steppeDesign('Gilt leather, maroon deel', { kind: 'mongolLamellar', matte: true, color: '#8a5a2a', lace: '#2a1a12', fur: '#8a6438' }, '#6a1f2a', '#c41e22', { kind: 'loovuuz', color: '#b3161b' }),
+      steppeDesign('Brown leather, blue deel', { kind: 'mongolLamellar', matte: true, color: '#6a4a2a', lace: '#1c1410', fur: '#5a4030' }, '#2f4a7a', '#7a2418', { kind: 'loovuuz', color: '#b3161b', fur: 0x4a3420 }),
+      steppeDesign('Black leather, red deel', { kind: 'mongolLamellar', matte: true, color: '#2a2420', lace: '#8a1418', fur: '#3a3028' }, '#8a1418', '#24201c', { kind: 'loovuuz', color: '#d6a743' }),
     ],
   },
-  // Iron lamellar to the knees, iron bracers, a helmet with a lamellar aventail.
-  steppeHeavy: {
-    faction: 'steppe',
-    label: 'Steppe — iron lamellar', movement: 'good', fists: 'bare',
+  // Ming heavy cavalry of the north (14th–16th centuries), armed and cut as
+  // their steppe enemies were: iron lamellar to the knees over the robe, a fur
+  // stole, iron bracers, a tall helmet with a lamellar aventail.
+  mingIronLamellar: {
+    faction: 'chinese',
+    label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
     extraMass: 0.32,
@@ -1349,7 +1351,7 @@ export const FACTIONS = {
   japanese: { label: 'Japanese', glyph: '⛩️', standard: { weapon: 'nobori', worn: true }, blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
   mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
   chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
-  steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, leather and iron lamellar, sabre, mace and composite bow; the Khan\'s kheshig of legend.' },
+  steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale.' },
   // Keyed `ottomans` (saves and levels name it); it holds the Turkish and Kurdish sultanates both, Saladin's Ayyubids of the 1100s and the Ottomans after them.
   ottomans: { label: 'Sultanates', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'Saladin\'s Ayyubids and the Ottoman Turks: Saladin in kazaghand and turbaned helmet; the Sultan\'s azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },

@@ -337,17 +337,25 @@ export const ARMOR_KINDS = {
     skirt: [0.92, 0.55, 1.32, { lamellae: 30, pointDown: true, gaps: [0, Math.PI / 2, -Math.PI / 2], gapWidth: 0.06 }],
     upperArm: [-0.26, 0.6, 1.52, { lamellae: 16, pointDown: true }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
-  // The elite in scale armour: overlapping scales from the collar to the
-  // knee, the mirror over the heart, the collar and arm guards as before.
+  // The elite in scale armour: overlapping iron scales from the collar to
+  // below the knee, hung point down, the steel mirror over the heart, the
+  // collar, scaled shoulder guards over segmented steel arm guards.
   mingScale: {
-    trunk: [-0.06, 0.97, 1.22, { scales: true, mirror: [0.62, 0.15, 'gold'] }], skirt: [0.88, 0.6, 1.34, { scales: true }], collar: 'steel',
-    upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }]],
+    skirt: [0.95, 0.6, 1.34, { lamellae: 30, pointDown: true, edge: 'gold', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], collar: 'steel',
+    upperArm: [[-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], [-0.26, 0.62, 1.6, { lamellae: 16, pointDown: true, edge: 'gold' }]], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+    mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
   },
-  // Ming elite: the long brigandine coat to the knee with a round steel
-  // mirror over the heart, a steel throat collar, segmented steel arm guards.
+  // Ming elite: the long brigandine coat to below the knee, its plates
+  // riveted close (gilt heads, more and smaller than a soldier's), bound in a
+  // dark edge, split for riding; a round steel mirror (huxinjing) over the
+  // heart, a steel throat collar, studded shoulder guards over segmented
+  // steel arm guards, a buckled belt.
   mingElite: {
-    trunk: [-0.06, 0.97, 1.22, { rivets: 4, base: 'cloth', mirror: [0.62, 0.15, 'steel'] }], skirt: [0.88, 0.6, 1.34, { rivets: 4, base: 'cloth' }], collar: 'steel',
-    upperArm: [-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+    trunk: [[-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', opening: 0.012, mirror: [0.62, 0.15, 'steel'] }], [0.14, 0.24, 1.32, { buckle: 'gold', base: 'leather' }]],
+    skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], collar: 'steel',
+    upperArm: [[-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], [-0.26, 0.62, 1.6, { studded: 14, base: 'cloth', edge: 'cloth2' }]], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+    mirrors: [[0.62, 0, 0.3, 1.36, 'steel']],
   },
   // Ō-yoroi: its box, skirt panels and shoulder boards are rigid pieces of
   // their own (oyoroi.js); on the body only what is worn on the limbs: the
@@ -396,12 +404,14 @@ export const ARMOR_KINDS = {
     trunk: [[-0.06, 0.99, 1.1, { panel: [0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], [0.18, 0.3, 1.2, { buckle: 'gold', base: 'leather' }]],
     skirt: [[1.32, 0.6, 1.16, 'cloth2'], [1.18, 0.55, 1.2, 'cloth']],
   },
+  // Leather lamellar: broad plates of hardened, lacquered hide, fewer and
+  // larger than iron ones, laced in rows.
   mongolLamellar: {
-    trunk: [[-0.06, 0.99, 1.1, 'cloth'], [-0.02, 0.92, 1.24, { lamellae: 30, gaps: [0], gapWidth: 0.05 }], [0.8, 1.02, 1.42, 'fur'], [0.16, 0.3, 1.34, { buckle: 'gold', base: 'leather' }]],
-    skirt: [[1.36, 0.62, 1.16, 'cloth2'], [1.22, 0.56, 1.2, 'cloth'], [0.86, 0.6, 1.32, { lamellae: 28, gaps: [0, Math.PI], gapWidth: 0.09 }]],
-    upperArm: [-0.3, 0.4, 1.55, { lamellae: 16 }], forearm: [0.12, -0.02, 1.34, { lamellae: 14 }],
+    trunk: [[-0.06, 0.99, 1.1, 'cloth'], [-0.02, 0.92, 1.24, { lamellae: 20, gaps: [0], gapWidth: 0.06 }], [0.8, 1.02, 1.42, 'fur'], [0.16, 0.3, 1.34, { buckle: 'gold', base: 'leather' }]],
+    skirt: [[1.36, 0.62, 1.16, 'cloth2'], [1.22, 0.56, 1.2, 'cloth'], [0.86, 0.6, 1.32, { lamellae: 18, gaps: [0, Math.PI], gapWidth: 0.1 }]],
+    upperArm: [-0.3, 0.4, 1.55, { lamellae: 10 }], forearm: [0.12, -0.02, 1.34, { lamellae: 9 }],
   },
-  // The iron-clad man: the same cut in iron, the lamellar skirt to the knee.
+  // The iron-clad horseman (the Ming's, cut as the steppe's): the same in small iron plates, the skirt to the knee.
   mongolIron: {
     trunk: [[-0.06, 0.99, 1.1, 'cloth'], [-0.04, 0.96, 1.24, { lamellae: 32, gaps: [0], gapWidth: 0.04 }], [0.84, 1.02, 1.4, 'fur'], [0.16, 0.3, 1.34, { buckle: 'gold', base: 'leather' }]],
     skirt: [[1.36, 0.62, 1.16, 'cloth2'], [1.24, 0.56, 1.2, 'cloth'], [1.04, 0.62, 1.32, { lamellae: 30, gaps: [0, Math.PI], gapWidth: 0.07 }]], collar: 'steel',
@@ -906,8 +916,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
       return;
     }
+    // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
-    loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+    loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
     // A brigandine's rivet heads, each its own small square (not in a crowd).
     if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, bones ?? (() => null));
   };
@@ -1072,6 +1083,21 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       const place = t * 20;
       const tall = size * 0.6;
       addPatch(mesh, rings, [[place - tall, angle - size, out], [place - tall, angle + size, out], [place + tall, angle + size, out], [place + tall, angle - size, out]], role, abdomen);
+    }
+  }
+  // Round plates on the trunk ([t, angle, radius rad, out, role]): a mirror
+  // over the heart, a gilt rim round it (painted on the cloth in a crowd).
+  if (kit?.mirrors && !lowDetail) {
+    const rings = trunkRings(0, 1, 20);
+    for (const [t, angle, radius, out, role] of kit.mirrors) {
+      // Its height along the trunk as its width round it (places are twentieths of the trunk).
+      const tall = radius * 9;
+      const disc = (scale, lift) => Array.from({ length: 16 }, (_, side) => {
+        const turn = (side / 16) * Math.PI * 2;
+        return [t * 20 + Math.sin(turn) * tall * scale, angle + Math.cos(turn) * radius * scale, out + lift];
+      });
+      addPatch(mesh, rings, disc(1.12, 0), 'gold', abdomen);
+      addPatch(mesh, rings, disc(1, 0.01), role, abdomen);
     }
   }
   if (kit?.tassels && !lowDetail) {

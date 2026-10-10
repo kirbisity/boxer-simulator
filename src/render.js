@@ -1901,7 +1901,9 @@ function paintBody(mesh, body, look, corner) {
       colors.set([color.r, color.g, color.b], vertex * 3);
     });
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
-    mesh.steelMask = mesh.regions.map((region) => region === 'steel' || region === 'steel2' || region === 'gold' || region === 'mail' || region === 'mail2');
+    // Armour of leather or horn (`armor.matte`) is drawn as the body is, not as metal; its gilt still shines.
+    const matte = Boolean(dress.armor?.matte);
+    mesh.steelMask = mesh.regions.map((region) => (!matte && (region === 'steel' || region === 'steel2')) || region === 'gold' || region === 'mail' || region === 'mail2');
     return colors;
   }
   const hipY = bindPoints[P.pelvis][1];

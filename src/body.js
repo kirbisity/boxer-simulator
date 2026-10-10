@@ -250,9 +250,9 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   kheshig: {
-    // The Khan's guard rode as heavy archers first: a quick volley, then in with the mace (his own, carried with the iron lamellar).
+    // The Khan's guard rode as heavy archers first: a quick volley, then in with the mace (his own, carried with the leather lamellar).
     name: 'Subutai', style: 'kheshigBow', sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 4300,
-    outfit: { kind: 'steppeHeavy', design: 0 }, accessories: [], sidearm: 'mace',
+    outfit: { kind: 'steppeMedium', design: 0 }, accessories: [], sidearm: 'mace',
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
@@ -303,7 +303,7 @@ export const PRESETS = {
   // the 1470s–90s; an Oirat archer and a lancer.
   maceShield: {
     name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 167, frame: 'large', age: 42, exercise: 0.6, calories: 4350,
-    outfit: { kind: 'steppeHeavy', design: 0 }, accessories: [],
+    outfit: { kind: 'steppeMedium', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   saber: {

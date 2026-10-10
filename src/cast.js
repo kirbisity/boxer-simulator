@@ -327,9 +327,9 @@ export function ottomanSoldier(random = Math.random, style = 'yatagan', rank = '
   return builtLike({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] }, PERIOD_BUILD.ottoman[rank], random);
 }
 
-/** A steppe warrior of the 1400s: an archer in his deel, a man in leather lamellar, an iron-clad lancer. */
+/** A steppe warrior of the 1400s: an archer in his deel, a man in leather lamellar (a heavier man in the same). */
 export function steppeWarrior(random = Math.random, style = 'steppeBow', rank = 'light') {
-  const kind = { light: 'steppeLight', medium: 'steppeMedium', heavy: 'steppeHeavy' }[rank];
+  const kind = { light: 'steppeLight', medium: 'steppeMedium', heavy: 'steppeMedium' }[rank];
   const base = varyCharacter(rank === 'heavy' ? PRESETS.maceShield : rank === 'medium' ? PRESETS.saberShield : PRESETS.steppeBow, random, { sex: 'male' });
   const name = pickOne(['Batu', 'Bayar', 'Ganbold', 'Temür', 'Toghon', 'Bolad', 'Arslan', 'Esen', 'Sübe', 'Khasar', 'Jochi', 'Mönke'], random);
   return builtLike({ ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [] }, PERIOD_BUILD.steppe[rank], random);
