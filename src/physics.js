@@ -310,6 +310,8 @@ export function startPickup(world, fighter, debris) {
   const shield = debris.kind === 'shield';
   if (shield && fighter.shield) return false;
   if (fighter.state !== 'up' || (fighter.weapon?.held && !standard && !shield) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
+  // Stooping for a standard, he lets go of what is in his hands first: a two-handed grip would keep the hand from it.
+  if (standard && fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   fighter.pickup = { debris: debris.id, t: 0 };
   fighter.clinch = null;
   return true;

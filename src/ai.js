@@ -133,6 +133,9 @@ export const AI = {
   confidence: { closer: 0.15, pressure: 1.0, tempo: 0.45, defend: 0.45, heavy: 0.08, cadence: 0.5 },
   // Team fights: a fighter facing an opponent already taken on by this many
   // team-mates looks for another, all else near equal (m of extra distance each).
+  // Keeping to the man in front: every `every` s, a man of the other side `margin` m and `ratio` nearer than his own is taken instead;
+  // a shooter who hits him draws him only from within `shooterWithin` m.
+  retarget: { every: 0.3, margin: 1, ratio: 0.67, shooterWithin: 3 },
   crowdPenalty: 0.7,
   // Team-mates keep this far apart (m), and treat one within this far of
   // the line to their man as in the line of fire.
@@ -298,7 +301,8 @@ function takeUpStandard(world, fighter) {
     fighter.strafe = 0;
     return true;
   }
-  // A blow already on its way is finished first.
+  // A blow already on its way is finished first; a shot not yet loosed is given up (the bow or gun lowered) for the standard.
+  if (fighter.punch?.spec.path === 'aim' && !fighter.punch.fired) fighter.punch = null;
   if (fighter.punch) return false;
   const debris = side.lying;
   const distance = Math.hypot(debris.x[0] - fighter.x[P.pelvis * 3], debris.x[2] - fighter.x[P.pelvis * 3 + 2]);
@@ -497,7 +501,10 @@ function chooseFocus(world, fighter) {
     surge(fighter, event);
     if (event.kind !== 'landed' && event.kind !== 'blocked' && event.kind !== 'shot' && event.kind !== 'arrow') continue;
     feel(world, fighter, event);
-    if (event.defender === fighter.id && world.fighters[event.attacker]?.corner !== fighter.corner) {
+    // Hit from afar (a shot, an arrow): he turns on the shooter only if he is near; a man across the field is not chased through his line.
+    const shooter = world.fighters[event.attacker];
+    const far = (event.kind === 'shot' || event.kind === 'arrow') && shooter && Math.hypot(shooter.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], shooter.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) > AI.retarget.shooterWithin;
+    if (event.defender === fighter.id && shooter?.corner !== fighter.corner && !far) {
       hitBy = event.attacker;
       if (event.kind !== 'blocked') fighter.aiLastHit = event.time;
     }
@@ -509,7 +516,7 @@ function chooseFocus(world, fighter) {
     fighter.focus = hitBy;
     return world.fighters[hitBy];
   }
-  if (current && current.state === 'up' && !current.crawling) return current;
+  if (current && current.state === 'up' && !current.crawling && !closerAtHand(world, fighter, current)) return current;
   const standing = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up' && !other.crawling);
   if (!standing.length) {
     fighter.focus = undefined;
@@ -536,6 +543,27 @@ function chooseFocus(world, fighter) {
   if (next.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: next.id, effects: [] });
   fighter.focus = next.id;
   return next;
+}
+
+/**
+ * Whether a man of the other side stands clearly nearer than the one he is
+ * on (by `AI.retarget.margin` m and `ratio` of the distance), looked at every
+ * `every` s: then he takes the man in front of him rather than going through
+ * a line to reach his own. One man to fight: never.
+ */
+function closerAtHand(world, fighter, current) {
+  const spec = AI.retarget;
+  if (world.time < (fighter.aiRetargetAt ?? 0)) return false;
+  fighter.aiRetargetAt = world.time + spec.every;
+  const at = point(fighter.x, P.pelvis);
+  const away = (other) => Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
+  const mine = away(current);
+  for (const other of world.fighters) {
+    if (other === current || other.corner === fighter.corner || other.state !== 'up' || other.crawling) continue;
+    const distance = away(other);
+    if (distance < mine - spec.margin && distance < mine * spec.ratio) return true;
+  }
+  return false;
 }
 
 /**

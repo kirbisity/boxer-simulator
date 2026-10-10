@@ -60,7 +60,7 @@ const PYONGYANG_JAPANESE = {
 /** Blades and polearms first (the front ranks), bows and guns last. */
 // Where the bows and guns open a battle: in the front rows, shooting, the
 // blades and spears this far (m) behind them, to go through when it comes to hand strokes.
-const SHOOTERS_FRONT_GAP = 2.2;
+const SHOOTERS_FRONT_GAP = 4;
 
 function shootersBehind(warriors) {
   const shooter = (warrior) => (STYLES[warrior.style]?.ranged ? 1 : 0);
