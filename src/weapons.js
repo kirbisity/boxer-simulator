@@ -200,7 +200,7 @@ export const WEAPONS = {
   // The hoplomachus's hasta: held near its balance in one hand, long ahead
   // of the hand and a good way behind it; made to thrust.
   spear: {
-    label: 'Spear', hands: 'one', length: 1.3, strikeFrom: 0.9, handle: 0.6, mass: 1.6, balance: 0.18, radius: 0.016,
+    pointFrom: 0, label: 'Spear', hands: 'one', length: 1.3, strikeFrom: 0.9, handle: 0.6, mass: 1.6, balance: 0.18, radius: 0.016,
     harm: { thrust: { pierce: 1.3, cut: 0.1, blunt: 0.2 }, swing: { cut: 0.2, blunt: 0.6 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.5,
   },
@@ -222,7 +222,7 @@ export const WEAPONS = {
   // The war spear: a stout ash shaft and a long socketed iron head, ~2.3 kg;
   // its weight behind a narrow point drives the thrust deep.
   longSpear: {
-    label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
+    pointFrom: 0, label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
     harm: { thrust: { pierce: 1.5, blunt: 0.3, cut: 0.15 }, swing: { blunt: 0.65, cut: 0.2 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
   },
@@ -230,7 +230,7 @@ export const WEAPONS = {
   // with a cross blade (jūmonji) below the point. The side blades cut and
   // hook a little better; the slimmer head knocks a man about a little less.
   yari: {
-    label: 'Yari', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
+    pointFrom: 0, label: 'Yari', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
     harm: { thrust: { pierce: 1.5, blunt: 0.22, cut: 0.3 }, swing: { blunt: 0.5, cut: 0.4 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, grip: 0.5,
   },
@@ -238,7 +238,7 @@ export const WEAPONS = {
   // made to fight. Blunt tines that pierce poorly and knock a man about;
   // a farm tool held loosely, easily knocked from the hands.
   pitchfork: {
-    label: 'Pitchfork', hands: 'two', length: 1.6, strikeFrom: 1.3, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.017,
+    pointFrom: 0, label: 'Pitchfork', hands: 'two', length: 1.6, strikeFrom: 1.3, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.017,
     harm: { thrust: { pierce: 0.85, blunt: 0.45, cut: 0.03 }, swing: { blunt: 0.7, cut: 0.05 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3, grip: 0.3,
   },
@@ -366,7 +366,7 @@ export const WEAPONS = {
   },
   // The tepoztopilli: a broad wooden spearhead edged with obsidian, for cut and thrust.
   tepoztopilli: {
-    label: 'Tepoztopilli', hands: 'two', length: 1.5, strikeFrom: 1.15, handle: 0.4, spacing: 0.42, leadAhead: true, mass: 2.0, balance: 0.6, radius: 0.02, brittle: 0.7,
+    pointFrom: 0, label: 'Tepoztopilli', hands: 'two', length: 1.5, strikeFrom: 1.15, handle: 0.4, spacing: 0.42, leadAhead: true, mass: 2.0, balance: 0.6, radius: 0.02, brittle: 0.7,
     harm: { thrust: { pierce: 0.8, cut: 0.5, blunt: 0.25 }, swing: { cut: 1.1, blunt: 0.45 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
   },
@@ -878,7 +878,8 @@ export function harmMix(spec, mode, along, at) {
   const mix = { blunt: table.blunt ?? 0, cut: 0, pierce: 0 };
   const across = Math.sqrt(Math.max(0, 1 - along * along));
   if (mode === 'thrust') {
-    const pointFirst = at >= BLADES.pointShare && along > 0.5;
+    // A spear's whole head is its point (a leaf of sharp iron): driven along the shaft it goes in wherever on the head it meets him.
+    const pointFirst = at >= (spec.pointFrom ?? BLADES.pointShare) && along > 0.5;
     mix.pierce = pointFirst ? (table.pierce ?? 0) * along : 0;
     mix.cut = (table.cut ?? 0) * across ** BLADES.cutAlignmentPower;
     if (!pointFirst) mix.blunt = Math.max(mix.blunt, 0.3);
