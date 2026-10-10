@@ -2152,6 +2152,7 @@ function solveJointLimits(world, fighter, h) {
   twistLimit(fighter, trunkUp, limp ? WORLD.ragdoll.spineTwist : WORLD.spineTwist);
   // Getting up, a body still unfolding from the floor keeps all its limbs
   // out of its trunk as a limp one does.
+  if (limp) holdLimbTwist(fighter);
   // A limp body's limits reposition its parts; the bones they stretched are
   // set back the same way, or next substep's pull would hand the stretch
   // back as speed (limits that disagree pumped a lying body). Its limbs are
@@ -2365,6 +2366,39 @@ function resistLimbTwist(world, fighter) {
     // On the lower bone alone: the turn's other half is a torque about the
     // upper bone's own length, which its two ends do not feel.
     for (let axisIndex = 0; axisIndex < 3; axisIndex += 1) fighter.v[limb.end * 3 + axisIndex] += tangent[axisIndex] * push;
+  }
+}
+
+/**
+ * A limp limb left turned past its limit (a fall can wrench it there faster
+ * than resisting its spin can stop it) is turned back towards it about its
+ * upper bone, a little each substep (WORLD.limbTwist.limpHold): a
+ * repositioning like the other limits, the lower bone's length kept, so it
+ * puts no speed in. All at once, it swung feet into the trunk and fought it.
+ */
+function holdLimbTwist(fighter) {
+  const pelvis = point(fighter.x, P.pelvis);
+  const neck = point(fighter.x, P.neck);
+  const axesFor = {
+    arm: trunkAxes(pelvis, neck, point(fighter.x, P.lShoulder), point(fighter.x, P.rShoulder)),
+    leg: trunkAxes(pelvis, neck, point(fighter.x, P.lHip), point(fighter.x, P.rHip)),
+  };
+  for (const limb of TWISTING) {
+    const axes = axesFor[limb.kind];
+    if (!axes || fighter.broken.has(limb.joint)) continue;
+    const a = point(fighter.x, limb.root);
+    const b = point(fighter.x, limb.middle);
+    const c = point(fighter.x, limb.end);
+    const turn = limbTwist(axes, limb.kind, limb.side, a, b, c);
+    const excess = twistExcess(limb.kind, turn, 0);
+    if (!excess) continue;
+    const bent = Math.min(1, (turn.bend - WORLD.limbTwist.from) / WORLD.limbTwist.from);
+    const axis = vec.normalize(vec.sub(b, a));
+    const lower = vec.sub(c, b);
+    const probed = limbTwist(axes, limb.kind, limb.side, a, b, vec.add(b, turnAbout(lower, axis, 0.05)));
+    if (!probed) continue;
+    const back = -Math.sign(excess) * (Math.sign(Math.sin(probed.twist - turn.twist)) || 1);
+    correctJoint(fighter, limb.end, [], vec.sub(turnAbout(lower, axis, back * Math.min(WORLD.limbTwist.limpHold, Math.abs(excess)) * bent), lower));
   }
 }
 

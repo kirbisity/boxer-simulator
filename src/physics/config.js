@@ -165,6 +165,9 @@ export const WORLD = {
     // the limit, within a few substeps: a firm stop without ringing); past the
     // limit, turned back at this many rad/s per rad over, up to `restoreMax` rad/s.
     resistShare: 0.3,
+    // A limp limb left past its limit is turned back this far (rad) a
+    // substep (~1 rad/s, as a limb sags back): faster fought the trunk and floor.
+    limpHold: 0.002,
     // Strain counts while the limb is still being wrenched out past its limit
     // faster than this (m/s at the hand or foot: a wrench, not a body
     // settling onto a folded limb), not while it lies there.
