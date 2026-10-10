@@ -158,7 +158,8 @@ test('facing a longer reach or a blade, a fighter holds off and surges; even fig
   const outside = spacing('contender:boxing', 'contender:longsword', 2, 40);
   assert.ok(outside[0].surgesPerMinute > 4, `surges ${outside[0].surgesPerMinute}`);
   assert.ok(outside[0].inside < 0.7, `inside ${outside[0].inside}`);
-  assert.equal(outside[1].surgesPerMinute, 0, 'the sword does not surge at the fists');
+  // In his own style: disarmed in a fall and facing his own sword picked up, he rightly does.
+  assert.equal(outside[1].ownSurgesPerMinute, 0, 'the sword does not surge at the fists');
   const even = spacing('contender:boxing', 'contender:boxing', 1, 30);
   assert.equal(even[0].surgesPerMinute + even[1].surgesPerMinute, 0);
 });

@@ -796,7 +796,7 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   if (outreaching) return holdTheRange(world, fighter, opponent, distance, cadence, dt);
   const start = (name, length) => {
     phase = fighter.aiCadence = { name, t: 0, length, thrownAtStart: fighter.stats.thrown, burstLeft: 0 };
-    if (name === 'work' && wary) world.events.push({ time: world.time, kind: 'surge', fighter: fighter.id, effects: [] });
+    if (name === 'work' && wary) world.events.push({ time: world.time, kind: 'surge', fighter: fighter.id, style: fighter.style, effects: [] });
   };
   if (!phase) start('work', phaseLength(random, cadence.work));
   phase.t += dt;

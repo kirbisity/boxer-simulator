@@ -24,7 +24,8 @@ export const SPACING_PAIRINGS = [
 ];
 
 export function spacing(red, blue, bouts = 3, seconds = 60) {
-  const sides = [0, 1].map(() => ({ distance: 0, inside: 0, samples: 0, thrown: 0, surges: 0, minutes: 0, working: 0, burst: 0, attacks: 0, temperaments: [] }));
+  const starts = [fighterFor(red).style, fighterFor(blue).style];
+  const sides = [0, 1].map(() => ({ distance: 0, inside: 0, samples: 0, thrown: 0, surges: 0, ownSurges: 0, minutes: 0, working: 0, burst: 0, attacks: 0, temperaments: [] }));
   for (let bout = 0; bout < bouts; bout += 1) {
     const world = createWorld([fighterFor(red), fighterFor(blue)], { seed: 700 + bout });
     let elapsed = 0;
@@ -57,6 +58,8 @@ export function spacing(red, blue, bouts = 3, seconds = 60) {
     world.fighters.forEach((fighter, index) => {
       sides[index].thrown += fighter.stats.thrown;
       sides[index].surges += world.events.filter((event) => event.kind === 'surge' && event.fighter === fighter.id).length;
+      // Surges in the style he started in (a man who lost his weapon fights another way).
+      sides[index].ownSurges += world.events.filter((event) => event.kind === 'surge' && event.fighter === fighter.id && event.style === starts[index]).length;
       sides[index].minutes += elapsed / 60;
       if (fighter.temperament) sides[index].temperaments.push(fighter.temperament);
     });
@@ -66,6 +69,7 @@ export function spacing(red, blue, bouts = 3, seconds = 60) {
     inside: side.inside / Math.max(1, side.samples),
     attacksPerMinute: side.thrown / side.minutes,
     surgesPerMinute: side.surges / side.minutes,
+    ownSurgesPerMinute: side.ownSurges / side.minutes,
     attacksPerSurge: side.surges ? side.thrown / side.surges : 0,
     working: side.working / Math.max(1, side.samples),
     bursty: side.burst / Math.max(1, side.attacks),
