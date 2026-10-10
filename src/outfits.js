@@ -88,6 +88,24 @@ function templarDesign(label, cloth, cloth2, heraldry) {
   };
 }
 
+/**
+ * Saladin's design: the kazaghand's silk (`silk`) and its second colour
+ * (`trim`: the hem, the front edge and the sash), the gold of the tiraz bands
+ * and the plaque belt, the robe (qaba) that shows at the wrists, the turban
+ * wound round the helmet.
+ */
+function saladinDesign(label, { silk, trim, gold = '#c9a23a', robe, turban }) {
+  return {
+    label,
+    top: { kind: 'longsleeve', color: robe },
+    // Wide trousers (sarawil) of undyed cotton, tucked into the boots.
+    bottom: { kind: 'pants', color: '#cfc4a8' },
+    armor: { kind: 'kazaghand', color: '#8d9097', mail: '#8d9097', cloth: silk, cloth2: trim, gold, leather: '#3a2618' },
+    head: { kind: 'ayyubidHelm', color: '#9ea4ac', gold, turban, mail: '#7c8087', openFace: true },
+    feet: { kind: 'ridingBoot', color: '#5a3a22' },
+  };
+}
+
 function toseiDesign(label, steel, lace, crest, mask, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'pants', color: under }, armor: { kind: 'toseiDo', color: steel, lace, gold: '#d6a743' }, head: { kind: 'kabuto', color: steel, crest, mask, lace, gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } };
 }
@@ -985,6 +1003,46 @@ export const OUTFITS = {
       { label: 'Mail, red coat', top: { kind: 'longsleeve', color: '#7a1418' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#e8dcc0' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
     ],
   },
+  // Salah ad-Din Yusuf ibn Ayyub (1137–1193), as the Ayyubid and Syrian
+  // pictures of his century show a sultan armed: a mail hauberk (zardiyya)
+  // to the knee, over it the kazaghand (a coat of mail sewn between padded
+  // layers, faced with silk, its sleeves to the elbow with tiraz bands of
+  // gold), the emir's belt of gilt plaques (mintaqa) and a silk sash; a
+  // pointed iron helmet of riveted segments on a quilted cap, a mail
+  // aventail over the neck, a turban wound round its foot; riding boots. A
+  // legend of an earlier age (not in the levels): the faction's flagship.
+  // So: two layers of mail and the padding between them turn an edge well
+  // and a point fairly (rings part to it, the quilting holds it), and take
+  // more of a blow than bare mail, not much (it moves with the body); the
+  // head guarded by steel over quilting and the turban's wraps, the face
+  // open; the shins only in boot leather.
+  saladin: {
+    faction: 'ottomans',
+    // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
+    label: 'Saladin — kazaghand over mail, turbaned helmet', movement: 'good', fists: 'bare',
+    arrowproof: true,
+    // The horseman's mace (dabbus) at the saddle, the Ayyubid emir's second weapon.
+    sidearm: 'mace',
+    // Hauberk ~10 kg, kazaghand ~7 kg, helmet and aventail ~2.5 kg: ~0.3 of a 67 kg man.
+    extraMass: 0.3,
+    // The turban wound round the helmet: another man's head stays outside it in a clinch.
+    headBulk: 1.25,
+    protection: {
+      blunt: 0.4, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.3, limb: 0.15 },
+      regions: {
+        head: { blunt: 0.6, cut: 0.92, pierce: 0.75, deflects: true },
+        Shank: { blunt: 0.1, cut: 0.35, pierce: 0.15 },
+      },
+    },
+    courage: 0.4,
+    designs: [
+      // Saladin's own colour: the yellow of the Ayyubid banners.
+      saladinDesign('Ayyubid yellow', { silk: '#c8a23a', trim: '#8a1e1a', robe: '#e8dcc0', turban: '#f0ebe0' }),
+      // Black, the Abbasid caliph's colour, in which the caliph's robes of honour came to him.
+      saladinDesign('Abbasid black', { silk: '#1e1c1e', trim: '#c9a23a', robe: '#e8dcc0', turban: '#f0ebe0' }),
+      saladinDesign('Crimson and green', { silk: '#7e1a1e', trim: '#2f5a3a', robe: '#d8cfb8', turban: '#ece4d0' }),
+    ],
+  },
   // A Chinese martial artist's silk suit (tai chi, kung fu): loose jacket and
   // trousers, cloth shoes. No protection; it moves.
   kungfu: {
@@ -1269,7 +1327,8 @@ export const FACTIONS = {
   mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
   chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
   steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, leather and iron lamellar, sabre, mace and composite bow; the Khan\'s kheshig of legend.' },
-  ottomans: { label: 'Ottomans', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'The Sultan\'s army: azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
+  // Keyed `ottomans` (saves and levels name it); it holds the Turkish and Kurdish sultanates both, Saladin's Ayyubids of the 1100s and the Ottomans after them.
+  ottomans: { label: 'Sultanates', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'Saladin\'s Ayyubids and the Ottoman Turks: Saladin in kazaghand and turbaned helmet; the Sultan\'s azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
@@ -1339,6 +1398,9 @@ export const HELMETS = {
   // Steppe and Ottoman pointed bowls (the chichak with its brim and nasal).
   steppeHelm: { mass: 1.8, padding: 0.45, curve: 0.85 },
   chichak: { mass: 2.0, padding: 0.45, curve: 0.85 },
+  // The Ayyubid helmet: a pointed bowl of riveted segments (~1.6 kg) and its mail aventail (~0.8 kg) on a
+  // quilted cap, the turban's wraps round its foot padding it further; steel above the turban, cloth over the rest.
+  ayyubidHelm: { mass: 2.6, padding: 0.65, curve: 0.75 },
   // Ming: the brimmed iron hat of the brigandine man; the elite's tall bowl. Han: an iron lamellar cap (Linzi), lightly lined.
   mingHat: { mass: 1.4, padding: 0.35, curve: 0.7 },
   mingHelm: { mass: 2.0, padding: 0.45, curve: 0.85 },

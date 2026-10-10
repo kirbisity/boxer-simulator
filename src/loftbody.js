@@ -225,6 +225,22 @@ export const ARMOR_KINDS = {
     upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL], thigh: [-0.05, 1.04, 1.1, MAIL], knee: [0.84, 1.04, 1.32, 'steel'],
     shin: [[-0.12, 0.95, 1.1, MAIL], [0.05, 0.85, 1.22, 'steel']],
   },
+  // Saladin's kazaghand over his hauberk: the hauberk (zardiyya) to the knee
+  // and wrist, its mail showing below the coat's hem and sleeves; the
+  // kazaghand (mail between padded layers, faced with silk) to above the
+  // knee, its front edge and hem in the second colour, buttoned in gold, its
+  // sleeves to the elbow, tiraz bands of gold round the upper arms; a silk
+  // sash, its ends hanging at the left hip, under the emir's belt of gilt
+  // plaques (mintaqa).
+  kazaghand: {
+    trunk: [[-0.12, 1.02, 1.1, MAIL], [-0.1, 0.97, 1.24, 'cloth']], skirt: [[0.82, 0.42, 1.16, MAIL], [0.66, 0.5, 1.3, { edge: 'cloth2', base: 'cloth' }]],
+    // No collar: the helmet's aventail covers the neck, open at the face so the beard shows.
+    belt: [[-0.04, 0.12, 1.31, 'cloth2'], [0.0, 0.08, 1.36, { plaques: 12, base: 'leather' }]],
+    straps: [[-0.1, 0, 0.97, 0, 0.13, 1.27, 'cloth2']],
+    studs: [[0.3, 0, 0.035, 1.3, 'gold'], [0.45, 0, 0.035, 1.3, 'gold'], [0.6, 0, 0.035, 1.3, 'gold'], [0.75, 0, 0.035, 1.3, 'gold']],
+    tassels: [[0.62, 0.62, 0.11, 1.52, 'cloth2'], [0.8, 0.5, 0.09, 1.52, 'cloth2']],
+    upperArm: [[-0.3, 1.04, 1.14, MAIL], [-0.3, 1.02, 1.26, 'cloth'], [0.16, 0.32, 1.3, 'gold']], forearm: [[-0.06, 0, 1.14, MAIL], [-0.08, 0.1, 1.28, 'cloth2']],
+  },
   // A foot soldier: a riveted brigandine over a quilted coat, a short skirt
   // of lames, spaulders, vambraces and knee cops; the legs otherwise bare of steel.
   brigandine: {
@@ -493,6 +509,8 @@ function paintFor(paint, armor) {
     if (paint.buckle) return Math.cos(angle) > 0.96 ? paint.buckle : paint.base;
     if (paint.braid) return (index + step) % 2 ? paint.braid : paint.base;
     if (paint.rivets && index % paint.rivets === 1 && step % 3 === 0) return 'gold';
+    // A hem in its own colour: the lowest ring (a skirt's rings run up from the hem).
+    if (paint.edge && index === 0) return paint.edge;
     if (paint.rows) return paint.rows[index % paint.rows.length];
     return paint.base;
   };
@@ -661,6 +679,19 @@ function paleOn(mesh, rings, out, role, bones) {
       const [a, b] = [-Math.PI + (Math.PI * step) / steps, -Math.PI + (Math.PI * (step + 1)) / steps];
       addPatch(mesh, rings, [[index, a, out], [index, b, out], [index + 1, b, out], [index + 1, a, out]], role, bones);
     }
+  }
+}
+
+/**
+ * Plaques round a belt (the Ayyubid emir's mintaqa): `count` small square
+ * plates, each its own faces a hair out from the leather, so they read sharp.
+ */
+function plaquesOn(mesh, rings, out, count, role, bones) {
+  const half = (Math.PI / count) * 0.5;
+  const [low, high] = [0.15 * (rings.length - 1), 0.85 * (rings.length - 1)];
+  for (let plaque = 0; plaque < count; plaque += 1) {
+    const angle = (plaque / count) * Math.PI * 2;
+    addPatch(mesh, rings, [[low, angle - half, out], [low, angle + half, out], [high, angle + half, out], [high, angle - half, out]], role, bones);
   }
 }
 
@@ -925,12 +956,25 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     tablePiece(rings, inflate, sharpPale(paint) ? 'cloth' : paint, () => hanging3);
     if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', () => hanging3);
   }
-  for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) tablePiece(shortsRings(from, to, count(3)), inflate, paint, abdomen);
+  for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) {
+    const rings = shortsRings(from, to, count(3));
+    tablePiece(rings, inflate, paint, abdomen);
+    if (paint?.plaques && !lowDetail) plaquesOn(mesh, rings, inflate * 1.03, paint.plaques, 'gold', abdomen);
+  }
   // Straps across the trunk ([from t, from angle, to t, to angle, width rad, out, role]) and cords hanging down the skirt.
   if (kit?.straps && !lowDetail) {
     const rings = trunkRings(0, 1, 20);
     const place = (t) => t * 20;
     for (const [fromT, fromAngle, toT, toAngle, width, out, role] of kit.straps) stripOn(mesh, rings, [place(fromT), fromAngle], [place(toT), toAngle], width, out, role, abdomen);
+  }
+  // Studs on the trunk ([t, angle, half-size rad, out, role]): buttons, bosses.
+  if (kit?.studs && !lowDetail) {
+    const rings = trunkRings(0, 1, 20);
+    for (const [t, angle, size, out, role] of kit.studs) {
+      const place = t * 20;
+      const tall = size * 0.6;
+      addPatch(mesh, rings, [[place - tall, angle - size, out], [place - tall, angle + size, out], [place + tall, angle + size, out], [place + tall, angle - size, out]], role, abdomen);
+    }
   }
   if (kit?.tassels && !lowDetail) {
     // [angle, how far down (thigh lengths below the waist), width rad, out, role]
@@ -1079,8 +1123,10 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     // Boot shafts up the shin; heels for a woman in business dress.
     const feet = (female && look.femaleFeet) || look.feet || {};
     // Shafts up the shin: an ankle boot just over the ankle bone.
-    const shaft = { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36], heelAnkleBoot: [0.74, 1.2], jinBoot: [0.3, 1.28] }[feet.kind];
-    if (shaft && !plate) loft(mesh, shinRings(shaft[0], 0.98, count(3)), sides, { color: 'boot', inflate: shaft[1], capStart: false, capEnd: false });
+    // A rider's boot (`over`) is pulled on over the trousers: its shaft as straight and full as they are, a little outside them.
+    const shaft = { boxingBoot: [feet.high ? 0.45 : 0.62, 1.2], hikingBoot: [0.74, 1.36], compactBoot: [0.76, 1.3], tacticalBoot: [0.66, 1.36], heelAnkleBoot: [0.74, 1.2], jinBoot: [0.3, 1.28], ridingBoot: [0.04, 1.3, 'over'] }[feet.kind];
+    const shaftRings = shaft?.[2] === 'over' ? along(knee, foot, frames[BONE[`${side}Shin`]].x, count(4), shaft[0], 0.98, (t) => shankR * (1.14 - 0.03 * t), (t) => shankR * (1.12 - 0.03 * t)) : shaft && shinRings(shaft[0], 0.98, count(3));
+    if (shaft && !plate) loft(mesh, shaftRings, sides, { color: 'boot', inflate: shaft[1], capStart: false, capEnd: false });
     if (feet.socks) loft(mesh, shinRings(0.66, 0.75, 1), sides, { color: 'sock', inflate: 1.28, capStart: false, capEnd: false });
   }
 

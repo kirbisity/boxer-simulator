@@ -321,6 +321,17 @@ export const PRESETS = {
     outfit: { kind: 'steppeMedium', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
+  // Salah ad-Din Yusuf ibn Ayyub (1137–1193), Kurdish sultan of Egypt and
+  // Syria, at fifty, the summer of Hattin (1187): of middle height, spare and
+  // hard from a life in the saddle (the Franks' and his own chroniclers'
+  // man; ill with fevers in his last years, not yet), his beard full and
+  // greying; the sayf, the turs, the kazaghand over his mail.
+  saladin: {
+    // His standard the Ayyubid yellow, when he leads.
+    name: 'Saladin', style: 'saladin', sex: 'male', heightCm: 170, frame: 'medium', age: 50, exercise: 0.65, calories: 3400, standardColour: '#d8b030',
+    outfit: { kind: 'saladin', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2e2620', facialHair: 'beard', eyeColor: 'brown' },
+  },
   // The Ottomans: Ulubatlı Hasan, the Janissary who raised the banner on the
   // walls of Constantinople (1453); an azap archer; a heavy sipahi on foot.
   yatagan: {

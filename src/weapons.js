@@ -517,6 +517,16 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 1, cut: 0.2, blunt: 0.12 }, swing: { cut: 0.95, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 24, zeta: 0.8 }, threat: 3.4,
   },
+  // The Ayyubid sword (sayf) of Saladin's day: straight and two-edged (the
+  // curved sabre came to Syria and Egypt only with the Mamluks, a century
+  // on), ~0.85 m of broad blade with a wide fuller and a rounded point, a
+  // short cross with langets, a cap pommel; a horseman's sword, made to cut
+  // from the saddle more than to thrust, so its balance a little further out.
+  sayf: {
+    label: 'Sayf', hands: 'one', length: 0.84, strikeFrom: 0.12, handle: 0.12, mass: 1.15, balance: 0.16, radius: 0.012,
+    harm: { swing: { cut: 1.0, blunt: 0.4 }, thrust: { pierce: 0.85, cut: 0.2, blunt: 0.12 } },
+    contactSeconds: 0.004, rotation: 0.72, wrist: { omega: 23, zeta: 0.8 }, threat: 3.4,
+  },
   // Hercules's club (clava), as Commodus carried it into the arena: a length
   // of knotted wood thickening to its end, ~0.9 m and 2 kg, no iron on it.
   // Only blunt; its weight out at the head.
@@ -591,6 +601,10 @@ export const SHIELDS = {
   // The kalkan: the Turkish and steppe round shield of wicker bound in
   // coloured thread round an iron boss; light and springy.
   kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, look: 'ming' },
+  // The Ayyubid horseman's round shield (turs): boards faced with dark
+  // leather, ~0.65 m across, a rawhide rim and an iron boss; heavier than
+  // the wicker kalkan of later centuries, and stiffer under a blow.
+  turs: { label: 'Turs', radius: 0.32, mass: 2.8, offset: 0.07, armHarm: 0.15, look: 'turs' },
   // Shaped shields (`shape: 'curved'`): a rectangle `width` × `height` (m)
   // bent round a vertical axis (`curve`, the bend's radius), held upright by
   // a grip at its middle. The scutum of the murmillo and the secutor: plywood

@@ -204,6 +204,8 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     dressShoe: { width: 0.045, height: 0.038, sole: 0x2a1d14 },
     // A Song and Jin rider's leather boot: soft, its toe turned up.
     jinBoot: { width: 0.056, height: 0.05, sole: 0x2a1d14 },
+    // A rider's soft leather boot (khuff) to the knee, its toe a little pointed.
+    ridingBoot: { width: 0.054, height: 0.048, sole: 0x2a1d14 },
     // Split-toed socks on straw sandals; a gladiator's leather sandal.
     tabi: { width: 0.046, height: 0.045, sole: 0xc8b27a },
     sandal: { width: 0.036, height: 0.044, sole: 0x5a3a22, skin: true },
@@ -230,13 +232,15 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
       shoe.add(strap);
     }
   }
-  if (kind === 'jinBoot') {
-    // The toe drawn out and turned up (+x is up from the sole).
-    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.9, length * 0.34, 10), upperMaterial);
-    toe.geometry.translate(0, length * 0.17, 0);
+  if (kind === 'jinBoot' || kind === 'ridingBoot') {
+    // The toe drawn out and turned up (+x is up from the sole); the rider's boot's only a little.
+    const turned = kind === 'jinBoot';
+    const reach = turned ? 0.34 : 0.26;
+    const toe = new THREE.Mesh(new THREE.ConeGeometry(spec.height * 0.9, length * reach, 10), upperMaterial);
+    toe.geometry.translate(0, length * reach / 2, 0);
     toe.scale.set(spec.width / spec.height, 1, 1);
     toe.position.set(-0.012, length * 0.62, 0);
-    toe.rotation.z = -0.55;
+    toe.rotation.z = turned ? -0.55 : -0.12;
     shoe.add(toe);
   }
   if (kind === 'trainer' && colors.accent) {
@@ -820,6 +824,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
     case 'pagodaHelm':
       buildPagodaHelm(group, head, r, steel, color);
       break;
+    case 'ayyubidHelm':
+      buildAyyubidHelm(group, head, r, steel, color);
+      break;
     case 'steppeHelm': {
       // A steppe helmet: a tall pointed iron bowl, a brow band, a spike with
       // a plume, a lamellar aventail round the sides and back (open at the
@@ -1150,7 +1157,113 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       return null;
   }
   inkAll(group);
-  return { group, hidesHair };
+  // An open-faced helmet (`openFace`) leaves the beard to be seen.
+  return { group, hidesHair, showsBeard: Boolean(head.openFace) };
+}
+
+// Saladin's helmet, in head radii: the bowl's lathe profile from its rim up
+// (a little swelling, then drawn in to a point, as the 12th-century Syrian
+// and Iranian bowls were), its ribs (`ribs`: the segments' joins, with
+// `rivets` along each), the turban's coils [height, radius, thickness, tilt]
+// wound round the bowl's foot, its tail down the back, and the mail
+// aventail's rows from the rim down over neck and shoulders, open at the face.
+const AYYUBID_HELM = {
+  bowl: [[1.17, -0.05], [1.2, 0.3], [1.14, 0.7], [0.98, 1.05], [0.74, 1.4], [0.46, 1.7], [0.2, 1.95], [0.05, 2.1]],
+  ribs: 4,
+  rivets: 5,
+  finial: [0.07, 0.32],
+  turban: [[0.02, 1.26, 0.2, 0.1], [0.3, 1.25, 0.21, -0.12], [0.56, 1.18, 0.19, 0.08], [0.78, 1.06, 0.15, -0.06]],
+  tail: { width: 0.5, length: 1.7, from: 0.25 },
+  // Rows: [top radius, bottom radius, height, centre y]; the face's opening (rad, centred on the front).
+  aventail: [[1.16, 1.32, 0.42, -0.2], [1.3, 1.48, 0.42, -0.58], [1.46, 1.66, 0.42, -0.96]],
+  faceOpen: Math.PI * 0.55,
+  nasal: [0.1, 0.95],
+};
+
+/**
+ * Saladin's helmet: a pointed bowl of riveted segments with a small finial
+ * and a nasal, a turban wound round its foot (the tail falling behind), and
+ * a mail aventail in rows from the rim to the shoulders, open at the face.
+ */
+function buildAyyubidHelm(group, head, r, steel, color) {
+  const spec = AYYUBID_HELM;
+  const iron = metal(steel, color);
+  const gilt = metal(steel, head.gold ?? 0xc9a23a);
+  const bowl = new THREE.Mesh(new THREE.LatheGeometry(spec.bowl.map(([x, y]) => new THREE.Vector2(x * r, y * r)), 28), iron);
+  group.add(bowl);
+  // The ribs: gilt strips over the segments' joins, following the bowl up to the point, riveted.
+  const studs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.045 * r, 6, 4), gilt, spec.ribs * spec.rivets);
+  const place = new THREE.Object3D();
+  let at = 0;
+  for (let rib = 0; rib < spec.ribs; rib += 1) {
+    const angle = (rib / spec.ribs) * Math.PI * 2 + Math.PI / spec.ribs;
+    const out = (x) => [Math.cos(angle) * x * 1.02 * r, Math.sin(angle) * x * 1.02 * r];
+    // A pivot turned to this rib's side of the bowl (its x outward), the strips laid along the profile in it.
+    const pivot = new THREE.Group();
+    pivot.rotation.y = -angle;
+    for (let index = 1; index < spec.bowl.length; index += 1) {
+      const [x0, y0] = spec.bowl[index - 1];
+      const [x1, y1] = spec.bowl[index];
+      const length = Math.hypot(x1 - x0, y1 - y0) * r;
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.03 * r, length * 1.04, 0.12 * r), gilt);
+      strip.position.set(((x0 + x1) / 2) * 1.02 * r, ((y0 + y1) / 2) * r, 0);
+      strip.rotation.z = -Math.atan2(x1 - x0, y1 - y0);
+      pivot.add(strip);
+    }
+    group.add(pivot);
+    for (let rivet = 0; rivet < spec.rivets; rivet += 1) {
+      const u = 1 + rivet * 1.0;
+      const [x, y] = spec.bowl[Math.min(spec.bowl.length - 1, Math.round(u))];
+      const [px, pz] = out(x * 1.01);
+      place.position.set(px, y * r, pz);
+      place.updateMatrix();
+      studs.setMatrixAt(at, place.matrix);
+      at += 1;
+    }
+  }
+  group.add(studs);
+  const [finialRadius, finialHeight] = spec.finial;
+  const finial = new THREE.Mesh(new THREE.ConeGeometry(finialRadius * r, finialHeight * r, 8), gilt);
+  finial.position.y = (spec.bowl.at(-1)[1] + finialHeight / 2 - 0.02) * r;
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(finialRadius * 1.2 * r, 8, 6), gilt);
+  knob.position.y = (spec.bowl.at(-1)[1] - 0.02) * r;
+  group.add(finial, knob);
+  // The nasal, riveted under the turban at the brow, down over the nose.
+  const [nasalWidth, nasalLength] = spec.nasal;
+  const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, nasalLength * r, nasalWidth * r), iron);
+  nasal.position.set(1.2 * r, (0.02 - nasalLength / 2) * r, 0);
+  nasal.rotation.z = 0.06;
+  group.add(nasal);
+  // The turban: coils of cloth wound round the bowl's foot, each a little across the last.
+  if (head.turban) {
+    const cloth = surface(new THREE.Color(head.turban).getHex(), { roughness: 0.9 });
+    for (const [y, radius, thick, tilt] of spec.turban) {
+      const coil = new THREE.Mesh(new THREE.TorusGeometry(radius * r, thick * r, 8, 26), cloth);
+      coil.rotation.set(Math.PI / 2, tilt, 0);
+      coil.position.y = y * r;
+      coil.scale.set(1, 1, 0.9);
+      group.add(coil);
+    }
+    // The tail (ʿadhaba) tucked in behind and falling down the back of the neck.
+    const tailCloth = cloth.clone();
+    tailCloth.side = THREE.DoubleSide;
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, spec.tail.length * r, spec.tail.width * r), tailCloth);
+    // Falling clear of the aventail as it flares: its foot further back than its top.
+    tail.position.set(-1.56 * r, (spec.tail.from - spec.tail.length / 2) * r, 0.12 * r);
+    tail.rotation.z = -0.24;
+    group.add(tail);
+  }
+  // The aventail: rows of mail, each a shade apart so the rows read, open at the face.
+  const mail = new THREE.Color(head.mail ?? 0x7c8087);
+  spec.aventail.forEach(([top, bottom, height, y], row) => {
+    const material = metal(steel, mail.clone().multiplyScalar(row % 2 ? 0.82 : 1));
+    material.side = THREE.DoubleSide;
+    material.roughness = 0.55;
+    const open = spec.faceOpen;
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, height * r, 26, 1, true, Math.PI / 2 + open / 2, Math.PI * 2 - open), material);
+    band.position.y = y * r;
+    group.add(band);
+  });
 }
 
 // The Iron Pagoda's helmet, in head radii (WARDROBE-style dials): the bowl's

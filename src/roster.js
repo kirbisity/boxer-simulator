@@ -53,6 +53,8 @@ export const WARRIORS = [
   warrior('steppeLancer', 'Temür', PRESETS.maceShield, { name: 'Temür', style: 'steppeBow', outfit: { kind: 'steppeHeavy', design: 1 } }),
   warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
   warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
+  // The sultanates' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
+  { ...warrior('saladin', 'Saladin', PRESETS.saladin), flagship: true },
   warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),
   warrior('sipahi', 'Davud the sipahi', PRESETS.sipahi),
   warrior('janissary', 'Ulubatlı Hasan', PRESETS.yatagan),
