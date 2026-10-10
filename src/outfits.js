@@ -112,9 +112,10 @@ function mingBrigandineDesign(label, cloth, iron, look = {}) {
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
   return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, gold: '#a8894e', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
-// The steppe man's kit: his deel (the robe over all), its trim and sash, his hat or helmet.
-function steppeDesign(label, armor, deel, trim, head, feet = '#3a2416') {
-  return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, ...armor }, head, feet: { kind: 'compactBoot', color: feet } };
+// The steppe man's kit: his deel (the robe over all) and the robe under it
+// at the hem (`trim`), his hat or helmet, the tall black boots (gutal).
+function steppeDesign(label, armor, deel, trim, head, feet = '#141210') {
+  return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, leather: '#4a2e1a', ...armor }, head, feet: { kind: 'jinBoot', color: feet } };
 }
 // A hex colour darker (or lighter) by a share.
 function shade(hex, share) {
@@ -878,23 +879,25 @@ export const OUTFITS = {
     label: 'Steppe — deel and fur hat', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     designs: [
-      steppeDesign('Blue deel', { kind: 'deel', color: '#2f4a7a' }, '#2f4a7a', '#d6a743', { kind: 'furHat', color: '#2f4a7a' }),
-      steppeDesign('Maroon deel', { kind: 'deel', color: '#6a1f2a' }, '#6a1f2a', '#2a3a5a', { kind: 'furHat', color: '#6a1f2a' }),
-      steppeDesign('Ochre deel', { kind: 'deel', color: '#a8742a' }, '#a8742a', '#3a2416', { kind: 'furHat', color: '#3a2416' }),
+      steppeDesign('Maroon deel', { kind: 'mongolDeel' }, '#6a1f2a', '#c41e22', { kind: 'loovuuz', color: '#b3161b' }),
+      steppeDesign('Blue deel', { kind: 'mongolDeel' }, '#2f4a7a', '#d6a743', { kind: 'loovuuz', color: '#b3161b', fur: 0x4a3420 }),
+      steppeDesign('Ochre deel', { kind: 'mongolDeel' }, '#a8742a', '#6a1f2a', { kind: 'loovuuz', color: '#1c1a18', fur: 0x5a3e24, plume: 0x1c1a18 }),
     ],
   },
-  // Hardened leather lamellar over the deel, an iron helmet: proof against a glancing cut.
+  // Hardened leather lamellar over the deel, a fur stole, the fur hat: the
+  // body proof against a glancing cut; the hat's thick fur and felt take the
+  // edge off a blow but no more (`regions`).
   steppeMedium: {
     faction: 'steppe',
-    label: 'Steppe — leather lamellar', movement: 'good', fists: 'bare',
+    label: 'Steppe — leather lamellar, fur hat', movement: 'good', fists: 'bare',
     sidearm: 'saber',
-    extraMass: 0.15,
-    protection: { blunt: 0.3, cut: 0.6, pierce: 0.45, bullet: { head: 0.1, torso: 0.15, limb: 0.05 } },
+    extraMass: 0.14,
+    protection: { blunt: 0.3, cut: 0.6, pierce: 0.45, bullet: { head: 0, torso: 0.15, limb: 0.05 }, regions: { head: { blunt: 0.15, cut: 0.25, pierce: 0.1 } } },
     courage: 0.2,
     designs: [
-      steppeDesign('Brown leather', { kind: 'steppeLeather', color: '#5a3a22', cloth: '#5a3a22', cloth2: '#3a2416' }, '#2f4a7a', '#3a2416', { kind: 'steppeHelm', color: '#7d8088', coif: '#4a3a2a' }),
-      steppeDesign('Red-lacquered leather', { kind: 'steppeLeather', color: '#7a2418', cloth: '#7a2418', cloth2: '#3a1410' }, '#3a3020', '#1c1a18', { kind: 'steppeHelm', color: '#7d8088', coif: '#3a2a20' }),
-      steppeDesign('Black-lacquered leather', { kind: 'steppeLeather', color: '#24201c', cloth: '#24201c', cloth2: '#6a4a2a' }, '#5a2a1a', '#24201c', { kind: 'steppeHelm', color: '#5a5d63', coif: '#2a2420' }),
+      steppeDesign('Gilt leather, maroon deel', { kind: 'mongolLamellar', color: '#a8874a', lace: '#2a1a12', fur: '#8a6438' }, '#6a1f2a', '#c41e22', { kind: 'loovuuz', color: '#b3161b' }),
+      steppeDesign('Brown leather, blue deel', { kind: 'mongolLamellar', color: '#6a4a2a', lace: '#1c1410', fur: '#5a4030' }, '#2f4a7a', '#7a2418', { kind: 'loovuuz', color: '#b3161b', fur: 0x4a3420 }),
+      steppeDesign('Black leather, red deel', { kind: 'mongolLamellar', color: '#2a2420', lace: '#8a1418', fur: '#3a3028' }, '#8a1418', '#24201c', { kind: 'loovuuz', color: '#d6a743' }),
     ],
   },
   // Iron lamellar to the knees, iron bracers, a helmet with a lamellar aventail.
@@ -907,9 +910,9 @@ export const OUTFITS = {
     protection: { blunt: 0.5, cut: 0.88, pierce: 0.72, bullet: { head: 0.3, torso: 0.35, limb: 0.15 } },
     courage: 0.3,
     designs: [
-      steppeDesign('Iron, blue laces', { kind: 'steppeLamellar', color: '#7d8088', lace: '#2a3a6a' }, '#2f4a7a', '#d6a743', { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', plume: '#b3161b' }),
-      steppeDesign('Iron, red laces', { kind: 'steppeLamellar', color: '#6a6d73', lace: '#8a1418' }, '#3a3020', '#8a1418', { kind: 'steppeHelm', color: '#6a6d73', coif: '#4a4d52', plume: '#1c1a18' }),
-      steppeDesign('Blackened iron', { kind: 'steppeLamellar', color: '#34363a', lace: '#a8742a' }, '#5a2a1a', '#a8742a', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#e8e0cc' }),
+      steppeDesign('Iron, maroon deel', { kind: 'mongolIron', color: '#7d8088', lace: '#2a1a12', fur: '#7a5634' }, '#6a1f2a', '#c41e22', { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', plume: '#e8e0cc' }),
+      steppeDesign('Iron, blue deel', { kind: 'mongolIron', color: '#6a6d73', lace: '#8a1418', fur: '#4a3a2a' }, '#2f4a7a', '#8a1418', { kind: 'steppeHelm', color: '#6a6d73', coif: '#4a4d52', plume: '#b3161b' }),
+      steppeDesign('Blackened iron, red deel', { kind: 'mongolIron', color: '#34363a', lace: '#a8742a', fur: '#2a2420' }, '#8a1418', '#24201c', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#1c1a18' }),
     ],
   },
   // The kheshig: Chinggis Khan's guard of the 1200s, a legend of an earlier
@@ -1104,9 +1107,9 @@ export const OUTFITS = {
     },
     courage: 0.4,
     designs: [
-      { label: 'Indigo kimono', top: { kind: 'flannel', color: '#1f2a4a' }, bottom: { kind: 'pants', color: '#3a3a40' }, armor: { kind: 'roninDo', color: '#3b3e44', lace: '#1d2a4f', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#ece4d0' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Indigo kimono', top: { kind: 'flannel', color: '#1f2a4a' }, bottom: { kind: 'pants', color: '#3a3a40' }, armor: { kind: 'roninDo', color: '#5a5e66', lace: '#2a5aa8', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#ece4d0' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Grey kimono', top: { kind: 'flannel', color: '#5a5a5e' }, bottom: { kind: 'pants', color: '#1c1c20' }, armor: { kind: 'roninDo', color: '#17171a', lace: '#b3161b', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Brown kimono', top: { kind: 'flannel', color: '#5a3a22' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'roninDo', color: '#6b4a32', lace: '#2a1a10', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' }, hair: 'topknot' },
+      { label: 'Brown kimono', top: { kind: 'flannel', color: '#5a3a22' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'roninDo', color: '#6b4a32', lace: '#c9a23a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' }, hair: 'topknot' },
     ],
   },
   // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth

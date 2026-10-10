@@ -251,7 +251,7 @@ export const PRESETS = {
   },
   kheshig: {
     // The Khan's guard rode as heavy archers first: a quick volley, then in with the mace.
-    name: 'Subutai', style: 'kheshigBow', sex: 'male', heightCm: 161, frame: 'large', age: 44, exercise: 0.65, calories: 4025,
+    name: 'Subutai', style: 'kheshigBow', sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 4300,
     outfit: { kind: 'kheshig', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -302,22 +302,22 @@ export const PRESETS = {
   // emperor at Tumu (1449); Mandukhai Khatun, who led the Mongols in armour in
   // the 1470s–90s; an Oirat archer and a lancer.
   maceShield: {
-    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 163, frame: 'large', age: 42, exercise: 0.6, calories: 4075,
+    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 167, frame: 'large', age: 42, exercise: 0.6, calories: 4350,
     outfit: { kind: 'steppeHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   saber: {
-    name: 'Mandukhai Khatun', style: 'saber', sex: 'female', heightCm: 155, frame: 'large', age: 30, exercise: 0.7, calories: 3100,
+    name: 'Mandukhai Khatun', style: 'saber', sex: 'female', heightCm: 158, frame: 'large', age: 30, exercise: 0.7, calories: 3250,
     outfit: { kind: 'steppeMedium', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   steppeBow: {
-    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 160, frame: 'large', age: 26, exercise: 0.7, calories: 4000,
+    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 164, frame: 'large', age: 26, exercise: 0.7, calories: 4275,
     outfit: { kind: 'steppeLight', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   saberShield: {
-    name: 'Ganbold', style: 'saberShield', sex: 'male', heightCm: 161, frame: 'large', age: 29, exercise: 0.65, calories: 4000,
+    name: 'Ganbold', style: 'saberShield', sex: 'male', heightCm: 165, frame: 'large', age: 29, exercise: 0.65, calories: 4275,
     outfit: { kind: 'steppeMedium', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },

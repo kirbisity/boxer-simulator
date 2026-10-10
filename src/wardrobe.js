@@ -71,6 +71,8 @@ export function roleColors(dress, skin) {
     mail: base(armor?.mail, 0x8d9097),
     mail2: darker(base(armor?.mail, 0x8d9097), 0.6),
     leather: base(armor?.leather, 0x5a3a22),
+    // The fur of a collar or stole (a steppe man's fox or wolf).
+    fur: base(armor?.fur, 0x6a4a2a),
     cloth: base(armor?.cloth, 0x8a1f22),
     cloth2: base(armor?.cloth2, 0xe8e2d2),
     // A device over the field (a Templar's cross), drawn sharp-edged.
@@ -863,6 +865,28 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       const knot = new THREE.Mesh(new THREE.SphereGeometry(0.14 * r, 8, 6), surface(0xb3161b, { roughness: 0.9 }));
       knot.position.y = 1.6 * r;
       group.add(crown, fur, knot);
+      break;
+    }
+    case 'loovuuz': {
+      // The Mongol fur hat: a tall domed crown of black fur (fox or sable),
+      // the fur turned up thick all round as a brim, a red knot on top and a
+      // white horsehair plume standing up from it, leaning back.
+      const furMaterial = surface(head.fur ?? 0x17130f, { roughness: 1 });
+      furMaterial.flatShading = true;
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.14 * r, 14, 9, 0, Math.PI * 2, 0, Math.PI * 0.55), furMaterial);
+      crown.scale.set(1, 1.7, 1);
+      crown.position.y = 0.4 * r;
+      const brim = new THREE.Mesh(new THREE.TorusGeometry(1.14 * r, 0.36 * r, 7, 18), furMaterial);
+      brim.rotation.x = Math.PI / 2;
+      brim.scale.z = 1.5;
+      brim.position.y = 0.62 * r;
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.16 * r, 8, 6), surface(color, { roughness: 0.9 }));
+      knot.position.y = 2.3 * r;
+      const hair = surface(head.plume ?? 0xece6d6, { roughness: 1 });
+      const plume = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * r, 0.1 * r, 1.4 * r, 9), hair);
+      plume.position.set(-0.28 * r, 2.95 * r, 0);
+      plume.rotation.z = 0.35;
+      group.add(crown, brim, knot, plume);
       break;
     }
     case 'bork': {

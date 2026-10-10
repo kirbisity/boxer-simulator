@@ -196,7 +196,7 @@ export const ARMOR_KINDS = {
   // thighs; arms and shins in his own clothes.
   roninDo: {
     trunk: [-0.08, 1.0, 1.18, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.4, 0.36, 1.22, LACED],
-    thigh: [0.12, 0.78, 1.26, LACED],
+    thigh: [0.05, 0.88, 1.42, { rows: ['steel', 'steel', 'lace'] }],
   },
   // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,
   // cloth sleeves and simple shin guards.
@@ -345,6 +345,27 @@ export const ARMOR_KINDS = {
   kheshig: {
     trunk: [-0.08, 1.0, 1.22, { scales: true, mirror: [0.62, 0.14, 'gold'] }], skirt: [1.05, 0.7, 1.34, { scales: true }], collar: 'steel',
     upperArm: [[-0.32, 0.45, 1.6, { scales: true }], [0.45, 1.02, 1.36, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.03, 1.3, { rows: ['steel', 'steel2'] }],
+  },
+  // The Mongol kit as worn by the steppe peoples into the 1600s: the deel to
+  // mid-calf over a second robe of another colour showing at the hem, a
+  // leather belt with a gilt buckle; the lamellar a vest over it, its skirt
+  // split before and behind for the saddle, the deel's sleeves out of the
+  // short lamellar shoulders, lamellar bracers; a fox or wolf stole over the
+  // shoulders (`fur`). Nothing of it like a Chinese soldier's coat.
+  mongolDeel: {
+    trunk: [[-0.06, 0.99, 1.1, { panel: [0.1, 0.96, 0.985, 'cloth2'], base: 'cloth' }], [0.18, 0.3, 1.2, { buckle: 'gold', base: 'leather' }]],
+    skirt: [[1.32, 0.6, 1.16, 'cloth2'], [1.18, 0.55, 1.2, 'cloth']],
+  },
+  mongolLamellar: {
+    trunk: [[-0.06, 0.99, 1.1, 'cloth'], [-0.02, 0.92, 1.24, { lamellae: 30, gaps: [0], gapWidth: 0.05 }], [0.8, 1.02, 1.42, 'fur'], [0.16, 0.3, 1.34, { buckle: 'gold', base: 'leather' }]],
+    skirt: [[1.36, 0.62, 1.16, 'cloth2'], [1.22, 0.56, 1.2, 'cloth'], [0.86, 0.6, 1.32, { lamellae: 28, gaps: [0, Math.PI], gapWidth: 0.09 }]],
+    upperArm: [-0.3, 0.4, 1.55, { lamellae: 16 }], forearm: [0.12, -0.02, 1.34, { lamellae: 14 }],
+  },
+  // The iron-clad man: the same cut in iron, the lamellar skirt to the knee.
+  mongolIron: {
+    trunk: [[-0.06, 0.99, 1.1, 'cloth'], [-0.04, 0.96, 1.24, { lamellae: 32, gaps: [0], gapWidth: 0.04 }], [0.84, 1.02, 1.4, 'fur'], [0.16, 0.3, 1.34, { buckle: 'gold', base: 'leather' }]],
+    skirt: [[1.36, 0.62, 1.16, 'cloth2'], [1.24, 0.56, 1.2, 'cloth'], [1.04, 0.62, 1.32, { lamellae: 30, gaps: [0, Math.PI], gapWidth: 0.07 }]], collar: 'steel',
+    upperArm: [-0.3, 0.55, 1.55, { lamellae: 18 }], forearm: [0.12, -0.02, 1.34, { lamellae: 14 }],
   },
   // The deel: the steppe robe, crossed over to the right, to below the knee, sashed.
   deel: {
