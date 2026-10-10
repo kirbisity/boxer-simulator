@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildBody } from '../src/body.js';
 import { seededRandom } from '../src/physics.js';
 import { OUTFITS } from '../src/outfits.js';
+import { ARMOR_KINDS } from '../src/loftbody.js';
 import { WEAPONS } from '../src/weapons.js';
 
 test('the Ming elite turns blades and arrows nearly as plate does; the brigandine man is better kept than the garrison man', () => {
@@ -15,8 +16,12 @@ test('the Ming elite turns blades and arrows nearly as plate does; the brigandin
     assert.ok(brigandine[kind] > garrison[kind], kind);
     assert.ok(elite.protection[kind] > brigandine[kind], kind);
   }
-  // Some elites wear the steel mask and neck guard.
-  assert.ok(elite.designs.some((design) => design.head.mask && design.head.neck === 'steel'));
+  // Some elites wear the steel mask; all the steel neck guard (laminated, over the shoulders) and the throat band.
+  assert.ok(elite.designs.some((design) => design.head.mask));
+  for (const design of elite.designs) {
+    const kit = ARMOR_KINDS[design.armor.kind];
+    assert.ok(kit.collar === 'steel' && kit.trunk.some((piece) => piece[3]?.lames), design.label);
+  }
 });
 
 test('the guandao sits between the naginata and the war hammer: more blunt, some of it through armour', () => {

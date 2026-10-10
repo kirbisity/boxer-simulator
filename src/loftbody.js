@@ -78,6 +78,10 @@ export const LOFT = {
   // row down over the next; two punched holes (`holes`: heights up the plate,
   // `hole`: size as a share of the plate's width and height).
   lamellae: { lift: 0.035, tilt: 0.03, width: 0.86, overlap: 0.3, shoulder: 0.78, holes: [0.62, 0.36], hole: [0.26, 0.11] },
+  // Laminated plate (lames): each band stands out at its lower edge by `tilt`
+  // over the next (`overlap` of a band beneath it), a dark edge line `edge`
+  // of a band deep, and rivets (`rivets` round, `rivet` rad across) on each.
+  lames: { lift: 0.03, tilt: 0.06, overlap: 0.25, edge: 0.14, steps: 18, rivets: 4, rivet: 0.05 },
   // A brigandine's rivet heads: three rows to a ring, each `size` of its column
   // across (and as tall, along the piece), a hair proud of the cloth.
   studs: { rowsPerRing: 3, size: 0.3, tall: 0.07, lift: 0.012 },
@@ -188,6 +192,13 @@ function computeNormals(positions, indices) {
 const MAIL = { mail: true };
 const LACED = { rows: ['steel', 'lace'] };
 const MANICA = { rows: ['steel', 'lace'] };
+// The Ming elite's neck guard: steel lames lying over the shoulders and the
+// top of the chest, each stepping out over the one below, with a steel band
+// round the throat (the kit's `collar`).
+const ELITE_GORGET = [0.8, 1.0, 1.36, { lames: 3, base: 'steel2' }];
+// The Ming elite's arms: a great spaulder of steel lames over the shoulder,
+// and lames down the upper arm (the forearm's to the wrist, in the kit).
+const ELITE_ARM = [[-0.24, 1.02, 1.42, { lames: 6, base: 'steel2' }], [-0.2, 0.38, 1.62, { lames: 3, base: 'steel2' }], [0.3, 0.62, 1.58, { lames: 3, base: 'steel2' }]];
 const BALTEUS = [0.04, 0.24, 1.14, { rows: ['steel', 'gold', 'steel'] }];
 export const ARMOR_KINDS = {
   // Tosei gusoku: a solid cuirass of riveted horizontal steel lames, laced
@@ -338,23 +349,24 @@ export const ARMOR_KINDS = {
     upperArm: [-0.26, 0.6, 1.52, { lamellae: 16, pointDown: true }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
   // The elite in scale armour: overlapping iron scales from the collar to
-  // below the knee, hung point down, the steel mirror over the heart, the
-  // collar, scaled shoulder guards over segmented steel arm guards.
+  // below the knee, hung point down, the steel mirror over the heart; the
+  // arms and the neck guard as the brigandine elite's.
   mingScale: {
-    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }]],
-    skirt: [0.95, 0.6, 1.34, { lamellae: 30, pointDown: true, edge: 'gold', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], collar: 'steel',
-    upperArm: [[-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], [-0.26, 0.62, 1.6, { lamellae: 16, pointDown: true, edge: 'gold' }]], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }], ELITE_GORGET],
+    skirt: [0.95, 0.6, 1.34, { lamellae: 30, pointDown: true, edge: 'gold', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], 
+    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
     mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
   },
   // Ming elite: the long brigandine coat to below the knee, its plates
   // riveted close (gilt heads, more and smaller than a soldier's), bound in a
   // dark edge, split for riding; a round steel mirror (huxinjing) over the
-  // heart, a steel throat collar, studded shoulder guards over segmented
-  // steel arm guards, a buckled belt.
+  // heart, a buckled belt; a great spaulder of steel lames over each
+  // shoulder and lames down the arm to the wrist (ELITE_ARM); the steel
+  // neck guard of lames over the shoulders (ELITE_GORGET).
   mingElite: {
-    trunk: [[-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', opening: 0.012, mirror: [0.62, 0.15, 'steel'] }], [0.14, 0.24, 1.32, { buckle: 'gold', base: 'leather' }]],
-    skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], collar: 'steel',
-    upperArm: [[-0.24, 1.02, 1.46, { rows: ['steel', 'steel2'] }], [-0.26, 0.62, 1.6, { studded: 14, base: 'cloth', edge: 'cloth2' }]], forearm: [-0.04, -0.03, 1.32, { rows: ['steel', 'steel2'] }],
+    trunk: [[-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', opening: 0.012, mirror: [0.62, 0.15, 'steel'] }], [0.14, 0.24, 1.32, { buckle: 'gold', base: 'leather' }], ELITE_GORGET],
+    skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], 
+    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
     mirrors: [[0.62, 0, 0.3, 1.36, 'steel']],
   },
   // Ō-yoroi: its box, skirt panels and shoulder boards are rigid pieces of
@@ -565,6 +577,8 @@ function paintFor(paint, armor) {
     // Scales: rows of them, each offset by half a scale from the one above,
     // the lower edge of every third row dark with its lacing so the rows read.
     if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
+    // Laminated plate in a crowd: its bands as rows, a dark line between.
+    if (paint.lames) return index % 2 ? 'steel2' : 'steel';
     // A brigandine (studded): its edges and front opening bound in the second
     // colour, the splits showing it too; in a crowd, the rivets as dots.
     if (paint.studded) {
@@ -685,6 +699,34 @@ function lamellaeOn(mesh, rings, inflate, paint, bones) {
           [along(u + high / 2), angle + half * across, lift], [along(u + high / 2), angle - half * across, lift],
         ], 'lace', bones);
       }
+    }
+  }
+}
+
+/**
+ * Laminated plate: `paint.lames` bands along the piece, each its own ring of
+ * faces standing out at one edge over the next band (so the steps catch the
+ * light), a dark line along that edge, and a few rivet heads on each band.
+ */
+function lamesOn(mesh, rings, inflate, paint, bones) {
+  const spec = LOFT.lames;
+  const span = (rings.length - 1) / paint.lames;
+  const turn = (step) => (step / spec.steps) * Math.PI * 2;
+  for (let lame = 0; lame < paint.lames; lame += 1) {
+    const from = lame * span;
+    const to = Math.min(rings.length - 1, (lame + 1 + spec.overlap) * span);
+    const out = (u) => inflate + spec.lift + spec.tilt * (1 - u);
+    const edgeTo = from + spec.edge * span;
+    for (let step = 0; step < spec.steps; step += 1) {
+      const [a, b] = [turn(step), turn(step + 1)];
+      addPatch(mesh, rings, [[from, a, out(0)], [from, b, out(0)], [to, b, out(1)], [to, a, out(1)]], 'steel', bones);
+      addPatch(mesh, rings, [[from, a, out(0) + 0.004], [from, b, out(0) + 0.004], [edgeTo, b, out(spec.edge) + 0.004], [edgeTo, a, out(spec.edge) + 0.004]], 'steel2', bones);
+    }
+    const at = from + span * 0.55;
+    for (let rivet = 0; rivet < spec.rivets; rivet += 1) {
+      const angle = ((rivet + 0.5) / spec.rivets) * Math.PI * 2;
+      const lift = out(0.55) + 0.008;
+      addPatch(mesh, rings, [[at - span * 0.12, angle - spec.rivet, lift], [at - span * 0.12, angle + spec.rivet, lift], [at + span * 0.12, angle + spec.rivet, lift], [at + span * 0.12, angle - spec.rivet, lift]], 'gold', bones);
     }
   }
 }
@@ -919,6 +961,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
     loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+    // Laminated plate: each lame its own band of faces (not in a crowd).
+    if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, bones ?? (() => null));
     // A brigandine's rivet heads, each its own small square (not in a crowd).
     if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, bones ?? (() => null));
   };

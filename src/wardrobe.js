@@ -1141,24 +1141,33 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       break;
     }
     case 'mingHelm': {
-      // A Ming officer's helmet: a tall steel bowl with a brass brow band, a
-      // spike with a red tassel and plume, and a padded coif hanging from
-      // the rim over the neck and shoulders, open at the face.
+      // A Ming officer's helmet (the bowl of the 1500s–1600s): a tall pointed
+      // steel bowl, swelling above the brow and drawn up to a finial tube,
+      // riveted bands down it front, back and sides, a brow band, a black
+      // horsehair plume falling back from the finial; padded cloth flaps
+      // studded with rivets hanging from the rim over the cheeks and neck.
       const bowlSteel = metal(steel, color);
-      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.18 * r, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), bowlSteel);
-      bowl.scale.y = 1.3;
-      bowl.position.y = 0.08 * r;
-      const band = new THREE.Mesh(new THREE.TorusGeometry(1.18 * r, 0.07 * r, 6, 24), metal(steel, head.gold ?? 0xd6a743));
+      const profile = [[1.12, 0.05], [1.15, 0.4], [1.08, 0.82], [0.9, 1.25], [0.64, 1.62], [0.37, 1.92], [0.17, 2.08], [0.1, 2.12]];
+      const bowl = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x * r, y * r)), 24), bowlSteel);
+      bowl.material = bowlSteel.clone();
+      bowl.material.side = THREE.DoubleSide;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.13 * r, 0.07 * r, 6, 24), metal(steel, head.gold ?? 0xd6a743));
       band.rotation.x = Math.PI / 2;
-      band.position.y = 0.12 * r;
-      const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * r, 0.09 * r, 0.9 * r, 8), metal(steel, head.gold ?? 0xd6a743));
-      spike.position.y = 1.95 * r;
-      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.34 * r, 0.42 * r, 10), surface(head.tassel ?? 0xb3161b, { roughness: 0.9 }));
-      tassel.position.y = 1.62 * r;
-      tassel.rotation.x = Math.PI;
-      const plume = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.7 * r, 6), surface(head.tassel ?? 0xb3161b, { roughness: 0.9 }));
-      plume.position.y = 2.65 * r;
-      group.add(bowl, band, spike, tassel, plume);
+      band.position.y = 0.1 * r;
+      // The riveted bands: down the bowl's curve, a hair proud of it.
+      const strap = metal(steel, new THREE.Color(color).multiplyScalar(0.7).getHex());
+      for (let side = 0; side < 4; side += 1) {
+        const turn = (side / 4) * Math.PI * 2;
+        const path = new THREE.CatmullRomCurve3(profile.slice(0, -1).map(([x, y]) => new THREE.Vector3(Math.cos(turn) * (x + 0.04) * r, y * r, Math.sin(turn) * (x + 0.04) * r)));
+        group.add(new THREE.Mesh(new THREE.TubeGeometry(path, 10, 0.05 * r, 4), strap));
+      }
+      const finial = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * r, 0.14 * r, 0.6 * r, 10), bowlSteel);
+      finial.position.y = 2.32 * r;
+      const hair = surface(head.plume ?? 0x141210, { roughness: 1 });
+      const plume = new THREE.Mesh(new THREE.ConeGeometry(0.22 * r, 1.6 * r, 7), hair);
+      plume.position.set(-0.42 * r, 2.15 * r, 0);
+      plume.rotation.z = Math.PI - 0.5;
+      group.add(bowl, band, finial, plume);
       if (head.neck === 'steel') {
         // A steel neck guard: three lames stepping out from the rim to the
         // shoulders, open over the face (+x).
@@ -1169,11 +1178,29 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
           group.add(ring);
         }
       } else {
-        // The coif: open over the face (+x), from the rim to the shoulders.
-        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.75 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
+        // The flaps: padded cloth open over the face (+x), from the rim to the
+        // shoulders, rows of rivet heads over them (one instanced mesh).
+        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.75 * r, 1.4 * r, 22, 3, true, Math.PI * 0.75, Math.PI * 1.5), surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
         coif.material.side = THREE.DoubleSide;
-        coif.position.y = -0.5 * r;
-        group.add(coif);
+        coif.position.y = -0.6 * r;
+        const rows = 3;
+        const columns = 11;
+        const studs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.06 * r, 6, 4), metal(steel, head.gold ?? 0xd6a743), rows * columns);
+        const place = new THREE.Object3D();
+        let stud = 0;
+        for (let row = 0; row < rows; row += 1) {
+          const down = (row + 0.6) / (rows + 0.4);
+          const radius = (1.2 + 0.55 * down + 0.03) * r;
+          for (let column = 0; column < columns; column += 1) {
+            const theta = Math.PI * 0.75 + Math.PI * 1.5 * ((column + 0.5 + (row % 2) * 0.5) / (columns + 0.5));
+            place.position.set(Math.sin(theta) * radius, (0.1 - 1.4 * down) * r, Math.cos(theta) * radius);
+            place.updateMatrix();
+            studs.setMatrixAt(stud, place.matrix);
+            stud += 1;
+          }
+        }
+        studs.userData.noOutline = true;
+        group.add(coif, studs);
       }
       if (head.mask) {
         // A steel face mask from the brow to the chin, an eye slit across it.

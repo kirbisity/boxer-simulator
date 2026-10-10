@@ -128,7 +128,7 @@ function mingBrigandineDesign(label, cloth, iron, look = {}) {
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
 // `look`: the same protection drawn as scale armour (`kind: 'mingScale'`).
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', tassel: '#b3161b', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // The steppe man's kit: his deel (the robe over all) and the robe under it
 // at the hem (`trim`), his hat or helmet, the tall black boots (gutal).
@@ -788,10 +788,10 @@ export const OUTFITS = {
     courage: 0.35,
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
-      mingEliteDesign('Imperial blue, steel neck guard', '#1f2f6a', '#7a1418', '#a7adb6', { neck: 'steel' }),
-      mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { neck: 'steel', mask: true }),
+      mingEliteDesign('Imperial blue', '#1f2f6a', '#e8e0cc', '#a7adb6'),
+      mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { mask: true }),
       mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
-      mingEliteDesign('Steel scale, masked', '#1c1c20', '#1f2a4a', '#a7adb6', { neck: 'steel', mask: true }, { kind: 'mingScale', lace: '#1a1c24' }),
+      mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true }, { kind: 'mingScale', lace: '#1a1c24' }),
     ],
   },
   // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the
