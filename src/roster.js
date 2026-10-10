@@ -59,7 +59,7 @@ export const WARRIORS = [
   warrior('janissaryGun', 'Mehmed Çavuş', PRESETS.yatagan, { name: 'Mehmed Çavuş', style: 'matchlock', outfit: { kind: 'janissary', design: 1 } }),
   warrior('azapArcher', 'Ali the azap', PRESETS.azap),
   warrior('azapSpear', 'Yusuf the azap', PRESETS.azap, { name: 'Yusuf the azap', style: 'spear', outfit: { kind: 'azap', design: 1 } }),
-  warrior('ronin', 'Miyamoto Musashi', PRESETS.samurai, { name: 'Miyamoto Musashi', outfit: { kind: 'ronin', design: 2 }, accessories: [] }),
+  warrior('ronin', 'Miyamoto Musashi', PRESETS.samurai, { name: 'Miyamoto Musashi', outfit: { kind: 'ronin', design: 2 }, accessories: [], charging: 2.5 }),
   warrior('wokou', 'Wang Zhi', PRESETS.mingDao, { name: 'Wang Zhi', outfit: { kind: 'wokou', design: 0 } }),
   warrior('hidalgo', 'Hernán Cortés', PRESETS.hidalgo),
   warrior('rodelero', 'Bernal Díaz', PRESETS.rodelero),

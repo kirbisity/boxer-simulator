@@ -191,6 +191,13 @@ export const ARMOR_KINDS = {
     trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, LACED], collar: 'steel',
     upperArm: [-0.18, 0.45, 1.62, LACED], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
   },
+  // A rōnin's odd pieces of tōsei gusoku: the riveted cuirass and its short
+  // laced skirt, and the haidate (small plates laced on cloth) over the
+  // thighs; arms and shins in his own clothes.
+  roninDo: {
+    trunk: [-0.08, 1.0, 1.18, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.4, 0.36, 1.22, LACED],
+    thigh: [0.12, 0.78, 1.26, LACED],
+  },
   // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,
   // cloth sleeves and simple shin guards.
   okegawa: {

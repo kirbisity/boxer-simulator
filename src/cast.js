@@ -242,11 +242,11 @@ export function mexicaWarrior(random = Math.random, style = 'macuahuitl', rank =
   return builtLike(soldier, PERIOD_BUILD.mexica[rank], random);
 }
 
-/** A masterless samurai (katana, naginata), unarmoured. */
+/** A masterless samurai (katana, naginata) in odd pieces of armour; light on his feet, he comes on at a run (`charging`). */
 export function roninWarrior(random = Math.random, style = 'katana') {
   const base = varyCharacter(PRESETS.samurai, random, { sex: 'male' });
   const name = `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`;
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: [] };
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: [], charging: RONIN_CHARGING };
   return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
 }
 
@@ -257,6 +257,8 @@ const WOKOU_KIT = { none: 0.45, piece: 0.36, ashigaru: 0.11, samurai: 0.08 };
 
 // Raiders come on at a run and throw themselves in: the charge sooner, and more eagerly (AI `charging`).
 const RAIDER_CHARGING = 2;
+// A rōnin closes faster still: lean, fit (PERIOD_BUILD), lightly armoured, he goes in at a run and throws himself on.
+const RONIN_CHARGING = 2.5;
 
 /**
  * A sea raider of the 1550s (wokou): Chinese (dao, spear, matchlock) or
@@ -288,7 +290,7 @@ const PERIOD_BUILD = {
   // lion): his elite is the big men of his army.
   // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
   mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 160, weightKg: 64, exercise: 0.66 } },
-  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 56, exercise: 0.75 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
+  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 56, exercise: 0.85 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
   // The men who crossed to the Indies were picked and hardened (veterans of

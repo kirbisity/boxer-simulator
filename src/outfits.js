@@ -1093,12 +1093,20 @@ export const OUTFITS = {
     faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
     sidearm: 'wakizashi',
-    protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    // A masterless man keeps what armour he can carry and run in: a tōsei
+    // cuirass and the haidate over his thighs, no helmet, no sleeves, no
+    // greaves. The trunk as a samurai's dō; the thighs behind small plates
+    // laced on cloth; head and the rest of the limbs bare (`regions`).
+    extraMass: 0.18,
+    protection: {
+      blunt: 0.6, cut: 0.9, pierce: 0.65, bullet: { head: 0, torso: 0.5, limb: 0.05 },
+      regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Thigh: { blunt: 0.35, cut: 0.75, pierce: 0.45 } },
+    },
     courage: 0.4,
     designs: [
-      { label: 'Indigo kimono', top: { kind: 'flannel', color: '#1f2a4a' }, bottom: { kind: 'pants', color: '#3a3a40' }, head: { kind: 'clothWrap', color: '#ece4d0' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Grey kimono', top: { kind: 'flannel', color: '#5a5a5e' }, bottom: { kind: 'pants', color: '#1c1c20' }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Brown kimono', top: { kind: 'flannel', color: '#5a3a22' }, bottom: { kind: 'pants', color: '#2a2622' }, feet: { kind: 'tabi', color: '#1a1b22' }, hair: 'topknot' },
+      { label: 'Indigo kimono', top: { kind: 'flannel', color: '#1f2a4a' }, bottom: { kind: 'pants', color: '#3a3a40' }, armor: { kind: 'roninDo', color: '#3b3e44', lace: '#1d2a4f', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#ece4d0' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Grey kimono', top: { kind: 'flannel', color: '#5a5a5e' }, bottom: { kind: 'pants', color: '#1c1c20' }, armor: { kind: 'roninDo', color: '#17171a', lace: '#b3161b', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Brown kimono', top: { kind: 'flannel', color: '#5a3a22' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'roninDo', color: '#6b4a32', lace: '#2a1a10', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' }, hair: 'topknot' },
     ],
   },
   // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth
