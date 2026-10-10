@@ -127,7 +127,8 @@ export function holdPin(world, fighter, h) {
 
 /**
  * The clock on a man held down: it runs while someone has hold of him and
- * his trunk is down, restarts if he gets up off the floor under them, and
+ * his trunk is down, waits while he struggles up on his knees under them,
+ * restarts once he is free of them or on his feet, and
  * past `seconds` he is beaten. A hold is announced when it starts and when
  * it is broken (no hands on him, or he is back on his feet).
  */
@@ -143,10 +144,9 @@ export function countPin(world, fighter, dt) {
     fighter.heldAnnounced = true;
     world.events.push({ time: world.time, kind: 'held', fighter: fighter.id, attacker: holders[0].id, effects: ['held down'] });
   }
-  if (!neckLow(fighter)) {
-    fighter.pinClock = 0;
-    return;
-  }
+  // His trunk up off the floor, the count waits: it starts again only once
+  // he is free of their hands or on his feet (above).
+  if (!neckLow(fighter)) return;
   fighter.pinClock = (fighter.pinClock ?? 0) + dt;
   // Held, he does not wait for the count: he tries to get up.
   if (fighter.state === 'down' && fighter.knockdowns < WORLD.knockdownsToStop) fighter.downTimer = Math.min(fighter.downTimer, WORLD.pin.struggleAfter);

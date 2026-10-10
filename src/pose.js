@@ -3,6 +3,8 @@
 // whether the body gets there, and how fast, is the physics' business.
 
 import { P, PARTICLES } from './body.js';
+import { WORLD } from './physics/config.js';
+import { swivelIntoRange, trunkAxes } from './joints.js';
 
 export const POSE = {
   // Orthodox stance, bladed so the lead (left) side faces the opponent.
@@ -118,13 +120,19 @@ export function desiredPose(body, intent = {}) {
     if (out[index] && index !== P.lFoot && index !== P.rFoot) out[index] = vec.add(out[index], [shift, -Math.abs(shift) * 0.3, 0]);
   }
 
+  // Elbows and knees swivel to where the shoulders and hips can turn them,
+  // short of the range's resisting band: the hands and feet stay where the
+  // move wants them.
+  const margin = WORLD.limbTwist.softBand;
+  const shoulderAxes = trunkAxes(out[P.pelvis], out[P.neck], out[P.lShoulder], out[P.rShoulder]);
+  const hipAxes = trunkAxes(out[P.pelvis], out[P.neck], out[P.lHip], out[P.rHip]);
   for (const side of ['l', 'r']) {
     const hip = out[P[`${side}Hip`]];
     const foot = out[P[`${side}Foot`]];
     const outward = side === 'l' ? 0.35 : -0.35;
     // A raised or kicking leg folds with its knee where the move puts it.
     const kneeOverride = intent[`${side}Knee`];
-    out[P[`${side}Knee`]] = kneeOverride ?? twoBoneIK(hip, foot, L.thigh, L.shank, [1, intent.check && side === 'l' ? 0.6 : 0, outward]);
+    out[P[`${side}Knee`]] = kneeOverride ?? swivelIntoRange(hipAxes, 'leg', side, hip, twoBoneIK(hip, foot, L.thigh, L.shank, [1, intent.check && side === 'l' ? 0.6 : 0, outward]), foot, { margin });
     if (kneeOverride) out[P[`${side}Foot`]] = intent[`${side}Foot`] ?? vec.add(kneeOverride, [-0.2, -L.shank * 0.8, 0]);
 
     const shoulder = out[P[`${side}Shoulder`]];
@@ -150,7 +158,9 @@ export function desiredPose(body, intent = {}) {
     const target = clampReach(shoulder, wanted, (L.upperArm + L.forearmToFist) * 0.995);
     out[P[`${side}Hand`]] = target;
     const pole = weaponArm ? [POSE.weaponPole[0], POSE.weaponPole[1], POSE.weaponPole[2] * (side === 'l' ? 1 : -1)] : [-0.4, -1, side === 'l' ? 0.5 : -0.5];
-    out[P[`${side}Elbow`]] = twoBoneIK(shoulder, target, L.upperArm, L.forearmToFist, pole);
+    // A weapon's hand also turns its forearm so the wrist can point the blade.
+    const elbow = twoBoneIK(shoulder, target, L.upperArm, L.forearmToFist, pole);
+    out[P[`${side}Elbow`]] = swivelIntoRange(shoulderAxes, 'arm', side, shoulder, elbow, target, { bladeDir: weaponArm ? intent.bladeDir : null, margin });
   }
   return out;
 }

@@ -2,6 +2,9 @@
 // directions and measures, over the fall and while lying:
 //   flips   — frames where a rig bone's frame turns more than 60° (the skin twists)
 //   jitter  — mean change of particle acceleration per frame while lying (m/s²)
+//   shiver  — velocity reversals per particle-second while lying: a part's
+//             frame-to-frame motion turning back on itself at more than
+//             0.1 m/s each way (what the eye sees as jitter)
 //   settle  — seconds until every particle moves slower than 0.15 m/s, frame to frame
 //   folded  — frames where a hand or foot is inside the trunk
 // Usage: node tools/falls-quality.js
@@ -23,7 +26,8 @@ export function fallQuality(preset = 'heavy', direction = DIRECTIONS[0], impulse
   fighter.state = 'down';
   fighter.downTimer = 99;
   hitParticle(world, fighter, P.head, direction, impulse);
-  const result = { flips: 0, jitter: 0, settle: null, folded: 0 };
+  const result = { flips: 0, jitter: 0, shiver: 0, settle: null, folded: 0 };
+  let previousVelocity = null;
   let previousFrames = null;
   let previousAcceleration = null;
   let lyingFrames = 0;
@@ -48,6 +52,17 @@ export function fallQuality(preset = 'heavy', direction = DIRECTIONS[0], impulse
       lyingFrames += 1;
     }
     previousAcceleration = acceleration;
+    const velocity = previousPoints ? points.map((at, index) => vec.scale(vec.sub(at, previousPoints[index]), 60)) : null;
+    if (velocity && previousVelocity && frame > 60) {
+      for (let index = 0; index < PARTICLE_COUNT; index += 1) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          const before = previousVelocity[index][axis];
+          const now = velocity[index][axis];
+          if (before * now < 0 && Math.abs(before) > 0.1 && Math.abs(now) > 0.1) result.shiver += 1;
+        }
+      }
+    }
+    previousVelocity = velocity;
     // Speed as the eye sees it: movement from one drawn frame to the next.
     const fastest = previousPoints ? Math.max(...points.map((at, index) => vec.length(vec.sub(at, previousPoints[index])) * 60)) : Infinity;
     previousPoints = points;
@@ -65,6 +80,7 @@ export function fallQuality(preset = 'heavy', direction = DIRECTIONS[0], impulse
     }
   }
   result.jitter /= Math.max(1, lyingFrames);
+  result.shiver /= Math.max(1, lyingFrames / 60) * PARTICLE_COUNT;
   result.settle ??= Infinity;
   return result;
 }
@@ -74,7 +90,7 @@ export function fallSweep() {
   for (const preset of ['heavy', 'light']) for (const direction of DIRECTIONS) rows.push(fallQuality(preset, direction));
   const mean = (key) => rows.reduce((sum, row) => sum + row[key], 0) / rows.length;
   const settled = rows.filter((row) => row.settle < Infinity);
-  return { flips: mean('flips'), jitter: mean('jitter'), unsettled: rows.length - settled.length, settle: settled.reduce((sum, row) => sum + row.settle, 0) / Math.max(1, settled.length), folded: mean('folded'), rows };
+  return { flips: mean('flips'), jitter: mean('jitter'), shiver: mean('shiver'), unsettled: rows.length - settled.length, settle: settled.reduce((sum, row) => sum + row.settle, 0) / Math.max(1, settled.length), folded: mean('folded'), rows };
 }
 
 if (process.argv[1]?.endsWith('falls-quality.js')) {

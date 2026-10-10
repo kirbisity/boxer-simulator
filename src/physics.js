@@ -12,9 +12,11 @@ import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf }
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToShield, shieldReach, NET } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 import { WORLD } from './physics/config.js';
+import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
+import { beginRise, restedToRise, riseTarget, supportLimit, updateRise } from './physics/rising.js';
 import { formUp } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
@@ -556,7 +558,20 @@ function updateWeapon(fighter, h) {
   // Wrists turn a weapon no faster than this (rad/s).
   const turnRate = vec.length(weapon.spin);
   if (turnRate > WORLD.weaponTurnLimit) weapon.spin = vec.scale(weapon.spin, WORLD.weaponTurnLimit / turnRate);
-  const dir = rotateAbout(previous, weapon.spin, h);
+  let dir = rotateAbout(previous, weapon.spin, h);
+  if (able) {
+    // The wrist bends only so far: a blade cannot point back into the
+    // forearm holding it. Turned that far, the wrist stops it.
+    const forearm = vec.normalize(vec.sub(point(fighter.x, main), point(fighter.x, P[`${weapon.main}Elbow`])));
+    const back = Math.acos(Math.max(-1, Math.min(1, vec.dot(dir, forearm))));
+    const across = vec.cross(forearm, dir);
+    if (back > WORLD.limbTwist.wristBack && vec.length(across) > 1e-6) {
+      const axisBack = vec.normalize(across);
+      dir = turnAbout(forearm, axisBack, WORLD.limbTwist.wristBack);
+      const further = vec.dot(weapon.spin, axisBack);
+      if (further > 0) weapon.spin = vec.sub(weapon.spin, vec.scale(axisBack, further));
+    }
+  }
   if (twoHands) {
     // The off hand on the handle, shared by the hands' inverse masses.
     // A sword's hands keep their places on the grip. On a polearm the shaft
@@ -1315,7 +1330,7 @@ function applyDefence(fighter, intent, dt) {
 
 // ---- Footwork -------------------------------------------------------------
 
-function plantFeet(fighter) {
+export function plantFeet(fighter) {
   fighter.feet = {};
   for (const side of ['l', 'r']) {
     const index = P[`${side}Foot`];
@@ -1329,6 +1344,8 @@ function updateFeet(fighter, dt) {
     plantFeet(fighter);
     return;
   }
+  // Getting up, he stands up off the feet where he put them; he steps once up.
+  if (fighter.state === 'rising') return;
   const spec = WORLD.step;
   const feet = Object.values(fighter.feet);
   for (const [side, foot] of Object.entries(fighter.feet)) {
@@ -1447,6 +1464,7 @@ export function step(world, dt) {
       const own = span(fighter);
       collideGround(world, fighter, own, world.arena);
       for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / own;
+      resistLimbTwist(world, fighter);
       settleWhenStill(fighter, own);
     }
     for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
@@ -1810,7 +1828,8 @@ function updateTimers(world, fighter, dt) {
   } else if (fighter.state === 'down') {
     fighter.motorScale = 0;
     fighter.downTimer -= dt;
-    if (fighter.downTimer <= 0) {
+    // Up only once he has come to rest: a man still tumbling does not try.
+    if (fighter.downTimer <= 0 && restedToRise(fighter, dt)) {
       // A broken leg will not stand him up, but a man still conscious drags himself off on his knees.
       if (legBroken(fighter) && !fighter.broken.has('neck') && !fighter.crawling) startCrawl(world, fighter, 'drags himself away on his knees');
       if (fighter.knockdowns >= WORLD.knockdownsToStop && !fighter.crawling) {
@@ -1824,34 +1843,32 @@ function updateTimers(world, fighter, dt) {
           if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
           fighter.pendingArm = null;
         }
-        // Get up facing the way the hips lie: the knees then bend the way
-        // the legs are pulled, not through the wrong side.
-        fighter.yaw = lyingYaw(fighter) ?? fighter.yaw;
-        fighter.riseFrom = PARTICLES.map((_, index) => point(fighter.x, index));
+        // Get up the way he lies, in stages (physics/rising.js).
+        beginRise(fighter);
         fighter.hurt = WORLD.hurt.hurtSeconds + WORLD.hurt.hurtPerKnockdown * fighter.knockdowns;
         fighter.hurtFor = fighter.hurt;
-        const pelvis = point(fighter.x, P.pelvis);
-        fighter.root = [pelvis[0], pelvis[2]];
         plantFeet(fighter);
       }
     }
   } else if (fighter.state === 'rising') {
-    fighter.motorScale = Math.min(1, fighter.motorScale + dt / WORLD.getUpSeconds);
-    if (fighter.motorScale >= 1) {
-      // Held down: if the hold kept his trunk low, he did not get up. He
-      // sinks back and tries again in a moment.
-      if (pinnedBy(world, fighter).length && neckLow(fighter)) {
-        fighter.state = 'down';
-        fighter.motorScale = 0;
-        fighter.downTimer = WORLD.pin.retry;
-        fighter.riseFrom = null;
-      } else {
-        // On his feet: any hold on him is broken, and he starts square.
-        fighter.state = 'up';
-        fighter.riseFrom = null;
-        fighter.knock = [0, 0, 0];
-        for (const holder of world.fighters) if (holder.pin?.target === fighter.id) holder.pin = null;
-      }
+    const stage = fighter.rise?.stage;
+    const result = fighter.rise ? updateRise(fighter, dt) : 'stood';
+    // Standing up from his knees, his feet are where the kneel put them.
+    if (fighter.rise?.stage === 'stand' && stage !== 'stand') plantFeet(fighter);
+    // Held down, if the hold kept his trunk low he did not get up; nor did
+    // he if his limbs could not lift him. He sinks back and tries again in a moment.
+    if (result === 'beaten' || (result === 'stood' && pinnedBy(world, fighter).length && neckLow(fighter))) {
+      fighter.state = 'down';
+      fighter.motorScale = 0;
+      fighter.downTimer = WORLD.pin.retry;
+      fighter.restFor = 0;
+      fighter.rise = null;
+    } else if (result === 'stood') {
+      // On his feet: any hold on him is broken, and he starts square.
+      fighter.state = 'up';
+      fighter.rise = null;
+      fighter.knock = [0, 0, 0];
+      for (const holder of world.fighters) if (holder.pin?.target === fighter.id) holder.pin = null;
     }
   } else if (fighter.state === 'up') {
     // Hurt after a knockdown: the legs and arms come back over seconds.
@@ -1874,20 +1891,13 @@ function reflexShare(fighter, elapsed) {
   return 1;
 }
 
-/**
- * Getting up: each part's target starts where the part lay and moves to
- * its standing target as the muscles come back, eased in and out. The body
- * unfolds from the pose it fell in instead of being yanked upright from it.
- */
+/** Getting up, the parts go where its stage puts them (physics/rising.js); otherwise where he stands. */
 function motorTarget(fighter, index) {
-  const standing = standingTarget(fighter, index);
-  if (fighter.state !== 'rising' || !fighter.riseFrom) return standing;
-  const u = Math.min(1, fighter.motorScale);
-  const eased = u * u * (3 - 2 * u);
-  return { target: vec.lerp(fighter.riseFrom[index], standing.target, eased), velocity: vec.scale(standing.velocity, eased) };
+  if (fighter.state === 'rising' && fighter.rise) return riseTarget(fighter, index);
+  return standingTarget(fighter, index);
 }
 
-function standingTarget(fighter, index) {
+export function standingTarget(fighter, index) {
   const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
@@ -1900,7 +1910,10 @@ function standingTarget(fighter, index) {
     const foot = footTarget(fighter, fighter.feet[side]);
     const pole = yawRotate([1, 0, side === 'l' ? 0.35 : -0.35], fighter.yaw);
     const L = fighter.body.lengths;
-    return { target: twoBoneIK(hip, foot, L.thigh, L.shank, pole), velocity: point(fighter.v, info.hip) };
+    const knee = twoBoneIK(hip, foot, L.thigh, L.shank, pole);
+    // Where the hips have turned the knee further than they can, it comes round.
+    const axes = trunkAxes(point(fighter.x, P.pelvis), point(fighter.x, P.neck), point(fighter.x, P.lHip), point(fighter.x, P.rHip));
+    return { target: swivelIntoRange(axes, 'leg', side, hip, knee, foot, { margin: WORLD.limbTwist.softBand }), velocity: point(fighter.v, info.hip) };
   }
   if (info.anchor === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
   const anchor = info.anchor;
@@ -1908,8 +1921,10 @@ function standingTarget(fighter, index) {
   return { target: vec.add(point(fighter.x, anchor), offset), velocity: point(fighter.v, anchor) };
 }
 
-// Scratch for the integrator's muscle drive (one particle at a time).
+// Scratch for the integrator's muscle drive (one particle at a time), and
+// every particle's acceleration this substep.
 const want = [0, 0, 0];
+const accelerations = new Float64Array(PARTICLES.length * 3);
 
 function integrate(fighter, h, time) {
   const fatigue = 0.55 + 0.45 * fighter.stamina;
@@ -1943,8 +1958,14 @@ function integrate(fighter, h, time) {
       const limit = size > cap ? cap / size : 1;
       acceleration = vec.add(acceleration, vec.scale(want, limit));
     }
+    for (let axis = 0; axis < 3; axis += 1) accelerations[base + axis] = acceleration[axis];
+  }
+  // Getting up, only the floor lifts him.
+  if (fighter.state === 'rising') supportLimit(fighter, accelerations);
+  for (let index = 0; index < PARTICLES.length; index += 1) {
+    const base = index * 3;
     for (let axis = 0; axis < 3; axis += 1) {
-      fighter.v[base + axis] = (fighter.v[base + axis] + acceleration[axis] * h) * damping;
+      fighter.v[base + axis] = (fighter.v[base + axis] + accelerations[base + axis] * h) * damping;
       fighter.prev[base + axis] = fighter.x[base + axis];
       fighter.x[base + axis] += fighter.v[base + axis] * h;
     }
@@ -2014,7 +2035,8 @@ function correctJoint(fighter, index, others, delta) {
   // A limp body's limits only reposition: limits that disagree would
   // otherwise turn each other's corrections into speed and set it thrashing.
   // Getting up too: a body unfolding from a heap breaks several limits at once.
-  const arrays = isLimp(fighter) || fighter.state === 'rising' ? [fighter.x, fighter.prev] : [fighter.x];
+  const repositioning = isLimp(fighter) || fighter.state === 'rising';
+  const arrays = repositioning ? [fighter.x, fighter.prev] : [fighter.x];
   for (const array of arrays) {
     for (let axis = 0; axis < 3; axis += 1) array[index * 3 + axis] += capped[axis] * (weights[0] / total);
     others.forEach((other, order) => {
@@ -2059,7 +2081,7 @@ function solveJointLimits(world, fighter, h) {
     // Hips: the thigh swings within a cone about straight down.
     coneLimit(world, fighter, `${side}Hip`, P[`${side}Hip`], P[`${side}Knee`], vec.scale(trunkUp, -1), limp ? WORLD.ragdoll.hipCone : WORLD.joint.hipCone);
     if (limp) coneLimit(world, fighter, null, P[`${side}Shoulder`], P[`${side}Elbow`], vec.scale(trunkUp, -1), WORLD.ragdoll.shoulderCone);
-    foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], WORLD.minFold.leg);
+    foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], limp ? WORLD.ragdoll.legFold : WORLD.minFold.leg);
     foldLimit(fighter, P[`${side}Shoulder`], P[`${side}Hand`], WORLD.minFold.arm);
   }
   coneLimit(world, fighter, 'neck', P.neck, P.head, trunkUp, limp ? WORLD.ragdoll.headCone : WORLD.headCone);
@@ -2088,19 +2110,6 @@ function keepArmsOffRibs(fighter) {
     if (distance >= radius || distance < 1e-6) continue;
     correctJoint(fighter, index, [P.pelvis, P.neck], vec.scale(radial, (radius - distance) / distance));
   }
-}
-
-/**
- * The heading a body lying on the floor faces: where its hips point,
- * flattened onto the floor (or, flat on its back or front, along the trunk).
- */
-function lyingYaw(fighter) {
-  const up = vec.normalize(vec.sub(point(fighter.x, P.neck), point(fighter.x, P.pelvis)));
-  const across = vec.sub(point(fighter.x, P.lHip), point(fighter.x, P.rHip));
-  let forward = vec.cross(up, across);
-  if (Math.hypot(forward[0], forward[2]) < 0.3 * vec.length(forward)) forward = up;
-  if (Math.hypot(forward[0], forward[2]) < 1e-6) return null;
-  return Math.atan2(-forward[2], forward[0]);
 }
 
 /** Down or out: the muscles have let go. */
@@ -2214,6 +2223,73 @@ function hinge(world, fighter, joint, root, middle, end, bendSide, lever) {
   const overAngle = 2 * Math.asin(Math.min(1, (tolerance - bend) / lever));
   if (strain(world, fighter, joint, overAngle)) return;
   correctJoint(fighter, middle, [root, end], vec.scale(bendSide, tolerance - bend));
+}
+
+// Each limb whose turn about its upper bone is held: kind, side, the three
+// particles and the joint that takes the strain.
+const TWISTING = ['l', 'r'].flatMap((side) => [
+  { kind: 'arm', side, root: P[`${side}Shoulder`], middle: P[`${side}Elbow`], end: P[`${side}Hand`], joint: `${side}Elbow` },
+  { kind: 'leg', side, root: P[`${side}Hip`], middle: P[`${side}Knee`], end: P[`${side}Foot`], joint: `${side}Knee` },
+]);
+
+/**
+ * The shoulders and hips turn the upper bones only so far about their
+ * length (joints.js). Past the comfortable range the forearm's or shin's
+ * spin about the upper bone further out is resisted, as a torque would: a
+ * share of it taken off each substep, growing through the range's last
+ * `softBand` to all of it at the limit. Only what carries it out is taken,
+ * never more, so the resistance takes energy out and puts none in; past the
+ * limit, a limb clear of the floor is eased back (`restoreRate`), one lying
+ * on it stays as it lies. Speeds, not positions: a body sat on its own folded
+ * leg cannot untwist it, and a positional push would fight the floor every
+ * substep. Wrenched on past the limit (still turning out), the elbow or knee
+ * strains; lying still in a turned pose, it does not.
+ */
+function resistLimbTwist(world, fighter) {
+  const spec = WORLD.limbTwist;
+  const pelvis = point(fighter.x, P.pelvis);
+  const neck = point(fighter.x, P.neck);
+  const axesFor = {
+    arm: trunkAxes(pelvis, neck, point(fighter.x, P.lShoulder), point(fighter.x, P.rShoulder)),
+    leg: trunkAxes(pelvis, neck, point(fighter.x, P.lHip), point(fighter.x, P.rHip)),
+  };
+  for (const limb of TWISTING) {
+    const axes = axesFor[limb.kind];
+    if (!axes || fighter.broken.has(limb.joint)) continue;
+    const a = point(fighter.x, limb.root);
+    const b = point(fighter.x, limb.middle);
+    const c = point(fighter.x, limb.end);
+    const turn = limbTwist(axes, limb.kind, limb.side, a, b, c);
+    const excess = twistExcess(limb.kind, turn, spec.softBand);
+    if (!excess) continue;
+    const over = Math.abs(excess);
+    const axis = vec.normalize(vec.sub(b, a));
+    const lower = vec.sub(c, b);
+    const radial = vec.sub(lower, vec.scale(axis, vec.dot(lower, axis)));
+    const radius = vec.length(radial);
+    if (radius < 0.02) continue;
+    // Spinning the lower bone about the upper turns the limb one for one:
+    // which way round takes it back into range.
+    const probed = limbTwist(axes, limb.kind, limb.side, a, b, vec.add(b, turnAbout(lower, axis, 0.05)));
+    if (!probed) continue;
+    const back = vec.scale(axis, -Math.sign(excess) * (Math.sign(Math.sin(probed.twist - turn.twist)) || 1));
+    const tangent = vec.scale(vec.cross(back, radial), 1 / radius);
+    // The lower bone's own speed round the upper, back towards range (− out).
+    const spin = vec.dot(vec.sub(point(fighter.v, limb.end), point(fighter.v, limb.middle)), tangent);
+    // A limb only just bent has little twist to speak of: no step as it
+    // straightens, and no strain from a turn the bend barely defines.
+    const bent = Math.min(1, (turn.bend - spec.from) / spec.from);
+    if (over > spec.softBand && bent >= 1 && -spin > spec.wrenchSpeed && strain(world, fighter, limb.joint, over - spec.softBand)) continue;
+    let push = Math.max(0, -spin) * Math.min(1, over / spec.softBand) * bent * spec.resistShare;
+    // Past the limit and clear of the floor, eased back at a gentle speed (set, not added).
+    if (over > spec.softBand && c[1] > fighter.radius[limb.end] + 0.01) {
+      push = Math.max(push, Math.min(spec.restoreMax, spec.restoreRate * (over - spec.softBand)) * bent * radius - spin);
+    }
+    if (push < 1e-6) continue;
+    // On the lower bone alone: the turn's other half is a torque about the
+    // upper bone's own length, which its two ends do not feel.
+    for (let axisIndex = 0; axisIndex < 3; axisIndex += 1) fighter.v[limb.end * 3 + axisIndex] += tangent[axisIndex] * push;
+  }
 }
 
 /** A cone: the tip stays within `limit` radians of `axis` about the pivot. */

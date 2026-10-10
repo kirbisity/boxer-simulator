@@ -96,6 +96,9 @@ export const WORLD = {
   ragdoll: {
     toneDamping: 7, spineTwist: 0.8, hipCone: 2.0, headCone: 0.9, shoulderCone: 2.8, bodyClearance: 0.85,
     sleepSpeed: 0.12, sleepSeconds: 0.25, hingeSlack: 0.03,
+    // A limp knee folds until the calf meets the thigh (~140°): hip to foot
+    // no nearer than this (m). Only muscle pulls a heel to the buttock.
+    legFold: 0.3,
   },
   minFold: { arm: 0.13, leg: 0.16 },
   // Held firmly: up to this far corrected per substep (more is stable now
@@ -132,6 +135,39 @@ export const WORLD = {
     strainLeak: 6,
     // A leg or neck broken: down this long (s) at most before he is out.
     brokenDownSeconds: 2,
+  },
+  // Turning a limb about its own length (src/joints.js). The way an elbow or
+  // knee bends is set by how far the shoulder or hip has turned the upper
+  // bone, measured from the rig's bind pose swung to where the bone points
+  // (rad, inward = the forearm or shin across the body). The shoulder: hanging,
+  // ~70° in from the hand-forward neutral plus the hand behind the back, ~90°
+  // out (forearm bent back past the side is out of reach); raised, its range
+  // opens until little is (Codman's paradox: an arm overhead reaches its hand
+  // behind the head or before the face). Elevation (rad above the trunk's
+  // across) sets it, `low` at and below `lowAt`, `high` at and above `highAt`.
+  // The hip turns the knee ~45° out (the shin across, as sitting
+  // cross-legged) and ~40° in (the foot out), whatever the thigh does, and a
+  // bent knee lets the shin turn ~30° more each way on the thigh. Resistance
+  // starts `softBand` short of a limit and is full at it; strain past it
+  // breaks the elbow or knee (joint.breakAngle). Bent less than `from`, a
+  // limb has no defined twist. `wristBack`: the most a weapon can point back
+  // along the forearm that holds it (~80° flexion beyond the grip's right
+  // angle, rounded up for the handle's angle in the fist).
+  limbTwist: {
+    arm: { low: { inward: 1.95, outward: 1.55 }, high: { inward: 2.8, outward: 2.6 }, lowAt: -0.8, highAt: 0.8 },
+    leg: { low: { inward: 1.3, outward: 1.2 }, high: { inward: 1.3, outward: 1.2 }, lowAt: -0.8, highAt: 0.8 },
+    softBand: 0.35,
+    // Of a turn out of range, the share taken off each substep (all of it, at
+    // the limit, within a few substeps: a firm stop without ringing); past the
+    // limit, turned back at this many rad/s per rad over, up to `restoreMax` rad/s.
+    resistShare: 0.3,
+    // Strain counts while the limb is still being wrenched out past its limit
+    // faster than this (m/s at the hand or foot), not while it lies there.
+    wrenchSpeed: 0.2,
+    restoreRate: 2,
+    restoreMax: 0.6,
+    from: 0.35,
+    wristBack: 2.6,
   },
   // Footwork: a planted foot stays put until the stance has drifted this far
   // from it, then steps; one foot at a time.
@@ -227,6 +263,25 @@ export const WORLD = {
   followThrough: 0.2, // m beyond the target the glove is aimed at
   minImpactSpeed: 2.0,
   getUpSeconds: 1.6,
+  // Getting up (physics/rising.js). He starts only once every part moves
+  // slower than `restSpeed` (m/s) for `restSeconds`, or `waitMost` s after
+  // his time down is up (a man held or jostled still tries). The muscles
+  // start at `strengthFrom` and come back over getUpSeconds. Stages (s):
+  // limbs drawn in straight, the roll to his front (for a half turn; less
+  // for less), up on hands and knees, a foot through, onto that foot and the
+  // other knee, standing (about 2.5 s in all, as a fit man takes); on to the next
+  // once its time is up and the hips are at `reached` of the height it puts
+  // them (`stood` of his standing height, the last), or `patience` s more,
+  // when he sinks back beaten. On hands and knees
+  // the knees are `kneesBack` of his height behind where he will stand;
+  // kneeling, the trunk leans `kneelLean` rad forward; standing from it, the
+  // rear foot slides in to stay within `legReach` of the leg's length. A part within
+  // `contact` m of the floor is on it: the floor pushes back through it.
+  rise: {
+    restSpeed: 0.3, restSeconds: 0.3, waitMost: 1.5, strengthFrom: 0.4,
+    seconds: { gather: 0.3, roll: 0.5, push: 0.5, step: 0.35, kneel: 0.4, stand: 0.55 },
+    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03,
+  },
   // Balance: pushed past these, a fighter goes over rather than stepping.
   // Speed of the hips (m/s) and their distance outside the feet, as a share
   // of leg length; both scale with how strong the legs are.
