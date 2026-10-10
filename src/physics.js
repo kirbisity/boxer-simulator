@@ -1450,6 +1450,10 @@ export function step(world, dt) {
       const own = span(fighter);
       solveConstraints(fighter, own);
       solveJointLimits(world, fighter, own);
+      // A limp body's limits reposition its parts; the bones they stretched
+      // are set back the same way, or next substep's pull would hand the
+      // stretch back as speed (limits that disagree pumped a lying body).
+      if (isLimp(fighter)) solveConstraints(fighter, own, true);
       if (fighter.weapon?.held) updateWeapon(fighter, own);
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
@@ -1467,6 +1471,7 @@ export function step(world, dt) {
       const own = span(fighter);
       collideGround(world, fighter, own, world.arena);
       for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / own;
+      stopAtLimits(fighter);
       resistLimbTwist(world, fighter);
       settleWhenStill(fighter, own);
     }
@@ -2018,7 +2023,7 @@ function handHealth(fighter, side) {
   return broken * (1 - WORLD.hurt.armForcePerDamage * beaten);
 }
 
-function solveConstraints(fighter, h) {
+function solveConstraints(fighter, h, reposition = false) {
   for (const constraint of fighter.constraints) {
     const { i, j, rest, compliance } = constraint;
     const offset = vec.sub(point(fighter.x, i), point(fighter.x, j));
@@ -2030,6 +2035,9 @@ function solveConstraints(fighter, h) {
     for (let axis = 0; axis < 3; axis += 1) {
       fighter.x[i * 3 + axis] += normal[axis] * lambda * fighter.invMass[i];
       fighter.x[j * 3 + axis] -= normal[axis] * lambda * fighter.invMass[j];
+      if (!reposition) continue;
+      fighter.prev[i * 3 + axis] += normal[axis] * lambda * fighter.invMass[i];
+      fighter.prev[j * 3 + axis] -= normal[axis] * lambda * fighter.invMass[j];
     }
   }
 }
@@ -2053,14 +2061,56 @@ function correctJoint(fighter, index, others, delta) {
   // A limp body's limits only reposition: limits that disagree would
   // otherwise turn each other's corrections into speed and set it thrashing.
   // Getting up too: a body unfolding from a heap breaks several limits at once.
-  const repositioning = isLimp(fighter) || fighter.state === 'rising';
-  const arrays = repositioning ? [fighter.x, fighter.prev] : [fighter.x];
+  const arrays = isLimp(fighter) || fighter.state === 'rising' ? [fighter.x, fighter.prev] : [fighter.x];
   for (const array of arrays) {
     for (let axis = 0; axis < 3; axis += 1) array[index * 3 + axis] += capped[axis] * (weights[0] / total);
     others.forEach((other, order) => {
       for (let axis = 0; axis < 3; axis += 1) array[other * 3 + axis] -= capped[axis] * (weights[order + 1] / total);
     });
   }
+  // ...and, repositioned, its motion into the limit is kept: noted here, it
+  // is stopped once the substep's speeds are known (stopAtLimits).
+  if (arrays.length === 2) (fighter.atLimits ??= []).push({ index, others, normal: vec.scale(capped, 1 / vec.length(capped)) });
+}
+
+/**
+ * The limits a limp or rising body met this substep stop what is coming to
+ * rest against them, as the floor stops what lies on it: the joint's parts'
+ * speed against each other into the limit is taken away (shared by mass, so
+ * the body's own motion goes on), all of it near rest and less the faster
+ * they close (WORLD.ragdoll.restAgainst). Repositioning alone kept that speed
+ * and gravity fed it back every substep: a limb lay against its limit at a
+ * speed it never moved by (a knee at −1.4 m/s indefinitely), and the body
+ * never came to rest. Stopping a falling body's every contact as hard made
+ * straight limbs under it props it sank onto slowly. Called once the
+ * substep's speeds are known; it only takes speed away.
+ */
+function stopAtLimits(fighter) {
+  const engaged = fighter.atLimits;
+  if (!engaged?.length) return;
+  for (const { index, others, normal } of engaged) {
+    const along = (particle) => fighter.v[particle * 3] * normal[0] + fighter.v[particle * 3 + 1] * normal[1] + fighter.v[particle * 3 + 2] * normal[2];
+    let othersMass = 0;
+    let othersAlong = 0;
+    for (const other of others) {
+      const kg = 1 / fighter.invMass[other];
+      othersMass += kg;
+      othersAlong += along(other) * kg;
+    }
+    const closing = along(index) - (othersMass > 0 ? othersAlong / othersMass : 0);
+    const resting = WORLD.ragdoll.restAgainst;
+    if (closing >= 0 || -closing > resting) continue;
+    // Equal and opposite impulses that bring the closing speed to nothing.
+    const reduced = 1 / (fighter.invMass[index] + (othersMass > 0 ? 1 / othersMass : 0));
+    // All of it when it has all but come to rest there; less the faster it
+    // comes, none from a blow (the limit repositions that, as it always has).
+    const impulse = -closing * reduced * (1 + closing / resting);
+    for (let axis = 0; axis < 3; axis += 1) {
+      fighter.v[index * 3 + axis] += normal[axis] * impulse * fighter.invMass[index];
+      for (const other of others) fighter.v[other * 3 + axis] -= (normal[axis] * impulse) / othersMass;
+    }
+  }
+  engaged.length = 0;
 }
 
 /**
@@ -2099,7 +2149,7 @@ function solveJointLimits(world, fighter, h) {
     // Hips: the thigh swings within a cone about straight down.
     coneLimit(world, fighter, `${side}Hip`, P[`${side}Hip`], P[`${side}Knee`], vec.scale(trunkUp, -1), limp ? WORLD.ragdoll.hipCone : WORLD.joint.hipCone);
     if (limp) coneLimit(world, fighter, null, P[`${side}Shoulder`], P[`${side}Elbow`], vec.scale(trunkUp, -1), WORLD.ragdoll.shoulderCone);
-    foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], limp ? WORLD.ragdoll.legFold : WORLD.minFold.leg);
+    foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], WORLD.minFold.leg);
     foldLimit(fighter, P[`${side}Shoulder`], P[`${side}Hand`], WORLD.minFold.arm);
   }
   coneLimit(world, fighter, 'neck', P.neck, P.head, trunkUp, limp ? WORLD.ragdoll.headCone : WORLD.headCone);
@@ -2191,7 +2241,9 @@ function twistLimit(fighter, trunkUp, limit) {
     for (const index of [left, right]) {
       const offset = vec.sub(point(fighter.x, index), point(fighter.x, centre));
       const radial = vec.sub(offset, vec.scale(trunkUp, vec.dot(offset, trunkUp)));
-      correctJoint(fighter, index, [centre], vec.scale(vec.cross(trunkUp, radial), amount));
+      // Turned, not pushed along the tangent: a push lengthens the hips and
+      // shoulders, and the bones' pull back is speed (it pumped a limp body).
+      correctJoint(fighter, index, [centre], vec.sub(turnAbout(radial, trunkUp, amount), radial));
     }
   };
   const sign = Math.sign(angle);
@@ -2301,8 +2353,9 @@ function resistLimbTwist(world, fighter) {
     const bent = Math.min(1, (turn.bend - spec.from) / spec.from);
     if (over > band && bent >= 1 && -spin > spec.wrenchSpeed && strain(world, fighter, limb.joint, over - band - spec.breakFurther)) continue;
     let push = Math.max(0, -spin) * Math.min(1, over / band) * bent * spec.resistShare;
-    // Past the limit and clear of the floor, eased back at a gentle speed (set, not added).
-    if (over > band && c[1] > fighter.radius[limb.end] + 0.01) {
+    // Past the limit and clear of the floor, eased back at a gentle speed
+    // (set, not added) by muscle; a limp limb only stops.
+    if (!isLimp(fighter) && over > band && c[1] > fighter.radius[limb.end] + 0.01) {
       push = Math.max(push, Math.min(spec.restoreMax, spec.restoreRate * (over - band)) * bent * radius - spin);
     }
     if (push < 1e-6) continue;

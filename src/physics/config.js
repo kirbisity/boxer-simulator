@@ -96,9 +96,10 @@ export const WORLD = {
   ragdoll: {
     toneDamping: 7, spineTwist: 0.8, hipCone: 2.0, headCone: 0.9, shoulderCone: 2.8, bodyClearance: 0.85,
     sleepSpeed: 0.12, sleepSeconds: 0.25, hingeSlack: 0.03,
-    // A limp knee folds until the calf meets the thigh (~140°): hip to foot
-    // no nearer than this (m). Only muscle pulls a heel to the buttock.
-    legFold: 0.3,
+    // A part coming to rest against a limit slower than this (m/s) is
+    // stopped there, all of it near rest, less the faster it comes; a blow
+    // faster than it is only repositioned (physics.js stopAtLimits).
+    restAgainst: 0.5,
   },
   minFold: { arm: 0.13, leg: 0.16 },
   // Held firmly: up to this far corrected per substep (more is stable now
