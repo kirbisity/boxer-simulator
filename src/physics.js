@@ -1450,10 +1450,6 @@ export function step(world, dt) {
       const own = span(fighter);
       solveConstraints(fighter, own);
       solveJointLimits(world, fighter, own);
-      // A limp body's limits reposition its parts; the bones they stretched
-      // are set back the same way, or next substep's pull would hand the
-      // stretch back as speed (limits that disagree pumped a lying body).
-      if (isLimp(fighter)) solveConstraints(fighter, own, true);
       if (fighter.weapon?.held) updateWeapon(fighter, own);
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
@@ -2154,7 +2150,14 @@ function solveJointLimits(world, fighter, h) {
   }
   coneLimit(world, fighter, 'neck', P.neck, P.head, trunkUp, limp ? WORLD.ragdoll.headCone : WORLD.headCone);
   twistLimit(fighter, trunkUp, limp ? WORLD.ragdoll.spineTwist : WORLD.spineTwist);
-  if (limp) keepOutOfTrunk(fighter);
+  // Getting up, a body still unfolding from the floor keeps all its limbs
+  // out of its trunk as a limp one does.
+  // A limp body's limits reposition its parts; the bones they stretched are
+  // set back the same way, or next substep's pull would hand the stretch
+  // back as speed (limits that disagree pumped a lying body). Its limbs are
+  // then kept out of its trunk, last, so nothing pulls them back in.
+  if (limp) solveConstraints(fighter, h, true);
+  if (limp || fighter.state === 'rising') keepOutOfTrunk(fighter);
   else keepArmsOffRibs(fighter);
 }
 
