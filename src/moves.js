@@ -1403,6 +1403,16 @@ export const STYLES = {
 // The spear's ways with a people's own spear: the ashigaru's yari, the rebel's pitchfork.
 STYLES.yari = { ...STYLES.spear, label: 'Yari', weapon: 'yari' };
 STYLES.pitchfork = { ...STYLES.spear, label: 'Pitchfork', weapon: 'pitchfork' };
+// The flanged mace without a shield: the steppe horseman's sidearm, its guard the haft across.
+STYLES.mace = { ...STYLES.maceShield, label: 'Mace', hidden: true, shield: undefined, shieldGuard: undefined, defences: { weaponBlock: 0.45, stepBack: 0.55 } };
+// The Khan's guard (kheshig): a quick volley of up to five arrows, standing his ground,
+// then the bow let fall and straight in with the mace, never keeping away as an archer would.
+STYLES.kheshigBow = {
+  ...STYLES.steppeBow,
+  label: "Khan's guard: bow and mace",
+  fallback: 'mace',
+  ranged: { ...STYLES.steppeBow.ranged, between: [0.25, 0.4], holdGround: true, charge: 3, volley: 5 },
+};
 
 /** Styles a player can pick (a fallback such as the drawn gladius is not one). */
 export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden);

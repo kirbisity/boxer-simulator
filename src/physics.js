@@ -2950,12 +2950,27 @@ function struckParticles(defender, capsule, closest, contactPoint, push) {
  * or bare-headed, nothing changes.
  */
 function helmetGlance(defender, capsule, relative, closing) {
-  const curve = capsule.key === 'head' ? defender.body.gear.helmet?.curve ?? 0 : 0;
+  const curve = surfaceCurve(defender, capsule.key);
   if (!(curve > 0)) return { share: 1, twist: 1 };
   const speed = vec.length(relative);
   const square = speed > 1e-6 ? Math.min(1, Math.max(0, closing / speed)) : 1;
   const off = curve * (1 - square);
   return { share: Math.max(0, 1 - WORLD.helmet.glance * off), twist: Math.max(0, 1 - WORLD.helmet.slide * off) };
+}
+
+/** How curved the hard surface a blow meets on this part is: his helmet on the head, a plate breastplate on the trunk. */
+export function surfaceCurve(defender, key) {
+  const gear = defender.body.gear;
+  if (key === 'head') return gear.helmet?.curve ?? 0;
+  if (key === 'trunk') return gear.breastplate ?? 0;
+  return 0;
+}
+
+/** Of a blow along `dir` meeting a surface of this `curve` with outward `normal`, the share that goes in (the rest skids off). */
+export function glanceShare(curve, dir, normal) {
+  if (!(curve > 0)) return 1;
+  const square = Math.min(1, Math.max(0, -vec.dot(dir, normal)));
+  return Math.max(0, 1 - WORLD.helmet.glance * curve * (1 - square));
 }
 
 /** The mass a struck part brings to a collision: the part, and what is braced behind it. */

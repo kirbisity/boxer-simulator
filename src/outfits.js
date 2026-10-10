@@ -388,6 +388,8 @@ export const OUTFITS = {
   knight: {
     faction: 'knights', bulletRating: 650, plated: true,
     label: 'Knight — full plate',
+    // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
+    breastplate: 0.8,
     // Arrows glance off it.
     arrowproof: true,
     sidearm: 'dagger',
@@ -421,6 +423,8 @@ export const OUTFITS = {
   joan: {
     faction: 'knights', bulletRating: 650, plated: true,
     label: 'Joan of Arc — white harness', arrowproof: true, sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
+    // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
+    breastplate: 0.8,
     cutProof: true,
     extraMass: 0.45,
     protection: { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0, torso: 0.7, limb: 0.3 }, regions: { head: ARENA.bare } },
@@ -914,7 +918,7 @@ export const OUTFITS = {
   kheshig: {
     faction: 'steppe',
     label: 'Kheshig — the Khan\'s guard', movement: 'good', fists: 'bare',
-    sidearm: 'saber',
+    sidearm: 'mace',
     arrowproof: true,
     extraMass: 0.38,
     protection: { blunt: 0.55, cut: 0.92, pierce: 0.8, bullet: { head: 0.4, torso: 0.4, limb: 0.2 } },
@@ -1014,6 +1018,8 @@ export const OUTFITS = {
   conquistadorPlate: {
     faction: 'knights', plated: true,
     label: 'Conquistador — breastplate', family: 'conquistador', movement: 'good', fists: 'bare',
+    // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
+    breastplate: 0.8,
     sidearm: 'espada',
     spare: 'dagger',
     extraMass: 0.3,
@@ -1381,6 +1387,8 @@ export function gearTraits(inputs) {
     headBulk: spec.headBulk ?? 1,
     // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve.
     helmet: HELMETS[look.head?.kind] ?? NO_HELMET,
+    // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
+    breastplate: spec.breastplate ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost.
     sidearm: spec.sidearm ?? null,
     spare: spec.spare ?? null,

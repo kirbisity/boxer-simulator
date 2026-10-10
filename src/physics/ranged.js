@@ -5,7 +5,7 @@
 import { buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
 import { STYLES } from '../moves.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
-import { aimPoint, BLOCKING, breakJoint, capsules, closestBetween, dropWeapon, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, toLocal, toWorld } from '../physics.js';
+import { aimPoint, BLOCKING, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
 import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir } from '../weapons.js';
@@ -173,6 +173,8 @@ export function drawBow(world, fighter, punch, target, intent) {
  */
 export function loose(world, fighter, bolt = null) {
   const punch = fighter.punch;
+  // Arrows (and bolts) loosed this bout: a volley style counts them (ranged.volley).
+  fighter.loosed = (fighter.loosed ?? 0) + 1;
   const weapon = fighter.weapon;
   const grip = point(fighter.x, P[`${weapon.main}Hand`]);
   const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(grip, yawRotate([1, 0, 0], fighter.yaw));
@@ -246,6 +248,21 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   const gear = victim.body.gear;
   const key = hit.capsule.key;
   world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse });
+  // A curved helmet or breastplate turns an arrow that does not meet it square: mostly glancing, it skids off; else it goes in with what is left.
+  const curve = hit.throat ? 0 : surfaceCurve(victim, key);
+  if (curve > 0) {
+    const [a, b] = capsuleEnds(victim, hit.capsule);
+    const axis = vec.sub(b, a);
+    const t = Math.max(0, Math.min(1, vec.dot(vec.sub(hit.point, a), axis) / Math.max(1e-9, vec.dot(axis, axis))));
+    const normal = vec.normalize(vec.sub(hit.point, vec.add(a, vec.scale(axis, t))));
+    const share = glanceShare(curve, dir, normal);
+    if (share < WORLD.helmet.glancedBelow) {
+      event.bounced = true;
+      event.effects.push(key === 'head' ? 'glances off the helmet' : 'glances off the breastplate');
+      return;
+    }
+    energy *= share;
+  }
   // Proof against arrows only where it is rigid (cut-proof plate or lamellar): an arm or leg left open is not.
   const proof = gear.arrowproof && (hit.throat || (protectionAt(gear, key).cut ?? 0) >= BLADES.gaps.rigidFrom);
   if (proof && world.random() < bounce) {

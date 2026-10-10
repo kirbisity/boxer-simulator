@@ -1238,7 +1238,9 @@ export function think(world, fighter, dt) {
   }
   // A gun: keep away and shoot; once he is in close, drop it and fight mixed.
   const gun = style.ranged && fighter.weapon?.held && !fighter.weapon.spent ? style.ranged : null;
-  if (gun && distance > gun.close) {
+  // A volley style (`ranged.volley`) shoots that many and then goes in, however far he is.
+  const volleySpent = Boolean(gun?.volley) && (fighter.loosed ?? 0) >= gun.volley;
+  if (gun && distance > gun.close && !volleySpent) {
     gunfight(world, fighter, opponent, distance, gun, dt);
     return;
   }

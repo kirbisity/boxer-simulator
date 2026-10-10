@@ -250,8 +250,8 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   kheshig: {
-    // The Khan's guard rode as heavy archers first: the bow, then the sabre (his kit's sidearm) when it comes to hands.
-    name: 'Subutai', style: 'steppeBow', sex: 'male', heightCm: 161, frame: 'large', age: 44, exercise: 0.65, calories: 4025,
+    // The Khan's guard rode as heavy archers first: a quick volley, then in with the mace.
+    name: 'Subutai', style: 'kheshigBow', sex: 'male', heightCm: 161, frame: 'large', age: 44, exercise: 0.65, calories: 4025,
     outfit: { kind: 'kheshig', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
