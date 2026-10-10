@@ -206,6 +206,13 @@ export const WORLD = {
   // A blow to the head: share of a blocked blow that still reaches it
   // through the guard; the peak force (N) past which a fist splits the skin.
   head: { blockedShare: 0.12, cutForce: 1800 },
+  // A blow's toll on the striking limb: of the speed change it suffers beyond
+  // what the same blow on a man its own size would give, `share` counts as
+  // damage to its bone (m/s, as a struck part's); a glove passes `gloved` of
+  // it; the struck part's blunt armour adds `armour` × its protection. Set
+  // so that a light man (~65 kg) beating on a sumo (~150 kg) breaks a hand
+  // or a shin in a few dozen full blows, and equal weights never do.
+  strikerRecoil: { share: 0.7, gloved: 0.4, armour: 1 },
   hurt: {
     chinPerHeadDamage: 0.35, chinPerKnockdown: 0.1, stunPerDeltaV: 0.6,
     hurtSeconds: 8, hurtPerKnockdown: 4, hurtStrength: 0.65,

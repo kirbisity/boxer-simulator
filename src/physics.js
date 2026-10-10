@@ -3042,6 +3042,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const harm = harmShare(attacker, defender, spec, capsule.key);
   event.harm = harm;
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked, rotation: spec.rotation * glance.twist, cuts: spec.cuts, cutForce: spec.limb.endsWith('Hand') ? fists.cutForce : Infinity, side, push: spec.push });
+  if (!striker.bash) strikerRecoil(attacker, defender, capsule, spec.limb, closing * glance.share, strikeMass, struckMass, event);
   if (spec.limb.endsWith('Hand') && !striker.bash && peakForce > attacker.body.fracture.hand * fists.handFracture * (blocked ? 0.8 : 1) && !attacker.injuries.some((injury) => injury.kind === 'hand' && injury.side === side)) {
     attacker.injuries.push({ kind: 'hand', side, time: world.time });
     event.effects.push(`${attacker.body.inputs.name}: broken hand`);
@@ -3050,6 +3051,35 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   if (defender.weapon?.held && capsule.key.startsWith(defender.weapon.main) && BLOCKING.has(capsule.key)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1));
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, harm, blocked, spec, RECOIL[spec.limb.slice(1)].map(([part, share]) => [P[`${side}${part}`], share]), time, event);
   world.events.push(event);
+}
+
+// The bone a striking part loads: a fist the forearm's, an elbow the upper arm's, a kick the shin's, a knee the thigh's.
+const STRIKER_BONE = { Hand: 'Forearm', Elbow: 'UpperArm', Foot: 'Shank', Knee: 'Thigh' };
+
+/**
+ * The blow's toll on the limb that throws it. The same impulse stops the
+ * striking part as moves the part struck; how hard it is stopped depends on
+ * what it meets. Against a man of his own size that is what his limbs are
+ * built for and costs nothing; against a much heavier body (a bigger,
+ * denser part braced behind it) the limb is stopped harder than that, and
+ * the excess (WORLD.strikerRecoil) wears its bone: a light man hammering a
+ * giant can break his own hand or shin before he hurts him. Padding on the
+ * limb (a glove, a greave) takes some of it; armour struck adds to it.
+ */
+function strikerRecoil(attacker, defender, capsule, limb, closing, strikeMass, struckMass, event) {
+  const spec = WORLD.strikerRecoil;
+  const bone = STRIKER_BONE[limb.slice(1)];
+  if (!bone) return;
+  const stopped = (mass) => (closing * (1 + WORLD.restitution) * mass) / (strikeMass + mass);
+  const asOwnSize = struckMass * (attacker.body.massKg / defender.body.massKg);
+  const excess = stopped(struckMass) - stopped(asOwnSize);
+  if (excess <= 0) return;
+  const key = `${limb[0]}${bone}`;
+  const padded = limb.endsWith('Hand') && glovedFists(attacker.body.inputs) ? spec.gloved : 1 - (protectionAt(attacker.body.gear, key).blunt ?? 0);
+  const hard = 1 + spec.armour * (protectionAt(defender.body.gear, capsule.key).blunt ?? 0);
+  const deltaV = excess * spec.share * padded * hard;
+  event.strikerDeltaV = deltaV;
+  addDamage(attacker, key, deltaV, false);
 }
 
 /**
