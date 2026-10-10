@@ -118,6 +118,17 @@ export const MOVES = {
   crescentSlash: { kind: 'strike', limb: 'lHand', path: 'hook', windup: 0.1, extendUntil: 0.3, duration: 0.5, twist: 0.45, shift: 0.03, cost: 0.026, mass: { arm: 0.7, body: 0.02 }, rotation: 1.3, cuts: true, zones: ['head', 'body'], reach: 'close' },
   gladiusThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.08, 0.6, -0.14], dir: [1, 0.1, 0.05] }, windup: 0.06, extendUntil: 0.3, duration: 0.5, twist: -0.6, lean: 0.12, shift: 0.08, depth: 0.25, step: 1.5, cost: 0.02, mass: { arm: 0.6, body: 0.03 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
   gladiusCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.0, 0.88, -0.2], dir: [-0.55, 0.65, -0.4] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.28, 0.5, 0.12], dir: [0.5, -0.6, 0.45] }, windup: 0.1, extendUntil: 0.3, duration: 0.6, twist: -0.6, lean: 0.12, shift: 0.05, cost: 0.024, mass: { arm: 0.6, body: 0.02 }, rotation: 0.7, zones: ['body', 'head'], reach: 'weapon' },
+  // The duellist's sword in one hand (rapier, jian): the lunge, the body
+  // turned fully side-on behind the arm and the rear leg driving, the free
+  // arm flung back as a counterweight (`counterArm`, local in heights) so he
+  // can lean out past his feet and still recover; it carries the point
+  // `lunge` of his height further than a thrust from the guard.
+  swordLunge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.2, 0.68, -0.12], dir: [1, 0.05, 0.02] }, windup: 0.05, extendUntil: 0.3, duration: 0.56, twist: -0.95, lean: 0.3, shift: 0.22, depth: 0.3, step: 2.4, cost: 0.024, extendShare: 0.6, mass: { arm: 0.5, body: 0.08 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon', lunge: 0.14, counterArm: [-0.3, 0.74, 0.14] },
+  // A quick thrust from the guard: the arm alone, the point in and out.
+  quickThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.14, 0.66, -0.12], dir: [1, 0.06, 0.03] }, windup: 0.04, extendUntil: 0.22, duration: 0.38, twist: -0.45, lean: 0.1, shift: 0.06, depth: 0.22, step: 1.2, cost: 0.015, extendShare: 0.65, mass: { arm: 0.5, body: 0.03 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon' },
+  // The jian's flicking cut: from the wrist and elbow, a short arc with the
+  // last third of the blade, back on guard before he can answer.
+  flickCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.1, 0.8, -0.16], dir: [-0.2, 0.8, -0.35] }, mid: [0.95, 0.1, 0.1], to: { hand: [0.3, 0.6, 0.06], dir: [0.6, -0.55, 0.35] }, windup: 0.05, extendUntil: 0.22, duration: 0.4, twist: -0.4, lean: 0.1, shift: 0.04, cost: 0.016, mass: { arm: 0.5, body: 0.015 }, rotation: 0.9, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.8 },
   // Whole-body moves.
   // A charge runs until it meets the other body or runs out of steam.
   rush: { kind: 'rush', duration: 1.2, cost: 0.05 },
@@ -730,14 +741,14 @@ export const STYLES = {
   // with the legs behind them) and the occasional cut; parries with the blade.
   rapier: {
     label: 'Rapier', weapon: 'rapier', fallback: 'mix',
-    cadence: { work: 1.1, move: 1, burst: 0.5, mobility: 0.65 },
+    cadence: { work: 1.3, move: 1.1, burst: 0.7, mobility: 0.8 },
     stance: { blade: 0.85, crouch: 0.06, width: 1.25, lean: 0.04, guardHeight: 0 },
     weaponGuard: { hand: [0.3, 0.68, -0.12], dir: [1, 0.08, 0.02] },
     idle: { bounce: 0.35, sway: 0.4, rock: 0.25 },
-    attacks: { spearHigh: 0.45, gladiusThrust: 0.35, gladiusCut: 0.2 },
-    combos: { 'gladiusThrust spearHigh': 0.6, 'gladiusCut gladiusThrust': 0.4 },
-    comboChance: 0.35,
-    tempo: 1,
+    attacks: { swordLunge: 0.4, quickThrust: 0.35, spearHigh: 0.15, gladiusCut: 0.1 },
+    combos: { 'quickThrust swordLunge': 0.5, 'quickThrust quickThrust': 0.3, 'gladiusCut quickThrust': 0.2 },
+    comboChance: 0.45,
+    tempo: 0.8,
     defences: { weaponBlock: 0.7, stepBack: 0.3 },
     defendChance: 0.72,
     headMovement: 0.1,
@@ -998,15 +1009,15 @@ export const STYLES = {
   // stepping away rather than blocking, always moving.
   wuxia: {
     label: 'Wuxia', weapon: 'jian', fallback: 'mix',
-    cadence: { work: 1.3, move: 0.95, burst: 0.75, mobility: 0.7 },
+    cadence: { work: 1.4, move: 1.05, burst: 0.8, mobility: 0.8 },
     stance: { blade: 0.58, crouch: 0.08, width: 1.16, lean: 0.07, guardHeight: 0 },
     weaponGuard: { hand: [0.17, 0.68, -0.07], dir: [1, 0.18, 0.06] },
     idle: { bounce: 0.4, sway: 0.6, rock: 0.35 },
-    attacks: { gladiusThrust: 0.5, gladiusCut: 0.38, forehand: 0.12 },
-    combos: { 'gladiusThrust gladiusCut': 0.4, 'gladiusCut gladiusThrust gladiusCut': 0.3, 'forehand gladiusThrust': 0.3 },
+    attacks: { flickCut: 0.32, swordLunge: 0.22, quickThrust: 0.22, gladiusCut: 0.16, forehand: 0.08 },
+    combos: { 'flickCut quickThrust': 0.3, 'flickCut flickCut swordLunge': 0.3, 'quickThrust flickCut': 0.2, 'forehand swordLunge': 0.2 },
     comboChance: 0.5,
     // Short rests between runs (tempo scales the rest after a blow).
-    tempo: 0.85,
+    tempo: 0.7,
     defences: { weaponBlock: 0.55, stepBack: 0.4, slip: 0.05 },
     defendChance: 0.78,
     headMovement: 0.15,
@@ -1496,7 +1507,7 @@ export function moveRange(move, body, weapon = null) {
   if (move.reach === 'gun') return 30;
   // A whip strikes with its thong's tip: its own `reach`, not its handle's length.
   if (move.reach === 'weapon' && weapon?.reach) return body.reach * 1.05 + weapon.reach;
-  if (move.reach === 'weapon') return body.reach * 1.05 + (weapon?.length ?? 0) * (move.mode === 'thrust' ? 0.9 : 0.85);
+  if (move.reach === 'weapon') return body.reach * 1.05 + (weapon?.length ?? 0) * (move.mode === 'thrust' ? 0.9 : 0.85) + (move.lunge ?? 0) * body.heightM;
   if (move.reach === 'leg') return legReach * 1.25;
   if (move.reach === 'close') return body.reach * 0.95;
   return body.reach * 1.3;

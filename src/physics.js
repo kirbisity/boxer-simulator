@@ -463,6 +463,15 @@ function weaponIntent(world, fighter, intent) {
   const oneHanded = weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && (fighter.net?.held || (punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil)));
   intent.twoHanded = !oneHanded;
   if (!oneHanded) intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, offHandAlong(weapon.spec)));
+  // A lunge: the free arm flung back behind him as a counterweight, out and back with the stroke.
+  const counter = punch?.spec.counterArm;
+  if (counter && oneHanded && !fighter.shield && !fighter.net?.held && punch.t < punch.spec.duration) {
+    const spec = punch.spec;
+    const out = punch.t < spec.extendUntil ? Math.min(1, punch.t / spec.extendUntil) : 1 - (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil);
+    const flung = vec.scale([counter[0], counter[1], weapon.off === 'l' ? counter[2] : -counter[2]], H);
+    const off = `${weapon.off}Hand`;
+    intent[off] = intent[off] ? vec.lerp(intent[off], flung, Math.sin(out * Math.PI * 0.5)) : flung;
+  }
   if (fighter.reloading && weapon.spec.shot && !weapon.loaded && !punch) {
     const spanning = weapon.spec.shot.bolt;
     const stroke = 0.5 - 0.5 * Math.cos(2 * Math.PI * LONG_GUN.ramPerSecond * (weapon.reloaded ?? 0));
