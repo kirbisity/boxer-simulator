@@ -50,7 +50,6 @@ export const WARRIORS = [
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
   // An iron-clad horse archer: the bow, then the sabre (his kit's sidearm) up close.
-  warrior('steppeLancer', 'Temür', PRESETS.maceShield, { name: 'Temür', style: 'steppeBow', outfit: { kind: 'steppeHeavy', design: 1 } }),
   warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
   warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
   // The sultanates' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.

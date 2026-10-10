@@ -122,7 +122,7 @@ function mingGarrisonDesign(label, coat, trousers) {
 // Brigandine: the coat's cloth, gilt rivets, the iron hat.
 // `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
 function mingBrigandineDesign(label, cloth, iron, look = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, gold: '#a8894e', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
@@ -768,6 +768,7 @@ export const OUTFITS = {
       mingBrigandineDesign('Black', '#1c1c20', '#6f747c'),
       mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }),
       mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a' }),
+      mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }),
     ],
   },
   // Ming elite: the long brigandine coat to the knee reinforced with plates,
@@ -942,9 +943,9 @@ export const OUTFITS = {
       steppeDesign('Blackened iron, red deel', { kind: 'mongolIron', color: '#34363a', lace: '#a8742a', fur: '#2a2420' }, '#8a1418', '#24201c', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#1c1a18' }),
     ],
   },
-  // The kheshig: Chinggis Khan's guard of the 1200s, a legend of an earlier
-  // age (not in the levels): gilt-bossed iron scale with broad shoulder
-  // guards, the masked helmet of the Khan's own men.
+  // The kheshig: the Khan's own guard, from Chinggis Khan's day on through
+  // the Northern Yuan khans (Mandukhai's, Ganbold's): gilt-edged iron
+  // scale with broad shoulder guards and a gilt boss, the masked helmet.
   kheshig: {
     faction: 'steppe',
     label: 'Kheshig — the Khan\'s guard', movement: 'good', fists: 'bare',
@@ -1473,8 +1474,8 @@ export function gearTraits(inputs) {
     helmet: HELMETS[look.head?.kind] ?? NO_HELMET,
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
-    // A second weapon carried with this kit (a style key), drawn once when the first is lost.
-    sidearm: spec.sidearm ?? null,
+    // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.
+    sidearm: inputs.sidearm ?? spec.sidearm ?? null,
     spare: spec.spare ?? null,
     arrowproof: Boolean(spec.arrowproof),
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },

@@ -250,9 +250,9 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   kheshig: {
-    // The Khan's guard rode as heavy archers first: a quick volley, then in with the mace.
+    // The Khan's guard rode as heavy archers first: a quick volley, then in with the mace (his own, carried with the iron lamellar).
     name: 'Subutai', style: 'kheshigBow', sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 4300,
-    outfit: { kind: 'kheshig', design: 0 }, accessories: [],
+    outfit: { kind: 'steppeHeavy', design: 0 }, accessories: [], sidearm: 'mace',
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
@@ -308,7 +308,7 @@ export const PRESETS = {
   },
   saber: {
     name: 'Mandukhai Khatun', style: 'saber', sex: 'female', heightCm: 158, frame: 'large', age: 30, exercise: 0.7, calories: 3250,
-    outfit: { kind: 'steppeMedium', design: 1 }, accessories: [],
+    outfit: { kind: 'kheshig', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   steppeBow: {
@@ -318,7 +318,7 @@ export const PRESETS = {
   },
   saberShield: {
     name: 'Ganbold', style: 'saberShield', sex: 'male', heightCm: 165, frame: 'large', age: 29, exercise: 0.65, calories: 4275,
-    outfit: { kind: 'steppeMedium', design: 0 }, accessories: [],
+    outfit: { kind: 'kheshig', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // Salah ad-Din Yusuf ibn Ayyub (1137–1193), Kurdish sultan of Egypt and

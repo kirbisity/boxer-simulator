@@ -78,6 +78,9 @@ export const LOFT = {
   // row down over the next; two punched holes (`holes`: heights up the plate,
   // `hole`: size as a share of the plate's width and height).
   lamellae: { lift: 0.035, tilt: 0.03, width: 0.86, overlap: 0.3, shoulder: 0.78, holes: [0.62, 0.36], hole: [0.26, 0.11] },
+  // A brigandine's rivet heads: three rows to a ring, each `size` of its column
+  // across (and as tall, along the piece), a hair proud of the cloth.
+  studs: { rowsPerRing: 3, size: 0.3, tall: 0.07, lift: 0.012 },
   // A light relaxation rounds the ring edges without losing the shapes.
   relaxPasses: 2,
   relaxAmount: 0.3,
@@ -264,11 +267,16 @@ export const ARMOR_KINDS = {
     trunk: [-0.05, 0.95, 1.12, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.8, 0.5, 1.24, { rows: ['cloth', 'cloth', 'cloth2'] }],
     upperArm: [-0.1, 1.0, 1.12, 'cloth'],
   },
-  // Ming brigandine: plates riveted inside a long cloth coat past the waist,
-  // short riveted sleeves, steel bracers; cloth below.
+  // Ming brigandine (bumianjia, cloth-faced armour): iron plates riveted
+  // inside a long coat of cloth, the brass rivet heads in rows over it; its
+  // edges and the front opening bound in a dark cloth; a buckled belt; the
+  // skirt to below the knee, split before, behind and at the sides for
+  // walking and riding; studded shoulder guards over the upper arms; steel
+  // bracers.
   mingBrigandine: {
-    trunk: [-0.06, 0.96, 1.2, { rivets: 4, base: 'cloth' }], skirt: [0.72, 0.55, 1.32, { rivets: 4, base: 'cloth' }],
-    upperArm: [-0.2, 0.5, 1.5, { rivets: 4, base: 'cloth' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
+    trunk: [[-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', opening: 0.012 }], [0.14, 0.24, 1.3, { buckle: 'gold', base: 'leather' }]],
+    skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    upperArm: [-0.26, 0.62, 1.52, { studded: 12, base: 'cloth', edge: 'cloth2' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
   // A conquistador: the breastplate over the doublet, short tassets, mail
   // sleeves and collar; the doublet's cloth shows below.
@@ -318,8 +326,16 @@ export const ARMOR_KINDS = {
   },
   // The same men in lamellar: small iron plates laced in rows (`lace`).
   mingLamellar: {
-    trunk: [-0.06, 0.96, 1.2, { rows: ['steel', 'steel', 'lace'] }], skirt: [0.72, 0.55, 1.32, { rows: ['steel', 'steel', 'lace'] }],
-    upperArm: [-0.2, 0.5, 1.5, { rows: ['steel', 'lace'] }], forearm: [-0.04, -0.03, 1.26, 'steel'],
+    trunk: [[-0.06, 0.96, 1.2, { lamellae: 30, gaps: [0], gapWidth: 0.025 }], [0.14, 0.24, 1.36, { buckle: 'gold', base: 'leather' }]],
+    skirt: [0.92, 0.55, 1.32, { lamellae: 30, gaps: [0, Math.PI / 2, -Math.PI / 2], gapWidth: 0.06 }],
+    upperArm: [-0.26, 0.6, 1.52, { lamellae: 16 }], forearm: [-0.04, -0.03, 1.26, 'steel'],
+  },
+  // The same coat in iron scales: small plates hung from the row above, their
+  // pointed ends down, each row lying over the next.
+  mingScaleCoat: {
+    trunk: [[-0.06, 0.96, 1.2, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.025 }], [0.14, 0.24, 1.36, { buckle: 'gold', base: 'leather' }]],
+    skirt: [0.92, 0.55, 1.32, { lamellae: 30, pointDown: true, gaps: [0, Math.PI / 2, -Math.PI / 2], gapWidth: 0.06 }],
+    upperArm: [-0.26, 0.6, 1.52, { lamellae: 16, pointDown: true }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
   // The elite in scale armour: overlapping scales from the collar to the
   // knee, the mirror over the heart, the collar and arm guards as before.
@@ -364,8 +380,11 @@ export const ARMOR_KINDS = {
     trunk: [-0.06, 0.96, 1.16, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.9, 0.5, 1.24, { rows: ['cloth', 'cloth2'] }], upperArm: [-0.2, 0.45, 1.32, { rows: ['cloth', 'cloth2'] }],
   },
   kheshig: {
-    trunk: [-0.08, 1.0, 1.22, { scales: true, mirror: [0.62, 0.14, 'gold'] }], skirt: [1.05, 0.7, 1.34, { scales: true }], collar: 'steel',
-    upperArm: [[-0.32, 0.45, 1.6, { scales: true }], [0.45, 1.02, 1.36, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.03, 1.3, { rows: ['steel', 'steel2'] }],
+    trunk: [[-0.08, 1.0, 1.22, { lamellae: 30, pointDown: true }], [0.14, 0.24, 1.36, { buckle: 'gold', base: 'leather' }]],
+    skirt: [1.05, 0.7, 1.34, { lamellae: 30, pointDown: true, edge: 'gold', gaps: [0, Math.PI], gapWidth: 0.06 }], collar: 'steel',
+    upperArm: [[-0.32, 0.45, 1.6, { lamellae: 18, pointDown: true, edge: 'gold' }], [0.45, 1.02, 1.36, { rows: ['steel', 'steel2'] }]], forearm: [-0.04, -0.03, 1.3, { rows: ['steel', 'steel2'] }],
+    // The gilt boss over the heart.
+    studs: [[0.64, 0, 0.16, 1.32, 'gold']],
   },
   // The Mongol kit as worn by the steppe peoples into the 1600s: the deel to
   // mid-calf over a second robe of another colour showing at the hem, a
@@ -536,6 +555,13 @@ function paintFor(paint, armor) {
     // Scales: rows of them, each offset by half a scale from the one above,
     // the lower edge of every third row dark with its lacing so the rows read.
     if (paint.scales) return index % 3 === 2 ? 'lace' : (step + index) % 2 ? 'steel' : 'steel2';
+    // A brigandine (studded): its edges and front opening bound in the second
+    // colour, the splits showing it too; in a crowd, the rivets as dots.
+    if (paint.studded) {
+      if ((paint.edge && index === 0) || (paint.opening && Math.cos(angle) > 1 - paint.opening) || inLamellaGap(paint, angle)) return paint.edge ?? paint.base;
+      if (paint.studsDrawn) return paint.base;
+      return index % 2 === 1 && step % 2 === 0 ? 'gold' : paint.base;
+    }
     // Lamellae drawn plainly (a crowd): rows of plates and their lacing; the robe in the splits.
     if (paint.lamellae) return inLamellaGap(paint, angle) ? 'cloth' : index % 3 === 2 ? 'lace' : 'steel';
     // A belt with its buckle in front; a braided cord.
@@ -626,6 +652,15 @@ function lamellaeOn(mesh, rings, inflate, paint, bones) {
       const along = (u) => foot + way * u;
       const out = (u) => inflate + spec.lift + spec.tilt * Math.max(0, 1 - u);
       const bottom = -spec.overlap;
+      if (paint.pointDown) {
+        // Scales: hung from the top, the free end pointed and lying over the row below; no lacing holes showing.
+        const waist = bottom + (1 - bottom) * (1 - spec.shoulder);
+        addPatch(mesh, rings, [
+          [along(1), angle - half, out(1)], [along(1), angle + half, out(1)],
+          [along(waist), angle + half, out(waist)], [along(bottom), angle, out(bottom)], [along(waist), angle - half, out(waist)],
+        ], role, bones);
+        continue;
+      }
       addPatch(mesh, rings, [
         [along(bottom), angle - half, out(bottom)], [along(bottom), angle + half, out(bottom)],
         [along(spec.shoulder), angle + half, out(spec.shoulder)], [along(1), angle, out(1)], [along(spec.shoulder), angle - half, out(spec.shoulder)],
@@ -640,6 +675,33 @@ function lamellaeOn(mesh, rings, inflate, paint, bones) {
           [along(u + high / 2), angle + half * across, lift], [along(u + high / 2), angle - half * across, lift],
         ], 'lace', bones);
       }
+    }
+  }
+}
+
+/**
+ * A brigandine's rivets: the heads of the rivets that hold its plates inside
+ * the cloth, in rows (`LOFT.studs.rowsPerRing` to a ring), `paint.studded`
+ * round, each row offset half a column from the last; none on the bound
+ * edges, the front opening or the splits.
+ */
+function studsOn(mesh, rings, inflate, paint, bones) {
+  const spec = LOFT.studs;
+  const columns = paint.studded;
+  const rows = (rings.length - 1) * spec.rowsPerRing;
+  const half = (Math.PI / columns) * spec.size;
+  const out = inflate + spec.lift;
+  for (let row = 0; row < rows; row += 1) {
+    const place = (row + 0.5) / spec.rowsPerRing;
+    // Clear of the hem's binding (the lowest ring's band).
+    if (paint.edge && place < 0.6) continue;
+    for (let column = 0; column < columns; column += 1) {
+      const angle = ((column + (row % 2) * 0.5) / columns) * Math.PI * 2;
+      if (inLamellaGap(paint, angle) || (paint.opening && Math.cos(angle) > 1 - paint.opening * 3)) continue;
+      addPatch(mesh, rings, [
+        [place - spec.tall, angle - half, out], [place - spec.tall, angle + half, out],
+        [place + spec.tall, angle + half, out], [place + spec.tall, angle - half, out],
+      ], 'gold', bones);
     }
   }
 }
@@ -844,7 +906,10 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
       return;
     }
-    loft(mesh, rings, sides, { color: paintFor(paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+    const studsDrawn = Boolean(paint?.studded && !lowDetail);
+    loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+    // A brigandine's rivet heads, each its own small square (not in a crowd).
+    if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, bones ?? (() => null));
   };
   // Lamellar: rows of lacquered scales, laced between rows and down each column.
   const laced = (ring, angle, index) => (index % 3 === 2 ? 'lace' : 'steel');

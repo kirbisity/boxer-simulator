@@ -58,8 +58,8 @@ test('a Ming garrison man who loses his weapon fights with his hands; a brigandi
   }
 });
 
-test('Ming brigandine men may wear lamellar and elites scale, with the same protection', () => {
+test('Ming brigandine men may wear lamellar or scale and elites scale, with the same protection', () => {
   const kinds = (outfit) => new Set(OUTFITS[outfit].designs.map((design) => design.armor.kind));
-  assert.deepEqual([...kinds('mingBrigandine')].sort(), ['mingBrigandine', 'mingLamellar']);
+  assert.deepEqual([...kinds('mingBrigandine')].sort(), ['mingBrigandine', 'mingLamellar', 'mingScaleCoat']);
   assert.deepEqual([...kinds('mingElite')].sort(), ['mingElite', 'mingScale']);
 });
