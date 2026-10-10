@@ -30,6 +30,8 @@ export const TOPS = {
   haramaki: { hem: -0.02, neck: 0.45, loose: 1.05, sleeve: 0 },
   // A ball gown's bodice, off the shoulder, with short puffed sleeves.
   bodice: { hem: 0, neck: 0.86, loose: 1.04, sleeve: 0.32, sleeveLoose: 1.55 },
+  // A kosode worn for the road: wide sleeves to below the elbow, wrapped across, its skirt tucked into the hakama.
+  kosode: { hem: -0.1, neck: 0.97, loose: 1.12, sleeve: 1.2, sleeveLoose: 1.42 },
   // A medieval tunic: to the waist as a shirt, then a skirt to mid-thigh (`skirt`, thigh shares), belted.
   tunic: { hem: -0.1, neck: 0.97, loose: 1.12, sleeve: 1.7, sleeveLoose: 1.26, skirt: 0.5 },
 };
@@ -191,12 +193,15 @@ export const ARMOR_KINDS = {
     trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, LACED], collar: 'steel',
     upperArm: [-0.18, 0.45, 1.62, LACED], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
   },
-  // A rōnin's odd pieces of tōsei gusoku: the riveted cuirass and its short
-  // laced skirt, and the haidate (small plates laced on cloth) over the
-  // thighs; arms and shins in his own clothes.
+  // A rōnin on the road: his odd pieces of tōsei gusoku (the riveted
+  // cuirass and its short laced skirt over the kosode, the haidate over the
+  // hakama), a sash of two colours, the forearms bound in cloth, gaiters
+  // (kyahan) over the shins.
   roninDo: {
     trunk: [-0.08, 1.0, 1.18, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.4, 0.36, 1.22, LACED],
-    thigh: [0.05, 0.88, 1.42, { rows: ['steel', 'steel', 'lace'] }],
+    belt: [0.02, 0.14, 1.3, { rows: ['cloth2', 'gold', 'cloth2'] }],
+    thigh: [0.05, 0.88, 1.5, { rows: ['steel', 'steel', 'lace'] }],
+    forearm: [0.3, -0.04, 1.2, 'cloth2'], shin: [0.08, 0.88, 1.3, 'cloth'],
   },
   // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,
   // cloth sleeves and simple shin guards.

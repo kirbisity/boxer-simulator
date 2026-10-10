@@ -117,6 +117,15 @@ function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
 function steppeDesign(label, armor, deel, trim, head, feet = '#141210') {
   return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, leather: '#4a2e1a', ...armor }, head, feet: { kind: 'jinBoot', color: feet } };
 }
+// A rōnin: kosode, hakama, sugegasa, the cloak and his pieces of armour (roninDo).
+function roninDesign(label, { kosode, hakama, cloak, steel, lace, sash, band, gaiters }) {
+  return {
+    label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama },
+    armor: { kind: 'roninDo', color: steel, lace, gold: band, cloth: gaiters, cloth2: sash },
+    head: { kind: 'kasa', color: '#c8a868' }, feet: { kind: 'sandal', color: '#5a3a22' },
+    extras: [{ kind: 'mantle', color: cloak, length: 1.0 }],
+  };
+}
 // A hex colour darker (or lighter) by a share.
 function shade(hex, share) {
   const value = parseInt(hex.slice(1), 16);
@@ -1096,20 +1105,22 @@ export const OUTFITS = {
     faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
     sidearm: 'wakizashi',
-    // A masterless man keeps what armour he can carry and run in: a tōsei
-    // cuirass and the haidate over his thighs, no helmet, no sleeves, no
-    // greaves. The trunk as a samurai's dō; the thighs behind small plates
-    // laced on cloth; head and the rest of the limbs bare (`regions`).
-    extraMass: 0.18,
+    // A masterless man on the road: the kosode and the hakama tied at the
+    // knee, a straw kasa low over the eyes, a travelling cloak, sandals; and
+    // what armour he can carry and still run in, a tōsei cuirass and the
+    // haidate over his thighs, no helmet, no sleeves, no greaves. The trunk
+    // as a samurai's dō; the thighs behind small plates laced on cloth;
+    // head and the rest of the limbs bare (`regions`).
+    extraMass: 0.2,
     protection: {
       blunt: 0.6, cut: 0.9, pierce: 0.65, bullet: { head: 0, torso: 0.5, limb: 0.05 },
       regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Thigh: { blunt: 0.35, cut: 0.75, pierce: 0.45 } },
     },
     courage: 0.4,
     designs: [
-      { label: 'Indigo kimono', top: { kind: 'flannel', color: '#1f2a4a' }, bottom: { kind: 'pants', color: '#3a3a40' }, armor: { kind: 'roninDo', color: '#5a5e66', lace: '#2a5aa8', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#ece4d0' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Grey kimono', top: { kind: 'flannel', color: '#5a5a5e' }, bottom: { kind: 'pants', color: '#1c1c20' }, armor: { kind: 'roninDo', color: '#17171a', lace: '#b3161b', gold: '#d6a743' }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Brown kimono', top: { kind: 'flannel', color: '#5a3a22' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'roninDo', color: '#6b4a32', lace: '#c9a23a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' }, hair: 'topknot' },
+      roninDesign('Brown cloak, white kosode', { kosode: '#e4dfd2', hakama: '#4a3e34', cloak: '#4a3020', steel: '#2a2a2e', lace: '#2a3a6a', sash: '#e8e2d2', band: '#c9a23a', gaiters: '#5a6270' }),
+      roninDesign('Grey cloak, indigo kosode', { kosode: '#2a3550', hakama: '#3a3a40', cloak: '#55534e', steel: '#3b3e44', lace: '#b3161b', sash: '#e8e2d2', band: '#b3161b', gaiters: '#2a2c30' }),
+      roninDesign('Black cloak, grey kosode', { kosode: '#8a8780', hakama: '#2a2622', cloak: '#1c1a18', steel: '#6b4a32', lace: '#c9a23a', sash: '#d8cfb8', band: '#3a2416', gaiters: '#4a4a50' }),
     ],
   },
   // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth
