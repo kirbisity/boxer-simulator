@@ -23,6 +23,13 @@ test('obsidian cuts flesh better than steel does, but chips on armour', () => {
   assert.ok(WEAPONS.macuahuitl.brittle > 0 && WEAPONS.macuahuitl.brittle < 1 && !WEAPONS.espada.brittle);
 });
 
+test('obsidian flakes set in wood: a short club and a short spear that cut shallow and strike lighter', () => {
+  const { macuahuitl, tepoztopilli, katana, spear, espada } = WEAPONS;
+  assert.ok(macuahuitl.length < espada.length && tepoztopilli.length <= spear.length);
+  assert.ok(macuahuitl.harm.swing.cut < katana.harm.swing.cut);
+  for (const club of [macuahuitl, tepoztopilli]) assert.ok(club.cleave < 1 && club.harm.swing.blunt < katana.harm.swing.blunt + 0.01);
+});
+
 test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin among Koxinga\'s men', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.zeelandia.cast(seededRandom(2));

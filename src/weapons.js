@@ -355,20 +355,28 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 1.6, cut: 0.08, blunt: 0.03 }, swing: { cut: 0.4, blunt: 0.05 } },
     contactSeconds: 0.003, rotation: 0.5, wrist: { omega: 26, zeta: 0.8 }, threat: 3.8,
   },
-  // The macuahuitl: a flat oak club edged both sides with obsidian blades.
-  // Obsidian cuts flesh as nothing else does (`cut`), but it is glass: each
-  // blow on steel or hard armour chips the edge (`brittle`: what is left of
-  // its cutting after such a blow), while the oak still strikes (`blunt`).
+  // The macuahuitl: a flat oak club edged both sides with obsidian blades,
+  // about 70 cm. Obsidian is sharper than steel but its flakes are small and
+  // set in a groove: they open the skin, not deep into a limb, and snap off
+  // as they go (`cut` a little above a sword's, well short of a katana's
+  // drawn cut); on steel or hard armour the edge chips away (`brittle`: what
+  // is left of its cutting after such a blow). A flake stands a few
+  // millimetres proud of the wood, so the cut stops at the bone: it takes
+  // a limb off only by a far harder blow than steel needs (`cleave`: the
+  // share of the cut that goes on into bone). The thin oak paddle is light
+  // and flexes, so it bruises less than a club (`blunt`).
   macuahuitl: {
-    label: 'Macuahuitl', hands: 'one', length: 0.8, strikeFrom: 0.2, handle: 0.18, mass: 1.4, balance: 0.38, radius: 0.03, brittle: 0.7,
-    harm: { swing: { cut: 1.5, blunt: 0.7 }, thrust: { blunt: 0.5 } },
-    contactSeconds: 0.004, rotation: 0.85, wrist: { omega: 20, zeta: 0.8 }, threat: 3.6,
+    label: 'Macuahuitl', hands: 'one', length: 0.7, strikeFrom: 0.18, handle: 0.16, mass: 1.15, balance: 0.36, radius: 0.028, brittle: 0.55, cleave: 0.4,
+    harm: { swing: { cut: 1.0, blunt: 0.4 }, thrust: { blunt: 0.3 } },
+    contactSeconds: 0.004, rotation: 0.85, wrist: { omega: 21, zeta: 0.8 }, threat: 3.2,
   },
-  // The tepoztopilli: a broad wooden spearhead edged with obsidian, for cut and thrust.
+  // The tepoztopilli: a broad wooden head edged with obsidian flakes on a
+  // short shaft, more a thrusting club than a steel spear: the flakes cut
+  // shallow and the wooden point goes in less than iron.
   tepoztopilli: {
-    pointFrom: 0, label: 'Tepoztopilli', hands: 'two', length: 1.5, strikeFrom: 1.15, handle: 0.4, spacing: 0.42, leadAhead: true, mass: 2.0, balance: 0.6, radius: 0.02, brittle: 0.7,
-    harm: { thrust: { pierce: 0.8, cut: 0.5, blunt: 0.25 }, swing: { cut: 1.1, blunt: 0.45 } },
-    contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
+    pointFrom: 0, label: 'Tepoztopilli', hands: 'two', length: 1.3, strikeFrom: 0.98, handle: 0.38, spacing: 0.4, leadAhead: true, mass: 1.7, balance: 0.58, radius: 0.02, brittle: 0.55, cleave: 0.4,
+    harm: { thrust: { pierce: 0.65, cut: 0.3, blunt: 0.15 }, swing: { cut: 0.7, blunt: 0.3 } },
+    contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 14, zeta: 0.85 }, threat: 3.4, grip: 0.5,
   },
   // The kanabo: a long oak club shod with iron studs, swung in two hands.
   // Heavy (~5 kg of iron-shod oak), its weight spread along the swelling

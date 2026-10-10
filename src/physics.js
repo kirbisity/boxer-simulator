@@ -3335,9 +3335,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const limb = capsule.key !== 'head' && capsule.key !== 'trunk';
   const square = Math.max(0, 1 - vec.length(vec.sub(closest.onFirst, closest.onSecond)) / capsule.radius);
   const toBone = (joules) => (limb ? boneShare(joules, square) : 1);
+  // An edge that cannot bite deep (`cleave`: obsidian flakes in a wooden groove) opens the flesh but takes less of the bone.
+  const cleaving = cut * (wspec.cleave ?? 1);
   if (cut > 0.5) {
     wound(defender, 'cut', cut, capsule.key, attacker);
-    addDamage(defender, capsule.key, cut / 6, false, toBone(cut));
+    addDamage(defender, capsule.key, cut / 6, false, toBone(cleaving));
     event.effects.push(cut > 40 ? 'deep cut' : 'cut');
   }
   if (pierce > 0.5) {
@@ -3348,7 +3350,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   let through = false;
   if (defender.state !== 'out') {
     const joint = cut > 0 ? jointAt(defender, capsule, closest.t, contactPoint) : null;
-    if (joint && cut > severThreshold(defender, joint)) {
+    if (joint && cleaving > severThreshold(defender, joint)) {
       sever(world, defender, joint, event, bladeVelocity);
       through = true;
     } else if (pierce > BLADES.lethalPierce * BODY.toughness && vital(defender, capsule, contactPoint)) {
@@ -3425,7 +3427,7 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away) {
     wound(attacker, 'cut', cut, limbKey, defender);
     addDamage(attacker, limbKey, cut / 6, false);
     event.effects.push(cut > 25 ? 'deep cut' : 'cut');
-    if (attacker.state !== 'out' && cut > severThreshold(attacker, { joint: meets.joint, side })) sever(world, attacker, { joint: meets.joint, side }, event, vec.scale(relative, -1));
+    if (attacker.state !== 'out' && cut * (weapon.spec.cleave ?? 1) > severThreshold(attacker, { joint: meets.joint, side })) sever(world, attacker, { joint: meets.joint, side }, event, vec.scale(relative, -1));
   }
   const chain = striker.shin ? [[P[`${side}Foot`], 1], [P[`${side}Knee`], 0.7]] : (RECOIL[striker.key.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${side}${part}`], share]);
   world.pendingImpulses.push({ fighter: attacker, shares: chain, direction: away, impulse });
