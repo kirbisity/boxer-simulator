@@ -621,24 +621,31 @@ export const WEAPONS = {
 // Shields strapped to the off forearm: a disc of this radius held off the
 // arm, facing where the fighter faces. A strike that meets it is stopped
 // there; its momentum goes into the arm and the body braced behind it.
+// `hold`: how fast it is held on the arm against a blow that would tear it
+// off (× the hand's grip; WORLD.shield.wrench). On arm straps (enarmes and a
+// guige: the heater, the rodela, a riot shield) the whole forearm holds it and
+// it is hard to lose; on a single grip behind the boss (the parma, a round
+// shield, the kalkan) the hand alone; a buckler, held out in the fist, least of
+// all. The scutum's horizontal grip is braced along the forearm and against the
+// body; the scissor's tube is on the arm itself.
 export const SHIELDS = {
   // The parma: small, round, convex bronze — far smaller than a hoplon.
-  parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15 },
+  parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15, hold: 1.0 },
   // A Ming soldier's small round shield: lacquered wood with an iron rim and a boss.
-  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, look: 'ming' },
+  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, hold: 1.1, look: 'ming' },
   // The Spanish rodela: a round steel shield, heavy and proof against cuts and thrusts.
-  rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, look: 'steel' },
+  rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, hold: 1.4, look: 'steel' },
   // The Mexica chimalli: a round shield of wicker or wood faced with feathers and hide.
-  chimalli: { label: 'Chimalli', radius: 0.33, mass: 1.6, offset: 0.07, armHarm: 0.2, look: 'feather' },
+  chimalli: { label: 'Chimalli', radius: 0.33, mass: 1.6, offset: 0.07, armHarm: 0.2, hold: 1.3, look: 'feather' },
   // A small round iron parry shield, held out to meet a blow.
-  buckler: { label: 'Iron buckler', radius: 0.2, mass: 1.4, offset: 0.06, armHarm: 0.12, look: 'steel' },
+  buckler: { label: 'Iron buckler', radius: 0.2, mass: 1.4, offset: 0.06, armHarm: 0.12, hold: 0.6, look: 'steel' },
   // The kalkan: the Turkish and steppe round shield of wicker bound in
   // coloured thread round an iron boss; light and springy.
-  kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, look: 'ming' },
+  kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, hold: 1.1, look: 'ming' },
   // The Ayyubid horseman's round shield (turs): boards faced with dark
   // leather, ~0.65 m across, a rawhide rim and an iron boss; heavier than
   // the wicker kalkan of later centuries, and stiffer under a blow.
-  turs: { label: 'Turs', radius: 0.32, mass: 2.8, offset: 0.07, armHarm: 0.15, look: 'turs' },
+  turs: { label: 'Turs', radius: 0.32, mass: 2.8, offset: 0.07, armHarm: 0.15, hold: 1.3, look: 'turs' },
   // Shaped shields (`shape: 'curved'`): a rectangle `width` × `height` (m)
   // bent round a vertical axis (`curve`, the bend's radius), held upright by
   // a grip at its middle. The scutum of the murmillo and the secutor: plywood
@@ -647,17 +654,17 @@ export const SHIELDS = {
   // the body: blows go round it to the head or the forward leg.
   // A police riot shield: clear polycarbonate, ~0.6 × 1.05 m, slightly
   // curved; it stops blows, thrown things and edges, not rounds.
-  riotShield: { label: 'Riot shield', shape: 'curved', width: 0.6, height: 1.05, curve: 1.2, mass: 4, offset: 0.1, armHarm: 0.07, look: 'riot' },
+  riotShield: { label: 'Riot shield', shape: 'curved', width: 0.6, height: 1.05, curve: 1.2, mass: 4, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'riot' },
   // The heater: the knight's shield of the 12th–13th century, ~0.6 × 0.8 m,
   // flat at the top and curving to a point below, a little bent round the
   // arm; wood faced with leather, painted (the Temple's white with its red cross).
-  heater: { label: 'Heater shield', shape: 'curved', width: 0.56, height: 0.8, curve: 0.75, mass: 4, offset: 0.1, armHarm: 0.08, look: 'heater' },
-  scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, look: 'scutum' },
+  heater: { label: 'Heater shield', shape: 'curved', width: 0.56, height: 0.8, curve: 0.75, mass: 4, offset: 0.1, armHarm: 0.08, hold: 1.6, look: 'heater' },
+  scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'scutum' },
   // The thraex's parmula: small and nearly square (~0.36 × 0.42 m), flat-ish.
-  parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, look: 'parmula' },
+  parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, hold: 1.1, look: 'parmula' },
   // The scissor's arm: a steel tube over the left forearm and fist, ending in
   // a crescent blade (~0.13 m round): it parries like a small shield.
-  scissores: { label: 'Scissores', radius: 0.13, mass: 2, offset: 0.12, armHarm: 0.04, look: 'scissores' },
+  scissores: { label: 'Scissores', radius: 0.13, mass: 2, offset: 0.12, armHarm: 0.04, hold: 4, look: 'scissores' },
 };
 
 /**
@@ -698,15 +705,79 @@ export function shieldClosest(p, shield) {
   return vec.add(axis, vec.add(vec.scale(shield.up, up), round));
 }
 
-/** Where a segment comes nearest a shield, sampled along it: { distance, point, along, from }. */
-export function segmentToShield(a, b, shield, samples = 10) {
-  let best = { distance: Infinity, point: shield.centre, along: 0 };
+/**
+ * Whether a point lies behind a shield's face, within its outline (not past
+ * its rim): what a blade or a fist there could only have reached through it.
+ */
+export function behindShield(p, shield) {
+  const side = shieldSide(p, shield);
+  return side.inside && side.height < 0;
+}
+
+/**
+ * A point against a shield: the nearest point on it, whether that is within
+ * its outline (not on the rim), the face's outward normal there (the side
+ * away from the man holding it), and the point's height over the face.
+ */
+function shieldSide(p, shield) {
+  const spec = shield.spec;
+  const onShield = shieldClosest(p, shield);
+  let inside;
+  let outward;
+  if (!spec?.shape) {
+    inside = vec.length(vec.sub(onShield, shield.centre)) < shield.radius - 1e-3;
+    outward = shield.normal;
+  } else {
+    const axis = vec.sub(shield.centre, vec.scale(shield.normal, spec.curve));
+    const d = vec.sub(onShield, axis);
+    const up = vec.dot(d, shield.up);
+    const angle = Math.atan2(vec.dot(d, shield.across), vec.dot(d, shield.normal));
+    inside = Math.abs(up) < spec.height / 2 - 1e-3 && Math.abs(angle) < spec.width / 2 / spec.curve - 1e-3;
+    outward = vec.scale(vec.sub(d, vec.scale(shield.up, up)), 1 / spec.curve);
+  }
+  return { onShield, inside, outward, height: vec.dot(vec.sub(p, onShield), outward) };
+}
+
+/**
+ * A segment (a blade, a limb, of this radius) against a shield, sampled along
+ * it: how deep it is in, where, and the way out — or null if clear. The shield
+ * is a thin plate a fast blade can pass in one substep: a segment with points
+ * both before and behind its face, within its outline, has gone into it from
+ * the front and goes back out that way, however far through; past the rim it
+ * meets the edge. A segment all behind the face (round the rim) is not in it.
+ */
+export function shieldContact(a, b, shield, radius) {
+  // A ball (a fist) is one point; a blade a point every 8 cm or so.
+  const length = vec.length(vec.sub(b, a));
+  const samples = length < 1e-6 ? 0 : Math.max(4, Math.min(24, Math.ceil(length / 0.08)));
+  const points = [];
+  let before = false;
+  let behind = false;
   for (let index = 0; index <= samples; index += 1) {
-    const along = index / samples;
+    const along = samples ? index / samples : 0;
     const p = vec.lerp(a, b, along);
-    const onShield = shieldClosest(p, shield);
-    const distance = vec.length(vec.sub(p, onShield));
-    if (distance < best.distance) best = { distance, point: onShield, along, from: p };
+    const side = shieldSide(p, shield);
+    if (side.inside) {
+      if (side.height >= 0) before = true;
+      else behind = true;
+    }
+    points.push({ along, p, side });
+  }
+  const through = before && behind;
+  let best = null;
+  for (const { along, p, side } of points) {
+    let depth;
+    let away;
+    if (side.inside && (side.height >= 0 || through)) {
+      depth = radius - side.height;
+      away = side.outward;
+    } else if (!side.inside) {
+      const offset = vec.sub(p, side.onShield);
+      const distance = vec.length(offset);
+      depth = radius - distance;
+      away = distance > 1e-6 ? vec.scale(offset, 1 / distance) : side.outward;
+    } else continue;
+    if (depth > 0 && (!best || depth > best.depth)) best = { depth, point: side.onShield, along, from: p, away };
   }
   return best;
 }

@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, segmentToShield, shieldReach, NET } from './weapons.js';
+import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
@@ -447,6 +447,8 @@ function weaponIntent(world, fighter, intent) {
     // In a testudo the shield is the formation's: a wall before him or a roof over him.
     const pose = !blocking && fighter.shieldPose ? WORLD.shield[fighter.shieldPose] : null;
     intent.lHand = vec.scale(pose ?? (blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard), H);
+    // Knocked out of line, the arm goes with the blow until he has it back.
+    if (fighter.shieldOpen > world.time) intent.lHand = toLocal(fighter, point(fighter.x, P.lHand));
     intent.shieldArm = 'l';
   }
   // The net held out in the off hand, ready to throw.
@@ -1027,6 +1029,8 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if (fighter.state !== 'up' || fighter.netted) return false;
   // His shield lost, he covers up with his arms.
   if (name === 'shieldBlock' && !fighter.shield) name = 'guard';
+  // His shield knocked out of line: it cannot be brought to meet this one.
+  if (name === 'shieldBlock' && fighter.shieldOpen > world.time) return false;
   if (DEFENCES[name]) {
     // `from`: who the strike comes from, for a block that goes to meet it.
     fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from };
@@ -1843,6 +1847,7 @@ export function spatialGrid(points, cell) {
 
 function updateTimers(world, fighter, dt) {
   if (fighter.weapon?.held) fighter.weapon.strain = Math.max(0, fighter.weapon.strain - BLADES.gripLeak * dt);
+  if (fighter.shield?.strain) fighter.shield.strain = Math.max(0, fighter.shield.strain - WORLD.shield.strainLeak * dt);
   // On his knees with the pain (physics/whip.js): until he is up again.
   if (fighter.pain) {
     fighter.pain.t += dt;
@@ -2961,22 +2966,30 @@ function collideStriker(world, attacker, defender, striker, time) {
       break;
     }
   }
+  const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
+  // A shield the strike has met: what lies behind its face is out of reach.
+  let shadow = null;
   if (defender.shield && defender.state !== 'out') {
-    // A shield in the way takes it: nothing behind is touched.
     const disc = shieldDisc(defender);
-    const hit = segmentToShield(sa, sb, disc);
+    const hit = shieldContact(sa, sb, disc, striker.radius + 0.012);
     const shieldKey = `${prefix}shield`;
-    if (hit.distance < striker.radius + 0.012) {
-      const away = hit.distance > 1e-6 ? vec.normalize(vec.sub(hit.from, hit.point)) : disc.normal;
+    if (hit) {
+      const away = hit.away;
       if (!attacker.contacts.has(shieldKey)) {
         attacker.contacts.add(shieldKey);
         registerShieldImpact(world, attacker, defender, striker, disc, hit, away);
+      } else if (striking && attacker.punch?.drove && !attacker.punch.stopped && vec.length(vec.sub(strikerVelocity(attacker, striker, hit.along), point(defender.v, P.lHand))) < WORLD.minImpactSpeed) {
+        // A blow that drove on into a shield that gave is spent once it comes to rest on it.
+        attacker.punch.landed = true;
+        attacker.punch.stopped = true;
+        if (attacker.punch.t < attacker.punch.spec.extendUntil) attacker.punch.t = attacker.punch.spec.extendUntil;
       }
-      const push = Math.min(striker.radius + 0.012 - hit.distance, WORLD.contactStep);
-      for (const index of new Set([striker.a, striker.b])) for (let axis = 0; axis < 3; axis += 1) attacker.x[index * 3 + axis] += away[axis] * push;
-      return;
-    }
-    if (touching) attacker.contacts.delete(shieldKey);
+      pressOnShield(attacker, defender, striker, hit, away, hit.depth);
+      // A shield in the way takes the blow: nothing behind is touched. A blow
+      // that glanced off its face goes on, round the rim if it was going there.
+      if (!striking || !attacker.punch || attacker.punch.stopped) return;
+      shadow = disc;
+    } else if (touching) attacker.contacts.delete(shieldKey);
   }
   // The hand and forearm in a shield's grip are behind it: a blade meets the shield.
   const shieldArm = attacker.shield && (striker.key === 'lHand' || striker.key === 'lForearm');
@@ -3000,7 +3013,6 @@ function collideStriker(world, attacker, defender, striker, time) {
     }
     if (touching) attacker.contacts.delete(bladeKey);
   }
-  const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
   // Nowhere near him: no part of his body can be touched (a crowd is mostly
   // this). Forget any contact with him, so the next real one counts.
   const hips = point(defender.x, P.pelvis);
@@ -3036,6 +3048,8 @@ function collideStriker(world, attacker, defender, striker, time) {
       }
       continue;
     }
+    // Past a shield's rim the blow finds him; through its face it does not.
+    if (shadow && behindShield(closest.onFirst, shadow)) continue;
     const contactKey = `${prefix}${capsule.key}`;
     const normal = distance > 1e-9 ? vec.scale(offset, 1 / distance) : [0, 1, 0];
     if (!attacker.contacts.has(contactKey)) {
@@ -3726,12 +3740,11 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   // Obsidian on a steel shield chips.
   if (weaponStrike && defender.shield?.spec.look === 'steel') chip(world, attacker);
   const spec = punch.spec;
-  let strikeVelocity;
   let strikeMass;
+  const strikeVelocity = strikerVelocity(attacker, striker, hit.along);
   if (striker.weapon) {
     const weapon = attacker.weapon;
     const distance = weapon.spec.strikeFrom + hit.along * (weapon.spec.length - weapon.spec.strikeFrom);
-    strikeVelocity = vec.lerp(handVelocityOf(attacker, P[`${weapon.main}Hand`]), weapon.tipVelocity, distance / weapon.spec.length);
     const arms = attacker.body.limbKg[`${weapon.main}Arm`] + (weapon.twoHanded ? attacker.body.limbKg[`${weapon.off}Arm`] : 0);
     const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
     const moving = vec.sub(strikeVelocity, point(defender.v, P.lHand));
@@ -3739,14 +3752,13 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
     const along = speed > 1e-6 ? Math.abs(vec.dot(moving, weapon.dir)) / speed : 0;
     strikeMass = effectiveMassAt(weapon.spec, armMass, distance, attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist, along);
   } else {
-    strikeVelocity = vec.lerp(point(attacker.v, striker.a), point(attacker.v, striker.b), hit.along);
     const side = striker.side;
     strikeMass = (spec.mass.arm ?? 0) * attacker.body.limbKg[`${side}Arm`] + (spec.mass.leg ?? 0) * attacker.body.limbKg[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg;
   }
-  const closing = -vec.dot(vec.sub(strikeVelocity, point(defender.v, P.lHand)), away);
-  if (closing < WORLD.minImpactSpeed) return;
-  punch.landed = true;
-  punch.stopped = true;
+  const relative = vec.sub(strikeVelocity, point(defender.v, P.lHand));
+  const closing = -vec.dot(relative, away);
+  // Too slow to count, or meeting the face at a slant: it glances along it and goes on.
+  if (closing < WORLD.minImpactSpeed || closing < WORLD.shield.glance * vec.length(relative)) return;
   const body = defender.body;
   const braced = defender.shield.spec.mass + body.segments.lForearm.mass + body.segments.lUpperArm.mass + body.massKg * 0.3;
   const reduced = (strikeMass * braced) / (strikeMass + braced);
@@ -3758,16 +3770,115 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
     effects: ['taken on the shield'], point: hit.point, normal: away, weapon: attacker.weapon?.held && striker.weapon ? attacker.weapon.kind : undefined,
   };
   world.pendingImpulses.push({ fighter: defender, shares: [[P.lHand, 1], [P.lElbow, 0.8], [P.lShoulder, 0.5], [P.neck, 0.3], [P.pelvis, 0.2]], direction: vec.scale(away, -1), impulse });
+  // Held in line, the shield stops the blow and the stroke ends there (no
+  // more driving into it; the arm comes back). If the shield arm gives, the
+  // blow drives it aside and goes on, thrown back only by what the arm held.
+  const gives = shieldArmGives(world, defender, hit.point, vec.scale(away, -1), impulse, event);
+  if (gives === 0) {
+    punch.landed = true;
+    punch.stopped = true;
+    if (punch.t < spec.extendUntil) punch.t = spec.extendUntil;
+  } else punch.drove = true;
+  // A block that has met its blow is done: the shield is drawn back to the guard, not pressed after the blade.
+  if (defender.defence?.name === 'shieldBlock') defender.defence = null;
   const recoil = striker.weapon ? [[P[`${attacker.weapon.main}Hand`], 1], [P[`${attacker.weapon.main}Elbow`], 0.6]] : (RECOIL[spec.limb.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${striker.side}${part}`], share]);
-  world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: away, impulse });
+  world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: away, impulse: impulse * (1 - gives) });
   if (striker.weapon) strainGrip(world, attacker, impulse * 0.25);
   world.events.push(event);
   if (striker.weapon) world.events.push({ time: world.time, kind: 'clash', fighter: defender.id, point: hit.point, normal: away, impulse });
-  // A blow past what his grip can hold may tear the shield off his arm.
-  const grip = WORLD.shield.wrench * (body.motorForce[P.lHand] / WORLD.recoil.reference);
-  if (impulse > grip && world.random() < Math.min(1, (impulse / grip - 1) * WORLD.shield.wrenchRise)) {
-    const shieldMass = defender.shield.spec.mass;
-    dropShield(world, defender, 'wrenched', vec.scale(away, (-impulse * 0.3) / shieldMass));
+  // Each blow strains the shield's hold on his arm, the more the further
+  // from the grip it lands (it twists the shield there); past it, it is torn off.
+  const shield = defender.shield;
+  const offCentre = vec.length(vec.sub(hit.point, disc.centre)) / disc.radius;
+  const hold = WORLD.shield.wrench * (shield.spec.hold ?? 1) * (body.motorForce[P.lHand] / WORLD.recoil.reference);
+  shield.strain = (shield.strain ?? 0) + (impulse * (1 + offCentre)) / hold;
+  if (shield.strain >= 1) dropShield(world, defender, 'wrenched', vec.scale(away, (-impulse * 0.3) / shield.spec.mass));
+}
+
+/** The speed of a striking limb or blade at a point along it (`along`, 0-1 of its striking length). */
+function strikerVelocity(attacker, striker, along) {
+  if (!striker.weapon) return vec.lerp(point(attacker.v, striker.a), point(attacker.v, striker.b), along);
+  const weapon = attacker.weapon;
+  const distance = weapon.spec.strikeFrom + along * (weapon.spec.length - weapon.spec.strikeFrom);
+  return vec.lerp(handVelocityOf(attacker, P[`${weapon.main}Hand`]), weapon.tipVelocity, distance / weapon.spec.length);
+}
+
+/**
+ * A blow on the shield turns the shield arm about the shoulder. The arm holds
+ * the shield in line against up to its force at the hand × its length for the
+ * moment the blow takes; past that it gives: the rest of the blow throws the
+ * shield arm out of line, and the guard is open until he has it back. The
+ * share of the blow the arm could not hold (0 if it held).
+ */
+function shieldArmGives(world, defender, at, direction, impulse, event) {
+  const body = defender.body;
+  const lever = vec.length(vec.cross(vec.sub(at, point(defender.x, P.lShoulder)), direction));
+  const moment = impulse * lever;
+  // Braced for it (a block he means), the arm holds with its full strength; in his guard, with what he has ready.
+  const braced = defender.defence?.name === 'shieldBlock' ? 1 : WORLD.shield.unbraced;
+  const held = body.strikeForce[P.lHand] * (body.lengths.upperArm + body.lengths.forearmToFist) * WORLD.shield.holdSeconds * braced * Math.max(0.2, defender.motorScale);
+  if (moment <= held) return 0;
+  const gives = 1 - held / moment;
+  world.pendingImpulses.push({ fighter: defender, shares: [[P.lHand, 1], [P.lElbow, 0.5]], direction, impulse: impulse * gives });
+  defender.shieldOpen = world.time + WORLD.shield.open * Math.min(1, 2 * gives);
+  event.effects.push('shield knocked aside');
+  return gives;
+}
+
+/**
+ * A strike pressed on a shield is pushed back off its face, a little each
+ * substep: shared between the striking limb (a blade turning about the hand
+ * that holds it, as far as its inertia lets it), and the shield arm, by
+ * their inverse masses. Moved, not flung: the previous positions move too, and
+ * any speed into the contact is taken out (the blow's rebound is the impact's
+ * impulse), so a blade resting on a shield slides off or lies on it, never
+ * held in it. The bodies move at most `contactStep` a substep; the blade's
+ * turn (no particle: its spin is corrected, so no speed is made) takes its
+ * share of the whole depth at once, up to `turnStep` rad, so a blade that
+ * crossed the thin plate within a substep is back at its face, not left in it.
+ */
+function pressOnShield(attacker, defender, striker, hit, away, depth) {
+  if (depth <= 0) return;
+  const push = Math.min(depth, WORLD.contactStep);
+  const parts = striker.a === striker.b ? [striker.a] : [striker.a, striker.b];
+  let own = 0;
+  for (const index of parts) own += attacker.invMass[index] / parts.length;
+  const weapon = striker.weapon ? attacker.weapon : null;
+  let turn = 0;
+  let lever = 0;
+  let pivot = null;
+  if (weapon) {
+    const spec = weapon.spec;
+    lever = spec.strikeFrom + hit.along * (spec.length - spec.strikeFrom);
+    pivot = vec.cross(weapon.dir, away);
+    const reach = spec.length + spec.handle;
+    const inertia = spec.mass * ((reach * reach) / 12 + spec.balance * spec.balance);
+    // Only the part of the push across the blade can turn it.
+    turn = ((lever * lever) / inertia) * vec.dot(pivot, pivot);
+  }
+  const shieldArm = defender.invMass[P.lHand];
+  const total = own + turn + shieldArm;
+  const shift = (fighter, index, normal, amount) => {
+    let into = 0;
+    for (let axis = 0; axis < 3; axis += 1) {
+      fighter.x[index * 3 + axis] += normal[axis] * amount;
+      fighter.prev[index * 3 + axis] += normal[axis] * amount;
+      into += normal[axis] * (fighter.x[index * 3 + axis] - fighter.prev[index * 3 + axis]);
+    }
+    if (into < 0) for (let axis = 0; axis < 3; axis += 1) fighter.prev[index * 3 + axis] += normal[axis] * into;
+  };
+  for (const index of parts) shift(attacker, index, away, (push * own) / total);
+  const back = vec.scale(away, -1);
+  shift(defender, P.lHand, back, (push * shieldArm) / total);
+  shift(defender, P.lElbow, back, (push * shieldArm) / total / 2);
+  if (turn > 0) {
+    const across = vec.dot(pivot, pivot);
+    const axis = vec.scale(pivot, 1 / Math.sqrt(across));
+    weapon.dir = rotateAbout(weapon.dir, axis, Math.min(WORLD.shield.turnStep, (depth * turn) / total / lever));
+    // The blade's own turning into the face stops there; along it, it slides on.
+    const into = lever * vec.dot(weapon.spin, pivot);
+    if (into < 0) weapon.spin = vec.sub(weapon.spin, vec.scale(pivot, into / (lever * across)));
+    weapon.tip = vec.add(point(attacker.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.length));
   }
 }
 
