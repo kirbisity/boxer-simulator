@@ -1416,10 +1416,11 @@ export function severView(view, fighterView, event, debris) {
     if (lifted) piece.add(lifted, outlineFor(lifted));
   }
   // What rode on it: a hand or its glove, a boot, the head with all it wore.
-  const carried = [];
+  // A machine's shells (robotview.js) on the bones that came away go with them.
+  const carried = fighterView.attachments.filter((attachment) => boneIndices.has(attachment.bone) && attachment.bone !== BONE.chest && attachment.bone !== BONE.pelvis);
   if (part.attach === 'hand' || part.attach === 'foot') {
     const at = P[name(part.attach === 'hand' ? 'Hand' : 'Foot')];
-    for (const attachment of fighterView.attachments) if (attachment.at === at && attachment.bone !== BONE.chest && attachment.bone !== BONE.pelvis) carried.push(attachment);
+    for (const attachment of fighterView.attachments) if (attachment.at === at && attachment.bone !== BONE.chest && attachment.bone !== BONE.pelvis && !carried.includes(attachment)) carried.push(attachment);
   }
   for (const attachment of carried) {
     fighterView.attachments.splice(fighterView.attachments.indexOf(attachment), 1);

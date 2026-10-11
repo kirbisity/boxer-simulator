@@ -20,6 +20,7 @@ import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.j
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
 import { SoftShell } from './soft.js';
+import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
@@ -2033,7 +2034,12 @@ function detailedView(view, fighter, simple) {
   const baseColors = paintBody(built, body, look, corner);
   // Steel is drawn apart, as metal; everything else is the toon body.
   const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];
-  const triangles = built.indices.length / 3;
+  const dressLook = dressFor(body.inputs, corner);
+  // A machine (`armor.robot`) is drawn in rigid shells over its bones, not a skin: the body mesh is left empty.
+  const machine = Boolean(dressLook.armor?.robot);
+  // A rigid build (`build.rigid`) has no flesh to jiggle under a blow.
+  const rigid = Boolean(body.inputs.build?.rigid);
+  const triangles = machine ? 0 : built.indices.length / 3;
   const bodyIndices = [];
   const steelIndices = [];
   for (let triangle = 0; triangle < triangles; triangle += 1) {
@@ -2042,7 +2048,6 @@ function detailedView(view, fighter, simple) {
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
   // Lacquered lamellar is glossy paint over steel: its colour shows, not only reflections.
-  const dressLook = dressFor(body.inputs, corner);
   const lacquer = dressLook.armor?.kind === 'lamellar' || dressLook.armor?.kind === 'okegawa' ? { metalness: 0.45, roughness: 0.3 } : {};
   const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
   let steelMesh = null;
@@ -2054,7 +2059,7 @@ function detailedView(view, fighter, simple) {
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   layers.skin.add(skinMesh, skinOutline);
-  const shells = simple ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
+  const shells = simple || rigid ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
 
   const dress = leaderDress(dressFor(body.inputs, corner), fighter);
   // A design may set the hair (a sumo's topknot).
@@ -2063,7 +2068,7 @@ function detailedView(view, fighter, simple) {
   const headView = buildHead(body, dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look, faceColor, corner);
   headView.group.matrixAutoUpdate = false;
   layers.skin.add(headView.group);
-  shells.push({ key: 'head', shell: headView.shell });
+  if (!rigid) shells.push({ key: 'head', shell: headView.shell });
 
   // Hands and feet ride on the forearm and foot bones: gloves, bare fists,
   // tactical gloves or gauntlets; boots, trainers, heels or sabatons.
@@ -2129,6 +2134,12 @@ function detailedView(view, fighter, simple) {
   if (!headgear?.hidesHair) for (const curtain of headView.curtains ?? []) dangles.push(...(simple ? [hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain)] : hairCurtainSoft(collar, headView.hairMaterial, body.lengths.headRadius, curtain)));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   if (dress.armor?.backBox) collar.add(buildBackBox(body, garmentColors));
+  if (machine) {
+    for (const entry of buildRobotBody(body, dress.armor, view.steelEnv)) {
+      layers.skin.add(entry.object);
+      attachments.push(entry);
+    }
+  }
   // The scissor's coat of scales, plate by plate over the painted shirt.
   // Maximus's harness: the straps, buckles, plates and belt over the loft.
   // The ō-yoroi: its box on the chest, its shoulder boards and skirt panels hung to swing (fixed in a crowd).
@@ -2167,7 +2178,7 @@ function detailedView(view, fighter, simple) {
   return {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
     baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh,
-    ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer,
+    ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine,
   };
 }
 
@@ -2536,7 +2547,8 @@ export function setLayer(fighterView, layer) {
   layers.muscle.visible = layer === 'muscle';
   // In the skin view the skeleton stays, painted as skin: hidden inside a
   // normal body, it shows through where a wasted one is thinner than its bones.
-  layers.bone.visible = layer !== 'physics';
+  // A machine has no skin over its skeleton: drawn in shells, the bones stay hidden.
+  layers.bone.visible = layer !== 'physics' && !(fighterView.machine && layer === 'skin');
   layers.physics.visible = layer === 'physics';
   paintSkeleton(fighterView, layer === 'skin');
   // A shod foot's bones stay hidden in the skin view: a heeled boot lifts off them.
@@ -2807,6 +2819,11 @@ export function showImpact(view, fighterViews, event) {
   const defenderView = fighterViews.find((entry) => entry.fighter.id === event.defender);
   if (!defenderView) return;
   const where = v3(event.point);
+  // Rigid shells (`rigid`, no SoftShell) take a blow without a dent: sparks, not sweat.
+  if (defenderView.rigid) {
+    showSparks(view, where, event);
+    return;
+  }
   if (event.target === 'head') defenderView.head.shell.dent(where, event.impulse);
   else {
     // Carry the world point back to the bind pose through the struck bone.
@@ -2819,12 +2836,17 @@ export function showImpact(view, fighterViews, event) {
     const bind = fromFrame(defenderView.built.bindFrames[bone], toFrame(frames[bone], event.point));
     defenderView.shells.find((entry) => entry.key === 'body')?.shell.dentLocal(v3(bind), event.impulse);
   }
+  showSparks(view, where, event, 0xdfe9ff);
+}
+
+/** A spray off the struck point: sweat off flesh (pale), sparks off a machine's shells (hot orange). */
+function showSparks(view, where, event, color = 0xffb35c) {
   const spray = view.spray ?? (view.spray = []);
   // Every drop is the one sphere, scaled; a melee of a hundred keeps a few at a time.
   const count = Math.min(14, Math.round(event.impulse / 2), SPRAY.most - spray.length);
   SPRAY.geometry ??= new THREE.SphereGeometry(1, 6, 4);
   for (let index = 0; index < count; index += 1) {
-    const drop = new THREE.Mesh(SPRAY.geometry, new THREE.MeshBasicMaterial({ color: 0xdfe9ff, transparent: true, opacity: 0.85 }));
+    const drop = new THREE.Mesh(SPRAY.geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 }));
     drop.scale.setScalar(0.008 + Math.random() * 0.006);
     drop.position.copy(where);
     const direction = v3(event.normal).multiplyScalar(-1).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5));

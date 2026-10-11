@@ -535,23 +535,6 @@ export const ARMOR_KINDS = {
     trunk: [-0.12, 1.02, 1.03, { back: [-0.12, 0.8, 'armor'], base: 'cloth' }],
     thigh: [0, 0.5, 1.03, { back: [0, 1, 'armor'], base: 'cloth' }],
   },
-  // A humanoid robot (Unitree's H1): white shells (`armor`) over the chest,
-  // the upper arms and thighs, silver (`mail`) at the waist, forearms and
-  // shins, the dark joints (skin) between.
-  humanoid: {
-    trunk: [[0.3, 0.98, 1.1, 'armor'], [-0.1, 0.3, 1.06, 'mail']],
-    upperArm: [0.12, 0.8, 1.22, 'armor'], forearm: [0.14, -0.03, 1.2, 'mail'],
-    thigh: [0.08, 0.8, 1.16, 'armor'], shin: [0.08, 0.86, 1.18, 'mail'],
-  },
-  // The combat bot: thick dark plate everywhere, bands of the accent colour
-  // (`cloth`) round the chest, the shoulders and the forearm guns' housings,
-  // accent knee guards, a dark waist.
-  combatBot: {
-    trunk: [-0.12, 1.0, 1.24, { panel: [0.6, 0.67, -1.01, 'cloth'], base: 'armor' }], belt: [-0.1, 0.08, 1.3, 'mail'],
-    upperArm: [0.0, 0.88, 1.36, { panel: [0.1, 0.22, -1.01, 'cloth'], base: 'armor' }],
-    forearm: [0.0, 0.0, 1.6, { panel: [0.72, 0.84, -1.01, 'cloth'], base: 'armor' }],
-    thigh: [0.0, 0.88, 1.28, 'armor'], knee: [0.86, 1.06, 1.45, 'cloth'], shin: [0.04, 0.9, 1.34, 'armor'],
-  },
   // Thraex: quilted wraps up both thighs, high greaves over them, the manica.
   thraex: {
     belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },

@@ -1284,39 +1284,43 @@ export const OUTFITS = {
       { label: 'Silverback', armor: { kind: 'silverback', color: '#8c8c89', cloth: '#232226', matte: true }, head: { kind: 'gorillaHead', color: '#232226' }, feet: { kind: 'bare' } },
     ],
   },
-  // A humanoid robot (Unitree's H1): white shells over the trunk, upper arms
-  // and thighs, silver forearms and shins, dark joints between them, a
-  // dark visor for a head. Thin aluminium and plastic: it turns some of an
-  // edge and a little of a blow, almost nothing of a round. No fear.
+  // A humanoid robot (Unitree's G1 and H1): rigid shells of brushed
+  // aluminium over each part, white panels on the chest and thighs, dark
+  // actuators bare at every joint and the waist, black hands and shoes; a
+  // dark helmet with a ring of blue light for a face (`armor.robot`, drawn
+  // by robotview.js). Thin aluminium and plastic: it turns some of an edge
+  // and a little of a blow, almost nothing of a round. No fear.
   humanoid: {
     faction: 'specials', bulletRating: 500,
-    label: 'Humanoid robot', movement: 'good', fists: 'bare', courage: 1,
+    label: 'Humanoid robot', movement: 'good', fists: 'gloved-tactical', courage: 1,
     protection: {
       blunt: 0.25, cut: 0.6, pierce: 0.4, bullet: { head: 0.1, torso: 0.15, limb: 0.1 },
       regions: { head: { blunt: 0.3, cut: 0.7, pierce: 0.5 }, limb: { blunt: 0.2, cut: 0.5, pierce: 0.3 } },
     },
     designs: [
-      { label: 'White and silver', armor: { kind: 'humanoid', color: '#eceef1', mail: '#b6bbc3', matte: true }, head: { kind: 'robotHead', color: '#eceef1', visor: '#141519', trim: '#b6bbc3' }, feet: { kind: 'tacticalBoot', color: '#2c2e33' } },
+      { label: 'Silver and white', armor: { kind: 'robot', color: '#c3c8cf', mail: '#eef0f3', robot: { metal: true, led: '#46b4ff' } }, head: { kind: 'robotHead', color: '#4a4d54', visor: '#0d0e11', trim: '#c3c8cf', led: '#46b4ff' }, feet: { kind: 'compactBoot', color: '#17181b' } },
     ],
   },
-  // The combat bot: the humanoid built thick, plated in steel and
-  // composite (rated against the AR-15's own round: it holds most of one
-  // over the trunk, less at the head and limbs; a blade glances off), a
-  // great battery box on its back, ~50 kg of kit on a 120 kg frame. Its
-  // forearms are its guns (`mounted`: an AR-15 on the right, a shotgun on
-  // the left; never dropped). Dark grey, picked out in #D97757.
+  // The combat bot: the humanoid built thick, its shells steel and ceramic
+  // composite plate, thicker than before (rated well past the AR-15's own
+  // round: it holds nearly all of one over the trunk, most at the head and
+  // limbs; a blade glances off), a great battery box on its back, ~55 kg
+  // of kit on a 115 kg frame. Its forearms are its guns (`mounted`: an
+  // AR-15 on the right, a shotgun on the left; never dropped). Dark grey,
+  // picked out in #D97757.
   combatBot: {
-    faction: 'specials', bulletRating: 1750, plated: true,
+    // Its neck in an armoured collar (`arrowproof`: the throat covered as the trunk; an arrow glances off the plate).
+    faction: 'specials', bulletRating: 3500, plated: true, arrowproof: true,
     label: 'Combat bot — armoured', movement: 'limited', fists: 'gauntlet', courage: 1,
-    extraMass: 50 / 120, balance: 1.5,
+    extraMass: 55 / 115, balance: 1.5,
     mounted: { r: 'armRifle', l: 'armShotgun' },
     protection: {
-      blunt: 0.6, cut: 0.95, pierce: 0.85, bullet: { head: 0.7, torso: 0.85, limb: 0.6 },
+      blunt: 0.6, cut: 0.95, pierce: 0.85, bullet: { head: 0.85, torso: 0.95, limb: 0.75 },
       regions: { head: { blunt: 0.65, cut: 0.95, pierce: 0.85 }, limb: { blunt: 0.5, cut: 0.9, pierce: 0.75 } },
     },
     deflects: true,
     designs: [
-      { label: 'Dark grey', armor: { kind: 'combatBot', color: '#43464c', cloth: '#d97757', mail: '#2a2b2f', matte: true, backBox: true }, head: { kind: 'robotHead', color: '#43464c', visor: '#0e0f12', trim: '#d97757' }, feet: { kind: 'tacticalBoot', color: '#2a2b2f' } },
+      { label: 'Dark grey', armor: { kind: 'robot', color: '#43464c', mail: '#2a2b2f', cloth: '#d97757', backBox: true, robot: { bulk: 1.3, led: '#ff8a5c' } }, head: { kind: 'robotHead', color: '#383b40', visor: '#0b0c0e', trim: '#d97757', led: '#ff8a5c' }, feet: { kind: 'tacticalBoot', color: '#2a2b2f' } },
     ],
   },
 };

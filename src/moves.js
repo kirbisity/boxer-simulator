@@ -144,13 +144,13 @@ export const MOVES = {
 // and pierce by the weapon and how its contact lands (weapons.js).
 // Defences, each a timed posture change the physics carries out.
 // A move done with the other arm: the same path mirrored across the body
-// (for a weapon in the left hand: the combat bot's forearm shotgun).
+// (for a weapon in the left hand: the combat bot's forearm shotgun, swung as a mace).
 function mirrored(move) {
   const flip = (v) => v && [v[0], v[1], -v[2]];
   const place = (at) => at && { hand: flip(at.hand), dir: flip(at.dir) };
   return { ...move, limb: move.limb.replace(/^r/, 'l'), twist: -(move.twist ?? 0), from: place(move.from), to: place(move.to), mid: flip(move.mid) };
 }
-for (const name of ['maceOverhead', 'maceSide', 'firePump']) MOVES[`${name}Left`] = mirrored(MOVES[name]);
+for (const name of ['maceOverhead', 'maceSide']) MOVES[`${name}Left`] = mirrored(MOVES[name]);
 
 export const DEFENCES = {
   guard: { seconds: 0.5 }, // gloves tight to the face, elbows in
@@ -1460,11 +1460,12 @@ export const STYLES = {
   },
 };
 
-// The combat bot: its forearms are its weapons (`mounted`), one in use at a
-// time, the other taken up at once as the range calls (`switches`, the AI):
-// the right arm's AR-15 from afar, walking on as it fires (`advance`), the
-// left's shotgun nearer, and in close the left's mace and the right's blade
-// by turns, a couple of blows each. Never reloaded, never dropped.
+// The combat bot: its forearms are its weapons (`mounted`). The right arm's
+// AR-15 in use from afar, walking on as it fires (`advance`); within the
+// buckshot's range the left arm's shotgun comes up on him as well and fires
+// on its own cadence (`paired`: both at once); in close (`switches`, the
+// AI) the left's mace and the right's blade by turns, a couple of blows
+// each. Never reloaded, never dropped.
 const BOT = {
   cadence: { work: 1.3, move: 0.6, burst: 0.5, mobility: 0.3 },
   stance: { blade: 0.3, crouch: 0.05, width: 1.15, lean: 0.08, guardHeight: 0 },
@@ -1479,28 +1480,23 @@ const BOT = {
 STYLES.combatBot = {
   ...BOT, label: 'Combat bot', weapon: 'armRifle', fallback: 'mix',
   ranged: { flee: 0, rest: 0, runFor: 0, standFor: 2, close: 1.2, shotSeconds: 0.25, headShare: 0.3, between: [0.15, 0.2], move: 'fireRifle', holdGround: true, advance: 0.45, reloadSafe: Infinity },
-  switches: [{ to: 'botShotgun', within: 5 }],
+  // The shotgun arm with it within 10 m, a shell every 0.9 s (a pump's cycle), on him to 0.15 rad.
+  paired: { weapon: 'armShotgun', within: 10, every: 0.9, settled: 0.15 },
+  switches: [{ to: 'botMace', within: 2.2 }],
   // The rifle arm low and forward.
   weaponGuard: { hand: [0.2, 0.62, -0.14], dir: [1, -0.35, 0.05] },
   attacks: { fireRifle: 1 },
 };
-STYLES.botShotgun = {
-  ...BOT, label: 'Combat bot (shotgun arm)', hidden: true, weapon: 'armShotgun', fallback: 'mix',
-  ranged: { flee: 0, rest: 0, runFor: 0, standFor: 2, close: 1.2, shotSeconds: 0.4, headShare: 0.1, between: [0.9, 0.5], move: 'firePumpLeft', holdGround: true, advance: 0.45, reloadSafe: Infinity },
-  switches: [{ to: 'combatBot', beyond: 7 }, { to: 'botMace', within: 2.2 }],
-  weaponGuard: { hand: [0.2, 0.62, 0.14], dir: [1, -0.35, -0.05] },
-  attacks: { firePumpLeft: 1 },
-};
 STYLES.botMace = {
   ...BOT, label: 'Combat bot (mace arm)', hidden: true, weapon: 'armShotgun', fallback: 'mix',
-  switches: [{ to: 'botShotgun', beyond: 3.5 }, { to: 'botBlade', strikes: 2 }],
+  switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botBlade', strikes: 2 }],
   weaponGuard: { hand: [0.12, 0.66, 0.14], dir: [0.45, 0.88, -0.05] },
   attacks: { maceOverheadLeft: 0.55, maceSideLeft: 0.45 },
   defences: { weaponBlock: 0.4, guard: 0.4, stepBack: 0.2 },
 };
 STYLES.botBlade = {
   ...BOT, label: 'Combat bot (blade arm)', hidden: true, weapon: 'armRifle', fallback: 'mix',
-  switches: [{ to: 'botShotgun', beyond: 3.5 }, { to: 'botMace', strikes: 2 }],
+  switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botMace', strikes: 2 }],
   weaponGuard: { hand: [0.1, 0.62, -0.12], dir: [1, 0.3, 0.05] },
   attacks: { gladiusCut: 0.45, gladiusThrust: 0.35, forehand: 0.2 },
   defences: { weaponBlock: 0.4, guard: 0.4, stepBack: 0.2 },

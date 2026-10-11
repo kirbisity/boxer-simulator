@@ -574,21 +574,25 @@ export const PRESETS = {
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
   // A silverback western lowland gorilla, fought upright: ~1.7 m standing
-  // and ~170 kg (wild adult males, Smith & Jungers 1997), lean (~8% fat).
-  // An ape's arms are long and its legs short (arm span ~2.4 m against
-  // ~1.0x height in a man; intermembral index ~117): `lengths`. Its muscle
-  // is half its weight (bonobo dissection ~49% against a man's ~36%,
-  // Zihlman & McFarland 2000) and sits in the arms, not the legs (`muscle`,
-  // multiples of a man's share). Ape muscle is ~1.35 times as strong and
-  // powerful per kilogram (more fast fibres; O'Neill et al. 2017, PNAS,
-  // chimpanzees) (`strength`), its fibres long, so a thick limb is not a
-  // slow one (`bulk`). Fists (knuckles), shoves, charges.
+  // and 200 kg, the top of the wild adult males' range (~160-200 kg; Smith
+  // & Jungers 1997), lean (~8% fat). An ape's arms are long and its legs
+  // short (arm span ~2.4 m against ~1.0x height in a man; intermembral
+  // index ~117): `lengths`. Its muscle is half its weight (bonobo dissection
+  // ~49% against a man's ~36%, Zihlman & McFarland 2000), more of it in the
+  // arms than a man's (`muscle`, multiples of a man's share). Ape muscle is
+  // ~1.35 times as strong and powerful per kilogram (O'Neill et al. 2017,
+  // PNAS, chimpanzees) (`strength`), about two thirds of it fast fibres
+  // against a man's third (`fast`: its top speed), its fibres long, so a
+  // thick limb is not a slow one (`bulk`). All told its arms (punch, shove,
+  // grip) are ~5.4 times an ordinary 80 kg man's and ~3 times a trained
+  // heavyweight's, its legs ~2.8 times a man's. Fists (knuckles), shoves,
+  // charges.
   gorilla: {
     name: 'Kumbuka', style: 'gorilla', sex: 'male', heightCm: 170, frame: 'large', age: 25, exercise: 0.5, calories: 2800, skill: 0.3,
     build: {
-      massKg: 170, bodyFat: 0.08, strength: 1.35, bulk: 3,
+      massKg: 200, bodyFat: 0.08, strength: 1.35, fast: 1.15, bulk: 2.85,
       lengths: { thigh: 0.21, shank: 0.2, trunk: 0.36, neckToHead: 0.1, upperArm: 0.29, forearmToFist: 0.3, shoulderSpan: 0.25, hipSpan: 0.13 },
-      muscle: { upperArm: 2.2, forearm: 2.4, thigh: 0.7, shank: 0.6 },
+      muscle: { upperArm: 1.6, forearm: 1.75, thigh: 0.7, shank: 0.6 },
     },
     outfit: { kind: 'silverback', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#26252a', hairStyle: 'bald', hairColor: '#1a1a1c', facialHair: 'none', eyeColor: 'brown' },
@@ -600,19 +604,20 @@ export const PRESETS = {
   // breath, for endurance (`aerobic`). Kickboxes, as Unitree's G1s did.
   humanoid: {
     name: 'H-1 "Unit"', style: 'kickboxing', sex: 'male', heightCm: 180, frame: 'medium', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
-    build: { massKg: 70, bodyFat: 0, strength: 1, aerobic: 1.1 },
+    // Rigid (`rigid`): shells and actuators, no flesh to give under a blow.
+    build: { massKg: 70, bodyFat: 0, strength: 1, aerobic: 1.1, rigid: true },
     outfit: { kind: 'humanoid', design: 0 }, accessories: [],
-    look: { skinTone: 'deep', skinColor: '#2c2e33', hairStyle: 'bald', hairColor: '#2c2e33', facialHair: 'none', eyeColor: 'brown' },
+    look: { skinTone: 'deep', skinColor: '#1d1e22', hairStyle: 'bald', hairColor: '#1d1e22', facialHair: 'none', eyeColor: 'brown' },
   },
   // The combat bot: the humanoid built thicker, 1.80 m and 170 kg all told:
-  // a 120 kg frame (its motors on that frame's scale) and 50 kg of armour,
-  // battery and guns (its kit's `extraMass`). An AR-15 in the right forearm,
-  // a shotgun in the left (`mounted`), fired, then fought as a heavy blade
-  // and a mace.
+  // a 115 kg frame (its motors on that frame's scale) and 55 kg of armour,
+  // battery and guns (its kit's `extraMass`); rigid, as the humanoid. An
+  // AR-15 in the right forearm, a shotgun in the left (`mounted`), fired
+  // together, then fought as a heavy blade and a mace.
   combatBot: {
     name: 'CB-170 "Warden"', style: 'combatBot', sex: 'male', heightCm: 180, frame: 'large', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
     // Motors, not pennate muscle: a thick limb is no slower for it (`bulk`).
-    build: { massKg: 120, bodyFat: 0, strength: 1, aerobic: 1.1, bulk: 2 },
+    build: { massKg: 115, bodyFat: 0, strength: 1, aerobic: 1.1, bulk: 2, rigid: true },
     outfit: { kind: 'combatBot', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1e1f22', hairStyle: 'bald', hairColor: '#1e1f22', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -719,8 +724,9 @@ export function buildBody(rawInputs) {
       boneRadius: radiusFor(volume('bone')),
       muscleRadius: radiusFor(volume('bone') + volume('muscle') + volume('other')),
       skinRadius: radiusFor(volume('bone') + volume('muscle') + volume('other') + volume('fat')),
-      // Fat makes flesh softer and thicker; muscle makes it firmer.
-      fleshFirmness: clamp(tissue.muscle / (tissue.muscle + tissue.fat * 1.6 + 1e-6), 0.2, 1),
+      // Fat makes flesh softer and thicker; muscle makes it firmer. A rigid
+      // build (`rigid`: a machine's shells) gives as little as armour does.
+      fleshFirmness: build?.rigid ? 1 : clamp(tissue.muscle / (tissue.muscle + tissue.fat * 1.6 + 1e-6), 0.2, 1),
     };
   }
   const arm = (side) => segments[`${side}UpperArm`].tissue.muscle + segments[`${side}Forearm`].tissue.muscle;
@@ -746,7 +752,8 @@ export function buildBody(rawInputs) {
   const strikeForce = new Array(PARTICLES.length).fill(0);
   const topSpeed = new Array(PARTICLES.length).fill(Infinity);
   // Fast fibres: training builds them; old age wastes them most (aging.js).
-  const fastFibres = (0.72 + 0.38 * inputs.training) * aged.fast;
+  // A build's `fast`: its share of fast fibres against a man's (an ape's, more).
+  const fastFibres = (0.72 + 0.38 * inputs.training) * aged.fast * (build?.fast ?? 1);
   const legLength = lengths.thigh + lengths.shank;
   // The trunk turns the shoulders into a punch: the same cross-section law.
   const trunkForce = allometric(trunkMuscle, BODY.referenceMuscleKg.trunk) * force.trunk * muscleQuality;

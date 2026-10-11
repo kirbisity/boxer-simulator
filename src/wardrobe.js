@@ -836,16 +836,25 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       break;
     }
     case 'robotHead': {
-      // A humanoid robot's head (Unitree's H1): a smooth rounded shell over
-      // the whole head, a dark glossy visor band across the front where a
-      // face would be, a trim disc at each ear.
+      // A humanoid robot's head (Unitree's G1): a rounded dark helmet over
+      // the whole head, an open oval face frame in front, black inside, no
+      // face; a ring of light round the opening (`led`) and a bar of it
+      // across; a trim disc at each ear.
       const shell = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 24, 16), surface(color, { roughness: 0.35 }));
-      shell.scale.set(1, 1.12, 0.94);
+      shell.scale.set(1, 1.1, 0.94);
       shell.position.y = 0.04 * r;
-      const visor = new THREE.Mesh(new THREE.SphereGeometry(1.23 * r, 22, 10, Math.PI * 0.62, Math.PI * 0.76, Math.PI * 0.3, Math.PI * 0.3), new THREE.MeshStandardMaterial({ color: head.visor ?? 0x141519, roughness: 0.12, metalness: 0.6 }));
-      visor.scale.set(1, 1.12, 0.94);
-      visor.position.y = 0.04 * r;
-      group.add(shell, visor);
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.62 * r, 20, 14), new THREE.MeshStandardMaterial({ color: head.visor ?? 0x0d0e11, roughness: 0.15, metalness: 0.5 }));
+      face.scale.set(0.42, 1.15, 0.95);
+      face.position.set(0.98 * r, 0.02 * r, 0);
+      const light = new THREE.MeshBasicMaterial({ color: new THREE.Color(head.led ?? '#46b4ff') });
+      const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.6 * r, 0.055 * r, 8, 32), light);
+      bezel.rotation.y = Math.PI / 2;
+      bezel.scale.set(1, 1.15, 1);
+      bezel.position.set(1.06 * r, 0.02 * r, 0);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 0.07 * r, 0.7 * r), light);
+      bar.position.set(1.22 * r, 0.12 * r, 0);
+      for (const glow of [bezel, bar]) glow.userData.noOutline = true;
+      group.add(shell, face, bezel, bar);
       for (const side of [1, -1]) {
         const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * r, 0.34 * r, 0.12 * r, 16), surface(head.trim ?? 0xb6bbc3, { roughness: 0.3 }));
         ear.rotation.x = Math.PI / 2;

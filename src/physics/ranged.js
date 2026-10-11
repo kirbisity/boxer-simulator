@@ -41,15 +41,15 @@ export function aimTargets(world, fighter, punch, guard) {
 // a little behind, below and to the left, cupping the grip.
 export const SUPPORT_GRIP = [-0.012, -0.018, 0.022];
 
-/** The gun arm up on a mark (local): out straight from the shoulder along the line to it, locked. */
-export function raisedAim(fighter, mark) {
-  const side = fighter.weapon.main;
+/** The gun arm up on a mark (local): out straight from the shoulder along the line to it, locked (`weapon`: the gun on that arm). */
+export function raisedAim(fighter, mark, weapon = fighter.weapon) {
+  const side = weapon.main;
   const shoulder = toLocal(fighter, point(fighter.x, P[`${side}Shoulder`]));
   const lengths = fighter.body.lengths;
   const along = vec.normalize(vec.sub(mark, shoulder));
   // A long gun: the stock at the cheek, the trigger hand just before the
   // shoulder, the support hand out under the barrel.
-  if (fighter.weapon.spec.longGun) return { hand: vec.add(vec.add(shoulder, vec.scale(along, LONG_GUN.handOut * lengths.upperArm)), [0, LONG_GUN.cheekRise * lengths.upperArm, 0]), dir: along };
+  if (weapon.spec.longGun) return { hand: vec.add(vec.add(shoulder, vec.scale(along, LONG_GUN.handOut * lengths.upperArm)), [0, LONG_GUN.cheekRise * lengths.upperArm, 0]), dir: along };
   return { hand: vec.add(shoulder, vec.scale(along, (lengths.upperArm + lengths.forearmToFist) * 0.97)), dir: along };
 }
 
@@ -325,11 +325,10 @@ export function emptied(world, fighter) {
  * to the mark, as fire() aims it, less its random error), or near it, is on
  * his own side.
  */
-export function comradeInLine(world, fighter) {
-  const weapon = fighter.weapon;
+export function comradeInLine(world, fighter, weapon = fighter.weapon, aimedAt = null) {
   const muzzleAt = weapon.spec.muzzle ?? GUN.muzzle;
   const from = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, muzzleAt[0]));
-  const mark = fighter.punch?.aim ? toWorld(fighter, fighter.punch.aim) : vec.add(from, weapon.dir);
+  const mark = aimedAt ?? (fighter.punch?.aim ? toWorld(fighter, fighter.punch.aim) : vec.add(from, weapon.dir));
   const dir = slerpDir(vec.normalize(vec.sub(mark, from)), weapon.dir, GUN.barrelShare);
   const hit = firstHit(world, fighter, from, vec.add(from, vec.scale(dir, GUN.range)));
   if (hit && hit.fighter.corner === fighter.corner && hit.fighter.state !== 'out') return true;
@@ -345,11 +344,15 @@ export function comradeInLine(world, fighter) {
   });
 }
 
-/** Fire: a round down the barrel's line as it is, give or take the aim's error. */
-export function fire(world, fighter) {
+/**
+ * Fire: a round down the barrel's line as it is, give or take the aim's
+ * error. The gun in hand on its shot's mark, or another (`weapon`: a second
+ * forearm gun) at a world point (`aimedAt`).
+ */
+export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null) {
   const punch = fighter.punch;
-  punch.fired = true;
-  const weapon = fighter.weapon;
+  const own = weapon === fighter.weapon;
+  if (own) punch.fired = true;
   if (!weapon?.held || !weapon.spec.ranged) return;
   if (weapon.spec.bow) return loose(world, fighter);
   // A gun with a charge to load (a matchlock) fires only loaded, and once.
@@ -358,12 +361,12 @@ export function fire(world, fighter) {
   if (shot) {
     if (!weapon.loaded) return;
     // A comrade on the line: he holds the shot (and keeps the charge).
-    if (comradeInLine(world, fighter)) return;
+    if (comradeInLine(world, fighter, weapon, aimedAt)) return;
     // Several barrels (the three-eyed gun) or a magazine (`rounds`): each shot in turn, empty after the last.
     weapon.charges = (weapon.charges ?? shot.rounds ?? shot.barrels ?? 1) - 1;
     weapon.loaded = weapon.charges > 0;
     weapon.reloaded = 0;
-    if (!weapon.loaded) emptied(world, fighter);
+    if (!weapon.loaded && own) emptied(world, fighter);
     if (random() < shot.misfire) {
       world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['flash in the pan'] });
       return;
@@ -391,7 +394,7 @@ export function fire(world, fighter) {
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   // Aimed through the sights at the mark: off by the aim's error, and by
   // part of however far the barrel itself is off that line.
-  const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(muzzle, barrel);
+  const mark = aimedAt ?? (punch?.aim ? toWorld(fighter, punch.aim) : vec.add(muzzle, barrel));
   const sighted = vec.normalize(vec.sub(mark, muzzle));
   const aimed = slerpDir(sighted, barrel, GUN.barrelShare);
   const dir = vec.normalize(vec.add(aimed, vec.add(vec.scale(up, gauss() * spread), vec.scale(across, gauss() * spread))));

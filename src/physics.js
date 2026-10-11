@@ -547,6 +547,38 @@ function weaponIntent(world, fighter, intent) {
 }
 
 /**
+ * A second forearm gun fired with the first (a style's `paired`: { weapon,
+ * within, every, settled }): while the gun in use is up on a man within
+ * `within` m, the other arm comes up on him too (straight out from the
+ * shoulder), and fires down that forearm's line as it points, a shot every
+ * `every` s, once it is within `settled` rad of him. Its own spread, kick and
+ * recoil as fire() gives any gun; no hands are needed (it is the arm).
+ */
+function pairedGun(world, fighter, intent, dt) {
+  const paired = STYLES[fighter.style]?.paired;
+  if (!paired) return;
+  if (fighter.paired?.weapon.kind !== paired.weapon) fighter.paired = { weapon: createWeapon(paired.weapon), wait: paired.every / 2 };
+  const gun = fighter.paired;
+  gun.wait = Math.max(0, gun.wait - dt);
+  const weapon = fighter.weapon;
+  const punch = fighter.punch;
+  const aiming = weapon?.held && weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined);
+  const target = aiming ? world.fighters[punch?.spec.path === 'aim' ? punch.target : fighter.aimAt] : null;
+  if (!target || target.state === 'out' || fighter.state !== 'up') return;
+  const from = point(fighter.x, P.pelvis);
+  const to = point(target.x, P.pelvis);
+  if (Math.hypot(to[0] - from[0], to[2] - from[2]) > paired.within) return;
+  const mark = aimPoint(target, 'body');
+  const side = gun.weapon.main;
+  intent[`${side}Hand`] = raisedAim(fighter, toLocal(fighter, mark), gun.weapon).hand;
+  const hand = point(fighter.x, P[`${side}Hand`]);
+  gun.weapon.dir = vec.normalize(vec.sub(hand, point(fighter.x, P[`${side}Elbow`])));
+  if (gun.wait > 0 || vec.dot(gun.weapon.dir, vec.normalize(vec.sub(mark, hand))) < Math.cos(paired.settled)) return;
+  fire(world, fighter, gun.weapon, mark);
+  gun.wait = paired.every;
+}
+
+/**
  * Move the weapon with the hands, each substep. The wrists turn it towards
  * where the move points it, a spring as fast as its inertia allows (stiffer
  * with both hands on it), while its own weight pulls the point down. In two
@@ -1103,6 +1135,7 @@ function updateIntent(world, fighter, dt) {
   }
   applyDefence(fighter, intent, dt);
   weaponIntent(world, fighter, intent);
+  pairedGun(world, fighter, intent, dt);
   weaveHead(world, fighter, intent, dt);
   if (fighter.rush) {
     // Charging: head down, shoulder first, hands up.
