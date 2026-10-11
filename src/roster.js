@@ -21,17 +21,20 @@ const warrior = (key, title, base, changes = {}) => {
   return { key, title, inputs, faction: factionOf(inputs), line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
 };
 
+// `legend`: shown in the intro on first load (intro.js), in `order`, with its
+// `kicker` (an epithet over the name) and `line`; `legend: true` alone will do
+// (after the numbered, his faction for the kicker, his kit for the line).
 export const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
   // The knights' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
-  { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true },
-  warrior('joan', 'Joan of Arc', PRESETS.joan),
+  { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true, legend: { order: 1, kicker: 'The Crusader', line: 'A warrior monk of the Crusades: arming sword, heater shield, mail and the great helm.' } },
+  { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: 'The Maid of Orléans', line: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.' } },
   warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
   // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
-  { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true },
+  { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true, legend: { order: 3, kicker: 'Great-armour samurai', line: 'The great archer of the Hōgen war, in ō-yoroi: the long yumi, then the blade.' } },
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
   warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', calories: 4050, exercise: 0.75, sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
@@ -42,32 +45,32 @@ export const WARRIORS = [
   warrior('shaolin', 'Tanzong', PRESETS.staff),
   warrior('taichi', 'Chen Fake', PRESETS.taichi),
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
-  warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda),
-  warrior('guanYu', 'Guan Yu', PRESETS.guanYu),
+  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: 'The Iron Pagoda', line: 'The Jin heavy guard: wolf-tooth mace and iron buckler, armoured head to foot.' } },
+  { ...warrior('guanYu', 'Guan Yu', PRESETS.guanYu), legend: { order: 6, kicker: 'God of War', line: 'The Green Dragon Crescent Blade: great sweeping cuts from far off.' } },
   warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
   warrior('wuxia', 'Pei Min', PRESETS.wuxia),
-  warrior('kheshig', 'Subutai', PRESETS.kheshig),
+  { ...warrior('kheshig', 'Subutai', PRESETS.kheshig), legend: { order: 10, kicker: 'The Khan\'s Guard', line: 'Quick arrows from the composite bow, then straight in with the flanged mace.' } },
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
   // An iron-clad horse archer: the bow, then the sabre (his kit's sidearm) up close.
   warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
   warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
   // The sultanates' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
-  { ...warrior('saladin', 'Saladin', PRESETS.saladin), flagship: true },
+  { ...warrior('saladin', 'Saladin', PRESETS.saladin), flagship: true, legend: { order: 9, kicker: 'Sultan of Egypt and Syria', line: 'The straight Ayyubid sword and round shield: patient, quick to answer.' } },
   warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),
   warrior('sipahi', 'Davud the sipahi', PRESETS.sipahi),
   warrior('janissary', 'Ulubatlı Hasan', PRESETS.yatagan),
   warrior('janissaryGun', 'Mehmed Çavuş', PRESETS.yatagan, { name: 'Mehmed Çavuş', style: 'matchlock', outfit: { kind: 'janissary', design: 1 } }),
   warrior('azapArcher', 'Ali the azap', PRESETS.azap),
   warrior('azapSpear', 'Yusuf the azap', PRESETS.azap, { name: 'Yusuf the azap', style: 'spear', outfit: { kind: 'azap', design: 1 } }),
-  warrior('ronin', 'Miyamoto Musashi', PRESETS.samurai, { name: 'Miyamoto Musashi', outfit: { kind: 'ronin', design: 2 }, accessories: [], charging: 2.5 }),
+  { ...warrior('ronin', 'Miyamoto Musashi', PRESETS.samurai, { name: 'Miyamoto Musashi', outfit: { kind: 'ronin', design: 2 }, accessories: [], charging: 2.5 }), legend: { order: 4, kicker: 'The Sword Saint', line: 'The masterless swordsman: the katana in both hands, deep cuts.' } },
   warrior('wokou', 'Wang Zhi', PRESETS.mingDao, { name: 'Wang Zhi', outfit: { kind: 'wokou', design: 0 } }),
   warrior('hidalgo', 'Hernán Cortés', PRESETS.hidalgo),
   warrior('rodelero', 'Bernal Díaz', PRESETS.rodelero),
   warrior('arquebusier', 'Diego de Ordaz', PRESETS.knight, { name: 'Diego de Ordaz', exercise: 0.66, heightCm: 183, calories: 4600, style: 'matchlock', outfit: { kind: 'conquistadorQuilted', design: 1 }, accessories: [] }),
   warrior('vocMusketeer', 'Hans Pedel', PRESETS.knight, { name: 'Hans Pedel', exercise: 0.66, heightCm: 183, calories: 4600, style: 'matchlock', outfit: { kind: 'conquistadorQuilted', design: 3 }, accessories: [] }),
   warrior('vocPikeman', 'Jan de Vries', PRESETS.knight, { name: 'Jan de Vries', exercise: 0.66, heightCm: 183, calories: 4600, style: 'spear', outfit: { kind: 'conquistadorPlate', design: 3 }, accessories: [] }),
-  warrior('eagle', 'Cuauhtémoc', PRESETS.macuahuitl),
+  { ...warrior('eagle', 'Cuauhtémoc', PRESETS.macuahuitl), legend: { order: 11, kicker: 'The Last Emperor', line: 'The last tlatoani of Tenochtitlan: the obsidian-edged macuahuitl and a feathered shield.' } },
   warrior('jaguar', 'Ocelotl', PRESETS.tepoztopilli),
   warrior('mexica', 'Yaotl', PRESETS.contender, { name: 'Yaotl', calories: 4050, exercise: 0.75, sex: 'male', style: 'macuahuitl', outfit: { kind: 'mexicaWarrior', design: 0 }, accessories: [], look: { skinTone: 'medium', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
   warrior('taekwondo', 'Kim Min-jun', PRESETS.taekwondo),
@@ -88,8 +91,8 @@ export const WARRIORS = [
   warrior('thraex', 'Spartacus', PRESETS.thraex),
   warrior('retiarius', 'Kalendio', PRESETS.retiarius),
   warrior('scissor', 'Astacius', PRESETS.scissor),
-  warrior('maximus', 'Maximus', PRESETS.maximus),
-  warrior('commodus', 'Commodus', PRESETS.commodus),
+  { ...warrior('maximus', 'Maximus', PRESETS.maximus), legend: { order: 7, kicker: 'The General', line: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.' } },
+  { ...warrior('commodus', 'Commodus', PRESETS.commodus), legend: { order: 8, kicker: 'The Emperor', line: 'The emperor as Hercules: lion skin and club, heavy blows.' } },
   warrior('lorarius', 'Felix the lorarius', PRESETS.whip),
   warrior('legionary', 'Gaius Valerius Crispus', PRESETS.legionary),
   warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
