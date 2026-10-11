@@ -1349,7 +1349,9 @@ export function think(world, fighter, dt) {
   if (waiting) fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 0.6 : -0.6)));
   // His own cadence: spells of moving and of working, in bursts; against a
   // longer reach or a blade, held off out of reach between surges.
-  const wary = !waiting && !fighter.clinch && outreached(fighter, opponent);
+  // A machine that knows no fear (`courage` 1) in plate no edge can cut (`cutProof`) walks in under the longer weapon.
+  const fearless = fighter.body.gear.courage >= 1 && fighter.body.gear.cutProof;
+  const wary = !waiting && !fighter.clinch && !fearless && outreached(fighter, opponent);
   const cadence = cadenceOf(world, fighter, style, plan, nerve);
   let mayAttack = true;
   if (fighter.clinch && style.clinchDrive) fighter.move = 1;

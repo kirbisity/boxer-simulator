@@ -750,6 +750,7 @@ const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
   elbow: 'Elbow', upElbow: 'Up elbow', clinch: 'Clinch', rush: 'Charge', guard: 'Guard', slip: 'Slip', roll: 'Roll', parry: 'Parry',
   leanBack: 'Lean back', check: 'Check', stepBack: 'Step back', body: 'Body', shoot: 'Shoot', rHook: 'Rear hook', collarTie: 'Collar tie',
+  clubR: 'Club', clubL: 'Left club', swipeR: 'Swipe', swipeL: 'Left swipe',
 };
 
 /** A move's name on a button: its own label, or its key in words ("hammerOverhead" → "Hammer overhead"). */

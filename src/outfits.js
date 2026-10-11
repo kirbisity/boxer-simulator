@@ -1290,14 +1290,22 @@ export const OUTFITS = {
   // aluminium over each part, white panels on the chest and thighs, dark
   // actuators bare at every joint and the waist, black hands and shoes; a
   // dark helmet with a ring of blue light for a face (`armor.robot`, drawn
-  // by robotview.js). Thin aluminium and plastic: it turns some of an edge
-  // and a little of a blow, almost nothing of a round. No fear.
+  // by robotview.js). Thin aluminium (a few mm) and plastic: it turns some
+  // of an edge and a little of a blow, almost nothing of a round. But it is
+  // hard and smooth as plate is, and rounded: an edge that meets it skids
+  // off (`deflects`), a blow or an arrow not square on the domed chest
+  // shell or the round head shell glances (`breastplate`, `helmet`: a light
+  // shell, little padding behind it). Its joints are bare actuators: an
+  // edge finds them as it finds plate's gaps. No fear.
   humanoid: {
     faction: 'specials', bulletRating: 500,
     label: 'Humanoid robot', movement: 'good', fists: 'gloved-tactical', courage: 1,
+    breastplate: 0.6,
+    helmet: { mass: 0.8, padding: 0.25, curve: 0.8 },
+    deflects: true,
     protection: {
-      blunt: 0.25, cut: 0.6, pierce: 0.4, bullet: { head: 0.1, torso: 0.15, limb: 0.1 },
-      regions: { head: { blunt: 0.3, cut: 0.7, pierce: 0.5 }, limb: { blunt: 0.2, cut: 0.5, pierce: 0.3 } },
+      blunt: 0.3, cut: 0.7, pierce: 0.5, bullet: { head: 0.1, torso: 0.15, limb: 0.1 },
+      regions: { head: { blunt: 0.35, cut: 0.75, pierce: 0.55 }, limb: { blunt: 0.25, cut: 0.6, pierce: 0.4 } },
     },
     designs: [
       { label: 'Silver and white', armor: { kind: 'robot', color: '#c3c8cf', mail: '#eef0f3', robot: { metal: true, led: '#46b4ff' } }, head: { kind: 'robotHead', color: '#4a4d54', visor: '#0d0e11', trim: '#c3c8cf', led: '#46b4ff' }, feet: { kind: 'compactBoot', color: '#17181b' } },
@@ -1306,8 +1314,13 @@ export const OUTFITS = {
   // The combat bot: the humanoid built thick, its shells steel and ceramic
   // composite plate, thicker than before (rated well past the AR-15's own
   // round: it holds nearly all of one over the trunk, most at the head and
-  // limbs; a blade glances off), a great battery box on its back, ~55 kg
-  // of kit on a 115 kg frame. Its forearms are its guns (`mounted`: an
+  // limbs), a great battery box on its back, ~55 kg of kit on a 115 kg
+  // frame. As a knight's harness: a blade glances off (`deflects`), and
+  // there is no gap for an edge, its joints shrouded (`cutProof`; a point
+  // may still find one); the chest a curved plate and the helmet a domed
+  // steel shell on a padded mount, so a blow or an arrow not square on
+  // either skids off (`breastplate`, `helmet`); the steel spreads a blow
+  // as plate does (`blunt`). Its forearms are its guns (`mounted`: an
   // AR-15 on the right, a shotgun on the left; never dropped). Dark grey,
   // picked out in #D97757.
   combatBot: {
@@ -1316,9 +1329,12 @@ export const OUTFITS = {
     label: 'Combat bot — armoured', movement: 'limited', fists: 'gauntlet', courage: 1,
     extraMass: 55 / 115, balance: 1.5,
     mounted: { r: 'armRifle', l: 'armShotgun' },
+    breastplate: 0.8,
+    helmet: { mass: 2.5, padding: 0.55, curve: 0.85 },
+    cutProof: true,
     protection: {
-      blunt: 0.6, cut: 0.95, pierce: 0.85, bullet: { head: 0.85, torso: 0.95, limb: 0.75 },
-      regions: { head: { blunt: 0.65, cut: 0.95, pierce: 0.85 }, limb: { blunt: 0.5, cut: 0.9, pierce: 0.75 } },
+      blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.85, torso: 0.95, limb: 0.75 },
+      regions: { head: { blunt: 0.65, cut: 1, pierce: 0.9 }, limb: { blunt: 0.55, cut: 0.95, pierce: 0.85 } },
     },
     deflects: true,
     designs: [
@@ -1527,8 +1543,8 @@ export function gearTraits(inputs) {
     gaps: spec.gaps ?? null,
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
     headBulk: spec.headBulk ?? 1,
-    // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve.
-    helmet: HELMETS[look.head?.kind] ?? NO_HELMET,
+    // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve; or the kit's own (`helmet`: a machine's head shell).
+    helmet: spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET,
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.

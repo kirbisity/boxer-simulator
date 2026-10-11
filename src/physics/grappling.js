@@ -3,7 +3,7 @@
 
 import { P } from '../body.js';
 import { STYLES } from '../moves.js';
-import { dropWeapon, opponentFor, point, TRUNK_PARTICLES } from '../physics.js';
+import { addDamage, boneShare, dropWeapon, opponentFor, point, protectionAt, TRUNK_PARTICLES, wound } from '../physics.js';
 import { vec, yawRotate } from '../pose.js';
 import { WORLD } from './config.js';
 
@@ -15,6 +15,14 @@ import { WORLD } from './config.js';
 export function holdClinch(world, fighter) {
   const target = world.fighters[fighter.clinch.target];
   const style = STYLES[fighter.style];
+  // Holding him, an ape bites (`bite`).
+  if (style?.bite && Object.values(fighter.clinch.locked ?? {}).some(Boolean)) {
+    fighter.clinch.biteAt ??= world.time + style.bite.first;
+    if (world.time >= fighter.clinch.biteAt) {
+      fighter.clinch.biteAt = world.time + style.bite.every;
+      bite(world, fighter, target, style.bite);
+    }
+  }
   if (style?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) {
     driveClinch(world, fighter, target);
     // Held long enough, a throw (sumo's: `throws`).
@@ -54,6 +62,37 @@ export function holdClinch(world, fighter) {
       target.x[P.neck * 3 + axis] += correction[axis] * (wNeck / total);
     }
   }
+}
+
+/**
+ * A bite on a man held close (a style's `bite`: { forceN, depth,
+ * pierceShare }): the teeth close on his neck and shoulder or the nearer
+ * upper arm, whichever is nearer the mouth. The work the jaw does is its
+ * force over the depth the canines go in, part a puncture and part a tear
+ * (`pierceShare`), each less what his kit turns of a point and of an edge,
+ * a wound as a blade's of that many joules: it bleeds, and reaches the bone
+ * of a limb as deep as it goes.
+ */
+function bite(world, fighter, target, spec) {
+  const mouth = point(fighter.x, P.head);
+  const parts = [['trunk', P.neck], ['lUpperArm', P.lShoulder], ['rUpperArm', P.rShoulder]];
+  const [key, at] = parts.reduce((best, part) => (vec.length(vec.sub(point(target.x, part[1]), mouth)) < vec.length(vec.sub(point(target.x, best[1]), mouth)) ? part : best));
+  const energy = spec.forceN * spec.depth * Math.max(0.3, fighter.motorScale ?? 1);
+  const covered = protectionAt(target.body.gear, key);
+  const pierce = energy * spec.pierceShare * (1 - (covered.pierce ?? 0));
+  const cut = energy * (1 - spec.pierceShare) * (1 - (covered.cut ?? 0));
+  const toBone = key === 'trunk' ? () => 1 : (joules) => boneShare(joules, 1);
+  const event = { time: world.time, kind: 'bite', attacker: fighter.id, defender: target.id, punch: 'bite', target: key, cut, pierce, energy, point: point(target.x, at), effects: [] };
+  if (pierce > 0.5) {
+    wound(target, 'pierce', pierce, key, fighter);
+    addDamage(target, key, pierce / 4, false, toBone(pierce));
+  }
+  if (cut > 0.5) {
+    wound(target, 'cut', cut, key, fighter);
+    addDamage(target, key, cut / 6, false, toBone(cut));
+  }
+  event.effects.push(pierce + cut > 0.5 ? (key === 'trunk' ? 'bitten in the neck' : 'bitten in the arm') : 'teeth on his armour');
+  world.events.push(event);
 }
 
 /** Where a pin's hands go on a lying man: his upper chest and his hips, on top of him. */

@@ -94,14 +94,18 @@ for its pieces; any new helmet as a `buildHeadgear` case; a glyph in
 
 **A beast or a machine:** a preset with `build` (body.js): a fixed mass and
 fat share, its own proportions (`lengths`), spread of muscle (`muscle`),
-strength per kilogram (`strength`), fibre `bulk` and endurance (`aerobic`),
-in place of diet and training; the same skeleton and physics. Weapons built
-into the forearms are `mounted` weapon specs (an outfit's `mounted` names
-them by arm; never dropped, their weight the kit's); a style's `switches`
-say when the AI takes up the other arm's, and its `paired` fires a second
-forearm gun alongside the one in use (physics.js `pairedGun`). A machine is
+strength per kilogram (`strength`), fibre `bulk`, bone strength (`bones`)
+and endurance (`aerobic`), in place of diet and training; the same skeleton
+and physics. Weapons built into the forearms are `mounted` weapon specs (an
+outfit's `mounted` names them by arm; never dropped, their weight the
+kit's); a style's `switches` say when the AI takes up the other arm's, and
+its `paired` fires a second forearm gun alongside the one in use, on a man
+of its own if one is near (physics.js `pairedGun`). A machine is
 `build.rigid` (firm flesh, no jiggle) and drawn by its kit's `armor.robot`
-as rigid shells and joints over the bones (robotview.js), not a skin.
+as rigid shells and joints over the bones (robotview.js), not a skin; a kit
+may give its own head shell (`helmet`) in place of the HELMETS entry. An
+animal's ways are style data too: its charge pose (`charge`), and a bite
+while it holds a man (`bite`, physics/grappling.js).
 
 **A level:** an entry in `SCENARIOS` with a troop table and a `cast`; body
 sizes in `PERIOD_BUILD`; check the historical outcome with the level runner

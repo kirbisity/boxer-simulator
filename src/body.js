@@ -581,24 +581,29 @@ export const PRESETS = {
     outfit: { kind: 'lorarius', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
-  // A silverback western lowland gorilla, fought upright: ~1.7 m standing
-  // and 200 kg, the top of the wild adult males' range (~160-200 kg; Smith
-  // & Jungers 1997), lean (~8% fat). An ape's arms are long and its legs
-  // short (arm span ~2.4 m against ~1.0x height in a man; intermembral
-  // index ~117): `lengths`. Its muscle is half its weight (bonobo dissection
-  // ~49% against a man's ~36%, Zihlman & McFarland 2000), more of it in the
-  // arms than a man's (`muscle`, multiples of a man's share). Ape muscle is
-  // ~1.35 times as strong and powerful per kilogram (O'Neill et al. 2017,
-  // PNAS, chimpanzees) (`strength`), about two thirds of it fast fibres
-  // against a man's third (`fast`: its top speed), its fibres long, so a
-  // thick limb is not a slow one (`bulk`). All told its arms (punch, shove,
-  // grip) are ~5.4 times an ordinary 80 kg man's and ~3 times a trained
-  // heavyweight's, its legs ~2.8 times a man's. Fists (knuckles), shoves,
-  // charges.
+  // A silverback western lowland gorilla, fought upright: ~1.8 m standing
+  // and 230 kg, past the top of the wild adult males' usual range (~160-200
+  // kg; Smith & Jungers 1997; captive males reach 270 and more), lean (~8%
+  // fat). An ape's arms are long and its legs short (arm span ~2.4 m
+  // against ~1.0x height in a man; intermembral index ~117): `lengths`,
+  // shares of its height, kept as it grew. Its muscle is half its weight
+  // (bonobo dissection ~49% against a man's ~36%, Zihlman & McFarland 2000),
+  // more of it in the arms than a man's (`muscle`, multiples of a man's
+  // share). Ape muscle is ~1.35 times as strong and powerful per kilogram
+  // (O'Neill et al. 2017, PNAS, chimpanzees) (`strength`), about two thirds
+  // of it fast fibres against a man's third (`fast`: its top speed), its
+  // fibres long, so a thick limb is not a slow one (`bulk`: its hand as fast
+  // per metre of arm as at 200 kg). All told its arms (punch, shove, grip)
+  // are ~5.9 times an ordinary 80 kg man's and ~3.3 times a trained
+  // heavyweight's, its legs ~3 times a man's. Its bones are as much
+  // stronger as they are thicker (`bones`: a bone's strength goes with its
+  // section, ~mass^(2/3): (230/80)^(2/3) ≈ 2; a knuckle-walker's hands
+  // carry its weight). It fights as apes do (STYLES.gorilla): charges,
+  // clubbing and slapping blows, grabs, bites.
   gorilla: {
-    name: 'Kumbuka', style: 'gorilla', sex: 'male', heightCm: 170, frame: 'large', age: 25, exercise: 0.5, calories: 2800, skill: 0.3,
+    name: 'Kumbuka', style: 'gorilla', sex: 'male', heightCm: 180, frame: 'large', age: 25, exercise: 0.5, calories: 2800, skill: 0.3,
     build: {
-      massKg: 200, bodyFat: 0.08, strength: 1.35, fast: 1.15, bulk: 2.85,
+      massKg: 230, bodyFat: 0.08, strength: 1.35, fast: 1.15, bulk: 3.1, bones: 2,
       lengths: { thigh: 0.21, shank: 0.2, trunk: 0.36, neckToHead: 0.1, upperArm: 0.29, forearmToFist: 0.3, shoulderSpan: 0.25, hipSpan: 0.13 },
       muscle: { upperArm: 1.6, forearm: 1.75, thigh: 0.7, shank: 0.6 },
     },
@@ -621,11 +626,15 @@ export const PRESETS = {
   // a 115 kg frame (its motors on that frame's scale) and 55 kg of armour,
   // battery and guns (its kit's `extraMass`); rigid, as the humanoid. An
   // AR-15 in the right forearm, a shotgun in the left (`mounted`), fired
-  // together, then fought as a heavy blade and a mace.
+  // together, then fought as a heavy blade and a mace. Its actuators are
+  // a heavy machine's, not a man's (`strength` 1.5 per kilogram of its
+  // frame: ~1.5 times the torque of a muscle of the same mass, as an
+  // industrial arm's geared motors give): its arms ~3.1 times an ordinary
+  // man's force and ~1.8 times a trained heavyweight's.
   combatBot: {
     name: 'CB-170 "Warden"', style: 'combatBot', sex: 'male', heightCm: 180, frame: 'large', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
     // Motors, not pennate muscle: a thick limb is no slower for it (`bulk`).
-    build: { massKg: 115, bodyFat: 0, strength: 1, aerobic: 1.1, bulk: 2, rigid: true },
+    build: { massKg: 115, bodyFat: 0, strength: 1.5, aerobic: 1.1, bulk: 2, rigid: true },
     outfit: { kind: 'combatBot', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1e1f22', hairStyle: 'bald', hairColor: '#1e1f22', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -834,10 +843,11 @@ export function buildBody(rawInputs) {
     // Head speed change that drops this fighter, ~3–4.5 m/s ("chin").
     chin: 3.1 * (0.8 + 0.25 * neckIndex) * Math.max(0.6, 1 - 0.004 * yearsAging) * BODY.toughness,
     // A man's own hand breaking on a punch is the attacker's risk, not his health: it stays.
+    // A build's `bones`: its bones' strength against a man's (thicker in section).
     fracture: {
-      face: BODY.fractureN.face * boneDensity * BODY.toughness,
-      hand: BODY.fractureN.hand * boneDensity,
-      rib: BODY.fractureN.rib * boneDensity * BODY.toughness,
+      face: BODY.fractureN.face * boneDensity * BODY.toughness * (build?.bones ?? 1),
+      hand: BODY.fractureN.hand * boneDensity * (build?.bones ?? 1),
+      rib: BODY.fractureN.rib * boneDensity * BODY.toughness * (build?.bones ?? 1),
     },
   };
 }

@@ -347,9 +347,9 @@ export function comradeInLine(world, fighter, weapon = fighter.weapon, aimedAt =
 /**
  * Fire: a round down the barrel's line as it is, give or take the aim's
  * error. The gun in hand on its shot's mark, or another (`weapon`: a second
- * forearm gun) at a world point (`aimedAt`).
+ * forearm gun) at a world point (`aimedAt`) on a man (`aimedId`, kept on the shot).
  */
-export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null) {
+export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, aimedId = null) {
   const punch = fighter.punch;
   const own = weapon === fighter.weapon;
   if (own) punch.fired = true;
@@ -403,7 +403,7 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null) {
     const flight = shot?.pellets ? vec.normalize(vec.add(dir, vec.add(vec.scale(up, gauss() * shot.pellet), vec.scale(across, gauss() * shot.pellet)))) : dir;
     const end = vec.add(muzzle, vec.scale(flight, GUN.range));
     const hit = firstHit(world, fighter, muzzle, end);
-    const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
+    const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
     world.events.push(event);
     if (hit?.target === 'shield') event.effects.push('stopped by the shield');
     else if (hit) bulletHit(world, fighter, hit, flight, event, shot);
