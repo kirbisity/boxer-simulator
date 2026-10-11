@@ -573,6 +573,49 @@ export const PRESETS = {
     outfit: { kind: 'lorarius', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
+  // A silverback western lowland gorilla, fought upright: ~1.7 m standing
+  // and ~170 kg (wild adult males, Smith & Jungers 1997), lean (~8% fat).
+  // An ape's arms are long and its legs short (arm span ~2.4 m against
+  // ~1.0x height in a man; intermembral index ~117): `lengths`. Its muscle
+  // is half its weight (bonobo dissection ~49% against a man's ~36%,
+  // Zihlman & McFarland 2000) and sits in the arms, not the legs (`muscle`,
+  // multiples of a man's share). Ape muscle is ~1.35 times as strong and
+  // powerful per kilogram (more fast fibres; O'Neill et al. 2017, PNAS,
+  // chimpanzees) (`strength`), its fibres long, so a thick limb is not a
+  // slow one (`bulk`). Fists (knuckles), shoves, charges.
+  gorilla: {
+    name: 'Kumbuka', style: 'gorilla', sex: 'male', heightCm: 170, frame: 'large', age: 25, exercise: 0.5, calories: 2800, skill: 0.3,
+    build: {
+      massKg: 170, bodyFat: 0.08, strength: 1.35, bulk: 3,
+      lengths: { thigh: 0.21, shank: 0.2, trunk: 0.36, neckToHead: 0.1, upperArm: 0.29, forearmToFist: 0.3, shoulderSpan: 0.25, hipSpan: 0.13 },
+      muscle: { upperArm: 2.2, forearm: 2.4, thigh: 0.7, shank: 0.6 },
+    },
+    outfit: { kind: 'silverback', design: 0 }, accessories: [],
+    look: { skinTone: 'deep', skinColor: '#26252a', hairStyle: 'bald', hairColor: '#1a1a1c', facialHair: 'none', eyeColor: 'brown' },
+  },
+  // A humanoid robot after Unitree's H1: 1.80 m, fixed at 70 kg (the H1 is
+  // ~47 kg; this one is built heavier), no fat, no diet, no ageing. Its
+  // actuators are put at a fit man's strength (the H1's ~75 N·m at the arm,
+  // ~360 N·m at the knee, against a man's ~70 and ~250); a battery, not
+  // breath, for endurance (`aerobic`). Kickboxes, as Unitree's G1s did.
+  humanoid: {
+    name: 'H-1 "Unit"', style: 'kickboxing', sex: 'male', heightCm: 180, frame: 'medium', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
+    build: { massKg: 70, bodyFat: 0, strength: 1, aerobic: 1.1 },
+    outfit: { kind: 'humanoid', design: 0 }, accessories: [],
+    look: { skinTone: 'deep', skinColor: '#2c2e33', hairStyle: 'bald', hairColor: '#2c2e33', facialHair: 'none', eyeColor: 'brown' },
+  },
+  // The combat bot: the humanoid built thicker, 1.80 m and 170 kg all told:
+  // a 120 kg frame (its motors on that frame's scale) and 50 kg of armour,
+  // battery and guns (its kit's `extraMass`). An AR-15 in the right forearm,
+  // a shotgun in the left (`mounted`), fired, then fought as a heavy blade
+  // and a mace.
+  combatBot: {
+    name: 'CB-170 "Warden"', style: 'combatBot', sex: 'male', heightCm: 180, frame: 'large', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
+    // Motors, not pennate muscle: a thick limb is no slower for it (`bulk`).
+    build: { massKg: 120, bodyFat: 0, strength: 1, aerobic: 1.1, bulk: 2 },
+    outfit: { kind: 'combatBot', design: 0 }, accessories: [],
+    look: { skinTone: 'deep', skinColor: '#1e1f22', hairStyle: 'bald', hairColor: '#1e1f22', facialHair: 'none', eyeColor: 'brown' },
+  },
   scissor: {
     name: 'Astacius', style: 'scissor', sex: 'male', heightCm: 176, frame: 'large', age: 31, exercise: 0.6, calories: 4590,
     outfit: { kind: 'scissor', design: 4 },
@@ -613,15 +656,18 @@ export function buildBody(rawInputs) {
   const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
   const yearsAging = Math.max(0, inputs.age - BODY.agingFrom);
 
+  // A fixed build (`inputs.build`: a robot, an animal) is what it is: its
+  // mass and fat given, no diet or bone density settling into them.
+  const build = inputs.build ?? null;
   // What eating and exercise settle into: lean and fat are outcomes.
-  const composition = settleComposition(inputs, frame.lean);
+  const composition = build ? fixedComposition(build, heightM) : settleComposition(inputs, frame.lean);
   const leanKg = composition.lean;
   const fatKg = composition.fat;
   const massKg = leanKg + fatKg;
   // Downstream reads training (skill, recruitment) and body fat from inputs.
   inputs.training = inputs.exercise;
   inputs.bodyFat = composition.bodyFat;
-  const tScore = boneTScore(inputs, massKg, composition.bodyFat);
+  const tScore = build ? 0 : boneTScore(inputs, massKg, composition.bodyFat);
   // Bone: the frame's skeleton, denser or more porous by its T-score
   // (each SD is ~10% of bone mineral).
   // A T-score is in standard deviations of mineral density, about 10% each;
@@ -633,19 +679,23 @@ export function buildBody(rawInputs) {
   const ffmi = leanKg / (heightM * heightM);
   // What the years (and the feeding) have left (aging.js): strength falls
   // faster than muscle, so each kilo left is weaker too.
-  const aged = ageing(inputs, { bodyFat: composition.bodyFat, starving: starvation(inputs, composition.bodyFat) });
-  const muscleQuality = aged.strength / aged.muscle ** BODY.allometryExponent;
+  const starving = build ? 0 : starvation(inputs, composition.bodyFat);
+  const aged = ageing(inputs, { bodyFat: composition.bodyFat, starving });
+  // A build's `strength`: force per kilogram of its muscle (or motor) against a man's.
+  const muscleQuality = (aged.strength / aged.muscle ** BODY.allometryExponent) * (build?.strength ?? 1);
 
+  // A build's own proportions (`lengths`, shares of height) over a man's.
   const lengths = {};
-  for (const [key, fraction] of Object.entries(LENGTH)) lengths[key] = fraction * heightM;
+  for (const [key, fraction] of Object.entries(LENGTH)) lengths[key] = (build?.lengths?.[key] ?? fraction) * heightM;
   lengths.hipSpan *= frame.width;
   lengths.shoulderSpan *= frame.width * (inputs.sex === 'female' ? 0.92 : 1) * (1 + 0.06 * inputs.training);
 
   // Training grows the arms (and shoulders) disproportionately; starvation
   // strips the limbs before the trunk. Shares are renormalised to sum to the
   // body's muscle.
-  const starving = starvation(inputs, composition.bodyFat);
   const muscleShares = { ...SHARE.muscle };
+  // A build's own spread of muscle (`muscle`: multiples of a man's share by part).
+  for (const kind of Object.keys(muscleShares)) muscleShares[kind] *= build?.muscle?.[kind] ?? 1;
   for (const kind of ['upperArm', 'forearm']) muscleShares[kind] *= 1 + BODY.armHypertrophy * inputs.exercise ** 2.5;
   for (const kind of ['upperArm', 'forearm', 'thigh', 'shank']) muscleShares[kind] /= 1 + BODY.limbWasting * starving;
   const shareTotal = muscleShares.head + muscleShares.trunk + 2 * (muscleShares.upperArm + muscleShares.forearm + muscleShares.thigh + muscleShares.shank);
@@ -710,8 +760,9 @@ export function buildBody(rawInputs) {
     strikeForce[P[`${side}Foot`]] = kickForce;
     strikeForce[P[`${side}Knee`]] = kickForce * 0.9;
     const armLength = lengths.upperArm + lengths.forearmToFist;
-    const armBulk = arm(side) / armLength / BODY.referenceBulk.arm;
-    const legBulk = leg(side) / legLength / BODY.referenceBulk.leg;
+    // A build's `bulk`: how much more muscle a metre of its limb carries before its fibres steepen.
+    const armBulk = arm(side) / armLength / (BODY.referenceBulk.arm * (build?.bulk ?? 1));
+    const legBulk = leg(side) / legLength / (BODY.referenceBulk.leg * (build?.bulk ?? 1));
     const pennation = (bulk) => 1 / (1 + BODY.pennationCost * Math.max(0, bulk - 1) ** 2);
     topSpeed[P[`${side}Hand`]] = BODY.topSpeedPerMetre.arm * armLength * fastFibres * pennation(armBulk);
     topSpeed[P[`${side}Elbow`]] = topSpeed[P[`${side}Hand`]] * 0.85;
@@ -733,7 +784,8 @@ export function buildBody(rawInputs) {
 
   const armKg = (side) => segments[`${side}UpperArm`].mass + segments[`${side}Forearm`].mass + BODY.gloveKg;
   const technique = 0.75 + 0.25 * inputs.training;
-  const aerobic = clamp((0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15)) * aged.aerobic, 0.1, 1.1);
+  // A build may set its own endurance (a machine's battery): `aerobic`.
+  const aerobic = build?.aerobic ?? clamp((0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15)) * aged.aerobic, 0.1, 1.1);
 
   return {
     inputs, heightM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
@@ -773,6 +825,13 @@ export function buildBody(rawInputs) {
       rib: BODY.fractureN.rib * boneDensity * BODY.toughness,
     },
   };
+}
+
+/** A fixed build's composition: its mass (`massKg`) and fat share (`bodyFat`) as given. */
+function fixedComposition(build, heightM) {
+  const bodyFat = build.bodyFat ?? 0;
+  // Not fed: no metabolism to report (rmr, tdee 0).
+  return { lean: build.massKg * (1 - bodyFat), fat: build.massKg * bodyFat, bodyFat, bmi: build.massKg / (heightM * heightM), rmr: 0, tdee: 0 };
 }
 
 function particleMasses(segments, massKg) {

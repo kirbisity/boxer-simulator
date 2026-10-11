@@ -447,6 +447,37 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       );
       break;
     }
+    case 'armRifle':
+    case 'armShotgun': {
+      // A combat bot's forearm weapon, from the wrist on (the forearm's own
+      // plate is the body's): a dark housing banded in the accent colour,
+      // the barrel out of it. The rifle's heavy blade runs under its barrel
+      // past the muzzle (edge +z); the shotgun's thick barrel ends in a
+      // flanged muzzle, the mace's head.
+      const casing = surface(0x43464c, { roughness: 0.55 });
+      const accent = surface(0xd97757, { roughness: 0.5 });
+      const gunmetal = steelMaterial(envMap, { vertexColors: false, color: 0x2a2b2f, roughness: 0.45 });
+      if (kind === 'armRifle') {
+        const barrel = cylinder(0.011, 0.011, 0.04, spec.muzzle[0], gunmetal, 10);
+        barrel.position.z = -0.022;
+        const brake = cylinder(0.017, 0.017, spec.muzzle[0] - 0.04, spec.muzzle[0], gunmetal, 10);
+        brake.position.z = -0.022;
+        const blade = bladeMesh(bladeGeometry(0.05, spec.length - 0.05, 0.062, 0.012, 0.16), steel);
+        blade.position.z = 0.016;
+        group.add(box([0.07, 0.12, 0.08], [0, 0.03, 0], casing), box([0.072, 0.022, 0.082], [0, 0.07, 0], accent), barrel, brake, blade);
+      } else {
+        const barrel = cylinder(0.024, 0.024, 0.04, spec.length - 0.1, gunmetal, 12);
+        const head = cylinder(0.042, 0.038, spec.length - 0.12, spec.length, gunmetal, 12);
+        group.add(box([0.1, 0.15, 0.1], [0, 0.04, 0], casing), box([0.102, 0.025, 0.102], [0, 0.09, 0], accent), barrel, head);
+        for (let flange = 0; flange < 6; flange += 1) {
+          const angle = (flange / 6) * Math.PI * 2;
+          const fin = box([0.012, 0.1, 0.03], [Math.cos(angle) * 0.048, spec.length - 0.06, Math.sin(angle) * 0.048], casing);
+          fin.rotation.y = -angle;
+          group.add(fin);
+        }
+      }
+      break;
+    }
     case 'shotgun': {
       // A pump shotgun: the receiver, a long barrel over the magazine tube,
       // the sliding pump (fore-end) under it, a synthetic stock (+z up).
@@ -1305,6 +1336,30 @@ export function updateArms(view, fighterView, time = 0) {
     fighterView.group.remove(arms.weapon);
     arms.weapon = null;
     arms.kind = null;
+  }
+  // Forearm weapons (the kit's `mounted`) not in use: drawn on their arms, along the forearm.
+  const mounted = fighter.body.gear.mounted;
+  if (mounted && !fighterView.baked) {
+    arms.idle ??= {};
+    for (const side of ['l', 'r']) {
+      if (!mounted[side]) continue;
+      let mesh = arms.idle[side];
+      if (!mesh) {
+        mesh = arms.idle[side] = buildWeaponMesh(mounted[side], view.steelEnv);
+        mesh.matrixAutoUpdate = false;
+        fighterView.group.add(mesh);
+      }
+      mesh.visible = showing && !(weapon?.held && weapon.kind === mounted[side]);
+      if (!mesh.visible) continue;
+      const hand = toVector(point(fighter.x, P[`${side}Hand`]));
+      const along = hand.clone().sub(toVector(point(fighter.x, P[`${side}Elbow`]))).normalize();
+      const front = toVector(fighterView.frames[BONE[`${side}Forearm`]].x);
+      const edge = front.sub(along.clone().multiplyScalar(front.dot(along)));
+      if (edge.lengthSq() < 1e-6) edge.copy(new THREE.Vector3(0, 1, 0).cross(along));
+      edge.normalize();
+      mesh.matrix.makeBasis(along.clone().cross(edge), along, edge).setPosition(hand);
+      mesh.matrixWorldNeedsUpdate = true;
+    }
   }
   // The shield gone from his arm (dropped, wrenched off) or another taken up: the old drawing goes.
   if (arms.shield && arms.shieldKind !== fighter.shield?.kind) {

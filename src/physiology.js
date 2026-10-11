@@ -267,7 +267,8 @@ export function deriveStats(body) {
   const massKg = body.bodyMassKg ?? body.massKg;
   const exercise = inputs.exercise;
   const recruitment = 0.55 + 0.55 * exercise;
-  const starving = starvation(inputs, composition.bodyFat);
+  // A fixed build (a robot, an animal) is not fed: never starving.
+  const starving = inputs.build ? 0 : starvation(inputs, composition.bodyFat);
   const weakness = 1 / (1 + STATS.starvationWeakness * starving * starving);
   const muscle = (keys) => keys.reduce((sum, key) => sum + segments[key].tissue.muscle, 0);
   const legs = muscle(['lThigh', 'rThigh', 'lShank', 'rShank']);

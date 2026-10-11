@@ -173,6 +173,11 @@ export const SHOTGUN = {
   reloadSeconds: 4,
 };
 
+// The combat bot's forearm guns: the AR-15's round and rate, the shotgun's
+// buckshot, fed from the body (`rounds` without end: never reloaded).
+export const ARM_RIFLE = { ...RIFLE, rounds: Infinity };
+export const ARM_SHOTGUN = { ...SHOTGUN, rounds: Infinity };
+
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
@@ -331,6 +336,27 @@ export const WEAPONS = {
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 11, zeta: 0.9 }, threat: 6.5, grip: 0.7, ranged: true, edgeUp: true,
     muzzle: [0.72, 0.03],
     shot: SHOTGUN,
+  },
+  // Forearm weapons (`mounted`): built into an arm (`hand`), no grip to
+  // lose (never dropped or knocked away), their weight the body's own. Each
+  // fires and strikes. The right: an AR-15's barrel (ARM_RIFLE) along the
+  // forearm, a heavy blade under it running past the muzzle, a short sword
+  // twice a sword's weight that cuts deeper. The left: a shotgun's barrel
+  // (ARM_SHOTGUN) in a thick steel housing, its flanged muzzle a mace's
+  // head, as the emptied three-eyed gun is swung (its blunt harm and crush).
+  armRifle: {
+    label: 'Arm rifle and blade', hands: 'one', hand: 'r', mounted: true, length: 0.55, strikeFrom: 0.18, handle: 0.02, mass: 2.6, balance: 0.22, radius: 0.026,
+    harm: { swing: { cut: 1.25, blunt: 0.5 }, thrust: { pierce: 1.05, cut: 0.2, blunt: 0.25 } },
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 18, zeta: 0.8 }, threat: 7, ranged: true,
+    muzzle: [0.34, 0.03],
+    shot: ARM_RIFLE,
+  },
+  armShotgun: {
+    label: 'Arm shotgun and mace', hands: 'one', hand: 'l', mounted: true, length: 0.42, strikeFrom: 0.16, handle: 0.02, mass: 4.0, balance: 0.3, radius: 0.05,
+    harm: { swing: { blunt: 1.3 }, thrust: { blunt: 0.6 } },
+    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.85 }, threat: 6.5, ranged: true, crush: 0.4,
+    muzzle: [0.42, 0],
+    shot: ARM_SHOTGUN,
   },
   // A long wooden staff (the Shaolin gun): held near its middle, both ends
   // striking (`strikeFrom` reaches back past the hands to the butt). Wood

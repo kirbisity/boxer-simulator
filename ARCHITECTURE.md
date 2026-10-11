@@ -90,6 +90,14 @@ for its pieces; any new helmet as a `buildHeadgear` case; a glyph in
 
 **A faction:** an entry in `FACTIONS`; its outfits name it.
 
+**A beast or a machine:** a preset with `build` (body.js): a fixed mass and
+fat share, its own proportions (`lengths`), spread of muscle (`muscle`),
+strength per kilogram (`strength`), fibre `bulk` and endurance (`aerobic`),
+in place of diet and training; the same skeleton and physics. Weapons built
+into the forearms are `mounted` weapon specs (an outfit's `mounted` names
+them by arm; never dropped, their weight the kit's); a style's `switches`
+say when the AI takes up the other arm's.
+
 **A level:** an entry in `SCENARIOS` with a troop table and a `cast`; body
 sizes in `PERIOD_BUILD`; check the historical outcome with the level runner
 and adjust only the numbers of each side.
