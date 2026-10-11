@@ -885,7 +885,7 @@ export const STYLES = {
   // The sabre alone (the steppe horseman, the Ottoman sipahi on foot), with
   // a kalkan, and the Janissary's yatagan: cut-and-thrust like the dao.
   saber: {
-    label: 'Sabre', weapon: 'saber', fallback: 'mix',
+    label: 'Sabre', hidden: true, weapon: 'saber', fallback: 'mix',
     cadence: { work: 1.2, move: 0.85, burst: 0.6, mobility: 0.5 },
     stance: { blade: 0.45, crouch: 0.05, width: 1.1, lean: 0.1, guardHeight: 0 },
     weaponGuard: { hand: [0.12, 0.62, -0.1], dir: [1, 0.3, 0.05] },
