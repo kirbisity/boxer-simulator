@@ -138,6 +138,16 @@ export const MOVES = {
   collarTie: { kind: 'clinch', hands: ['l'], duration: 7, cost: 0.016 },
   // The rear hand looped round: the brawler's hook, in close or held.
   rHook: { kind: 'strike', limb: 'rHand', path: 'hook', windup: 0.1, extendUntil: 0.32, duration: 0.5, twist: -0.6, shift: 0.02, cost: 0.026, mass: { arm: 0.6, body: 0.014 }, rotation: 1.4, zones: ['head', 'body'], reach: 'close' },
+  // An ape's blows (silverbacks and chimpanzees fighting): no boxing. The
+  // arm flung up and brought down on him like a club (`club`): the fist's
+  // fleshy heel and the forearm, a longer contact than the knuckles' and
+  // no knuckle to break (`contactSeconds`), the shoulders and the trunk
+  // coming down behind it. And the open hand swung round in a wide swipe
+  // (`swipe`), a slap that bowls a man over more than it hurts (`harm`).
+  clubR: { kind: 'strike', limb: 'rHand', path: 'club', windup: 0.16, extendUntil: 0.38, duration: 0.62, twist: -0.25, lean: 0.2, dip: 0.05, shift: 0.05, cost: 0.026, mass: { arm: 0.8, body: 0.04 }, rotation: 0.5, contactSeconds: 0.012, zones: ['head', 'body'], reach: 'close' },
+  clubL: { kind: 'strike', limb: 'lHand', path: 'club', windup: 0.16, extendUntil: 0.38, duration: 0.62, twist: 0.25, lean: 0.2, dip: 0.05, shift: 0.05, cost: 0.026, mass: { arm: 0.8, body: 0.04 }, rotation: 0.5, contactSeconds: 0.012, zones: ['head', 'body'], reach: 'close' },
+  swipeR: { kind: 'strike', limb: 'rHand', path: 'swipe', windup: 0.12, extendUntil: 0.34, duration: 0.56, twist: -0.75, shift: 0.04, cost: 0.024, mass: { arm: 0.7, body: 0.02 }, rotation: 1.4, push: true, shove: 0.3, harm: 0.6, contactSeconds: 0.018, zones: ['head', 'body'], reach: 'arm' },
+  swipeL: { kind: 'strike', limb: 'lHand', path: 'swipe', windup: 0.12, extendUntil: 0.34, duration: 0.56, twist: 0.75, shift: 0.04, cost: 0.024, mass: { arm: 0.7, body: 0.02 }, rotation: 1.4, push: true, shove: 0.3, harm: 0.6, contactSeconds: 0.018, zones: ['head', 'body'], reach: 'arm' },
 };
 
 // Bare strikes do blunt harm; a weapon move's harm splits into blunt, cut
@@ -359,18 +369,35 @@ export const STYLES = {
     headMovement: 0.5,
     pressure: 0.2,
   },
-  // A silverback, upright: square and hunched, long arms swinging big
-  // hooks and clubbing blows down, shoving with both hands, charging. No
-  // craft in defence but to cover and back off.
+  // A silverback, fought as apes fight (gorillas' and chimpanzees' fights
+  // and displays): hunched, arms hanging low and forward. It charges, low
+  // and fast, into a man (`rush`, `charge`: the knuckle-walking rush);
+  // clubs down on him with fist and forearm and swipes him with the open
+  // hand; grabs him with one hand and clubs him with the other
+  // (`collarTie`, `clinchStrikes`), or with both, drags and shoves him
+  // about and throws him down (`clinch`, `clinchDrive`, `throws`); and,
+  // holding him, bites (`bite`). No craft in defence but to cover and back off.
   gorilla: {
     label: 'Gorilla',
-    cadence: { work: 1.6, move: 0.45, burst: 0.9, mobility: 0.2 },
-    stance: { blade: 0.12, crouch: 0.07, width: 1.3, lean: 0.22, guardHeight: -0.1 },
+    cadence: { work: 1.6, move: 0.45, burst: 1, mobility: 0.2 },
+    stance: { blade: 0.1, crouch: 0.1, width: 1.35, lean: 0.34, guardHeight: -0.22 },
     idle: { bounce: 0.15, sway: 1.2, rock: 0.7 },
-    attacks: { hook: 0.2, rHook: 0.24, uppercut: 0.1, cross: 0.1, oshi: 0.14, tsuppariL: 0.07, tsuppariR: 0.07, rush: 0.08 },
-    combos: { 'rHook hook': 0.5, 'hook rHook oshi': 0.3, 'tsuppariL tsuppariR rHook': 0.2 },
+    attacks: { clubR: 0.2, clubL: 0.14, swipeR: 0.13, swipeL: 0.1, oshi: 0.08, collarTie: 0.12, clinch: 0.1, rush: 0.3 },
+    combos: { 'clubL clubR': 0.35, 'swipeL clubR': 0.35, 'swipeR swipeL oshi': 0.3 },
     comboChance: 0.45,
-    tempo: 0.9,
+    clinchStrikes: { clubR: 0.8, swipeR: 0.2 },
+    clinchDrive: true,
+    clinchDriveShare: 1,
+    throws: { after: 0.5, rate: 1 },
+    // Its canines (~5 cm) driven in by the jaw: a silverback's bite is
+    // estimated at several kilonewtons at the molars, ~2.5 kN at the canines
+    // (a man's ~0.8 kN); the work a bite does is that force over the depth
+    // the teeth go in, part a puncture and part a tear. Once a hand holds
+    // him, a bite `first` s after the grip and then every `every` s, at his neck and shoulders or an arm.
+    bite: { first: 0.3, every: 1.6, forceN: 2500, depth: 0.03, pierceShare: 0.6 },
+    // The charge: low on the arms, as a knuckle-walking rush looks (lean and dip added, hands low and forward, shares of height).
+    charge: { lean: 0.5, dip: 0.1, hands: [0.4, 0.3, 0.14] },
+    tempo: 0.85,
     defences: { guard: 0.45, stepBack: 0.4, parry: 0.15 },
     defendChance: 0.3,
     headMovement: 0.05,
@@ -1461,11 +1488,12 @@ export const STYLES = {
 };
 
 // The combat bot: its forearms are its weapons (`mounted`). The right arm's
-// AR-15 in use from afar, walking on as it fires (`advance`); within the
-// buckshot's range the left arm's shotgun comes up on him as well and fires
-// on its own cadence (`paired`: both at once); in close (`switches`, the
-// AI) the left's mace and the right's blade by turns, a couple of blows
-// each. Never reloaded, never dropped.
+// AR-15 in use from afar, walking on as it fires (`advance`); the left
+// arm's shotgun up as well on a man of its own within the buckshot's range
+// (`paired`: two men at once, each arm aimed on its own, or both on one);
+// in close (`switches`, the AI) the left's mace and the right's blade by
+// turns, a blow each, one after the other as a combination. Never reloaded,
+// never dropped.
 const BOT = {
   cadence: { work: 1.3, move: 0.6, burst: 0.5, mobility: 0.3 },
   stance: { blade: 0.3, crouch: 0.05, width: 1.15, lean: 0.08, guardHeight: 0 },
@@ -1477,29 +1505,36 @@ const BOT = {
   plans: { pressure: 2, brawler: 1, counter: 0.3, outboxer: 0.2 },
   pressure: 0.4,
 };
+// In close it does not rest between arms as a man between blows (`tempo`),
+// and it presses (`pressure`): a machine does not tire or fear.
+const BOT_CLOSE = { ...BOT, tempo: 0.7, pressure: 0.7, defences: { weaponBlock: 0.5, guard: 0.35, stepBack: 0.15 }, plans: { pressure: 2.5, brawler: 1.5, counter: 0.2, outboxer: 0.1 } };
+// The blade arm's cuts and thrusts with the machine's weight stepped in
+// behind them (`mass.body`, `shift`, `step`), as the mace's blows already
+// carry it: a heavy blade on a heavy frame.
+MOVES.botCut = { ...MOVES.gladiusCut, lean: 0.16, shift: 0.08, mass: { arm: 0.65, body: 0.05 } };
+MOVES.botThrust = { ...MOVES.gladiusThrust, shift: 0.12, step: 1.8, mass: { arm: 0.65, body: 0.06 } };
+MOVES.botSweep = { ...MOVES.forehand, shift: 0.06, mass: { arm: 0.65, body: 0.04 } };
 STYLES.combatBot = {
   ...BOT, label: 'Combat bot', weapon: 'armRifle', fallback: 'mix',
   ranged: { flee: 0, rest: 0, runFor: 0, standFor: 2, close: 1.2, shotSeconds: 0.25, headShare: 0.3, between: [0.15, 0.2], move: 'fireRifle', holdGround: true, advance: 0.45, reloadSafe: Infinity },
-  // The shotgun arm with it within 10 m, a shell every 0.9 s (a pump's cycle), on him to 0.15 rad.
-  paired: { weapon: 'armShotgun', within: 10, every: 0.9, settled: 0.15 },
+  // The shotgun arm within 10 m, a shell every 0.9 s (a pump's cycle), on its man to 0.15 rad; swung out no more than 100° from the front.
+  paired: { weapon: 'armShotgun', within: 10, every: 0.9, settled: 0.15, arc: 1.75 },
   switches: [{ to: 'botMace', within: 2.2 }],
   // The rifle arm low and forward.
   weaponGuard: { hand: [0.2, 0.62, -0.14], dir: [1, -0.35, 0.05] },
   attacks: { fireRifle: 1 },
 };
 STYLES.botMace = {
-  ...BOT, label: 'Combat bot (mace arm)', hidden: true, weapon: 'armShotgun', fallback: 'mix',
-  switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botBlade', strikes: 2 }],
+  ...BOT_CLOSE, label: 'Combat bot (mace arm)', hidden: true, weapon: 'armShotgun', fallback: 'mix',
+  switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botBlade', strikes: 1 }],
   weaponGuard: { hand: [0.12, 0.66, 0.14], dir: [0.45, 0.88, -0.05] },
   attacks: { maceOverheadLeft: 0.55, maceSideLeft: 0.45 },
-  defences: { weaponBlock: 0.4, guard: 0.4, stepBack: 0.2 },
 };
 STYLES.botBlade = {
-  ...BOT, label: 'Combat bot (blade arm)', hidden: true, weapon: 'armRifle', fallback: 'mix',
-  switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botMace', strikes: 2 }],
+  ...BOT_CLOSE, label: 'Combat bot (blade arm)', hidden: true, weapon: 'armRifle', fallback: 'mix',
+  switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botMace', strikes: 1 }],
   weaponGuard: { hand: [0.1, 0.62, -0.12], dir: [1, 0.3, 0.05] },
-  attacks: { gladiusCut: 0.45, gladiusThrust: 0.35, forehand: 0.2 },
-  defences: { weaponBlock: 0.4, guard: 0.4, stepBack: 0.2 },
+  attacks: { botCut: 0.45, botThrust: 0.35, botSweep: 0.2 },
 };
 
 // The spear's ways with a people's own spear: the ashigaru's yari, the rebel's pitchfork.
@@ -1556,6 +1591,12 @@ export function strikeTargets(move, t, aim, body, followThrough) {
       return { [`${s}Hand`]: windingUp ? add(aim, [-0.2, 0.02, 0.38 * side]) : add(aim, [0.06, 0, -0.2 * side]) };
     case 'upper':
       return { [`${s}Hand`]: windingUp ? add(aim, [-0.18, -0.38, 0]) : add(aim, [0.06, 0.16, 0]) };
+    case 'club':
+      // Raised high over the shoulder, then down onto him and through.
+      return { [`${s}Hand`]: windingUp ? add(aim, [-0.3, 0.5, 0.12 * side]) : add(aim, [0.08, -0.32, -0.02 * side]) };
+    case 'swipe':
+      // Opened wide out to the side, then swept round across him.
+      return { [`${s}Hand`]: windingUp ? add(aim, [-0.25, 0.08, 0.6 * side]) : add(aim, [0.12, -0.05, -0.4 * side]) };
     case 'elbow': {
       // The elbow sweeps across at head height; the fist folds to the ear.
       const elbow = windingUp ? add(aim, [-0.32, 0.04, 0.42 * side]) : add(aim, [0.1, -0.02, -0.3 * side]);

@@ -1949,21 +1949,21 @@ export const RATINGS = {
    "type": "gorilla|silverback",
    "records": {
     "maximus": {
-     "wins": 11,
-     "losses": 5,
+     "wins": 16,
+     "losses": 0,
      "draws": 0
     },
     "monk": {
-     "wins": 11,
+     "wins": 16,
      "losses": 0,
-     "draws": 5
+     "draws": 0
     }
    },
-   "score": 141,
-   "provisional": 141,
+   "score": 1831,
+   "provisional": 1831,
    "kd": {
-    "maximus": 2.1,
-    "monk": 4.7
+    "maximus": 33,
+    "monk": 33
    }
   },
   "humanoid": {
@@ -1971,21 +1971,21 @@ export const RATINGS = {
    "type": "kickboxing|humanoid",
    "records": {
     "maximus": {
-     "wins": 0,
-     "losses": 16,
+     "wins": 1,
+     "losses": 15,
      "draws": 0
     },
     "monk": {
-     "wins": 13,
+     "wins": 14,
      "losses": 1,
-     "draws": 2
+     "draws": 1
     }
    },
-   "score": 27,
-   "provisional": 27,
+   "score": 33,
+   "provisional": 33,
    "kd": {
-    "maximus": 0,
-    "monk": 5.8
+    "maximus": 0.1,
+    "monk": 7.5
    }
   },
   "combatBot": {
@@ -2099,8 +2099,8 @@ export const RATINGS = {
   "baton|police": 2.3,
   "street|casual": 2.5,
   "unskilled|commoner": 1.2,
-  "gorilla|silverback": 141,
-  "kickboxing|humanoid": 27,
+  "gorilla|silverback": 1831,
+  "kickboxing|humanoid": 33,
   "combatBot|combatBot": 1831
  },
  "cross": [

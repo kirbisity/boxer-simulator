@@ -128,7 +128,7 @@ function steer(world, fighter, orders, opponent, dt) {
 
 export const ATTACK_PAD = {
   // Places by the way a move travels: [x for the right side (mirrored for the left), y].
-  paths: { straight: [0.3, 0.3], hook: [0.85, 0.35], upper: [0.4, -0.2], elbow: [0.65, 0.62], upElbow: [0.3, 0.75], knee: [0.3, -0.45], teep: [0.15, -0.62], pushBoth: [0, -0.1], aim: [0, 0.1] },
+  paths: { straight: [0.3, 0.3], hook: [0.85, 0.35], upper: [0.4, -0.2], elbow: [0.65, 0.62], upElbow: [0.3, 0.75], knee: [0.3, -0.45], teep: [0.15, -0.62], pushBoth: [0, -0.1], aim: [0, 0.1], club: [0.45, 0.85], swipe: [0.95, 0.15] },
   // A kick: at the body and head mid-low on its side; at the legs at the very bottom.
   kick: [0.82, -0.35],
   lowKick: [0.72, -0.85],

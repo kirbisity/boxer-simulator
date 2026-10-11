@@ -548,9 +548,12 @@ function weaponIntent(world, fighter, intent) {
 
 /**
  * A second forearm gun fired with the first (a style's `paired`: { weapon,
- * within, every, settled }): while the gun in use is up on a man within
- * `within` m, the other arm comes up on him too (straight out from the
- * shoulder), and fires down that forearm's line as it points, a shot every
+ * within, every, settled, arc }): while the gun in use is up on a man, the
+ * other arm takes its own: the nearest other man of the other side up
+ * within `within` m and within `arc` rad of where the body faces (the arm
+ * swings out no further), else the same man if he is within `within`. It
+ * comes up on him (straight out from the shoulder), each arm aimed on its
+ * own, and fires down that forearm's line as it points, a shot every
  * `every` s, once it is within `settled` rad of him. Its own spread, kick and
  * recoil as fire() gives any gun; no hands are needed (it is the arm).
  */
@@ -560,21 +563,38 @@ function pairedGun(world, fighter, intent, dt) {
   if (fighter.paired?.weapon.kind !== paired.weapon) fighter.paired = { weapon: createWeapon(paired.weapon), wait: paired.every / 2 };
   const gun = fighter.paired;
   gun.wait = Math.max(0, gun.wait - dt);
+  gun.target = undefined;
   const weapon = fighter.weapon;
   const punch = fighter.punch;
   const aiming = weapon?.held && weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined);
-  const target = aiming ? world.fighters[punch?.spec.path === 'aim' ? punch.target : fighter.aimAt] : null;
-  if (!target || target.state === 'out' || fighter.state !== 'up') return;
+  const first = aiming ? world.fighters[punch?.spec.path === 'aim' ? punch.target : fighter.aimAt] : null;
+  if (!first || first.state === 'out' || fighter.state !== 'up') return;
   const from = point(fighter.x, P.pelvis);
-  const to = point(target.x, P.pelvis);
-  if (Math.hypot(to[0] - from[0], to[2] - from[2]) > paired.within) return;
+  const facing = yawRotate([1, 0, 0], fighter.yaw);
+  const away = (other) => {
+    const to = point(other.x, P.pelvis);
+    return [to[0] - from[0], to[2] - from[2]];
+  };
+  const inReach = (other) => {
+    const [x, z] = away(other);
+    const distance = Math.hypot(x, z);
+    return distance <= paired.within && (facing[0] * x + facing[2] * z) / Math.max(1e-6, distance) >= Math.cos(paired.arc ?? Math.PI);
+  };
+  let target = null;
+  for (const other of world.fighters) {
+    if (other === first || other.corner === fighter.corner || other.state !== 'up' || !inReach(other)) continue;
+    if (!target || Math.hypot(...away(other)) < Math.hypot(...away(target))) target = other;
+  }
+  target ??= inReach(first) ? first : null;
+  if (!target) return;
+  gun.target = target.id;
   const mark = aimPoint(target, 'body');
   const side = gun.weapon.main;
   intent[`${side}Hand`] = raisedAim(fighter, toLocal(fighter, mark), gun.weapon).hand;
   const hand = point(fighter.x, P[`${side}Hand`]);
   gun.weapon.dir = vec.normalize(vec.sub(hand, point(fighter.x, P[`${side}Elbow`])));
   if (gun.wait > 0 || vec.dot(gun.weapon.dir, vec.normalize(vec.sub(mark, hand))) < Math.cos(paired.settled)) return;
-  fire(world, fighter, gun.weapon, mark);
+  fire(world, fighter, gun.weapon, mark, target.id);
   gun.wait = paired.every;
 }
 
@@ -1137,7 +1157,14 @@ function updateIntent(world, fighter, dt) {
   weaponIntent(world, fighter, intent);
   pairedGun(world, fighter, intent, dt);
   weaveHead(world, fighter, intent, dt);
-  if (fighter.rush) {
+  const charge = fighter.rush && STYLES[fighter.style]?.charge;
+  if (charge) {
+    // An ape's charge (a style's `charge`): low over its arms, square on, the hands down and forward as if on its knuckles.
+    intent.lean += charge.lean;
+    intent.dip += charge.dip;
+    intent.twist = 0;
+    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = vec.scale([charge.hands[0], charge.hands[1], sign * charge.hands[2]], H);
+  } else if (fighter.rush) {
     // Charging: head down, shoulder first, hands up.
     intent.lean += 0.28;
     intent.dip += 0.04;
@@ -4079,7 +4106,7 @@ export function addDamage(fighter, key, deltaV, blocked, toBone = 1) {
 }
 
 /** Of a limb wound of `joules` (past the armour), the share that reaches the bone; `square` 0 (a graze) to 1 (across the axis). */
-function boneShare(joules, square) {
+export function boneShare(joules, square) {
   const spec = BLADES.bone;
   const deep = Math.max(0, Math.min(1, (joules - spec.fleshJ) / (spec.fullJ - spec.fleshJ)));
   return deep * (spec.grazeShare + (1 - spec.grazeShare) * square);
