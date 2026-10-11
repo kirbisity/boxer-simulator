@@ -102,7 +102,7 @@ const OTUMBA = {
 // regulars in brigandine, garrison troops, and a few Japanese.
 const ZEELANDIA = {
   dutch: { musketeer: 9, pikeman: 6, officer: 3 },
-  koxinga: { elite: { guandao: 4, swordShield: 2 }, brigandine: { swordShield: 4, spear: 3, matchlock: 3 }, garrison: { spear: 8, dao: 2, matchlock: 2 }, ronin: { katana: 2 } },
+  koxinga: { elite: { guandao: 4, swordShield: 2 }, brigandine: { swordShield: 4, spear: 3, matchlock: 3 }, garrison: { spear: 8, dao: 2, matchlock: 2 }, ronin: { ronin: 2 } },
 };
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders

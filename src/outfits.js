@@ -135,12 +135,12 @@ function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
 function steppeDesign(label, armor, deel, trim, head, feet = '#141210') {
   return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, leather: '#4a2e1a', ...armor }, head, feet: { kind: 'jinBoot', color: feet } };
 }
-// A rōnin: kosode, hakama, sugegasa, the cloak and his pieces of armour (roninDo).
+// A rōnin: kosode, hakama, the cloak and his pieces of armour (roninDo); his sugegasa is worn loose (HEADGEAR kasa).
 function roninDesign(label, { kosode, hakama, cloak, steel, lace, sash, band, gaiters }) {
   return {
     label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama },
     armor: { kind: 'roninDo', color: steel, lace, gold: band, cloth: gaiters, cloth2: sash },
-    head: { kind: 'kasa', color: '#c8a868' }, feet: { kind: 'sandal', color: '#5a3a22' },
+    feet: { kind: 'sandal', color: '#5a3a22' },
     extras: [{ kind: 'mantle', color: cloak, length: 1.0 }],
   };
 }
@@ -1166,6 +1166,8 @@ export const OUTFITS = {
     faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
     sidearm: 'wakizashi',
+    headgear: ['kasa'],
+    defaultHeadgear: 'kasa',
     // A masterless man on the road: the kosode and the hakama tied at the
     // knee, a straw kasa low over the eyes, a travelling cloak, sandals; and
     // what armour he can carry and still run in, a tōsei cuirass and the
@@ -1340,6 +1342,8 @@ export const HEADGEAR = {
   hat: { label: 'Hat', knock: 0.25, falls: true, icon: '🎩' },
   headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: '🧣' },
   plume: { label: 'Plume', knock: 0.45, falls: true, icon: '🪶' },
+  // A straw hat tied loosely under the chin: a hard blow or a fall takes it off.
+  kasa: { label: 'Kasa', knock: 0.3, falls: true, icon: '👒' },
   // A cut on the helmet carrying at least `cutFrom` J of edge takes the crest off with it.
   crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6 },
 };

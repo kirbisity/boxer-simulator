@@ -431,6 +431,25 @@ export const STYLES = {
     plans: { counter: 1.4, outboxer: 1.2, pressure: 0.8, brawler: 0.4 },
     pressure: 0.05,
   },
+  // The rōnin's katana: the same cuts, fought to finish it — he presses in,
+  // strings cuts together and rests little, rushes in to close, and waits
+  // less on the counter than a retainer drilled to keep his line.
+  ronin: {
+    label: 'Rōnin', weapon: 'katana',
+    cadence: { work: 1.6, move: 0.95, burst: 0.9, mobility: 0.75 },
+    stance: { blade: 0.2, crouch: 0.08, width: 1.2, lean: 0.07, guardHeight: 0 },
+    weaponGuard: { hand: [0.17, 0.6, -0.03], dir: [0.3, 1, 0.05] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.25 },
+    attacks: { shomen: 0.22, kesagiri: 0.27, gyakuKesa: 0.17, yokogiri: 0.14, kiriage: 0.1, tsuki: 0.1, rush: 0.04 },
+    combos: { 'kesagiri gyakuKesa': 0.3, 'kesagiri gyakuKesa shomen': 0.25, 'kiriage kesagiri': 0.15, 'tsuki shomen': 0.15, 'yokogiri kesagiri': 0.15 },
+    comboChance: 0.7,
+    tempo: 0.75,
+    defences: { weaponBlock: 0.65, stepBack: 0.2, guard: 0.15 },
+    defendChance: 0.65,
+    headMovement: 0.1,
+    plans: { pressure: 1.8, brawler: 0.8, counter: 0.6, outboxer: 0.4 },
+    pressure: 0.45,
+  },
   // Polearms. Each holds the range its reach gives (see the AI), and fights
   // mixed when it loses its weapon. `rangeInside`: how far inside his own
   // reach he likes to stand (a spearman, at the very point).

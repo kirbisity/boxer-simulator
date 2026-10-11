@@ -243,10 +243,10 @@ export function mexicaWarrior(random = Math.random, style = 'macuahuitl', rank =
 }
 
 /** A masterless samurai (katana, naginata) in odd pieces of armour; light on his feet, he comes on at a run (`charging`). */
-export function roninWarrior(random = Math.random, style = 'katana') {
+export function roninWarrior(random = Math.random, style = 'ronin') {
   const base = varyCharacter(PRESETS.samurai, random, { sex: 'male' });
   const name = `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`;
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: [], charging: RONIN_CHARGING };
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: ['kasa'], charging: RONIN_CHARGING };
   return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
 }
 

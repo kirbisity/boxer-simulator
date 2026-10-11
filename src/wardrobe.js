@@ -555,39 +555,10 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       hidesHair = false;
       break;
     }
-    case 'kasa': {
-      // A traveller's sugegasa: a broad, shallow cone of plaited sedge, its
-      // ribs radiating from the peak, a dark bound rim, tied under the chin;
-      // worn low, it shades the eyes.
-      const straw = surface(color, { roughness: 0.95 });
-      straw.flatShading = true;
-      straw.side = THREE.DoubleSide;
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3 * r, 1.15 * r, 40, 1, true), straw);
-      cone.position.y = 0.62 * r;
-      const ribs = surface(new THREE.Color(color).multiplyScalar(0.72).getHex(), { roughness: 1 });
-      for (let rib = 0; rib < 16; rib += 1) {
-        const angle = (rib / 16) * Math.PI * 2;
-        const line = new THREE.Mesh(new THREE.BoxGeometry(3.4 * r, 0.025 * r, 0.04 * r), ribs);
-        line.position.set(Math.cos(angle) * 1.65 * r, 0.64 * r, Math.sin(angle) * 1.65 * r);
-        line.rotation.set(0, -angle, -Math.atan2(1.15, 3.3));
-        line.userData.noOutline = true;
-        group.add(line);
-      }
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(3.3 * r, 0.06 * r, 5, 40), surface(head.rim ?? 0x1c1a18, { roughness: 0.8 }));
-      rim.rotation.x = Math.PI / 2;
-      rim.position.y = 0.05 * r;
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.08 * r, 0.32 * r, 18, 1, true), surface(0x2a2420));
-      band.position.y = 0.22 * r;
-      for (const side of [1, -1]) {
-        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 1.25 * r, 0.05 * r), surface(head.tie ?? 0xe8e2d2));
-        tie.position.set(0.25 * r, -0.2 * r, side * 0.9 * r);
-        tie.rotation.set(side * 0.18, 0, 0.2);
-        group.add(tie);
-      }
-      group.add(cone, rim, band);
+    case 'kasa':
+      buildKasa(group, r, color, head);
       hidesHair = false;
       break;
-    }
     case 'kettleHat': {
       // A foot soldier's chapel de fer: a round steel crown and a broad brim sloping down.
       const crownSteel = metal(steel, color);
@@ -1865,11 +1836,49 @@ export function kabutoCrest(head, r, steel) {
  * wrapped head, a knight's plume, a kabuto's crest. Null if the outfit has
  * nothing for it to sit on.
  */
+/**
+ * A traveller's sugegasa: a broad, shallow cone of plaited sedge, its ribs
+ * radiating from the peak, a dark bound rim, tied under the chin; worn low,
+ * it shades the eyes. Worn as a helmet would be, or as a loose hat (a prop
+ * that a blow or a fall can knock off).
+ */
+function buildKasa(group, r, color, head = {}) {
+  const straw = surface(color, { roughness: 0.95 });
+  straw.flatShading = true;
+  straw.side = THREE.DoubleSide;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3 * r, 1.15 * r, 40, 1, true), straw);
+  cone.position.y = 0.62 * r;
+  const ribs = surface(new THREE.Color(color).multiplyScalar(0.72).getHex(), { roughness: 1 });
+  for (let rib = 0; rib < 16; rib += 1) {
+    const angle = (rib / 16) * Math.PI * 2;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(3.4 * r, 0.025 * r, 0.04 * r), ribs);
+    line.position.set(Math.cos(angle) * 1.65 * r, 0.64 * r, Math.sin(angle) * 1.65 * r);
+    line.rotation.set(0, -angle, -Math.atan2(1.15, 3.3));
+    line.userData.noOutline = true;
+    group.add(line);
+  }
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(3.3 * r, 0.06 * r, 5, 40), surface(head.rim ?? 0x1c1a18, { roughness: 0.8 }));
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 0.05 * r;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.08 * r, 0.32 * r, 18, 1, true), surface(0x2a2420));
+  band.position.y = 0.22 * r;
+  for (const side of [1, -1]) {
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 1.25 * r, 0.05 * r), surface(head.tie ?? 0xe8e2d2));
+    tie.position.set(0.25 * r, -0.2 * r, side * 0.9 * r);
+    tie.rotation.set(side * 0.18, 0, 0.2);
+    group.add(tie);
+  }
+  group.add(cone, rim, band);
+}
+
 export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
   const r = body.lengths.headRadius;
   const group = new THREE.Group();
   const cloth = (hex) => surface(hex, { roughness: 0.75 });
   switch (kind) {
+    case 'kasa':
+      buildKasa(group, r, 0xc8a868);
+      break;
     case 'cap': {
       const fabric = cloth(colors.top.getHex());
       const crown = new THREE.Mesh(new THREE.SphereGeometry(1.14 * r, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), fabric);

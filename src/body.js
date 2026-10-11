@@ -489,6 +489,14 @@ export const PRESETS = {
     outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
+  // Miyamoto Musashi at Ganryūjima (1612, about 28): a rōnin on the road,
+  // remembered as tall for his day (about six shaku, ~180 cm), lean and fit;
+  // he goes in at a run (charging).
+  ronin: {
+    name: 'Miyamoto Musashi', style: 'ronin', sex: 'male', heightCm: 178, frame: 'medium', age: 28, exercise: 0.85, calories: 3950, charging: 2.5,
+    outfit: { kind: 'ronin', design: 2 }, accessories: ['kasa'],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
   knife: {
     name: 'Ryo Kanda', style: 'knife', sex: 'male', heightCm: 175, frame: 'small', age: 29, exercise: 0.55, calories: 3100,
     outfit: { kind: 'yakuza', design: 0 }, accessories: ['hat'],

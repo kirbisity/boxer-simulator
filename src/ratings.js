@@ -1330,7 +1330,7 @@ export const RATINGS = {
   },
   "ronin": {
    "title": "Miyamoto Musashi",
-   "type": "katana|ronin",
+   "type": "ronin|ronin",
    "records": {
     "maximus": {
      "wins": 12,
@@ -2071,7 +2071,7 @@ export const RATINGS = {
   "matchlock|janissary": 320,
   "handgun|police": 217,
   "steppeBow|steppeLight": 119,
-  "katana|ronin": 70,
+  "ronin|ronin": 70,
   "wuxia|wuxia": 95,
   "steppeBow|azap": 80,
   "yatagan|janissary": 84,
