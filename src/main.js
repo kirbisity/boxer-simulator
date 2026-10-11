@@ -11,6 +11,7 @@ import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
+import { introPlaying, introWanted, playIntro, skipIntro, stepIntro } from './intro.js';
 import { directFighter, newOrders } from './control.js';
 import { installFightControls } from './touch.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
@@ -243,6 +244,8 @@ function showMustering() {
 // ---- Loop -------------------------------------------------------------------
 
 function thinkForBout(world, dt) {
+  // The intro's legends stand in their guard: nobody to fight.
+  if (state.game === 'intro') return;
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
   // The one you play is simulated in full however big the fight.
   world.keepFull = new Set(players);
@@ -368,6 +371,8 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     }
   }
   consumeEvents();
+  // The intro has one side only: no bout to win.
+  if (state.game === 'intro') return;
   const winner = boutWinner(state.world);
   // Behind the menus, one fight follows another.
   if (state.game === 'home' && state.finishedAt !== null && state.world.time > state.finishedAt + 3) state.next.run();
@@ -506,7 +511,8 @@ function drawWorld(dt) {
     pelvisMid[0] += fighter.x[24] / world.fighters.length;
     pelvisMid[2] += fighter.x[26] / world.fighters.length;
   }
-  const sheet = document.body.classList.contains('sheet');
+  // A design sheet, and the intro, hold their own framing.
+  const sheet = document.body.classList.contains('sheet') || state.game === 'intro';
   // Playing: the camera follows his man from behind (third person).
   const followed = state.mode === 'play' && !sheet ? player() : null;
   if (followed) followCamera(followed);
@@ -1343,6 +1349,118 @@ function preview(inputs, event) {
   document.body.classList.add('sheet');
 }
 
+
+// ---- The intro (intro.js): the legends, staged in the arena ---------------------
+// One faction's legends at a time are simulated (standing in guard, no
+// thinking) and drawn; those shown before are kept, still and hidden, for the
+// line-up at the end, then freed.
+
+// Room for the line-up's arc (the Colosseum's sand is 10.5 × 7 m).
+const INTRO_ARENA = { halfX: 9.8, halfZ: 6.5 };
+const introKept = [];
+const introPoint = new THREE.Vector3();
+
+const introStage = {
+  /** Clear whatever was on (the fight behind the menu) for the empty arena. */
+  begin() {
+    if (state.mode === 'play') $('#modes button[data-value="watch"]').click();
+    state.sideAsked = false;
+    $('#side-pick').hidden = true;
+    for (const id of ['home', 'quick', 'levels-screen', 'versus', 'wizard']) $(`#${id}`).hidden = true;
+    setGame('intro');
+    state.scenario = null;
+    for (const view of state.views) disposeFighterView(scene, view);
+    state.views = [];
+    state.viewQueue = [];
+    state.world = createWorld([], { seed: 3, arena: INTRO_ARENA });
+    state.before = null;
+    clearGore(scene);
+    setPlace(scene, 'colosseum', PLACE_ARENAS.colosseum);
+    document.body.dataset.place = 'colosseum';
+    state.paused = true;
+    state.finishedAt = null;
+    state.eventCursor = 0;
+    resetDrama(state.drama);
+    $('#banner').hidden = true;
+    $('#log').replaceChildren();
+  },
+  /** These legends ({ inputs, x, z, yaw }) in their places, in guard, breathing; the last lot kept, still and hidden. */
+  place(legends) {
+    for (const view of state.views) {
+      view.group.visible = false;
+      introKept.push({ view, time: state.world.time });
+    }
+    state.world = createWorld(legends.map((legend) => ({ inputs: normaliseInputs(structuredClone(legend.inputs)), corner: 'red' })), { seed: 3, arena: INTRO_ARENA });
+    state.world.fighters.forEach((fighter, index) => {
+      placeFighter(fighter, legends[index].x, legends[index].z);
+      fighter.yaw = legends[index].yaw;
+    });
+    advance(state.world, 0.6, null, STEP);
+    state.before = null;
+    state.eventCursor = state.world.events.length;
+    state.views = state.world.fighters.map((fighter) => {
+      const view = buildFighterView(scene, fighter);
+      setLayer(view, state.layer);
+      return view;
+    });
+    state.paused = false;
+  },
+  /** Everyone at once, still. */
+  lineup() {
+    state.paused = true;
+    // Drawn again where they stand: a hidden view is not posed.
+    for (const { view, time } of introKept) {
+      view.group.visible = true;
+      updateFighterView(view, 0, time);
+      updateArms(scene, view, time);
+    }
+  },
+  camera({ target, yaw, pitch, distance }) {
+    Object.assign(scene.orbit, { yaw, pitch, distance });
+    scene.orbit.target.set(...target);
+    placeCamera(scene, null);
+  },
+  /**
+   * The nearest distance from which all these points fall within `bounds`
+   * (of the screen, −1 to 1), the target raised or lowered so they sit in
+   * the middle of them: { distance, target }.
+   */
+  fit(points, { target, yaw, pitch, bounds }) {
+    const project = (at) => introPoint.set(...at).project(scene.camera);
+    const aim = [...target];
+    let distance = 10;
+    for (let round = 0; round < 3; round += 1) {
+      let near = 0.5;
+      // Within the camera's far plane (60 m), or everything is "outside".
+      let far = 45;
+      for (let pass = 0; pass < 22; pass += 1) {
+        distance = (near + far) / 2;
+        introStage.camera({ target: aim, yaw, pitch, distance });
+        scene.camera.updateMatrixWorld();
+        const inside = points.every((at) => {
+          project(at);
+          return introPoint.z < 1 && introPoint.x >= bounds.left && introPoint.x <= bounds.right && introPoint.y >= bounds.bottom && introPoint.y <= bounds.top;
+        });
+        if (inside) far = distance;
+        else near = distance;
+      }
+      distance = far;
+      introStage.camera({ target: aim, yaw, pitch, distance });
+      scene.camera.updateMatrixWorld();
+      const heights = points.map((at) => project(at).y);
+      const off = (bounds.top + bounds.bottom) / 2 - (Math.max(...heights) + Math.min(...heights)) / 2;
+      // Up the screen by `off` is down the world by about this much at this distance.
+      aim[1] -= off * distance * Math.tan(THREE.MathUtils.degToRad(scene.camera.fov / 2));
+    }
+    return { distance, target: aim };
+  },
+  /** Free everything the intro built. */
+  end() {
+    for (const { view } of introKept) disposeFighterView(scene, view);
+    introKept.length = 0;
+  },
+};
+
 // ---- Start -------------------------------------------------------------------
 
 function fit() {
@@ -1357,14 +1475,16 @@ new ResizeObserver(fit).observe($('.controls'));
 buildCornerForm('red');
 buildCornerForm('blue');
 const menus = installMenus({
-  attract, match, sandbox: enterSandbox, level: enterLevel, preview, portrait,
+  intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, preview, portrait,
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
   onMenu: (home) => { goHome = home; },
 });
-menus.home();
 fit();
+// The first visit opens on the intro, then the menu; after, straight to the menu.
+if (introWanted()) playIntro(introStage, menus.home);
+else menus.home();
 requestAnimationFrame(frame);
 
 // ---- Design sheets -------------------------------------------------------------
@@ -1514,6 +1634,12 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
 window.boxer = {
   state,
   scene,
+  // The intro: end it now (true if it was playing), as Skip does; or play it again.
+  skipIntro,
+  playIntro: () => playIntro(introStage, () => goHome()),
+  introPlaying,
+  // Move the intro on (its own clock, s) without frames; the shot it is on, null once over.
+  introStep: stepIntro,
   designSheet,
   presets: PRESETS,
   fight,

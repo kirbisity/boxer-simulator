@@ -57,7 +57,9 @@ footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
 `src/crowdview.js` (instanced crowds), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
 `disposeObject`). `src/main.js` runs the loop and input (playing, the camera
 follows the player's man from behind: `CAMERA_FOLLOW`); `src/menu.js` the
-menus. Anything removed from the scene is freed with `disposeObject`.
+menus; `src/intro.js` the intro on a first visit (the roster's `legend`
+entries, a faction at a time, staged by main.js's `introStage`; skippable,
+remembered in localStorage, replayed from the home screen). Anything removed from the scene is freed with `disposeObject`.
 
 ## Principles
 

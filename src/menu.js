@@ -102,7 +102,9 @@ export function installMenus(game) {
       choice({ glyph: '⚡', kicker: 'Play now', title: 'Quick Battle', text: 'A prize fight or the arena: you, or a random fighter, against whoever comes.', onClick: quickEvent, tone: 'gold' }),
       choice({ glyph: '🗺️', kicker: 'Stories', title: 'Levels', text: 'Set fights in set places: a subway platform at 1:40 a.m., a village in revolt.', onClick: levels }),
       choice({ glyph: '☠️', kicker: 'Who would win?', title: 'Deadliest Warrior', text: 'Pick any two: a knight against a samurai, a sumo against a hoplomachus.', onClick: versus }),
-      choice({ glyph: '🧪', kicker: 'Everything', title: 'Sandbox', text: 'Every setting: teams of eight, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })));
+      choice({ glyph: '🧪', kicker: 'Everything', title: 'Sandbox', text: 'Every setting: teams of eight, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })),
+      // The intro (intro.js) again: the legends, then back here.
+      el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } }));
     show('home');
   }
 
