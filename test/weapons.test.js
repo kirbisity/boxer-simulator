@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { gearTraits } from '../src/outfits.js';
-import { STYLES, STYLE_KEYS } from '../src/moves.js';
-import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, dropWeapon, perform, placeFighter, throwPunch, WORLD } from '../src/physics.js';
+import { MOVES, STYLES, STYLE_KEYS } from '../src/moves.js';
+import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, dropWeapon, perform, placeFighter, shieldDisc, throwPunch, WORLD } from '../src/physics.js';
 import { AI, thinkAll } from '../src/ai.js';
-import { WEAPONS, harmMix } from '../src/weapons.js';
+import { SHIELDS, WEAPONS, harmMix, shieldContact } from '../src/weapons.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 import { fighterFor } from '../tools/weapons.js';
 import { spacing } from '../tools/spacing.js';
@@ -120,8 +120,9 @@ test('a weapon shaken loose in a fall: he fights mixed; a hoplomachus draws his 
   assert.ok(gladiator.shield, 'the shield stays on his arm');
 });
 
-test('a shield takes strikes at the body, and a sweeping cut stops on it', () => {
-  // Over a few seeds: an edge can now and then find the arm at the rim.
+test('a shield takes strikes at the body, and a sweeping cut held on it stops there', () => {
+  // Over a few seeds: an edge can now and then find the arm at the rim, or
+  // glance off the small parma's face and go on past it to the leg.
   for (const move of ['kesagiri', 'yokogiri', 'tsuki']) {
     let onShield = 0;
     for (let seed = 1; seed <= 4; seed += 1) {
@@ -129,12 +130,85 @@ test('a shield takes strikes at the body, and a sweeping cut stops on it', () =>
       const mine = events.filter((event) => event.attacker === 0 && (event.kind === 'landed' || event.kind === 'blocked'));
       if (mine[0]?.target !== 'shield') continue;
       onShield += 1;
-      assert.equal(mine.length, 1, `${move}: nothing behind the shield`);
+      // Held in line, nothing behind the shield is touched (knocked aside, the blow may drive on past it).
+      if (!mine[0].effects.includes('shield knocked aside')) assert.equal(mine.length, 1, `${move}: nothing behind the shield`);
       assert.ok(!events.some((event) => event.kind === 'severed'), move);
     }
-    // Cuts are met on it; a straight thrust from a blade held well forward now and then slips past the rim.
-    assert.ok(onShield >= (move === 'tsuki' ? 2 : 3), `${move}: ${onShield} of 4 on the shield`);
+    assert.ok(onShield >= 2, `${move}: ${onShield} of 4 on the shield`);
   }
+});
+
+// A blade's run along a shield: frames it lies in contact, and the deepest it is ever found in the plate.
+function bladeOnShield(style, move, seed) {
+  const world = createWorld([{ ...PRESETS.contender, style }, { ...PRESETS.contender, style: 'templar' }], { seed });
+  const [attacker, defender] = world.fighters;
+  placeFighter(attacker, -0.8, 0);
+  placeFighter(defender, 0.8, 0);
+  advance(world, 0.8);
+  world.events.length = 0;
+  throwPunch(world, attacker, move, 'body');
+  let run = 0;
+  let longest = 0;
+  let deepest = 0;
+  for (let frame = 0; frame < (MOVES[move].duration + 0.4) * 60; frame += 1) {
+    advance(world, 1 / 60);
+    if (!attacker.weapon?.held || !defender.shield) break;
+    const weapon = attacker.weapon;
+    const hilt = weapon.tip.map((value, axis) => value - weapon.dir[axis] * (weapon.spec.length - weapon.spec.strikeFrom));
+    const hit = shieldContact(hilt, weapon.tip, shieldDisc(defender), weapon.spec.radius + 0.012);
+    // While the blow is in the air (a blade resting on it in his guard afterwards is not held there).
+    run = hit && attacker.punch ? run + 1 : 0;
+    longest = Math.max(longest, run);
+    deepest = Math.max(deepest, hit ? hit.depth - weapon.spec.radius : 0);
+  }
+  return { world, longest, deepest };
+}
+
+test('a blow on a shield is an impact: the blade rebounds or glances off, never held in it or passing through', () => {
+  for (const [style, move] of [['odachi', 'kesagiri'], ['odachi', 'yokogiri'], ['katana', 'yokogiri'], ['gladius', 'gladiusThrust']]) {
+    for (let seed = 1; seed <= 3; seed += 1) {
+      const { world, longest, deepest } = bladeOnShield(style, move, seed);
+      if (!world.events.some((event) => event.target === 'shield')) continue;
+      assert.ok(longest <= 6, `${style} ${move} seed ${seed}: on the shield ${longest} frames`);
+      // A thin plate a fast blade may cross within a substep, but it goes back out the way it came.
+      assert.ok(deepest < 0.12, `${style} ${move} seed ${seed}: ${deepest.toFixed(3)} m into the shield`);
+    }
+  }
+});
+
+test('a hard blow knocks the shield arm out of line, a heavy weapon far more often than a light one', () => {
+  const effects = (style, move) => [1, 2, 3, 4].flatMap((seed) => strikeAt(style, move, 'body', 1.6, { defenderStyle: 'templar', seed }).events.filter((event) => event.target === 'shield').flatMap((event) => event.effects));
+  const aside = (style, move) => effects(style, move).filter((effect) => effect === 'shield knocked aside').length;
+  assert.ok(aside('odachi', 'yokogiri') >= 2, 'the ōdachi beats the heater aside');
+  assert.ok(aside('odachi', 'yokogiri') > aside('katana', 'yokogiri'), 'the lighter katana less often');
+  // Knocked aside, his guard is open: he cannot bring the shield to meet the next until he has it back.
+  const world = createWorld([{ ...PRESETS.contender, style: 'templar' }, { ...PRESETS.contender, style: 'odachi' }]);
+  const [knight] = world.fighters;
+  knight.shieldOpen = world.time + 0.3;
+  assert.equal(perform(world, knight, 'shieldBlock', { from: 1 }), false);
+  advance(world, 0.35);
+  assert.equal(perform(world, knight, 'shieldBlock', { from: 1 }), true);
+});
+
+test('a shield on arm straps is harder to tear away than one held in the fist', () => {
+  assert.ok(SHIELDS.heater.hold > SHIELDS.parma.hold && SHIELDS.parma.hold > SHIELDS.buckler.hold);
+  // The same hard blows, one after another: the strapped heater stays on, the buckler is torn away.
+  const lost = (kind) => [1, 2, 3].filter((seed) => tornOff(kind, seed)).length;
+  const tornOff = (kind, seed) => {
+    const world = createWorld([{ ...PRESETS.contender, style: 'templar' }, { ...PRESETS.contender, style: 'odachi' }], { seed });
+    const [knight, swordsman] = world.fighters;
+    knight.shield = { kind, spec: SHIELDS[kind] };
+    placeFighter(knight, -0.8, 0);
+    placeFighter(swordsman, 0.8, 0);
+    advance(world, 0.8);
+    for (let blow = 0; blow < 3 && knight.shield; blow += 1) {
+      throwPunch(world, swordsman, 'yokogiri', 'body');
+      advance(world, 0.5);
+    }
+    return world.events.some((event) => event.kind === 'disarmed' && event.effects[0].includes('torn from his arm'));
+  };
+  assert.equal(lost('heater'), 0);
+  assert.ok(lost('buckler') >= 1);
 });
 
 test('knife wounds bleed; enough of them and a man collapses', () => {

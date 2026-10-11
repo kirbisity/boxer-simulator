@@ -411,15 +411,30 @@ export const WORLD = {
   // wanders `heavyAimJitter` m (each way, per unit of mass over heavyFrom), so
   // a great club finds the head less often than the shoulder.
   // A shield lost: in a fall, most likely (`dropOnFall`: the arm goes out to
-  // break the fall and lets go of the grip), or wrenched off the arm by a blow on it
-  // whose impulse passes `wrench` N·s (for an arm of the reference strength;
-  // the likelier the further past), or with the arm that held it broken or
-  // gone. On the floor it is a plate of its own weight; a man of a shield
-  // style without his takes it up again.
+  // break the fall and lets go of the grip), or wrenched off the arm by blows on it:
+  // each strains the hold by its impulse, more the further from the grip it
+  // lands (it twists the shield on the arm: × 1 + offset / the shield's reach),
+  // against `wrench` N·s × the shield's `hold` (SHIELDS) × his grip (against
+  // the reference); the strain eases at `strainLeak` a second, and past 1 the
+  // shield goes. Or with the arm that held it broken or gone. On the floor it
+  // is a plate of its own weight; a man of a shield style without his takes it up again.
+  // A blow on the shield turns the arm about the shoulder (its impulse × its
+  // lever from the shoulder); the arm holds it in line against up to its force
+  // at the hand × its length for `holdSeconds` (a heater and arm, ~1 kg·m²
+  // about the shoulder, are turned past ~11° (θ = J² / 2IT) by J ~6 N·m·s against
+  // the ~100 N·m a shoulder has sideways: ~0.03 s of the ~200 N·m it pushes
+  // with), and only `unbraced` of that unless he is blocking, set for the blow.
+  // Past that the arm gives: the excess share of the impulse throws the shield
+  // arm, the blow drives on past it (thrown back only by what the arm held),
+  // and the guard is open, the arm going with the blow, for up to `open` s
+  // (the whole of it at half the impulse over).
+  // A blow meeting the face at a slant (its closing speed under `glance` of
+  // its speed) glances along it and goes on, past the rim if that is where it goes.
+  // A blade in it is turned back out about the hand up to `turnStep` rad a substep.
   // `wall` and `roof`: where the shield hand goes (heights) in a testudo
   // (formation.js): square before the chest, or up over the head; `roofTilt`,
   // how far forward a raised shield leans (of its facing).
-  shield: { dropOnFall: 0.75, wrench: 42, wrenchRise: 1.5, wall: [0.36, 0.7, 0.1], roof: [0.26, 0.96, 0.03], roofTilt: 1.1 },
+  shield: { dropOnFall: 0.75, wrench: 60, strainLeak: 1, holdSeconds: 0.03, unbraced: 0.6, open: 0.4, glance: 0.45, turnStep: 0.5, wall: [0.36, 0.7, 0.1], roof: [0.26, 0.96, 0.03], roofTilt: 1.1 },
   weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).
