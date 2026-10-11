@@ -14,7 +14,7 @@ import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
-import { buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
+import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -28,6 +28,8 @@ const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
 // light skin: a shade under light, nowhere near medium.
 // porcelain: a pale, cold-toned complexion (powdered, gothic).
 export const SKIN_TONES = { porcelain: 0xd9c4c2, light: 0xe8b796, lightTan: 0xcc9a66, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
+/** A look's skin colour: its own (`skinColor`: a gorilla's black skin, a robot's dark joints) or its tone's. */
+const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getHex() : SKIN_TONES[look.skinTone ?? 'medium']);
 
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
@@ -1882,7 +1884,7 @@ const ARM_BONES = new Set(['lClavicle', 'lUpperArm', 'lForearm', 'rClavicle', 'r
 /** Kit and skin colours painted onto the body by where each vertex sits in the bind pose. */
 function paintBody(mesh, body, look, corner) {
   const { positions, skinIndex, bindPoints } = mesh;
-  const skin = new THREE.Color(SKIN_TONES[look.skinTone ?? 'medium']);
+  const skin = new THREE.Color(skinHex(look));
   const shorts = new THREE.Color(corner);
   const band = new THREE.Color(0xf4f4f4);
   const top = new THREE.Color(corner).multiplyScalar(0.7);
@@ -2016,7 +2018,7 @@ function detailedView(view, fighter, simple) {
   const body = fighter.body;
   const look = lookOf(body.inputs);
   const corner = CORNER_COLORS[fighter.corner];
-  const skinColor = SKIN_TONES[look.skinTone ?? 'medium'];
+  const skinColor = skinHex(look);
   const group = new THREE.Group();
   const layers = Object.fromEntries(LAYERS.map((name) => [name, new THREE.Group()]));
   for (const layer of Object.values(layers)) group.add(layer);
@@ -2126,6 +2128,7 @@ function detailedView(view, fighter, simple) {
   // Soft (chains of links) for a fighter drawn in full; one rigid sheet for a crowd.
   if (!headgear?.hidesHair) for (const curtain of headView.curtains ?? []) dangles.push(...(simple ? [hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain)] : hairCurtainSoft(collar, headView.hairMaterial, body.lengths.headRadius, curtain)));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
+  if (dress.armor?.backBox) collar.add(buildBackBox(body, garmentColors));
   // The scissor's coat of scales, plate by plate over the painted shirt.
   // Maximus's harness: the straps, buckles, plates and belt over the loft.
   // The ō-yoroi: its box on the chest, its shoulder boards and skirt panels hung to swing (fixed in a crowd).
@@ -2269,7 +2272,7 @@ function crowdView(view, fighter, template) {
   const body = fighter.body;
   const look = lookOf(body.inputs);
   const corner = CORNER_COLORS[fighter.corner];
-  const skinColor = SKIN_TONES[look.skinTone ?? 'medium'];
+  const skinColor = skinHex(look);
   const group = new THREE.Group();
   const layers = Object.fromEntries(LAYERS.map((name) => [name, new THREE.Group()]));
   for (const layer of Object.values(layers)) group.add(layer);

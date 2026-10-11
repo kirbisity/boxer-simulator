@@ -835,6 +835,55 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       group.add(crown, band, visor, badge);
       break;
     }
+    case 'robotHead': {
+      // A humanoid robot's head (Unitree's H1): a smooth rounded shell over
+      // the whole head, a dark glossy visor band across the front where a
+      // face would be, a trim disc at each ear.
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 24, 16), surface(color, { roughness: 0.35 }));
+      shell.scale.set(1, 1.12, 0.94);
+      shell.position.y = 0.04 * r;
+      const visor = new THREE.Mesh(new THREE.SphereGeometry(1.23 * r, 22, 10, Math.PI * 0.62, Math.PI * 0.76, Math.PI * 0.3, Math.PI * 0.3), new THREE.MeshStandardMaterial({ color: head.visor ?? 0x141519, roughness: 0.12, metalness: 0.6 }));
+      visor.scale.set(1, 1.12, 0.94);
+      visor.position.y = 0.04 * r;
+      group.add(shell, visor);
+      for (const side of [1, -1]) {
+        const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * r, 0.34 * r, 0.12 * r, 16), surface(head.trim ?? 0xb6bbc3, { roughness: 0.3 }));
+        ear.rotation.x = Math.PI / 2;
+        ear.position.set(-0.05 * r, 0.05 * r, side * 1.12 * r);
+        group.add(ear);
+      }
+      break;
+    }
+    case 'gorillaHead': {
+      // A silverback's head over the man's: the black-furred cranium with
+      // its sagittal crest, the heavy brow ridge, the deep-set eyes under
+      // it, the broad dark muzzle and its nostrils.
+      const fur = surface(color, { roughness: 0.9 });
+      const face = surface(0x34302f, { roughness: 0.7 });
+      const cranium = new THREE.Mesh(new THREE.SphereGeometry(1.14 * r, 20, 14), fur);
+      cranium.scale.set(1.02, 1.0, 0.98);
+      cranium.position.y = 0.06 * r;
+      const crest = new THREE.Mesh(new THREE.SphereGeometry(0.62 * r, 14, 10), fur);
+      crest.scale.set(1.35, 0.85, 0.42);
+      crest.position.set(-0.2 * r, 0.82 * r, 0);
+      const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * r, 0.24 * r, 1.7 * r, 12), face);
+      brow.rotation.x = Math.PI / 2;
+      brow.scale.set(1, 1, 0.8);
+      brow.position.set(0.98 * r, 0.3 * r, 0);
+      const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.66 * r, 16, 12), face);
+      muzzle.scale.set(0.8, 0.78, 1.05);
+      muzzle.position.set(0.82 * r, -0.38 * r, 0);
+      group.add(cranium, crest, brow, muzzle);
+      const dark = surface(0x120c08, { roughness: 0.3 });
+      for (const side of [1, -1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11 * r, 10, 8), dark);
+        eye.position.set(1.08 * r, 0.08 * r, side * 0.34 * r);
+        const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.1 * r, 8, 6), dark);
+        nostril.position.set(1.32 * r, -0.2 * r, side * 0.14 * r);
+        group.add(eye, nostril);
+      }
+      break;
+    }
     case 'opsHelmet': {
       // A high-cut ballistic helmet: the shell cut high over the ears, rails
       // on the sides, the night-vision mount on the front, electronic ear
@@ -2384,6 +2433,33 @@ export function buildBackPrint(body, text, colorHex = '#e9e2c8') {
   print.renderOrder = 2;
   const group = new THREE.Group();
   group.add(print);
+  return group;
+}
+
+/**
+ * A machine's battery box on its back (`armor.backBox`): a big dark case
+ * across the shoulder blades, its edges and vents picked out in the
+ * accent colour (`cloth`).
+ */
+export function buildBackBox(body, colors) {
+  const scale = body.heightM / 1.8;
+  const back = body.segments.trunk.skinRadius * 0.62 * 1.32;
+  const casing = surface(colors.armor.getHex(), { roughness: 0.55 });
+  const accent = surface(colors.cloth.getHex(), { roughness: 0.5 });
+  const group = new THREE.Group();
+  const add = (size, at, material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size.map((value) => value * scale)), material);
+    mesh.position.set(...at.map((value) => value * scale));
+    mesh.castShadow = true;
+    mesh.add(outlineFor(mesh, 0.003));
+    group.add(mesh);
+  };
+  const depth = 0.2;
+  const behind = -back / scale - depth / 2;
+  add([depth, 0.44, 0.4], [behind, -0.2, 0], casing);
+  // The lid's band and the vents in the accent colour.
+  add([depth + 0.01, 0.035, 0.41], [behind, 0.0, 0], accent);
+  for (const row of [-0.26, -0.31, -0.36]) add([0.01, 0.018, 0.24], [behind - depth / 2 - 0.004, row, 0], accent);
   return group;
 }
 

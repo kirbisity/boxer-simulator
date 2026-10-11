@@ -409,7 +409,7 @@ export function fire(world, fighter) {
   // The gun kicks up and back in the hand.
   // Into both hands (both on the gun in the stance), the arms and the shoulders: a heavy man barely moves, a light one rocks.
   // A long gun's stock drives back into the shoulder and the cheek as well.
-  const support = fighter.aimAt !== undefined || weapon.spec.longGun ? [[P[`${weapon.off}Hand`], 0.6], [P[`${weapon.off}Elbow`], 0.3]] : [];
+  const support = !weapon.spec.mounted && (fighter.aimAt !== undefined || weapon.spec.longGun) ? [[P[`${weapon.off}Hand`], 0.6], [P[`${weapon.off}Elbow`], 0.3]] : [];
   const stock = weapon.spec.longGun ? [[P[`${weapon.main}Shoulder`], 0.9], [P.neck, 0.4], [P.head, 0.25]] : [[P[`${weapon.main}Shoulder`], 0.25]];
   const kick = shot?.recoil ?? GUN.recoil;
   world.pendingImpulses.push({ fighter, shares: [[handIndex, 1], [P[`${weapon.main}Elbow`], 0.5], ...stock, ...support], direction: vec.normalize(vec.add(vec.scale(barrel, -1), vec.scale(up, weapon.spec.longGun ? 0.35 : 0.8))), impulse: kick });

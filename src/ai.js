@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, collapseAt, dazedShare, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, WORLD } from './physics.js';
+import { chinNow, collapseAt, dazedShare, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -670,7 +670,8 @@ function goForWeapon(world, fighter, opponent, dt) {
   }
   // A man of a shield style who has lost his wants it back, whatever is in his hand.
   const wantsShield = Boolean(STYLES[fighter.style]?.shield) && !fighter.shield;
-  const wantsWeapon = !fighter.weapon?.held;
+  // A beast (`unarmed` kit) takes up no weapon.
+  const wantsWeapon = !fighter.weapon?.held && !fighter.body.gear.unarmed;
   // Nothing loose on the floor he wants (the usual case): no thought, and no draw on the bout's randomness.
   const loose = world.debris?.some((debris) => !debris.taken && debris.resting && ((debris.kind === 'weapon' && wantsWeapon) || (debris.kind === 'shield' && wantsShield)));
   if (!loose || fighter.clinch || fighter.pin || fighter.punch || !AI.pickup.enabled) {
@@ -1033,6 +1034,19 @@ function keepAway(world, fighter, opponent, dt) {
  * `rest` again; then he turns, takes the stance, gun up on him in both
  * hands, and fires as he backs away.
  */
+/**
+ * A style with weapons built into the arms (`switches`: [{ to, within,
+ * beyond, strikes }]) takes up the first whose terms are met: the man
+ * nearer than `within` m, further than `beyond`, or `strikes` blows thrown
+ * with the one in use. Between blows only.
+ */
+function switchArms(world, fighter, style, distance) {
+  if (!style.switches || fighter.punch) return false;
+  const thrown = fighter.stats.thrown - (fighter.mountedSince ?? 0);
+  const rule = style.switches.find((each) => (each.within === undefined || distance < each.within) && (each.beyond === undefined || distance > each.beyond) && (each.strikes === undefined || thrown >= each.strikes));
+  return Boolean(rule) && useMounted(world, fighter, rule.to);
+}
+
 function gunfight(world, fighter, opponent, distance, gun, dt) {
   // A fired matchlock: loaded only with nobody near; with someone coming,
   // away from him for room to load.
@@ -1096,7 +1110,8 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   const back = point(fighter.x, P.pelvis);
   const away = [back[0] - opponent.x[P.pelvis * 3], back[2] - opponent.x[P.pelvis * 3 + 2]];
   const roomBehind = room(world, [back[0] + away[0] / distance, back[2] + away[1] / distance]);
-  fighter.move = !gun.holdGround && roomBehind > AI.gunKite.wallMargin ? -0.6 : 0;
+  // A style that walks on as it shoots (`ranged.advance`, of a full step) closes the range instead.
+  fighter.move = gun.advance ?? (!gun.holdGround && roomBehind > AI.gunKite.wallMargin ? -0.6 : 0);
   fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
   if (fighter.punch || fighter.cooldown > 0) return;
   if (teamSpacing(world, fighter, opponent).blocked) return;
@@ -1264,6 +1279,8 @@ export function think(world, fighter, dt) {
     fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
     return;
   }
+  // Forearm weapons (`switches`): the one the distance, or the blows thrown with this one, call for.
+  if (switchArms(world, fighter, style, distance)) style = STYLES[fighter.style];
   // A gun: keep away and shoot; once he is in close, drop it and fight mixed.
   const gun = style.ranged && fighter.weapon?.held && !fighter.weapon.spent ? style.ranged : null;
   // A volley style (`ranged.volley`) shoots that many and then goes in, however far he is.

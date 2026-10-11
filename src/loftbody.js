@@ -528,6 +528,30 @@ export const ARMOR_KINDS = {
     upperArm: { r: [-0.25, 1.02, 1.32, MANICA], l: [-0.2, 0.5, 1.4, { scales: true }] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA], l: [-0.1, 0.06, 1.55, 'steel'] },
     shin: [-0.1, 0.88, 1.32, 'steel'],
   },
+  // A silverback's fur is his skin's colour; the silver saddle over the
+  // back and down the hips (`back`: from, to up the piece, its role), the
+  // rest of the coat black (`cloth`).
+  silverback: {
+    trunk: [-0.12, 1.02, 1.03, { back: [-0.12, 0.8, 'armor'], base: 'cloth' }],
+    thigh: [0, 0.5, 1.03, { back: [0, 1, 'armor'], base: 'cloth' }],
+  },
+  // A humanoid robot (Unitree's H1): white shells (`armor`) over the chest,
+  // the upper arms and thighs, silver (`mail`) at the waist, forearms and
+  // shins, the dark joints (skin) between.
+  humanoid: {
+    trunk: [[0.3, 0.98, 1.1, 'armor'], [-0.1, 0.3, 1.06, 'mail']],
+    upperArm: [0.12, 0.8, 1.22, 'armor'], forearm: [0.14, -0.03, 1.2, 'mail'],
+    thigh: [0.08, 0.8, 1.16, 'armor'], shin: [0.08, 0.86, 1.18, 'mail'],
+  },
+  // The combat bot: thick dark plate everywhere, bands of the accent colour
+  // (`cloth`) round the chest, the shoulders and the forearm guns' housings,
+  // accent knee guards, a dark waist.
+  combatBot: {
+    trunk: [-0.12, 1.0, 1.24, { panel: [0.6, 0.67, -1.01, 'cloth'], base: 'armor' }], belt: [-0.1, 0.08, 1.3, 'mail'],
+    upperArm: [0.0, 0.88, 1.36, { panel: [0.1, 0.22, -1.01, 'cloth'], base: 'armor' }],
+    forearm: [0.0, 0.0, 1.6, { panel: [0.72, 0.84, -1.01, 'cloth'], base: 'armor' }],
+    thigh: [0.0, 0.88, 1.28, 'armor'], knee: [0.86, 1.06, 1.45, 'cloth'], shin: [0.04, 0.9, 1.34, 'armor'],
+  },
   // Thraex: quilted wraps up both thighs, high greaves over them, the manica.
   thraex: {
     belt: BALTEUS, upperArm: { r: [-0.25, 1.02, 1.32, MANICA] }, forearm: { r: [-0.06, -0.02, 1.32, MANICA] },
@@ -559,6 +583,8 @@ function paintFor(paint, armor) {
     return (ring, angle) => (ring.t > from && ring.t < to && Math.cos(angle) > ahead ? role : paint.base);
   }
   return (ring, angle, index, step) => {
+    // A region over the back (`back`: from, to along the piece, its role): a silverback's saddle.
+    if (paint.back && ring.t > paint.back[0] && ring.t < paint.back[1] && Math.cos(angle) < -0.2) return paint.back[2];
     // A round plate over the breast (`mirror`: centre up the trunk, size, role), riveted cloth round it.
     if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
     // A big cat's rosettes, scattered: a dark spot every few rings and steps.

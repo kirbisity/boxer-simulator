@@ -1273,6 +1273,52 @@ export const OUTFITS = {
       { label: 'Tunic and hose', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#6a4a30', skirt: true }, feet: { kind: 'bare' } },
     ],
   },
+  // Beasts and machines. A silverback: nothing worn; his black fur is his
+  // skin's colour, the grey saddle over his back and hips, the ape's head.
+  // A gorilla's hide is thick, but it turns nothing an armour would.
+  silverback: {
+    faction: 'specials',
+    label: 'Silverback', movement: 'excellent', fists: 'bare', courage: 0.6, unarmed: true,
+    protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    designs: [
+      { label: 'Silverback', armor: { kind: 'silverback', color: '#8c8c89', cloth: '#232226', matte: true }, head: { kind: 'gorillaHead', color: '#232226' }, feet: { kind: 'bare' } },
+    ],
+  },
+  // A humanoid robot (Unitree's H1): white shells over the trunk, upper arms
+  // and thighs, silver forearms and shins, dark joints between them, a
+  // dark visor for a head. Thin aluminium and plastic: it turns some of an
+  // edge and a little of a blow, almost nothing of a round. No fear.
+  humanoid: {
+    faction: 'specials', bulletRating: 500,
+    label: 'Humanoid robot', movement: 'good', fists: 'bare', courage: 1,
+    protection: {
+      blunt: 0.25, cut: 0.6, pierce: 0.4, bullet: { head: 0.1, torso: 0.15, limb: 0.1 },
+      regions: { head: { blunt: 0.3, cut: 0.7, pierce: 0.5 }, limb: { blunt: 0.2, cut: 0.5, pierce: 0.3 } },
+    },
+    designs: [
+      { label: 'White and silver', armor: { kind: 'humanoid', color: '#eceef1', mail: '#b6bbc3', matte: true }, head: { kind: 'robotHead', color: '#eceef1', visor: '#141519', trim: '#b6bbc3' }, feet: { kind: 'tacticalBoot', color: '#2c2e33' } },
+    ],
+  },
+  // The combat bot: the humanoid built thick, plated in steel and
+  // composite (rated against the AR-15's own round: it holds most of one
+  // over the trunk, less at the head and limbs; a blade glances off), a
+  // great battery box on its back, ~50 kg of kit on a 120 kg frame. Its
+  // forearms are its guns (`mounted`: an AR-15 on the right, a shotgun on
+  // the left; never dropped). Dark grey, picked out in #D97757.
+  combatBot: {
+    faction: 'specials', bulletRating: 1750, plated: true,
+    label: 'Combat bot — armoured', movement: 'limited', fists: 'gauntlet', courage: 1,
+    extraMass: 50 / 120, balance: 1.5,
+    mounted: { r: 'armRifle', l: 'armShotgun' },
+    protection: {
+      blunt: 0.6, cut: 0.95, pierce: 0.85, bullet: { head: 0.7, torso: 0.85, limb: 0.6 },
+      regions: { head: { blunt: 0.65, cut: 0.95, pierce: 0.85 }, limb: { blunt: 0.5, cut: 0.9, pierce: 0.75 } },
+    },
+    deflects: true,
+    designs: [
+      { label: 'Dark grey', armor: { kind: 'combatBot', color: '#43464c', cloth: '#d97757', mail: '#2a2b2f', matte: true, backBox: true }, head: { kind: 'robotHead', color: '#43464c', visor: '#0e0f12', trim: '#d97757' }, feet: { kind: 'tacticalBoot', color: '#2a2b2f' } },
+    ],
+  },
 };
 
 export const OUTFIT_KEYS = Object.keys(OUTFITS);
@@ -1359,6 +1405,7 @@ export const FACTIONS = {
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
   romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
   law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT and special forces: the baton, the service pistol, the shotgun and the AR-15.' },
+  specials: { label: 'Beasts & Machines', glyph: '🦍', blurb: 'Not men: a silverback gorilla, a humanoid robot, and a combat bot whose forearms are an AR-15 and a shotgun.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
 
@@ -1478,6 +1525,10 @@ export function gearTraits(inputs) {
     breastplate: spec.breastplate ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.
     sidearm: inputs.sidearm ?? spec.sidearm ?? null,
+    // Weapons built into the forearms, by side (`mounted`: { r, l }, weapon kinds): one in use at a time, the other drawn on its arm.
+    mounted: spec.mounted ?? null,
+    // Never takes up a weapon off the floor (a beast).
+    unarmed: Boolean(spec.unarmed),
     spare: spec.spare ?? null,
     arrowproof: Boolean(spec.arrowproof),
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },

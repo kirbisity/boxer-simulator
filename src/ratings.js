@@ -1943,6 +1943,72 @@ export const RATINGS = {
     "maximus": 0.015,
     "monk": 0.065
    }
+  },
+  "gorilla": {
+   "title": "Silverback",
+   "type": "gorilla|silverback",
+   "records": {
+    "maximus": {
+     "wins": 13,
+     "losses": 3,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 12,
+     "losses": 0,
+     "draws": 4
+    }
+   },
+   "score": 233,
+   "provisional": 233,
+   "kd": {
+    "maximus": 3.9,
+    "monk": 5.8
+   }
+  },
+  "humanoid": {
+   "title": "Humanoid robot",
+   "type": "kickboxing|humanoid",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 16,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 11,
+     "losses": 3,
+     "draws": 2
+    }
+   },
+   "score": 20,
+   "provisional": 20,
+   "kd": {
+    "maximus": 0,
+    "monk": 2.8
+   }
+  },
+  "combatBot": {
+   "title": "Combat bot",
+   "type": "combatBot|combatBot",
+   "records": {
+    "maximus": {
+     "wins": 16,
+     "losses": 0,
+     "draws": 0
+    },
+    "monk": {
+     "wins": 16,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 1831,
+   "provisional": 1831,
+   "kd": {
+    "maximus": 33,
+    "monk": 33
+   }
   }
  },
  "types": {
@@ -2032,7 +2098,10 @@ export const RATINGS = {
   "nu|mingGarrison": 5.3,
   "baton|police": 2.3,
   "street|casual": 2.5,
-  "unskilled|commoner": 1.2
+  "unskilled|commoner": 1.2,
+  "gorilla|silverback": 233,
+  "kickboxing|humanoid": 20,
+  "combatBot|combatBot": 1831
  },
  "cross": [
   {

@@ -183,8 +183,11 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   const weapon = createWeapon(style.weapon);
   weapon.handling = handled;
   const shares = handShares(weapon.spec);
-  addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * shares.main);
-  if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * shares.off);
+  // A forearm weapon (`mounted`) weighs as part of the body already (its kit's mass).
+  if (!weapon.spec.mounted) {
+    addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * shares.main);
+    if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * shares.off);
+  }
   const guard = guardTargets(style, fighter.body);
   weapon.dir = yawRotate(guard.dir, fighter.yaw);
   weapon.tip = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.length));
@@ -198,7 +201,8 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
  */
 export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
-  if (!weapon?.held) return;
+  // A forearm weapon is the arm: it cannot be let go or knocked away.
+  if (!weapon?.held || weapon.spec.mounted) return;
   releaseWeapon(world, fighter, reason, push);
   if (fighter.state === 'out') return;
   rearm(world, fighter, weapon);
@@ -207,6 +211,7 @@ export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
 /** The weapon leaves his hands and falls as a loose thing (no other drawn in its place). */
 function releaseWeapon(world, fighter, reason, push) {
   const weapon = fighter.weapon;
+  if (weapon.spec.mounted) return;
   weapon.held = false;
   // A whip let go: its thong is no longer swung (it lies with the handle).
   weapon.rope = null;
@@ -295,6 +300,20 @@ export function dropShield(world, fighter, reason, push = [0, 0, 0]) {
   });
   fighter.shield = null;
   world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, point: shield.centre, effects: [`${spec.label.toLowerCase()} ${reason === 'wrenched' ? 'torn from his arm' : 'dropped'}`] });
+}
+
+/**
+ * Take up another forearm weapon (a style whose weapon is `mounted`): the
+ * one in use goes back to its arm, the other is in use at once (no draw: it
+ * is the arm). Its weight is the body's either way.
+ */
+export function useMounted(world, fighter, styleKey) {
+  if (fighter.weapon && !fighter.weapon.spec.mounted) return false;
+  fighter.weapon = null;
+  fighter.aimAt = undefined;
+  armFighter(fighter, styleKey, { random: world.random, shield: false });
+  fighter.mountedSince = fighter.stats.thrown;
+  return true;
 }
 
 /** Which style a weapon picked up off the floor is fought in. */
@@ -456,6 +475,8 @@ function weaponIntent(world, fighter, intent) {
   // gun hand from below and behind, its elbow bent — the Chapman triangle.
   if (weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined)) {
     if (weapon.spec.bow) target = drawBow(world, fighter, punch, target, intent);
+    // A forearm gun is aimed with its own arm alone: the other is a weapon too, kept at its guard.
+    else if (weapon.spec.mounted) intent.twoHanded = false;
     // The duellist: one hand on the gun, the other at the small of his back.
     else if (style.oneHandAim) intent[`${weapon.off}Hand`] = vec.scale([-0.14, 0.52, weapon.off === 'l' ? 0.06 : -0.06], H);
     else intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(SUPPORT_GRIP, H));

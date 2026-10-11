@@ -104,6 +104,10 @@ export const WARRIORS = [
   warrior('swatShotgun', 'Cpl. Marcus Hale', PRESETS.shotgun),
   warrior('specialForces', 'SSgt. Ryan Brooks', PRESETS.rifle),
   warrior('knife', 'Ryo Kanda', PRESETS.knife),
+  // Beasts and machines. The faction opens on the combat bot (`flagship`).
+  warrior('gorilla', 'Silverback', PRESETS.gorilla),
+  warrior('humanoid', 'Humanoid robot', PRESETS.humanoid),
+  { ...warrior('combatBot', 'Combat bot', PRESETS.combatBot), flagship: true },
   warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),
   warrior('kickboxer', 'Leo Quickhands', PRESETS.light),
   warrior('muayThai', preset('muayThai')?.name ?? 'Muay Thai', preset('muayThai') ?? PRESETS.light, { style: 'muayThai' }),
