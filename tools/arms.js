@@ -1,13 +1,13 @@
 // Weapon arms: how often an arm holding a weapon folds back — the elbow
 // pointing behind the shoulder, or the hand drawn back past it — measured in
 // the fighter's own frame (x forward) over the time he stands holding it.
-// Usage: node tools/arms.js [bouts per style] [seconds]
+// Usage: [STYLES=guandao,naginata] node tools/arms.js [bouts per style] [seconds]
 
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld, point, toLocal } from '../src/physics.js';
 
-export const ARM_STYLES = ['baton', 'longsword', 'katana', 'knife', 'hoplomachus', 'warhammer', 'naginata', 'spear'];
+export const ARM_STYLES = (process.env.STYLES ?? 'baton,longsword,katana,knife,hoplomachus,warhammer,naginata,spear').split(',');
 // How far behind the shoulder counts as folded back (m).
 const BEHIND = 0.06;
 
