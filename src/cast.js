@@ -58,9 +58,13 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
       facialHair: sex === 'female' ? 'none' : pickOne(looks.facialHair, random),
     },
   };
+  // A skill of his own stays his; otherwise it is his kit's (normaliseInputs), whatever kit he is put in.
+  if (inputs.skill === undefined) delete varied.skill;
   const kind = varied.outfit?.kind;
   if (kind) varied.outfit = { ...varied.outfit, colors: randomColors(kind, random) };
-  return normaliseInputs(OUTFITS[kind]?.family || OUTFITS[kind]?.picked ? redress(varied, random) : varied);
+  const dressed = normaliseInputs(OUTFITS[kind]?.family || OUTFITS[kind]?.picked ? redress(varied, random) : varied);
+  if (inputs.skill === undefined) delete dressed.skill;
+  return dressed;
 }
 
 /**

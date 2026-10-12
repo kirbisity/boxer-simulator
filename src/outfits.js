@@ -737,6 +737,7 @@ export const OUTFITS = {
   // Ming garrison: a padded cotton coat and a red cloth head wrap. Little
   // protection beyond the padding; quick on his feet.
   mingGarrison: {
+    skill: 0.25,
     faction: 'chinese',
     label: 'Ming — garrison', family: 'chinese', movement: 'good', fists: 'bare',
     // No sidearm: a garrison man who loses his weapon fights with his hands.
@@ -755,6 +756,7 @@ export const OUTFITS = {
   // iron helmet with a wide brim; a regular army's kit, better than a
   // levy's, never full cover.
   mingBrigandine: {
+    skill: 0.35,
     faction: 'chinese',
     label: 'Ming — brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
@@ -777,6 +779,7 @@ export const OUTFITS = {
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
   mingElite: {
+    skill: 0.45,
     faction: 'chinese', bulletRating: 650, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
@@ -801,6 +804,7 @@ export const OUTFITS = {
   // a plume, and an aventail rolled up round the face so only the eyes show.
   // Fought here on foot, with the mace. The flagship of its faction, drawn in full.
   ironPagoda: {
+    skill: 0.45,
     faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
     sidearm: 'dao',
@@ -838,6 +842,7 @@ export const OUTFITS = {
   // the knee, a black cloth cap over the topknot, trousers and shoes. The
   // lamellae turn cuts and most points over the trunk; the rest is cloth.
   hanSoldier: {
+    skill: 0.3,
     faction: 'chinese',
     label: 'Han soldier — iron lamellar', movement: 'good', fists: 'bare',
     // Han crossbowmen stood in ranks and shot, the ranks relieving each other; they held their ground.
@@ -857,6 +862,7 @@ export const OUTFITS = {
   // The wuxia swordsman's dress: a light robe crossed over the breast and
   // open below the waist for the legs, a sash, cloth shoes; no armour.
   wuxia: {
+    skill: 0.85,
     faction: 'chinese',
     label: 'Wuxia — robe and sash', movement: 'good', fists: 'bare',
     protection: { blunt: 0, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
@@ -932,6 +938,7 @@ export const OUTFITS = {
   // their steppe enemies were: iron lamellar to the knees over the robe, a fur
   // stole, iron bracers, a tall helmet with a lamellar aventail.
   mingIronLamellar: {
+    skill: 0.4,
     faction: 'chinese',
     label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -966,6 +973,7 @@ export const OUTFITS = {
   // and its guns), the heavy man in mail-and-plate; and the legend of the
   // 1300s, an alp of Osman's frontier warriors. ----
   azap: {
+    skill: 0.25,
     faction: 'ottomans',
     label: 'Ottoman — azap', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -976,6 +984,7 @@ export const OUTFITS = {
     ],
   },
   janissary: {
+    skill: 0.4,
     faction: 'ottomans',
     label: 'Ottoman — Janissary', movement: 'good', fists: 'bare',
     sidearm: 'yatagan',
@@ -990,6 +999,7 @@ export const OUTFITS = {
   // Mail-and-plate (krug): rows of small plates riveted into a mail shirt,
   // mail to the thighs, iron vambraces, and the turban helmet (chichak).
   ottomanHeavy: {
+    skill: 0.45,
     faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -1163,6 +1173,7 @@ export const OUTFITS = {
   },
   // A rōnin: no lord, no armour; a kimono and hakama, a headband.
   ronin: {
+    skill: 0.8,
     faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
     sidearm: 'wakizashi',
@@ -1193,6 +1204,7 @@ export const OUTFITS = {
   // feet bare. The armour covers the trunk alone (`regions`): head and limbs
   // as a raider's.
   wokouArmoured: {
+    skill: 0.3,
     faction: 'chinese',
     label: 'Wokou in a dō-maru', movement: 'good', fists: 'bare',
     sidearm: 'dao',
@@ -1211,6 +1223,7 @@ export const OUTFITS = {
     ],
   },
   wokou: {
+    skill: 0.25,
     faction: 'chinese',
     label: 'Wokou raider', movement: 'excellent', fists: 'bare',
     sidearm: 'dao',

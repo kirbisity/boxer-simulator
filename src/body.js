@@ -4,7 +4,7 @@
 
 import { ageing } from './aging.js';
 import { boneTScore, caloriesForBodyFat, settleComposition, starvation } from './physiology.js';
-import { gearTraits } from './outfits.js';
+import { gearTraits, OUTFITS } from './outfits.js';
 
 export const PARTICLES = [
   'head', 'neck', 'lShoulder', 'rShoulder', 'lElbow', 'rElbow', 'lHand', 'rHand',
@@ -656,6 +656,8 @@ const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 export function normaliseInputs(rawInputs) {
   const inputs = { ...DEFAULT_INPUTS, ...rawInputs, look: { ...DEFAULT_INPUTS.look, ...rawInputs?.look } };
   if (rawInputs?.exercise === undefined) inputs.exercise = rawInputs?.training ?? DEFAULT_INPUTS.exercise;
+  // His own skill, else what his kit's men are trained to (OUTFITS[kind].skill), else an ordinary man's.
+  if (rawInputs?.skill === undefined) inputs.skill = OUTFITS[inputs.outfit?.kind]?.skill ?? DEFAULT_INPUTS.skill;
   if (rawInputs?.calories === undefined) {
     const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
     inputs.calories = Math.round(caloriesForBodyFat(inputs, rawInputs?.bodyFat ?? 0.16, frame.lean));
