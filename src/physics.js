@@ -4259,6 +4259,11 @@ export function collapseAt() {
   return BLADES.collapseAt * BODY.toughness;
 }
 
+/** How hurt the body is, 0 (fresh) to 1 (spent): the worst of the brain's strain, the blood lost and gunshot wounds. */
+export function bodyHarm(fighter) {
+  return Math.min(1, Math.max(fighter.concussion / concussionCapacity(fighter), (fighter.bloodLost ?? 0) / collapseAt(), fighter.gunshot ?? 0));
+}
+
 /** Out on the spot: the bout is over, no count. */
 export function knockOut(world, defender, event, reason, kind = 'knockout') {
   const standing = defender.state === 'up' || defender.state === 'rising';
@@ -4285,7 +4290,9 @@ function knockDown(world, defender, event, reason) {
   defender.punch = null;
   defender.rush = null;
   defender.clinch = null;
-  defender.downTimer = WORLD.downSecondsMin + world.random() * WORLD.downSecondsRange + defender.knockdowns;
+  // A man little hurt is up sooner (WORLD.rise.freshDown of the count when fresh).
+  const harmed = WORLD.rise.freshDown + (1 - WORLD.rise.freshDown) * bodyHarm(defender);
+  defender.downTimer = (WORLD.downSecondsMin + world.random() * WORLD.downSecondsRange) * harmed + defender.knockdowns;
   event.effects.push(reason);
   world.fighters[event.attacker].stats.knockdownsScored += 1;
 }

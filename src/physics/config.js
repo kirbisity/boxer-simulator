@@ -307,6 +307,11 @@ export const WORLD = {
     restSpeed: 0.3, restSeconds: 0.3, waitMost: 1.5, strengthFrom: 0.4,
     seconds: { gather: 0.3, roll: 0.5, push: 0.5, step: 0.35, kneel: 0.4, stand: 0.55 },
     rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03, pushShare: 0.6,
+    // A man little hurt (bodyHarm 0) rises sooner and stronger: the count's
+    // wait is `freshDown` of a spent man's, he starts the rise with
+    // `freshStrength` more of his strength, and each stage takes `freshPace`
+    // less time; a badly hurt one as before.
+    freshDown: 0.45, freshStrength: 0.3, freshPace: 0.15,
   },
   // Balance: pushed past these, a fighter goes over rather than stepping.
   // Speed of the hips (m/s) and their distance outside the feet, as a share
@@ -460,5 +465,5 @@ export const WORLD = {
   // On his knees with the pain (a lash, physics/whip.js): how far the hips drop and the trunk bows.
   pain: { dip: 0.27, lean: 0.35 },
   crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6 },
-  pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 3, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
+  pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 4, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
 };

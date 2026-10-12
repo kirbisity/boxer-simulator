@@ -11,7 +11,7 @@
 // lifted. Tuning: WORLD.rise.
 
 import { P, PARTICLES } from '../body.js';
-import { point, standingTarget, toWorld } from '../physics.js';
+import { bodyHarm, point, standingTarget, toWorld } from '../physics.js';
 import { clampReach, twoBoneIK, vec } from '../pose.js';
 import { turnAbout } from '../joints.js';
 import { WORLD } from './config.js';
@@ -251,9 +251,12 @@ export function updateRise(fighter, dt) {
   rise.elapsed += dt;
   // Hurt from the fall as he will be once up (physics.js: recovering), the muscles coming back as he goes.
   const hurt = fighter.hurt > 0 && fighter.hurtFor ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
-  fighter.motorScale = Math.min(1, spec.strengthFrom + rise.elapsed / WORLD.getUpSeconds) * hurt;
-  const seconds = rise.stage === 'stand' ? spec.seconds.stand : rise.seconds ?? spec.seconds[rise.stage];
-  rise.seconds = seconds;
+  // The less hurt, the more of his strength he rises with and the quicker each stage goes.
+  const fresh = 1 - bodyHarm(fighter);
+  fighter.motorScale = Math.min(1, spec.strengthFrom + spec.freshStrength * fresh + rise.elapsed / WORLD.getUpSeconds) * hurt;
+  const pace = 1 - spec.freshPace * fresh;
+  const seconds = (rise.stage === 'stand' ? spec.seconds.stand : rise.seconds ?? spec.seconds[rise.stage]) * pace;
+  rise.seconds = seconds / pace;
   if (rise.t < seconds) return null;
   const wanted = rise.stage === 'stand' ? toWorld(fighter, fighter.desired[P.pelvis])[1] : rise.to?.[P.pelvis]?.[1] ?? 0;
   const there = pelvisHeight(fighter) >= wanted * (rise.stage === 'stand' ? spec.stood : spec.reached) || rise.stage === 'gather' || rise.stage === 'roll' || rise.stage === 'step';

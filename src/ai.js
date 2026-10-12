@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { chinNow, collapseAt, dazedShare, concussionCapacity, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bodyHarm, chinNow, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -954,12 +954,7 @@ function surge(fighter, event) {
 
 /** How hurt he is, 0 (fresh) to 1 (about to drop): the worst of everything that puts a man down. */
 export function hurtShare(fighter) {
-  return Math.min(1, Math.max(
-    fighter.concussion / concussionCapacity(fighter),
-    (fighter.bloodLost ?? 0) / collapseAt(),
-    fighter.gunshot ?? 0,
-    AI.panic.perKnockdown * fighter.knockdowns,
-  ));
+  return Math.min(1, Math.max(bodyHarm(fighter), AI.panic.perKnockdown * fighter.knockdowns));
 }
 
 /**
