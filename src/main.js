@@ -5,15 +5,17 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, opponentFor, perform, placeFighter, point, startCrawl, throwPunch } from './physics.js';
+import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { introPlaying, introWanted, playIntro, skipIntro, stepIntro } from './intro.js';
-import { directFighter, newOrders } from './control.js';
-import { installFightControls } from './touch.js';
+import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders } from './control.js';
+import { installFightControls, TOUCH } from './touch.js';
+import { cameraRoom, createFollowCam } from './followcam.js';
+import { installTutorial, TUTORIAL, TUTORIAL_STEPS } from './tutorial.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -74,12 +76,23 @@ const shortName = (name) => {
 
 const scene = createScene($('#stage'));
 
+// The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
+let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
+
+// The third-person camera of play mode (followcam.js), kept out of the place's walls.
+let cameraWalls = null;
+const followCam = createFollowCam(undefined, { room: (x, z) => !cameraWalls || cameraWalls(x, z) });
+
 // The fight's controls (touch.js): drawn over the fight in play mode only.
 const fightControls = installFightControls($('#fight-ui'), {
   world: () => state.world,
   player: () => player(),
   orders: () => state.orders,
   now: realSeconds,
+  look: (yaw, pitch) => followCam.look(yaw, pitch, realSeconds(), state.orders.lock !== null),
+  zoom: (ratio) => followCam.zoom(ratio),
+  signal: (kind, detail) => tutorial.signal(kind, detail),
+  onDevice: (kind) => tutorial.setDevice(kind),
   project: (at) => {
     const projected = new THREE.Vector3(at[0], at[1], at[2]).project(scene.camera);
     const box = scene.renderer.domElement.getBoundingClientRect();
@@ -92,12 +105,7 @@ const fightControls = installFightControls($('#fight-ui'), {
     const dir = through.sub(origin).normalize();
     return { origin: [origin.x, origin.y, origin.z], dir: [dir.x, dir.y, dir.z] };
   },
-  floorAxes: () => {
-    const look = [scene.orbit.target.x - scene.camera.position.x, scene.orbit.target.z - scene.camera.position.z];
-    const length = Math.hypot(look[0], look[1]) || 1;
-    const ahead = [look[0] / length, look[1] / length];
-    return { ahead, right: [-ahead[1], ahead[0]] };
-  },
+  floorAxes: () => floorAxes(),
 });
 
 // The ring on the floor round the man locked on.
@@ -176,6 +184,8 @@ function newBout() {
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
   clearGore(scene);
   setPlace(scene, place, arena);
+  cameraWalls = cameraRoom(place, arena);
+  followCam.reset();
   // A level frames its own place; anything else starts from the usual ringside view.
   Object.assign(scene.orbit, scenario?.camera ?? { yaw: -0.5, pitch: 0.2, distance: 5.2 });
   document.body.dataset.place = place;
@@ -189,6 +199,7 @@ function newBout() {
   renderHud();
   state.orders = newOrders();
   fightControls.reset();
+  if (state.game === 'tutorial') placeYard();
 }
 
 /** Rebuild the fighters' models, for a new bout or a new shading style. */
@@ -259,11 +270,33 @@ function thinkForBout(world, dt) {
       Object.assign(fighter, { move: 0, strafe: 0, running: false, goTo: null, defence: null, rush: null });
     }
   }
+  // The training partner thinks nothing: he stands, and swings only when the tutorial says.
+  if (state.game === 'tutorial') {
+    const partner = yardPartner();
+    if (partner) {
+      still.add(partner.id);
+      world.keepFull.add(partner.id);
+      yardStep(world, partner);
+    }
+  }
   thinkAll(world, dt, still);
   if (!players.size) return;
   // Walking about (V), the keys steer him; otherwise he does as the orders say.
   if (player().walking) walkAbout(player());
-  else directFighter(world, player(), state.orders, dt);
+  else {
+    // The movement keys: a stick, the way the camera looks.
+    state.orders.keyStick = keyStick(fightKeys, floorAxes(), state.walkRunning);
+    if (state.orders.keyStick) tutorial.signal('move', 1);
+    directFighter(world, player(), state.orders, dt);
+  }
+}
+
+/** The camera's own axes on the floor: the way it looks, and its right. */
+function floorAxes() {
+  const look = [scene.orbit.target.x - scene.camera.position.x, scene.orbit.target.z - scene.camera.position.z];
+  const length = Math.hypot(look[0], look[1]) || 1;
+  const ahead = [look[0] / length, look[1] / length];
+  return { ahead, right: [-ahead[1], ahead[0]] };
 }
 
 // ---- Walk mode: the player walks or runs about, guard down ----------------
@@ -358,6 +391,8 @@ const frameErrors = new Set();
 const SIM_BUDGET_MS = 20;
 
 function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
+  // The training yard begins again when a man in it is out (between frames: never while one is drawn).
+  if (state.game === 'tutorial' && yard.restart) newBout();
   state.accumulator += seconds;
   const started = performance.now();
   while (state.accumulator >= STEP) {
@@ -371,8 +406,8 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     }
   }
   consumeEvents();
-  // The intro has one side only: no bout to win.
-  if (state.game === 'intro') return;
+  // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
+  if (state.game === 'intro' || state.game === 'tutorial') return;
   const winner = boutWinner(state.world);
   // Behind the menus, one fight follows another.
   if (state.game === 'home' && state.finishedAt !== null && state.world.time > state.finishedAt + 3) state.next.run();
@@ -441,7 +476,7 @@ function blendWorld(world, before, share) {
     for (const entry of kept) {
       if (entry.fighter) {
         entry.fighter.x.set(entry.x);
-        if (entry.dir) entry.fighter.weapon.dir = entry.dir;
+        if (entry.dir && entry.fighter.weapon) entry.fighter.weapon.dir = entry.dir;
       } else {
         entry.piece.x = entry.x;
         entry.piece.q = entry.q;
@@ -450,47 +485,29 @@ function blendWorld(world, before, share) {
   };
 }
 
-// Third person: `distance` m behind and `pitch` rad above the man played,
-// looking at a point `aboveHips` m over his hips and `shoulder` m to his
-// right (over the shoulder, his man in view); the target keeps up `ease`
-// of the way each frame, and the camera swings round behind him `turn` of
-// the way. Walking, the turn is the player's (drag): the keys go by the camera.
-// Locked on, the view is of both men: aimed `lockAt` of the way from him to his man, from
-// `lockAngle` (rad) off the line between them, further back the further apart they stand.
-// Walking free (the stick unlocked, or walk mode), the view comes round behind him more gently (`walkTurn`).
-const CAMERA_FOLLOW = { distance: 4.2, pitch: 0.26, aboveHips: 0.45, shoulder: 0.55, ease: 0.2, turn: 0.05, walkTurn: 0.03, lockAt: 0.45, lockAngle: 0.55, lockBack: 0.6 };
+// Third person (followcam.js): over his shoulder from behind, or locked on,
+// on both men; following a smoothed anchor with critically damped springs.
+// The player's drag of the view (touch.js: the top half, or the right
+// button) is kept a while, then eased back.
 
 /** The man the player has locked on, in play mode. */
 const lockedTarget = () => (state.mode === 'play' && state.orders.lock !== null ? state.world.fighters[state.orders.lock] ?? null : null);
 
-/** Where the following camera looks: beside him, so that he stands left of the picture and his man shows past his right shoulder. */
-function shoulderPoint(fighter) {
-  const pelvis = point(fighter.x, P.pelvis);
-  const locked = lockedTarget();
-  if (locked) {
-    const his = point(locked.x, P.pelvis);
-    return [pelvis[0] + (his[0] - pelvis[0]) * CAMERA_FOLLOW.lockAt, pelvis[1], pelvis[2] + (his[2] - pelvis[2]) * CAMERA_FOLLOW.lockAt];
-  }
-  return [pelvis[0] + Math.sin(fighter.yaw) * CAMERA_FOLLOW.shoulder, pelvis[1], pelvis[2] + Math.cos(fighter.yaw) * CAMERA_FOLLOW.shoulder];
-}
-
-/** Behind the man played, at a fixed distance; in the fight, round behind him as he turns. */
-function followCamera(fighter) {
+/** The follow camera, this frame: behind the man played, or on him and the man he is locked on. */
+function followCamera(fighter, dt) {
   const orbit = scene.orbit;
   const locked = lockedTarget();
-  const apart = locked ? Math.hypot(locked.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], locked.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) : 0;
-  orbit.distance += (CAMERA_FOLLOW.distance + apart * CAMERA_FOLLOW.lockBack - orbit.distance) * 0.1;
-  orbit.pitch += (CAMERA_FOLLOW.pitch - orbit.pitch) * 0.05;
-  // Held by the player's own drag: his choice of view.
-  if (pointers.size) return;
-  const free = fighter.walking || (state.orders.stick && state.orders.lock === null);
-  // He faces (cos yaw, −sin yaw) on the floor: the camera sits the other way.
-  // Locked on: behind him along the line from his man, swung off it so neither hides the other.
-  const behind = locked
-    ? Math.atan2(fighter.x[P.pelvis * 3 + 2] - locked.x[P.pelvis * 3 + 2], fighter.x[P.pelvis * 3] - locked.x[P.pelvis * 3]) + CAMERA_FOLLOW.lockAngle
-    : Math.atan2(Math.sin(fighter.yaw), -Math.cos(fighter.yaw));
-  const turn = Math.atan2(Math.sin(behind - orbit.yaw), Math.cos(behind - orbit.yaw));
-  orbit.yaw += turn * (free ? CAMERA_FOLLOW.walkTurn : CAMERA_FOLLOW.turn);
+  const view = followCam.update({
+    me: point(fighter.x, P.pelvis),
+    facing: fighter.yaw,
+    down: fighter.state !== 'up',
+    foe: locked ? point(locked.x, P.pelvis) : null,
+    moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick) && state.orders.lock === null)),
+    aspect: scene.camera.aspect,
+    from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
+  }, realSeconds(), dt);
+  Object.assign(orbit, { yaw: view.yaw, pitch: view.pitch, distance: view.distance });
+  orbit.target.set(...view.target);
 }
 
 function draw(dt) {
@@ -515,7 +532,7 @@ function drawWorld(dt) {
   const sheet = document.body.classList.contains('sheet') || state.game === 'intro';
   // Playing: the camera follows his man from behind (third person).
   const followed = state.mode === 'play' && !sheet ? player() : null;
-  if (followed) followCamera(followed);
+  if (followed) followCamera(followed, dt);
   // A crowd needs a wider shot: back off with the spread of the fighters.
   else if (world.fighters.length > 2 && !sheet) {
     const spread = Math.max(...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - pelvisMid[0], fighter.x[26] - pelvisMid[2])));
@@ -523,8 +540,7 @@ function drawWorld(dt) {
     scene.orbit.distance += (Math.min(furthest, Math.max(5.2, 3.4 + spread * 2.2)) - scene.orbit.distance) * 0.03;
   }
   // A design sheet holds its own framing.
-  if (followed) placeCamera(scene, shoulderPoint(followed), { ease: CAMERA_FOLLOW.ease, height: followed.x[P.pelvis * 3 + 1] + CAMERA_FOLLOW.aboveHips });
-  else placeCamera(scene, sheet ? null : pelvisMid);
+  placeCamera(scene, followed || sheet ? null : pelvisMid);
   dramaCamera(scene, state.drama, world, realSeconds());
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
@@ -548,6 +564,7 @@ function drawWorld(dt) {
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
   fightControls.update();
+  tutorial.update();
 }
 
 function consumeEvents() {
@@ -726,6 +743,8 @@ segmented('#modes', (mode, button) => {
   state.mode = mode;
   state.playSide = button.dataset.side ?? 'red';
   state.orders = newOrders();
+  followCam.reset();
+  fightKeys.clear();
   fightControls.setActive(mode === 'play');
   document.body.classList.toggle('playing', mode === 'play');
 });
@@ -742,10 +761,15 @@ $('#open-menu').addEventListener('click', () => goHome());
 const player = () => state.world.fighters.find((fighter) => fighter.corner === state.playSide) ?? state.world.fighters[0];
 // Keys: punches on the right hand's home row, kicks and knees above and
 // below, defences on the left hand.
+// The movement keys (w a s d, the arrows) move him the way the camera looks;
+// F does the special action; Tab locks on; Space held guards, tapped dodges.
 const KEYS = {
   j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
-  c: 'clinch', r: 'rush', ' ': 'guard', s: 'slip', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', f: 'shoot', y: 'rHook', g: 'collarTie',
+  c: 'clinch', r: 'rush', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', y: 'rHook', g: 'collarTie',
 };
+// The movement keys held in the fight (not walk mode), and when Space went down.
+const fightKeys = new Set();
+let spaceDown = null;
 const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
   elbow: 'Elbow', upElbow: 'Up elbow', clinch: 'Clinch', rush: 'Charge', guard: 'Guard', slip: 'Slip', roll: 'Roll', parry: 'Parry',
@@ -779,6 +803,7 @@ const typing = (target) => Boolean(target.closest?.('input, select, textarea, [c
 window.addEventListener('keydown', (press) => {
   if (state.mode !== 'play' || typing(press.target) || press.repeat) return;
   const key = press.key.toLowerCase();
+  fightControls.setDevice('mouse');
   if (key === 'v') return setWalking(!player().walking);
   if (player().walking) {
     if (key === 'c') return setCrawling(!player().crawling);
@@ -789,16 +814,25 @@ window.addEventListener('keydown', (press) => {
       return;
     }
   }
-  if (press.key === 'a' || press.key === 'ArrowLeft') state.orders.keyMove = -1;
-  else if (press.key === 'd' || press.key === 'ArrowRight') state.orders.keyMove = 1;
-  else if (press.key === ' ') {
-    // Held, the guard stays up.
+  if (key === 'shift') state.walkRunning = true;
+  if (MOVE_KEYS[key]) {
+    press.preventDefault();
+    fightKeys.add(key);
+  } else if (press.key === ' ') {
+    // Held, the guard stays up; tapped, a dodge (as the Guard button).
     press.preventDefault();
     state.orders.guard = true;
+    spaceDown = realSeconds();
   } else if (press.key === 'Tab') {
     press.preventDefault();
-    const target = state.orders.lock === null ? opponentFor(state.world, player()) : null;
-    state.orders.lock = target ? target.id : null;
+    fightControls.toggleLock();
+  } else if (key === 'f') {
+    // The special action, whatever it is now (the button's label).
+    const action = contextAction(state.world, player());
+    if (action) {
+      (state.orders.actions ??= []).push(action);
+      tutorial.signal('action', action);
+    }
   } else if (KEYS[key]) {
     press.preventDefault();
     command(KEYS[key]);
@@ -807,17 +841,26 @@ window.addEventListener('keydown', (press) => {
 // Away from the window, every held key and button is let go.
 window.addEventListener('blur', () => {
   walkHeld.clear();
+  fightKeys.clear();
   state.walkRunning = false;
   if (state.mode === 'play' && player()) player().move = 0;
-  state.orders.keyMove = 0;
+  state.orders.keyStick = null;
   state.orders.guard = false;
+  spaceDown = null;
 });
 window.addEventListener('keyup', (press) => {
   const key = press.key.toLowerCase();
   walkHeld.delete(key);
+  fightKeys.delete(key);
   if (key === 'shift') state.walkRunning = false;
-  if (['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(press.key)) state.orders.keyMove = 0;
-  if (press.key === ' ') state.orders.guard = false;
+  if (press.key === ' ') {
+    state.orders.guard = false;
+    if (spaceDown !== null && realSeconds() - spaceDown < TOUCH.guardTap) {
+      (state.orders.evasions ??= []).push(1);
+      tutorial.signal('evade');
+    }
+    spaceDown = null;
+  }
 });
 
 // Orbit: drag to turn, wheel or pinch to zoom.
@@ -1193,6 +1236,10 @@ let goHome = () => {};
 /** Show which part of the game is on: the footer keeps only what it uses. */
 function setGame(game, next = null) {
   if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
+  if (game !== 'tutorial') {
+    tutorial.stop();
+    delete document.body.dataset.tutorialStep;
+  }
   state.game = game;
   state.next = next;
   document.body.dataset.game = game;
@@ -1263,6 +1310,119 @@ function enterLevel(key) {
   setGame('level', { text: 'Again', run: () => chooseLevel(key) });
   chooseLevel(key);
   askSide();
+}
+
+// ---- The tutorial: the training yard ----------------------------------------------
+// The player with a katana, in the Colosseum's sand, against Sir Edric in
+// full plate with a training staff: he stands still to be struck (his plate
+// turns most cuts), and only at the guard step does he swing, every
+// `TUTORIAL.swingEvery` s, stepping in if the player is out of reach.
+
+const YARD = {
+  place: 'colosseum',
+  trainee: { ...PRESETS.ronin, style: 'katana', name: 'Trainee' },
+  partner: { ...PRESETS.knight, style: 'staff' },
+  // Where each stands at the start (x, z: m), facing the other.
+  traineeAt: [-2.6, 0.6],
+  partnerAt: [1.4, 0],
+  // His swing: the staff's overhead blow at the head; he steps in from beyond `reach` m.
+  swing: 'naginataCut',
+  reach: 1.9,
+};
+const yard = { swinging: false, eventCursor: 0, lastAt: null, restart: false, disarm: false };
+
+const yardPartner = () => state.world?.fighters.find((fighter) => fighter.corner === 'blue') ?? null;
+const yardTrainee = () => state.world?.fighters.find((fighter) => fighter.corner === 'red') ?? null;
+
+/** Both in their places, facing each other; what the yard watches, from now. */
+function placeYard() {
+  const [trainee, partner] = [yardTrainee(), yardPartner()];
+  if (!trainee || !partner) return;
+  placeFighter(trainee, ...YARD.traineeAt);
+  placeFighter(partner, ...YARD.partnerAt);
+  trainee.yaw = 0;
+  partner.yaw = Math.PI;
+  state.before = null;
+  yard.eventCursor = 0;
+  yard.lastAt = null;
+  yard.restart = false;
+  // Started again mid-lesson (a man out): the lock as it was.
+  const step = tutorial.run?.step?.key;
+  if (step && TUTORIAL_STEPS.findIndex((entry) => entry.key === step) > TUTORIAL_STEPS.findIndex((entry) => entry.key === 'lock') && step !== 'unlock') state.orders.lock = partner.id;
+  if (step === 'pickUp') yardStage('disarm');
+}
+
+/** The partner, each step: at the guard step he closes in and swings; otherwise he stands. A man out starts the yard again. */
+function yardStep(world, partner) {
+  const trainee = yardTrainee();
+  if (partner.state === 'out' || trainee.state === 'out') yard.restart = true;
+  if (yard.disarm) {
+    // His sword knocked to the sand at his feet; no sidearm drawn in its place: he must pick it up.
+    yard.disarm = false;
+    if (trainee.weapon?.held) {
+      trainee.sidearmDrawn = true;
+      dropWeapon(world, trainee, 'disarmed', [0, 0.3, 0.6]);
+    }
+  }
+  if (!yard.swinging || partner.state !== 'up') {
+    partner.move = 0;
+    partner.goTo = null;
+    return;
+  }
+  const apart = Math.hypot(trainee.x[P.pelvis * 3] - partner.x[P.pelvis * 3], trainee.x[P.pelvis * 3 + 2] - partner.x[P.pelvis * 3 + 2]);
+  partner.focus = trainee.id;
+  if (apart > YARD.reach) {
+    partner.goTo = point(trainee.x, P.pelvis);
+    partner.move = 0.7;
+    return;
+  }
+  partner.move = 0;
+  partner.goTo = null;
+  if (!partner.punch && world.time >= (yard.swingAt ?? 0) && trainee.state === 'up') {
+    throwPunch(world, partner, YARD.swing, 'head');
+    yard.swingAt = world.time + TUTORIAL.swingEvery;
+  }
+}
+
+/** What a step needs of the yard as it begins. */
+function yardStage(what) {
+  if (what.startsWith('step:')) {
+    const key = what.slice(5);
+    document.body.dataset.tutorialStep = key;
+    yard.swinging = key === 'guard';
+    yard.swingAt = (state.world?.time ?? 0) + 1;
+  } else if (what === 'finished') {
+    document.body.dataset.tutorialStep = 'finished';
+    yard.swinging = false;
+  } else if (what === 'disarm') yard.disarm = true;
+}
+
+/** What the tutorial sees of the yard, each frame. */
+function observeYard() {
+  const world = state.world;
+  const trainee = yardTrainee();
+  const partner = yardPartner();
+  const at = point(trainee.x, P.pelvis);
+  // Walked: his hips' way over the floor, not their sway (a step's worth a frame at most).
+  const walked = yard.lastAt && trainee.state === 'up' ? Math.min(0.2, Math.hypot(at[0] - yard.lastAt[0], at[2] - yard.lastAt[2])) : 0;
+  yard.lastAt = at;
+  let blocked = 0;
+  for (; yard.eventCursor < world.events.length; yard.eventCursor += 1) {
+    const event = world.events[yard.eventCursor];
+    // Met on his guard, his shield, or his blade (a limb on it, or blade on blade).
+    if ((event.kind === 'blocked' && event.defender === trainee.id) || (event.kind === 'bladeBlock' && event.attacker === trainee.id) || (event.kind === 'clash' && event.fighter === trainee.id && event.other === undefined)) blocked += 1;
+  }
+  const apart = partner ? Math.hypot(partner.x[P.pelvis * 3] - at[0], partner.x[P.pelvis * 3 + 2] - at[2]) : Infinity;
+  return { walked: walked > 0.004 ? walked : 0, near: apart < TUTORIAL.nearFrom, locked: state.orders.lock !== null, guarding: state.orders.guard, blocked, armed: Boolean(trainee.weapon?.held) };
+}
+
+/** Into the training yard: the player plays the trainee at once (no side to choose), the card on its first step. */
+function enterTutorial() {
+  state.sideAsked = true;
+  $('#side-pick').hidden = true;
+  match({ red: [YARD.trainee], blue: [YARD.partner], place: YARD.place, game: 'tutorial', next: { text: 'Again', run: enterTutorial } });
+  $('#modes button[data-value="play"]:not([data-side])').click();
+  tutorial.start();
 }
 
 /** The sandbox as it was left: its own fighters, sides and place. */
@@ -1475,8 +1635,16 @@ window.addEventListener('resize', fit);
 new ResizeObserver(fit).observe($('.controls'));
 buildCornerForm('red');
 buildCornerForm('blue');
+tutorial = installTutorial($('#fight-ui'), {
+  now: realSeconds,
+  stage: yardStage,
+  observe: observeYard,
+  exit: () => goHome(),
+  again: () => enterTutorial(),
+});
+tutorial.setDevice(fightControls.device);
 const menus = installMenus({
-  intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, preview, portrait,
+  intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait,
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
@@ -1646,6 +1814,9 @@ window.boxer = {
   fight,
   // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.
   level: chooseLevel,
+  // The training yard, as the Levels menu opens it; its run (step, progress).
+  tutorial: enterTutorial,
+  tutorialRun: () => tutorial.run,
   preview,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.

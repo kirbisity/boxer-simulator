@@ -55,8 +55,17 @@ crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
 `src/crowdview.js` (instanced crowds), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
-`disposeObject`). `src/main.js` runs the loop and input (playing, the camera
-follows the player's man from behind: `CAMERA_FOLLOW`); `src/menu.js` the
+`disposeObject`). `src/main.js` runs the loop and input; playing, the camera
+follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
+critically damped springs, a dead band on his facing, the heading held while
+he is down, the player's own look kept `holdSeconds`, inside a place's walls;
+`node tools/camera-stability.js` measures it). The fight's controls:
+`src/gesture.js` (a touch's meaning: a drag begun in the top half looks, in
+the bottom half is the stick; taps and presses anywhere), `src/control.js`
+(orders → the fighter; the attack pad; `moveName`, `strikeOutcome` for the
+on-screen call of each attack), `src/touch.js` (the controls and HUD on
+screen). `src/tutorial.js` is the training yard's steps and card, staged by
+main.js (`YARD`). `src/menu.js` the
 menus; `src/intro.js` the intro on a first visit (the roster's `legend`
 entries, a faction at a time, staged by main.js's `introStage`; skippable,
 remembered in localStorage, replayed from the home screen). Anything removed from the scene is freed with `disposeObject`.

@@ -1,16 +1,19 @@
 // The fight's controls on screen, for a finger or a mouse: the game surface
-// (drag anywhere for a floating stick; tap anywhere for an attack, which
-// one by where: every move of his style has its place on the screen;
-// press and hold to shove, or to hold down a man on the floor), a big Guard
-// button, a Lock button above it, one special button in a fixed place, and
-// the fight-mode HUD (the player's status low down, his man's over his head).
+// (a drag begun in the top half turns the view, two fingers there zoom; a
+// drag begun in the bottom half is a floating stick; a mouse's right button
+// always turns the view; tap anywhere for an attack, which one by where:
+// every move of his style has its place on the screen; press and hold to
+// shove, or to hold down a man on the floor), a big Guard button, a Lock
+// button above it, one special button in a fixed place, and the fight-mode
+// HUD (the player's status low down, his man's over his head, and the name
+// of each attack he makes, with how it went).
 // Only this surface takes the browser's gestures from it: menus and text
 // elsewhere stay selectable and scroll as usual.
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, attackAt, attackLayout, contextAction } from './control.js';
-import { createRecognizer, GESTURE } from './gesture.js';
+import { ACTIONS, attackAt, attackLayout, attackWhere, contextAction, moveName, strikeOutcome } from './control.js';
+import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 
 export const TOUCH = {
@@ -27,7 +30,19 @@ export const TOUCH = {
   markSeconds: 0.35,
   // The pad keeps clear of the buttons' column at the right edge (px).
   padRight: 130,
+  // rad the view turns for each px dragged, across and up.
+  lookYaw: 0.008,
+  lookPitch: 0.005,
+  // The attack's name stays this long (s) from the blow, and at least this long after how it went is known.
+  callSeconds: 0.8,
+  callAfterOutcome: 0.6,
+  // The man's attack, small over his head, this long (s).
+  incomingSeconds: 0.7,
+  // The look and move hints fade this long (s) after both have been used.
+  hintFade: 1.5,
 };
+
+const OUTCOME_WORDS = { hit: 'Hit', glance: 'Glanced off', blocked: 'Blocked', parried: 'Parried', miss: 'Missed' };
 
 const uiElement = (tag, className, text) => Object.assign(document.createElement(tag), { className, ...(text ? { textContent: text } : {}) });
 
@@ -38,9 +53,24 @@ const uiElement = (tag, className, text) => Object.assign(document.createElement
  * (the camera's on the floor), now() (s). Returns { update, setActive, reset }.
  */
 export function installFightControls(root, hooks) {
-  const gestures = createRecognizer();
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
-  surface.setAttribute('aria-label', 'Fight: drag to move, tap for an attack (each move has its place on the screen), press and hold to shove or hold a man down');
+  surface.setAttribute('aria-label', 'Fight: drag in the top half to look about, in the bottom half to move; tap for an attack (each move has its place on the screen), press and hold to shove or hold a man down');
+  const gestures = createRecognizer(GESTURE, { zoneOf: (at) => {
+    const { top, height } = playArea();
+    return screenZone(at[1], top, height);
+  } });
+  // The two halves, named faintly until each has been used.
+  const hints = root.appendChild(uiElement('div', 'zone-hints'));
+  hints.setAttribute('aria-hidden', 'true');
+  hints.innerHTML = '<span class="look"></span><i class="divider"></i><span class="move"></span>';
+  const used = { look: false, move: false, at: null };
+  // The attack just made: its name, where it went, how it went.
+  const call = root.appendChild(uiElement('div', 'strike-call'));
+  call.setAttribute('role', 'status');
+  call.innerHTML = '<span class="where"></span><b class="name"></b><span class="gloss"></span><em class="outcome"></em>';
+  call.hidden = true;
+  let strike = null;
+  let lastTapAt = null;
   const stick = root.appendChild(uiElement('div', 'stick'));
   stick.appendChild(uiElement('i', 'knob'));
   stick.hidden = true;
@@ -59,7 +89,8 @@ export function installFightControls(root, hooks) {
   const status = root.appendChild(uiElement('div', 'player-status'));
   status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div>';
   const marker = root.appendChild(uiElement('div', 'target-marker'));
-  marker.innerHTML = '<span class="name"></span><div class="bar health"><i></i></div>';
+  marker.innerHTML = '<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div>';
+  let incoming = null;
   const touches = new Map();
   let stickId = null;
   let guardDown = null;
@@ -122,6 +153,8 @@ export function installFightControls(root, hooks) {
     markAt = hooks.now();
   }
 
+  const signal = (kind, detail) => hooks.signal?.(kind, detail);
+
   function handle(events) {
     const orders = hooks.orders();
     const world = hooks.world();
@@ -131,6 +164,15 @@ export function installFightControls(root, hooks) {
         if (stickId !== event.id) continue;
         orders.stick = event.amount > 0 ? { dir: floorWay(event.dx, event.dy), amount: event.amount } : null;
         showStick(event);
+        markUsed('move');
+        signal('move', event.amount);
+      } else if (event.type === 'look') {
+        hooks.look?.(-event.dx * TOUCH.lookYaw, event.dy * TOUCH.lookPitch);
+        markUsed('look');
+        signal('look', Math.abs(event.dx * TOUCH.lookYaw) + Math.abs(event.dy * TOUCH.lookPitch));
+      } else if (event.type === 'zoom') {
+        hooks.zoom?.(event.ratio);
+        signal('zoom', event.ratio);
       } else if (event.type === 'stickEnd') {
         if (stickId !== event.id) continue;
         stickId = null;
@@ -144,6 +186,8 @@ export function installFightControls(root, hooks) {
         orders.requests.push({ move: chosen.move, zone: chosen.zone, strength: event.double ? 'combo' : 'quick', at: world.time });
         showMark(event.at, 'strike');
         flashLabel(chosen.move);
+        lastTapAt = { move: chosen.move, x, zone: chosen.zone, time: hooks.now() };
+        signal(event.double ? 'combo' : 'tap', chosen.move);
         const target = orders.lock ?? opponentFor(world, hooks.player())?.id;
         if (target !== undefined && target !== null) awake.set(target, hooks.now());
       } else if (event.type === 'hold') {
@@ -152,24 +196,44 @@ export function installFightControls(root, hooks) {
         showMark(event.at, 'press');
         navigator.vibrate?.(12);
         wakeNear(aim);
+        signal('hold');
       }
     }
   }
 
-  /** A point on the screen as a place on the pad: x right and y up, −1 to 1 about the middle of the fight (above the footer). */
-  function padCoordinates(px, py) {
+  /** The fight's part of the surface: above the footer. */
+  function playArea() {
     const box = surface.getBoundingClientRect();
     const footer = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--controls-height')) || 0;
-    const height = Math.max(1, box.height - footer);
-    const width = Math.max(1, box.width - TOUCH.padRight);
-    return [((px - box.left) / width) * 2 - 1, 1 - ((py - box.top) / height) * 2];
+    return { left: box.left, top: box.top, width: box.width, height: Math.max(1, box.height - footer) };
+  }
+
+  /** A point on the screen as a place on the pad: x right and y up, −1 to 1 about the middle of the fight (above the footer). */
+  function padCoordinates(px, py) {
+    const { left, top, width: full, height } = playArea();
+    const width = Math.max(1, full - TOUCH.padRight);
+    return [((px - left) / width) * 2 - 1, 1 - ((py - top) / height) * 2];
+  }
+
+  /** A half of the screen has been used: once both have, the hints fade. */
+  function markUsed(zone) {
+    if (used[zone]) return;
+    used[zone] = true;
+    hints.querySelector(`.${zone}`).classList.add('used');
+    if (used.look && used.move) used.at = hooks.now();
+  }
+
+  /** The hints in the words of the hand in use: a finger, or a mouse and keys. */
+  function wordHints(mouse) {
+    hints.querySelector('.look').textContent = mouse ? 'Drag here or right-drag · look' : 'Drag here · look';
+    hints.querySelector('.move').textContent = mouse ? 'Drag here or WASD · move' : 'Drag here · move';
   }
 
   /** The pad's labels for his style, placed as the pad places its moves. */
   function drawPad(styleKey) {
     padStyle = styleKey;
     pad.replaceChildren(...attackLayout(styleKey).map((place) => {
-      const label = uiElement('span', 'pad-move', moveWords(place.move));
+      const label = uiElement('span', 'pad-move', moveName(place.move).name);
       label.dataset.move = place.move;
       label.style.left = `${50 + place.x * 50}%`;
       label.style.top = `${50 - place.y * 50}%`;
@@ -201,8 +265,19 @@ export function installFightControls(root, hooks) {
     press.preventDefault();
     capture(surface, press.pointerId);
     touches.set(press.pointerId, true);
-    handle(gestures.down(press.pointerId, [press.clientX, press.clientY], hooks.now()));
+    setDevice(press.pointerType === 'mouse' ? 'mouse' : 'touch');
+    // The right (or middle) button turns the view wherever it is pressed; it never strikes.
+    const at = [press.clientX, press.clientY];
+    handle(press.button > 0 ? gestures.down(press.pointerId, at, hooks.now(), 'look') : gestures.down(press.pointerId, at, hooks.now()));
+    if (press.button > 0) rightButtons.add(press.pointerId);
   });
+  const rightButtons = new Set();
+  // The wheel zooms.
+  surface.addEventListener('wheel', (wheel) => {
+    if (!active) return;
+    wheel.preventDefault();
+    hooks.zoom?.(Math.exp(-wheel.deltaY * 0.001));
+  }, { passive: false });
   surface.addEventListener('pointermove', (move) => {
     if (!touches.has(move.pointerId)) return;
     handle(gestures.move(move.pointerId, [move.clientX, move.clientY]));
@@ -210,7 +285,10 @@ export function installFightControls(root, hooks) {
   surface.addEventListener('pointerup', (up) => {
     if (!touches.has(up.pointerId)) return;
     touches.delete(up.pointerId);
-    handle(gestures.up(up.pointerId, [up.clientX, up.clientY], hooks.now()));
+    const events = gestures.up(up.pointerId, [up.clientX, up.clientY], hooks.now());
+    // A right-button click is not a tap: only its drag counts.
+    const right = rightButtons.delete(up.pointerId);
+    handle(right ? events.filter((event) => event.type !== 'tap' && event.type !== 'hold') : events);
   });
   const drop = (cancel) => {
     if (!touches.has(cancel.pointerId)) return;
@@ -235,7 +313,10 @@ export function installFightControls(root, hooks) {
   const guardUp = (up, cancelled) => {
     if (!guardDown || guardDown.id !== up.pointerId) return;
     const orders = hooks.orders();
-    if (!cancelled && hooks.now() - guardDown.at < TOUCH.guardTap) (orders.evasions ??= []).push(1);
+    if (!cancelled && hooks.now() - guardDown.at < TOUCH.guardTap) {
+      (orders.evasions ??= []).push(1);
+      signal('evade');
+    }
     orders.guard = false;
     guardDown = null;
     guard.classList.remove('on');
@@ -248,22 +329,98 @@ export function installFightControls(root, hooks) {
     if (!active || !lastAction) return;
     (hooks.orders().actions ??= []).push(lastAction);
     navigator.vibrate?.(10);
+    signal('action', lastAction);
   });
   // Lock: on the man he is on (the nearest), or off.
   lock.addEventListener('pointerdown', (press) => {
     press.preventDefault();
     if (!active) return;
-    const orders = hooks.orders();
-    if (orders.lock !== null) orders.lock = null;
-    else {
-      const target = opponentFor(hooks.world(), hooks.player());
-      if (target) {
-        orders.lock = target.id;
-        awake.set(target.id, hooks.now());
-      }
-    }
+    toggleLock();
     navigator.vibrate?.(15);
   });
+
+  /** Lock on the man he is on (the nearest), or let go. */
+  function toggleLock() {
+    const orders = hooks.orders();
+    if (orders.lock !== null) {
+      orders.lock = null;
+      signal('unlock');
+      return;
+    }
+    const target = opponentFor(hooks.world(), hooks.player());
+    if (!target) return;
+    orders.lock = target.id;
+    awake.set(target.id, hooks.now());
+    signal('lock', target.id);
+  }
+
+  let device = null;
+  /** The hand in use, for the words on screen: 'touch' or 'mouse' (a key pressed counts as the mouse). */
+  function setDevice(kind) {
+    if (kind === device) return;
+    device = kind;
+    root.dataset.device = kind;
+    wordHints(kind === 'mouse');
+    hooks.onDevice?.(kind);
+  }
+  setDevice(globalThis.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'mouse');
+
+  /** The attack he has just made: its name, its height and side, and (once known) how it went. */
+  function callStrike(world, me, now) {
+    const punch = me.punch;
+    if (punch && punch !== strike?.punch && punch.spec?.kind === 'strike') {
+      // Its side on the screen: the tap that asked for it, or the move's own place on the pad.
+      const tapped = lastTapAt && lastTapAt.move === punch.type && now - lastTapAt.time < 1 ? lastTapAt : null;
+      const place = tapped ?? attackLayout(me.style).find((entry) => entry.move === punch.type);
+      const where = attackWhere(punch.zone, place?.x ?? 0);
+      const { name, gloss } = moveName(punch.type);
+      strike = { punch, since: world.time - (punch.age ?? 0) - 1 / 60, start: now, outcome: null, outcomeAt: null };
+      call.hidden = false;
+      call.dataset.outcome = '';
+      call.querySelector('.where').textContent = `${where.arrow} ${where.height}${where.side === 'centre' ? '' : ` · ${where.side}`}`;
+      call.querySelector('.name').textContent = name;
+      call.querySelector('.gloss').textContent = gloss;
+      call.querySelector('.outcome').textContent = '';
+      call.classList.remove('show');
+      void call.offsetWidth;
+      call.classList.add('show');
+      signal('strike', punch.type);
+    }
+    if (!strike) return;
+    if (!strike.outcome) {
+      const outcome = strikeOutcome(world.events, me.id, strike.since, me.punch !== strike.punch);
+      if (outcome) {
+        strike.outcome = outcome;
+        strike.outcomeAt = now;
+        call.dataset.outcome = outcome;
+        call.querySelector('.outcome').textContent = OUTCOME_WORDS[outcome];
+        signal('outcome', outcome);
+      }
+    }
+    const until = Math.max(strike.start + TOUCH.callSeconds, (strike.outcomeAt ?? strike.start) + TOUCH.callAfterOutcome);
+    if (now > until && (strike.outcome || me.punch !== strike.punch)) {
+      call.classList.remove('show');
+      if (now > until + 0.3) {
+        call.hidden = true;
+        strike = null;
+      }
+    }
+  }
+
+  /** The man's own attack, small over his head as it begins. */
+  function callIncoming(target, now) {
+    const punch = target.punch;
+    const label = marker.querySelector('.incoming');
+    if (punch && punch !== incoming?.punch && punch.spec?.kind === 'strike') {
+      incoming = { punch, start: now };
+      label.textContent = moveName(punch.type).name;
+      label.classList.add('show');
+    }
+    if (incoming && now - incoming.start > TOUCH.incomingSeconds) {
+      label.classList.remove('show');
+      incoming = null;
+    }
+  }
 
   /** Anything aimed near a man wakes his marker. */
   function wakeNear(at) {
@@ -276,11 +433,13 @@ export function installFightControls(root, hooks) {
     const now = hooks.now();
     handle(gestures.tick(now));
     if (now - markAt > TOUCH.markSeconds) mark.hidden = true;
+    hints.classList.toggle('gone', used.at !== null && now - used.at > TOUCH.hintFade);
     const world = hooks.world();
     const me = hooks.player();
     const orders = hooks.orders();
     if (!world || !me) return;
     if (me.style !== padStyle) drawPad(me.style);
+    callStrike(world, me, now);
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
     // The special button: one place, its label what it would do now.
     const name = contextAction(world, me);
@@ -311,6 +470,7 @@ export function installFightControls(root, hooks) {
     marker.hidden = !at[2];
     if (!at[2]) return;
     marker.style.transform = `translate(${at[0]}px, ${at[1]}px) translate(-50%, -100%)`;
+    callIncoming(target, now);
     marker.querySelector('.name').textContent = firstNameOf(target);
     marker.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(target)) * 100)}%`;
     marker.classList.toggle('locked', Boolean(locked));
@@ -335,9 +495,14 @@ export function installFightControls(root, hooks) {
     guard.classList.remove('on');
     awake.clear();
     padStyle = null;
+    strike = null;
+    incoming = null;
+    call.hidden = true;
+    lastTapAt = null;
+    rightButtons.clear();
   }
 
-  return { update, setActive, reset };
+  return { update, setActive, reset, toggleLock, setDevice, get device() { return device; } };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */
@@ -349,13 +514,11 @@ function capture(element, pointerId) {
   }
 }
 
-const firstNameOf = (fighter) => fighter.body.inputs.name.split(' ')[0];
-
-/** A move's name in words: "hammerOverhead" → "Hammer overhead". */
-function moveWords(name) {
-  const words = name.replace(/([A-Z])/g, ' $1').toLowerCase();
-  return words[0].toUpperCase() + words.slice(1);
-}
+/** A man's first name; a rank or title ("Sir Edric", "Sgt. Cole") gives way to the name after it. */
+const firstNameOf = (fighter) => {
+  const words = fighter.body.inputs.name.split(' ');
+  return (/\.$/.test(words[0]) || ['Sir', 'Officer'].includes(words[0])) && words[1] ? words[1] : words[0];
+};
 
 /** The nearest approach of a line of sight (origin + t·dir, t ≥ 0) to a segment a–b: how far, and the point on the segment. */
 function rayToSegment(origin, dir, a, b) {

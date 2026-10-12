@@ -143,7 +143,9 @@ export function installMenus(game) {
   // ---- Levels --------------------------------------------------------------
   function levels() {
     const body = screen('levels-screen', 'Levels', 'Set fights in set places, with their own people.', home);
-    body.append(el('div', { className: 'choices levels' }, ...Object.entries(SCENARIOS).map(([key, level]) => {
+    // The training yard first: every control, one at a time.
+    const yard = choice({ glyph: '🎯', kicker: 'Start here · about two minutes', title: 'Tutorial: the training yard', text: 'Every control, one at a time: look, move, lock on, cut where you tap, guard, and the special button. A katana against Sir Edric in full plate, who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
+    body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(([key, level]) => {
       const who = level.roster ?? level.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg ? `${fighter.weightKg} kg` : `${Math.round(fighter.bodyFat * 100)}% fat`}`).join(' — ');
       return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
     })));
