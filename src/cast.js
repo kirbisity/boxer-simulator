@@ -60,6 +60,8 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
   };
   // A skill of his own stays his; otherwise it is his kit's (normaliseInputs), whatever kit he is put in.
   if (inputs.skill === undefined) delete varied.skill;
+  // Someone like a hero is not the hero.
+  delete varied.hero;
   const kind = varied.outfit?.kind;
   if (kind) varied.outfit = { ...varied.outfit, colors: randomColors(kind, random) };
   const dressed = normaliseInputs(OUTFITS[kind]?.family || OUTFITS[kind]?.picked ? redress(varied, random) : varied);

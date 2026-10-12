@@ -1320,7 +1320,7 @@ function enterLevel(key) {
 
 const YARD = {
   place: 'colosseum',
-  trainee: { ...PRESETS.ronin, style: 'katana', name: 'Trainee' },
+  trainee: { ...PRESETS.ronin, style: 'katana', name: 'Trainee', skill: 0.5 },
   partner: { ...PRESETS.knight, style: 'staff' },
   // Where each stands at the start (x, z: m), facing the other.
   traineeAt: [-2.6, 0.6],

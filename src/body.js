@@ -245,13 +245,13 @@ export const PRESETS = {
   // who led the Iron Pagoda (1140); Subutai, Chinggis Khan's general, in the
   // kheshig's armour; Turgut Alp, one of Osman's companions (c. 1300).
   ironPagoda: {
-    name: 'Wanyan Wuzhu', style: 'langyaShield', sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550,
+    name: 'Wanyan Wuzhu', style: 'langyaShield', hero: true, sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550,
     outfit: { kind: 'ironPagoda', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   kheshig: {
     // The Khan's guard rode as heavy archers first: a quick volley, then in with the sabre (his own, carried with the leather lamellar).
-    name: 'Subutai', style: 'kheshigBow', sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 4300,
+    name: 'Subutai', style: 'kheshigBow', hero: true, sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 4300,
     outfit: { kind: 'steppeMedium', design: 0 }, accessories: [], sidearm: 'saber',
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -294,7 +294,7 @@ export const PRESETS = {
   // over his armour, the Green Dragon Crescent Blade. A legend, like the Iron
   // Pagoda: tall and heavy here, not nine chi.
   guanYu: {
-    name: 'Guan Yu', style: 'guanYu', sex: 'male', heightCm: 187, frame: 'large', age: 45, exercise: 0.58, calories: 4200,
+    name: 'Guan Yu', style: 'guanYu', hero: true, sex: 'male', heightCm: 187, frame: 'large', age: 45, exercise: 0.58, calories: 4200,
     outfit: { kind: 'guanYu', design: 0 }, accessories: [],
     look: { skinTone: 'tan', faceColor: '#b06c48', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'longBeard', eyeColor: 'brown' },
   },
@@ -328,7 +328,7 @@ export const PRESETS = {
   // greying; the sayf, the turs, the kazaghand over his mail.
   saladin: {
     // His standard the Ayyubid yellow, when he leads.
-    name: 'Saladin', style: 'saladin', sex: 'male', heightCm: 170, frame: 'medium', age: 50, exercise: 0.65, calories: 3400, standardColour: '#d8b030',
+    name: 'Saladin', style: 'saladin', hero: true, sex: 'male', heightCm: 170, frame: 'medium', age: 50, exercise: 0.65, calories: 3400, standardColour: '#d8b030',
     outfit: { kind: 'saladin', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2e2620', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -369,7 +369,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1d14', facialHair: 'beard', eyeColor: 'brown' },
   },
   macuahuitl: {
-    name: 'Cuauhtémoc', style: 'macuahuitl', sex: 'male', heightCm: 162, frame: 'medium', age: 25, exercise: 0.77, calories: 3775,
+    name: 'Cuauhtémoc', style: 'macuahuitl', hero: true, sex: 'male', heightCm: 162, frame: 'medium', age: 25, exercise: 0.77, calories: 3775,
     outfit: { kind: 'mexicaElite', design: 1 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -463,7 +463,7 @@ export const PRESETS = {
   // arming sword. She leads: on a side with a standard she bears it, as she
   // bore her white banner herself.
   joan: {
-    name: 'Joan of Arc', style: 'joan', sex: 'female', heightCm: 158, frame: 'medium', age: 18, exercise: 0.75, calories: 2700, leads: true, standardColour: '#f1ece0',
+    name: 'Joan of Arc', style: 'joan', hero: true, sex: 'female', heightCm: 158, frame: 'medium', age: 18, exercise: 0.75, calories: 2700, leads: true, standardColour: '#f1ece0',
     outfit: { kind: 'joan', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2416', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -471,7 +471,7 @@ export const PRESETS = {
   // Grand Master of the Temple, taken at Marj Ayyun and dead in Saladin's
   // prison rather than ransomed: a brother-knight of the Order in its prime.
   templar: {
-    name: 'Odo de Saint-Amand', style: 'templar', sex: 'male', heightCm: 178, frame: 'large', age: 34, exercise: 0.68, calories: 4425,
+    name: 'Odo de Saint-Amand', style: 'templar', hero: true, sex: 'male', heightCm: 178, frame: 'large', age: 34, exercise: 0.68, calories: 4425,
     outfit: { kind: 'templar', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2a1c', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -480,7 +480,7 @@ export const PRESETS = {
   // strength the chronicles made legend; ō-yoroi, the yumi, and the ōdachi
   // when a man came close.
   tametomo: {
-    name: 'Minamoto no Tametomo', style: 'yumi', sex: 'male', heightCm: 168, frame: 'large', age: 18, exercise: 0.74, calories: 3950,
+    name: 'Minamoto no Tametomo', style: 'yumi', hero: true, sex: 'male', heightCm: 168, frame: 'large', age: 18, exercise: 0.74, calories: 3950,
     outfit: { kind: 'oyoroi', design: 0 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
@@ -493,7 +493,7 @@ export const PRESETS = {
   // remembered as tall for his day (about six shaku, ~180 cm), lean and fit;
   // he goes in at a run (charging).
   ronin: {
-    name: 'Miyamoto Musashi', style: 'ronin', sex: 'male', heightCm: 178, frame: 'medium', age: 28, exercise: 0.85, calories: 3950, charging: 2.5,
+    name: 'Miyamoto Musashi', style: 'ronin', hero: true, sex: 'male', heightCm: 178, frame: 'medium', age: 28, exercise: 0.85, calories: 3950, charging: 2.5,
     outfit: { kind: 'ronin', design: 2 }, accessories: ['kasa'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -562,7 +562,7 @@ export const PRESETS = {
   // cuirass strapped and buckled, a guard on the left shoulder, a triple
   // belt over hanging leather strips, a blue-grey tunic, leather bracers.
   maximus: {
-    name: 'Maximus', style: 'maximus', sex: 'male', heightCm: 178, frame: 'large', age: 35, exercise: 0.68, calories: 4610,
+    name: 'Maximus', style: 'maximus', hero: true, sex: 'male', heightCm: 178, frame: 'large', age: 35, exercise: 0.68, calories: 4610,
     outfit: { kind: 'maximus', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#1c130c', facialHair: 'beard', eyeColor: 'blue' },
   },
@@ -571,7 +571,7 @@ export const PRESETS = {
   // hair, strong and practised (he killed beasts by the hundred). Not a
   // barley-fed gladiator: an athlete's body, not a fighter's fat.
   commodus: {
-    name: 'Commodus', style: 'commodus', sex: 'male', heightCm: 177, frame: 'large', age: 31, exercise: 0.68, calories: 4375,
+    name: 'Commodus', style: 'commodus', hero: true, sex: 'male', heightCm: 177, frame: 'large', age: 31, exercise: 0.68, calories: 4375,
     outfit: { kind: 'commodus', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#a8803e', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -657,7 +657,9 @@ export function normaliseInputs(rawInputs) {
   const inputs = { ...DEFAULT_INPUTS, ...rawInputs, look: { ...DEFAULT_INPUTS.look, ...rawInputs?.look } };
   if (rawInputs?.exercise === undefined) inputs.exercise = rawInputs?.training ?? DEFAULT_INPUTS.exercise;
   // His own skill, else what his kit's men are trained to (OUTFITS[kind].skill), else an ordinary man's.
-  if (rawInputs?.skill === undefined) inputs.skill = OUTFITS[inputs.outfit?.kind]?.skill ?? DEFAULT_INPUTS.skill;
+  // His own skill; else a hero's, the best there is (`hero`: the legends, not the men varied from them);
+  // else what his kit's men are trained to (OUTFITS[kind].skill), else an ordinary man's.
+  if (rawInputs?.skill === undefined) inputs.skill = rawInputs?.hero ? 1 : OUTFITS[inputs.outfit?.kind]?.skill ?? DEFAULT_INPUTS.skill;
   if (rawInputs?.calories === undefined) {
     const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
     inputs.calories = Math.round(caloriesForBodyFat(inputs, rawInputs?.bodyFat ?? 0.16, frame.lean));
