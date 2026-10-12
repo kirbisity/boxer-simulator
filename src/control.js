@@ -51,8 +51,30 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, guard: false, keyMove: 0, requests: [] };
+  return { lock: null, stick: null, keyStick: null, guard: false, requests: [] };
 }
+
+/**
+ * The movement keys held (w a s d and the arrows) as a stick: a way on the
+ * floor taken from the camera's own axes (`ahead`, `right`), at full throw,
+ * or a run with `running`; null when none are held or they cancel out.
+ */
+export function keyStick(held, { ahead, right }, running = false) {
+  let along = 0;
+  let across = 0;
+  for (const key of held) {
+    const [forward, side] = MOVE_KEYS[key] ?? [0, 0];
+    along += forward;
+    across += side;
+  }
+  const way = [ahead[0] * along + right[0] * across, ahead[1] * along + right[1] * across];
+  const length = Math.hypot(way[0], way[1]);
+  if (length < 1e-6) return null;
+  return { dir: [way[0] / length, way[1] / length], amount: running ? 1 : CONTROL.stick.fullFrom };
+}
+
+/** The movement keys: [ahead, right] on the screen. */
+export const MOVE_KEYS = { w: [1, 0], arrowup: [1, 0], s: [-1, 0], arrowdown: [-1, 0], a: [0, -1], arrowleft: [0, -1], d: [0, 1], arrowright: [0, 1] };
 
 // ---- Movement ---------------------------------------------------------------
 
@@ -78,7 +100,8 @@ function steer(world, fighter, orders, opponent, dt) {
   fighter.strafe = 0;
   fighter.running = false;
   const locked = orders.lock !== null && opponent?.id === orders.lock;
-  const stick = orders.stick && orders.stick.amount >= CONTROL.stick.deadZone ? orders.stick : null;
+  const held = orders.stick ?? orders.keyStick;
+  const stick = held && held.amount >= CONTROL.stick.deadZone ? held : null;
   const slow = orders.guard ? CONTROL.guardFootwork : 1;
   if (stick) {
     const { pace, running } = stickPace(stick.amount);
@@ -101,10 +124,6 @@ function steer(world, fighter, orders, opponent, dt) {
     return;
   }
   fighter.goTo = null;
-  if (orders.keyMove) {
-    fighter.move = orders.keyMove * slow;
-    return;
-  }
   if (!locked || opponent.state !== 'up') {
     fighter.move *= Math.exp(-dt * 6);
     return;
@@ -199,6 +218,70 @@ export function attackAt(styleKey, x, y) {
   const zones = MOVES[best.move].zones ?? [];
   const zone = y > ATTACK_PAD.headFrom && zones.includes('head') ? 'head' : y < ATTACK_PAD.legsBelow && zones.includes('legs') ? 'legs' : zones.includes('body') ? 'body' : zones[0] ?? null;
   return { move: best.move, zone };
+}
+
+// ---- What an attack is called -----------------------------------------------
+//
+// A move's name on screen, and a few words for what it is: the name a
+// fighter of its school would use, and the plain English beside it.
+
+export const MOVE_NAMES = {
+  jab: ['Jab'], cross: ['Cross'], hook: ['Hook'], rHook: ['Rear hook'], uppercut: ['Uppercut'],
+  roundhouse: ['Roundhouse', 'kick'], lowKick: ['Low kick'], spinKick: ['Spinning kick'], teep: ['Teep', 'push kick'],
+  knee: ['Knee'], elbow: ['Elbow'], upElbow: ['Rising elbow'], palm: ['Palm strike'], taichiPush: ['Push', 'both hands'],
+  tsuppariL: ['Tsuppari', 'left thrust'], tsuppariR: ['Tsuppari', 'right thrust'], oshi: ['Oshi', 'two-hand shove'],
+  clubR: ['Club', 'overhead'], clubL: ['Club', 'left overhead'], swipeR: ['Swipe'], swipeL: ['Swipe', 'left'],
+  rush: ['Charge'], clinch: ['Clinch'], collarTie: ['Collar tie'], shieldBash: ['Shield bash'],
+  overhand: ['Overhand', 'downward blow'], forehand: ['Forehand', 'side cut'], legSwing: ['Leg strike'], poke: ['Poke', 'end thrust'],
+  oberhau: ['Oberhau', 'cut from above'], zwerchhau: ['Zwerchhau', 'cross cut'], unterhau: ['Unterhau', 'rising cut'], lunge: ['Lunge', 'thrust'],
+  shomen: ['Shōmen', 'overhead cut'], kesagiri: ['Kesagiri', 'diagonal cut'], gyakuKesa: ['Gyaku-kesa', 'reverse diagonal'],
+  yokogiri: ['Yokogiri', 'level cut'], kiriage: ['Kiriage', 'rising cut'], tsuki: ['Tsuki', 'thrust'],
+  hammerOverhead: ['Hammer', 'overhead'], hammerSide: ['Hammer', 'side blow'], hammerThrust: ['Hammer', 'spike thrust'],
+  naginataSweep: ['Sweep', 'low cut'], naginataCut: ['Cut', 'overhead'], naginataRising: ['Rising cut'], naginataThrust: ['Thrust'],
+  spearThrust: ['Spear thrust'], spearJab: ['Spear jab'], spearSweep: ['Spear sweep'], spearHigh: ['High thrust'], spearLow: ['Low thrust'],
+  stab: ['Stab'], upStab: ['Rising stab'], highStab: ['High stab'],
+  gladiusThrust: ['Thrust'], gladiusCut: ['Cut'], swordLunge: ['Lunge'], quickThrust: ['Quick thrust'], flickCut: ['Flick cut'],
+  sicaHook: ['Hooked cut'], sicaThrust: ['Thrust'], crescentSlash: ['Crescent slash'], staffButt: ['Butt strike'],
+  maceOverhead: ['Mace', 'overhead'], maceSide: ['Mace', 'side blow'], maceOverheadLeft: ['Mace', 'overhead'], maceSideLeft: ['Mace', 'side blow'],
+  botCut: ['Blade cut'], botThrust: ['Blade thrust'], botSweep: ['Blade sweep'],
+  shoot: ['Shot'], fireLong: ['Shot'], fireRifle: ['Shot'], firePump: ['Shot'], fireVolley: ['Volley'], loose: ['Arrow loosed'],
+};
+
+/** A move's name, and a gloss if it has one: { name, gloss }. Unnamed: its key in words ("hammerOverhead" → "Hammer overhead"). */
+export function moveName(key) {
+  const named = MOVE_NAMES[key];
+  if (named) return { name: named[0], gloss: named[1] ?? '' };
+  const words = String(key).replace(/([A-Z])/g, ' $1').toLowerCase();
+  return { name: words[0].toUpperCase() + words.slice(1), gloss: '' };
+}
+
+/** Where an attack goes, in words: its height (by zone) and its side on the pad (x −1 to 1): { height, side, arrow }. */
+export function attackWhere(zone, x = 0) {
+  const height = zone === 'head' ? 'high' : zone === 'legs' ? 'low' : 'body';
+  const side = x < -0.33 ? 'left' : x > 0.33 ? 'right' : 'centre';
+  const arrows = { high: { left: '↖', centre: '↑', right: '↗' }, body: { left: '←', centre: '•', right: '→' }, low: { left: '↙', centre: '↓', right: '↘' } };
+  return { height, side, arrow: arrows[height][side] };
+}
+
+/**
+ * How a strike thrown by `attacker` at `since` (world time) went, from the
+ * world's events after it: 'hit', 'glance' (off armour), 'blocked' (on a
+ * guard or a shield), 'parried' (met by a blade), or null while there is no
+ * word yet. `over` (the strike has ended) with no word: 'miss'.
+ */
+export function strikeOutcome(events, attacker, since, over = false) {
+  let outcome = null;
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.time < since) break;
+    let found = null;
+    if (event.kind === 'landed' && event.attacker === attacker) found = event.effects?.some((effect) => /glanced/.test(effect)) ? 'glance' : 'hit';
+    else if (event.kind === 'blocked' && event.attacker === attacker) found = 'blocked';
+    else if (event.kind === 'bladeBlock' && event.defender === attacker) found = 'parried';
+    // The first word after the strike began is the one that counts.
+    if (found) outcome = found;
+  }
+  return outcome ?? (over ? 'miss' : null);
 }
 
 // ---- Attacks ----------------------------------------------------------------
