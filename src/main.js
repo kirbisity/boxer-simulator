@@ -874,7 +874,7 @@ canvas.addEventListener('pointermove', (move) => {
   if (!pointers.has(move.pointerId)) return;
   const [x, y] = pointers.get(move.pointerId);
   if (pointers.size === 1) {
-    scene.orbit.yaw += (move.clientX - x) * 0.008;
+    scene.orbit.yaw -= (move.clientX - x) * 0.008;
     scene.orbit.pitch = Math.max(-0.05, Math.min(1.3, scene.orbit.pitch + (move.clientY - y) * 0.006));
   } else if (pointers.size === 2) {
     const [other] = [...pointers.entries()].filter(([id]) => id !== move.pointerId).map(([, position]) => position);

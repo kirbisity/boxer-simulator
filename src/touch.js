@@ -167,7 +167,7 @@ export function installFightControls(root, hooks) {
         markUsed('move');
         signal('move', event.amount);
       } else if (event.type === 'look') {
-        hooks.look?.(-event.dx * TOUCH.lookYaw, event.dy * TOUCH.lookPitch);
+        hooks.look?.(event.dx * TOUCH.lookYaw, event.dy * TOUCH.lookPitch);
         markUsed('look');
         signal('look', Math.abs(event.dx * TOUCH.lookYaw) + Math.abs(event.dy * TOUCH.lookPitch));
       } else if (event.type === 'zoom') {

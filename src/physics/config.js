@@ -230,7 +230,14 @@ export const WORLD = {
   // below it a novice's error is added, up to `aimError` (m, each way) at 0,
   // by what he strikes with: points (spear, rapier) need precision most. A
   // gun's or a bow's spread scales by 1 ± `gunSpread` × (0.5 − skill).
-  skill: { aimError: { hand: 0.02, blunt: 0.05, blade: 0.04, point: 0.06 }, gunSpread: 1 },
+  // Skill (0 to 1, an ordinary man 0.5): `aimError` (m) a novice's blows go
+  // off the mark at 0; `gunSpread` widens a novice's shots and narrows a
+  // master's; `edgeTilt` [least, most] (rad) a novice's blade is turned off
+  // true in the stroke at 0 (cos² of it bites; the rest lands as the flat,
+  // `flatBlunt` of it as a blow); gaps in armour are found × (0.5 + skill);
+  // `draw`: a master draws the edge through and drives the point straight,
+  // the cut and the stab biting × (1 + draw) at 1, × (1 − draw) at 0.
+  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -382,7 +389,10 @@ export const WORLD = {
   // player's fighter (world.keepFull) is always in full.
   // `proxyEvery`: a proxy's pose is worked out every this many steps (spread over them), for that span.
   tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12, proxyEvery: 2 },
-  gunStartApart: 2.5, // m each side of the centre, when someone carries a gun
+  // m each side of the centre the sides start: a few steps apart, room to come on (further when someone carries a gun).
+  startApart: 1.3,
+  teamStartApart: 1.1,
+  gunStartApart: 3.2,
   // The clinch: hands locked behind the neck; it breaks when the defender's
   // strength wins or the time runs out.
   // reachSeconds: time the hands have to get to the neck before the clinch is abandoned.

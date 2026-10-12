@@ -293,14 +293,14 @@ test('a punch into a held blade is stopped there, and the edge cuts the hand', (
 
 test('an unskilled fighter swings one at a time, barely defends, and misses more', () => {
   const pair = ['contender', 'contender'];
-  // Twenty bouts each: over ten the ratio still swings from about 0.35 to
-  // 0.5 on chance. Over twenty an unskilled man defends about a third as
-  // often as a boxer (0.36 before the joint-range work, 0.39 after): half
-  // is the line.
+  // Twenty bouts each: over ten the rates swing a good deal on chance.
+  // Counting only trained defences, an unskilled man makes about a fifth
+  // as many as a boxer: half is the line.
   const unskilled = measureStyle('unskilled', 20, 40, pair);
   const boxer = measureStyle('boxing', 20, 40, pair);
   assert.equal(unskilled.comboShare, 0);
-  assert.ok(unskilled.defencesPerMinute < boxer.defencesPerMinute * 0.5, `${unskilled.defencesPerMinute.toFixed(1)} vs ${boxer.defencesPerMinute.toFixed(1)} defences a minute`);
+  // Covering up is a flinch anyone makes: the trained defences (slips, parries, rolls, steps off the line) are what he lacks.
+  assert.ok(unskilled.activeDefencesPerMinute < boxer.activeDefencesPerMinute * 0.5, `${unskilled.activeDefencesPerMinute.toFixed(1)} vs ${boxer.activeDefencesPerMinute.toFixed(1)} active defences a minute`);
   assert.ok(unskilled.headEvaded > boxer.headEvaded, 'wild swings miss more');
 });
 

@@ -8,7 +8,7 @@ import { advance, boutWinner, createWorld } from '../src/physics.js';
 
 /** Play bouts between two fighters of one style and count what they do. */
 export function measureStyle(style = 'boxing', bouts = 6, seconds = 60, pair = ['heavy', 'light']) {
-  const tally = { minutes: 0, thrown: 0, inCombo: 0, headThrown: 0, headClean: 0, headBlocked: 0, headEvaded: 0, moved: 0, movedEvaded: 0, defences: 0, slips: 0, advancing: 0, frames: 0 };
+  const tally = { minutes: 0, thrown: 0, inCombo: 0, headThrown: 0, headClean: 0, headBlocked: 0, headEvaded: 0, moved: 0, movedEvaded: 0, defences: 0, activeDefences: 0, slips: 0, advancing: 0, frames: 0 };
   for (let bout = 0; bout < bouts; bout += 1) {
     const world = createWorld(pair.map((key) => ({ ...PRESETS[key], style })), { seed: 500 + bout });
     const seen = new Set();
@@ -34,6 +34,8 @@ export function measureStyle(style = 'boxing', bouts = 6, seconds = 60, pair = [
         if (defence && !seen.has(defence)) {
           seen.add(defence);
           tally.defences += 1;
+          // Covering up is a flinch anyone makes; slipping, parrying, stepping off the line are trained.
+          if (defence.name !== 'guard') tally.activeDefences += 1;
           if (defence.name === 'slip' || defence.name === 'roll') tally.slips += 1;
           fighter.lastDefence = defence.name;
         }
@@ -63,6 +65,7 @@ export function measureStyle(style = 'boxing', bouts = 6, seconds = 60, pair = [
     headClean: tally.headClean / Math.max(1, tally.headThrown),
     headEvaded: tally.headEvaded / Math.max(1, tally.headThrown),
     defencesPerMinute: tally.defences / tally.minutes,
+    activeDefencesPerMinute: tally.activeDefences / tally.minutes,
     headMoveShare: tally.slips / Math.max(1, tally.defences),
     slipWorks: tally.movedEvaded / Math.max(1, tally.moved),
     slipTried: tally.moved / Math.max(1, tally.headThrown),

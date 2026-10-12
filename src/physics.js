@@ -805,7 +805,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
   const gunFight = sides.some((side) => STYLES[side.inputs.style]?.ranged);
-  const apart = gunFight ? Math.min(WORLD.gunStartApart, arena.halfX - 0.6) : 1.1;
+  const apart = Math.min(gunFight ? WORLD.gunStartApart : WORLD.startApart, arena.halfX - 0.6);
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
     const x = (onRed ? -1 : 1) * apart;
@@ -824,7 +824,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     if (team.length < 2 && !order) continue;
     const spacing = order?.spacing ?? WORLD.teamSpacing;
     const rowSpacing = order?.rowSpacing ?? WORLD.teamRowSpacing;
-    const front = order?.front ?? (gunFight ? apart : 1.1);
+    // Teams line up closer than a pair: a crowd that runs in from further bunches and hits its own.
+    const front = order?.front ?? (gunFight ? apart : WORLD.teamStartApart);
     const perRow = order?.perRow ?? Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / spacing) + 1);
     const sign = corner === 'red' ? -1 : 1;
     const placeRows = (group, back) => group.forEach((fighter, index) => {
@@ -1006,6 +1007,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
     // A place in the world: the strike follows it as he turns to it.
     at: at ? aimed : null,
+    // How far an untrained hand turns the blade off true (rad): the edge meeting at a slant, the point off its line.
+    edgeTilt: edgeTilt(world, fighter, spec),
   };
   fighter.stamina = Math.max(0, fighter.stamina - drain);
   fighter.stats.thrown += 1;
@@ -1027,6 +1030,20 @@ export function skillScatter(fighter, spec, scatter) {
   const held = spec.path === 'blade' && fighter.weapon?.held ? fighter.weapon.spec : null;
   const kind = !held ? 'hand' : spec.mode === 'thrust' ? 'point' : held.harm?.swing?.cut ? 'blade' : 'blunt';
   return scatter * Math.min(1, 2 * (1 - skill)) + WORLD.skill.aimError[kind] * Math.max(0, 1 - 2 * skill);
+}
+
+/**
+ * An untrained hand turns a blade in the stroke: the edge meets at a slant
+ * and slaps with the flat, the point arrives off its line and skids. Below
+ * an ordinary skill (0.5) each blow's edge is this far off true (rad), up
+ * to WORLD.skill.edgeTilt at 0 (a few degrees short of flat); at 0.5 and
+ * above the edge runs true. Drawn per blow, only for the untrained.
+ */
+function edgeTilt(world, fighter, spec) {
+  const untrained = Math.max(0, 1 - 2 * (fighter.body.skill ?? 0.5));
+  if (!untrained || spec?.path !== 'blade' || !fighter.weapon?.held) return 0;
+  const [least, most] = WORLD.skill.edgeTilt;
+  return untrained * (least + (most - least) * world.random());
 }
 
 /** The man of the other side nearest a place, within `within` m of it (on the floor), or null. */
@@ -3609,12 +3626,24 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * goingIn * goingIn;
   const mix = harmMix(wspec, spec.mode, along, closest.s);
+  // An edge or point turned off true (punch.edgeTilt) bites as much as it is square: the rest lands as the flat.
+  // A trained hand draws the edge through the cut and drives the point straight (WORLD.skill.draw: ± at skill 1 and 0).
+  const drawn = 1 + WORLD.skill.draw * 2 * ((attacker.body.skill ?? 0.5) - 0.5);
+  mix.cut *= drawn;
+  mix.pierce *= drawn;
+  const trueEdge = Math.cos(punch.edgeTilt ?? 0) ** 2;
+  if (trueEdge < 1) {
+    const lost = (mix.cut + mix.pierce) * (1 - trueEdge);
+    mix.cut *= trueEdge;
+    mix.pierce *= trueEdge;
+    mix.blunt += lost * WORLD.skill.flatBlunt;
+  }
   const covered = protectionAt(body.gear, capsule.key);
   // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
   const gaps = body.gear.gaps ? { ...BLADES.gaps, ...body.gear.gaps } : BLADES.gaps;
   // (A full plate harness has no gap for an edge: `cutProof`.)
   const gapChance = spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing;
-  const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique;
+  const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (wspec.contactSeconds * (1 + 0.6 * (1 - firmness)));
