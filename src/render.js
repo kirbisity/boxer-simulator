@@ -2059,7 +2059,7 @@ function detailedView(view, fighter, simple) {
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   layers.skin.add(skinMesh, skinOutline);
-  const shells = simple || rigid ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false }) }];
+  const shells = simple || rigid ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) }];
 
   const dress = leaderDress(dressFor(body.inputs, corner), fighter);
   // A design may set the hair (a sumo's topknot).

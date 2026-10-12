@@ -106,3 +106,22 @@ test('every body style is wound outward, so the ink outline stays behind it', as
     assert.ok(share > 0.8, `${name}: ${(share * 100).toFixed(0)}% of faces outward`);
   }
 });
+
+test('a plate breastplate rides the chest bone alone (rigid: no bend, twist or dent); the fauld below stays lofted', async () => {
+  const { buildLoftBody } = await import('../src/loftbody.js');
+  for (const preset of ['knight', 'joan', 'hidalgo']) {
+    const mesh = buildLoftBody(buildBody(PRESETS[preset]));
+    const rigid = mesh.rigid.map((flag, vertex) => (flag ? vertex : -1)).filter((vertex) => vertex >= 0);
+    assert.ok(rigid.length > 100, `${preset}: a rigid breastplate`);
+    const steel = rigid.filter((vertex) => mesh.regions[vertex] === 'steel' || mesh.regions[vertex] === 'steel2');
+    assert.ok(steel.length > 50, `${preset}: the plate itself is rigid`);
+    for (const vertex of rigid) {
+      assert.equal(mesh.skinIndex[vertex * 4], BONE.chest);
+      assert.equal(mesh.skinWeight[vertex * 4], 1);
+    }
+    // Below the waist the plate's fauld still follows the hips.
+    const lowSteel = mesh.regions.some((region, vertex) => !mesh.rigid[vertex] && region === 'steel' && mesh.positions[vertex * 3 + 1] < mesh.bindPoints[P.pelvis][1] + 0.1);
+    assert.ok(lowSteel, `${preset}: a lofted fauld`);
+  }
+  assert.ok(!buildLoftBody(buildBody(PRESETS.heavy)).rigid.some(Boolean), 'no rigid piece without a breastplate');
+});
