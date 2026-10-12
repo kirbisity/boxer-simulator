@@ -96,7 +96,8 @@ in `buildWeaponMesh`, a style in `STYLES` that wields it, a character in
 (head, torso, limb), a part on both sides (Forearm), or one part (rShank),
 each with `deflects` if it is plate that turns a blade),
 `bulletRating`/`plated` if proofed; an `ARMOR_KINDS` entry in `loftbody.js`
-for its pieces; any new helmet as a `buildHeadgear` case; a glyph in
+for its pieces (a plate breastplate as `rigidBreastplate: [waist, top]`: the
+trunk there rides the chest bone alone, so it neither bends, twists nor dents); any new helmet as a `buildHeadgear` case; a glyph in
 `OUTFIT_GLYPH`.
 
 **A faction:** an entry in `FACTIONS`; its outfits name it.

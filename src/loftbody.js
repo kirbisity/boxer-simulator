@@ -85,6 +85,13 @@ export const LOFT = {
   // A brigandine's rivet heads: three rows to a ring, each `size` of its column
   // across (and as tall, along the piece), a hair proud of the cloth.
   studs: { rowsPerRing: 3, size: 0.3, tall: 0.07, lift: 0.012 },
+  // A plate breastplate (`plate`, or a kit's `rigidBreastplate`: [waist, top]
+  // up the trunk) is one rigid shell on the chest bone from its lower edge at
+  // the waist to its top: the trunk under it, and whatever is worn between
+  // (the arming coat, mail, a huque over it), is carried with it, so it neither
+  // bends, twists, stretches nor dents. Below the waist the fauld stays
+  // lofted (articulated lames), one surface with the plate, so no gap opens.
+  plateBreastplate: [0.32, 1.02],
   // A light relaxation rounds the ring edges without losing the shapes.
   relaxPasses: 2,
   relaxAmount: 0.3,
@@ -293,6 +300,7 @@ export const ARMOR_KINDS = {
   // sleeves and collar; the doublet's cloth shows below.
   conquistador: {
     trunk: [[-0.06, 0.97, 1.12, MAIL], [0.1, 0.96, 1.22, 'steel']], skirt: [0.3, 0.4, 1.24, { rows: ['steel', 'steel2'] }], collar: 'mail',
+    rigidBreastplate: [0.32, 0.96],
     upperArm: [-0.3, 1.04, 1.14, MAIL],
   },
   // A corset: boned cloth from the hips to under the bust, laced tight (the
@@ -462,6 +470,7 @@ export const ARMOR_KINDS = {
   // A foot soldier's breastplate and backplate, a short fauld, knee cops: nothing on the arms.
   breastplate: {
     trunk: [-0.04, 0.96, 1.19, 'steel'], skirt: [0.22, 0.3, 1.2, { rows: ['steel', 'steel2'] }], knee: [0.82, 1.05, 1.45, 'steel'],
+    rigidBreastplate: [0.32, 0.96],
   },
   // Murmillo: belt, the manica on the sword arm, a short greave on the lead leg over a quilted wrap.
   murmillo: {
@@ -940,7 +949,13 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   // in a crouch; only the sides and back of the hips follow the legs.
   const torso = [BONE.pelvis, BONE.spine, BONE.chest, BONE.lThigh, BONE.rThigh];
   const hanging = [BONE.pelvis, BONE.spine, BONE.chest];
-  const abdomen = (ring, front) => (ring.t < -0.12 || (belly > 0 && front > 0.2) ? hanging : ring.t < 0.55 ? torso : null);
+  const lumbar = (ring, front) => (ring.t < -0.12 || (belly > 0 && front > 0.2) ? hanging : ring.t < 0.55 ? torso : null);
+  // A rigid breastplate (LOFT.plateBreastplate): the trunk from its waist to
+  // its top rides the chest bone alone, everything on it; `chestOnly` marks those vertices.
+  const kitOf = ARMOR_KINDS[outfitOf(body.inputs).look.armor?.kind];
+  const breastplate = outfitOf(body.inputs).look.armor?.kind === 'plate' ? LOFT.plateBreastplate : kitOf?.rigidBreastplate ?? null;
+  const chestOnly = [BONE.chest];
+  const abdomen = (ring, front) => (breastplate && ring.t >= breastplate[0] && ring.t <= breastplate[1] ? chestOnly : lumbar(ring, front));
   loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, count(18) + Math.round((-0.12 - Math.min(-0.12, hem)) * 10)), sides, { bones: abdomen });
   // Kit is geometry, not paint: shorts, waistband and (for women) a sports
   // top are lofts a little proud of the skin, so their edges are crisp.
@@ -1095,6 +1110,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   if (armor) {
     const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
     const role = (ring, angle, index, step) => {
+      if (plate && ring.t < breastplate[0]) return index % 2 ? 'steel2' : 'steel';
       if (plate) return armor.fluted && step % 2 ? 'steel2' : 'steel';
       // The ō-yoroi's leather front panel, where the bowstring would catch.
       if (lamellar && armor.panel && ring.t > 0.3 && ring.t < 0.86 && Math.cos(angle) > 0.82) return 'leather';
@@ -1321,6 +1337,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     });
   }
   const normals = computeNormals(positionArray, indexArray);
+  // `rigid`: vertices carried by the chest bone alone (a breastplate and what is under it): no flesh to dent.
+  const rigid = bones.map((list) => list === chestOnly);
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
-  return { positions: positionArray, normals, indices: indexArray, regions: colors, ...skinWeights(Float32Array.from(weightPositions), frames, bones), bindFrames: frames, bindPoints: points };
+  return { positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...skinWeights(Float32Array.from(weightPositions), frames, bones), bindFrames: frames, bindPoints: points };
 }

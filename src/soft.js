@@ -21,9 +21,10 @@ export class SoftShell {
    * @param geometry  the shell's geometry (or `mesh` to wrap an existing one)
    * @param options   { mesh, recomputeNormals }: pass a skinned body as
    *   `mesh`; its normals come from the anatomy field and are kept, since
-   *   recomputing them on every frame of a dent would cost more than it shows.
+   *   recomputing them on every frame of a dent would cost more than it shows;
+   *   `fixed`, per vertex, those that do not move (a rigid plate over the flesh).
    */
-  constructor(geometry, material, firmness, { mesh = null, recomputeNormals = true } = {}) {
+  constructor(geometry, material, firmness, { mesh = null, recomputeNormals = true, fixed = null } = {}) {
     this.mesh = mesh ?? new THREE.Mesh(geometry, material);
     this.mesh.castShadow = true;
     geometry = this.mesh.geometry;
@@ -34,6 +35,7 @@ export class SoftShell {
     this.normals = Float32Array.from(geometry.attributes.normal.array);
     this.offset = new Float32Array(positions.count);
     this.velocity = new Float32Array(positions.count);
+    this.fixed = fixed;
     this.active = false;
     this.omega = SOFT.omegaSoft + (SOFT.omegaFirm - SOFT.omegaSoft) * firmness;
     this.depthScale = 1.6 - firmness;
@@ -55,7 +57,7 @@ export class SoftShell {
       const dz = (rest[index * 3 + 2] - local.z) * scale.z;
       const distanceSquared = dx * dx + dy * dy + dz * dz;
       const falloff = Math.exp(-distanceSquared / (SOFT.spread * SOFT.spread));
-      if (falloff < 0.02) continue;
+      if (falloff < 0.02 || this.fixed?.[index]) continue;
       // An impulse sets the flesh moving inward; the spring does the rest.
       this.velocity[index] -= depth * this.omega * falloff;
     }
