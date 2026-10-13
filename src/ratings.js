@@ -16,13 +16,13 @@ export const RATINGS = {
     "maximus": {
      "wins": 1,
      "losses": 7,
-     "draws": 0
+     "draws": 4
     }
    },
-   "score": 235,
+   "score": 250,
    "provisional": 235,
    "kd": {
-    "maximus": 0.2
+    "maximus": 0.333
    }
   },
   "ironPagoda": {
@@ -1707,7 +1707,7 @@ export const RATINGS = {
   }
  },
  "types": {
-  "lance|tournament": 235,
+  "lance|tournament": 250,
   "langyaShield|ironPagoda": 397,
   "longsword|knight": 411,
   "warhammer|knight": 964,
