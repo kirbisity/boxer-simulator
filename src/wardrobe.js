@@ -8,6 +8,8 @@ import { outlineFor, surface } from './toon.js';
 import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 
 export const WARDROBE = {
+  // How far (m, for a 1.8 m man) a sabaton's point runs on past the foot.
+  sabatonPoint: 0.06,
   // Steel: how metal and how polished; the reflection map is a gradient
   // sky (cheap — one texture, built once — and enough to read as steel).
   steel: { metalness: 0.9, roughness: 0.26 },
@@ -308,11 +310,20 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     }
   }
   if (kind === 'sabaton') {
-    // Overlapping lames over the toes.
-    for (let lame = 0; lame < 3; lame += 1) {
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(spec.width * 1.05, spec.width * 1.05, 0.012, 14, 1, true, 0, Math.PI), steel);
-      band.rotation.z = Math.PI / 2;
-      band.position.set(0.005, length * (0.42 + lame * 0.14), 0);
+    // The pointed toe of a 15th-century sabaton: the steel drawn out past the
+    // foot to a point (WARDROBE.sabatonPoint: m beyond it, at this height), low over the ground.
+    const point = WARDROBE.sabatonPoint * body.heightM / 1.8;
+    const toe = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 12), steel);
+    toe.scale.set(spec.width * 0.62, point + length * 0.16, spec.height * 0.72);
+    toe.position.set(-spec.width * 0.42, length * 0.78 + (point - length * 0.16) / 2 + length * 0.16 * 0.5, 0);
+    shoe.add(toe);
+    // Lames across the foot: thin steel rings following its section, narrowing towards the toe.
+    for (const along of [0.36, 0.46, 0.56]) {
+      const across = Math.sqrt(Math.max(0.05, 1 - ((along - 0.28) / 0.5) ** 2));
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1, 0.08, 4, 18), steel);
+      band.rotation.x = Math.PI / 2;
+      band.scale.set(spec.width * across * 1.03, spec.height * across * 1.03, spec.width);
+      band.position.set(-0.012, length * along, 0);
       band.userData.noOutline = true;
       shoe.add(band);
     }

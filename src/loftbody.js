@@ -1252,7 +1252,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), sides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
   }
   if (armor) {
-    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
+    const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.1, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
     const role = (ring, angle, index, step) => {
       if (plate && ring.t < breastplate[0]) return index % 2 ? 'steel2' : 'steel';
       if (plate) return roped(ring, step) ?? (armor.fluted && step % 2 ? 'steel2' : 'steel');
@@ -1334,8 +1334,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
-  const collarFrom = plate || lamellar || kit?.collar ? -0.15 : -0.6;
-  const flare = (t) => 1 + (plate || lamellar || kit?.collar ? 0 : 0.9 * Math.max(0, -t) / 0.6);
+  // Plate's gorget flares down over the tops of the breast and back plates, closing the gap between them and the helmet.
+  const collarFrom = plate ? -0.45 : lamellar || kit?.collar ? -0.15 : -0.6;
+  const flare = (t) => 1 + (lamellar || kit?.collar ? 0 : (plate ? 0.7 : 0.9) * Math.max(0, -t) / 0.6);
   if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false });
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
@@ -1450,7 +1451,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       profile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
       profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]]));
     loft(mesh, shinRings(-0.12, 0.97, count(10)), sides);
-    if (legReach[1] > 0 && !skirted) {
+    // A plate greave covers the shin: the hose under it is not drawn (it stands wider than the greave at the ankle and showed through).
+    if (legReach[1] > 0 && !skirted && !plate) {
       // Trousers fall straight to the shoe; joggers and track pants gather.
       const gathered = bottom.kind === 'joggers' || bottom.kind === 'trackPants';
       loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : 1.22, capStart: false, capEnd: false });
