@@ -100,6 +100,13 @@ export const LOFT = {
   // out (`flare`, over its lowest `flareOver` of t); `rope` (t) a roped
   // border at the neck and the hem.
   ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
+  // Its front drawn sharp (breastplateOn, not in a crowd): the two halves as
+  // faces of their own, `lift` proud of the plate, `rows` to a ring and
+  // `steps` across each half, so the ridge is an edge, not a curve; rivet
+  // heads (`rivet` rad across) along the neck and the hem; a leather strap
+  // and buckle on each shoulder; on a knight's full plate the lance rest
+  // (arrêt) on the right breast.
+  ridgedFront: { lift: 0.012, rows: 2, steps: 8, rivet: 0.055, rivetsNeck: 5, rivetsHem: 7, strapAt: 1.0, strapWidth: 0.09, lanceRest: [-0.55, 0.62, 0.12, 0.05, 0.05] },
   // A light relaxation rounds the ring edges without losing the shapes.
   relaxPasses: 2,
   relaxAmount: 0.3,
@@ -679,6 +686,39 @@ function addPatch(mesh, rings, corners, role, bones) {
 }
 
 /**
+ * A grid of faces over a piece, its vertices shared within it (so it
+ * shades smooth) but with nothing else (so its edges are sharp):
+ * `grid[row][column]` = [place, angle, out].
+ */
+function addGrid(mesh, rings, grid, role, bones) {
+  const start = mesh.positions.length / 3;
+  const columns = grid[0].length;
+  for (const row of grid) {
+    for (const [place, angle, out] of row) {
+      const ring = ringAt(rings, place);
+      mesh.positions.push(...onRing(ring, angle, out));
+      mesh.weightPositions.push(...onRing(ring, angle, 1));
+      mesh.colors.push(role);
+      mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
+    }
+  }
+  const at = (row, column) => start + row * columns + column;
+  // Wound so its faces look away from the piece's axis (judged on the first).
+  const point = (index) => mesh.positions.slice(index * 3, index * 3 + 3);
+  const [place0] = grid[0][0];
+  const outward = vec.sub(point(at(0, 0)), ringAt(rings, place0).center);
+  const normal = vec.cross(vec.sub(point(at(0, 1)), point(at(0, 0))), vec.sub(point(at(1, 0)), point(at(0, 0))));
+  const flip = vec.dot(normal, outward) < 0;
+  for (let row = 0; row < grid.length - 1; row += 1) {
+    for (let column = 0; column < columns - 1; column += 1) {
+      const [a, b, c, d] = [at(row, column), at(row, column + 1), at(row + 1, column + 1), at(row + 1, column)];
+      if (flip) mesh.indices.push(a, c, b, a, d, c);
+      else mesh.indices.push(a, b, c, a, c, d);
+    }
+  }
+}
+
+/**
  * Lamellae as plates: a row of small rounded-top plates between each pair
  * of rings, `paint.lamellae` round, each row offset half a plate from the
  * next, their rounded tops up (towards the shoulder on an arm), each with
@@ -756,6 +796,52 @@ function lamesOn(mesh, rings, inflate, paint, bones) {
       const lift = out(0.55) + 0.008;
       addPatch(mesh, rings, [[at - span * 0.12, angle - spec.rivet, lift], [at - span * 0.12, angle + spec.rivet, lift], [at + span * 0.12, angle + spec.rivet, lift], [at + span * 0.12, angle - spec.rivet, lift]], 'gold', bones);
     }
+  }
+}
+
+/**
+ * A ridged breastplate's front, drawn sharp over the plate beneath: each
+ * half its own faces (shared by no vertex with the other), so the ridge
+ * down the middle is a crisp edge; rivets along the neck and the hem,
+ * leather straps at the shoulders, and (`lanceRest`) the arrêt on the right
+ * breast. `shape` is the plate's own (the ridge, the flared hem); `range`
+ * the plate's span of t.
+ */
+function breastplateOn(mesh, rings, inflate, shape, range, { lanceRest = false } = {}, bones) {
+  const spec = LOFT.ridgedFront;
+  const width = LOFT.ridged.width * 1.6;
+  const from = placeAt(rings, range[0]);
+  const to = placeAt(rings, range[1]);
+  const rows = Math.max(2, Math.round((to - from) * spec.rows));
+  const out = (place, angle, lift = spec.lift) => inflate * shape(ringAt(rings, place), angle) + lift;
+  // Each half one smooth sheet; the two meet at the ridge without sharing it.
+  for (const side of [1, -1]) {
+    const grid = Array.from({ length: rows + 1 }, (_, row) => {
+      const place = from + ((to - from) * row) / rows;
+      return Array.from({ length: spec.steps + 1 }, (_, step) => {
+        const angle = (side * width * step) / spec.steps;
+        return [place, angle, out(place, angle)];
+      });
+    });
+    addGrid(mesh, rings, grid, 'steel', bones);
+  }
+  const square = (place, angle, half, role, lift = spec.lift * 2) => addPatch(mesh, rings, [
+    [place - half * 0.6, angle - half, out(place, angle, lift)], [place - half * 0.6, angle + half, out(place, angle, lift)],
+    [place + half * 0.6, angle + half, out(place, angle, lift)], [place + half * 0.6, angle - half, out(place, angle, lift)],
+  ], role, bones);
+  const neck = to - 0.35;
+  const hem = from + 0.35;
+  for (let index = 0; index < spec.rivetsNeck; index += 1) square(neck, -width * 0.8 + (1.6 * width * index) / (spec.rivetsNeck - 1), spec.rivet, 'gold');
+  for (let index = 0; index < spec.rivetsHem; index += 1) square(hem, -width + (2 * width * index) / (spec.rivetsHem - 1), spec.rivet, 'gold');
+  for (const side of [1, -1]) {
+    const angle = side * spec.strapAt;
+    addPatch(mesh, rings, [[to - 1.2, angle - spec.strapWidth, out(to - 1.2, angle, spec.lift * 2)], [to - 1.2, angle + spec.strapWidth, out(to - 1.2, angle, spec.lift * 2)], [to, angle + spec.strapWidth, out(to, angle, spec.lift * 2)], [to, angle - spec.strapWidth, out(to, angle, spec.lift * 2)]], 'leather', bones);
+    square(to - 0.9, angle, spec.rivet * 1.2, 'gold', spec.lift * 3);
+  }
+  if (lanceRest) {
+    const [angle, at, across, high, stand] = spec.lanceRest;
+    const place = from + (to - from) * at;
+    addPatch(mesh, rings, [[place - high * 10, angle - across, out(place, angle, stand)], [place - high * 10, angle + across, out(place, angle, stand)], [place + high * 10, angle + across, out(place, angle, stand)], [place + high * 10, angle - across, out(place, angle, stand)]], 'steel2', bones);
   }
 }
 
@@ -1143,7 +1229,10 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       if (armor.kind === 'carrier') return Math.abs(Math.sin(angle)) < 0.75 ? 'armor' : 'top';
       return 'armor';
     };
-    if (shell) loft(mesh, trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen, ...(plate ? { shape: ridgedPlate } : {}) });
+    const shellRings = shell ? trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)) : null;
+    if (shell) loft(mesh, shellRings, sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen, ...(plate ? { shape: ridgedPlate } : {}) });
+    // (Under cloth worn over it, the plate's front is not seen: drawn plain.)
+    if (plate && !lowDetail && !armor.over) breastplateOn(mesh, shellRings, shell[2], ridgedPlate, breastplate, { lanceRest: true }, abdomen);
   }
   // A field per pale is drawn sharp down the middle (paleOn), except in a crowd; a device over it (chargeOn) likewise.
   const sharpPale = (paint) => paint?.heraldry && armor?.heraldry === 'pale' && !lowDetail;
@@ -1152,6 +1241,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     // A kit's steel breastplate (rigidBreastplate) is ridged, its borders roped.
     const ridgedPiece = kit?.rigidBreastplate && paint === 'steel';
     tablePiece(rings, inflate, ridgedPiece ? (ring, angle, index, step) => roped(ring, step) ?? 'steel' : sharpPale(paint) ? 'cloth' : paint, abdomen, ridgedPiece ? ridgedPlate : null);
+    if (ridgedPiece && !lowDetail) breastplateOn(mesh, rings, inflate, ridgedPlate, breastplate, {}, abdomen);
     if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', abdomen);
     if (paint?.heraldry && armor?.charge && !lowDetail) chargeOn(mesh, rings, armor.charge.kind, inflate * 1.06, 'charge', abdomen);
   }
