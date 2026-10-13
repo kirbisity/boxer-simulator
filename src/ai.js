@@ -959,6 +959,49 @@ export function hurtShare(fighter) {
 }
 
 /**
+ * The couched charge: true while it has the fighter (running in, or the
+ * blow under way). Once its blow is over the lance goes (dropped: the
+ * sidearm is drawn as for any lost weapon) and the style is fought as usual.
+ */
+function couchedCharge(world, fighter, opponent, style, distance) {
+  const charge = style.couchedCharge;
+  if (fighter.couched === 'done' || !fighter.weapon?.held || fighter.weapon.kind !== style.weapon) return false;
+  const punch = fighter.punch;
+  if (fighter.couched === 'striking') {
+    if (punch?.type === charge.move) {
+      fighter.move = 1;
+      fighter.running = true;
+      return true;
+    }
+    fighter.couched = 'done';
+    dropWeapon(world, fighter, 'dropped');
+    return false;
+  }
+  if (punch || fighter.clinch || fighter.slot) return false;
+  const reach = moveRange(MOVES[charge.move], fighter.body, fighter.weapon.spec) + opponent.body.lengths.headRadius;
+  // The point meets him only from `pointBand` m inside the lance's reach out to `strikeAt` beyond it (in stride).
+  const inBand = distance >= reach - charge.pointBand && distance <= reach + charge.strikeAt;
+  fighter.couched ??= { backUntil: world.time + charge.backFor };
+  // Inside the point (he came on): back off for room, a while at most, then drive it anyway.
+  if (!inBand && distance < reach - charge.pointBand && world.time < fighter.couched.backUntil) {
+    fighter.move = -1;
+    fighter.strafe = 0;
+    return true;
+  }
+  fighter.move = 1;
+  fighter.running = distance > reach;
+  fighter.strafe = 0;
+  // Aimed by the run: level, at the height the lance is carried, straight at him; not swung down onto him at the last moment.
+  // (From the hand, along the line to him: the lance kept parallel to that line, the point meeting him a hand's breadth off his middle.)
+  const hand = point(fighter.x, P[`${fighter.weapon.main}Hand`]);
+  const toward = [opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]];
+  const run = Math.hypot(...toward) || 1;
+  const at = [hand[0] + (toward[0] / run) * distance, hand[1], hand[2] + (toward[1] / run) * distance];
+  if (distance <= reach + charge.strikeAt && throwPunch(world, fighter, charge.move, 'body', { at })) fighter.couched = 'striking';
+  return true;
+}
+
+/**
  * Fear, settling towards what he feels now; past breaking point he may
  * break (unless adrenaline holds him), and once calm again he recovers.
  */
@@ -1275,6 +1318,10 @@ export function think(world, fighter, dt) {
     fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
     return;
   }
+  // A couched charge (style.couchedCharge): the lance used once, as it was meant — run at him and
+  // drive it home in stride; when that blow is done, hit or miss, the lance is let fall and the sidearm drawn.
+  if (style.couchedCharge && couchedCharge(world, fighter, opponent, style, distance)) return;
+  if (style.couchedCharge) style = STYLES[fighter.style] ?? STYLES.mix;
   // Forearm weapons (`switches`): the one the distance, or the blows thrown with this one, call for.
   if (switchArms(world, fighter, style, distance)) style = STYLES[fighter.style];
   // A gun: keep away and shoot; once he is in close, drop it and fight mixed.

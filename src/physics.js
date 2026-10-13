@@ -805,7 +805,12 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
   const gunFight = sides.some((side) => STYLES[side.inputs.style]?.ranged);
-  const apart = Math.min(gunFight ? WORLD.gunStartApart : WORLD.startApart, arena.halfX - 0.6);
+  // A fight starts out of reach: a pair at least just beyond the longer weapon's reach (a lance's point does not start in a man's chest).
+  const longest = Math.max(0, ...sides.map((side) => {
+    const spec = WEAPONS[STYLES[side.inputs.style]?.weapon];
+    return spec && !spec.ranged ? spec.length + spec.handle * 0.5 : 0;
+  }));
+  const apart = Math.min(gunFight ? WORLD.gunStartApart : Math.max(WORLD.startApart, (longest + WORLD.startBeyondReach) / 2), arena.halfX - 0.6);
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
     const x = (onRed ? -1 : 1) * apart;
@@ -1691,6 +1696,8 @@ function moveRoot(world, fighter, dt) {
       change = Math.max(-most, Math.min(most, change));
       fighter.crawlTurn = change / Math.max(dt, 1e-6) / spec.turnSpeed;
     }
+    // A blow aimed by the line he runs (a couched lance: `holdHeading`) is not turned once it is going: the point would sweep sideways.
+    if (fighter.punch?.spec.holdHeading && fighter.punch.t >= fighter.punch.spec.windup) change = 0;
     fighter.yaw += change;
   }
   // Footwork has inertia: the stance accelerates and brakes at what the legs

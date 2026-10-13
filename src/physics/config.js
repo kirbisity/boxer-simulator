@@ -398,6 +398,8 @@ export const WORLD = {
   tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12, proxyEvery: 2 },
   // m each side of the centre the sides start: a few steps apart, room to come on (further when someone carries a gun).
   startApart: 1.3,
+  // m past the longest weapon's length (and half its grip) the pair starts apart.
+  startBeyondReach: 1.0,
   teamStartApart: 1.1,
   gunStartApart: 3.2,
   // The clinch: hands locked behind the neck; it breaks when the defender's
