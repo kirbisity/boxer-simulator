@@ -396,14 +396,15 @@ export const STECHHELM_STYLES = {
     plume: { at: [-0.55, 2.14], blades: 15, size: 0.27, length: 4.8, reach: 1.45 },
     mantling: { strips: 7, length: 3.3, width: 1.0, spread: 1.0, dags: 4 },
   },
-  // The Gothic: the whole front fluted, the flutes running from the chest
+  // The Gothic: its lower lip (the beak) thrust out beyond the crown's, the
+  // whole front fluted, the flutes running from the chest
   // plate up the bevor and over the crown, sharp-crested; a roped edge to
   // both lips of the sight; the chest plate's foot cut in scallops;
   // blackened or russet steel with brass rivets and rosettes all round.
   gothic: {
-    lower: [[-1.85, -1.08, 1.02, 1.24], [-1.5, -0.98, 0.92, 1.14], [-1.1, -1.06, 0.98, 1.14], [-0.65, -1.12, 1.32, 1.16], [-0.2, -1.15, 1.88, 1.14], [0.18, -1.14, 2.32, 1.1, 0.68], [0.3, -1.12, 2.4, 1.06, 0.8]],
+    lower: [[-1.85, -1.08, 1.02, 1.24], [-1.5, -0.98, 0.92, 1.14], [-1.1, -1.06, 0.98, 1.14], [-0.65, -1.12, 1.32, 1.16], [-0.2, -1.15, 1.98, 1.14], [0.18, -1.14, 2.58, 1.1, 0.68], [0.3, -1.12, 2.7, 1.06, 0.8]],
     lowerCreases: [5],
-    crown: [[0.5, -1.2, 2.55, 1.12, 0.5], [0.6, -1.21, 2.38, 1.15], [0.95, -1.2, 1.88, 1.14], [1.4, -1.1, 1.24, 1.03], [1.8, -0.93, 0.56, 0.83], [2.07, -0.67, 0.02, 0.56], [2.2, -0.45, -0.24, 0.26], [2.22, -0.39, -0.3, 0.02]],
+    crown: [[0.5, -1.2, 2.3, 1.12, 0.5], [0.6, -1.21, 2.2, 1.15], [0.95, -1.2, 1.8, 1.14], [1.4, -1.1, 1.24, 1.03], [1.8, -0.93, 0.56, 0.83], [2.07, -0.67, 0.02, 0.56], [2.2, -0.45, -0.24, 0.26], [2.22, -0.39, -0.3, 0.02]],
     crownCreases: [1],
     chest: [[-1.85, -1.08, 1.02, 1.24], [-2.3, -0.25, 1.62, 1.28], [-2.85, 0.2, 2.25, 1.36]],
     chestCreases: [],

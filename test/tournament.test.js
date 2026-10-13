@@ -20,7 +20,9 @@ test('the helm in three shapes: each a design of the Stechzeug, waisted in profi
     assert.ok(spec.chest.at(-1)[2] - waist > 1, `${name}: chest plate flares`);
     assert.ok(lower.indexOf(waist) > 0, `${name}: the waist above the ring's foot`);
     assert.ok(spec.crown[0][0] > spec.lower.at(-1)[0], `${name}: the sight a gap between the lips`);
-    assert.ok(spec.crown[0][2] > spec.lower.at(-1)[2], `${name}: the upper lip projects`);
+    // The Gothic's beak thrust out beyond the crown; the others' upper lip over it.
+    if (name === 'gothic') assert.ok(spec.lower.at(-1)[2] > spec.crown[0][2], `${name}: the lower lip projects beyond the upper`);
+    else assert.ok(spec.crown[0][2] > spec.lower.at(-1)[2], `${name}: the upper lip projects`);
     assert.deepEqual(spec.chest[0], spec.lower[0], `${name}: chest plate from the ring`);
     assert.deepEqual(spec.nape[0], spec.lower[0], `${name}: nape plate from the ring`);
   }

@@ -434,7 +434,7 @@ export const PRESETS = {
   // war lance, the long sword at his side.
   maximilian: {
     name: 'Maximilian I', style: 'lance', hero: true, sex: 'male', heightCm: 182, frame: 'large', age: 30, exercise: 0.7, calories: 4500,
-    outfit: { kind: 'tournament', design: 0 }, accessories: [],
+    outfit: { kind: 'tournament', design: 5 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#5a3a22', facialHair: 'none', eyeColor: 'brown' },
   },
   // Makara Naotaka of the Asakura, who at Anegawa (1570) fought with a
