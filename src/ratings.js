@@ -794,18 +794,54 @@ export const RATINGS = {
   "ronin": {
    "title": "Miyamoto Musashi",
    "faction": "japanese",
-   "type": "ronin|ronin",
+   "type": "nito|ronin",
    "records": {
     "maximus": {
-     "wins": 5,
-     "losses": 11,
+     "wins": 1,
+     "losses": 7,
+     "draws": 0
+    },
+    "azapArcher": {
+     "wins": 3,
+     "losses": 9,
+     "draws": 0
+    },
+    "boxer": {
+     "wins": 6,
+     "losses": 6,
+     "draws": 0
+    },
+    "humanoid": {
+     "wins": 7,
+     "losses": 1,
+     "draws": 0
+    },
+    "mingSpear": {
+     "wins": 7,
+     "losses": 5,
+     "draws": 0
+    },
+    "janissary": {
+     "wins": 1,
+     "losses": 7,
+     "draws": 0
+    },
+    "brawler": {
+     "wins": 6,
+     "losses": 6,
      "draws": 0
     }
    },
-   "score": 44,
+   "score": 36,
    "provisional": 48,
    "kd": {
-    "maximus": 0.478
+    "maximus": 0.143,
+    "azapArcher": 0.333,
+    "boxer": 1,
+    "humanoid": 7,
+    "mingSpear": 1.4,
+    "janissary": 0.143,
+    "brawler": 1
    }
   },
   "baton": {
@@ -1753,6 +1789,7 @@ export const RATINGS = {
   "bow|ashigaru": 94,
   "yari|ashigaru": 218,
   "ronin|ronin": 44,
+  "nito|ronin": 36,
   "baton|swat": 100,
   "nu|hanSoldier": 69,
   "riot|riot": 100,

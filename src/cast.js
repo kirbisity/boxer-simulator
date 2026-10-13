@@ -248,12 +248,17 @@ export function mexicaWarrior(random = Math.random, style = 'macuahuitl', rank =
   return builtLike(soldier, PERIOD_BUILD.mexica[rank], random);
 }
 
-/** A masterless samurai (katana, naginata) in odd pieces of armour; light on his feet, he comes on at a run (`charging`). */
+/**
+ * A masterless samurai (katana, naginata) in odd pieces of armour; light on
+ * his feet, he comes on at a run (`charging`). A swordsman among them fights
+ * with both his swords (`RONIN_TWO_SWORDS` of them: nitō), as Musashi taught.
+ */
 export function roninWarrior(random = Math.random, style = 'ronin') {
   const base = varyCharacter(PRESETS.samurai, random, { sex: 'male' });
   const name = `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`;
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'ronin', design: randomDesign('ronin', random) }, accessories: ['kasa'], charging: RONIN_CHARGING };
-  return builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
+  const built = builtLike(soldier, PERIOD_BUILD.japanese.ronin, random);
+  return style === 'ronin' && random() < RONIN_TWO_SWORDS ? { ...built, style: 'nito' } : built;
 }
 
 // What a sea raider has on (shares, summing to 1): many nothing but a robe
@@ -265,6 +270,10 @@ const WOKOU_KIT = { none: 0.45, piece: 0.36, ashigaru: 0.11, samurai: 0.08 };
 const RAIDER_CHARGING = 2;
 // A rōnin closes faster still: lean, fit (PERIOD_BUILD), lightly armoured, he goes in at a run and throws himself on.
 const RONIN_CHARGING = 2.5;
+// The share of rōnin swordsmen who fight with two swords: Niten Ichi-ryū was
+// one school among many (and the katana in one hand wants a strong arm), so a
+// third, not all.
+const RONIN_TWO_SWORDS = 1 / 3;
 
 /**
  * A sea raider of the 1550s (wokou): Chinese (dao, spear, matchlock) or
