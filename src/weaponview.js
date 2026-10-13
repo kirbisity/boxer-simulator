@@ -834,6 +834,40 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'lance': {
+      // The war lance: an ash shaft turned to swell behind the grip and
+      // beyond the vamplate and taper to a socketed four-sided steel point;
+      // the grip a narrow waist wrapped in leather; over it the vamplate, a
+      // steel cone (`spec.vamplate` m across its mouth) fluted in a swirl,
+      // its mouth to the hand; a steel cap on the butt.
+      const headLength = (1 - spec.pointFrom) * (spec.length - spec.strikeFrom) + 0.04;
+      const shaftTo = spec.length - headLength + 0.02;
+      const turned = [[-spec.handle, 0.02], [-spec.handle * 0.6, 0.03], [-0.12, 0.025], [-0.06, 0.02], [0.08, 0.02], [0.3, 0.036], [0.9, 0.03], [shaftTo, 0.016]];
+      group.add(new THREE.Mesh(new THREE.LatheGeometry(turned.map(([y, radius]) => new THREE.Vector2(radius, y)), 10), wood));
+      group.add(cylinder(0.023, 0.023, -0.08, 0.05, leather, 10));
+      const socket = cylinder(0.013, 0.019, shaftTo - 0.1, shaftTo + 0.02, steel, 8);
+      const point = new THREE.Mesh(new THREE.ConeGeometry(0.022, headLength, 4), steel);
+      point.position.y = shaftTo + headLength / 2;
+      point.userData.blade = true;
+      const butt = cylinder(0.022, 0.02, -spec.handle - 0.03, -spec.handle + 0.04, steel, 10);
+      group.add(socket, point, butt);
+      // The vamplate: a cone from its mouth behind the grip's front to its nose on the shaft, its flutes swirling round it.
+      const mouth = spec.vamplate;
+      const profile = [[0.026, 0.18], [mouth * 0.32, 0.11], [mouth * 0.7, 0.01], [mouth, -0.04], [mouth * 1.02, -0.06]].map(([radius, y]) => new THREE.Vector2(radius, y));
+      const plate = new THREE.LatheGeometry(profile, 36);
+      const position = plate.attributes.position;
+      for (let index = 0; index < position.count; index += 1) {
+        const [x, y, z] = [position.getX(index), position.getY(index), position.getZ(index)];
+        const angle = Math.atan2(z, x);
+        const flute = 1 + 0.07 * Math.sin(12 * angle + 26 * y) * Math.min(1, (0.18 - y) * 8);
+        position.setXYZ(index, x * flute, y, z * flute);
+      }
+      plate.computeVertexNormals();
+      const vamplateSteel = steel.clone();
+      vamplateSteel.side = THREE.DoubleSide;
+      group.add(new THREE.Mesh(plate, vamplateSteel));
+      break;
+    }
     case 'spear': {
       group.add(cylinder(0.014, 0.015, -spec.handle, spec.length - 0.24, wood, 8));
       group.add(bladeMesh(bladeGeometry(spec.length - 0.26, 0.26, 0.05, 0.012, 0.16), steel));

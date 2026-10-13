@@ -6,6 +6,7 @@
 
 /* global THREE */
 import { buildOyoroiBox, buildOyoroiHanging } from './oyoroi.js';
+import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
@@ -2104,7 +2105,7 @@ function detailedView(view, fighter, simple) {
   // Worn things: headgear (which hides the hair it encloses), a headset
   // (it can be knocked off), and what swings: a hood, a tie, sumo strings,
   // a tabard.
-  const headgear = buildHeadgear(body, dress.head, garmentColors, plainSteel, corner);
+  const headgear = buildHeadgear(body, dress.head, garmentColors, plainSteel, corner, { lowDetail: simple });
   if (headgear) {
     headView.group.add(headgear.group);
     if (headgear.hidesHair) headView.hideHair({ beard: headgear.showsBeard });
@@ -2151,6 +2152,8 @@ function detailedView(view, fighter, simple) {
     collar.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildHarness(body, dress.armor, view.steelEnv, steelMaterial, 'hips'));
   }
+  // A jousting harness: the tilting targe on the left breast, the queue behind the lance rest.
+  if (dress.armor?.joust) collar.add(buildJoustKit(body, dress.armor, plainSteel, { lowDetail: simple }));
   // Commodus's lion skin: the hide, the knotted forelegs, the tail.
   if (dress.armor?.kind === 'commodus') collar.add(buildLionPelt(body, dress.armor));
   // A legionary's apron of studded strips; a centurion's phalerae as well.

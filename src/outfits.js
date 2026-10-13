@@ -515,8 +515,9 @@ export const OUTFITS = {
     skillFactor: 0.5,
     // The frog-mouth helm: another man's head stays well outside it in a clinch.
     headBulk: 1.5,
-    // Overlapping plates bolted together: half the gaps a point finds in field plate.
-    gaps: { thrust: 0.12 },
+    // Overlapping plates bolted together: half the gaps a point finds in field plate; and under them
+    // the thick quilted jousting doublet and mail (BLADES.gaps `under`: field plate's arming coat 0.25/0.3/0.2).
+    gaps: { thrust: 0.12, under: { blunt: 0.35, cut: 0.5, pierce: 0.4 } },
     protection: {
       blunt: 0.65, cut: 1, pierce: 0.95, bullet: { head: 0.75, torso: 0.85, limb: 0.35 },
       regions: { head: { blunt: 0.7, cut: 1, pierce: 0.95, deflects: true } },

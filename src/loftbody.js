@@ -106,6 +106,11 @@ export const LOFT = {
   // out than the one above it, from `from` to `to` down the thigh.
   fauld: { reach: 0.14, lames: 3, flare: 0.2 },
   tasset: { from: -0.12, to: 0.42, lames: 3, arc: 2.3, outward: 0.35, inflate: 1.42, step: 0.05, steps: 10 },
+  // A jousting harness (`armor.joust`, the Stechzeug): long tassets of more
+  // lames to above the knee, laminated pauldrons of `pauldronLames` over the
+  // shoulders (standing out to `pauldron`), and mail at the armpits showing
+  // between the pauldron and the rerebrace.
+  joust: { tassetTo: 0.68, tassetLames: 5, pauldron: 1.8, pauldronLames: 4, mail: [0.1, 0.4, 1.3] },
   ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
   // Its front drawn sharp (breastplateOn, not in a crowd): the two halves as
   // faces of their own, `lift` proud of the plate, `rows` to a ring and
@@ -812,8 +817,8 @@ function lamesOn(mesh, rings, inflate, paint, bones) {
  * a little further out than the one above, so they read as lapped plates
  * hanging from the fauld rather than a skirt.
  */
-function tassetOn(mesh, rings, outer) {
-  const spec = LOFT.tasset;
+function tassetOn(mesh, rings, outer, lames = LOFT.tasset.lames) {
+  const spec = { ...LOFT.tasset, lames };
   const last = rings.length - 1;
   const centre = outer * spec.outward;
   for (let lame = 0; lame < spec.lames; lame += 1) {
@@ -1394,8 +1399,12 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       for (const [from, to, inflate, paint] of armorPieces(kit, 'upperArm', side)) tablePiece(upperArmRings(from, to, count(Math.max(3, Math.round(7 * (to - from))))), inflate, paint);
       for (const [from, to, inflate, paint] of armorPieces(kit, 'forearm', side)) tablePiece(forearmRings(from, to <= 0 ? wrist + to : to, count(5)), inflate, paint);
     } else if (armor && armor.kind !== 'carrier') {
-      const big = { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
-      armorPiece(upperArmRings(-0.2, 0.38, count(3)), big);
+      const big = armor.joust ? LOFT.joust.pauldron : { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
+      // A jousting harness: mail at the armpit under the pauldron, the pauldron in lames (not in a crowd).
+      if (armor.joust) loft(mesh, upperArmRings(LOFT.joust.mail[0], LOFT.joust.mail[1], count(3)), sides, { color: paintFor(MAIL, armor), inflate: LOFT.joust.mail[2], capStart: false, capEnd: false });
+      const pauldron = upperArmRings(-0.2, 0.38, count(armor.joust ? 4 : 3));
+      armorPiece(pauldron, big);
+      if (armor.joust && !lowDetail) lamesOn(mesh, pauldron, big, { lames: LOFT.joust.pauldronLames, base: 'steel' }, () => null);
       if (plate) armorPiece(upperArmRings(0.36, 1.0, count(4)), 1.28);
       if (plate) armorPiece(forearmRings(-0.12, 0.12, count(2)), 1.5);
       armorPiece(forearmRings(0.12, wrist - 0.06, count(4)), plate ? 1.32 : 1.42);
@@ -1440,7 +1449,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       if (plate) armorPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
       // The tasset: lames hung from the fauld over the front and outer side of the thigh, moving with it.
       // (Under a surcoat's or a huque's skirt they are not seen.)
-      if (plate && !armor.over) tassetOn(mesh, thighRings(LOFT.tasset.from, LOFT.tasset.to, count(4)), side === 'l' ? 1 : -1);
+      if (plate && !armor.over) tassetOn(mesh, thighRings(LOFT.tasset.from, armor.joust ? LOFT.joust.tassetTo : LOFT.tasset.to, count(armor.joust ? 6 : 4)), side === 'l' ? 1 : -1, armor.joust ? LOFT.joust.tassetLames : LOFT.tasset.lames);
       if (armor.kind === 'heavyRiot') armorPiece(thighRings(0.05, 0.7, count(3)), 1.35);
       armorPiece(thighRings(0.82, 1.05, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
     }

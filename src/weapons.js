@@ -234,17 +234,20 @@ export const WEAPONS = {
   // The war lance taken up on foot: an ash shaft of ~3.3 m, swelling at the
   // grip and tapering to a socketed steel war point (not the jousting
   // coronel's three blunt tines: on foot and to the death, the sharp head of
-  // the Rennen and the field). ~6.5 kg with its vamplate (the steel cone over
-  // the grip that guards the hand): heavier than any spear here, lighter than
-  // a 10–14 kg jousting lance, which no man wields off a horse. Held at the
+  // the Rennen and the field). ~5.2 kg: ~4.4 kg of ash (a war lance, not the
+  // 10–14 kg hollowed jousting lance no man wields off a horse) and ~0.8 kg
+  // of vamplate (the steel cone over the grip that guards the hand): twice
+  // any spear here. The point is the last ~0.25 m (`pointFrom`); the shaft
+  // before it, met by a man who has come inside the point, only shoves. Held at the
   // grip behind the vamplate, the other hand back on the butt (`hands` two,
   // the second behind); its balance a hand's breadth ahead of the grip, as a
   // lance is made. Driven, not swung: a narrow point with the man's weight
-  // behind it; slow to turn (`wrist`), easily levered out of the hands (`grip`).
+  // behind it; slow to turn (`wrist`). The swell and the burr behind the grip
+  // hold it in the hand against a blow on the long shaft (`grip`) better than a spear.
   lance: {
     pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, vamplate: 0.13,
     harm: { thrust: { pierce: 1.6, blunt: 0.4, cut: 0.05 }, swing: { blunt: 0.7 } },
-    contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.45,
+    contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.8,
   },
   // The yari, as the ashigaru carried it: the war spear's long straight head
   // with a cross blade (jūmonji) below the point. The side blades cut and

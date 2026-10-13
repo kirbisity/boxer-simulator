@@ -6,6 +6,7 @@ import { Dangle } from './dangle.js';
 import { heelLift, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
 import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
+import { buildStechhelm } from './stechzeug.js';
 
 export const WARDROBE = {
   // How far (m, for a 1.8 m man) a sabaton's point runs on past the foot.
@@ -347,7 +348,7 @@ const HAN_HELM = {
   faceOpen: 1.5,
 };
 
-export function buildHeadgear(body, head, colors, steel, cornerHex) {
+export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail = false } = {}) {
   if (!head) return null;
   const r = body.lengths.headRadius;
   const group = new THREE.Group();
@@ -483,6 +484,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex) {
       }
       break;
     }
+    case 'stechhelm':
+      buildStechhelm(group, head, r, steel, { lowDetail });
+      break;
     case 'bascinet': {
       const skull = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 20, 14), steel);
       skull.scale.set(1, head.pointed ? 1.25 : 1.08, 1);

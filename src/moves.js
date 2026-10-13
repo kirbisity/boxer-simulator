@@ -562,7 +562,7 @@ export const STYLES = {
     pressure: 0.03,
     rangeInside: 0.06,
     keepPoint: 1.1,
-    // Each thrust of a 6.5 kg lance costs twice a spear's: met with a burst only with the wind for it.
+    // Each thrust of a 5.2 kg lance costs over half again a spear's: met with a burst only with the wind for it.
     burstAbove: 0.45,
   },
   knife: {
