@@ -92,6 +92,14 @@ export const LOFT = {
   // bends, twists, stretches nor dents. Below the waist the fauld stays
   // lofted (articulated lames), one surface with the plate, so no gap opens.
   plateBreastplate: [0.32, 1.02],
+  // A ridged breastplate (the 16th-century peascod's forebear, a keel down
+  // the middle): `ridge` how far the centre stands out (share of the
+  // trunk's depth), falling off straight to `width` rad either side, so the
+  // two halves are flat planes meeting at an edge; it fades out over `fade`
+  // of the plate's height at the neck and the waist. The lower edge turns
+  // out (`flare`, over its lowest `flareOver` of t); `rope` (t) a roped
+  // border at the neck and the hem.
+  ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
   // A light relaxation rounds the ring edges without losing the shapes.
   relaxPasses: 2,
   relaxAmount: 0.3,
@@ -116,7 +124,7 @@ function profile(stops) {
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
-function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null } = {}) {
+function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null } = {}) {
   const start = mesh.positions.length / 3;
   // A colour may be a pattern: a function of the ring (and its index), and
   // of the angle round it (0 at the front, as the depth axis points).
@@ -124,7 +132,9 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   for (const [ringIndex, ring] of rings.entries()) {
     for (let step = 0; step < sides; step += 1) {
       const angle = (step / sides) * Math.PI * 2;
-      const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * inflate), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * inflate)));
+      // `shape`: the surface stood further out (or in) by angle and ring: a breastplate's ridge, its flared hem.
+      const out = inflate * (shape ? shape(ring, angle) : 1);
+      const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * out), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * out)));
       mesh.positions.push(...p);
       // Weighted where the body's own surface is beneath it: cloth standing
       // off the skin would otherwise follow the bones less than the skin
@@ -562,7 +572,7 @@ function armorPieces(kind, slot, side) {
 
 /** A paint as the loft wants it: a role, or a function of the ring and its place. */
 function paintFor(paint, armor) {
-  if (typeof paint === 'string') return paint;
+  if (typeof paint === 'string' || typeof paint === 'function') return paint;
   if (paint.mail) return (ring, angle, index, step) => ((index + step) % 2 ? 'mail' : 'mail2');
   if (paint.heraldry) return (ring, angle) => heraldry(armor?.heraldry, ring.t, Math.sin(angle), Math.cos(angle));
   if (paint.mon) {
@@ -956,6 +966,20 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const breastplate = outfitOf(body.inputs).look.armor?.kind === 'plate' ? LOFT.plateBreastplate : kitOf?.rigidBreastplate ?? null;
   const chestOnly = [BONE.chest];
   const abdomen = (ring, front) => (breastplate && ring.t >= breastplate[0] && ring.t <= breastplate[1] ? chestOnly : lumbar(ring, front));
+  // The breastplate's ridge and flared hem (LOFT.ridged), over its span of the trunk.
+  const ridgedPlate = (ring, angle) => {
+    if (!breastplate || ring.t < breastplate[0] - 0.02 || ring.t > breastplate[1]) return 1;
+    const spec = LOFT.ridged;
+    const height = breastplate[1] - breastplate[0];
+    const along = (ring.t - breastplate[0]) / height;
+    const fade = Math.min(1, along / spec.fade, (1 - along) / spec.fade);
+    const off = Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle)));
+    const keel = spec.ridge * Math.max(0, 1 - off / spec.width) * Math.max(0, fade);
+    const flare = spec.flare * Math.max(0, 1 - (ring.t - breastplate[0]) / spec.flareOver);
+    return 1 + keel + flare;
+  };
+  // Roped borders on the breastplate: a twisted band at its neck and its hem.
+  const roped = (ring, step) => breastplate && (Math.abs(ring.t - breastplate[1] + LOFT.ridged.rope) < LOFT.ridged.rope || Math.abs(ring.t - breastplate[0] - LOFT.ridged.rope) < LOFT.ridged.rope) ? (step % 2 ? 'steel2' : 'steel') : null;
   loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, count(18) + Math.round((-0.12 - Math.min(-0.12, hem)) * 10)), sides, { bones: abdomen });
   // Kit is geometry, not paint: shorts, waistband and (for women) a sports
   // top are lofts a little proud of the skin, so their edges are crisp.
@@ -975,7 +999,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const hoplomachus = armor?.kind === 'hoplomachus';
   // A kind drawn from the table of pieces.
   const kit = ARMOR_KINDS[armor?.kind] ?? null;
-  const tablePiece = (rings, inflate, paint, bones) => {
+  const tablePiece = (rings, inflate, paint, bones, shape = null) => {
     // Lamellae drawn as plates over a backing of their dark lacing (the robe showing in the splits), except in a crowd.
     if (paint?.lamellae && !lowDetail) {
       loft(mesh, rings, sides, { color: (ring, angle) => (inLamellaGap(paint, angle) ? 'cloth' : 'lace'), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
@@ -984,7 +1008,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
-    loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+    loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}) });
     // Laminated plate: each lame its own band of faces (not in a crowd).
     if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, bones ?? (() => null));
     // A brigandine's rivet heads, each its own small square (not in a crowd).
@@ -1111,7 +1135,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.02, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
     const role = (ring, angle, index, step) => {
       if (plate && ring.t < breastplate[0]) return index % 2 ? 'steel2' : 'steel';
-      if (plate) return armor.fluted && step % 2 ? 'steel2' : 'steel';
+      if (plate) return roped(ring, step) ?? (armor.fluted && step % 2 ? 'steel2' : 'steel');
       // The ō-yoroi's leather front panel, where the bowstring would catch.
       if (lamellar && armor.panel && ring.t > 0.3 && ring.t < 0.86 && Math.cos(angle) > 0.82) return 'leather';
       if (lamellar && armor.trim && index % 5 === 0) return 'gold';
@@ -1119,13 +1143,15 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       if (armor.kind === 'carrier') return Math.abs(Math.sin(angle)) < 0.75 ? 'armor' : 'top';
       return 'armor';
     };
-    if (shell) loft(mesh, trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
+    if (shell) loft(mesh, trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)), sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen, ...(plate ? { shape: ridgedPlate } : {}) });
   }
   // A field per pale is drawn sharp down the middle (paleOn), except in a crowd; a device over it (chargeOn) likewise.
   const sharpPale = (paint) => paint?.heraldry && armor?.heraldry === 'pale' && !lowDetail;
   for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) {
     const rings = trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from)))));
-    tablePiece(rings, inflate, sharpPale(paint) ? 'cloth' : paint, abdomen);
+    // A kit's steel breastplate (rigidBreastplate) is ridged, its borders roped.
+    const ridgedPiece = kit?.rigidBreastplate && paint === 'steel';
+    tablePiece(rings, inflate, ridgedPiece ? (ring, angle, index, step) => roped(ring, step) ?? 'steel' : sharpPale(paint) ? 'cloth' : paint, abdomen, ridgedPiece ? ridgedPlate : null);
     if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', abdomen);
     if (paint?.heraldry && armor?.charge && !lowDetail) chargeOn(mesh, rings, armor.charge.kind, inflate * 1.06, 'charge', abdomen);
   }
@@ -1178,7 +1204,8 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   }
   // Cloth worn over the armour (`armor.over`, a kind from the table): Joan's huque over her plate.
   const over = ARMOR_KINDS[armor?.over] ?? null;
-  for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen);
+  // Cloth over a ridged plate lies over the ridge.
+  for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen, plate ? ridgedPlate : null);
   for (const [hem, flare, inflate, paint] of armorPieces(over, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
   loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
