@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildBody, P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { MOVEMENT, OUTFITS } from '../src/outfits.js';
-import { STYLES } from '../src/moves.js';
+import { MOVES, STYLES, moveRange } from '../src/moves.js';
 import { WEAPONS } from '../src/weapons.js';
 import { STECHHELM_STYLES } from '../src/stechzeug.js';
 import { advance, createWorld, placeFighter, point, poiseOf, throwPunch } from '../src/physics.js';
@@ -147,3 +147,53 @@ const sub = (a, b) => a.map((value, axis) => value - b[axis]);
 const dot = (a, b) => a.reduce((sum, value, axis) => sum + value * b[axis], 0);
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a) => a.map((value) => value / Math.hypot(...a));
+
+/** Maximilian's first blow with the lance at a man standing still (a boxer's style: no weapon of his own): the contact, or null. */
+function lanceAt(move, seed) {
+  const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS.samurai, style: 'boxing' }], { seed });
+  const [knight, man] = world.fighters;
+  const reach = moveRange(MOVES[move], knight.body, knight.weapon.spec) + man.body.lengths.headRadius;
+  let thrown = false;
+  for (let step = 0; step < 240 && !world.events.some((event) => event.attacker === 0 && event.kind === 'landed'); step += 1) {
+    man.move = 0;
+    const distance = Math.hypot(man.x[P.pelvis * 3] - knight.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2] - knight.x[P.pelvis * 3 + 2]);
+    // The couched charge is begun at once and run in; the thrust walked in to and thrown within its reach.
+    knight.running = move === 'lanceCharge';
+    knight.move = !thrown || (move === 'lanceCharge' && knight.punch) ? 1 : 0;
+    if (!thrown && (move === 'lanceCharge' || distance <= reach - 0.3 + (seed % 6) * 0.1)) thrown = throwPunch(world, knight, move, 'body');
+    advance(world, 1 / 60);
+  }
+  return world.events.find((event) => event.attacker === 0 && event.kind === 'landed') ?? null;
+}
+
+test('the couched charge: run in, the point meets the man first along the shaft, and goes in harder than a thrust', () => {
+  const charges = [0, 1, 2].map((seed) => lanceAt('lanceCharge', 2000 + seed));
+  const thrusts = [0, 1, 2, 3, 4, 5].map((seed) => lanceAt('lanceThrust', 2000 + seed)).filter(Boolean);
+  for (const hit of charges) {
+    assert.ok(hit, 'the charge meets him');
+    assert.equal(hit.target, 'trunk');
+    assert.ok(hit.along > 0.9, `point-first along the shaft (${hit.along.toFixed(2)})`);
+    assert.ok(hit.at > WEAPONS.lance.pointFrom, 'on the point, not the shaft');
+    assert.ok(hit.pierce > 60, `run through (${hit.pierce.toFixed(0)} J)`);
+  }
+  const mean = (hits) => hits.reduce((sum, hit) => sum + hit.pierce, 0) / hits.length;
+  assert.ok(mean(charges) > mean(thrusts), `charge ${mean(charges).toFixed(0)} J against a thrust's ${mean(thrusts).toFixed(0)} J`);
+});
+
+test('the lance is used once: after the charge, hit or miss, it is let fall and the long sword drawn', () => {
+  // (A bout with Sir Edric that the charge does not end.)
+  const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS.knight }], { seed: 1002 });
+  const knight = world.fighters[0];
+  let charges = 0;
+  let wasCharging = false;
+  for (let step = 0; step < 600; step += 1) {
+    advance(world, 1 / 60, (current, dt) => thinkAll(current, dt));
+    const charging = knight.punch?.type === 'lanceCharge';
+    if (charging && !wasCharging) charges += 1;
+    wasCharging = charging;
+  }
+  assert.equal(charges, 1);
+  assert.equal(world.events.filter((event) => event.attacker === 0 && ['lanceThrust', 'lanceHigh', 'lanceJab'].includes(event.punch)).length, 0, 'no poking with the lance');
+  assert.notEqual(world.fighters[1].state, 'out', 'the bout goes on after the charge');
+  assert.equal(knight.weapon?.kind, 'longsword');
+});

@@ -107,9 +107,12 @@ export const MOVES = {
   // higher hold, or a short jab to keep a man off. Slow to start and to bring
   // back: a heavy shaft (WORLD.weapons.heavyFrom slows it further).
   // The couched charge: the lance tucked under the arm at the hip, the point
-  // carried level, run in and driven home in stride, his whole weight braced
-  // behind it through the arm and the rest (`mass.body`), not the arms' push.
-  lanceCharge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.08, 0.58, -0.12], dir: [1, 0, 0] }, windup: 0.12, extendUntil: 0.45, duration: 0.95, twist: 0, lean: 0, shift: 0.1, depth: 0.85, step: 2.6, cost: 0.05, extendShare: 0.5, mass: { arm: 0.6, body: 0.6 }, rotation: 0, zones: ['body'], reach: 'weapon', holdHeading: true },
+  // on the line to his middle (`couched`: the line set as it begins and held,
+  // the heading held too), carried in at a run for up to `carry` s; when the
+  // point is within `driveFrom` m of his middle the body throws itself in
+  // behind it, the hand going `drive` m on along that line with the lunge,
+  // his whole weight braced behind it (`mass.body`), not the arms' push.
+  lanceCharge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.14, 0.58, -0.12], dir: [1, 0, 0] }, windup: 0.15, extendUntil: 0.4, duration: 0.8, twist: 0, lean: 0.18, shift: 0.14, step: 2.6, cost: 0.05, extendShare: 0.7, mass: { arm: 0.6, body: 0.6 }, rotation: 0, zones: ['body'], reach: 'weapon', holdHeading: true, couched: { carry: 1.6, drive: 0.4, lead: 0.5 } },
   lanceThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.2, 0.56, -0.12], dir: [1, 0.04, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.14, shift: 0.1, depth: 0.6, step: 1.4, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.3 }, rotation: 0.4, zones: ['body'], reach: 'weapon' },
   lanceHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.16, 0.66, -0.12], dir: [1, 0.14, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.12, shift: 0.09, depth: 0.55, step: 1.3, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.26 }, rotation: 0.4, zones: ['head', 'body'], reach: 'weapon' },
   lanceJab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.12, 0.58, -0.1], dir: [1, 0.06, 0] }, windup: 0.14, extendUntil: 0.34, duration: 0.62, twist: -0.25, lean: 0.1, shift: 0.08, depth: 0.45, step: 1.1, cost: 0.02, extendShare: 0.6, mass: { arm: 0.75, body: 0.16 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon' },
@@ -567,10 +570,11 @@ export const STYLES = {
     plans: { pressure: 1.4, outboxer: 1.2, counter: 0.8, brawler: 0.3 },
     pressure: 0.2,
     rangeInside: 0.06,
-    // One charge with the lance couched, then the sidearm (AI couchedCharge): drive `move` home
-    // when he is in the point's band (`pointBand` m inside the reach to `strikeAt` beyond it),
-    // running in to it from further, backing off for it (at most `backFor` s) from nearer.
-    couchedCharge: { move: 'lanceCharge', pointBand: 0.6, strikeAt: 0.35, backFor: 1.5 },
+    // One charge with the lance couched, then the sidearm (AI couchedCharge): `move` begun within
+    // `couchFrom` m beyond the reach (the point carried in at the run, driven home near him),
+    // running in to it from further, backing off for room (at most `backFor` s) when he is over
+    // `pointBand` m inside the point.
+    couchedCharge: { move: 'lanceCharge', pointBand: 0.6, couchFrom: 1.5, backFor: 1.5 },
     keepPoint: 1.1,
     // A 5.2 kg lance's thrust costs over half again a spear's; still he bursts in with little wind to spare.
     burstAbove: 0.25,

@@ -1073,6 +1073,8 @@ export function bladeTargets(move, t, aim, body, spec, reachShare = 1) {
     const dir = vec.normalize(vec.sub(aim, from.hand));
     if (t < move.windup) return { hand: from.hand, dir: slerpDir(from.dir, dir, Math.min(1, t / Math.max(1e-3, move.windup))) };
     const u = Math.min(1, (t - move.windup) / (move.extendUntil - move.windup));
+    // Couched: the hand stays at the hip on that line, and goes on along it only as far as the body throws itself in (`drive`).
+    if (move.couched) return { hand: vec.add(from.hand, vec.scale(dir, move.couched.drive * Math.min(1, u / (move.extendShare ?? 0.75)) ** 2)), dir };
     // Accelerating all the way in, as a punch does, not easing to a stop at the skin.
     const end = vec.sub(aim, vec.scale(dir, spec.length * reachShare - (move.depth ?? 0.25)));
     // Fully out by `extendShare` of the way (three quarters by default), then

@@ -458,11 +458,17 @@ function weaponIntent(world, fighter, intent) {
   intent.weaponArms = null;
   if (!weapon?.held || !style.weaponGuard) return;
   let target;
-  if (punch?.spec.path === 'blade' && punch.t <= punch.spec.extendUntil) {
+  // (A couched point is held out on its line to the end of the move: the run carries it on.)
+  if (punch?.spec.path === 'blade' && punch.t <= (punch.spec.couched ? punch.spec.duration : punch.spec.extendUntil)) {
     target = bladeTargets(punch.spec, punch.load > 0 ? 0 : punch.t, punch.aim, fighter.body, weapon.spec);
-    // A thrust's point is steered at the target from wherever the hand really is.
+    // A thrust's point is steered at the target from wherever the hand really is (a couched one's line is held as it was set).
     if (punch.spec.mode === 'thrust' && punch.t >= punch.spec.windup) {
-      target.dir = vec.normalize(vec.sub(punch.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
+      const line = vec.normalize(vec.sub(punch.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
+      // Couched, the point is kept on him while it is carried in, and its line held once it is driven.
+      if (punch.spec.couched) {
+        if (!punch.driven || !punch.line) punch.line = line;
+        target.dir = punch.line;
+      } else target.dir = line;
     }
   } else if (fighter.defence?.name === 'weaponBlock') {
     // Blade across the strike's line, meeting it; or across before the head.
@@ -979,6 +985,31 @@ export function aimPoint(target, zone) {
   return vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.6);
 }
 
+/** How far (m) a couched point is from its man's front, along the lance (Infinity with no man or no lance). */
+export function couchedGap(world, fighter, punch) {
+  const target = punch.target === null ? null : world.fighters[punch.target];
+  const weapon = fighter.weapon;
+  if (!target || !weapon?.held) return Infinity;
+  return vec.dot(vec.sub(aimPoint(target, punch.zone), weapon.tip), weapon.dir) - target.body.segments.trunk.skinRadius;
+}
+
+/**
+ * A couched point near enough its man to drive it home: the gap from the
+ * point to his front, along the lance, no more than `couched.lead` of what
+ * the drive closes (the hand's `drive` and the two closing on each other
+ * for the drive's time), so the point meets him well into the drive, as
+ * it goes fastest. With no man to carry it at, it is driven at once.
+ */
+function couchedNear(world, fighter, punch) {
+  const target = punch.target === null ? null : world.fighters[punch.target];
+  const weapon = fighter.weapon;
+  if (!target || !weapon?.held) return true;
+  const spec = punch.spec;
+  const gap = couchedGap(world, fighter, punch);
+  const closing = (fighter.rootVelocity[0] - target.rootVelocity[0]) * weapon.dir[0] + (fighter.rootVelocity[1] - target.rootVelocity[1]) * weapon.dir[2];
+  return gap <= spec.couched.lead * (spec.couched.drive + Math.max(0, closing) * (spec.extendUntil - spec.windup));
+}
+
 /**
  * Throw a strike (any attack in MOVES) at the opponent. The zone defaults to
  * the move's first. Returns false if the fighter cannot throw it now.
@@ -1002,7 +1033,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
-  const heft = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(0, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
+  // (Not couched: the body carries it, not the arms held out.)
+  const heft = spec?.path === 'blade' && !spec.couched && fighter.weapon?.held ? Math.max(0, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
   // His skill: how near the mark his blow goes (a point needs it most; a gun aims by its own spread).
   const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft);
   const mark = at ?? aimPoint(target, aimZone);
@@ -1012,6 +1044,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
     // A place in the world: the strike follows it as he turns to it.
     at: at ? aimed : null,
+    // How far off his mark it went (a couched point carried in keeps it as it follows him).
+    miss: vec.sub(aimed, mark),
     // How far an untrained hand turns the blade off true (rad): the edge meeting at a slant, the point off its line.
     edgeTilt: edgeTilt(world, fighter, spec),
   };
@@ -1140,6 +1174,15 @@ function updateIntent(world, fighter, dt) {
     const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
     punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace;
     punch.age += dt;
+    if (punch.spec.couched && !punch.driven && punch.t >= punch.spec.windup) {
+      // Couched, the point is carried in (the run brings it) and driven only once it is near him.
+      if (couchedNear(world, fighter, punch) || punch.age >= punch.spec.windup + punch.spec.couched.carry) punch.driven = true;
+      else {
+        punch.t = punch.spec.windup;
+        const target = punch.target === null ? null : world.fighters[punch.target];
+        if (target && !punch.at) punch.aim = toLocal(fighter, vec.add(aimPoint(target, punch.zone), punch.miss ?? [0, 0, 0]));
+      }
+    }
     if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
     // Automatic fire: the trigger held, a round at the gun's cyclic rate until the burst is spent (or the gun).
     const automatic = punch.spec.path === 'aim' && fighter.weapon?.held ? fighter.weapon.spec.shot?.automatic : null;
@@ -1160,7 +1203,8 @@ function updateIntent(world, fighter, dt) {
     const spec = punch.spec;
     // The kinetic chain: hips and shoulders turn first and have finished
     // turning by the time the strike is halfway there.
-    const phase = Math.min(1, punch.t / (spec.extendUntil * WORLD.rotationLead));
+    // (Couched, he runs in upright and throws the body in behind the point only as it is driven home.)
+    const phase = spec.couched ? Math.max(0, Math.min(1, (punch.t - spec.windup) / (spec.extendUntil - spec.windup))) : Math.min(1, punch.t / (spec.extendUntil * WORLD.rotationLead));
     const shape = punch.t < spec.extendUntil ? Math.sin(phase * Math.PI * 0.5) : Math.max(0, 1 - (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil));
     intent.twist += spec.twist * shape;
     intent.dip += (spec.dip ?? 0) * shape;
@@ -2853,10 +2897,13 @@ function collideFighters(world, h, time, substep = 0) {
   // Two bodies whose hips are further apart than a kick and a body can
   // span cannot touch: skip them. In a crowd most pairs are like that.
   const hips = fighters.map((fighter) => point(fighter.x, P.pelvis));
-  const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange;
   // (A proxy touches nothing in a big fight: no bound needed.)
   const big = fighters.length > WORLD.tiers.full;
   for (const fighter of fighters) if (!big || fighter.detail !== 'proxy') fighter.reachBound = reachBound(fighter);
+  // A weapon reaching past what a body can (a lance's point, ~2.8 m out) widens the range by as much:
+  // otherwise its point could never meet a man before he was inside it.
+  const beyond = fighters.map((fighter) => (fighter.weapon?.held ? Math.max(0, (fighter.reachBound ?? 0) - REACH_MARGIN - WORLD.bodyReach) : 0));
+  const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange + beyond[a] + beyond[b];
   // A big fight finds its near pairs through a grid, in the same order as
   // the all-pairs test; a proxy (posed, not simulated) touches nothing.
   if (fighters.length > WORLD.tiers.full) {
@@ -2866,8 +2913,8 @@ function collideFighters(world, h, time, substep = 0) {
       const grid = spatialGrid(hips.map((hip) => [hip[0], hip[2]]), WORLD.contactRange + WORLD.contactMargin);
       world.contactCache = { time: world.time, count: fighters.length, near: fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index))) };
     }
-    const range = WORLD.contactRange * WORLD.contactRange;
-    const within = (a, b) => (hips[a][0] - hips[b][0]) ** 2 + (hips[a][2] - hips[b][2]) ** 2 < range;
+    // (Among the grid's candidates: a long weapon's extra reach counts out to contactMargin.)
+    const within = (a, b) => (hips[a][0] - hips[b][0]) ** 2 + (hips[a][2] - hips[b][2]) ** 2 < (WORLD.contactRange + beyond[a] + beyond[b]) ** 2;
     // Two coarse fighters move only on their substeps: they are tested then.
     const stride = coarseStride(world);
     const meet = (a, b) => fighters[b].detail !== 'proxy' && (substep % stride === stride - 1 || fighters[a].detail === 'full' || fighters[b].detail === 'full');
@@ -3623,6 +3670,15 @@ function sever(world, defender, where, event, bladeVelocity) {
 }
 
 /**
+ * Until when (the move's time) a weapon's blow can land: a little past its
+ * extension; a couched point to the end of the move, held out braced while
+ * the run still carries it on.
+ */
+function strikeLiveUntil(spec) {
+  return spec.couched ? spec.duration : spec.extendUntil + 0.06;
+}
+
+/**
  * A weapon lands. The physics is any strike's: an impulse between the
  * effective mass of weapon and arm at the point of contact and the part
  * struck, the push and recoil from it. The harm splits by what the contact
@@ -3635,7 +3691,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const weapon = attacker.weapon;
   if (!punch || punch.spec.path !== 'blade' || !weapon?.held) return false;
   const spec = punch.spec;
-  if (punch.load > 0 || punch.t < spec.windup || punch.t > spec.extendUntil + 0.06) return false;
+  if (punch.load > 0 || punch.t < spec.windup || punch.t > strikeLiveUntil(spec)) return false;
   punch.hits ??= new Set();
   // A sweep carries on through what it cuts, but not through a shield or a blade that stopped it.
   if (punch.stopped || punch.hits.has(defender.id) || (punch.landed && !spec.sweep)) return false;
@@ -3833,7 +3889,7 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away) {
 function registerShieldImpact(world, attacker, defender, striker, disc, hit, away) {
   const punch = attacker.punch;
   const weaponStrike = striker.weapon && punch?.spec.path === 'blade';
-  if (!punch || punch.landed || (!striker.weapon && punch.spec.path === 'blade') || (!weaponStrike && punch.spec.limb !== striker.key) || punch.t > punch.spec.extendUntil + 0.06 || (weaponStrike && punch.t < punch.spec.windup)) return;
+  if (!punch || punch.landed || (!striker.weapon && punch.spec.path === 'blade') || (!weaponStrike && punch.spec.limb !== striker.key) || (weaponStrike ? punch.t > strikeLiveUntil(punch.spec) : punch.t > punch.spec.extendUntil + 0.06) || (weaponStrike && punch.t < punch.spec.windup)) return;
   // Obsidian on a steel shield chips.
   if (weaponStrike && defender.shield?.spec.look === 'steel') chip(world, attacker);
   const spec = punch.spec;
@@ -3871,7 +3927,8 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   // more driving into it; the arm comes back). If the shield arm gives, the
   // blow drives it aside and goes on, thrown back only by what the arm held.
   const gives = shieldArmGives(world, defender, hit.point, vec.scale(away, -1), impulse, event);
-  if (gives === 0) {
+  // A couched point met square on the board does not go through it: if the arm gives, the point goes aside with the shield.
+  if (gives === 0 || (weaponStrike && spec.couched)) {
     punch.landed = true;
     punch.stopped = true;
     if (punch.t < spec.extendUntil) punch.t = spec.extendUntil;

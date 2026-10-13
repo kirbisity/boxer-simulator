@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bodyHarm, chinNow, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -67,6 +67,10 @@ export const AI = {
   reactionSeconds: 0.15,
   reactionTrained: 0.08,
   reactionJitter: 0.04,
+  // A couched point carried in at a run is watched, not answered, until it
+  // is within `couchedWatch` m of him (its gap, physics couchedGap): from then
+  // the reaction runs as to any blow starting.
+  couchedWatch: 0.6,
   // How much more often a straight punch to the head is slipped than the
   // style's overall mix says (the mix includes body shots, which cannot be).
   slipPreference: 3,
@@ -979,25 +983,19 @@ function couchedCharge(world, fighter, opponent, style, distance) {
   }
   if (punch || fighter.clinch || fighter.slot) return false;
   const reach = moveRange(MOVES[charge.move], fighter.body, fighter.weapon.spec) + opponent.body.lengths.headRadius;
-  // The point meets him only from `pointBand` m inside the lance's reach out to `strikeAt` beyond it (in stride).
-  const inBand = distance >= reach - charge.pointBand && distance <= reach + charge.strikeAt;
   fighter.couched ??= { backUntil: world.time + charge.backFor };
-  // Inside the point (he came on): back off for room, a while at most, then drive it anyway.
-  if (!inBand && distance < reach - charge.pointBand && world.time < fighter.couched.backUntil) {
+  // Inside the point (he came on, `pointBand` m inside the lance's reach): back off for room, a while at most, then couch it anyway.
+  if (distance < reach - charge.pointBand && world.time < fighter.couched.backUntil) {
     fighter.move = -1;
     fighter.strafe = 0;
     return true;
   }
   fighter.move = 1;
-  fighter.running = distance > reach;
+  fighter.running = true;
   fighter.strafe = 0;
-  // Aimed by the run: level, at the height the lance is carried, straight at him; not swung down onto him at the last moment.
-  // (From the hand, along the line to him: the lance kept parallel to that line, the point meeting him a hand's breadth off his middle.)
-  const hand = point(fighter.x, P[`${fighter.weapon.main}Hand`]);
-  const toward = [opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]];
-  const run = Math.hypot(...toward) || 1;
-  const at = [hand[0] + (toward[0] / run) * distance, hand[1], hand[2] + (toward[1] / run) * distance];
-  if (distance <= reach + charge.strikeAt && throwPunch(world, fighter, charge.move, 'body', { at })) fighter.couched = 'striking';
+  // Within `couchFrom` m beyond the reach the lance is couched on the line to his middle and carried in at the run;
+  // the move drives it home when the point is near him (MOVES couched).
+  if (distance <= reach + charge.couchFrom && throwPunch(world, fighter, charge.move, 'body')) fighter.couched = 'striking';
   return true;
 }
 
@@ -1420,7 +1418,13 @@ export function think(world, fighter, dt) {
     fighter.reacted = false;
   }
   // Seen from when it starts to move, loading included; not while committed.
-  if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && (incoming.age ?? incoming.t) >= fighter.reactAt) {
+  // (A couched point carried in at a run: from when it comes within couchedWatch of him.)
+  let seenFor = incoming?.age ?? incoming?.t;
+  if (incoming?.spec.couched) {
+    if (incoming.watchedFrom === undefined && (incoming.driven || couchedGap(world, striker, incoming) <= AI.couchedWatch)) incoming.watchedFrom = incoming.age;
+    seenFor = incoming.watchedFrom === undefined ? 0 : incoming.age - incoming.watchedFrom;
+  }
+  if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && seenFor >= fighter.reactAt) {
     fighter.reacted = true;
     // Reeling from a blow, he is slow to cover up.
     const reeling = staggerShare(fighter, WORLD.stagger.defend);
