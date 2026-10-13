@@ -48,6 +48,13 @@ export const WORLD = {
   // unseen; the head moves this much further for it.
   blindsideAngle: Math.PI / 3,
   blindsideFactor: 1.6,
+  // A head locked to the trunk (a jousting helm bolted to the breast): he
+  // sees out of the sight's slit only `sight` rad either side of his facing
+  // (a blow from further round comes unseen: not answered, and blindsiding),
+  // turns his body to follow his man at `turn` of the usual rate (the eyes
+  // and head lead a turn, and his cannot), and with no style of his own to
+  // say, the head sits for a trunk leaning `restLean` rad.
+  headLock: { sight: Math.PI / 5, turn: 0.55, restLean: 0.12 },
   // Head movement in range: how far past both reaches it starts (m), how
   // quickly it eases in (/s), its rhythm (Hz), its side-to-side size as a
   // share of height (~8 cm on a 1.8 m boxer) and the knee bend as it crosses.

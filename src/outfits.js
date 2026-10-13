@@ -23,6 +23,9 @@ export const MOVEMENT = {
   good: { foot: 0.92, accel: 0.88, swing: 0.97 },
   // Heavy kit (plate, SWAT, a suit): slower, but not far behind (it was 0.72 / 0.62 / 0.88).
   limited: { foot: 0.82, accel: 0.75, swing: 0.92 },
+  // A harness made for the lists, not the field (the Stechzeug): its wearer
+  // walks, he does not skip; he turns his whole body to look round.
+  slow: { foot: 0.66, accel: 0.55, swing: 0.84 },
 };
 
 // `bullet`: share of a pistol round's harm stopped, by region (see GUN).
@@ -41,6 +44,22 @@ export const CLOTH_COLORS = {
 /** Knight plate in another finish. */
 function plateDesign(label, steel, fluted, pointed, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed }, feet: { kind: 'sabaton', color: steel } };
+}
+
+/**
+ * A jousting harness (Stechzeug) in its finish: the steel, the arming
+ * clothes under it, the leather of the tilting targe, and the knight's two
+ * colours for the mantling (lambrequin) down the back of his helm.
+ */
+function tournamentDesign(label, { steel, under, leather, colour, colour2, plume = '#f2efe6' }) {
+  return {
+    label,
+    top: { kind: 'longsleeve', color: under },
+    bottom: { kind: 'tights', color: under },
+    armor: { kind: 'plate', color: steel, joust: true, mail: '#8d9097', leather, gold: '#c9a23a', cloth: colour, cloth2: colour2 },
+    head: { kind: 'stechhelm', color: steel, plume, mantling: [colour, colour2] },
+    feet: { kind: 'sabaton', color: steel },
+  };
 }
 
 /** A foot soldier's body armour (brigandine, mail shirt or breastplate) in its cloth, over a quilted coat, and a kettle hat. */
@@ -460,6 +479,55 @@ export const OUTFITS = {
     deflects: true,
     designs: [
       { label: 'White harness, crimson huque', special: true, top: { kind: 'longsleeve', color: '#4a1a1e' }, bottom: { kind: 'tights', color: '#2e2420' }, armor: { kind: 'plate', color: '#d4d8de', fluted: false, over: 'huque', cloth: '#8c1c26', cloth2: '#c9a24a' }, feet: { kind: 'sabaton', color: '#d4d8de' } },
+    ],
+  },
+  // The German jousting harness of the 1480s–1500s (Stechzeug, for the
+  // Gestech with crowned or sharp lances): the frog-mouthed helm (stechhelm)
+  // bolted to the breastplate front and back, a thick reinforced breastplate
+  // with the lance rest and the queue on the right, the tilting targe tied
+  // to the left breast, laminated pauldrons over mail at the armpits, long
+  // laminated tassets. Built to take a lance square on the helm and breast:
+  // ~40–45 kg (the Vienna harnesses), against ~25 kg for field plate. So:
+  // - the head: the helm alone weighs ~9 kg, stands well off the skull over
+  //   a thick padded cap laced to it, and its smooth steel sweeps a point
+  //   off; a blow there does half what it does to a knight in his bascinet
+  //   (measured in test/tournament.test.js);
+  // - completely proof against an edge, a point finds fewer gaps (the plates
+  //   overlap and are bolted) and the steel is thicker: pierce 0.95;
+  // - the helm bolted to the cuirass (`headLocked`): the head cannot turn,
+  //   nod or duck apart from the body, and he sees only through the slit;
+  //   he fights by feel more than sight (`skillFactor`: half his skill);
+  // - the weight and the one rigid shell of helm and breast stand him
+  //   against a blow (`poise`), and he moves slowly (`movement: 'slow'`).
+  // Not dealt at random (no `family`); in no level.
+  tournament: {
+    faction: 'knights', bulletRating: 1000, plated: true,
+    label: 'Stechzeug — jousting harness',
+    breastplate: 0.85,
+    arrowproof: true,
+    sidearm: 'longsword',
+    movement: 'slow', fists: 'gauntlet',
+    // ~0.5 of a knight's weight is field plate; the Stechzeug is ~1.7 times as heavy.
+    extraMass: 0.8,
+    // The helm and the reinforced breast bolted into one rigid shell: a blow anywhere on it is taken by the whole man.
+    poise: 1,
+    headLocked: true,
+    skillFactor: 0.5,
+    // The frog-mouth helm: another man's head stays well outside it in a clinch.
+    headBulk: 1.5,
+    // Overlapping plates bolted together: half the gaps a point finds in field plate.
+    gaps: { thrust: 0.12 },
+    protection: {
+      blunt: 0.65, cut: 1, pierce: 0.95, bullet: { head: 0.75, torso: 0.85, limb: 0.35 },
+      regions: { head: { blunt: 0.7, cut: 1, pierce: 0.95, deflects: true } },
+    },
+    cutProof: true,
+    courage: 0.55,
+    deflects: true,
+    designs: [
+      tournamentDesign('Bright steel, red and white', { steel: '#c2c7ce', under: '#2a2622', leather: '#6b4528', colour: '#a8201e', colour2: '#ece6d8' }),
+      tournamentDesign('Blued steel, black and gold', { steel: '#5d6672', under: '#1c1a18', leather: '#4a3020', colour: '#1c1c20', colour2: '#d4a83a' }),
+      tournamentDesign('Bright steel, blue and white', { steel: '#c9ced5', under: '#26283a', leather: '#7a5434', colour: '#23408a', colour2: '#ece6d8' }),
     ],
   },
   // A brother-knight of the Temple (c. 1180–1300): a full mail hauberk with
@@ -1502,6 +1570,11 @@ export const HELMETS = {
   cabasset: { mass: 1.8, padding: 0.4, curve: 0.8 },
   potHelmet: { mass: 2.2, padding: 0.4, curve: 0.7 },
   kettleHat: { mass: 2.0, padding: 0.45, curve: 0.6 },
+  // The stechhelm (frog-mouthed jousting helm): ~9 kg of thick steel (the
+  // Vienna and Nuremberg examples run 8–10 kg) standing well off the head on
+  // a thick padded cap laced into it; its smooth, sweeping planes turn a
+  // point aside.
+  stechhelm: { mass: 9, padding: 0.95, curve: 0.8 },
   // The Iron Pagoda: a tall bowl and its rolled lamellar aventail (~4 kg together) over a padded cap.
   pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8 },
   // Steppe and Ottoman pointed bowls (the chichak with its brim and nasal).
@@ -1546,6 +1619,12 @@ export function gearTraits(inputs) {
     extraMass: spec.extraMass ?? 0,
     protection: { ...NO_PROTECTION, ...spec.protection },
     deflects: Boolean(spec.deflects),
+    // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
+    headLocked: Boolean(spec.headLocked),
+    // His skill in this kit, as a share of his own (a man who cannot turn his head fights by feel).
+    skillFactor: spec.skillFactor ?? 1,
+    // Poise beyond the armour's weight and shell (physics poiseOf): one rigid shell bolted together.
+    poise: spec.poise ?? 0,
     // Courage from good armour: less fear, readier to close (0 to 1).
     courage: spec.courage ?? 0,
     // Trained to fight in ranks (formation.js): { advance, charge, testudo } — the line moves up to the enemy (closed under its shields if `testudo`; the last `charge` m at a run), or holds.

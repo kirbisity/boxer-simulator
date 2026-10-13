@@ -238,7 +238,7 @@ export const MOVE_NAMES = {
   yokogiri: ['Yokogiri', 'level cut'], kiriage: ['Kiriage', 'rising cut'], tsuki: ['Tsuki', 'thrust'],
   hammerOverhead: ['Hammer', 'overhead'], hammerSide: ['Hammer', 'side blow'], hammerThrust: ['Hammer', 'spike thrust'],
   naginataSweep: ['Sweep', 'low cut'], naginataCut: ['Cut', 'overhead'], naginataRising: ['Rising cut'], naginataThrust: ['Thrust'],
-  spearThrust: ['Spear thrust'], spearJab: ['Spear jab'], spearSweep: ['Spear sweep'], spearHigh: ['High thrust'], spearLow: ['Low thrust'],
+  spearThrust: ['Spear thrust'], spearJab: ['Spear jab'], spearSweep: ['Spear sweep'], spearHigh: ['High thrust'], spearLow: ['Low thrust'], lanceThrust: ['Lance thrust'], lanceHigh: ['Lance at the face'], lanceJab: ['Lance jab'],
   stab: ['Stab'], upStab: ['Rising stab'], highStab: ['High stab'],
   gladiusThrust: ['Thrust'], gladiusCut: ['Cut'], swordLunge: ['Lunge'], quickThrust: ['Quick thrust'], flickCut: ['Flick cut'],
   sicaHook: ['Hooked cut'], sicaThrust: ['Thrust'], crescentSlash: ['Crescent slash'], staffButt: ['Butt strike'],

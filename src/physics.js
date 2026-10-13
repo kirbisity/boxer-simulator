@@ -10,7 +10,7 @@ import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
-import { desiredPose, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
+import { desiredPose, lockedHead, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
@@ -1681,7 +1681,8 @@ function moveRoot(world, fighter, dt) {
     const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    let change = turn * Math.min(1, dt * WORLD.footing.turnRate);
+    // A man who cannot turn his head turns his whole body to follow, slowly.
+    let change = turn * Math.min(1, dt * WORLD.footing.turnRate * (fighter.body.gear.headLocked ? WORLD.headLock.turn : 1));
     if (fighter.crawling) {
       // On his knees he turns only as fast as his steps carry him round.
       const spec = WORLD.crawl;
@@ -2251,7 +2252,8 @@ function solveJointLimits(world, fighter, h) {
     foldLimit(fighter, P[`${side}Hip`], P[`${side}Foot`], WORLD.minFold.leg);
     foldLimit(fighter, P[`${side}Shoulder`], P[`${side}Hand`], WORLD.minFold.arm);
   }
-  coneLimit(world, fighter, 'neck', P.neck, P.head, trunkUp, limp ? WORLD.ragdoll.headCone : WORLD.headCone);
+  if (fighter.body.gear.headLocked) lockHead(fighter, trunkUp, leftward);
+  else coneLimit(world, fighter, 'neck', P.neck, P.head, trunkUp, limp ? WORLD.ragdoll.headCone : WORLD.headCone);
   twistLimit(fighter, trunkUp, limp ? WORLD.ragdoll.spineTwist : WORLD.spineTwist);
   // Getting up, a body still unfolding from the floor keeps all its limbs
   // out of its trunk as a limp one does.
@@ -2505,6 +2507,33 @@ function holdLimbTwist(fighter) {
   }
 }
 
+/**
+ * A head locked to the trunk (a jousting helm bolted to the breastplate,
+ * OUTFITS headLocked): every substep it is put back where the trunk carries
+ * it (pose.js lockedHead), the correction shared by head and upper trunk by
+ * their masses, so a blow on the helm moves the man, not his head on his
+ * neck. No neck to wrench or break. Limp or rising, only repositioned (as
+ * correctJoint does), so it hands back no speed.
+ */
+function lockHead(fighter, trunkUp, leftward) {
+  const neck = point(fighter.x, P.neck);
+  const forward = vec.normalize(vec.cross(trunkUp, leftward));
+  const restLean = STYLES[fighter.style]?.stance?.lean ?? WORLD.headLock.restLean;
+  const delta = vec.sub(lockedHead(fighter.body, neck, trunkUp, forward, restLean), point(fighter.x, P.head));
+  if (vec.length(delta) < 1e-9) return;
+  const carriers = [P.neck, P.lShoulder, P.rShoulder];
+  const headWeight = fighter.invMass[P.head];
+  const trunkWeight = 1 / carriers.reduce((sum, index) => sum + 1 / fighter.invMass[index], 0);
+  const share = headWeight / (headWeight + trunkWeight);
+  const arrays = isLimp(fighter) || fighter.state === 'rising' ? [fighter.x, fighter.prev] : [fighter.x];
+  for (const array of arrays) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      array[P.head * 3 + axis] += delta[axis] * share;
+      for (const index of carriers) array[index * 3 + axis] -= delta[axis] * (1 - share);
+    }
+  }
+}
+
 /** A cone: the tip stays within `limit` radians of `axis` about the pivot. */
 function coneLimit(world, fighter, joint, pivot, tip, axis, limit) {
   if (joint && fighter.broken.has(joint)) return;
@@ -2680,7 +2709,12 @@ function blindside(defender, attacker) {
   const facing = yawRotate([1, 0, 0], defender.yaw);
   const from = vec.sub(point(attacker.x, P.pelvis), point(defender.x, P.pelvis));
   const length = Math.hypot(from[0], from[2]) || 1e-6;
-  return (facing[0] * from[0] + facing[2] * from[2]) / length < Math.cos(WORLD.blindsideAngle);
+  return (facing[0] * from[0] + facing[2] * from[2]) / length < Math.cos(sightAngle(defender));
+}
+
+/** How far off his facing a man sees (rad): a head locked in a jousting helm sees only out of its slit. */
+export function sightAngle(fighter) {
+  return fighter.body.gear.headLocked ? WORLD.headLock.sight : WORLD.blindsideAngle;
 }
 
 // ---- Props -------------------------------------------------------------------
@@ -3452,7 +3486,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
 export function poiseOf(fighter) {
   const body = fighter.body;
   const share = body.bodyMassKg > 0 ? (body.gearKg ?? 0) / body.bodyMassKg : 0;
-  return 1 + WORLD.poise.mass * share + WORLD.poise.shell * (protectionAt(body.gear, 'trunk').blunt ?? 0);
+  return 1 + WORLD.poise.mass * share + WORLD.poise.shell * (protectionAt(body.gear, 'trunk').blunt ?? 0) + (body.gear.poise ?? 0);
 }
 
 /**

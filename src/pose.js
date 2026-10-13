@@ -88,6 +88,19 @@ export function clampReach(shoulder, target, reach) {
 }
 
 /**
+ * Where a head locked to the trunk sits (a jousting helm bolted to the
+ * breastplate): on the trunk's axis above the neck, tilted back by the
+ * stance's own lean so that at rest he looks level, and carried with the
+ * trunk from there (leaning in further, he looks down; knocked back, up).
+ * `up` the trunk's axis and `forward` its front (unit vectors), `restLean` rad.
+ */
+export function lockedHead(body, neck, up, forward, restLean) {
+  const reach = body.lengths.neckToHead;
+  const ahead = 0.012 * body.heightM - Math.sin(restLean) * reach;
+  return vec.add(neck, vec.add(vec.scale(up, Math.cos(restLean) * reach), vec.scale(forward, ahead)));
+}
+
+/**
  * Desired particle positions in the local frame.
  * @param body   built body (lengths)
  * @param intent { stance, twist, lean, dip, shift, headOffset, guardTight,
@@ -125,6 +138,8 @@ export function desiredPose(body, intent = {}) {
   out[P.rShoulder] = vec.add(shoulderBase, vec.scale(shoulderAxis, -L.shoulderSpan / 2));
   const headOffset = intent.headOffset ?? [0, 0, 0];
   out[P.head] = vec.add(neck, [0.012 * H + headOffset[0], L.neckToHead + headOffset[1], headOffset[2]]);
+  // A locked head (OUTFITS headLocked) goes where the trunk takes it: no slip, roll or bob of its own.
+  if (body.gear?.headLocked) out[P.head] = lockedHead(body, neck, [Math.sin(lean), Math.cos(lean), 0], [Math.cos(lean), -Math.sin(lean), 0], stance.lean);
 
   // Weight shifts onto the front foot to extend a punch: everything above
   // the feet moves forward; the knees go half as far.

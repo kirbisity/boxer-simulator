@@ -102,6 +102,13 @@ export const MOVES = {
   spearThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.22, 0.58, -0.1], dir: [1, 0.08, 0] }, windup: 0.14, extendUntil: 0.36, duration: 0.62, twist: -0.45, lean: 0.2, shift: 0.16, depth: 0.65, step: 2.1, cost: 0.026, extendShare: 0.6, mass: { arm: 0.8, body: 0.2 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
   spearJab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.14, 0.6, -0.09], dir: [1, 0.1, 0] }, windup: 0.09, extendUntil: 0.27, duration: 0.46, twist: -0.32, lean: 0.14, shift: 0.12, depth: 0.5, step: 1.6, cost: 0.018, extendShare: 0.6, mass: { arm: 0.7, body: 0.12 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
   spearSweep: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.7, -0.25], dir: [-0.1, 0.25, -1] }, mid: [1, 0, 0], to: { hand: [0.18, 0.62, 0.2], dir: [0.3, -0.1, 1] }, windup: 0.16, extendUntil: 0.42, duration: 0.75, twist: -0.7, lean: 0.06, shift: 0.04, cost: 0.03, mass: { arm: 0.55, body: 0.03 }, rotation: 1, zones: ['legs', 'body'], reach: 'weapon', contactAt: 0.85 },
+  // The lance on foot, held low as if couched: the point driven at the body
+  // with a step and the trunk behind it (`mass.body`), at the face from a
+  // higher hold, or a short jab to keep a man off. Slow to start and to bring
+  // back: a heavy shaft (WORLD.weapons.heavyFrom slows it further).
+  lanceThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.2, 0.56, -0.12], dir: [1, 0.04, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.14, shift: 0.1, depth: 0.6, step: 1.4, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.3 }, rotation: 0.4, zones: ['body'], reach: 'weapon' },
+  lanceHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.16, 0.66, -0.12], dir: [1, 0.14, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.12, shift: 0.09, depth: 0.55, step: 1.3, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.26 }, rotation: 0.4, zones: ['head', 'body'], reach: 'weapon' },
+  lanceJab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.12, 0.58, -0.1], dir: [1, 0.06, 0] }, windup: 0.14, extendUntil: 0.34, duration: 0.62, twist: -0.25, lean: 0.1, shift: 0.08, depth: 0.45, step: 1.1, cost: 0.02, extendShare: 0.6, mass: { arm: 0.75, body: 0.16 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon' },
   // Hoplomachus: the spear thrust overhand at the face and throat, or
   // underhand at the belly; then, with the spear gone, the gladius.
   spearHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [-0.02, 0.86, -0.18], dir: [1, -0.05, 0.05] }, windup: 0.1, extendUntil: 0.36, duration: 0.6, twist: -0.6, lean: 0.14, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.026, mass: { arm: 0.6, body: 0.04 }, rotation: 0.5, zones: ['head', 'body'], reach: 'weapon' },
@@ -533,6 +540,30 @@ export const STYLES = {
     // The spearman keeps his man where the point lands, near his full reach:
     // too close, the shaft, not the point, meets him.
     keepPoint: 1.1,
+  },
+  // The tournament knight on foot with the lance: he stands his ground and
+  // holds his man at the point, thrusts with his weight behind each, and
+  // little else; slow in everything (the harness, the helm that cannot turn,
+  // the heavy shaft). The long sword when the lance is gone (his kit's sidearm).
+  lance: {
+    label: 'Lance', weapon: 'lance', fallback: 'mix',
+    cadence: { work: 0.9, move: 0.6, burst: 0.3, mobility: 0.3 },
+    stance: { blade: 0.55, crouch: 0.05, width: 1.25, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [-0.08, 0.58, -0.12], dir: [1, 0.06, 0] },
+    idle: { bounce: 0.08, sway: 0.25, rock: 0.2 },
+    attacks: { lanceThrust: 0.5, lanceHigh: 0.25, lanceJab: 0.25 },
+    combos: { 'lanceJab lanceThrust': 0.6, 'lanceThrust lanceHigh': 0.4 },
+    comboChance: 0.25,
+    tempo: 1.6,
+    defences: { weaponBlock: 0.45, stepBack: 0.3, guard: 0.25 },
+    defendChance: 0.6,
+    headMovement: 0,
+    plans: { outboxer: 1.6, counter: 1.3, pressure: 0.6, brawler: 0.2 },
+    pressure: 0.03,
+    rangeInside: 0.06,
+    keepPoint: 1.1,
+    // Each thrust of a 6.5 kg lance costs twice a spear's: met with a burst only with the wind for it.
+    burstAbove: 0.45,
   },
   knife: {
     label: 'Knife', weapon: 'knife',

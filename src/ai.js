@@ -5,8 +5,8 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bodyHarm, chinNow, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
-import { vec } from './pose.js';
+import { bodyHarm, chinNow, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
 import { handling } from './handling.js';
@@ -870,7 +870,8 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
   const closing = (fighter.aiLastGap ?? distance) - distance;
   fighter.aiLastGap = distance;
   const comingIn = distance < mine && (closing > spec.closingSpeed * dt || opponent.aiCadence?.name === 'work');
-  if (comingIn && !fighter.punch && !fighter.aiBurst) {
+  // A style that tires fast (a heavy lance) meets him with a burst only while it has the wind for one (`burstAbove`, stamina).
+  if (comingIn && !fighter.punch && !fighter.aiBurst && fighter.stamina > (style?.burstAbove ?? 0)) {
     fighter.aiBurst = { left: spec.burstMin + Math.floor(world.random() * (1 + spec.burstRange * cadence.burst)) };
   }
   if (fighter.aiBurst) {
@@ -1362,7 +1363,8 @@ export function think(world, fighter, dt) {
   // that training shortens, and only if not busy throwing one.
   // In a crowd, the strike to answer is whichever is coming at me.
   // Only a blow aimed at him: one at a team-mate is not his to answer.
-  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id);
+  // A man in a helm bolted to his breast sees only through its slit (sightAngle): a blow from outside it comes unseen.
+  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
   const incoming = striker?.punch;
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;
@@ -1477,4 +1479,12 @@ export function think(world, fighter, dt) {
 function restAfterAttack(fighter, style, random) {
   const tired = 1.6 - fighter.stamina * 0.6;
   return (AI.restMin + random() * AI.restRange) * tired * (style.tempo ?? 1) * (fighter.clinch ? 0.4 : 1);
+}
+
+/** Whether `other` is within what this man can see ahead of him (physics sightAngle). */
+function inSight(fighter, other) {
+  const facing = yawRotate([1, 0, 0], fighter.yaw);
+  const from = vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis));
+  const length = Math.hypot(from[0], from[2]) || 1e-6;
+  return (facing[0] * from[0] + facing[2] * from[2]) / length >= Math.cos(sightAngle(fighter));
 }

@@ -10,7 +10,7 @@ const wearing = (preset, kind, extra = {}) => ({ ...PRESETS[preset], outfit: { k
 test('every outfit has its picked design, a movement class, and traits as specified', () => {
   for (const [kind, outfit] of Object.entries(OUTFITS)) {
     assert.ok(outfit.designs.length >= 1, kind);
-    assert.ok(['excellent', 'good', 'limited'].includes(outfit.movement), kind);
+    assert.ok(['excellent', 'good', 'limited', 'slow'].includes(outfit.movement), kind);
   }
   const male = { sex: 'male' };
   const female = { sex: 'female' };

@@ -425,6 +425,18 @@ export const PRESETS = {
     outfit: { kind: 'knight', design: 0 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#c9a25e', facialHair: 'beard', eyeColor: 'blue' },
   },
+  // Maximilian I (1459–1519), King of the Romans and Holy Roman Emperor, the
+  // great jouster of his age (his own Freydal records 64 jousts and
+  // tourneys), here about thirty, in the Gestech harness of the 1480s–90s
+  // (the Stechzeug made for him by Lorenz Helmschmid of Augsburg): tall and
+  // strong (his field armours fit a man of ~1.8 m), hunter and athlete, the
+  // long brown hair and clean-shaven face of his portraits; on foot with the
+  // war lance, the long sword at his side.
+  maximilian: {
+    name: 'Maximilian I', style: 'lance', hero: true, sex: 'male', heightCm: 182, frame: 'large', age: 30, exercise: 0.7, calories: 4500,
+    outfit: { kind: 'tournament', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#5a3a22', facialHair: 'none', eyeColor: 'brown' },
+  },
   // Makara Naotaka of the Asakura, who at Anegawa (1570) fought with a
   // five-shaku ōdachi (the Tarōtachi, ~1.75 m) against the Tokugawa: a big
   // man, as the sword wanted.
@@ -827,7 +839,8 @@ export function buildBody(rawInputs) {
       rLeg: segments.rThigh.mass + segments.rShank.mass,
     },
     technique,
-    skill: inputs.skill ?? 0.5,
+    // His own skill, as far as his kit lets him use it (a helm bolted to the breast: half; OUTFITS skillFactor).
+    skill: (inputs.skill ?? 0.5) * gear.skillFactor,
     reach: lengths.upperArm + lengths.forearmToFist,
     headMass,
     // Effective head mass at impact: a strong neck braces the head to the
