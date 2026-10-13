@@ -13,7 +13,7 @@ export const INTRO = {
   // Seconds: the opening title, a faction's card (its legends are built behind it,
   // the one still moment), the shot of them, the closing line-up, the fade out.
   // A faction's card holds at least `card`, longer while its fighters are built.
-  times: { title: 2.2, card: 0.8, shot: 2.4, lineup: 3.8, fade: 0.45 },
+  times: { title: 2.2, card: 0.8, shot: 2.3, lineup: 3.8, fade: 0.45 },
   // With reduced motion: shorter, and the camera cuts rather than moves.
   reduced: { title: 1.4, card: 0.5, shot: 1.7, lineup: 2.6, fade: 0 },
   // Fighters shown together at most (one faction's): each a full model, slow to build.

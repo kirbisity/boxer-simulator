@@ -29,6 +29,8 @@ export const WARRIORS = [
   // The knights' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
   { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true, legend: { order: 1, kicker: 'The Crusader', line: 'A warrior monk of the Crusades: arming sword, heater shield, mail and the great helm.' } },
   { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: 'The Maid of Orléans', line: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.' } },
+  // Maximilian I, the great jouster, on foot in his Gestech harness with the lance: a legend, not the flagship.
+  { ...warrior('maximilian', 'Maximilian I', PRESETS.maximilian), legend: { order: 2.5, kicker: 'The Last Knight', line: 'The jousting emperor in his Stechzeug: the frog-mouthed helm bolted to the breast, and the lance.' } },
   warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),

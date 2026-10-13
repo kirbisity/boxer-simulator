@@ -54,7 +54,7 @@ crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
-`src/crowdview.js` (instanced crowds), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
+`src/crowdview.js` (instanced crowds), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
 `disposeObject`). `src/main.js` runs the loop and input; playing, the camera
 follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
 critically damped springs, a dead band on his facing, the heading held while
@@ -95,7 +95,7 @@ in `buildWeaponMesh`, a style in `STYLES` that wields it, a character in
 `protection` (and `regions` for what covers only part of the body: a region
 (head, torso, limb), a part on both sides (Forearm), or one part (rShank),
 each with `deflects` if it is plate that turns a blade),
-`bulletRating`/`plated` if proofed; an `ARMOR_KINDS` entry in `loftbody.js`
+`bulletRating`/`plated` if proofed; a helm bolted to the breast (`headLocked`: physics lockHead and pose.js lockedHead carry the head with the trunk, and he sees only `WORLD.headLock.sight` round), the share of his skill the kit leaves him (`skillFactor`), poise beyond its weight and shell (`poise`); an `ARMOR_KINDS` entry in `loftbody.js`
 for its pieces (a plate breastplate as `rigidBreastplate: [waist, top]`: the
 trunk there rides the chest bone alone, so it neither bends, twists nor dents); any new helmet as a `buildHeadgear` case; a glyph in
 `OUTFIT_GLYPH`.
