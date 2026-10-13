@@ -1,15 +1,22 @@
-// Fighting ratings: every character in the roster fights the two reference
-// fighters, Maximus (armed: a gladius, no shield) and Tanzong (the Shaolin
-// monk with the staff), `bouts` times from each corner. Each character's
-// strength s is fitted to both records at once (Bradley-Terry: his odds of
-// beating a man of strength r are s/r, so his K/D against him is s/r; a
-// draw counts half each way, and half a bout either way is added so no
-// record is certain). Maximus is fixed at 100; the monk at 100 over
-// Maximus's K/D against him. A score is so proportional to inferred K/D:
-// against Maximus it is 100 × that K/D. Maximus resolves the strong, the
-// monk the weak. Writes src/ratings.js (generated: do not edit by hand).
-// Usage: node tools/ratings.js [bouts per corner = 16] [workers = 10] [cross bouts = 8] [random opponents each = 4]
-//        node tools/ratings.js worker FROM TO BOUTS   (one share of the roster; sends its records)
+// Fighting ratings, by stack ranking. Every rating is a Bradley-Terry
+// strength fitted to all the bouts at once (his odds of beating a man of
+// strength r are s/r; a draw half each way, half a bout either way added),
+// Maximus held at 100, so a score is proportional to inferred K/D. Which
+// bouts are fought is chosen to tell the most for the fewest:
+//   1. Seed: everyone against Maximus (and the weak against the Shaolin
+//      monk too), for a first order.
+//   2. Within each faction, a ladder: each against the nearest two or
+//      three of his own faction by that order.
+//   3. Across factions, targeted comparisons: each faction's top, middle
+//      and bottom against the nearest-rated men of other factions (where a
+//      merge of the factions' rankings would compare them).
+//   4. Spot checks: pairs drawn at random, fitted without them first to
+//      say how well the ratings predict a fight they never saw; then in.
+// Every pairing is fought adaptively: two bouts at a time (each man from
+// each corner), stopped once it is settled (RATING.settle), else at most
+// its cap. Writes src/ratings.js (generated: do not edit by hand).
+// Usage: node tools/ratings.js [max bouts a pairing = 16] [workers = 10] [spot checks = 30]
+//        node tools/ratings.js pairs JSON MAX   (a worker: one share of the pairings; sends their records)
 
 import { fork } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -18,9 +25,18 @@ import { PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld, seededRandom } from '../src/physics.js';
 import { WARRIORS } from '../src/roster.js';
+import { factionOf } from '../src/outfits.js';
 
 // The references, by roster key; each bout lasts at most this long (s).
-export const RATING = { references: { maximus: PRESETS.maximus, monk: PRESETS.staff }, seconds: 120, firstSeed: 900 };
+export const RATING = {
+  references: { maximus: PRESETS.maximus, monk: PRESETS.staff }, seconds: 120, firstSeed: 900,
+  // A pairing is settled after at least `minBouts` once one side has won `share` of them (draws half), else fought to its cap.
+  settle: { minBouts: 6, share: 0.85 },
+  // The seed's second reference for the weak: those Maximus beats at least this share of the time.
+  monkBelow: 0.25,
+  // Each man's ladder within his faction, and how many of other factions each of his faction's top, middle and bottom meet.
+  ladder: 3, across: 2,
+};
 
 /** One bout: who wins ('red', 'blue' or null for a draw at the bell). */
 function bout(red, blue, seed) {
@@ -38,6 +54,22 @@ export function record(inputs, reference, bouts) {
     const asBlue = bout(reference, inputs, seed);
     if (asRed === 'red') tally.wins += 1; else if (asRed === 'blue') tally.losses += 1; else tally.draws += 1;
     if (asBlue === 'blue') tally.wins += 1; else if (asBlue === 'red') tally.losses += 1; else tally.draws += 1;
+  }
+  return tally;
+}
+
+/** A pairing fought until it is settled (RATING.settle) or `most` bouts: a's record against b. */
+export function settledRecord(a, b, most) {
+  const tally = { wins: 0, losses: 0, draws: 0 };
+  for (let index = 0; tally.wins + tally.losses + tally.draws < most; index += 1) {
+    const seed = RATING.firstSeed + index;
+    const asRed = bout(a, b, seed);
+    const asBlue = bout(b, a, seed);
+    if (asRed === 'red') tally.wins += 1; else if (asRed === 'blue') tally.losses += 1; else tally.draws += 1;
+    if (asBlue === 'blue') tally.wins += 1; else if (asBlue === 'red') tally.losses += 1; else tally.draws += 1;
+    const fought = tally.wins + tally.losses + tally.draws;
+    const share = (tally.wins + tally.draws / 2) / fought;
+    if (fought >= RATING.settle.minBouts && (share >= RATING.settle.share || share <= 1 - RATING.settle.share)) break;
   }
   return tally;
 }
@@ -64,10 +96,6 @@ export function fitStrength(against) {
     if (slope(middle) > 0) low = middle; else high = middle;
   }
   return Math.exp((low + high) / 2);
-}
-
-function records(warrior, bouts) {
-  return { key: warrior.key, title: warrior.title, type: `${warrior.inputs.style}|${warrior.inputs.outfit?.kind ?? 'boxing'}`, records: Object.fromEntries(Object.entries(RATING.references).map(([name, reference]) => [name, record(warrior.inputs, reference, bouts)])) };
 }
 
 /**
@@ -116,72 +144,107 @@ const rounded = (value) => (value < 10 ? Math.round(value * 10) / 10 : Math.roun
 const [mode, ...args] = process.argv.slice(2);
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const byKey = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, warrior]));
-  if (mode === 'references') {
-    // A share of the roster against the references.
-    const [keys, bouts] = [JSON.parse(args[0]), Number(args[1])];
-    process.send(keys.map((key) => records(byKey[key], bouts)));
-  } else if (mode === 'pairs') {
-    // A share of the cross pairs: each [a, b], a's record against b.
-    const [pairs, bouts] = [JSON.parse(args[0]), Number(args[1])];
-    process.send(pairs.map(([a, b]) => ({ a, b, record: record(byKey[a].inputs, byKey[b].inputs, bouts) })));
+  // The references by roster key, and their inputs.
+  const referenceKey = { maximus: 'maximus', monk: 'shaolin' };
+  const inputsOf = (key) => byKey[key]?.inputs ?? RATING.references[Object.keys(referenceKey).find((name) => referenceKey[name] === key)];
+  if (mode === 'pairs') {
+    // A share of the pairings: each [a, b], a's record against b, fought until settled.
+    const [pairs, most] = [JSON.parse(args[0]), Number(args[1])];
+    process.send(pairs.map(([a, b]) => ({ a, b, record: settledRecord(inputsOf(a), inputsOf(b), most) })));
   } else {
-    const bouts = Number(mode ?? 16);
+    const most = Number(mode ?? 16);
     const workers = Number(args[0] ?? 10);
-    const crossBouts = Number(args[1] ?? Math.max(4, bouts / 2));
-    const randomOpponents = Number(args[2] ?? 4);
+    const spotChecks = Number(args[1] ?? 30);
     const started = Date.now();
-    // First, everyone against the two references.
-    const first = await inParallel('references', WARRIORS.map((warrior) => warrior.key), bouts, workers);
-    const referenceKey = { maximus: 'maximus', monk: 'shaolin' };
-    const games = first.flatMap((entry) => Object.entries(entry.records).map(([name, tally]) => ({ a: entry.key, b: referenceKey[name], record: tally })))
-      // A reference against himself is no evidence.
-      .filter((game) => game.a !== game.b);
-    const provisional = fitAll(games, 'maximus');
-    // Then each against the two rated nearest him (on the log scale): neighbours checked directly, not only through the references.
-    const order = Object.keys(provisional).sort((a, b) => provisional[a] - provisional[b]);
-    const pairs = new Map();
-    order.forEach((key, index) => {
-      const near = order.filter((other) => other !== key).sort((x, y) => Math.abs(Math.log(provisional[x] / provisional[key])) - Math.abs(Math.log(provisional[y] / provisional[key]))).slice(0, 2);
-      for (const other of near) {
-        const pair = [key, other].sort();
-        pairs.set(pair.join('|'), pair);
-      }
-    });
-    // And each against a few drawn at random from the whole roster (seeded): the far apart compared directly too.
-    const draw = seededRandom(RATING.firstSeed);
+    const games = [];
+    let bouts = 0;
+    const fought = new Set();
+    const keyOf = (a, b) => [a, b].sort().join('|');
+    const fight = async (label, pairs) => {
+      const fresh = pairs.filter(([a, b]) => a !== b && !fought.has(keyOf(a, b)));
+      for (const [a, b] of fresh) fought.add(keyOf(a, b));
+      const results = await inParallel('pairs', fresh, most, workers);
+      const count = results.reduce((sum, { record: tally }) => sum + tally.wins + tally.losses + tally.draws, 0);
+      bouts += count;
+      console.log(`${label}: ${results.length} pairings, ${count} bouts (${(count / Math.max(1, results.length)).toFixed(1)} each), ${((Date.now() - started) / 1000).toFixed(0)} s`);
+      return results;
+    };
     const keys = WARRIORS.map((warrior) => warrior.key);
-    for (const key of keys) {
-      let added = 0;
-      for (let tries = 0; added < randomOpponents && tries < 50; tries += 1) {
-        const other = keys[Math.floor(draw() * keys.length)];
-        const pair = [key, other].sort();
-        if (other === key || pairs.has(pair.join('|'))) continue;
-        pairs.set(pair.join('|'), pair);
-        added += 1;
-      }
+    const factionOfKey = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, factionOf(warrior.inputs) ?? 'none']));
+    // 1. Seed: everyone against Maximus; the weak against the monk as well.
+    const seed = await fight('seed: v Maximus', keys.map((key) => [key, 'maximus']));
+    games.push(...seed);
+    const weak = seed.filter(({ record: tally }) => (tally.wins + tally.draws / 2) / (tally.wins + tally.losses + tally.draws) < RATING.monkBelow).map(({ a }) => a);
+    games.push(...await fight('seed: the weak v the monk', weak.map((key) => [key, 'shaolin'])));
+    let strength = fitAll(games, 'maximus');
+    const provisional = { ...strength };
+    const nearest = (key, pool, count) => pool.filter((other) => other !== key).sort((x, y) => Math.abs(Math.log(strength[x] / strength[key])) - Math.abs(Math.log(strength[y] / strength[key]))).slice(0, count);
+    // 2. Within each faction, a ladder.
+    const factions = {};
+    for (const key of keys) (factions[factionOfKey[key]] ??= []).push(key);
+    const ladder = [];
+    for (const members of Object.values(factions)) for (const key of members) for (const other of nearest(key, members, RATING.ladder)) ladder.push([key, other]);
+    games.push(...await fight('within factions (ladders)', ladder));
+    strength = fitAll(games, 'maximus');
+    // 3. Across factions: each faction's top, middle and bottom against the nearest of the others.
+    const across = [];
+    for (const [faction, members] of Object.entries(factions)) {
+      const ranked = [...members].sort((a, b) => strength[b] - strength[a]);
+      const marks = [...new Set([ranked[0], ranked[Math.floor(ranked.length / 2)], ranked.at(-1)])];
+      const others = keys.filter((key) => factionOfKey[key] !== faction);
+      for (const key of marks) for (const other of nearest(key, others, RATING.across)) across.push([key, other]);
     }
-    const cross = await inParallel('pairs', [...pairs.values()], crossBouts, workers);
-    const strength = fitAll([...games, ...cross], 'maximus');
-    const rated = first.map((entry) => ({
-      ...entry,
-      score: rounded(strength[entry.key]),
-      provisional: rounded(provisional[entry.key]),
-      kd: Object.fromEntries(Object.entries(entry.records).map(([name, tally]) => [name, Number(kd(tally).toFixed(3))])),
-    }));
+    games.push(...await fight('across factions (targeted)', across));
+    strength = fitAll(games, 'maximus');
+    // 4. Spot checks: random pairs, predicted from the rest before they are fought.
+    const draw = seededRandom(RATING.firstSeed);
+    const spots = [];
+    for (let tries = 0; spots.length < spotChecks && tries < spotChecks * 20; tries += 1) {
+      const a = keys[Math.floor(draw() * keys.length)];
+      const b = keys[Math.floor(draw() * keys.length)];
+      if (a === b || fought.has(keyOf(a, b)) || spots.some((pair) => keyOf(...pair) === keyOf(a, b))) continue;
+      spots.push([a, b]);
+    }
+    const before = { ...strength };
+    const checks = await fight('spot checks', spots);
+    const misses = checks.map(({ a, b, record: tally }) => Math.abs(Math.log(kd(tally) / (before[a] / before[b]))));
+    const rightWay = checks.filter(({ a, b, record: tally }) => (kd(tally) > 1) === (before[a] > before[b]) || Math.abs(Math.log(kd(tally))) < 0.2).length;
+    games.push(...checks);
+    strength = fitAll(games, 'maximus');
+    // The record against each reference where fought, for the table.
+    const recordsOf = (key) => {
+      const out = {};
+      for (const { a, b, record: tally } of games) {
+        for (const [name, reference] of Object.entries(referenceKey)) {
+          if (a === key && b === reference) out[name] = tally;
+          if (b === key && a === reference) out[name] = { wins: tally.losses, losses: tally.wins, draws: tally.draws };
+        }
+      }
+      return out;
+    };
+    const rated = WARRIORS.map((warrior) => {
+      const recordsAgainst = recordsOf(warrior.key);
+      return {
+        key: warrior.key, title: warrior.title, faction: factionOfKey[warrior.key],
+        type: `${warrior.inputs.style}|${warrior.inputs.outfit?.kind ?? 'boxing'}`,
+        records: recordsAgainst,
+        score: rounded(strength[warrior.key]),
+        provisional: rounded(provisional[warrior.key]),
+        kd: Object.fromEntries(Object.entries(recordsAgainst).map(([name, tally]) => [name, Number(kd(tally).toFixed(3))])),
+      };
+    });
     const characters = Object.fromEntries(rated.map(({ key, ...rest }) => [key, rest]));
     // A type (style and armour) is rated by its characters' geometric mean.
     const byType = {};
     for (const entry of rated) (byType[entry.type] ??= []).push(strength[entry.key]);
     const types = Object.fromEntries(Object.entries(byType).map(([type, values]) => [type, rounded(Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length))]));
-    const crossRecords = cross.map(({ a, b, record: tally }) => ({ a, b, ...tally }));
-    const header = `// GENERATED by tools/ratings.js (${bouts} bouts a corner against each reference, ${crossBouts} against each of two nearest-rated and ${randomOpponents} drawn at random) — do not edit by hand; re-run the tool.\n// Score = strength fitted to all those bouts at once (Bradley-Terry), Maximus held at 100: ∝ inferred K/D.\n`;
-    const body = `export const RATINGS = ${JSON.stringify({ references: Object.keys(RATING.references), bouts, crossBouts, characters, types, cross: crossRecords }, null, 1)};\n`;
+    const crossRecords = games.filter(({ a, b }) => !Object.values(referenceKey).includes(b) || !keys.includes(a)).map(({ a, b, record: tally }) => ({ a, b, ...tally }));
+    const header = `// GENERATED by tools/ratings.js (stack ranking: a seed against Maximus and the monk, ladders within each faction, targeted comparisons across them, ${spots.length} spot checks; each pairing fought until settled, at most ${most} bouts; ${bouts} bouts in all) — do not edit by hand; re-run the tool.\n// Score = strength fitted to all those bouts at once (Bradley-Terry), Maximus held at 100: ∝ inferred K/D.\n`;
+    const body = `export const RATINGS = ${JSON.stringify({ references: Object.keys(RATING.references), bouts: most, totalBouts: bouts, characters, types, cross: crossRecords }, null, 1)};\n`;
     writeFileSync(new URL('../src/ratings.js', import.meta.url), header + body);
-    for (const entry of [...rated].sort((a, b) => strength[b.key] - strength[a.key])) console.log(`${String(entry.score).padStart(6)}  (was ${String(entry.provisional).padStart(5)})  ${entry.title.padEnd(26)} ${entry.type.padEnd(30)} K/D ${entry.kd.maximus} / ${entry.kd.monk}`);
-    // How well the scores predict the cross bouts: each pairing's observed K/D against the scores' ratio.
-    const misses = cross.map(({ a, b, record: tally }) => Math.abs(Math.log(kd(tally) / (strength[a] / strength[b]))));
-    const median = [...misses].sort((x, y) => x - y)[Math.floor(misses.length / 2)];
+    for (const entry of [...rated].sort((a, b) => strength[b.key] - strength[a.key])) console.log(`${String(entry.score).padStart(6)}  (seed ${String(entry.provisional).padStart(5)})  ${entry.title.padEnd(26)} ${entry.faction.padEnd(11)} ${entry.type}`);
+    const median = [...misses].sort((x, y) => x - y)[Math.floor(misses.length / 2)] ?? 0;
     const within2 = misses.filter((miss) => miss < Math.log(2)).length;
-    console.log(`${rated.length} characters, ${pairs.size} cross pairs (nearest and random); scores predict a cross pairing's K/D within ×2 in ${within2} of ${misses.length}, median miss ×${Math.exp(median).toFixed(2)}; ${((Date.now() - started) / 1000).toFixed(0)} s`);
+    console.log(`${rated.length} characters, ${fought.size} pairings, ${bouts} bouts, ${((Date.now() - started) / 1000).toFixed(0)} s. Spot checks (predicted before they were fought): the stronger by rating won or drew level in ${rightWay} of ${checks.length}; K/D within ×2 in ${within2} of ${checks.length}, median miss ×${Math.exp(median).toFixed(2)}`);
   }
 }
