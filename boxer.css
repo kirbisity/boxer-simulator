@@ -358,7 +358,18 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
 /* ---- Factions: tabs over each Deadliest Warrior carousel ---- */
 .dw-side { grid-template-rows: auto minmax(0, 1fr) auto; }
 /* Under the corner and "make your own": a row of their own (seven factions do not fit beside them). */
-.dw-tabs { grid-column: 1 / -1; display: flex; justify-content: center; gap: 4px; padding: 0 6px; margin-top: 26px; min-width: 0; flex-wrap: nowrap; }
+.dw-tabs {
+  grid-column: 1 / -1; display: flex; justify-content: flex-start; gap: 4px; padding: 0 6px; margin-top: 26px; min-width: 0; flex-wrap: nowrap;
+  /* More factions than fit: the row scrolls sideways (never spills past the panel, where the first ones were out of reach), its edges fading out. */
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+}
+.dw-tabs::-webkit-scrollbar { display: none; }
+/* Centred when they all fit; from the left edge when they don't (centring an overflow would push the first ones out of reach). */
+.dw-tabs > .dw-tab:first-child { margin-left: auto; }
+.dw-tabs > .dw-tab:last-child { margin-right: auto; }
+.dw-tab { flex: 0 0 auto; }
 .dw-tab { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; font-size: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; white-space: nowrap; }
 .dw-tab b { font: 600 12px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .dw-tab.on { border-color: var(--gold); background: rgba(255, 207, 74, 0.14); color: var(--fg); }

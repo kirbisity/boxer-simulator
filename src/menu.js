@@ -177,6 +177,12 @@ export function installMenus(game) {
         };
         return tab;
       }));
+      // A mouse wheel turns into a sideways scroll on the row (a trackpad's own sideways swipe passes through).
+      tabs.addEventListener('wheel', (wheel) => {
+        if (tabs.scrollWidth <= tabs.clientWidth || Math.abs(wheel.deltaX) > Math.abs(wheel.deltaY)) return;
+        tabs.scrollLeft += wheel.deltaY;
+        wheel.preventDefault();
+      }, { passive: false });
       const stage = el('div', { className: 'dw-stage' });
       const title = el('div', { className: 'dw-name' });
       const prev = el('button', { className: 'dw-arrow prev', type: 'button', ariaLabel: 'Previous', textContent: '‹', onclick: () => turn(corner, -1) });
@@ -216,6 +222,9 @@ export function installMenus(game) {
         return { card, image, warrior };
       });
       for (const tab of side.tabs.children) tab.classList.toggle('on', tab.dataset.faction === faction[corner]);
+      // The row scrolls when the factions don't fit: bring the chosen one into view (the row only, not the page).
+      const chosen = side.tabs.querySelector('.dw-tab.on');
+      if (chosen && side.tabs.scrollWidth > side.tabs.clientWidth) side.tabs.scrollTo({ left: chosen.offsetLeft - (side.tabs.clientWidth - chosen.offsetWidth) / 2, behavior: 'smooth' });
       draw(corner);
     }
     function turn(corner, by) {
