@@ -99,6 +99,13 @@ export const LOFT = {
   // of the plate's height at the neck and the waist. The lower edge turns
   // out (`flare`, over its lowest `flareOver` of t); `rope` (t) a roped
   // border at the neck and the hem.
+  // Plate below the waist: the fauld (`reach` of a thigh's length below the
+  // waist, `lames` bands, a little `flare`) and on each thigh a tasset of
+  // `lames` overlapping plates over the front and outer side (`arc` rad,
+  // centred `outward` rad towards the outside), each standing `step` further
+  // out than the one above it, from `from` to `to` down the thigh.
+  fauld: { reach: 0.14, lames: 3, flare: 0.2 },
+  tasset: { from: -0.12, to: 0.42, lames: 3, arc: 2.3, outward: 0.35, inflate: 1.42, step: 0.05, steps: 10 },
   ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
   // Its front drawn sharp (breastplateOn, not in a crowd): the two halves as
   // faces of their own, `lift` proud of the plate, `rows` to a ring and
@@ -800,6 +807,28 @@ function lamesOn(mesh, rings, inflate, paint, bones) {
 }
 
 /**
+ * A tasset: `LOFT.tasset.lames` plates over the front and outer side of a
+ * thigh (`outer` 1 for the left, -1 the right), each its own sheet and each
+ * a little further out than the one above, so they read as lapped plates
+ * hanging from the fauld rather than a skirt.
+ */
+function tassetOn(mesh, rings, outer) {
+  const spec = LOFT.tasset;
+  const last = rings.length - 1;
+  const centre = outer * spec.outward;
+  for (let lame = 0; lame < spec.lames; lame += 1) {
+    const [top, bottom] = [(last * lame) / spec.lames, Math.min(last, (last * (lame + 1.25)) / spec.lames)];
+    const out = spec.inflate + spec.step * lame;
+    const grid = [top, (top + bottom) / 2, bottom].map((place, row) => Array.from({ length: spec.steps + 1 }, (_, step) => {
+      const angle = centre - spec.arc / 2 + (spec.arc * step) / spec.steps;
+      // Each lame flares a little at its lower edge, lapping over the next.
+      return [place, angle, out + 0.03 * row];
+    }));
+    addGrid(mesh, rings, grid, lame % 2 ? 'steel2' : 'steel', () => null);
+  }
+}
+
+/**
  * A ridged breastplate's front, drawn sharp over the plate beneath: each
  * half its own faces (shared by no vertex with the other), so the ridge
  * down the middle is a crisp edge; rivets along the neck and the hem,
@@ -1173,7 +1202,12 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     (u) => (u >= -0.12 ? unbulged(bodyLean, 0.8)(u) : unbulged(bodyLean, 0.8)(-0.12)));
   const skirted = Boolean(bottom?.skirt && female);
   if (skirted) loft(mesh, skirtRings(skirtTo(0.85), count(8), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
-  if (plate) loft(mesh, skirtRings(skirtTo(0.4), count(5)), sides, { color: (ring, angle, index) => (index % 2 ? 'steel2' : 'steel'), inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+  // Plate below the waist is a fauld, not a skirt: a short band of lames round the hips (the tassets hang from it over each thigh, with the legs).
+  if (plate) {
+    const fauld = skirtRings(skirtTo(LOFT.fauld.reach), count(3), LOFT.fauld.flare);
+    loft(mesh, fauld, sides, { color: (ring, angle, index) => (index % 2 ? 'steel2' : 'steel'), inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
+    if (!lowDetail && !armor.over) lamesOn(mesh, fauld, 1.2, { lames: LOFT.fauld.lames, base: 'steel2' }, () => hanging3);
+  }
   // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
   if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
   // A long gown's skirt, belled out from the waist to below the knee.
@@ -1403,6 +1437,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       for (const [from, to, inflate, paint] of armorPieces(kit, 'knee', side)) tablePiece(thighRings(from, to, count(2)), inflate, paint);
     } else if (armor) {
       if (plate) armorPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
+      // The tasset: lames hung from the fauld over the front and outer side of the thigh, moving with it.
+      // (Under a surcoat's or a huque's skirt they are not seen.)
+      if (plate && !armor.over) tassetOn(mesh, thighRings(LOFT.tasset.from, LOFT.tasset.to, count(4)), side === 'l' ? 1 : -1);
       if (armor.kind === 'heavyRiot') armorPiece(thighRings(0.05, 0.7, count(3)), 1.35);
       armorPiece(thighRings(0.82, 1.05, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
     }
