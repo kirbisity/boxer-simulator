@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -450,7 +450,8 @@ export function chooseDefence(fighter, attacker, style, incoming, random) {
 /** How heavy an incoming blow is, 0 (a jab) to 1 (a great club, or a strike loaded up). */
 function heaviness(striker, incoming) {
   const spec = AI.evadeHeavy;
-  const weapon = incoming.spec.path === 'blade' && striker.weapon?.held ? striker.weapon.spec.mass / spec.heavyMass : 0;
+  const blade = incoming.spec.path === 'blade' ? bladeFor(striker, incoming.spec) : null;
+  const weapon = blade?.held ? blade.spec.mass / spec.heavyMass : 0;
   return Math.min(1, Math.max(weapon, incoming.heavy ? spec.loaded : 0));
 }
 
@@ -1432,6 +1433,8 @@ export function think(world, fighter, dt) {
     const heavy = 1 + AI.evadeHeavy.defend * heaviness(striker, incoming);
     if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling * heavy)) {
       let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
+      // Two blades: meet it with one and cut with the other.
+      if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;
       // A blade coming is got away from, not blocked with an arm.
       if (incoming.spec.path === 'blade' && wary && random() < AI.blade.stepBackChance) name = 'stepBack';
       perform(world, fighter, name, { side, from: striker.id });
@@ -1489,7 +1492,8 @@ export function think(world, fighter, dt) {
       continue;
     }
     if (!spacing.kickRoom && spec.limb.match(/Foot|Knee/)) continue;
-    const held = fighter.weapon?.held ? fighter.weapon.spec : null;
+    const blade = spec.path === 'blade' ? bladeFor(fighter, spec) : fighter.weapon;
+    const held = blade?.held ? blade.spec : null;
     if (spec.reach === 'weapon' && !held) continue;
     const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius;
     // Close-range moves only when close; long ones only when there is room.
@@ -1524,6 +1528,36 @@ export function think(world, fighter, dt) {
     fighter.aiComboZone = zone;
     fighter.cooldown = combo ? 0 : nextGap(world, fighter, style, plan, cadence);
   }
+}
+
+/**
+ * Parry and riposte with two blades (a style's `riposte`): a share of the
+ * strikes he answers (`chance`) are met with one blade (weaponBlock: the blade
+ * not striking goes across the line, physics weaponIntent) while the other
+ * cuts into the opening at once — the katana's cut while the wakizashi takes
+ * his blade, or the wakizashi's thrust while the katana does. Only a riposte
+ * that reaches him from here. Returns whether he answered so.
+ */
+function riposte(world, fighter, striker, style, distance) {
+  const random = world.random;
+  const answer = style.riposte;
+  if (random() >= answer.chance) return false;
+  const choices = {};
+  for (const [name, weight] of Object.entries(answer.moves)) {
+    const spec = MOVES[name];
+    const blade = bladeFor(fighter, spec);
+    if (blade?.held && distance <= moveRange(spec, fighter.body, blade.spec) + striker.body.lengths.headRadius) choices[name] = weight;
+  }
+  const move = pick(choices, random);
+  if (!move) return false;
+  perform(world, fighter, 'weaponBlock', { from: striker.id });
+  const spec = MOVES[move];
+  const zone = random() < AI.bodyShotShare ? spec.zones.at(-1) : spec.zones[0];
+  if (throwPunch(world, fighter, move, zone, { riposte: true })) {
+    fighter.stats.ripostes = (fighter.stats.ripostes ?? 0) + 1;
+    fighter.aiCombo = null;
+  }
+  return true;
 }
 
 /** Seconds before the next attack: the style's tempo, slower when tired, quicker in the clinch. */

@@ -67,7 +67,9 @@ export function armRanges(style, bouts = 3, seconds = 40) {
         totals.seconds += 1 / 30;
         const points = Array.from({ length: PARTICLES.length }, (_, index) => point(fighter.x, index));
         const frames = boneFrames(points, fighter.body);
-        const sides = fighter.weapon.twoHanded ? ['l', 'r'] : [fighter.weapon.main];
+        // Two blades: the off hand's arm is a weapon arm too.
+        const second = fighter.offWeapon?.held ? fighter.offWeapon : null;
+        const sides = fighter.weapon.twoHanded ? ['l', 'r'] : second ? [fighter.weapon.main, second.main] : [fighter.weapon.main];
         const shoulders = trunkAxes(points[P.pelvis], points[P.neck], points[P.lShoulder], points[P.rShoulder]);
         for (const side of sides) {
           const turn = limbTwist(shoulders, 'arm', side, points[P[`${side}Shoulder`]], points[P[`${side}Elbow`]], points[P[`${side}Hand`]]);
@@ -75,8 +77,9 @@ export function armRanges(style, bouts = 3, seconds = 40) {
           if (turn && Math.abs(turn.twist) > (150 * Math.PI) / 180) totals.back += 1;
           if (drawnBack(frames, points, side)) totals.drawn += 1;
         }
-        const main = fighter.weapon.main;
-        if (wristAngle(points[P[`${main}Elbow`]], points[P[`${main}Hand`]], fighter.weapon.dir) > WORLD.limbTwist.wristBack + SLACK) totals.wrist += 1;
+        for (const held of second ? [fighter.weapon, second] : [fighter.weapon]) {
+          if (wristAngle(points[P[`${held.main}Elbow`]], points[P[`${held.main}Hand`]], held.dir) > WORLD.limbTwist.wristBack + SLACK) totals.wrist += 1;
+        }
         totals.knee += limbViolations(points, { arms: false }).knee;
       }
     }
@@ -88,8 +91,10 @@ export function armRanges(style, bouts = 3, seconds = 40) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const bouts = Number(process.argv[2] ?? 3);
   const seconds = Number(process.argv[3] ?? 40);
+  // Styles named after the numbers: those alone (each must have a character).
+  const only = process.argv.slice(4);
   const sum = { minutes: 0, arm: 0, back: 0, wrist: 0, drawn: 0, knee: 0 };
-  for (const style of ANATOMY_STYLES) {
+  for (const style of only.length ? only : ANATOMY_STYLES) {
     const row = armRanges(style, bouts, seconds);
     for (const key of Object.keys(sum)) sum[key] += key === 'minutes' ? row.minutes : row[key] * row.minutes;
     console.log(`${style.padEnd(12)} per minute held: arm ${row.arm.toFixed(1).padStart(6)}  back ${row.back.toFixed(1).padStart(6)}  wrist ${row.wrist.toFixed(1).padStart(6)}  drawn ${row.drawn.toFixed(1).padStart(6)}  knee ${row.knee.toFixed(1).padStart(6)}`);

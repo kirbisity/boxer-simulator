@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
-import { STYLE_KEYS } from '../src/moves.js';
+import { STYLE_KEYS, STYLES } from '../src/moves.js';
 import { randomCharacter, varyCharacter } from '../src/cast.js';
 import { seededRandom } from '../src/physics.js';
 import { headgearOptions } from '../src/outfits.js';
 
 test('every style has a character, dressed for it; the knight and samurai wear their plume and crest', () => {
-  for (const style of STYLE_KEYS) assert.ok(Object.values(PRESETS).some((preset) => preset.style === style), style);
+  // (A style that is another's one-blade form, its `single`, is that character's with a blade lost.)
+  const single = new Set(STYLE_KEYS.map((key) => STYLES[key].single).filter(Boolean));
+  for (const style of STYLE_KEYS) assert.ok(Object.values(PRESETS).some((preset) => preset.style === style) || single.has(style), style);
   assert.deepEqual(PRESETS.knight.accessories, ['plume']);
   assert.deepEqual(PRESETS.samurai.accessories, ['crest']);
   for (const preset of Object.values(PRESETS)) {

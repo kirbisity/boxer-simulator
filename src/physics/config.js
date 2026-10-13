@@ -34,6 +34,12 @@ export const WORLD = {
   weaponTurnLimit: 25,
   // A blade fending off a strike drives out this far (share of the line to the strike) past where they meet.
   fendDrive: 0.25,
+  // Where along it a blade meets a strike it is set across (share of its
+  // length from the hand): the first blade by its middle; the off hand's
+  // short one (two blades) further out, its hand kept off the line the
+  // strike comes in on (the wakizashi is half a katana: met by its middle,
+  // the hand would be a hand's breadth from the incoming edge).
+  meetAlong: 0.45, offMeetAlong: 0.7,
   gripStep: 0.006, // m the off hand is drawn onto a two-handed grip per substep
   // A polearm's front hand slides along the shaft: no closer to the rear
   // hand than this share of its usual spacing, and this far short of the head (m).

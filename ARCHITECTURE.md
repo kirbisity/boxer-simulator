@@ -91,6 +91,20 @@ remembered in localStorage, replayed from the home screen). Anything removed fro
 in `buildWeaponMesh`, a style in `STYLES` that wields it, a character in
 `PRESETS` with that style, an entry in `menu.js` `WARRIORS` and `STYLE_NOTES`.
 
+**Two blades (dual wield):** a style with `offWeapon` holds a second weapon
+in the off hand (`fighter.offWeapon`, the left hand: its own direction, spin,
+point and grip strain), and may hold its first weapon otherwise than it is
+made (`grip: 'one'`: a katana in one hand). A blade move is made with the
+weapon in its `limb`'s hand (physics `bladeFor`); each blade's stroke is its
+own (`strokeOf`: what it hit, whether it was stopped), and a move may drive
+the other hand's move alongside (`with`, `withDelay`). Every held blade
+strikes, meets fists and other blades (`heldBlades`; a blade stopped by one
+not striking is a `parry` event), is jarred and is lost on its own
+(`dropOffWeapon`; the wakizashi lost, the style's `single`; the long blade
+lost, the short one goes to the sword hand). A weaponBlock is made with
+whichever blade is not striking; the AI's `riposte` (style data) parries
+with one blade and cuts with the other. Drawn by weaponview `drawHeld`.
+
 **An outfit or armour:** an entry in `OUTFITS` with `faction`, `movement`,
 `protection` (and `regions` for what covers only part of the body: a region
 (head, torso, limb), a part on both sides (Forearm), or one part (rShank),

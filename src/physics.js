@@ -173,14 +173,21 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   }
   if (style.net && !fighter.net) fighter.net = { held: true };
   if (!style.weapon) return;
+  // A style may hold its weapon otherwise than it is made to be held (`grip`:
+  // a katana in one hand, the other holding a second blade).
+  const spec = gripSpec(style.weapon, style.grip);
   // Too heavy for him to hold out (handling.js): he fights without it.
-  const handled = handling(fighter.body, WEAPONS[style.weapon]);
+  const handled = handling(fighter.body, spec);
   if (!handled.canHold) {
     fighter.cannotWield = style.weapon;
-    if (style.fallback && style.fallback !== styleKey) armFighter(fighter, style.fallback, { random, shield: false });
+    // (Two blades too much for one hand: the one in both hands, if the style says.)
+    const instead = style.offWeapon ? style.single : style.fallback;
+    if (instead && instead !== styleKey) armFighter(fighter, instead, { random, shield: false });
     return;
   }
   const weapon = createWeapon(style.weapon);
+  weapon.spec = spec;
+  weapon.twoHanded = spec.hands !== 'one';
   weapon.handling = handled;
   const shares = handShares(weapon.spec);
   // A forearm weapon (`mounted`) weighs as part of the body already (its kit's mass).
@@ -192,6 +199,69 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   weapon.dir = yawRotate(guard.dir, fighter.yaw);
   weapon.tip = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.length));
   fighter.weapon = weapon;
+  if (style.offWeapon && !fighter.offWeapon) armOffHand(fighter, style);
+}
+
+/** A weapon's spec as a style holds it: its own, or with `hands` as the style's `grip` says. */
+function gripSpec(kind, grip) {
+  const spec = WEAPONS[kind];
+  return grip && grip !== spec.hands ? { ...spec, hands: grip } : spec;
+}
+
+/**
+ * Two blades (a style's `offWeapon`): a second weapon in the off hand, held
+ * and moved on its own (its own direction, spin and point), its weight in
+ * that hand. It strikes, blocks, is jarred and is lost like the first. A kit
+ * whose sidearm it is wears it drawn: there is no other to draw.
+ */
+function armOffHand(fighter, style) {
+  const spec = WEAPONS[style.offWeapon];
+  const handled = handling(fighter.body, spec);
+  if (!handled.canHold) return;
+  const weapon = createWeapon(style.offWeapon);
+  weapon.main = 'l';
+  weapon.off = 'r';
+  weapon.twoHanded = false;
+  weapon.handling = handled;
+  addParticleMass(fighter, P.lHand, spec.mass);
+  const guard = offGuardTargets(style, fighter.body);
+  weapon.dir = yawRotate(guard.dir, fighter.yaw);
+  weapon.tip = vec.add(point(fighter.x, P.lHand), vec.scale(weapon.dir, spec.length));
+  fighter.offWeapon = weapon;
+  if (fighter.body.gear?.sidearm === style.offWeapon) fighter.sidearmDrawn = true;
+}
+
+/** Where the off hand's blade rests in the guard (a style's `offGuard`, in heights, local). */
+function offGuardTargets(style, body) {
+  const guard = style.offGuard ?? { hand: [0.2, 0.6, 0.1], dir: [0.8, 0.6, 0] };
+  return { hand: vec.scale(guard.hand, body.heightM), dir: vec.normalize(guard.dir) };
+}
+
+/** The blades in his hands, held: the weapon and the off hand's (two blades). */
+export function heldBlades(fighter) {
+  const main = fighter.weapon?.held ? fighter.weapon : null;
+  const off = fighter.offWeapon?.held ? fighter.offWeapon : null;
+  return off ? (main ? [main, off] : [off]) : main ? [main] : NO_BLADES;
+}
+const NO_BLADES = [];
+
+/** The weapon a move is made with: the off hand's blade for a blade move of that hand, else the weapon. */
+export function bladeFor(fighter, spec) {
+  const off = fighter.offWeapon;
+  return off?.held && spec?.path === 'blade' && spec.limb[0] === off.main ? off : fighter.weapon;
+}
+
+/**
+ * The stroke a blade is making now, or null: the strike in flight if it is
+ * that blade's, or the second blade's half of a two-bladed move (`with`).
+ * Each carries its own time, aim, and what it has hit.
+ */
+export function strokeOf(fighter, weapon) {
+  const punch = fighter.punch;
+  if (!punch || punch.spec.path !== 'blade' || !weapon?.held) return null;
+  if (bladeFor(fighter, punch.spec) === weapon) return punch;
+  const second = punch.with;
+  return second && bladeFor(fighter, second.spec) === weapon ? second : null;
 }
 
 /**
@@ -202,16 +272,81 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
 export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
   // A forearm weapon is the arm: it cannot be let go or knocked away.
-  if (!weapon?.held || weapon.spec.mounted) return;
+  if (!weapon?.held || weapon.spec.mounted) {
+    if (fighter.state === 'out') dropOffWeapon(world, fighter, reason);
+    return;
+  }
   releaseWeapon(world, fighter, reason, push);
-  if (fighter.state === 'out') return;
+  if (fighter.state === 'out') {
+    dropOffWeapon(world, fighter, reason);
+    return;
+  }
+  // Two blades, the long one gone: the short one is all he has, and it goes to his sword hand.
+  if (fighter.offWeapon?.held) {
+    changeHands(world, fighter);
+    return;
+  }
   rearm(world, fighter, weapon);
 }
 
-/** The weapon leaves his hands and falls as a loose thing (no other drawn in its place). */
-function releaseWeapon(world, fighter, reason, push) {
+/**
+ * The off hand's blade lost (knocked away, let fall, the hand cut off): it
+ * falls as a loose thing; he fights on with the one he has, as the style
+ * says for one blade (`single`: the katana in both hands again).
+ */
+export function dropOffWeapon(world, fighter, reason, push = [0, 0, 0]) {
+  const weapon = fighter.offWeapon;
+  if (!weapon?.held) return;
+  releaseWeapon(world, fighter, reason, push, weapon);
+  fighter.offWeapon = null;
+  const single = STYLES[fighter.style]?.single;
+  if (fighter.state === 'out' || !single || !fighter.weapon?.held) return;
+  regrip(fighter, single);
+}
+
+/** Take up another style with the weapon already in hand, held as it holds it (its `grip`): the weight shared again between the hands. */
+function regrip(fighter, styleKey) {
   const weapon = fighter.weapon;
+  const before = handShares(weapon.spec);
+  const spec = gripSpec(weapon.kind, STYLES[styleKey].grip);
+  const after = handShares(spec);
+  addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * (after.main - before.main));
+  addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * (after.off - before.off));
+  weapon.spec = spec;
+  weapon.twoHanded = spec.hands !== 'one';
+  weapon.handling = handling(fighter.body, spec);
+  fighter.style = styleKey;
+}
+
+/**
+ * The long blade lost with the short one still in his off hand: he takes it
+ * into his sword hand (its weight goes with it) and fights in its style.
+ */
+function changeHands(world, fighter) {
+  const off = fighter.offWeapon;
+  addParticleMass(fighter, P[`${off.main}Hand`], -off.spec.mass);
+  fighter.offWeapon = null;
+  fighter.weapon = null;
+  fighter.sidearmDrawn = true;
+  if (fighter.punch && fighter.punch.spec.path === 'blade') fighter.punch = null;
+  const next = styleForWeapon(off.kind) ?? 'mix';
+  const effects = [`takes the ${off.spec.label.toLowerCase()} in his sword hand`];
+  if (fighter.state === 'down') {
+    fighter.style = next;
+    fighter.pendingArm = next;
+    return;
+  }
+  armFighter(fighter, next, { random: world.random, shield: false });
+  if (fighter.weapon) {
+    fighter.weapon.strain = off.strain;
+    world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects });
+  }
+}
+
+/** The weapon (or the off hand's blade) leaves his hands and falls as a loose thing (no other drawn in its place). */
+function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
   if (weapon.spec.mounted) return;
+  const second = weapon === fighter.offWeapon;
   weapon.held = false;
   // A whip let go: its thong is no longer swung (it lies with the handle).
   weapon.rope = null;
@@ -227,8 +362,13 @@ function releaseWeapon(world, fighter, reason, push) {
     colour: weapon.colour, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
   });
-  if (fighter.punch?.spec.path === 'blade' || fighter.punch?.spec.path === 'aim') fighter.punch = null;
-  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
+  // The stroke it was making ends; with two blades, only its own.
+  if (!second && (fighter.punch?.spec.path === 'blade' || fighter.punch?.spec.path === 'aim')) fighter.punch = null;
+  else if (second && fighter.punch) {
+    if (fighter.punch.with && bladeFor(fighter, fighter.punch.with.spec) === weapon) fighter.punch.with = null;
+    else if (bladeFor(fighter, fighter.punch.spec) === weapon) fighter.punch = null;
+  }
+  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, off: second || undefined, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
 }
 
 /** After losing a weapon, the next: a backup, his kit's sidearm, or his bare hands. */
@@ -258,6 +398,7 @@ function rearm(world, fighter, weapon) {
 /** Going down shakes the grip: sometimes the weapon goes with the fall. */
 function shakenLoose(world, fighter) {
   if (fighter.weapon?.held && world.random() < WORLD.weapons.dropOnFall) dropWeapon(world, fighter, 'dropped');
+  if (fighter.offWeapon?.held && world.random() < WORLD.weapons.dropOnFall) dropOffWeapon(world, fighter, 'dropped');
   if (fighter.shield && world.random() < WORLD.shield.dropOnFall) dropShield(world, fighter, 'dropped');
 }
 
@@ -398,13 +539,14 @@ function chip(world, fighter) {
   }
 }
 
-/** A blow jars the grip; strained past what the hand can hold, the weapon goes. */
-export function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
-  const weapon = fighter.weapon;
+/** A blow jars the grip (of the weapon, or of the off hand's blade); strained past what the hand can hold, it goes. */
+export function strainGrip(world, fighter, impulse, push = [0, 0, 0], weapon = fighter.weapon) {
   if (!weapon?.held || impulse <= 0) return;
   // A long lever off the hands is easier to tear away (`grip` < 1).
   weapon.strain += impulse / (BLADES.gripImpulsePerNewton * (weapon.spec.grip ?? 1) * fighter.body.strikeForce[P[`${weapon.main}Hand`]]);
-  if (weapon.strain >= 1) dropWeapon(world, fighter, 'disarmed', push);
+  if (weapon.strain < 1) return;
+  if (weapon === fighter.offWeapon) dropOffWeapon(world, fighter, 'disarmed', push);
+  else dropWeapon(world, fighter, 'disarmed', push);
 }
 
 /** The weapon's targets for this frame: guard, block or the move in flight, and how many hands hold it. */
@@ -414,13 +556,14 @@ export function strainGrip(world, fighter, impulse, push = [0, 0, 0]) {
  * a fist or a shin that comes on runs into the edge. Tracks the strike as
  * it comes. Null if there is nothing to meet.
  */
-function interceptBlock(world, fighter) {
+function interceptBlock(world, fighter, weapon = fighter.weapon) {
   const attacker = world.fighters[fighter.defence?.from];
   const punch = attacker?.punch;
   if (!punch) return null;
-  const weapon = fighter.weapon;
-  const threat = attacker.weapon?.held && punch.spec.path === 'blade'
-    ? vec.add(point(attacker.x, P[`${attacker.weapon.main}Hand`]), vec.scale(attacker.weapon.dir, attacker.weapon.spec.length * 0.7))
+  // The blade coming (with two, the one the strike is made with).
+  const coming = punch.spec.path === 'blade' ? bladeFor(attacker, punch.spec) : null;
+  const threat = coming?.held
+    ? vec.add(point(attacker.x, P[`${coming.main}Hand`]), vec.scale(coming.dir, coming.spec.length * 0.7))
     : point(attacker.x, P[punch.spec.limb]);
   const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
   const line = vec.sub(threat, mine);
@@ -431,8 +574,10 @@ function interceptBlock(world, fighter) {
   // Across the line, tilted up; pointed to whichever side the strike is not coming round from.
   let across = vec.cross(toward, [0, 1, 0]);
   if (vec.length(across) < 1e-3) across = yawRotate([0, 0, 1], fighter.yaw);
+  // The off hand's blade is held from its own side: the hand on the left of the line.
+  if (weapon === fighter.offWeapon) across = vec.scale(across, -1);
   across = vec.normalize(vec.add(vec.normalize(across), [0, 0.6, 0]));
-  const hand = vec.sub(meet, vec.scale(across, weapon.spec.length * 0.45));
+  const hand = vec.sub(meet, vec.scale(across, weapon.spec.length * (weapon === fighter.offWeapon ? WORLD.offMeetAlong : WORLD.meetAlong)));
   return { hand: toLocal(fighter, hand), dir: yawRotate(across, -fighter.yaw) };
 }
 
@@ -456,21 +601,21 @@ function weaponIntent(world, fighter, intent) {
   const weapon = fighter.weapon;
   intent.bladeDir = null;
   intent.weaponArms = null;
+  intent.offArm = null;
   if (!weapon?.held || !style.weaponGuard) return;
-  let target;
+  // Two blades: each strikes on its own (strokeOf); a block is made with
+  // whichever is not striking, the short one first — the one meets his blade
+  // while the other cuts.
+  const off = fighter.offWeapon?.held ? fighter.offWeapon : null;
+  const stroke = strokeOf(fighter, weapon);
+  const offStroke = off ? strokeOf(fighter, off) : null;
   // (A couched point is held out on its line to the end of the move: the run carries it on.)
-  if (punch?.spec.path === 'blade' && punch.t <= (punch.spec.couched ? punch.spec.duration : punch.spec.extendUntil)) {
-    target = bladeTargets(punch.spec, punch.load > 0 ? 0 : punch.t, punch.aim, fighter.body, weapon.spec);
-    // A thrust's point is steered at the target from wherever the hand really is (a couched one's line is held as it was set).
-    if (punch.spec.mode === 'thrust' && punch.t >= punch.spec.windup) {
-      const line = vec.normalize(vec.sub(punch.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
-      // Couched, the point is kept on him while it is carried in, and its line held once it is driven.
-      if (punch.spec.couched) {
-        if (!punch.driven || !punch.line) punch.line = line;
-        target.dir = punch.line;
-      } else target.dir = line;
-    }
-  } else if (fighter.defence?.name === 'weaponBlock') {
+  const extending = (s) => s && s.t <= (s.spec.couched ? s.spec.duration : s.spec.extendUntil);
+  const blocking = fighter.defence?.name === 'weaponBlock';
+  const blocker = !blocking ? null : off && !extending(offStroke) ? off : !extending(stroke) ? weapon : null;
+  let target;
+  if (extending(stroke)) target = strokeTargets(fighter, weapon, stroke);
+  else if (blocker === weapon) {
     // Blade across the strike's line, meeting it; or across before the head.
     target = interceptBlock(world, fighter) ?? { hand: vec.scale([0.2, 0.8, -0.08], H), dir: vec.normalize([0.15, 0.3, 1]) };
   } else if (weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined)) {
@@ -497,7 +642,7 @@ function weaponIntent(world, fighter, intent) {
   if (!oneHanded) intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, offHandAlong(weapon.spec)));
   // A lunge: the free arm flung back behind him as a counterweight, out and back with the stroke.
   const counter = punch?.spec.counterArm;
-  if (counter && oneHanded && !fighter.shield && !fighter.net?.held && punch.t < punch.spec.duration) {
+  if (counter && oneHanded && !off && !fighter.shield && !fighter.net?.held && punch.t < punch.spec.duration) {
     const spec = punch.spec;
     const out = punch.t < spec.extendUntil ? Math.min(1, punch.t / spec.extendUntil) : 1 - (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil);
     const flung = vec.scale([counter[0], counter[1], weapon.off === 'l' ? counter[2] : -counter[2]], H);
@@ -549,9 +694,46 @@ function weaponIntent(world, fighter, intent) {
   intent.weaponArms = oneHanded ? [main] : [main, weapon.off];
   intent.weaponReach = style.weaponGuard.reach ?? null;
   intent.polearmRear = weapon.spec.leadAhead && !oneHanded ? main : null;
-  intent.windingUp = punch?.spec.path === 'blade' && (punch.load > 0 || punch.t < punch.spec.windup);
+  intent.windingUp = Boolean(stroke) && (stroke.load > 0 || stroke.t < stroke.spec.windup);
   // Swinging through, the arm goes as the stroke throws it (pose.js).
-  intent.swinging = punch?.spec.path === 'blade' && !intent.windingUp && punch.t <= punch.spec.extendUntil;
+  intent.swinging = Boolean(stroke) && !intent.windingUp && stroke.t <= stroke.spec.extendUntil;
+  if (off) offBladeIntent(world, fighter, intent, off, offStroke, blocker === off);
+}
+
+/** The hand and blade direction (local) a stroke wants now: along its path; a thrust's point steered at the mark from where the hand really is. */
+function strokeTargets(fighter, weapon, stroke) {
+  const t = stroke.load > 0 ? 0 : Math.max(0, stroke.t);
+  const target = bladeTargets(stroke.spec, t, stroke.aim, fighter.body, weapon.spec);
+  // A thrust's point is steered at the target from wherever the hand really is (a couched one's line is held as it was set).
+  if (stroke.spec.mode === 'thrust' && t >= stroke.spec.windup) {
+    const line = vec.normalize(vec.sub(stroke.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
+    // Couched, the point is kept on him while it is carried in, and its line held once it is driven.
+    if (stroke.spec.couched) {
+      if (!stroke.driven || !stroke.line) stroke.line = line;
+      target.dir = stroke.line;
+    } else target.dir = line;
+  }
+  return target;
+}
+
+/**
+ * The off hand's blade (two blades): along its own stroke, across the line
+ * of a strike to meet it, or at its guard. Its arm is a weapon arm with its
+ * own blade direction and swing (pose.js `offArm`).
+ */
+function offBladeIntent(world, fighter, intent, off, stroke, blocking) {
+  const H = fighter.body.heightM;
+  const extending = stroke && stroke.t <= stroke.spec.extendUntil;
+  let target;
+  if (extending) target = strokeTargets(fighter, off, stroke);
+  else if (blocking) target = interceptBlock(world, fighter, off) ?? { hand: vec.scale([0.2, 0.8, 0.08], H), dir: vec.normalize([0.15, 0.3, -1]) };
+  else target = offGuardTargets(STYLES[fighter.style], fighter.body);
+  intent[`${off.main}Hand`] = target.hand;
+  intent.offArm = off.main;
+  intent.offBladeDir = target.dir;
+  intent.weaponArms = [...intent.weaponArms, off.main];
+  intent.offWindingUp = Boolean(extending) && (stroke.load > 0 || stroke.t < stroke.spec.windup);
+  intent.offSwinging = Boolean(extending) && !intent.offWindingUp;
 }
 
 /**
@@ -612,19 +794,21 @@ function pairedGun(world, fighter, intent, dt) {
  * with both hands on it), while its own weight pulls the point down. In two
  * hands, the off hand is held to the handle a grip behind the main one.
  */
-function updateWeapon(fighter, h) {
-  const weapon = fighter.weapon;
+function updateWeapon(fighter, h, weapon = fighter.weapon) {
   const spec = weapon.spec;
   const main = P[`${weapon.main}Hand`];
   const off = P[`${weapon.off}Hand`];
   const previous = weapon.dir;
   const able = fighter.state === 'up' || fighter.state === 'rising';
+  // The off hand's blade (two blades) turns as its own intent says, in its one hand.
+  const second = weapon === fighter.offWeapon;
+  const bladeDir = second ? fighter.intent.offBladeDir : fighter.intent.bladeDir;
   let twoHands = false;
-  if (fighter.intent.twoHanded && able) {
+  if (fighter.intent.twoHanded && able && !second) {
     const gap = vec.length(vec.sub(point(fighter.x, main), point(fighter.x, off)));
     twoHands = gap < spec.spacing * 2.5;
   }
-  const want = fighter.intent.bladeDir && able ? yawRotate(fighter.intent.bladeDir, fighter.yaw) : previous;
+  const want = bladeDir && able ? yawRotate(bladeDir, fighter.yaw) : previous;
   const axis = vec.cross(previous, want);
   const sin = vec.length(axis);
   const angle = Math.atan2(sin, vec.dot(previous, want));
@@ -910,6 +1094,11 @@ function raiseStandards(fighters, random) {
       if (shares.off) addParticleMass(leader, P[`${leader.weapon.off}Hand`], -leader.weapon.spec.mass * shares.off);
       leader.weapon = null;
     }
+    // (Two blades: the short one put away; the standard takes both hands.)
+    if (leader.offWeapon) {
+      addParticleMass(leader, P[`${leader.offWeapon.main}Hand`], -leader.offWeapon.spec.mass);
+      leader.offWeapon = null;
+    }
     armFighter(leader, standard.weapon, { random, shield: false });
     leader.weapon.colour = colour;
   }
@@ -981,6 +1170,10 @@ export function nearestOpponent(world, fighter) {
 /** Where on the target a strike aims: the head, the body, or the lead thigh. */
 export function aimPoint(target, zone) {
   if (zone === 'head') return point(target.x, P.head);
+  // His blade (a beat at it, to knock it off the line): its middle; empty-handed, his body.
+  if (zone === 'blade' && target.weapon?.held && !target.weapon.spec.mounted) {
+    return vec.add(point(target.x, P[`${target.weapon.main}Hand`]), vec.scale(target.weapon.dir, target.weapon.spec.length * 0.5));
+  }
   if (zone === 'legs') return vec.lerp(point(target.x, P.lHip), point(target.x, P.lKnee), 0.55);
   return vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.6);
 }
@@ -1014,14 +1207,16 @@ function couchedNear(world, fighter, punch) {
  * Throw a strike (any attack in MOVES) at the opponent. The zone defaults to
  * the move's first. Returns false if the fighter cannot throw it now.
  */
-export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null } = {}) {
+export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null, riposte = false } = {}) {
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
   // Thrown at a place (`at`, the player's aim): at whoever stands there, or at the empty air.
   const target = at ? manNear(world, fighter, at, WORLD.aimedAtWithin) : opponentFor(world, fighter);
+  // The blade it is struck with (two blades: the one in the striking hand).
+  const blade = spec?.path === 'blade' ? bladeFor(fighter, spec) : null;
   // Raising a weapon heavier than heavyFrom is work in proportion to its mass.
   // (and the harder, the weaker he is for it: handling.js)
-  const lift = spec?.path === 'blade' && fighter.weapon?.held ? Math.max(1, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom) / (fighter.weapon.handling?.speed ?? 1) : 1;
+  const lift = blade?.held ? Math.max(1, blade.spec.mass / WORLD.weapons.heavyFrom) / (blade.handling?.speed ?? 1) : 1;
   const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift : 0;
   // An empty gun is not fired: the same button starts loading it (no mark needed).
   if (spec?.path === 'aim' && fighter.weapon?.held && fighter.weapon.spec.shot && !fighter.weapon.loaded) {
@@ -1034,7 +1229,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
   // (Not couched: the body carries it, not the arms held out.)
-  const heft = spec?.path === 'blade' && !spec.couched && fighter.weapon?.held ? Math.max(0, fighter.weapon.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
+  const heft = blade?.held && !spec?.couched ? Math.max(0, blade.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
   // His skill: how near the mark his blow goes (a point needs it most; a gun aims by its own spread).
   const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft);
   const mark = at ?? aimPoint(target, aimZone);
@@ -1049,6 +1244,19 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     // How far an untrained hand turns the blade off true (rad): the edge meeting at a slant, the point off its line.
     edgeTilt: edgeTilt(world, fighter, spec),
   };
+  // A riposte: struck as the other blade (or the guard) takes his.
+  if (riposte) fighter.punch.riposte = true;
+  // Two blades at once (`with`: the other hand's move, `withDelay` s behind):
+  // its own stroke, aimed at its own zone, the same scatter off the mark.
+  const second = spec.with ? MOVES[spec.with] : null;
+  if (second && fighter.offWeapon?.held && bladeFor(fighter, second) !== blade) {
+    const secondZone = second.zones[0];
+    const secondMark = at ?? aimPoint(target, secondZone);
+    const secondAim = vec.add(secondMark, vec.sub(aimed, mark));
+    fighter.punch.with = { type: spec.with, spec: second, zone: secondZone, t: -(spec.withDelay ?? 0), age: 0, aim: toLocal(fighter, secondAim), target: target?.id ?? null, landed: false, load: 0, at: at ? secondAim : null, edgeTilt: fighter.punch.edgeTilt, heavy: false };
+    fighter.stats.dual = (fighter.stats.dual ?? 0) + 1;
+  }
+  if (blade && blade === fighter.offWeapon) fighter.stats.offStrikes = (fighter.stats.offStrikes ?? 0) + 1;
   fighter.stamina = Math.max(0, fighter.stamina - drain);
   fighter.stats.thrown += 1;
   if (heavy) world.events.push({ time: world.time, kind: 'heavy', attacker: fighter.id, punch: type, effects: [] });
@@ -1066,7 +1274,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
 export function skillScatter(fighter, spec, scatter) {
   if (!spec || spec.path === 'aim') return scatter;
   const skill = fighter.body.skill ?? 0.5;
-  const held = spec.path === 'blade' && fighter.weapon?.held ? fighter.weapon.spec : null;
+  const blade = spec.path === 'blade' ? bladeFor(fighter, spec) : null;
+  const held = blade?.held ? blade.spec : null;
   const kind = !held ? 'hand' : spec.mode === 'thrust' ? 'point' : held.harm?.swing?.cut ? 'blade' : 'blunt';
   return scatter * Math.min(1, 2 * (1 - skill)) + WORLD.skill.aimError[kind] * Math.max(0, 1 - 2 * skill);
 }
@@ -1168,9 +1377,10 @@ function updateIntent(world, fighter, dt) {
   } else if (fighter.punch) {
     const punch = fighter.punch;
     // A heavy weapon is slow to raise and slow to bring back; the blow between is the muscles'.
-    const heavy = punch.spec.path === 'blade' && fighter.weapon?.held ? Math.max(1, Math.sqrt(fighter.weapon.spec.mass / WORLD.weapons.heavyFrom)) : 1;
+    const blade = punch.spec.path === 'blade' ? bladeFor(fighter, punch.spec) : null;
+    const heavy = blade?.held ? Math.max(1, Math.sqrt(blade.spec.mass / WORLD.weapons.heavyFrom)) : 1;
     // The stroke at the pace his arms give the weapon; a bow drawn as fast as he can pull it (handling.js).
-    const held = fighter.weapon?.held ? fighter.weapon : null;
+    const held = punch.spec.path === 'blade' ? (blade?.held ? blade : null) : fighter.weapon?.held ? fighter.weapon : null;
     const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
     punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace;
     punch.age += dt;
@@ -1182,6 +1392,12 @@ function updateIntent(world, fighter, dt) {
         const target = punch.target === null ? null : world.fighters[punch.target];
         if (target && !punch.at) punch.aim = toLocal(fighter, vec.add(aimPoint(target, punch.zone), punch.miss ?? [0, 0, 0]));
       }
+    }
+    // The other blade's half of a two-bladed move keeps the same time, `withDelay` behind.
+    if (punch.with) {
+      punch.with.t = punch.t - (punch.spec.withDelay ?? 0);
+      punch.with.age = punch.age;
+      if (punch.with.at) punch.with.aim = toLocal(fighter, punch.with.at);
     }
     if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
     // Automatic fire: the trigger held, a round at the gun's cyclic rate until the burst is spent (or the gun).
@@ -1266,6 +1482,7 @@ function updateIntent(world, fighter, dt) {
     intent.twist = 0;
     intent.twoHanded = false;
     intent.bladeDir = null;
+    intent.offBladeDir = null;
     const [chest, hips] = pinPoints(target);
     intent.lHand = toLocal(fighter, chest);
     intent.rHand = toLocal(fighter, hips);
@@ -1283,11 +1500,17 @@ function updateIntent(world, fighter, dt) {
     // Bound: the arms pinned in close to the chest, the weapon with them.
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.16 * H, 0.62 * H, sign * 0.1 * H];
     intent.bladeDir = null;
+    intent.offBladeDir = null;
   }
   runCarry(world, fighter, intent, dt);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * 0.2 * H];
+    // Two blades held at his sides: both points down and forward, clear of his legs.
+    if (fighter.offWeapon?.held) {
+      intent.bladeDir = [0.45, -1, -0.1];
+      intent.offBladeDir = [0.45, -1, 0.1];
+    }
   }
   if (fighter.slip > 0) {
     // Aimed past where the head ends up: the muscles drive harder towards a
@@ -1335,6 +1558,7 @@ function painPose(fighter, intent) {
   const hurt = toLocal(fighter, vec.lerp(a, b, 0.5));
   intent[`${free}Hand`] = vec.lerp(intent[`${free}Hand`] ?? hurt, hurt, share);
   if (fighter.weapon?.held) intent.bladeDir = [0.4, -1, 0];
+  if (fighter.offWeapon?.held) intent.offBladeDir = [0.4, -1, 0];
 }
 
 function crawlPose(fighter, intent, dt) {
@@ -1353,6 +1577,7 @@ function crawlPose(fighter, intent, dt) {
   intent.twist = 0;
   intent.twoHanded = false;
   intent.bladeDir = null;
+  intent.offBladeDir = null;
   intent.guardTight = false;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     // Turning right (yaw growing), the left knee is on the outside: its stride the longer.
@@ -1602,6 +1827,7 @@ export function step(world, dt) {
       solveConstraints(fighter, own);
       solveJointLimits(world, fighter, own);
       if (fighter.weapon?.held) updateWeapon(fighter, own);
+      if (fighter.offWeapon?.held) updateWeapon(fighter, own, fighter.offWeapon);
     }
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
     for (const fighter of world.fighters) if (fighter.pin) holdPin(world, fighter, h);
@@ -1872,6 +2098,7 @@ function poseProxy(fighter, dt) {
   }
   solveConstraints(fighter, dt);
   if (fighter.weapon?.held) updateWeapon(fighter, dt);
+  if (fighter.offWeapon?.held) updateWeapon(fighter, dt, fighter.offWeapon);
 }
 
 /**
@@ -1943,6 +2170,7 @@ export function spatialGrid(points, cell) {
 
 function updateTimers(world, fighter, dt) {
   if (fighter.weapon?.held) fighter.weapon.strain = Math.max(0, fighter.weapon.strain - BLADES.gripLeak * dt);
+  if (fighter.offWeapon?.held) fighter.offWeapon.strain = Math.max(0, fighter.offWeapon.strain - BLADES.gripLeak * dt);
   if (fighter.shield?.strain) fighter.shield.strain = Math.max(0, fighter.shield.strain - WORLD.shield.strainLeak * dt);
   // On his knees with the pain (physics/whip.js): until he is up again.
   if (fighter.pain) {
@@ -2632,8 +2860,9 @@ const LIMP_BELOW = {
 /** A joint gives: no more limit, no more muscle below it; a leg or neck ends the fight. */
 export function breakJoint(world, fighter, joint) {
   fighter.broken.add(joint);
-  // The shield arm broken: it cannot hold it.
+  // The shield arm broken: it cannot hold it; nor the off hand's blade.
   if (joint === 'lElbow') dropShield(world, fighter, 'dropped');
+  if (fighter.offWeapon?.held && joint === `${fighter.offWeapon.main}Elbow`) dropOffWeapon(world, fighter, 'dropped');
   for (const name of LIMP_BELOW[joint]) fighter.limp.add(P[name]);
   fighter.damage[JOINT_SEGMENTS[joint][0]] = Math.max(fighter.damage[JOINT_SEGMENTS[joint][0]] ?? 0, 1);
   const ending = !joint.endsWith('Elbow');
@@ -2929,7 +3158,7 @@ function collideFighters(world, h, time, substep = 0) {
         const defender = fighters[d];
         if (attacker.corner === defender.corner && !attacker.punch) continue;
         for (const striker of limbs) {
-          const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
+          const striking = striker.weapon ? Boolean(strokeOf(attacker, striker.weapon)) : attacker.punch?.spec.limb === striker.key;
           if (striking || substep % idleEvery === 0) collideStriker(world, attacker, defender, striker, time);
         }
       }
@@ -2939,7 +3168,7 @@ function collideFighters(world, h, time, substep = 0) {
         if (b <= a) continue;
         const second = fighters[b];
         pushApart(world, first, second);
-        if (first.weapon?.held && second.weapon?.held && first.corner !== second.corner) clashWeapons(world, first, second);
+        if (first.corner !== second.corner) clashBlades(world, first, second);
       }
     });
     return;
@@ -2958,7 +3187,7 @@ function collideFighters(world, h, time, substep = 0) {
     for (let second = first + 1; second < fighters.length; second += 1) {
       if (!near(first, second)) continue;
       pushApart(world, fighters[first], fighters[second]);
-      if (fighters[first].weapon?.held && fighters[second].weapon?.held && fighters[first].corner !== fighters[second].corner) clashWeapons(world, fighters[first], fighters[second]);
+      if (fighters[first].corner !== fighters[second].corner) clashBlades(world, fighters[first], fighters[second]);
     }
   }
 }
@@ -2979,12 +3208,13 @@ function strikers(fighter) {
     const face = vec.add(shield.centre, vec.scale(shield.normal, 0.02));
     list[0] = { key: 'lHand', bash: true, a: P.lHand, b: P.lHand, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)), radius: spec.shape ? spec.width * 0.4 : spec.radius * 0.75, side: 'l' };
   }
-  const weapon = fighter.weapon;
-  // (A whip's handle strikes nothing: its thong's tip does, in physics/whip.js.)
-  if (weapon?.held && !weapon.spec.rope) {
+  // Each blade in his hands (two blades: the off hand's too, `offWeapon`).
+  for (const weapon of heldBlades(fighter)) {
+    // (A whip's handle strikes nothing: its thong's tip does, in physics/whip.js.)
+    if (weapon.spec.rope) continue;
     // The weapon, from where it starts to strike to its tip.
     const hand = P[`${weapon.main}Hand`];
-    list.push({ key: 'weapon', weapon: true, a: hand, b: hand, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip, radius: weapon.spec.radius, side: weapon.main });
+    list.push({ key: weapon === fighter.weapon ? 'weapon' : 'offWeapon', weapon, a: hand, b: hand, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip, radius: weapon.spec.radius, side: weapon.main });
   }
   const punch = fighter.punch;
   if (!punch || punch.t > punch.spec.extendUntil + 0.06) return list;
@@ -3059,16 +3289,27 @@ function reachBound(fighter) {
     const disc = shieldDisc(fighter);
     bound = Math.max(bound, from(disc.centre) + disc.radius + 0.012);
   }
-  const weapon = fighter.weapon;
-  if (weapon?.held && fighter.state === 'up') {
-    const hilt = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));
-    bound = Math.max(bound, Math.max(from(hilt), from(weapon.tip)) + weapon.spec.radius);
+  if (fighter.state === 'up') {
+    for (const weapon of heldBlades(fighter)) {
+      const hilt = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));
+      bound = Math.max(bound, Math.max(from(hilt), from(weapon.tip)) + weapon.spec.radius);
+    }
   }
   return bound + REACH_MARGIN;
 }
 
 // m: what a defender can be pushed in one substep's contacts, and more.
 const REACH_MARGIN = 0.1;
+
+/** The contact key for a defender's blade met by a limb: `blade`, or `offBlade` for the off hand's. */
+function bladeKeyOf(defender, weapon) {
+  return weapon === defender.offWeapon ? 'offBlade' : 'blade';
+}
+
+/** Whether a contact key is with something held before the body (a shield or a blade), not the body. */
+function guardKey(key) {
+  return key.endsWith(':shield') || key.endsWith(':blade') || key.endsWith(':offBlade');
+}
 
 function collideStriker(world, attacker, defender, striker, time) {
   const sa = striker.pa ?? point(attacker.x, striker.a);
@@ -3082,8 +3323,8 @@ function collideStriker(world, attacker, defender, striker, time) {
         const prefix = `${defender.id}:${striker.key}:`;
         if (defender.shield && defender.state !== 'out') attacker.contacts.delete(`${prefix}shield`);
         const shieldArm = attacker.shield && (striker.key === 'lHand' || striker.key === 'lForearm');
-        if (!striker.weapon && !shieldArm && defender.weapon?.held && defender.state === 'up') attacker.contacts.delete(`${prefix}blade`);
-        for (const key of attacker.contacts) if (key.startsWith(prefix) && !key.endsWith(':shield') && !key.endsWith(':blade')) attacker.contacts.delete(key);
+        if (!striker.weapon && !shieldArm && defender.state === 'up') for (const weapon of heldBlades(defender)) attacker.contacts.delete(`${prefix}${bladeKeyOf(defender, weapon)}`);
+        for (const key of attacker.contacts) if (key.startsWith(prefix) && !guardKey(key)) attacker.contacts.delete(key);
       }
       return;
     }
@@ -3098,7 +3339,9 @@ function collideStriker(world, attacker, defender, striker, time) {
       break;
     }
   }
-  const striking = striker.weapon ? attacker.punch?.spec.path === 'blade' : attacker.punch?.spec.limb === striker.key;
+  // The stroke this striker is making (a blade's own, with two), if any.
+  const stroke = striker.weapon ? strokeOf(attacker, striker.weapon) : attacker.punch?.spec.limb === striker.key ? attacker.punch : null;
+  const striking = Boolean(stroke);
   // A shield the strike has met: what lies behind its face is out of reach.
   let shadow = null;
   if (defender.shield && defender.state !== 'out') {
@@ -3110,47 +3353,48 @@ function collideStriker(world, attacker, defender, striker, time) {
       if (!attacker.contacts.has(shieldKey)) {
         attacker.contacts.add(shieldKey);
         registerShieldImpact(world, attacker, defender, striker, disc, hit, away);
-      } else if (striking && attacker.punch?.drove && !attacker.punch.stopped && vec.length(vec.sub(strikerVelocity(attacker, striker, hit.along), point(defender.v, P.lHand))) < WORLD.minImpactSpeed) {
+      } else if (striking && stroke.drove && !stroke.stopped && vec.length(vec.sub(strikerVelocity(attacker, striker, hit.along), point(defender.v, P.lHand))) < WORLD.minImpactSpeed) {
         // A blow that drove on into a shield that gave is spent once it comes to rest on it.
-        attacker.punch.landed = true;
-        attacker.punch.stopped = true;
-        if (attacker.punch.t < attacker.punch.spec.extendUntil) attacker.punch.t = attacker.punch.spec.extendUntil;
+        stroke.landed = true;
+        stroke.stopped = true;
+        if (stroke.t < stroke.spec.extendUntil) stroke.t = stroke.spec.extendUntil;
       }
       pressOnShield(attacker, defender, striker, hit, away, hit.depth);
       // A shield in the way takes the blow: nothing behind is touched. A blow
       // that glanced off its face goes on, round the rim if it was going there.
-      if (!striking || !attacker.punch || attacker.punch.stopped) return;
+      if (!striking || stroke.stopped) return;
       shadow = disc;
     } else if (touching) attacker.contacts.delete(shieldKey);
   }
   // The hand and forearm in a shield's grip are behind it: a blade meets the shield.
   const shieldArm = attacker.shield && (striker.key === 'lHand' || striker.key === 'lForearm');
-  if (!striker.weapon && !shieldArm && defender.weapon?.held && defender.state === 'up') {
-    // A blade in the way: a fist, shin, elbow or knee that comes on meets its edge.
-    const weapon = defender.weapon;
-    const hilt = vec.add(point(defender.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));
-    const closest = closestBetween(sa, sb, hilt, weapon.tip);
-    const offset = vec.sub(closest.onFirst, closest.onSecond);
-    const distance = vec.length(offset);
-    const bladeKey = `${prefix}blade`;
-    if (distance < striker.radius + weapon.spec.radius) {
-      const away = distance > 1e-6 ? vec.scale(offset, 1 / distance) : yawRotate([-1, 0, 0], defender.yaw);
-      if (!attacker.contacts.has(bladeKey)) {
-        attacker.contacts.add(bladeKey);
-        registerBladeBlock(world, attacker, defender, striker, closest, away);
+  if (!striker.weapon && !shieldArm && defender.state === 'up') {
+    // A blade in the way (either of two): a fist, shin, elbow or knee that comes on meets its edge.
+    for (const weapon of heldBlades(defender)) {
+      const hilt = vec.add(point(defender.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, weapon.spec.strikeFrom));
+      const closest = closestBetween(sa, sb, hilt, weapon.tip);
+      const offset = vec.sub(closest.onFirst, closest.onSecond);
+      const distance = vec.length(offset);
+      const bladeKey = `${prefix}${bladeKeyOf(defender, weapon)}`;
+      if (distance < striker.radius + weapon.spec.radius) {
+        const away = distance > 1e-6 ? vec.scale(offset, 1 / distance) : yawRotate([-1, 0, 0], defender.yaw);
+        if (!attacker.contacts.has(bladeKey)) {
+          attacker.contacts.add(bladeKey);
+          registerBladeBlock(world, attacker, defender, striker, closest, away, weapon);
+        }
+        const push = Math.min(striker.radius + weapon.spec.radius - distance, WORLD.contactStep);
+        for (const index of new Set([striker.a, striker.b])) for (let axis = 0; axis < 3; axis += 1) attacker.x[index * 3 + axis] += away[axis] * push;
+        return;
       }
-      const push = Math.min(striker.radius + weapon.spec.radius - distance, WORLD.contactStep);
-      for (const index of new Set([striker.a, striker.b])) for (let axis = 0; axis < 3; axis += 1) attacker.x[index * 3 + axis] += away[axis] * push;
-      return;
+      if (touching) attacker.contacts.delete(bladeKey);
     }
-    if (touching) attacker.contacts.delete(bladeKey);
   }
   // Nowhere near him: no part of his body can be touched (a crowd is mostly
   // this). Forget any contact with him, so the next real one counts.
   const hips = point(defender.x, P.pelvis);
   if (vec.length(vec.sub(closestOnSegment(hips, sa, sb).point, hips)) > WORLD.bodyReach + striker.radius) {
     if (touching) {
-      for (const key of attacker.contacts) if (key.startsWith(prefix) && !key.endsWith(':shield') && !key.endsWith(':blade')) attacker.contacts.delete(key);
+      for (const key of attacker.contacts) if (key.startsWith(prefix) && !guardKey(key)) attacker.contacts.delete(key);
     }
     return;
   }
@@ -3434,7 +3678,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
     event.effects.push(`${attacker.body.inputs.name}: broken hand`);
   }
   // A blow to the arm that holds a weapon jars the grip.
-  if (defender.weapon?.held && capsule.key.startsWith(defender.weapon.main) && BLOCKING.has(capsule.key)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1));
+  if (BLOCKING.has(capsule.key)) for (const held of heldBlades(defender)) if (capsule.key.startsWith(held.main)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1), held);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, harm, blocked, spec, RECOIL[spec.limb.slice(1)].map(([part, share]) => [P[`${side}${part}`], share]), time, event);
   world.events.push(event);
 }
@@ -3643,6 +3887,8 @@ function sever(world, defender, where, event, bladeVelocity) {
   if (defender.severed.some((done) => done.side === where.side && done.joint === where.joint)) return;
   defender.severed.push({ joint: where.joint, side: where.side });
   if (where.side === 'l' && ['wrist', 'elbow', 'shoulder'].includes(where.joint)) dropShield(world, defender, 'dropped');
+  // The hand that held the off blade gone: the blade with it.
+  if (defender.offWeapon?.held && where.side === defender.offWeapon.main && ['wrist', 'elbow', 'shoulder'].includes(where.joint)) dropOffWeapon(world, defender, 'dropped');
   defender.severedCapsules ??= new Set();
   for (const capsule of part.capsules) defender.severedCapsules.add(name(capsule));
   const members = part.particles.length ? part.particles.map((piece) => P[name(piece)]) : [P[name(part.base)]];
@@ -3687,9 +3933,10 @@ function strikeLiveUntil(spec) {
  * cut through (the blade then carries on).
  */
 function registerWeaponImpact(world, attacker, defender, striker, closest, capsule, normal, time) {
-  const punch = attacker.punch;
-  const weapon = attacker.weapon;
-  if (!punch || punch.spec.path !== 'blade' || !weapon?.held) return false;
+  // The blade that met him, and the stroke it is making (with two blades, each its own).
+  const weapon = striker.weapon;
+  const punch = strokeOf(attacker, weapon);
+  if (!punch) return false;
   const spec = punch.spec;
   if (punch.load > 0 || punch.t < spec.windup || punch.t > strikeLiveUntil(spec)) return false;
   punch.hits ??= new Set();
@@ -3757,6 +4004,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id, weapon: weapon.kind, mode: spec.mode,
+    off: weapon === attacker.offWeapon || undefined, riposte: attacker.punch?.riposte || undefined,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
     point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt,
     edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce),
@@ -3803,9 +4051,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
       knockOut(world, defender, event, capsule.key === 'head' ? 'stabbed through the head' : 'stabbed through the heart', 'killed');
     }
   }
-  if (defender.weapon?.held && capsule.key.startsWith(defender.weapon.main) && BLOCKING.has(capsule.key)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1));
+  if (BLOCKING.has(capsule.key)) for (const held of heldBlades(defender)) if (capsule.key.startsWith(held.main)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1), held);
   // Jarred by what it hit (least when it cut straight through).
-  strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15));
+  strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   if (weapon.twoHanded) recoil.push([P[`${weapon.off}Hand`], 0.8]);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
@@ -3827,8 +4075,7 @@ const BLADE_MEETS = {
  * it, is the collision; an edge met across cuts as deep as that, and a hand
  * or foot driven onto it can come off. The blade's owner has fended it off.
  */
-function registerBladeBlock(world, attacker, defender, striker, closest, away) {
-  const weapon = defender.weapon;
+function registerBladeBlock(world, attacker, defender, striker, closest, away, weapon = defender.weapon) {
   const punch = attacker.punch;
   const striking = punch && punch.spec.path !== 'blade' && punch.spec.limb === striker.key && !punch.landed && punch.t <= punch.spec.extendUntil + 0.06;
   const along = weapon.spec.strikeFrom + closest.t * (weapon.spec.length - weapon.spec.strikeFrom);
@@ -3878,7 +4125,7 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away) {
   const chain = striker.shin ? [[P[`${side}Foot`], 1], [P[`${side}Knee`], 0.7]] : (RECOIL[striker.key.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${side}${part}`], share]);
   world.pendingImpulses.push({ fighter: attacker, shares: chain, direction: away, impulse });
   world.pendingImpulses.push({ fighter: defender, shares: [[P[`${weapon.main}Hand`], 1], [P[`${weapon.main}Elbow`], 0.6]], direction: vec.scale(away, -1), impulse });
-  strainGrip(world, defender, impulse * 0.3);
+  strainGrip(world, defender, impulse * 0.3, [0, 0, 0], weapon);
   world.events.push(event);
 }
 
@@ -3887,8 +4134,9 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away) {
  * arm and the body braced behind it; the arm takes a little of the harm.
  */
 function registerShieldImpact(world, attacker, defender, striker, disc, hit, away) {
-  const punch = attacker.punch;
-  const weaponStrike = striker.weapon && punch?.spec.path === 'blade';
+  // A blade's own stroke (with two blades, each its own); a limb's, the strike if it is that limb's.
+  const punch = striker.weapon ? strokeOf(attacker, striker.weapon) : attacker.punch;
+  const weaponStrike = Boolean(striker.weapon && punch);
   if (!punch || punch.landed || (!striker.weapon && punch.spec.path === 'blade') || (!weaponStrike && punch.spec.limb !== striker.key) || (weaponStrike ? punch.t > strikeLiveUntil(punch.spec) : punch.t > punch.spec.extendUntil + 0.06) || (weaponStrike && punch.t < punch.spec.windup)) return;
   // Obsidian on a steel shield chips.
   if (weaponStrike && defender.shield?.spec.look === 'steel') chip(world, attacker);
@@ -3896,7 +4144,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   let strikeMass;
   const strikeVelocity = strikerVelocity(attacker, striker, hit.along);
   if (striker.weapon) {
-    const weapon = attacker.weapon;
+    const weapon = striker.weapon;
     const distance = weapon.spec.strikeFrom + hit.along * (weapon.spec.length - weapon.spec.strikeFrom);
     const arms = attacker.body.limbKg[`${weapon.main}Arm`] + (weapon.twoHanded ? attacker.body.limbKg[`${weapon.off}Arm`] : 0);
     const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
@@ -3920,7 +4168,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   attacker.stats.blocked += 1;
   const event = {
     time: world.time, kind: 'blocked', attacker: attacker.id, defender: defender.id, punch: punch.type, target: 'shield', speed: closing, impulse, force: 0, headDeltaV: 0,
-    effects: ['taken on the shield'], point: hit.point, normal: away, weapon: attacker.weapon?.held && striker.weapon ? attacker.weapon.kind : undefined,
+    effects: ['taken on the shield'], point: hit.point, normal: away, weapon: striker.weapon ? striker.weapon.kind : undefined,
   };
   world.pendingImpulses.push({ fighter: defender, shares: [[P.lHand, 1], [P.lElbow, 0.8], [P.lShoulder, 0.5], [P.neck, 0.3], [P.pelvis, 0.2]], direction: vec.scale(away, -1), impulse });
   // Held in line, the shield stops the blow and the stroke ends there (no
@@ -3935,9 +4183,9 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   } else punch.drove = true;
   // A block that has met its blow is done: the shield is drawn back to the guard, not pressed after the blade.
   if (defender.defence?.name === 'shieldBlock') defender.defence = null;
-  const recoil = striker.weapon ? [[P[`${attacker.weapon.main}Hand`], 1], [P[`${attacker.weapon.main}Elbow`], 0.6]] : (RECOIL[spec.limb.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${striker.side}${part}`], share]);
+  const recoil = striker.weapon ? [[P[`${striker.weapon.main}Hand`], 1], [P[`${striker.weapon.main}Elbow`], 0.6]] : (RECOIL[spec.limb.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${striker.side}${part}`], share]);
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: away, impulse: impulse * (1 - gives) });
-  if (striker.weapon) strainGrip(world, attacker, impulse * 0.25);
+  if (striker.weapon) strainGrip(world, attacker, impulse * 0.25, [0, 0, 0], striker.weapon);
   world.events.push(event);
   if (striker.weapon) world.events.push({ time: world.time, kind: 'clash', fighter: defender.id, point: hit.point, normal: away, impulse });
   // Each blow strains the shield's hold on his arm, the more the further
@@ -3952,7 +4200,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
 /** The speed of a striking limb or blade at a point along it (`along`, 0-1 of its striking length). */
 function strikerVelocity(attacker, striker, along) {
   if (!striker.weapon) return vec.lerp(point(attacker.v, striker.a), point(attacker.v, striker.b), along);
-  const weapon = attacker.weapon;
+  const weapon = striker.weapon;
   const distance = weapon.spec.strikeFrom + along * (weapon.spec.length - weapon.spec.strikeFrom);
   return vec.lerp(handVelocityOf(attacker, P[`${weapon.main}Hand`]), weapon.tipVelocity, distance / weapon.spec.length);
 }
@@ -3997,7 +4245,7 @@ function pressOnShield(attacker, defender, striker, hit, away, depth) {
   const parts = striker.a === striker.b ? [striker.a] : [striker.a, striker.b];
   let own = 0;
   for (const index of parts) own += attacker.invMass[index] / parts.length;
-  const weapon = striker.weapon ? attacker.weapon : null;
+  const weapon = striker.weapon || null;
   let turn = 0;
   let lever = 0;
   let pivot = null;
@@ -4036,13 +4284,25 @@ function pressOnShield(attacker, defender, striker, hit, away, depth) {
   }
 }
 
+/** Every blade of one man against every blade of the other (two blades: up to four pairs). */
+function clashBlades(world, first, second) {
+  if (!first.weapon?.held && !first.offWeapon?.held) return;
+  if (!second.weapon?.held && !second.offWeapon?.held) return;
+  for (const a of heldBlades(first)) {
+    for (const b of heldBlades(second)) {
+      // A blade lost in an earlier clash this substep meets nothing more.
+      if (a.held && b.held) clashWeapons(world, first, second, a, b);
+    }
+  }
+}
+
 /**
  * Two weapons meet. They cannot pass through each other; met hard enough,
- * they bang apart, each strike stopped where it was, each grip jarred.
+ * they bang apart, each strike stopped where it was, each grip jarred. A
+ * blade that was not striking stopping one that was has parried it (a
+ * `parry` event: with the off hand's blade, `off`).
  */
-function clashWeapons(world, first, second) {
-  const a = first.weapon;
-  const b = second.weapon;
+function clashWeapons(world, first, second, a = first.weapon, b = second.weapon) {
   // Glass against steel: the brittle one chips at each clash.
   const chipOnSteel = () => {
     if (a.spec.brittle && !b.spec.brittle) chip(world, first);
@@ -4058,7 +4318,7 @@ function clashWeapons(world, first, second) {
   const offset = vec.sub(closest.onFirst, closest.onSecond);
   const distance = vec.length(offset);
   const reach = a.spec.radius + b.spec.radius;
-  const key = `${first.id}:${second.id}`;
+  const key = `${first.id}${a === first.offWeapon ? 'o' : ''}:${second.id}${b === second.offWeapon ? 'o' : ''}`;
   if (distance >= reach || distance < 1e-9) {
     world.clashing.delete(key);
     return;
@@ -4088,15 +4348,27 @@ function clashWeapons(world, first, second) {
   const impulse = ((massA * massB) / (massA + massB)) * closing * (1 + BLADES.clashRestitution);
   world.pendingImpulses.push({ fighter: first, shares: [[mainA, 1], [P[`${a.main}Elbow`], 0.5]], direction: normal, impulse });
   world.pendingImpulses.push({ fighter: second, shares: [[mainB, 1], [P[`${b.main}Elbow`], 0.5]], direction: vec.scale(normal, -1), impulse });
-  for (const fighter of [first, second]) {
-    if (fighter.punch?.spec.path !== 'blade') continue;
-    fighter.punch.landed = true;
-    fighter.punch.stopped = true;
+  // Each blade's own stroke is stopped where it met the other.
+  const strokeA = strokeOf(first, a);
+  const strokeB = strokeOf(second, b);
+  const cutting = (stroke) => stroke && !stroke.landed && stroke.t >= stroke.spec.windup && stroke.t <= stroke.spec.extendUntil + 0.06;
+  const parried = cutting(strokeA) && !strokeB ? [second, b, first, strokeA] : cutting(strokeB) && !strokeA ? [first, a, second, strokeB] : null;
+  for (const stroke of [strokeA, strokeB]) {
+    if (!stroke) continue;
+    stroke.landed = true;
+    stroke.stopped = true;
   }
-  world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: vec.lerp(closest.onFirst, closest.onSecond, 0.5), normal, impulse, effects: ['blades meet'] });
+  const met = vec.lerp(closest.onFirst, closest.onSecond, 0.5);
+  world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, effects: ['blades meet'] });
+  if (parried) {
+    const [parrier, blade, striker, stroke] = parried;
+    // Parried while his other blade is on its way in: the parry and the cut together.
+    const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;
+    world.events.push({ time: world.time, kind: 'parry', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, effects: [`parried with the ${blade.spec.label.toLowerCase()}`] });
+  }
   chipOnSteel();
-  strainGrip(world, first, impulse, normal);
-  strainGrip(world, second, impulse, vec.scale(normal, -1));
+  strainGrip(world, first, impulse, normal, a);
+  strainGrip(world, second, impulse, vec.scale(normal, -1), b);
 }
 
 /** Loose things — dropped weapons, severed parts — fall, tumble, bounce and come to rest lying flat. */

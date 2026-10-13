@@ -47,8 +47,10 @@ function tracker(fighter) {
   return (tally) => {
     const points = Array.from({ length: PARTICLES.length }, (_, index) => point(fighter.x, index));
     const weapon = fighter.weapon?.held ? fighter.weapon : null;
+    // Two blades: the off hand's tip is tracked too (after the first's), and its arm and shaft checked.
+    const second = fighter.offWeapon?.held ? fighter.offWeapon : null;
     const sample = {
-      points: [...TRACKED.map((name) => points[P[name]]), ...(weapon ? [weapon.tip] : [])],
+      points: [...TRACKED.map((name) => points[P[name]]), ...(weapon ? [weapon.tip] : []), ...(weapon && second ? [second.tip] : [])],
       dir: weapon ? weapon.dir : null,
     };
     const drawn = coherentFrames(boneFrames(points, fighter.body), frames);
@@ -104,20 +106,20 @@ function tracker(fighter) {
     tally.twist.push((Math.abs(turn) * 180) / Math.PI);
     if (weapon) {
       const axes = trunkAxes(points[P.pelvis], points[P.neck], points[P.lShoulder], points[P.rShoulder]);
-      const sides = weapon.twoHanded ? ['l', 'r'] : [weapon.main];
+      const sides = weapon.twoHanded ? ['l', 'r'] : second ? [weapon.main, second.main] : [weapon.main];
       for (const side of sides) {
         const limb = limbTwist(axes, 'arm', side, points[P[`${side}Shoulder`]], points[P[`${side}Elbow`]], points[P[`${side}Hand`]]);
         tally.armFrames += 1;
         if (Math.abs(twistExcess('arm', limb)) > ARM_SLACK) tally.arm += 1;
       }
-      // The shaft behind the rear hand (the butt) and ahead of it, against the trunk's core.
-      const hand = points[P[`${weapon.main}Hand`]];
-      const butt = vec.sub(hand, vec.scale(weapon.dir, weapon.spec.handle ?? 0));
-      const pelvis = points[P.pelvis];
-      const neck = points[P.neck];
-      const near = closestBetween(butt, weapon.tip, pelvis, neck);
-      const gap = vec.length(vec.sub(near.onFirst, near.onSecond));
-      if (gap < 0.07) tally.thru += 1;
+      // The shaft behind the rear hand (the butt) and ahead of it, against the trunk's core (either blade).
+      const through = (held) => {
+        const hand = points[P[`${held.main}Hand`]];
+        const butt = vec.sub(hand, vec.scale(held.dir, held.spec.handle ?? 0));
+        const near = closestBetween(butt, held.tip, points[P.pelvis], points[P.neck]);
+        return vec.length(vec.sub(near.onFirst, near.onSecond)) < 0.07;
+      };
+      if (through(weapon) || (second && through(second))) tally.thru += 1;
     }
   };
 }

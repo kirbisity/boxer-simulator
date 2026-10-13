@@ -69,6 +69,23 @@ export const MOVES = {
   yokogiri: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', sweep: true, from: { hand: [0.04, 0.68, -0.26], dir: [-0.2, 0.12, -1] }, mid: [1, 0.05, 0], to: { hand: [0.2, 0.66, 0.26], dir: [0.15, 0.05, 1] }, windup: 0.13, extendUntil: 0.36, duration: 0.7, twist: -0.75, lean: 0.06, shift: 0.04, cost: 0.03, mass: { arm: 0.6, body: 0.035 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
   kiriage: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.14, 0.4, -0.18], dir: [0.4, -0.6, -0.6] }, mid: [0.9, 0.1, 0], to: { hand: [0.12, 0.86, 0.12], dir: [0.3, 0.8, 0.5] }, windup: 0.12, extendUntil: 0.34, duration: 0.68, twist: 0.3, lean: 0.04, shift: 0.04, cost: 0.028, mass: { arm: 0.55, body: 0.025 }, rotation: 0.8, zones: ['body'], reach: 'weapon' },
   tsuki: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.12, 0.6, 0], dir: [1, 0.2, 0] }, windup: 0.08, extendUntil: 0.32, duration: 0.55, twist: -0.1, lean: 0.16, shift: 0.1, depth: 0.25, step: 1.6, cost: 0.025, mass: { arm: 0.6, body: 0.05 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
+  // Two swords (nitō, Musashi's Niten Ichi-ryū): the katana in the right hand
+  // alone (katate: `grip` one) — the same cuts, shorter and quicker, only the
+  // arm behind them (mass.arm, no body); the wakizashi in the left, shorter
+  // and quicker again. Each blade's moves are its own hand's (`limb`); the
+  // left's are the right's mirrored across the body (below).
+  kataShomen: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.02, 0.96, -0.1], dir: [-0.6, 0.75, 0] }, mid: [0.9, 0.3, 0], to: { hand: [0.3, 0.5, -0.02], dir: [0.5, -0.85, 0] }, windup: 0.11, extendUntil: 0.31, duration: 0.6, twist: -0.25, lean: 0.12, shift: 0.06, cost: 0.022, mass: { arm: 0.6 }, rotation: 0.8, zones: ['head'], reach: 'weapon' },
+  kataKesa: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.0, 0.9, -0.2], dir: [-0.45, 0.7, -0.55] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.28, 0.45, 0.14], dir: [0.45, -0.7, 0.55] }, windup: 0.1, extendUntil: 0.3, duration: 0.58, twist: -0.55, lean: 0.1, shift: 0.05, cost: 0.022, mass: { arm: 0.6 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  kataGyaku: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.08, 0.86, -0.02], dir: [-0.4, 0.7, 0.6] }, mid: [0.9, 0.15, -0.1], to: { hand: [0.28, 0.45, -0.26], dir: [0.45, -0.7, -0.55] }, windup: 0.1, extendUntil: 0.3, duration: 0.58, twist: 0.2, lean: 0.1, shift: 0.05, cost: 0.022, mass: { arm: 0.55 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  kataYoko: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', sweep: true, from: { hand: [0.04, 0.68, -0.28], dir: [-0.2, 0.12, -1] }, mid: [1, 0.05, 0], to: { hand: [0.22, 0.66, 0.2], dir: [0.15, 0.05, 1] }, windup: 0.1, extendUntil: 0.31, duration: 0.6, twist: -0.7, lean: 0.06, shift: 0.04, cost: 0.022, mass: { arm: 0.6 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
+  kataTsuki: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', from: { hand: [0.14, 0.62, -0.1], dir: [1, 0.2, 0] }, windup: 0.06, extendUntil: 0.28, duration: 0.5, twist: -0.45, lean: 0.14, shift: 0.09, depth: 0.25, step: 1.6, cost: 0.02, mass: { arm: 0.6 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
+  // The wakizashi's low cut, at the legs: across from the left, under his guard.
+  wakiLow: { kind: 'strike', limb: 'lHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.06, 0.72, 0.24], dir: [-0.3, 0.7, 0.5] }, mid: [0.8, -0.45, -0.1], to: { hand: [0.3, 0.34, -0.06], dir: [0.4, -0.7, -0.4] }, windup: 0.08, extendUntil: 0.27, duration: 0.5, twist: 0.4, lean: 0.16, dip: 0.04, shift: 0.05, cost: 0.018, mass: { arm: 0.6 }, rotation: 0.8, zones: ['legs'], reach: 'weapon' },
+  // The beat (uchi-otoshi): the wakizashi struck down across his blade to
+  // knock it off the line, and the katana into the gap a moment behind it
+  // (`with`: the other hand's move, `withDelay` s later; the move lasts
+  // until both are done). Aimed at his blade (`zones` blade); if he has none, at him.
+  wakiBeat: { kind: 'strike', limb: 'lHand', path: 'blade', mode: 'swing', grip: 'one', from: { hand: [0.1, 0.8, 0.16], dir: [0.1, 0.9, -0.3] }, mid: [0.6, -0.35, -0.7], to: { hand: [0.3, 0.52, 0.0], dir: [0.5, -0.7, -0.45] }, windup: 0.05, extendUntil: 0.2, duration: 0.42, twist: 0.3, lean: 0.08, shift: 0.05, cost: 0.032, mass: { arm: 0.6 }, rotation: 0.6, zones: ['blade'], reach: 'weapon', with: 'kataTsuki', withDelay: 0.1, contactAt: 0.5 },
   // Long sword: two hands for the cuts (the middle cut sweeps), one for the lunge.
   oberhau: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', from: { hand: [0.0, 0.94, -0.16], dir: [-0.45, 0.65, -0.6] }, mid: [0.9, 0.15, 0.1], to: { hand: [0.27, 0.42, 0.18], dir: [0.45, -0.7, 0.55] }, windup: 0.16, extendUntil: 0.4, duration: 0.78, twist: -0.5, lean: 0.12, shift: 0.07, cost: 0.034, mass: { arm: 0.6, body: 0.035 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
   zwerchhau: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', sweep: true, from: { hand: [0.03, 0.72, -0.28], dir: [-0.25, 0.15, -1] }, mid: [1, 0.05, 0], to: { hand: [0.2, 0.68, 0.28], dir: [0.15, 0.05, 1] }, windup: 0.16, extendUntil: 0.42, duration: 0.8, twist: -0.8, lean: 0.06, shift: 0.05, cost: 0.036, mass: { arm: 0.6, body: 0.04 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon' },
@@ -167,14 +184,24 @@ export const MOVES = {
 // Bare strikes do blunt harm; a weapon move's harm splits into blunt, cut
 // and pierce by the weapon and how its contact lands (weapons.js).
 // Defences, each a timed posture change the physics carries out.
+
 // A move done with the other arm: the same path mirrored across the body
-// (for a weapon in the left hand: the combat bot's forearm shotgun, swung as a mace).
-function mirrored(move) {
+// (for a weapon in the left hand: the combat bot's forearm shotgun, swung as
+// a mace; the wakizashi in the left hand of two swords).
+function mirrored(move, change = {}) {
   const flip = (v) => v && [v[0], v[1], -v[2]];
   const place = (at) => at && { hand: flip(at.hand), dir: flip(at.dir) };
-  return { ...move, limb: move.limb.replace(/^r/, 'l'), twist: -(move.twist ?? 0), from: place(move.from), to: place(move.to), mid: flip(move.mid) };
+  return { ...move, limb: move.limb.replace(/^r/, 'l'), twist: -(move.twist ?? 0), from: place(move.from), to: place(move.to), mid: flip(move.mid), ...change };
 }
 for (const name of ['maceOverhead', 'maceSide']) MOVES[`${name}Left`] = mirrored(MOVES[name]);
+// The wakizashi's cut and thrust: the katana's, in the left hand, a shorter blade quicker still.
+MOVES.wakiKesa = mirrored(MOVES.kataKesa, { windup: 0.08, extendUntil: 0.26, duration: 0.5, cost: 0.018, twist: 0.3 });
+MOVES.wakiTsuki = mirrored(MOVES.kataTsuki, { windup: 0.05, extendUntil: 0.25, duration: 0.46, step: 1.4, cost: 0.017 });
+// Both at once: the katana's cut across the line of the wakizashi's thrust
+// (the thrust first, the cut a moment behind it: the hands do not cross);
+// and high and low, the katana at the head while the wakizashi takes the leg.
+MOVES.kesaTsuki = { ...MOVES.kataKesa, with: 'wakiTsuki', withDelay: -0.04, duration: 0.62, cost: 0.036 };
+MOVES.jodanGedan = { ...MOVES.kataShomen, with: 'wakiLow', withDelay: 0.06, duration: 0.62, cost: 0.036 };
 
 export const DEFENCES = {
   guard: { seconds: 0.5 }, // gloves tight to the face, elbows in
@@ -490,6 +517,34 @@ export const STYLES = {
     headMovement: 0.1,
     plans: { pressure: 1.8, brawler: 0.8, counter: 0.6, outboxer: 0.4 },
     pressure: 0.45,
+  },
+  // Two swords (nitō: Musashi's Niten Ichi-ryū): the katana in the right hand
+  // alone (`grip` one), the wakizashi in the left (`offWeapon`, its guard
+  // `offGuard`), both points forward at him. Either blade cuts and thrusts;
+  // both at once (kesaTsuki, jodanGedan); the short one beats his blade aside and
+  // the long one goes into the gap (wakiBeat). A strike seen coming is met
+  // with one blade while the other cuts (`riposte`: that share of the times
+  // he answers one, and the moves: the blade struck with is the riposte's,
+  // the other parries; AI). One blade left, he fights with it alone: the
+  // katana in both hands as a rōnin (`single`), or, the katana lost, the
+  // wakizashi in his sword hand.
+  nito: {
+    label: 'Nitō (two swords)', weapon: 'katana', grip: 'one', offWeapon: 'wakizashi', single: 'ronin',
+    cadence: { work: 1.5, move: 0.9, burst: 0.85, mobility: 0.7 },
+    stance: { blade: 0.12, crouch: 0.08, width: 1.2, lean: 0.06, guardHeight: 0 },
+    weaponGuard: { hand: [0.2, 0.64, -0.12], dir: [0.7, 0.65, 0.12] },
+    offGuard: { hand: [0.22, 0.56, 0.13], dir: [0.85, 0.35, -0.18] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.25 },
+    attacks: { kataKesa: 0.18, kataGyaku: 0.1, kataShomen: 0.08, kataYoko: 0.06, kataTsuki: 0.1, wakiKesa: 0.06, wakiTsuki: 0.08, wakiBeat: 0.16, kesaTsuki: 0.1, jodanGedan: 0.08, rush: 0.02 },
+    combos: { 'wakiTsuki kataKesa': 0.25, 'kataKesa wakiKesa': 0.2, 'wakiBeat kataGyaku': 0.2, 'kataGyaku kesaTsuki': 0.15, 'wakiKesa kataShomen': 0.2 },
+    comboChance: 0.6,
+    tempo: 0.8,
+    defences: { weaponBlock: 0.75, stepBack: 0.2, guard: 0.05 },
+    defendChance: 0.75,
+    riposte: { chance: 0.65, moves: { kataKesa: 0.35, kataTsuki: 0.25, kataGyaku: 0.15, wakiTsuki: 0.25 } },
+    headMovement: 0.1,
+    plans: { pressure: 1.4, counter: 1.3, brawler: 0.5, outboxer: 0.5 },
+    pressure: 0.35,
   },
   // Polearms. Each holds the range its reach gives (see the AI), and fights
   // mixed when it loses its weapon. `rangeInside`: how far inside his own
