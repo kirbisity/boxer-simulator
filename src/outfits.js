@@ -51,13 +51,14 @@ function plateDesign(label, steel, fluted, pointed, under) {
  * clothes under it, the leather of the tilting targe, and the knight's two
  * colours for the mantling (lambrequin) down the back of his helm.
  */
-function tournamentDesign(label, { steel, under, leather, colour, colour2, plume = '#f2efe6' }) {
+function tournamentDesign(label, { steel, under, leather, colour, colour2, plume = '#f2efe6', style, gold = '#c9a23a' }) {
   return {
     label,
     top: { kind: 'longsleeve', color: under },
     bottom: { kind: 'tights', color: under },
-    armor: { kind: 'plate', color: steel, joust: true, mail: '#8d9097', leather, gold: '#c9a23a', cloth: colour, cloth2: colour2 },
-    head: { kind: 'stechhelm', color: steel, plume, mantling: [colour, colour2] },
+    armor: { kind: 'plate', color: steel, joust: true, mail: '#8d9097', leather, gold, cloth: colour, cloth2: colour2 },
+    // `style`: the helm's shape (STECHHELM_STYLES in stechzeug.js); none, the first drawing of it.
+    head: { kind: 'stechhelm', color: steel, plume, mantling: [colour, colour2], gold, ...(style ? { style } : {}) },
     feet: { kind: 'sabaton', color: steel },
   };
 }
@@ -529,6 +530,10 @@ export const OUTFITS = {
       tournamentDesign('Bright steel, red and white', { steel: '#c2c7ce', under: '#2a2622', leather: '#6b4528', colour: '#a8201e', colour2: '#ece6d8' }),
       tournamentDesign('Blued steel, black and gold', { steel: '#5d6672', under: '#1c1a18', leather: '#4a3020', colour: '#1c1c20', colour2: '#d4a83a' }),
       tournamentDesign('Bright steel, blue and white', { steel: '#c9ced5', under: '#26283a', leather: '#7a5434', colour: '#23408a', colour2: '#ece6d8' }),
+      // The helm in three shapes nearer the surviving ones (the waisted, concave profile; ridged), to choose between.
+      tournamentDesign('Augsburg helm: fluted, brass, red and white', { style: 'augsburg', steel: '#c2c7ce', under: '#2a2622', leather: '#6b4528', colour: '#a8201e', colour2: '#ece6d8' }),
+      tournamentDesign('Frog helm: plain steel, green and white', { style: 'frog', steel: '#cfd3d9', under: '#26302a', leather: '#6b4528', colour: '#2f6a3a', colour2: '#ece6d8' }),
+      tournamentDesign('Gothic helm: russet and brass, black and gold', { style: 'gothic', steel: '#6a4a3a', under: '#1c1a18', leather: '#4a3020', colour: '#1c1c20', colour2: '#d4a83a', gold: '#d0a640' }),
     ],
   },
   // A brother-knight of the Temple (c. 1180–1300): a full mail hauberk with

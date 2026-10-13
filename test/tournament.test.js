@@ -5,7 +5,26 @@ import { thinkAll } from '../src/ai.js';
 import { MOVEMENT, OUTFITS } from '../src/outfits.js';
 import { STYLES } from '../src/moves.js';
 import { WEAPONS } from '../src/weapons.js';
+import { STECHHELM_STYLES } from '../src/stechzeug.js';
 import { advance, createWorld, placeFighter, point, poiseOf, throwPunch } from '../src/physics.js';
+
+test('the helm in three shapes: each a design of the Stechzeug, waisted in profile, the sight a gap, the plates meeting the ring', () => {
+  const styled = OUTFITS.tournament.designs.filter((design) => design.head.style);
+  assert.deepEqual(styled.map((design) => design.head.style), ['augsburg', 'frog', 'gothic']);
+  assert.ok(!OUTFITS.tournament.designs[0].head.style, 'the first drawing stays the default');
+  for (const [name, spec] of Object.entries(STECHHELM_STYLES)) {
+    const lower = spec.lower.map((section) => section[2]);
+    const waist = Math.min(...lower);
+    // The beak stands out at the sight, the bevor draws in at the throat, the chest plate flares out again.
+    assert.ok(lower.at(-1) - waist > 1, `${name}: beak ${lower.at(-1)} over waist ${waist}`);
+    assert.ok(spec.chest.at(-1)[2] - waist > 1, `${name}: chest plate flares`);
+    assert.ok(lower.indexOf(waist) > 0, `${name}: the waist above the ring's foot`);
+    assert.ok(spec.crown[0][0] > spec.lower.at(-1)[0], `${name}: the sight a gap between the lips`);
+    assert.ok(spec.crown[0][2] > spec.lower.at(-1)[2], `${name}: the upper lip projects`);
+    assert.deepEqual(spec.chest[0], spec.lower[0], `${name}: chest plate from the ring`);
+    assert.deepEqual(spec.nape[0], spec.lower[0], `${name}: nape plate from the ring`);
+  }
+});
 
 // Sir Edric's own body in his plate, or in the Stechzeug: only the kit differs.
 const edricIn = (kind) => ({ ...structuredClone(PRESETS.knight), style: 'boxing', outfit: { kind, design: 0 }, accessories: [] });
