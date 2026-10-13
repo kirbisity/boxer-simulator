@@ -435,7 +435,7 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
 function snapshot(world) {
   return {
     world,
-    fighters: world.fighters.map((fighter) => ({ x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice() })),
+    fighters: world.fighters.map((fighter) => ({ x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
     debris: world.debris.map((piece) => ({ x: piece.x?.slice(), q: piece.q?.slice() })),
   };
 }
@@ -456,10 +456,11 @@ function blendWorld(world, before, share) {
   world.fighters.forEach((fighter, index) => {
     const then = before.fighters[index];
     if (!then) return;
-    const now = { fighter, x: fighter.x.slice(), dir: fighter.weapon?.dir };
+    const now = { fighter, x: fighter.x.slice(), dir: fighter.weapon?.dir, offDir: fighter.offWeapon?.dir };
     kept.push(now);
     fighter.x.set(blend(then.x, now.x, share));
     if (then.dir && now.dir) fighter.weapon.dir = unit(blend(then.dir, now.dir, share));
+    if (then.offDir && now.offDir) fighter.offWeapon.dir = unit(blend(then.offDir, now.offDir, share));
   });
   world.debris.forEach((piece, index) => {
     const then = before.debris[index];
@@ -477,6 +478,7 @@ function blendWorld(world, before, share) {
       if (entry.fighter) {
         entry.fighter.x.set(entry.x);
         if (entry.dir && entry.fighter.weapon) entry.fighter.weapon.dir = entry.dir;
+        if (entry.offDir && entry.fighter.offWeapon) entry.fighter.offWeapon.dir = entry.offDir;
       } else {
         entry.piece.x = entry.x;
         entry.piece.q = entry.q;
@@ -655,6 +657,7 @@ function logEvent(event) {
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
+  else if (event.kind === 'parry') text = `⚔️ <b>${name(event.fighter)}</b> parries <b>${name(event.attacker)}</b>'s ${event.punch} · <em>${event.effects.join(', ')}${event.answering ? ', cutting as he does' : ''}</em>`;
   else if (event.kind === 'bladeBlock') text = `<b>${name(event.attacker)}</b> meets <b>${name(event.defender)}</b>'s ${event.punch ?? 'strike'} with the blade · <em>${event.effects.join(', ') || 'fended off'}</em>`;
   else if (event.kind === 'pickup') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'styleSwitch') text = `<b>${name(event.fighter)}</b> switches to ${STYLES[event.style].label}`;

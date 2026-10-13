@@ -179,10 +179,14 @@ export function desiredPose(body, intent = {}) {
       continue;
     }
     const weaponArm = intent.weaponArms?.includes(side);
+    // A second blade's arm (two blades: `offArm`) has its own stroke and blade direction.
+    const second = intent.offArm === side;
+    const windingUp = second ? intent.offWindingUp : intent.windingUp;
+    const swinging = second ? intent.offSwinging : intent.swinging;
     let wanted = intent[`${side}Hand`] ?? guardPoint;
     if (weaponArm && weaponShift) wanted = vec.add(wanted, weaponShift);
     if (weaponArm) {
-      const reach = intent.windingUp ? POSE.weaponWindupReach : intent.polearmRear === side ? POSE.polearmRearReach : intent.weaponReach ?? POSE.weaponReach;
+      const reach = windingUp ? POSE.weaponWindupReach : intent.polearmRear === side ? POSE.polearmRearReach : intent.weaponReach ?? POSE.weaponReach;
       wanted = [Math.max(wanted[0], shoulder[0] + reach * H), wanted[1], wanted[2]];
     }
     const target = clampReach(shoulder, wanted, (L.upperArm + L.forearmToFist) * 0.995);
@@ -192,7 +196,7 @@ export function desiredPose(body, intent = {}) {
     const elbow = twoBoneIK(shoulder, target, L.upperArm, L.forearmToFist, pole);
     // Not mid-stroke: a swing's own path through the arm is what drives the blade.
     // A shield arm's forearm lies where the shield's straps put it.
-    out[P[`${side}Elbow`]] = (weaponArm && (intent.swinging || intent.windingUp)) || intent.shieldArm === side ? elbow : swivelIntoRange(shoulderAxes, 'arm', side, shoulder, elbow, target, { bladeDir: weaponArm ? intent.bladeDir : null, margin: weaponArm ? margin : 0 });
+    out[P[`${side}Elbow`]] = (weaponArm && (swinging || windingUp)) || intent.shieldArm === side ? elbow : swivelIntoRange(shoulderAxes, 'arm', side, shoulder, elbow, target, { bladeDir: weaponArm ? (second ? intent.offBladeDir : intent.bladeDir) : null, margin: weaponArm ? margin : 0 });
   }
   return out;
 }

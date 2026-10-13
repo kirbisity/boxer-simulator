@@ -1325,6 +1325,20 @@ export function updateArms(view, fighterView, time = 0) {
   const weapon = fighter.weapon;
   const arms = fighterView.arms ?? (fighterView.arms = { weapon: null, kind: null, shield: null });
   const showing = fighterView.layers.skin.visible;
+  drawHeld(view, fighterView, arms, weapon, time);
+  // A second blade in the off hand (two blades): drawn the same way, in its own hand.
+  if (fighter.offWeapon?.held || arms.second?.weapon) drawHeld(view, fighterView, arms.second ??= { weapon: null, kind: null }, fighter.offWeapon, time);
+  drawMounted(view, fighterView, arms, weapon, showing);
+}
+
+/**
+ * A weapon held in the hand (`slot`: its drawing, kept between frames: the
+ * fighter's arms for his weapon, `arms.second` for the off hand's), drawn
+ * where the simulation holds it; gone from the hand, its drawing goes.
+ */
+function drawHeld(view, fighterView, arms, weapon, time) {
+  const fighter = fighterView.fighter;
+  const showing = fighterView.layers.skin.visible;
   if (weapon?.held) {
     const key = weapon.colour ? `${weapon.kind}:${weapon.colour}` : weapon.kind;
     if (arms.kind !== key) {
@@ -1371,6 +1385,11 @@ export function updateArms(view, fighterView, time = 0) {
     arms.weapon = null;
     arms.kind = null;
   }
+}
+
+/** Forearm weapons (the kit's `mounted`) not in use, drawn on their arms; and the shield on its arm. */
+function drawMounted(view, fighterView, arms, weapon, showing) {
+  const fighter = fighterView.fighter;
   // Forearm weapons (the kit's `mounted`) not in use: drawn on their arms, along the forearm.
   const mounted = fighter.body.gear.mounted;
   if (mounted && !fighterView.baked) {
