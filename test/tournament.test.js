@@ -67,10 +67,10 @@ test('the Stechzeug: cut-proof, better against a point than plate, proofed, slow
   assert.ok(mine > his * 1.35, `poise ${mine.toFixed(2)} against the knight's ${his.toFixed(2)}`);
 });
 
-test('the helm halves the skill of the man in it: a hero\'s 1 to 0.5, a kit\'s or his own likewise', () => {
+test('the helm costs the man in it a quarter of his skill: a hero\'s 1 to 0.75, a kit\'s or his own likewise', () => {
   assert.equal(PRESETS.maximilian.hero, true);
-  assert.equal(buildBody(PRESETS.maximilian).skill, 0.5);
-  assert.equal(buildBody({ ...PRESETS.maximilian, skill: 0.8 }).skill, 0.4);
+  assert.equal(buildBody(PRESETS.maximilian).skill, 0.75);
+  assert.ok(Math.abs(buildBody({ ...PRESETS.maximilian, skill: 0.8 }).skill - 0.6) < 1e-9);
   assert.equal(buildBody({ ...PRESETS.maximilian, outfit: { kind: 'knight', design: 0 } }).skill, 1, 'out of it, his own');
   assert.equal(buildBody(PRESETS.knight).skill, 0.5);
 });
@@ -110,6 +110,7 @@ test('the war lance: long, heavy, a point; the lance style thrusts, holds the ra
   assert.ok(lance.mass >= 5 && lance.mass <= 8, `${lance.mass} kg`);
   assert.ok(lance.mass > WEAPONS.longSpear.mass * 2);
   assert.ok(lance.harm.thrust.pierce > WEAPONS.longSpear.harm.thrust.pierce);
+  assert.ok((lance.harm.thrust.cut ?? 0) < 0.05 && !lance.harm.swing.cut && lance.harm.swing.blunt > 0.5, 'next to no edge; swung, it clubs');
   assert.ok(lance.wrist.omega < WEAPONS.longSpear.wrist.omega, 'slower to turn than a spear');
   assert.ok(lance.vamplate > 0.1);
   const style = STYLES.lance;

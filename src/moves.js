@@ -547,23 +547,25 @@ export const STYLES = {
   // the heavy shaft). The long sword when the lance is gone (his kit's sidearm).
   lance: {
     label: 'Lance', weapon: 'lance', fallback: 'mix',
-    cadence: { work: 0.9, move: 0.6, burst: 0.3, mobility: 0.3 },
-    stance: { blade: 0.55, crouch: 0.05, width: 1.25, lean: 0.12, guardHeight: 0 },
+    // Fought to drive it home: he holds the lance's length off and comes on
+    // behind the point again and again, a jab to set the line, the couched thrust after it.
+    cadence: { work: 1.4, move: 0.75, burst: 0.7, mobility: 0.45 },
+    stance: { blade: 0.55, crouch: 0.06, width: 1.25, lean: 0.16, guardHeight: 0 },
     weaponGuard: { hand: [-0.08, 0.58, -0.12], dir: [1, 0.06, 0] },
     idle: { bounce: 0.08, sway: 0.25, rock: 0.2 },
-    attacks: { lanceThrust: 0.5, lanceHigh: 0.25, lanceJab: 0.25 },
-    combos: { 'lanceJab lanceThrust': 0.6, 'lanceThrust lanceHigh': 0.4 },
-    comboChance: 0.25,
-    tempo: 1.6,
-    defences: { weaponBlock: 0.45, stepBack: 0.3, guard: 0.25 },
-    defendChance: 0.6,
+    attacks: { lanceThrust: 0.55, lanceHigh: 0.25, lanceJab: 0.2 },
+    combos: { 'lanceJab lanceThrust': 0.5, 'lanceThrust lanceHigh': 0.3, 'lanceJab lanceJab lanceThrust': 0.2 },
+    comboChance: 0.5,
+    tempo: 1.0,
+    defences: { weaponBlock: 0.45, stepBack: 0.25, guard: 0.3 },
+    defendChance: 0.5,
     headMovement: 0,
-    plans: { outboxer: 1.6, counter: 1.3, pressure: 0.6, brawler: 0.2 },
-    pressure: 0.03,
+    plans: { pressure: 1.4, outboxer: 1.2, counter: 0.8, brawler: 0.3 },
+    pressure: 0.2,
     rangeInside: 0.06,
     keepPoint: 1.1,
-    // Each thrust of a 5.2 kg lance costs over half again a spear's: met with a burst only with the wind for it.
-    burstAbove: 0.45,
+    // A 5.2 kg lance's thrust costs over half again a spear's; still he bursts in with little wind to spare.
+    burstAbove: 0.25,
   },
   knife: {
     label: 'Knife', weapon: 'knife',

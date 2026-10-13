@@ -496,7 +496,7 @@ export const OUTFITS = {
   //   overlap and are bolted) and the steel is thicker: pierce 0.95;
   // - the helm bolted to the cuirass (`headLocked`): the head cannot turn,
   //   nod or duck apart from the body, and he sees only through the slit;
-  //   he fights by feel more than sight (`skillFactor`: half his skill);
+  //   he fights by feel more than sight (`skillFactor`: three quarters of his skill);
   // - the weight and the one rigid shell of helm and breast stand him
   //   against a blow (`poise`), and he moves slowly (`movement: 'slow'`).
   // Not dealt at random (no `family`); in no level.
@@ -512,7 +512,7 @@ export const OUTFITS = {
     // The helm and the reinforced breast bolted into one rigid shell: a blow anywhere on it is taken by the whole man.
     poise: 1,
     headLocked: true,
-    skillFactor: 0.5,
+    skillFactor: 0.75,
     // The frog-mouth helm: another man's head stays well outside it in a clinch.
     headBulk: 1.5,
     // Overlapping plates bolted together: half the gaps a point finds in field plate; and under them

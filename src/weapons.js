@@ -242,11 +242,12 @@ export const WEAPONS = {
   // grip behind the vamplate, the other hand back on the butt (`hands` two,
   // the second behind); its balance a hand's breadth ahead of the grip, as a
   // lance is made. Driven, not swung: a narrow point with the man's weight
-  // behind it; slow to turn (`wrist`). The swell and the burr behind the grip
+  // behind it (`pierce` well above a spear's); its narrow head has next to
+  // no edge; swung, the heavy shaft clubs (`swing` blunt). Slow to turn (`wrist`). The swell and the burr behind the grip
   // hold it in the hand against a blow on the long shaft (`grip`) better than a spear.
   lance: {
     pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, vamplate: 0.13,
-    harm: { thrust: { pierce: 1.6, blunt: 0.4, cut: 0.05 }, swing: { blunt: 0.7 } },
+    harm: { thrust: { pierce: 2.0, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.8,
   },
   // The yari, as the ashigaru carried it: the war spear's long straight head
