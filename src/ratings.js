@@ -8,6 +8,23 @@ export const RATINGS = {
  "bouts": 16,
  "totalBouts": 5244,
  "characters": {
+  "maximilian": {
+   "title": "Maximilian I",
+   "faction": "knights",
+   "type": "lance|tournament",
+   "records": {
+    "maximus": {
+     "wins": 1,
+     "losses": 7,
+     "draws": 0
+    }
+   },
+   "score": 235,
+   "provisional": 235,
+   "kd": {
+    "maximus": 0.2
+   }
+  },
   "ironPagoda": {
    "title": "Wanyan Wuzhu",
    "faction": "chinese",
@@ -1690,6 +1707,7 @@ export const RATINGS = {
   }
  },
  "types": {
+  "lance|tournament": 235,
   "langyaShield|ironPagoda": 397,
   "longsword|knight": 411,
   "warhammer|knight": 964,
