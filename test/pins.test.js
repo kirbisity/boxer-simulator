@@ -43,7 +43,7 @@ test('sumo pushes men off their feet: a heavy sumo drives a lighter man over, op
   let falls = 0;
   let palmHarm = 0;
   let palms = 0;
-  for (let seed = 950; seed < 954; seed += 1) {
+  for (let seed = 950; seed < 958; seed += 1) {
     const world = createWorld([{ ...PRESETS.heavy, style: 'sumo' }, { ...PRESETS.light, style: 'kickboxing' }], { seed });
     for (let second = 0; second < 90 && !boutWinner(world); second += 0.5) advance(world, 0.5, (current, dt) => thinkAll(current, dt));
     falls += world.events.filter((event) => event.kind === 'fell' && event.fighter === 1).length;

@@ -49,6 +49,9 @@ export const AI = {
   // Pelvis-to-pelvis distance beyond arm reach the AI stands at: the lead
   // hand then lands near full extension, when it is fastest.
   rangeExtra: 0.2,
+  // Closing into range: full pace until this far (m) beyond his working range, then easing to `approachFloor` of it.
+  approachBrake: 1.0,
+  approachFloor: 0.35,
   // Kickers hold a little further out than punchers.
   kickerExtra: 0.15,
   // Charges per second at range, per unit of the style's rush weight: at
@@ -845,7 +848,8 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   }
   // Sure of himself, he works from closer still: he walks his man down.
   const workRange = range - AI.confidence.closer * Math.max(0, cadence.nerve);
-  if (distance > workRange + AI.rangeSlack) fighter.move = approach;
+  // Coming into his range he checks his pace (AI.approachBrake m out, down to approachFloor): he arrives set, not walking onto the other man's fist.
+  if (distance > workRange + AI.rangeSlack) fighter.move = approach * Math.min(1, AI.approachFloor + (distance - workRange) / AI.approachBrake);
   else if (distance < workRange - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
   else fighter.move *= Math.exp(-dt * 4);
   if (fighter.stamina < 0.25 && distance < range + 0.4) fighter.move = -0.6;

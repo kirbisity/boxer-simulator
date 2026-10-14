@@ -162,7 +162,7 @@ test('the special button: reload an empty gun, fire a loaded one, pick up a weap
   const sumo = played(Object.values(PRESETS).find((preset) => preset.style === 'sumo'), PRESETS.light, { still: true });
   assert.equal(contextAction(sumo.world, sumo.me), null, 'nothing to do from across the ring');
   sumo.orders.lock = sumo.him.id;
-  sumo.step(3);
+  sumo.step(4.5);
   assert.equal(contextAction(sumo.world, sumo.me), 'clinch', 'up close, a clinch');
   assert.ok(doAction(sumo.world, sumo.me, 'clinch'));
   let held = null;
