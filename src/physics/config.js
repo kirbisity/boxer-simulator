@@ -313,8 +313,18 @@ export const WORLD = {
   // for less), up on hands and knees, a foot through, onto that foot and the
   // other knee, standing (about 2.5 s in all, as a fit man takes); on to the next
   // once its time is up and the hips are at `reached` of the height it puts
-  // them (`stood` of his standing height, the last), or `patience` s more,
-  // when he sinks back beaten. On hands and knees
+  // them (`stood` of his standing height, the last). Short of it he strains
+  // on while the hips still come up (`gain` m higher than before), until
+  // they have not for `patience` s, `strainMost` s past the stage's time at
+  // most; then he sinks back beaten (on his feet if not quite straight, he
+  // is up). The lifting stages are slower the less his legs and arms can
+  // lift beyond his weight with all he wears (rising.js liftMargin, as
+  // strong as the fall has left him): none with `easyMargin` of it, as the
+  // square root of the margin shrinking, `slowest` times at most. Field
+  // plate (25–30 kg) costs a fit man a second or so; a jousting harness on
+  // a fit man two; a man whose limbs cannot lift him and it does not get up
+  // (Askew et al. 2012: men in field plate rose and remounted unaided).
+  // On hands and knees
   // the knees are `kneesBack` of his height behind where he will stand;
   // kneeling, the trunk leans `kneelLean` rad forward; standing from it, the
   // rear foot slides in to stay within `legReach` of the leg's length. A part within
@@ -322,11 +332,16 @@ export const WORLD = {
   // a hand or knee with at most `pushShare` of its limb's muscle force (the
   // rest holds the limb's own joints: on hands and knees a man lifts about
   // twice his weight, not the sum of every muscle's); a foot under a
-  // straightening leg with all of it.
+  // straightening leg with all of it; a hand within `brace` m of the thigh
+  // of a leg standing on its foot pushes down through it as a hand on the
+  // floor. Standing up off the knee his hands press on it until the hips
+  // are `braceFrom` of the way up, and come off by `braceTo` (or, past the
+  // stand's time, once the hips have stalled `braceStall` s).
   rise: {
     restSpeed: 0.3, restSeconds: 0.3, waitMost: 1.5, strengthFrom: 0.4,
     seconds: { gather: 0.3, roll: 0.5, push: 0.5, step: 0.35, kneel: 0.4, stand: 0.55 },
-    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03, pushShare: 0.6,
+    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, gain: 0.01, strainMost: 6, easyMargin: 1.7, slowest: 2.5,
+    kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03, pushShare: 0.6, brace: 0.06, braceFrom: 0.6, braceTo: 0.9, braceStall: 0.3,
     // A man little hurt (bodyHarm 0) rises sooner and stronger: the count's
     // wait is `freshDown` of a spent man's, he starts the rise with
     // `freshStrength` more of his strength, and each stage takes `freshPace`

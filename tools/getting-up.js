@@ -18,12 +18,28 @@
 // Each pairing is fought as it is (the last man down is held down: pins)
 // and again with no pins, so that men get up unhindered.
 // Usage: node tools/getting-up.js [bouts] [seconds]
+//
+// Alone (node tools/getting-up.js alone [seeds] [seconds]): each of a set of
+// characters, nobody near, knocked over by a shove to the trunk (its way
+// turned with the seed) and left to get up. Per character:
+//   up       — share of falls he got up from within `seconds`
+//   time     — mean seconds from starting to rise to standing (those who stood)
+//   tries    — mean attempts (a sink back beaten and a fresh try is one more)
+//   stalls   — where the failed attempts sank back (stage: count)
+//   legs/W   — what both legs can push through the feet at full strength, over
+//              his weight with his gear (body + armour, × g)
+//   arms/W   — the same for both arms pushing (hands on the floor or a knee,
+//              at WORLD.rise.pushShare)
+//   budget   — per stage, what the floor could push back through what touched
+//              it over his weight, mean over the stage (rising.js supportLimit,
+//              with his strength then): below 1 he cannot lift himself there
 
-import { P, PARTICLES } from '../src/body.js';
+import { P, PARTICLES, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { advance, boutWinner, createWorld, point } from '../src/physics.js';
+import { advance, boutWinner, createWorld, deliverImpulse, placeFighter, point, WORLD } from '../src/physics.js';
 import { fighterFor } from './weapons.js';
 import { jointViolations } from './anatomy.js';
+import { liftMargin } from '../src/physics/rising.js';
 
 export const FALL_PAIRINGS = [
   ['light:kickboxing', 'heavy:kickboxing'],
@@ -187,7 +203,94 @@ export function summarise(rows) {
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// The men who get up alone: the unarmoured, the armoured, the heaviest, and
+// one who should not (old and unfit in the jousting harness).
+export const ALONE = {
+  boxer: PRESETS.heavy,
+  knight: PRESETS.knight,
+  templar: PRESETS.templar,
+  'samurai (tōsei)': PRESETS.odachi,
+  'Tametomo (ō-yoroi)': PRESETS.tametomo,
+  'Iron Pagoda': PRESETS.ironPagoda,
+  'Maximilian (Stechzeug)': PRESETS.maximilian,
+  kheshig: PRESETS.saberShield,
+  legionary: PRESETS.legionary,
+  'combat bot': PRESETS.combatBot,
+  gorilla: PRESETS.gorilla,
+  'old man (Stechzeug)': { ...PRESETS.passive, name: 'Old man', age: 72, exercise: 0.05, calories: 2200, outfit: { kind: 'tournament', design: 5 } },
+};
+
+/** One man knocked over with nobody near, and how he gets up. */
+export function riseAlone(inputs, seed, seconds = 30) {
+  const world = createWorld([inputs, PRESETS.light], { seed: 700 + seed });
+  const fighter = world.fighters[0];
+  placeFighter(world.fighters[1], 4);
+  advance(world, 0.5);
+  const angle = seed * 2.4;
+  const shove = fighter.body.masses.reduce((sum, mass) => sum + mass, 0) * 3.5;
+  deliverImpulse({ fighter, shares: [[P.neck, 1], [P.lShoulder, 0.5], [P.rShoulder, 0.5], [P.pelvis, 0.3]], direction: [Math.cos(angle), 0.1, Math.sin(angle)], impulse: shove });
+  const out = { fell: false, stood: false, time: null, tries: 0, stalls: {}, budget: {} };
+  let started = null;
+  let stage = null;
+  for (let elapsed = 0; elapsed < seconds; elapsed += 1 / 60) {
+    advance(world, 1 / 60);
+    if (fighter.state === 'down') out.fell = true;
+    if (fighter.state === 'rising' && fighter.rise) {
+      if (stage === null) out.tries += 1;
+      started ??= elapsed;
+      stage = fighter.rise.stage;
+      const budget = fighter.riseBudget;
+      if (budget) (out.budget[stage] ??= []).push(budget.support / budget.weight);
+    } else if (stage !== null) {
+      if (fighter.state === 'up') {
+        out.stood = true;
+        out.time = elapsed - started;
+        break;
+      }
+      out.stalls[stage] = (out.stalls[stage] ?? 0) + 1;
+      stage = null;
+    }
+  }
+  return out;
+}
+
+export function riseAloneTable(characters = ALONE, seeds = 8, seconds = 30) {
+  const STAGES = ['push', 'step', 'kneel', 'stand'];
+  const rows = [];
+  for (const [label, inputs] of Object.entries(characters)) {
+    const runs = Array.from({ length: seeds }, (_, seed) => riseAlone(inputs, seed, seconds)).filter((run) => run.fell);
+    const stood = runs.filter((run) => run.stood);
+    const stalls = {};
+    const budget = {};
+    for (const run of runs) {
+      for (const [stage, count] of Object.entries(run.stalls)) stalls[stage] = (stalls[stage] ?? 0) + count;
+      for (const [stage, values] of Object.entries(run.budget)) (budget[stage] ??= []).push(...values);
+    }
+    const mean = (values) => values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
+    rows.push({
+      label,
+      falls: runs.length,
+      up: stood.length / Math.max(1, runs.length),
+      time: stood.length ? mean(stood.map((run) => run.time)) : null,
+      tries: mean(runs.map((run) => run.tries)),
+      stalls,
+      budget: Object.fromEntries(STAGES.filter((stage) => budget[stage]).map((stage) => [stage, mean(budget[stage])])),
+    });
+  }
+  return rows;
+}
+
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === 'alone') {
+  const { buildBody } = await import('../src/body.js');
+  const seeds = Number(process.argv[3] ?? 8);
+  const seconds = Number(process.argv[4] ?? 30);
+  for (const row of riseAloneTable(ALONE, seeds, seconds)) {
+    const strength = liftMargin(buildBody(ALONE[row.label]));
+    const stalls = Object.entries(row.stalls).map(([stage, count]) => `${stage} ${count}`).join(', ') || '-';
+    const budget = Object.entries(row.budget).map(([stage, value]) => `${stage} ${value.toFixed(2)}`).join('  ');
+    console.log(`${row.label.padEnd(24)} ${strength.kg.toFixed(0).padStart(4)} kg  legs/W ${strength.legs.toFixed(2)}  arms/W ${strength.arms.toFixed(2)}  up ${(100 * row.up).toFixed(0).padStart(3)}% of ${row.falls}  time ${row.time === null ? '  - ' : row.time.toFixed(1).padStart(4)} s  tries ${row.tries.toFixed(1)}  stalls ${stalls.padEnd(18)} budget ${budget}`);
+  }
+} else if (import.meta.url === `file://${process.argv[1]}`) {
   const bouts = Number(process.argv[2] ?? 4);
   const seconds = Number(process.argv[3] ?? 90);
   const rows = [...riseQuality(FALL_PAIRINGS, bouts, seconds), ...riseQuality(FALL_PAIRINGS, bouts, seconds, { noPins: true })];

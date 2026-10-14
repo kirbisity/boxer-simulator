@@ -124,8 +124,10 @@ test('each style fights with its own moves, chosen by distance: a boxer never ki
   const pinners = AI.pin.pinners;
   AI.pin.pinners = 0;
   after(() => { AI.pin.pinners = pinners; });
-  const thrown = (style, gap) => {
-    const world = createWorld([{ ...PRESETS.light, style }, { ...PRESETS.veteran, style: 'boxing' }], { seed: 9 });
+  // A sample ends when the passive man is knocked out: two of them.
+  const thrown = (style, gap) => new Set([9, 10].flatMap((seed) => [...thrownWith(style, gap, seed)]));
+  const thrownWith = (style, gap, seed) => {
+    const world = createWorld([{ ...PRESETS.light, style }, { ...PRESETS.veteran, style: 'boxing' }], { seed });
     placeFighter(world.fighters[0], -gap / 2);
     placeFighter(world.fighters[1], gap / 2);
     const types = new Set();

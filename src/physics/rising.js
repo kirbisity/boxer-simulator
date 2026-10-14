@@ -199,7 +199,8 @@ export function riseTarget(fighter, index) {
   if (rise.stage === 'stand') {
     if (index === P.rFoot) drawFootIn(fighter, fighter.feet.r);
     const standing = standingTarget(fighter, index);
-    const u = Math.min(1, rise.t / WORLD.rise.seconds.stand);
+    // His hands stay pressing on his knee until his legs are nearly straight.
+    const u = ARMS.has(index) ? handsOff(fighter) : Math.min(1, rise.t / rise.seconds);
     return { target: vec.lerp(rise.from[index], standing.target, ease(u)), velocity: vec.scale(standing.velocity, ease(u)) };
   }
   const seconds = rise.seconds;
@@ -215,6 +216,24 @@ export function riseTarget(fighter, index) {
   const target = vec.add(centre, turnAbout(offset, axis, angle));
   const rate = u < 1 ? (rise.roll * easeRate(u)) / seconds : 0;
   return { target: [target[0], Math.max(target[1], fighter.radius[index]), target[2]], velocity: vec.scale(vec.cross(axis, turnAbout(offset, axis, angle)), rate) };
+}
+
+const ARMS = new Set(SIDES.flatMap(([side]) => [P[`${side}Hand`], P[`${side}Elbow`]]));
+
+/**
+ * How far his hands have come off his knee standing up: none until the hips
+ * are `braceFrom` of the way up, all by `braceTo`; or, past the stand's time,
+ * once the hips have stopped coming up for `braceStall` s, over the stand's
+ * time again, however high he is (pressing on, they would hold him bent).
+ */
+function handsOff(fighter) {
+  const spec = WORLD.rise;
+  const rise = fighter.rise;
+  const from = rise.from[P.pelvis][1];
+  const to = toWorld(fighter, fighter.desired[P.pelvis])[1];
+  const up = (pelvisHeight(fighter) - from) / Math.max(1e-6, to - from);
+  const stalled = (rise.t - Math.max(rise.seconds, (rise.gainedAt ?? 0) + spec.braceStall)) / rise.seconds;
+  return Math.max(0, Math.min(1, Math.max((up - spec.braceFrom) / (spec.braceTo - spec.braceFrom), stalled)));
 }
 
 /**
@@ -254,18 +273,28 @@ export function updateRise(fighter, dt) {
   // The less hurt, the more of his strength he rises with and the quicker each stage goes.
   const fresh = 1 - bodyHarm(fighter);
   fighter.motorScale = Math.min(1, spec.strengthFrom + spec.freshStrength * fresh + rise.elapsed / WORLD.getUpSeconds) * hurt;
+  // The strength he has to lift himself with, once his muscles have gathered.
+  rise.strength = hurt;
   const pace = 1 - spec.freshPace * fresh;
-  const seconds = (rise.stage === 'stand' ? spec.seconds.stand : rise.seconds ?? spec.seconds[rise.stage]) * pace;
-  rise.seconds = seconds / pace;
+  const seconds = rise.seconds * pace;
+  // Still coming up (the hips `gain` higher than they have been this stage), he keeps at it.
+  const hips = pelvisHeight(fighter);
+  if (rise.best === undefined || hips > rise.best + spec.gain) Object.assign(rise, { best: Math.max(hips, rise.best ?? hips), gainedAt: rise.t });
   if (rise.t < seconds) return null;
   const wanted = rise.stage === 'stand' ? toWorld(fighter, fighter.desired[P.pelvis])[1] : rise.to?.[P.pelvis]?.[1] ?? 0;
   const there = pelvisHeight(fighter) >= wanted * (rise.stage === 'stand' ? spec.stood : spec.reached) || rise.stage === 'gather' || rise.stage === 'roll' || rise.stage === 'step';
-  if (!there && rise.t < seconds + spec.patience) return null;
+  // Short of it, he strains `patience` s past his stage's time and past the
+  // last time he gained height (a heavy man coming up slowly is coming up),
+  // `strainMost` s at most; on his feet if not quite straight, `patience` s.
+  const nearlyUp = rise.stage === 'stand' && hips >= wanted * spec.reached;
+  const strained = nearlyUp ? seconds + spec.patience : Math.min(seconds + spec.strainMost, Math.max(seconds, rise.gainedAt) + spec.patience);
+  if (!there && rise.t < strained) return null;
   // Long at it and up on his feet, if not quite straight, he is up.
-  if (!there) return rise.stage === 'stand' && pelvisHeight(fighter) >= wanted * spec.reached ? 'stood' : 'beaten';
+  if (!there) return nearlyUp ? 'stood' : 'beaten';
   const current = rise.roll === null && rise.to ? rise.to : PARTICLES.map((_, index) => riseTarget(fighter, index).target);
   const next = (stage, to, roll = null) => {
-    Object.assign(rise, { stage, t: 0, from: current, to, roll, seconds: stage === 'roll' ? spec.seconds.roll * Math.max(0.4, Math.abs(roll) / Math.PI) : spec.seconds[stage] });
+    const time = stage === 'roll' ? spec.seconds.roll * Math.max(0.4, Math.abs(roll) / Math.PI) : spec.seconds[stage] * (LIFTING.has(stage) ? loadPace(fighter) : 1);
+    Object.assign(rise, { stage, t: 0, best: undefined, gainedAt: 0, from: current, to, roll, seconds: time });
   };
   if (rise.stage === 'gather') {
     const angle = rollAngle(current);
@@ -284,19 +313,60 @@ export function updateRise(fighter, dt) {
   return null;
 }
 
+// The stages that lift him: the heavier he is for his strength, the slower.
+const LIFTING = new Set(['push', 'step', 'kneel', 'stand']);
+
+/**
+ * What his limbs can lift, over what there is to lift: both legs pushing
+ * through the feet and both arms through the hands (at `pushShare`), with
+ * the strength he has (`scale`), over his weight with all he wears.
+ */
+export function liftMargin(body, scale = 1) {
+  const force = body.muscleForce ?? body.motorForce;
+  const weight = body.masses.reduce((sum, mass) => sum + mass, 0) * WORLD.gravity;
+  const leg = (side) => force[P.pelvis] * 0.5 + force[P[`${side}Hip`]] + force[P[`${side}Knee`]];
+  const arm = (side) => (force[P[`${side}Hand`]] + force[P[`${side}Elbow`]]) * WORLD.rise.pushShare;
+  return { legs: (scale * (leg('l') + leg('r'))) / weight, arms: (scale * (arm('l') + arm('r'))) / weight, kg: weight / WORLD.gravity };
+}
+
+/**
+ * How much longer a lifting stage takes him: none with `easyMargin` of
+ * his weight and more (legs and arms, as strong as the fall has left him); as
+ * the margin over his weight shrinks, slower (as its square root), at most
+ * `slowest` times.
+ */
+function loadPace(fighter) {
+  const spec = WORLD.rise;
+  const { legs, arms } = liftMargin(fighter.body, fighter.rise.strength ?? 1);
+  const spare = legs + arms - 1;
+  if (spare <= 0) return spec.slowest;
+  return Math.min(spec.slowest, Math.max(1, Math.sqrt((spec.easyMargin - 1) / spare)));
+}
+
 /**
  * The floor lifts him, not his own muscles: their pull upward on the body as
  * a whole is no more than the floor can push back through what touches it.
- * A hand, knee or foot on the floor pushes as hard as its limb can, times how
- * nearly its limb stands upright over it; anything else lying on the floor
- * bears its own weight. What the muscles ask beyond that is taken off every
- * part alike, so the pose they hold is kept and the body only sags.
+ * A hand, knee or foot on the floor pushes as hard as its limb's muscles can
+ * (body.muscleForce: his own strength, nothing for the weight he carries),
+ * times how nearly its limb stands upright over it; a hand pressing on the
+ * thigh of a leg whose foot is planted pushes down through that leg as it
+ * would on the floor; anything else lying on the floor bears its own weight.
+ * What the muscles ask beyond that is taken off every part alike, so the
+ * pose they hold is kept and the body only sags.
  * `acceleration` holds each particle's (gravity and muscle), and is changed.
  */
 export function supportLimit(fighter, acceleration) {
   const spec = WORLD.rise;
-  const force = fighter.body.motorForce;
+  const force = fighter.body.muscleForce ?? fighter.body.motorForce;
   const scale = Math.max(0, fighter.motorScale);
+  const down = (index) => fighter.x[index * 3 + 1] - fighter.radius[index] <= spec.contact;
+  const pushing = (push, index) => {
+    const strength = push.muscles.reduce((sum, [part, share]) => sum + force[part] * share, 0) * scale * (push.standing ? 1 : spec.pushShare);
+    const root = point(fighter.x, push.root);
+    const contact = point(fighter.x, index);
+    const reach = vec.length(vec.sub(root, contact));
+    return strength * (reach > 1e-6 ? Math.max(0, (root[1] - contact[1]) / reach) : 0);
+  };
   let asked = 0;
   let mass = 0;
   let support = 0;
@@ -304,29 +374,37 @@ export function supportLimit(fighter, acceleration) {
     const kg = 1 / fighter.invMass[index];
     mass += kg;
     asked += kg * (acceleration[index * 3 + 1] + WORLD.gravity);
-    if (fighter.x[index * 3 + 1] - fighter.radius[index] > spec.contact) continue;
-    const push = PUSHES[index];
-    if (!push) {
-      support += kg * WORLD.gravity;
+    if (!down(index)) {
+      if (PUSHES[index]?.hand && bracedOn(fighter, index, down)) support += pushing(PUSHES[index], index);
       continue;
     }
-    const strength = push.muscles.reduce((sum, [part, share]) => sum + force[part] * share, 0) * scale * (push.standing ? 1 : spec.pushShare);
-    const root = point(fighter.x, push.root);
-    const contact = point(fighter.x, index);
-    const reach = vec.length(vec.sub(root, contact));
-    const upright = reach > 1e-6 ? Math.max(0, (root[1] - contact[1]) / reach) : 0;
-    support += strength * upright + kg * WORLD.gravity;
+    support += kg * WORLD.gravity + (PUSHES[index] ? pushing(PUSHES[index], index) : 0);
   }
+  fighter.riseBudget = { asked, support, weight: mass * WORLD.gravity };
   if (asked <= support) return;
   const sag = (asked - support) / mass;
   for (let index = 0; index < COUNT; index += 1) acceleration[index * 3 + 1] -= sag;
+}
+
+/** Is this hand pressing on the thigh of a leg that stands on its foot (knee up)? */
+function bracedOn(fighter, hand, down) {
+  const at = point(fighter.x, hand);
+  return SIDES.some(([side]) => {
+    if (!down(P[`${side}Foot`]) || down(P[`${side}Knee`])) return false;
+    const hip = point(fighter.x, P[`${side}Hip`]);
+    const knee = point(fighter.x, P[`${side}Knee`]);
+    const thigh = vec.sub(knee, hip);
+    const along = Math.max(0, Math.min(1, vec.dot(vec.sub(at, hip), thigh) / Math.max(1e-9, vec.dot(thigh, thigh))));
+    const gap = vec.length(vec.sub(at, vec.add(hip, vec.scale(thigh, along)))) - fighter.radius[hand] - fighter.radius[P[`${side}Knee`]];
+    return gap < WORLD.rise.brace;
+  });
 }
 
 // What pushes through a part on the floor: the joint it pushes from, the
 // muscles that do it (share of each particle's motor force), and whether it
 // is a foot under a leg straightening as it stands (all of the leg's force).
 const PUSHES = Object.fromEntries(SIDES.flatMap(([side]) => [
-  [P[`${side}Hand`], { root: P[`${side}Shoulder`], muscles: [[P[`${side}Hand`], 1], [P[`${side}Elbow`], 1]] }],
+  [P[`${side}Hand`], { root: P[`${side}Shoulder`], muscles: [[P[`${side}Hand`], 1], [P[`${side}Elbow`], 1]], hand: true }],
   [P[`${side}Elbow`], { root: P[`${side}Shoulder`], muscles: [[P[`${side}Elbow`], 1], [P[`${side}Shoulder`], 0.5]] }],
   [P[`${side}Knee`], { root: P[`${side}Hip`], muscles: [[P.pelvis, 0.5], [P[`${side}Hip`], 1]] }],
   [P[`${side}Foot`], { root: P[`${side}Hip`], muscles: [[P.pelvis, 0.5], [P[`${side}Hip`], 1], [P[`${side}Knee`], 1]], standing: true }],
