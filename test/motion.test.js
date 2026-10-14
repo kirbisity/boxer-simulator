@@ -2,7 +2,9 @@ import { BODIES, boutGlitches } from '../tools/glitches.js';
 import { test } from 'node:test';
 import { fallSweep } from '../tools/falls-quality.js';
 import assert from 'node:assert/strict';
-import { P, PRESETS } from '../src/body.js';
+import { buildBody, P, PRESETS } from '../src/body.js';
+import { ALONE, riseAlone } from '../tools/getting-up.js';
+import { liftMargin } from '../src/physics/rising.js';
 import { thinkAll, AI } from '../src/ai.js';
 import { advance, createWorld, deliverImpulse, hitParticle, placeFighter, point, WORLD } from '../src/physics.js';
 import { twoBoneIK, vec } from '../src/pose.js';
@@ -241,4 +243,17 @@ test('mixed styles and weights fight without visible glitches: no teleporting pa
   assert.equal(total.broken, 0);
   assert.ok(total.pops / total.minutes < 1, `${(total.pops / total.minutes).toFixed(2)} pops a minute`);
   assert.ok(total.flips / total.minutes < 3, `${(total.flips / total.minutes).toFixed(2)} flips a minute`);
+});
+
+test('getting up is as strong as his legs and arms against his weight with his gear: the jousting knight and the Iron Pagoda get up alone; an old, unfit man in the Stechzeug does not', () => {
+  const rises = (inputs) => [0, 1, 2].map((seed) => riseAlone(inputs, seed, 20)).filter((run) => run.fell);
+  for (const [name, inputs] of [['Maximilian', PRESETS.maximilian], ['the Iron Pagoda', PRESETS.ironPagoda]]) {
+    const runs = rises(inputs);
+    assert.ok(runs.length >= 2, `${name} fell`);
+    for (const run of runs) assert.ok(run.stood && run.time < 8, `${name} gets up unaided (${run.stood ? `${run.time.toFixed(1)} s` : `not in 20 s; sank back at ${JSON.stringify(run.stalls)}`})`);
+  }
+  const old = ALONE['old man (Stechzeug)'];
+  const weak = liftMargin(buildBody(old));
+  assert.ok(weak.legs + weak.arms < 1, `his legs and arms together cannot lift him and the harness (${(weak.legs + weak.arms).toFixed(2)} of his weight)`);
+  for (const run of rises(old)) assert.ok(!run.stood || run.time > 12, `the old man stays down or takes far longer (${run.stood ? `${run.time.toFixed(1)} s` : 'stayed down'})`);
 });

@@ -2232,8 +2232,13 @@ function updateTimers(world, fighter, dt) {
         }
         // Get up the way he lies, in stages (physics/rising.js).
         beginRise(fighter);
-        fighter.hurt = WORLD.hurt.hurtSeconds + WORLD.hurt.hurtPerKnockdown * fighter.knockdowns;
-        fighter.hurtFor = fighter.hurt;
+        // Hurt by the fall, coming back from the first try on: a man who
+        // sank back and tries again is no more hurt than he was.
+        if (!fighter.triedRise) {
+          fighter.hurt = WORLD.hurt.hurtSeconds + WORLD.hurt.hurtPerKnockdown * fighter.knockdowns;
+          fighter.hurtFor = fighter.hurt;
+        }
+        fighter.triedRise = false;
         plantFeet(fighter);
       }
     }
@@ -2258,6 +2263,7 @@ function updateTimers(world, fighter, dt) {
       fighter.downTimer = WORLD.pin.retry;
       fighter.restFor = 0;
       fighter.rise = null;
+      fighter.triedRise = true;
     } else if (result === 'stood') {
       // On his feet: any hold on him is broken, and he starts square.
       fighter.state = 'up';

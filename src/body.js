@@ -822,6 +822,9 @@ export function buildBody(rawInputs) {
   // Armour and tight tailoring keep the limbs from swinging as fast; so do stiff, worn joints.
   const jointFreedom = BODY.jointSpeedFloor + (1 - BODY.jointSpeedFloor) * aged.joints;
   for (let index = 0; index < topSpeed.length; index += 1) topSpeed[index] *= gear.swing * jointFreedom;
+  // What the muscles themselves can push (getting up off the floor lifts
+  // with this: physics/rising.js), before the floor below.
+  const muscleForce = [...motorForce];
   // A motor must at least hold its own particle up, or the fighter sags.
   for (let index = 0; index < motorForce.length; index += 1) motorForce[index] = Math.max(motorForce[index], masses[index] * 9.81 * 2.2);
 
@@ -834,7 +837,7 @@ export function buildBody(rawInputs) {
     inputs, heightM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
     // The years: shares of a young body's (aging.js); joints 1 young; stoop, the back's forward lean (rad).
     aged, joints: aged.joints, stoop: aged.stoop,
-    lengths, segments, masses, motorForce, strikeForce, topSpeed, aerobic,
+    lengths, segments, masses, motorForce, muscleForce, strikeForce, topSpeed, aerobic,
     limbKg: {
       lArm: segments.lUpperArm.mass + segments.lForearm.mass + BODY.gloveKg,
       rArm: segments.rUpperArm.mass + segments.rForearm.mass + BODY.gloveKg,
