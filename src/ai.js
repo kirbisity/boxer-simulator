@@ -10,6 +10,7 @@ import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
 import { handling } from './handling.js';
+import { ride, standToRider } from './riding.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -1274,6 +1275,11 @@ export function think(world, fighter, dt) {
     fighter.move = 0;
     return;
   }
+  // On horseback: the charge (riding.js).
+  if (fighter.mount) {
+    ride(world, fighter, opponent, STYLES[fighter.style] ?? STYLES.mix, dt, { gunfight });
+    return;
+  }
   switchMix(world, fighter, dt);
   // A weapon on the floor, and the chance to get it.
   fighter.goTo = null;
@@ -1352,6 +1358,11 @@ export function think(world, fighter, dt) {
       return;
     }
     fighter.aiCharge = null;
+  }
+  // A man on a horse coming at him: braced with a long weapon, or out of its way (riding.js).
+  if (opponent.mount?.state === 'up' && !fighter.slot) {
+    standToRider(world, fighter, opponent, style, dt);
+    return;
   }
   // Grabbed by the neck, a brawler grabs back: the mutual tie, trading.
   if (style.attacks.collarTie && !fighter.clinch && !fighter.punch && opponent.clinch?.target === fighter.id && world.random() < AI.tieBackPerSecond * dt) perform(world, fighter, 'collarTie');
