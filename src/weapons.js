@@ -241,13 +241,14 @@ export const WEAPONS = {
   // before it, met by a man who has come inside the point, only shoves. Held at the
   // grip behind the vamplate, the other hand back on the butt (`hands` two,
   // the second behind); its balance a hand's breadth ahead of the grip, as a
-  // lance is made. Driven, not swung: a narrow point with the man's weight
-  // behind it (`pierce` well above a spear's); its narrow head has next to
+  // lance is made. Driven, not swung: a narrow four-sided war point, a
+  // little keener than a spear's leaf per joule (`pierce`; the man's weight
+  // behind it is in the blow's mass, not here, so not counted twice); its narrow head has next to
   // no edge; swung, the heavy shaft clubs (`swing` blunt). Slow to turn (`wrist`). The swell and the burr behind the grip
   // hold it in the hand against a blow on the long shaft (`grip`) better than a spear.
   lance: {
     pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, vamplate: 0.13,
-    harm: { thrust: { pierce: 2.0, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
+    harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.8,
   },
   // The yari, as the ashigaru carried it: the war spear's long straight head
@@ -816,7 +817,14 @@ export const BLADES = {
   // than an edge; × the striker's technique), and meets there only what is
   // under it (`under`: the arming doublet, a mail voider), and does not
   // glance. Fighting in armour was largely the art of finding them.
-  gaps: { rigidFrom: 0.75, thrust: 0.25, swing: 0.06, under: { blunt: 0.25, cut: 0.3, pierce: 0.2 } },
+  // A gap is about a hand's breadth (`size`, m): a heavy point that wanders
+  // (a lance carried at a run) is put into one the less, by size / (size + its wander).
+  gaps: { rigidFrom: 0.75, thrust: 0.25, swing: 0.06, size: 0.05, under: { blunt: 0.25, cut: 0.3, pierce: 0.2 } },
+  // A point meets plate square enough to bite only within ~35 degrees of
+  // square (the cosine, 0.82); further round the curve of a breastplate or
+  // helm it skids off and goes in nowhere, as arrows and spear points were
+  // seen to on plate: the medial ridge and rounded breast were made so.
+  bite: 0.82,
   sever: {
     // joint: [J for a typical limb, the segment whose thickness scales it, typical radius m]
     wrist: [34, 'Forearm', 0.035], elbow: [60, 'Forearm', 0.04], shoulder: [105, 'UpperArm', 0.05],

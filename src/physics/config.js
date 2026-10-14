@@ -481,6 +481,10 @@ export const WORLD = {
   // how far forward a raised shield leans (of its facing).
   shield: { dropOnFall: 0.75, wrench: 60, strainLeak: 1, holdSeconds: 0.03, unbraced: 0.6, open: 0.4, glance: 0.45, turnStep: 0.5, wall: [0.36, 0.7, 0.1], roof: [0.26, 0.96, 0.03], roofTilt: 1.1 },
   weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
+  // A long point: a couched lance, or a thrust with a weapon this long (m, shaft and all) or longer
+  // (the 3.3 m war lance; not a 2.25 m spear). It comes on a line from far out: a man steps off that
+  // line rather than back along it (AI.offLine), and a shield is put on the line to meet it.
+  longPoint: 3,
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).
   // Without a banner colour of its own, a side's flag is its corner's.

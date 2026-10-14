@@ -130,7 +130,9 @@ export const MOVES = {
   // behind it, the hand going `drive` m on along that line with the lunge,
   // braced behind it through his planted feet and shoulder (`mass.body`: on foot, a
   // quarter of him — no saddle and lance rest to put his whole weight on the point).
-  lanceCharge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.14, 0.58, -0.12], dir: [1, 0, 0] }, windup: 0.15, extendUntil: 0.4, duration: 0.8, twist: 0, lean: 0.18, shift: 0.14, step: 2.6, cost: 0.05, extendShare: 0.7, mass: { arm: 0.6, body: 0.25 }, rotation: 0, zones: ['body'], reach: 'weapon', holdHeading: true, couched: { carry: 1.6, drive: 0.4, lead: 0.5 } },
+  // Carried at the hip at a run it bobs with his stride: `wander` of a heavy weapon's wander held out;
+  // the shaft along his side, the hands angle it at most `swing` rad (~17 degrees) across him.
+  lanceCharge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.14, 0.58, -0.12], dir: [1, 0, 0] }, windup: 0.15, extendUntil: 0.4, duration: 0.8, twist: 0, lean: 0.18, shift: 0.14, step: 2.6, cost: 0.05, extendShare: 0.7, mass: { arm: 0.6, body: 0.25 }, rotation: 0, zones: ['body'], reach: 'weapon', holdHeading: true, couched: { carry: 1.6, drive: 0.4, lead: 0.5, wander: 0.5, swing: 0.3 } },
   lanceThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.2, 0.56, -0.12], dir: [1, 0.04, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.14, shift: 0.1, depth: 0.6, step: 1.4, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.3 }, rotation: 0.4, zones: ['body'], reach: 'weapon' },
   lanceHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.16, 0.66, -0.12], dir: [1, 0.14, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.12, shift: 0.09, depth: 0.55, step: 1.3, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.26 }, rotation: 0.4, zones: ['head', 'body'], reach: 'weapon' },
   lanceJab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.12, 0.58, -0.1], dir: [1, 0.06, 0] }, windup: 0.14, extendUntil: 0.34, duration: 0.62, twist: -0.25, lean: 0.1, shift: 0.08, depth: 0.45, step: 1.1, cost: 0.02, extendShare: 0.6, mass: { arm: 0.75, body: 0.16 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon' },
@@ -212,6 +214,11 @@ export const DEFENCES = {
   leanBack: { seconds: 0.4 }, // trunk back out of range: the answer to a head kick
   check: { seconds: 0.45 }, // lead knee up, shin out: the answer to a low kick
   stepBack: { seconds: 0.35 },
+  // Off the line: one quick step to the side (`side`), the body taken out of
+  // the path of a long point rather than back along it. `step` × his
+  // footwork speed (legs, gear: a lunge's step is 1.4–2.6), at what his legs
+  // can accelerate; nothing else is done with the feet while it lasts.
+  sidestep: { seconds: 0.45, step: 1.6 },
   // The weapon brought across the line of the incoming strike, to meet it.
   weaponBlock: { seconds: 0.45 },
   // The shield punched out towards the incoming strike.

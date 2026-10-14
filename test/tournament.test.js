@@ -197,3 +197,58 @@ test('the lance is used once: after the charge, hit or miss, it is let fall and 
   assert.notEqual(world.fighters[1].state, 'out', 'the bout goes on after the charge');
   assert.equal(knight.weapon?.kind, 'longsword');
 });
+
+/** The couched charge at a man standing still, aimed `across` m to the side of his middle (a world place): the contact, or null. */
+function chargeOffCentre(target, across) {
+  const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS[target], style: 'boxing' }], { seed: 2000 });
+  const [knight, man] = world.fighters;
+  let thrown = false;
+  for (let step = 0; step < 240 && !world.events.some((event) => event.attacker === 0 && event.kind === 'landed'); step += 1) {
+    man.move = 0;
+    knight.running = true;
+    knight.move = 1;
+    if (!thrown) {
+      const middle = point(man.x, P.pelvis).map((value, axis) => (value + point(man.x, P.neck)[axis]) / 2);
+      thrown = throwPunch(world, knight, 'lanceCharge', 'body', { at: [middle[0], middle[1], middle[2] + across] });
+    }
+    advance(world, 1 / 60);
+  }
+  return world.events.find((event) => event.attacker === 0 && event.kind === 'landed') ?? null;
+}
+
+test('plate turns a point that meets it aslant: it skids off the curve of the breastplate, where it runs an unarmoured man through', () => {
+  const square = chargeOffCentre('knight', 0);
+  const aslant = chargeOffCentre('knight', 0.1);
+  const bare = chargeOffCentre('heavy', 0.1);
+  assert.ok(square && aslant && bare);
+  assert.ok(square.pierce > 0 && !square.effects.includes('glanced off the plate'), 'square on, the point bites (what the plate lets through)');
+  assert.equal(aslant.pierce, 0);
+  assert.ok(aslant.effects.includes('glanced off the plate'));
+  assert.ok(bare.pierce > 60, `the same line into a bare chest: ${bare.pierce.toFixed(0)} J`);
+  // On foot the charge goes in with tens of joules to about a hundred, not hundreds (a man standing still).
+  assert.ok(square.energy > 40 && square.energy < 160, `${square.energy.toFixed(0)} J`);
+});
+
+test('an alert man answers the couched lance off its line (a sidestep or a blade across it), not by stepping straight back, and it mostly misses him', () => {
+  let answered = 0;
+  let avoided = 0;
+  const answers = new Set();
+  for (let seed = 0; seed < 6; seed += 1) {
+    const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS.samurai }], { seed: 1000 + seed });
+    const [knight, man] = world.fighters;
+    let seen = false;
+    for (let step = 0; step < 150 && knight.couched !== 'done'; step += 1) {
+      advance(world, 1 / 60, (current, dt) => thinkAll(current, dt));
+      if (knight.punch?.type === 'lanceCharge' && man.defence) {
+        answers.add(man.defence.name);
+        seen = true;
+      }
+    }
+    if (seen) answered += 1;
+    if (!world.events.some((event) => event.attacker === 0 && event.punch === 'lanceCharge' && event.target === 'trunk')) avoided += 1;
+  }
+  assert.ok(answered >= 5, `answered ${answered} of 6`);
+  assert.ok(!answers.has('stepBack') && !answers.has('slip'), [...answers].join(', '));
+  assert.ok(answers.has('sidestep'));
+  assert.ok(avoided >= 3, `the point kept off his body ${avoided} times in 6`);
+});

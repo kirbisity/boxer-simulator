@@ -581,6 +581,30 @@ function interceptBlock(world, fighter, weapon = fighter.weapon) {
   return { hand: toLocal(fighter, hand), dir: yawRotate(across, -fighter.yaw) };
 }
 
+/**
+ * A long point (WORLD.longPoint) coming at a man: true for a couched lance,
+ * or a thrust with a weapon that long.
+ */
+export function longPoint(striker, punch) {
+  if (!punch) return false;
+  if (punch.spec.couched) return true;
+  if (punch.spec.mode !== 'thrust' || punch.spec.path !== 'blade') return false;
+  const blade = bladeFor(striker, punch.spec);
+  return Boolean(blade?.held) && blade.spec.length + blade.spec.handle >= WORLD.longPoint;
+}
+
+/** Where (local) the shield hand goes to put the shield on a long point's line, held out as far as a block: null for any other strike. */
+function shieldOnLine(world, fighter, guard) {
+  const attacker = world.fighters[fighter.defence?.from];
+  const punch = attacker?.punch;
+  if (!longPoint(attacker, punch)) return null;
+  const blade = bladeFor(attacker, punch.spec);
+  const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
+  const line = vec.sub(blade.tip, mine);
+  if (vec.length(line) < 1e-3) return null;
+  return toLocal(fighter, vec.add(mine, vec.scale(vec.normalize(line), (guard[0] + 0.1) * fighter.body.heightM)));
+}
+
 function weaponIntent(world, fighter, intent) {
   const style = STYLES[fighter.style];
   const H = fighter.body.heightM;
@@ -589,9 +613,11 @@ function weaponIntent(world, fighter, intent) {
     // The shield arm before the chest, punched out to meet a strike.
     const blocking = fighter.defence?.name === 'shieldBlock';
     const guard = style.shieldGuard ?? [0.3, 0.72, 0.05];
+    // A long point comes on a line, not round: the shield goes onto that line, held out before him.
+    const lineBlock = blocking ? shieldOnLine(world, fighter, guard) : null;
     // In a testudo the shield is the formation's: a wall before him or a roof over him.
     const pose = !blocking && fighter.shieldPose ? WORLD.shield[fighter.shieldPose] : null;
-    intent.lHand = vec.scale(pose ?? (blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard), H);
+    intent.lHand = lineBlock ?? vec.scale(pose ?? (blocking ? [guard[0] + 0.1, guard[1] + 0.1, guard[2] - 0.03] : guard), H);
     // Knocked out of line, the arm goes with the blow until he has it back.
     if (fighter.shieldOpen > world.time) intent.lHand = toLocal(fighter, point(fighter.x, P.lHand));
     intent.shieldArm = 'l';
@@ -709,11 +735,24 @@ function strokeTargets(fighter, weapon, stroke) {
     const line = vec.normalize(vec.sub(stroke.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
     // Couched, the point is kept on him while it is carried in, and its line held once it is driven.
     if (stroke.spec.couched) {
-      if (!stroke.driven || !stroke.line) stroke.line = line;
+      if (!stroke.driven || !stroke.line) stroke.line = withinSwing(line, stroke.spec.couched.swing);
       target.dir = stroke.line;
     } else target.dir = line;
   }
   return target;
+}
+
+/**
+ * A couched line kept within `swing` rad either side of straight ahead: the
+ * shaft runs back under the arm along the body, and with the heading held
+ * (holdHeading) the hands can only angle it so far across him.
+ */
+function withinSwing(line, swing) {
+  const yaw = Math.atan2(line[2], line[0]);
+  if (Math.abs(yaw) <= swing) return line;
+  const level = Math.hypot(line[0], line[2]);
+  const held = Math.sign(yaw) * swing;
+  return [Math.cos(held) * level, line[1], Math.sin(held) * level];
 }
 
 /**
@@ -1228,10 +1267,12 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
-  // (Not couched: the body carries it, not the arms held out.)
-  const heft = blade?.held && !spec?.couched ? Math.max(0, blade.spec.mass / WORLD.weapons.heavyFrom - 1) : 0;
+  // (Couched, the body carries it: only `couched.wander` of that, the point bobbing with his stride.)
+  const heft = blade?.held ? Math.max(0, blade.spec.mass / WORLD.weapons.heavyFrom - 1) * (spec?.couched ? spec.couched.wander : 1) : 0;
   // His skill: how near the mark his blow goes (a point needs it most; a gun aims by its own spread).
   const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft);
+  // What of it is the weapon's weight (a point that wanders so finds a gap in armour the less: BLADES.gaps.size).
+  const wander = heft > 0 ? skillScatter(fighter, spec, WORLD.weapons.heavyAimJitter * heft) : 0;
   const mark = at ?? aimPoint(target, aimZone);
   const aimed = jitter > 0 ? vec.add(mark, [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : mark;
   fighter.punch = {
@@ -1243,6 +1284,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     miss: vec.sub(aimed, mark),
     // How far an untrained hand turns the blade off true (rad): the edge meeting at a slant, the point off its line.
     edgeTilt: edgeTilt(world, fighter, spec),
+    wander,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
@@ -1700,9 +1742,13 @@ function applyDefence(fighter, intent, dt) {
     intent.check = arc > 0.2;
   } else if (defence.name === 'stepBack') {
     fighter.move = -1;
+  } else if (defence.name === 'sidestep') {
+    // Off the line, not along it (moveRoot drives the step).
+    fighter.move = 0;
+    fighter.strafe = 0;
   }
   if (defence.t >= defence.seconds) {
-    if (defence.name === 'stepBack') fighter.move = 0;
+    if (defence.name === 'stepBack' || defence.name === 'sidestep') fighter.move = 0;
     fighter.defence = null;
   }
 }
@@ -1992,7 +2038,9 @@ function moveRoot(world, fighter, dt) {
   }
   // A sidestep (+ to the left), slower than stepping in or out.
   const left = yawRotate([0, 0, 1], fighter.yaw);
-  const side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare * (fighter.crawling ? WORLD.crawl.speed : 1) * (fighter.netted ? NET.step : 1);
+  let side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare * (fighter.crawling ? WORLD.crawl.speed : 1) * (fighter.netted ? NET.step : 1);
+  // Off the line (a sidestep defence): one quick step to the side, as fast as his legs and gear let him.
+  if (fighter.defence?.name === 'sidestep' && !fighter.rush && !fighter.crawling) side = fighter.defence.side * DEFENCES.sidestep.step * (fighter.netted ? NET.step : 1);
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
   const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
@@ -3992,7 +4040,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
   const gaps = body.gear.gaps ? { ...BLADES.gaps, ...body.gear.gaps } : BLADES.gaps;
   // (A full plate harness has no gap for an edge: `cutProof`.)
-  const gapChance = spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing;
+  // A heavy point that wanders (punch.wander, m) is put into a gap the less often: a gap is a hand's breadth (`size`).
+  const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
+  const gapChance = (spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing) * placed;
   const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
@@ -4003,9 +4053,20 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
   // A brittle edge (obsidian) cuts only as well as it is still sharp.
   const sharp = weapon.edge ?? 1;
+  // A point on plate bites only if it meets it near square (BLADES.bite: the cosine of the steepest
+  // slant it holds at); slanting, it skids off the curve of the plate (a rounded breastplate, its
+  // ridge) and goes in nowhere: it is a shove.
+  const facing = Math.abs(vec.dot(weapon.dir, normal));
+  const skids = Boolean(protection.deflects) && spec.mode === 'thrust' && mix.pierce > 0 && facing < BLADES.bite;
+  if (skids) {
+    // (The impulse is already only what the point brings square to the plate.)
+    mix.cut = 0;
+    mix.pierce = 0;
+  }
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp;
   const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0)) * sharp;
-  const glanced = Boolean(protection.deflects) && mix.cut + mix.pierce > 0.2;
+  // (An edge always glances off plate; a point that bites square does not.)
+  const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(spec.mode === 'thrust' && mix.pierce > 0)));
   // Glass on steel or hard armour chips.
   if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
   const event = {
@@ -4358,17 +4419,22 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     second.x[mainB * 3 + axis] -= normal[axis] * penetration * (wB / (wA + wB));
   }
   const closing = -vec.dot(vec.sub(one.velocity, two.velocity), normal);
-  if (world.clashing.has(key) || closing < BLADES.clashSpeed) return;
-  world.clashing.add(key);
-  const massA = effectiveMassAt(a.spec, first.body.limbKg[`${a.main}Arm`] * 0.6, one.along, first.body.lengths.upperArm + first.body.lengths.forearmToFist);
-  const massB = effectiveMassAt(b.spec, second.body.limbKg[`${b.main}Arm`] * 0.6, two.along, second.body.lengths.upperArm + second.body.lengths.forearmToFist);
-  const impulse = ((massA * massB) / (massA + massB)) * closing * (1 + BLADES.clashRestitution);
-  world.pendingImpulses.push({ fighter: first, shares: [[mainA, 1], [P[`${a.main}Elbow`], 0.5]], direction: normal, impulse });
-  world.pendingImpulses.push({ fighter: second, shares: [[mainB, 1], [P[`${b.main}Elbow`], 0.5]], direction: vec.scale(normal, -1), impulse });
   // Each blade's own stroke is stopped where it met the other.
   const strokeA = strokeOf(first, a);
   const strokeB = strokeOf(second, b);
-  const cutting = (stroke) => stroke && !stroke.landed && stroke.t >= stroke.spec.windup && stroke.t <= stroke.spec.extendUntil + 0.06;
+  const cutting = (stroke) => stroke && !stroke.landed && stroke.t >= stroke.spec.windup && stroke.t <= strikeLiveUntil(stroke.spec);
+  // A thrust runs along its own shaft, so it hardly closes on a blade held across its line; but
+  // the point cannot go through it: it is turned aside along the blade (a bind), the more easily the
+  // further out on a long shaft it is met. A blade brought across to meet it (weaponBlock) wards it off.
+  const warding = (fighter, stroke, other) => cutting(stroke) && stroke.spec.mode === 'thrust' && !strokeOf(other.fighter, other.blade) && other.fighter.defence?.name === 'weaponBlock';
+  const bind = warding(first, strokeA, { fighter: second, blade: b }) || warding(second, strokeB, { fighter: first, blade: a });
+  if (world.clashing.has(key) || (closing < BLADES.clashSpeed && !bind)) return;
+  world.clashing.add(key);
+  const massA = effectiveMassAt(a.spec, first.body.limbKg[`${a.main}Arm`] * 0.6, one.along, first.body.lengths.upperArm + first.body.lengths.forearmToFist);
+  const massB = effectiveMassAt(b.spec, second.body.limbKg[`${b.main}Arm`] * 0.6, two.along, second.body.lengths.upperArm + second.body.lengths.forearmToFist);
+  const impulse = ((massA * massB) / (massA + massB)) * Math.max(0, closing) * (1 + BLADES.clashRestitution);
+  world.pendingImpulses.push({ fighter: first, shares: [[mainA, 1], [P[`${a.main}Elbow`], 0.5]], direction: normal, impulse });
+  world.pendingImpulses.push({ fighter: second, shares: [[mainB, 1], [P[`${b.main}Elbow`], 0.5]], direction: vec.scale(normal, -1), impulse });
   const parried = cutting(strokeA) && !strokeB ? [second, b, first, strokeA] : cutting(strokeB) && !strokeA ? [first, a, second, strokeB] : null;
   for (const stroke of [strokeA, strokeB]) {
     if (!stroke) continue;
