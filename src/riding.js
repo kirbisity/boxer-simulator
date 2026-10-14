@@ -47,8 +47,8 @@ export const RIDING = {
   charging: 3, within: 14,
 };
 
-const forwardOf = (yaw) => yawRotate([1, 0, 0], yaw);
-const leftOf = (yaw) => yawRotate([0, 0, 1], yaw);
+const aheadOf = (yaw) => yawRotate([1, 0, 0], yaw);
+const leftwardOf = (yaw) => yawRotate([0, 0, 1], yaw);
 const headingOf = (x, z) => Math.atan2(-z, x);
 
 function weightedPick(weights, random) {
@@ -165,8 +165,8 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   const target = vec.add(now, vec.scale(theirs, lead));
   const to = [target[0] - me[0], 0, target[2] - me[2]];
   const distance = Math.hypot(to[0], to[2]);
-  const along = distance > 1e-6 ? [to[0] / distance, 0, to[2] / distance] : forwardOf(horse.yaw);
-  const forward = forwardOf(horse.yaw);
+  const along = distance > 1e-6 ? [to[0] / distance, 0, to[2] / distance] : aheadOf(horse.yaw);
+  const forward = aheadOf(horse.yaw);
   const setGoal = (heading, speed) => {
     horse.goal = { heading: steerInside(world, horse, heading), speed };
   };
@@ -274,8 +274,8 @@ export function standToRider(world, fighter, opponent, style, dt) {
     let side = vec.sub(toMe, vec.scale(line, vec.dot(toMe, line)));
     if (vec.length(side) < 0.2) side = [-line[2], 0, line[0]];
     side = vec.normalize(side);
-    const facing = forwardOf(fighter.yaw);
-    const left = leftOf(fighter.yaw);
+    const facing = aheadOf(fighter.yaw);
+    const left = leftwardOf(fighter.yaw);
     fighter.move = Math.max(-1, Math.min(1, vec.dot(side, facing)));
     fighter.strafe = Math.max(-1, Math.min(1, vec.dot(side, left) * 2));
     fighter.running = true;

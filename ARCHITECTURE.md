@@ -25,6 +25,9 @@ logic.
 | `src/handling.js` | A man and a weapon: whether he can hold it out (its weight at its balance, against his arms), its pace in his hands (arm torque against its inertia, against a reference arm), and a bow's draw weight against his pull (part draws cast slower arrows). armFighter refuses what he cannot hold. |
 | `src/formation.js` | Drill: a kit with `drill` ({ advance, charge }) fights in ranks. Each drilled man keeps a slot (ahead, across) relative to his side's leader; the anchor walks up (dressing the line, the last `charge` m at a run) or holds; the front rank fights on a leash, the rest stand in their slots (posed: no physics). Fallen men's places are filled from behind in the file; a shooter who has loosed swaps with a loaded man behind. Nothing names a unit. |
 | `src/physics/net.js` | The retiarius's net: thrown, binding a man (no blows, no guard, short steps) until he works or cuts free. Drawn as a soft body by `src/netcloth.js` (cords that only pull, contact with bodies and sand; the physics alone decides who is caught). |
+| `src/horses.js` | `HORSES` (destrier, warhorse, Arabian, steppe, Japanese: mass, withers, paces, getting away, lateral pull, laden by `HORSE_LOAD`), `BARDING` (plate, lamellar, bare: protection by horse part), `canRide`/`mountOf` from the kit's `horse` and `barding`. |
+| `src/physics/mounted.js` | On horseback: the horse a rigid body of capsules (`HORSE_SHAPE`, gait-cycled legs: `poseHorse`), steered within its limits (`stepHorse`, `turnRadius`); the rider's hips, knees and feet held in the saddle each substep (`seatRider`; his stance `lift`ed, his body damped against the horse: `fighter.carrier`), his facing (`riderFacing`), the seat (`keepSeat`, `seatMass`), thrown (`unhorse`); blows on the horse through its barding (`strikeHorses`, `harmHorse`), its bleeding and fall (`bringDown`), horses against men and horses (`collideHorses`). `WORLD.mount` tunes it. |
+| `src/riding.js` | The AI on horseback (`ride`: charge to pass on the weapon side, a blow timed to land abreast in the rider's own frame, past, wheel round; side by side against a rider; a couched lance; a mounted archer circling) and on foot against a rider (`standToRider`: a long weapon braced at the horse's chest, else off its line). `RIDING` holds its tunables. |
 | `src/ai.js` | Decisions: target, game plan, range, when to strike, defend, pick up a weapon, shoot or reload. `AI` holds its tunables. |
 | `src/cast.js` | Generators for armies (`mingSoldier`, `ottomanSoldier`, `steppeWarrior`, …) and `PERIOD_BUILD`: historical body sizes by people and rank. |
 | `src/scenarios.js` | Levels: place, arena, formation, and the armies (troop tables) set from history. |
@@ -55,7 +58,7 @@ crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
-`src/crowdview.js` (instanced crowds), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue; the helm in its first drawing, `STECHHELM`, or drawn to a profile, `STECHHELM_STYLES`, picked by the design's `head.style`), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
+`src/crowdview.js` (instanced crowds), `src/horseview.js` (horses: body, gait-placed legs, saddle and reins, plate or lamellar barding), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue; the helm in its first drawing, `STECHHELM`, or drawn to a profile, `STECHHELM_STYLES`, picked by the design's `head.style`), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
 `disposeObject`). `src/main.js` runs the loop and input; playing, the camera
 follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
 critically damped springs, a dead band on his facing, the heading held while
@@ -154,8 +157,12 @@ and adjust only the numbers of each side.
 - Some magic numbers remain inline in contact and wound code (cut thresholds,
   trunk mass share, grip-strain shares); they are listed in the review notes
   and belong in `WORLD`.
-- No horses: battles decided from horseback (most steppe battles) cannot be
-  recreated faithfully yet.
+- Horses: one or two in a duel (Deadliest Warrior, the sandbox's Mounted
+  pick), on the open field (`field`); not in levels. A thrown rider does not
+  remount; a riderless horse bolts and stands. The rider's legs are held,
+  not simulated (no gripping with the knees, no standing in the stirrups);
+  he does not parry from the saddle. A horse is not stepped round men lying
+  down, and is not drawn as a skinned body (rigid low-poly parts).
 - Big battles: 100 a side of drilled troops (`tools/legion.js`) costs ~0.3 s of
   work per simulated second before contact and ~0.6–0.9 s at contact (Node,
   M-series); in the browser ~50 fps before contact, ~25 fps at contact, the

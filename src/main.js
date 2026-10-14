@@ -22,6 +22,8 @@ import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
 import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
+import { canRide } from './horses.js';
 import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -63,6 +65,8 @@ const state = {
   next: null,
   // The sandbox's own fighters, sizes and place, kept while elsewhere.
   sandbox: null,
+  // The sandbox's riders: '' (nobody), 'red', 'blue' or 'both' (only those whose kit rides: horses.js canRide).
+  mountedSides: '',
 };
 const realSeconds = () => performance.now() / 1000;
 /** A short name for crowded places: the first name, and its number if it has one ("Dave 2"). */
@@ -171,7 +175,10 @@ function newBout() {
   const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
   // Each side: its lead (the one the builder edits) and, in a team fight,
   // the level's crew or, in the ring, fighters from the presets.
-  const sides = ['red', 'blue'].map((corner) => teamFor(corner, scenario).map((inputs) => ({ inputs, corner })));
+  // In the sandbox the Mounted pick puts a side on horseback (whoever of it rides); the menus' fights say it in each fighter's inputs.
+  const riding = (corner) => state.mountedSides === corner || state.mountedSides === 'both';
+  const sides = ['red', 'blue'].map((corner) => teamFor(corner, scenario).map((inputs) => ({ inputs: state.game === 'sandbox' && !scenario ? { ...inputs, mounted: riding(corner) && canRide(inputs) } : inputs, corner })));
+  refreshMountPick();
   // Five presets for six places: a name used twice gets a number.
   const names = new Map();
   for (const entry of [...sides[0], ...sides[1]]) {
@@ -179,7 +186,9 @@ function newBout() {
     names.set(entry.inputs.name, count);
     if (count > 1) entry.inputs = { ...entry.inputs, name: `${entry.inputs.name.split(" ")[0]} ${count}` };
   }
-  const place = scenario?.scene ?? state.place;
+  // Horsemen need room to charge and wheel: a place too small for it gives way to the open field.
+  const mounted = [...sides[0], ...sides[1]].some((entry) => entry.inputs.mounted && canRide(entry.inputs));
+  const place = scenario?.scene ?? (mounted && (PLACE_ARENAS[state.place]?.halfX ?? 0) < PLACE_ARENAS.field.halfX * 0.6 ? 'field' : state.place);
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
   clearGore(scene);
@@ -220,6 +229,9 @@ const BUILD_BUDGET_MS = 24;
  */
 function rebuildViews({ progressive = false } = {}) {
   for (const view of state.views) disposeFighterView(scene, view);
+  // The horses (physics/mounted.js), one model each.
+  for (const view of state.horseViews ?? []) disposeHorseView(scene, view);
+  state.horseViews = (state.world.horses ?? []).map((horse) => buildHorseView(scene, horse));
   if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
   const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
@@ -437,6 +449,7 @@ function snapshot(world) {
     world,
     fighters: world.fighters.map((fighter) => ({ x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
     debris: world.debris.map((piece) => ({ x: piece.x?.slice(), q: piece.q?.slice() })),
+    horses: (world.horses ?? []).map((horse) => ({ at: horse.at.slice(), yaw: horse.yaw, stride: horse.stride })),
   };
 }
 
@@ -462,6 +475,17 @@ function blendWorld(world, before, share) {
     if (then.dir && now.dir) fighter.weapon.dir = unit(blend(then.dir, now.dir, share));
     if (then.offDir && now.offDir) fighter.offWeapon.dir = unit(blend(then.offDir, now.offDir, share));
   });
+  (world.horses ?? []).forEach((horse, index) => {
+    const then = before.horses?.[index];
+    if (!then) return;
+    kept.push({ horse, at: horse.at, yaw: horse.yaw, stride: horse.stride });
+    horse.at = blend(then.at, horse.at, share);
+    horse.yaw = then.yaw + Math.atan2(Math.sin(horse.yaw - then.yaw), Math.cos(horse.yaw - then.yaw)) * share;
+    // The stride wraps round at 1: blended the short way.
+    let stride = horse.stride - then.stride;
+    stride -= Math.round(stride);
+    horse.stride = (((then.stride + stride * share) % 1) + 1) % 1;
+  });
   world.debris.forEach((piece, index) => {
     const then = before.debris[index];
     if (!then?.x || !piece.x) return;
@@ -475,7 +499,9 @@ function blendWorld(world, before, share) {
   });
   return () => {
     for (const entry of kept) {
-      if (entry.fighter) {
+      if (entry.horse) {
+        Object.assign(entry.horse, { at: entry.at, yaw: entry.yaw, stride: entry.stride });
+      } else if (entry.fighter) {
         entry.fighter.x.set(entry.x);
         if (entry.dir && entry.fighter.weapon) entry.fighter.weapon.dir = entry.dir;
         if (entry.offDir && entry.fighter.offWeapon) entry.fighter.offWeapon.dir = entry.offDir;
@@ -536,7 +562,7 @@ function drawWorld(dt) {
   const followed = state.mode === 'play' && !sheet ? player() : null;
   if (followed) followCamera(followed, dt);
   // A crowd needs a wider shot: back off with the spread of the fighters.
-  else if (world.fighters.length > 2 && !sheet) {
+  else if ((world.fighters.length > 2 || world.horses?.length) && !sheet) {
     const spread = Math.max(...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - pelvisMid[0], fighter.x[26] - pelvisMid[2])));
     const furthest = state.scenario ? SCENARIOS[state.scenario].camera?.maxDistance ?? Infinity : Infinity;
     scene.orbit.distance += (Math.min(furthest, Math.max(5.2, 3.4 + spread * 2.2)) - scene.orbit.distance) * 0.03;
@@ -546,6 +572,7 @@ function drawWorld(dt) {
   dramaCamera(scene, state.drama, world, realSeconds());
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
+  for (const view of state.horseViews ?? []) updateHorseView(view);
   for (const view of state.views) {
     updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
     updateArms(scene, view, drawnTime);
@@ -576,6 +603,7 @@ function consumeEvents() {
     state.eventCursor += 1;
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
     if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked')) woundBlood(scene, event);
+    if (event.kind === 'horseHit' && event.cut + event.pierce > 1) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     if (event.kind === 'shot') spawnShot(scene, event);
     if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : woundBlood(scene, event));
@@ -667,6 +695,10 @@ function logEvent(event) {
   else if (event.kind === 'pinned') text = `🤼 <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'impact') text = `💥 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'pain') text = `😣 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'unhorsed') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'horseDown') text = `🐎 ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'A horse'} goes down · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'horseHit') text = `<b>${name(event.attacker)}</b> ${event.punch} → ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'a horse'} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
+  else if (event.kind === 'trampled') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   // A strike's line needs its numbers; anything else without a line of its own is not logged.
   else if (event.attacker === undefined || event.speed === undefined || event.impulse === undefined || event.force === undefined || !event.effects) return;
@@ -735,6 +767,19 @@ for (const corner of ['red', 'blue']) {
 }
 $('#stand-still').addEventListener('change', (event) => {
   state.standStill = event.target.value;
+});
+/** The sandbox's Mounted pick: a side can ride only if its lead's kit rides. */
+function refreshMountPick() {
+  const select = $('#mounted');
+  if (!select) return;
+  const rides = Object.fromEntries(['red', 'blue'].map((corner) => [corner, Boolean(state.rosters[corner]?.[0] && canRide(state.rosters[corner][0]))]));
+  for (const option of select.options) option.disabled = option.value === 'both' ? !(rides.red && rides.blue) : option.value ? !rides[option.value] : false;
+  if (select.selectedOptions[0]?.disabled) select.value = '';
+  select.value = state.mountedSides;
+}
+$('#mounted').addEventListener('change', (event) => {
+  state.mountedSides = event.target.value;
+  newBout();
 });
 $('#place').addEventListener('change', (event) => {
   state.place = event.target.value;
@@ -1238,7 +1283,8 @@ let goHome = () => {};
 
 /** Show which part of the game is on: the footer keeps only what it uses. */
 function setGame(game, next = null) {
-  if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
+  if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place, mountedSides: state.mountedSides };
+  if (game !== 'sandbox') state.mountedSides = '';
   if (game !== 'tutorial') {
     tutorial.stop();
     delete document.body.dataset.tutorialStep;
@@ -1437,6 +1483,7 @@ function enterSandbox() {
   state.sandboxRosters = kept.rosters;
   state.teamSizes = { ...kept.teamSizes };
   state.place = kept.place;
+  state.mountedSides = kept.mountedSides ?? '';
   state.editing = { red: 0, blue: 0 };
   $('#place').value = kept.place;
   refreshBuilder();
