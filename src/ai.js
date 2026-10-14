@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -75,6 +75,11 @@ export const AI = {
   // is within `couchedWatch` m of him (its gap, physics couchedGap): from then
   // the reaction runs as to any blow starting.
   couchedWatch: 0.6,
+  // A long point (physics longPoint: a couched lance; a thrust with a weapon WORLD.longPoint m long or more) is answered off
+  // its line: a sidestep (weight `sidestep` among the style's defences), a straight step back
+  // (`stepBack` of its weight) and the guard (`guard`) far less. And while a couched point comes at
+  // him he does not walk onto it: he holds his ground, watching it, until he steps off its line.
+  offLine: { sidestep: 1.2, stepBack: 0.15, guard: 0.3 },
   // How much more often a straight punch to the head is slipped than the
   // style's overall mix says (the mix includes body shots, which cannot be).
   slipPreference: 3,
@@ -446,7 +451,7 @@ export function chooseDefence(fighter, attacker, style, incoming, random) {
   const root = spec.limb.replace(/Hand|Elbow/, 'Shoulder').replace(/Foot|Knee/, 'Hip');
   const lateral = toLocal(fighter, point(attacker.x, P[root]))[2] - head[2];
   const away = Math.abs(lateral) > 0.02 ? -Math.sign(lateral) : random() < 0.5 ? 1 : -1;
-  const name = pickDefence(style, incoming, random, heaviness(attacker, incoming));
+  const name = pickDefence(style, incoming, random, heaviness(attacker, incoming), longPoint(attacker, incoming));
   // A roll starts on the side the hook comes from and ducks across with it.
   return { name, side: name === 'roll' ? -away : away };
 }
@@ -459,9 +464,21 @@ function heaviness(striker, incoming) {
   return Math.min(1, Math.max(weapon, incoming.heavy ? spec.loaded : 0));
 }
 
-function pickDefence(style, incoming, random, heavy = 0) {
+function pickDefence(style, incoming, random, heavy = 0, long = false) {
   const answers = { ...style.defences };
   const spec = incoming.spec;
+  if (long) {
+    // A long point: stepping straight back only keeps him on its line (it comes on faster than he
+    // gives ground), and arms raised do not turn it; he steps off the line, or beats the shaft aside.
+    const offLine = AI.offLine;
+    answers.sidestep = offLine.sidestep;
+    if (answers.stepBack) answers.stepBack *= offLine.stepBack;
+    if (answers.guard) answers.guard *= offLine.guard;
+    delete answers.slip;
+    delete answers.roll;
+    delete answers.leanBack;
+    return pick(answers, random) ?? 'sidestep';
+  }
   if (heavy > 0) {
     // A heavy blow: anyone takes his body out of its way rather than meet it.
     const evade = AI.evadeHeavy;
@@ -1353,8 +1370,11 @@ export function think(world, fighter, dt) {
     // A style that charges in once the bow is down (`ranged.charge` s): straight at him with the sword drawn.
     if (gun.charge) fighter.aiCharge = { until: world.time + gun.charge };
   }
+  // A couched point levelled at him and coming: he does not run onto it (AI.offLine), whatever else he meant to do.
+  // (Looked for only by a man about to run in: a charger, or one charging in after the bow.)
+  const levelled = (fighter.aiCharge || (fighter.body.inputs.charging ?? 1) > 1) && world.fighters.some((other) => other.corner !== fighter.corner && other.punch?.spec.couched && other.punch.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
   // Charging in after the bow: flat out until he is within the sword's reach, then the fight.
-  if (fighter.aiCharge && !fighter.slot) {
+  if (fighter.aiCharge && !fighter.slot && !levelled) {
     if (world.time < fighter.aiCharge.until && distance > reachOf(fighter) * AI.chargeInto) {
       fighter.move = 1;
       fighter.running = true;
@@ -1384,7 +1404,7 @@ export function think(world, fighter, dt) {
   }
   // A man who charges (`inputs.charging`, a raider): from well out, he comes on at a run.
   const charging = fighter.body.inputs.charging ?? 1;
-  if (charging > 1 && !fighter.slot && !fighter.clinch && distance > reachOf(fighter) + AI.charging.runFrom) {
+  if (charging > 1 && !fighter.slot && !fighter.clinch && !levelled && distance > reachOf(fighter) + AI.charging.runFrom) {
     fighter.move = 1;
     fighter.running = true;
     fighter.strafe = 0;
@@ -1416,7 +1436,7 @@ export function think(world, fighter, dt) {
     if (distance > range + AI.rangeSlack) fighter.move = 1;
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
     else fighter.move *= Math.exp(-dt * 4);
-  } else if (!fighter.defence || fighter.defence.name !== 'stepBack') {
+  } else if (!fighter.defence || (fighter.defence.name !== 'stepBack' && fighter.defence.name !== 'sidestep')) {
     mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt });
   }
 
@@ -1436,6 +1456,8 @@ export function think(world, fighter, dt) {
   // Seen from when it starts to move, loading included; not while committed.
   // (A couched point carried in at a run: from when it comes within couchedWatch of him.)
   let seenFor = incoming?.age ?? incoming?.t;
+  // A couched point levelled at him and coming: he does not walk onto it (AI.offLine).
+  if (incoming?.spec.couched && !fighter.defence && fighter.move > 0) fighter.move = 0;
   if (incoming?.spec.couched) {
     if (incoming.watchedFrom === undefined && (incoming.driven || couchedGap(world, striker, incoming) <= AI.couchedWatch)) incoming.watchedFrom = incoming.age;
     seenFor = incoming.watchedFrom === undefined ? 0 : incoming.age - incoming.watchedFrom;
@@ -1451,7 +1473,7 @@ export function think(world, fighter, dt) {
       // Two blades: meet it with one and cut with the other.
       if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;
       // A blade coming is got away from, not blocked with an arm.
-      if (incoming.spec.path === 'blade' && wary && random() < AI.blade.stepBackChance) name = 'stepBack';
+      if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';
       perform(world, fighter, name, { side, from: striker.id });
       // Slip and fire back: the counter comes while the attacker's hand is out.
       if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {

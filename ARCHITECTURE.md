@@ -147,6 +147,10 @@ and adjust only the numbers of each side.
   fixed fights at fixed seeds, hashed. A refactor must leave every hash as it
   was; a physics change shows which fights it moved, and the timing column
   shows speed.
+- `node tools/lance.js [bouts] [seconds] [opponent ...]` — Maximilian's one
+  couched charge against each opponent: met or not, how the man answered it
+  (sidestep, blade across it, shield), point-first, glanced, into a gap, the
+  pierce, and whether it decided the bout.
 - Level outcomes: run a level over several seeds and compare winners with
   history (see the scratch `level.mjs` pattern in the PR description).
 
