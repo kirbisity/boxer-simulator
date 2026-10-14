@@ -72,3 +72,43 @@ export function mountOf(inputs) {
   if (!HORSES[spec.horse]) return null;
   return { breed: spec.horse, barding: BARDING[spec.barding] ? spec.barding : 'bare' };
 }
+
+/** Whether he is on a horse: set to ride (`inputs.mounted`) and his kit rides. */
+export function isMounted(inputs) {
+  return Boolean(inputs.mounted) && canRide(inputs);
+}
+
+/** The fighters of a roster who can ride, set to ride (`on`) or to fight on foot; the rest are left as they are. Returns how many ride. */
+export function mountAll(roster, on) {
+  let riders = 0;
+  for (const inputs of roster) {
+    if (!canRide(inputs)) continue;
+    inputs.mounted = on;
+    riders += 1;
+  }
+  return riders;
+}
+
+/** The sides an older setup's side-level `mounted` ('red', 'blue', 'both', true for both, or { red: bool, blue: bool }) names. */
+export function sidesMounted(value) {
+  if (value === 'both' || value === true) return ['red', 'blue'];
+  if (value === 'red' || value === 'blue') return [value];
+  if (value && typeof value === 'object') return ['red', 'blue'].filter((corner) => value[corner]);
+  return [];
+}
+
+/**
+ * A setup file's fighters with each one's own `mounted` set. A fighter's own
+ * `mounted` wins; one with none rides if his side was named in the file's
+ * side-level `mounted` (or `mountedSides`: an older setup) and his kit rides.
+ * Returns { red: [inputs...], blue: [inputs...] } as copies.
+ */
+export function mountedTeams(file) {
+  const named = new Set(sidesMounted(file.mounted ?? file.mountedSides ?? file.teams?.mounted ?? file.teams?.mountedSides));
+  const team = (corner) => file.teams[corner].map((entry) => {
+    const inputs = { ...entry };
+    if (inputs.mounted === undefined && named.has(corner) && canRide(inputs)) inputs.mounted = true;
+    return inputs;
+  });
+  return { red: team('red'), blue: team('blue') };
+}

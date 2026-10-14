@@ -78,6 +78,10 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .field.wide { grid-template-columns: 74px 1fr; }
 .field span { color: var(--muted); }
 .field select, .field input:not([type=range]) { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; min-width: 0; }
+.field .mount-line { display: flex; align-items: center; gap: 8px; color: var(--fg); }
+.field.mount-row input.mount-check { width: 20px; height: 20px; padding: 0; margin: 0; accent-color: var(--gold); }
+.field.mount-row input.mount-check:disabled { opacity: 0.4; }
+.mount-note { font-style: normal; font-size: 12px; color: var(--muted); }
 .field output { font: 12px var(--mono); text-align: right; }
 .field input[type=range] { width: 100%; accent-color: var(--gold); }
 .looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 4px 10px; }
@@ -125,6 +129,11 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 
 /* Big moments: a white flash and icons that pop over the body part. */
 #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
+.camera-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(54px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font: 600 12px var(--body); color: var(--muted); z-index: 3; white-space: nowrap; }
+.camera-bar[data-mode="free"] { color: var(--fg); border-color: rgba(255, 207, 74, 0.5); }
+.camera-bar button { padding: 5px 12px; font-size: 12px; border-radius: 999px; }
+.camera-bar:has(#frame-all[hidden]) { padding-right: 12px; }
+body[data-game="home"] .camera-bar, body[data-overlay="wizard"] .camera-bar, body.sheet .camera-bar, body[data-game="intro"] .camera-bar, body[data-game="tutorial"] .camera-bar, body.playing .camera-bar { display: none; }
 #icons { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
 .event-icon { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; transform: translate(-50%, -100%); will-change: transform, opacity; }
 .event-icon .glyph { font-size: 34px; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }

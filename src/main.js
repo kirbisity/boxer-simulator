@@ -16,6 +16,7 @@ import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders } from './
 import { installFightControls, TOUCH } from './touch.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createSeeThrough } from './seethrough.js';
+import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
 import { installTutorial, TUTORIAL, TUTORIAL_STEPS } from './tutorial.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
@@ -24,7 +25,7 @@ import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
 import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
-import { canRide } from './horses.js';
+import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -66,8 +67,6 @@ const state = {
   next: null,
   // The sandbox's own fighters, sizes and place, kept while elsewhere.
   sandbox: null,
-  // The sandbox's riders: '' (nobody), 'red', 'blue' or 'both' (only those whose kit rides: horses.js canRide).
-  mountedSides: '',
 };
 const realSeconds = () => performance.now() / 1000;
 /** A short name for crowded places: the first name, and its number if it has one ("Dave 2"). */
@@ -87,6 +86,9 @@ let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}
 // The third-person camera of play mode (followcam.js), kept out of the place's walls.
 let cameraWalls = null;
 const followCam = createFollowCam(undefined, { room: (x, z) => !cameraWalls || cameraWalls(x, z) });
+
+// The camera when watching (watchcam.js): framing everyone, or taken over by the viewer's zoom and tap.
+let watchCam = createWatchCam();
 
 // Scenery between the camera and the men it watches is drawn see-through (seethrough.js).
 const seeThrough = createSeeThrough();
@@ -179,10 +181,9 @@ function newBout() {
   const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
   // Each side: its lead (the one the builder edits) and, in a team fight,
   // the level's crew or, in the ring, fighters from the presets.
-  // In the sandbox the Mounted pick puts a side on horseback (whoever of it rides); the menus' fights say it in each fighter's inputs.
-  const riding = (corner) => state.mountedSides === corner || state.mountedSides === 'both';
-  const sides = ['red', 'blue'].map((corner) => teamFor(corner, scenario).map((inputs) => ({ inputs: state.game === 'sandbox' && !scenario ? { ...inputs, mounted: riding(corner) && canRide(inputs) } : inputs, corner })));
-  refreshMountPick();
+  // Who rides is each fighter's own (`inputs.mounted`, set in the builder; those whose kit rides: horses.js canRide).
+  const sides = ['red', 'blue'].map((corner) => teamFor(corner, scenario).map((inputs) => ({ inputs, corner })));
+  refreshMountButton();
   // Five presets for six places: a name used twice gets a number.
   const names = new Map();
   for (const entry of [...sides[0], ...sides[1]]) {
@@ -201,6 +202,8 @@ function newBout() {
   followCam.reset();
   // A level frames its own place; anything else starts from the usual ringside view.
   Object.assign(scene.orbit, scenario?.camera ?? { yaw: -0.5, pitch: 0.2, distance: 5.2 });
+  watchCam = createWatchCam();
+  cameraNote = '';
   document.body.dataset.place = place;
   $('#place').closest('label').hidden = Boolean(scenario);
   rebuildViews({ progressive: true });
@@ -543,6 +546,56 @@ function followCamera(fighter, dt) {
   orbit.target.set(...view.target);
 }
 
+/** The men as the watching camera sees them: where each stands, how high his neck is, and whether he is left lying. */
+function watchMen(world) {
+  return world.fighters.map((fighter) => ({
+    id: fighter.id,
+    x: fighter.x[P.pelvis * 3],
+    y: fighter.x[P.neck * 3 + 1],
+    z: fighter.x[P.pelvis * 3 + 2],
+    up: fighter.state === 'up',
+    gone: fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds,
+  }));
+}
+
+/**
+ * The camera when watching. Auto: the middle of everyone, a crowd drawn back to fit (a pair keeps the
+ * zoom the viewer gave it). Free (the viewer zoomed or tapped a man): it stays where he put it and
+ * follows the man he tapped, or the men near where it looks (watchcam.js).
+ */
+function watchCamera(world, middle, dt) {
+  const spread = Math.max(0, ...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - middle[0], fighter.x[26] - middle[2])));
+  watchCam.spread = spread;
+  const orbit = scene.orbit;
+  if (watchCam.mode === 'free') {
+    stepFree(watchCam, orbit, watchMen(world), dt);
+    const { min, max } = zoomLimits(spread);
+    orbit.distance = Math.max(min, Math.min(max, orbit.distance));
+  } else if (world.fighters.length > 2 || world.horses?.length) {
+    // A crowd needs a wider shot: back off with the spread of the fighters.
+    const furthest = state.scenario ? SCENARIOS[state.scenario].camera?.maxDistance ?? Infinity : Infinity;
+    orbit.distance += (Math.min(furthest, frameDistance(spread)) - orbit.distance) * 0.03;
+    watchCam.reframing = false;
+  } else stepReframe(watchCam, orbit, spread, dt);
+}
+
+// The camera's small bar: what the camera is doing, and 'Frame all' to go back to the whole field.
+const cameraBar = $('#camera-bar');
+let cameraNote = '';
+function showCameraBar(watching) {
+  const show = watching && state.mode !== 'play' && !state.viewQueue?.length && $('#builder').hidden && ['sandbox', 'quick', 'versus', 'level'].includes(state.game);
+  cameraBar.hidden = !show;
+  if (!show) return;
+  const free = watchCam.mode === 'free';
+  const man = free && watchCam.focus !== null ? state.world.fighters[watchCam.focus] : null;
+  const note = man ? `Following ${shortName(man.body.inputs.name)}` : free ? 'Zoomed in' : 'Auto camera';
+  if (note === cameraNote) return;
+  cameraNote = note;
+  cameraBar.dataset.mode = free ? 'free' : 'auto';
+  $('#camera-note').textContent = note;
+  $('#frame-all').hidden = !free;
+}
+
 // The points on a man the camera must see past the scenery to.
 const WATCHED = [P.head, P.neck, P.pelvis, P.lFoot, P.rFoot];
 // In a crowd, the men nearest what the camera looks at (at most this many).
@@ -565,6 +618,9 @@ function watchedPoints(world, followed) {
     const off = (fighter) => Math.hypot(fighter.x[P.pelvis * 3] - at.x, fighter.x[P.pelvis * 3 + 2] - at.z);
     men = standing.slice().sort((a, b) => off(a) - off(b)).slice(0, WATCHED_IN_CROWD);
   }
+  // The man the viewer follows is the one he is looking at.
+  const looked = !followed && watchCam.mode === 'free' && watchCam.focus !== null ? world.fighters[watchCam.focus] : null;
+  if (looked && !men.includes(looked)) men = [looked, ...men];
   for (const fighter of men) for (const particle of WATCHED) points.push(point(fighter.x, particle));
   return points;
 }
@@ -592,15 +648,12 @@ function drawWorld(dt) {
   // Playing: the camera follows his man from behind (third person).
   const followed = state.mode === 'play' && !sheet ? player() : null;
   if (followed) followCamera(followed, dt);
-  // A crowd needs a wider shot: back off with the spread of the fighters.
-  else if ((world.fighters.length > 2 || world.horses?.length) && !sheet) {
-    const spread = Math.max(...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - pelvisMid[0], fighter.x[26] - pelvisMid[2])));
-    const furthest = state.scenario ? SCENARIOS[state.scenario].camera?.maxDistance ?? Infinity : Infinity;
-    scene.orbit.distance += (Math.min(furthest, Math.max(5.2, 3.4 + spread * 2.2)) - scene.orbit.distance) * 0.03;
-  }
-  // A design sheet holds its own framing.
-  placeCamera(scene, followed || sheet ? null : pelvisMid);
-  dramaCamera(scene, state.drama, world, realSeconds());
+  else if (!sheet) watchCamera(world, pelvisMid, dt);
+  // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
+  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid);
+  // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
+  if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
+  showCameraBar(!followed && !sheet);
   seeThrough.update(scene, document.body.classList.contains('sheet') ? [] : watchedPoints(world, followed), dt);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
@@ -800,17 +853,24 @@ for (const corner of ['red', 'blue']) {
 $('#stand-still').addEventListener('change', (event) => {
   state.standStill = event.target.value;
 });
-/** The sandbox's Mounted pick: a side can ride only if its lead's kit rides. */
-function refreshMountPick() {
-  const select = $('#mounted');
-  if (!select) return;
-  const rides = Object.fromEntries(['red', 'blue'].map((corner) => [corner, Boolean(state.rosters[corner]?.[0] && canRide(state.rosters[corner][0]))]));
-  for (const option of select.options) option.disabled = option.value === 'both' ? !(rides.red && rides.blue) : option.value ? !rides[option.value] : false;
-  if (select.selectedOptions[0]?.disabled) select.value = '';
-  select.value = state.mountedSides;
+/** The sandbox's Mounted button: everyone on the field who can ride rides, or all of them on foot (each fighter's own choice is in the builder). */
+function refreshMountButton() {
+  const button = $('#mounted');
+  if (!button) return;
+  const fighters = ['red', 'blue'].flatMap((corner) => state.rosters[corner]?.slice(0, state.teamSizes[corner]) ?? []);
+  const riders = fighters.filter(canRide);
+  const riding = riders.filter(isMounted).length;
+  button.disabled = riders.length === 0;
+  button.dataset.all = String(riders.length > 0 && riding === riders.length);
+  button.textContent = riders.length > 0 && riding === riders.length ? '🐎 Dismount all' : '🐎 Mount all';
+  button.title = riders.length
+    ? `${riding} of the ${riders.length} who can ride are mounted. Each fighter's own Mounted choice is in Build fighters. A mounted fight is on the open field.`
+    : 'Nobody here rides (knights, samurai, steppe, sultanates, Ming cavalry...)';
 }
-$('#mounted').addEventListener('change', (event) => {
-  state.mountedSides = event.target.value;
+$('#mounted').addEventListener('click', () => {
+  const on = $('#mounted').dataset.all !== 'true';
+  for (const corner of ['red', 'blue']) mountAll(state.rosters[corner].slice(0, state.teamSizes[corner]), on);
+  refreshBuilder();
   newBout();
 });
 $('#place').addEventListener('change', (event) => {
@@ -824,6 +884,8 @@ segmented('#modes', (mode, button) => {
   state.playSide = button.dataset.side ?? 'red';
   state.orders = newOrders();
   followCam.reset();
+  watchCam = createWatchCam();
+  cameraNote = '';
   fightKeys.clear();
   fightControls.setActive(mode === 'play');
   document.body.classList.toggle('playing', mode === 'play');
@@ -943,34 +1005,80 @@ window.addEventListener('keyup', (press) => {
   }
 });
 
-// Orbit: drag to turn, wheel or pinch to zoom.
+// Orbit: drag to turn, wheel or pinch to zoom. Watching, a zoom or a tap on a
+// man takes the camera (watchcam.js): it follows him; a double tap or 'Frame
+// all' gives it back.
 const canvas = $('#stage');
 const pointers = new Map();
+const tapper = createTapper();
+/** Whether the viewer's gestures move the watching camera (not the follow camera, a design sheet or the intro). */
+const viewerCamera = () => state.mode !== 'play' && state.game !== 'intro' && !document.body.classList.contains('sheet');
+function zoomView(ratio) {
+  if (viewerCamera()) zoomBy(watchCam, scene.orbit, ratio, watchCam.spread ?? 0);
+  else scene.orbit.distance = Math.max(1.6, Math.min(12, scene.orbit.distance * ratio));
+}
+/** The man under a tap, if any: each man's head, pelvis and feet on the screen as a stick figure. */
+function manAt(x, y) {
+  const box = canvas.getBoundingClientRect();
+  const projected = new THREE.Vector3();
+  const onScreen = (fighter, particle) => {
+    projected.set(fighter.x[particle * 3], fighter.x[particle * 3 + 1], fighter.x[particle * 3 + 2]).project(scene.camera);
+    return [box.left + ((projected.x + 1) / 2) * box.width, box.top + ((1 - projected.y) / 2) * box.height, projected.z];
+  };
+  const shapes = [];
+  for (const fighter of state.world.fighters) {
+    if (fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds) continue;
+    const points = [P.head, P.pelvis, P.lFoot, P.rFoot].map((particle) => onScreen(fighter, particle));
+    if (points.some((point) => point[2] > 1)) continue;
+    shapes.push({ id: fighter.id, depth: points[1][2], points: points.map(([px, py]) => [px, py]) });
+  }
+  return pickMan(shapes, x, y);
+}
+function tapView(tap) {
+  if (!viewerCamera() || !state.world) return;
+  if (tap.kind === 'double') return frameAll(watchCam);
+  const id = manAt(tap.x, tap.y);
+  if (id !== null) focusOn(watchCam, id);
+  // A tap on nobody lets go of the man but keeps the zoom.
+  else if (watchCam.mode === 'free') focusOn(watchCam, null);
+}
 canvas.addEventListener('pointerdown', (press) => {
   canvas.setPointerCapture(press.pointerId);
   pointers.set(press.pointerId, [press.clientX, press.clientY]);
+  if (pointers.size === 1) tapper.press(press.clientX, press.clientY, realSeconds() * 1000);
+  else tapper.cancel();
 });
 canvas.addEventListener('pointermove', (move) => {
   if (!pointers.has(move.pointerId)) return;
   const [x, y] = pointers.get(move.pointerId);
   if (pointers.size === 1) {
+    tapper.move(move.clientX, move.clientY);
     scene.orbit.yaw -= (move.clientX - x) * 0.008;
     scene.orbit.pitch = Math.max(-0.05, Math.min(1.3, scene.orbit.pitch + (move.clientY - y) * 0.006));
   } else if (pointers.size === 2) {
     const [other] = [...pointers.entries()].filter(([id]) => id !== move.pointerId).map(([, position]) => position);
     const before = Math.hypot(x - other[0], y - other[1]);
     const after = Math.hypot(move.clientX - other[0], move.clientY - other[1]);
-    scene.orbit.distance = Math.max(1.6, Math.min(12, scene.orbit.distance * (before / Math.max(1, after))));
+    zoomView(before / Math.max(1, after));
   }
   pointers.set(move.pointerId, [move.clientX, move.clientY]);
 });
-const release = (up) => pointers.delete(up.pointerId);
-canvas.addEventListener('pointerup', release);
-canvas.addEventListener('pointercancel', release);
+canvas.addEventListener('pointerup', (up) => {
+  const alone = pointers.size === 1 && pointers.has(up.pointerId);
+  pointers.delete(up.pointerId);
+  const tap = alone ? tapper.release(up.clientX, up.clientY, realSeconds() * 1000) : null;
+  if (tap) tapView(tap);
+});
+canvas.addEventListener('pointercancel', (up) => {
+  pointers.delete(up.pointerId);
+  tapper.cancel();
+});
 canvas.addEventListener('wheel', (wheel) => {
   wheel.preventDefault();
-  scene.orbit.distance = Math.max(1.6, Math.min(12, scene.orbit.distance * Math.exp(wheel.deltaY * 0.001)));
+  // A trackpad's pinch arrives as a wheel with ctrl held, in small steps.
+  zoomView(Math.exp(wheel.deltaY * (wheel.ctrlKey ? 0.015 : 0.002)));
 }, { passive: false });
+$('#frame-all').addEventListener('click', () => frameAll(watchCam));
 
 // ---- Builder ----------------------------------------------------------------
 
@@ -1042,7 +1150,7 @@ function fillMemberPicker(corner) {
   const picker = $(`#build-${corner} .member`);
   const size = state.teamSizes[corner];
   picker.closest('label').hidden = size < 2;
-  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${fighter.name}${index === 0 ? ' (lead)' : ''}`, String(index))));
+  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${isMounted(fighter) ? '🐎 ' : ''}${fighter.name}${index === 0 ? ' (lead)' : ''}`, String(index))));
   picker.value = String(state.editing[corner]);
 }
 
@@ -1064,6 +1172,8 @@ function buildCornerForm(corner) {
   presetSelect.addEventListener('change', () => {
     const chosen = normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
     shuffleColors(chosen);
+    // The slot keeps its choice to ride (if the new man's kit rides).
+    if (current(corner).mounted) chosen.mounted = true;
     setCurrent(corner, chosen);
     fillCornerForm(corner);
   });
@@ -1145,6 +1255,12 @@ function buildCornerForm(corner) {
       form.querySelector('.code').value = 'That code is not a fighter file.';
     }
   });
+  form.querySelector('.mount-check').addEventListener('change', (changed) => {
+    current(corner).mounted = changed.target.checked;
+    fillMemberPicker(corner);
+    fillCornerForm(corner);
+    refreshMountButton();
+  });
   form.querySelector('.name-input').addEventListener('input', (typed) => {
     current(corner).name = typed.target.value || 'Fighter';
     fillMemberPicker(corner);
@@ -1172,6 +1288,14 @@ function fillCornerForm(corner) {
   outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
   for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
   form.querySelector('.name-input').value = inputs.name;
+  // Mounted is each fighter's own, and only if his kit rides (levels have no horses).
+  const rides = canRide(inputs);
+  const mount = form.querySelector('.mount-check');
+  form.querySelector('.mount-row').hidden = Boolean(state.scenario);
+  mount.disabled = !rides;
+  mount.checked = rides && Boolean(inputs.mounted);
+  const horse = mountOf(inputs);
+  form.querySelector('.mount-note').textContent = !rides ? 'his people did not ride' : mount.checked ? `${HORSES[horse.breed].label}${horse.barding === 'bare' ? '' : `, ${horse.barding} barding`}` : 'on foot';
   form.querySelector('.copy').textContent = 'Copy code';
   for (const field of FIELDS) {
     const input = form.querySelector(`[data-key="${field.key}"]`);
@@ -1247,6 +1371,8 @@ const OLD_SETUP_KIND = 'boxer-simulator/setup';
 function setupFile() {
   const side = (corner) => state.rosters[corner].slice(0, state.teamSizes[corner]).map((inputs) => ({
     ...inputs,
+    // Whether he rides: his own choice, written only where it is so.
+    mounted: isMounted(inputs) ? true : undefined,
     // The weight the body settles at, for reading (and for a level's file); calories are what set it.
     weightKg: Math.round(buildBody(inputs).massKg * 10) / 10,
   }));
@@ -1261,7 +1387,9 @@ function loadSetup(file) {
     const { weightKg, ...inputs } = entry;
     return normaliseInputs({ ...inputs, look: { ...DEFAULT_LOOK, ...inputs.look } });
   };
-  state.rosters = { red: file.teams.red.map(fighter), blue: file.teams.blue.map(fighter) };
+  // Each fighter's own Mounted; an older file's side-level one is given to the riders of that side.
+  const teams = mountedTeams(file);
+  state.rosters = { red: teams.red.map(fighter), blue: teams.blue.map(fighter) };
   if (state.scenario) state.levelRosters[state.scenario] = state.rosters;
   for (const corner of ['red', 'blue']) {
     state.teamSizes[corner] = Math.min(20, state.rosters[corner].length);
@@ -1315,8 +1443,7 @@ let goHome = () => {};
 
 /** Show which part of the game is on: the footer keeps only what it uses. */
 function setGame(game, next = null) {
-  if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place, mountedSides: state.mountedSides };
-  if (game !== 'sandbox') state.mountedSides = '';
+  if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
   if (game !== 'tutorial') {
     tutorial.stop();
     delete document.body.dataset.tutorialStep;
@@ -1515,7 +1642,6 @@ function enterSandbox() {
   state.sandboxRosters = kept.rosters;
   state.teamSizes = { ...kept.teamSizes };
   state.place = kept.place;
-  state.mountedSides = kept.mountedSides ?? '';
   state.editing = { red: 0, blue: 0 };
   $('#place').value = kept.place;
   refreshBuilder();
@@ -1894,6 +2020,12 @@ window.boxer = {
   designSheet,
   // What the scenery see-through has faded now ([{ name, opacity, box }]); refresh() tests again at the next frame.
   seeThrough,
+  // The watching camera's state ({ mode: 'auto' | 'free', focus }) and its two verbs, as a tap and 'Frame all' do them.
+  watchCam: () => watchCam,
+  // The man under a point on the screen (what a tap picks), or null.
+  manAt,
+  focusOn: (id) => focusOn(watchCam, id),
+  frameAll: () => frameAll(watchCam),
   presets: PRESETS,
   fight,
   // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.

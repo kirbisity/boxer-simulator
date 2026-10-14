@@ -35,6 +35,11 @@
   <ol class="log" id="log" aria-live="polite"></ol>
   <div id="icons" aria-hidden="true"></div>
   <div id="flash" aria-hidden="true"></div>
+  <!-- Watching: what the camera is doing, and a way back to the whole field after zooming in (watchcam.js). -->
+  <div class="camera-bar" id="camera-bar" data-mode="auto" hidden>
+    <span id="camera-note" title="Scroll or pinch to zoom in on a fighter, tap one to follow him, double-tap to frame everyone again">Auto camera</span>
+    <button type="button" id="frame-all" hidden>Frame all</button>
+  </div>
 
   <!-- The menus: one screen at a time, over the fight behind them. -->
   <div class="screen" id="home" hidden></div>
@@ -82,7 +87,7 @@
       <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random">🎲</button>
     </div>
     <label class="teams scene-pick sandbox-only" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option><option value="meadow">Village green</option><option value="stadium">Stadium</option><option value="town">Town square</option><option value="port">Port at night</option><option value="sengoku">Sengoku battlefield</option><option value="plain">Valley of Mexico</option><option value="coastFort">Shore and fort</option><option value="coastVillage">Coastal village</option><option value="field">Open field</option></select></label>
-    <label class="teams mount-pick sandbox-only" aria-label="Mounted" title="That side rides (only those whose kit rides: knights, samurai, steppe, sultanates, Ming cavalry...); a mounted fight is on the open field"><span>Mounted</span><select id="mounted"><option value="">Nobody</option><option value="red">Red</option><option value="blue">Blue</option><option value="both">Both</option></select></label>
+    <button type="button" id="mounted" class="mount-pick sandbox-only" title="Put everyone who can ride on horseback, or all on foot; each fighter's own choice is in Build fighters">🐎 Mount all</button>
     <label class="teams still-pick sandbox-only" aria-label="Stand still" title="That side stands still, no guard, no blows: a target for testing armour"><span>Stand still</span><select id="stand-still"><option value="">Nobody</option><option value="red">Red</option><option value="blue">Blue</option></select></label>
     <div class="seg" id="modes" aria-label="Mode">
       <button data-value="watch" class="on">Watch</button>
@@ -108,6 +113,7 @@
           <label class="field wide member-row"><span>Fighter</span><select class="member"></select></label>
           <label class="field wide"><span>Preset</span><select class="preset"></select></label>
           <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
+          <label class="field wide mount-row" title="Whether this fighter rides his people's horse (only kits that ride); a mounted fight is on the open field"><span>Mounted</span><span class="mount-line"><input type="checkbox" class="mount-check"><em class="mount-note"></em></span></label>
           <div class="fields"></div>
           <div class="looks"></div>
           <div class="derived"></div>
@@ -118,6 +124,7 @@
           <label class="field wide member-row"><span>Fighter</span><select class="member"></select></label>
           <label class="field wide"><span>Preset</span><select class="preset"></select></label>
           <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
+          <label class="field wide mount-row" title="Whether this fighter rides his people's horse (only kits that ride); a mounted fight is on the open field"><span>Mounted</span><span class="mount-line"><input type="checkbox" class="mount-check"><em class="mount-note"></em></span></label>
           <div class="fields"></div>
           <div class="looks"></div>
           <div class="derived"></div>

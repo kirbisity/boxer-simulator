@@ -1090,6 +1090,11 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const team = fighters.filter((fighter) => fighter.corner === corner);
     const order = formation[corner];
     if (team.length < 2 && !order) continue;
+    // With riders in the fight, every team lines up at the charging distance: the foot in rows, the riders on their flanks.
+    if (mounted && !order) {
+      lineUpMounted(team, corner === 'red' ? -1 : 1, apart, arena, (fighter) => riding(fighter.body.inputs));
+      continue;
+    }
     const spacing = order?.spacing ?? WORLD.teamSpacing;
     const rowSpacing = order?.rowSpacing ?? WORLD.teamRowSpacing;
     // Teams line up closer than a pair: a crowd that runs in from further bunches and hits its own.
@@ -1127,6 +1132,44 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // Drilled men form up on their side's leader (formation.js).
   formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
   return world;
+}
+
+/**
+ * A team in a fight with riders in it, in one line `apart` m from the middle (`sign`: -1 for red):
+ * the men on foot abreast at the team spacing, rows behind at the row spacing; the riders on the
+ * flanks, alternating sides outward; those who do not fit across the field in a rank behind the
+ * foot. A team of riders only is a line abreast, further ranks behind (WORLD.mount.line).
+ */
+function lineUpMounted(team, sign, apart, arena, rides) {
+  const { spacing, rankBack, margin } = WORLD.mount.line;
+  const foot = team.filter((fighter) => !rides(fighter));
+  const riders = team.filter(rides);
+  const across = arena.halfZ - margin;
+  const at = (fighter, back, z) => placeFighter(fighter, sign * Math.min(arena.halfX - 0.4, apart + back), Math.max(-across, Math.min(across, z)));
+  // The foot: as many abreast as the field is wide, the rest in rows behind.
+  const perRow = Math.max(1, Math.floor((2 * (arena.halfZ - 0.5)) / WORLD.teamSpacing) + 1);
+  foot.forEach((fighter, index) => {
+    const row = Math.floor(index / perRow);
+    const inRow = Math.min(perRow, foot.length - row * perRow);
+    at(fighter, row * WORLD.teamRowSpacing, ((index % perRow) - (inRow - 1) / 2) * WORLD.teamSpacing);
+  });
+  const width = foot.length ? (Math.min(perRow, foot.length) - 1) * WORLD.teamSpacing : 0;
+  const rows = Math.ceil(foot.length / perRow);
+  const flanks = [];
+  if (foot.length) {
+    for (let step = 1; (width / 2 + step * spacing) <= across; step += 1) flanks.push(-(width / 2 + step * spacing), width / 2 + step * spacing);
+  }
+  // Left and right in turn, the inner places first; the rest behind.
+  const wings = riders.slice(0, flanks.length);
+  wings.forEach((fighter, index) => at(fighter, 0, flanks[index]));
+  const behind = riders.slice(wings.length);
+  const perRank = Math.max(1, Math.floor((2 * across) / spacing) + 1);
+  const firstRank = foot.length ? Math.max(0, rows - 1) * WORLD.teamRowSpacing + rankBack : 0;
+  behind.forEach((fighter, index) => {
+    const rank = Math.floor(index / perRank);
+    const inRank = Math.min(perRank, behind.length - rank * perRank);
+    at(fighter, firstRank + rank * rankBack, ((index % perRank) - (inRank - 1) / 2) * spacing);
+  });
 }
 
 /**

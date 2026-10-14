@@ -63,7 +63,7 @@ footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
 follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
 critically damped springs, a dead band on his facing, the heading held while
 he is down, the player's own look kept `holdSeconds`, inside a place's walls;
-`node tools/camera-stability.js` measures it). Scenery that comes between the camera and the men it watches is faded see-through (`src/seethrough.js`: a few tests a second of lines from the camera to each man against the place's pieces, box then triangles; each faded mesh on its own copy of its material). The fight's controls:
+`node tools/camera-stability.js` measures it). Scenery that comes between the camera and the men it watches is faded see-through (`src/seethrough.js`: a few tests a second of lines from the camera to each man against the place's pieces, box then triangles; each faded mesh on its own copy of its material). Watching, the camera is `src/watchcam.js`: auto (everyone framed, a crowd drawn back to fit) until the viewer takes it by zooming (wheel, pinch) or tapping a man (then it follows him, or the men near where it looks, damped, moving with a steady run exactly; a man left lying gives way to the nearest still fighting); 'Frame all' or a double tap gives it back; the drama camera's push-in leaves a viewer's own zoom alone. The fight's controls:
 `src/gesture.js` (a touch's meaning: a drag begun in the top half looks, in
 the bottom half is the stick; taps and presses anywhere), `src/control.js`
 (orders → the fighter; the attack pad; `moveName`, `strikeOutcome` for the
@@ -161,8 +161,7 @@ and adjust only the numbers of each side.
 - Some magic numbers remain inline in contact and wound code (cut thresholds,
   trunk mass share, grip-strain shares); they are listed in the review notes
   and belong in `WORLD`.
-- Horses: one or two in a duel (Deadliest Warrior, the sandbox's Mounted
-  pick), on the open field (`field`); not in levels. A thrown rider does not
+- Horses: one or two in a duel (Deadliest Warrior; the sandbox's per-fighter Mounted choice, `inputs.mounted`, with a Mount all / Dismount all shortcut: a team with riders lines up at the charging distance, the foot in rows and the riders on their flanks, `lineUpMounted`), on the open field (`field`); not in levels. A thrown rider does not
   remount; a riderless horse bolts and stands. The rider's legs are held,
   not simulated (no gripping with the knees, no standing in the stirrups);
   he does not parry from the saddle. A horse is not stepped round men lying

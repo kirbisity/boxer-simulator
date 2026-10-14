@@ -515,6 +515,10 @@ export const WORLD = {
   // stirrups put them (no muscles of their own); the trunk, arms and weapon
   // are simulated as on foot, carried by the horse.
   // - startApart: m each side of the middle a mounted pair starts (room to charge).
+  // - line: a team in a fight with riders in it starts in one line at `startApart` (the foot in
+  //   their rows, abreast at the team spacing, the rows behind); the riders ride on the
+  //   foot's flanks, `spacing` m apart across, and those who do not fit across the field
+  //   form a rank `rankBack` m behind the last of the foot. Riders only: a line abreast.
   // - seat: the knock (m/s of the trunk, as on foot) a man in a war saddle
   //   (high pommel and cantle) takes before he is thrown: `speed`, against the
   //   2.1 m/s that puts a man on foot over (WORLD.balance.speed); the seat
@@ -551,6 +555,7 @@ export const WORLD = {
   //   (`restitution`), and the closing speed (m/s) above which it is a blow.
   mount: {
     startApart: 12,
+    line: { spacing: 1.8, rankBack: 5, margin: 1.5 },
     seat: { speed: 3.0, horseShare: 0.1 },
     couched: { rider: 0.6, horse: 0.1 },
     twist: 1.3,
