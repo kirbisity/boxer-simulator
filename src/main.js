@@ -5,7 +5,7 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch } from './physics.js';
+import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
@@ -15,6 +15,7 @@ import { introPlaying, introWanted, playIntro, skipIntro, stepIntro } from './in
 import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
+import { createSeeThrough } from './seethrough.js';
 import { installTutorial, TUTORIAL, TUTORIAL_STEPS } from './tutorial.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
@@ -82,6 +83,9 @@ let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}
 // The third-person camera of play mode (followcam.js), kept out of the place's walls.
 let cameraWalls = null;
 const followCam = createFollowCam(undefined, { room: (x, z) => !cameraWalls || cameraWalls(x, z) });
+
+// Scenery between the camera and the men it watches is drawn see-through (seethrough.js).
+const seeThrough = createSeeThrough();
 
 // The fight's controls (touch.js): drawn over the fight in play mode only.
 const fightControls = installFightControls($('#fight-ui'), {
@@ -512,6 +516,32 @@ function followCamera(fighter, dt) {
   orbit.target.set(...view.target);
 }
 
+// The points on a man the camera must see past the scenery to.
+const WATCHED = [P.head, P.neck, P.pelvis, P.lFoot, P.rFoot];
+// In a crowd, the men nearest what the camera looks at (at most this many).
+const WATCHED_IN_CROWD = 3;
+
+/**
+ * What the camera is there to see: the man played and the man he is locked
+ * on; one man against another, both; in a crowd, the point the camera looks
+ * at and the men nearest it.
+ */
+function watchedPoints(world, followed) {
+  const standing = world.fighters.filter((fighter) => !(fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds));
+  let men;
+  const points = [];
+  if (followed) men = [followed, lockedTarget()].filter(Boolean);
+  else if (standing.length <= 2) men = standing;
+  else {
+    const at = scene.orbit.target;
+    points.push([at.x, at.y, at.z]);
+    const off = (fighter) => Math.hypot(fighter.x[P.pelvis * 3] - at.x, fighter.x[P.pelvis * 3 + 2] - at.z);
+    men = standing.slice().sort((a, b) => off(a) - off(b)).slice(0, WATCHED_IN_CROWD);
+  }
+  for (const fighter of men) for (const particle of WATCHED) points.push(point(fighter.x, particle));
+  return points;
+}
+
 function draw(dt) {
   const restore = blendWorld(state.world, state.before, state.paused ? 1 : state.accumulator / STEP);
   try {
@@ -544,6 +574,7 @@ function drawWorld(dt) {
   // A design sheet holds its own framing.
   placeCamera(scene, followed || sheet ? null : pelvisMid);
   dramaCamera(scene, state.drama, world, realSeconds());
+  seeThrough.update(scene, document.body.classList.contains('sheet') ? [] : watchedPoints(world, followed), dt);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
   for (const view of state.views) {
@@ -1813,6 +1844,8 @@ window.boxer = {
   // Move the intro on (its own clock, s) without frames; the shot it is on, null once over.
   introStep: stepIntro,
   designSheet,
+  // What the scenery see-through has faded now ([{ name, opacity, box }]); refresh() tests again at the next frame.
+  seeThrough,
   presets: PRESETS,
   fight,
   // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.

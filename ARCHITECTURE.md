@@ -60,7 +60,7 @@ footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
 follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
 critically damped springs, a dead band on his facing, the heading held while
 he is down, the player's own look kept `holdSeconds`, inside a place's walls;
-`node tools/camera-stability.js` measures it). The fight's controls:
+`node tools/camera-stability.js` measures it). Scenery that comes between the camera and the men it watches is faded see-through (`src/seethrough.js`: a few tests a second of lines from the camera to each man against the place's pieces, box then triangles; each faded mesh on its own copy of its material). The fight's controls:
 `src/gesture.js` (a touch's meaning: a drag begun in the top half looks, in
 the bottom half is the stick; taps and presses anywhere), `src/control.js`
 (orders → the fighter; the attack pad; `moveName`, `strikeOutcome` for the
