@@ -58,7 +58,7 @@ crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
-`src/crowdview.js` (instanced crowds), `src/horseview.js` (horses: body, gait-placed legs, saddle and reins, plate or lamellar barding), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue; the helm in its first drawing, `STECHHELM`, or drawn to a profile, `STECHHELM_STYLES`, picked by the design's `head.style`), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
+`src/crowdview.js` (instanced crowds), `src/horsemesh.js` (a horse's meshes as plain arrays, built once per breed, barding, coat and level of detail: lofted barrel, neck and head over surfaces the tack and barding lie on, legs in segments, coats and markings by seed, `HORSE_BUILD` per breed; `buildHorseModel`, a `low` detail for crowds), `src/horsehair.js` (Verlet chains for what hangs: tail, trapper, loose stirrups), `src/horseview.js` (horses: the shared meshes moved each frame: gait-placed legs bending at knee, fetlock and hoof, head and neck nod, ears, mane, tail, trapper, stirrups at the rider's feet, reins from the bit to his hand; a fallen horse rolled, a broken leg hanging), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue; the helm in its first drawing, `STECHHELM`, or drawn to a profile, `STECHHELM_STYLES`, picked by the design's `head.style`), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
 `disposeObject`). `src/main.js` runs the loop and input; playing, the camera
 follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
 critically damped springs, a dead band on his facing, the heading held while
@@ -166,7 +166,7 @@ and adjust only the numbers of each side.
   remount; a riderless horse bolts and stands. The rider's legs are held,
   not simulated (no gripping with the knees, no standing in the stirrups);
   he does not parry from the saddle. A horse is not stepped round men lying
-  down, and is not drawn as a skinned body (rigid low-poly parts).
+  down, and is drawn as rigid lofted parts (meshes shared by every horse alike, not a skinned body): the mane's tufts and the tail's hair are cheap chains, not a soft body.
 - Big battles: 100 a side of drilled troops (`tools/legion.js`) costs ~0.3 s of
   work per simulated second before contact and ~0.6–0.9 s at contact (Node,
   M-series); in the browser ~50 fps before contact, ~25 fps at contact, the

@@ -235,7 +235,8 @@ function rebuildViews({ progressive = false } = {}) {
   for (const view of state.views) disposeFighterView(scene, view);
   // The horses (physics/mounted.js), one model each.
   for (const view of state.horseViews ?? []) disposeHorseView(scene, view);
-  state.horseViews = (state.world.horses ?? []).map((horse) => buildHorseView(scene, horse));
+  const crowded = (state.world.horses?.length ?? 0) > 4;
+  state.horseViews = (state.world.horses ?? []).map((horse) => buildHorseView(scene, horse, { detail: crowded ? 'low' : 'full' }));
   if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
   const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
@@ -603,7 +604,7 @@ function drawWorld(dt) {
   seeThrough.update(scene, document.body.classList.contains('sheet') ? [] : watchedPoints(world, followed), dt);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
-  for (const view of state.horseViews ?? []) updateHorseView(view);
+  for (const view of state.horseViews ?? []) updateHorseView(view, world);
   for (const view of state.views) {
     updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
     updateArms(scene, view, drawnTime);
