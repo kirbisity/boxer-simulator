@@ -506,4 +506,55 @@ export const WORLD = {
   pain: { dip: 0.27, lean: 0.35 },
   crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6 },
   pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 4, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
+  // On horseback (physics/mounted.js; the breeds and barding in horses.js).
+  // The rider sits his saddle: hips, knees and feet go where the saddle and
+  // stirrups put them (no muscles of their own); the trunk, arms and weapon
+  // are simulated as on foot, carried by the horse.
+  // - startApart: m each side of the middle a mounted pair starts (room to charge).
+  // - seat: the knock (m/s of the trunk, as on foot) a man in a war saddle
+  //   (high pommel and cantle) takes before he is thrown: `speed`, against the
+  //   2.1 m/s that puts a man on foot over (WORLD.balance.speed); the seat
+  //   couples him to the horse, so a share (`horseShare`) of the horse's mass
+  //   resists a blow on him with his own (the cantle at his back, the stirrups).
+  //   A lance's ~10 ms contact engages only the part of the horse the
+  //   saddle's give lets it reach: a tenth, ~50-60 kg.
+  // - couched: the share of the rider's mass behind a couched lance braced in
+  //   the saddle and lance rest (`rider`, against 0.25 on foot: no rest, no
+  //   cantle), and of the horse's (`horse`, through the saddle, as `seat`):
+  //   a 90 kg man on a 600 kg horse puts ~115 kg behind the point, so a lance
+  //   meeting a man at 12 m/s spends ~2 kJ (reconstructions of the joust
+  //   measure 1-3 kJ).
+  // - twist: how far (rad) the rider turns his shoulders off his horse's line.
+  // - swingPitch: how far (rad) below the shoulder a cut's mark lies for a man
+  //   on foot at a man on foot (~0.3: the chest at arm's and blade's length);
+  //   a rider's cut at a mark further down is the same swing turned down to it.
+  // - seatHeight: the rider's hip joint above the saddle's seat (m).
+  // - pass: m at least to one side of a man on foot the rider aims to pass
+  //   him (his weapon side: clear of the horse's barrel), else as far off as
+  //   puts the man's body (below him) `passReach` of his reach from the
+  //   shoulder; against a rider, `passMounted` m between the horses' lines;
+  //   a couched lance `passLance`.
+  // - wheelAt: m past his man before he wheels round; `turnSpeed` the pace
+  //   (m/s) he turns at; `edge` m from the arena's edge he turns away.
+  // - horse: `blood` (share of its mass, ~8%: litres per kg) against a man's
+  //   (`manBlood`, kg of a reference man's blood: 5.3 l), so a wound's loss is
+  //   that much smaller a share; `heartSeconds` a pierced heart or great
+  //   vessel leaves it standing; `legBreak` J of blunt or cut harm through a
+  //   leg that cripples it; `headStun` J of blunt harm to the head that drops it;
+  //   `trunkFatal` J of blunt harm summed on the body that kills it;
+  //   `boltSeconds` a riderless horse runs before it stands.
+  // - trample: a horse running into a man: the restitution of the contact
+  //   (`restitution`), and the closing speed (m/s) above which it is a blow.
+  mount: {
+    startApart: 12,
+    seat: { speed: 3.0, horseShare: 0.1 },
+    couched: { rider: 0.6, horse: 0.1 },
+    twist: 1.3,
+    swingPitch: 0.3,
+    seatHeight: 0.1,
+    pass: 0.6, passReach: 0.5, passMounted: 1.5, passLance: 0.7,
+    wheelAt: 9, turnSpeed: 5, edge: 6,
+    horse: { manBlood: 75, heartSeconds: 10, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
+    trample: { restitution: 0.2, from: 1.5 },
+  },
 };

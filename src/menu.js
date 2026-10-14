@@ -11,6 +11,7 @@ import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, OUTFIT_KE
 import { SCENARIOS } from './scenarios.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
+import { canRide, HORSES, mountOf } from './horses.js';
 import { SKIN_TONES } from './render.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
@@ -157,6 +158,8 @@ export function installMenus(game) {
     // Each side picks a faction, then turns its carousel through that faction's warriors.
     const faction = { red: 'knights', blue: 'japanese' };
     const custom = { red: null, blue: null };
+    // On horseback (each side's pick; only a man whose kit rides can: horses.js).
+    const mounted = { red: false, blue: false };
     const body = screen('versus', 'Deadliest Warrior', null, home);
     body.parentElement.classList.add('dw');
     const roster = (corner) => WARRIORS.filter((warrior) => warrior.faction === faction[corner]);
@@ -249,7 +252,15 @@ export function installMenus(game) {
       // His strength in stars (roster.js), the rating behind them on hover.
       const stars = starsOf(shown.inputs);
       const starLine = el('span', { className: 'dw-stars', textContent: stars ? '★'.repeat(stars) + '☆'.repeat(5 - stars) : '', title: stars ? `Fighting rating ${ratingOf(shown.inputs)} (Maximus 100)` : '' });
-      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }));
+      // Mounted or on foot: offered to a man who rides, with his horse and its armour.
+      const rides = canRide(shown.inputs);
+      const kit = rides ? mountOf(shown.inputs) : null;
+      const mount = el('button', { type: 'button', className: `dw-mount${rides && mounted[corner] ? ' on' : ''}`, disabled: !rides, textContent: rides ? (mounted[corner] ? `🐎 Mounted · ${HORSES[kit.breed].label}${kit.barding === 'bare' ? '' : `, ${kit.barding} barding`}` : '🐎 On foot (tap to ride)') : '🚶 Fights on foot', title: rides ? 'Ride or fight on foot' : 'His people did not fight on horseback' });
+      mount.onclick = () => {
+        mounted[corner] = !mounted[corner];
+        draw(corner);
+      };
+      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }), mount);
       if (custom[corner]) side.title.prepend(el('em', { textContent: 'Your fighter' }));
     }
     const fightButton = el('button', { className: 'primary big dw-fight', type: 'button', textContent: 'Fight' });
@@ -258,8 +269,12 @@ export function installMenus(game) {
       const red = normaliseInputs(redress(structuredClone(entry('red').inputs)));
       const blue = normaliseInputs(redress(structuredClone(entry('blue').inputs)));
       const armed = [red, blue].some((inputs) => STYLES[inputs.style]?.weapon);
+      red.mounted = mounted.red && canRide(red);
+      blue.mounted = mounted.blue && canRide(blue);
+      // Horsemen fight on the open field: room to charge and wheel round.
+      const place = red.mounted || blue.mounted ? 'field' : armed ? 'colosseum' : 'ring';
       close();
-      const fight = () => game.match({ red: [red], blue: [blue], place: armed ? 'colosseum' : 'ring', game: 'versus', label: 'Deadliest Warrior', next: { text: 'Rematch', run: fight } });
+      const fight = () => game.match({ red: [red], blue: [blue], place, game: 'versus', label: 'Deadliest Warrior', next: { text: 'Rematch', run: fight } });
       fight();
     };
     body.append(sides.red.section, el('div', { className: 'dw-middle' }, el('span', { className: 'dw-vs', textContent: 'VS' }), fightButton), sides.blue.section);

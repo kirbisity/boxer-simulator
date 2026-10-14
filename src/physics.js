@@ -20,6 +20,8 @@ import { beginRise, restedToRise, riseTarget, supportLimit, updateRise } from '.
 import { formUp } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
+import { canRide } from './horses.js';
+import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, riderFacing, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -396,7 +398,7 @@ function rearm(world, fighter, weapon) {
 }
 
 /** Going down shakes the grip: sometimes the weapon goes with the fall. */
-function shakenLoose(world, fighter) {
+export function shakenLoose(world, fighter) {
   if (fighter.weapon?.held && world.random() < WORLD.weapons.dropOnFall) dropWeapon(world, fighter, 'dropped');
   if (fighter.offWeapon?.held && world.random() < WORLD.weapons.dropOnFall) dropOffWeapon(world, fighter, 'dropped');
   if (fighter.shield && world.random() < WORLD.shield.dropOnFall) dropShield(world, fighter, 'dropped');
@@ -703,17 +705,38 @@ function weaponIntent(world, fighter, intent) {
 /** The hand and blade direction (local) a stroke wants now: along its path; a thrust's point steered at the mark from where the hand really is. */
 function strokeTargets(fighter, weapon, stroke) {
   const t = stroke.load > 0 ? 0 : Math.max(0, stroke.t);
+  // From the saddle a cut goes down to a man below: the whole swing pitched down about the shoulder.
+  if (fighter.mount && stroke.spec.mode !== 'thrust') return pitchedSwing(fighter, weapon, stroke, t);
   const target = bladeTargets(stroke.spec, t, stroke.aim, fighter.body, weapon.spec);
   // A thrust's point is steered at the target from wherever the hand really is (a couched one's line is held as it was set).
   if (stroke.spec.mode === 'thrust' && t >= stroke.spec.windup) {
     const line = vec.normalize(vec.sub(stroke.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
     // Couched, the point is kept on him while it is carried in, and its line held once it is driven.
     if (stroke.spec.couched) {
-      if (!stroke.driven || !stroke.line) stroke.line = line;
+      if (!stroke.driven || !stroke.line || fighter.mount) stroke.line = line;
       target.dir = stroke.line;
     } else target.dir = line;
   }
   return target;
+}
+
+/**
+ * A swing at a mark further below the shoulder than a man on foot meets
+ * one (a rider's cut down at a man on foot, or at a horse): the stroke made
+ * as at a mark at the usual angle below the shoulder (WORLD.mount.swingPitch),
+ * and the whole swing turned down about the shoulder to the real mark.
+ */
+function pitchedSwing(fighter, weapon, stroke, t) {
+  const shoulder = fighter.desired[P[`${weapon.main}Shoulder`]];
+  const toAim = vec.sub(stroke.aim, shoulder);
+  const level = Math.hypot(toAim[0], toAim[2]);
+  const delta = Math.atan2(-toAim[1], level) - WORLD.mount.swingPitch;
+  if (delta <= 0 || level < 1e-6) return bladeTargets(stroke.spec, t, stroke.aim, fighter.body, weapon.spec);
+  const axis = vec.cross([0, 1, 0], [toAim[0] / level, 0, toAim[2] / level]);
+  const turn = (v, angle) => vec.scale(rotateAbout(v, axis, angle), vec.length(v));
+  const virtualAim = vec.add(shoulder, turn(toAim, -delta));
+  const target = bladeTargets(stroke.spec, t, virtualAim, fighter.body, weapon.spec);
+  return { ...target, hand: vec.add(shoulder, turn(vec.sub(target.hand, shoulder), delta)), dir: turn(target.dir, delta) };
 }
 
 /**
@@ -885,9 +908,16 @@ function updateWeapon(fighter, h, weapon = fighter.weapon) {
  * drive it. Contact corrections from bodies pressed together add apparent
  * speed to the particle that no blade really has.
  */
-function handVelocityOf(fighter, index) {
+export function handVelocityOf(fighter, index) {
   const velocity = point(fighter.v, index);
   const limit = fighter.body.topSpeed[index] * 1.15;
+  // On a horse, the arm's own speed is capped and the horse's added: the blade moves with both.
+  const carrier = fighter.carrier;
+  if (carrier) {
+    const own = vec.sub(velocity, carrier);
+    const ownSpeed = vec.length(own);
+    return vec.add(carrier, ownSpeed > limit ? vec.scale(own, limit / ownSpeed) : own);
+  }
   const speed = vec.length(velocity);
   return speed > limit ? vec.scale(velocity, limit / speed) : velocity;
 }
@@ -1000,7 +1030,10 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const spec = WEAPONS[STYLES[side.inputs.style]?.weapon];
     return spec && !spec.ranged ? spec.length + spec.handle * 0.5 : 0;
   }));
-  const apart = Math.min(gunFight ? WORLD.gunStartApart : Math.max(WORLD.startApart, (longest + WORLD.startBeyondReach) / 2), arena.halfX - 0.6);
+  // Mounted (`inputs.mounted`, for a man who rides: horses.js), they start far enough apart to charge.
+  const riding = (inputs) => Boolean(inputs.mounted) && canRide(inputs);
+  const mounted = sides.some((side) => riding(side.inputs));
+  const apart = mounted ? Math.min(WORLD.mount.startApart, arena.halfX - 3) : Math.min(gunFight ? WORLD.gunStartApart : Math.max(WORLD.startApart, (longest + WORLD.startBeyondReach) / 2), arena.halfX - 0.6);
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
     const x = (onRed ? -1 : 1) * apart;
@@ -1047,7 +1080,10 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   const standards = raiseStandards(fighters, random);
   // `rules`: a level's own (noPins: a man down gets up again; nobody holds him there).
-  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards };
+  // Each rider's horse under him (physics/mounted.js).
+  const horses = [];
+  if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
+  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
   // Drilled men form up on their side's leader (formation.js).
   formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
   return world;
@@ -1135,10 +1171,11 @@ function setPoint(array, index, value) {
 }
 export function toWorld(fighter, local) {
   const turned = yawRotate(local, fighter.yaw);
-  return [fighter.root[0] + turned[0], turned[1], fighter.root[1] + turned[2]];
+  // On horseback his stance is lifted to the saddle (`lift`, physics/mounted.js).
+  return [fighter.root[0] + turned[0], turned[1] + (fighter.lift ?? 0), fighter.root[1] + turned[2]];
 }
 export function toLocal(fighter, world) {
-  return yawRotate([world[0] - fighter.root[0], world[1], world[2] - fighter.root[1]], -fighter.yaw);
+  return yawRotate([world[0] - fighter.root[0], world[1] - (fighter.lift ?? 0), world[2] - fighter.root[1]], -fighter.yaw);
 }
 
 /**
@@ -1170,6 +1207,8 @@ export function nearestOpponent(world, fighter) {
 /** Where on the target a strike aims: the head, the body, or the lead thigh. */
 export function aimPoint(target, zone) {
   if (zone === 'head') return point(target.x, P.head);
+  // His horse: its chest (the part that comes first), if he is mounted.
+  if (zone === 'horse' && target.mount) return vec.lerp(target.mount.capsules[0].a, target.mount.capsules[0].b, 0.6);
   // His blade (a beat at it, to knock it off the line): its middle; empty-handed, his body.
   if (zone === 'blade' && target.weapon?.held && !target.weapon.spec.mounted) {
     return vec.add(point(target.x, P[`${target.weapon.main}Hand`]), vec.scale(target.weapon.dir, target.weapon.spec.length * 0.5));
@@ -1384,6 +1423,8 @@ function updateIntent(world, fighter, dt) {
     const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
     punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace;
     punch.age += dt;
+    // From the saddle the lancer keeps his point on the man all the way in (the horse carries it on its own line, not the lance's).
+    if (punch.spec.couched && punch.driven && fighter.mount && punch.target !== null && !punch.at) punch.aim = toLocal(fighter, vec.add(aimPoint(world.fighters[punch.target], punch.zone), punch.miss ?? [0, 0, 0]));
     if (punch.spec.couched && !punch.driven && punch.t >= punch.spec.windup) {
       // Couched, the point is carried in (the run brings it) and driven only once it is near him.
       if (couchedNear(world, fighter, punch) || punch.age >= punch.spec.windup + punch.spec.couched.carry) punch.driven = true;
@@ -1719,6 +1760,8 @@ export function plantFeet(fighter) {
 
 /** Feet stay planted while the stance drifts, then step to catch up, one at a time. */
 function updateFeet(fighter, dt) {
+  // In the stirrups: no steps.
+  if (fighter.mount) return;
   if (fighter.state !== 'up' && fighter.state !== 'rising') {
     plantFeet(fighter);
     return;
@@ -1799,6 +1842,7 @@ export function step(world, dt) {
   for (const fighter of world.fighters) {
     if (fighter.state === 'out') fighter.outFor = (fighter.outFor ?? 0) + dt;
     if (gone(fighter)) continue;
+    if (fighter.mount) goalFromFootwork(world, fighter, dt);
     moveRoot(world, fighter, dt);
     updateTimers(world, fighter, dt);
     // A pose (a proxy) is worked out on its own beat, every WORLD.tiers.proxyEvery steps, for that long.
@@ -1812,6 +1856,8 @@ export function step(world, dt) {
   const stride = coarseStride(world);
   for (let substep = 0; substep < WORLD.substeps; substep += 1) {
     const time = world.time + substep * h;
+    // Horses move on their own (rigid bodies), and carry their riders.
+    for (const horse of world.horses) stepHorse(world, horse, h);
     // A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all.
     const stepping = (fighter) => fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
     const span = (fighter) => (fighter.detail === 'coarse' ? stride * h : h);
@@ -1821,6 +1867,7 @@ export function step(world, dt) {
       const own = span(fighter);
       if (isLimp(fighter)) relaxedTone(fighter, own);
       integrate(fighter, own, time);
+      if (fighter.mount) seatRider(fighter, own);
     }
     for (const fighter of moving) {
       const own = span(fighter);
@@ -1832,6 +1879,10 @@ export function step(world, dt) {
     for (const fighter of world.fighters) if (fighter.clinch) holdClinch(world, fighter);
     for (const fighter of world.fighters) if (fighter.pin) holdPin(world, fighter, h);
     collideFighters(world, h, time, substep);
+    if (world.horses.length) {
+      strikeHorses(world, time);
+      collideHorses(world, h);
+    }
     stepWhips(world, h);
     for (const fighter of world.fighters) {
       if (fighter.detail === 'proxy') continue;
@@ -1847,14 +1898,20 @@ export function step(world, dt) {
       stopAtLimits(fighter);
       resistLimbTwist(world, fighter);
       settleWhenStill(fighter, own);
+      if (fighter.mount) seatRider(fighter, own);
     }
     for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
     world.pendingImpulses = [];
   }
   for (const fighter of world.fighters) if (fighter.detail === 'proxy' && proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+  for (const horse of world.horses) {
+    horseTimers(world, horse, dt);
+    if (horse.rider === null) loseHorse(world, horse);
+  }
   for (const fighter of world.fighters) {
     trackHandSpeed(fighter);
-    checkBalance(world, fighter);
+    if (fighter.mount) keepSeat(world, fighter);
+    else checkBalance(world, fighter);
     if (fighter.state !== 'up' && fighter.state !== 'rising') knockOff(world, fighter, null);
   }
   moveProps(world, dt);
@@ -1942,6 +1999,12 @@ export function advance(world, seconds, think = null, stepSeconds = 1 / 60) {
 
 function moveRoot(world, fighter, dt) {
   const opponent = opponentFor(world, fighter);
+  if (fighter.mount) {
+    // In the saddle: the horse carries him (seatRider); he turns his shoulders to his man or his mark.
+    const facing = fighter.faceAt && world.time < fighter.faceAt.until ? fighter.faceAt.at : null;
+    riderFacing(fighter, fighter.punch?.at ?? facing ?? (opponent ? aimPoint(opponent, 'body') : null), dt);
+    return;
+  }
   if (fighter.state !== 'up') {
     fighter.rootVelocity = [0, 0];
     return;
@@ -2373,6 +2436,16 @@ function integrate(fighter, h, time) {
 
 function moveParticle(fighter, index, h, damping) {
   const base = index * 3;
+  // Carried on a horse, the body's own losses are of its motion on the horse, not over the ground.
+  const carrier = fighter.carrier;
+  if (carrier) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      fighter.v[base + axis] = (fighter.v[base + axis] - carrier[axis] + accelerations[base + axis] * h) * damping + carrier[axis];
+      fighter.prev[base + axis] = fighter.x[base + axis];
+      fighter.x[base + axis] += fighter.v[base + axis] * h;
+    }
+    return;
+  }
   for (let axis = 0; axis < 3; axis += 1) {
     fighter.v[base + axis] = (fighter.v[base + axis] + accelerations[base + axis] * h) * damping;
     fighter.prev[base + axis] = fighter.x[base + axis];
@@ -3926,7 +3999,28 @@ function sever(world, defender, where, event, bladeVelocity) {
  * extension; a couched point to the end of the move, held out braced while
  * the run still carries it on.
  */
-function strikeLiveUntil(spec) {
+/**
+ * The effective mass a blade strikes with at `distance` along it, moving
+ * `relative` to what it meets: the weapon and the arm (and the body, as the
+ * move puts it behind the blow) at that point; `along`, how nearly the
+ * blow runs along the blade (a thrust). A couched lance from the saddle
+ * has the rider braced in the saddle and lance rest behind it and, through
+ * the saddle, a share of the horse (WORLD.mount.couched).
+ */
+export function bladeStrike(attacker, weapon, punch, relative, distance) {
+  const spec = punch.spec;
+  const wspec = weapon.spec;
+  const limbs = attacker.body.limbKg;
+  const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
+  const behind = attacker.mount && spec.couched ? WORLD.mount.couched.rider * attacker.body.massKg + WORLD.mount.couched.horse * attacker.mount.mass : (spec.mass.body ?? 0) * attacker.body.massKg;
+  const armMass = ((spec.mass.arm ?? 0) * arms + behind) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
+  const speed = vec.length(relative);
+  const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
+  const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
+  return { strikeMass: effectiveMassAt(wspec, armMass, distance, armLength, along), along };
+}
+
+export function strikeLiveUntil(spec) {
   return spec.couched ? spec.duration : spec.extendUntil + 0.06;
 }
 
@@ -3963,13 +4057,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const goingIn = closing * glance.share;
 
   const body = defender.body;
-  const limbs = attacker.body.limbKg;
-  const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
-  const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
-  const speed = vec.length(relative);
-  const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
-  const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
-  const strikeMass = effectiveMassAt(wspec, armMass, distance, armLength, along);
+  const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance);
   const struckMass = struckMassOf(defender, capsule);
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
   const impulse = reducedMass * goingIn * (1 + WORLD.restitution);
@@ -4476,7 +4564,9 @@ export function deliverImpulse({ fighter, shares, direction, impulse, braced = 0
   // feet are planted, so all of the body's mass resists being moved.
   const trunkShare = shares.filter(([index]) => TRUNK_PARTICLES.includes(index)).reduce((sum, [index, share]) => sum + share * fighter.body.masses[index], 0);
   if (trunkShare > 0) {
-    const bodyDeltaV = Math.max(0, (impulse * (trunkShare / weightedMass)) / (fighter.body.massKg * massShare) - braced);
+    // In the saddle, the seat couples a share of the horse to him (physics/mounted.js seatMass).
+    const resisting = fighter.mount ? seatMass(fighter) : fighter.body.massKg;
+    const bodyDeltaV = Math.max(0, (impulse * (trunkShare / weightedMass)) / (resisting * massShare) - braced);
     for (let axis = 0; axis < 3; axis += 1) fighter.knock[axis] += direction[axis] * bodyDeltaV;
   }
   for (const [index, share] of shares) {

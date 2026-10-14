@@ -436,6 +436,8 @@ export const OUTFITS = {
     ],
   },
   knight: {
+    // Rides (full plate: the great horse in a steel bard).
+    horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 650, plated: true,
     label: 'Knight — full plate',
     // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
@@ -471,6 +473,8 @@ export const OUTFITS = {
   // and over the plate the huque of crimson cloth the Duke of Orléans gave
   // her. The plate's protection, the head bare.
   joan: {
+    // Rides (full plate: the great horse in a steel bard).
+    horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 650, plated: true,
     label: 'Joan of Arc — white harness', arrowproof: true, sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
     // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
@@ -504,6 +508,8 @@ export const OUTFITS = {
   //   against a blow (`poise`), and he moves slowly (`movement: 'slow'`).
   // Not dealt at random (no `family`); in no level.
   tournament: {
+    // Rides (full plate: the great horse in a steel bard).
+    horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 1000, plated: true,
     label: 'Stechzeug — jousting harness',
     breastplate: 0.85,
@@ -548,6 +554,8 @@ export const OUTFITS = {
   // it), poorly against a blow (mail moves with it: only the gambeson takes
   // a little); the legs a little better for the greaves.
   templar: {
+    // Rides (a knight of the Temple: the great horse, unarmoured (the Rule kept the brothers plain)).
+    horse: 'destrier',
     faction: 'knights',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
     label: 'Knights Templar — mail, surcoat and great helm', movement: 'limited', fists: 'gauntlet',
@@ -591,6 +599,8 @@ export const OUTFITS = {
   // Lamellar: small lacquered steel scales laced in rows, in red. Proof
   // against most cuts, good against points; lighter than plate.
   samurai: {
+    // Rides (the samurai fought from the saddle, the bow first).
+    horse: 'japanese',
     faction: 'japanese', plated: true,
     label: 'Samurai — ō-yoroi', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
@@ -624,6 +634,8 @@ export const OUTFITS = {
   // finds the openings of the box (armpits, the waidate's seam, under the
   // skirt) more often than in later armour (`gaps`).
   oyoroi: {
+    // Rides (the o-yoroi was made to be worn on horseback).
+    horse: 'japanese',
     faction: 'japanese', plated: true,
     // No `family`: never dealt to a samurai at random (it is the flagship's own, too detailed for a crowd).
     label: 'Ō-yoroi (great armour)', movement: 'good', fists: 'bare',
@@ -656,6 +668,8 @@ export const OUTFITS = {
   // steel lames, laced skirt and sleeves, and the menpo war mask. Better
   // than ō-yoroi against points and bullets, and heavier.
   samuraiTosei: {
+    // Rides (mounted samurai of the Sengoku).
+    horse: 'japanese',
     faction: 'japanese', bulletRating: 900, plated: true,
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
@@ -855,6 +869,8 @@ export const OUTFITS = {
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
   mingElite: {
+    // Rides (Ming elite cavalry on northern horses).
+    horse: 'steppe',
     skill: 0.45,
     faction: 'chinese', bulletRating: 650, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
@@ -880,6 +896,8 @@ export const OUTFITS = {
   // a plume, and an aventail rolled up round the face so only the eyes show.
   // Fought here on foot, with the mace. The flagship of its faction, drawn in full.
   ironPagoda: {
+    // Rides (the Jurchen iron pagoda: men and horses in iron lamellar).
+    horse: 'steppe', barding: 'lamellar',
     skill: 0.45,
     faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
@@ -901,6 +919,8 @@ export const OUTFITS = {
   // (zhanpao) over gilt scale armour, the scale at the shoulders and arms, a green soft cap tied at the
   // back, black boots. The scale is a general's; the head is in cloth.
   guanYu: {
+    // Rides (Red Hare).
+    horse: 'warhorse',
     faction: 'chinese', plated: true,
     label: 'Guan Yu — green robe over gilt scale', movement: 'good', fists: 'bare',
     sidearm: 'dao',
@@ -985,6 +1005,8 @@ export const OUTFITS = {
   // the archer in his deel, the man in leather lamellar; and the Khan's own
   // guard in gilt iron scale. Fought on foot here. ----
   steppeLight: {
+    // Rides (every steppe warrior rode).
+    horse: 'steppe',
     faction: 'steppe',
     label: 'Steppe — deel and fur hat', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -998,6 +1020,8 @@ export const OUTFITS = {
   // body proof against a glancing cut; the hat's thick fur and felt take the
   // edge off a blow but no more (`regions`).
   steppeMedium: {
+    // Rides (every steppe warrior rode).
+    horse: 'steppe',
     faction: 'steppe',
     label: 'Steppe — leather lamellar, fur hat', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -1014,6 +1038,8 @@ export const OUTFITS = {
   // their steppe enemies were: iron lamellar to the knees over the robe, a fur
   // stole, iron bracers, a tall helmet with a lamellar aventail.
   mingIronLamellar: {
+    // Rides (Ming northern heavy cavalry).
+    horse: 'steppe',
     skill: 0.4,
     faction: 'chinese',
     label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
@@ -1032,6 +1058,8 @@ export const OUTFITS = {
   // the Northern Yuan khans (Mandukhai's, Ganbold's): gilt-edged iron
   // scale with broad shoulder guards and a gilt boss, the masked helmet.
   kheshig: {
+    // Rides (the khan's guard: the heaviest steppe kit, its horses in lamellar).
+    horse: 'steppe', barding: 'lamellar',
     faction: 'steppe',
     label: 'Kheshig — the Khan\'s guard', movement: 'good', fists: 'bare',
     sidearm: 'mace',
@@ -1075,6 +1103,8 @@ export const OUTFITS = {
   // Mail-and-plate (krug): rows of small plates riveted into a mail shirt,
   // mail to the thighs, iron vambraces, and the turban helmet (chichak).
   ottomanHeavy: {
+    // Rides (the sipahi: the Sultan's horsemen).
+    horse: 'arabian',
     skill: 0.45,
     faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
@@ -1093,6 +1123,8 @@ export const OUTFITS = {
   // the levels): a mail hauberk, a conical helmet with a mail aventail and a
   // turban wound round it.
   gaziAlp: {
+    // Rides (the gazi raiders rode Turkoman horses).
+    horse: 'arabian',
     faction: 'ottomans',
     label: 'Alp — Osman\'s gazi', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -1118,6 +1150,8 @@ export const OUTFITS = {
   // head guarded by steel over quilting and the turban's wraps, the face
   // open; the shins only in boot leather.
   saladin: {
+    // Rides (Saladin's Arab horses).
+    horse: 'arabian',
     faction: 'ottomans',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
     label: 'Saladin — kazaghand over mail, turbaned helmet', movement: 'good', fists: 'bare',
@@ -1175,6 +1209,8 @@ export const OUTFITS = {
   // and collar under a morion; a doublet and breeches. Proof against most
   // cuts and points; a gun's ball goes through it unless it is proofed.
   conquistadorPlate: {
+    // Rides (the conquistadors' Andalusian horses).
+    horse: 'warhorse',
     faction: 'knights', plated: true,
     label: 'Conquistador — breastplate', family: 'conquistador', movement: 'good', fists: 'bare',
     // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.

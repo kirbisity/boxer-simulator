@@ -86,7 +86,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
+  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -124,6 +124,8 @@ const PLACE_LIGHT = {
   sengoku: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
   // The high plain of the Valley of Mexico: thin bright air, a hard sun.
   plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // An open field for horsemen: a clear day, the haze far off.
+  field: { background: 0xb4d2ee, fog: [45, 140], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xd6e6ff, sun: 1.0 },
   // A tropical shore: bright, hazy over the sea.
   coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
@@ -145,6 +147,8 @@ export const PLACE_ARENAS = {
   port: { halfX: 10, halfZ: 6 },
   sengoku: { halfX: 11, halfZ: 7 },
   plain: { halfX: 12, halfZ: 8 },
+  // Room for horsemen to charge, pass and wheel round (WORLD.mount): 60 by 40 m inside a rail.
+  field: { halfX: 30, halfZ: 20 },
   coastFort: { halfX: 12, halfZ: 8 },
   coastVillage: { halfX: 12, halfZ: 8 },
 };
@@ -720,6 +724,54 @@ function fieldLitter(seed, keep, { grass = 0x7a7a3e, stone = 0x8a8478, tufts = 7
     scatter(tuft, new THREE.MeshStandardMaterial({ color: grass, roughness: 1 }), fieldSpots(random, tufts, half, keep, [0.7, 1.3], allowed)),
     scatter(rock, new THREE.MeshStandardMaterial({ color: stone, roughness: 0.95, flatShading: true }), fieldSpots(random, stones, half, keep, [0.5, 1.8], allowed)),
   ];
+}
+
+/** An open field for mounted fights: grass, a low rail round the ground, hills far off. */
+function buildField(arena = PLACE_ARENAS.field) {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...options });
+  place.add(daySky());
+  const grass = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#6a8a40';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 22000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${70 + shade * 70},${100 + shade * 70},${35 + shade * 30},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
+    }
+  }, [8, 8]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), lit(0xffffff, { map: grass }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  place.add(ground);
+  // Hoof-churned earth down the middle of the ground.
+  const track = new THREE.Mesh(new THREE.PlaneGeometry(arena.halfX * 1.7, arena.halfZ * 0.9), lit(0x7a6a48, { transparent: true, opacity: 0.35 }));
+  track.rotation.x = -Math.PI / 2;
+  track.position.y = 0.004;
+  place.add(track);
+  // The rail: posts and a bar round the ground.
+  const wood = lit(0x6a4a2c);
+  const { halfX, halfZ } = arena;
+  for (const [length, x, z, turn] of [[2 * halfX, 0, -halfZ, 0], [2 * halfX, 0, halfZ, 0], [2 * halfZ, -halfX, 0, Math.PI / 2], [2 * halfZ, halfX, 0, Math.PI / 2]]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(length, 0.08, 0.08), wood);
+    bar.position.set(x, 0.9, z);
+    bar.rotation.y = turn;
+    place.add(bar);
+    for (let at = -length / 2; at <= length / 2 + 1e-6; at += 4) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.12), wood);
+      post.position.set(x + (turn ? 0 : at), 0.55, z + (turn ? at : 0));
+      place.add(post);
+    }
+  }
+  // Low hills all round, far off.
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (index / 12) * Math.PI * 2;
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(12 + Math.random() * 8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x6d8a45));
+    hill.scale.y = 0.22 + Math.random() * 0.18;
+    hill.position.set(Math.cos(angle) * 52, -0.5, Math.sin(angle) * 50);
+    place.add(hill);
+  }
+  return place;
 }
 
 function buildPlain(arena = PLACE_ARENAS.plain) {

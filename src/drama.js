@@ -52,6 +52,8 @@ export function momentFor(event) {
   if (event.kind === 'severed') return { kind: 'severed', fighter: event.fighter, particle: event.joint === 'neck' ? P.neck : P[`${event.side}${{ shoulder: 'Shoulder', elbow: 'Elbow', wrist: 'Hand', hip: 'Hip', knee: 'Knee', ankle: 'Foot' }[event.joint]}`] };
   if (event.kind === 'held' || event.kind === 'pinned') return { kind: event.kind, fighter: event.fighter, particle: P.neck };
   if (event.kind === 'panic' || event.kind === 'rally') return { kind: event.kind, fighter: event.fighter, particle: P.head };
+  // Thrown from the saddle: as a knockdown.
+  if (event.kind === 'unhorsed' && !event.effects[0]?.startsWith('slumps')) return { kind: 'knockdown', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'staggered') return { kind: 'staggered', fighter: event.fighter, particle: P.head };
   if (event.kind === 'killed') return { kind: 'killed', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'bledOut') return { kind: 'bledOut', fighter: event.fighter, particle: P.neck };
