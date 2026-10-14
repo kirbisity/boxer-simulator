@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { advance, aimPoint, bladeStrike, createWorld, handVelocityOf, placeFighter, point, throwPunch } from '../src/physics.js';
 import { BARDING, canRide, HORSES, mountOf } from '../src/horses.js';
-import { turnRadius } from '../src/physics/mounted.js';
+import { ladenMass, turnRadius } from '../src/physics/mounted.js';
+import { ATTACKERS, firstBlow } from '../tools/couched.js';
 import { thinkAll } from '../src/ai.js';
 import { MOVES } from '../src/moves.js';
 import { vec } from '../src/pose.js';
@@ -167,4 +168,179 @@ test('mounted bouts run: a rider strikes in passing with the horse\'s speed in t
   assert.ok(footBlows.length >= 1, 'the spearman reaches him or his horse');
   // At a gallop the cut closes faster than any arm alone swings (~10-12 m/s).
   assert.ok(riderBlows.some((event) => event.speed > 9), riderBlows.map((event) => event.speed.toFixed(1)).join(', '));
+});
+
+// ---- Momentum: the lance on foot and on horseback; horses against men and against each other ----
+
+const median = (values) => [...values].sort((a, b) => a - b)[Math.floor((values.length - 1) / 2)];
+
+test('the same lance couched from a destrier at the gallop spends an order of magnitude more than on foot at a run: the saddle and lance rest put the horse behind the point', () => {
+  const [foot, saddle] = ATTACKERS;
+  const blows = (entry, seeds) => seeds.map((seed) => firstBlow(entry[1], 'street', 3000 + seed, entry[2])).filter(Boolean).map((row) => row.hit);
+  const onFoot = blows(foot, [0, 1, 2, 3]);
+  const mounted = blows(saddle, [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.ok(onFoot.length >= 3 && mounted.length >= 3, `landed ${onFoot.length}, ${mounted.length}`);
+  const energy = (hits) => median(hits.map((hit) => hit.energy));
+  // The mass behind the point: the man's weight and the horse's share, against a quarter of the man on foot.
+  assert.ok(median(mounted.map((hit) => hit.strikeMass)) > 3 * median(onFoot.map((hit) => hit.strikeMass)));
+  // Its speed: the horse's gallop, against a laden man's run.
+  assert.ok(median(mounted.map((hit) => hit.speed)) > 2 * median(onFoot.map((hit) => hit.speed)));
+  assert.ok(energy(mounted) >= 8 * energy(onFoot), `${energy(mounted).toFixed(0)} J from the saddle, ${energy(onFoot).toFixed(0)} J on foot`);
+  assert.ok(median(mounted.map((hit) => hit.pierce)) >= 8 * median(onFoot.map((hit) => hit.pierce)));
+  // On foot it is still tens of joules; from the saddle hundreds, kilojoule class when it meets square at the gallop.
+  assert.ok(energy(onFoot) < 160 && energy(mounted) > 400, `${energy(mounted).toFixed(0)} J v ${energy(onFoot).toFixed(0)} J`);
+});
+
+/** A rider at the gallop straight at men standing where they are put (no blow struck): what the horse and the men did, to 3 s after the first contact. */
+function chargeInto(riderInputs, men, places) {
+  const sides = [{ inputs: riderInputs, corner: 'red' }, ...men.map((inputs) => ({ inputs, corner: 'blue' }))];
+  const w = createWorld(sides, { seed: 4000, arena: FIELD, formation: {} });
+  const foes = w.fighters.slice(1);
+  places.forEach(([x, z], index) => placeFighter(foes[index], x, z));
+  const horse = w.horses[0];
+  const knight = w.fighters[0];
+  const start = foes.map((man) => point(man.x, P.pelvis));
+  let before = 0;
+  let low = Infinity;
+  let contact = null;
+  let peak = 0;
+  for (let t = 0; t < 9; t += 1 / 60) {
+    horse.goal = { heading: 0, speed: horse.paces.gallop };
+    horse.goalAt = w.time + 1;
+    knight.cooldown = 1;
+    advance(w, 1 / 60, () => {
+      for (const man of foes) man.move = 0;
+    });
+    if (contact === null && w.events.some((event) => event.kind === 'trampled' || event.kind === 'horseCrash')) contact = w.time;
+    if (contact === null) before = Math.max(before, horse.speed);
+    else if (w.time - contact < 0.5) low = Math.min(low, horse.speed);
+    if (contact !== null) peak = Math.max(peak, ...foes.map((man) => Math.hypot(...point(man.v, P.pelvis))));
+    if (contact !== null && w.time - contact > 3) break;
+  }
+  return { w, horse, knight, foes, before, low, peak, thrown: foes.map((man, index) => Math.hypot(point(man.x, P.pelvis)[0] - start[index][0], point(man.x, P.pelvis)[2] - start[index][2])) };
+}
+const row = (key, count, extra = {}) => Array.from({ length: count }, () => ({ ...footman(key), ...extra }));
+const block = (files, ranks, across = 0.7, deep = 0.8) => Array.from({ length: files * ranks }, (_, index) => [12 + Math.floor(index / files) * deep, ((index % files) - (files - 1) / 2) * across]);
+
+test('a horse at the gallop bowls a man over and carries him, the reaction slowing it by his share of the momentum; in plate he goes over all the same but is hurt less', () => {
+  const bare = chargeInto(rider('knight'), row('street', 1, { style: 'unskilled' }), [[12, 0]]);
+  const plate = chargeInto(rider('knight'), row('knight', 1, { style: 'unskilled' }), [[12, 0]]);
+  for (const run of [bare, plate]) {
+    const event = run.w.events.find((e) => e.kind === 'trampled');
+    assert.ok(event && event.fell, 'ridden down and put over');
+    assert.ok(event.speed > 8, `closing ${event.speed.toFixed(1)} m/s`);
+    // Carried at the horse's own speed and thrown several metres, a ragdoll.
+    assert.ok(run.peak > 0.8 * run.before, `flung at ${run.peak.toFixed(1)} m/s by a horse at ${run.before.toFixed(1)}`);
+    assert.ok(run.thrown[0] > 3, `thrown ${run.thrown[0].toFixed(1)} m`);
+    // Equal and opposite: the horse lost his impulse over its laden mass, a tenth of its speed.
+    const lost = run.before - run.low;
+    assert.ok(Math.abs(lost - event.impulse / ladenMass(run.w, run.horse)) < 0.3 * lost + 0.15, `lost ${lost.toFixed(2)} m/s`);
+    assert.ok(lost > 0.4 && run.low > 0.7 * run.before, `slowed ${run.before.toFixed(1)} -> ${run.low.toFixed(1)}`);
+  }
+  assert.ok(ladenMass(bare.w, bare.horse) > bare.horse.mass + 100, 'the rider and his kit are in the mass');
+  // Harm of the blow, through his armour.
+  assert.ok(bare.foes[0].trauma.trunk > 0.8, `bare ${bare.foes[0].trauma.trunk.toFixed(2)}`);
+  assert.ok(plate.foes[0].trauma.trunk < 0.6 * bare.foes[0].trauma.trunk, `plate ${plate.foes[0].trauma.trunk.toFixed(2)}`);
+  assert.equal(bare.w.events.filter((e) => e.kind === 'horseDown').length, 0);
+});
+
+test('men in close order are one block to the horse and stop it where it rides down one man; spaced out they are bowled singly', () => {
+  const one = chargeInto(rider('knight'), row('hoplomachus', 1), [[12, 0]]);
+  const spaced = chargeInto(rider('knight'), row('hoplomachus', 3), block(3, 1, 1.8));
+  const wall = chargeInto(rider('knight'), row('hoplomachus', 9), block(3, 3));
+  const plates = chargeInto(rider('knight'), row('knight', 6, { style: 'unskilled' }), block(3, 2, 0.8));
+  const lostBy = (run) => (run.before - run.low) / run.before;
+  assert.ok(lostBy(one) < 0.2, `one man ${lostBy(one).toFixed(2)}`);
+  assert.ok(lostBy(spaced) < 0.3, `spaced ${lostBy(spaced).toFixed(2)}`);
+  assert.ok(lostBy(wall) > 0.6, `a wall of nine ${lostBy(wall).toFixed(2)}`);
+  assert.ok(lostBy(plates) > 0.55, `six in plate ${lostBy(plates).toFixed(2)}`);
+  // The rider goes over the horse's neck when it stops, and the men take less each than a lone man.
+  for (const run of [wall, plates]) assert.ok(run.w.events.some((e) => e.kind === 'unhorsed' && e.fighter === 0), 'the rider is thrown');
+  assert.ok(wall.peak < one.peak * 0.8, `${wall.peak.toFixed(1)} v ${one.peak.toFixed(1)} m/s`);
+  assert.ok(wall.foes.filter((man) => man.state === 'up').length >= 6, 'most of the wall stays on its feet');
+});
+
+test('a man lying in a horse\'s path is trodden on by its hooves', () => {
+  const w = world(rider('knight'), footman('street', { style: 'unskilled' }));
+  const [horse] = w.horses;
+  const man = w.fighters[1];
+  w.fighters[0].cooldown = 1;
+  man.state = 'down';
+  man.downTimer = 30;
+  placeFighter(man, -6, 0);
+  advance(w, 0.1);
+  for (let t = 0; t < 7; t += 1 / 60) {
+    horse.goal = { heading: 0, speed: 3 };
+    horse.goalAt = w.time + 1;
+    advance(w, 1 / 60);
+  }
+  assert.ok(w.events.some((event) => event.kind === 'trampled' && event.effects[0] === 'trodden by a hoof'), 'a hoof came down on him');
+});
+
+test('two horses meeting exchange momentum by their laden masses; head-on at a canter or more both go down and throw their riders, a brush only shoves', () => {
+  const meet = (blue, offset = 0, angle = 0) => {
+    const w = createWorld([{ inputs: rider('knight'), corner: 'red' }, { inputs: rider(blue), corner: 'blue' }], { seed: 4000, arena: FIELD });
+    const [a, b] = w.horses;
+    const at = [12 * Math.cos(angle), -12 * Math.sin(angle) - offset];
+    placeFighter(w.fighters[1], at[0], at[1]);
+    b.at = at;
+    b.yaw = Math.PI + angle;
+    w.fighters[1].yaw = b.yaw;
+    const masses = [ladenMass(w, a), ladenMass(w, b)];
+    let momentum = null;
+    for (let t = 0; t < 8; t += 1 / 60) {
+      a.goal = { heading: 0, speed: a.paces.gallop };
+      b.goal = { heading: Math.PI + angle, speed: b.paces.gallop };
+      for (const h of w.horses) h.goalAt = w.time + 1;
+      for (const f of w.fighters) f.cooldown = 1;
+      const along = (h) => h.speed * Math.cos(h.yaw);
+      const before = masses[0] * along(a) + masses[1] * along(b);
+      advance(w, 1 / 60);
+      if (!momentum && w.events.some((e) => e.kind === 'horseCrash')) momentum = { before, after: masses[0] * along(a) + masses[1] * along(b) };
+      if (momentum && t > 3) break;
+    }
+    return { w, momentum };
+  };
+  const head = meet('saladin');
+  assert.ok(head.momentum, 'they met');
+  // Their momentum along the line is what it was (the legs' own push in a few thousandths of a second aside).
+  assert.ok(Math.abs(head.momentum.after - head.momentum.before) < 0.06 * Math.abs(head.momentum.before) + 150, `${head.momentum.before.toFixed(0)} -> ${head.momentum.after.toFixed(0)} kg m/s`);
+  assert.equal(head.w.events.filter((e) => e.kind === 'horseDown').length, 2, 'both horses fall');
+  assert.equal(head.w.events.filter((e) => e.kind === 'unhorsed').length, 2, 'both riders are thrown');
+  // The lighter horse is knocked back the more (it takes the larger share of the speed change).
+  const first = (horse) => head.w.events.find((e) => e.kind === 'horseCrash' && e.horse === horse);
+  const [heavy, light] = [first(0), first(1)];
+  assert.ok(light.dv > heavy.dv, `${light.dv.toFixed(1)} v ${heavy.dv.toFixed(1)} m/s`);
+  // Barrels brushing: a shove, both stay up and seated.
+  const brush = meet('knight', 0.66);
+  assert.equal(brush.w.events.filter((e) => e.kind === 'horseDown').length, 0);
+  assert.equal(brush.w.events.filter((e) => e.kind === 'unhorsed').length, 0);
+  // Crossing at an angle is worse than a brush.
+  const across = meet('knight', 0, 0.7);
+  assert.equal(across.w.events.filter((e) => e.kind === 'horseDown').length, 2);
+});
+
+test('a lance set against the charge has the man behind it, and pushes the horse back by the blow\'s momentum', () => {
+  const w = createWorld([{ inputs: rider('knight'), corner: 'red' }, { inputs: footman('maximilian'), corner: 'blue' }], { seed: 4000, arena: FIELD });
+  const horse = w.horses[0];
+  const man = w.fighters[1];
+  w.fighters[0].cooldown = 1;
+  placeFighter(man, 3, 0);
+  let hit = null;
+  let thrown = false;
+  for (let t = 0; t < 10 && !hit; t += 1 / 60) {
+    horse.goal = { heading: 0, speed: horse.paces.gallop };
+    horse.goalAt = w.time + 1;
+    advance(w, 1 / 60, () => {
+      // He stands, the point levelled at its chest and thrust as it comes (what the AI's standToRider does, timed to land).
+      man.move = 0;
+      const chest = aimPoint(w.fighters[0], 'horse');
+      if (!thrown && !man.punch && chest[0] > point(man.x, P.pelvis)[0] - 6) thrown = throwPunch(w, man, 'lanceThrust', 'body', { at: vec.add(chest, vec.scale(horse.velocity, 0.45)) });
+    });
+    hit = w.events.find((event) => event.kind === 'horseHit' && event.attacker === 1);
+  }
+  assert.ok(hit, 'the lance struck the horse');
+  assert.ok(hit.strikeMass > 0.5 * man.body.massKg, `${hit.strikeMass.toFixed(0)} kg behind the point`);
+  assert.ok(hit.pushed > 0.1, `the horse pushed back ${hit.pushed.toFixed(2)} m/s`);
+  assert.ok(hit.pierce > 0, 'and run on to it');
 });

@@ -15,7 +15,7 @@ import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
 import { vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, harmMix } from '../weapons.js';
-import { bladeStrike, closestBetween, deliverImpulse, handVelocityOf, heldBlades, point, shakenLoose, strainGrip, strikeLiveUntil, strokeOf, TRUNK_PARTICLES } from '../physics.js';
+import { bladeStrike, bodyBlow, closestBetween, fall, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, stagger, strainGrip, strikeLiveUntil, strokeOf } from '../physics.js';
 import { WORLD } from './config.js';
 
 /**
@@ -78,7 +78,7 @@ export function createHorse(fighter, id, random) {
     // Its paces laden, and how hard it gets away (its own weight to its weight laden).
     paces: { gallop: breed.gallop * pace, canter: breed.canter * pace, trot: breed.trot, walk: breed.walk },
     accel: breed.accel * breed.mass / (breed.mass + load) * (1 + HORSE_LOAD.easy),
-    at: [fighter.root[0], fighter.root[1]], yaw: fighter.yaw, speed: 0, yawRate: 0,
+    at: [fighter.root[0], fighter.root[1]], yaw: fighter.yaw, speed: 0, yawRate: 0, shove: [0, 0], shock: 0,
     goal: { heading: fighter.yaw, speed: 0 }, goalAt: -Infinity,
     stride: 0, state: 'up', fall: 0, roll: 0, bleed: 0, bloodLost: 0, trauma: 0, wounds: {},
     capsules: [], legs: {},
@@ -129,7 +129,7 @@ export function horseVelocityAt(horse, at) {
   const f = forwardOf(horse.yaw);
   const r = [at[0] - horse.at[0], 0, at[2] - horse.at[1]];
   // ω about the vertical: v = ω × r.
-  return [f[0] * horse.speed + horse.yawRate * r[2], 0, f[2] * horse.speed - horse.yawRate * r[0]];
+  return [f[0] * horse.speed + horse.yawRate * r[2] + horse.shove[0], 0, f[2] * horse.speed - horse.yawRate * r[0] + horse.shove[1]];
 }
 
 /**
@@ -203,8 +203,13 @@ export function stepHorse(world, horse, h) {
     horse.yaw += horse.yawRate * h;
   }
   const f = forwardOf(horse.yaw);
-  horse.at[0] += f[0] * horse.speed * h;
-  horse.at[1] += f[2] * horse.speed * h;
+  horse.at[0] += (f[0] * horse.speed + horse.shove[0]) * h;
+  horse.at[1] += (f[2] * horse.speed + horse.shove[1]) * h;
+  // What a crash shoved it sideways by dies away as its legs find the ground.
+  const settle = Math.exp(-h * WORLD.mount.crash.shoveDecay);
+  horse.shove[0] *= settle;
+  horse.shove[1] *= settle;
+  horse.shock *= Math.exp(-h / WORLD.mount.crash.shockSeconds);
   const arena = world.arena;
   const margin = 0.9 * horse.withers;
   const clamped = [Math.max(-(arena.halfX - margin), Math.min(arena.halfX - margin, horse.at[0])), Math.max(-(arena.halfZ - margin), Math.min(arena.halfZ - margin, horse.at[1]))];
@@ -215,7 +220,7 @@ export function stepHorse(world, horse, h) {
   }
   const gait = gaitAt(horse.speed);
   horse.stride = (horse.stride + gait.hz * h) % 1;
-  horse.velocity = [f[0] * horse.speed, 0, f[2] * horse.speed];
+  horse.velocity = [f[0] * horse.speed + horse.shove[0], 0, f[2] * horse.speed + horse.shove[1]];
   poseHorse(horse);
 }
 
@@ -357,10 +362,14 @@ export function goalFromFootwork(world, fighter, dt) {
 export function keepSeat(world, fighter) {
   const horse = fighter.mount;
   const knock = Math.hypot(fighter.knock[0], fighter.knock[2]);
-  fighter.knock = fighter.knock.map((value) => value * Math.exp(-WORLD.balance.absorbPerSecond * world.lastDt));
-  if (fighter.state !== 'up') return unhorse(world, fighter, fighter.state === 'out' ? 'slumps from the saddle' : 'falls from the saddle', false);
-  if (horse.state !== 'up') return unhorse(world, fighter, 'thrown as his horse goes down', true);
-  if (knock > WORLD.mount.seat.speed * fighter.body.gear.balance) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true);
+  const decay = Math.exp(-WORLD.balance.absorbPerSecond * world.lastDt);
+  fighter.knock = fighter.knock.map((value) => value * decay);
+  // (The speed his horse lost to a crash, as he still has it: he is flung with it if he goes.)
+  const lost = fighter.joltLost ?? [0, 0, 0];
+  fighter.joltLost = lost.map((value) => value * decay);
+  if (fighter.state !== 'up') return unhorse(world, fighter, fighter.state === 'out' ? 'slumps from the saddle' : 'falls from the saddle', false, lost);
+  if (horse.state !== 'up') return unhorse(world, fighter, 'thrown as his horse goes down', true, lost);
+  if (knock > WORLD.mount.seat.speed * fighter.body.gear.balance) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true, lost);
 }
 
 /** The share of the horse's mass a blow on its rider must move with him (the seat). */
@@ -373,9 +382,16 @@ export function seatMass(fighter) {
  * with the horse's speed in him (his particles keep it). `thrown`: down, as
  * a fall (not counted as a knockdown). The horse runs off a while.
  */
-export function unhorse(world, fighter, reason, thrown) {
+export function unhorse(world, fighter, reason, thrown, lost = null) {
   const horse = fighter.mount;
   if (!horse) return;
+  // He leaves the saddle at the speed the crash took from his horse, not the horse's new one.
+  if (lost) {
+    for (let index = 0; index < fighter.x.length / 3; index += 1) {
+      for (const axis of [0, 2]) fighter.v[index * 3 + axis] += lost[axis];
+    }
+    fighter.joltLost = [0, 0, 0];
+  }
   fighter.mount = null;
   fighter.carrier = null;
   fighter.lift = 0;
@@ -478,7 +494,12 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   if (closing < WORLD.minImpactSpeed) return false;
   punch.hits.add(`horse${horse.id}`);
   punch.landed = true;
-  const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance);
+  const bladed = bladeStrike(attacker, weapon, punch, relative, distance);
+  const along = bladed.along;
+  // A long point set against the horse's charge, its butt to the ground and the man standing behind it: his weight is behind the point.
+  const brace = WORLD.mount.brace;
+  const set = !attacker.mount && spec.mode === 'thrust' && wspec.length >= brace.length && Math.hypot(...attacker.rootVelocity) < brace.still;
+  const strikeMass = bladed.strikeMass + (set ? brace.share * attacker.body.massKg : 0);
   const struckMass = horse.mass * capsule.mass;
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
   const impulse = reducedMass * closing * (1 + WORLD.restitution);
@@ -496,13 +517,15 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const event = {
     time: world.time, kind: 'horseHit', attacker: attacker.id, horse: horse.id, rider: horse.rider ?? undefined, weapon: weapon.kind, punch: punch.type, target: capsule.key,
-    speed: closing, impulse, energy, harm: blunt, cut, pierce, point: contactPoint, normal, effects: [],
+    speed: closing, impulse, energy, strikeMass, harm: blunt, cut, pierce, point: contactPoint, normal, effects: [],
   };
   if (glanced) {
     event.effects.push('glanced off the barding');
     world.events.push({ time: world.time, kind: 'glance', fighter: -1, point: contactPoint, normal });
   }
   harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, attacker);
+  // The blow pushes the horse back, by its momentum over the laden horse's mass.
+  event.pushed = jolt(world, horse, vec.scale(normal, -impulse / ladenMass(world, horse)), 'brought down by the blows');
   // The blade is jarred by what it met, and the arm takes the blow back.
   strainGrip(world, attacker, impulse * (glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
@@ -565,89 +588,310 @@ export function bringDown(world, horse, reason) {
   world.events.push({ time: world.time, kind: 'horseDown', horse: horse.id, rider: horse.rider ?? undefined, attacker: horse.lastHitBy, effects: [reason] });
 }
 
+
 // ---- The horse's body against men and horses -------------------------------
+//
+// A horse is 300-600 kg, its rider and his kit another 80-150, and at a
+// gallop (10-12 m/s) it carries 5-8 kN·s. What it runs into is an exchange of
+// momentum between that laden mass and the mass it meets, nothing more:
+// the impulse is the reduced mass times the closing speed (and a little for
+// the rebound), the one gets it and the other has its opposite. A lone man
+// of 80 kg has a tenth of the horse's mass: he takes ~1.1 times the horse's
+// own speed and it loses a tenth of its own; a dense block of men moves
+// less and the horse more; another horse of the same weight head-on takes
+// the whole of its speed away.
+
+/** A horse and what sits on it (kg): the mass a collision has to move. */
+export function ladenMass(world, horse) {
+  const rider = horse.rider === null ? null : world.fighters[horse.rider];
+  return horse.mass + (rider?.mount === horse ? wholeManKg(rider) : 0);
+}
+
+/** All of a man (kg): his body, his kit and what he holds. */
+function wholeManKg(fighter) {
+  return fighter.body.masses.reduce((sum, kg) => sum + kg, 0);
+}
+
+/** A man's velocity as a whole body (the mass-weighted mean of his particles). */
+function wholeManVelocity(fighter) {
+  const sum = [0, 0, 0];
+  fighter.body.masses.forEach((kg, index) => {
+    for (let axis = 0; axis < 3; axis += 1) sum[axis] += fighter.v[index * 3 + axis] * kg;
+  });
+  return vec.scale(sum, 1 / wholeManKg(fighter));
+}
+
+const LEG_PARTICLES = new Set([P.lKnee, P.rKnee, P.lFoot, P.rFoot]);
+
+/** How a shove at the chest is shared among a man's particles: the knees and feet follow slower (`legs`), so he is tipped over backwards. */
+function ragdollShares() {
+  return Object.values(P).map((index) => [index, LEG_PARTICLES.has(index) ? WORLD.mount.trample.legs : 1]);
+}
 
 /**
- * A horse's barrel, neck and head against a man on foot: it pushes him out
- * of its way, and at speed the contact is a blow (the man's mass against
- * the horse's, the closing speed) that knocks him as any collision does.
- * Horses against horses push apart and share their momentum along the
- * contact. Once a substep.
+ * A horse's speed changed by `delta` (m/s, a world vector) by what it struck:
+ * along its line that is its pace, across it a shove (its own velocity, dying
+ * away as its legs find the ground). Its rider goes on at the speed he had,
+ * and the saddle has to take it (keepSeat). Past what a horse's legs can take
+ * (WORLD.mount.crash) it goes down. Returns the size of the jolt (m/s): along
+ * its line, and `lateral` of what came across.
+ */
+export function jolt(world, horse, delta, reason = 'brought down by the crash') {
+  const spec = WORLD.mount.crash;
+  const ahead = forwardOf(horse.yaw);
+  const left = leftOf(horse.yaw);
+  const along = vec.dot(delta, ahead);
+  const across = vec.dot(delta, left);
+  horse.speed += along;
+  horse.shove[0] += left[0] * across;
+  horse.shove[1] += left[2] * across;
+  // Each knock adds to the shock its legs are taking, which fades in `shockSeconds`: a pile of men is a blow spread over a few frames.
+  const size = Math.abs(along) + spec.lateral * Math.abs(across);
+  horse.shock += size;
+  const rider = horse.rider === null ? null : world.fighters[horse.rider];
+  if (rider?.mount === horse) {
+    rider.knock = rider.knock.map((value, axis) => value - delta[axis]);
+    rider.joltLost = (rider.joltLost ?? [0, 0, 0]).map((value, axis) => value - delta[axis]);
+  }
+  if (horse.state === 'up' && horse.shock > spec.fall) bringDown(world, horse, reason);
+  return size;
+}
+
+/**
+ * The men standing close together with these (hips within `link` m, in
+ * close order: a shield wall's frontage, a pike block's files): the block
+ * a horse has to move.
+ */
+function packedWith(world, men) {
+  const spec = WORLD.mount.trample;
+  const block = new Set(men);
+  const queue = [...men];
+  while (queue.length && block.size < spec.most) {
+    const one = point(queue.pop().x, P.pelvis);
+    for (const other of world.fighters) {
+      if (block.has(other) || other.mount || other.state !== 'up') continue;
+      const at = point(other.x, P.pelvis);
+      if (Math.hypot(at[0] - one[0], at[2] - one[2]) >= spec.link) continue;
+      block.add(other);
+      queue.push(other);
+    }
+  }
+  return [...block];
+}
+
+/**
+ * Horses against men on foot and against each other, once a substep. A
+ * horse's barrel, neck and head against a man: see rideDown. Horses
+ * against horses: see horsesMeet.
  */
 export function collideHorses(world, h) {
   const horses = world.horses;
   if (!horses?.length) return;
   for (const horse of horses) {
     if (horse.state === 'down') continue;
-    for (const fighter of world.fighters) {
-      if (fighter.mount || fighter.state === 'out' && fighter.outFor > 20) continue;
-      const pelvis = point(fighter.x, P.pelvis);
-      if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
-      const neck = point(fighter.x, P.neck);
-      const radius = fighter.body.segments.trunk.skinRadius;
-      for (const capsule of horse.capsules) {
-        if (capsule.part === 'legs') continue;
-        const closest = closestBetween(pelvis, neck, capsule.a, capsule.b);
-        const offset = vec.sub(closest.onFirst, closest.onSecond);
-        const flat = [offset[0], 0, offset[2]];
-        const gap = vec.length(offset) - radius - capsule.radius;
-        if (gap >= 0) continue;
-        const normal = vec.length(flat) > 1e-6 ? vec.normalize(flat) : vec.normalize([forwardOf(horse.yaw)[2], 0, -forwardOf(horse.yaw)[0]]);
-        // Out of its way (moved, not pushed: the previous positions go too).
-        const depth = -gap;
-        for (let index = 0; index < fighter.x.length / 3; index += 1) {
-          fighter.x[index * 3] += normal[0] * depth;
-          fighter.x[index * 3 + 2] += normal[2] * depth;
-          fighter.prev[index * 3] += normal[0] * depth;
-          fighter.prev[index * 3 + 2] += normal[2] * depth;
-        }
-        fighter.root[0] += normal[0] * depth;
-        fighter.root[1] += normal[2] * depth;
-        const horseVelocity = horseVelocityAt(horse, closest.onSecond);
-        const manVelocity = point(fighter.v, P.pelvis);
-        const closing = vec.dot(vec.sub(horseVelocity, manVelocity), normal);
-        if (closing > WORLD.mount.trample.from) {
-          const man = fighter.body.massKg;
-          const reduced = (man * horse.mass) / (man + horse.mass);
-          const impulse = reduced * closing * (1 + WORLD.mount.trample.restitution);
-          deliverImpulse({ fighter, shares: TRUNK_PARTICLES.map((index) => [index, 1]), direction: normal, impulse });
-          horse.speed -= (impulse / horse.mass) * Math.max(0, vec.dot(forwardOf(horse.yaw), normal));
-          if (!fighter.trampledAt || world.time - fighter.trampledAt > 0.5) {
-            fighter.trampledAt = world.time;
-            world.events.push({ time: world.time, kind: 'trampled', fighter: fighter.id, horse: horse.id, attacker: horse.rider ?? undefined, speed: closing, impulse, effects: [`ridden down at ${closing.toFixed(1)} m/s`] });
-          }
-        }
-        break;
-      }
-    }
+    rideDown(world, horse);
+    trodOn(world, horse);
   }
   for (let a = 0; a < horses.length; a += 1) {
     for (let b = a + 1; b < horses.length; b += 1) {
-      const first = horses[a];
-      const second = horses[b];
-      if (first.state === 'down' || second.state === 'down') continue;
-      if (Math.hypot(first.at[0] - second.at[0], first.at[1] - second.at[1]) > 1.6 * (first.withers + second.withers)) continue;
-      for (const one of first.capsules.slice(0, 2)) {
-        for (const two of second.capsules.slice(0, 2)) {
-          const closest = closestBetween(one.a, one.b, two.a, two.b);
-          const offset = vec.sub(closest.onFirst, closest.onSecond);
-          const gap = vec.length(offset) - one.radius - two.radius;
-          if (gap >= 0) continue;
-          const normal = vec.normalize([offset[0], 0, offset[2]]);
-          const total = first.mass + second.mass;
-          first.at[0] += normal[0] * -gap * (second.mass / total);
-          first.at[1] += normal[2] * -gap * (second.mass / total);
-          second.at[0] -= normal[0] * -gap * (first.mass / total);
-          second.at[1] -= normal[2] * -gap * (first.mass / total);
-          // The speeds along the contact pooled (an inelastic meeting).
-          const closing = vec.dot(vec.sub(second.velocity ?? [0, 0, 0], first.velocity ?? [0, 0, 0]), normal);
-          if (closing > 0) {
-            const impulse = (first.mass * second.mass) / total * closing;
-            first.speed += (impulse / first.mass) * vec.dot(forwardOf(first.yaw), normal);
-            second.speed -= (impulse / second.mass) * vec.dot(forwardOf(second.yaw), normal);
-          }
-        }
+      if (horses[a].state !== 'down' && horses[b].state !== 'down') horsesMeet(world, horses[a], horses[b]);
+    }
+  }
+}
+
+/**
+ * A horse (with its rider) running into men on foot. The men it touches,
+ * and those standing in close order with them, are one block: its mass and
+ * its velocity. Closing faster than `trample.from` the horse and the block
+ * exchange momentum (the impulse reduced mass × closing × (1 + restitution),
+ * the horse's speed changed by its share, the men's by theirs), and each man
+ * is flung as a ragdoll: the impulse goes to every part of him through the
+ * engine's pending impulses (shared, the knees and feet less), so he flies
+ * with his own weight, is put down if his speed change is past what his
+ * poise lets him take (`trample.fell`, raised for armour) or reels if near
+ * it, and is bruised by the blow of a whole-body charge through his armour.
+ * The horse takes blunt harm from what it hit (through its barding) and,
+ * if its own speed change is too much, goes down. Short of a blow the man
+ * is only moved out of the way.
+ */
+function rideDown(world, horse) {
+  const spec = WORLD.mount.trample;
+  const touched = [];
+  for (const fighter of world.fighters) {
+    if (fighter.mount || (fighter.state === 'out' && fighter.outFor > 20)) continue;
+    const pelvis = point(fighter.x, P.pelvis);
+    if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
+    const neck = point(fighter.x, P.neck);
+    const radius = fighter.body.segments.trunk.skinRadius;
+    let best = null;
+    for (const capsule of horse.capsules) {
+      if (capsule.part === 'legs') continue;
+      const closest = closestBetween(pelvis, neck, capsule.a, capsule.b);
+      const offset = vec.sub(closest.onFirst, closest.onSecond);
+      const gap = vec.length(offset) - radius - capsule.radius;
+      if (gap >= 0 || (best && gap >= best.gap)) continue;
+      const flat = [offset[0], 0, offset[2]];
+      const normal = vec.length(flat) > 1e-6 ? vec.normalize(flat) : vec.normalize([forwardOf(horse.yaw)[2], 0, -forwardOf(horse.yaw)[0]]);
+      best = { fighter, capsule, gap, normal, at: closest.onSecond };
+    }
+    if (best) touched.push(best);
+  }
+  if (!touched.length) return;
+  const touching = new Set(touched.map((entry) => entry.fighter));
+  const block = packedWith(world, [...touching]);
+  const weight = (fighter) => (touching.has(fighter) ? 1 : spec.behind);
+  // The block as one body: what it weighs to the horse, and how fast it moves.
+  const mass = block.reduce((sum, man) => sum + weight(man) * wholeManKg(man), 0);
+  const moving = vec.scale(block.reduce((sum, man) => vec.add(sum, vec.scale(wholeManVelocity(man), weight(man) * wholeManKg(man))), [0, 0, 0]), 1 / mass);
+  const direction = vec.normalize(touched.reduce((sum, entry) => vec.add(sum, vec.scale(entry.normal, -entry.gap)), [0, 0, 0]));
+  const deepest = touched.reduce((one, entry) => (entry.gap < one.gap ? entry : one));
+  const laden = ladenMass(world, horse);
+  // Out of its way: the deeper they overlap, the more of it each gives (the lighter moves further).
+  const depth = -deepest.gap;
+  const horseShare = mass / (laden + mass);
+  horse.at[0] -= direction[0] * depth * horseShare;
+  horse.at[1] -= direction[2] * depth * horseShare;
+  for (const man of block) {
+    const move = touching.has(man) ? depth * (1 - horseShare) : 0;
+    if (move === 0) continue;
+    for (let index = 0; index < man.x.length / 3; index += 1) {
+      for (const axis of [0, 2]) {
+        man.x[index * 3 + axis] += direction[axis] * move;
+        man.prev[index * 3 + axis] += direction[axis] * move;
+      }
+    }
+    man.root[0] += direction[0] * move;
+    man.root[1] += direction[2] * move;
+  }
+  const closing = vec.dot(vec.sub(horseVelocityAt(horse, deepest.at), moving), direction);
+  if (closing <= spec.from) return;
+  const reduced = (laden * mass) / (laden + mass);
+  const impulse = reduced * closing * (1 + spec.restitution);
+  const rider = horse.rider === null ? null : world.fighters[horse.rider];
+  for (const man of block) {
+    const share = weight(man);
+    const dv = (impulse * share) / mass;
+    world.pendingImpulses.push({ fighter: man, shares: ragdollShares(), direction, impulse: dv * wholeManKg(man), braced: Infinity });
+    if (man.state === 'out') continue;
+    bodyBlow(man, dv / WORLD.rush.trunkShare, WORLD.impact.charge);
+    const effects = [`ridden down at ${closing.toFixed(1)} m/s`];
+    // Put over by what he cannot take, or reeling from near it.
+    const limit = spec.fell * (1 + spec.poiseGain * (poiseOf(man) - 1)) * man.body.gear.balance;
+    const event = { time: world.time, kind: 'trampled', fighter: man.id, horse: horse.id, attacker: rider?.id, speed: closing, impulse: dv * wholeManKg(man), dv, block: block.length, effects };
+    if (man.state === 'up') {
+      man.knock = [0, 0, 0];
+      if (dv > limit) {
+        effects.push(`knocked down, flung at ${dv.toFixed(1)} m/s`);
+        fall(world, man, 'ridden down by a horse');
+        event.fell = true;
+      } else if (dv > limit * WORLD.stagger.startAt && stagger(world, man, dv / limit, event, true)) effects.push('reels');
+    }
+    if (!man.trampledAt || world.time - man.trampledAt > 0.5) {
+      man.trampledAt = world.time;
+      world.events.push(event);
+    }
+  }
+  // The horse: its own speed changed by the block's reaction, and hurt by the hard bodies it ran into.
+  const struckKg = 0.35 * block.reduce((sum, man) => sum + weight(man) * wholeManKg(man), 0);
+  const partKg = horse.mass * deepest.capsule.mass;
+  const energy = 0.5 * ((struckKg * partKg) / (struckKg + partKg)) * closing * closing;
+  const hardness = 1 + spec.hardness * (block.reduce((sum, man) => sum + (man.body.gear.protection.blunt ?? 0), 0) / block.length);
+  const barding = BARDING[horse.barding].parts[deepest.capsule.part];
+  const blunt = energy * spec.harm * hardness * (1 - (barding.blunt ?? 0));
+  const crash = { time: world.time, kind: 'horseCrash', horse: horse.id, rider: horse.rider ?? undefined, speed: closing, impulse, energy: blunt, block: block.length, target: deepest.capsule.key, effects: [] };
+  harmHorse(world, horse, deepest.capsule, { blunt, cut: 0, pierce: 0 }, crash);
+  const size = jolt(world, horse, vec.scale(direction, -impulse / laden), 'goes down in a heap of the men it rode into');
+  crash.dv = size;
+  if (size > WORLD.mount.crash.fall * 0.4) {
+    crash.effects.push(`its pace broken by ${size.toFixed(1)} m/s`);
+    world.events.push(crash);
+  }
+}
+
+/**
+ * A hoof coming down on a man on the ground (a man knocked down in front of
+ * a horse, or lying in its way): the horse's weight on that foot for the
+ * length of a stride's stance (`hooves.stance` of its laden weight for
+ * `hooves.seconds`) is an impulse on his trunk, taken as a whole-body blow
+ * through his armour, once a stride per hoof (`hooves.every`).
+ */
+function trodOn(world, horse) {
+  const spec = WORLD.mount.hooves;
+  const weight = ladenMass(world, horse) * WORLD.gravity;
+  for (const fighter of world.fighters) {
+    if (fighter.mount || fighter.state === 'up' || (fighter.state === 'out' && fighter.outFor > 20)) continue;
+    const pelvis = point(fighter.x, P.pelvis);
+    if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
+    const neck = point(fighter.x, P.neck);
+    const reach = fighter.body.segments.trunk.skinRadius + HORSE_SHAPE.legRadius * horse.withers;
+    for (const leg of HORSE_SHAPE.legs) {
+      const hoof = horse.legs[leg.key]?.hoof;
+      // Down on the ground, in the stance (a hoof in the air touches nothing).
+      if (!hoof || hoof[1] > spec.height * horse.withers) continue;
+      const closest = closestBetween(hoof, hoof, pelvis, neck);
+      if (vec.length(vec.sub(closest.onFirst, closest.onSecond)) > reach) continue;
+      fighter.hoofed ??= {};
+      const key = `${horse.id}:${leg.key}`;
+      if (world.time - (fighter.hoofed[key] ?? -Infinity) < spec.every) continue;
+      fighter.hoofed[key] = world.time;
+      const impulse = weight * spec.stance * spec.seconds;
+      bodyBlow(fighter, impulse / (wholeManKg(fighter) * WORLD.rush.trunkShare), WORLD.impact.charge);
+      world.pendingImpulses.push({ fighter, shares: [[P.pelvis, 1], [P.neck, 1]], direction: [0, -1, 0], impulse, braced: Infinity });
+      if (!fighter.trampledAt || world.time - fighter.trampledAt > 0.5) {
+        fighter.trampledAt = world.time;
+        world.events.push({ time: world.time, kind: 'trampled', fighter: fighter.id, horse: horse.id, attacker: horse.rider ?? undefined, speed: Math.abs(horse.speed), impulse, effects: ['trodden by a hoof'] });
       }
     }
   }
+}
+
+/**
+ * Two horses meeting: where their barrels, necks and heads overlap they are
+ * eased apart (the lighter further) and, if closing, exchange momentum by
+ * their laden masses along the contact (each with its rider), the impulse
+ * reduced mass × closing × (1 + restitution). Each is jolted by its own
+ * share (jolt: its pace along its line, a shove across it, its rider
+ * flung forward, down if past what its legs take: head-on is worst, a
+ * glancing pass mostly a shove) and bruised by the energy of the crash.
+ */
+function horsesMeet(world, first, second) {
+  if (Math.hypot(first.at[0] - second.at[0], first.at[1] - second.at[1]) > 1.6 * (first.withers + second.withers)) return;
+  let deepest = null;
+  for (const one of first.capsules) {
+    if (one.part === 'legs') continue;
+    for (const two of second.capsules) {
+      if (two.part === 'legs') continue;
+      const closest = closestBetween(one.a, one.b, two.a, two.b);
+      const offset = vec.sub(closest.onFirst, closest.onSecond);
+      const gap = vec.length(offset) - one.radius - two.radius;
+      if (gap >= 0 || (deepest && gap >= deepest.gap)) continue;
+      deepest = { one, two, gap, offset, at: vec.lerp(closest.onFirst, closest.onSecond, 0.5) };
+    }
+  }
+  if (!deepest) return;
+  const flat = [-deepest.offset[0], 0, -deepest.offset[2]];
+  // From the first to the second.
+  const normal = vec.length(flat) > 1e-6 ? vec.normalize(flat) : vec.normalize([second.at[0] - first.at[0], 0, second.at[1] - first.at[1]]);
+  const a = ladenMass(world, first);
+  const b = ladenMass(world, second);
+  const depth = -deepest.gap;
+  first.at[0] -= normal[0] * depth * (b / (a + b));
+  first.at[1] -= normal[2] * depth * (b / (a + b));
+  second.at[0] += normal[0] * depth * (a / (a + b));
+  second.at[1] += normal[2] * depth * (a / (a + b));
+  const closing = vec.dot(vec.sub(horseVelocityAt(first, deepest.at), horseVelocityAt(second, deepest.at)), normal);
+  if (closing <= 0.1) return;
+  const spec = WORLD.mount.crash;
+  const impulse = ((a * b) / (a + b)) * closing * (1 + spec.restitution);
+  const sizes = [jolt(world, first, vec.scale(normal, -impulse / a)), jolt(world, second, vec.scale(normal, impulse / b))];
+  // The energy of the crash, in the parts that met: blunt harm to each, through its barding.
+  const partA = a * deepest.one.mass;
+  const partB = b * deepest.two.mass;
+  const energy = 0.5 * ((partA * partB) / (partA + partB)) * closing * closing;
+  [[first, deepest.one, sizes[0], second], [second, deepest.two, sizes[1], first]].forEach(([horse, capsule, size, other]) => {
+    const blunt = energy * spec.harm * (1 - (BARDING[horse.barding].parts[capsule.part].blunt ?? 0));
+    const crash = { time: world.time, kind: 'horseCrash', horse: horse.id, rider: horse.rider ?? undefined, other: other.id, speed: closing, impulse, energy: blunt, dv: size, target: capsule.key, effects: [`horses collide at ${closing.toFixed(1)} m/s`] };
+    harmHorse(world, horse, capsule, { blunt, cut: 0, pierce: 0 }, crash);
+    world.events.push(crash);
+  });
 }
