@@ -54,6 +54,8 @@ export function momentFor(event) {
   if (event.kind === 'panic' || event.kind === 'rally') return { kind: event.kind, fighter: event.fighter, particle: P.head };
   // Thrown from the saddle: as a knockdown.
   if (event.kind === 'unhorsed' && !event.effects[0]?.startsWith('slumps')) return { kind: 'knockdown', fighter: event.fighter, particle: P.neck };
+  // Ridden down and put over by a horse: as a knockdown.
+  if (event.kind === 'trampled' && event.fell) return { kind: 'knockdown', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'staggered') return { kind: 'staggered', fighter: event.fighter, particle: P.head };
   if (event.kind === 'killed') return { kind: 'killed', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'bledOut') return { kind: 'bledOut', fighter: event.fighter, particle: P.neck };

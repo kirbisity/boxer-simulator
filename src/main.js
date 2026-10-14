@@ -783,7 +783,8 @@ function logEvent(event) {
   else if (event.kind === 'unhorsed') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'horseDown') text = `🐎 ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'A horse'} goes down · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'horseHit') text = `<b>${name(event.attacker)}</b> ${event.punch} → ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'a horse'} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
-  else if (event.kind === 'trampled') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'horseCrash') text = `🐎 ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'A horse'} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'trampled') text =`🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   // A strike's line needs its numbers; anything else without a line of its own is not logged.
   else if (event.attacker === undefined || event.speed === undefined || event.impulse === undefined || event.force === undefined || !event.effects) return;

@@ -2058,14 +2058,19 @@ function checkBalance(world, fighter) {
   } else stagger(world, fighter, pushed, null);
   if (knock > WORLD.balance.speed * footing || outside > WORLD.balance.reach * legLength * footing) {
     fighter.knock = [0, 0, 0];
-    fighter.state = 'down';
-    shakenLoose(world, fighter);
-    fighter.punch = null;
-    fighter.rush = null;
-    fighter.clinch = null;
-    fighter.downTimer = WORLD.balance.fallSeconds;
-    world.events.push({ time: world.time, kind: 'fell', fighter: fighter.id, onOneFoot: !planted, effects: [knock > WORLD.balance.speed * footing ? 'knocked off balance' : 'overreached'] });
+    fall(world, fighter, knock > WORLD.balance.speed * footing ? 'knocked off balance' : 'overreached', !planted);
   }
+}
+
+/** Over he goes (not counted as a knockdown): the muscles let go, and up again after a moment. */
+export function fall(world, fighter, reason, onOneFoot = false) {
+  fighter.state = 'down';
+  shakenLoose(world, fighter);
+  fighter.punch = null;
+  fighter.rush = null;
+  fighter.clinch = null;
+  fighter.downTimer = WORLD.balance.fallSeconds;
+  world.events.push({ time: world.time, kind: 'fell', fighter: fighter.id, onOneFoot, effects: [reason] });
 }
 
 /** How far a point is outside the base between two feet (m, on the floor): from the nearest point on the line joining them. */
@@ -3720,7 +3725,7 @@ function bodiesMeet(world, first, second, closing) {
 }
 
 /** A whole-body blow of `deltaV` (m/s) to the trunk: spread by armour, borne by bone. */
-function bodyBlow(fighter, deltaV, share) {
+export function bodyBlow(fighter, deltaV, share) {
   if (fighter.state === 'out') return;
   const spread = 1 - (fighter.body.gear.protection.blunt ?? 0);
   const bruise = (deltaV * share * spread) / Math.max(0.4, fighter.body.boneDensity ?? 1);
