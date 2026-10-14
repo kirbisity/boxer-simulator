@@ -147,8 +147,10 @@ function mingBrigandineDesign(label, cloth, iron, look = {}) {
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
 // `look`: the same protection drawn as scale armour (`kind: 'mingScale'`).
+// The helm's flaps are of the coat: the brigandine's own cloth and gilt rivets, or steel where the coat is scale (`flapSteel`).
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#d6a743', coif, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
+  const scale = look.kind === 'mingScale';
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: scale ? steel : cloth, flapSteel: scale, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // The steppe man's kit: his deel (the robe over all) and the robe under it
 // at the hem (`trim`), his hat or helmet, the tall black boots (gutal).
@@ -1247,7 +1249,7 @@ export const OUTFITS = {
   },
   // A rōnin: no lord, no armour; a kimono and hakama, a headband.
   ronin: {
-    skill: 0.8,
+    skill: 0.85,
     faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
     sidearm: 'wakizashi',

@@ -128,8 +128,9 @@ export const MOVES = {
   // the heading held too), carried in at a run for up to `carry` s; when the
   // point is within `driveFrom` m of his middle the body throws itself in
   // behind it, the hand going `drive` m on along that line with the lunge,
-  // his whole weight braced behind it (`mass.body`), not the arms' push.
-  lanceCharge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.14, 0.58, -0.12], dir: [1, 0, 0] }, windup: 0.15, extendUntil: 0.4, duration: 0.8, twist: 0, lean: 0.18, shift: 0.14, step: 2.6, cost: 0.05, extendShare: 0.7, mass: { arm: 0.6, body: 0.6 }, rotation: 0, zones: ['body'], reach: 'weapon', holdHeading: true, couched: { carry: 1.6, drive: 0.4, lead: 0.5 } },
+  // braced behind it through his planted feet and shoulder (`mass.body`: on foot, a
+  // quarter of him — no saddle and lance rest to put his whole weight on the point).
+  lanceCharge: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [0.14, 0.58, -0.12], dir: [1, 0, 0] }, windup: 0.15, extendUntil: 0.4, duration: 0.8, twist: 0, lean: 0.18, shift: 0.14, step: 2.6, cost: 0.05, extendShare: 0.7, mass: { arm: 0.6, body: 0.25 }, rotation: 0, zones: ['body'], reach: 'weapon', holdHeading: true, couched: { carry: 1.6, drive: 0.4, lead: 0.5 } },
   lanceThrust: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.2, 0.56, -0.12], dir: [1, 0.04, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.14, shift: 0.1, depth: 0.6, step: 1.4, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.3 }, rotation: 0.4, zones: ['body'], reach: 'weapon' },
   lanceHigh: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.16, 0.66, -0.12], dir: [1, 0.14, 0] }, windup: 0.2, extendUntil: 0.46, duration: 0.86, twist: -0.35, lean: 0.12, shift: 0.09, depth: 0.55, step: 1.3, cost: 0.03, extendShare: 0.6, mass: { arm: 0.85, body: 0.26 }, rotation: 0.4, zones: ['head', 'body'], reach: 'weapon' },
   lanceJab: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', from: { hand: [-0.12, 0.58, -0.1], dir: [1, 0.06, 0] }, windup: 0.14, extendUntil: 0.34, duration: 0.62, twist: -0.25, lean: 0.1, shift: 0.08, depth: 0.45, step: 1.1, cost: 0.02, extendShare: 0.6, mass: { arm: 0.75, body: 0.16 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon' },
@@ -528,23 +529,24 @@ export const STYLES = {
   // the other parries; AI). One blade left, he fights with it alone: the
   // katana in both hands as a rōnin (`single`), or, the katana lost, the
   // wakizashi in his sword hand.
+  // Two swords fought to overwhelm: both blades always busy, long runs, little rest, pressing in.
   nito: {
     label: 'Nitō (two swords)', weapon: 'katana', grip: 'one', offWeapon: 'wakizashi', single: 'ronin',
-    cadence: { work: 1.5, move: 0.9, burst: 0.85, mobility: 0.7 },
+    cadence: { work: 1.8, move: 0.95, burst: 1.0, mobility: 0.75 },
     stance: { blade: 0.12, crouch: 0.08, width: 1.2, lean: 0.06, guardHeight: 0 },
     weaponGuard: { hand: [0.2, 0.64, -0.12], dir: [0.7, 0.65, 0.12] },
     offGuard: { hand: [0.22, 0.56, 0.13], dir: [0.85, 0.35, -0.18] },
     idle: { bounce: 0.15, sway: 0.4, rock: 0.25 },
-    attacks: { kataKesa: 0.18, kataGyaku: 0.1, kataShomen: 0.08, kataYoko: 0.06, kataTsuki: 0.1, wakiKesa: 0.06, wakiTsuki: 0.08, wakiBeat: 0.16, kesaTsuki: 0.1, jodanGedan: 0.08, rush: 0.02 },
+    attacks: { kataKesa: 0.18, kataGyaku: 0.1, kataShomen: 0.08, kataYoko: 0.06, kataTsuki: 0.1, wakiKesa: 0.06, wakiTsuki: 0.08, wakiBeat: 0.16, kesaTsuki: 0.1, jodanGedan: 0.08, rush: 0.05 },
     combos: { 'wakiTsuki kataKesa': 0.25, 'kataKesa wakiKesa': 0.2, 'wakiBeat kataGyaku': 0.2, 'kataGyaku kesaTsuki': 0.15, 'wakiKesa kataShomen': 0.2 },
-    comboChance: 0.6,
-    tempo: 0.8,
+    comboChance: 0.75,
+    tempo: 0.65,
     defences: { weaponBlock: 0.75, stepBack: 0.2, guard: 0.05 },
-    defendChance: 0.75,
+    defendChance: 0.6,
     riposte: { chance: 0.65, moves: { kataKesa: 0.35, kataTsuki: 0.25, kataGyaku: 0.15, wakiTsuki: 0.25 } },
     headMovement: 0.1,
-    plans: { pressure: 1.4, counter: 1.3, brawler: 0.5, outboxer: 0.5 },
-    pressure: 0.35,
+    plans: { pressure: 1.9, counter: 0.9, brawler: 0.7, outboxer: 0.4 },
+    pressure: 0.55,
   },
   // Polearms. Each holds the range its reach gives (see the AI), and fights
   // mixed when it loses its weapon. `rangeInside`: how far inside his own

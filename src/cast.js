@@ -305,7 +305,7 @@ const PERIOD_BUILD = {
   // lion): his elite is the big men of his army.
   // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
   mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 160, weightKg: 64, exercise: 0.66 } },
-  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 56, exercise: 0.85 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
+  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 60, exercise: 0.92 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
   // The men who crossed to the Indies were picked and hardened (veterans of

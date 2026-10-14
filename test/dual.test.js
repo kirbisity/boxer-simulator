@@ -77,8 +77,9 @@ test('both blades at once: the second hand\'s stroke has its own time and aim, a
 test('one blade meets his while the other cuts: a parry with the wakizashi, the katana on its way in', () => {
   // The samurai cuts; Musashi blocks (the wakizashi, the blade not striking) and cuts with the katana at once.
   let parried = null;
-  for (const [move, seed] of [['tsuki', 1], ['kesagiri', 1], ['tsuki', 2], ['shomen', 1], ['kesagiri', 3]]) {
-    const world = facing(musashi(), { ...PRESETS.samurai }, 1.9, seed);
+  const tries = [1.9, 1.7, 2.1].flatMap((gap) => [['tsuki', 1], ['kesagiri', 1], ['tsuki', 2], ['shomen', 1], ['kesagiri', 3]].map(([move, seed]) => [move, seed, gap]));
+  for (const [move, seed, gap] of tries) {
+    const world = facing(musashi(), { ...PRESETS.samurai }, gap, seed);
     const [him, samurai] = world.fighters;
     assert.ok(throwPunch(world, samurai, move, MOVES[move].zones[0]));
     advance(world, 0.12);

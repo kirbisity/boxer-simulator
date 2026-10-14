@@ -5,7 +5,7 @@ import { gearTraits } from '../src/outfits.js';
 import { MOVES, STYLES, STYLE_KEYS } from '../src/moves.js';
 import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, dropWeapon, perform, placeFighter, shieldDisc, throwPunch, WORLD } from '../src/physics.js';
 import { AI, thinkAll } from '../src/ai.js';
-import { SHIELDS, WEAPONS, harmMix, shieldContact } from '../src/weapons.js';
+import { BLADES, SHIELDS, WEAPONS, harmMix, shieldContact } from '../src/weapons.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 import { fighterFor } from '../tools/weapons.js';
 import { spacing } from '../tools/spacing.js';
@@ -78,10 +78,14 @@ test('plate turns the same cut aside: the push lands, the edge does not', () => 
   assert.notEqual(world.fighters[1].state, 'out');
 });
 
-test('a thrust driven point-first into the chest kills; plate stops it', () => {
+test('a thrust driven point-first into the chest is mortal within seconds, not on the spot; plate stops it', () => {
   const bare = strikeAt('katana', 'tsuki', 'body', 1.5);
   assert.ok(bare.hit.along > 0.9, 'point first');
-  assert.ok(bare.events.some((event) => event.kind === 'killed'));
+  assert.ok(bare.events.some((event) => (event.effects ?? []).includes('stabbed through the chest')));
+  assert.ok(!bare.events.some((event) => event.kind === 'killed'), 'not dead on the spot');
+  const stabbed = bare.world.fighters.find((fighter) => fighter.bleed > 0);
+  advance(bare.world, BLADES.heartSeconds + 1);
+  assert.equal(stabbed.state, 'out', 'down from the blood he lost within seconds');
   const plated = strikeAt('katana', 'tsuki', 'body', 1.5, { outfit: 'knight' });
   assert.ok(plated.hit && plated.hit.pierce < 15);
   assert.ok(!plated.events.some((event) => event.kind === 'killed'));

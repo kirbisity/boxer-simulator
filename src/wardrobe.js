@@ -1224,7 +1224,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       } else {
         // The flaps: padded cloth open over the face (+x), from the rim to the
         // shoulders, rows of rivet heads over them (one instanced mesh).
-        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.75 * r, 1.4 * r, 22, 3, true, Math.PI * 0.75, Math.PI * 1.5), surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
+        // Of the coat's own stuff: its cloth, or its steel (`flapSteel`) where the coat is scale.
+        const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * r, 1.75 * r, 1.4 * r, 22, 3, true, Math.PI * 0.75, Math.PI * 1.5), head.flapSteel ? metal(steel, new THREE.Color(head.coif).getHex()).clone() : surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
         coif.material.side = THREE.DoubleSide;
         coif.position.y = -0.6 * r;
         const rows = 3;

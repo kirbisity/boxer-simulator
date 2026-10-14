@@ -502,12 +502,13 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // Miyamoto Musashi at Ganryūjima (1612, about 28): a rōnin on the road,
-  // remembered as tall for his day (about six shaku, ~180 cm), lean and fit;
+  // remembered as tall and strong for his day (about six shaku, ~180 cm), hard-trained
+  // all his life (exercise 0.95, a large frame): the strength to swing a sword in each hand;
   // he goes in at a run (charging). He fights with both swords (nitō), the
   // school he founded (Niten Ichi-ryū): the katana in his right hand, the
   // wakizashi in his left.
   ronin: {
-    name: 'Miyamoto Musashi', style: 'nito', hero: true, sex: 'male', heightCm: 178, frame: 'medium', age: 28, exercise: 0.85, calories: 3950, charging: 2.5,
+    name: 'Miyamoto Musashi', style: 'nito', hero: true, sex: 'male', heightCm: 178, frame: 'large', age: 28, exercise: 0.95, calories: 4400, charging: 2.5,
     outfit: { kind: 'ronin', design: 2 }, accessories: ['kasa'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },

@@ -4038,7 +4038,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   }
   if (pierce > 0.5) {
     wound(defender, 'pierce', pierce, capsule.key, attacker);
-    addDamage(defender, capsule.key, pierce / 4, false, toBone(pierce));
+    // A point's harm to the trunk and the head is its wound (it bleeds, and through the heart it drops him, above), not a crushing injury: it counts for less there.
+    addDamage(defender, capsule.key, pierce * (limb ? 0.25 : BLADES.pierceTrauma), false, toBone(pierce));
     event.effects.push(pierce > 25 ? 'run through' : 'stabbed');
   }
   let through = false;
@@ -4048,7 +4049,17 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
       sever(world, defender, joint, event, bladeVelocity);
       through = true;
     } else if (pierce > BLADES.lethalPierce * BODY.toughness && vital(defender, capsule, contactPoint)) {
-      knockOut(world, defender, event, capsule.key === 'head' ? 'stabbed through the head' : 'stabbed through the heart', 'killed');
+      if (capsule.key === 'head') knockOut(world, defender, event, 'stabbed through the head', 'killed');
+      else {
+        // Through the heart or the great vessels: not dead on the spot — he has
+        // seconds (BLADES.heartSeconds) before the blood he loses drops him.
+        const clot = BLADES.clotSeconds;
+        const left = Math.max(0, collapseAt() - (defender.bloodLost ?? 0));
+        defender.bleed = (defender.bleed ?? 0) + left / (clot * (1 - Math.exp(-BLADES.heartSeconds / clot)));
+        defender.bleedOutside = (defender.bleedOutside ?? 0) + left;
+        defender.lastWoundedBy = attacker.id;
+        event.effects.push('stabbed through the chest');
+      }
     }
   }
   if (BLOCKING.has(capsule.key)) for (const held of heldBlades(defender)) if (capsule.key.startsWith(held.main)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1), held);
