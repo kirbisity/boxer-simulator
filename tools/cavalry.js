@@ -6,9 +6,9 @@
 // Usage: node tools/cavalry.js [seeds] [case ...]
 //   cases: lone bare plate line pikes head glance angle
 
-import { P, PRESETS } from '../src/body.js';
+import { BODY, P, PRESETS } from '../src/body.js';
 import { think } from '../src/ai.js';
-import { advance, bodyHarm, closestBetween, createWorld, placeFighter, point } from '../src/physics.js';
+import { advance, closestBetween, createWorld, placeFighter, point, WORLD } from '../src/physics.js';
 import { vec } from '../src/pose.js';
 
 const [seedsArg = '5', ...named] = process.argv.slice(2);
@@ -135,10 +135,13 @@ function run(spec, seed) {
     fell: fellMen.length,
     men: men.length,
     out: men.filter((man) => man.state === 'out').length,
+    dead: men.filter((man) => (man.trauma?.trunk ?? 0) >= WORLD.injury.trunkFatal || world.events.some((event) => event.kind === 'killed' && event.fighter === man.id)).length,
+    ribs: men.filter((man) => man.injuries.some((injury) => injury.kind === 'rib')).length,
+    horsesKilled: world.events.filter((event) => event.kind === 'horseDown' && /killed by the blows|heap of the men/.test(event.effects[0] ?? '')).length,
     trunk: men.map((man) => man.trauma?.trunk ?? 0),
     horsesDown: world.events.filter((event) => event.kind === 'horseDown').length,
     riderThrown: world.events.filter((event) => event.kind === 'unhorsed').length,
-    horseHurt: horses.map((horse) => horse.trauma + horse.bloodLost),
+    horseHurt: horses.map((horse) => horse.trauma / (WORLD.mount.horse.trunkFatal * BODY.toughness)),
   };
 }
 
@@ -148,10 +151,10 @@ for (const key of wanted) {
   for (let seed = 0; seed < seeds; seed += 1) rows.push(run(spec, 4000 + seed));
   console.log(`\n${spec.label} (${seeds} seeds)`);
   const horses = rows[0].horseLow.length;
-  console.log(`  contact ${rows.filter((r) => r.contacted).length}/${seeds}; horse speed ${fmt(median(rows.map((r) => r.horseBefore)))} -> low within 0.5 s ${Array.from({ length: horses }, (_, i) => fmt(median(rows.map((r) => r.horseLow[i])))).join(' / ')} m/s; horses down ${rows.reduce((s, r) => s + r.horsesDown, 0)}/${seeds * horses}; riders thrown ${rows.reduce((s, r) => s + r.riderThrown, 0)}/${seeds * horses}; horse hurt ${Array.from({ length: horses }, (_, i) => fmt(median(rows.map((r) => r.horseHurt[i])), 3)).join(' / ')}`);
+  console.log(`  contact ${rows.filter((r) => r.contacted).length}/${seeds}; horse speed ${fmt(median(rows.map((r) => r.horseBefore)))} -> low within 0.5 s ${Array.from({ length: horses }, (_, i) => fmt(median(rows.map((r) => r.horseLow[i])))).join(' / ')} m/s; horses down ${rows.reduce((s, r) => s + r.horsesDown, 0)}/${seeds * horses}; riders thrown ${rows.reduce((s, r) => s + r.riderThrown, 0)}/${seeds * horses}; horse blunt harm, 1 kills ${Array.from({ length: horses }, (_, i) => fmt(median(rows.map((r) => r.horseHurt[i])), 2)).join(' / ')} (killed ${rows.reduce((s, r) => s + r.horsesKilled, 0)})`);
   if (!spec.mountedBlue) {
     const all = (pick) => rows.flatMap(pick);
-    console.log(`  ${rows[0].men} man(men): fell ${rows.reduce((s, r) => s + r.fell, 0)}/${rows.reduce((s, r) => s + r.men, 0)}, out ${rows.reduce((s, r) => s + r.out, 0)}; peak speed ${fmt(median(all((r) => r.manPeak)))} m/s (max ${fmt(Math.max(...all((r) => r.manPeak)))}), thrown ${fmt(median(all((r) => r.thrown)))} m (max ${fmt(Math.max(...all((r) => r.thrown)))}), trunk trauma ${fmt(median(all((r) => r.trunk)), 2)} (max ${fmt(Math.max(...all((r) => r.trunk)), 2)}; fatal 2.5)`);
+    console.log(`  ${rows[0].men} man(men): fell ${rows.reduce((s, r) => s + r.fell, 0)}/${rows.reduce((s, r) => s + r.men, 0)}, out ${rows.reduce((s, r) => s + r.out, 0)}; peak speed ${fmt(median(all((r) => r.manPeak)))} m/s (max ${fmt(Math.max(...all((r) => r.manPeak)))}), thrown ${fmt(median(all((r) => r.thrown)))} m (max ${fmt(Math.max(...all((r) => r.thrown)))}), ribs broken ${rows.reduce((s, r) => s + r.ribs, 0)}, dead ${rows.reduce((s, r) => s + r.dead, 0)}; trunk trauma ${fmt(median(all((r) => r.trunk)), 2)} (max ${fmt(Math.max(...all((r) => r.trunk)), 2)}; fatal 2.5)`);
   } else {
     console.log(`  rider trunk trauma ${fmt(mean(rows.flatMap((r) => r.trunk)), 2)}`);
   }

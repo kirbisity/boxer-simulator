@@ -3666,7 +3666,7 @@ function pushApart(world, first, second) {
     const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
     if (distance >= reach || distance < 1e-9) continue;
     const normal = vec.scale(offset, 1 / distance);
-    if (firstKey === 'trunk' && secondKey === 'trunk') collideBodies(world, first, second, normal);
+    crashBodies(world, first, second, firstKey, secondKey, normal);
     const shares = [
       [first, one.a, one.a === one.b ? 1 : 1 - closest.s, 1], [first, one.b, one.a === one.b ? 0 : closest.s, 1],
       [second, two.a, two.a === two.b ? 1 : 1 - closest.t, -1], [second, two.b, two.a === two.b ? 0 : closest.t, -1],
@@ -3677,60 +3677,231 @@ function pushApart(world, first, second) {
       for (let axis = 0; axis < 3; axis += 1) fighter.x[index * 3 + axis] += sign * normal[axis] * amount;
     }
   }
+  // A shield held in front is what a body running into the man meets first.
+  crashIntoShield(world, first, second);
+  crashIntoShield(world, second, first);
 }
 
-/** A charge landing: the trunks exchange momentum as two effective masses would. */
-function collideBodies(world, first, second, normal) {
-  const charger = first.rush && !first.rush.hit ? first : second.rush && !second.rush.hit ? second : null;
-  const velocity = (fighter) => vec.scale(TRUNK_PARTICLES.reduce((sum, index) => vec.add(sum, vec.scale(point(fighter.v, index), fighter.body.masses[index])), [0, 0, 0]), 1 / TRUNK_PARTICLES.reduce((sum, index) => sum + fighter.body.masses[index], 0));
+// ---- Crashes: bodies meeting ---------------------------------------------------
+//
+// Two bodies meeting (a man's trunk or head against another's, a horse's
+// barrel, neck or head against a man or another horse) are two effective
+// masses at a closing speed, whatever they are (WORLD.crash). Each part brings
+// what is braced behind it standing, as a blow's struck part does, and the
+// whole of the body as far as the body is going into the contact: a running
+// man's weight is behind his shoulder, a galloping horse's and its rider's
+// behind its chest. The impulse is the reduced mass times the closing speed
+// (and the rebound), the energy taken up half the reduced mass times the speed
+// squared; each is hurt as a blow hurts, by the speed change the impulse gives
+// its own part (the lighter takes more, the heavier hits harder), through its
+// armour. The same exchange between the bodies' whole masses moves them.
+
+/** A body's velocity as a whole (the mean of its particles, weighted by their masses). */
+export function wholeVelocity(fighter) {
+  const sum = [0, 0, 0];
+  let total = 0;
+  fighter.body.masses.forEach((kg, index) => {
+    for (let axis = 0; axis < 3; axis += 1) sum[axis] += fighter.v[index * 3 + axis] * kg;
+    total += kg;
+  });
+  return vec.scale(sum, 1 / total);
+}
+
+/** The impulse (N·s) and the energy (J) a meeting of masses `a` and `b` (kg) at `closing` (m/s) takes up. */
+export function crashOf(a, b, closing, restitution = WORLD.crash.restitution) {
+  const reduced = (a * b) / (a + b);
+  return { reduced, impulse: reduced * closing * (1 + restitution), energy: 0.5 * reduced * closing * closing };
+}
+
+/**
+ * The mass (kg) a part brings to a crash: `local`, what is braced behind it
+ * standing, and as far as the rest of the body goes into the contact (its speed
+ * towards it, against the closing speed) up to `whole`. A body lying on the
+ * ground (`supported`) has the ground behind every part of it.
+ */
+export function crashMass(local, whole, intoSpeed, closing, supported = false) {
+  const into = supported ? 1 : closing > 1e-6 ? Math.max(0, Math.min(1, intoSpeed / closing)) : 0;
+  return local + into * Math.max(0, whole - local);
+}
+
+/** What a part (trunk, head, a limb) of a fighter brings to a crash: its standing mass, his whole, his motion. */
+export function fighterParty(fighter, key) {
+  const kg = fighter.mount ? seatMass(fighter) : fighter.body.massKg;
+  return { local: struckMassOf(fighter, { key }), whole: WORLD.balance.massShare * kg, velocity: wholeVelocity(fighter), supported: fighter.state !== 'up' };
+}
+
+/**
+ * Two parties (`{ local, whole, velocity, supported }`) meeting at `closing`
+ * m/s, `toward` the unit vector from the first to the second: the mass each
+ * brings, the impulse and energy of the crash, and the impulse between their
+ * whole masses that moves them (`motion`, with `bounce`: two men push each
+ * other with the engine's usual knockback, WORLD.transferRestitution).
+ */
+export function crashBetween(first, second, toward, closing, bounce = WORLD.crash.restitution) {
+  const into = (party, direction) => Math.max(0, vec.dot(party.velocity, direction));
+  const massFirst = crashMass(first.local, first.whole, into(first, toward), closing, first.supported);
+  const massSecond = crashMass(second.local, second.whole, into(second, vec.scale(toward, -1)), closing, second.supported);
+  return { massFirst, massSecond, ...crashOf(massFirst, massSecond, closing), motion: crashOf(first.whole, second.whole, closing, bounce).impulse };
+}
+
+/**
+ * A crash's toll on one fighter's part `key`: the speed change the impulse gives
+ * the part, through his armour, as a blow's (the head's brain strain and
+ * knockout, the trunk's wind, ribs and trauma, a leg's giving), and a hard blow
+ * to the trunk bleeds inside. `source` is the fighter who did it, if any (a
+ * horse's rider), `hard` how much worse the other's hard armour makes it.
+ * Tissue takes a shove unharmed: the energy of the closing speed beyond
+ * `crash.tolerance` is what hurts (the impulse is scaled by the root of it).
+ */
+export function crashHarm(world, victim, key, { impulse: whole, mass, closing, energy: all, point: at, normal, source = null, hard = 1 }) {
+  const tolerance = WORLD.crash.tolerance;
+  if (victim.state === 'out' || closing <= tolerance) return null;
+  const beyond = 1 - (tolerance / closing) ** 2;
+  const impulse = whole * Math.sqrt(beyond);
+  const energy = all * beyond;
+  const body = victim.body;
+  const firmness = body.segments[key].fleshFirmness;
+  const peakForce = ((Math.PI / 2) * impulse) / (WORLD.crash.contactSeconds * (1 + 0.6 * (1 - firmness)));
+  const harm = (1 - (protectionAt(body.gear, key).blunt ?? 0)) * hard;
+  const event = { time: world.time, kind: 'crash', attacker: source?.id, defender: victim.id, target: key, speed: closing, impulse, energy, force: peakForce, headDeltaV: 0, effects: [], point: at, normal, harm };
+  if (source) victim.lastHitBy = source.id;
+  // (The head's speed change is the impulse over the mass behind it in this crash, not over its own: a head carried by a charging body is not whipped.)
+  const turn = key === 'head' ? (WORLD.crash.rotation * body.headEffectiveMass) / mass : WORLD.crash.rotation;
+  bluntConsequences(world, source, victim, { key }, event, { impulse, struckMass: mass, peakForce, harm, blocked: false, rotation: turn, side: 'r', push: true });
+  if (key === 'trunk') bleedInside(victim, (impulse / mass) * harm);
+  world.events.push(event);
+  return event;
+}
+
+/** How much worse a crash is for what runs into hard armour (a blunt protection of `blunt`, 0..1): 1 plus `crash.hard` per unit of it. */
+export function crashHardness(blunt) {
+  return 1 + WORLD.crash.hard * (blunt ?? 0);
+}
+
+/** The velocity of a fighter's trunk or head. */
+function partVelocity(fighter, key) {
+  if (key === 'head') return point(fighter.v, P.head);
+  const kg = TRUNK_PARTICLES.reduce((sum, index) => sum + fighter.body.masses[index], 0);
+  return vec.scale(TRUNK_PARTICLES.reduce((sum, index) => vec.add(sum, vec.scale(point(fighter.v, index), fighter.body.masses[index])), [0, 0, 0]), 1 / kg);
+}
+
+/**
+ * Two fighters' parts (trunk or head) meeting, `normal` pointing from the second to the first: the
+ * general crash. Both are hurt by it. A man charging (`rush`) leads with his head and shoulders:
+ * what they meet a chest with is the body behind them, hurt at that first touch at its speed;
+ * the charge lands when the trunks meet (the push, as it has always been), meant as he is to be
+ * moving: the part of the impulse that only cancels his own run is braking, not a knock. Two men
+ * that only run into each other are hurt and separated, as bodies are. A pair is one meeting
+ * every `crash.cooldown` s.
+ */
+function crashBodies(world, first, second, partFirst, partSecond, normal) {
+  const spec = WORLD.crash;
+  const leads = (fighter) => Boolean(fighter.rush && !fighter.rush.hit);
+  const leading = partFirst === 'head' && partSecond === 'trunk' && leads(first) ? first : partSecond === 'head' && partFirst === 'trunk' && leads(second) ? second : null;
+  const firstKey = leading === first ? 'trunk' : partFirst;
+  const secondKey = leading === second ? 'trunk' : partSecond;
+  const bodies = firstKey === 'trunk' && secondKey === 'trunk';
+  const charger = leading ?? (bodies ? (leads(first) ? first : leads(second) ? second : null) : null);
   // Normal points from second to first; closing speed is how fast they meet.
-  const closing = vec.dot(vec.sub(velocity(second), velocity(first)), normal);
-  if (!charger) {
-    bodiesMeet(world, first, second, closing);
-    return;
-  }
-  if (closing < WORLD.rush.minClosing) return;
-  charger.rush.hit = true;
-  charger.rush.t = Math.max(charger.rush.t, charger.rush.duration - 0.15);
-  const m1 = first.body.massKg * WORLD.rush.trunkShare;
-  const m2 = second.body.massKg * WORLD.rush.trunkShare;
-  const impulse = ((m1 * m2) / (m1 + m2)) * closing * (1 + WORLD.transferRestitution);
-  const everywhere = TRUNK_PARTICLES.map((index) => [index, 1]);
-  // The charger meant to be moving: the impulse that only cancels his own
-  // run is braking, not a knock. Only what goes beyond it can topple him.
-  const runSpeed = (fighter, towards) => Math.max(0, vec.dot(velocity(fighter), towards));
-  const braced = (fighter, direction) => (fighter === charger ? runSpeed(fighter, vec.scale(direction, -1)) : 0);
-  world.pendingImpulses.push({ fighter: first, shares: everywhere, direction: normal, impulse, braced: braced(first, normal) });
-  world.pendingImpulses.push({ fighter: second, shares: everywhere, direction: vec.scale(normal, -1), impulse, braced: braced(second, vec.scale(normal, -1)) });
-  const struck = charger === first ? second : first;
-  struck.stamina = Math.max(0, struck.stamina - impulse / (struck.body.massKg * 2) / struck.body.aerobic);
-  // Both bodies take their own speed change: the lighter one more.
-  for (const fighter of [first, second]) bodyBlow(fighter, impulse / (fighter.body.massKg * WORLD.rush.trunkShare), WORLD.impact.charge);
-  world.events.push({ time: world.time, kind: 'collision', attacker: charger.id, defender: struck.id, punch: 'rush', target: 'trunk', speed: closing, impulse, force: 0, headDeltaV: 0, effects: [], point: point(struck.x, P.neck), normal });
-}
-
-/** Two bodies running into each other (no charge): past `bumpSpeed`, both are hurt by it. */
-function bodiesMeet(world, first, second, closing) {
-  const spec = WORLD.impact;
-  if (closing < spec.bumpSpeed) return;
-  const key = first.id < second.id ? `${first.id}:${second.id}` : `${second.id}:${first.id}`;
+  const closing = vec.dot(vec.sub(partVelocity(second, secondKey), partVelocity(first, firstKey)), normal);
+  // (A head whips about on its neck: only a head that is really driven into another body is a crash.)
+  if (closing < (bodies ? spec.from : spec.fromHead) || (leading && leading.rush.harmed)) return;
+  const key = `${Math.min(first.id, second.id)}:${Math.max(first.id, second.id)}:${firstKey}${secondKey}`;
   world.bumps ??= new Map();
-  if (world.time - (world.bumps.get(key) ?? -Infinity) < spec.bumpEvery) return;
+  if (!charger && world.time - (world.bumps.get(key) ?? -Infinity) < spec.cooldown) return;
   world.bumps.set(key, world.time);
-  const m1 = first.body.massKg * WORLD.rush.trunkShare;
-  const m2 = second.body.massKg * WORLD.rush.trunkShare;
-  const impulse = ((m1 * m2) / (m1 + m2)) * closing;
-  for (const fighter of [first, second]) bodyBlow(fighter, impulse / (fighter.body.massKg * WORLD.rush.trunkShare), spec.charge);
-  world.events.push({ time: world.time, kind: 'bump', attacker: first.id, defender: second.id, speed: closing, impulse, effects: [] });
+  const pushing = charger && !leading;
+  if (pushing) {
+    charger.rush.hit = true;
+    charger.rush.t = Math.max(charger.rush.t, charger.rush.duration - 0.15);
+  }
+  const crash = crashBetween(fighterParty(first, firstKey), fighterParty(second, secondKey), vec.scale(normal, -1), closing, WORLD.transferRestitution);
+  const struck = charger === first ? second : first;
+  const at = point(struck.x, P.neck);
+  if (pushing) {
+    const everywhere = (part) => (part === 'head' ? [[P.head, 1]] : TRUNK_PARTICLES.map((index) => [index, 1]));
+    const braced = (fighter, part, direction) => (fighter === charger ? Math.max(0, vec.dot(partVelocity(fighter, part), vec.scale(direction, -1))) : 0);
+    world.pendingImpulses.push({ fighter: first, shares: everywhere(firstKey), direction: normal, impulse: crash.motion, braced: braced(first, firstKey, normal) });
+    world.pendingImpulses.push({ fighter: second, shares: everywhere(secondKey), direction: vec.scale(normal, -1), impulse: crash.motion, braced: braced(second, secondKey, vec.scale(normal, -1)) });
+    world.events.push({ time: world.time, kind: 'collision', attacker: charger.id, defender: struck.id, punch: 'rush', target: 'trunk', speed: closing, impulse: crash.impulse, energy: crash.energy, force: 0, headDeltaV: 0, effects: [], point: at, normal });
+  } else if (!charger) world.events.push({ time: world.time, kind: 'bump', attacker: first.id, defender: second.id, speed: closing, impulse: crash.impulse, energy: crash.energy, effects: [] });
+  // The harm at the first touch (a charge that has hurt at its head and shoulders does not hurt again when the trunks meet).
+  if (charger?.rush.harmed) return;
+  if (charger) charger.rush.harmed = true;
+  const harmed = (victim, part, mass, direction, source) => crashHarm(world, victim, part, { impulse: crash.impulse, mass, closing, energy: crash.energy, point: at, normal: direction, source, hard: crashHardness(source.body.gear.protection.blunt) });
+  harmed(first, firstKey, crash.massFirst, normal, second);
+  harmed(second, secondKey, crash.massSecond, vec.scale(normal, -1), first);
 }
 
-/** A whole-body blow of `deltaV` (m/s) to the trunk: spread by armour, borne by bone. */
-export function bodyBlow(fighter, deltaV, share) {
-  if (fighter.state === 'out') return;
-  const spread = 1 - (fighter.body.gear.protection.blunt ?? 0);
-  const bruise = (deltaV * share * spread) / Math.max(0.4, fighter.body.boneDensity ?? 1);
-  addDamage(fighter, 'trunk', bruise, false);
-  bleedInside(fighter, bruise);
+/** What a man's shield brings to a crash: the board, his arm behind it and part of him braced against it. */
+export function shieldParty(bearer) {
+  const body = bearer.body;
+  const braced = bearer.shield.spec.mass + body.segments.lForearm.mass + body.segments.lUpperArm.mass + body.massKg * 0.3;
+  return { local: braced, whole: WORLD.balance.massShare * (bearer.mount ? seatMass(bearer) : body.massKg), velocity: wholeVelocity(bearer), supported: false };
+}
+
+/**
+ * What a crash into a man's shield did to him: the shield arm takes the blow (as a blow on the
+ * shield does: blocked harm to the forearm, a share of it through to the chest, the arm giving if
+ * the moment is more than it holds, the shield wrenched from his hand if it strains past what its
+ * grip bears). `normal` points out from the shield towards what struck it.
+ */
+export function shieldHarm(world, bearer, { crash, closing, at, normal, offCentre, source }) {
+  const body = bearer.body;
+  const shield = bearer.shield;
+  addDamage(bearer, 'lForearm', (crash.impulse / crash.massSecond) * shield.spec.armHarm, true);
+  const event = crashHarm(world, bearer, 'trunk', { impulse: crash.impulse, mass: crash.massSecond, closing, energy: crash.energy, point: at, normal, source, hard: WORLD.blockedDamageShare }) ?? { effects: [] };
+  event.effects.push('taken on the shield');
+  shieldArmGives(world, bearer, at, vec.scale(normal, -1), crash.impulse, event);
+  const hold = WORLD.shield.wrench * (shield.spec.hold ?? 1) * (body.motorForce[P.lHand] / WORLD.recoil.reference);
+  shield.strain = (shield.strain ?? 0) + (crash.impulse * (1 + offCentre)) / hold;
+  if (shield.strain >= 1) dropShield(world, bearer, 'wrenched', vec.scale(normal, (-crash.impulse * 0.3) / shield.spec.mass));
+}
+
+/**
+ * A man's trunk against another's shield, which is what a body running into him meets first: if it
+ * is running into it (`crash.from`), the board stops it (the two are eased apart, the lighter
+ * further) and it is a crash with the shield arm and the man braced behind it (shieldHarm); a
+ * charge is driven into the board and spent there. The momentum the bearer takes goes to him
+ * through the shield arm.
+ */
+function crashIntoShield(world, mover, bearer) {
+  if (!bearer.shield || bearer.state === 'out') return;
+  const disc = shieldDisc(bearer);
+  const hit = shieldContact(point(mover.x, P.pelvis), point(mover.x, P.neck), disc, mover.body.segments.trunk.skinRadius);
+  if (!hit) return;
+  const away = flatOf(hit.away);
+  const closing = vec.dot(vec.sub(wholeVelocity(bearer), partVelocity(mover, 'trunk')), away);
+  if (closing < WORLD.crash.from) return;
+  // The board stops him: eased apart along the way out, the heavier giving less.
+  const m = mover.body.massKg;
+  const b = bearer.body.massKg;
+  for (const [fighter, sign, share] of [[mover, 1, b / (m + b)], [bearer, -1, m / (m + b)]]) {
+    const move = Math.min(hit.depth, 0.05) * share * sign;
+    for (let index = 0; index < fighter.x.length / 3; index += 1) {
+      for (const axis of [0, 2]) {
+        fighter.x[index * 3 + axis] += away[axis] * move;
+        fighter.prev[index * 3 + axis] += away[axis] * move;
+      }
+    }
+    fighter.root[0] += away[0] * move;
+    fighter.root[1] += away[2] * move;
+  }
+  const charging = mover.rush && !mover.rush.hit;
+  world.bumps ??= new Map();
+  const key = `${mover.id}:${bearer.id}:shield`;
+  if (!charging && world.time - (world.bumps.get(key) ?? -Infinity) < WORLD.crash.cooldown) return;
+  world.bumps.set(key, world.time);
+  const crash = crashBetween(fighterParty(mover, 'trunk'), shieldParty(bearer), vec.scale(away, -1), closing, WORLD.transferRestitution);
+  if (charging) {
+    mover.rush.hit = true;
+    mover.rush.t = Math.max(mover.rush.t, mover.rush.duration - 0.15);
+    world.pendingImpulses.push({ fighter: mover, shares: TRUNK_PARTICLES.map((index) => [index, 1]), direction: away, impulse: crash.motion, braced: Math.max(0, vec.dot(partVelocity(mover, 'trunk'), vec.scale(away, -1))) });
+    world.events.push({ time: world.time, kind: 'collision', attacker: mover.id, defender: bearer.id, punch: 'rush', target: 'shield', speed: closing, impulse: crash.impulse, energy: crash.energy, force: 0, headDeltaV: 0, effects: [], point: hit.point, normal: away });
+    world.pendingImpulses.push({ fighter: bearer, shares: [[P.lHand, 1], [P.lElbow, 0.8], [P.lShoulder, 0.5], [P.neck, 0.3], [P.pelvis, 0.2]], direction: vec.scale(away, -1), impulse: crash.motion });
+  }
+  crashHarm(world, mover, 'trunk', { impulse: crash.impulse, mass: crash.massFirst, closing, energy: crash.energy, point: hit.point, normal: away, source: bearer });
+  shieldHarm(world, bearer, { crash, closing, at: hit.point, normal: away, offCentre: vec.length(vec.sub(hit.point, disc.centre)) / disc.radius, source: mover });
 }
 
 /** A blunt blow to the trunk (m/s through armour and bone) bleeds inside, as a wound does outside. */
@@ -3904,14 +4075,15 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     if (checked) attacker.legDamage[side] += ((impulse * 0.5) / attacker.body.limbKg[`${side}Leg`]) * (1 - (protectionAt(attacker.body.gear, `${side}Shank`).blunt ?? 0));
     return;
   }
-  attacker.stats.landed += 1;
+  // (A crash has no attacker to credit when it is a horse with no rider.)
+  if (attacker) attacker.stats.landed += 1;
   if (capsule.key === 'head') {
     // Rotational strikes turn the head as well as pushing it, and rotation
     // is what knocks people out (Ommaya; Viano 2005).
     event.headDeltaV = (impulse / body.headEffectiveMass) * rotation;
     // Unseen, unbraced: a blow from well off where he faces finds the neck
     // slack, and the head snaps further — the blindside shot of a brawl.
-    if (blindside(defender, attacker)) {
+    if (attacker && blindside(defender, attacker)) {
       event.headDeltaV *= WORLD.blindsideFactor;
       event.effects.push('blindsided');
     }
@@ -4428,7 +4600,7 @@ function strikerVelocity(attacker, striker, along) {
  * shield arm out of line, and the guard is open until he has it back. The
  * share of the blow the arm could not hold (0 if it held).
  */
-function shieldArmGives(world, defender, at, direction, impulse, event) {
+export function shieldArmGives(world, defender, at, direction, impulse, event) {
   const body = defender.body;
   const lever = vec.length(vec.cross(vec.sub(at, point(defender.x, P.lShoulder)), direction));
   const moment = impulse * lever;
@@ -4899,7 +5071,7 @@ export function knockOut(world, defender, event, reason, kind = 'knockout') {
   defender.clinch = null;
   event.effects.push(reason);
   event.knockout = true;
-  if (standing) world.fighters[event.attacker].stats.knockdownsScored += 1;
+  if (standing && world.fighters[event.attacker]) world.fighters[event.attacker].stats.knockdownsScored += 1;
   world.events.push({ time: world.time, kind, fighter: defender.id, attacker: event.attacker, punch: event.punch, point: event.point, effects: [reason] });
 }
 
@@ -4916,7 +5088,7 @@ function knockDown(world, defender, event, reason) {
   const harmed = WORLD.rise.freshDown + (1 - WORLD.rise.freshDown) * bodyHarm(defender);
   defender.downTimer = (WORLD.downSecondsMin + world.random() * WORLD.downSecondsRange) * harmed + defender.knockdowns;
   event.effects.push(reason);
-  world.fighters[event.attacker].stats.knockdownsScored += 1;
+  if (world.fighters[event.attacker]) world.fighters[event.attacker].stats.knockdownsScored += 1;
 }
 
 function trackHandSpeed(fighter) {

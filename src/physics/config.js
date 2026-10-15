@@ -357,9 +357,40 @@ export const WORLD = {
   // legs hold the whole body behind the trunk. legDamageCost: balance lost
   // to a fully damaged pair of legs.
   balance: { speed: 2.1, reach: 0.8, fallSeconds: 1.4, absorbPerSecond: 5, massShare: 0.7, strikeMassShare: 1, legDamageCost: 0.3 },
-  // Charging: top speed as a multiple of footwork speed, and how much of the
-  // trunk's mass meets the other body in a collision.
-  rush: { speedFactor: 2.6, trunkShare: 0.7, minClosing: 0.8 },
+  // Charging: top speed as a multiple of footwork speed.
+  rush: { speedFactor: 2.6 },
+  // Bodies meeting (a man's trunk or head against another's, a horse's barrel,
+  // neck or head against a man or another horse): two effective masses at a
+  // closing speed, whatever they are (physics.js crashBetween).
+  // - Contact: closing faster than `from` m/s (`fromHead` where a head is one
+  //   of them: it whips about on its neck) the pair exchange momentum (impulse =
+  //   reduced mass x closing x (1 + `restitution`): a body is no ball) and a
+  //   pair brushing is one meeting every `cooldown` s.
+  // - Mass: a part brings what is braced behind it standing (a blow's struck
+  //   mass) and, as far as the rest of the body is going into the contact (its
+  //   speed towards it, against the closing speed), the whole of it
+  //   (`balance.massShare` of the body, a laden horse's, a man and his horse's
+  //   through the seat); a body lying on the ground has the ground behind
+  //   every part.
+  // - Harm: the energy of the closing speed beyond `tolerance` m/s (a shove
+  //   is taken unharmed) is ½ reduced mass x closing² and the impulse over the
+  //   reduced masses; each is hurt as a blow hurts, by the speed change that
+  //   impulse gives its own part (the lighter more, the heavier hits harder),
+  //   through the blunt blow's machinery and its armour (worse where the other
+  //   is in hard armour: `hard` per unit of its blunt protection). The
+  //   contact lasts `contactSeconds` (the chest gives for a few centimetres,
+  //   ~40 mm), so the peak force is (π/2) impulse over it, against the ribs'
+  //   (body.fracture.rib): AIS 3+ thoracic injury (3 or more ribs) begins
+  //   about 3-4 kN peak. `rotation` the head's turn for a push. A horse's blunt
+  //   harm is `horse` of the energy its part took up (a man's harm is in speed
+  //   change on a part a dozen times lighter; in joules it is a twentieth of
+  //   that to a horse, WORLD.mount.horse thresholds).
+  // - Calibrated: a man's trunk is seriously hurt by 8.8 m/s of speed change
+  //   and dies of 22 (WORLD.damageCapacity, injury): 22 m/s on its 28 kg is
+  //   ~7 kJ, the range of the 'commonly lethal' chest impacts of a vehicle on
+  //   a pedestrian (~5 kJ); a horse at the gallop into a man standing gives
+  //   his chest ~10 m/s and ~7 kN: ribs broken, in plate a third of the harm.
+  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05 },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
   // Walking about (the player's walk mode): upright and square, feet under
@@ -377,14 +408,12 @@ export const WORLD = {
   // head (`head` of it, the arms and shoulders breaking part of a fall), the
   // rest as damage to the part (`body` of it), less what armour spreads,
   // less again for dense bone. A hand or elbow landing faster than
-  // `fractureSpeed` × bone density breaks the joint. Two bodies meeting
-  // faster than `bumpSpeed` (m/s; a charge at any speed) each take their own
-  // speed change (`charge` of it) as damage to the trunk: the lighter man more.
+  // `fractureSpeed` × bone density breaks the joint (two bodies meeting: `crash`).
   // A hard blow to the trunk (a fall on it, a collision) bleeds inside:
   // `internalBleed` of the blood a second per m/s that got through armour and
   // bone, clotting as a wound does. One fall is a bruise; fall after fall, or
   // trampled in a crush, a man can collapse and die of it.
-  impact: { minSpeed: 2.2, head: 0.6, body: 1.0, fractureSpeed: 9.5, bumpSpeed: 2.2, charge: 0.75, bumpEvery: 0.6, internalBleed: 0.0003 },
+  impact: { minSpeed: 2.2, head: 0.6, body: 1.0, fractureSpeed: 9.5, internalBleed: 0.0003 },
   // Injury piling up, from blows, falls and collisions alike (in each part's
   // damage capacity, uncapped): the trunk past `trunkFatal` and he dies of
   // his injuries; the head past `headFatal`, the skull breaks; an arm or leg
@@ -565,9 +594,8 @@ export const WORLD = {
   //   `boltSeconds` a riderless horse runs before it stands.
   // - trample: a horse (and its rider) running into men on foot, a momentum
   //   exchange between the laden horse (~600-800 kg) and the men it meets:
-  //   `from` m/s closing and above it is a blow, `restitution` of the contact
-  //   (a body is no ball: 0.2), the impulse then reduced mass x closing x
-  //   (1 + restitution) shared across the men's bodies by `legs` (the knees
+  //   closing faster than `crash.from` it is a blow, the impulse then reduced
+  //   mass x closing x (1 + `crash.restitution`) shared across the men's bodies by `legs` (the knees
   //   and feet take that share of what the upper body does: struck at the
   //   chest he is tipped over backwards, a ragdoll). Men standing with hips
   //   within `link` m of each other (close order: a shield wall's frontage,
@@ -578,14 +606,11 @@ export const WORLD = {
   //   is put over by ~1.5; a horse's push is broadside across the chest) raised
   //   by `poiseGain` per unit of poise over 1 (armour and a rigid shell spread
   //   the blow into braced legs), and staggers (armoured) from `fell` x
-  //   stagger.startAt; the blow's harm is the body-blow of a charge
-  //   (WORLD.impact.charge) through his armour. `harm` is the share of the
-  //   energy he takes from the horse that is blunt harm to the horse's chest
-  //   (a body is soft: the man hurts a horse little; more in iron, `hardness`
-  //   per unit of his blunt protection).
+  //   stagger.startAt. The harm to each, the man's trunk and the horse's chest,
+  //   is the general crash rule (WORLD.crash), not this module's.
   // - hooves: a hoof in the stance (within `height` of the withers of the ground)
   //   on a man lying there bears `stance` of the laden horse's weight for
-  //   `seconds` (an impulse on his trunk, taken as a body blow), once every
+  //   `seconds` (an impulse on his trunk, taken as a crash: the ground behind him), once every
   //   `every` s a hoof.
   // - brace: a man on foot standing (slower than `still` m/s) with a thrusting
   //   weapon `length` m or longer, set against a horse's charge, has `share` of his
@@ -596,10 +621,10 @@ export const WORLD = {
   //   `lateral` of what comes across: a head-on crash is worst, a sidelong one
   //   mostly shoves; the knocks of the last `shockSeconds` add) it goes down and throws its rider; short of it the rider is
   //   knocked by the speed it lost (WORLD.mount.seat). Horses meeting exchange
-  //   momentum by their laden masses, with `restitution`; a shove across its
+  //   momentum by their laden masses; a shove across its
   //   line is `shove`, a velocity of its own that dies away in 1/`shoveDecay` s
-  //   (its legs find the ground again). `harm` is the share of the crash's
-  //   energy that is blunt harm to the horse's part struck (through its barding).
+  //   (its legs find the ground again). The harm to each horse is the general
+  //   crash rule's (WORLD.crash `horse`: through its barding).
   mount: {
     startApart: 12,
     line: { spacing: 1.8, rankBack: 5, margin: 1.5 },
@@ -611,9 +636,9 @@ export const WORLD = {
     pass: 0.6, passReach: 0.5, passMounted: 1.5, passLance: 0.7,
     wheelAt: 9, turnSpeed: 5, edge: 6,
     horse: { manBlood: 75, heartSeconds: 10, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
-    trample: { restitution: 0.2, from: 1.5, legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15, harm: 0.05, hardness: 1 },
+    trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     hooves: { height: 0.08, stance: 0.5, seconds: 0.08, every: 0.35 },
     brace: { length: 1.5, still: 0.5, share: 0.5 },
-    crash: { restitution: 0.15, fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, harm: 0.05 },
+    crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3 },
   },
 };

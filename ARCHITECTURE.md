@@ -15,7 +15,7 @@ logic.
 | `src/outfits.js` | `OUTFITS`: every outfit's look, movement class, protection (by region: `protection.regions`), bullet rating, plating, faction, sidearm. `gearTraits` resolves them for a fighter. `FACTIONS`. |
 | `src/weapons.js` | `WEAPONS` and `SHIELDS` (mass, balance, reach, harm mix), shot specs (`MATCHLOCK`, `RIFLE`, `SHOTGUN`, `THREE_EYED`), `ARROW`, `GUN`, `BLADES`; effective mass of a weapon at its point of contact. |
 | `src/moves.js` | `MOVES` (every strike and defence as a timed path) and `STYLES` (how a fighter fights: weapon, stance, attacks, defences, ranged behaviour). |
-| `src/physics.js` | The world and its step: fighters, intent → pose → muscles → integration (XPBD constraints, joint limits), feet, balance, contact between bodies and weapons, blunt and blade harm, wounds, stagger, knockdowns. |
+| `src/physics.js` | The world and its step: fighters, intent → pose → muscles → integration (XPBD constraints, joint limits), feet, balance, contact between bodies and weapons, blunt and blade harm, wounds, stagger, knockdowns. Bodies meeting (a man's trunk or head against another's, a horse's barrel, neck or head against a man or another horse, a charge on a shield) are one general crash (`crashBetween`, `crashHarm`, `WORLD.crash`): two effective masses (`crashMass`: what is braced behind the part standing, the whole body as far as it is going into the contact, the ground behind a man lying) at a closing speed, an impulse and ½ reduced mass x closing² of energy, and each part hurt by the speed change that impulse gives it, through the blunt blow's machinery (`bluntConsequences`: the head's brain strain, the chest's ribs and trauma) and its armour; a horse is one of the parties, not a case. |
 | `src/physics/config.js` | `WORLD`: every physical constant of the fight, each with what it is set against. Tune here. |
 | `src/physics/ranged.js` | Guns, bows and crossbows: aim, fire (rounds, pellets, recoil, rocking), reload (a crossbow is spanned; its `shot.bolt` looses an arrow-like bolt with its own energy), arrows in flight, what a round or arrow does to a body. |
 | `src/physics/grappling.js` | The clinch (holding, driving, throws) and holding a man down. |
@@ -26,8 +26,8 @@ logic.
 | `src/formation.js` | Drill: a kit with `drill` ({ advance, charge }) fights in ranks. Each drilled man keeps a slot (ahead, across) relative to his side's leader; the anchor walks up (dressing the line, the last `charge` m at a run) or holds; the front rank fights on a leash, the rest stand in their slots (posed: no physics). Fallen men's places are filled from behind in the file; a shooter who has loosed swaps with a loaded man behind. Nothing names a unit. |
 | `src/physics/net.js` | The retiarius's net: thrown, binding a man (no blows, no guard, short steps) until he works or cuts free. Drawn as a soft body by `src/netcloth.js` (cords that only pull, contact with bodies and sand; the physics alone decides who is caught). |
 | `src/horses.js` | `HORSES` (destrier, warhorse, Arabian, steppe, Japanese: mass, withers, paces, getting away, lateral pull, laden by `HORSE_LOAD`), `BARDING` (plate, lamellar, bare: protection by horse part), `canRide`/`mountOf` from the kit's `horse` and `barding`. |
-| `src/physics/mounted.js` | On horseback: the horse a rigid body of capsules (`HORSE_SHAPE`, gait-cycled legs: `poseHorse`), steered within its limits (`stepHorse`, `turnRadius`); the rider's hips, knees and feet held in the saddle each substep (`seatRider`; his stance `lift`ed, his body damped against the horse: `fighter.carrier`), his facing (`riderFacing`), the seat (`keepSeat`, `seatMass`), thrown (`unhorse`); blows on the horse through its barding (`strikeHorses`, `harmHorse`), its bleeding and fall (`bringDown`), horses against men and horses (`collideHorses`: a momentum exchange between the laden horse, `ladenMass`, and the men it meets as one block `packedWith`, or another laden horse; the men flung as ragdolls through the engine's pending impulses, put over or staggered by their own speed change and poise, bruised through their armour; the horse's pace and sideways shove changed by the reaction (`jolt`), its rider knocked by the speed it lost, the horse brought down past what its legs take; hooves on men lying down: `trodOn`). `WORLD.mount` tunes it. |
-| `src/riding.js` | The AI on horseback (`ride`: charge to pass on the weapon side, a blow timed to land abreast in the rider's own frame, past, wheel round; side by side against a rider; a couched lance; a mounted archer circling) and on foot against a rider (`standToRider`: a long weapon braced at the horse's chest, else off its line). `RIDING` holds its tunables. |
+| `src/physics/mounted.js` | On horseback: the horse a rigid body of capsules (`HORSE_SHAPE`, gait-cycled legs: `poseHorse`), steered within its limits (`stepHorse`, `turnRadius`); the rider's hips, knees and feet held in the saddle each substep (`seatRider`; his stance `lift`ed, his body damped against the horse: `fighter.carrier`), his facing (`riderFacing`), the seat (`keepSeat`, `seatMass`), thrown (`unhorse`); blows on the horse through its barding (`strikeHorses`, `harmHorse`), its bleeding and fall (`bringDown`), horses against men and horses (`collideHorses`: a momentum exchange between the laden horse, `ladenMass`, and the men it meets as one block `packedWith`, or another laden horse; the men flung as ragdolls through the engine's pending impulses and put over or staggered by their own speed change and poise; the horse's pace and sideways shove changed by the reaction (`jolt`), its rider knocked by the speed it lost, the horse brought down past what its legs take; hooves on men lying down: `trodOn`; the harm to the men, the horse and the shield arm is physics.js's general crash, the horse's part (`horseParty`) one of its two parties); a blow from the saddle has behind it the rider and a share of the horse as rigidly as its weapon is coupled to them (`mountedBehind`, `WORLD.mount.coupling`). `WORLD.mount` tunes it. |
+| `src/riding.js` | The AI on horseback (`ride`: charge to pass on the weapon side, a move drawn for the pass by the style's weights, a point thrown while the man is still ahead and a cut as they pass abreast, steered on in the air (`steerBlow`), past, wheel round; side by side against a rider; a couched lance; a mounted archer circling) and on foot against a rider (`standToRider`: a long weapon braced at the horse's chest, else off its line). `RIDING` holds its tunables. |
 | `src/ai.js` | Decisions: target, game plan, range, when to strike, defend, pick up a weapon, shoot or reload. `AI` holds its tunables. |
 | `src/cast.js` | Generators for armies (`mingSoldier`, `ottomanSoldier`, `steppeWarrior`, …) and `PERIOD_BUILD`: historical body sizes by people and rank. |
 | `src/scenarios.js` | Levels: place, arena, formation, and the armies (troop tables) set from history. |
@@ -152,13 +152,19 @@ and adjust only the numbers of each side.
   (sidestep, blade across it, shield), point-first, glanced, into a gap, the
   pierce, and whether it decided the bout.
 - `node tools/couched.js [seeds] [target ...]` — the same weapon on foot and
-  from the saddle (the couched lance, a spear, a sabre) at a man standing still:
-  closing speed, mass behind the point, energy, pierce, cut, outcome.
+  from the saddle (the couched lance, a spear, a yari, a sabre, a long sword, a
+  mace, a war hammer) at a man standing still: closing speed, mass behind the
+  point, energy, pierce, cut, outcome.
 - `node tools/cavalry.js [seeds] [case ...]` — a horse at the gallop into a
   man, a block of men, or another horse: its speed before and after, how fast
-  and far the men were flung, who fell, the harm, which horses went down.
+  and far the men were flung, who fell, whose ribs broke and who died, the horses'
+  blunt harm, which horses went down.
+- `node tools/crash.js [seeds] [charger:target[:run] ...]` — a man charging or
+  running into another standing: the closing speed, impulse, energy and peak
+  force of the crash, the harm each took, who went over.
 - `node tools/mounted-bouts.js [bouts] [seconds] [matchup ...]` — whole mounted
-  fights, to see that they still work (winners, riders thrown, horses down).
+  fights, to see that they still work (winners, riders thrown, horses down), and
+  the riding AI's blows thrown and landed, by weapon.
 - Level outcomes: run a level over several seeds and compare winners with
   history (see the scratch `level.mjs` pattern in the PR description).
 
