@@ -372,6 +372,23 @@ export function keepSeat(world, fighter) {
   if (knock > WORLD.mount.seat.speed * fighter.body.gear.balance) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true, lost);
 }
 
+/**
+ * The mass (kg) behind a blow from the saddle, on top of the arm: the rider's
+ * body and a share of the horse's, as rigidly as the weapon is coupled to
+ * them along the line the target presses back (WORLD.mount.coupling). The
+ * form is the move's grip and mode (a couched lance, a spear thrust held
+ * under the arm, a swung or one-handed point or cut), the line the blow's
+ * velocity relative to what it meets, against the horse's own line.
+ */
+export function mountedBehind(fighter, spec, relative) {
+  const coupling = WORLD.mount.coupling;
+  const form = spec.couched ? 'couched' : `${spec.grip === 'two' ? 'two' : 'one'}${spec.mode === 'thrust' ? 'Thrust' : 'Swing'}`;
+  const speed = vec.length(relative);
+  const ahead = speed > 1e-6 ? Math.abs(vec.dot(relative, forwardOf(fighter.mount.yaw))) / speed : 1;
+  const share = (spec.coupling ?? coupling.forms[form]) * (coupling.across + (1 - coupling.across) * ahead);
+  return share * (fighter.body.massKg + coupling.horse * fighter.mount.mass);
+}
+
 /** The share of the horse's mass a blow on its rider must move with him (the seat). */
 export function seatMass(fighter) {
   return fighter.body.massKg + WORLD.mount.seat.horseShare * fighter.mount.mass;

@@ -21,7 +21,7 @@ import { formUp } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
-import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, riderFacing, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
+import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -4100,21 +4100,22 @@ function sever(world, defender, where, event, bladeVelocity) {
  * The effective mass a blade strikes with at `distance` along it, moving
  * `relative` to what it meets: the weapon and the arm (and the body, as the
  * move puts it behind the blow) at that point; `along`, how nearly the
- * blow runs along the blade (a thrust). A couched lance from the saddle
- * has the rider braced in the saddle and lance rest behind it and, through
- * the saddle, a share of the horse (WORLD.mount.couched).
+ * blow runs along the blade (a thrust). From the saddle the rider's body
+ * and, through the saddle, a share of the horse are behind the blow as
+ * rigidly as the weapon is coupled to them (mounted.js mountedBehind).
  */
 export function bladeStrike(attacker, weapon, punch, relative, distance) {
   const spec = punch.spec;
   const wspec = weapon.spec;
   const limbs = attacker.body.limbKg;
   const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
-  const behind = attacker.mount && spec.couched ? WORLD.mount.couched.rider * attacker.body.massKg + WORLD.mount.couched.horse * attacker.mount.mass : (spec.mass.body ?? 0) * attacker.body.massKg;
-  const armMass = ((spec.mass.arm ?? 0) * arms + behind) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
+  const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
-  return { strikeMass: effectiveMassAt(wspec, armMass, distance, armLength, along), along };
+  // (Whichever way the blade turns about the grip, what the weapon is coupled to goes with the point.)
+  const carried = attacker.mount ? mountedBehind(attacker, spec, relative) * staggerShare(attacker, WORLD.stagger.harm) : 0;
+  return { strikeMass: effectiveMassAt(wspec, armMass, distance, armLength, along) + carried, along };
 }
 
 export function strikeLiveUntil(spec) {

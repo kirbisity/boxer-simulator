@@ -526,12 +526,24 @@ export const WORLD = {
   //   resists a blow on him with his own (the cantle at his back, the stirrups).
   //   A lance's ~10 ms contact engages only the part of the horse the
   //   saddle's give lets it reach: a tenth, ~50-60 kg.
-  // - couched: the share of the rider's mass behind a couched lance braced in
-  //   the saddle and lance rest (`rider`, against 0.25 on foot: no rest, no
-  //   cantle), and of the horse's (`horse`, through the saddle, as `seat`):
-  //   a 90 kg man on a 600 kg horse puts ~115 kg behind the point, so a lance
-  //   meeting a man at 12 m/s spends ~2 kJ (reconstructions of the joust
-  //   measure 1-3 kJ).
+  // - coupling: a blow from the saddle has behind it the rider's body and, through
+  //   the saddle and stirrups, a share of the horse: the target presses back along the
+  //   line of the blow into the blade, the hand, the arm braced against the shoulder,
+  //   the trunk and the seat, and the horse carries them all forward. How much of
+  //   them takes part in the instant of contact is how rigidly the weapon is coupled
+  //   to the body along that line: `forms` the share of the rider's mass by how it is
+  //   held (the move's grip and mode; a move's own `coupling` overrides): `couched`
+  //   a lance braced in the saddle and the lance rest (0.6, against 0.25 on foot: no
+  //   rest, no cantle: a 90 kg man on a 600 kg horse puts ~115 kg behind the point, so
+  //   a lance meeting a man at 12 m/s spends ~2 kJ; reconstructions of the joust
+  //   measure 1-3 kJ), `twoThrust` a spear held under the arm against the ribs (the
+  //   arm and the shaft a column into the trunk), `oneThrust` a point in one hand,
+  //   `twoSwing` and `oneSwing` a cut or a swung head, which turns about the wrist and
+  //   elbow and has only the locked arm and the shoulder on contact. The share is
+  //   `across` at least, and its whole as the blow runs along the horse's own line
+  //   (the stirrups and cantle brace the rider fore and aft; across it only his thighs
+  //   hold him); the horse's mass takes part as `horse` of the rider's share (0.1 of it
+  //   to the rider's 0.6 for the lance).
   // - twist: how far (rad) the rider turns his shoulders off his horse's line.
   // - swingPitch: how far (rad) below the shoulder a cut's mark lies for a man
   //   on foot at a man on foot (~0.3: the chest at arm's and blade's length);
@@ -592,7 +604,7 @@ export const WORLD = {
     startApart: 12,
     line: { spacing: 1.8, rankBack: 5, margin: 1.5 },
     seat: { speed: 3.0, horseShare: 0.1 },
-    couched: { rider: 0.6, horse: 0.1 },
+    coupling: { forms: { couched: 0.6, twoThrust: 0.35, oneThrust: 0.12, twoSwing: 0.04, oneSwing: 0.03 }, across: 0.4, horse: 0.167 },
     twist: 1.3,
     swingPitch: 0.3,
     seatHeight: 0.1,

@@ -2,27 +2,43 @@
 // each attacker against a man standing still (bare, or Sir Edric in plate):
 // the closing speed at the point, the mass behind it, the energy the
 // collision took up, what went in (pierce, cut, blunt), and what became of
-// him. The couched lance on foot (Maximilian, running) against the same
-// lance from a destrier at the gallop; a spear and a sabre from the saddle.
-// A rider is ridden straight at the gallop on a line that brings his weapon
-// to the man (no steering to miss: this measures the blow, not the aim).
+// him. The lance, a spear, a yari, a sabre, a long sword, a mace and a war
+// hammer: on foot (the AI's own first blow) and from the saddle at the gallop
+// (the couched lance from a destrier). A rider is ridden straight at the
+// gallop on a line that brings his weapon to the man and makes the blow as
+// the riding AI times and steers it (no steering of the horse to miss: this
+// measures the blow, not the ride).
 // Usage: node tools/couched.js [seeds] [target ...]
 
 import { P, PRESETS } from '../src/body.js';
 import { think } from '../src/ai.js';
 import { MOVES } from '../src/moves.js';
 import { advance, aimPoint, createWorld, point, throwPunch, toLocal } from '../src/physics.js';
+import * as riding from '../src/riding.js';
 import { vec } from '../src/pose.js';
+
+// (How long the riding AI reckons a move takes to land, and its steering of a blow in flight.)
+const contactTime = riding.contactTime ?? ((fighter, spec) => spec.extendUntil);
+const steerBlow = riding.steerBlow ?? (() => {});
 
 const FIELD = { halfX: 30, halfZ: 20 };
 // Each attacker: inputs (with a style and a ride if any), and for a rider the blow he makes in passing and how far to the side the man stands (m).
+// The same weapon on foot (the AI's first blow at the man) and from the saddle, for each.
 export const ATTACKERS = [
   ['Maximilian, lance, on foot', { ...PRESETS.maximilian }, null],
   ['Maximilian, lance, destrier', { ...PRESETS.maximilian, mounted: true }, { move: 'lanceCharge', side: 0.5 }],
-  ['horseman, yari, steppe horse', { ...PRESETS.kheshig, style: 'yari', mounted: true }, { move: 'spearThrust', side: 0.9 }],
-  ['knight, spear, destrier', { ...PRESETS.knight, style: 'spear', mounted: true }, { move: 'spearThrust', side: 0.9 }],
-  ['kheshig, sabre, steppe horse', { ...PRESETS.saber, style: 'saberShield', mounted: true }, null],
-  ['Sir Edric, long sword, destrier', { ...PRESETS.knight, mounted: true }, null],
+  ['knight, spear, on foot', { ...PRESETS.knight, style: 'spear' }, null],
+  ['knight, spear, destrier', { ...PRESETS.knight, style: 'spear', mounted: true }, { move: 'spearThrust', side: 0.6 }],
+  ['horseman, yari, on foot', { ...PRESETS.kheshig, style: 'yari' }, null],
+  ['horseman, yari, steppe horse', { ...PRESETS.kheshig, style: 'yari', mounted: true }, { move: 'spearThrust', side: 0.6 }],
+  ['kheshig, sabre, on foot', { ...PRESETS.saber, style: 'saberShield' }, null],
+  ['kheshig, sabre, steppe horse', { ...PRESETS.saber, style: 'saberShield', mounted: true }, { move: 'gladiusCut', side: 0.5 }],
+  ['Sir Edric, long sword, on foot', { ...PRESETS.knight }, null],
+  ['Sir Edric, long sword, destrier', { ...PRESETS.knight, mounted: true }, { move: 'zwerchhau', side: 0.5 }],
+  ['knight, flanged mace, on foot', { ...PRESETS.knight, style: 'mace' }, null],
+  ['knight, flanged mace, destrier', { ...PRESETS.knight, style: 'mace', mounted: true }, { move: 'maceSide', side: 0.5 }],
+  ['knight, war hammer, on foot', { ...PRESETS.knight, style: 'warhammer' }, null],
+  ['knight, war hammer, destrier', { ...PRESETS.knight, style: 'warhammer', mounted: true }, { move: 'hammerSide', side: 0.5 }],
 ];
 const median = (values) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -62,12 +78,14 @@ export function firstBlow(attackerInputs, targetKey, seed, pass) {
       const mark = aimPoint(man, 'body');
       const shoulder = point(attacker.x, P.rShoulder);
       const ahead = mark[0] - shoulder[0];
-      const lands = spec.extendUntil;
+      const lands = contactTime(attacker, spec);
+      // (A blow in the air is steered on as the riding AI steers it.)
+      if (attacker.punch) steerBlow(attacker, man);
       if (thrown || attacker.punch) return;
       if (pass.move === 'lanceCharge') {
         // (Laid a little low: the heavy shaft's point trails the line it is laid on.)
         if (ahead < 3.8 + 0.9 * horse.speed) thrown = throwPunch(world, attacker, pass.move, 'body', { at: vec.add(mark, [0, -0.3, 0]) });
-      } else if (ahead <= horse.speed * (lands + 0.15) + 0.3 && ahead > 0) {
+      } else if (ahead <= horse.speed * (lands + (spec.mode === 'thrust' ? 0.15 : 0)) + 0.3 && ahead > 0) {
         thrown = throwPunch(world, attacker, pass.move, 'body');
         if (thrown) {
           attacker.punch.aim = toLocal(attacker, vec.sub(mark, vec.scale(horse.velocity, lands)));

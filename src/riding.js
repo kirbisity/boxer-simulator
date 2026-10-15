@@ -15,13 +15,17 @@ import { vec, yawRotate } from './pose.js';
  * - leadMost: s at most a rider leads his man (rides at where he will be).
  * - lookAhead: s ahead a rider (or a man on foot) reckons where the two of
  *   them will be when a blow he begins now lands.
- * - contactAt: the share of a move's extension (from its windup to its
- *   full extent) at which it lands, for that reckoning.
- * - reachShare: of his reach from the shoulder (arm and weapon) he lets a blow go at.
- * - couchAhead: s before the point would meet him that the lance is couched (its carry does the rest).
+ * - contactAt: the share of a swing's extension (from its windup to its
+ *   full extent) at which it lands, for that reckoning (the blade is late to
+ *   the mark the hand sends it to, by the wrist's turning: measured, a swing
+ *   lands at its full extent); a thrust lands where its point is out (the
+ *   move's `extendShare`).
+ * - reachShare: of his reach from the shoulder (arm and weapon) he lets a blow go at. * - couchAhead: s before the point would meet him that the lance is couched (its carry does the rest).
  * - rest: s after a blow before the next.
- * - passing: closing faster than this (m/s), a blow waits until it would
- *   land no more than `early` s before the two are nearest (abreast).
+ * - passing: closing faster than this (m/s), a cut waits until it would
+ *   land no more than `early` s before the two are nearest (abreast); a
+ *   point, driven along the line he rides at the man, goes while the man is
+ *   within `cone` rad of it.
  * - archer: a mounted archer rides round his man at a canter, `radius` m
  *   off, his man on his left (the bow side), turning in by `inward` rad per
  *   radius off his ring.
@@ -40,7 +44,7 @@ export const RIDING = {
   reachShare: 0.8,
   couchAhead: 0.9,
   rest: 0.35,
-  passing: 3, early: 0.06,
+  passing: 3, early: 0.06, cone: 0.8,
   archer: { radius: 11, inward: 0.6 },
   melee: { within: 4, closing: 4, slowest: 1.5, closeIn: 1.5 },
   brace: { length: 1.8 },
@@ -76,12 +80,31 @@ function reachFromShoulder(fighter, spec) {
   return arm;
 }
 
-/** When a move begun now lands (s): its windup and part of its extension, at his pace with the weapon. */
-function contactTime(fighter, spec) {
+/** When a move begun now lands (s), or one `from` s into it has left to land: its windup and part of its extension, at his pace with the weapon. */
+export function contactTime(fighter, spec, from = 0) {
   const blade = spec.path === 'blade' ? bladeFor(fighter, spec) : null;
   const pace = blade?.held ? (blade.handling?.speed ?? 1) : 1;
   const heavy = blade?.held ? Math.max(1, Math.sqrt(blade.spec.mass / WORLD.weapons.heavyFrom)) : 1;
-  return (spec.windup * heavy + RIDING.contactAt * (spec.extendUntil - spec.windup)) / pace;
+  const at = spec.windup + (spec.mode === 'thrust' ? spec.extendShare ?? 0.75 : RIDING.contactAt) * (spec.extendUntil - spec.windup);
+  return (Math.max(0, spec.windup - from) * heavy + Math.max(0, at - Math.max(from, spec.windup))) / pace;
+}
+
+/**
+ * A blow from the saddle steered on while it is in the air: aimed (in his own
+ * frame, which the horse carries) at where his man will be when the blade
+ * gets there, reckoned from where he is now and the time it has left. The
+ * first reckoning, at the throw, is out by what the man did since, and by
+ * the hand's and the wrist's lag; this one closes in as the blow does.
+ */
+export function steerBlow(fighter, opponent) {
+  const punch = fighter.punch;
+  const spec = punch?.spec;
+  if (!spec || spec.path !== 'blade' || spec.couched || punch.at || punch.target !== opponent.id || punch.load > 0) return;
+  const left = contactTime(fighter, spec, punch.t);
+  // (Past the moment the aim is passed through, it is left as it was.)
+  if (left <= 0) return;
+  const ahead = vec.scale(vec.sub(groundVelocity(opponent), groundVelocity(fighter)), left);
+  punch.aim = toLocal(fighter, vec.add(vec.add(aimPoint(opponent, punch.zone), ahead), punch.miss ?? [0, 0, 0]));
 }
 
 /**
@@ -89,14 +112,18 @@ function contactTime(fighter, spec) {
  * style, where his shoulder and his mark will be when it lands (both
  * carried on as they go now), and whether it reaches then, in front of or
  * beside him (not behind). Thrown, it is aimed at where the mark will be.
- * `markOf(target)` is the point aimed at.
+ * `markOf(target)` is the point aimed at. A rider draws his move for the
+ * pass by his style's weights and makes it when its moment comes (a point
+ * while his man is still ahead, a cut as they pass abreast).
  */
 function strikeInPassing(world, fighter, target, attacks, markOf, zoneOf, forward) {
   if (fighter.punch || fighter.cooldown > 0) return false;
+  const usable = {};
   const choices = {};
   const aims = {};
   const mine = groundVelocity(fighter);
   const theirs = groundVelocity(target);
+  const ride = fighter.mount ? fighter.ride : null;
   for (const [name, weight] of Object.entries(attacks)) {
     const spec = MOVES[name];
     if (!spec || spec.kind !== 'strike' || spec.with || spec.path === 'aim') continue;
@@ -105,6 +132,7 @@ function strikeInPassing(world, fighter, target, attacks, markOf, zoneOf, forwar
     if (spec.limb.endsWith('Foot') || spec.limb.endsWith('Knee')) continue;
     const t = contactTime(fighter, spec);
     if (t > RIDING.lookAhead) continue;
+    usable[name] = weight;
     const shoulder = vec.add(point(fighter.x, P[`${spec.limb[0]}Shoulder`]), vec.scale(mine, t));
     const mark = vec.add(markOf(target), vec.scale(theirs, t));
     const gap = vec.sub(mark, shoulder);
@@ -114,19 +142,31 @@ function strikeInPassing(world, fighter, target, attacks, markOf, zoneOf, forwar
     const relative = vec.sub(theirs, mine);
     const pace = vec.length(relative);
     if (pace > RIDING.passing) {
-      const now = vec.sub(markOf(target), point(fighter.x, P[`${spec.limb[0]}Shoulder`]));
-      const nearest = -vec.dot(now, relative) / (pace * pace);
-      if (nearest > t + RIDING.early) continue;
+      if (spec.mode === 'thrust') {
+        // A point is driven along the line he rides at his man (that is where the horse's speed is in it): it
+        // lands while the man is still ahead, no more than `cone` off that line, not across it at the pass.
+        if (vec.dot(vec.normalize(gap), vec.scale(relative, -1 / pace)) < Math.cos(RIDING.cone)) continue;
+      } else {
+        const now = vec.sub(markOf(target), point(fighter.x, P[`${spec.limb[0]}Shoulder`]));
+        const nearest = -vec.dot(now, relative) / (pace * pace);
+        if (nearest > t + RIDING.early) continue;
+      }
     }
     const flat = vec.normalize([gap[0], 0, gap[2]]);
     if (forward && vec.dot(flat, forward) < -0.2) continue;
     choices[name] = weight;
     aims[name] = mark;
   }
-  const move = weightedPick(choices, world.random);
+  let move;
+  if (ride) {
+    // His move for the pass, drawn by his style's weights (not whichever comes into its moment first), made when its moment comes.
+    ride.pick ??= weightedPick(usable, world.random);
+    move = choices[ride.pick] === undefined ? null : ride.pick;
+  } else move = weightedPick(choices, world.random);
   if (!move) return false;
   const spec = MOVES[move];
   if (!throwPunch(world, fighter, move, zoneOf(spec))) return false;
+  if (ride) ride.pick = null;
   const miss = fighter.punch.miss ?? [0, 0, 0];
   if (fighter.mount) {
     // From the saddle: aimed where the mark will be relative to him when it lands, in his own frame,
@@ -213,7 +253,10 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     // Close in, the line is held (no swerve at the last moment).
     const heading = distance > 3 ? headingOf(aim[0], aim[1]) : horse.goal.heading;
     setGoal(heading, horse.paces.gallop);
-    if (ahead < -0.1 || distance < 1) ride.phase = 'past';
+    if (ahead < -0.1 || distance < 1) {
+      ride.phase = 'past';
+      ride.pick = null;
+    }
   } else if (ride.phase === 'past') {
     // Ridden past: on, straight, until there is room to turn.
     setGoal(horse.yaw, horse.paces.gallop);
@@ -224,6 +267,7 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     setGoal(headingOf(along[0], along[2]), WORLD.mount.turnSpeed);
     if (ahead > Math.cos(0.45)) ride.phase = 'charge';
   }
+  if (fighter.punch) steerBlow(fighter, opponent);
   if (fighter.punch || fighter.cooldown > 0) return true;
   if (lance) {
     // The lance couched when the point is about to meet him: its carry and drive do the rest (MOVES couched).

@@ -95,6 +95,31 @@ test('a couched lance from the saddle strikes with the braced rider and a share 
   assert.ok(saddle.energy > foot.energy * 5, `${saddle.energy.toFixed(0)} J v ${foot.energy.toFixed(0)} J`);
 });
 
+test('a blow from the saddle has the rider and a share of the horse behind it as rigidly as its weapon is coupled to them: a thrust held under the arm tens of kg, a cut a few, none on foot', () => {
+  const mounted = world(rider('knight', { style: 'spear' }), footman('yari'));
+  const onFoot = world({ ...footman('knight'), style: 'spear' }, footman('yari'));
+  const gallop = mounted.horses[0].paces.gallop;
+  const behind = (w, move, speed, direction, blade = [1, 0, 0]) => {
+    const man = w.fighters[0];
+    const weapon = man.weapon;
+    weapon.dir = blade;
+    return bladeStrike(man, weapon, { spec: MOVES[move], heavy: false }, vec.scale(direction, speed), weapon.spec.length * 0.9).strikeMass;
+  };
+  const ahead = [1, 0, 0];
+  const across = [0, 0, 1];
+  const thrust = behind(mounted, 'spearThrust', gallop, ahead);
+  const cut = behind(mounted, 'gladiusCut', gallop, ahead, across);
+  const lunge = behind(mounted, 'lunge', gallop, ahead);
+  assert.ok(thrust > 30 && thrust < 120, `a spear thrust from the saddle: ${thrust.toFixed(0)} kg`);
+  assert.ok(cut > 2 && cut < 12, `a cut: ${cut.toFixed(1)} kg`);
+  assert.ok(thrust > lunge && lunge > cut, `a point held in both hands, in one, a cut: ${thrust.toFixed(0)}, ${lunge.toFixed(0)}, ${cut.toFixed(1)} kg`);
+  // The share is less as the blow runs across the horse's own line (the thighs hold him there, not the stirrups and cantle).
+  assert.ok(behind(mounted, 'spearThrust', gallop, across) < thrust * 0.7, 'across the horse\'s line');
+  // The same moves on foot have only the arm and the body the move brings in: the thrust a third of it, the cut a few kg less.
+  assert.ok(behind(onFoot, 'spearThrust', 5, ahead) < thrust / 2.5, 'a thrust on foot');
+  assert.ok(cut - behind(onFoot, 'gladiusCut', 5, ahead, across) > 1.5, 'a cut on foot');
+});
+
 test('a rider who takes a knock past what the saddle holds is thrown, falls, gets up and fights on foot', () => {
   const w = world(rider('knight'), footman('yari'));
   const man = w.fighters[0];
@@ -160,7 +185,8 @@ test('barding keeps out the edge: the same cut at a horse\'s chest bleeds a bare
 });
 
 test('mounted bouts run: a rider strikes in passing with the horse\'s speed in the blow, and the man on foot meets him', () => {
-  const w = world(rider('knight'), footman('yari'), 1);
+  // (A sabre: the cut a horseman makes in passing. A knight's long sword, by its style's weights, is often a lunge made while the man is still ahead.)
+  const w = world(rider('saber'), footman('yari'), 1);
   advance(w, 20, thinkAll);
   const riderBlows = w.events.filter((event) => (event.kind === 'landed' || event.kind === 'blocked') && event.attacker === 0);
   const footBlows = w.events.filter((event) => (event.kind === 'landed' || event.kind === 'blocked' || event.kind === 'horseHit') && event.attacker === 1);
