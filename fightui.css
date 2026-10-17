@@ -1,4 +1,4 @@
-/* The fight's attack controls (src/fightui/): the figure of his man (Body, the default) or a button for each kind of blow (Buttons).
+/* The fight's attack controls (src/fightui/): tapping his man himself (Body, the default) or a button for each kind of blow (Buttons).
    One colour for each kind of blow, set on each element as --fu-col (the kind's) or --fu-lit (the move just asked for): see FIGHT_UI.colours. */
 
 /* The special button lit when it has something to do. */
@@ -86,20 +86,16 @@ body:not(.playing) .fu-pick { display: none; }
   .fight-ui[data-fightui="buttons"] .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 226px); }
 }
 
-/* ---- Body: the figure to tap where to hit; each place's icon in its move's colour; the place tapped lit in the colour of the move chosen ---- */
-.fu-target { position: absolute; right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 12px); width: 136px; height: 246px; border-radius: 16px; background: rgba(10, 12, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.22); pointer-events: auto; touch-action: none; box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4); }
-.fu-figure { position: absolute; left: 12px; top: 8px; width: 112px; height: 210px; fill: rgba(255, 255, 255, 0.16); pointer-events: none; }
-.fu-figure-mid { stroke: rgba(255, 255, 255, 0.18); stroke-dasharray: 3 4; fill: none; }
-.fu-zone { --fu-col: #ffffff; position: absolute; width: 62px; padding: 0; border-radius: 10px; display: grid; place-items: center; background: transparent; border: 1px dashed rgba(255, 255, 255, 0.16); color: var(--fu-col); touch-action: none; transition: background 0.12s, border-color 0.12s; }
-.fu-zone.left { left: 5px; }
-.fu-zone.right { right: 5px; }
-.fu-zone.head { top: 5px; height: 54px; }
-.fu-zone.body { top: 62px; height: 80px; }
-.fu-zone.legs { top: 145px; height: 72px; }
-.fu-zone:active { background: color-mix(in srgb, var(--fu-col) 25%, transparent); }
-.fu-zone-icon { width: 30px; height: 30px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.85)); }
-.fu-zone.fu-cant .fu-zone-icon { opacity: 0.35; }
-.fu-zone.fu-lit { color: #10121a; background: var(--fu-lit); border: 2px solid #ffffff; box-shadow: 0 0 16px var(--fu-lit); z-index: 1; }
-.fu-zone.fu-lit .fu-zone-icon { width: 36px; height: 36px; filter: none; opacity: 1; }
-.fu-target-name { --fu-col: rgba(238, 240, 245, 0.85); position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 700 10px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fu-col); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
-@media (max-width: 520px) { .fu-target { right: calc(114px + env(safe-area-inset-right, 0px)); } }
+/* ---- Body: tap his man himself; a faint ring on his chest is the only sign, lit in the colour of the move chosen, then how it went ---- */
+.fu-reticle { --fu-size: 34px; --fu-lit: #ffffff; position: fixed; left: 0; top: 0; z-index: 1; width: 0; height: 0; pointer-events: none; }
+.fu-reticle svg { position: absolute; left: calc(var(--fu-size) / -2); top: calc(var(--fu-size) / -2); width: var(--fu-size); height: var(--fu-size); fill: none; stroke: #ffffff; stroke-width: 2; stroke-linecap: round; opacity: 0.22; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7)); transition: opacity 0.2s, stroke 0.12s; }
+.fu-reticle.fu-lit svg { stroke: var(--fu-lit); opacity: 0.85; stroke-width: 3; }
+.fu-reticle.fu-tired svg { opacity: 0.1; }
+.fu-reticle.fu-busy::after { content: none; }
+.fu-reticle.fu-flash { animation: none; }
+.fu-reticle.fu-flash svg { animation: fu-reticle 0.5s ease-out; }
+@keyframes fu-reticle { 0% { opacity: 1; scale: 1.5; stroke: var(--fu-flash, #ffffff); } 100% { scale: 1; } }
+[data-fu-flash="nudge"] { --fu-flash: #ffffff; }
+.fu-reticle.fu-flash[data-fu-flash="nudge"] svg { animation: fu-nudge 0.6s ease-out; }
+@keyframes fu-nudge { 0%, 60% { opacity: 0.7; scale: 1.3; } 100% { scale: 1; } }
+.fu-reticle.fu-flash[data-fu-flash="miss"] svg { animation: fu-reticle 0.5s ease-out, fu-miss 0.3s; }

@@ -57,7 +57,7 @@ test('the controls: Body by default, Buttons if asked in the address; nothing el
   assert.equal(fightUiFromAddress('?fightui=buttons'), 'buttons');
   assert.equal(fightUiFromAddress('?fightui=swipe'), null, 'the dropped designs are gone');
   assert.equal(fightUiFromAddress(''), null);
-  assert.equal(fightUiPreferred(''), 'target', 'nothing remembered (no storage here): the figure');
+  assert.equal(fightUiPreferred(''), 'target', 'nothing remembered (no storage here): Body');
   assert.equal(fightUiPreferred('?fightui=buttons'), 'buttons');
 });
 
@@ -86,4 +86,22 @@ test('a blow on the player pulses the edge it came from', () => {
   const [x, y] = fightUiEdge(-1, 1, 400, 800);
   assert.equal(x, 0);
   assert.equal(y, 200, 'ahead and to the left: the left edge, high');
+});
+
+test('Body: a tap on his man on screen lands on the place it touched; a tap well off him lands nowhere', async () => {
+  const { fightUiPlaceOnHim } = await import('../src/fightui/target.js');
+  // Standing 300 px tall, his middle at x 500: head 100, neck 130, hips 230, feet 400.
+  const head = [500, 100];
+  const neck = [500, 130];
+  const hips = [500, 230];
+  const feet = [[480, 400], [520, 400]];
+  const at = (x, y) => fightUiPlaceOnHim([x, y], head, neck, hips, feet);
+  assert.deepEqual(at(480, 105), { zone: 'head', side: -1 });
+  assert.deepEqual(at(530, 190), { zone: 'body', side: 1 });
+  assert.deepEqual(at(470, 330), { zone: 'legs', side: -1 });
+  assert.deepEqual(at(600, 200), { zone: 'body', side: 1 }, 'a finger beside his arm still counts');
+  assert.equal(at(700, 200), null, 'well to the side');
+  assert.equal(at(500, 30), null, 'well above his head');
+  // Far off, 20 px tall: taken as tall enough to tap.
+  assert.ok(fightUiPlaceOnHim([512, 52], [500, 40], [500, 43], [500, 50], [[500, 60], [500, 60]]));
 });

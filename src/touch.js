@@ -2,8 +2,8 @@
 // (a drag begun in the top half turns the view, two fingers there zoom; a
 // drag begun in the bottom half is a floating stick; a mouse's right button
 // always turns the view; press and hold to shove, or to hold down a man on
-// the floor), the attack controls the player chose (fightui/: a figure of
-// his man to tap where to hit, or a button for each kind of blow, with the
+// the floor), the attack controls the player chose (fightui/: a tap on
+// his man himself where to hit, or a button for each kind of blow, with the
 // name of each attack he makes and how it went), a big Guard button, a Lock
 // button above it, one special button in a fixed place, and the fight-mode
 // HUD (the player's status low down, his man's over his head).
@@ -82,7 +82,7 @@ export function installFightControls(root, hooks) {
   let markAt = -Infinity;
   const awake = new Map();
   let active = false;
-  // The attack controls (fightui/): the figure of his man, or the buttons, as the player chose.
+  // The attack controls (fightui/): tapping his man himself, or the buttons, as the player chose.
   const fightUi = fightUiInstall(root, hooks);
 
   /**
@@ -165,7 +165,7 @@ export function installFightControls(root, hooks) {
         orders.stick = null;
         stick.hidden = true;
       } else if (event.type === 'tap') {
-        // The attack controls take it: on the figure's design, a tap on his man strikes there.
+        // The attack controls take it: with Body, a tap on his man strikes there.
         fightUi.tap(event);
         const target = orders.lock ?? opponentFor(world, hooks.player())?.id;
         if (target !== undefined && target !== null) awake.set(target, hooks.now());

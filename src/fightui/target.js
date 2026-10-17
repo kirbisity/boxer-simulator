@@ -1,151 +1,140 @@
-// Body (C, the default): a small figure of his man by the Guard, cut into
-// six places to hit (head, body and legs, each on the left or right of the
-// screen). Tap where you want to hit; the game picks the move of his style
-// that reaches there best (each place shows its move's icon, in the colour
-// of its kind); a quick second tap on the same place takes the next best (a
-// jab, then a hook). A tap on the man himself in the fight does the same,
-// by where it lands on him. The place tapped lights in the colour of the
-// move chosen, with its icon, until the blow is done; then flashes how it went.
+// Body (C, the default): tap his man himself, in the fight, where you want
+// to hit (head, body or legs, on the left or right of him as the screen
+// shows him). The game picks the move of his style that reaches there best;
+// a quick second tap on the same place takes the next best (a jab, then a
+// hook). No panel covers the fight: the only sign is a faint ring on his
+// chest, which lights in the colour of the move chosen, flashes how it
+// went, greys while he has not the wind, and pulses when a tap misses him.
 
 import { P } from '../body.js';
 import { opponentFor } from '../physics.js';
 import { fightUiColour, fightUiReady, fightUiTarget, FIGHT_UI } from './logic.js';
-import { fightUiIcon } from './icons.js';
 import { fightUiElement, fightUiFlash, fightUiPaintReady } from './kit.js';
 
-const FIGHT_UI_FIGURE = '<svg class="fu-figure" viewBox="0 0 120 220" aria-hidden="true">'
-  + '<circle cx="60" cy="27" r="19"/>'
-  + '<path d="M60 48c-12 0-30 4-34 12l-10 46c-1 5 7 7 9 2l9-34 2 52h48l2-52 9 34c2 5 10 3 9-2l-10-46c-4-8-22-12-34-12z"/>'
-  + '<path d="M38 128l-6 82c0 6 12 6 13 0l13-62h4l13 62c1 6 13 6 13 0l-6-82z"/>'
-  + '<path d="M60 4v212" class="fu-figure-mid"/></svg>';
+const FIGHT_UI_RETICLE = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14"/>'
+  + '<path d="M20 1v8M20 31v8M1 20h8M31 20h8"/></svg>';
 
-const FIGHT_UI_ZONES = [
-  { zone: 'head', side: -1 }, { zone: 'head', side: 1 },
-  { zone: 'body', side: -1 }, { zone: 'body', side: 1 },
-  { zone: 'legs', side: -1 }, { zone: 'legs', side: 1 },
-];
+export const FIGHT_UI_TAP = {
+  // How far round his figure (in shares of his height on screen) a tap still counts as on him: a finger is wide.
+  above: 0.14,
+  below: 0.06,
+  aside: 0.4,
+  // Under this height (px) on screen (far off, in a crowd) he is taken as this tall, so he can still be hit.
+  leastTall: 70,
+  // The ring: its width as a share of his height on screen, within these px.
+  ringShare: 0.2,
+  ringLeast: 22,
+  ringMost: 54,
+  // It stays lit this long (s) after the tap, unless the blow takes longer.
+  litFor: 0.9,
+};
+
+/** Where on his figure a tap at [x, y] (px) lands, from his head, neck, hips and feet on screen: { zone, side } or null if off him. */
+export function fightUiPlaceOnHim(at, head, neck, hips, feet, spec = FIGHT_UI_TAP) {
+  const foot = Math.max(feet[0][1], feet[1][1]);
+  const tall = Math.max(spec.leastTall, foot - head[1]);
+  const [x, y] = at;
+  if (y < head[1] - tall * spec.above || y > foot + tall * spec.below || Math.abs(x - hips[0]) > tall * spec.aside) return null;
+  const zone = y < neck[1] + tall * 0.02 ? 'head' : y < hips[1] + tall * 0.04 ? 'body' : 'legs';
+  const side = x < (zone === 'head' ? head[0] : hips[0]) ? -1 : 1;
+  return { zone, side };
+}
 
 export function fightUiTargetBody(root, kit, hooks) {
-  const panel = root.appendChild(fightUiElement('div', 'fu-target', `${FIGHT_UI_FIGURE}<div class="fu-target-name"></div>`));
-  panel.setAttribute('aria-label', 'Tap where to hit him');
-  const nameLine = panel.querySelector('.fu-target-name');
-  let style = null;
+  const ring = root.appendChild(fightUiElement('div', 'fu-reticle', FIGHT_UI_RETICLE));
+  ring.setAttribute('aria-hidden', 'true');
+  ring.hidden = true;
   let last = null;
-  const places = FIGHT_UI_ZONES.map((place) => {
-    const element = panel.appendChild(fightUiElement('button', `fu-zone ${place.zone} ${place.side < 0 ? 'left' : 'right'}`, '<i class="fu-zone-icon"></i>'));
-    element.setAttribute('aria-label', `${place.zone} ${place.side < 0 ? 'left' : 'right'}`);
-    element.addEventListener('pointerdown', (press) => {
-      press.preventDefault();
-      press.stopPropagation();
-      strikeAt(place.zone, place.side, element);
-    });
-    element.addEventListener('contextmenu', (event) => event.preventDefault());
-    return { ...place, element, pick: null, litUntil: null };
-  });
-  // A place stays lit this long (s) after the tap, unless the blow takes longer.
-  const litFor = 0.9;
+  let litUntil = null;
+  let readyMove = null;
+  let readyStyle = null;
+
+  /** His man: the one locked on, else the one he is on. */
+  function targetMan() {
+    const world = kit.world();
+    const me = kit.me();
+    if (!world || !me) return null;
+    const orders = hooks.orders();
+    return (orders.lock !== null ? world.fighters[orders.lock] : null) ?? opponentFor(world, me);
+  }
+
+  const onScreen = (target, index) => hooks.project([target.x[index * 3], target.x[index * 3 + 1], target.x[index * 3 + 2]]);
 
   /** A tap on a place on him: its best move (the next on a quick second tap). */
-  function strikeAt(zone, side, source) {
+  function strikeAt(zone, side) {
     const now = hooks.now();
     const again = last && last.zone === zone && last.side === side && now - last.at < FIGHT_UI.againWithin ? last.again + 1 : 0;
     const pick = fightUiTarget(kit.moves(), zone, side, again);
     if (!pick) return;
     last = { zone, side, at: now, again };
-    kit.throwMove(pick.entry, pick.zone, side, source, { again: again > 0 });
+    kit.throwMove(pick.entry, pick.zone, side, ring, { again: again > 0 });
     const colour = fightUiColour(pick.entry.group);
-    fightUiFlash(source, 'asked', colour);
-    nameLine.textContent = pick.entry.name;
-    nameLine.style.setProperty('--fu-col', colour);
-    const place = places.find((item) => item.element === source);
-    if (place) {
-      for (const other of places) if (other !== place && other.litUntil !== null) unlight(other);
-      place.element.querySelector('.fu-zone-icon').innerHTML = fightUiIcon(pick.entry);
-      place.element.style.setProperty('--fu-lit', colour);
-      place.element.classList.add('fu-lit');
-      place.litUntil = now + litFor;
-    }
+    fightUiFlash(ring, 'asked', colour);
+    ring.style.setProperty('--fu-lit', colour);
+    ring.classList.add('fu-lit');
+    litUntil = now + FIGHT_UI_TAP.litFor;
   }
 
-  /** A place back to its own move. */
-  function unlight(place) {
-    place.litUntil = null;
-    place.element.classList.remove('fu-lit');
-    paintPlace(place);
-  }
-
-  function paintPlace(place) {
-    place.element.querySelector('.fu-zone-icon').innerHTML = place.pick ? fightUiIcon(place.pick.entry) : '';
-    place.element.style.setProperty('--fu-col', place.pick ? fightUiColour(place.pick.entry.group) : '#ffffff');
-  }
-
-  function build() {
-    style = kit.me()?.style;
-    for (const place of places) {
-      place.pick = fightUiTarget(kit.moves(), place.zone, place.side, 0);
-      place.litUntil = null;
-      place.element.classList.remove('fu-lit');
-      paintPlace(place);
-      place.element.title = place.pick?.entry.name ?? '';
-      // No move of his reaches there (a boxer at the legs): the best he has, dimmed.
-      place.element.classList.toggle('fu-cant', !place.pick?.reaches);
-    }
-    nameLine.textContent = 'Tap where to hit';
-    nameLine.style.removeProperty('--fu-col');
-  }
-
-  /** A tap in the fight on his man: the place on him it landed on, struck. True if it was on him. */
+  /** A tap in the fight: on his man, struck where it landed; off him, the ring pulses to show where to tap. */
   function tapInWorld(event) {
-    const world = kit.world();
-    const me = kit.me();
-    const orders = hooks.orders();
-    const target = (orders.lock !== null ? world.fighters[orders.lock] : null) ?? opponentFor(world, me);
+    const target = targetMan();
     if (!target) return false;
-    const screen = (index) => hooks.project([target.x[index * 3], target.x[index * 3 + 1], target.x[index * 3 + 2]]);
-    const head = screen(P.head);
-    const neck = screen(P.neck);
-    const hips = screen(P.pelvis);
-    const feet = [screen(P.lFoot), screen(P.rFoot)];
+    const head = onScreen(target, P.head);
+    const hips = onScreen(target, P.pelvis);
     if (!head[2] || !hips[2]) return false;
-    const foot = Math.max(feet[0][1], feet[1][1]);
-    const tall = Math.max(40, foot - head[1]);
-    const [x, y] = event.at;
-    if (y < head[1] - tall * 0.12 || y > foot + tall * 0.04 || Math.abs(x - hips[0]) > tall * 0.32) return false;
-    const zone = y < neck[1] + tall * 0.02 ? 'head' : y < hips[1] + tall * 0.04 ? 'body' : 'legs';
-    const side = x < (zone === 'head' ? head[0] : hips[0]) ? -1 : 1;
-    const place = places.find((item) => item.zone === zone && item.side === side);
-    strikeAt(zone, side, place?.element ?? null);
+    const place = fightUiPlaceOnHim(event.at, head, onScreen(target, P.neck), hips, [onScreen(target, P.lFoot), onScreen(target, P.rFoot)]);
+    if (!place) {
+      fightUiFlash(ring, 'nudge');
+      return false;
+    }
+    strikeAt(place.zone, place.side);
     return true;
   }
 
   kit.listen({
-    thrown: (strike) => {
-      const place = places.find((item) => item.element === strike.source);
-      // Lit while the blow is on its way.
-      if (place?.litUntil != null) place.litUntil = Math.max(place.litUntil, hooks.now() + 0.6);
-    },
+    // Lit while the blow is on its way.
+    thrown: (strike) => { if (strike.source === ring && litUntil !== null) litUntil = Math.max(litUntil, hooks.now() + 0.6); },
     outcome: (strike) => {
-      const place = places.find((item) => item.element === strike.source);
-      if (place?.litUntil != null) place.litUntil = hooks.now() + 0.45;
-      fightUiFlash(strike.source, strike.outcome);
+      if (strike.source !== ring) return;
+      if (litUntil !== null) litUntil = hooks.now() + 0.45;
+      fightUiFlash(ring, strike.outcome);
     },
   });
 
+  /** Each frame: the ring on his chest, sized to him, showing whether a blow can be thrown. */
   function update() {
     const me = kit.me();
-    if (!me) return;
-    if (me.style !== style) build();
-    const now = hooks.now();
-    for (const place of places) {
-      if (place.litUntil !== null && now > place.litUntil) unlight(place);
-      if (place.pick) fightUiPaintReady(place.element, fightUiReady(me, place.pick.move));
+    const target = targetMan();
+    if (!me || !target) {
+      ring.hidden = true;
+      return;
     }
+    const head = onScreen(target, P.head);
+    const neck = onScreen(target, P.neck);
+    const hips = onScreen(target, P.pelvis);
+    ring.hidden = !neck[2] || !hips[2];
+    if (ring.hidden) return;
+    const tall = Math.max(1, Math.max(onScreen(target, P.lFoot)[1], onScreen(target, P.rFoot)[1]) - head[1]);
+    const size = Math.min(FIGHT_UI_TAP.ringMost, Math.max(FIGHT_UI_TAP.ringLeast, tall * FIGHT_UI_TAP.ringShare));
+    ring.style.setProperty('--fu-size', `${size.toFixed(1)}px`);
+    ring.style.transform = `translate(${((neck[0] + hips[0]) / 2).toFixed(1)}px, ${(neck[1] * 0.6 + hips[1] * 0.4).toFixed(1)}px)`;
+    const now = hooks.now();
+    if (litUntil !== null && now > litUntil) {
+      litUntil = null;
+      ring.classList.remove('fu-lit');
+    }
+    // Ready or not by his body blow, the one a tap on the middle of him throws.
+    if (me.style !== readyStyle) {
+      readyStyle = me.style;
+      readyMove = fightUiTarget(kit.moves(), 'body', 1, 0)?.move ?? null;
+    }
+    if (readyMove) fightUiPaintReady(ring, fightUiReady(me, readyMove));
   }
 
   return {
     update,
-    reset: () => { style = null; last = null; },
+    reset: () => { last = null; litUntil = null; readyStyle = null; ring.classList.remove('fu-lit'); },
     tap: (event) => { tapInWorld(event); return true; },
-    destroy: () => panel.remove(),
+    destroy: () => ring.remove(),
   };
 }

@@ -89,8 +89,8 @@ export const TUTORIAL_STEPS = [
   },
   {
     key: 'strike', title: 'Strike',
-    touch: '<b>Tap Edric where to cut</b>: head, body or legs, left or right (or the same on the figure by Guard; with the Buttons controls, a coloured button). Each colour is a kind of blow. Make <b>three different</b> cuts.',
-    mouse: '<b>Click Edric where to cut</b>: head, body or legs, left or right (or the same on the figure by Guard; with the Buttons controls, a coloured button or keys 1–6). Make <b>three different</b> cuts.',
+    touch: '<b>Tap Edric where to cut</b>: head, body or legs, left or right (with the Buttons controls, a coloured button). Each colour is a kind of blow. Make <b>three different</b> cuts.',
+    mouse: '<b>Click Edric where to cut</b>: head, body or legs, left or right (with the Buttons controls, a coloured button or keys 1–6). Make <b>three different</b> cuts.',
     done: (progress) => progress.kinds.size >= TUTORIAL.strikes,
     stage: 'teachPad',
   },

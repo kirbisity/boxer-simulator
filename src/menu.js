@@ -114,7 +114,7 @@ export function installMenus(game) {
         el('button', { className: 'replay-intro', type: 'button', textContent: '🎯 Tutorial', onclick: () => { close(); game.tutorial(); } }),
         // The intro (intro.js) again: the legends, then back here.
         el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } }),
-        // How the player attacks (fightui/): the figure of his man or the buttons; a tap flips it.
+        // How the player attacks (fightui/): tapping his man or the buttons; a tap flips it.
         fightUiHomeSwitch((textContent, onclick) => el('button', { className: 'replay-intro', type: 'button', textContent, onclick }))));
     show('home');
   }

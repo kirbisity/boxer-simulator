@@ -1,4 +1,4 @@
-// The fight's attack controls (the player picks between the figure and the
+// The fight's attack controls (the player picks between tapping his man and the
 // buttons: see fightui/index.js): what each move of a style is on screen,
 // its kind and the colour of that kind, and how each way of asking picks
 // one. No DOM here: tests drive it directly.

@@ -2147,7 +2147,7 @@ const boxer = window.boxer = {
   // Dev tool: every control on the screen now, judged for size, place and whether anything covers it (uicheck.js).
   checkButtons,
   preview,
-  // The fight's attack controls: 'target' (the figure of his man, the default) or 'buttons' (fightui/index.js); remembered.
+  // The fight's attack controls: 'target' (tap his man himself, the default) or 'buttons' (fightui/index.js); remembered.
   fightUi: (id) => fightUiChoose(id),
   fightMarks,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
