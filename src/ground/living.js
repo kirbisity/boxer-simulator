@@ -909,6 +909,7 @@ const LIVING_GREENS = {
   meadow: [0x5f8a34, 0x6e9a3c, 0x7c9e40, 0x5a7e30, 0x86a648],
   field: [0x5f8838, 0x6c943e, 0x7a9a44, 0x58803a, 0x8aa250],
   sengoku: [0x8e8a42, 0x9a8a48, 0x7e8442, 0xa89458, 0x6f7a3c],
+  jiangnan: [0x4f7a30, 0x5c8a36, 0x46702c, 0x6a9440, 0x3f6428],
 };
 
 /** Grass places: meadow, field, sengoku. */
@@ -1417,6 +1418,24 @@ function livingCobbles({ view, arena, rng }) {
   return group;
 }
 
+/**
+ * The water town's square: the slabs are painted; on them, grass and moss
+ * growing lush out of the joints along the house fronts and the canal's edge
+ * (the damp south), thinning to the odd tuft between the slabs where feet go.
+ */
+function livingSlabs({ place, view, arena, rng }) {
+  const group = new THREE.Group();
+  const land = livingLand(view, place);
+  // The square's edges: house fronts at x = ±19.5 and z = −15.5, the canal's kerb at z = 11.8, the bridge's foot about x = −6.
+  const margin = (x, z) => Math.max(Math.abs(x) - 17.6, -z - 13.6, z - 10.2);
+  const keep = (x, z) => Math.abs(x) < 19.2 && z > -15.2 && z < 11.5 && !(Math.abs(x + 6) < 2.2 && z > 9.2) && (margin(x, z) > -0.4 || livingFbm(x / 2.5, z / 2.5, 61, 2) > 0.28);
+  group.add(livingGrass({
+    land, arena, rng, palette: LIVING_GREENS[place],
+    near: 7, band: 6, far: 6, tall: [0.08, 0.24], inside: 0.25, keep, seed: 17,
+  }));
+  return group;
+}
+
 /** The shore: wind-rippled sand at the margins, a glossy film at the tide line, shells, seaweed, driftwood, footprints. */
 function livingBeach({ place, view, arena, grounds, rng }) {
   const group = new THREE.Group();
@@ -1656,6 +1675,7 @@ function livingBuild(context) {
   else if (kind === 'dry') group = livingDryPlace(context);
   else if (kind === 'arena-sand') group = livingArenaSand(context);
   else if (kind === 'cobbles') group = livingCobbles(context);
+  else if (kind === 'slabs') group = livingSlabs(context);
   else if (kind === 'beach') group = livingBeach(context);
   else if (kind === 'wet-concrete') group = livingWetConcrete(context);
   else group = new THREE.Group();

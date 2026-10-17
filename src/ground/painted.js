@@ -589,6 +589,78 @@ const PAINTED_GROUND_LAYERS = {
     });
   },
 
+  /**
+   * Granite paving of a Jiangnan water town, 2.4 m a sheet: long slabs laid
+   * in courses across the street, grey to blue-grey, their edges worn round,
+   * moss and grass in the joints, a few cracked.
+   */
+  slabs(random) {
+    const s = paintedGroundSheet(random, '#3c4434', 0.3);
+    const { rr } = s;
+    // Moss and earth in the joints, under everything.
+    for (let index = 0; index < 400; index += 1) s.stroke(rr(0, 512), rr(0, 512), rr(4, 10), rr(0, 6.3), rr(-0.3, 0.3), 1.2, paintedGroundHsl(rr(70, 100), rr(30, 45), rr(22, 34)), 0.3);
+    const rows = 5;
+    const rowH = 512 / rows;
+    for (let row = 0; row < rows; row += 1) {
+      let x = rr(0, 120);
+      const end = x + 512;
+      while (x < end - 50) {
+        const length = Math.min(end - x, rr(130, 240));
+        const y = row * rowH;
+        const lightness = rr(36, 54);
+        // Mostly warm grey granite, a few cooler slabs; the morning sky lights them blue enough.
+        const fill = random() < 0.85 ? paintedGroundHsl(rr(28, 45), rr(7, 13), lightness) : paintedGroundHsl(rr(60, 90), rr(4, 8), lightness - 3);
+        const w = length - rr(3, 6);
+        const h = rowH - rr(3, 6);
+        const cracked = random() < 0.15 ? rr(-w / 3, w / 3) : null;
+        const bends = [rr(-8, 8), rr(-8, 8)];
+        s.wrap(x + length / 2, y + rowH / 2, length, (X, Y) => {
+          s.colour.fillStyle = fill;
+          s.colour.fillRect(X - w / 2, Y - h / 2, w, h);
+          // Worn: paler down the middle where feet go.
+          const glow = s.colour.createRadialGradient(X, Y, 0, X, Y, w / 2);
+          glow.addColorStop(0, 'rgba(255,255,250,0.1)');
+          glow.addColorStop(1, 'rgba(255,255,250,0)');
+          s.colour.fillStyle = glow;
+          s.colour.fillRect(X - w / 2, Y - h / 2, w, h);
+          const face = s.height.createLinearGradient(0, Y - h / 2, 0, Y + h / 2);
+          face.addColorStop(0, paintedGroundGrey(0.6));
+          face.addColorStop(0.08, paintedGroundGrey(0.84));
+          face.addColorStop(0.5, paintedGroundGrey(0.8));
+          face.addColorStop(0.92, paintedGroundGrey(0.84));
+          face.addColorStop(1, paintedGroundGrey(0.6));
+          s.height.fillStyle = face;
+          s.height.fillRect(X - w / 2, Y - h / 2, w, h);
+          if (cracked !== null) {
+            for (const [context, style] of [[s.colour, 'rgba(30,34,26,0.7)'], [s.height, paintedGroundGrey(0.4)]]) {
+              context.strokeStyle = style;
+              context.lineWidth = 1.5;
+              context.beginPath();
+              context.moveTo(X + cracked, Y - h / 2);
+              context.lineTo(X + cracked + bends[0], Y);
+              context.lineTo(X + cracked + bends[1], Y + h / 2);
+              context.stroke();
+            }
+          }
+        });
+        x += length;
+      }
+    }
+    // Moss creeping out of the joints onto the stones' edges.
+    for (let index = 0; index < 220; index += 1) {
+      const y = Math.round(rr(0, rows)) * rowH + rr(-3, 3);
+      s.blob(rr(0, 512), y, rr(3, 10), rr(1.5, 4), 0, paintedGroundHsl(rr(75, 100), rr(30, 45), rr(24, 36), 0.6), null);
+    }
+    return paintedGroundFinish(s, {
+      relief: 5,
+      rough: (h) => (h < 0.5 ? 0.97 : 0.88),
+      post: ({ size, rgb, random: rnd }) => {
+        paintedGroundMottle(rgb, size, paintedGroundTileNoise(size, 64, rnd, 2), 0.88, 1.1);
+        paintedGroundMottle(rgb, size, paintedGroundTileNoise(size, 4, rnd, 3), 0.9, 1.08);
+      },
+    });
+  },
+
   /** Dry beach sand: wind ripples with dark grains in the troughs, shells and shell grit. */
   beachDry(random) {
     const s = paintedGroundSheet(random, '#d0a66a', 0.5);
@@ -823,6 +895,18 @@ const PAINTED_GROUND_PLACES = {
       const wear = 1 - paintedGroundSmooth(2.2, 4.8, Math.abs(z - 0.8 * Math.sin(x / 9)) + (f(x * 0.3, z * 0.3, 24) - 0.5) * 1.6);
       const mud = paintedGroundSmooth(0.62, 0.74, f(x * 0.3, z * 0.3, 25)) * paintedGroundSmooth(2.5, 5, Math.abs(z));
       return [wear, f(x * 0.06, z * 0.06, 26) * 0.6 + f(x * 0.35, z * 0.35, 27) * 0.4, mud * 0.5, mud];
+    },
+  },
+  // The water town's square: granite slabs, grass and moss growing in from the edges by the houses and the canal, damp in the morning.
+  jiangnan: {
+    a: 'slabs', b: 'grass', tiles: [2.4, 1.4], bomb: [0, 1], macro: PAINTED_GROUND_STONE_MACRO, match: 0.15,
+    wet: [0.85, 0.55, 1.5, 0.3],
+    layout: (x, z, f) => {
+      // How far into the margins: the house fronts (x = ±19.5, z = −15.5) and the canal's edge (z = 11.8).
+      const margin = Math.max(Math.abs(x) - 16.8, -z - 12.8, z - 10.4);
+      const grass = paintedGroundSmooth(0, 2, margin + (f(x * 0.4, z * 0.4, 40) - 0.5) * 2.2) * 0.9 + paintedGroundSmooth(0.7, 0.82, f(x * 0.25, z * 0.25, 41)) * 0.45;
+      const wet = paintedGroundSmooth(0.6, 0.75, f(x * 0.3, z * 0.3, 42)) * 0.6;
+      return [Math.min(1, grass), f(x * 0.06, z * 0.06, 43) * 0.6 + f(x * 0.35, z * 0.35, 44) * 0.4, wet, 0];
     },
   },
   coastFort: {

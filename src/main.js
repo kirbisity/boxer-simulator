@@ -203,7 +203,7 @@ function newBout() {
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
   clearGore(scene);
-  setPlace(scene, place, arena);
+  setPlace(scene, place, arena, scenario?.weather);
   cameraWalls = cameraRoom(place, arena);
   followCam.reset();
   // A level frames its own place; anything else starts from the usual ringside view.

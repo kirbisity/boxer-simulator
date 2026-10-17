@@ -15,6 +15,8 @@ const SKYBALL = {
 };
 
 const SKYBALL_DEG = Math.PI / 180;
+// Below the horizon the photograph's own ground fades into the fog colour between these elevations.
+const SKYBALL_FADE = [-7 * SKYBALL_DEG, -1.5 * SKYBALL_DEG];
 
 // ---- the ball ---------------------------------------------------------------
 
@@ -28,7 +30,7 @@ void main() {
 // Photo: a sharp band round the horizon, a small cap of sky above; below the horizon the photograph's own ground fades into the fog colour.
 const SKYBALL_PHOTO_FRAGMENT = `
 uniform sampler2D uBand; uniform sampler2D uSky; uniform vec3 uHorizon; uniform float uTurn;
-uniform vec2 uBandRange; uniform vec2 uSkyRange; uniform vec2 uFade;
+uniform vec2 uBandRange; uniform vec2 uSkyRange; uniform vec2 uFade; uniform float uMist;
 varying vec3 vDir;
 void main() {
   vec3 d = normalize( vDir );
@@ -39,6 +41,7 @@ void main() {
   float toSky = smoothstep( uSkyRange.x + 0.01, uBandRange.y - 0.01, elevation );
   vec3 colour = mix( band, sky, toSky );
   colour = mix( uHorizon, colour, smoothstep( uFade.x, uFade.y, elevation ) );
+  colour = mix( colour, uHorizon, uMist );
   gl_FragColor = vec4( colour, 1.0 );
 }`;
 
@@ -119,7 +122,9 @@ export const SKYBALL_VARIANTS = [
           uTurn: { value: turn },
           uBandRange: { value: new THREE.Vector2(data.band.low * SKYBALL_DEG, data.band.high * SKYBALL_DEG) },
           uSkyRange: { value: new THREE.Vector2(data.sky.low * SKYBALL_DEG, data.sky.high * SKYBALL_DEG) },
-          uFade: { value: new THREE.Vector2(-7 * SKYBALL_DEG, -1.5 * SKYBALL_DEG) },
+          uFade: { value: new THREE.Vector2(...SKYBALL_FADE) },
+          // A level's mist (render.js applyWeather): how far the whole picture is toned toward the horizon colour.
+          uMist: { value: 0 },
         },
         side: THREE.BackSide,
         depthWrite: false,
@@ -145,6 +150,9 @@ export const SKYBALL_VARIANTS = [
       view.scene.fog?.color.copy(horizon);
       const uniforms = group.children[0].material.uniforms;
       uniforms.uHorizon.value.copy(horizon);
+      // Clear weather: the picture as it is (a level's mist sets these again after).
+      uniforms.uMist.value = 0;
+      uniforms.uFade.value.set(...SKYBALL_FADE);
     },
   },
 ];

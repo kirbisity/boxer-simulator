@@ -146,6 +146,7 @@ export const PLACE_GROUND = {
   town: { kind: 'cobbles', about: 'a market square of worn cobbles, mud and straw in the joints' },
   coastFort: { kind: 'beach', about: 'a tropical beach before a brick fort: dry sand, wet sand at the tide line, shells' },
   coastVillage: { kind: 'beach', about: 'a beach before a fishing village: sand, wet sand, nets, seaweed' },
+  jiangnan: { kind: 'slabs', about: 'a water town square of granite slabs, grass and moss in the joints and at the edges, damp with the morning mist' },
   port: { kind: 'wet-concrete', about: 'a container quay at night in the rain: wet concrete, puddles reflecting the lamps, painted lines' },
 };
 
