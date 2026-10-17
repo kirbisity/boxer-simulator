@@ -55,8 +55,15 @@ export const PLACE_SCENERY = {
 
 const CURRENT = { id: 'current', label: 'Current (as built)', replaces: [] };
 
+// The head-to-head: each way of drawing the land, with the same trees.
+const SCENERY_COMPOSITES = [
+  { id: 'painted-trees', label: 'Painted skyball + trees', parts: ['skyball-painted', 'trees-mixed'] },
+  { id: 'photo-trees', label: 'Photo skyball + trees', parts: ['skyball-photo', 'trees-mixed'] },
+  { id: 'land-trees', label: 'Generated land + trees', parts: ['generated-land', 'trees-mixed'] },
+];
+
 /** Every variant: current, then each method's own, then the composites. */
-export const SCENERY_VARIANTS = [CURRENT, ...SKYBALL_VARIANTS, ...GENERATED_VARIANTS, ...TREE_VARIANTS];
+export const SCENERY_VARIANTS = [CURRENT, ...SKYBALL_VARIANTS, ...GENERATED_VARIANTS, ...TREE_VARIANTS, ...SCENERY_COMPOSITES];
 
 let sceneryInForce = 'current';
 
