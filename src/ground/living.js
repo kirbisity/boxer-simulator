@@ -9,6 +9,7 @@
 // stays flat at y = 0: inside it nothing stands taller than a short tuft.
 
 /* global THREE */
+import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
 
 /** The one dial: 1 is the full look, 0.5 halves every scatter (grass, flowers, stones, leaves). */
 const LIVING_DENSITY = 1;
@@ -149,6 +150,7 @@ function livingWaterMaterial({ color = 0x14181a, roughness = 0.05, metalness = 0
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, { livingTime: livingClock });
+    bloodDyeShader(shader);
     shader.vertexShader = shader.vertexShader
       .replace('void main() {', 'varying vec3 vLivingWorld;\nvoid main() {')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvLivingWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
@@ -162,6 +164,7 @@ uniform vec3 livingLamps[ ${LIVING_WATER_LAMPS} ];
 uniform vec3 livingLampColour;
 uniform float livingLampGain;
 uniform vec3 livingOil;
+${BLOOD_DYE_GLSL}
 float livingHash1( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
 vec2 livingRing( vec2 p, float cell, float seed ) {
   vec2 q = p / cell;
@@ -177,6 +180,9 @@ vec2 livingRing( vec2 p, float cell, float seed ) {
   return dv / d * slope * 0.0045;
 }
 void main() {`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+float livingBlood = bloodDyeAt( vLivingWorld.xz );
+diffuseColor.rgb = mix( diffuseColor.rgb, bloodDyeColour, livingBlood );`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 vec2 livingP = vLivingWorld.xz;
 vec2 livingGrad = vec2( 0.0 );
@@ -203,6 +209,7 @@ for ( int i = 0; i < ${LIVING_WATER_LAMPS}; i ++ ) {
   livingGlint += livingLampColour * ( exp( -across * across * 5000.0 - along * along * 260.0 ) * 2.6 + exp( -across * across * 400.0 - along * along * 14.0 ) * 0.3 + exp( -across * across * 40.0 - along * along * 4.0 ) * 0.05 );
 }
 gl_FragColor.rgb += livingGlint * livingLampGain;
+gl_FragColor.rgb *= mix( vec3( 1.0 ), bloodDyeFilter, livingBlood );
 if ( livingOil.z > 0.0 ) {
   float livingFilm = 1.0 - smoothstep( livingOil.z * 0.4, livingOil.z, length( vLivingWorld.xz - livingOil.xy ) );
   float livingBand = sin( vLivingWorld.x * 3.1 + vLivingWorld.z * 2.3 + sin( vLivingWorld.z * 4.7 ) * 1.5 ) * 0.5 + 0.5;
@@ -524,7 +531,7 @@ function livingBlobGeometry(spots, y, seed = 1) {
     uvs.push(0.5, 0.5);
     for (let side = 0; side < sides; side += 1) {
       const angle = (side / sides) * Math.PI * 2;
-      const wobble = 1 + 0.22 * livingNoise(Math.cos(angle) * 1.6 + number * 7, Math.sin(angle) * 1.6, seed) + 0.08 * livingNoise(Math.cos(angle) * 4 + number * 3, Math.sin(angle) * 4, seed + 1);
+      const wobble = livingBlobWobble(angle, number, seed);
       const lx = Math.cos(angle) * spot.rx * wobble;
       const lz = Math.sin(angle) * spot.rz * wobble;
       const turn = spot.turn ?? 0;
@@ -539,6 +546,33 @@ function livingBlobGeometry(spots, y, seed = 1) {
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(index);
   return geometry;
+}
+
+/** The wobble of blob `number`'s rim at `angle` (livingBlobGeometry's outline). */
+const livingBlobWobble = (angle, number, seed) => 1 + 0.22 * livingNoise(Math.cos(angle) * 1.6 + number * 7, Math.sin(angle) * 1.6, seed) + 0.08 * livingNoise(Math.cos(angle) * 4 + number * 3, Math.sin(angle) * 4, seed + 1);
+
+/**
+ * Where blob water lies, for the blood: (x, z) -> { wet, reach } or null.
+ * wet follows the blobs' own outline and their radial alpha (solid to
+ * `inner`, fading to the rim); reach is how far a cloud can spread in it.
+ */
+function livingWaterAt(spots, seed, inner, reachOf = (spot) => 0.55 * Math.sqrt(spot.rx * spot.rz)) {
+  return (x, z) => {
+    let best = null;
+    spots.forEach((spot, number) => {
+      const turn = spot.turn ?? 0;
+      const dx = x - spot.x;
+      const dz = z - spot.z;
+      const u = (dx * Math.cos(turn) + dz * Math.sin(turn)) / spot.rx;
+      const v = (-dx * Math.sin(turn) + dz * Math.cos(turn)) / spot.rz;
+      const out = Math.hypot(u, v);
+      if (out > 1.4) return;
+      const d = out / livingBlobWobble(Math.atan2(v, u), number, seed);
+      const wet = 1 - livingSmooth(inner, 1, d);
+      if (wet > 0 && (!best || wet > best.wet)) best = { wet, reach: reachOf(spot) };
+    });
+    return best;
+  };
 }
 
 // ---- the land: foothills, micro-relief ----------------------------------------
@@ -1051,6 +1085,7 @@ function livingPond({ land, view, rng, pond }) {
   );
   water.onBeforeRender = livingTick;
   group.userData.waters = [water.material];
+  group.userData.bloodDyeWater = [livingWaterAt([{ ...pond, turn: 0.3 }], 4, 0.82, () => 1.2)];
   // The bank: dark wet earth round the water, a little raised.
   const bank = new THREE.Mesh(livingBlobGeometry([{ x: pond.x, z: pond.z, rx: pond.rx * 1.3, rz: pond.rz * 1.35, turn: 0.3 }], 0.012, 9), new THREE.MeshLambertMaterial({ color: 0x4a3c26, transparent: true, alphaMap: livingRadialAlpha(128, 0.7), depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
   bank.receiveShadow = true;
@@ -1330,6 +1365,7 @@ function livingCobbles({ view, arena, rng }) {
   water.onBeforeRender = livingTick;
   group.add(water);
   group.userData.waters = [water.material];
+  group.userData.bloodDyeWater = [livingWaterAt(spots, 3, 0.6)];
   return group;
 }
 
@@ -1522,6 +1558,7 @@ function livingWetConcrete({ view, arena, grounds, rng }) {
   }
   group.add(livingDecal({ cz, width, depth, canvas: decal.canvas, y: 0.003 }));
   group.userData.waters = [material];
+  group.userData.bloodDyeWater = [livingWaterAt(spots, 6, 0.78)];
   // The yard seen from the puddles (containers, lamps, cranes): a cube rendered once, for the puddles to mirror.
   group.userData.mirror = { at: new THREE.Vector3(0, 0.15, 0), materials: [material] };
   return group;
@@ -1574,8 +1611,10 @@ function livingBuild(context) {
   else group = new THREE.Group();
   group.userData.buildMs = performance.now() - started;
   group.userData.waters ??= [];
+  group.userData.bloodDyeWater ??= [];
   group.traverse((object) => {
     if (object.userData.waters && object !== group) group.userData.waters.push(...object.userData.waters);
+    if (object.userData.bloodDyeWater && object !== group) group.userData.bloodDyeWater.push(...object.userData.bloodDyeWater);
   });
   return group;
 }

@@ -15,6 +15,7 @@
 // the place's own painted texture, which the foothills wear too.
 
 /* global THREE */
+import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
 
 const PAINTED_GROUND_TEXELS = 512;
 
@@ -754,7 +755,8 @@ const PAINTED_GROUND_STONE_MACRO = [[1.06, 1.01, 0.95], [0.9, 0.92, 0.95]];
  * wetness [darken, roughness, fill-the-low-spots, flatten], a decal colour
  * and roughness, the foothills' keepOut (fade the detail out beyond it),
  * how far to match the place's own mean colour, and the layout: (x, z) →
- * [B share, macro, wetness, decal], 0..1 each.
+ * [B share, macro, wetness, decal], 0..1 each. `pools`: its wettest spots are
+ * standing water (blood dissolves in them), a cloud spreading at most that far (m).
  */
 const PAINTED_GROUND_PLACES = {
   meadow: {
@@ -771,7 +773,7 @@ const PAINTED_GROUND_PLACES = {
   },
   field: {
     a: 'grass', b: 'mud:hoof', tiles: [1.4, 1.6], bomb: [1, 1], macro: PAINTED_GROUND_GRASS_MACRO, keepOut: [32, 22], match: 0.85,
-    wet: [0.7, 0.18, 2, 0.7], env: 1, envSplit: [0.15, 0.8],
+    wet: [0.7, 0.18, 2, 0.7], env: 1, envSplit: [0.15, 0.8], pools: 0.8,
     layout: (x, z, f) => {
       const ex = Math.abs(x) - 25 + (f(x * 0.1, z * 0.1, 6) - 0.5) * 5;
       const ez = Math.abs(z) - 8 + (f(x * 0.15, z * 0.15, 7) - 0.5) * 4;
@@ -791,7 +793,7 @@ const PAINTED_GROUND_PLACES = {
   },
   sengoku: {
     a: 'trampled', b: 'mud:mixed', tiles: [1.8, 1.6], bomb: [1, 1], macro: PAINTED_GROUND_GRASS_MACRO, keepOut: [13, 9], match: 0.85,
-    wet: [0.68, 0.14, 2, 0.75], env: 1, envSplit: [0.15, 0.8],
+    wet: [0.68, 0.14, 2, 0.75], env: 1, envSplit: [0.15, 0.8], pools: 0.8,
     layout: (x, z, f) => {
       const box = Math.max(Math.abs(x) / 10, Math.abs(z) / 6);
       const mud = paintedGroundSmooth(0.42, 0.6, f(x * 0.25, z * 0.25, 16) * 0.8 + (1 - paintedGroundSmooth(0.5, 1.2, box)) * 0.35);
@@ -835,7 +837,7 @@ const PAINTED_GROUND_PLACES = {
   },
   port: {
     a: 'concrete', b: 'concrete:worn', tiles: [2.2, 2.6], bomb: [1, 1], macro: PAINTED_GROUND_STONE_MACRO, match: 0.5, quay: true,
-    wet: [0.62, 0.06, 3, 0.95], env: 1, envSplit: [0.5, 2.5],
+    wet: [0.62, 0.06, 3, 0.95], env: 1, envSplit: [0.5, 2.5], pools: 1,
     layout: (x, z, f) => {
       let puddle = paintedGroundSmooth(0.58, 0.66, f(x * 0.22, z * 0.22, 30));
       for (const [px, pz, r] of [[1.8, 1.4, 1.3], [-2.6, -1.4, 1.0], [4.5, -3.2, 1.6]]) {
@@ -891,6 +893,9 @@ function paintedGroundMeanOf(map) {
 
 // ---- the material ------------------------------------------------------------------
 
+/** Wetness from which a painted puddle is standing water (smoothstep edges). */
+const PAINTED_GROUND_POOL = [0.5, 0.75];
+
 const PAINTED_GROUND_FRAGMENT_HEAD = `
 uniform sampler2D uPgColA;
 uniform sampler2D uPgNrmA;
@@ -912,6 +917,9 @@ uniform float uPgRelief;
 uniform float uPgOrigRough;
 uniform vec2 uPgEnv;
 varying vec3 vPaintedWorld;
+#ifdef PAINTED_POOLS
+${BLOOD_DYE_GLSL}
+#endif
 vec2 pgRot(vec2 p) { return vec2(0.6 * p.x - 0.8 * p.y, 0.8 * p.x + 0.6 * p.y); }
 vec2 pgUnrot(vec2 p) { return vec2(0.6 * p.x + 0.8 * p.y, -0.8 * p.x + 0.6 * p.y); }
 void pgLayer(sampler2D colTex, sampler2D nrmTex, vec2 p, float tile, float bomb, float pick, out vec4 c, out vec4 n) {
@@ -966,6 +974,10 @@ float pgWet = clamp(pgLay.b + (0.5 - pgH) * uPgWet.z * pgLay.b * (1.0 - pgLay.b)
 pgCol *= mix(1.0, uPgWet.x, pgWet);
 pgRough = mix(pgRough, uPgWet.y, pgWet * pgWet);
 pgSlope *= 1.0 - pgWet * uPgWet.w;
+#ifdef PAINTED_POOLS
+  float pgBlood = bloodDyeAt(pgP) * smoothstep(${PAINTED_GROUND_POOL[0]}, ${PAINTED_GROUND_POOL[1]}, pgWet);
+  pgCol = mix(pgCol, bloodDyeColour, pgBlood);
+#endif
 float pgDec = pgLay.a * uPgDecal.a;
 pgCol = mix(pgCol, uPgDecal.rgb, pgDec);
 pgRough = mix(pgRough, uPgDecalRough, pgDec);
@@ -1016,8 +1028,10 @@ function paintedGroundMaterial(view, spec, layers, layout, box, original) {
   }
   if (fade) material.defines = { PAINTED_FADE: '' };
   if (spec.quay) material.defines = { ...material.defines, PAINTED_QUAY: '' };
+  if (spec.pools) material.defines = { ...material.defines, PAINTED_POOLS: '' };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
+    if (spec.pools) bloodDyeShader(shader);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vPaintedWorld;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaintedWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -1026,9 +1040,10 @@ function paintedGroundMaterial(view, spec, layers, layout, box, original) {
       .replace('#include <map_fragment>', PAINTED_GROUND_FRAGMENT_BODY)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = pgRough;')
       .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(pgNormalW, 0.0)).xyz);')
-      .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\n#if defined( RE_IndirectSpecular )\nradiance *= mix(uPgEnv.x, uPgEnv.y, pgWet);\n#endif');
+      .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\n#if defined( RE_IndirectSpecular )\nradiance *= mix(uPgEnv.x, uPgEnv.y, pgWet);\n#endif')
+      .replace('#include <tonemapping_fragment>', '#ifdef PAINTED_POOLS\ngl_FragColor.rgb *= mix(vec3(1.0), bloodDyeFilter, pgBlood);\n#endif\n#include <tonemapping_fragment>');
   };
-  material.customProgramCacheKey = () => `painted-ground${fade ? '-fade' : ''}${spec.quay ? '-quay' : ''}`;
+  material.customProgramCacheKey = () => `painted-ground${fade ? '-fade' : ''}${spec.quay ? '-quay' : ''}${spec.pools ? '-pools' : ''}`;
   return material;
 }
 
@@ -1077,6 +1092,8 @@ function paintedGroundBuild({ place, view, arena, grounds, rng }) {
   void arena;
   PAINTED_GROUND_COST[place] = { ms: Math.round(performance.now() - started), bytes: Math.round(bytes), layoutMs: Math.round(layoutMs), layers: fresh.map((name) => `${name} ${paintedGroundLayerCache.get(name).ms}ms`) };
   group.userData.paintedCost = PAINTED_GROUND_COST[place];
+  // Its standing water, for the blood: the wettest spots of the layout.
+  if (spec.pools) group.userData.bloodDyeWater = [(x, z) => ({ wet: paintedGroundSmooth(...PAINTED_GROUND_POOL, spec.layout(x, z, paintedGroundFbm, rng)[2]), reach: spec.pools })];
   return group;
 }
 
