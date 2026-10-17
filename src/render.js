@@ -18,7 +18,7 @@ import { applyScenery } from './scenery.js';
 import { orbitAboveGround } from './watchcam.js';
 import { arenaColosseum } from './props/arena.js';
 import { harbourPort } from './props/harbour.js';
-import { subwayPuddleFilm, subwayStation, subwayTrain } from './props/subway.js';
+import { SUBWAY_ARENA, subwayPuddleFilm, subwayStation } from './props/subway.js';
 import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks, coastPalms, coastPier, coastSampans, coastShip, coastShipMaterials } from './props/coast.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
@@ -172,7 +172,8 @@ function lightPlace(view, place) {
 
 // ---- weather ------------------------------------------------------------------
 //
-// A level may bring its own weather (scenarios.js `weather`): so far, mist.
+// A level may bring its own weather (scenarios.js `weather`): so far, mist,
+// and Pier 9's night sea fog (its own `colour`, and `halos` round the lamps).
 // `fog` [near, far] replaces the place's haze; the fog takes the look's horizon
 // colour (the photograph's, the sky dome's) paled `pale` (0..1) toward a damp
 // grey-white, and the horizon takes it too, so the land and the sky meet in
@@ -201,7 +202,9 @@ function applyWeather(view) {
   // Mist pales the horizon (the look's own, already the fog's colour) toward a damp grey-white: the fog, the background and the sky's horizon all take it.
   const fog = view.scene.fog;
   if (weather?.fog && fog) {
-    fog.color.lerp(WEATHER_MIST_COLOUR, weather.pale ?? 0.5);
+    // Night fog has a colour of its own (the lamps' light in it), not the horizon's.
+    if (weather.colour !== undefined) fog.color.set(weather.colour);
+    else fog.color.lerp(WEATHER_MIST_COLOUR, weather.pale ?? 0.5);
     view.scene.background = fog.color.clone();
   }
   // The look's sky dome, toned toward that horizon.
@@ -236,6 +239,8 @@ function applyWeather(view) {
     }
     // Tree cards beyond the fog: their instances are sorted near to far, so drawing fewer leaves out the farthest.
     child.traverse((object) => {
+      // A lamp's halo, seen only in fog.
+      if (object.userData.fogHalo) object.visible = !!weather?.halos;
       const reach = object.userData.treeReach;
       if (!object.isInstancedMesh || !reach) return;
       const limit = weather?.fog ? weather.fog[1] + WEATHER_TREE_REACH : Infinity;
@@ -300,7 +305,7 @@ const PLACE_LIGHT = {
 export const PLACE_ARENAS = {
   ring: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
   colosseum: { halfX: 6.5, halfZ: 4.4 },
-  subway: { halfX: 4.2, halfZ: 1.35 },
+  subway: SUBWAY_ARENA,
   meadow: { halfX: 9, halfZ: 7 },
   stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
   town: { halfX: 9, halfZ: 7 },
@@ -471,7 +476,7 @@ function paintedTexture(width, height, paint, repeat = [1, 1]) {
 
 /**
  * A New York platform at 1:40 a.m.: grimy concrete, the worn yellow edge
- * strip, the wet track bed and an R160 train standing at it, painted I-beam
+ * strip, the wet track bed open below it (no train in: the edge is a drop), painted I-beam
  * columns and girders, stained tile, caged fluorescent tubes under a low
  * ceiling, water leaking through it (src/props/subway.js). The fight's arena
  * is the strip of platform between the wall and the edge (z from −halfZ to
@@ -479,7 +484,6 @@ function paintedTexture(width, height, paint, repeat = [1, 1]) {
  */
 function buildSubway(arena) {
   const { group: place, layout } = subwayStation(arena);
-  place.add(subwayTrain(layout));
   place.add(subwayPuddleFilm(layout));
   place.userData.subwayLayout = layout;
   for (const x of [-4.6, 0, 4.6]) {

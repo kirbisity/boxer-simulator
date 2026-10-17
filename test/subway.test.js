@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SUBWAY_CAR, SUBWAY_LEAKS, SUBWAY_RING_LIFE, subwayDrip, subwayLayout } from '../src/props/subway.js';
-import { SCENARIOS } from '../src/scenarios.js';
+import { SCENARIOS, scenarioWorld } from '../src/scenarios.js';
+import { P } from '../src/body.js';
+import { thinkAll } from '../src/ai.js';
+import { advance, boutWinner, deliverImpulse, floorUnder, placeFighter, point } from '../src/physics.js';
 
 const arena = SCENARIOS.subway.arena;
 
@@ -40,4 +43,55 @@ test('some leaks drip onto the fighting floor (so a fight goes through water), t
   assert.ok(onFloor.length >= 2);
   for (const leak of layout.leaks) if (leak.floor === 0) assert.ok(leak.z - leak.rz > layout.wallZ && leak.z + leak.rz < layout.edgeZ);
   assert.equal(layout.leaks.length, SUBWAY_LEAKS.length);
+});
+
+// ---- the edge: no train in, the track bed below ------------------------------------------
+
+/** Fighter 0 stood at z on the platform, the other well off, then shoved hard toward ±z; 4 s on. */
+function shoved(z, direction) {
+  const world = scenarioWorld('subway', 3);
+  const [fighter, other] = world.fighters;
+  placeFighter(other, -3.5, 0);
+  placeFighter(fighter, 0, z);
+  advance(world, 0.5);
+  const shares = [[P.pelvis, 0.3], [P.neck, 0.3], [P.lShoulder, 0.2], [P.rShoulder, 0.2]];
+  deliverImpulse({ fighter, shares, direction: [0, 0, direction], impulse: 260 });
+  let lowest = Infinity;
+  for (let frame = 0; frame < 240; frame += 1) {
+    advance(world, 1 / 60);
+    lowest = Math.min(lowest, point(fighter.x, P.pelvis)[1]);
+  }
+  return { world, fighter, lowest };
+}
+
+test('the platform edge is a drop: a man shoved over it falls onto the track bed and is out of the bout', () => {
+  const drop = arena.drop;
+  const layout = subwayLayout(arena);
+  assert.equal(drop.at, layout.edgeZ, 'the drop is at the platform edge');
+  assert.ok(drop.floor < layout.railTop + 0.05 && drop.floor > layout.railTop - 0.25, 'the lower floor is the track bed');
+  assert.ok(drop.to <= layout.farZ, 'the far wall stops him');
+  assert.equal(floorUnder(arena, 0), 0);
+  assert.equal(floorUnder(arena, drop.at + 0.5), drop.floor);
+  const { world, fighter, lowest } = shoved(1.0, 1);
+  assert.ok(point(fighter.x, P.pelvis)[2] > drop.at, 'he went over the edge');
+  assert.ok(lowest < -0.8, `his hips fell below the platform (to ${lowest.toFixed(2)} m)`);
+  assert.equal(fighter.state, 'out');
+  assert.ok(world.events.some((event) => event.fighter === fighter.id && event.effects?.includes('fell onto the tracks')));
+  assert.equal(boutWinner(world), world.fighters[1].corner);
+});
+
+test('the wall side is still a wall: a man shoved into it meets it and stays on the platform', () => {
+  const { fighter, lowest } = shoved(-1.0, -1);
+  for (let index = 0; index < fighter.x.length / 3; index += 1) assert.ok(fighter.x[index * 3 + 2] >= -arena.halfZ - 1e-6, 'no part through the wall');
+  assert.ok(lowest > 0, 'never below the platform');
+});
+
+test('left alone, fighters keep off the edge: a bout on the platform stays on it', () => {
+  const world = scenarioWorld('subway', 5);
+  for (let frame = 0; frame < 60 * 30 && !world.over; frame += 1) {
+    thinkAll(world, 1 / 60);
+    advance(world, 1 / 60);
+  }
+  for (const fighter of world.fighters) if (fighter.state !== 'out') assert.ok(point(fighter.x, P.pelvis)[1] > 0, 'still on the platform');
+  assert.ok(!world.events.some((event) => event.effects?.includes('fell onto the tracks')), 'nobody walked off');
 });

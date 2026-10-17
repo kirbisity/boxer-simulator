@@ -136,6 +136,11 @@ export const WORLD = {
   // A strike thrown at a place is aimed at a man of the other side standing within this (m) of it.
   aimedAtWithin: 0.7,
   footing: { turnRate: 6, followPushed: 2.5, edgeMargin: 0.3 },
+  // A drop edge (an arena's `drop`: a subway platform over the track bed):
+  // hips more than `footing` m past it and his feet are gone from under him;
+  // hips below `outBelow` (m, the platform's top at 0; a man lying on the
+  // track bed has them at about −1.1) and he is down on the tracks, out.
+  drop: { footing: 0.12, outBelow: -0.45 },
   joint: {
     hipCone: 2.4, // rad from straight down: room for a head kick, not the splits
     // Forced this far past its range in an instant, a joint breaks.

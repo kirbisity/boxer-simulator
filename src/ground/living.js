@@ -136,8 +136,14 @@ const LIVING_WATER_LAMPS = 6;
  * normal made in the shader from world position and time: rain rings
  * (`rain` 1), wind ripples (`wave`), an oil film inside a circle, and a
  * glint of each lamp (streaked, as on wet ground) added after the lighting.
+ * As water is: a mirror at grazing angles and see-through looking down
+ * (Fresnel, Schlick's, n = 1.33: 2% reflected straight down, all of it at
+ * the horizon), so a thin puddle seen from above shows the ground under it;
+ * a darker wet meniscus at its rim (`rim`, on blob water whose uv runs out
+ * from each blob's centre); and `depth` (0..1) darkens a pond toward its
+ * middle, where it is deep.
  */
-function livingWaterMaterial({ color = 0x14181a, roughness = 0.05, metalness = 0.05, rain = 0, wave = 1, lamps = [], lampColour = 0xffa24a, lampGain = 0, oil = [0, 0, 0], alphaMap = null, opacity = 1, envMap = null, envMapIntensity = 1 } = {}) {
+function livingWaterMaterial({ color = 0x14181a, roughness = 0.05, metalness = 0.05, rain = 0, wave = 1, lamps = [], lampColour = 0xffa24a, lampGain = 0, oil = [0, 0, 0], alphaMap = null, opacity = 1, envMap = null, envMapIntensity = 1, rim = 1, depth = 0 } = {}) {
   const material = new THREE.MeshStandardMaterial({ color, roughness, metalness, envMap, envMapIntensity, transparent: !!alphaMap || opacity < 1, opacity, alphaMap, depthWrite: !alphaMap, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
   const lampList = Array.from({ length: LIVING_WATER_LAMPS }, (_, index) => (lamps[index] ? lamps[index].clone() : new THREE.Vector3(0, -1000, 0)));
   const uniforms = {
@@ -147,6 +153,8 @@ function livingWaterMaterial({ color = 0x14181a, roughness = 0.05, metalness = 0
     livingLampColour: { value: new THREE.Color(lampColour) },
     livingLampGain: { value: lampGain },
     livingOil: { value: new THREE.Vector3(...oil) },
+    livingRim: { value: rim },
+    livingDepth: { value: depth },
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, { livingTime: livingClock });
@@ -164,6 +172,8 @@ uniform vec3 livingLamps[ ${LIVING_WATER_LAMPS} ];
 uniform vec3 livingLampColour;
 uniform float livingLampGain;
 uniform vec3 livingOil;
+uniform float livingRim;
+uniform float livingDepth;
 ${BLOOD_DYE_GLSL}
 float livingHash1( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
 vec2 livingRing( vec2 p, float cell, float seed ) {
@@ -199,6 +209,19 @@ normal = normalize( ( viewMatrix * vec4( livingNormal, 0.0 ) ).xyz );`)
       .replace('#include <tonemapping_fragment>', `
 vec3 livingLook = normalize( vLivingWorld - cameraPosition );
 vec3 livingRefl = reflect( livingLook, livingNormal );
+// Fresnel (Schlick, water's 2% at normal incidence), on the rippled normal: looking down, the water lets the ground through and darkens a little; at a grazing angle it is a mirror.
+float livingFresnel = 0.02 + 0.98 * pow( 1.0 - clamp( dot( -livingLook, livingNormal ), 0.0, 1.0 ), 5.0 );
+float livingClear = 1.0 - smoothstep( 0.02, 0.2, livingFresnel );
+gl_FragColor.rgb *= 1.0 - 0.12 * livingClear;
+gl_FragColor.a *= 1.0 - 0.22 * livingClear;
+#ifdef USE_ALPHAMAP
+// Out from the blob's centre (0) to its rim (1): the meniscus, a darker wet line just inside the edge, and a pond's depth.
+float livingOut = length( vUv - 0.5 ) * 2.0;
+float livingMeniscus = livingRim * smoothstep( 0.62, 0.82, livingOut ) * ( 1.0 - smoothstep( 0.86, 0.98, livingOut ) );
+gl_FragColor.rgb *= 1.0 - 0.4 * livingMeniscus;
+gl_FragColor.a = max( gl_FragColor.a, 0.55 * livingMeniscus * smoothstep( 0.0, 0.3, gl_FragColor.a ) );
+gl_FragColor.rgb *= 1.0 - livingDepth * 0.4 * ( 1.0 - smoothstep( 0.2, 0.85, livingOut ) );
+#endif
 vec3 livingSide = normalize( cross( livingLook, vec3( 0.0, 1.0, 0.0 ) ) + 1e-5 );
 vec3 livingGlint = vec3( 0.0 );
 for ( int i = 0; i < ${LIVING_WATER_LAMPS}; i ++ ) {
@@ -206,7 +229,7 @@ for ( int i = 0; i < ${LIVING_WATER_LAMPS}; i ++ ) {
   vec3 miss = livingRefl - toLamp;
   float across = dot( miss, livingSide );
   float along = length( miss - livingSide * across );
-  livingGlint += livingLampColour * ( exp( -across * across * 5000.0 - along * along * 260.0 ) * 2.6 + exp( -across * across * 400.0 - along * along * 14.0 ) * 0.3 + exp( -across * across * 40.0 - along * along * 4.0 ) * 0.05 );
+  livingGlint += livingLampColour * ( exp( -across * across * 7000.0 - along * along * 320.0 ) * 2.8 + exp( -across * across * 600.0 - along * along * 20.0 ) * 0.22 + exp( -across * across * 40.0 - along * along * 4.0 ) * 0.035 );
 }
 gl_FragColor.rgb += livingGlint * livingLampGain;
 gl_FragColor.rgb *= mix( vec3( 1.0 ), bloodDyeFilter, livingBlood );
@@ -1089,7 +1112,7 @@ function livingPond({ land, view, rng, pond }) {
   const group = new THREE.Group();
   const water = new THREE.Mesh(
     livingBlobGeometry([{ x: pond.x, z: pond.z, rx: pond.rx, rz: pond.rz, turn: 0.3 }], 0.03, 4),
-    livingWaterMaterial({ color: 0x1c2a22, roughness: 0.06, metalness: 0.08, wave: 0.7, envMap: view.steelEnv, alphaMap: livingRadialAlpha(128, 0.82) }),
+    livingWaterMaterial({ color: 0x1c2a22, roughness: 0.06, metalness: 0.08, wave: 0.7, envMap: view.steelEnv, alphaMap: livingRadialAlpha(128, 0.82), depth: 1 }),
   );
   water.onBeforeRender = livingTick;
   // Water lies over the mud, films and decals round it: drawn after them (they are all see-through, so order, not depth, decides).
@@ -1508,7 +1531,7 @@ function livingBeach({ place, view, arena, grounds, rng }) {
   filmAlpha.g.fillStyle = film;
   filmAlpha.g.fillRect(0, 0, 256, 256);
   const filmTexture = new THREE.CanvasTexture(filmAlpha.canvas);
-  const filmMaterial = livingWaterMaterial({ color: 0x5a4c34, roughness: 0.06, metalness: 0.05, wave: 0.35, envMap: view.steelEnv, alphaMap: filmTexture, opacity: 0.85 });
+  const filmMaterial = livingWaterMaterial({ color: 0x5a4c34, roughness: 0.06, metalness: 0.05, wave: 0.35, envMap: view.steelEnv, alphaMap: filmTexture, opacity: 0.85, rim: 0 });
   const filmMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 130), filmMaterial);
   filmMesh.rotation.x = -Math.PI / 2;
   filmMesh.position.set(shore - 1.7, 0.016, 0);
@@ -1647,7 +1670,7 @@ function livingSubway({ view, place }) {
   const track = layout.leaks.filter((leak) => leak.floor !== 0);
   const lamps = layout.fixtures.map((fixture) => new THREE.Vector3(fixture.x, fixture.y, fixture.z)).sort((a, b) => a.length() - b.length());
   const material = livingWaterMaterial({
-    color: 0x9a968c, roughness: 0.04, metalness: 0.6, rain: 0, wave: 0.06, envMapIntensity: 1.7,
+    color: 0x9a968c, roughness: 0.04, metalness: 0.6, rain: 0, wave: 0.1, envMapIntensity: 1.7,
     lamps: lamps.slice(0, LIVING_WATER_LAMPS), lampColour: 0xffd27a, lampGain: 1.1,
     envMap: view.steelEnv, alphaMap: livingRadialAlpha(128, 0.7),
   });

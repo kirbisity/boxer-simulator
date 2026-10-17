@@ -133,14 +133,40 @@ export const COMPARE_SCENES = {
     blue: [{ preset: 'heavy' }],
     camera: { focus: { centre: true, height: 1.6 }, yaw: 1.7, pitch: 0.05, distance: 9, fov: 50 },
   },
-  // The subway level at the platform: the train beside the fighters, the leaks and the light.
+  // The subway level at the platform: the open track beside the fighters, the leaks and the light.
   'subway-platform': {
-    about: 'The subway level: two fighters on the platform, the train at the edge, the camera along the platform.',
+    about: 'The subway level: two fighters on the platform, the open track at the edge, the camera along the platform.',
     place: 'subway',
     level: 'subway',
     seed: 6,
     frames: 40,
     camera: { focus: { centre: true, height: 1.3 }, yaw: -0.25, pitch: 0.14, distance: 5.4, fov: 50 },
+  },
+  'subway-edge': {
+    about: 'The subway level from over the track bed, looking back at the platform edge: the strip, the face, the drop.',
+    place: 'subway',
+    level: 'subway',
+    seed: 6,
+    frames: 40,
+    camera: { focus: { centre: true, height: 0.6 }, yaw: 1.7, pitch: 0.25, distance: 5.5, fov: 50 },
+  },
+  // Pier 9 as its level frames it: the yard at night, the sodium lamps, the puddles (and the level's sea fog).
+  'pier9-wide': {
+    about: 'Pier 9 (the port level) as its camera frames it: the raid in the yard at night under the sodium lamps.',
+    place: 'port',
+    level: 'port',
+    seed: 9,
+    frames: 60,
+    camera: { focus: { centre: true, height: 1.0 }, yaw: -0.6, pitch: 0.36, distance: 11, fov: 45 },
+  },
+  'meadow-pond': {
+    about: 'The meadow pond close up from the bank: the water, its rim, its reflections.',
+    place: 'meadow',
+    seed: 6,
+    frames: 20,
+    red: [{ preset: 'contender' }],
+    blue: [{ preset: 'heavy' }],
+    camera: { focus: { at: [-1.5, -16.5], height: 0.2 }, yaw: 1.66, pitch: 0.4, distance: 7, fov: 50 },
   },
   'sengoku-army': {
     about: 'Sekigahara in daylight, sixty fighters in formation: a wide shot for load (many fighters, crowd batching).',

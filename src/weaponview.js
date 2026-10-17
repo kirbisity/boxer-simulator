@@ -5,7 +5,7 @@
 
 /* global THREE */
 import { P } from './body.js';
-import { SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
+import { floorUnder, SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
@@ -1956,13 +1956,15 @@ export function updateBlood(view, world, dt) {
   blood.drops = blood.drops.filter((drop) => {
     drop.velocity.y -= 9.81 * dt;
     drop.position.addScaledVector(drop.velocity, dt);
-    if (drop.position.y > floor) return true;
+    // Past a drop edge (the subway's platform) it falls on to the track bed.
+    const ground = floorUnder(world?.arena, drop.position.z);
+    if (drop.position.y > ground + floor) return true;
     // Into standing water: it sinks and spreads, no stain.
     if (bloodDyeLand(view, blood.dye, drop.position.x, drop.position.z, (drop.size / GORE.dropRadius) ** 3, now)) return false;
     // A stain where it lands; drops landing together run into one pool.
     const slot = blood.stainCount % GORE.maxStains;
     const size = drop.size * (2.5 + Math.random() * 3);
-    placer.position.set(drop.position.x, 0.0015 + (slot % 7) * 0.0002, drop.position.z);
+    placer.position.set(drop.position.x, ground + 0.0015 + (slot % 7) * 0.0002, drop.position.z);
     placer.rotation.set(0, Math.random() * Math.PI, 0);
     placer.scale.set(size * (0.8 + Math.random() * 0.6), 1, size);
     placer.updateMatrix();

@@ -1914,7 +1914,9 @@ function onTheFloor(fighter, target) {
   const arena = fighter.arena;
   if (!arena) return target;
   const margin = fighter.radius[P.lFoot] + 0.01;
-  return [Math.max(-(arena.halfX - margin), Math.min(arena.halfX - margin, target[0])), target[1], Math.max(-(arena.halfZ - margin), Math.min(arena.halfZ - margin, target[2]))];
+  // Toward a drop edge, the floor runs on to the edge itself.
+  const outer = arena.drop ? arena.drop.at - margin : arena.halfZ - margin;
+  return [Math.max(-(arena.halfX - margin), Math.min(arena.halfX - margin, target[0])), target[1], Math.max(-(arena.halfZ - margin), Math.min(outer, target[2]))];
 }
 
 function rawFootTarget(fighter, foot) {
@@ -2168,18 +2170,22 @@ function moveRoot(world, fighter, dt) {
   const scale = size > limit ? limit / size : 1;
   fighter.rootVelocity[0] += change[0] * scale;
   fighter.rootVelocity[1] += change[1] * scale;
+  const { halfX, halfZ, drop } = world.arena;
+  const margin = WORLD.footing.edgeMargin;
+  const walkedFrom = fighter.root[1];
   fighter.root[0] += fighter.rootVelocity[0] * dt;
   fighter.root[1] += fighter.rootVelocity[1] * dt;
+  // Toward a drop edge his own steps never take him past the floor's edge (he keeps off it, as at any edge).
+  if (drop) fighter.root[1] = Math.min(fighter.root[1], Math.max(halfZ - margin, walkedFrom));
   // A shove moves the stance too: the root drifts to where the pelvis was pushed.
   const pelvis = point(fighter.x, P.pelvis);
   const rootPelvis = toWorld(fighter, fighter.desired[P.pelvis]);
   const follow = Math.min(1, dt * WORLD.footing.followPushed);
   fighter.root[0] += (pelvis[0] - rootPelvis[0]) * follow;
   fighter.root[1] += (pelvis[2] - rootPelvis[2]) * follow;
-  const { halfX, halfZ } = world.arena;
-  const margin = WORLD.footing.edgeMargin;
   fighter.root[0] = Math.max(-(halfX - margin), Math.min(halfX - margin, fighter.root[0]));
-  fighter.root[1] = Math.max(-(halfZ - margin), Math.min(halfZ - margin, fighter.root[1]));
+  // ... but a shove can: out across the strip to the edge and over it.
+  fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
 }
 
 // ---- Detail by the size of the fight ----------------------------------------------
@@ -2355,6 +2361,7 @@ function updateTimers(world, fighter, dt) {
     }
   }
   if (fighter.trauma && fighter.state !== 'out') sufferInjuries(world, fighter);
+  overTheEdge(world, fighter);
   fighter.cooldown = Math.max(0, fighter.cooldown - dt);
   fighter.guardHigh = Math.max(0, fighter.guardHigh - dt);
   fighter.slip = Math.max(0, fighter.slip - dt);
@@ -3082,9 +3089,15 @@ function foldLimit(fighter, rootIndex, endIndex, minimum) {
 
 function collideGround(world, fighter, h, arena) {
   const friction = Math.exp(-WORLD.groundFriction * h);
+  const drop = arena.drop;
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const base = index * 3;
-    const floor = fighter.radius[index];
+    // The platform's face: a part gone over the edge and below its top is held off the slab, not lifted back onto it.
+    if (drop && fighter.x[base + 1] < 0 && fighter.x[base + 2] < drop.at && fighter.prev[base + 2] >= drop.at) {
+      fighter.x[base + 2] = drop.at;
+      fighter.prev[base + 2] = Math.max(fighter.prev[base + 2], drop.at);
+    }
+    const floor = fighter.radius[index] + floorUnder(arena, fighter.x[base + 2]);
     if (fighter.x[base + 1] < floor) {
       // Arriving this substep (it was clear of the floor): how fast it hit.
       if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, (fighter.prev[base + 1] - fighter.x[base + 1]) / h);
@@ -3097,11 +3110,13 @@ function collideGround(world, fighter, h, arena) {
     }
     // The arena's edge stops a part, as a wall does: held at the edge, and
     // its motion into the wall gone (not turned back into a fling inwards).
+    // Past a drop edge the wall is the far one, across the lower floor.
     for (const axis of [0, 2]) {
       const limit = axis === 0 ? arena.halfX : arena.halfZ;
-      if (fighter.x[base + axis] > limit) {
-        fighter.x[base + axis] = limit;
-        fighter.prev[base + axis] = Math.min(fighter.prev[base + axis], limit);
+      const far = axis === 2 && drop ? drop.to : limit;
+      if (fighter.x[base + axis] > far) {
+        fighter.x[base + axis] = far;
+        fighter.prev[base + axis] = Math.min(fighter.prev[base + axis], far);
       }
       if (fighter.x[base + axis] < -limit) {
         fighter.x[base + axis] = -limit;
@@ -3109,6 +3124,34 @@ function collideGround(world, fighter, h, arena) {
       }
     }
   }
+}
+
+/**
+ * The floor's height at z: 0, or past an arena's drop edge (`arena.drop`, on
+ * the +z side: a subway platform's edge over the track bed) the lower floor.
+ */
+export function floorUnder(arena, z) {
+  const drop = arena?.drop;
+  return drop && z > drop.at ? drop.floor : 0;
+}
+
+/**
+ * Over a drop edge: a man whose hips have gone past it loses his feet; once
+ * they are down below the platform he is off it, and out of the bout (he
+ * fell onto the tracks: no climbing back up a 1.1 m face with the other man
+ * standing over him).
+ */
+function overTheEdge(world, fighter) {
+  const drop = world.arena.drop;
+  if (!drop || fighter.state === 'out') return;
+  const pelvis = point(fighter.x, P.pelvis);
+  if (pelvis[2] <= drop.at) return;
+  if (pelvis[1] < WORLD.drop.outBelow) {
+    const event = { time: world.time, kind: 'knockout', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, point: pelvis, effects: [] };
+    knockOut(world, fighter, event, drop.reason ?? 'fell off the edge');
+    return;
+  }
+  if ((fighter.state === 'up' || fighter.state === 'rising') && pelvis[2] > drop.at + WORLD.drop.footing) fall(world, fighter, 'steps back into nothing');
 }
 
 // The body part a particle meeting the floor bruises; the feet are made for it.
@@ -3241,8 +3284,9 @@ function moveProps(world, dt) {
     prop.v[1] -= WORLD.gravity * dt;
     prop.x = vec.add(prop.x, vec.scale(prop.v, dt));
     prop.turn = vec.add(prop.turn, vec.scale(prop.spin, dt));
-    if (prop.x[1] < spec.radius) {
-      prop.x[1] = spec.radius;
+    const propFloor = spec.radius + floorUnder(world.arena, prop.x[2]);
+    if (prop.x[1] < propFloor) {
+      prop.x[1] = propFloor;
       prop.v = [prop.v[0] * spec.slide, -prop.v[1] * spec.restitution, prop.v[2] * spec.slide];
       prop.spin = vec.scale(prop.spin, spec.slide);
       if (Math.abs(prop.v[1]) < 0.4 && Math.hypot(prop.v[0], prop.v[2]) < 0.15) {
@@ -3251,10 +3295,10 @@ function moveProps(world, dt) {
         prop.turn = [0, prop.turn[1], 0];
       }
     }
-    const { halfX, halfZ } = world.arena;
-    for (const [axis, half] of [[0, halfX + 0.3], [2, halfZ + 0.3]]) {
-      if (Math.abs(prop.x[axis]) > half) {
-        prop.x[axis] = Math.sign(prop.x[axis]) * half;
+    const { halfX, halfZ, drop } = world.arena;
+    for (const [axis, half, far] of [[0, halfX + 0.3, halfX + 0.3], [2, halfZ + 0.3, drop ? drop.to : halfZ + 0.3]]) {
+      if (prop.x[axis] > far || prop.x[axis] < -half) {
+        prop.x[axis] = prop.x[axis] > 0 ? far : -half;
         prop.v[axis] *= -spec.restitution;
       }
     }
@@ -4790,8 +4834,9 @@ function moveDebris(world, dt) {
     const lowest = piece.plate
       ? piece.x[1] - piece.radius * Math.sqrt(Math.max(0, 1 - axis[1] * axis[1])) - piece.half * Math.abs(axis[1])
       : Math.min(piece.x[1] + axis[1] * piece.half, piece.x[1] - axis[1] * piece.half) - piece.radius;
-    if (lowest < 0 && piece.plate) {
-      piece.x[1] -= lowest;
+    const ground = floorUnder(world.arena, piece.x[2]);
+    if (lowest < ground && piece.plate) {
+      piece.x[1] += ground - lowest;
       piece.v = [piece.v[0] * spec.slide, Math.abs(piece.v[1]) * spec.restitution * 0.5, piece.v[2] * spec.slide];
       piece.spin = vec.scale(piece.spin, spec.slide);
       // On its rim it falls over onto its face or its back, whichever it leans to.
@@ -4799,25 +4844,25 @@ function moveDebris(world, dt) {
       piece.q = quatMultiply(quatFromTo(axis, vec.normalize(vec.lerp(axis, down, 0.3))), piece.q);
       if (Math.abs(piece.v[1]) < 0.35 && Math.hypot(piece.v[0], piece.v[2]) < 0.15) {
         piece.q = quatMultiply(quatFromTo(quatRotate(piece.q, piece.axis), down), piece.q);
-        piece.x[1] = piece.half;
+        piece.x[1] = ground + piece.half;
         piece.resting = true;
       }
-    } else if (lowest < 0) {
-      piece.x[1] -= lowest;
+    } else if (lowest < ground) {
+      piece.x[1] += ground - lowest;
       piece.v = [piece.v[0] * spec.slide, Math.abs(piece.v[1]) * spec.restitution, piece.v[2] * spec.slide];
       piece.spin = vec.scale(piece.spin, spec.slide);
       // On the floor it topples flat.
       piece.q = quatMultiply(quatFromTo(axis, vec.normalize(vec.lerp(axis, flatOf(axis), 0.35))), piece.q);
       if (Math.abs(piece.v[1]) < 0.35 && Math.hypot(piece.v[0], piece.v[2]) < 0.15) {
         piece.q = quatMultiply(quatFromTo(axis, flatOf(axis)), piece.q);
-        piece.x[1] = piece.radius;
+        piece.x[1] = ground + piece.radius;
         piece.resting = true;
       }
     }
-    const { halfX, halfZ } = world.arena;
-    for (const [index, limit] of [[0, halfX + 0.3], [2, halfZ + 0.3]]) {
-      if (Math.abs(piece.x[index]) > limit) {
-        piece.x[index] = Math.sign(piece.x[index]) * limit;
+    const { halfX, halfZ, drop } = world.arena;
+    for (const [index, limit, far] of [[0, halfX + 0.3, halfX + 0.3], [2, halfZ + 0.3, drop ? drop.to : halfZ + 0.3]]) {
+      if (piece.x[index] > far || piece.x[index] < -limit) {
+        piece.x[index] = piece.x[index] > 0 ? far : -limit;
         piece.v[index] *= -spec.restitution;
       }
     }
