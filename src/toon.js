@@ -1,12 +1,18 @@
 // Shading styles. 'toon' is cel shading with ink outlines: flat tones read
 // as drawn rather than as almost-real skin, which is what keeps stylised
 // faces out of the uncanny valley. 'soft' is the plain lit look, kept so the
-// two can be compared.
+// two can be compared. Which one is in force, and whether outlines are drawn
+// or the look builds its own materials, is the look's say (src/looks.js).
 
 /* global THREE */
+import { activeLook } from './looks.js';
+import { outlineScale } from './looks/kit.js';
 
 export const STYLE = {
-  current: 'toon',
+  /** The shading style of the look in force: 'toon' or 'soft'. */
+  get current() {
+    return activeLook().style;
+  },
   // Three tones: shadow, mid, light. Wide mid band, as in cel animation;
   // the light band stops short of 1 so pale skin under the key light does
   // not burn out to white.
@@ -34,8 +40,12 @@ function gradientMap(steps = STYLE.toonSteps) {
 
 /** A surface material in the current style. */
 export function surface(color, { skinning = false, vertexColors = false, roughness = 0.6, opacity = 1, steps = STYLE.toonSteps } = {}) {
+  const look = activeLook();
+  // A look may build its own skin and cloth; it answers nothing to leave it to the style.
+  const custom = look.surface?.(color, { skinning, vertexColors, roughness, opacity, steps });
+  if (custom) return custom;
   const common = { color, skinning, vertexColors, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 };
-  if (STYLE.current === 'toon') return new THREE.MeshToonMaterial({ ...common, gradientMap: gradientMap(steps) });
+  if (look.style === 'toon') return new THREE.MeshToonMaterial({ ...common, gradientMap: gradientMap(steps) });
   return new THREE.MeshStandardMaterial({ ...common, roughness, metalness: 0 });
 }
 
@@ -45,6 +55,10 @@ export function surface(color, { skinning = false, vertexColors = false, roughne
  * the push happens before skinning.
  */
 export function outlineFor(mesh, width = STYLE.outlineWidth) {
+  const scale = outlineScale(activeLook());
+  // No outlines: still a mesh, for the code that keeps the outline or switches it on and off, but one the renderer skips (the material is invisible).
+  if (scale === 0) return hiddenOutline(mesh);
+  width *= scale;
   const material = new THREE.MeshBasicMaterial({ color: STYLE.outlineColor, side: THREE.BackSide, skinning: !!mesh.isSkinnedMesh });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3( position ) + normalize( normal ) * ${width.toFixed(5)};`);
@@ -53,6 +67,16 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
   // for every width: key the program by the width, or all widths share the first.
   material.customProgramCacheKey = () => `outline-${width.toFixed(5)}`;
   const outline = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, material) : new THREE.Mesh(mesh.geometry, material);
+  if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
+  outline.userData.outline = true;
+  outline.frustumCulled = false;
+  return outline;
+}
+
+let hiddenOutlineMaterial = null;
+function hiddenOutline(mesh) {
+  hiddenOutlineMaterial ??= new THREE.MeshBasicMaterial({ visible: false });
+  const outline = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, hiddenOutlineMaterial) : new THREE.Mesh(mesh.geometry, hiddenOutlineMaterial);
   if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
   outline.userData.outline = true;
   outline.frustumCulled = false;

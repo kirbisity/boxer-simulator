@@ -4,8 +4,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-// In load order: a module's top-level code may use only what comes before it.
-const MODULES = ['aging', 'outfits', 'horses', 'physiology', 'body', 'physics/config', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/whip', 'physics/rising', 'physics/mounted', 'cast', 'riding', 'ai', 'gesture', 'control', 'followcam', 'watchcam', 'seethrough', 'rig', 'bodymesh', 'loftbody', 'toon', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'robotview', 'oyoroi', 'crowdview', 'render', 'weaponview', 'horsemesh', 'horsehair', 'horseview', 'drama', 'scenarios', 'ratings', 'roster', 'touch', 'tutorial', 'intro', 'menu', 'main'];
+// In load order: a module's top-level code may use only what comes before it. The looks (the kit, one file per look, then the registry) come before toon.js, which asks the registry which look is in force.
+const MODULES = ['aging', 'outfits', 'horses', 'physiology', 'body', 'physics/config', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/whip', 'physics/rising', 'physics/mounted', 'cast', 'riding', 'ai', 'gesture', 'control', 'followcam', 'watchcam', 'seethrough', 'rig', 'bodymesh', 'loftbody', 'looks/kit', 'looks/toon', 'looks/physical-sky', 'looks/hdr-post', 'looks/probe-lite', 'looks/quality-physical', 'looks/photo-hdri', 'looks', 'toon', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'face', 'wardrobe', 'robotview', 'oyoroi', 'crowdview', 'render', 'weaponview', 'horsemesh', 'horsehair', 'horseview', 'drama', 'scenarios', 'ratings', 'roster', 'touch', 'tutorial', 'intro', 'menu', 'looksbench', 'main'];
 const out = process.argv[2] ?? 'dist/gladiator.html';
 
 const html = readFileSync('index.html', 'utf8');
@@ -16,7 +16,7 @@ const code = MODULES.map((name) => {
     .replace(/^import [^;]+;\n/gm, '')
     // Re-exports (export { x } from './y.js') name what is already in the shared scope.
     .replace(/^export \{[^}]*\} from [^;]+;\n/gm, '')
-    .replace(/^export (const|function|class|let) /gm, '$1 ');
+    .replace(/^export (async function|const|function|class|let) /gm, '$1 ');
   if (/^(import|export) /m.test(stripped)) throw new Error(`src/${name}.js: an import or export survived the bundling`);
   // Every local module imported must be on the list, or the page dies at load.
   for (const [, path] of source.matchAll(/from '(\.{1,2}\/[\w/-]+)\.js'/g)) {
@@ -31,7 +31,7 @@ const code = MODULES.map((name) => {
 const seen = new Map();
 for (const name of MODULES) {
   const source = readFileSync(`src/${name}.js`, 'utf8');
-  for (const [, identifier] of source.matchAll(/^(?:export )?(?:const|let|function|class) ([A-Za-z_$][\w$]*)/gm)) {
+  for (const [, identifier] of source.matchAll(/^(?:export )?(?:const|let|(?:async )?function|class) ([A-Za-z_$][\w$]*)/gm)) {
     if (seen.has(identifier)) throw new Error(`${identifier} is declared in both ${seen.get(identifier)} and ${name}`);
     seen.set(identifier, name);
   }

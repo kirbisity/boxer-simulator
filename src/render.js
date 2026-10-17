@@ -23,6 +23,7 @@ import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, stretchedInverse
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
+import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -77,7 +78,10 @@ export function createScene(canvas) {
   // One reflection map for every piece of steel in the scene.
   const steelEnv = steelEnvironment(renderer);
   scene.add(places.ring, shaderWarmers());
-  return { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim, sun, hemi }, place: 'ring', steelEnv };
+  const view = { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim, sun, hemi }, place: 'ring', steelEnv };
+  // What a look will be undone to: the renderer and rig as built here, and the steel's map (built decoded from sRGB too when a linear look wants it).
+  captureViewDefaults(view, (linear) => steelEnvironment(renderer, { linear }));
+  return view;
 }
 
 /**
@@ -86,7 +90,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena) {
   if (place === view.place) return;
-  const builders = { subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -99,7 +103,39 @@ export function setPlace(view, place, arena) {
     view.scene.add(view.places[place]);
   }
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
+  view.place = place;
+  lightPlace(view, place);
+}
+
+/**
+ * Throw away every place built so far, so the next setPlace builds it anew.
+ * The places are painted with Math.random; the looks harness rebuilds them
+ * under a seeded generator so that every look is shown the same one.
+ */
+export function forgetPlaces(view) {
+  for (const [key, group] of Object.entries(view.places)) {
+    if (!group) continue;
+    view.scene.remove(group);
+    group.traverse((object) => {
+      object.geometry?.dispose?.();
+      for (const material of [].concat(object.material ?? [])) material.map?.dispose?.();
+    });
+    view.places[key] = null;
+  }
+  view.place = null;
+}
+
+/** The place already shown, lit and drawn again: after the look changed. */
+export function reapplyPlace(view) {
+  lightPlace(view, view.place);
+}
+
+/** A place's sky, fog and light rig, then the look in force on top of them. */
+function lightPlace(view, place) {
+  // Whatever a look changed in the view is undone first, so every look starts from the same rig.
+  resetForLook(view);
   const light = PLACE_LIGHT[place] ?? PLACE_LIGHT.ring;
+  view.light = light;
   view.scene.background = new THREE.Color(light.background);
   view.scene.fog = new THREE.Fog(light.background, light.fog[0], light.fog[1]);
   view.lights.key.color.set(light.key);
@@ -108,7 +144,7 @@ export function setPlace(view, place, arena) {
   view.lights.sun.intensity = light.sun ?? 0;
   view.lights.hemi.intensity = light.hemi ?? 0.62;
   view.lights.key.castShadow = !light.sun;
-  view.place = place;
+  applyLook(view, place);
 }
 
 // Each place's light: sky or dark hall, fog, the overhead key, the rim,
@@ -1205,6 +1241,8 @@ function daySky() {
   skyTexture.wrapT = THREE.ClampToEdgeWrapping;
   const sky = new THREE.Mesh(new THREE.SphereGeometry(52, 32, 16), new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.renderOrder = -1;
+  // A look that draws its own sky hides this one (looks/kit.js hidePaintedSky).
+  sky.userData.paintedSky = true;
   return sky;
 }
 
@@ -1567,6 +1605,7 @@ function buildPort() {
   });
   night.wrapT = THREE.ClampToEdgeWrapping;
   const sky = new THREE.Mesh(new THREE.SphereGeometry(52, 32, 16), new THREE.MeshBasicMaterial({ map: night, side: THREE.BackSide, fog: false, depthWrite: false }));
+  sky.userData.paintedSky = true;
   sky.renderOrder = -1;
   place.add(sky);
   // Concrete apron: stained, damp, with the yard's painted lines.
@@ -1914,6 +1953,7 @@ export function resize(view, width, height) {
   view.renderer.setSize(width, height, false);
   view.camera.aspect = width / Math.max(1, height);
   view.camera.updateProjectionMatrix();
+  resizeLook(view, width, height);
 }
 
 /** The camera on its orbit round the target, the target eased towards `focus` (`ease` of the way each frame, at `height` m). */
@@ -2928,5 +2968,5 @@ export function updateSpray(view, dt) {
 export function render(view) {
   // A place that moves (rain, a ship at anchor) moves with the clock.
   view.places?.[view.place]?.userData.tick?.(performance.now() / 1000);
-  view.renderer.render(view.scene, view.camera);
+  drawFrame(view);
 }

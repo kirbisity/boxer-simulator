@@ -170,7 +170,7 @@ body[data-game="home"] .camera-bar, body[data-overlay="wizard"] .camera-bar, bod
 .teams select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
 .teams .versus { color: var(--muted); }
 .teams .dice { padding: 3px 6px; font-size: 14px; line-height: 1; }
-.scene-pick span { font-weight: 600; color: var(--muted); margin-right: 4px; }
+.scene-pick span, .look-pick span { font-weight: 600; color: var(--muted); margin-right: 4px; }
 
 /* The whole setup as JSON, beside the Fight button. */
 #setup-code { flex: 1; min-width: 0; resize: vertical; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: 11px var(--mono); user-select: text; -webkit-user-select: text; }
