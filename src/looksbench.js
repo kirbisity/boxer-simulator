@@ -15,7 +15,7 @@
 /* global THREE */
 import { activeLook, LOOKS } from './looks.js';
 import { defineLook, loadScripts, sweepMaterials } from './looks/kit.js';
-import { activeScenery, applyScenery, SCENERY_VARIANTS, setScenery } from './scenery.js';
+import { activeGround, activeScenery, applyScenery, GROUND_STYLES, SCENERY_VARIANTS, setGround, setScenery } from './scenery.js';
 
 /** A small seeded generator (mulberry32): the same sequence from the same seed. */
 function seededGenerator(seed) {
@@ -142,6 +142,20 @@ export const COMPARE_SCENES = {
     camera: { focus: { centre: true, height: 1.0 }, yaw: -0.5, pitch: 0.34, distance: 26, fov: 40 },
   },
 };
+
+// Close shots of the ground at each open-air place: two fighters, the camera
+// at head height a few metres off, looking down past them at the ground.
+for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['port', 1.2]]) {
+  COMPARE_SCENES[`ground-${place}`] = {
+    about: `Two fighters at the ${place}, a close shot looking down at the ground round their feet: the ground.`,
+    place,
+    seed: 6,
+    frames: 40,
+    red: [{ preset: 'contender' }],
+    blue: [{ preset: 'heavy' }],
+    camera: { focus: { centre: true, height: 0.6 }, yaw, pitch: 0.38, distance: 5.5, fov: 50 },
+  };
+}
 
 /** The value at fraction `share` (0..1) of an ascending list. */
 const percentile = (sorted, share) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * share))];
@@ -388,6 +402,14 @@ export function installLooksBench(context) {
     stage,
     capture,
     stats,
+    /** The ground style (src/scenery.js GROUND): with an id, switch to it in the place shown now; without, list them. */
+    ground: (id) => {
+      if (id === undefined) return { current: activeGround(), styles: GROUND_STYLES.map((style) => style.id) };
+      const chosen = setGround(id);
+      applyScenery(scene, scene.place);
+      context.draw(0);
+      return chosen;
+    },
     /** The scenery variant (src/scenery.js): with an id, switch to it in the place shown now; without, list them. */
     scenery: (id) => {
       if (id === undefined) return { current: activeScenery(), variants: SCENERY_VARIANTS.map((variant) => variant.id) };

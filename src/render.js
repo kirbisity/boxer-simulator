@@ -351,6 +351,7 @@ function buildColosseum() {
   floorGeometry.rotateX(-Math.PI / 2);
   const floor = new THREE.Mesh(oval(floorGeometry), stone(0xffffff, { map: sand, roughness: 1 }));
   floor.receiveShadow = true;
+  floor.userData.scenery = 'ground';
   place.add(floor);
   // The podium wall: dressed stone, a dark base, marble on top.
   const podiumHeight = 3.2;
@@ -897,6 +898,7 @@ function buildCoast({ fort }) {
   sand.rotation.x = -Math.PI / 2;
   sand.position.x = -10;
   sand.receiveShadow = true;
+  sand.userData.scenery = 'ground';
   place.add(sand);
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshStandardMaterial({ color: 0x2f6a8a, roughness: 0.25, metalness: 0.1 }));
   sea.rotation.x = -Math.PI / 2;
@@ -1324,6 +1326,7 @@ function buildTown() {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), lit(0xffffff, { map: cobbles, roughness: 0.85 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
   place.add(ground);
 
   // House fronts: limewash between dark oak framing, leaded windows, a door.
@@ -1672,6 +1675,7 @@ function buildPort() {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), wet);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
   place.add(ground);
   // The quay edge and the water beyond it (+z).
   const edgeZ = 9;

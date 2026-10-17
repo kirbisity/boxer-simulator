@@ -13,6 +13,10 @@ import { SKYBALL_VARIANTS } from './scenery/skyball.js';
 import { GENERATED_VARIANTS } from './scenery/generated.js';
 import { TREE_VARIANTS } from './scenery/trees.js';
 import { activeLook } from './looks.js';
+import { PAINTED_GROUND } from './ground/painted.js';
+import { PHOTO_GROUND } from './ground/photo.js';
+import { LIVING_GROUND } from './ground/living.js';
+import { PLACE_ARENAS } from './render.js';
 
 /**
  * What each open-air place has beyond its ground, for a variant to draw in
@@ -124,6 +128,67 @@ export function applyScenery(view, place) {
     built.visible = true;
     part.apply?.({ place, view, spec, group: built });
   }
+  applyGround(view, place, group);
+}
+
+// ---- ground styles (proof of concept) ----------------------------------------
+//
+// A second axis, beside the scenery: how the ground near the fight is drawn.
+// Every open-air place's own ground mesh is tagged userData.scenery = 'ground'
+// in render.js. A style builds its group once per place (cached on the place
+// group as userData.groundStyle) and, if hidesGround, hides the place's own
+// ground meshes. The fighting floor (PLACE_ARENAS) must stay flat at y = 0:
+// the physics stands on it. Switched by __looks.ground(id).
+
+/** What each place's ground is made of, for a style to draw in its own way. */
+export const PLACE_GROUND = {
+  meadow: { kind: 'grass', about: 'a village green in summer: grass, a worn track, wild flowers at the edges' },
+  field: { kind: 'grass', about: 'open pasture churned by hooves down the middle' },
+  plain: { kind: 'dry', about: 'the high plain of Mexico: dry bunch grass, volcanic grit and stones' },
+  sengoku: { kind: 'trampled', about: 'autumn grass trampled to earth by armies, mud patches' },
+  colosseum: { kind: 'arena-sand', about: 'raked arena sand (harena), footprints, a few dark stains' },
+  town: { kind: 'cobbles', about: 'a market square of worn cobbles, mud and straw in the joints' },
+  coastFort: { kind: 'beach', about: 'a tropical beach before a brick fort: dry sand, wet sand at the tide line, shells' },
+  coastVillage: { kind: 'beach', about: 'a beach before a fishing village: sand, wet sand, nets, seaweed' },
+  port: { kind: 'wet-concrete', about: 'a container quay at night in the rain: wet concrete, puddles reflecting the lamps, painted lines' },
+};
+
+const CURRENT_GROUND = { id: 'current', label: 'Current ground', hidesGround: false };
+export const GROUND_STYLES = [CURRENT_GROUND, ...PAINTED_GROUND, ...PHOTO_GROUND, ...LIVING_GROUND];
+let groundInForce = 'current';
+export const groundById = (id) => GROUND_STYLES.find((style) => style.id === id);
+export const activeGround = () => groundInForce;
+
+/** Choose a ground style (it takes effect at the next applyScenery). */
+export function setGround(id) {
+  if (!groundById(id)) {
+    console.warn(`no ground style ${id}; the styles are ${GROUND_STYLES.map((style) => style.id).join(', ')}`);
+    id = 'current';
+  }
+  groundInForce = id;
+  return id;
+}
+
+function applyGround(view, place, group) {
+  const info = PLACE_GROUND[place];
+  const style = info ? groundById(groundInForce) : CURRENT_GROUND;
+  for (const child of group.children) if (child.userData.groundStyle) child.visible = child.userData.groundStyle === style.id;
+  const grounds = [];
+  group.traverse((object) => {
+    if (object.userData.scenery === 'ground') grounds.push(object);
+  });
+  if (style.hidesGround) for (const ground of grounds) ground.visible = false;
+  if (!style.build) return;
+  const context = { place, view, kind: info.kind, about: info.about, arena: PLACE_ARENAS[place], grounds };
+  let built = group.children.find((child) => child.userData.groundStyle === style.id);
+  if (!built) {
+    built = style.build({ ...context, rng: sceneryRandom(place, `ground:${style.id}`) });
+    if (!built) return;
+    built.userData.groundStyle = style.id;
+    group.add(built);
+  }
+  built.visible = true;
+  style.apply?.({ ...context, group: built });
 }
 
 /** A seeded generator per place and variant, so a variant draws the same land every time. */
