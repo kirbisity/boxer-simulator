@@ -201,9 +201,9 @@ export const PLACE_ARENAS = {
 
 /**
  * Shader programs for things that first appear in the middle of a fight —
- * a severed limb (an unskinned body-coloured piece and its ink outline), a
- * gun's smoke, the first blood and stains, an arrow's vanes — compiled before the fight instead of on the frame they appear,
- * where a compile stalls the page. Each is one zero-area triangle, drawn
+ * a severed limb (an unskinned body-coloured piece and its ink outline), the first blood and stains, an arrow's vanes, a shot's streak — compiled before the fight instead of on the frame they appear,
+ * where a compile stalls the page. (A gun's smoke and flash, sparks and glints are
+ * batches of their own, in the scene from the first frame: see battlefx.js.) Each is one zero-area triangle, drawn
  * every frame (no pixels), so its program is built with the scene's lights
  * whenever they change (a new place, at a bout's start) and never released.
  */
@@ -214,15 +214,15 @@ function shaderWarmers() {
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
   const severed = new THREE.Mesh(geometry, surface(0xffffff, { vertexColors: true, roughness: 0.55 }));
-  const smoke = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0xe9e6df, transparent: true, opacity: 0.6, depthWrite: false }));
   // Blood: instanced drops and sparks, and the stains on the floor; an arrow's double-sided vanes.
   const drops = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ color: 0x8a0d12 }), 1);
   const stains = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ color: 0x5a0a0d, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -2 }), 1);
   const vane = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xf0ece4, side: THREE.DoubleSide }));
+  const tracer = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.85, depthWrite: false }));
   // A retiarius's net: cord drawn as lines.
   const cord = new THREE.LineSegments(geometry, netCord());
   for (const instanced of [drops, stains]) instanced.setMatrixAt(0, new THREE.Matrix4());
-  group.add(severed, outlineFor(severed), smoke, drops, stains, vane, cord);
+  group.add(severed, outlineFor(severed), drops, stains, vane, tracer, cord);
   group.traverse((object) => {
     object.frustumCulled = false;
     object.userData.shared = true;

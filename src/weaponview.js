@@ -13,6 +13,7 @@ import { featherDevice, steelMaterial } from './wardrobe.js';
 import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
 import { crowdBatch } from './crowdview.js';
 import { bloodDyeClear, bloodDyeCreate, bloodDyeLand, bloodDyeUpload } from './blooddye.js';
+import { BATTLE_FX, BLACK_POWDER, battleFxAddGlint, battleFxClear, battleFxGlint, battleFxPrimary, battleFxShot, battleFxSpark, battleFxUpdate } from './battlefx.js';
 
 export const GORE = {
   // Blood: drops thrown from a wound or a stump, and the stains they leave.
@@ -24,8 +25,14 @@ export const GORE = {
   pieceSeconds: 1.1,
   colour: 0x8a0d12,
   stainColour: 0x5a0a0d,
-  sparkColour: 0xffe7a3,
+  // Sparks: steel on steel tears off glowing flecks of hot metal; at most this many in the air.
+  maxSparks: 400,
 };
+
+// The steel of a blade (sword, spear, axe and polearm heads): polished along
+// its flats and edge, so it takes a sharper reflection than the rest of the
+// fittings (guards, pommels, sockets at ~0.4).
+const POLISHED_BLADE = { color: 0xe2e6ec, roughness: 0.22 };
 
 const BRONZE = 0xb98a3e;
 const toVector = (array) => new THREE.Vector3(array[0], array[1], array[2]);
@@ -281,6 +288,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   if (kind === 'sica' || kind === 'trident') return buildArenaWeapon(kind, spec, envMap, steelMaterial);
   const group = new THREE.Group();
   const steel = steelMaterial(envMap, { vertexColors: false, color: 0xd9dde4 });
+  const polished = steelMaterial(envMap, { vertexColors: false, ...POLISHED_BLADE });
   const dark = surface(0x1b1b1f, { roughness: 0.6 });
   const leather = surface(0x3a2416, { roughness: 0.8 });
   const wood = surface(0x7a5530, { roughness: 0.7 });
@@ -463,7 +471,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
         barrel.position.z = -0.022;
         const brake = cylinder(0.017, 0.017, spec.muzzle[0] - 0.04, spec.muzzle[0], gunmetal, 10);
         brake.position.z = -0.022;
-        const blade = bladeMesh(bladeGeometry(0.05, spec.length - 0.05, 0.062, 0.012, 0.16), steel);
+        const blade = bladeMesh(bladeGeometry(0.05, spec.length - 0.05, 0.062, 0.012, 0.16), polished);
         blade.position.z = 0.016;
         group.add(box([0.07, 0.12, 0.08], [0, 0.03, 0], casing), box([0.072, 0.022, 0.082], [0, 0.07, 0], accent), barrel, brake, blade);
       } else {
@@ -587,7 +595,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     }
     case 'rapier': {
       // A long, slender blade; a swept hilt of curving bars round the hand, a cup, a long cross.
-      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.018, 0.006, 0.25), steel));
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.018, 0.006, 0.25), polished));
       const cross = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.26), steel);
       cross.position.y = 0.02;
       const cup = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel);
@@ -609,7 +617,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     case 'espada': {
       // A Spanish cut-and-thrust sword: a narrow straight blade, a cross with
       // long quillons and a side ring, a wire-bound grip, a round pommel.
-      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.03, 0.006, 0.12), steel));
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.03, 0.006, 0.12), polished));
       const cross = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.22), steel);
       cross.position.y = 0.022;
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.004, 6, 14), steel);
@@ -713,7 +721,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       break;
     }
     case 'longsword': {
-      group.add(bladeMesh(bladeGeometry(0.05, spec.length - 0.05, 0.045, 0.008, 0.22), steel));
+      group.add(bladeMesh(bladeGeometry(0.05, spec.length - 0.05, 0.045, 0.008, 0.22), polished));
       const guard = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.022, 0.24), steel);
       guard.position.y = 0.04;
       const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 10), steel);
@@ -736,7 +744,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
         mesh.rotation.x = Math.atan(slope(y));
         return mesh;
       };
-      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.032, 0.007, 0.08, bend), steel));
+      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.032, 0.007, 0.08, bend), polished));
       const handlePath = new THREE.CatmullRomCurve3(Array.from({ length: 7 }, (_, index) => {
         const y = -spec.handle + ((spec.handle + 0.026) * index) / 6;
         return new THREE.Vector3(0, y, bend(y));
@@ -750,7 +758,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     }
     case 'dagger':
     case 'knife': {
-      group.add(bladeMesh(bladeGeometry(0.02, spec.length - 0.02, 0.026, 0.005, 0.07), steel));
+      group.add(bladeMesh(bladeGeometry(0.02, spec.length - 0.02, 0.026, 0.005, 0.07), polished));
       const guard = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.01, 0.05), dark);
       guard.position.y = 0.016;
       group.add(guard, cylinder(0.014, 0.015, -spec.handle, 0.012, dark));
@@ -783,7 +791,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       const bladeLength = spec.length - bladeStart;
       group.add(cylinder(0.016, 0.018, -spec.handle, bladeStart + 0.02, surface(0x3a1e14, { roughness: 0.6 }), 10));
       const bend = (y) => -0.06 * ((y - bladeStart) / bladeLength) ** 2;
-      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.045, 0.008, 0.14, bend), steel));
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.045, 0.008, 0.14, bend), polished));
       const collar = cylinder(0.022, 0.022, bladeStart - 0.06, bladeStart + 0.01, brass, 10);
       const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.008, 16), surface(0x2a2420, { roughness: 0.5 }));
       tsuba.position.y = bladeStart - 0.07;
@@ -794,7 +802,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     case 'longSpear': {
       const headStart = spec.length - 0.28;
       group.add(cylinder(0.015, 0.017, -spec.handle, headStart + 0.02, wood, 8));
-      group.add(bladeMesh(bladeGeometry(headStart, 0.28, 0.055, 0.012, 0.18), steel));
+      group.add(bladeMesh(bladeGeometry(headStart, 0.28, 0.055, 0.012, 0.18), polished));
       const socket = cylinder(0.013, 0.018, headStart - 0.07, headStart + 0.01, steel, 8);
       group.add(socket);
       break;
@@ -808,9 +816,9 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(cylinder(0.015, 0.017, -spec.handle, headStart - 0.05, lacquer, 8));
       group.add(cylinder(0.019, 0.019, headStart - 0.09, headStart - 0.03, surface(0x8a6a2a, { roughness: 0.6 }), 8));
       group.add(cylinder(0.012, 0.017, headStart - 0.05, headStart + 0.02, steel, 8));
-      group.add(bladeMesh(bladeGeometry(headStart, 0.3, 0.035, 0.012, 0.14), steel));
+      group.add(bladeMesh(bladeGeometry(headStart, 0.3, 0.035, 0.012, 0.14), polished));
       for (const side of [1, -1]) {
-        const arm = bladeMesh(bladeGeometry(0, 0.13, 0.026, 0.008, 0.07), steel);
+        const arm = bladeMesh(bladeGeometry(0, 0.13, 0.026, 0.008, 0.07), polished);
         arm.position.y = headStart + 0.05;
         arm.rotation.z = -side * (Math.PI / 2 - 0.25);
         group.add(arm);
@@ -871,7 +879,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     }
     case 'spear': {
       group.add(cylinder(0.014, 0.015, -spec.handle, spec.length - 0.24, wood, 8));
-      group.add(bladeMesh(bladeGeometry(spec.length - 0.26, 0.26, 0.05, 0.012, 0.16), steel));
+      group.add(bladeMesh(bladeGeometry(spec.length - 0.26, 0.26, 0.05, 0.012, 0.16), polished));
       const ferrule = cylinder(0.012, 0.016, spec.length - 0.3, spec.length - 0.24, brass, 8);
       const butt = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.06, 8), brass);
       butt.rotation.x = Math.PI;
@@ -884,7 +892,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       // cord-wrapped grip and a red tassel from the pommel ring. Held, as a
       // sabre is, with its edge (and the curve's outside) away from the
       // wrist's top: the blade turned half round the grip from the katana's.
-      const sabre = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -0.05 * ((y - 0.04) / (spec.length - 0.04)) ** 2), steel);
+      const sabre = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -0.05 * ((y - 0.04) / (spec.length - 0.04)) ** 2), polished);
       sabre.rotation.y = Math.PI;
       group.add(sabre);
       const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 18), brass);
@@ -943,7 +951,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       // its grip ending in two "ears".
       const forward = kind === 'yatagan';
       const curve = (y) => (forward ? 0.04 : -0.06) * ((y - 0.04) / (spec.length - 0.04)) ** (forward ? 1.4 : 2);
-      const blade = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, forward ? 0.034 : 0.032, 0.007, 0.14, curve), steel);
+      const blade = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, forward ? 0.034 : 0.032, 0.007, 0.14, curve), polished);
       blade.rotation.y = Math.PI;
       group.add(blade);
       const grip = cylinder(0.015, 0.017, -spec.handle + 0.02, 0.03, surface(forward ? 0xe8e0cc : 0x2a1c14, { roughness: 0.6 }));
@@ -969,7 +977,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       const bladeLength = spec.length - bladeStart;
       group.add(cylinder(0.018, 0.02, -spec.handle, bladeStart + 0.02, surface(0x5a1612, { roughness: 0.55 }), 10));
       const bend = (y) => -0.09 * ((y - bladeStart) / bladeLength) ** 1.6;
-      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.085, 0.01, 0.2, bend), steel));
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.085, 0.01, 0.2, bend), polished));
       const notch = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 6), steel);
       notch.position.set(0, bladeStart + bladeLength * 0.45, -0.05);
       notch.rotation.x = -Math.PI / 2;
@@ -992,7 +1000,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(cylinder(0.018, 0.02, -spec.handle, bladeStart + 0.02, green, 10));
       for (const y of [-spec.handle + 0.04, bladeStart * 0.3, bladeStart * 0.62, bladeStart - 0.16]) group.add(cylinder(0.021, 0.021, y - 0.012, y + 0.012, gilt, 10));
       const bend = (y) => -0.1 * ((y - bladeStart) / bladeLength) ** 1.5;
-      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.1, 0.011, 0.22, bend), steel));
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.1, 0.011, 0.22, bend), polished));
       const notch = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 6), steel);
       notch.position.set(0, bladeStart + bladeLength * 0.42, -0.06);
       notch.rotation.x = -Math.PI / 2;
@@ -1026,7 +1034,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       // The straight double-edged jian: a ridged blade tapering to its
       // point, a small bronze guard, a cord-wound grip, a bronze pommel, a
       // silk tassel from it.
-      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.036, 0.007, 0.12), steel));
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.036, 0.007, 0.12), polished));
       const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.004, spec.length * 0.85, 0.004), steel);
       ridge.position.set(0.004, 0.03 + spec.length * 0.42, 0);
       ridge.userData.blade = true;
@@ -1068,7 +1076,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     case 'armingSword': {
       // A stiff, tapering blade with a fuller, a straight cross, a leather
       // grip, a wheel pommel.
-      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.048, 0.008, 0.2), steel));
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.048, 0.008, 0.2), polished));
       const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.003, spec.length * 0.55, 0.01), dark);
       fuller.position.set(0.0045, 0.03 + spec.length * 0.3, 0);
       fuller.userData.blade = true;
@@ -1084,7 +1092,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       // A broad straight blade, two-edged, a wide fuller to near the point; a
       // short cross with its langets running up the blade's flats; a grip
       // bound in leather with a gilt ferrule and a cap pommel.
-      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.052, 0.008, 0.12), steel));
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.052, 0.008, 0.12), polished));
       const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.003, spec.length * 0.7, 0.016), dark);
       fuller.position.set(0.0045, 0.04 + spec.length * 0.35, 0);
       fuller.userData.blade = true;
@@ -1127,7 +1135,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     }
     case 'shortSword':
     case 'gladius': {
-      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.055, 0.009, 0.12), steel));
+      group.add(bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.055, 0.009, 0.12), polished));
       const guard = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.08), wood);
       guard.position.y = 0.025;
       const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), wood);
@@ -1381,11 +1389,74 @@ function drawHeld(view, fighterView, arms, weapon, time) {
     arms.weapon.visible = showing;
     if (arms.weapon.userData.bow) drawString(arms.weapon, fighter);
     if (showing) arms.weapon.userData.batch?.add(arms.weapon.matrix);
+    if (showing) bladeGlint(view, weapon.kind, hand, along, flat, edge);
   } else if (arms.weapon) {
     fighterView.group.remove(arms.weapon);
     arms.weapon = null;
     arms.kind = null;
   }
+}
+
+// Where each kind's blade runs in its own frame (from the grip, +y): the
+// span of its blade meshes, found once by building one; null for no blade.
+const bladeSpans = new Map();
+
+function bladeSpan(kind) {
+  if (bladeSpans.has(kind)) return bladeSpans.get(kind);
+  let span = null;
+  if (!WEAPONS[kind]?.flag) {
+    const built = buildWeaponMesh(kind, null);
+    built.updateMatrixWorld(true);
+    const box = new THREE.Box3();
+    built.traverse((object) => {
+      if (!object.userData.blade) return;
+      object.geometry.computeBoundingBox();
+      box.union(object.geometry.boundingBox.clone().applyMatrix4(object.matrixWorld));
+    });
+    if (!box.isEmpty()) span = { from: box.min.y, to: box.max.y, x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2 };
+    disposeObject(built);
+  }
+  bladeSpans.set(kind, span);
+  return span;
+}
+
+const glintEye = [0, 0, 0];
+const glintLight = [0, 0, 0];
+
+/**
+ * The sun (or the brightest lamp) caught in a blade's flat and thrown
+ * straight into the camera: a small star of glare where it falls on the
+ * blade, as it does off polished steel turned just so. One per blade at
+ * most, and only near the mirror line.
+ */
+function bladeGlint(view, kind, hand, along, flat, edge) {
+  const primary = battleFxPrimary(view);
+  if (!primary) return;
+  const span = bladeSpan(kind);
+  if (!span) return;
+  const offset = (y) => [0, 1, 2].map((axis) => hand[axis] + flat.getComponent(axis) * span.x + along.getComponent(axis) * y + edge.getComponent(axis) * span.z);
+  const base = offset(span.from);
+  const tip = offset(span.to);
+  const camera = view.camera.position;
+  glintEye[0] = camera.x;
+  glintEye[1] = camera.y;
+  glintEye[2] = camera.z;
+  const lamp = !primary.isDirectionalLight;
+  if (lamp) primary.position.toArray(glintLight);
+  else {
+    glintLight[0] = primary.position.x - primary.target.position.x;
+    glintLight[1] = primary.position.y - primary.target.position.y;
+    glintLight[2] = primary.position.z - primary.target.position.z;
+  }
+  const glint = battleFxGlint(base, tip, flat.toArray(), edge.toArray(), glintLight, glintEye, undefined, lamp);
+  if (!glint) return;
+  // Glare is a size in the eye, not on the blade: it is drawn bigger the further off it is.
+  const distance = Math.hypot(glint.at[0] - glintEye[0], glint.at[1] - glintEye[1], glint.at[2] - glintEye[2]);
+  const toward = 0.03 / Math.max(distance, 0.1);
+  const at = glint.at.map((value, axis) => value + (glintEye[axis] - value) * toward);
+  const brightness = Math.min(2, primary.intensity) * 1.4;
+  const colour = [primary.color.r * brightness, primary.color.g * brightness, primary.color.b * brightness];
+  battleFxAddGlint(view, at, glint.strength, colour, Math.min(0.6, distance * BATTLE_FX.glintSize * (0.6 + glint.strength)));
 }
 
 /** Forearm weapons (the kit's `mounted`) not in use, drawn on their arms; and the shield on its arm. */
@@ -1645,6 +1716,13 @@ export function updateDebris(view, world) {
 
 /** A new bout: clear what lay on the floor. */
 export function clearGore(view) {
+  battleFxClear(view);
+  for (const shot of view.shots ?? []) {
+    view.scene.remove(shot.tracer);
+    shot.tracer.geometry.dispose();
+    shot.tracer.material.dispose();
+  }
+  view.shots = [];
   for (const mesh of view.pieces?.values() ?? []) {
     view.scene.remove(mesh);
     disposeObject(mesh);
@@ -1656,6 +1734,7 @@ export function clearGore(view) {
     view.blood.stainCount = 0;
     view.blood.stains.count = 0;
     view.blood.dropMesh.count = 0;
+    view.blood.sparks = [];
     bloodDyeClear(view.blood.dye);
     bloodDyeUpload(view.blood.dye, view.clock ?? 0);
   }
@@ -1674,11 +1753,9 @@ function bloodOf(view) {
   stains.count = 0;
   stains.frustumCulled = false;
   stains.receiveShadow = true;
-  const sparkMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 5, 3), new THREE.MeshBasicMaterial({ color: GORE.sparkColour }), 200);
-  sparkMesh.count = 0;
-  sparkMesh.frustumCulled = false;
-  view.scene.add(dropMesh, stains, sparkMesh);
-  view.blood = { drops: [], sparks: [], emitters: [], dropMesh, stains, sparkMesh, stainCount: 0, dye: bloodDyeCreate() };
+  view.scene.add(dropMesh, stains);
+  // The sparks are drawn with the other glowing things (battlefx.js); only their flight is kept here.
+  view.blood = { drops: [], sparks: [], emitters: [], dropMesh, stains, stainCount: 0, dye: bloodDyeCreate() };
   return view.blood;
 }
 
@@ -1695,9 +1772,9 @@ export function spawnBlood(view, at, direction, count, speed = 2.2) {
 
 // ---- Shots ------------------------------------------------------------------
 
-const SHOT = { flashSeconds: 0.06, tracerSeconds: 0.08, smokeSeconds: 2.5 };
+const SHOT = { tracerSeconds: 0.08 };
 
-/** A shot: the flash at the muzzle, a streak to where it went, and what it hit. */
+/** A shot: the flash at the muzzle, a streak to where it went, smoke, and what it hit. */
 export function spawnShot(view, event) {
   const shots = view.shots ?? (view.shots = []);
   const from = toVector(event.from);
@@ -1705,71 +1782,48 @@ export function spawnShot(view, event) {
   const length = from.distanceTo(to);
   const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, length, 4, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.85, depthWrite: false }));
   tracer.position.copy(from).lerp(to, 0.5);
-  tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
-  const heavy = WEAPONS[event.weapon]?.shot;
-  const flash = new THREE.Mesh(new THREE.SphereGeometry(heavy ? 0.12 : 0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffc35a, transparent: true, opacity: 1, depthWrite: false }));
-  flash.position.copy(from);
-  view.scene.add(tracer, flash);
-  shots.push({ tracer, flash, age: 0 });
-  // Black powder: a cloud of white smoke hangs where the gun went off.
-  if (heavy) {
-    // A few soft puffs, not one ball, sharing one fading material.
-    const material = new THREE.MeshLambertMaterial({ color: 0xe9e6df, transparent: true, opacity: 0.6, depthWrite: false });
-    const smoke = new THREE.Group();
-    smoke.material = material;
-    const ahead = to.clone().sub(from).normalize();
-    for (let puff = 0; puff < 5; puff += 1) {
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.07 + Math.random() * 0.07, 8, 6), material);
-      ball.position.copy(ahead).multiplyScalar(0.1 + puff * 0.08).add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).multiplyScalar(0.12));
-      smoke.add(ball);
-    }
-    smoke.position.copy(from);
-    smoke.geometry = { dispose() { for (const ball of smoke.children) ball.geometry.dispose(); } };
-    view.scene.add(smoke);
-    shots.push({ smoke, age: 0 });
+  const ahead = to.clone().sub(from).normalize();
+  tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ahead);
+  view.scene.add(tracer);
+  shots.push({ tracer, age: 0 });
+  // One flash and one cloud per firing: a shotgun's nine pellets are nine events at one moment.
+  const firing = `${event.attacker}:${event.time}`;
+  if (view.lastFiring !== firing) {
+    view.lastFiring = firing;
+    const spec = WEAPONS[event.weapon] ?? {};
+    const powder = BLACK_POWDER.has(event.weapon);
+    // The priming pan (or touch-hole) at the lock, back along the barrel from the muzzle and a little up.
+    const back = spec.muzzle ? spec.muzzle[0] * (spec.longGun ? 0.85 : 0.7) : 0.15;
+    const pan = powder ? [from.x - ahead.x * back, from.y - ahead.y * back + 0.03, from.z - ahead.z * back] : null;
+    battleFxShot(view, { from: event.from, dir: ahead.toArray(), powder, long: Boolean(spec.longGun), pan });
   }
   if (event.plate === 'knight') {
     // Off plate: a spray of sparks and the round whining away off the steel.
-    spawnSparks(view, event.point, 16);
-    const incoming = to.clone().sub(from).normalize();
+    spawnSparks(view, event.point, 22);
+    const incoming = ahead;
     const normal = toVector(event.normal).normalize();
     const away = incoming.clone().sub(normal.clone().multiplyScalar(2 * incoming.dot(normal))).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.6, Math.random() - 0.5).multiplyScalar(0.6)).normalize();
     const ricochet = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 1.2, 4, 1, true), tracer.material.clone());
     ricochet.position.copy(to).addScaledVector(away, 0.6);
     ricochet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), away);
     view.scene.add(ricochet);
-    shots.push({ tracer: ricochet, flash: new THREE.Mesh(), age: 0 });
-  } else if (event.plate) spawnSparks(view, event.point, 5);
+    shots.push({ tracer: ricochet, age: 0 });
+  } else if (event.plate) spawnSparks(view, event.point, 8);
   else if (event.harm > 0.02) spawnBlood(view, event.point, event.normal, Math.min(24, 6 + Math.round(event.harm * 20)), 2.2);
-  else if (event.target) spawnSparks(view, event.point, 8);
+  else if (event.target) spawnSparks(view, event.point, 8, { flash: false });
 }
 
-/** Fade the flashes and streaks out. */
+/** Fade the streaks out; move the smoke on and fill the effect batches (every frame, from the first). */
 export function updateShots(view, dt) {
+  battleFxUpdate(view, dt, view.blood?.sparks);
   if (!view.shots?.length) return;
   view.shots = view.shots.filter((shot) => {
     shot.age += dt;
-    if (shot.smoke) {
-      // The smoke swells, drifts up and thins over a couple of seconds.
-      const share = shot.age / SHOT.smokeSeconds;
-      shot.smoke.scale.setScalar(1 + share * 3);
-      shot.smoke.position.y += dt * 0.15;
-      shot.smoke.material.opacity = 0.6 * Math.max(0, 1 - share);
-      if (share < 1) return true;
-      view.scene.remove(shot.smoke);
-      shot.smoke.geometry.dispose();
-      shot.smoke.material.dispose();
-      return false;
-    }
-    shot.flash.material.opacity = Math.max(0, 1 - shot.age / SHOT.flashSeconds);
-    shot.flash.scale.setScalar(1 + shot.age * 12);
     shot.tracer.material.opacity = 0.85 * Math.max(0, 1 - shot.age / SHOT.tracerSeconds);
-    if (shot.age < Math.max(SHOT.flashSeconds, SHOT.tracerSeconds)) return true;
-    for (const mesh of [shot.tracer, shot.flash]) {
-      view.scene.remove(mesh);
-      mesh.geometry.dispose();
-      mesh.material.dispose();
-    }
+    if (shot.age < SHOT.tracerSeconds) return true;
+    view.scene.remove(shot.tracer);
+    shot.tracer.geometry.dispose();
+    shot.tracer.material.dispose();
     return false;
   });
 }
@@ -1847,13 +1901,21 @@ export function updateArrows(view, world) {
   }
 }
 
-/** Sparks off steel meeting steel or turned by plate. */
-export function spawnSparks(view, at, count = 14) {
+/**
+ * Sparks off steel meeting steel or turned by plate: flecks of metal torn
+ * off hot enough to burn white, thrown out fast, cooling through orange to
+ * red as they fall; each drawn as a short streak along its flight. `flash`:
+ * a brief burst of light at the point of contact.
+ */
+export function spawnSparks(view, at, count = 26, { flash = true } = {}) {
   const blood = bloodOf(view);
-  for (let index = 0; index < count && blood.sparks.length < 200; index += 1) {
-    const velocity = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize().multiplyScalar(2 + Math.random() * 3);
-    blood.sparks.push({ position: toVector(at), velocity, life: 0.18 + Math.random() * 0.2 });
+  for (let index = 0; index < count && blood.sparks.length < GORE.maxSparks; index += 1) {
+    const velocity = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9 - 0.1, Math.random() - 0.5).normalize().multiplyScalar(2 + Math.random() ** 2 * 5);
+    // Most die in the air in a few tenths of a second; some last to the floor.
+    const life = 0.25 + Math.random() ** 2 * 0.6;
+    blood.sparks.push({ position: toVector(at), velocity, life, lifeAtStart: life, width: 0.005 + Math.random() * 0.004, bounced: false });
   }
+  if (flash) battleFxSpark(view, at, 0.08 + Math.min(count, 30) * 0.004);
 }
 
 /** A cut or a stab: blood from the wound, out against the blade. */
@@ -1922,18 +1984,19 @@ export function updateBlood(view, world, dt) {
   bloodDyeUpload(blood.dye, now, view.place);
   blood.sparks = blood.sparks.filter((spark) => {
     spark.life -= dt;
+    // Light flecks: the air slows them a little as gravity takes them.
+    spark.velocity.multiplyScalar(Math.exp(-0.8 * dt));
     spark.velocity.y -= 9.81 * dt;
     spark.position.addScaledVector(spark.velocity, dt);
+    if (spark.position.y < floor && spark.velocity.y < 0) {
+      // On the floor: one skip, low and slower; the second time it lies there and goes out.
+      if (spark.bounced) return false;
+      spark.bounced = true;
+      spark.position.y = floor;
+      spark.velocity.set(spark.velocity.x * 0.55, -spark.velocity.y * 0.3, spark.velocity.z * 0.55);
+    }
     return spark.life > 0;
   });
-  blood.sparks.forEach((spark, index) => {
-    placer.position.copy(spark.position);
-    placer.scale.setScalar(0.006);
-    placer.updateMatrix();
-    blood.sparkMesh.setMatrixAt(index, placer.matrix);
-  });
-  blood.sparkMesh.count = blood.sparks.length;
-  blood.sparkMesh.instanceMatrix.needsUpdate = true;
   // Pieces follow their debris.
   for (const [id, piece] of view.pieces ?? []) {
     const debris = world.debris?.[id];
