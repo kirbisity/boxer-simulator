@@ -68,7 +68,8 @@ function probeLiteHall(light, x, y, z, out) {
   const floor = probeLiteSmooth(0, 0.3, -y);
   for (let c = 0; c < 3; c++) {
     let v = bg[c] + light.panel[c] * warm + light.panel[c] * 0.35 * ringLights;
-    v = probeLiteMix(v, bg[c] * 0.4, floor);
+    // Below: a lit canvas throws the lamps' light back up; a hall floor without one is dark.
+    v = probeLiteMix(v, light.bounce ? light.bounce[c] : bg[c] * 0.4, floor);
     out[c] = v;
   }
   return out;
@@ -211,10 +212,12 @@ const probeLiteKind = (place) => (PROBE_LITE_PLACES.night.includes(place) ? 'nig
 // and keyGain on the overhead key. A fight-night ring sits under a bank of
 // lamps far brighter than the hall around it, so the stage is lit to read
 // at least as well as toon's (toon has a hemisphere fill and a rim this look
-// switches off); the hall around it stays dark.
+// switches off); the hall around it stays dark. bounce is the light the
+// lit canvas throws back up from below (its pale grey-blue times the lamps):
+// it fills chins, undersides and the shadowed side, as a real ring's floor does.
 const PROBE_LITE_HALLS = {
-  ring: { hallBase: [0.07, 0.08, 0.12], panel: [1.0, 0.9, 0.72], probe: 1.0, keyGain: 1.6 },
-  stadium: { hallBase: [0.05, 0.06, 0.1], panel: [1.0, 0.97, 0.9], probe: 0.9, keyGain: 1.5 },
+  ring: { hallBase: [0.07, 0.08, 0.12], panel: [1.0, 0.9, 0.72], probe: 1.0, keyGain: 1.6, bounce: [0.42, 0.41, 0.37] },
+  stadium: { hallBase: [0.05, 0.06, 0.1], panel: [1.0, 0.97, 0.9], probe: 0.9, keyGain: 1.5, bounce: [0.46, 0.47, 0.48] },
   subway: { hallBase: [0.07, 0.1, 0.08], panel: [0.82, 1.0, 0.86], probe: 0.55 },
 };
 
