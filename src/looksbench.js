@@ -141,6 +141,26 @@ export const COMPARE_SCENES = {
     frames: 120,
     camera: { focus: { centre: true, height: 1.0 }, yaw: -0.5, pitch: 0.34, distance: 26, fov: 40 },
   },
+  'fx-night': {
+    about: 'A teppō man and a knight at the port at night, side on: the gun smoke and muzzle flash in the dark (fire one with boxer.fx.shot).',
+    place: 'port',
+    seed: 6,
+    frames: 30,
+    red: [{ preset: 'matchlock' }],
+    blue: [{ preset: 'knight' }],
+    distance: 3.2,
+    camera: { focus: { centre: true, height: 1.4 }, yaw: 1.6, pitch: 0.06, distance: 4.5, fov: 50 },
+  },
+  'fx-day': {
+    about: 'Two knights with long swords in the field in the sun, close in: steel blades, their glint, the sparks when they meet.',
+    place: 'field',
+    seed: 8,
+    frames: 70,
+    red: [{ preset: 'knight' }],
+    blue: [{ preset: 'knight' }],
+    distance: 2.2,
+    camera: { focus: { centre: true, height: 1.4 }, yaw: 1.3, pitch: 0.05, distance: 3.2, fov: 45 },
+  },
 };
 
 // Close shots of the ground at each open-air place: two fighters, the camera

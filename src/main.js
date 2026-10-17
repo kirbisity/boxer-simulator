@@ -698,7 +698,7 @@ function consumeEvents() {
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     if (event.kind === 'shot') spawnShot(scene, event);
     if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : woundBlood(scene, event));
-    if (event.kind === 'bladeBlock') (event.cut > 1 ? woundBlood : (view, at) => spawnSparks(view, at.point, 6))(scene, event);
+    if (event.kind === 'bladeBlock') (event.cut > 1 ? woundBlood : (view, at) => spawnSparks(view, at.point, 18))(scene, event);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);
@@ -2129,5 +2129,16 @@ const boxer = window.boxer = {
       for (let left = seconds; left > 1e-9; left -= dt) updateBlood(scene, state.world, Math.min(dt, left));
     },
     clouds: () => scene.blood?.dye.clouds ?? [],
+  },
+  // Shots and sparks (tests, shots): fire a shot event ({ from, to, weapon, attacker }); throw sparks at a point; let them run on `seconds`.
+  fx: {
+    shot: (event) => spawnShot(scene, { attacker: 0, time: state.world.time, point: event.to, normal: [0, 0, 1], harm: 0, ...event }),
+    sparks: (at, count) => spawnSparks(scene, at, count),
+    step: (seconds, dt = 1 / 60) => {
+      for (let left = seconds; left > 1e-9; left -= dt) {
+        updateShots(scene, Math.min(dt, left));
+        updateBlood(scene, state.world, Math.min(dt, left));
+      }
+    },
   },
 };
