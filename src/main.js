@@ -2132,6 +2132,8 @@ const boxer = window.boxer = {
   // Dev tool: every control on the screen now, judged for size, place and whether anything covers it (uicheck.js).
   checkButtons,
   preview,
+  // The fight's attack controls: a POC to try ('buttons', 'swipe', 'target', 'radial'), or null for today's pad (fightui/index.js).
+  fightUi: (id) => fightControls.fightUi(id),
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
