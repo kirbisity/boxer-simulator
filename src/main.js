@@ -27,7 +27,7 @@ import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
-import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
+import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -2121,5 +2121,13 @@ const boxer = window.boxer = {
   advance: (seconds) => {
     tick(seconds, { budget: Infinity });
     draw(0);
+  },
+  // Blood (tests, shots): throw `count` drops from a point; let the blood alone run on `seconds` (drops fall, stains, clouds in water).
+  blood: {
+    spawn: (at, direction = [0, 1, 0], count = 20, speed = 1.5) => spawnBlood(scene, at, direction, count, speed),
+    step: (seconds, dt = 1 / 60) => {
+      for (let left = seconds; left > 1e-9; left -= dt) updateBlood(scene, state.world, Math.min(dt, left));
+    },
+    clouds: () => scene.blood?.dye.clouds ?? [],
   },
 };

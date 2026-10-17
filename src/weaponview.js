@@ -12,6 +12,7 @@ import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
 import { featherDevice, steelMaterial } from './wardrobe.js';
 import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
 import { crowdBatch } from './crowdview.js';
+import { bloodDyeClear, bloodDyeCreate, bloodDyeLand, bloodDyeUpload } from './blooddye.js';
 
 export const GORE = {
   // Blood: drops thrown from a wound or a stump, and the stains they leave.
@@ -1655,6 +1656,8 @@ export function clearGore(view) {
     view.blood.stainCount = 0;
     view.blood.stains.count = 0;
     view.blood.dropMesh.count = 0;
+    bloodDyeClear(view.blood.dye);
+    bloodDyeUpload(view.blood.dye, view.clock ?? 0);
   }
 }
 
@@ -1675,7 +1678,7 @@ function bloodOf(view) {
   sparkMesh.count = 0;
   sparkMesh.frustumCulled = false;
   view.scene.add(dropMesh, stains, sparkMesh);
-  view.blood = { drops: [], sparks: [], emitters: [], dropMesh, stains, sparkMesh, stainCount: 0 };
+  view.blood = { drops: [], sparks: [], emitters: [], dropMesh, stains, sparkMesh, stainCount: 0, dye: bloodDyeCreate() };
   return view.blood;
 }
 
@@ -1892,6 +1895,8 @@ export function updateBlood(view, world, dt) {
     drop.velocity.y -= 9.81 * dt;
     drop.position.addScaledVector(drop.velocity, dt);
     if (drop.position.y > floor) return true;
+    // Into standing water: it sinks and spreads, no stain.
+    if (bloodDyeLand(view, blood.dye, drop.position.x, drop.position.z, (drop.size / GORE.dropRadius) ** 3, now)) return false;
     // A stain where it lands; drops landing together run into one pool.
     const slot = blood.stainCount % GORE.maxStains;
     const size = drop.size * (2.5 + Math.random() * 3);
@@ -1914,6 +1919,7 @@ export function updateBlood(view, world, dt) {
   });
   blood.dropMesh.count = blood.drops.length;
   blood.dropMesh.instanceMatrix.needsUpdate = true;
+  bloodDyeUpload(blood.dye, now, view.place);
   blood.sparks = blood.sparks.filter((spark) => {
     spark.life -= dt;
     spark.velocity.y -= 9.81 * dt;
