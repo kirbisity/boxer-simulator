@@ -15,6 +15,7 @@ import { concussionCapacity } from './physics.js';
 import { Dangle } from './dangle.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
+import { assignColour } from './looks/kit.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
@@ -461,7 +462,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     guard.visible = opening.visible;
     opening.scale.set(0.5 + 0.5 * face.mouth, Math.max(0.15, face.mouth), 1);
     for (const disc of blush) disc.material.opacity = face.flush * 0.55;
-    skinMaterial.color.copy(baseSkin).lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare);
+    assignColour(skinMaterial, 'color', baseSkin.clone().lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare));
   }
 
   // Under a helmet: no hair, and no locks swinging through the steel; the

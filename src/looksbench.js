@@ -13,6 +13,8 @@
 //   framing and hides the HUD).
 
 /* global THREE */
+import { activeLook, LOOKS } from './looks.js';
+import { defineLook, loadScripts, sweepMaterials } from './looks/kit.js';
 
 /** A small seeded generator (mulberry32): the same sequence from the same seed. */
 function seededGenerator(seed) {
@@ -133,6 +135,8 @@ export function installLooksBench(context) {
     state.paused = false;
     state.speed = 1;
     state.layer = 'skin';
+    // What a place paints with Math.random (the crowd's colours, the grass) is built now, under this seed.
+    context.forgetPlaces();
     if (spec.level) {
       context.setGame('level', { text: 'Again', run: () => {} });
       state.seed = spec.seed;
@@ -258,6 +262,60 @@ export function installLooksBench(context) {
     return result;
   }
 
+  /**
+   * The test of a look's colour pipeline: three unlit swatches of one
+   * authored colour (as a material colour, as a canvas texture, as a vertex
+   * colour) drawn through the renderer as the look has set it, with tone
+   * mapping off for them, read back from the canvas. Each must come back as
+   * the authored hex, within a few levels; a milky or dark swatch means a
+   * piece of the sRGB decoding is missing (see "The colour trap", looks.js).
+   */
+  function colourCheck(hex = 0x5f7f3a) {
+    const renderer = scene.renderer;
+    const authored = new THREE.Color(hex);
+    const canvas = Object.assign(document.createElement('canvas'), { width: 4, height: 4 });
+    const paint = canvas.getContext('2d');
+    paint.fillStyle = `#${hex.toString(16).padStart(6, '0')}`;
+    paint.fillRect(0, 0, 4, 4);
+    const quad = (x, material, colours) => {
+      const geometry = new THREE.PlaneGeometry(1.6, 1.6);
+      if (colours) geometry.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: 4 }, () => [authored.r, authored.g, authored.b]).flat(), 3));
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.x = x;
+      return mesh;
+    };
+    const basic = (options) => new THREE.MeshBasicMaterial({ toneMapped: false, ...options });
+    const swatches = [
+      ['colour', quad(-2, basic({ color: hex }))],
+      ['texture', quad(0, basic({ map: new THREE.CanvasTexture(canvas) }))],
+      ['vertex', quad(2, basic({ vertexColors: true }), true)],
+    ];
+    const swatchScene = new THREE.Scene();
+    swatchScene.add(...swatches.map(([, mesh]) => mesh));
+    sweepMaterials(swatchScene, Boolean(activeLook().linear));
+    const camera = new THREE.OrthographicCamera(-3, 3, 1, -1, 0.1, 10);
+    camera.position.z = 5;
+    renderer.setRenderTarget(null);
+    renderer.render(swatchScene, camera);
+    const gl = renderer.getContext();
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    const wanted = [authored.r, authored.g, authored.b].map((value) => Math.round(value * 255));
+    const results = swatches.map(([kind, mesh]) => {
+      const pixel = new Uint8Array(4);
+      gl.readPixels(Math.floor(((mesh.position.x + 3) / 6) * width), Math.floor(height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      const got = [pixel[0], pixel[1], pixel[2]];
+      return { kind, wanted, got, ok: got.every((value, index) => Math.abs(value - wanted[index]) <= 3) };
+    });
+    for (const [, mesh] of swatches) {
+      mesh.geometry.dispose();
+      mesh.material.map?.dispose();
+      mesh.material.dispose();
+    }
+    context.render();
+    return { look: looks.current(), ok: results.every((result) => result.ok), results };
+  }
+
   window.__looks = {
     list: () => looks.list(),
     current: () => looks.current(),
@@ -266,6 +324,7 @@ export function installLooksBench(context) {
     stage,
     capture,
     stats,
+    colourCheck,
     /** stage + capture, named <scene>-<look> unless a name is given. */
     shoot: async (sceneId, name = `${sceneId}-${looks.current()}`, options = {}) => {
       await stage(sceneId);
@@ -283,5 +342,17 @@ export function installLooksBench(context) {
       return staged.spec.camera;
     },
     unseed: () => { Math.random = NATIVE_RANDOM; },
+    /**
+     * Try a look from the console without a file: `__looks.register({ id, label, blurb, style, scripts, prepare, apply, ... })`
+     * adds it to the registry and the selector (until the page is reloaded), then `await __looks.set(id)`.
+     */
+    register: (spec) => {
+      const look = defineLook({ label: spec.id, blurb: 'Registered from the console.', ...spec });
+      LOOKS.push(look);
+      document.querySelector('#look')?.append(Object.assign(new Option(look.label, look.id), { title: look.blurb }));
+      return look.id;
+    },
+    /** Load non-module scripts as a look's `scripts` would (once each, in order). */
+    loadScripts,
   };
 }

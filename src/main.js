@@ -7,7 +7,7 @@ import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
-import { STYLE } from './toon.js';
+import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
@@ -24,7 +24,7 @@ import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADG
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
 import { updateNets } from './arenaview.js';
-import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, placeCamera, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { clearGore, severView, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -79,7 +79,12 @@ const shortName = (name) => {
   return `${first}${number ? ` ${number[1]}` : ''}`;
 };
 
+// The look (looks.js): ?look= over the one remembered. One that needs nothing loaded is in force before the scene is made; the others are switched to once the page is up.
+const startingLookId = lookIdFromSearch(location.search) ?? rememberedLookId() ?? DEFAULT_LOOK_ID;
+activateLookNow(startingLookId);
+
 const scene = createScene($('#stage'));
+if (activeLook().id !== DEFAULT_LOOK_ID) reapplyPlace(scene);
 
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
 let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
@@ -821,11 +826,36 @@ segmented('#layers', (layer) => {
   for (const view of state.views) setLayer(view, layer);
 });
 segmented('#corner-tabs', (corner) => { $('.corners').dataset.showing = corner; });
-segmented('#styles', (style) => {
-  STYLE.current = style;
-  // A few a frame, as at a level's start: an army rebuilt at once stalls the page for seconds.
-  rebuildViews({ progressive: true });
-});
+// ---- The look: a selector, ?look=, and what is remembered ---------------------
+
+const lookSelect = $('#look');
+lookSelect.append(...LOOKS.map((look) => Object.assign(new Option(look.placeholder ? `${look.label} (soft)` : look.label, look.id), { title: look.blurb })));
+lookSelect.value = activeLook().id;
+let lookQueue = Promise.resolve();
+
+/**
+ * Switch the whole game to another look: its scripts and scene setup are
+ * loaded first (a failure leaves the toon look, with a warning), then the
+ * place is lit again and every model rebuilt, a few a frame as at a level's
+ * start (an army rebuilt at once stalls the page for seconds). Resolves when
+ * the look is in force. Switches are taken in turn.
+ */
+function switchLook(id, { remember = false } = {}) {
+  lookQueue = lookQueue.then(async () => {
+    const look = (await loadLook(id, [scene])) ?? lookById(DEFAULT_LOOK_ID);
+    activateLook(look);
+    lookSelect.value = look.id;
+    if (remember) rememberLook(look.id);
+    reapplyPlace(scene);
+    // Templates keep the materials of the look they were built in.
+    clearCrowdTemplates(scene);
+    rebuildViews({ progressive: true });
+    return look;
+  });
+  return lookQueue;
+}
+lookSelect.addEventListener('change', () => switchLook(lookSelect.value, { remember: true }));
+
 segmented('#speeds', (speed) => { state.speed = Number(speed); });
 for (const corner of ['red', 'blue']) {
   const select = $(`#team-${corner}`);
@@ -1672,6 +1702,8 @@ function drawPortrait(inputs) {
     canvas.height = 380;
     portraitView = createScene(canvas);
     portraitView.renderer.setPixelRatio(1);
+    // Rewritten below as the look asks (flattenView): the baseline it is undone to is this size.
+    portraitView.defaults.renderer.pixelRatio = 1;
     resize(portraitView, 300, 380);
     portraitView.places.ring.visible = false;
     portraitView.scene.background = new THREE.Color(0x1a1f2c);
@@ -1682,6 +1714,8 @@ function drawPortrait(inputs) {
   placeFighter(fighter, 0, 0);
   fighter.yaw = -0.45;
   advance(world, 0.7, null, STEP);
+  // Drawn plainly in the look's renderer settings and colours: its steel map must be in place before the fighter is built.
+  flattenView(portraitView);
   const view = buildFighterView(portraitView, fighter);
   setLayer(view, 'skin');
   updateFighterView(view, 0, world.time);
@@ -1690,6 +1724,7 @@ function drawPortrait(inputs) {
   Object.assign(portraitView.orbit, { distance: 2.35, pitch: 0.08, yaw: 0.15 });
   portraitView.orbit.target.set(0, 1.0, 0);
   placeCamera(portraitView, null);
+  flattenView(portraitView);
   render(portraitView);
   const url = portraitView.renderer.domElement.toDataURL('image/png');
   disposeFighterView(portraitView, view);
@@ -1866,6 +1901,8 @@ fit();
 if (introWanted()) playIntro(introStage, menus.home);
 else menus.home();
 requestAnimationFrame(frame);
+// A look that needs its scripts loaded or its scene prepared (or one not found: it warns and stays toon) comes now, over the first bout.
+if (activeLook().id !== startingLookId) switchLook(startingLookId);
 
 // ---- Design sheets -------------------------------------------------------------
 
@@ -2014,8 +2051,9 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
 installLooksBench({
   state,
   scene,
-  looks: { list: () => [{ id: 'toon' }], current: () => 'toon', set: async () => {} },
+  looks: { list: lookList, current: () => activeLook().id, set: switchLook },
   setGame,
+  forgetPlaces: () => forgetPlaces(scene),
   chooseLevel,
   fight,
   // The first visit's intro is over the scene until skipped.

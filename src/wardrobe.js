@@ -5,6 +5,8 @@
 import { Dangle } from './dangle.js';
 import { heelLift, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
+import { activeLook } from './looks.js';
+import { outlineScale } from './looks/kit.js';
 import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 import { buildStechhelm } from './stechzeug.js';
 
@@ -101,6 +103,9 @@ export function tattooColor(point, segment, skin) {
 
 /** A metal material for steel: shiny, lit by the shared reflection map. */
 export function steelMaterial(envMap, options = {}) {
+  // A look may build its own metal; it answers nothing to leave it to the default.
+  const custom = activeLook().steel?.(envMap, options);
+  if (custom) return custom;
   return new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: WARDROBE.steel.metalness, roughness: WARDROBE.steel.roughness, envMap, envMapIntensity: 1.1, ...options });
 }
 
@@ -108,7 +113,7 @@ export function steelMaterial(envMap, options = {}) {
  * The reflection map for steel: a painted gradient sky with a bright
  * horizon band, made into an environment once per scene.
  */
-export function steelEnvironment(renderer) {
+export function steelEnvironment(renderer, { linear = false } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 128;
@@ -130,6 +135,8 @@ export function steelEnvironment(renderer) {
     g.fillRect(x - 18, y - 18, 36, 36);
   }
   const texture = new THREE.CanvasTexture(canvas);
+  // The painted sky is authored in sRGB; a linear-workflow look needs it decoded before it is filtered (see the colour trap in looks.js).
+  if (linear) texture.encoding = THREE.sRGBEncoding;
   texture.mapping = THREE.EquirectangularReflectionMapping;
   const generator = new THREE.PMREMGenerator(renderer);
   const target = generator.fromEquirectangular(texture);
@@ -148,7 +155,7 @@ export function inkAll(group, width = 0.003) {
   });
   for (const piece of meshes) {
     piece.castShadow = true;
-    if (!piece.userData.noOutline) piece.add(outlineFor(piece, width));
+    if (!piece.userData.noOutline && outlineScale(activeLook()) !== 0) piece.add(outlineFor(piece, width));
   }
 }
 

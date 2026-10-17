@@ -74,6 +74,118 @@ menus; `src/intro.js` the intro on a first visit (the roster's `legend`
 entries, a faction at a time, staged by main.js's `introStage`; skippable,
 remembered in localStorage, replayed from the home screen). Anything removed from the scene is freed with `disposeObject`.
 
+## Looks (browser only)
+
+A **look** is a whole way of drawing the game, switchable at runtime: the
+Look selector in the sandbox's footer, `?look=<id>` in the URL, and the choice
+made last (localStorage, kept only when picked in the selector). `toon` is the
+default and is today's drawing exactly (no hooks, nothing loaded, same pixels
+and speed as before looks existed); the five others (`physical-sky`,
+`hdr-post`, `probe-lite`, `quality-physical`, `photo-hdri`) are placeholders
+(the soft style) waiting for their real look.
+
+| File | Owns |
+|---|---|
+| `src/looks.js` | The registry (`LOOKS`), the look in force (`activeLook`), choosing and loading a look (`loadLook`, `setLook`, `activateLookNow`), and the plumbing render.js calls: `captureViewDefaults`, `resetForLook`, `applyLook`, `drawFrame`, `resizeLook`, `flattenView`. Its header holds the shoot-and-measure recipe, the colour trap and the other r128 traps. |
+| `src/looks/kit.js` | What look files import: `defineLook` and the `Look` type, `loadScripts` (lazy `<script>` tags, once each, in order, with a timeout), the colour helpers (`linearColour`, `linearise`, `sweepMaterials`, `assignColour`), renderer/sky/environment helpers (`setRenderer`, `hidePaintedSky`, `replaceEnvironment`, `own`, `stateOf`, `setShadowMapSize`), and THREE's constants by name (`TONE_MAPPING`, `OUTPUT_ENCODING`, `SHADOW_MAP`), so a look is plain data until a hook runs. |
+| `src/looks/<id>.js` | One look. Exports one `<ID>_LOOK`. |
+| `src/looksbench.js` | `window.__looks`: the staged still-lifes (`COMPARE_SCENES`), `capture`, `stats`, `colourCheck`, `register`. |
+
+**The interface** (`Look` in `kit.js`): `id`, `label`, `blurb`; `style`
+('toon' or 'soft': what `surface()` builds when the look has no hook of its
+own); `scripts` (urls of optional three r128 example scripts, dependencies
+first; loaded once and only when the look is chosen; a failure or a throw in
+`prepare` falls back to toon with a console warning); `linear` (opt in to the
+colour handling below); `outlines` (`true` as drawn, `false` none and no hull
+meshes at all, a number multiplies every width); `renderer` (static renderer
+settings, also given to the portrait renderer); and hooks, each optional (a
+hook left out is the identity):
+
+- `prepare(view)` (async): once per scene after the scripts load. Build what is
+  expensive and reusable: an environment, a composer. Keep it in
+  `stateOf(view, id)`.
+- `apply(view, place)`: every time the place or the look changes, *after*
+  `setPlace` has set the default rig for the place (`view.light` is the
+  place's `PLACE_LIGHT` entry). Set renderer settings (`setRenderer`),
+  `scene.environment` and the steel's map (`replaceEnvironment`), the sky
+  (`hidePaintedSky`; the painted domes are tagged `userData.paintedSky`; add
+  your own with `own(view, object)`), fog, and the lights (`view.lights.key`,
+  `rim`, `sun`, `hemi`). Whatever it changes is put back before the next
+  `apply`, so it never has to undo itself.
+- `surface(color, options)` and `steel(envMap, options)`: the skin-and-cloth
+  and metal materials; return a material, or nothing for the default.
+- `renderFrame(view)` and `resize(view, w, h)`: the whole frame (an
+  EffectComposer) and its sizing; `dispose(view)` frees what `own` did not know of.
+
+Life cycle: choosing a look (`switchLook` in main.js) loads its scripts and
+runs `prepare` for the scene; then `reapplyPlace` (reset to the built defaults,
+the default rig, `applyLook`), `clearCrowdTemplates` and a progressive
+`rebuildViews` (so materials and outlines are made afresh). Leaving a look runs
+its `dispose`, frees what it `own`ed, and restores the renderer, lights,
+environment and painted skies from the snapshot taken when the scene was built.
+
+**Adding a look** is editing one file, `src/looks/<id>.js` (it already exists
+as a placeholder, is registered, bundled and listed): add the hooks, delete
+`placeholder`. Prefix every top-level name in it with the look: the bundle puts
+all modules in one scope and `tools/bundle.js` and `test/looks.test.js` refuse
+a duplicate. Try an idea without a file first: `__looks.register({ id, ... })`.
+
+**The colour trap (r128).** Colour is not managed: a hex is used as if it were
+linear light and the canvas is written as it stands, so the game is authored in
+display values and shown unchanged. Set `outputEncoding = sRGBEncoding` (or tone
+map) and everything authored is brightened and washed out, unless it is all
+decoded on the way in. A look that wants a linear workflow says `linear: true`
+and the plumbing decodes material colours and emissives (`convertSRGBToLinear`,
+the authored values kept so toon comes back exactly), tags canvas textures
+`sRGBEncoding`, decodes vertex and instance colours in the vertex shader
+(skin, kit, steel and the crowd are painted into them), decodes the light and fog
+colours after the default rig is set, and gives the steel a decoded copy of its
+painted environment (the sRGB tag must be on the canvas texture before PMREM).
+`scene.background` stays as authored (the clear colour is written raw). Anything
+a look builds itself uses `linearColour(hex)`; a colour changed after the build
+uses `assignColour` (face.js's bruise). `await __looks.colourCheck()` draws an
+unlit swatch as a material colour, a canvas texture and a vertex colour through
+the current look and reads the pixels back: all three must equal the hex
+(`physical-sky`'s placeholder, with ACES and sRGB, does; toon with sRGB output
+and nothing decoded returns 95,127,58 as 164,187,131, the milky wash).
+
+Other things found: a changed `toneMapping` or shadow type does not recompile
+compiled materials (`setRenderer` flags them; a new `outputEncoding` or
+`scene.environment` does recompile); `scene.environment` reaches only
+MeshStandard/MeshPhysical, not MeshToon (which has no envMap at all), Lambert,
+Phong or Basic; a render target ignores `renderer.outputEncoding` (it uses the
+target texture's) but gets `renderer.toneMapping` on every material, so set it
+to none while a composer draws and tone-map in the last pass (a plain render
+target has no antialiasing; a `WebGLMultisampleRenderTarget` with samples 4
+worked in the harness);
+skinned meshes work unchanged through a composer; a canvas must be read in the
+same task as the render. The `field` shots show a pale blue disc against the
+haze: the sky dome (radius 52) against the camera's far plane (60) is the
+likely cause; it is there in the toon look too, and a look that replaces the sky
+has no such disc.
+
+**Comparing looks.** `python3 tools/serve.py 8941`, open
+`http://127.0.0.1:8941/index.html?shoot&look=<id>` (`shoot` seeds Math.random
+from the first line), then in the page (Chrome's javascript_tool):
+
+```
+await __looks.stage('colosseum')          // colosseum | field-cavalry | ring-portrait | sengoku-army
+await __looks.capture('colosseum-<id>')   // shots/colosseum-<id>.png, 1280x720, pixel ratio 1
+await __looks.stats(120)                  // ms per frame, draw calls, triangles, textures, geometries, programs
+await __looks.set('hdr-post')             // another look, same page; stage() again before capturing
+```
+
+Each scene is a fixed seed and fighters, rebuilt places (their painting is
+seeded), a stated number of exact 1/60 s steps, then frozen under a fixed camera
+(`__looks.tune({ yaw, pitch, distance, fov, height })` finds a framing). Two
+loads of one look give byte-identical PNGs (the cavalry still differs in about
+a thousand pixels of one horse's hair or cloth from load to load, on the old
+renderer too). `stats` times the physics and view update (`updateMs`) apart from
+the look's frame (`renderMs`: CPU submit plus a pixel read-back to wait for the
+GPU; `submitMs` is the CPU part; `gpuMs` is the timer query where the browser
+gives one, null where it answers zeros); a hidden-outline look draws fewer calls.
+The page's own size and pixel ratio are not used, so numbers compare across looks.
+
 ## Principles
 
 - **Simulate, don't script.** Capabilities come from bodies, kit and
