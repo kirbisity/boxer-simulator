@@ -40,7 +40,8 @@ function fightUiPathMark(entry) {
   const way = [entry.travel[0], -entry.travel[1]];
   const start = [-way[0] * 15, -way[1] * 15 - 2];
   const end = [way[0] * 13, way[1] * 13 - 2];
-  const bow = entry.limb === 'blade' ? 4 : 10;
+  // A climb or a fall nearly straight up or down bows little (else it reads as a bracket).
+  const bow = entry.limb === 'blade' ? 4 : Math.abs(entry.travel[1]) > 0.8 ? 4 : 10;
   const normal = [-way[1], way[0]];
   // Bowed away from the middle of the screen below: hooks round, uppercuts scoop.
   const sign = normal[1] > 0 || (normal[1] === 0 && normal[0] > 0) ? -1 : 1;
@@ -55,14 +56,18 @@ function fightUiPathMark(entry) {
   return `<path d="M${start[0].toFixed(1)} ${start[1].toFixed(1)}Q${control[0].toFixed(1)} ${control[1].toFixed(1)} ${end[0].toFixed(1)} ${end[1].toFixed(1)}" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round"/>${fightUiArrowHead(tip, endWay, 8)}`;
 }
 
-/** A move's icon (SVG markup), its hand's mark in the corner. */
+/** A move's icon (SVG markup), its hand's mark in the corner; a low blow stands on a floor line (its shape, not only its colour, says low). */
 export function fightUiIcon(entry, { mark = true } = {}) {
   const limb = mark ? `<g transform="translate(15 16)" opacity=".9">${FIGHT_UI_LIMB_MARKS[entry.limb] ?? ''}</g>` : '';
-  return `<svg class="fu-icon" viewBox="-24 -24 48 48" aria-hidden="true">${fightUiPathMark(entry)}${limb}</svg>`;
+  const floor = entry.group === 'low' ? '<path d="M-19 19h26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' : '';
+  return `<svg class="fu-icon" viewBox="-24 -24 48 48" aria-hidden="true">${fightUiPathMark(entry)}${floor}${limb}</svg>`;
 }
 
-/** The guard's shield, the special's star and the hand of the radial. */
-export const FIGHT_UI_GLYPHS = {
-  hand: '<svg class="fu-icon" viewBox="-24 -24 48 48" aria-hidden="true"><path d="M-9 14v-14c0-3 4-3 4 0v-8c0-3 4-3 4 0v-3c0-3 4-3 4 0v3c0-3 4-3 4 0v12c0-3 4-3 4 0v6c0 6-4 10-10 10h-2c-4 0-8-3-8-6z" fill="currentColor"/></svg>',
-  ring: '<svg class="fu-icon" viewBox="-24 -24 48 48" aria-hidden="true"><circle r="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="5 4"/><circle r="3" fill="currentColor"/></svg>',
+/** The marks of how a blow went, small, for the word beside the man: a burst, a shield, a spark, a dashed ring. */
+export const FIGHT_UI_OUTCOME_GLYPHS = {
+  hit: '<svg class="fu-icon" viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0-10l2.6 6.4 6.9-1.2-4.6 5.1 4.6 5.1-6.9-1.2L0 10l-2.6-6.4-6.9 1.2 4.6-5.1-4.6-5.1 6.9 1.2z" fill="currentColor"/></svg>',
+  blocked: '<svg class="fu-icon" viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0-10l8 3v5c0 6-4 9-8 11c-4-2-8-5-8-11v-5z" fill="currentColor"/></svg>',
+  glance: '<svg class="fu-icon" viewBox="-12 -12 24 24" aria-hidden="true"><path d="M-9 6a10 10 0 0 1 16-11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M7-5l4-3M8 0l4 0M4-9l1-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  miss: '<svg class="fu-icon" viewBox="-12 -12 24 24" aria-hidden="true"><circle r="8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="4 3.4"/></svg>',
 };
+FIGHT_UI_OUTCOME_GLYPHS.parried = FIGHT_UI_OUTCOME_GLYPHS.blocked;

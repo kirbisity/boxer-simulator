@@ -89,15 +89,15 @@ export const TUTORIAL_STEPS = [
   },
   {
     key: 'strike', title: 'Strike',
-    touch: '<b>Tap</b> anywhere to cut. Where you tap picks the cut: high or low, left or right; the faint names show where each one is. Make <b>three different</b> cuts.',
-    mouse: '<b>Click</b> anywhere to cut. Where you click picks the cut: high or low, left or right; the faint names show where each one is. Make <b>three different</b> cuts.',
+    touch: '<b>Tap Edric where to cut</b>: head, body or legs, left or right (or the same on the figure by Guard; with the Buttons controls, a coloured button). Each colour is a kind of blow. Make <b>three different</b> cuts.',
+    mouse: '<b>Click Edric where to cut</b>: head, body or legs, left or right (or the same on the figure by Guard; with the Buttons controls, a coloured button or keys 1–6). Make <b>three different</b> cuts.',
     done: (progress) => progress.kinds.size >= TUTORIAL.strikes,
     stage: 'teachPad',
   },
   {
     key: 'combo', title: 'Combination',
-    touch: '<b>Double-tap</b>: the cut, and the rest of a combination after it.',
-    mouse: '<b>Double-click</b>: the cut, and the rest of a combination after it.',
+    touch: '<b>Tap the same place twice, quickly</b>: the cut, then the next one after it, a combination.',
+    mouse: '<b>Click the same place twice, quickly</b>: the cut, then the next one after it, a combination.',
     done: (progress) => progress.combos >= 1,
   },
   {
@@ -219,7 +219,7 @@ export function installTutorial(root, hooks) {
     if (!step) {
       card.querySelector('.count').textContent = 'Training yard';
       card.querySelector('.title').textContent = 'Well done';
-      card.querySelector('.text').innerHTML = 'That is every control. Lock on, cut where you tap, guard when he swings, and the special button does the rest. Back to the menu in a moment.';
+      card.querySelector('.text').innerHTML = 'That is every control. Lock on, cut where you tap him, guard when he swings, and the special button does the rest. Back to the menu in a moment.';
       card.querySelector('.skip').textContent = 'Again';
       card.querySelector('.exit').hidden = false;
       skipAll.hidden = true;

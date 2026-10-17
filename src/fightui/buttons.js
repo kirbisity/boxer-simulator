@@ -1,17 +1,18 @@
-// POC A, action buttons: a thumb cluster of big round buttons round the
-// Guard, one for each kind of blow his style has (straight, swing, from
-// above, rising, low, push). Each shows the icon and name of the move it
-// throws next; a press throws it and the button moves on to the next of
-// its kind (a jab, then a cross). Keys 1–6 press them too.
+// Buttons (A): a thumb cluster of big round buttons round the Guard, one
+// for each kind of blow his style has (straight, swing, from above, rising,
+// low, push), each ringed in its kind's colour. Each shows the icon and
+// name of the move it throws next; a press throws it (pulsing in its
+// colour, and marking the blow on his man) and the button moves on to the
+// next of its kind (a jab, then a cross). Keys 1–6 press them too.
 
-import { fightUiButtons, fightUiReady, fightUiZoneOf, FIGHT_UI } from './logic.js';
+import { fightUiButtons, fightUiColour, fightUiReady, fightUiZoneOf, FIGHT_UI } from './logic.js';
 import { fightUiIcon } from './icons.js';
 import { fightUiElement, fightUiFlash, fightUiPaintReady } from './kit.js';
 
 // Where each button sits: its centre, px left of the right edge and above the footer, round the guard's.
 const FIGHT_UI_SLOTS = [[206, 64], [186, 140], [128, 194], [52, 210], [282, 112], [262, 196]];
 
-export function fightUiActionButtons(root, kit) {
+export function fightUiActionButtons(root, kit, hooks) {
   const cluster = root.appendChild(fightUiElement('div', 'fu-buttons'));
   let style = null;
   let buttons = [];
@@ -22,11 +23,12 @@ export function fightUiActionButtons(root, kit) {
       const element = fightUiElement('button', 'fu-btn', '<i class="fu-btn-icon"></i><span class="fu-btn-name"></span><span class="fu-btn-dots"></span><kbd></kbd>');
       element.setAttribute('aria-label', FIGHT_UI.groupNames[group.group]);
       element.dataset.group = group.group;
+      element.style.setProperty('--fu-col', fightUiColour(group.group));
       element.querySelector('kbd').textContent = String(index + 1);
       const [right, bottom] = FIGHT_UI_SLOTS[index];
       element.style.setProperty('--fu-x', `${right}px`);
       element.style.setProperty('--fu-y', `${bottom}px`);
-      const button = { element, group, next: 0 };
+      const button = { element, group, next: 0, pressedAt: -Infinity };
       element.addEventListener('pointerdown', (press) => {
         press.preventDefault();
         press.stopPropagation();
@@ -49,8 +51,11 @@ export function fightUiActionButtons(root, kit) {
   /** A press: the move it shows, then the next of its kind. */
   function pressButton(button) {
     const entry = button.group.moves[button.next];
-    kit.throwMove(entry.move, fightUiZoneOf(entry), button.element);
-    fightUiFlash(button.element, 'asked');
+    const now = hooks.now();
+    const again = now - button.pressedAt < FIGHT_UI.againWithin;
+    button.pressedAt = now;
+    kit.throwMove(entry, fightUiZoneOf(entry), entry.side, button.element, { again });
+    fightUiFlash(button.element, 'asked', fightUiColour(entry.group));
     button.next = (button.next + 1) % button.group.moves.length;
     show(button);
   }
@@ -66,7 +71,6 @@ export function fightUiActionButtons(root, kit) {
   window.addEventListener('keydown', onKey);
 
   kit.listen({
-    thrown: (strike) => fightUiFlash(strike.source, 'thrown'),
     outcome: (strike) => fightUiFlash(strike.source, strike.outcome),
   });
 

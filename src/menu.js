@@ -14,6 +14,7 @@ import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster
 import { WEAPONS } from './weapons.js';
 import { canRide, HORSES, mountOf } from './horses.js';
 import { SKIN_TONES } from './render.js';
+import { fightUiHomeSwitch } from './fightui/toggle.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
 export const EVENTS = {
@@ -112,7 +113,9 @@ export function installMenus(game) {
       el('div', { className: 'home-links' },
         el('button', { className: 'replay-intro', type: 'button', textContent: '🎯 Tutorial', onclick: () => { close(); game.tutorial(); } }),
         // The intro (intro.js) again: the legends, then back here.
-        el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } })));
+        el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } }),
+        // How the player attacks (fightui/): the figure of his man or the buttons; a tap flips it.
+        fightUiHomeSwitch((textContent, onclick) => el('button', { className: 'replay-intro', type: 'button', textContent, onclick }))));
     show('home');
   }
 

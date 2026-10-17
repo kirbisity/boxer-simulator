@@ -1,35 +1,53 @@
-// Which attack controls the fight draws: today's tap pad (touch.js, the
-// default) or one of the POCs here, for the player to try and pick among:
-//   buttons — A, action buttons round the Guard (fightui/buttons.js)
-//   swipe   — B, a pad to swipe the blow's way across (fightui/swipe.js)
-//   target  — C, a figure of his man to tap where to hit (fightui/target.js)
-//   radial  — D, hold a hand button for a wheel of every move (fightui/radial.js)
-// Chosen by ?fightui=<id> in the address, or boxer.fightUi('<id>') ('pad' or
-// null for today's). The Guard, Lock, special button, stick and look stay.
+// The fight's attack controls, one of two the player picks between (the
+// "Controls: Body · Buttons" switch in the footer and on the home screen):
+//   target  — Body, the default: a figure of his man by the Guard to tap
+//             where to hit, or a tap on the man himself (fightui/target.js)
+//   buttons — Buttons: one coloured button per kind of blow round the Guard (fightui/buttons.js)
+// The choice is remembered on this device; ?fightui=<id> in the address
+// overrides it (for testing), as does boxer.fightUi('<id>'). The Guard,
+// Lock, special button, stick, look and the keys stay as they are.
 
 import { fightUiActionButtons } from './buttons.js';
-import { fightUiDirectional } from './swipe.js';
 import { fightUiTargetBody } from './target.js';
-import { fightUiRadialHand } from './radial.js';
-import { fightUiKit } from './kit.js';
+import { fightUiKit, fightUiRecall, fightUiRemember } from './kit.js';
 
 export const FIGHT_UI_DESIGNS = {
-  buttons: { name: 'Action buttons', make: fightUiActionButtons },
-  swipe: { name: 'Directional strike', make: fightUiDirectional },
-  target: { name: 'Target on the body', make: fightUiTargetBody },
-  radial: { name: 'Radial hand', make: fightUiRadialHand },
+  target: { name: 'Body', title: 'Target on the body', make: fightUiTargetBody },
+  buttons: { name: 'Buttons', title: 'Action buttons', make: fightUiActionButtons },
 };
 
-/** The design asked for in the address (?fightui=<id>), or null for today's. */
+export const FIGHT_UI_CHOICE = {
+  fallback: 'target',
+  storageKey: 'gladiator.fightControls',
+};
+
+/** The design asked for in the address (?fightui=<id>), or null. */
 export function fightUiFromAddress(search = globalThis.location?.search ?? '') {
   const id = new URLSearchParams(search).get('fightui');
   return id && FIGHT_UI_DESIGNS[id] ? id : null;
 }
 
+/** The controls the player chose: the address's, else the remembered, else the figure. */
+export function fightUiPreferred(search) {
+  const remembered = fightUiRecall(FIGHT_UI_CHOICE.storageKey);
+  return fightUiFromAddress(search) ?? (FIGHT_UI_DESIGNS[remembered] ? remembered : FIGHT_UI_CHOICE.fallback);
+}
+
+const fightUiChoosers = new Set();
+
+/** Choose the controls (remembered), for every fight surface on the page. */
+export function fightUiChoose(id) {
+  if (!FIGHT_UI_DESIGNS[id]) return null;
+  fightUiRemember(FIGHT_UI_CHOICE.storageKey, id);
+  for (const chooser of fightUiChoosers) chooser(id);
+  globalThis.dispatchEvent?.(new CustomEvent('fightui', { detail: id }));
+  return id;
+}
+
 /**
  * The chooser, inside the fight's controls (`root`, touch.js's `hooks`):
- * update/reset follow the fight; tap(event) is asked first about each tap
- * on the fight's surface (true: the design took it, the pad throws nothing).
+ * update/reset follow the fight; tap(event) is asked about each tap on the
+ * fight's surface (the figure strikes where the tap lands on his man).
  */
 export function fightUiInstall(root, hooks) {
   let id = null;
@@ -37,34 +55,30 @@ export function fightUiInstall(root, hooks) {
   let design = null;
 
   function choose(next) {
-    const wanted = next && FIGHT_UI_DESIGNS[next] ? next : null;
+    const wanted = FIGHT_UI_DESIGNS[next] ? next : FIGHT_UI_CHOICE.fallback;
     if (wanted === id) return id;
     design?.destroy();
     kit?.destroy();
-    design = null;
-    kit = null;
     id = wanted;
-    if (id) {
-      kit = fightUiKit(root, hooks);
-      design = FIGHT_UI_DESIGNS[id].make(root, kit, hooks);
-      root.dataset.fightui = id;
-    } else delete root.dataset.fightui;
+    kit = fightUiKit(root, hooks);
+    design = FIGHT_UI_DESIGNS[id].make(root, kit, hooks);
+    root.dataset.fightui = id;
     return id;
   }
-  choose(fightUiFromAddress());
+  choose(fightUiPreferred());
+  fightUiChoosers.add(choose);
 
   return {
     choose,
     get id() { return id; },
-    tap: (event) => Boolean(design?.tap(event)),
+    tap: (event) => design.tap(event),
     update: () => {
-      if (!design) return;
       design.update();
       kit.update();
     },
     reset: () => {
-      design?.reset();
-      kit?.reset();
+      design.reset();
+      kit.reset();
     },
   };
 }

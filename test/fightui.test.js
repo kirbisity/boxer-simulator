@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FIGHT_UI, fightUiButtons, fightUiCompass, fightUiMoves, fightUiRadial, fightUiRadialPick, fightUiReady, fightUiSwipe, fightUiTarget, fightUiStyles } from '../src/fightui/logic.js';
+import { FIGHT_UI, fightUiButtons, fightUiColour, fightUiMoves, fightUiReady, fightUiTarget, fightUiStyles } from '../src/fightui/logic.js';
 import { fightUiIcon } from '../src/fightui/icons.js';
-import { FIGHT_UI_DESIGNS, fightUiFromAddress } from '../src/fightui/index.js';
+import { FIGHT_UI_CHOICE, FIGHT_UI_DESIGNS, fightUiFromAddress, fightUiPreferred } from '../src/fightui/index.js';
+import { fightUiEdge, fightUiLegend, fightUiOutcomeOf, fightUiStrikeEvent } from '../src/fightui/kit.js';
 import { attackLayout } from '../src/control.js';
 
-test('fight UI POCs: every style with attacks has its moves on every design, each with an icon', () => {
+test('fight controls: every style with attacks has its moves on both designs, each with an icon and a colour', () => {
   for (const style of fightUiStyles()) {
     const moves = fightUiMoves(style);
     assert.equal(moves.length, attackLayout(style).length, `${style}: every move the pad throws`);
@@ -13,28 +14,12 @@ test('fight UI POCs: every style with attacks has its moves on every design, eac
     const buttons = fightUiButtons(moves);
     assert.ok(buttons.length >= 1 && buttons.length <= FIGHT_UI.groups.length, `${style}: 1–6 buttons`);
     assert.equal(buttons.reduce((sum, button) => sum + button.moves.length, 0), moves.length, `${style}: each move on one button`);
-    const compass = fightUiCompass(moves);
-    assert.ok(compass.tap.length >= 1, `${style}: a tap throws something`);
-    assert.equal(fightUiRadial(moves).length, moves.length, `${style}: every move on the wheel`);
-    for (const entry of moves) assert.match(fightUiIcon(entry), /^<svg[^>]*>.*<\/svg>$/s, `${style} ${entry.move}: an icon`);
+    for (const zone of ['head', 'body', 'legs']) assert.ok(fightUiTarget(moves, zone, 1), `${style}: a tap on the ${zone} throws something`);
+    for (const entry of moves) {
+      assert.match(fightUiIcon(entry), /^<svg[^>]*>.*<\/svg>$/s, `${style} ${entry.move}: an icon`);
+      assert.match(fightUiColour(entry.group), /^#[0-9a-f]{6}$/, `${style} ${entry.move}: a colour`);
+    }
   }
-});
-
-test('directional strike: a swipe throws the blow that travels its way; a tap the straight one', () => {
-  const compass = fightUiCompass(fightUiMoves('katana'));
-  assert.equal(fightUiSwipe(compass, 3, 2).move, 'tsuki', 'a short drag is a tap: the thrust');
-  // Down and to the left: the cut from the upper right.
-  assert.equal(fightUiSwipe(compass, -60, -60).move, 'kesagiri');
-  // Straight down: the cut from above, at the head.
-  const down = fightUiSwipe(compass, 0, -80);
-  assert.deepEqual([down.move, down.zone], ['shomen', 'head']);
-  // From the right across: the level cut.
-  assert.equal(fightUiSwipe(compass, -80, 0).move, 'yokogiri');
-  const boxing = fightUiCompass(fightUiMoves('boxing'));
-  assert.deepEqual([0, 1].map((turn) => fightUiSwipe(boxing, 0, 0, turn).move), ['jab', 'cross'], 'taps take the straight punches in turn');
-  assert.equal(fightUiSwipe(boxing, 80, 0).move, 'hook', 'in from the left: the hook');
-  assert.equal(fightUiSwipe(boxing, 0, -80), null, 'no blow of his comes from above: nothing');
-  assert.equal(fightUiSwipe(fightUiCompass(fightUiMoves('handgun')), 70, 30).move, 'shoot', 'a gun: any swipe fires');
 });
 
 test('target on the body: a tap on a place throws a move that reaches it, the next on a second tap', () => {
@@ -49,15 +34,6 @@ test('target on the body: a tap on a place throws a move that reaches it, the ne
   assert.equal(boxer.reaches, false, 'a boxer cannot hit the legs: the best he has, marked so');
 });
 
-test('radial: the item a thumb slides to is the nearest by angle, none in the middle', () => {
-  const items = fightUiRadial(fightUiMoves('katana'));
-  const angles = items.map((item) => item.angle).sort((a, b) => a - b);
-  for (let index = 1; index < angles.length; index += 1) assert.ok(angles[index] - angles[index - 1] > 0.5, 'items kept apart');
-  assert.equal(fightUiRadialPick(items, 5, 5, 30), null);
-  const top = fightUiRadialPick(items, 0, 100, 30);
-  assert.equal(top.entry.move, 'shomen', 'the cut from above sits at the top');
-});
-
 test('readiness: a blow in flight is busy, short wind is tired, a man down cannot', () => {
   const fighter = { state: 'up', stamina: 1, body: { aerobic: 1 }, punch: null };
   assert.deepEqual(fightUiReady(fighter, 'jab'), { ok: true, why: null, cooling: 0 });
@@ -68,9 +44,46 @@ test('readiness: a blow in flight is busy, short wind is tired, a man down canno
   assert.equal(fightUiReady({ ...fighter, state: 'down' }, 'jab').why, 'down');
 });
 
-test('the design is chosen in the address, and only a known one', () => {
-  assert.deepEqual(Object.keys(FIGHT_UI_DESIGNS), ['buttons', 'swipe', 'target', 'radial']);
-  assert.equal(fightUiFromAddress('?fightui=swipe'), 'swipe');
-  assert.equal(fightUiFromAddress('?fightui=nope'), null);
-  assert.equal(fightUiFromAddress(''), null, 'nothing asked: today\'s pad');
+test('the colours: six kinds, six different colours, each in the legend', () => {
+  const colours = FIGHT_UI.groups.map(fightUiColour);
+  assert.equal(new Set(colours).size, 6);
+  const legend = fightUiLegend();
+  for (const group of FIGHT_UI.groups) assert.ok(legend.includes(FIGHT_UI.groupNames[group]) && legend.includes(fightUiColour(group)), group);
+});
+
+test('the controls: Body by default, Buttons if asked in the address; nothing else', () => {
+  assert.deepEqual(Object.keys(FIGHT_UI_DESIGNS), ['target', 'buttons']);
+  assert.equal(FIGHT_UI_CHOICE.fallback, 'target');
+  assert.equal(fightUiFromAddress('?fightui=buttons'), 'buttons');
+  assert.equal(fightUiFromAddress('?fightui=swipe'), null, 'the dropped designs are gone');
+  assert.equal(fightUiFromAddress(''), null);
+  assert.equal(fightUiPreferred(''), 'target', 'nothing remembered (no storage here): the figure');
+  assert.equal(fightUiPreferred('?fightui=buttons'), 'buttons');
+});
+
+test('how a blow went: the first word after it began, with where it landed', () => {
+  const events = [
+    { time: 1, kind: 'landed', attacker: 0, point: [9, 9, 9] },
+    { time: 2.1, kind: 'blocked', attacker: 0, point: [1, 2, 3] },
+    { time: 2.2, kind: 'landed', attacker: 0, point: [4, 5, 6] },
+    { time: 2.3, kind: 'landed', attacker: 1, point: [7, 7, 7] },
+  ];
+  assert.deepEqual(fightUiStrikeEvent(events, 0, 2).point, [1, 2, 3]);
+  assert.equal(fightUiStrikeEvent(events, 0, 3), null);
+  assert.equal(fightUiStrikeEvent([{ time: 2.5, kind: 'bladeBlock', defender: 0, point: [0, 1, 0] }], 0, 2).kind, 'bladeBlock', 'his blow parried');
+  assert.equal(fightUiOutcomeOf(events[1]), 'blocked');
+  assert.equal(fightUiOutcomeOf({ kind: 'landed', effects: ['glanced off the helmet'] }), 'glance');
+  assert.equal(fightUiOutcomeOf({ kind: 'bladeBlock' }), 'parried');
+  assert.equal(fightUiOutcomeOf({ kind: 'shot', attacker: 0, defender: 1, target: 'head' }), 'hit', 'a shot that struck him');
+  assert.equal(fightUiOutcomeOf({ kind: 'shot', attacker: 0, target: null }), 'miss');
+  assert.equal(fightUiOutcomeOf({ kind: 'shot', attacker: 0, defender: 1, target: 'shield' }), 'blocked');
+});
+
+test('a blow on the player pulses the edge it came from', () => {
+  assert.deepEqual(fightUiEdge(1, 0, 400, 800), [400, 400], 'from the right: the right edge');
+  assert.deepEqual(fightUiEdge(0, 1, 400, 800), [200, 0], 'from ahead: the top');
+  assert.deepEqual(fightUiEdge(0, -1, 400, 800), [200, 800], 'from behind: the bottom');
+  const [x, y] = fightUiEdge(-1, 1, 400, 800);
+  assert.equal(x, 0);
+  assert.equal(y, 200, 'ahead and to the left: the left edge, high');
 });

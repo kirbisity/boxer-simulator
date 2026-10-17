@@ -1,18 +1,18 @@
 // The fight's controls on screen, for a finger or a mouse: the game surface
 // (a drag begun in the top half turns the view, two fingers there zoom; a
 // drag begun in the bottom half is a floating stick; a mouse's right button
-// always turns the view; tap anywhere for an attack, which one by where:
-// every move of his style has its place on the screen; press and hold to
-// shove, or to hold down a man on the floor), a big Guard button, a Lock
+// always turns the view; press and hold to shove, or to hold down a man on
+// the floor), the attack controls the player chose (fightui/: a figure of
+// his man to tap where to hit, or a button for each kind of blow, with the
+// name of each attack he makes and how it went), a big Guard button, a Lock
 // button above it, one special button in a fixed place, and the fight-mode
-// HUD (the player's status low down, his man's over his head, and the name
-// of each attack he makes, with how it went).
+// HUD (the player's status low down, his man's over his head).
 // Only this surface takes the browser's gestures from it: menus and text
 // elsewhere stay selectable and scroll as usual.
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, attackAt, attackLayout, attackWhere, contextAction, moveName, strikeOutcome } from './control.js';
+import { ACTIONS, contextAction, moveName } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
@@ -29,21 +29,14 @@ export const TOUCH = {
   markerAwake: 2.5,
   // The ring where a tap or press landed fades over this (s).
   markSeconds: 0.35,
-  // The pad keeps clear of the buttons' column at the right edge (px).
-  padRight: 130,
   // rad the view turns for each px dragged, across and up.
   lookYaw: 0.008,
   lookPitch: 0.005,
-  // The attack's name stays this long (s) from the blow, and at least this long after how it went is known.
-  callSeconds: 0.8,
-  callAfterOutcome: 0.6,
   // The man's attack, small over his head, this long (s).
   incomingSeconds: 0.7,
   // The look and move hints fade this long (s) after both have been used.
   hintFade: 1.5,
 };
-
-const OUTCOME_WORDS = { hit: 'Hit', glance: 'Glanced off', blocked: 'Blocked', parried: 'Parried', miss: 'Missed' };
 
 const uiElement = (tag, className, text) => Object.assign(document.createElement(tag), { className, ...(text ? { textContent: text } : {}) });
 
@@ -51,11 +44,12 @@ const uiElement = (tag, className, text) => Object.assign(document.createElement
  * Put the fight's controls in `root`. `hooks`: world(), player(), orders(),
  * project([x, y, z]) → [px, py, inFront], ray(px, py) → { origin, dir } (the
  * line of sight through a point on the screen), floorAxes() → { ahead, right }
- * (the camera's on the floor), now() (s). Returns { update, setActive, reset }.
+ * (the camera's on the floor), now() (s), marks() (the marks of a blow in the
+ * fight: fightui/marker.js). Returns { update, setActive, reset, ... }.
  */
 export function installFightControls(root, hooks) {
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
-  surface.setAttribute('aria-label', 'Fight: drag in the top half to look about, in the bottom half to move; tap for an attack (each move has its place on the screen), press and hold to shove or hold a man down');
+  surface.setAttribute('aria-label', 'Fight: drag in the top half to look about, in the bottom half to move; tap your man where to hit him, press and hold to shove or hold a man down');
   const gestures = createRecognizer(GESTURE, { zoneOf: (at) => {
     const { top, height } = playArea();
     return screenZone(at[1], top, height);
@@ -65,20 +59,9 @@ export function installFightControls(root, hooks) {
   hints.setAttribute('aria-hidden', 'true');
   hints.innerHTML = '<span class="look"></span><i class="divider"></i><span class="move"></span>';
   const used = { look: false, move: false, at: null };
-  // The attack just made: its name, where it went, how it went.
-  const call = root.appendChild(uiElement('div', 'strike-call'));
-  call.setAttribute('role', 'status');
-  call.innerHTML = '<span class="where"></span><b class="name"></b><span class="gloss"></span><em class="outcome"></em>';
-  call.hidden = true;
-  let strike = null;
-  let lastTapAt = null;
   const stick = root.appendChild(uiElement('div', 'stick'));
   stick.appendChild(uiElement('i', 'knob'));
   stick.hidden = true;
-  // The pad's labels: each move of his style, faintly, where a tap throws it.
-  const pad = root.appendChild(uiElement('div', 'attack-pad'));
-  pad.setAttribute('aria-hidden', 'true');
-  let padStyle = null;
   const mark = root.appendChild(uiElement('div', 'tap-mark'));
   mark.hidden = true;
   const guard = root.appendChild(uiElement('button', 'fight-button guard-button'));
@@ -99,7 +82,7 @@ export function installFightControls(root, hooks) {
   let markAt = -Infinity;
   const awake = new Map();
   let active = false;
-  // Other attack controls to try (fightui/): none until one is chosen, and today's pad stays.
+  // The attack controls (fightui/): the figure of his man, or the buttons, as the player chose.
   const fightUi = fightUiInstall(root, hooks);
 
   /**
@@ -182,16 +165,8 @@ export function installFightControls(root, hooks) {
         orders.stick = null;
         stick.hidden = true;
       } else if (event.type === 'tap') {
-        if (fightUi.tap(event)) continue;
-        // Always an attack, at once: the move whose place on the pad the tap is nearest.
-        const [x, y] = padCoordinates(event.at[0], event.at[1]);
-        const chosen = attackAt(hooks.player().style, x, y);
-        if (!chosen) continue;
-        orders.requests.push({ move: chosen.move, zone: chosen.zone, strength: event.double ? 'combo' : 'quick', at: world.time });
-        showMark(event.at, 'strike');
-        flashLabel(chosen.move);
-        lastTapAt = { move: chosen.move, x, zone: chosen.zone, time: hooks.now() };
-        signal(event.double ? 'combo' : 'tap', chosen.move);
+        // The attack controls take it: on the figure's design, a tap on his man strikes there.
+        fightUi.tap(event);
         const target = orders.lock ?? opponentFor(world, hooks.player())?.id;
         if (target !== undefined && target !== null) awake.set(target, hooks.now());
       } else if (event.type === 'hold') {
@@ -212,13 +187,6 @@ export function installFightControls(root, hooks) {
     return { left: box.left, top: box.top, width: box.width, height: Math.max(1, box.height - footer) };
   }
 
-  /** A point on the screen as a place on the pad: x right and y up, −1 to 1 about the middle of the fight (above the footer). */
-  function padCoordinates(px, py) {
-    const { left, top, width: full, height } = playArea();
-    const width = Math.max(1, full - TOUCH.padRight);
-    return [((px - left) / width) * 2 - 1, 1 - ((py - top) / height) * 2];
-  }
-
   /** A half of the screen has been used: once both have, the hints fade. */
   function markUsed(zone) {
     if (used[zone]) return;
@@ -231,26 +199,6 @@ export function installFightControls(root, hooks) {
   function wordHints(mouse) {
     hints.querySelector('.look').textContent = mouse ? 'Drag here or right-drag · look' : 'Drag here · look';
     hints.querySelector('.move').textContent = mouse ? 'Drag here or WASD · move' : 'Drag here · move';
-  }
-
-  /** The pad's labels for his style, placed as the pad places its moves. */
-  function drawPad(styleKey) {
-    padStyle = styleKey;
-    pad.replaceChildren(...attackLayout(styleKey).map((place) => {
-      const label = uiElement('span', 'pad-move', moveName(place.move).name);
-      label.dataset.move = place.move;
-      label.style.left = `${50 + place.x * 50}%`;
-      label.style.top = `${50 - place.y * 50}%`;
-      return label;
-    }));
-  }
-
-  function flashLabel(move) {
-    const label = pad.querySelector(`[data-move="${move}"]`);
-    if (!label) return;
-    label.classList.remove('flash');
-    void label.offsetWidth;
-    label.classList.add('flash');
   }
 
   function showStick(event) {
@@ -369,48 +317,6 @@ export function installFightControls(root, hooks) {
   }
   setDevice(globalThis.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'mouse');
 
-  /** The attack he has just made: its name, its height and side, and (once known) how it went. */
-  function callStrike(world, me, now) {
-    const punch = me.punch;
-    if (punch && punch !== strike?.punch && punch.spec?.kind === 'strike') {
-      // Its side on the screen: the tap that asked for it, or the move's own place on the pad.
-      const tapped = lastTapAt && lastTapAt.move === punch.type && now - lastTapAt.time < 1 ? lastTapAt : null;
-      const place = tapped ?? attackLayout(me.style).find((entry) => entry.move === punch.type);
-      const where = attackWhere(punch.zone, place?.x ?? 0);
-      const { name, gloss } = moveName(punch.type);
-      strike = { punch, since: world.time - (punch.age ?? 0) - 1 / 60, start: now, outcome: null, outcomeAt: null };
-      call.hidden = false;
-      call.dataset.outcome = '';
-      call.querySelector('.where').textContent = `${where.arrow} ${where.height}${where.side === 'centre' ? '' : ` · ${where.side}`}`;
-      call.querySelector('.name').textContent = name;
-      call.querySelector('.gloss').textContent = gloss;
-      call.querySelector('.outcome').textContent = '';
-      call.classList.remove('show');
-      void call.offsetWidth;
-      call.classList.add('show');
-      signal('strike', punch.type);
-    }
-    if (!strike) return;
-    if (!strike.outcome) {
-      const outcome = strikeOutcome(world.events, me.id, strike.since, me.punch !== strike.punch);
-      if (outcome) {
-        strike.outcome = outcome;
-        strike.outcomeAt = now;
-        call.dataset.outcome = outcome;
-        call.querySelector('.outcome').textContent = OUTCOME_WORDS[outcome];
-        signal('outcome', outcome);
-      }
-    }
-    const until = Math.max(strike.start + TOUCH.callSeconds, (strike.outcomeAt ?? strike.start) + TOUCH.callAfterOutcome);
-    if (now > until && (strike.outcome || me.punch !== strike.punch)) {
-      call.classList.remove('show');
-      if (now > until + 0.3) {
-        call.hidden = true;
-        strike = null;
-      }
-    }
-  }
-
   /** The man's own attack, small over his head as it begins. */
   function callIncoming(target, now) {
     const punch = target.punch;
@@ -442,9 +348,7 @@ export function installFightControls(root, hooks) {
     const me = hooks.player();
     const orders = hooks.orders();
     if (!world || !me) return;
-    if (me.style !== padStyle) drawPad(me.style);
     fightUi.update();
-    callStrike(world, me, now);
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
     // The special button: one place, its label what it would do now.
     const name = contextAction(world, me);
@@ -499,11 +403,7 @@ export function installFightControls(root, hooks) {
     mark.hidden = true;
     guard.classList.remove('on');
     awake.clear();
-    padStyle = null;
-    strike = null;
     incoming = null;
-    call.hidden = true;
-    lastTapAt = null;
     rightButtons.clear();
     fightUi.reset();
   }

@@ -15,6 +15,9 @@ import { installMenus } from './menu.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
+import { createFightUiMarks } from './fightui/marker.js';
+import { fightUiChoose } from './fightui/index.js';
+import { fightUiWireToggle } from './fightui/toggle.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createSeeThrough } from './seethrough.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
@@ -100,6 +103,10 @@ let watchCam = createWatchCam();
 // Scenery between the camera and the men it watches is drawn see-through (seethrough.js).
 const seeThrough = createSeeThrough();
 
+// The marks of the player's blows in the fight (fightui/marker.js): where each goes, its way, how it went.
+const fightMarks = createFightUiMarks(scene);
+let fightMarksClock = 0;
+
 // The fight's controls (touch.js): drawn over the fight in play mode only.
 const fightControls = installFightControls($('#fight-ui'), {
   world: () => state.world,
@@ -123,7 +130,10 @@ const fightControls = installFightControls($('#fight-ui'), {
     return { origin: [origin.x, origin.y, origin.z], dir: [dir.x, dir.y, dir.z] };
   },
   floorAxes: () => floorAxes(),
+  marks: () => (state.mode === 'play' ? fightMarks : null),
+  clock: () => fightMarksClock,
 });
+fightUiWireToggle($('#fightui-pick'));
 
 // The ring on the floor round the man locked on.
 const lockRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
@@ -205,6 +215,8 @@ function newBout() {
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
   clearGore(scene);
   setPlace(scene, place, arena, scenario?.weather);
+  fightMarks.reset();
+  fightMarks.warm();
   cameraWalls = cameraRoom(place, arena);
   followCam.reset();
   // A level frames its own place; anything else starts from the usual ringside view.
@@ -682,6 +694,9 @@ function drawWorld(dt, drawIt = true) {
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
+  // The marks keep the fight's pace: slowed with it (a slow-motion moment, ¼×), still while it is paused.
+  fightMarksClock += dt * (state.paused ? 0 : state.speed * timeScale(state.drama, realSeconds()));
+  fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
   if (drawIt) render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
@@ -2132,8 +2147,9 @@ const boxer = window.boxer = {
   // Dev tool: every control on the screen now, judged for size, place and whether anything covers it (uicheck.js).
   checkButtons,
   preview,
-  // The fight's attack controls: a POC to try ('buttons', 'swipe', 'target', 'radial'), or null for today's pad (fightui/index.js).
-  fightUi: (id) => fightControls.fightUi(id),
+  // The fight's attack controls: 'target' (the figure of his man, the default) or 'buttons' (fightui/index.js); remembered.
+  fightUi: (id) => fightUiChoose(id),
+  fightMarks,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),

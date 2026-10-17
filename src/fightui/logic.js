@@ -1,6 +1,7 @@
-// The fight's attack controls, other ways (POCs the player picks among: see
-// fightui/index.js): what each move of a style is on screen, and how each
-// way of asking picks one. No DOM here: tests drive it directly.
+// The fight's attack controls (the player picks between the figure and the
+// buttons: see fightui/index.js): what each move of a style is on screen,
+// its kind and the colour of that kind, and how each way of asking picks
+// one. No DOM here: tests drive it directly.
 //
 // Screen coordinates here are x right and y UP, −1 to 1 about the middle,
 // as the attack pad's (control.js attackLayout): a move's place is where it
@@ -15,16 +16,15 @@ export const FIGHT_UI = {
   // The groups of the action buttons, in the order they sit round the guard.
   groups: ['straight', 'side', 'down', 'rising', 'low', 'push'],
   groupNames: { straight: 'Straight', side: 'Swing', down: 'From above', rising: 'Rising', low: 'Low', push: 'Push' },
+  // One colour for each kind of blow, everywhere it is shown (the buttons, the
+  // figure, the marks in the fight, the word): Okabe and Ito's colour-blind-safe
+  // set, lifted a little to read on a night scene. Each kind has its own icon
+  // shape too (a target, a sweep, a fall, a climb, a floor line, chevrons).
+  colours: { straight: '#56b4e9', side: '#e69f00', down: '#cc79a7', rising: '#2bc48a', low: '#f0e442', push: '#e3622b' },
+  // How a blow went: a hit flashes white round the kind's colour; a block is steel; a glance a spark; a miss grey.
+  outcomeColours: { hit: '#ffffff', glance: '#ffe9a8', blocked: '#b7c3d0', parried: '#b7c3d0', miss: '#8a93a6' },
   // A move whose travel climbs (or falls) more than this share is rising (or from above).
   steep: 0.5,
-  // Directional strike: a drag shorter than this (px) is a tap; the ring keeps its icons this far apart (rad).
-  swipeFrom: 22,
-  ringGap: 0.76,
-  // A swipe throws the blow on the ring within this (rad) of where it comes from, else nothing.
-  swipeWithin: 1,
-  // A swipe's origin above this sine aims high, below the second low.
-  headAbove: 0.45,
-  legsBelow: -0.6,
   // Target on the body: where each zone of him lies on the pad.
   zoneHeight: { head: 0.55, body: 0, legs: -0.75 },
   zoneSide: 0.55,
@@ -96,6 +96,9 @@ export function fightUiMoves(styleKey) {
   });
 }
 
+/** The colour of a kind of blow (a move's group). */
+export const fightUiColour = (group) => FIGHT_UI.colours[group] ?? '#ffffff';
+
 /** The action buttons of a style: [{ group, moves }] in the groups' order, empty groups left out. */
 export function fightUiButtons(moves) {
   return FIGHT_UI.groups.map((group) => ({ group, moves: moves.filter((entry) => entry.group === group) })).filter((button) => button.moves.length);
@@ -110,60 +113,6 @@ export function fightUiZone(move, wanted) {
 
 /** The zone a move goes at by its own height on the pad (as a tap there would). */
 export const fightUiZoneOf = (entry) => fightUiZone(entry.move, entry.place.y > 0.25 ? 'head' : entry.place.y < -0.55 ? 'legs' : 'body');
-
-// ---- Directional strike -----------------------------------------------------
-
-/** Slots round a circle (each { angle }, rad), pushed apart in place until each keeps `gap` of its own (relaxation round the circle). */
-function fightUiSpread(slots, gap) {
-  slots.sort((a, b) => a.angle - b.angle);
-  const room = Math.min(gap, (Math.PI * 2) / Math.max(1, slots.length));
-  for (let pass = 0; pass < 120 && slots.length > 1; pass += 1) {
-    for (let index = 0; index < slots.length; index += 1) {
-      const a = slots[index];
-      const b = slots[(index + 1) % slots.length];
-      let between = b.angle - a.angle;
-      if (index === slots.length - 1) between += Math.PI * 2;
-      if (between < room) {
-        const push = (room - between) / 2;
-        a.angle -= push;
-        b.angle += push;
-      }
-    }
-  }
-  return slots;
-}
-
-/** The ring and the tap of a directional pad: moves that go straight in are tapped; the rest sit round the ring where they come from (angle, rad), kept apart. */
-export function fightUiCompass(moves) {
-  const tap = moves.filter((entry) => entry.straight && entry.group === 'straight');
-  const ring = fightUiSpread(moves.filter((entry) => !tap.includes(entry)).map((entry) => ({ entry, angle: Math.atan2(entry.place.y, entry.place.x) })), FIGHT_UI.ringGap);
-  return { tap: tap.length ? tap : moves.slice().sort((a, b) => Math.hypot(a.place.x, a.place.y) - Math.hypot(b.place.x, b.place.y)).slice(0, 1), ring };
-}
-
-const fightUiAngleBetween = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-
-/**
- * What a drag (dx right, dy UP, px) on the directional pad throws: a short
- * one is a tap (the `tapIndex`th of the straight moves, in turn); a swipe is
- * the blow that travels its way, from the side opposite: { move, zone, angle } or null.
- */
-export function fightUiSwipe(compass, dx, dy, tapIndex = 0) {
-  if (Math.hypot(dx, dy) < FIGHT_UI.swipeFrom) {
-    const entry = compass.tap[tapIndex % compass.tap.length];
-    return entry ? { move: entry.move, zone: fightUiZoneOf(entry), angle: null, entry } : null;
-  }
-  // Nothing round the ring (a gun): any swipe is the tap.
-  if (!compass.ring.length) return fightUiSwipe(compass, 0, 0, tapIndex);
-  const from = Math.atan2(-dy, -dx);
-  let best = null;
-  for (const slot of compass.ring) if (!best || fightUiAngleBetween(slot.angle, from) < fightUiAngleBetween(best.angle, from)) best = slot;
-  // No blow comes from anywhere near there: nothing.
-  if (fightUiAngleBetween(best.angle, from) > FIGHT_UI.swipeWithin) return null;
-  const height = Math.sin(from);
-  // Clearly from above or below: at the head or the legs; level, where the move itself goes.
-  const zone = height > FIGHT_UI.headAbove ? fightUiZone(best.entry.move, 'head') : height < FIGHT_UI.legsBelow ? fightUiZone(best.entry.move, 'legs') : fightUiZoneOf(best.entry);
-  return { move: best.entry.move, zone, angle: best.angle, entry: best.entry };
-}
 
 // ---- Target on the body -----------------------------------------------------
 
@@ -189,23 +138,6 @@ export function fightUiTarget(moves, zone, side, again = 0) {
   if (!reaching.length) return null;
   const entry = reaching[again % Math.min(reaching.length, 3)];
   return { move: entry.move, zone: fightUiZone(entry.move, zone), entry, reaches: entry.zones.includes(zone) };
-}
-
-// ---- Radial -----------------------------------------------------------------
-
-/** The radial's items: every move round the circle where it comes from (a straight blow at the top), kept apart. */
-export function fightUiRadial(moves) {
-  const angleOf = (entry) => (entry.straight && entry.group === 'straight' ? Math.PI / 2 - entry.place.x * 0.5 : Math.atan2(entry.place.y, entry.place.x));
-  return fightUiSpread(moves.map((entry) => ({ entry, angle: angleOf(entry) })), Math.PI * 2);
-}
-
-/** The radial item nearest a point (dx right, dy UP from the centre, px) once past `dead` px from it; null inside. */
-export function fightUiRadialPick(items, dx, dy, dead) {
-  if (Math.hypot(dx, dy) < dead) return null;
-  const at = Math.atan2(dy, dx);
-  let best = null;
-  for (const item of items) if (!best || fightUiAngleBetween(item.angle, at) < fightUiAngleBetween(best.angle, at)) best = item;
-  return best;
 }
 
 // ---- Whether a move can be thrown now --------------------------------------
