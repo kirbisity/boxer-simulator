@@ -347,9 +347,11 @@ function generatedInstallWarden(view) {
     const group = view.places?.[view.place];
     const foothills = Boolean(group?.visible && group.children.some((child) => child.visible && child.userData.sceneryVariant === 'foothills'));
     const reach = foothills;
+    // A level's mist (render.js applyWeather) keeps its own fog and the camera's reach that goes with it.
+    const mist = view.weather?.fog;
     if (camera.isPerspectiveCamera) {
       if (camera.far !== GENERATED_FAR) baseFar = camera.far;
-      const far = reach ? GENERATED_FAR : baseFar ?? camera.far;
+      const far = reach && !mist ? GENERATED_FAR : view.cameraFar ?? baseFar ?? camera.far;
       if (camera.far !== far) {
         camera.far = far;
         camera.updateProjectionMatrix();
@@ -358,7 +360,7 @@ function generatedInstallWarden(view) {
     const fog = scene.fog;
     if (fog?.isFog && view.light?.fog) {
       if (foothills) {
-        [fog.near, fog.far] = GENERATED_FOOTHILLS_FOG;
+        [fog.near, fog.far] = mist ?? GENERATED_FOOTHILLS_FOG;
         hazed = true;
       } else if (hazed) {
         [fog.near, fog.far] = view.light.fog;

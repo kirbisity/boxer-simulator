@@ -29,6 +29,7 @@ import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
+import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
 
@@ -95,9 +96,9 @@ export function createScene(canvas) {
  * Where the fight is: the ring, or a scenario's scene round its arena. The
  * scene is built the first time it is needed; lighting goes with it.
  */
-export function setPlace(view, place, arena) {
-  if (place === view.place) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }) };
+export function setPlace(view, place, arena, weather = null) {
+  if (place === view.place && weather === (view.weather ?? null)) return;
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -111,8 +112,11 @@ export function setPlace(view, place, arena) {
   }
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
   view.place = place;
+  // A level's own weather (scenarios.js `weather`): the same place is clear for the sandbox and for other levels.
+  view.weather = weather;
   lightPlace(view, place);
   applyScenery(view, place);
+  applyWeather(view);
 }
 
 /**
@@ -137,14 +141,23 @@ export function forgetPlaces(view) {
 export function reapplyPlace(view) {
   lightPlace(view, view.place);
   applyScenery(view, view.place);
+  applyWeather(view);
 }
 
 /** A place's sky, fog and light rig, then the look in force on top of them. */
 function lightPlace(view, place) {
   // Whatever a look changed in the view is undone first, so every look starts from the same rig.
   resetForLook(view);
-  const light = PLACE_LIGHT[place] ?? PLACE_LIGHT.ring;
+  const own = PLACE_LIGHT[place] ?? PLACE_LIGHT.ring;
+  const fog = view.weather?.fog;
+  const light = fog ? { ...own, fog } : own;
   view.light = light;
+  // How far the camera sees: the place's own reach, or (in mist) just past where the fog is opaque, so nothing hidden in it is drawn.
+  view.cameraFar = fog ? fog[1] + WEATHER_FAR_MARGIN : own.far ?? CAMERA_FAR;
+  if (view.camera.far !== view.cameraFar) {
+    view.camera.far = view.cameraFar;
+    view.camera.updateProjectionMatrix();
+  }
   view.scene.background = new THREE.Color(light.background);
   view.scene.fog = new THREE.Fog(light.background, light.fog[0], light.fog[1]);
   view.lights.key.color.set(light.key);
@@ -156,8 +169,106 @@ function lightPlace(view, place) {
   applyLook(view, place);
 }
 
+// ---- weather ------------------------------------------------------------------
+//
+// A level may bring its own weather (scenarios.js `weather`): so far, mist.
+// `fog` [near, far] replaces the place's haze; the fog takes the look's horizon
+// colour (the photograph's, the sky dome's) paled `pale` (0..1) toward a damp
+// grey-white, and the horizon takes it too, so the land and the sky meet in
+// it without a band. `sky` (0..1) tones the sky itself toward that
+// colour, `mistLine` [from, to] (degrees above the horizon) is where a
+// photograph's own land fades into it, and `sun` dims the sun through it.
+// The mist also saves work: the camera's far plane comes in to just past
+// where the fog is opaque, the photograph's ball below the mist line is not
+// drawn, and tree cards wholly beyond the fog are left out.
+
+/** The camera's far plane where a place says nothing else (metres). */
+const CAMERA_FAR = 60;
+/** How far past the fog's opaque distance the camera still sees: the dome and photograph (radius 40, 30) must stay inside it. */
+const WEATHER_FAR_MARGIN = 2;
+/** How far a tree can stand from the centre and still be seen from the camera, beyond the fog's reach (the camera stands up to ~25 m out). */
+const WEATHER_TREE_REACH = 30;
+/** Morning mist's own colour, a damp grey-white: what the horizon is paled toward. */
+const WEATHER_MIST_COLOUR = new THREE.Color(0xdde2e2);
+
+function applyWeather(view) {
+  const weather = view.weather;
+  const group = view.places?.[view.place];
+  if (!group) return;
+  const mist = weather?.sky ?? 0;
+  if (weather?.sun) view.lights.sun.intensity *= weather.sun;
+  // Mist pales the horizon (the look's own, already the fog's colour) toward a damp grey-white: the fog, the background and the sky's horizon all take it.
+  const fog = view.scene.fog;
+  if (weather?.fog && fog) {
+    fog.color.lerp(WEATHER_MIST_COLOUR, weather.pale ?? 0.5);
+    view.scene.background = fog.color.clone();
+  }
+  // The look's sky dome, toned toward that horizon.
+  const dome = view.lookState?.['probe-lite']?.dome;
+  if (dome?.visible && mist) {
+    const u = dome.material.uniforms;
+    u.uHorizon.value.set(fog.color.r, fog.color.g, fog.color.b);
+    u.uZenith.value.lerp(u.uHorizon.value, mist);
+    u.uHaze.value.lerp(u.uHorizon.value, mist);
+    u.uSunColour.value.multiplyScalar(1 - 0.6 * mist);
+  }
+  for (const child of group.children) {
+    // The classic look's painted sky: let the mist (the background) show through it; it is drawn behind everything, so it blends with nothing else.
+    if (child.userData.paintedSky) {
+      const material = child.material;
+      const misty = mist > 0;
+      if (material.transparent !== misty) {
+        material.transparent = misty;
+        material.needsUpdate = true;
+      }
+      material.opacity = 1 - 0.8 * mist;
+    }
+    if (!child.visible) continue;
+    // The photograph: toned, its land faded into the mist, and the ball cut off below the mist line.
+    if (child.userData.sceneryVariant === 'skyball-photo') {
+      const ball = child.children[0];
+      const u = ball.material.uniforms;
+      if (u.uMist) u.uMist.value = mist;
+      if (mist) u.uHorizon.value.copy(fog.color);
+      if (mist && weather.mistLine) u.uFade.value.set(weather.mistLine[0] * WEATHER_DEG, weather.mistLine[1] * WEATHER_DEG);
+      weatherCutBall(ball, mist && weather.mistLine ? weather.mistLine[0] : null);
+    }
+    // Tree cards beyond the fog: their instances are sorted near to far, so drawing fewer leaves out the farthest.
+    child.traverse((object) => {
+      const reach = object.userData.treeReach;
+      if (!object.isInstancedMesh || !reach) return;
+      const limit = weather?.fog ? weather.fog[1] + WEATHER_TREE_REACH : Infinity;
+      let count = 0;
+      while (count < reach.length && reach[count] < limit) count += 1;
+      object.count = count;
+    });
+  }
+}
+
+const WEATHER_DEG = Math.PI / 180;
+
+/** Draw the photograph's ball only down to `elevation` degrees (its rows run from the top down), or all of it. */
+function weatherCutBall(ball, elevation) {
+  const geometry = ball.geometry;
+  if (elevation === null) {
+    geometry.setDrawRange(0, Infinity);
+    return;
+  }
+  const index = geometry.index;
+  const position = geometry.attributes.position;
+  const radius = geometry.parameters.radius;
+  const lowest = Math.sin(elevation * WEATHER_DEG) * radius;
+  let count = 0;
+  for (; count < index.count; count += 3) {
+    const top = Math.max(position.getY(index.getX(count)), position.getY(index.getX(count + 1)), position.getY(index.getX(count + 2)));
+    if (top < lowest) break;
+  }
+  geometry.setDrawRange(0, count);
+}
+
 // Each place's light: sky or dark hall, fog, the overhead key, the rim,
-// and the sun for a place open to the sky.
+// and the sun for a place open to the sky. `far` is the camera's reach
+// there, where it must see further than CAMERA_FAR.
 const PLACE_LIGHT = {
   ring: { background: 0x0b0d14, fog: [9, 22], key: 0xfff2e0, keyIntensity: 1.2, rim: 0x6f8cff },
   // Fluorescent tubes behind yellowed diffusers (about 3200 K): warm, a little green off the old tile; the tunnel beyond is black.
@@ -175,6 +286,8 @@ const PLACE_LIGHT = {
   // A tropical shore: bright, hazy over the sea.
   coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
+  // A water town south of the Yangtze: soft bright sky, damp air, the wooded hills 50–80 m out in the haze.
+  jiangnan: { background: 0xc6d6e0, fog: [30, 110], far: 112, key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
   // Rain on the quay: a little more moonlight and fill than a clear night, so the wet reads.
   port: { background: 0x0b1020, fog: [16, 54], key: 0xa8bcff, keyIntensity: 1.05, rim: 0x6a88d0, hemi: 0.36 },
@@ -197,6 +310,8 @@ export const PLACE_ARENAS = {
   field: { halfX: 30, halfZ: 20 },
   coastFort: { halfX: 12, halfZ: 8 },
   coastVillage: { halfX: 12, halfZ: 8 },
+  // The square between the shops and the canal: room for the wokou raid's formations.
+  jiangnan: { halfX: 14, halfZ: 9 },
 };
 
 /**
@@ -823,6 +938,56 @@ function buildTown() {
 
   // The houses, the church, the market: built for real in src/props/town.js.
   townSquare(place, { halfX, halfZ });
+  return place;
+}
+
+/**
+ * A water town in Zhejiang in the 1550s (the wokou raid): a square paved with
+ * granite slabs between whitewashed shops and a canal, the far bank's houses
+ * standing in the water, a humpbacked bridge, willows, wooded hills behind.
+ * Built for real in src/props/jiangnan.js; here the sky and the ground.
+ */
+function buildJiangnan() {
+  const place = new THREE.Group();
+  place.add(daySky());
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
+  // Granite slabs in long courses, grey with moss in the joints (the realistic looks paint their own over it).
+  const slabs = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#4a5046';
+    g.fillRect(0, 0, w, h);
+    const rows = 12;
+    for (let row = 0; row < rows; row += 1) {
+      let x = Math.random() * -120;
+      while (x < w) {
+        const length = 140 + Math.random() * 200;
+        const tone = 120 + Math.random() * 40;
+        g.fillStyle = `rgb(${tone},${tone * 0.99},${tone * 0.94})`;
+        g.fillRect(x + 3, row * (h / rows) + 3, length - 6, h / rows - 6);
+        x += length;
+      }
+    }
+    for (let index = 0; index < 260; index += 1) {
+      g.fillStyle = `rgba(70,96,52,${Math.random() * 0.3})`;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * 16, 0, Math.PI * 2);
+      g.fill();
+    }
+  }, [12, 12]);
+  // The town's floor: everything north of the canal's near edge.
+  const { near, far } = JIANGNAN_PLAN.canal;
+  const depth = near + 60;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, depth), lit(0xffffff, { map: slabs, roughness: 0.85 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.z = near - depth / 2;
+  ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
+  place.add(ground);
+  // The far bank, behind its houses.
+  const bank = new THREE.Mesh(new THREE.PlaneGeometry(150, 50), new THREE.MeshLambertMaterial({ color: 0x5a6a48 }));
+  bank.rotation.x = -Math.PI / 2;
+  bank.position.set(0, 0.02, far + 25);
+  place.add(bank);
+  jiangnanTown(place);
   return place;
 }
 

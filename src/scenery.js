@@ -147,6 +147,7 @@ export const PLACE_GROUND = {
   coastFort: { kind: 'beach', about: 'a tropical beach before a brick fort: dry sand, wet sand at the tide line, shells' },
   coastVillage: { kind: 'beach', about: 'a beach before a fishing village: sand, wet sand, nets, seaweed' },
   subway: { kind: 'subway', about: 'a New York subway platform: grimy concrete, gum, puddles under the leaks in the ceiling' },
+  jiangnan: { kind: 'slabs', about: 'a water town square of granite slabs, grass and moss in the joints and at the edges, damp with the morning mist' },
   port: { kind: 'wet-concrete', about: 'a container quay at night in the rain: wet concrete, puddles reflecting the lamps, painted lines' },
 };
 

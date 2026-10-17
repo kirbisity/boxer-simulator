@@ -170,11 +170,44 @@ export const COMPARE_SCENES = {
     distance: 2.2,
     camera: { focus: { centre: true, height: 1.4 }, yaw: 1.3, pitch: 0.05, distance: 3.2, fov: 45 },
   },
+  // The misty levels (scenarios.js `weather`) as their own cameras frame them.
+  'wokou-square': {
+    about: 'The wokou raid in the water town, in the morning mist: the square, the canal and the bridge, as the level frames it.',
+    place: 'jiangnan',
+    level: 'wokou',
+    seed: 15,
+    frames: 90,
+    camera: { focus: { centre: true, height: 1.0 }, yaw: -0.5, pitch: 0.42, distance: 15, fov: 40 },
+  },
+  'wokou-bridge': {
+    about: 'The water town from low down on the square, looking across the canal at the bridge and the far bank: the place itself.',
+    place: 'jiangnan',
+    level: 'wokou',
+    seed: 15,
+    frames: 30,
+    camera: { focus: { centre: true, height: 1.6 }, yaw: -1.9, pitch: 0.08, distance: 9, fov: 55 },
+  },
+  'rebellion-square': {
+    about: 'The peasant rebellion in the market town, in the morning mist, as the level frames it.',
+    place: 'town',
+    level: 'rebellion',
+    seed: 11,
+    frames: 90,
+    camera: { focus: { centre: true, height: 1.0 }, yaw: -0.55, pitch: 0.42, distance: 10, fov: 40 },
+  },
+  'pyongyang-wide': {
+    about: 'Pyongyang: the same place as Sekigahara, clear (no mist), as the level frames it.',
+    place: 'sengoku',
+    level: 'pyongyang',
+    seed: 21,
+    frames: 120,
+    camera: { focus: { centre: true, height: 1.0 }, yaw: -0.5, pitch: 0.34, distance: 22, fov: 40 },
+  },
 };
 
 // Close shots of the ground at each open-air place: two fighters, the camera
 // at head height a few metres off, looking down past them at the ground.
-for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['port', 1.2], ['subway', -0.4]]) {
+for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['jiangnan', 0.9], ['port', 1.2], ['subway', -0.4]]) {
   COMPARE_SCENES[`ground-${place}`] = {
     about: `Two fighters at the ${place}, a close shot looking down at the ground round their feet: the ground.`,
     place,

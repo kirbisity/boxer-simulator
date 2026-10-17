@@ -331,7 +331,8 @@ function treesInstance(group, geometries, material, trees, { shadows = true, sca
   const s = new THREE.Vector3();
   const colour = new THREE.Color();
   geometries.forEach((geometry, shape) => {
-    const mine = trees.filter((tree) => tree.shape % geometries.length === shape);
+    // Near to far, so a level's mist can leave out the farthest by drawing fewer (render.js applyWeather).
+    const mine = trees.filter((tree) => tree.shape % geometries.length === shape).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
     if (!mine.length) return;
     const mesh = new THREE.InstancedMesh(geometry, material, mine.length);
     mine.forEach((tree, index) => {
@@ -344,6 +345,7 @@ function treesInstance(group, geometries, material, trees, { shadows = true, sca
       mesh.setColorAt(index, colour);
     });
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.userData.treeReach = mine.map((tree) => Math.hypot(tree.x, tree.z));
     (globalThis.__treesStats ??= []).push({ trees: mine.length, triangles: geometry.attributes.position.count / 3 });
     mesh.frustumCulled = false;
     mesh.castShadow = shadows;

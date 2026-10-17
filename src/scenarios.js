@@ -20,6 +20,16 @@ export function legionSides(random, count = LEGION.perSide) {
 }
 
 /**
+ * Morning mist for the levels that have it (a scenario's `weather`; render.js
+ * applyWeather): fog [near, far] in metres from the camera, light — at the
+ * far edge of the fighting the haze is a fifth to a third, the land beyond
+ * goes soft and the far hills are silhouettes. The wokou came up the canals
+ * at first light; the morning of Sekigahara was famously foggy; Maidstone's
+ * square, a June dawn. Pyongyang uses the same place as Sekigahara, clear.
+ */
+export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [12, 120] };
+
+/**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
  * it), and who, as ordinary fighter inputs plus what they wear. A body is
  * given by its weight: the calories that settle at it are worked out when
@@ -147,6 +157,7 @@ export const SCENARIOS = {
     place: 'The market square, Maidstone, Kent · June 1381',
     blurb: 'The town has risen. Two lords in plate and three of their foot soldiers ride in to put it down — and meet twenty peasants with spears in the market square.',
     scene: 'town',
+    weather: { fog: WEATHER_MIST.rebellion, sky: 0.55, pale: 0.55, sun: 0.9 },
     arena: { halfX: 9, halfZ: 7 },
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
@@ -165,6 +176,7 @@ export const SCENARIOS = {
     place: 'Sekigahara, Mino · 21 October 1600',
     blurb: 'The battle that ends the Sengoku. Thirty of the East in red against thirty of the West in black and blue: bows and teppō in front, spears, blades and polearms behind.',
     scene: 'sengoku',
+    weather: { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
     roster: 'Thirty a side: samurai and ashigaru',
@@ -243,9 +255,10 @@ export const SCENARIOS = {
   },
   wokou: {
     title: 'Wokou raid',
-    place: 'Zhejiang coast · 1554',
-    blurb: 'Sea raiders come ashore, Japanese and Chinese together, barefoot, some in pieces of samurai armour: swords, bows, dao, spears and guns, against the coast garrison and the few brigandine regulars among them.',
-    scene: 'coastVillage',
+    place: 'A water town, Zhejiang · 1554',
+    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, barefoot, some in pieces of samurai armour: swords, bows, dao, spears and guns. In the market square by the bridge they meet the town\'s garrison and the few brigandine regulars among them.',
+    scene: 'jiangnan',
+    weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: 'Twenty-six raiders · fifteen garrison',
