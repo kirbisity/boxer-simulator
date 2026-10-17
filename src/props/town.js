@@ -1,18 +1,21 @@
 // The market town's buildings and things (buildTown in render.js): a
-// late-medieval square of jettied half-timbered houses, the church tower and
-// spire over the north roofs, the market's stalls, barrels, crates and sacks,
-// the well, the market cross, the stocks and a cart.
+// late-medieval square closed in on every side by jettied half-timbered
+// houses, its streets turning out of sight, plainer houses and the church
+// tower and spire over the roofs, and a little market: two stalls, barrels,
+// the well and the market cross.
 //
-// Everything is real geometry where the silhouette shows it (jetties on
-// joist ends, timbers proud of the infill, recessed windows, roofs with
-// thickness, eaves and verges, chimneys and dormers, quoins, louvres) and
-// generated canvas textures with normal maps for the surface (lime render,
-// oak grain, clay tiles, slates, ashlar, planks, leaded glass, staves,
-// wicker, canvas, sacking, straw). Each texture is painted once per page and
-// kept. All the pieces are baked into one merged mesh per material, tinted
-// per piece by vertex colour (each house its own wash, timber and tiles;
-// grime at the foot of walls, moss on the north slopes), so the whole square
-// costs about two dozen draw calls.
+// Real geometry where the silhouette shows it (jetties, timbers proud of the
+// infill, recessed windows, roofs with thickness, eaves and verges, chimneys
+// and dormers), and the age in the surface: generated textures (lime render
+// patched, spalled and rain-streaked; silvered, checked oak; clay tiles with
+// moss and new replacements; slates; ashlar; brick; planks with the paint
+// flaking) with their relief baked into the colour, and vertex colour (grime
+// up from the street, stains under the sills and soot over the openings,
+// soot round the stacks, roofs sagging between their gables, houses a
+// little out of true). It is drawn cheaply: one atlas texture and one matte
+// material for nearly everything, one for glass and one for iron and
+// gilding, and the sun's shadows cast by plain blocks inside the front
+// houses rather than by all their pieces.
 
 /* global THREE */
 
@@ -46,9 +49,8 @@ const TOWN_ZERO = [0, 0, 0];
 // ---- painting the textures -------------------------------------------------------
 //
 // A sheet is two square canvases painted together: the colour and a height
-// field (grey, 0.5 = the surface). `townFinish` turns the height into a
-// tangent-space normal map (a canvas too, so it flips the same way as the
-// colour), both tiling.
+// field (grey, 0.5 = the surface). `townFinish` bakes the height into the
+// colour as light and shade (the sheets tile, and so does the relief).
 
 function townSheet(size, base, seed) {
   const make = (fill) => {
@@ -123,48 +125,39 @@ function townGrainLine(sheet, y, amplitude, periods, phase, width, fill, height)
   }
 }
 
-/** Read the sheet back and pack the colour and the normal map (from the height, `relief` strong). */
-function townFinish(sheet, relief, repeat = true) {
+/**
+ * Bake the height field's relief into the colour, lit from above and a
+ * little to the left (no normal map: the texture carries its own shading),
+ * and return the colour canvas. `relief` is how steep the height reads.
+ */
+function townFinish(sheet, relief) {
   const { size } = sheet;
   const raw = sheet.height.getImageData(0, 0, size, size).data;
-  let height = new Float32Array(size * size);
+  const height = new Float32Array(size * size);
   for (let index = 0; index < height.length; index += 1) height[index] = raw[index * 4] / 255;
-  // One soft pass, so the slopes are not stair-stepped.
-  const soft = new Float32Array(height.length);
+  const image = sheet.colour.getImageData(0, 0, size, size);
+  const data = image.data;
+  // The light in the texture's own frame: x right, y up the canvas, z out of it.
+  const L = [-0.35, 0.6, 0.72];
+  const ll = Math.hypot(...L);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const at = (dx, dy) => height[((y + dy + size) % size) * size + ((x + dx + size) % size)];
-      soft[y * size + x] = (at(0, 0) * 4 + at(1, 0) + at(-1, 0) + at(0, 1) + at(0, -1)) / 8;
-    }
-  }
-  height = soft;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext('2d');
-  const image = context.createImageData(size, size);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const dx = height[y * size + ((x + 1) % size)] - height[y * size + ((x - 1 + size) % size)];
-      const dy = height[((y + 1) % size) * size + x] - height[((y - 1 + size) % size) * size + x];
-      // The canvas runs down where v runs up: the v slope is minus the canvas y slope.
+      const dx = (at(1, 0) + at(1, 1) + at(1, -1) - at(-1, 0) - at(-1, 1) - at(-1, -1)) / 3;
+      const dy = (at(0, 1) + at(1, 1) + at(-1, 1) - at(0, -1) - at(1, -1) - at(-1, -1)) / 3;
       const nx = -dx * relief;
       const ny = dy * relief;
-      const length = Math.sqrt(nx * nx + ny * ny + 1);
-      const at = (y * size + x) * 4;
-      image.data[at] = (nx / length * 0.5 + 0.5) * 255;
-      image.data[at + 1] = (ny / length * 0.5 + 0.5) * 255;
-      image.data[at + 2] = (1 / length * 0.5 + 0.5) * 255;
-      image.data[at + 3] = 255;
+      const length = Math.hypot(nx, ny, 1);
+      const lit = (nx * L[0] + ny * L[1] + L[2]) / length / ll;
+      const shade = townClamp(lit / (L[2] / ll), 0.55, 1.3);
+      const index = (y * size + x) * 4;
+      data[index] = Math.min(255, data[index] * shade);
+      data[index + 1] = Math.min(255, data[index + 1] * shade);
+      data[index + 2] = Math.min(255, data[index + 2] * shade);
     }
   }
-  context.putImageData(image, 0, 0);
-  const wrap = (texture) => {
-    if (repeat) texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.anisotropy = 8;
-    return texture;
-  };
-  return { map: wrap(new THREE.CanvasTexture(sheet.colour.canvas)), normalMap: wrap(new THREE.CanvasTexture(canvas)) };
+  sheet.colour.putImageData(image, 0, 0);
+  return sheet.colour.canvas;
 }
 
 /** Rows of overlapping tiles or slates, the canvas top up the roof: each course's tails lie on the course below. */
@@ -249,7 +242,7 @@ const TOWN_PAINTERS = {
     townCloud(colour, size, random, 16, 0.16, 'overlay');
     townCloud(colour, size, random, 64, 0.1, 'overlay');
     townCloud(height, size, random, 8, 0.5);
-    townCloud(height, size, random, 48, 0.35);
+    townCloud(height, size, random, 48, 0.15);
     for (let index = 0; index < 220; index += 1) {
       const x = rr(0, size);
       const y = rr(0, size);
@@ -274,7 +267,7 @@ const TOWN_PAINTERS = {
       const r = rr(0.6, 1.6);
       colour.fillStyle = `rgba(${90 + rr(0, 60)},${80 + rr(0, 50)},${60 + rr(0, 40)},${rr(0.15, 0.4)})`;
       colour.fillRect(x, y, r, r);
-      height.fillStyle = townGrey(rr(0.2, 0.75), 0.6);
+      height.fillStyle = townGrey(rr(0.35, 0.6), 0.4);
       height.fillRect(x, y, r * 1.4, r * 1.4);
     }
     for (let crack = 0; crack < 7; crack += 1) {
@@ -296,7 +289,76 @@ const TOWN_PAINTERS = {
         context.stroke();
       }
     }
-    return townFinish(sheet, 3);
+    // Old repairs: patches of newer render, a shade off the wash, their edges hard.
+    for (let patch = 0; patch < 6; patch += 1) {
+      const x = rr(0, size);
+      const y = rr(0, size);
+      const points = [];
+      const reach = rr(26, 70);
+      for (let k = 0; k < 9; k += 1) {
+        const angle = (k / 9) * Math.PI * 2;
+        const r = reach * rr(0.6, 1.1);
+        points.push([Math.cos(angle) * r, Math.sin(angle) * r * rr(0.6, 0.9)]);
+      }
+      const light = random() < 0.6;
+      townWrap(size, x, y, reach * 1.2, (X, Y) => {
+        for (const [context, style] of [[colour, light ? 'rgba(252,248,238,0.5)' : 'rgba(150,132,104,0.35)'], [height, townGrey(light ? 0.6 : 0.45, 0.6)]]) {
+          context.fillStyle = style;
+          context.beginPath();
+          points.forEach(([px, py], k) => (k ? context.lineTo(X + px, Y + py) : context.moveTo(X + px, Y + py)));
+          context.closePath();
+          context.fill();
+        }
+        colour.strokeStyle = 'rgba(80,68,50,0.25)';
+        colour.lineWidth = 1.2;
+        colour.stroke();
+      });
+    }
+    // Spalls: the render fallen away, the daub and laths behind, a dark lip round them.
+    for (let spall = 0; spall < 1; spall += 1) {
+      const x = rr(0, size);
+      const y = rr(0, size);
+      const rx = rr(22, 44);
+      const ry = rx * rr(0.5, 0.8);
+      townWrap(size, x, y, rx + 4, (X, Y) => {
+        colour.fillStyle = 'rgba(90,80,66,0.4)';
+        colour.beginPath();
+        colour.ellipse(X, Y, rx + 2.5, ry + 2.5, 0, 0, Math.PI * 2);
+        colour.fill();
+        colour.fillStyle = 'rgb(170,152,126)';
+        colour.beginPath();
+        colour.ellipse(X, Y, rx, ry, 0, 0, Math.PI * 2);
+        colour.fill();
+        colour.strokeStyle = 'rgba(110,92,70,0.6)';
+        colour.lineWidth = 2;
+        for (let lath = Y - ry; lath < Y + ry; lath += 6) {
+          const half = rx * Math.sqrt(Math.max(0, 1 - ((lath - Y) / ry) ** 2));
+          colour.beginPath();
+          colour.moveTo(X - half, lath);
+          colour.lineTo(X + half, lath);
+          colour.stroke();
+        }
+        height.fillStyle = townGrey(0.2);
+        height.beginPath();
+        height.ellipse(X, Y, rx, ry, 0, 0, Math.PI * 2);
+        height.fill();
+      });
+    }
+    // Rain runs: faint streaks down from wherever water sheds.
+    for (let streak = 0; streak < 26; streak += 1) {
+      const x = rr(0, size);
+      const y = rr(0, size);
+      const length = rr(40, 180);
+      const width = rr(3, 12);
+      townWrap(size, x, y + length / 2, length, (X, Y) => {
+        const run = colour.createLinearGradient(0, Y - length / 2, 0, Y + length / 2);
+        run.addColorStop(0, `rgba(86,78,62,${rr(0.12, 0.3)})`);
+        run.addColorStop(1, 'rgba(90,82,66,0)');
+        colour.fillStyle = run;
+        colour.fillRect(X - width / 2, Y - length / 2, width, length);
+      });
+    }
+    return townFinish(sheet, 1.4);
   },
   /** Oak, grain along u: a light grey-brown the vertex colour darkens to each house's timber (oiled, tarred, ox-blood, silvered); checks, knots. */
   oak: () => {
@@ -339,6 +401,8 @@ const TOWN_PAINTERS = {
         height.fill();
       });
     }
+    // Weathered silver-grey where the sun and rain have had it.
+    townCloud(colour, size, random, 5, 0.18, 'screen');
     return townFinish(sheet, 4);
   },
   /** Clay plain tiles (beaver tails), six courses to the metre and a half, each its own fired colour, lichen. */
@@ -350,12 +414,28 @@ const TOWN_PAINTERS = {
       round: 0.55,
       lichen: 0.25,
       tone: (random) => {
+        // One in twelve a newer replacement, still bright from the kiln.
+        if (random() < 0.08) return [196 + random() * 30, 92 + random() * 20, 56 + random() * 12];
         const k = random();
-        const burn = 0.75 + random() * 0.35;
-        return [(176 + k * 40) * burn, (86 + k * 30 + random() * 18) * burn, (58 + k * 18) * burn];
+        const burn = 0.68 + random() * 0.36;
+        return [(170 + k * 40) * burn, (84 + k * 28 + random() * 18) * burn, (58 + k * 18) * burn];
       },
     });
-    townCloud(sheet.colour, sheet.size, sheet.random, 4, 0.25, 'overlay');
+    const { size, colour, random, rr } = sheet;
+    townCloud(colour, size, random, 4, 0.3, 'overlay');
+    // Moss in cushions where the courses overlap, and a grey bloom of lichen.
+    for (let clump = 0; clump < 40; clump += 1) {
+      const x = rr(0, size);
+      const y = rr(0, size);
+      const r = rr(4, 14);
+      townWrap(size, x, y, r * 2, (X, Y) => {
+        colour.fillStyle = random() < 0.65 ? `rgba(${rr(70, 100)},${rr(92, 120)},${rr(40, 56)},0.7)` : 'rgba(190,186,160,0.5)';
+        colour.beginPath();
+        colour.ellipse(X, Y, r * 1.6, r * 0.7, 0, 0, Math.PI * 2);
+        colour.fill();
+      });
+    }
+    townCloud(colour, size, random, 8, 0.25, 'multiply');
     return townFinish(sheet, 5);
   },
   /** Slates: dark blue-grey, random widths, square tails. */
@@ -494,6 +574,21 @@ const TOWN_PAINTERS = {
       }
     }
     townCloud(colour, size, random, 6, 0.2, 'overlay');
+    // Paint flaking off: ragged pale patches of bare, greyed wood, longest along the grain.
+    for (let flake = 0; flake < 50; flake += 1) {
+      const x = rr(0, size);
+      const y = rr(0, size);
+      const length = rr(6, 40);
+      townWrap(size, x, y, length, (X, Y) => {
+        colour.fillStyle = `rgba(${rr(215, 235)},${rr(208, 225)},${rr(195, 210)},${rr(0.35, 0.7)})`;
+        colour.beginPath();
+        colour.moveTo(X - length / 2, Y);
+        for (let k = 1; k <= 6; k += 1) colour.lineTo(X - length / 2 + (k / 6) * length, Y - rr(1, 5));
+        for (let k = 6; k >= 0; k -= 1) colour.lineTo(X - length / 2 + (k / 6) * length, Y + rr(1, 5));
+        colour.closePath();
+        colour.fill();
+      });
+    }
     return townFinish(sheet, 4);
   },
   /** Leaded lights: diamond quarries of green-tinged crown glass in lead cames. */
@@ -635,51 +730,11 @@ const TOWN_PAINTERS = {
     townCloud(colour, size, random, 8, 0.25, 'multiply');
     return townFinish(sheet, 2);
   },
-  /** Hessian sacking: a coarse weave, stained. */
-  sacking: () => {
-    const sheet = townSheet(256, '#bba57c', 83);
-    const { size, colour, height, random } = sheet;
-    for (let y = 0; y < size; y += 4) {
-      colour.fillStyle = 'rgba(70,55,30,0.18)';
-      colour.fillRect(0, y, size, 1.5);
-      height.fillStyle = townGrey(0.35);
-      height.fillRect(0, y, size, 1.5);
-    }
-    for (let x = 0; x < size; x += 4) {
-      colour.fillStyle = 'rgba(70,55,30,0.14)';
-      colour.fillRect(x, 0, 1.5, size);
-      height.fillStyle = townGrey(0.4, 0.7);
-      height.fillRect(x, 0, 1.5, size);
-    }
-    townCloud(colour, size, random, 6, 0.35, 'multiply');
-    return townFinish(sheet, 2);
-  },
-  /** Loose straw: thousands of stalks, mostly lying along u. */
-  straw: () => {
-    const sheet = townSheet(256, '#8a6c32', 89);
-    const { size, colour, height, random, rr } = sheet;
-    for (let index = 0; index < 2600; index += 1) {
-      const x = rr(0, size);
-      const y = rr(0, size);
-      const length = rr(10, 40);
-      const angle = rr(-0.7, 0.7) + (random() < 0.2 ? Math.PI / 2 : 0);
-      const tone = rr(0.7, 1.15);
-      townWrap(size, x, y, length, (X, Y) => {
-        colour.strokeStyle = townRgb([220 * tone, 185 * tone, 105 * tone], 0.9);
-        colour.lineWidth = rr(0.8, 1.8);
-        colour.beginPath();
-        colour.moveTo(X, Y);
-        colour.lineTo(X + Math.cos(angle) * length, Y + Math.sin(angle) * length);
-        colour.stroke();
-        height.strokeStyle = townGrey(rr(0.55, 0.9));
-        height.lineWidth = 1.6;
-        height.beginPath();
-        height.moveTo(X, Y);
-        height.lineTo(X + Math.cos(angle) * length, Y + Math.sin(angle) * length);
-        height.stroke();
-      });
-    }
-    return townFinish(sheet, 3);
+  /** Plain white with a little grain, for things the vertex colour paints whole (produce, a hatch). */
+  white: () => {
+    const sheet = townSheet(128, '#f4f2ee', 97);
+    townCloud(sheet.colour, sheet.size, sheet.random, 8, 0.12, 'multiply');
+    return sheet.colour.canvas;
   },
 };
 
@@ -714,67 +769,120 @@ function townDialTexture() {
   g.beginPath();
   g.arc(128, 128, 10, 0, Math.PI * 2);
   g.fill();
-  return new THREE.CanvasTexture(canvas);
+  return canvas;
 }
 
-const townTextureCache = new Map();
-/** One texture pair per page, painted the first time it is asked for. */
-function townTexture(name) {
-  if (!townTextureCache.has(name)) townTextureCache.set(name, TOWN_PAINTERS[name]());
-  return townTextureCache.get(name);
+// ---- the atlas and the materials -----------------------------------------------------
+//
+// Every textured surface of the town draws from one 2048² atlas of tiling
+// sheets, 4 by 4 cells of 512 px: each sheet painted 480 px square with a
+// 16 px border of its own wrap round it. A piece's UVs run on in metres as if
+// its sheet tiled on its own; the shader takes them modulo one into its cell
+// (the cell travels with each vertex) and samples with the gradients of the
+// unwrapped UVs, so the mip level is right across the seams. So the walls,
+// timber, roofs, stone, brick, doors, barrels and awnings are all one
+// material and one draw, tinted per piece by vertex colour.
+
+const TOWN_ATLAS_CELLS = ['plaster', 'oak', 'ashlar', 'brick', 'planks', 'tiles', 'slate', 'scales', 'staves', 'wicker', 'cloth', 'dial', 'white'];
+TOWN_PAINTERS.dial = townDialTexture;
+
+let townAtlasTexture = null;
+/** The atlas, painted the first time the town is built and kept for the page. */
+function townAtlas() {
+  if (townAtlasTexture) return townAtlasTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 2048;
+  const g = canvas.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  TOWN_ATLAS_CELLS.forEach((name, index) => {
+    const sheet = TOWN_PAINTERS[name]();
+    const x = (index % 4) * 512;
+    const y = Math.floor(index / 4) * 512;
+    g.save();
+    g.beginPath();
+    g.rect(x, y, 512, 512);
+    g.clip();
+    for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) g.drawImage(sheet, x + 16 + dx * 480, y + 16 + dy * 480, 480, 480);
+    g.restore();
+  });
+  townAtlasTexture = new THREE.CanvasTexture(canvas);
+  townAtlasTexture.anisotropy = 8;
+  return townAtlasTexture;
 }
 
-// ---- materials --------------------------------------------------------------------
+/** Each cell's corner in the atlas, in cells from the bottom left (the texture is flipped: canvas row 0 is the top). */
+function townCellOf(name) {
+  const index = TOWN_ATLAS_CELLS.indexOf(name);
+  return [index % 4, 3 - Math.floor(index / 4)];
+}
 
-/** Each material: its texture, how rough, how strong the relief, and which side. One merged mesh each. */
-const TOWN_MATERIALS = {
-  plaster: { texture: 'plaster', roughness: 0.95, relief: 0.35 },
-  oak: { texture: 'oak', roughness: 0.85, relief: 0.8 },
-  tiles: { texture: 'tiles', roughness: 0.82, relief: 1.1 },
-  slate: { texture: 'slate', roughness: 0.6, relief: 1 },
-  scales: { texture: 'scales', roughness: 0.55, relief: 1 },
-  ashlar: { texture: 'ashlar', roughness: 0.92, relief: 1 },
-  brick: { texture: 'brick', roughness: 0.9, relief: 1 },
-  planks: { texture: 'planks', roughness: 0.85, relief: 0.8 },
-  glass: { texture: 'glass', roughness: 0.18, relief: 0.6, reflects: 0.7 },
-  staves: { texture: 'staves', roughness: 0.75, relief: 1.4 },
-  wicker: { texture: 'wicker', roughness: 0.85, relief: 1 },
-  cloth: { texture: 'cloth', roughness: 0.95, relief: 0.6, side: 'double' },
-  sacking: { texture: 'sacking', roughness: 0.95, relief: 0.8 },
-  straw: { texture: 'straw', roughness: 0.95, relief: 1 },
-  iron: { roughness: 0.55, metalness: 0.6 },
-  paint: { roughness: 0.85 },
-  produce: { roughness: 0.5 },
-  gilt: { roughness: 0.3, metalness: 0.9, reflects: 1 },
-  water: { roughness: 0.04, reflects: 0.9 },
-  dial: { dial: true, roughness: 0.6 },
-};
-
-function townMakeMaterial(name) {
-  const spec = TOWN_MATERIALS[name];
-  const options = { color: 0xffffff, roughness: spec.roughness, metalness: spec.metalness ?? 0, vertexColors: true };
-  if (spec.texture) {
-    const { map, normalMap } = townTexture(spec.texture);
-    Object.assign(options, { map, normalMap, normalScale: new THREE.Vector2(spec.relief, spec.relief) });
-  }
-  if (spec.dial) options.map = townTexture('dial');
-  if (spec.side === 'double') options.side = THREE.DoubleSide;
-  const material = new THREE.MeshStandardMaterial(options);
-  if (spec.reflects) material.userData.reflects = spec.reflects;
+/** Sample `map` through the atlas cell each vertex carries, the UVs taken modulo one. */
+function townAtlasShader(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = `attribute vec2 atlasCell;\nvarying vec2 vAtlasCell;\n${shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vAtlasCell = atlasCell;')}`;
+    shader.fragmentShader = `varying vec2 vAtlasCell;\n${shader.fragmentShader.replace('#include <map_fragment>', `
+  vec2 atlasUv = (floor(vAtlasCell + 0.5) * 512.0 + 16.0 + fract(vUv) * 480.0) / 2048.0;
+  vec4 texelColor = textureGrad(map, atlasUv, dFdx(vUv) * (480.0 / 2048.0), dFdy(vUv) * (480.0 / 2048.0));
+  texelColor = mapTexelToLinear(texelColor);
+  diffuseColor *= texelColor;`)}`;
+  };
+  material.customProgramCacheKey = () => 'town-atlas';
   return material;
 }
-TOWN_PAINTERS.dial = townDialTexture;
+
+/**
+ * Where each surface draws: its material, and for the atlas its cell.
+ * 'fabric' is matte (Lambert: lit per vertex, which on the town's flat
+ * faces under the sun comes to the same, at a fraction of the cost), 'glass'
+ * the leaded lights and the dark of every opening, 'metal' the ironwork and
+ * gilding, 'shadow' the plain blocks the front houses cast their shadows
+ * with (never seen).
+ */
+const TOWN_SLOTS = {
+  glass: { material: 'glass' },
+  paint: { material: 'glass', flat: true },
+  water: { material: 'glass', flat: true },
+  iron: { material: 'metal' },
+  gilt: { material: 'metal' },
+  shadow: { material: 'shadow' },
+  produce: { material: 'fabric', cell: townCellOf('white') },
+};
+for (const name of TOWN_ATLAS_CELLS) TOWN_SLOTS[name] = { material: 'fabric', cell: townCellOf(name) };
+
+let townGlassTexture = null;
+function townMakeMaterial(name) {
+  if (name === 'fabric') return townAtlasShader(new THREE.MeshLambertMaterial({ color: 0xffffff, map: townAtlas(), vertexColors: true }));
+  if (name === 'glass') {
+    if (!townGlassTexture) {
+      townGlassTexture = new THREE.CanvasTexture(TOWN_PAINTERS.glass());
+      townGlassTexture.wrapS = townGlassTexture.wrapT = THREE.RepeatWrapping;
+      townGlassTexture.anisotropy = 4;
+    }
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, map: townGlassTexture, roughness: 0.25, metalness: 0, vertexColors: true });
+    material.userData.reflects = 0.6;
+    return material;
+  }
+  if (name === 'metal') {
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45, metalness: 0.6, vertexColors: true });
+    material.userData.reflects = 0.8;
+    return material;
+  }
+  // The shadow blocks: drawn into the sun's shadow map, never to the screen.
+  return new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+}
 
 // ---- merging --------------------------------------------------------------------
 //
 // A batch gathers pieces for one material, each baked through its matrix
-// into the place's space with its own UVs and vertex colour. UVs:
+// into the place's space with its own UVs, vertex colour and atlas cell. UVs:
 //   'keep'  the geometry's own, times `tile` (a repeat count, or [u, v]);
 //   'box'   from the piece's own (scaled) coordinates, projected on the axis
 //           its face looks along, in metres over `tile` (metres per repeat);
 //           with `grain` the u runs along the piece's longest side (timber);
 //   'world' the same in the place's coordinates (render running on from
 //           one panel to the next).
+// `warp(l)` may bend the piece's unit coordinates before they are placed (a
+// sagging roof).
 
 const townFlats = new WeakMap();
 function townFlat(geometry) {
@@ -793,6 +901,7 @@ function townBatch() {
   const normal = [];
   const uv = [];
   const colour = [];
+  const cells = [];
   const p = new THREE.Vector3();
   const n = new THREE.Vector3();
   const l = new THREE.Vector3();
@@ -804,17 +913,18 @@ function townBatch() {
   const worldNormal = [0, 0, 0];
   return {
     position,
-    add(geometry, matrix, { size = TOWN_ONE, mapping = 'box', tile = 1, offset = TOWN_ZERO, colour: tint = TOWN_ONE, shade = null, grain = false } = {}) {
-      const flat = townFlat(geometry);
-      const P = flat.attributes.position;
-      const N = flat.attributes.normal;
-      const T = flat.attributes.uv;
+    add(geometry, matrix, { size = TOWN_ONE, mapping = 'box', tile = 1, offset = TOWN_ZERO, colour: tint = TOWN_ONE, shade = null, grain = false, cell = TOWN_ZERO, flat = false, warp = null } = {}) {
+      const source = townFlat(geometry);
+      const P = source.attributes.position;
+      const N = source.attributes.normal;
+      const T = source.attributes.uv;
       normalMatrix.getNormalMatrix(matrix);
       const tu = Array.isArray(tile) ? tile[0] : tile;
       const tv = Array.isArray(tile) ? tile[1] : tile;
       const long = size[0] >= size[1] && size[0] >= size[2] ? 0 : size[1] >= size[2] ? 1 : 2;
       for (let index = 0; index < P.count; index += 1) {
         l.fromBufferAttribute(P, index);
+        if (warp) warp(l);
         p.copy(l).applyMatrix4(matrix);
         n.fromBufferAttribute(N, index);
         localNormal[0] = n.x;
@@ -823,13 +933,18 @@ function townBatch() {
         n.applyMatrix3(normalMatrix).normalize();
         position.push(p.x, p.y, p.z);
         normal.push(n.x, n.y, n.z);
+        cells.push(cell[0], cell[1]);
         let u;
         let v;
-        if (mapping === 'keep') {
+        if (flat) {
+          // A dark opening: one texel of the glass, the vertex colour does the rest.
+          u = 0.06;
+          v = 0.5;
+        } else if (mapping === 'keep') {
           u = T.getX(index) * tu;
           v = T.getY(index) * tv;
         } else {
-          let source;
+          let from;
           let facing;
           if (mapping === 'world') {
             world[0] = p.x;
@@ -838,13 +953,13 @@ function townBatch() {
             worldNormal[0] = n.x;
             worldNormal[1] = n.y;
             worldNormal[2] = n.z;
-            source = world;
+            from = world;
             facing = worldNormal;
           } else {
             local[0] = l.x * size[0];
             local[1] = l.y * size[1];
             local[2] = l.z * size[2];
-            source = local;
+            from = local;
             facing = localNormal;
           }
           const ax = Math.abs(facing[0]);
@@ -866,8 +981,8 @@ function townBatch() {
             a = 0;
             b = 1;
           }
-          u = source[a] / tu;
-          v = source[b] / tv;
+          u = from[a] / tu;
+          v = from[b] / tv;
         }
         uv.push(u + offset[0], v + offset[1]);
         c[0] = tint[0];
@@ -884,11 +999,9 @@ function townBatch() {
       geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normal, 3));
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       geometry.setAttribute('color', new THREE.Float32BufferAttribute(colour, 3));
+      geometry.setAttribute('atlasCell', new THREE.Float32BufferAttribute(cells, 2));
       geometry.computeBoundingSphere();
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      return mesh;
+      return new THREE.Mesh(geometry, material);
     },
   };
 }
@@ -898,11 +1011,16 @@ const townBox = () => (townUnitBox ??= new THREE.BoxGeometry(1, 1, 1));
 
 /**
  * The builder's kit: a batch per material, a current parent transform (a
- * house's place and turn), and ways to put pieces down in it.
+ * house's place and turn), and ways to put pieces down in it, each by the
+ * name of its surface (a TOWN_SLOTS key).
  */
 function townKit() {
   const batches = {};
-  for (const name of Object.keys(TOWN_MATERIALS)) batches[name] = townBatch();
+  for (const name of ['fabric', 'glass', 'metal', 'shadow']) batches[name] = townBatch();
+  const put = (name, geometry, matrix, options) => {
+    const slot = TOWN_SLOTS[name];
+    batches[slot.material].add(geometry, matrix, { ...options, cell: slot.cell ?? TOWN_ZERO, flat: slot.flat ?? false });
+  };
   let parent = new THREE.Matrix4();
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
@@ -931,7 +1049,7 @@ function townKit() {
       euler.set(...(options.rotation ?? TOWN_ZERO), 'YXZ');
       quaternion.setFromEuler(euler);
       matrix.compose(at.set(...position), quaternion, scale.set(...size)).premultiply(parent);
-      batches[name].add(townBox(), matrix, { size, ...options });
+      put(name, townBox(), matrix, { size, ...options });
     },
     /** A squared timber (or any box) from point a to point b, `width` by `depth` across. */
     beam(name, a, b, width, depth, options = {}) {
@@ -941,28 +1059,33 @@ function townKit() {
       quaternion.setFromUnitVectors(X, direction);
       const size = [length, width, depth];
       matrix.compose(at.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), quaternion, scale.set(...size)).premultiply(parent);
-      batches[name].add(townBox(), matrix, { size, grain: true, ...options });
+      put(name, townBox(), matrix, { size, grain: true, ...options });
     },
-    /** A box on its own axes: ex, ey, ez (Vector3s, right-handed), centred at `centre`. */
-    oriented(name, centre, ex, ey, ez, size, options = {}) {
+    /** A box on its own axes: ex, ey, ez (Vector3s, right-handed), centred at `centre`; `geometry` in place of the unit box (a subdivided one, to warp). */
+    oriented(name, centre, ex, ey, ez, size, options = {}, geometry = townBox()) {
       matrix.makeBasis(ex, ey, ez).scale(scale.set(...size)).setPosition(centre).premultiply(parent);
-      batches[name].add(townBox(), matrix, { size, ...options });
+      put(name, geometry, matrix, { size, ...options });
+    },
+    /** Where a point of the current frame lies in the place. */
+    toWorld(point) {
+      return new THREE.Vector3(...point).applyMatrix4(parent);
     },
     /** Any geometry through a local matrix (or none). */
     shape(name, geometry, local = null, options = {}) {
       matrix.copy(parent);
       if (local) matrix.multiply(local);
-      batches[name].add(geometry, matrix, options);
+      put(name, geometry, matrix, options);
     },
-    /** The merged meshes, one per material that got anything. */
+    /** The merged meshes, one per material that got anything: they take the sun's shadows, and only the shadow blocks cast them. */
     meshes() {
       const out = [];
       for (const [name, batch] of Object.entries(batches)) {
         const mesh = batch.mesh(townMakeMaterial(name));
-        if (mesh) {
-          mesh.name = `town-${name}`;
-          out.push(mesh);
-        }
+        if (!mesh) continue;
+        mesh.name = `town-${name}`;
+        mesh.castShadow = name === 'shadow';
+        mesh.receiveShadow = name !== 'shadow';
+        out.push(mesh);
       }
       return out;
     },
@@ -974,10 +1097,10 @@ function townKit() {
 
 /** Dirt splashed up the foot of a wall: darker and browner below a metre. */
 function townGrime(c, p) {
-  const k = townSmooth(-0.1, 1.2, p.y);
-  c[0] *= 0.62 + 0.38 * k;
-  c[1] *= 0.58 + 0.42 * k;
-  c[2] *= 0.52 + 0.48 * k;
+  const k = townSmooth(-0.1, 1.7, p.y);
+  c[0] *= 0.5 + 0.5 * k;
+  c[1] *= 0.46 + 0.54 * k;
+  c[2] *= 0.4 + 0.6 * k;
 }
 
 /** Roofs: moss and lichen on the slopes that face north (−z), out of the sun. */
@@ -993,6 +1116,24 @@ const townStone = (c, p, n) => {
   townGrime(c, p);
   townMoss(c, p, n);
 };
+
+/** A value 0..1 that holds still over half a metre of the place: for blotches that do not line up with the pieces. */
+function townHash(p) {
+  const x = Math.round(p.x * 2);
+  const y = Math.round(p.y * 2);
+  const z = Math.round(p.z * 2);
+  const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+  return h - Math.floor(h);
+}
+
+/** Render: the grime at its foot, and blotches of damp and old limewash over it. */
+function townRender(c, p) {
+  townGrime(c, p);
+  const k = 1 - 0.24 * townHash(p) ** 2;
+  c[0] *= k;
+  c[1] *= k;
+  c[2] *= k * 0.98;
+}
 
 // ---- shared geometry ----------------------------------------------------------------
 
@@ -1054,14 +1195,18 @@ function townGablePrism(width, rise, length) {
   return geometry;
 }
 
+
 /**
  * A pitched roof over a rectangle, the ridge along local z: two slabs
  * `thickness` thick lying on the gables' raking edges, the eaves
  * `overhang` out past the walls and the verges `verge` past the gables, a
  * ridge of half-round tiles, rafter feet under the eaves and bargeboards
  * under the verges. `eave` is the wall top, `rise` the ridge above it.
+ * `sag` (metres) bows the ridge and the slabs down in the middle, as an old
+ * roof's do; `shade` weathers the slabs (moss, soot). With material
+ * 'shadow' it is only the two slabs, for the shadow blocks.
  */
-function townRoof(kit, { width, eave, rise, front, back, overhang = 0.35, verge = 0.3, thickness = 0.12, material = 'tiles', colour = TOWN_ONE, timber = TOWN_ONE, rafters = true, barge = true, tile = 1.2, random = Math.random }) {
+function townRoof(kit, { width, eave, rise, front, back, overhang = 0.35, verge = 0.3, thickness = 0.12, material = 'tiles', colour = TOWN_ONE, timber = TOWN_ONE, rafters = true, barge = true, tile = 1.2, random = Math.random, sag = 0, shade = townMoss }) {
   const half = width / 2;
   const angle = Math.atan2(rise, half);
   const cos = Math.cos(angle);
@@ -1071,13 +1216,23 @@ function townRoof(kit, { width, eave, rise, front, back, overhang = 0.35, verge 
   const z1 = front + verge;
   const length = (half + overhang) / cos + thickness * tan * 0.5 + 0.02;
   const wood = { colour: timber, tile: 1.2, grain: true };
+  const proxy = material === 'shadow';
+  const slab = sag > 0 && !proxy ? townShared('slab', () => new THREE.BoxGeometry(1, 1, 1, 8, 1, 3)) : townBox();
+  // The slab's unit coordinates: x along the ridge, y out of the roof, z up the slope to the ridge.
+  const bow = (l) => {
+    l.y -= (sag * (1 - 4 * l.x * l.x) * (0.35 + 0.65 * (l.z + 0.5))) / thickness;
+  };
   for (const s of [1, -1]) {
     const up = new THREE.Vector3(-s * cos, sin, 0);
     const out = new THREE.Vector3(s * sin, cos, 0);
     const along = new THREE.Vector3(0, 0, s);
     const eaveAt = new THREE.Vector3(s * (half + overhang), eave - overhang * tan, (z0 + z1) / 2);
     const centre = eaveAt.clone().addScaledVector(up, length / 2).addScaledVector(out, thickness / 2);
-    kit.oriented(material, centre, along, out, up, [z1 - z0, thickness, length], { tile, colour, shade: townMoss, offset: [random(), random()] });
+    if (proxy) {
+      kit.oriented('shadow', centre, along, out, up, [z1 - z0, thickness, length]);
+      continue;
+    }
+    kit.oriented(material, centre, along, out, up, [z1 - z0, thickness, length], { tile, colour, shade, offset: [random(), random()], warp: sag > 0 ? bow : null }, slab);
     // A point under the slabs, `across` out from the ridge line and `drop` below their underside.
     const under = (across, drop = 0) => [s * across - out.x * drop, eave + rise - across * tan - out.y * drop];
     if (rafters) {
@@ -1095,10 +1250,15 @@ function townRoof(kit, { width, eave, rise, front, back, overhang = 0.35, verge 
       }
     }
   }
-  // The ridge: half-round ridge tiles bedded along the top.
-  const ridge = townShared('ridge', () => new THREE.CylinderGeometry(1, 1, 1, 10, 1));
+  if (proxy) return { angle, tan };
+  // The ridge: half-round ridge tiles bedded along the top, bowed with the slabs.
+  const ridge = townShared('ridge', () => new THREE.CylinderGeometry(1, 1, 1, 8, 6));
   const r = Math.max(0.05, thickness * 0.8);
-  kit.shape(material, ridge, kit.place([0, eave + rise + thickness / cos - r * 0.35, (z0 + z1) / 2], [Math.PI / 2, 0, 0], [r, z1 - z0 + 0.04, r * 0.75]), { mapping: 'keep', tile: [2, (z1 - z0) * 0.45], colour: colour.map((value) => value * 0.85) });
+  // The cylinder's y runs along the ridge; its z, turned, points down.
+  const bowRidge = (l) => {
+    l.z += (sag * (1 - 4 * l.y * l.y)) / (r * 0.75);
+  };
+  kit.shape(material, ridge, kit.place([0, eave + rise + thickness / cos - r * 0.35, (z0 + z1) / 2], [Math.PI / 2, 0, 0], [r, z1 - z0 + 0.04, r * 0.75]), { mapping: 'keep', tile: [2, (z1 - z0) * 0.45], colour: colour.map((value) => value * 0.8), warp: sag > 0 ? bowRidge : null });
   return { angle, tan };
 }
 
@@ -1113,20 +1273,28 @@ const TOWN_TILE_TINTS = [[1, 1, 1], [0.86, 0.78, 0.72], [0.96, 0.88, 0.82], [0.7
 const TOWN_DOORS = [[0.5, 0.36, 0.24], [0.32, 0.42, 0.34], [0.58, 0.24, 0.17], [0.32, 0.38, 0.48], [0.42, 0.3, 0.2]];
 
 /**
- * One half-timbered house, its gable to the square (+z), in the kit's
+ * One half-timbered house, its front to the square (+z), in the kit's
  * current frame: a stone plinth, a ground storey of 3 m with its door and
  * perhaps a shop window with stall board and flaps, upper storeys of 2.5 m
  * jettied out on joist ends and knee braces, the oak frame proud of the
- * lime-rendered infill, leaded windows set back with sills, the gable's
- * collar, king post and windows, the tiled (or slated) roof with a chimney
- * and maybe a dormer. `far` leaves out what only shows close to.
+ * lime-rendered infill, leaded windows set back with sills, and the tiled
+ * (or slated) roof with a chimney and maybe a dormer: its gable to the
+ * square (the collar, king post and windows framed in it), or `broadside`,
+ * its eaves to the square and the ridge along the front. `far` leaves out
+ * what only shows close to (the shop, the joist ends, the sides' framing).
+ * `casts` adds the plain blocks it casts its shadow with.
+ *
+ * Old and used: the render stained by the sills and sooted over the
+ * openings, grimed up from the street, blotched; the timber silvering; the
+ * roof sagging between its gables, sooted round the stack, mossed.
  */
-function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, ground: S0 = 3, storey: S = 2.5 }) {
+function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, ground: S0 = 3, storey: S = 2.5, broadside = false, casts = false }) {
   const random = townRandom(seed * 97 + 5);
   const rr = (a, b) => a + (b - a) * random();
   const pick = (list) => list[Math.floor(random() * list.length)];
+  const mix = (a, b, k) => a.map((value, index) => value + (b[index] - value) * k);
   const wash = pick(TOWN_WASHES);
-  const timber = pick(TOWN_TIMBERS);
+  const timber = mix(pick(TOWN_TIMBERS), [0.6, 0.58, 0.54], rr(0, 0.4));
   const slate = random() < 0.22;
   const roofTint = slate ? [rr(0.9, 1), rr(0.9, 1), rr(0.95, 1)] : pick(TOWN_TILE_TINTS);
   const doorTint = pick(TOWN_DOORS);
@@ -1140,16 +1308,27 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
   const fzOf = (level) => (level === 0 ? d / 2 - 0.4 : d / 2 + (level >= 2 ? 0.2 : 0));
   const bottomOf = (level) => (level === 0 ? plinth : S0 + S * (level - 1));
   const topOf = (level) => S0 + S * level;
-  const plaster = { mapping: 'world', tile: 1.8, colour: wash, shade: townGrime };
-  const oakTint = timber.map((value) => value * rr(0.92, 1.06));
-  const timberBox = (size, at, extra = {}) => kit.box('oak', size, at, { colour: oakTint, shade: townGrime, grain: true, tile: 1.2, offset: [random(), random()], ...extra });
-  const timberBeam = (a, b, width, depth) => kit.beam('oak', a, b, width, depth, { colour: oakTint, shade: townGrime, tile: 1.2, offset: [random(), random()] });
-  const panel = (x0, x1, y0, y1, fz) => {
+  const plaster = { mapping: 'world', tile: 3.2, colour: wash, shade: townRender };
+  const timberBox = (size, at, extra = {}) => {
+    const tint = timber.map((value) => value * rr(0.86, 1.08));
+    kit.box('oak', size, at, { colour: tint, shade: townGrime, grain: true, tile: 1.2, offset: [random(), random()], ...extra });
+  };
+  const timberBeam = (a, b, width, depth) => kit.beam('oak', a, b, width, depth, { colour: timber.map((value) => value * rr(0.86, 1.08)), shade: townGrime, tile: 1.2, offset: [random(), random()] });
+  /** A panel of render; `stain` darkens its top (rain off the sill above), `soot` its foot (smoke out of the opening below). */
+  const panel = (x0, x1, y0, y1, fz, { stain = 0, soot = 0 } = {}) => {
     if (x1 - x0 < 0.02 || y1 - y0 < 0.02) return;
-    kit.box('plaster', [x1 - x0, y1 - y0, 0.1], [(x0 + x1) / 2, (y0 + y1) / 2, fz - 0.05], plaster);
+    const mid = (y0 + y1) / 2;
+    const shade = stain || soot ? (c, p) => {
+      townRender(c, p);
+      const k = p.y > mid ? 1 - stain : 1 - soot;
+      c[0] *= k;
+      c[1] *= k;
+      c[2] *= k * 0.96;
+    } : townRender;
+    kit.box('plaster', [x1 - x0, y1 - y0, 0.1], [(x0 + x1) / 2, mid, fz - 0.05], { ...plaster, shade });
   };
   const glazing = (x0, x1, y0, y1, z) => {
-    kit.box('glass', [x1 - x0 + 0.02, y1 - y0 + 0.02, 0.02], [(x0 + x1) / 2, (y0 + y1) / 2, z], { tile: 0.42, offset: [random(), random()] });
+    kit.box('glass', [x1 - x0 + 0.02, y1 - y0 + 0.02, 0.02], [(x0 + x1) / 2, (y0 + y1) / 2, z], { tile: 0.42, offset: [random(), random()], colour: TOWN_ONE.map(() => rr(0.75, 1.05)) });
   };
 
   kit.box('ashlar', [w + 0.04, plinth, d - 0.4 + 0.04], [0, plinth / 2, -0.2], { mapping: 'world', tile: 2.2, colour: [0.86, 0.84, 0.8], shade: townStone });
@@ -1164,6 +1343,7 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
     // The wall behind the infill: render all round, its front 10 cm back from the infill's face.
     const coreDepth = fz - 0.1 + d / 2;
     kit.box('plaster', [w, y1 - y0, coreDepth], [0, (y0 + y1) / 2, -d / 2 + coreDepth / 2], plaster);
+    if (casts) kit.box('shadow', [w - 0.12, y1 - (level === 0 ? 0 : y0), coreDepth - 0.1], [0, (y1 + (level === 0 ? 0 : y0)) / 2, -d / 2 + coreDepth / 2]);
     // Sill beam and wall plate, a moulding under the bressumer of a jettied storey.
     timberBox([w + 0.02, 0.2, 0.16], [0, y0 + 0.1, fz - 0.02]);
     timberBox([w + 0.02, 0.2, 0.16], [0, plateTop - 0.1, fz - 0.02]);
@@ -1199,10 +1379,10 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
       const high = plateTop - 0.2;
       const rail = (y) => timberBox([x1 - x0 + 0.04, 0.13, 0.14], [cx, y, fz - 0.03]);
       if (kind === 'window') {
-        panel(x0, x1, low, ya - 0.13, fz);
+        panel(x0, x1, low, ya - 0.13, fz, { stain: rr(0.15, 0.35) });
         rail(ya - 0.065);
         rail(yb + 0.065);
-        panel(x0, x1, yb + 0.13, high, fz);
+        panel(x0, x1, yb + 0.13, high, fz, { soot: rr(0.05, 0.22) });
         glazing(x0, x1, ya, yb, fz - 0.09);
         if (x1 - x0 > 0.55) timberBox([0.06, yb - ya, 0.06], [cx, (ya + yb) / 2, fz - 0.065]);
         timberBox([x1 - x0, 0.05, 0.06], [cx, ya + (yb - ya) * 0.64, fz - 0.065]);
@@ -1229,18 +1409,17 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
         timberBox([dw + 0.34, 0.17, 0.17], [cx, top + 0.085, fz - 0.015]);
         panel(x0, cx - dw / 2 - 0.14, low, high, fz);
         panel(cx + dw / 2 + 0.14, x1, low, high, fz);
-        panel(x0, x1, top + 0.17, high, fz);
-        // The door: boards up and down, set back, on strap hinges, a ring to pull; a step before it.
+        panel(x0, x1, top + 0.17, high, fz, { soot: rr(0.2, 0.4) });
+        // The door: boards up and down, set back, on strap hinges; a worn step before it.
         kit.box('planks', [dw, top - y0, 0.05], [cx, (y0 + top) / 2, fz - 0.075], { colour: doorTint, shade: townGrime, grain: true, tile: 1.4, offset: [random(), 0] });
         for (const y of [y0 + 0.35, top - 0.35]) kit.box('iron', [dw * 0.7, 0.045, 0.015], [cx - dw * 0.15, y, fz - 0.045], { colour: [0.2, 0.19, 0.18] });
-        kit.shape('iron', townShared('ring', () => new THREE.TorusGeometry(1, 0.15, 5, 12)), kit.place([cx + dw * 0.32, y0 + 1.0, fz - 0.04], TOWN_ZERO, [0.05, 0.05, 0.05]), { colour: [0.2, 0.19, 0.18] });
-        kit.box('ashlar', [dw + 0.4, 0.16, 0.38], [cx, 0.08, fz + 0.19], { mapping: 'world', tile: 2.2, colour: [0.82, 0.8, 0.76], shade: townGrime });
+        kit.box('ashlar', [dw + 0.4, 0.16, 0.38], [cx, 0.08, fz + 0.19], { mapping: 'world', tile: 2.2, colour: [0.74, 0.72, 0.68], shade: townGrime });
       } else if (kind === 'shop') {
         const sill = y0 + 0.55;
         kit.box('planks', [x1 - x0, sill - low, 0.06], [cx, (low + sill) / 2, fz - 0.04], { colour: doorTint, shade: townGrime, grain: true, tile: 1.4 });
         timberBox([x1 - x0 + 0.04, 0.12, 0.16], [cx, sill + 0.06, fz - 0.02]);
         rail(yb + 0.065);
-        panel(x0, x1, yb + 0.13, high, fz);
+        panel(x0, x1, yb + 0.13, high, fz, { soot: rr(0.15, 0.35) });
         kit.box('paint', [x1 - x0, yb - sill, 0.02], [cx, (sill + yb) / 2, fz - 0.09], { colour: [0.11, 0.085, 0.065] });
         // The counter flap let down on its struts, the top flap propped up as a little pentice.
         kit.box('planks', [x1 - x0 - 0.04, 0.05, 0.5], [cx, sill + 0.1, fz + 0.27], { colour: doorTint, grain: true, tile: 1.4 });
@@ -1249,9 +1428,10 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
       }
     });
     if (jetty) {
-      // Joist ends carrying the storey above, and knee braces at the posts.
+      // Joist ends carrying the storey above (close to only), and knee braces at the posts.
       const reach = fzOf(level + 1);
-      for (let x = -w / 2 + 0.2; x <= w / 2 - 0.15; x += 0.42) timberBox([0.13, 0.17, reach - fz + 0.14], [x, plateTop + 0.085, (fz - 0.1 + reach + 0.04) / 2]);
+      if (!far) for (let x = -w / 2 + 0.2; x <= w / 2 - 0.15; x += 0.42) timberBox([0.13, 0.17, reach - fz + 0.14], [x, plateTop + 0.085, (fz - 0.1 + reach + 0.04) / 2]);
+      else timberBox([w, 0.17, reach - fz + 0.1], [0, plateTop + 0.085, (fz - 0.1 + reach + 0.04) / 2], { colour: timber.map((value) => value * 0.6) });
       for (let index = 0; index <= nb; index += far ? nb : 2) {
         const x = index === 0 ? -w / 2 + 0.1 : index === nb ? w / 2 - 0.1 : -w / 2 + index * bw;
         timberBeam([x, plateTop - 0.8, fz + 0.02], [x, plateTop - 0.04, reach - 0.04], 0.12, 0.12);
@@ -1264,7 +1444,6 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
         timberBox([0.24, fullHeight, 0.24], [side * (w / 2 - 0.1), y0 + fullHeight / 2, -d / 2 + 0.1]);
         timberBeam([side * w / 2, y0 + 0.2, -d / 2 + 0.25], [side * w / 2, plateTop - 0.2, -d / 2 + 0.25 + fullHeight * 0.7], 0.13, 0.1);
       }
-      for (const y of [y0 + 0.1, plateTop - 0.1]) timberBox([w, 0.2, 0.1], [0, y, -d / 2]);
     }
     if (level === 0 && !far && seed % 2 === 0) {
       // A hanging sign on a wrought bracket.
@@ -1276,64 +1455,168 @@ function townHouse(kit, { width: w, storeys, depth: d = 6, seed, far = false, gr
     }
   }
 
-  // The gable: the attic's triangle of wall, framed, with its windows and a loft hatch.
   const fzTop = fzOf(storeys - 1);
-  kit.shape('plaster', townGablePrism(w, R, fzTop - 0.04 + d / 2), kit.place([0, H, fzTop - 0.04]), plaster);
-  const gz = fzTop - 0.01;
-  const collar = H + R * 0.45;
-  timberBox([w * 0.55 - 0.05, 0.16, 0.1], [0, collar, gz]);
-  timberBox([w * 0.55 - 0.05, 0.16, 0.1], [0, collar, -d / 2 + 0.01], { rotation: [0, Math.PI, 0] });
-  timberBox([0.16, R * 0.55 - 0.15, 0.1], [0, collar + (R * 0.55 - 0.15) / 2, gz]);
-  for (const side of [-1, 1]) {
-    timberBeam([side * (w / 2 - 0.08), H, gz], [0, H + R - 0.1, gz], 0.18, 0.1);
-    timberBeam([side * w * 0.38, H + 0.05, gz], [side * 0.1, collar, gz], 0.13, 0.09);
-  }
-  const gableWindows = w > 3.7 && !far ? [-w * 0.2, w * 0.2] : [0];
-  for (const x of gableWindows) {
-    const ww = 0.5;
-    const wy0 = H + 0.3;
-    const wy1 = Math.min(collar - 0.1, H + 1.05);
-    glazing(x - ww / 2, x + ww / 2, wy0, wy1, gz - 0.025);
-    for (const side of [-1, 1]) timberBox([0.1, wy1 - wy0 + 0.1, 0.1], [x + side * (ww / 2 + 0.05), (wy0 + wy1) / 2, gz]);
-    timberBox([ww + 0.25, 0.06, 0.15], [x, wy0 - 0.02, gz + 0.04]);
-  }
-  // With two windows the king post runs down to the plate; with one it stands on the collar over it.
-  if (gableWindows.length > 1) timberBox([0.16, collar - H, 0.1], [0, (H + collar) / 2, gz]);
-  kit.box('paint', [0.22, 0.34, 0.02], [0, collar + 0.45, gz - 0.02], { colour: [0.06, 0.05, 0.04] });
-
   const roofKind = slate ? 'slate' : 'tiles';
-  const roof = townRoof(kit, { width: w, eave: H, rise: R, front: fzTop, back: -d / 2, material: roofKind, colour: roofTint, timber: oakTint, tile: slate ? 1.1 : 1.3, random, rafters: !far });
+  const sag = rr(0.05, 0.16);
+  // The stack: through the slope away from any dormer, or on the ridge of a broadside roof.
+  const hasChimney = random() < 0.85;
+  const side = random() < 0.5 ? 1 : -1;
+  const chimney = broadside ? [side * w * 0.28, (fzTop - d / 2) / 2 + rr(-0.3, 0.3)] : [side * w * 0.2, -d * 0.2 + rr(-0.4, 0.4)];
+  const chimneyAt = kit.toWorld([chimney[0], 0, chimney[1]]);
+  /** The roof weathered: moss to the north, soot round the stack, blotches. */
+  const roofShade = (c, p, n) => {
+    townMoss(c, p, n);
+    let k = 1 - 0.2 * townHash(p);
+    if (hasChimney) k *= 0.5 + 0.5 * townSmooth(0.3, 1.8, Math.hypot(p.x - chimneyAt.x, p.z - chimneyAt.z));
+    c[0] *= k;
+    c[1] *= k;
+    c[2] *= k;
+  };
+  const roofOptions = { material: roofKind, colour: roofTint, timber, tile: slate ? 1.1 : 1.3, random, sag, shade: roofShade };
+  const dormer = (wd, hd, tan) => {
+    const back = hd / tan + 0.2;
+    kit.box('plaster', [wd, hd, back], [0, hd / 2, -back / 2], plaster);
+    for (const s of [-1, 1]) timberBox([0.1, hd, 0.12], [s * (wd / 2 - 0.05), hd / 2, -0.04]);
+    timberBox([wd + 0.06, 0.1, 0.14], [0, 0.05, -0.03]);
+    timberBox([wd + 0.06, 0.1, 0.14], [0, hd - 0.05, -0.03]);
+    glazing(-wd / 2 + 0.1, wd / 2 - 0.1, 0.1, hd - 0.1, -0.07);
+    kit.shape('plaster', townGablePrism(wd, 0.45, back), kit.place([0, hd, -0.02]), plaster);
+    townRoof(kit, { ...roofOptions, width: wd, eave: hd, rise: 0.45, front: -0.02, back: -back, overhang: 0.12, verge: 0.18, thickness: 0.07, rafters: false, sag: 0, shade: townMoss });
+  };
 
-  let dormerSide = 0;
-  if (!far && w >= 3.6 && random() < 0.5) {
-    dormerSide = random() < 0.5 ? 1 : -1;
-    const ax = (w / 2) * 0.5;
-    const yb = H + R - ax * roof.tan;
-    const hd = 0.95;
-    const wd = 0.9;
-    const back = hd / roof.tan + 0.2;
-    kit.within(kit.place([dormerSide * ax, yb, -d * 0.05], [0, dormerSide * Math.PI / 2, 0]), () => {
-      kit.box('plaster', [wd, hd, back], [0, hd / 2, -back / 2], plaster);
-      for (const side of [-1, 1]) timberBox([0.1, hd, 0.12], [side * (wd / 2 - 0.05), hd / 2, -0.04]);
-      timberBox([wd + 0.06, 0.1, 0.14], [0, 0.05, -0.03]);
-      timberBox([wd + 0.06, 0.1, 0.14], [0, hd - 0.05, -0.03]);
-      glazing(-wd / 2 + 0.1, wd / 2 - 0.1, 0.1, hd - 0.1, -0.07);
-      kit.shape('plaster', townGablePrism(wd, 0.45, back), kit.place([0, hd, -0.02]), plaster);
-      townRoof(kit, { width: wd, eave: hd, rise: 0.45, front: -0.02, back: -back, overhang: 0.12, verge: 0.18, thickness: 0.07, material: roofKind, colour: roofTint, timber: oakTint, rafters: false, tile: slate ? 1.1 : 1.3, random });
+  let top = H + R;
+  if (broadside) {
+    // The ridge along the front: the roof built a quarter turned, its gables at the sides.
+    const span = fzTop + d / 2;
+    const mid = (fzTop - d / 2) / 2;
+    const rise = 0.42 * span + 0.6;
+    top = H + rise;
+    let tan = 1;
+    kit.within(kit.place([0, 0, mid], [0, Math.PI / 2, 0]), () => {
+      kit.shape('plaster', townGablePrism(span, rise, w), kit.place([0, H, w / 2]), plaster);
+      ({ tan } = townRoof(kit, { ...roofOptions, width: span, eave: H, rise, front: w / 2, back: -w / 2, rafters: !far }));
+      if (casts) {
+        townRoof(kit, { width: span, eave: H, rise, front: w / 2, back: -w / 2, material: 'shadow', thickness: 0.06 });
+        kit.shape('shadow', townGablePrism(span - 0.12, rise - 0.08, w - 0.12), kit.place([0, H, w / 2 - 0.06]));
+      }
     });
+    // A dormer or two in the front slope.
+    const count = w > 4.4 && random() < 0.5 ? 2 : random() < 0.6 ? 1 : 0;
+    for (let k = 0; k < count; k += 1) {
+      const ax = (span / 2) * 0.48;
+      const x = count === 2 ? (k ? 1 : -1) * w * 0.24 : rr(-w * 0.15, w * 0.15);
+      kit.within(kit.place([x, H + rise - ax * tan, mid + ax]), () => dormer(0.85, 0.9, tan));
+    }
+  } else {
+    // The gable: the attic's triangle of wall, framed, with its windows and a loft hatch.
+    kit.shape('plaster', townGablePrism(w, R, fzTop - 0.04 + d / 2), kit.place([0, H, fzTop - 0.04]), plaster);
+    if (casts) kit.shape('shadow', townGablePrism(w - 0.12, R - 0.1, fzTop - 0.1 + d / 2), kit.place([0, H, fzTop - 0.1]));
+    const gz = fzTop - 0.01;
+    const collar = H + R * 0.45;
+    timberBox([w * 0.55 - 0.05, 0.16, 0.1], [0, collar, gz]);
+    timberBox([0.16, R * 0.55 - 0.15, 0.1], [0, collar + (R * 0.55 - 0.15) / 2, gz]);
+    for (const s of [-1, 1]) {
+      timberBeam([s * (w / 2 - 0.08), H, gz], [0, H + R - 0.1, gz], 0.18, 0.1);
+      timberBeam([s * w * 0.38, H + 0.05, gz], [s * 0.1, collar, gz], 0.13, 0.09);
+    }
+    const gableWindows = w > 3.7 && !far ? [-w * 0.2, w * 0.2] : [0];
+    for (const x of gableWindows) {
+      const ww = 0.5;
+      const wy0 = H + 0.3;
+      const wy1 = Math.min(collar - 0.1, H + 1.05);
+      glazing(x - ww / 2, x + ww / 2, wy0, wy1, gz - 0.025);
+      for (const s of [-1, 1]) timberBox([0.1, wy1 - wy0 + 0.1, 0.1], [x + s * (ww / 2 + 0.05), (wy0 + wy1) / 2, gz]);
+      timberBox([ww + 0.25, 0.06, 0.15], [x, wy0 - 0.02, gz + 0.04]);
+    }
+    // With two windows the king post runs down to the plate; with one it stands on the collar over it.
+    if (gableWindows.length > 1) timberBox([0.16, collar - H, 0.1], [0, (H + collar) / 2, gz]);
+    kit.box('paint', [0.22, 0.34, 0.02], [0, collar + 0.45, gz - 0.02], { colour: [0.06, 0.05, 0.04] });
+    const roof = townRoof(kit, { ...roofOptions, width: w, eave: H, rise: R, front: fzTop, back: -d / 2, rafters: !far });
+    if (casts) townRoof(kit, { width: w, eave: H, rise: R, front: fzTop, back: -d / 2, material: 'shadow', thickness: 0.06 });
+    if (!far && w >= 3.6 && random() < 0.5) {
+      const ax = (w / 2) * 0.5;
+      kit.within(kit.place([-side * ax, H + R - ax * roof.tan, -d * 0.05], [0, -side * Math.PI / 2, 0]), () => dormer(0.9, 0.95, roof.tan));
+    }
   }
-  if (random() < 0.85) {
-    // A brick chimney stack through the slope, its oversailing cap sooted, a pot or two.
-    const side = dormerSide ? -dormerSide : random() < 0.5 ? 1 : -1;
-    const cx = side * w * 0.2;
-    const cz = -d * 0.2 + rr(-0.4, 0.4);
-    const top = H + R + rr(0.45, 0.85);
-    const brick = { tile: 0.8, colour: [0.92, 0.86, 0.82], offset: [random(), random()] };
-    kit.box('brick', [0.5, top - H, 0.62], [cx, (H + top) / 2, cz], brick);
-    kit.box('brick', [0.64, 0.12, 0.76], [cx, top - 0.18, cz], { ...brick, colour: [0.5, 0.45, 0.42] });
-    kit.box('brick', [0.6, 0.08, 0.72], [cx, top + 0.02, cz], { ...brick, colour: [0.28, 0.25, 0.24] });
-    const pot = townShared('pot', () => new THREE.CylinderGeometry(0.07, 0.09, 0.3, 8, 1));
-    kit.shape('tiles', pot, kit.place([cx, top + 0.2, cz + (random() < 0.5 ? 0.12 : -0.12)]), { mapping: 'keep', tile: [1, 0.3], colour: [0.8, 0.62, 0.55] });
+  if (hasChimney) {
+    // A brick stack, its oversailing cap black with soot, a pot or two.
+    const [cx, cz] = chimney;
+    const stackTop = top + rr(0.45, 0.85);
+    const brick = { tile: 0.8, colour: [0.9, 0.84, 0.8], offset: [random(), random()] };
+    const sooty = (c, p) => {
+      const k = 1 - 0.55 * townSmooth(stackTop - 1.2, stackTop, p.y);
+      c[0] *= k;
+      c[1] *= k;
+      c[2] *= k;
+    };
+    kit.box('brick', [0.5, stackTop - H, 0.62], [cx, (H + stackTop) / 2, cz], { ...brick, shade: sooty });
+    kit.box('brick', [0.64, 0.12, 0.76], [cx, stackTop - 0.18, cz], { ...brick, colour: [0.32, 0.29, 0.27] });
+    kit.box('brick', [0.6, 0.08, 0.72], [cx, stackTop + 0.02, cz], { ...brick, colour: [0.16, 0.15, 0.14] });
+    const pot = townShared('pot', () => new THREE.CylinderGeometry(0.07, 0.09, 0.3, 6, 1));
+    kit.shape('tiles', pot, kit.place([cx, stackTop + 0.2, cz + (random() < 0.5 ? 0.12 : -0.12)]), { mapping: 'keep', tile: [1, 0.3], colour: [0.5, 0.4, 0.36] });
+  }
+}
+
+/**
+ * A house further off, behind the front rows, for its roofline: a rendered
+ * box with a sill band and a plate at each floor, corner posts, dark
+ * windows, a sagging tiled roof (gable or eaves to the front), a stack. Seen
+ * only over and between the nearer roofs and down the streets.
+ */
+function townBackdrop(kit, { width: w, depth: d, storeys, seed, broadside }) {
+  const random = townRandom(seed * 131 + 17);
+  const rr = (a, b) => a + (b - a) * random();
+  const pick = (list) => list[Math.floor(random() * list.length)];
+  const wash = pick(TOWN_WASHES);
+  const timber = pick(TOWN_TIMBERS);
+  const slate = random() < 0.25;
+  const roofTint = slate ? [0.95, 0.95, 1] : pick(TOWN_TILE_TINTS);
+  const H = 3 + 2.6 * (storeys - 1);
+  const plaster = { mapping: 'world', tile: 3.2, colour: wash, shade: townRender };
+  kit.box('plaster', [w, H, d], [0, H / 2, 0], plaster);
+  const wood = { colour: timber, shade: townGrime, grain: true, tile: 1.2 };
+  for (let level = 0; level < storeys; level += 1) {
+    const y0 = level === 0 ? 0 : 3 + 2.6 * (level - 1);
+    kit.box('oak', [w + 0.04, 0.2, 0.06], [0, y0 + 0.1, d / 2 + 0.02], wood);
+    const windows = Math.max(1, Math.round(w / 1.7));
+    for (let k = 0; k < windows; k += 1) {
+      if (level === 0 && k === Math.floor(windows / 2)) {
+        kit.box('planks', [0.9, 2.0, 0.04], [-w / 2 + ((k + 0.5) * w) / windows, 1.0, d / 2 + 0.01], { colour: pick(TOWN_DOORS), grain: true, tile: 1.4 });
+        continue;
+      }
+      const x = -w / 2 + ((k + 0.5) * w) / windows;
+      const y = y0 + (level === 0 ? 1.0 : 0.85);
+      kit.box('glass', [0.7, 1.0, 0.04], [x, y + 0.5, d / 2 + 0.01], { tile: 0.42, offset: [random(), random()], colour: [0.8, 0.8, 0.8] });
+      kit.box('oak', [0.86, 0.06, 0.1], [x, y, d / 2 + 0.04], wood);
+    }
+  }
+  for (const s of [-1, 1]) kit.box('oak', [0.2, H, 0.08], [s * (w / 2 - 0.08), H / 2, d / 2 + 0.02], wood);
+  const sag = rr(0.06, 0.18);
+  const roof = { material: slate ? 'slate' : 'tiles', colour: roofTint, timber, tile: slate ? 1.1 : 1.3, random, sag, rafters: false, shade: (c, p, n) => {
+    townMoss(c, p, n);
+    const k = 1 - 0.22 * townHash(p);
+    c[0] *= k;
+    c[1] *= k;
+    c[2] *= k;
+  } };
+  let top;
+  if (broadside) {
+    const rise = 0.45 * d + 0.4;
+    top = H + rise;
+    kit.within(kit.place([0, 0, 0], [0, Math.PI / 2, 0]), () => {
+      kit.shape('plaster', townGablePrism(d, rise, w), kit.place([0, H, w / 2]), plaster);
+      townRoof(kit, { ...roof, width: d, eave: H, rise, front: w / 2, back: -w / 2, barge: false });
+    });
+  } else {
+    const rise = 0.62 * w + 0.6;
+    top = H + rise;
+    kit.shape('plaster', townGablePrism(w, rise, d), kit.place([0, H, d / 2]), plaster);
+    townRoof(kit, { ...roof, width: w, eave: H, rise, front: d / 2, back: -d / 2 });
+  }
+  if (random() < 0.8) {
+    const cx = rr(-w * 0.3, w * 0.3);
+    const stackTop = top + rr(0.3, 0.8);
+    kit.box('brick', [0.5, stackTop - H, 0.6], [cx, (H + stackTop) / 2, rr(-d * 0.25, 0)], { tile: 0.8, colour: [0.8, 0.74, 0.7] });
   }
 }
 
@@ -1412,7 +1695,7 @@ function townChurch(kit, random) {
   }
   kit.box('ashlar', [7.2, 0.25, 16.2], [0, 9.0, 0], pale);
   kit.shape('ashlar', townGablePrism(7, 5.5, 14.5), kit.place([0, 9, 6.5]), stone);
-  townRoof(kit, { width: 7, eave: 9, rise: 5.5, front: 6.5, back: -7.75, overhang: 0.35, verge: 0, thickness: 0.15, material: 'slate', colour: [0.95, 0.96, 1], timber: [0.35, 0.27, 0.2], barge: false, tile: 1.1, random });
+  townRoof(kit, { width: 7, eave: 9, rise: 5.5, front: 6.5, back: -7.75, overhang: 0.35, verge: 0, thickness: 0.15, material: 'slate', colour: [0.95, 0.96, 1], timber: [0.35, 0.27, 0.2], barge: false, tile: 1.1, random, sag: 0.1 });
   // The east gable's coped parapet and its cross.
   for (const s of [-1, 1]) kit.beam('ashlar', [s * 3.75, 9.15, -8], [0, 14.95, -8], 0.42, 0.55, pale);
   kit.box('ashlar', [0.14, 1.0, 0.14], [0, 15.4, -8], pale);
@@ -1463,7 +1746,7 @@ function townChurch(kit, random) {
           kit.beam('ashlar', [side * 0.8, 2.85, 0.5], [0, 3.65, 0.5], 0.22, 0.3, pale);
         }
         kit.box('planks', [1.4, 3.1, 0.06], [0, 1.55, 0.37], { colour: [0.42, 0.28, 0.18], grain: true, tile: 1.6 });
-        kit.box('paint', [1.6, 0.9, 0.02], [0, 3.3, 0.36], { colour: [0.52, 0.5, 0.46] });
+        kit.box('ashlar', [1.6, 0.9, 0.02], [0, 3.3, 0.36], { colour: [0.62, 0.6, 0.56], shade: townStone });
         for (const y of [0.6, 1.6, 2.6]) kit.box('iron', [1.1, 0.05, 0.015], [-0.1, y, 0.41], { colour: [0.18, 0.17, 0.16] });
         kit.box('ashlar', [2.8, 0.16, 0.7], [0, 0.08, 0.7], stone);
         townLancet(kit, { width: 0.5, sill: 8.0, spring: 9.3, stone: pale, depth: 0.18 });
@@ -1513,30 +1796,31 @@ function townChurch(kit, random) {
 }
 
 // ---- the market -------------------------------------------------------------------
+//
+// Only what reads as real at a few metres: two stalls under striped
+// awnings with their baskets, a cluster of barrels by a door, the well and
+// the market cross. (The stocks, the cart, the bunting, the sacks and the
+// loose crates went: they read as toys.)
 
-/** Produce at its real size (radius in metres), the colours it comes in, its shape as a scaled ball (or a wheel). */
+/** Produce at its real size (radius in metres), the colours it comes in, its shape as a scaled ball. */
 const TOWN_PRODUCE = {
   apple: { r: 0.042, scale: [1, 0.9, 1], colours: [[0.72, 0.14, 0.09], [0.78, 0.32, 0.1], [0.62, 0.1, 0.08], [0.8, 0.62, 0.2]] },
   pear: { r: 0.04, scale: [1, 1.35, 1], colours: [[0.62, 0.66, 0.22], [0.7, 0.68, 0.3]] },
-  plum: { r: 0.026, scale: [1, 1.1, 1], colours: [[0.32, 0.12, 0.28], [0.42, 0.16, 0.3]] },
   loaf: { r: 0.11, scale: [1.5, 0.62, 0.95], colours: [[0.6, 0.38, 0.17], [0.55, 0.33, 0.15]] },
   roll: { r: 0.05, scale: [1, 0.7, 1], colours: [[0.76, 0.52, 0.26], [0.7, 0.46, 0.22]] },
-  egg: { r: 0.024, scale: [1, 1.3, 1], colours: [[0.93, 0.88, 0.78], [0.85, 0.72, 0.55]] },
   cabbage: { r: 0.085, scale: [1, 0.9, 1], colours: [[0.42, 0.6, 0.26], [0.5, 0.66, 0.32], [0.36, 0.52, 0.24]] },
   onion: { r: 0.038, scale: [1, 0.85, 1], colours: [[0.68, 0.42, 0.18], [0.74, 0.5, 0.24], [0.55, 0.25, 0.3]] },
   turnip: { r: 0.05, scale: [1, 0.9, 1], colours: [[0.9, 0.85, 0.78], [0.75, 0.5, 0.62]] },
-  cheese: { r: 0.14, scale: [1, 0.42, 1], colours: [[0.86, 0.68, 0.32], [0.8, 0.6, 0.28]], wheel: true },
 };
 
-/** A heaped pile of produce in a circle of `radius` resting at `at` (its floor): layers, each smaller, so it domes. */
+/** A heaped basketful in a circle of `radius` resting at `at`: two layers, the top one smaller, so it domes. */
 function townHeap(kit, at, radius, kind, random) {
   const spec = TOWN_PRODUCE[kind];
-  // Small things are a twenty-sided ball (too small to see the facets), big ones eighty.
-  const ball = spec.r < 0.06 ? townShared('fruitSmall', () => new THREE.IcosahedronGeometry(1, 0)) : townShared('fruit', () => new THREE.IcosahedronGeometry(1, 1));
+  const ball = townShared('fruit', () => new THREE.IcosahedronGeometry(1, 0));
   let reach = radius - spec.r * 0.9;
-  for (let layer = 0; layer < 4 && reach > -0.001; layer += 1) {
+  for (let layer = 0; layer < 2 && reach > -0.001; layer += 1) {
     const y = at[1] + spec.r * spec.scale[1] * (0.85 + layer * 1.45);
-    const count = Math.max(1, Math.floor(((reach + spec.r) / spec.r) ** 2 * 0.75));
+    const count = Math.max(1, Math.floor(((reach + spec.r) / spec.r) ** 2 * 0.5));
     for (let k = 0; k < count; k += 1) {
       const angle = random() * Math.PI * 2;
       const away = Math.sqrt(random()) * Math.max(0, reach);
@@ -1545,20 +1829,45 @@ function townHeap(kit, at, radius, kind, random) {
       const size = spec.r * (0.88 + random() * 0.24);
       kit.shape('produce', ball, kit.place([at[0] + Math.cos(angle) * away, y + random() * spec.r * 0.25, at[2] + Math.sin(angle) * away], [random() * 6, random() * 6, random() * 6], spec.scale.map((value) => value * size)), { mapping: 'keep', colour: base.map((value) => value * jitter) });
     }
-    reach -= spec.r * 1.5;
+    reach -= spec.r * 2;
   }
 }
 
 /** A willow basket, open, a rolled rim (its floor at y = 0). */
 function townBasketGeometry() {
   const points = [[0.001, 0.0], [0.15, 0.0], [0.2, 0.07], [0.225, 0.15], [0.24, 0.165], [0.212, 0.165], [0.19, 0.08], [0.14, 0.03], [0.001, 0.03]];
-  return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), 14);
+  return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), 10);
+}
+
+/** A sheet seen from both sides: the same triangles again, wound the other way, facing back. */
+function townTwoSided(geometry) {
+  const flat = geometry.toNonIndexed();
+  flat.computeVertexNormals();
+  const P = flat.attributes.position.array;
+  const N = flat.attributes.normal.array;
+  const T = flat.attributes.uv.array;
+  const position = [...P];
+  const normal = [...N];
+  const uv = [...T];
+  for (let t = 0; t < P.length / 9; t += 1) {
+    for (const corner of [0, 2, 1]) {
+      const i = t * 3 + corner;
+      position.push(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]);
+      normal.push(-N[i * 3], -N[i * 3 + 1], -N[i * 3 + 2]);
+      uv.push(T[i * 2], T[i * 2 + 1]);
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(normal, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return out;
 }
 
 /** The awning over a stall: canvas sagging between its rails, run out past the front rail, and a scalloped valance along its front edge. */
 function townAwning(kit, band, { left, right, backZ, backY, frontZ, frontY, overhang }) {
-  const columns = 18;
-  const rows = 10;
+  const columns = 10;
+  const rows = 6;
   const run = frontZ - backZ + overhang;
   const atFront = (frontZ - backZ) / run;
   const slope = (frontY - backY) / (frontZ - backZ);
@@ -1572,7 +1881,7 @@ function townAwning(kit, band, { left, right, backZ, backY, frontZ, frontY, over
     }
     return [left + s * (right - left), y, z];
   };
-  // The canvas's top band is the top of v.
+  // The canvas's top band is the top of v; the bands sit inside the cell (v within 0..1).
   const v0 = (3 - band) * 0.25 + 0.03;
   const position = [];
   const uv = [];
@@ -1597,11 +1906,17 @@ function townAwning(kit, band, { left, right, backZ, backY, frontZ, frontY, over
   sheet.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
   sheet.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   sheet.setIndex(index);
-  sheet.computeVertexNormals();
-  kit.shape('cloth', sheet, null, { mapping: 'keep' });
+  // Soiled toward the back where the rain stands, a little faded.
+  const soil = (c, p) => {
+    const k = 0.8 + 0.2 * townSmooth(backZ, frontZ, p.z);
+    c[0] *= k;
+    c[1] *= k;
+    c[2] *= k * 0.95;
+  };
+  kit.shape('cloth', townTwoSided(sheet), null, { mapping: 'keep', colour: [0.92, 0.9, 0.86], shade: soil });
   // The valance: seven scallops hanging from the front edge.
   const lobes = 7;
-  const across = lobes * 6;
+  const across = lobes * 4;
   const hang = [];
   const hangUv = [];
   const hangIndex = [];
@@ -1620,25 +1935,23 @@ function townAwning(kit, band, { left, right, backZ, backY, frontZ, frontY, over
   valance.setAttribute('position', new THREE.Float32BufferAttribute(hang, 3));
   valance.setAttribute('uv', new THREE.Float32BufferAttribute(hangUv, 2));
   valance.setIndex(hangIndex);
-  valance.computeVertexNormals();
-  kit.shape('cloth', valance, null, { mapping: 'keep' });
+  kit.shape('cloth', townTwoSided(valance), null, { mapping: 'keep', colour: [0.9, 0.88, 0.84] });
 }
 
 /**
  * A market stall (its customers at +z): a boarded table on trestles, four
  * posts carrying rails, the striped awning (`band` picks its colourway) and
- * the goods in baskets, cheeses stacked.
+ * the goods heaped in baskets.
  */
 function townStall(kit, band, goods, random) {
   const top = 0.86;
-  const boards = { colour: [0.74, 0.6, 0.46], shade: townGrime, grain: true, tile: 1.5 };
-  const oak = { colour: [0.52, 0.4, 0.3], shade: townGrime, tile: 1.2 };
+  const boards = { colour: [0.66, 0.54, 0.42], shade: townGrime, grain: true, tile: 1.5 };
+  const oak = { colour: [0.46, 0.38, 0.3], shade: townGrime, tile: 1.2 };
   kit.box('planks', [2.4, 0.05, 1.0], [0, top, 0], { ...boards, offset: [random(), random()] });
   kit.box('planks', [2.4, 0.38, 0.03], [0, top - 0.24, 0.49], boards);
   for (const x of [-0.95, 0.95]) {
     for (const s of [-1, 1]) kit.beam('oak', [x, 0, s * 0.42], [x, top - 0.03, s * 0.14], 0.06, 0.05, oak);
     kit.beam('oak', [x, top - 0.055, -0.46], [x, top - 0.055, 0.46], 0.07, 0.06, oak);
-    kit.beam('oak', [x, 0.3, -0.34], [x, 0.3, 0.34], 0.04, 0.04, oak);
   }
   const frontY = 2.1;
   const backY = 2.45;
@@ -1653,41 +1966,31 @@ function townStall(kit, band, goods, random) {
   townAwning(kit, band, { left: -1.4, right: 1.4, backZ: backZ - 0.06, backY, frontZ, frontY, overhang: 0.34 });
   const basket = townShared('basket', townBasketGeometry);
   [-0.82, -0.28, 0.28, 0.82].forEach((x, k) => {
-    const kind = goods[k % goods.length];
-    if (TOWN_PRODUCE[kind].wheel) {
-      const wheel = townShared('wheel', () => new THREE.CylinderGeometry(1, 1, 1, 18, 1));
-      for (let layer = 0; layer < 3; layer += 1) {
-        const r = 0.15 - layer * 0.012;
-        const colour = TOWN_PRODUCE.cheese.colours[layer % 2];
-        kit.shape('produce', wheel, kit.place([x + (random() - 0.5) * 0.03, top + 0.025 + 0.035 + layer * 0.072, (random() - 0.5) * 0.03], [0, random(), 0], [r, 0.068, r]), { mapping: 'keep', colour });
-      }
-    } else {
-      kit.shape('wicker', basket, kit.place([x, top + 0.025, 0.04], [0, random() * 3, 0]), { mapping: 'keep', tile: [4, 1.5], colour: [0.95, 0.9, 0.85] });
-      townHeap(kit, [x, top + 0.04, 0.04], 0.2, kind, random);
-    }
+    kit.shape('wicker', basket, kit.place([x, top + 0.025, 0.04], [0, random() * 3, 0]), { mapping: 'keep', tile: [4, 1.5], colour: [0.9, 0.84, 0.78] });
+    townHeap(kit, [x, top + 0.04, 0.04], 0.2, goods[k % goods.length], random);
   });
 }
 
 /** A barrel's staves: bellied, 0.9 m tall, 0.34 m at the bilge (its foot at y = 0). */
 function townBarrelGeometry() {
   const points = [];
-  for (let j = 0; j <= 8; j += 1) points.push(new THREE.Vector2(0.29 + 0.05 * Math.sin((Math.PI * j) / 8), (j / 8) * 0.9));
-  return new THREE.LatheGeometry(points, 16);
+  for (let j = 0; j <= 6; j += 1) points.push(new THREE.Vector2(0.29 + 0.05 * Math.sin((Math.PI * j) / 6), (j / 6) * 0.9));
+  return new THREE.LatheGeometry(points, 14);
 }
 
-/** A coopered barrel: staves, its head, four iron hoops. In the kit's frame, standing at the origin. */
+/** A coopered barrel: staves, its head, the iron hoops. In the kit's frame, standing at the origin. */
 function townBarrelHere(kit, tint) {
   const radiusAt = (y) => 0.29 + 0.05 * Math.sin((Math.PI * y) / 0.9);
   kit.shape('staves', townShared('barrel', townBarrelGeometry), null, { mapping: 'keep', colour: tint, shade: townGrime });
-  const head = townShared('barrelHead', () => new THREE.CircleGeometry(0.285, 16));
-  kit.shape('staves', head, kit.place([0, 0.875, 0], [-Math.PI / 2, 0, 0]), { mapping: 'keep', colour: tint.map((value) => value * 0.9) });
-  kit.shape('staves', head, kit.place([0, 0.025, 0], [Math.PI / 2, 0, 0]), { mapping: 'keep', colour: tint.map((value) => value * 0.8) });
+  const head = townShared('barrelHead', () => new THREE.CircleGeometry(0.285, 14));
+  kit.shape('staves', head, kit.place([0, 0.875, 0], [-Math.PI / 2, 0, 0]), { mapping: 'keep', colour: tint.map((value) => value * 0.8) });
+  kit.shape('staves', head, kit.place([0, 0.025, 0], [Math.PI / 2, 0, 0]), { mapping: 'keep', colour: tint.map((value) => value * 0.7) });
   [0.07, 0.24, 0.66, 0.83].forEach((y, k) => {
     const hoop = townShared(`hoop${k}`, () => {
       const r = radiusAt(y);
-      return new THREE.LatheGeometry([new THREE.Vector2(r + 0.003, y - 0.024), new THREE.Vector2(r + 0.009, y), new THREE.Vector2(r + 0.003, y + 0.024)], 16);
+      return new THREE.LatheGeometry([new THREE.Vector2(r + 0.003, y - 0.024), new THREE.Vector2(r + 0.009, y), new THREE.Vector2(r + 0.003, y + 0.024)], 14);
     });
-    kit.shape('iron', hoop, null, { mapping: 'keep', colour: [0.22, 0.2, 0.19] });
+    kit.shape('iron', hoop, null, { mapping: 'keep', colour: [0.2, 0.17, 0.15] });
   });
 }
 
@@ -1696,241 +1999,148 @@ function townBarrel(kit, at, { turn = 0, lying = false, tint }) {
   else kit.within(kit.place([at[0], 0, at[2]], [0, turn, 0]), () => townBarrelHere(kit, tint));
 }
 
-/** A slatted crate, `size` on a side: three boards a side with gaps, corner posts, filled or lidded. */
-function townCrate(kit, at, size, turn, random, contents = null) {
-  kit.within(kit.place([at[0], 0, at[2]], [0, turn, 0]), () => {
-    const s = size;
-    const wood = { colour: [0.8, 0.68, 0.52], shade: townGrime, grain: true, tile: 1.2, offset: [random(), random()] };
-    for (let k = 0; k < 3; k += 1) {
-      const y = s * (0.17 + k * 0.33);
-      const h = s * 0.25;
-      for (const side of [-1, 1]) {
-        kit.box('planks', [s, h, 0.02], [0, y, side * (s / 2 - 0.01)], wood);
-        kit.box('planks', [0.02, h, s - 0.04], [side * (s / 2 - 0.01), y, 0], wood);
-      }
-    }
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) kit.box('oak', [0.045, s, 0.045], [sx * (s / 2 - 0.04), s / 2, sz * (s / 2 - 0.04)], { colour: [0.55, 0.44, 0.33], grain: true, shade: townGrime });
-    kit.box('planks', [s - 0.02, 0.02, s - 0.02], [0, 0.03, 0], wood);
-    if (contents) townHeap(kit, [0, s * 0.55, 0], s * 0.42, contents, random);
-    else for (let k = 0; k < 3; k += 1) kit.box('planks', [s * 0.98, 0.02, s * 0.3], [0, s + 0.01, (k - 1) * s * 0.33], { ...wood, rotation: [0, k === 2 ? 0.08 : 0, 0] });
-  });
-}
-
-/** A filled sack: a lumpy lathe of hessian, tied at the neck. */
-function townSackGeometry() {
-  const points = [[0.001, 0], [0.2, 0.0], [0.27, 0.05], [0.3, 0.2], [0.29, 0.4], [0.23, 0.55], [0.12, 0.65], [0.06, 0.69], [0.065, 0.73], [0.1, 0.79], [0.04, 0.82], [0.001, 0.82]];
-  const geometry = new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), 16);
-  const p = geometry.attributes.position;
-  for (let index = 0; index < p.count; index += 1) {
-    const x = p.getX(index);
-    const y = p.getY(index);
-    const z = p.getZ(index);
-    const angle = Math.atan2(z, x);
-    // Whole multiples of the angle, so the seam closes.
-    const k = 1 + (0.08 * Math.sin(3 * angle + y * 7) + 0.04 * Math.sin(5 * angle - y * 11)) * Math.sin(Math.PI * Math.min(1, y / 0.62));
-    p.setXYZ(index, x * k, y, z * k);
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function townSack(kit, at, { turn = 0, tilt = 0, scale = 1, random }) {
-  const k = 0.92 + random() * 0.12;
-  kit.shape('sacking', townShared('sack', townSackGeometry), kit.place(at, [tilt, turn, tilt * 0.5], [scale, scale * (0.9 + random() * 0.2), scale]), { mapping: 'keep', tile: [3, 2], colour: [k, k * 0.97, k * 0.92], shade: townGrime });
-}
-
-/** A heap of loose straw (a dome, lumpy). */
-function townHeapGeometry() {
-  const geometry = new THREE.SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  const p = geometry.attributes.position;
-  for (let index = 0; index < p.count; index += 1) {
-    const x = p.getX(index);
-    const y = p.getY(index);
-    const z = p.getZ(index);
-    const angle = Math.atan2(z, x);
-    const k = 1 + 0.07 * Math.sin(5 * angle + y * 3) + 0.05 * Math.sin(9 * angle - y * 7);
-    p.setXYZ(index, x * k, y * (0.95 + 0.1 * Math.sin(4 * angle)), z * k);
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-/** The well: an ashlar drum with a coping, dark water, oak posts carrying a windlass with its rope and bucket, under a little tiled roof. */
+/** The well: an ashlar drum with a worn coping, dark water, oak posts and a windlass under a little tiled roof. */
 function townWell(kit, random) {
-  const stone = { mapping: 'keep', colour: [0.8, 0.78, 0.74], shade: townStone };
-  kit.shape('ashlar', townShared('wellDrum', () => new THREE.CylinderGeometry(0.98, 1.02, 0.86, 22, 1, true)), kit.place([0, 0.43, 0]), { ...stone, tile: [2.8, 0.4] });
-  const coping = townShared('wellCoping', () => new THREE.LatheGeometry([[1.0, 0.84], [1.07, 0.87], [1.07, 0.99], [0.76, 0.99], [0.76, 0.86], [0.78, 0.45]].map(([r, y]) => new THREE.Vector2(r, y)), 22));
-  kit.shape('ashlar', coping, null, { ...stone, tile: [6, 1], colour: [0.86, 0.84, 0.8] });
-  kit.shape('water', townShared('wellWater', () => new THREE.CircleGeometry(0.78, 22)), kit.place([0, 0.52, 0], [-Math.PI / 2, 0, 0]), { mapping: 'keep', colour: [0.1, 0.14, 0.15] });
-  const oak = { colour: [0.46, 0.35, 0.26], shade: townGrime, tile: 1.2 };
+  const stone = { mapping: 'keep', colour: [0.78, 0.76, 0.72], shade: townStone };
+  kit.shape('ashlar', townShared('wellDrum', () => new THREE.CylinderGeometry(0.98, 1.02, 0.86, 16, 1, true)), kit.place([0, 0.43, 0]), { ...stone, tile: [2.8, 0.4] });
+  const coping = townShared('wellCoping', () => new THREE.LatheGeometry([[1.0, 0.84], [1.07, 0.87], [1.07, 0.99], [0.76, 0.99], [0.76, 0.86], [0.78, 0.45]].map(([r, y]) => new THREE.Vector2(r, y)), 16));
+  kit.shape('ashlar', coping, null, { ...stone, tile: [6, 1], colour: [0.84, 0.82, 0.78] });
+  kit.shape('water', townShared('wellWater', () => new THREE.CircleGeometry(0.78, 16)), kit.place([0, 0.52, 0], [-Math.PI / 2, 0, 0]), { colour: [0.06, 0.08, 0.09] });
+  const oak = { colour: [0.42, 0.34, 0.27], shade: townGrime, tile: 1.2 };
   for (const x of [-0.9, 0.9]) kit.box('oak', [0.14, 2.38, 0.14], [x, 1.19, 0], { ...oak, grain: true });
-  kit.shape('oak', townShared('windlass', () => new THREE.CylinderGeometry(0.08, 0.08, 1.66, 10, 1)), kit.place([0, 1.45, 0], [0, 0, Math.PI / 2]), { mapping: 'keep', tile: [1, 2], colour: oak.colour });
-  kit.shape('sacking', townShared('ropeCoil', () => new THREE.CylinderGeometry(0.105, 0.105, 0.42, 12, 1)), kit.place([0.05, 1.45, 0], [0, 0, Math.PI / 2]), { mapping: 'keep', tile: [6, 3], colour: [0.85, 0.75, 0.55] });
-  kit.shape('sacking', townShared('rope', () => new THREE.CylinderGeometry(0.012, 0.012, 1, 5, 1)), kit.place([0.05, 1.2, 0.1], TOWN_ZERO, [1, 0.5, 1]), { mapping: 'keep', colour: [0.85, 0.75, 0.55] });
-  kit.within(kit.place([0.05, 0.62, 0.1], [0, 0.4, 0], [0.55, 0.38, 0.55]), () => townBarrelHere(kit, [0.8, 0.7, 0.6]));
-  kit.shape('iron', townShared('bail', () => new THREE.TorusGeometry(0.16, 0.008, 4, 12, Math.PI)), kit.place([0.05, 0.95, 0.1], [0, 0.4, 0]), { mapping: 'keep', colour: [0.2, 0.19, 0.18] });
-  const iron = { colour: [0.2, 0.19, 0.18] };
-  kit.beam('iron', [0.86, 1.45, 0], [1.06, 1.45, 0], 0.03, 0.03, iron);
-  kit.beam('iron', [1.06, 1.45, 0], [1.06, 1.17, 0], 0.03, 0.03, iron);
-  kit.beam('iron', [1.06, 1.17, 0], [1.2, 1.17, 0], 0.035, 0.035, iron);
+  kit.shape('oak', townShared('windlass', () => new THREE.CylinderGeometry(0.08, 0.08, 1.66, 8, 1)), kit.place([0, 1.45, 0], [0, 0, Math.PI / 2]), { mapping: 'keep', tile: [1, 2], colour: oak.colour });
   for (const z of [-0.8, 0.8]) kit.beam('oak', [-1.0, 2.33, z], [1.0, 2.33, z], 0.08, 0.08, oak);
-  for (const x of [-0.9, 0.9]) kit.beam('oak', [x, 2.33, -0.85], [x, 2.33, 0.85], 0.1, 0.1, oak);
-  kit.within(kit.place([0, 0, 0], [0, Math.PI / 2, 0]), () => townRoof(kit, { width: 1.6, eave: 2.38, rise: 0.75, front: 0.95, back: -0.95, overhang: 0.2, verge: 0.12, thickness: 0.06, material: 'tiles', colour: [0.95, 0.9, 0.86], timber: oak.colour, rafters: false, tile: 1.3, random }));
+  kit.within(kit.place([0, 0, 0], [0, Math.PI / 2, 0]), () => townRoof(kit, { width: 1.6, eave: 2.38, rise: 0.75, front: 0.95, back: -0.95, overhang: 0.2, verge: 0.12, thickness: 0.06, material: 'tiles', colour: [0.85, 0.8, 0.76], timber: oak.colour, rafters: false, tile: 1.3, random }));
 }
 
-/** The market cross: three steps, a socket stone, an octagonal shaft, its head. */
+/** The market cross: three steps worn hollow, a socket stone, an octagonal shaft, its head. */
 function townMarketCross(kit) {
-  const stone = { mapping: 'world', tile: 2.2, colour: [0.8, 0.78, 0.74], shade: townStone };
-  const pale = { ...stone, colour: [0.86, 0.84, 0.8] };
+  const stone = { mapping: 'world', tile: 2.2, colour: [0.78, 0.76, 0.72], shade: townStone };
+  const pale = { ...stone, colour: [0.84, 0.82, 0.78] };
   kit.box('ashlar', [2.4, 0.3, 2.4], [0, 0.15, 0], stone);
   kit.box('ashlar', [1.75, 0.3, 1.75], [0, 0.45, 0], stone);
   kit.box('ashlar', [1.1, 0.3, 1.1], [0, 0.75, 0], stone);
   kit.box('ashlar', [0.66, 0.5, 0.66], [0, 1.15, 0], pale);
-  kit.box('ashlar', [0.54, 0.1, 0.54], [0, 1.44, 0], { ...pale, rotation: [0, Math.PI / 4, 0] });
-  kit.shape('ashlar', townShared('crossShaft', () => new THREE.CylinderGeometry(0.12, 0.16, 2.7, 8, 1)), kit.place([0, 2.85, 0], [0, Math.PI / 8, 0]), { mapping: 'keep', tile: [1, 1.2], colour: pale.colour, shade: townStone });
-  kit.box('ashlar', [0.36, 0.18, 0.36], [0, 4.27, 0], pale);
-  kit.box('ashlar', [0.16, 0.75, 0.14], [0, 4.7, 0], pale);
-  kit.box('ashlar', [0.75, 0.16, 0.14], [0, 4.76, 0], pale);
-}
-
-/** The stocks: a sill, two posts, the pair of holed boards, a bench behind. */
-function townStocks(kit) {
-  const oak = { colour: [0.42, 0.32, 0.24], shade: townGrime, tile: 1.2, grain: true };
-  kit.box('oak', [2.0, 0.14, 0.22], [0, 0.07, 0], oak);
-  for (const x of [-0.85, 0.85]) kit.box('oak', [0.14, 1.0, 0.14], [x, 0.5, 0], oak);
-  kit.box('planks', [1.7, 0.2, 0.1], [0, 0.42, 0], { ...oak, colour: [0.6, 0.48, 0.36] });
-  kit.box('planks', [1.7, 0.2, 0.1], [0, 0.63, 0], { ...oak, colour: [0.6, 0.48, 0.36] });
-  for (const x of [-0.5, -0.2, 0.2, 0.5]) {
-    for (const z of [0.052, -0.052]) kit.shape('paint', townShared('hole', () => new THREE.CircleGeometry(0.055, 10)), kit.place([x, 0.525, z], [0, z < 0 ? Math.PI : 0, 0]), { mapping: 'keep', colour: [0.08, 0.06, 0.05] });
-  }
-  kit.box('iron', [0.05, 0.3, 0.02], [0.83, 0.55, 0.06], { colour: [0.2, 0.19, 0.18] });
-  kit.box('planks', [1.6, 0.06, 0.34], [0, 0.4, -0.6], { ...oak, colour: [0.6, 0.48, 0.36] });
-  for (const x of [-0.7, 0.7]) kit.box('oak', [0.08, 0.37, 0.28], [x, 0.185, -0.6], oak);
-}
-
-/** A two-wheeled cart: a boarded bed with stake sides, shafts, spoked wheels with iron tyres, a load of straw and a sack. */
-function townCart(kit, random) {
-  const boards = { colour: [0.64, 0.5, 0.36], shade: townGrime, grain: true, tile: 1.4 };
-  const oak = { colour: [0.46, 0.35, 0.26], shade: townGrime, tile: 1.2 };
-  kit.box('planks', [2.2, 0.06, 1.2], [0, 0.75, 0], boards);
-  for (const s of [-1, 1]) {
-    for (const y of [0.88, 1.06]) kit.box('planks', [2.2, 0.14, 0.04], [0, y, s * 0.6], boards);
-    for (const x of [-1.05, -0.35, 0.35, 1.05]) kit.box('oak', [0.06, 0.48, 0.06], [x, 0.96, s * 0.63], { ...oak, grain: true });
-    kit.box('oak', [2.3, 0.1, 0.1], [0, 0.67, s * 0.35], { ...oak, grain: true });
-    kit.beam('oak', [0.9, 0.7, s * 0.35], [2.5, 0.05, s * 0.42], 0.08, 0.07, oak);
-  }
-  for (const x of [-1.1, 1.1]) kit.box('planks', [0.04, 0.32, 1.2], [x, 0.95, 0], boards);
-  kit.box('oak', [0.1, 0.1, 1.62], [-0.2, 0.52, 0], { ...oak, grain: true });
-  const felloe = townShared('felloe', () => new THREE.TorusGeometry(0.46, 0.045, 6, 22));
-  const tyre = townShared('tyre', () => new THREE.TorusGeometry(0.507, 0.018, 4, 26));
-  const hub = townShared('hub', () => new THREE.CylinderGeometry(0.08, 0.09, 0.24, 10, 1));
-  for (const s of [-1, 1]) {
-    const z = s * 0.74;
-    kit.shape('oak', felloe, kit.place([-0.2, 0.525, z]), { mapping: 'keep', tile: [8, 1], colour: oak.colour, shade: townGrime });
-    kit.shape('iron', tyre, kit.place([-0.2, 0.525, z]), { mapping: 'keep', colour: [0.22, 0.2, 0.19] });
-    kit.shape('oak', hub, kit.place([-0.2, 0.525, z], [Math.PI / 2, 0, 0]), { mapping: 'keep', colour: oak.colour });
-    for (let k = 0; k < 10; k += 1) {
-      const a = (k / 10) * Math.PI * 2 + 0.2;
-      kit.beam('oak', [-0.2 + Math.cos(a) * 0.08, 0.525 + Math.sin(a) * 0.08, z], [-0.2 + Math.cos(a) * 0.44, 0.525 + Math.sin(a) * 0.44, z], 0.035, 0.035, oak);
-    }
-  }
-  kit.shape('straw', townShared('heap', townHeapGeometry), kit.place([-0.1, 0.78, 0], [0, 0.3, 0], [1.0, 0.5, 0.55]), { mapping: 'keep', tile: [3, 2], colour: [1, 0.88, 0.62] });
-  townSack(kit, [0.65, 0.78, 0.15], { turn: 1.2, tilt: 1.2, scale: 0.75, random });
-}
-
-/** Bunting strung across the square: cords sagging between the upper windows, the pennants two-sided. */
-function townBunting(kit, halfX, halfZ) {
-  const colours = [[0.72, 0.2, 0.16], [0.91, 0.84, 0.66], [0.18, 0.35, 0.54], [0.23, 0.48, 0.23], [0.85, 0.64, 0.23]];
-  const pennant = townShared('pennant', () => {
-    const geometry = new THREE.BufferGeometry();
-    const a = [-0.11, 0, 0];
-    const b = [0.11, 0, 0];
-    const c = [0, -0.22, 0];
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...c, ...b, ...a, ...b, ...c], 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, -1, 0, 0, -1], 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(12).fill(0), 2));
-    return geometry;
-  });
-  const up = new THREE.Vector3(0, 1, 0);
-  const matrix = new THREE.Matrix4();
-  for (const [from, to] of [[[-halfX - 0.5, 7.6, -6], [halfX + 0.5, 7.6, -4]], [[-halfX - 0.5, 7.4, 4], [halfX + 0.5, 7.8, 6]], [[-6, 7.6, -halfZ - 0.5], [-3, 7.6, halfZ + 0.5]]]) {
-    const start = new THREE.Vector3(...from);
-    const end = new THREE.Vector3(...to);
-    const count = Math.floor(start.distanceTo(end) / 0.5);
-    let previous = start.clone();
-    for (let index = 1; index <= count; index += 1) {
-      const share = index / count;
-      const at = start.clone().lerp(end, share);
-      at.y -= Math.sin(share * Math.PI) * 0.7;
-      kit.beam('paint', previous.toArray(), at.toArray(), 0.012, 0.012, { colour: [0.3, 0.27, 0.22] });
-      previous = at;
-      if (index === count) continue;
-      const target = new THREE.Vector3(at.x + (end.z - start.z), at.y, at.z - (end.x - start.x));
-      matrix.lookAt(target, at, up).setPosition(at);
-      kit.shape('paint', pennant, matrix, { mapping: 'keep', colour: colours[index % colours.length] });
-    }
-  }
+  kit.shape('ashlar', townShared('crossShaft', () => new THREE.CylinderGeometry(0.12, 0.16, 2.7, 8, 1)), kit.place([0, 2.75, 0], [0, Math.PI / 8, 0]), { mapping: 'keep', tile: [1, 1.2], colour: pale.colour, shade: townStone });
+  kit.box('ashlar', [0.36, 0.18, 0.36], [0, 4.17, 0], pale);
+  kit.box('ashlar', [0.16, 0.75, 0.14], [0, 4.6, 0], pale);
+  kit.box('ashlar', [0.75, 0.16, 0.14], [0, 4.66, 0], pale);
 }
 
 // ---- the square -------------------------------------------------------------------
 
 /**
  * Build the town round a square `halfX` by `halfZ` (the cobbles' edge) into
- * `place`: the four rows of houses, each broken by a street running off;
- * more houses beyond; the church; the market. The positions are the old
- * builder's, house for house.
+ * `place`. Four rows of houses face the square, each broken by one narrow
+ * street; every street turns a few metres down, closed by a house set
+ * across its end, so no view out of the square runs on to open ground. A
+ * ring of plainer houses behind the rows fills the roofline between and
+ * over the nearer gables; the church tower rises over the north side.
  */
 export function townSquare(place, { halfX, halfZ }) {
   const kit = townKit();
   const random = townRandom(1471);
   let seed = 0;
-  const house = (x, z, turn, width, storeys) => {
+  const lean = () => [(random() - 0.5) * 0.02, (random() - 0.5) * 0.024];
+  /** A house at (x, z) turned `turn`, a little out of true. */
+  const house = (x, z, turn, options) => {
     seed += 1;
-    kit.within(kit.place([x, 0, z], [0, turn, 0]), () => townHouse(kit, { width, storeys, seed }));
+    const [forward, sideways] = lean();
+    kit.within(kit.place([x, 0, z], [forward, turn, sideways]), () => townHouse(kit, { seed, ...options }));
   };
-  // Four rows round the square, each broken by a street running off.
-  const row = (length, build, turn, gapAt) => {
-    let along = -length / 2;
-    while (along < length / 2 - 2) {
-      const width = 3.2 + ((seed * 7) % 5) * 0.4;
-      const middle = along + width / 2;
-      if (Math.abs(middle - gapAt) > 2.6) build(middle, turn, width, 2 + ((seed * 3) % 3 === 0 ? 1 : 0));
-      along += width + 0.05;
+  // A row of fronts along one side, from `from` to `to` along it: widths drawn and then stretched to fill exactly.
+  const row = (from, to, at, { casts = true } = {}) => {
+    const widths = [];
+    let total = 0;
+    while (total < to - from - 3.2) {
+      const width = 3.4 + random() * 1.6;
+      widths.push(width);
+      total += width;
+    }
+    const k = (to - from) / total;
+    let along = from;
+    for (const raw of widths) {
+      const width = raw * k;
+      const roll = random();
+      const storeys = roll < 0.45 ? 3 : 2;
+      at(along + width / 2, { width: width - 0.04, storeys, broadside: width > 4.2 && random() < 0.45, casts });
+      along += width;
     }
   };
-  row(halfX * 2 + 8, (along, turn, width, storeys) => house(along, -halfZ - 3, turn, width, storeys), 0, 2);
-  row(halfX * 2 + 8, (along, turn, width, storeys) => house(along, halfZ + 3, turn, width, storeys), Math.PI, -4);
-  row(halfZ * 2, (along, turn, width, storeys) => house(-halfX - 3, along, turn, width, storeys), Math.PI / 2, -1);
-  row(halfZ * 2, (along, turn, width, storeys) => house(halfX + 3, along, turn, width, storeys), -Math.PI / 2, 3);
-  // Beyond the streets: more houses, the town going on, their gables to the square.
-  for (let index = 0; index < 22; index += 1) {
-    const angle = (index / 22) * Math.PI * 2;
-    const reach = 26 + random() * 10;
-    const width = 4 + random() * 3;
-    const storeys = random() < 0.55 ? 2 : 3;
-    kit.within(kit.place([Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.85], [0, -angle - Math.PI / 2, 0]), () => townHouse(kit, { width, storeys, seed: 100 + index, far: true }));
-  }
-  kit.within(kit.place([-4, 0, -halfZ - 22]), () => townChurch(kit, random));
+  const street = 3.4;
+  const fz = halfZ + 3;
+  const fx = halfX + 3;
+  // The streets: north at x = 2, south at x = −4, west at z = −1, east at z = 3.
+  const N = 2;
+  const Sx = -4;
+  const W = -1;
+  const E = 3;
+  row(-21, N - street / 2, (x, options) => house(x, -fz, 0, options));
+  row(N + street / 2, 21, (x, options) => house(x, -fz, 0, options));
+  row(-21, Sx - street / 2, (x, options) => house(x, fz, Math.PI, options));
+  row(Sx + street / 2, 21, (x, options) => house(x, fz, Math.PI, options));
+  row(-halfZ + 0.2, W - street / 2, (z, options) => house(-fx, z, Math.PI / 2, options));
+  row(W + street / 2, halfZ - 0.2, (z, options) => house(-fx, z, Math.PI / 2, options));
+  row(-halfZ + 0.2, E - street / 2, (z, options) => house(fx, z, -Math.PI / 2, options));
+  row(E + street / 2, halfZ - 0.2, (z, options) => house(fx, z, -Math.PI / 2, options));
 
-  // The market about the edges of the square.
+  // Down each street, a house across its end, set off to one side so the street turns.
+  const across = 9.5;
+  const shift = 1.2;
+  const endWidth = 7;
+  const ends = { N: N + shift, S: Sx - shift, W: W - shift, E: E + shift };
+  const end = { width: endWidth, storeys: 3, far: true, broadside: true };
+  house(ends.N, -fz - across, 0, end);
+  house(ends.S, fz + across, Math.PI, end);
+  house(-fx - across, ends.W, Math.PI / 2, end);
+  house(fx + across, ends.E, -Math.PI / 2, end);
+
+  // Behind the rows: plainer, taller houses for the roofline, filling each side right up to the street ends and the church tower.
+  const church = [-4, -halfZ - 22];
+  let back = 0;
+  const backdrop = (x, z, turn, width) => {
+    back += 1;
+    const [forward, sideways] = lean();
+    kit.within(kit.place([x, 0, z], [forward, turn, sideways]), () => townBackdrop(kit, { width, depth: 7, storeys: random() < 0.6 ? 4 : 3, seed: back, broadside: random() < 0.6 }));
+  };
+  /** Houses along `from`..`to`, leaving out the `cuts` (intervals), each free stretch filled exactly. */
+  const ring = (from, to, cuts, at) => {
+    const spans = [];
+    let start = from;
+    for (const [a, b] of cuts) {
+      if (a > start) spans.push([start, a]);
+      start = Math.max(start, b);
+    }
+    if (to > start) spans.push([start, to]);
+    for (const [a, b] of spans) {
+      if (b - a < 2.5) continue;
+      const count = Math.max(1, Math.round((b - a) / 5.6));
+      const width = (b - a) / count;
+      for (let k = 0; k < count; k += 1) at(a + (k + 0.5) * width, width - 0.05);
+    }
+  };
+  const half = endWidth / 2;
+  const reach = 7.5;
+  ring(-30, 30, [[church[0] - 3.1, church[0] + 3.1], [ends.N - half, ends.N + half]], (x, width) => backdrop(x, -fz - reach, 0, width));
+  ring(-30, 30, [[ends.S - half, ends.S + half]], (x, width) => backdrop(x, fz + reach, Math.PI, width));
+  ring(-fz - 4, fz + 4, [[ends.W - half, ends.W + half]], (z, width) => backdrop(-fx - reach, z, Math.PI / 2, width));
+  ring(-fz - 4, fz + 4, [[ends.E - half, ends.E + half]], (z, width) => backdrop(fx + reach, z, -Math.PI / 2, width));
+  kit.within(kit.place([church[0], 0, church[1]]), () => townChurch(kit, random));
+
+  // The market about the edges of the square, clear of the fighting floor.
   const stall = (x, z, turn, band, goods) => kit.within(kit.place([x, 0, z], [0, turn, 0]), () => townStall(kit, band, goods, random));
-  stall(-8, -halfZ + 0.9, 0, 0, ['apple', 'pear', 'plum', 'apple']);
-  stall(-4.5, -halfZ + 0.9, 0, 1, ['loaf', 'roll', 'egg', 'loaf']);
-  stall(7.5, halfZ - 0.9, Math.PI, 2, ['cabbage', 'onion', 'turnip', 'onion']);
-  stall(halfX - 1, 3.5, -Math.PI / 2, 3, ['cheese', 'egg', 'onion', 'cheese']);
-  kit.within(kit.place([-halfX + 1.6, 0, halfZ - 1.8]), () => townWell(kit, random));
-  kit.within(kit.place([halfX - 1.6, 0, -halfZ + 1.8]), () => townMarketCross(kit));
-  kit.within(kit.place([2, 0, halfZ - 0.8], [0, Math.PI, 0]), () => townStocks(kit));
-  const barrelTints = [[1, 0.95, 0.9], [0.85, 0.8, 0.75], [0.95, 0.85, 0.75], [0.78, 0.72, 0.66]];
-  [[-10.6, -3], [-10.8, -2.1], [-10, -2.5], [10.8, -5.5], [3.5, -halfZ + 0.6], [-1.5, halfZ - 0.5]].forEach(([x, z], k) => townBarrel(kit, [x, 0, z], { turn: k * 1.3, tint: barrelTints[k % barrelTints.length] }));
-  townBarrel(kit, [-11.3, 0, -1.2], { turn: 0.3, lying: true, tint: barrelTints[1] });
-  townCrate(kit, [-11, 0, 4], 0.7, 0.3, random, 'cabbage');
-  townCrate(kit, [-11.2, 0, 4.9], 0.55, -0.2, random, null);
-  townCrate(kit, [10.6, 0, 6], 0.7, 0.5, random, 'turnip');
-  townCrate(kit, [5, 0, -halfZ + 0.6], 0.6, 0.1, random, 'apple');
-  for (const [x, z] of [[-6.5, halfZ - 0.6], [-6, halfZ - 0.8], [10.9, -6.3]]) townSack(kit, [x, 0, z], { turn: random() * 6, tilt: (random() - 0.5) * 0.2, random });
-  kit.within(kit.place([halfX - 1.4, 0, -1.5], [0, 0.3, 0]), () => townCart(kit, random));
-  townBunting(kit, halfX, halfZ);
+  stall(-7, -halfZ + 1.1, 0, 0, ['apple', 'pear', 'apple', 'onion']);
+  stall(7.5, halfZ - 1.1, Math.PI, 2, ['cabbage', 'onion', 'turnip', 'loaf']);
+  kit.within(kit.place([-halfX + 1.8, 0, halfZ - 1.9]), () => townWell(kit, random));
+  kit.within(kit.place([halfX - 1.7, 0, -halfZ + 1.9]), () => townMarketCross(kit));
+  const barrelTints = [[0.92, 0.86, 0.8], [0.78, 0.72, 0.66], [0.86, 0.78, 0.7]];
+  [[-halfX + 0.6, -4.3], [-halfX + 0.75, -3.55], [-halfX + 1.35, -4.0]].forEach(([x, z], k) => townBarrel(kit, [x, 0, z], { turn: k * 1.3, tint: barrelTints[k] }));
+  townBarrel(kit, [-halfX + 0.9, 0, -5.2], { turn: 0.2, lying: true, tint: barrelTints[1] });
 
-  for (const mesh of kit.meshes()) place.add(mesh);
+  const group = new THREE.Group();
+  group.name = 'town-props';
+  for (const mesh of kit.meshes()) group.add(mesh);
+  place.add(group);
+  // For the timing harness: the last town built (hide it to weigh what it costs).
+  globalThis.__townLast = group;
 }
