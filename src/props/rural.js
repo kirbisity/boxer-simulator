@@ -1,8 +1,7 @@
 // Rural props: the buildings and furniture of the open-country places. The
 // meadow's thatched cottages, hay ricks, hurdles and split-rail fence; the
 // field's post-and-rail round the riding ground; and at Sekigahara the
-// castle keep on its hill, the bamboo palisade, each side's camp curtain and
-// its banners. Called from the place builders in render.js.
+// bamboo palisade, each side's camp curtain and its banners. Called from the place builders in render.js.
 //
 // Surfaces are generated canvas textures, painted once per page: a colour
 // and a height field drawn together, the normal map taken from the height's
@@ -1333,386 +1332,6 @@ export function ruralFieldRail({ halfX, halfZ, spacing = 4, top = 0.9 }) {
 // ---- Sekigahara --------------------------------------------------------------------
 
 /**
- * Ishigaki: the castle's base of big roughly dressed granite stones fitted
- * dry, wedge stones between. One tile is 3 m.
- */
-function ruralIshigaki() {
-  return ruralPainted('rural:ishigaki', 512, 512, { relief: 5 }, (sheet) => {
-    ruralPaintStones(sheet, {
-      rows: [36, 120], widths: [46, 210], gap: 1.5, joint: '#34322e', angular: true,
-      palette: [[150, 146, 138], [122, 118, 112], [172, 166, 156], [104, 100, 96], [146, 134, 116], [132, 126, 110], [90, 88, 84]], speckle: 6000,
-    });
-    // Rain streaks and dark lichen down the face.
-    for (let index = 0; index < 60; index += 1) {
-      const x = sheet.rr(0, 512);
-      const y = sheet.rr(0, 512);
-      const length = sheet.rr(40, 200);
-      sheet.wrap(x - 4, y, x + 4, y + length, (ox, oy) => {
-        const gradient = sheet.colour.createLinearGradient(0, y + oy, 0, y + oy + length);
-        gradient.addColorStop(0, 'rgba(50,50,44,0.3)');
-        gradient.addColorStop(1, 'rgba(50,50,44,0)');
-        sheet.colour.fillStyle = gradient;
-        sheet.colour.fillRect(x + ox, y + oy, sheet.rr(2, 8), length);
-      });
-    }
-  });
-}
-
-/**
- * Hongawarabuki: a roof of fired grey tiles, rows of round cover tiles
- * running down the slope over the flat pan tiles between them, the courses
- * stepping every 0.3 m. One tile of the texture is 0.6 m by 0.6 m: two rows, two courses.
- */
-function ruralRoofTiles() {
-  return ruralPainted('rural:kawara', 256, 256, { relief: 6 }, ({ colour, bump, width, height, rr, grey }) => {
-    colour.fillStyle = '#4c5257';
-    colour.fillRect(0, 0, width, height);
-    const row = width / 2;
-    for (let k = 0; k < 2; k += 1) {
-      const centre = k * row + row / 2;
-      // The pan tiles: a shallow trough between the cover rows.
-      const pan = bump.createLinearGradient(centre - row / 2, 0, centre + row / 2, 0);
-      pan.addColorStop(0, grey(0.45));
-      pan.addColorStop(0.5, grey(0.3));
-      pan.addColorStop(1, grey(0.45));
-      bump.fillStyle = pan;
-      bump.fillRect(centre - row / 2, 0, row, height);
-    }
-    for (let k = 0; k <= 2; k += 1) {
-      const x = k * row;
-      // The round cover tiles, proud, lit along their crown.
-      const cover = bump.createLinearGradient(x - 18, 0, x + 18, 0);
-      cover.addColorStop(0, grey(0.45));
-      cover.addColorStop(0.5, grey(1));
-      cover.addColorStop(1, grey(0.45));
-      bump.fillStyle = cover;
-      bump.fillRect(x - 18, 0, 36, height);
-      const shade = colour.createLinearGradient(x - 18, 0, x + 18, 0);
-      shade.addColorStop(0, 'rgba(20,22,26,0.7)');
-      shade.addColorStop(0.35, 'rgba(110,116,122,0.6)');
-      shade.addColorStop(0.65, 'rgba(80,86,92,0.4)');
-      shade.addColorStop(1, 'rgba(20,22,26,0.7)');
-      colour.fillStyle = shade;
-      colour.fillRect(x - 18, 0, 36, height);
-    }
-    // Courses: each tile's lower end laps over the next, a step and a shadow line.
-    for (let course = 0; course < 2; course += 1) {
-      const y = course * (height / 2) + height / 2 - 4;
-      colour.fillStyle = 'rgba(15,16,18,0.6)';
-      colour.fillRect(0, y, width, 4);
-      bump.fillStyle = grey(0.15);
-      bump.fillRect(0, y, width, 4);
-    }
-    for (let index = 0; index < 900; index += 1) {
-      colour.fillStyle = `rgba(${rr(0, 1) > 0.5 ? '200,205,210' : '10,10,12'},${rr(0.04, 0.12)})`;
-      colour.fillRect(rr(0, width), rr(0, height), rr(1, 4), rr(1, 4));
-    }
-  });
-}
-
-/**
- * A storey of the keep, one bay (2.4 m) wide by one storey high (v 0 at
- * its floor, 1 under the eaves): black-stained boards below (shitami-
- * itabari: clapboards with battens over them), white lime plaster above,
- * and a barred window in each bay, with grime streaked down from its sill.
- */
-function ruralKeepWall() {
-  return ruralPainted('rural:keepwall', 512, 512, { relief: 4 }, ({ colour, bump, width, height, rr, grey }) => {
-    const boardsTop = height * 0.6;
-    colour.fillStyle = '#eceae2';
-    colour.fillRect(0, 0, width, boardsTop);
-    for (let index = 0; index < 200; index += 1) {
-      colour.fillStyle = `rgba(${rr(180, 230)},${rr(178, 225)},${rr(170, 215)},0.1)`;
-      colour.beginPath();
-      colour.arc(rr(0, width), rr(0, boardsTop), rr(6, 30), 0, Math.PI * 2);
-      colour.fill();
-    }
-    // The boards: horizontal, each lapping the one below, with battens across them.
-    colour.fillStyle = '#26241f';
-    colour.fillRect(0, boardsTop, width, height - boardsTop);
-    for (let y = boardsTop + 6; y < height; y += 22) {
-      colour.fillStyle = 'rgba(0,0,0,0.6)';
-      colour.fillRect(0, y + 18, width, 4);
-      colour.fillStyle = `rgba(120,110,95,${rr(0.05, 0.15)})`;
-      colour.fillRect(0, y, width, 8);
-      const lap = bump.createLinearGradient(0, y, 0, y + 22);
-      lap.addColorStop(0, grey(0.4));
-      lap.addColorStop(0.9, grey(0.62));
-      lap.addColorStop(1, grey(0.3));
-      bump.fillStyle = lap;
-      bump.fillRect(0, y, width, 22);
-    }
-    for (let k = 0; k < 3; k += 1) {
-      const x = (k + 0.5) * (width / 3);
-      colour.fillStyle = '#1c1b18';
-      colour.fillRect(x - 6, boardsTop, 12, height - boardsTop);
-      bump.fillStyle = grey(0.85);
-      bump.fillRect(x - 6, boardsTop, 12, height - boardsTop);
-    }
-    // A moulding at the top of the boards.
-    colour.fillStyle = '#1c1b18';
-    colour.fillRect(0, boardsTop - 6, width, 10);
-    bump.fillStyle = grey(0.85);
-    bump.fillRect(0, boardsTop - 6, width, 10);
-    // The window: a black frame, sunk, with five plastered bars.
-    const x0 = width * 0.37;
-    const x1 = width * 0.63;
-    const y0 = height * 0.2;
-    const y1 = height * 0.48;
-    for (let index = 0; index < 14; index += 1) {
-      const x = rr(x0, x1);
-      const length = rr(20, 90);
-      const streak = colour.createLinearGradient(0, y1, 0, y1 + length);
-      streak.addColorStop(0, 'rgba(70,64,52,0.3)');
-      streak.addColorStop(1, 'rgba(70,64,52,0)');
-      colour.fillStyle = streak;
-      colour.fillRect(x, y1, rr(2, 6), Math.min(length, boardsTop - y1 - 6));
-    }
-    colour.fillStyle = '#1a1917';
-    colour.fillRect(x0 - 8, y0 - 8, x1 - x0 + 16, y1 - y0 + 16);
-    bump.fillStyle = grey(0.7);
-    bump.fillRect(x0 - 8, y0 - 8, x1 - x0 + 16, y1 - y0 + 16);
-    colour.fillStyle = '#0d0d0e';
-    colour.fillRect(x0, y0, x1 - x0, y1 - y0);
-    bump.fillStyle = grey(0.1);
-    bump.fillRect(x0, y0, x1 - x0, y1 - y0);
-    for (let k = 1; k <= 5; k += 1) {
-      const x = x0 + ((x1 - x0) * k) / 6;
-      colour.fillStyle = '#c9c6bc';
-      colour.fillRect(x - 4, y0, 8, y1 - y0);
-      bump.fillStyle = grey(0.55);
-      bump.fillRect(x - 4, y0, 8, y1 - y0);
-    }
-  });
-}
-
-/**
- * A tiled roof skirt round a storey of the keep: it runs from the inner
- * rectangle [hwI, hdI] at yI (against the storey above) down and out to the
- * eaves [hwO, hdO] at yO, sagging a little in the middle of its slope (the
- * concave Japanese roof) and its eave line sweeping up towards each corner
- * (sori), `lift` at the tip. It has a soffit under it and a fascia at the
- * eave, `thick` deep. Each side's uv runs along the eave and down the slope in metres.
- */
-function ruralSkirt({ hwI, hdI, yI, hwO, hdO, yO, lift = 0.35, sag = 0.12, thick = 0.22, gable = false }) {
-  const parts = [];
-  const cornersI = [[hwI, hdI], [-hwI, hdI], [-hwI, -hdI], [hwI, -hdI]];
-  const cornersO = [[hwO, hdO], [-hwO, hdO], [-hwO, -hdO], [hwO, -hdO]];
-  const along = 16;
-  const down = 6;
-  for (let side = 0; side < 4; side += 1) {
-    const [i0, i1] = [cornersI[side], cornersI[(side + 1) % 4]];
-    const [o0, o1] = [cornersO[side], cornersO[(side + 1) % 4]];
-    const edge = Math.hypot(o1[0] - o0[0], o1[1] - o0[1]);
-    const run = Math.hypot((i0[0] + i1[0]) / 2 - (o0[0] + o1[0]) / 2, (i0[1] + i1[1]) / 2 - (o0[1] + o1[1]) / 2);
-    const slopeLength = Math.hypot(run, yI - yO);
-    const point = (s, r, under) => {
-      const ix = ruralLerp(i0[0], i1[0], s);
-      const iz = ruralLerp(i0[1], i1[1], s);
-      const ox = ruralLerp(o0[0], o1[0], s);
-      const oz = ruralLerp(o0[1], o1[1], s);
-      const corner = Math.pow(Math.abs(2 * s - 1), 4);
-      const y = ruralLerp(yI, yO, r) - sag * Math.sin(Math.PI * r) + lift * r * r * corner - (under ? thick * (0.4 + 0.6 * r) : 0);
-      return [ruralLerp(ix, ox, r), y, ruralLerp(iz, oz, r)];
-    };
-    const outward = ruralV((o0[0] + o1[0]) / 2, 0, (o0[1] + o1[1]) / 2).normalize();
-    // Top: the tiles.
-    parts.push(['tiles', ruralGrid(along, down, (i, j) => [...point(i / along, j / down, false), (i / along) * edge, slopeLength * (1 - j / down)], [along / 2, down, ruralV(outward.x, 1, outward.z)])]);
-    // Underneath: the soffit, its rafters showing as the tile's courses would (it is in shadow).
-    parts.push(['soffit', ruralGrid(along, down, (i, j) => [...point(i / along, j / down, true), (i / along) * edge, slopeLength * (j / down)], [along / 2, down, ruralV(0, -1, 0)])]);
-    // The fascia: a band along the eave joining the two.
-    parts.push(['fascia', ruralGrid(along, 1, (i, j) => [...point(i / along, 1, j === 0), (i / along) * edge, j * thick], [along / 2, 0, outward])]);
-  }
-  if (gable) {
-    // The top roof's gables (irimoya): from the inner rectangle's long sides up to the ridge, gable boards at the ends, white gable faces.
-    const ridgeY = yI + hdI * 0.95;
-    const over = 0.14;
-    for (const side of [-1, 1]) {
-      const run = Math.hypot(hdI, ridgeY - yI);
-      parts.push(['tiles', ruralGrid(8, 3, (i, j) => {
-        const x = -hwI - over + ((2 * (hwI + over)) * i) / 8;
-        const r = j / 3;
-        return [x, ruralLerp(yI, ridgeY, r) - 0.05 * Math.sin(Math.PI * r), side * hdI * (1 + 0.05) * (1 - r), x + hwI, run * (1 - r)];
-      }, [4, 1, ruralV(0, 1, side)])]);
-      parts.push(['soffit', ruralGrid(8, 1, (i, j) => {
-        const x = -hwI - over + ((2 * (hwI + over)) * i) / 8;
-        return [x, ruralLerp(yI, ridgeY, j) - 0.12, side * hdI * (1 - j), x, j];
-      }, [4, 0, ruralV(0, -1, 0)])]);
-    }
-    for (const end of [-1, 1]) {
-      const x = end * (hwI - 0.04);
-      parts.push(['plaster', ruralPolygon([ruralV(x, yI - 0.3, -hdI), ruralV(x, yI - 0.3, hdI), ruralV(x, ridgeY - 0.05, 0)], ruralV(end, 0, 0), (p) => [p.z, p.y])]);
-      // Bargeboards along the gable's two rakes, and the gegyo hanging board at the apex.
-      for (const side of [-1, 1]) parts.push(['trim', ruralStick(ruralV(end * (hwI + over), yI - 0.02, side * hdI * 1.06), ruralV(end * (hwI + over), ridgeY + 0.06, 0), 0.07, 0.2)]);
-      parts.push(['trim', ruralBox(0.06, 0.35, 0.4, end * (hwI + over + 0.01), ridgeY - 0.2, 0)]);
-    }
-    // The ridge, its end tiles (onigawara) and a pair of shachi.
-    parts.push(['trim', ruralBox(2 * (hwI + over) + 0.1, 0.24, 0.26, 0, ridgeY + 0.1, 0)]);
-    for (const end of [-1, 1]) {
-      parts.push(['trim', ruralBox(0.14, 0.42, 0.36, end * (hwI + over + 0.08), ridgeY + 0.2, 0)]);
-      parts.push(...ruralShachi(end * (hwI + over - 0.05), ridgeY + 0.22, end));
-    }
-  }
-  return parts;
-}
-
-/** A shachi: the gilded tiger-headed carp that stands on each end of a keep's ridge, tail up, as a charm against fire. */
-function ruralShachi(x, y, end) {
-  const parts = [];
-  // The body arched head-down on the ridge, the tail flung up and outward, the fins.
-  const body = new THREE.SphereGeometry(0.12, 8, 6);
-  body.scale(1, 2.1, 0.7);
-  parts.push(['gold', ruralAt(body, x - end * 0.03, y + 0.24, 0, 0, 0, end * 0.3)]);
-  const tail = new THREE.ConeGeometry(0.07, 0.3, 6);
-  parts.push(['gold', ruralAt(tail, x + end * 0.07, y + 0.55, 0, 0, 0, end * 0.7)]);
-  const fin = new THREE.ConeGeometry(0.13, 0.05, 4);
-  fin.rotateX(Math.PI / 2);
-  parts.push(['gold', ruralAt(fin, x + end * 0.17, y + 0.7, 0, 0, 0, end * 0.7)]);
-  parts.push(['gold', ruralAt(new THREE.SphereGeometry(0.09, 8, 6), x - end * 0.08, y + 0.06, 0)]);
-  return parts;
-}
-
-/**
- * The castle on its hill north of the field: a tenshu (keep) of three
- * roofs over its ishigaki, the battered base of fitted stones that curves
- * up steeper towards its top, a low plastered wall with a tiled coping
- * round the base's top; storeys of white plaster over black boards with
- * barred windows; at each storey a tiled roof skirt sweeping up at its
- * corners, gabled dormers (chidori-hafu) on the lower two, the top roof
- * hipped and gabled (irimoya) with a shachi at each end of its ridge.
- */
-export function ruralCastle({ hillColour }) {
-  const castle = new THREE.Group();
-  const parts = { stone: [], tiles: [], soffit: [], fascia: [], wall: [], plaster: [], trim: [], gold: [] };
-  // The hill, as before, now lumpy and patchy.
-  const hill = new THREE.SphereGeometry(9, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-  const position = hill.attributes.position;
-  for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index);
-    const z = position.getZ(index);
-    const y = position.getY(index);
-    const wobble = 1 + 0.05 * Math.sin(x * 0.9 + z * 0.4) + 0.04 * Math.sin(z * 1.3 - x * 0.7);
-    position.setXYZ(index, x * wobble, y * 0.45, z * wobble);
-  }
-  hill.computeVertexNormals();
-  ruralTint(hill, (x, y, z) => {
-    const patch = 0.92 + 0.1 * Math.sin(x * 1.7 + z * 0.9) * Math.sin(z * 1.1 - x * 0.6);
-    return [patch, patch * (1 + 0.04 * Math.sin(x)), patch * 0.95];
-  });
-  const hillMesh = new THREE.Mesh(hill, new THREE.MeshStandardMaterial({ color: hillColour, roughness: 0.95, vertexColors: true }));
-  hillMesh.receiveShadow = true;
-  castle.add(hillMesh);
-  const S = 0.8;
-  // The ishigaki: its sides curve from a gentle batter at the foot to nearly upright at the top.
-  const base = { hwB: 6.2, hdB: 5.4, hwT: 4.9, hdT: 4.1, y0: 2.0, y1: 7.0 };
-  const curve = (t) => 1 - Math.pow(t, 0.6);
-  for (let side = 0; side < 4; side += 1) {
-    const corner = (k, t) => {
-      const sx = [1, -1, -1, 1][(side + k) % 4];
-      const sz = [1, 1, -1, -1][(side + k) % 4];
-      const f = curve(t);
-      return [sx * ruralLerp(base.hwT, base.hwB, f), ruralLerp(base.y0, base.y1, t), sz * ruralLerp(base.hdT, base.hdB, f)];
-    };
-    const outward = [ruralV(0, 0, 1), ruralV(-1, 0, 0), ruralV(0, 0, -1), ruralV(1, 0, 0)][side];
-    const edge = side % 2 === 0 ? 2 * base.hwB : 2 * base.hdB;
-    parts.stone.push(ruralGrid(1, 8, (i, j) => {
-      const t = j / 8;
-      return [...corner(i, t), i * edge, t * 5.4];
-    }, [0, 4, outward]));
-  }
-  parts.stone.push(ruralBox(2 * base.hwT, 0.1, 2 * base.hdT, 0, base.y1 - 0.05, 0));
-  // The low wall round the top of the base, with its tiled coping.
-  for (const [length, x, z, turn] of [[2 * base.hwT, 0, base.hdT - 0.15, 0], [2 * base.hwT, 0, -base.hdT + 0.15, 0], [2 * base.hdT - 0.3, base.hwT - 0.15, 0, Math.PI / 2], [2 * base.hdT - 0.3, -base.hwT + 0.15, 0, Math.PI / 2]]) {
-    parts.plaster.push(ruralBox(length, 0.6, 0.22, x, base.y1 + 0.3, z, turn));
-    parts.tiles.push(ruralBox(length + 0.1, 0.1, 0.46, x, base.y1 + 0.65, z, turn));
-    parts.trim.push(ruralBox(length + 0.1, 0.08, 0.1, x, base.y1 + 0.73, z, turn));
-  }
-  const storeys = [
-    { hw: 4.1, hd: 3.3, y0: 7.0, height: 2.4 },
-    { hw: 3.3, hd: 2.6, y0: 9.4, height: 2.0 },
-    { hw: 2.4, hd: 1.9, y0: 11.4, height: 1.8 },
-  ];
-  storeys.forEach((storey, level) => {
-    const { hw, hd, y0, height } = storey;
-    // The walls: one bay of the painted wall to every 2.4 m or so, so the windows fall evenly.
-    for (let side = 0; side < 4; side += 1) {
-      const half = side % 2 === 0 ? hw : hd;
-      const bays = Math.max(1, Math.round((2 * half) / 2.4));
-      const geometry = ruralQuad(ruralV(-half, y0, 0), ruralV(half, y0, 0), ruralV(half, y0 + height, 0), ruralV(-half, y0 + height, 0));
-      const uv = geometry.attributes.uv;
-      for (let index = 0; index < uv.count; index += 1) uv.setXY(index, (uv.getX(index) / (2 * half)) * bays, uv.getY(index) / height);
-      const turn = [0, Math.PI / 2, Math.PI, -Math.PI / 2][side];
-      geometry.applyMatrix4(new THREE.Matrix4().makeRotationY(turn).multiply(new THREE.Matrix4().makeTranslation(0, 0, side % 2 === 0 ? hd : hw)));
-      parts.wall.push(geometry);
-    }
-    const next = storeys[level + 1];
-    const top = !next;
-    const yTop = y0 + height;
-    const skirt = top
-      ? ruralSkirt({ hwI: hw * 0.72, hdI: hd * 0.42, yI: yTop + 0.75, hwO: hw + 0.95, hdO: hd + 0.95, yO: yTop - 0.3, lift: 0.3, gable: true })
-      : ruralSkirt({ hwI: next.hw, hdI: next.hd, yI: yTop + 0.55, hwO: hw + 0.95, hdO: hd + 0.95, yO: yTop - 0.3, lift: 0.35 });
-    for (const [kind, geometry] of skirt) parts[kind].push(geometry);
-    if (level < 2) {
-      // Chidori-hafu: triangular gabled dormers on the skirt, on the long faces below, the short faces above.
-      const faces = level === 0 ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
-      for (const [fx, fz] of faces) {
-        const reachO = fx ? hw + 0.95 : hd + 0.95;
-        const reachI = fx ? next.hw : next.hd;
-        const r = 0.55;
-        const front = ruralLerp(reachI, reachO, r);
-        const yFront = ruralLerp(yTop + 0.55, yTop - 0.3, r) - 0.12 * Math.sin(Math.PI * r);
-        const width = level === 0 ? 2.6 : 2.0;
-        const rise = width * 0.42;
-        const back = reachI - 0.2;
-        const turn = Math.atan2(fx, fz);
-        const local = [];
-        local.push(['plaster', ruralPolygon([ruralV(-width / 2, 0, 0), ruralV(width / 2, 0, 0), ruralV(0, rise, 0)], ruralV(0, 0, 1), (p) => [p.x, p.y])]);
-        const deep = front - back + 0.3;
-        for (const side of [-1, 1]) {
-          const slope = Math.hypot(width / 2 + 0.15, rise + 0.15);
-          local.push(['tiles', ruralGrid(4, 2, (i, j) => {
-            const z = 0.25 - (deep * i) / 4;
-            const t = j / 2;
-            return [side * ruralLerp(width / 2 + 0.2, 0, t), ruralLerp(-0.1, rise + 0.12, t), z, z, slope * (1 - t)];
-          }, [2, 1, ruralV(side, 1, 0)])]);
-          local.push(['trim', ruralStick(ruralV(side * (width / 2 + 0.22), -0.12, 0.27), ruralV(0, rise + 0.14, 0.27), 0.06, 0.16)]);
-        }
-        local.push(['trim', ruralBox(0.12, 0.14, deep, 0, rise + 0.16, 0.25 - deep / 2)]);
-        local.push(['trim', ruralBox(0.06, 0.3, 0.32, 0, rise - 0.12, 0.28)]);
-        const matrix = new THREE.Matrix4().makeRotationY(turn).multiply(new THREE.Matrix4().makeTranslation(0, yFront, front));
-        for (const [kind, geometry] of local) parts[kind].push(geometry.applyMatrix4(matrix));
-      }
-    }
-  });
-  const tiled = new THREE.MeshStandardMaterial({ color: 0xffffff, ...ruralRoofTilesMaps(), roughness: 0.6, metalness: 0.1, vertexColors: true });
-  const plain = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, vertexColors: true, ...options });
-  const group = new THREE.Group();
-  const scaled = (list) => list.map((geometry) => geometry.scale(S, S, S));
-  // The plaster of the gables and the base's wall takes the keep wall's white band.
-  const plasterUv = (geometry) => {
-    const uv = geometry.attributes.uv;
-    for (let index = 0; index < uv.count; index += 1) uv.setXY(index, 0.1 + (index % 3) * 0.02, 0.85);
-    return geometry;
-  };
-  // The eaves are plastered white under the tiles (as at Himeji), the soffit in its own shade.
-  parts.wall.push(...parts.plaster.map(plasterUv), ...parts.soffit.map((geometry) => ruralTint(plasterUv(geometry), [0.82, 0.8, 0.77])), ...parts.fascia.map(plasterUv));
-  group.add(
-    ruralMesh(scaled(parts.stone), ruralMaterial(ruralIshigaki(), { roughness: 0.95, normal: 1.2 }), 1 / 3),
-    ruralMesh(scaled(parts.tiles), tiled, 1 / 0.6),
-    ruralMesh(scaled(parts.trim.map((geometry) => ruralTint(geometry, [0.7, 0.72, 0.75]))), tiled, 1 / 0.6),
-    ruralMesh(scaled(parts.wall), ruralMaterial(ruralKeepWall(), { roughness: 0.9 }), 1),
-    ruralMesh(scaled(parts.gold), plain(0xd8aa48, { roughness: 0.35, metalness: 0.55, emissive: 0x2a1a00 }), 1),
-  );
-  castle.add(group);
-  return castle;
-}
-
-function ruralRoofTilesMaps() {
-  const pair = ruralRoofTiles();
-  return { map: pair.map, normalMap: pair.normalMap, normalScale: new THREE.Vector2(1.2, 1.2) };
-}
-
-/**
  * The bamboo palisade along a flank (z), gapped round x = 0: canes lashed
  * between pairs of horizontal rails with black palm-fibre cord, their tops
  * cut on the slant (outward) as a battlefield fence's were. Pushes onto `bamboo`.
@@ -1727,7 +1346,7 @@ function ruralPalisade(bamboo, { z, from, to, gap, random }) {
     for (const x of canes) {
       const radius = 0.04 + random() * 0.015;
       const height = 1.6 + random() * 0.3;
-      const cane = ruralRod(ruralV(0, -0.05, 0), ruralV(0, height, 0), radius, 7, random() * 6);
+      const cane = ruralRod(ruralV(0, -0.05, 0), ruralV(0, height, 0), radius, 5, random() * 6);
       // The top cut on the slant, the long side to the outside.
       const position = cane.attributes.position;
       for (let index = 0; index < position.count; index += 1) if (position.getY(index) > height - 1e-3) position.setY(index, height + position.getZ(index) * outward * 1.2);
@@ -1750,13 +1369,8 @@ function ruralPalisade(bamboo, { z, from, to, gap, random }) {
           bamboo.push(ruralTint(rail, [0.9, 0.85, 0.7]));
         }
       }
-      // The lashing at each crossing on the outer face: a cross of black cord.
-      for (const x of canes) {
-        for (const turn of [Math.PI / 4, -Math.PI / 4]) {
-          bamboo.push(ruralTint(ruralBox(0.1, 0.022, 0.02, x, height, z + outward * 0.095, 0, 0, turn), cord));
-        }
-        bamboo.push(ruralTint(ruralBox(0.03, 0.075, 0.17, x, height, z), cord));
-      }
+      // The lashing at each crossing: a wrap of black cord round rails and cane.
+      for (const x of canes) bamboo.push(ruralTint(ruralBox(0.03, 0.075, 0.17, x, height, z), cord));
     }
   }
 }
@@ -1768,7 +1382,7 @@ function ruralPalisade(bamboo, { z, from, to, gap, random }) {
  * art is the texture given (u along it, v up it, as the plane it replaces).
  */
 function ruralCurtain(art, { length, height, centreY, poles }) {
-  const columns = Math.ceil(length / 0.12);
+  const columns = Math.ceil(length / 0.2);
   const rows = 8;
   const top = centreY + height / 2;
   const sagAt = (x) => {
@@ -1785,7 +1399,8 @@ function ruralCurtain(art, { length, height, centreY, poles }) {
     const belly = 0.05 * Math.sin(Math.PI * (((x + length / 2) % (length / (poles.length - 1))) / (length / (poles.length - 1)))) * Math.sin(Math.PI * Math.min(1, fall * 1.2));
     return [x, y, fold + belly, i / columns, v];
   }, [columns / 2, rows / 2, ruralV(0, 0, 1)]);
-  const material = new THREE.MeshStandardMaterial({ map: ruralCurtainArt(art), normalMap: ruralCurtainSeams(), normalScale: new THREE.Vector2(1, 1), side: THREE.DoubleSide, roughness: 0.95 });
+  // Matt hemp: Lambert, the folds shaded per vertex; the seams are in the art.
+  const material = new THREE.MeshLambertMaterial({ map: ruralCurtainArt(art), side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(cloth, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -1819,20 +1434,6 @@ function ruralCurtainArt(art) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.anisotropy = 8;
   return texture;
-}
-
-function ruralCurtainSeams() {
-  return ruralPainted('rural:seams', 64, 256, { relief: 6 }, ({ bump, width, height, grey }) => {
-    for (let k = 1; k < 5; k += 1) {
-      const y = (height * k) / 5;
-      const ridge = bump.createLinearGradient(0, y - 4, 0, y + 4);
-      ridge.addColorStop(0, grey(0.5));
-      ridge.addColorStop(0.5, grey(0.85));
-      ridge.addColorStop(1, grey(0.5));
-      bump.fillStyle = ridge;
-      bump.fillRect(0, y - 4, width, 8);
-    }
-  }).normalMap;
 }
 
 /**
@@ -1913,12 +1514,13 @@ export function ruralSengokuCamps({ sides, curtainX, curtainArt, bannerArt, pali
       cloths.push(cloth.applyMatrix4(matrix));
       bamboo.push(...ruralMoved(sticks, matrix));
     });
-    const flags = new THREE.Mesh(ruralMerge(cloths), new THREE.MeshStandardMaterial({ map: art, side: THREE.DoubleSide, roughness: 0.9 }));
+    const flags = new THREE.Mesh(ruralMerge(cloths), new THREE.MeshLambertMaterial({ map: art, side: THREE.DoubleSide }));
     flags.castShadow = true;
     flags.receiveShadow = true;
     group.add(flags);
   }
   for (const z of palisadeZ) ruralPalisade(bamboo, { z, from: -11, to: 11, gap: 1.6, random });
-  group.add(ruralMesh(bamboo, ruralMaterial(ruralBamboo(), { roughness: 0.7 }), 1));
+  // Bamboo seen from the fight: its painted grain is enough, no relief.
+  group.add(ruralMesh(bamboo, new THREE.MeshLambertMaterial({ map: ruralBamboo().map, vertexColors: true }), 1));
   return group;
 }

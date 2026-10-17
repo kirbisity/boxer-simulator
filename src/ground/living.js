@@ -920,11 +920,10 @@ function livingGrassPlace({ place, view, arena, grounds, rng, kind }) {
   if (relief) group.add(relief);
   const pond = place === 'meadow' ? { x: -1.5, z: -16.5, rx: 3.4, rz: 2.2 } : null;
   const offPond = (x, z) => !pond || ((x - pond.x) / (pond.rx + 0.3)) ** 2 + ((z - pond.z) / (pond.rz + 0.3)) ** 2 > 1;
-  const offCastle = (x, z) => place !== 'sengoku' || Math.hypot(x + 6, z + 40) > 11;
   // Mud where the armies trod (sengoku), a churned strip (field): a decal, and grass lying flat in it.
   const mudLevel = (x, z) => livingFbm(x / 3.2, z / 3.2, 77, 4) + 0.3 * livingSmooth(4, 0, livingOutside(arena, x, z)) - 0.05;
   const mudAt = trampled ? (x, z) => mudLevel(x, z) > 0.2 : null;
-  const keep = (x, z) => offPond(x, z) && offCastle(x, z);
+  const keep = offPond;
   // Short grass on the fighting floor only off the worn ground: the meadow's track (painted, an ellipse turned 0.2), the field's churned strip, the sengoku mud.
   const insideKeep = (x, z) => {
     if (place === 'meadow') {
@@ -940,9 +939,10 @@ function livingGrassPlace({ place, view, arena, grounds, rng, kind }) {
     arena,
     rng,
     palette: LIVING_GREENS[place],
-    near: place === 'field' ? 6 : 8,
+    // Sekigahara is fought by armies seen from afar: sparser, nearer grass there (the mud and the decal carry the ground).
+    near: place === 'meadow' ? 8 : 6,
     band: place === 'field' ? 7 : 9,
-    far: place === 'field' ? 32 : 40,
+    far: { field: 32, sengoku: 28 }[place] ?? 40,
     tall: trampled ? [0.14, 0.34] : [0.16, 0.4],
     inside: trampled ? 0.6 : 5,
     insideKeep,
@@ -1015,14 +1015,14 @@ function livingGrassPlace({ place, view, arena, grounds, rng, kind }) {
   }
 
   if (trampled) {
-    // Fallen leaves blown off the pines, in every autumn colour; broken arrows; a fallen banner.
-    const reach = Math.max(arena.halfX, arena.halfZ) + 22;
+    // Fallen leaves blown off the pines, in every autumn colour, round the fighting ground (further out they are too small to see); broken arrows.
+    const reach = Math.max(arena.halfX, arena.halfZ) + 10;
     group.add(livingLitter({
       land, rng,
       box: [-reach, -reach, reach, reach],
-      density: (x, z) => (offCastle(x, z) ? 0.35 + 0.65 * livingSmooth(-0.2, 0.4, livingFbm(x / 4, z / 4, 61, 2)) : 0),
+      density: (x, z) => 0.35 + 0.65 * livingSmooth(-0.2, 0.4, livingFbm(x / 4, z / 4, 61, 2)),
       items: [
-        { count: 5200 * Math.min(1, LIVING_DENSITY * 2), length: 0.1, width: 0.075, palette: [0xe0642a, 0xf09a30, 0xf0c040, 0xb84a22, 0xc08a3a, 0xd85a2a, 0xa8a040] },
+        { count: 2200 * Math.min(1, LIVING_DENSITY * 2), length: 0.1, width: 0.075, palette: [0xe0642a, 0xf09a30, 0xf0c040, 0xb84a22, 0xc08a3a, 0xd85a2a, 0xa8a040] },
       ],
     }));
     group.add(livingArrows({ land, arena, rng }));

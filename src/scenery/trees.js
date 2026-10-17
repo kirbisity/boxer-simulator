@@ -248,7 +248,7 @@ function treesFree(place, spec, x, z, margin = 2.5) {
 
 /**
  * Where trees stand: `count` in an annulus [from, to], scattered (or in
- * `woods` clusters of `perWood`), spaced apart, off the ground and the castle.
+ * `woods` clusters of `perWood`), spaced apart, off the ground and any keepClear.
  */
 function treesScatter(place, spec, rng, { count, from, to, spacing = 3, woods = 0, perWood = 0, taken = [] }) {
   const trees = [];

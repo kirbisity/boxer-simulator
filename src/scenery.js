@@ -49,13 +49,12 @@ export const PLACE_SCENERY = {
     ],
     trees: { kind: 'none', count: 0, from: 0, to: 0, colour: 0x6a8a6a, bark: 0x4a3626 },
   },
-  // Sekigahara: a valley ringed by forested mountains, pines about the field, the castle on its hill to the north.
+  // Sekigahara: a valley ringed by forested mountains, pines about the field.
   sengoku: {
     keepOut: [13, 9], groundColour: 0x7d8a4a,
     hills: { from: 30, to: 60, height: [3, 8], colour: 0x5f7040, character: 'forested' },
     mountains: [{ ring: true, from: 42, to: 70, height: [9, 18], colour: 0x6a7a88, forested: true }],
     trees: { kind: 'pine', count: 30, from: 19, to: 34, colour: 0x2a4430, bark: 0x4a3626 },
-    keepClear: [{ at: [-6, -40], radius: 10 }],
   },
 };
 

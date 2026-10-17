@@ -261,7 +261,7 @@ function harbourContainer(parts, { x, y, z, turn, line, random, doorEnd }) {
   }
   parts.skin.add(new THREE.PlaneGeometry(W - 0.3, H - 0.3), at(-doorEnd * (L / 2 - 0.035), H / 2, 0, 0, -doorEnd * Math.PI / 2), skin);
   parts.skin.add(new THREE.PlaneGeometry(L - 0.2, W - 0.2), at(0, H - 0.04, 0, -Math.PI / 2), { ...skin, offset: [offset[0], random()], colour: paint.map((v) => v * 0.85) });
-  // The doors: two leaves, their seal line, four locking bars with cams and handles, hinges.
+  // The doors: two leaves, their seal line, four locking bars with their handles, hinges.
   const doorX = doorEnd * (L / 2 - 0.03);
   for (const side of [-1, 1]) parts.skin.add(new THREE.PlaneGeometry((W - 0.32) / 2, H - 0.34), at(doorX, H / 2, side * (W - 0.32) / 4, 0, doorEnd * Math.PI / 2), { ...skin, tile: [1.0, H] });
   const steel = (value) => ({ tile: 1.5, colour: value });
@@ -269,11 +269,10 @@ function harbourContainer(parts, { x, y, z, turn, line, random, doorEnd }) {
   const zinc = [0.55, 0.55, 0.53];
   for (const bar of [-0.88, -0.32, 0.32, 0.88]) {
     const bx = doorX + doorEnd * 0.05;
-    parts.steel.add(new THREE.CylinderGeometry(0.022, 0.022, H - 0.24, 6), at(bx, H / 2, bar), steel(zinc));
-    for (const by of [0.3, H - 0.3]) parts.steel.add(new THREE.BoxGeometry(0.06, 0.08, 0.09), at(bx, by, bar), steel(zinc));
+    parts.steel.add(new THREE.BoxGeometry(0.04, H - 0.24, 0.04), at(bx, H / 2, bar), steel(zinc));
     parts.steel.add(new THREE.BoxGeometry(0.03, 0.035, 0.42), at(bx + doorEnd * 0.02, 1.15, bar + 0.2), steel(zinc));
   }
-  for (const side of [-1, 1]) for (const hy of [0.45, 1.05, 1.65, 2.2]) parts.steel.add(new THREE.BoxGeometry(0.06, 0.12, 0.07), at(doorX + doorEnd * 0.03, hy, side * (W / 2 - 0.14)), steel(frame));
+  for (const side of [-1, 1]) for (const hy of [0.45, 2.2]) parts.steel.add(new THREE.BoxGeometry(0.06, 0.12, 0.07), at(doorX + doorEnd * 0.03, hy, side * (W / 2 - 0.14)), steel(frame));
   parts.logos.add(new THREE.PlaneGeometry(1.0, 0.25), at(doorX + doorEnd * 0.012, H - 0.5, -0.55, 0, doorEnd * Math.PI / 2), { uv: 'keep', tile: [2, 4], offset: [(line % 2) * 0.5, (3 - Math.floor((line % 8) / 2)) * 0.25] });
   // The frame: corner posts, side and end rails, the castings at the eight corners.
   for (const ex of [-1, 1]) for (const ez of [-1, 1]) {
@@ -446,16 +445,12 @@ function harbourShip(parts, { centreZ, random }) {
 
 // ---- the quay -------------------------------------------------------------------
 
-/** A cast-iron tee-headed bollard: flange, waisted body, the head with its lip, bolted down. */
+/** A cast-iron tee-headed bollard: flange, waisted body, the head with its lip. */
 function harbourBollard(builder, x, y, z, colour) {
   const profile = [[0, 0], [0.32, 0], [0.32, 0.05], [0.22, 0.07], [0.19, 0.3], [0.17, 0.42], [0.2, 0.47], [0.27, 0.52], [0.27, 0.57], [0.2, 0.62], [0, 0.63]].map(([r, y]) => new THREE.Vector2(r, y));
-  builder.add(new THREE.LatheGeometry(profile, 16), arenaAt(x, y, z), { tile: 1.5, colour });
+  builder.add(new THREE.LatheGeometry(profile, 12), arenaAt(x, y, z), { tile: 1.5, colour });
   // The tee: horns either side of the head, so a line cannot jump off.
   builder.add(new THREE.CylinderGeometry(0.07, 0.07, 0.62, 8), arenaAt(x, y + 0.5, z, 0, 0, Math.PI / 2), { tile: 1.5, colour });
-  for (let bolt = 0; bolt < 6; bolt += 1) {
-    const a = (bolt / 6) * Math.PI * 2;
-    builder.add(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 6), arenaAt(x + Math.cos(a) * 0.27, y + 0.07, z + Math.sin(a) * 0.27), { tile: 1.5, colour: colour.map((v) => v * 1.3) });
-  }
 }
 
 function harbourQuay(parts, { edgeZ, random }) {
@@ -514,8 +509,6 @@ function harbourCrane(parts, { x, z, spreaderY }) {
   const legs = [[-4, -4], [4, -4], [-4, 2], [4, 2]];
   for (const [dx, dz] of legs) {
     parts.steel.add(new THREE.BoxGeometry(0.8, 19, 0.8), at(dx, 1.4 + 9.5, dz), paint(red));
-    // Stiffener flats down the leg's faces.
-    for (const side of [-1, 1]) parts.steel.add(new THREE.BoxGeometry(0.06, 18.6, 0.2), at(dx + side * 0.43, 1.4 + 9.5, dz), paint(red.map((v) => v * 0.9)));
     // The bogie: an equaliser beam on two wheel trucks running along the quay.
     const yellow = [0.75, 0.6, 0.12];
     parts.steel.add(new THREE.BoxGeometry(2.6, 0.5, 0.6), at(dx, 1.15, dz), paint(yellow));
@@ -532,14 +525,13 @@ function harbourCrane(parts, { x, z, spreaderY }) {
   }
   // Portal beams across the top, land side and sea side.
   for (const dz of [-4, 2]) parts.steel.add(new THREE.BoxGeometry(8.8, 1.2, 1.0), at(0, 20.3, dz), paint(red));
-  // The boom: two box girders from the backreach out over the water, stiffened, tied across beneath, walkways railed.
+  // The boom: two box girders from the backreach out over the water, tied across beneath, walkways railed.
   const boom0 = -12;
   const boom1 = 30;
   for (const side of [-1, 1]) {
-    parts.steel.add(new THREE.BoxGeometry(0.6, 1.8, boom1 - boom0, 1, 1, 8), at(side * 1.8, 21.8, (boom0 + boom1) / 2), paint(red));
-    for (let sz = boom0 + 1; sz < boom1; sz += 2) parts.steel.add(new THREE.BoxGeometry(0.05, 1.8, 0.12), at(side * 2.12, 21.8, sz), paint(red.map((v) => v * 0.88)));
-    for (let sz = boom0 + 0.5; sz <= boom1; sz += 1.5) parts.steel.add(new THREE.BoxGeometry(0.04, 1.0, 0.04), at(side * 2.25, 23.2, sz), paint([0.8, 0.8, 0.75]));
-    parts.steel.add(new THREE.BoxGeometry(0.05, 0.05, boom1 - boom0, 1, 1, 8), at(side * 2.25, 23.7, (boom0 + boom1) / 2), paint([0.8, 0.8, 0.75]));
+    parts.steel.add(new THREE.BoxGeometry(0.6, 1.8, boom1 - boom0), at(side * 1.8, 21.8, (boom0 + boom1) / 2), paint(red));
+    for (let sz = boom0 + 0.5; sz <= boom1; sz += 3) parts.steel.add(new THREE.BoxGeometry(0.04, 1.0, 0.04), at(side * 2.25, 23.2, sz), paint([0.8, 0.8, 0.75]));
+    parts.steel.add(new THREE.BoxGeometry(0.05, 0.05, boom1 - boom0), at(side * 2.25, 23.7, (boom0 + boom1) / 2), paint([0.8, 0.8, 0.75]));
   }
   for (let sz = boom0 + 2; sz < boom1; sz += 4) parts.steel.add(new THREE.BoxGeometry(3.6, 0.3, 0.35), at(0, 20.95, sz), paint(red));
   // The A-frame over the legs, and its stays down to the boom's tip and tail.
@@ -585,7 +577,7 @@ function harbourLamp(parts, x, z, toward) {
 /** A steel drum: rolling hoops, the chimes top and bottom, its bungs. */
 function harbourDrum(builder, x, z, colour) {
   const profile = [[0, 0.005], [0.28, 0.005], [0.29, 0.02], [0.29, 0.04], [0.283, 0.06], [0.283, 0.27], [0.297, 0.285], [0.297, 0.305], [0.283, 0.32], [0.283, 0.56], [0.297, 0.575], [0.297, 0.595], [0.283, 0.61], [0.283, 0.83], [0.29, 0.85], [0.29, 0.875], [0.275, 0.88], [0.27, 0.865], [0, 0.865]].map(([r, y]) => new THREE.Vector2(r, y));
-  builder.add(new THREE.LatheGeometry(profile, 18), arenaAt(x, 0, z), { tile: 1.5, colour });
+  builder.add(new THREE.LatheGeometry(profile, 14), arenaAt(x, 0, z), { tile: 1.5, colour });
   for (const [bx, bz] of [[0.16, 0.05], [-0.15, -0.06]]) builder.add(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 8), arenaAt(x + bx, 0.875, z + bz), { tile: 1.5, colour: [0.5, 0.5, 0.48] });
 }
 

@@ -29,7 +29,7 @@ import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
-import { ruralCastle, ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
+import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -582,8 +582,8 @@ function buildSubway(arena) {
 /**
  * A Sengoku battlefield: trampled grass between two camps, each with its
  * white curtain (jin-maku) bearing a crest and its tall nobori banners in
- * the side's colour; a bamboo palisade, pines, the mountains, and a castle
- * on a far hill, under a day sky.
+ * the side's colour; a bamboo palisade, pines and the mountains, under a
+ * day sky.
  */
 /**
  * The plain below the volcanoes: dry grass, maguey and nopal, the snowy
@@ -876,7 +876,7 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   ground.receiveShadow = true;
   ground.userData.scenery = 'ground';
   place.add(ground);
-  // Mountains and the castle on its hill, far off.
+  // Mountains, far off.
   for (let index = 0; index < 12; index += 1) {
     const angle = (index / 12) * Math.PI * 2 + 0.2;
     const mountain = new THREE.Mesh(new THREE.ConeGeometry(10 + Math.random() * 6, 9 + Math.random() * 7, 7), lit(0x6a7a88));
@@ -884,10 +884,6 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
     mountain.userData.scenery = 'mountains';
     place.add(mountain);
   }
-  // The castle keep on its hill (src/props/rural.js).
-  const castle = ruralCastle({ hillColour: 0x5f7040 });
-  castle.position.set(-6, 0, -40);
-  place.add(castle);
   // Pines about the field.
   const needles = lit(0x2a4430);
   const bark = lit(0x4a3626);
