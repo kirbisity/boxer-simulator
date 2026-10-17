@@ -34,6 +34,10 @@ export const FOLLOW_CAM = {
   lockAt: 0.45,
   lockAngle: 0.55,
   lockBack: 0.6,
+  // m: the most of the gap between them the locked view frames. A man locked on further off (across
+  // a battle, or from horseback, where the gap opens fast) turns the view to him over the shoulder
+  // without backing out to fit him in: the view stays a third-person view of the player.
+  lockReach: 3,
   // The player's drag: kept this long (s) after he lets go (shorter locked on), then eased back.
   holdSeconds: 3,
   lockHoldSeconds: 1.2,
@@ -154,14 +158,15 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
     const right = [Math.sin(cam.yaw), -Math.cos(cam.yaw)];
     const across = (input.aspect ?? 16 / 9) * Math.tan(((spec.fov / 2) * Math.PI) / 180);
     // How far back: further, the further apart they stand; his zoom (the walls come after).
-    const apart = locked ? Math.hypot(cam.foe[0] - cam.anchor[0], cam.foe[2] - cam.anchor[2]) : 0;
+    const gap = locked ? Math.hypot(cam.foe[0] - cam.anchor[0], cam.foe[2] - cam.anchor[2]) : 0;
+    const apart = Math.min(gap, spec.lockReach);
     const halfWidth = locked ? spec.lockMargin + apart * 0.5 : spec.minHalfWidth;
     const wanted = Math.max(spec.distance + apart * spec.lockBack, halfWidth / across) * cam.zoom;
     if (cam.distance === null) cam.distance = wanted;
     const shoulder = Math.min(spec.shoulder, cam.distance * across * spec.shoulderShare);
     const height = cam.anchor[1] + spec.aboveHips;
     const goalTarget = locked
-      ? [cam.anchor[0] + (cam.foe[0] - cam.anchor[0]) * spec.lockAt, height, cam.anchor[2] + (cam.foe[2] - cam.anchor[2]) * spec.lockAt]
+      ? [cam.anchor[0] + ((cam.foe[0] - cam.anchor[0]) / Math.max(gap, 1e-6)) * apart * spec.lockAt, height, cam.anchor[2] + ((cam.foe[2] - cam.anchor[2]) / Math.max(gap, 1e-6)) * apart * spec.lockAt]
       : [cam.anchor[0] + right[0] * shoulder, height, cam.anchor[2] + right[1] * shoulder];
     if (!cam.target) cam.target = goalTarget.slice();
     for (let axis = 0; axis < 3; axis += 1) [cam.target[axis], cam.targetV[axis]] = spring(cam.target[axis], cam.targetV[axis], goalTarget[axis], spec.targetRate, dt);

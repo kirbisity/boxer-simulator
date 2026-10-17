@@ -153,6 +153,21 @@ test('the camera follows a smoothed man: his sway and small turns do not move it
   assert.ok(turned <= goal + 1e-6, 'without overshoot');
 });
 
+test('locked on a man far off (across a battle, from horseback), the view turns to him but does not back out to fit him in', () => {
+  const near = createFollowCam();
+  const far = createFollowCam();
+  let nearView = null;
+  let farView = null;
+  for (let time = 0; time < 5; time += 1 / 60) {
+    nearView = frame(near, { foe: [FOLLOW_CAM.lockReach, 0.9, 0] }, time);
+    farView = frame(far, { foe: [20, 0.9, 0] }, time);
+  }
+  assert.ok(Math.abs(farView.distance - nearView.distance) < 0.05, `as far back for a man 20 m off as for one ${FOLLOW_CAM.lockReach} m off (${farView.distance.toFixed(2)} m)`);
+  assert.ok(farView.distance < FOLLOW_CAM.distance * 1.6, 'still a third-person view of the player');
+  assert.ok(farView.target[0] < FOLLOW_CAM.lockReach, 'aimed near the player, not halfway across the field');
+  assert.ok(Math.abs(farView.yaw - nearView.yaw) < 0.05, 'and turned to face the man the same way');
+});
+
 test('the camera holds its heading while he is down, keeps both men in view locked on, and keeps the player\'s look a while', () => {
   const cam = createFollowCam();
   let time = 0;
