@@ -8,6 +8,7 @@ import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { STYLE } from './toon.js';
+import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
@@ -625,16 +626,16 @@ function watchedPoints(world, followed) {
   return points;
 }
 
-function draw(dt) {
+function draw(dt, { render: drawIt = true } = {}) {
   const restore = blendWorld(state.world, state.before, state.paused ? 1 : state.accumulator / STEP);
   try {
-    drawWorld(dt);
+    drawWorld(dt, drawIt);
   } finally {
     restore();
   }
 }
 
-function drawWorld(dt) {
+function drawWorld(dt, drawIt = true) {
   const world = state.world;
   // The moment on screen: between the last two steps, as the bodies are drawn.
   const drawnTime = world.time - STEP + (state.paused ? STEP : state.accumulator);
@@ -674,7 +675,7 @@ function drawWorld(dt) {
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
-  render(scene);
+  if (drawIt) render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
   fightControls.update();
@@ -2009,8 +2010,33 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
   return state.world.fighters.map((fighter) => fighter.style);
 }
 
+// The looks harness (looksbench.js): staged still-lifes, shots and timings, for comparing looks.
+installLooksBench({
+  state,
+  scene,
+  looks: { list: () => [{ id: 'toon' }], current: () => 'toon', set: async () => {} },
+  setGame,
+  chooseLevel,
+  fight,
+  // The first visit's intro is over the scene until skipped.
+  introPlaying,
+  skipIntro,
+  finishBuilding: () => boxer.finishBuilding(),
+  // Exact frames of `dt` s: the world stepped without the time budget, the views updated, nothing drawn.
+  exactFrames: (count, dt) => {
+    for (let index = 0; index < count; index += 1) {
+      tick(dt, { budget: Infinity });
+      draw(dt, { render: false });
+    }
+  },
+  draw,
+  render: () => render(scene),
+  resize: (width, height) => resize(scene, width, height),
+  fit,
+});
+
 // Test hook: step the world by seconds without the frame clock.
-window.boxer = {
+const boxer = window.boxer = {
   state,
   scene,
   // The intro: end it now (true if it was playing), as Skip does; or play it again.
