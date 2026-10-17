@@ -41,7 +41,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir _site
-          cp -R index.html boxer.css src _site/
+          cp -R index.html boxer.css fightui.css src _site/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
