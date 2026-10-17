@@ -36,6 +36,8 @@ export const SEE_THROUGH = {
   besideMan: 0.35,
   // m: a piece is a single thing (faded whole) up to this wide; a bigger group fades by its meshes.
   pieceMax: 14,
+  // A mesh wider than pieceMax with more triangles than this is many things merged (see isMergedScenery): left out.
+  mergedTriangles: 4000,
   // m: a mesh this low is floor (or a kerb, a rug), never in the way.
   floorTop: 0.25,
   // m: a mesh wider than this is ground or sky, never in the way.
@@ -83,6 +85,12 @@ export function mayBlock(min, max, spec = SEE_THROUGH) {
   return [0, 1, 2].filter((axis) => max[axis] - min[axis] >= spec.thick).length >= 2;
 }
 
+/** Whether a mesh is many things merged into one: wider than a piece and heavy (more than `mergedTriangles`). */
+export function isMergedScenery(box, geometry, spec = SEE_THROUGH) {
+  const triangles = (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3;
+  return triangles > spec.mergedTriangles && Math.max(box.max.x - box.min.x, box.max.z - box.min.z) > spec.pieceMax;
+}
+
 /** Whether a mesh's box is scenery at all (not the floor, the ground or the sky). */
 export function isScenery(min, max, spec = SEE_THROUGH) {
   return max[1] >= spec.floorTop && max[0] - min[0] <= spec.skyWide && max[2] - min[2] <= spec.skyWide;
@@ -125,11 +133,20 @@ function piecesOf(place, spec) {
   const boxes = new Map();
   place.traverse((mesh) => {
     if (!mesh.isMesh || !mesh.geometry || mesh.userData.seeThrough === false) return;
+    // Instanced copies (grass, flowers, stones, setts, trees) are spread over the
+    // whole place: their box always lies across the line of sight, so testing
+    // them means a ray against every copy, every test (tens of thousands a
+    // frame in the meadow), and fading them would fade every copy at once.
+    if (mesh.isInstancedMesh && mesh.userData.seeThrough !== true) return;
     const materials = [].concat(mesh.material);
     // What is drawn see-through already (glows, smoke, the sky) is left alone.
     if (materials.some((material) => material.transparent || !material.depthWrite)) return;
     const box = meshBox(mesh);
     if (box.isEmpty() || !isScenery(box.min.toArray(), box.max.toArray(), spec)) return;
+    // A merged mesh of many things (a whole street of houses, the ring of
+    // stands) is no single thing to fade, and a ray against it tests every
+    // one of its triangles (100k in the town square: a third of a frame).
+    if (isMergedScenery(box, mesh.geometry, spec) && mesh.userData.seeThrough !== true) return;
     boxes.set(mesh, box);
   });
   // How wide a group is, over the meshes in it that may block.

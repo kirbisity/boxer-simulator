@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fadeStep, mayBlock, SEE_THROUGH, segmentBoxEntry } from '../src/seethrough.js';
+import { fadeStep, isMergedScenery, mayBlock, SEE_THROUGH, segmentBoxEntry } from '../src/seethrough.js';
 
 test('a wall between the camera and the man is in the way; one beside or beyond him is not', () => {
   const camera = [0, 2, 8];
@@ -67,4 +67,13 @@ test('a piece found in the way only between tests does not flicker', () => {
   }
   assert.equal(lowest, SEE_THROUGH.faded);
   assert.equal(highestAfter, SEE_THROUGH.faded, 'held faded between sightings');
+});
+
+test('a whole street merged into one heavy mesh is left out; a house, or a long plain wall, is not', () => {
+  const box = (wide, deep) => ({ min: { x: 0, z: 0 }, max: { x: wide, z: deep } });
+  const geometry = (triangles) => ({ index: { count: triangles * 3 }, attributes: { position: { count: triangles * 3 } } });
+  assert.equal(isMergedScenery(box(60, 60), geometry(100000)), true, 'the town square\'s merged houses');
+  assert.equal(isMergedScenery(box(10, 8), geometry(20000)), false, 'one detailed house is a piece');
+  assert.equal(isMergedScenery(box(40, 1), geometry(12)), false, 'a long plain step or wall is cheap to test');
+  assert.ok(SEE_THROUGH.mergedTriangles > 0);
 });
