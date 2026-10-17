@@ -25,6 +25,7 @@ import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
+import { ruralCastle, ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -259,49 +260,13 @@ function buildMeadow() {
     hill.userData.scenery = 'hills';
     place.add(hill);
   }
-  // Cottages: wattle and daub under thatch.
-  const daub = lit(0xd8c8a4);
-  const thatch = lit(0xb08a4a);
-  const timber = lit(0x4a3422);
-  for (const [x, z, turn] of [[-13, -9, 0.3], [-6, -12, -0.1], [9, -11, 0.2], [14, 4, 1.4], [-14, 6, -1.2], [4, 12, 3.0]]) {
-    const cottage = new THREE.Group();
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 3), daub);
-    walls.position.y = 1.1;
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.4, 4), thatch);
-    roof.rotation.y = Math.PI / 4;
-    roof.scale.set(1.35, 1, 0.95);
-    roof.position.y = 3.3;
-    const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.6, 0.06), timber);
-    door.position.set(0, 0.8, 1.52);
-    for (const piece of [walls, roof]) {
-      piece.castShadow = true;
-      piece.receiveShadow = true;
-    }
-    cottage.add(walls, roof, door);
-    cottage.position.set(x, 0, z);
-    cottage.rotation.y = turn;
-    place.add(cottage);
-  }
-  // A wattle fence round the green, gapped.
-  const post = lit(0x5a4128);
-  for (let index = 0; index < 64; index += 1) {
-    const angle = (index / 64) * Math.PI * 2;
-    if (Math.sin(angle * 3) > 0.85) continue;
-    const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.1, 6), post);
-    stake.position.set(Math.cos(angle) * 11.5, 0.55, Math.sin(angle) * 9.5);
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 1.2), lit(0x7a5a34));
-    rail.position.set(stake.position.x, 0.55, stake.position.z);
-    rail.rotation.y = -angle;
-    place.add(stake, rail);
-  }
-  // Haystacks and trees.
-  for (const [x, z] of [[-10, 2], [11, -4], [-3, 10], [6, -9]]) {
-    const stack = new THREE.Mesh(new THREE.SphereGeometry(1.2, 14, 10), lit(0xd8b860));
-    stack.scale.y = 1.2;
-    stack.position.set(x, 0.9, z);
-    stack.castShadow = true;
-    place.add(stack);
-  }
+  // Cottages of wattle and daub under thatch, a wattle fence round the green (gapped), and hay ricks: see src/props/rural.js.
+  place.add(ruralMeadowProps({
+    cottages: [[-13, -9, 0.3], [-6, -12, -0.1], [9, -11, 0.2], [14, 4, 1.4], [-14, 6, -1.2], [4, 12, 3.0]],
+    ricks: [[-10, 2], [11, -4], [-3, 10], [6, -9]],
+    fence: { count: 64, rx: 11.5, rz: 9.5, gap: (angle) => Math.sin(angle * 3) > 0.85 },
+  }));
+  // Trees.
   for (const [x, z, size] of [[-18, -2, 1.2], [18, -8, 1], [-8, 16, 1.4], [16, 12, 1.1], [0, -17, 1.3]]) {
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25 * size, 0.35 * size, 3 * size, 8), lit(0x5a4128));
     trunk.position.set(x, 1.5 * size, z);
@@ -793,20 +758,8 @@ function buildField(arena = PLACE_ARENAS.field) {
   track.rotation.x = -Math.PI / 2;
   track.position.y = 0.004;
   place.add(track);
-  // The rail: posts and a bar round the ground.
-  const wood = lit(0x6a4a2c);
-  const { halfX, halfZ } = arena;
-  for (const [length, x, z, turn] of [[2 * halfX, 0, -halfZ, 0], [2 * halfX, 0, halfZ, 0], [2 * halfZ, -halfX, 0, Math.PI / 2], [2 * halfZ, halfX, 0, Math.PI / 2]]) {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(length, 0.08, 0.08), wood);
-    bar.position.set(x, 0.9, z);
-    bar.rotation.y = turn;
-    place.add(bar);
-    for (let at = -length / 2; at <= length / 2 + 1e-6; at += 4) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.12), wood);
-      post.position.set(x + (turn ? 0 : at), 0.55, z + (turn ? at : 0));
-      place.add(post);
-    }
-  }
+  // The rail round the ground: post-and-rail, posts every 4 m (src/props/rural.js).
+  place.add(ruralFieldRail(arena));
   // Low hills all round, far off.
   for (let index = 0; index < 12; index += 1) {
     const angle = (index / 12) * Math.PI * 2;
@@ -1118,25 +1071,8 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
     mountain.userData.scenery = 'mountains';
     place.add(mountain);
   }
-  const castle = new THREE.Group();
-  const hill = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x5f7040));
-  hill.scale.y = 0.45;
-  castle.add(hill);
-  const white = lit(0xece6d6);
-  const roof = lit(0x30343a);
-  [[6, 2.2, 4.1], [4.6, 1.8, 6.3], [3.2, 1.6, 8.2]].forEach(([size, tall, at]) => {
-    const storey = new THREE.Mesh(new THREE.BoxGeometry(size, tall, size * 0.8), white);
-    storey.position.y = at;
-    const eaves = new THREE.Mesh(new THREE.ConeGeometry(size * 0.85, 1.1, 4), roof);
-    eaves.rotation.y = Math.PI / 4;
-    eaves.scale.z = 0.8;
-    eaves.position.y = at + tall / 2 + 0.4;
-    castle.add(storey, eaves);
-  });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5.6, 2.2, 4), lit(0x8a8478));
-  base.rotation.y = Math.PI / 4;
-  base.position.y = 2.6;
-  castle.add(base);
+  // The castle keep on its hill (src/props/rural.js).
+  const castle = ruralCastle({ hillColour: 0x5f7040 });
   castle.position.set(-6, 0, -40);
   place.add(castle);
   // Pines about the field.
@@ -1176,54 +1112,25 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
       g.fill();
     }
   });
-  const pole = lit(0x3a2a1c);
-  for (const [side, colour] of [[-1, '#b3161b'], [1, '#1f3f8a']]) {
-    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(14, 1.8), new THREE.MeshStandardMaterial({ map: crestCurtain(colour), side: THREE.DoubleSide, roughness: 0.95 }));
-    curtain.position.set(side * 14.5, 1.3, 0);
-    curtain.rotation.y = Math.PI / 2;
-    place.add(curtain);
-    for (let post = -7; post <= 7; post += 3.5) {
-      const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 6), pole);
-      stake.position.set(side * 14.5, 1.2, post);
-      place.add(stake);
-    }
-    // Nobori: tall narrow banners, the side's colour with a white crest.
-    const banner = paintedTexture(64, 256, (g, w, h) => {
-      g.fillStyle = colour;
-      g.fillRect(0, 0, w, h);
-      g.fillStyle = '#efeadc';
-      g.beginPath();
-      g.arc(w / 2, h * 0.18, w * 0.3, 0, Math.PI * 2);
-      g.fill();
-      g.fillRect(w * 0.42, h * 0.32, w * 0.16, h * 0.6);
-    });
-    const cloth = new THREE.MeshStandardMaterial({ map: banner, side: THREE.DoubleSide, roughness: 0.9 });
-    for (let index = 0; index < 7; index += 1) {
-      const z = -9 + index * 3;
-      const x = side * (12.4 + (index % 2) * 0.8);
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 5.2, 6), pole);
-      mast.position.set(x, 2.6, z);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 3), cloth);
-      flag.position.set(x, 3.3, z + 0.4);
-      flag.rotation.y = Math.PI / 2 + side * 0.25;
-      place.add(mast, flag);
-    }
-  }
-  // A bamboo palisade along both flanks, gapped.
-  const bamboo = lit(0x8a8a4a);
-  for (const z of [-9.5, 9.5]) {
-    for (let x = -11; x <= 11; x += 0.32) {
-      if (Math.abs(x) < 1.6) continue;
-      const cane = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6 + Math.random() * 0.3, 5), bamboo);
-      cane.position.set(x, 0.8, z);
-      place.add(cane);
-    }
-    for (const y of [0.5, 1.2]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(22, 0.06, 0.06), bamboo);
-      rail.position.set(0, y, z + (z < 0 ? 0.08 : -0.08));
-      place.add(rail);
-    }
-  }
+  // Nobori: tall narrow banners, the side's colour with a white crest.
+  const bannerArt = (colour) => paintedTexture(64, 256, (g, w, h) => {
+    g.fillStyle = colour;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#efeadc';
+    g.beginPath();
+    g.arc(w / 2, h * 0.18, w * 0.3, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(w * 0.42, h * 0.32, w * 0.16, h * 0.6);
+  });
+  // The curtains, the banners on their poles, and a bamboo palisade along both flanks, gapped (src/props/rural.js).
+  place.add(ruralSengokuCamps({
+    sides: [[-1, '#b3161b'], [1, '#1f3f8a']],
+    curtainX: 14.5,
+    curtainArt: crestCurtain,
+    bannerArt,
+    banners: (side) => Array.from({ length: 7 }, (_, index) => [side * (12.4 + (index % 2) * 0.8), -9 + index * 3]),
+    palisadeZ: [-9.5, 9.5],
+  }));
   // Autumn grass in tufts and field stones beyond the trampled ground.
   place.add(...fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] }));
   return place;
