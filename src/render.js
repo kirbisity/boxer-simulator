@@ -14,6 +14,7 @@ import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
+import { applyScenery } from './scenery.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
@@ -105,6 +106,7 @@ export function setPlace(view, place, arena) {
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
   view.place = place;
   lightPlace(view, place);
+  applyScenery(view, place);
 }
 
 /**
@@ -128,6 +130,7 @@ export function forgetPlaces(view) {
 /** The place already shown, lit and drawn again: after the look changed. */
 export function reapplyPlace(view) {
   lightPlace(view, view.place);
+  applyScenery(view, view.place);
 }
 
 /** A place's sky, fog and light rig, then the look in force on top of them. */
@@ -245,6 +248,7 @@ function buildMeadow() {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), lit(0xffffff, { map: grass }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
   place.add(ground);
   // Low hills all round.
   for (let index = 0; index < 14; index += 1) {
@@ -252,6 +256,7 @@ function buildMeadow() {
     const hill = new THREE.Mesh(new THREE.SphereGeometry(8 + Math.random() * 6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x6d8a45));
     hill.scale.y = 0.25 + Math.random() * 0.2;
     hill.position.set(Math.cos(angle) * 40, -0.5, Math.sin(angle) * 40);
+    hill.userData.scenery = 'hills';
     place.add(hill);
   }
   // Cottages: wattle and daub under thatch.
@@ -303,6 +308,7 @@ function buildMeadow() {
     const crown = new THREE.Mesh(new THREE.SphereGeometry(2.2 * size, 12, 10), lit(0x3f6a2a));
     crown.position.set(x, 4 * size, z);
     crown.castShadow = true;
+    trunk.userData.scenery = crown.userData.scenery = 'trees';
     place.add(trunk, crown);
   }
   return place;
@@ -779,6 +785,7 @@ function buildField(arena = PLACE_ARENAS.field) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), lit(0xffffff, { map: grass }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
   place.add(ground);
   // Hoof-churned earth down the middle of the ground.
   const track = new THREE.Mesh(new THREE.PlaneGeometry(arena.halfX * 1.7, arena.halfZ * 0.9), lit(0x7a6a48, { transparent: true, opacity: 0.35 }));
@@ -805,6 +812,7 @@ function buildField(arena = PLACE_ARENAS.field) {
     const hill = new THREE.Mesh(new THREE.SphereGeometry(12 + Math.random() * 8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x6d8a45));
     hill.scale.y = 0.22 + Math.random() * 0.18;
     hill.position.set(Math.cos(angle) * 52, -0.5, Math.sin(angle) * 50);
+    hill.userData.scenery = 'hills';
     place.add(hill);
   }
   return place;
@@ -826,6 +834,7 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(130, 130), lit(0xffffff, { map: field }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
   place.add(ground);
   // The volcanoes, snow on their crowns, and a ring of lower hills.
   [[-20, -55, 20, 22], [12, -58, 17, 18]].forEach(([x, z, radius, tall]) => {
@@ -833,12 +842,14 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
     cone.position.set(x, tall / 2 - 1, z);
     const snow = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.32, tall * 0.32, 14), lit(0xf2f4f8));
     snow.position.set(x, tall - 1 - tall * 0.16, z);
+    cone.userData.scenery = snow.userData.scenery = 'mountains';
     place.add(cone, snow);
   });
   for (let index = 0; index < 10; index += 1) {
     const angle = (index / 10) * Math.PI * 2;
     const hill = new THREE.Mesh(new THREE.ConeGeometry(9 + Math.random() * 6, 4 + Math.random() * 4, 8), lit(0x5f6448));
     hill.position.set(Math.cos(angle) * 52, 1.5, Math.sin(angle) * 50);
+    hill.userData.scenery = 'hills';
     place.add(hill);
   }
   // Maguey (a rosette of spiky leaves) and nopal about the field.
@@ -856,6 +867,7 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
     }
     plant.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.8);
     plant.scale.setScalar(0.8 + Math.random() * 0.8);
+    plant.userData.scenery = 'plants';
     place.add(plant);
   }
   // Dry bunch grass and volcanic stones over the plain.
@@ -1094,12 +1106,14 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 110), lit(0xffffff, { map: field }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
   place.add(ground);
   // Mountains and the castle on its hill, far off.
   for (let index = 0; index < 12; index += 1) {
     const angle = (index / 12) * Math.PI * 2 + 0.2;
     const mountain = new THREE.Mesh(new THREE.ConeGeometry(10 + Math.random() * 6, 9 + Math.random() * 7, 7), lit(0x6a7a88));
     mountain.position.set(Math.cos(angle) * 46, 3, Math.sin(angle) * 44);
+    mountain.userData.scenery = 'mountains';
     place.add(mountain);
   }
   const castle = new THREE.Group();
@@ -1140,6 +1154,7 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
     }
     tree.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.8);
     tree.scale.setScalar(0.8 + Math.random() * 0.6);
+    tree.userData.scenery = 'trees';
     place.add(tree);
   }
   // Each side's camp: the curtain with its crest, and its banners.

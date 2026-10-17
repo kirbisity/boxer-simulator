@@ -15,6 +15,7 @@
 /* global THREE */
 import { activeLook, LOOKS } from './looks.js';
 import { defineLook, loadScripts, sweepMaterials } from './looks/kit.js';
+import { activeScenery, applyScenery, SCENERY_VARIANTS, setScenery } from './scenery.js';
 
 /** A small seeded generator (mulberry32): the same sequence from the same seed. */
 function seededGenerator(seed) {
@@ -95,6 +96,42 @@ export const COMPARE_SCENES = {
     red: [{ preset: 'contender' }],
     blue: [{ preset: 'heavy' }],
     camera: { focus: { centre: true, height: 1.0 }, yaw: 0.8, pitch: 0.28, distance: 8.5, fov: 42 },
+  },
+  'meadow-vista': {
+    about: 'Two fighters in the meadow, a low camera looking out at the hills, mountains and trees beyond: the scenery.',
+    place: 'meadow',
+    seed: 4,
+    frames: 40,
+    red: [{ preset: 'contender' }],
+    blue: [{ preset: 'heavy' }],
+    camera: { focus: { centre: true, height: 1.6 }, yaw: 1.4, pitch: 0.05, distance: 9, fov: 50 },
+  },
+  'field-vista': {
+    about: 'Two fighters in the field, a low camera looking out at the hills, mountains and trees beyond: the scenery.',
+    place: 'field',
+    seed: 4,
+    frames: 40,
+    red: [{ preset: 'contender' }],
+    blue: [{ preset: 'heavy' }],
+    camera: { focus: { centre: true, height: 1.6 }, yaw: 1.57, pitch: 0.05, distance: 9, fov: 50 },
+  },
+  'plain-vista': {
+    about: 'Two fighters in the plain, a low camera looking out at the hills, mountains and trees beyond: the scenery.',
+    place: 'plain',
+    seed: 4,
+    frames: 40,
+    red: [{ preset: 'contender' }],
+    blue: [{ preset: 'heavy' }],
+    camera: { focus: { centre: true, height: 1.6 }, yaw: 1.6, pitch: 0.05, distance: 9, fov: 50 },
+  },
+  'sengoku-vista': {
+    about: 'Two fighters in the sengoku, a low camera looking out at the hills, mountains and trees beyond: the scenery.',
+    place: 'sengoku',
+    seed: 4,
+    frames: 40,
+    red: [{ preset: 'contender' }],
+    blue: [{ preset: 'heavy' }],
+    camera: { focus: { centre: true, height: 1.6 }, yaw: 1.7, pitch: 0.05, distance: 9, fov: 50 },
   },
   'sengoku-army': {
     about: 'Sekigahara in daylight, sixty fighters in formation: a wide shot for load (many fighters, crowd batching).',
@@ -351,6 +388,14 @@ export function installLooksBench(context) {
     stage,
     capture,
     stats,
+    /** The scenery variant (src/scenery.js): with an id, switch to it in the place shown now; without, list them. */
+    scenery: (id) => {
+      if (id === undefined) return { current: activeScenery(), variants: SCENERY_VARIANTS.map((variant) => variant.id) };
+      const chosen = setScenery(id);
+      applyScenery(scene, scene.place);
+      context.draw(0);
+      return chosen;
+    },
     colourCheck,
     /** stage + capture, named <scene>-<look> unless a name is given. */
     shoot: async (sceneId, name = `${sceneId}-${looks.current()}`, options = {}) => {
