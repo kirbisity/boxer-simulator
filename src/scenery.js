@@ -60,6 +60,8 @@ const SCENERY_COMPOSITES = [
   { id: 'painted-trees', label: 'Painted skyball + trees', parts: ['skyball-painted', 'trees-mixed'] },
   { id: 'photo-trees', label: 'Photo skyball + trees', parts: ['skyball-photo', 'trees-mixed'] },
   { id: 'land-trees', label: 'Generated land + trees', parts: ['generated-land', 'trees-mixed'] },
+  // The pick: the photograph for the far mountains and sky, gentle generated hills in front of it, trees on them.
+  { id: 'photo-foothills', label: 'Photo skyball + foothills + trees', parts: ['skyball-photo', 'foothills', 'trees-on-land'] },
 ];
 
 /** Every variant: current, then each method's own, then the composites. */

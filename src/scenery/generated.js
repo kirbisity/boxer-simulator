@@ -122,12 +122,33 @@ const GENERATED_PLACES = {
   },
 };
 
+/**
+ * Foothills: the same land made gentle, for when a photograph carries the
+ * mountains. The ground undulates a little (bump, in metres) just off the
+ * fighting ground and rises slowly (slope, metres per metre) into small
+ * hills at the far edge (radius), where the haze takes them into the
+ * photograph's horizon. No volcanoes: the photograph has its own.
+ */
+// farTint is the photograph's own ground just below its horizon (its mean
+// colour from 2 to 6 degrees down): the far hills take it on, so the land
+// runs into the picture's land without a change of colour.
+const GENERATED_FOOTHILLS = {
+  meadow: { ...GENERATED_PLACES.meadow, bump: 0.8, slope: 0.075, ramp: 12, radius: 360, cap: 22, farTint: 0x56663d },
+  field: { ...GENERATED_PLACES.field, bump: 0.7, slope: 0.065, ramp: 14, radius: 360, cap: 20, farTint: 0x56663d },
+  plain: { ...GENERATED_PLACES.plain, bump: 0.6, slope: 0.08, ramp: 16, radius: 360, cap: 24, volcanoes: [], farTint: 0x6a5e4c },
+  sengoku: { ...GENERATED_PLACES.sengoku, bump: 0.9, slope: 0.11, ramp: 12, radius: 360, cap: 32, farTint: 0x858759 },
+};
+
+// The haze while foothills are shown: far enough to see the hills, near enough that their edge fades into the horizon.
+const GENERATED_FOOTHILLS_FOG = [70, 420];
+
 const generatedLands = new Map();
 
 /** The land of a place: a height at any (x, z) and the noise behind it; the same every time. */
-function generatedLand(place, spec) {
-  if (generatedLands.has(place)) return generatedLands.get(place);
-  const land = GENERATED_PLACES[place];
+function generatedLand(place, spec, profile = 'land') {
+  const key = `${place}:${profile}`;
+  if (generatedLands.has(key)) return generatedLands.get(key);
+  const land = profile === 'foothills' ? GENERATED_FOOTHILLS[place] : GENERATED_PLACES[place];
   const random = generatedRandom(`land:${place}`);
   const noise = generatedNoise(random);
   const patch = generatedNoise(random);
@@ -181,7 +202,7 @@ function generatedLand(place, spec) {
     const { outside, rise } = flatness(x, z);
     if (rise <= 0) return 0;
     const reach = Math.max(outside, 0);
-    const amplitude = 1.5 + land.slope * reach;
+    const amplitude = Math.min((land.bump ?? 1.5) + land.slope * reach, land.cap ?? Infinity);
     const sx = x / land.scale;
     const sz = z / land.scale;
     let shape;
@@ -198,7 +219,7 @@ function generatedLand(place, spec) {
   };
 
   const result = { land, noise, patch, height, flatness, volcanoes };
-  generatedLands.set(place, result);
+  generatedLands.set(key, result);
   return result;
 }
 
@@ -324,12 +345,14 @@ function generatedInstallWarden(view) {
     const group = view.places?.[view.place];
     let reach = false;
     let terrain = false;
+    let foothills = false;
     let ridges = null;
     if (group?.visible) {
       for (const child of group.children) {
         if (!child.visible) continue;
         const id = child.userData.sceneryVariant;
         if (id === 'terrain') terrain = reach = true;
+        if (id === 'foothills') foothills = reach = true;
         if (id === 'ground') reach = true;
         if (id === 'ridges') ridges = child;
       }
@@ -344,11 +367,14 @@ function generatedInstallWarden(view) {
     }
     const fog = scene.fog;
     if (fog?.isFog && view.light?.fog) {
-      if (terrain) {
+      if (foothills) {
+        [fog.near, fog.far] = GENERATED_FOOTHILLS_FOG;
+        hazed = true;
+      } else if (terrain) {
         fog.far = 460;
         hazed = true;
       } else if (hazed) {
-        fog.far = view.light.fog[1];
+        [fog.near, fog.far] = view.light.fog;
         hazed = false;
       }
     }
@@ -539,17 +565,18 @@ function generatedApplyRidges({ view, group }) {
 
 // ---- terrain ----------------------------------------------------------------
 
-function generatedBuildTerrain({ place, view, spec }) {
+function generatedBuildTerrain({ place, view, spec }, profile = 'land') {
   const settings = GENERATED_PLACES[place];
   if (!settings) return null;
   generatedInstallWarden(view);
-  const world = generatedLand(place, spec);
+  const world = generatedLand(place, spec, profile);
   const { land, patch, height, flatness } = world;
   const { material, size, mean } = generatedLandMaterial(view, place, land);
   const segments = 256;
   const ringCount = 72;
   const inner = 6;
-  const radii = Array.from({ length: ringCount + 1 }, (_, index) => inner + (GENERATED_RADIUS - inner) * Math.pow(index / ringCount, 1.7));
+  const outer = land.radius ?? GENERATED_RADIUS;
+  const radii = Array.from({ length: ringCount + 1 }, (_, index) => inner + (outer - inner) * Math.pow(index / ringCount, 1.7));
   const positions = [];
   const uvs = [];
   const fades = [];
@@ -612,6 +639,7 @@ function generatedBuildTerrain({ place, view, spec }) {
       const line = volcano.snow + 0.07 * generatedFbm(patch, x / 9, z / 9, 3);
       if (rel > line && up > 0.35) colour.lerp(snow, generatedSmooth(line, line + 0.04, rel));
     }
+    if (land.farTint !== undefined) colour.lerp(generatedColour(land.farTint), 0.8 * generatedSmooth(70, 280, Math.hypot(x, z)));
     colour.multiplyScalar(0.92 + 0.14 * generatedFbm(patch, x / 6, z / 6, 2));
     colours[index * 3] = colour.r;
     colours[index * 3 + 1] = colour.g;
@@ -625,11 +653,18 @@ function generatedBuildTerrain({ place, view, spec }) {
   const group = new THREE.Group();
   group.add(mesh);
   group.userData.material = material;
+  // For whatever stands on the land (trees): its height at (x, z).
+  group.userData.heightAt = height;
   return group;
 }
 
 function generatedApplyTerrain({ group }) {
   group.userData.material.userData.generated.uMacroOn.value = 0;
+}
+
+function generatedApplyFoothills({ group }) {
+  // The macro tint's lusher and drier patches: the ground's slight variance, out to the hills.
+  group.userData.material.userData.generated.uMacroOn.value = 1;
 }
 
 // ---- ground -----------------------------------------------------------------
@@ -786,6 +821,14 @@ export const GENERATED_VARIANTS = [
     replaces: [],
     build: generatedBuildGround,
     apply: generatedApplyGround,
+  },
+  {
+    id: 'foothills',
+    label: 'Generated: foothills (for the photo)',
+    blurb: 'The terrain made gentle: a little undulation off the fighting ground, rising into small hills out to 360 m that the haze takes into the photograph\'s horizon.',
+    replaces: ['hills', 'mountains'],
+    build: (context) => generatedBuildTerrain(context, 'foothills'),
+    apply: generatedApplyFoothills,
   },
   {
     id: 'generated-land',

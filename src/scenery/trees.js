@@ -311,6 +311,46 @@ function treesOnMountains(view, place, rng, count) {
   return trees;
 }
 
+/** The height of the land a sibling scenery part has raised in this place (foothills, terrain), or null on flat ground. */
+function treesLandOf(view, place) {
+  const shown = view.places?.[place]?.children.find((child) => child.visible && child.userData.heightAt);
+  return shown?.userData.heightAt ?? null;
+}
+
+/**
+ * Woods up the hills beyond the ground: clusters set where the land has
+ * risen at least a metre, each tree standing on the slope (a little sunk, so
+ * no root shows on the downhill side). Far off, so they are drawn as cards.
+ */
+function treesOnHills(place, spec, rng, heightAt, { count, from, to, perWood }) {
+  const trees = [];
+  for (let tries = 0; trees.length < count && tries < count * 6; tries++) {
+    const a = rng() * Math.PI * 2;
+    const r = from + (to - from) * Math.pow(rng(), 0.8);
+    const cx = Math.cos(a) * r;
+    const cz = Math.sin(a) * r;
+    if (heightAt(cx, cz) < 1) continue;
+    if ((spec.keepClear ?? []).some((clear) => Math.hypot(cx - clear.at[0], cz - clear.at[1]) < clear.radius + 6)) continue;
+    const size = 8 + rng() * 14;
+    for (let made = 0, attempts = 0; made < perWood && attempts < perWood * 4; attempts++) {
+      const x = cx + (rng() - 0.5) * size * 2;
+      const z = cz + (rng() - 0.5) * size * 2;
+      const y = heightAt(x, z);
+      if (y < 0.6) continue;
+      trees.push({ x, y: y - 0.25, z, scale: 0.9 + rng() * 0.6, turn: rng() * Math.PI * 2, shape: Math.floor(rng() * 3), tint: rng(), hill: true });
+      made++;
+    }
+  }
+  return trees;
+}
+
+// How many trees go up each place's hills when the land rises (in woods of perWood).
+const TREES_HILL_WOODS = {
+  meadow: { count: 260, from: 45, to: 200, perWood: 16 },
+  field: { count: 320, from: 75, to: 220, perWood: 18 },
+  sengoku: { count: 700, from: 40, to: 230, perWood: 28 },
+};
+
 /** One InstancedMesh per shape for the trees that use it. */
 function treesInstance(group, geometries, material, trees, { shadows = true, scale = 1 } = {}) {
   // For the harness: where the last trees stood (to aim a close-up).
@@ -443,10 +483,18 @@ function treesCards(view, shapes) {
 }
 
 /** The trees a place has by its spec, plus (mixed) its extra woods. */
-function treesPlan(view, place, spec, rng, { woods }) {
+function treesPlan(view, place, spec, rng, { woods, heightAt = null }) {
   const { count, from, to, kind } = spec.trees;
   const trees = treesScatter(place, spec, rng, { count, from, to, spacing: kind === 'pine' ? 2.6 : 3.4 });
   if (!woods) return trees;
+  if (heightAt) {
+    // On raised land: the spec's trees stand on it, and the hills carry woods instead of the old cones' pines.
+    for (const tree of trees) tree.y = heightAt(tree.x, tree.z) - 0.1;
+    const extra = place === 'meadow' ? treesScatter(place, spec, rng, { count: 30, from: 30, to: 39, spacing: 2.4, woods: 5, perWood: 12, taken: trees }) : [];
+    for (const tree of extra) tree.y = heightAt(tree.x, tree.z) - 0.1;
+    const hills = TREES_HILL_WOODS[place] ? treesOnHills(place, spec, rng, heightAt, TREES_HILL_WOODS[place]) : [];
+    return [...trees, ...extra, ...hills];
+  }
   if (place === 'field') {
     // The field's spec trees become woods and hedgerow along the hills.
     const extra = treesScatter(place, spec, rng, { count: 30, from: 40, to: 68, spacing: 2.3, woods: 12, perWood: 26, taken: trees });
@@ -481,13 +529,14 @@ function treesBuildCards({ place, view, spec, rng }) {
   return group;
 }
 
-function treesBuildMixed({ place, view, spec, rng }) {
+function treesBuildMixed({ place, view, spec, rng }, { onLand = false } = {}) {
   if (spec.trees.kind === 'none') return null;
   const group = new THREE.Group();
-  const trees = treesPlan(view, place, spec, rng, { woods: true });
+  const heightAt = onLand ? treesLandOf(view, place) : null;
+  const trees = treesPlan(view, place, spec, rng, { woods: true, heightAt });
   const shapes = treesShapes(spec, rng, view);
   const cards = treesCards(view, shapes);
-  const near = trees.filter((tree) => tree.y === undefined && Math.hypot(tree.x, tree.z) < TREES_NEAR);
+  const near = trees.filter((tree) => !tree.haze && !tree.hill && Math.hypot(tree.x, tree.z) < TREES_NEAR);
   const far = trees.filter((tree) => !near.includes(tree));
   treesInstance(group, cards.geometries, cards.material, far, { shadows: false });
   treesInstance(group, shapes, treesClumpedMaterial(), near);
@@ -572,6 +621,13 @@ export const TREE_VARIANTS = [
     blurb: 'Clumped trees near the ground, cards beyond 30 m, and more of them: woods round the field and meadow, pines up the sengoku mountains.',
     replaces: ['trees'],
     build: treesBuildMixed,
+  },
+  {
+    id: 'trees-on-land',
+    label: 'Trees: mixed, standing on raised land',
+    blurb: 'The mixed trees, each standing on the land a terrain part has raised, and woods in clusters up its hills. List it after the terrain part.',
+    replaces: ['trees'],
+    build: (context) => treesBuildMixed(context, { onLand: true }),
   },
   {
     id: 'trees-models',
