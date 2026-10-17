@@ -133,6 +133,15 @@ export const COMPARE_SCENES = {
     blue: [{ preset: 'heavy' }],
     camera: { focus: { centre: true, height: 1.6 }, yaw: 1.7, pitch: 0.05, distance: 9, fov: 50 },
   },
+  // The subway level at the platform: the train beside the fighters, the leaks and the light.
+  'subway-platform': {
+    about: 'The subway level: two fighters on the platform, the train at the edge, the camera along the platform.',
+    place: 'subway',
+    level: 'subway',
+    seed: 6,
+    frames: 40,
+    camera: { focus: { centre: true, height: 1.3 }, yaw: -0.25, pitch: 0.14, distance: 5.4, fov: 50 },
+  },
   'sengoku-army': {
     about: 'Sekigahara in daylight, sixty fighters in formation: a wide shot for load (many fighters, crowd batching).',
     place: 'sengoku',
@@ -145,7 +154,7 @@ export const COMPARE_SCENES = {
 
 // Close shots of the ground at each open-air place: two fighters, the camera
 // at head height a few metres off, looking down past them at the ground.
-for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['port', 1.2]]) {
+for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['port', 1.2], ['subway', -0.4]]) {
   COMPARE_SCENES[`ground-${place}`] = {
     about: `Two fighters at the ${place}, a close shot looking down at the ground round their feet: the ground.`,
     place,

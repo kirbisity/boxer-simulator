@@ -1614,6 +1614,47 @@ function livingWetConcrete({ view, arena, grounds, rng }) {
   return group;
 }
 
+/**
+ * The subway platform: a puddle under each leak in the ceiling (the leaks are
+ * the station's: src/props/subway.js), ringed by a darker damp rim, and a
+ * pool in the track bed. They mirror the tubes and the train, and blood
+ * dissolves in them. The fighting floor stays flat: the water is a film.
+ */
+function livingSubway({ view, place }) {
+  const group = new THREE.Group();
+  const layout = view.places?.[place]?.userData.subwayLayout;
+  if (!layout) return group;
+  const platform = layout.leaks.filter((leak) => leak.floor === 0);
+  const track = layout.leaks.filter((leak) => leak.floor !== 0);
+  const lamps = layout.fixtures.map((fixture) => new THREE.Vector3(fixture.x, fixture.y, fixture.z)).sort((a, b) => a.length() - b.length());
+  const material = livingWaterMaterial({
+    color: 0x9a968c, roughness: 0.04, metalness: 0.6, rain: 0, wave: 0.06, envMapIntensity: 1.7,
+    lamps: lamps.slice(0, LIVING_WATER_LAMPS), lampColour: 0xffd27a, lampGain: 1.1,
+    envMap: view.steelEnv, alphaMap: livingRadialAlpha(128, 0.7),
+  });
+  for (const [spots, y, seed] of [[platform, 0.005, 8], [track, (track[0]?.floor ?? 0) + 0.005, 9]]) {
+    if (!spots.length) continue;
+    const water = new THREE.Mesh(livingBlobGeometry(spots, y, seed), material);
+    water.onBeforeRender = livingTick;
+    water.renderOrder = LIVING_WATER_ORDER;
+    water.receiveShadow = true;
+    water.userData.seeThrough = false;
+    group.add(water);
+  }
+  // The damp round each puddle: darker concrete fading out (only round the puddles, so it costs little to draw).
+  const damp = platform.map((spot) => ({ ...spot, rx: spot.rx * 1.7, rz: spot.rz * 1.7 }));
+  const rim = new THREE.Mesh(livingBlobGeometry(damp, 0.003, 8), new THREE.MeshLambertMaterial({ color: 0x0e0c08, transparent: true, opacity: 0.6, alphaMap: livingRadialAlpha(64, 0.5), depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  rim.renderOrder = 1;
+  rim.receiveShadow = true;
+  rim.userData.seeThrough = false;
+  group.add(rim);
+  group.userData.waters = [material];
+  group.userData.bloodDyeWater = [livingWaterAt(platform, 8, 0.7)];
+  // The station seen from the puddles (tubes, girders, the train): a cube rendered once.
+  group.userData.mirror = { at: new THREE.Vector3(0, 0.12, 0), materials: [material] };
+  return group;
+}
+
 /** Render the place (not the fighters) once into a cube from just above the ground, for standing water to mirror. */
 function livingMirror(view, group) {
   const mirror = group.userData.mirror;
@@ -1658,6 +1699,7 @@ function livingBuild(context) {
   else if (kind === 'cobbles') group = livingCobbles(context);
   else if (kind === 'beach') group = livingBeach(context);
   else if (kind === 'wet-concrete') group = livingWetConcrete(context);
+  else if (kind === 'subway') group = livingSubway(context);
   else group = new THREE.Group();
   group.userData.buildMs = performance.now() - started;
   group.userData.waters ??= [];

@@ -17,6 +17,7 @@ import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
 import { arenaColosseum } from './props/arena.js';
 import { harbourPort } from './props/harbour.js';
+import { subwayPuddleFilm, subwayStation, subwayTrain } from './props/subway.js';
 import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks, coastPalms, coastPier, coastSampans, coastShip, coastShipMaterials } from './props/coast.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
@@ -159,7 +160,8 @@ function lightPlace(view, place) {
 // and the sun for a place open to the sky.
 const PLACE_LIGHT = {
   ring: { background: 0x0b0d14, fog: [9, 22], key: 0xfff2e0, keyIntensity: 1.2, rim: 0x6f8cff },
-  subway: { background: 0x10140f, fog: [8, 26], key: 0xf2fff0, keyIntensity: 0.9, rim: 0x9fd8c0 },
+  // Fluorescent tubes behind yellowed diffusers (about 3200 K): warm, a little green off the old tile; the tunnel beyond is black.
+  subway: { background: 0x0d0c08, fog: [10, 26], key: 0xffe4b4, keyIntensity: 0.95, rim: 0xc9c08a, hemi: 0.5 },
   colosseum: { background: 0x9cc4e8, fog: [30, 90], key: 0xfff4e0, keyIntensity: 0.2, rim: 0xbcd4ff, sun: 0.85 },
   meadow: { background: 0xa9cbe6, fog: [25, 70], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xc8e0ff, sun: 0.9 },
   // A bright summer noon, a clear sky with high cloud, haze in the distance.
@@ -352,196 +354,21 @@ function paintedTexture(width, height, paint, repeat = [1, 1]) {
 }
 
 /**
- * A New York platform at night: concrete floor, the yellow tactile strip at
- * the edge, the track bed and a train standing at it, a row of painted
- * I-beam columns, a tiled wall with the station's mosaic name band, and
- * fluorescent tubes. The fight's arena is the strip of platform between the
- * wall and the edge (z from −halfZ to +halfZ).
+ * A New York platform at 1:40 a.m.: grimy concrete, the worn yellow edge
+ * strip, the wet track bed and an R160 train standing at it, painted I-beam
+ * columns and girders, stained tile, caged fluorescent tubes under a low
+ * ceiling, water leaking through it (src/props/subway.js). The fight's arena
+ * is the strip of platform between the wall and the edge (z from −halfZ to
+ * +halfZ). A few warm point lights make the pools of light under the tubes.
  */
 function buildSubway(arena) {
-  const place = new THREE.Group();
-  const length = 26;
-  const wallZ = -(arena.halfZ + 0.9);
-  const edgeZ = arena.halfZ + 0.75;
-  const mat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...options });
-
-  // Platform slab and its worn, speckled concrete.
-  const concrete = paintedTexture(256, 256, (g, w, h) => {
-    g.fillStyle = '#8a8b85';
-    g.fillRect(0, 0, w, h);
-    for (let index = 0; index < 1600; index += 1) {
-      g.fillStyle = `rgba(${40 + Math.random() * 60},${40 + Math.random() * 60},${40 + Math.random() * 55},${0.08 + Math.random() * 0.15})`;
-      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 2 + Math.random() * 3);
-    }
-    g.strokeStyle = 'rgba(50,50,48,0.35)';
-    g.lineWidth = 2;
-    g.strokeRect(0, 0, w, h);
-  }, [length / 2, (edgeZ - wallZ) / 2]);
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(length, 1.2, edgeZ - wallZ), mat(0xffffff, { map: concrete }));
-  slab.position.set(0, -0.6, (edgeZ + wallZ) / 2);
-  slab.receiveShadow = true;
-  place.add(slab);
-  // Yellow tactile warning strip, raised domes and all, then the white edge.
-  const tactile = paintedTexture(64, 64, (g, w, h) => {
-    g.fillStyle = '#e8b50f';
-    g.fillRect(0, 0, w, h);
-    g.fillStyle = '#c99a08';
-    for (let row = 0; row < 4; row += 1) for (let col = 0; col < 4; col += 1) {
-      g.beginPath();
-      g.arc(8 + col * 16 + (row % 2) * 8, 8 + row * 16, 4.5, 0, Math.PI * 2);
-      g.fill();
-    }
-  }, [length / 0.3, 2]);
-  const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.012, 0.6), mat(0xffffff, { map: tactile, roughness: 0.6 }));
-  strip.position.set(0, 0.006, edgeZ - 0.38);
-  strip.receiveShadow = true;
-  place.add(strip);
-  const lip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.02, 0.08), mat(0xe9e6dc));
-  lip.position.set(0, 0.01, edgeZ - 0.04);
-  place.add(lip);
-
-  // Track bed: ballast, ties, running rails, the covered third rail.
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(length, 0.1, 3.4), mat(0x2a2620, { roughness: 1 }));
-  bed.position.set(0, -1.25, edgeZ + 1.7);
-  place.add(bed);
-  for (let x = -length / 2; x < length / 2; x += 0.6) {
-    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, 2.4), mat(0x3a2f25));
-    tie.position.set(x, -1.17, edgeZ + 1.7);
-    place.add(tie);
-  }
-  for (const offset of [-0.72, 0.72]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.08, 0.07), mat(0x8c8d90, { metalness: 0.7, roughness: 0.35 }));
-    rail.position.set(0, -1.1, edgeZ + 1.7 + offset);
-    place.add(rail);
-  }
-  const third = new THREE.Mesh(new THREE.BoxGeometry(length, 0.1, 0.22), mat(0x6e5a2c));
-  third.position.set(0, -1.05, edgeZ + 0.45);
-  place.add(third);
-
-  // The train at the platform: brushed steel car bodies, dark window bands,
-  // doors, a blue stripe and the route bullet.
-  const steel = mat(0xb9bec4, { metalness: 0.75, roughness: 0.32 });
-  const glass = mat(0x10151a, { metalness: 0.3, roughness: 0.15, emissive: 0x1c2a22, emissiveIntensity: 0.6 });
-  const trainZ = edgeZ + 1.75;
-  for (const carX of [-7.8, 7.8]) {
-    const car = new THREE.Group();
-    const shell = new THREE.Mesh(new THREE.BoxGeometry(15.4, 3.1, 2.9), steel);
-    shell.position.y = 0.5;
-    car.add(shell);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.75, 0.02), glass);
-    band.position.set(0, 1.0, -1.46);
-    car.add(band);
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.1, 0.02), mat(0x1d4fa3));
-    stripe.position.set(0, 0.45, -1.465);
-    car.add(stripe);
-    for (let door = -2; door <= 2; door += 1) {
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.25, 2.0, 0.03), mat(0xa9aeb4, { metalness: 0.7, roughness: 0.3 }));
-      panel.position.set(door * 3.1, 0.05, -1.47);
-      const pane = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.7, 0.02), glass);
-      pane.position.set(door * 3.1 - 0.3, 0.55, -1.49);
-      const pane2 = pane.clone();
-      pane2.position.x = door * 3.1 + 0.3;
-      const seam = new THREE.Mesh(new THREE.BoxGeometry(0.02, 2.0, 0.035), mat(0x2a2d31));
-      seam.position.set(door * 3.1, 0.05, -1.48);
-      car.add(panel, pane, pane2, seam);
-    }
-    car.position.set(carX, 0, trainZ);
-    car.traverse((object) => {
-      if (object.isMesh) {
-        object.castShadow = false;
-        object.receiveShadow = true;
-      }
-    });
-    place.add(car);
-  }
-
-  // Columns: I-beams painted dark green, a white band at eye level.
-  const columnPaint = mat(0x24443a, { roughness: 0.55, metalness: 0.2 });
-  for (let x = -length / 2 + 2; x < length / 2; x += 4.6) {
-    const column = new THREE.Group();
-    const web = new THREE.Mesh(new THREE.BoxGeometry(0.06, 3.3, 0.26), columnPaint);
-    const flangeA = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.3, 0.04), columnPaint);
-    flangeA.position.z = 0.13;
-    const flangeB = flangeA.clone();
-    flangeB.position.z = -0.13;
-    const bandWhite = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.3), mat(0xe8e5da));
-    bandWhite.position.y = 0.1;
-    column.add(web, flangeA, flangeB, bandWhite);
-    column.position.set(x, 1.65, edgeZ - 1.0);
-    column.traverse((object) => { if (object.isMesh) object.castShadow = true; });
-    place.add(column);
-  }
-
-  // The wall: cream tiles, a maroon-and-green mosaic band with the name.
-  const tiles = paintedTexture(256, 128, (g, w, h) => {
-    g.fillStyle = '#e9e2cf';
-    g.fillRect(0, 0, w, h);
-    g.strokeStyle = '#b9b19d';
-    g.lineWidth = 2;
-    for (let x = 0; x <= w; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
-    for (let y = 0; y <= h; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
-    for (let index = 0; index < 120; index += 1) {
-      g.fillStyle = `rgba(120,100,70,${Math.random() * 0.12})`;
-      g.fillRect(Math.random() * w, Math.random() * h, 6, 3);
-    }
-  }, [length / 1.6, 2]);
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(length, 3.4), mat(0xffffff, { map: tiles, roughness: 0.5 }));
-  wall.position.set(0, 1.7, wallZ);
-  wall.receiveShadow = true;
-  place.add(wall);
-  const name = paintedTexture(1024, 128, (g, w, h) => {
-    g.fillStyle = '#6b1f24';
-    g.fillRect(0, 0, w, h);
-    g.fillStyle = '#2f5a3d';
-    for (let x = 0; x < w; x += 24) g.fillRect(x, 0, 12, 14), g.fillRect(x + 12, h - 14, 12, 14);
-    g.fillStyle = '#efe6cc';
-    g.fillRect(140, 26, w - 280, h - 52);
-    g.fillStyle = '#1d1a17';
-    g.font = 'bold 64px Georgia, serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText('CANAL  ST', w / 2, h / 2 + 3);
-  });
-  for (const x of [-6.5, 6.5]) {
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 0.52), mat(0xffffff, { map: name, roughness: 0.4 }));
-    sign.position.set(x, 2.15, wallZ + 0.01);
-    place.add(sign);
-  }
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(length, 0.16, 0.03), mat(0x2f5a3d));
-  trim.position.set(0, 2.85, wallZ + 0.015);
-  place.add(trim);
-  // A bench against the wall and a trash can by a column.
-  const bench = new THREE.Group();
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 0.42), mat(0x6b4a2b, { roughness: 0.7 }));
-  seat.position.y = 0.46;
-  bench.add(seat);
-  for (const leg of [-0.95, 0.95]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.46, 0.38), mat(0x2b2d31, { metalness: 0.5 }));
-    post.position.set(leg, 0.23, 0);
-    bench.add(post);
-  }
-  bench.position.set(-2.8, 0, wallZ + 0.3);
-  bench.traverse((object) => { if (object.isMesh) object.castShadow = true; });
-  place.add(bench);
-  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.24, 0.85, 16, 1, true), mat(0x3b5f45, { side: THREE.DoubleSide, metalness: 0.3 }));
-  can.position.set(4.4, 0.43, wallZ + 0.4);
-  can.castShadow = true;
-  place.add(can);
-
-  // Ceiling and fluorescent tubes; a few lights so the platform reads.
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(length, edgeZ - wallZ + 4), mat(0x1a1d1b, { side: THREE.DoubleSide }));
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(0, 3.4, (edgeZ + wallZ) / 2 + 1.5);
-  place.add(ceiling);
-  const tube = new THREE.MeshStandardMaterial({ color: 0xf4fff4, emissive: 0xe8fff0, emissiveIntensity: 1.4 });
-  for (let x = -length / 2 + 1.5; x < length / 2; x += 3.2) {
-    const light = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 0.1), tube);
-    light.position.set(x, 3.3, 0);
-    place.add(light);
-  }
-  for (const x of [-5, 0, 5]) {
-    const glow = new THREE.PointLight(0xe6ffe8, 0.55, 9, 1.6);
-    glow.position.set(x, 3.0, 0);
+  const { group: place, layout } = subwayStation(arena);
+  place.add(subwayTrain(layout));
+  place.add(subwayPuddleFilm(layout));
+  place.userData.subwayLayout = layout;
+  for (const x of [-4.6, 0, 4.6]) {
+    const glow = new THREE.PointLight(0xffe0a6, 0.6, 9, 1.6);
+    glow.position.set(x, layout.ceiling - 0.6, layout.fixtures[0].z);
     place.add(glow);
   }
   return place;
