@@ -78,11 +78,19 @@ remembered in localStorage, replayed from the home screen). Anything removed fro
 
 A **look** is a whole way of drawing the game, switchable at runtime: the
 Look selector in the sandbox's footer, `?look=<id>` in the URL, and the choice
-made last (localStorage, kept only when picked in the selector). `toon` is the
-default and is today's drawing exactly (no hooks, nothing loaded, same pixels
-and speed as before looks existed); the five others (`physical-sky`,
-`hdr-post`, `probe-lite`, `quality-physical`, `photo-hdri`) are placeholders
-(the soft style) waiting for their real look.
+made last (localStorage, kept only when picked in the selector). There are
+two. `probe-lite` ("Realistic") is the look the game is committed to and the
+one a first visit starts in: an SH light probe from a procedural sky, one sun
+with one shadow map, Lambert skin and cloth, steel on a baked sky cube, no
+post-processing. With it, the open-air places wear the scenery of
+`src/scenery.js`: a CC0 photograph of the distant land and sky over generated
+foothills with trees on them, and painted ground with a living layer (grass,
+flowers, stones, puddles, the meadow pond). `toon` ("Classic cartoon") is the
+old drawing exactly (no hooks, nothing loaded) and the safe fallback; with it
+the places are as render.js builds them. Four other looks (`physical-sky`,
+`hdr-post`, `quality-physical`, `photo-hdri`) and the scenery and ground
+alternatives (painted sky band, ridges, full terrain, photo ground, model
+trees) were tried as proofs of concept in October 2026 and removed.
 
 | File | Owns |
 |---|---|
@@ -146,7 +154,7 @@ a look builds itself uses `linearColour(hex)`; a colour changed after the build
 uses `assignColour` (face.js's bruise). `await __looks.colourCheck()` draws an
 unlit swatch as a material colour, a canvas texture and a vertex colour through
 the current look and reads the pixels back: all three must equal the hex
-(`physical-sky`'s placeholder, with ACES and sRGB, does; toon with sRGB output
+(a look with ACES and sRGB output does; toon with sRGB output
 and nothing decoded returns 95,127,58 as 164,187,131, the milky wash).
 
 Other things found: a changed `toneMapping` or shadow type does not recompile
@@ -172,7 +180,7 @@ from the first line), then in the page (Chrome's javascript_tool):
 await __looks.stage('colosseum')          // colosseum | field-cavalry | ring-portrait | sengoku-army
 await __looks.capture('colosseum-<id>')   // shots/colosseum-<id>.png, 1280x720, pixel ratio 1
 await __looks.stats(120)                  // ms per frame, draw calls, triangles, textures, geometries, programs
-await __looks.set('hdr-post')             // another look, same page; stage() again before capturing
+await __looks.set('toon')                 // the other look, same page; stage() again before capturing
 ```
 
 Each scene is a fixed seed and fighters, rebuilt places (their painting is

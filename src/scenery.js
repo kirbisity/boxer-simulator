@@ -1,12 +1,13 @@
-// Scenery variants (proof of concept): different ways to draw what lies
-// beyond the fighting ground (hills, mountains, trees, the ground's far
-// reach) in the open-air places. 'default' is the photograph over generated
-// foothills in the realistic looks and 'current' (the game as built in
-// render.js) in the classic cartoon look. A variant names the kinds of current scenery it replaces
-// (render.js tags them userData.scenery = 'ground' | 'hills' | 'mountains' |
-// 'trees' | 'plants') and builds its own group into the place; a composite
-// variant is a list of parts. Switched from the console or the looks bench:
-// `__looks.scenery('generated')`.
+// Scenery: what lies beyond the fighting ground in the open-air places, and
+// the ground near the fight. In the realistic look ('default'): a photograph
+// of the distant land and sky over generated foothills, trees standing on
+// them (scenery/*), and painted ground with the living layer on it
+// (ground/*). In the classic cartoon look: the places as render.js builds
+// them ('current'). A part names the kinds of render.js scenery it replaces
+// (tagged userData.scenery = 'ground' | 'hills' | 'mountains' | 'trees' |
+// 'plants') and builds its own group into the place, once, cached there; a
+// composite is a list of parts. The looks bench can force one:
+// `__looks.scenery('current')`, `__looks.ground('current')`.
 
 /* global THREE */
 import { SKYBALL_VARIANTS } from './scenery/skyball.js';
@@ -14,7 +15,6 @@ import { GENERATED_VARIANTS } from './scenery/generated.js';
 import { TREE_VARIANTS } from './scenery/trees.js';
 import { activeLook } from './looks.js';
 import { PAINTED_GROUND } from './ground/painted.js';
-import { PHOTO_GROUND } from './ground/photo.js';
 import { LIVING_GROUND } from './ground/living.js';
 import { PLACE_ARENAS } from './render.js';
 
@@ -64,11 +64,7 @@ const CURRENT = { id: 'current', label: 'Current (as built)', replaces: [] };
 const DEFAULT_SCENERY = { id: 'default', label: 'Default for the look' };
 const sceneryForLook = () => (activeLook().id === 'toon' ? 'current' : 'photo-foothills');
 
-// The head-to-head: each way of drawing the land, with the same trees.
 const SCENERY_COMPOSITES = [
-  { id: 'painted-trees', label: 'Painted skyball + trees', parts: ['skyball-painted', 'trees-mixed'] },
-  { id: 'photo-trees', label: 'Photo skyball + trees', parts: ['skyball-photo', 'trees-mixed'] },
-  { id: 'land-trees', label: 'Generated land + trees', parts: ['generated-land', 'trees-mixed'] },
   // The pick: the photograph for the far mountains and sky, gentle generated hills in front of it, trees on them.
   { id: 'photo-foothills', label: 'Photo skyball + foothills + trees', parts: ['skyball-photo', 'foothills', 'trees-on-land'] },
 ];
@@ -131,7 +127,7 @@ export function applyScenery(view, place) {
   applyGround(view, place, group);
 }
 
-// ---- ground styles (proof of concept) ----------------------------------------
+// ---- ground styles ---------------------------------------------------------
 //
 // A second axis, beside the scenery: how the ground near the fight is drawn.
 // Every open-air place's own ground mesh is tagged userData.scenery = 'ground'
@@ -160,9 +156,8 @@ const DEFAULT_GROUND = { id: 'default', label: 'Default for the look' };
 const groundForLook = () => (activeLook().id === 'toon' ? 'current' : 'painted-living');
 const GROUND_COMPOSITES = [
   { id: 'painted-living', label: 'Painted ground + living ground', parts: ['ground-painted', 'ground-living'] },
-  { id: 'photo-living', label: 'Photo ground + living ground', parts: ['ground-photo', 'ground-living'] },
 ];
-export const GROUND_STYLES = [DEFAULT_GROUND, CURRENT_GROUND, ...PAINTED_GROUND, ...PHOTO_GROUND, ...LIVING_GROUND, ...GROUND_COMPOSITES];
+export const GROUND_STYLES = [DEFAULT_GROUND, CURRENT_GROUND, ...PAINTED_GROUND, ...LIVING_GROUND, ...GROUND_COMPOSITES];
 let groundInForce = 'default';
 export const groundById = (id) => GROUND_STYLES.find((style) => style.id === id);
 export const activeGround = () => groundInForce;

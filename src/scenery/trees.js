@@ -1,20 +1,13 @@
-// Scenery variants: trees (proof of concept). See src/scenery.js for the contract.
-//
-// Four ways to draw the open-air places' trees, all instanced (a few draw
-// calls per place whatever the count):
-//  - trees-clumped: procedural geometry. Broadleaf crowns are a handful of
-//    noise-displaced icosahedron clumps with crown-shaped normals and baked
-//    vertex shading (dark inside and underneath, light on top); pines are a
-//    tapered trunk under drooping, ragged needle skirts.
-//  - trees-cards: the same trees rendered once into a texture (an atlas of
-//    side views) and drawn as three crossed alpha-tested quads.
-//  - trees-mixed: clumped near the ground, cards beyond, and more of them:
-//    woods round the field and the meadow, pines up the sengoku mountains.
-//  - trees-models: CC0 low-poly models (Quaternius), packed into
-//    trees-models-data.js and instanced the same way.
+// The open-air places' trees, instanced (a few draw calls per place whatever
+// the count): clumped geometry near the fight (broadleaf crowns of a handful
+// of noise-displaced icosahedron clumps with crown-shaped normals and baked
+// shading, dark inside and underneath; pines as a tapered trunk under
+// drooping, ragged needle skirts), and beyond 30 m the same trees as cards
+// (rendered once into an atlas, drawn as three crossed alpha-tested quads).
+// They stand on the land the foothills raise, with woods up the hills.
+// See src/scenery.js for the contract.
 
 /* global THREE */
-import { TREES_MODELS_DATA } from './trees-models-data.js';
 
 // ---- Shared ---------------------------------------------------------------
 
@@ -286,31 +279,6 @@ function treesScatter(place, spec, rng, { count, from, to, spacing = 3, woods = 
   return trees;
 }
 
-/** Pines up the sides of the place's mountain cones (sengoku), standing on the slope. */
-function treesOnMountains(view, place, rng, count) {
-  const group = view.places?.[place];
-  const cones = [];
-  group?.traverse((object) => {
-    if (object.userData.scenery !== 'mountains' || object.geometry?.type !== 'ConeGeometry') return;
-    const { radius, height } = object.geometry.parameters;
-    cones.push({ x: object.position.x, z: object.position.z, top: object.position.y + height / 2, radius: radius * object.scale.x, height: height * object.scale.y });
-  });
-  const trees = [];
-  for (let tries = 0; trees.length < count && cones.length && tries < count * 20; tries++) {
-    const cone = cones[Math.floor(rng() * cones.length)];
-    const a = rng() * Math.PI * 2;
-    const d = cone.radius * (0.3 + rng() * 0.65);
-    const x = cone.x + Math.cos(a) * d;
-    const z = cone.z + Math.sin(a) * d;
-    const y = cone.top - (d / cone.radius) * cone.height;
-    if (y < 0.2 || Math.hypot(x, z) < 30 || Math.hypot(x + 6, z + 40) < 12) continue;
-    // Only the face towards the ground, or they'd be hidden anyway.
-    if ((x - cone.x) * -cone.x + (z - cone.z) * -cone.z < 0) continue;
-    trees.push({ x, y: y - 0.3, z, scale: 0.4 + rng() * 0.25, turn: rng() * 6.28, shape: Math.floor(rng() * 3), tint: rng(), haze: true });
-  }
-  return trees;
-}
-
 /** The height of the land a sibling scenery part has raised in this place (foothills, terrain), or null on flat ground. */
 function treesLandOf(view, place) {
   const shown = view.places?.[place]?.children.find((child) => child.visible && child.userData.heightAt);
@@ -373,8 +341,6 @@ function treesInstance(group, geometries, material, trees, { shadows = true, sca
       mesh.setMatrixAt(index, matrix);
       const t = tree.tint;
       colour.setRGB(0.88 + t * 0.2, 0.9 + t * 0.16, 0.86 + (1 - t) * 0.16);
-      // On the far mountains: bluer and darker, as the mountains are.
-      if (tree.haze) colour.multiply(new THREE.Color(0.72, 0.82, 1.0));
       mesh.setColorAt(index, colour);
     });
     mesh.instanceMatrix.needsUpdate = true;
@@ -485,62 +451,25 @@ function treesCards(view, shapes) {
   return { geometries, material };
 }
 
-/** The trees a place has by its spec, plus (mixed) its extra woods. */
-function treesPlan(view, place, spec, rng, { woods, heightAt = null }) {
+/** The trees a place has by its spec, standing on the land, plus woods up its hills. */
+function treesPlan(place, spec, rng, heightAt) {
   const { count, from, to, kind } = spec.trees;
   const trees = treesScatter(place, spec, rng, { count, from, to, spacing: kind === 'pine' ? 2.6 : 3.4 });
-  if (!woods) return trees;
-  if (heightAt) {
-    // On raised land: the spec's trees stand on it (broadleaf thinned, so the
-    // hills show through the gaps), and the hills carry woods instead of the
-    // old cones' pines.
-    const kept = kind === 'pine' ? trees : trees.filter(() => rng() < TREES_ON_LAND_KEEP);
-    for (const tree of kept) tree.y = heightAt(tree.x, tree.z) - 0.1;
-    const hills = TREES_HILL_WOODS[place] ? treesOnHills(place, spec, rng, heightAt, TREES_HILL_WOODS[place]) : [];
-    return [...kept, ...hills];
-  }
-  if (place === 'field') {
-    // The field's spec trees become woods and hedgerow along the hills.
-    const extra = treesScatter(place, spec, rng, { count: 30, from: 40, to: 68, spacing: 2.3, woods: 12, perWood: 26, taken: trees });
-    for (const tree of [...trees, ...extra]) tree.scale *= 1.3;
-    return [...trees, ...extra];
-  }
-  if (place === 'meadow') {
-    // A wood edge round the green, in front of the hills.
-    const extra = treesScatter(place, spec, rng, { count: 40, from: 30, to: 39, spacing: 2.4, woods: 7, perWood: 14, taken: trees });
-    return [...trees, ...extra];
-  }
-  if (place === 'sengoku') return [...trees, ...treesOnMountains(view, place, rng, 260)];
-  return trees;
+  if (!heightAt) return trees;
+  // Broadleaf thinned, so the hills show through the gaps.
+  const kept = kind === 'pine' ? trees : trees.filter(() => rng() < TREES_ON_LAND_KEEP);
+  for (const tree of kept) tree.y = heightAt(tree.x, tree.z) - 0.1;
+  const hills = TREES_HILL_WOODS[place] ? treesOnHills(place, spec, rng, heightAt, TREES_HILL_WOODS[place]) : [];
+  return [...kept, ...hills];
 }
 
-function treesBuildClumped({ place, view, spec, rng }) {
+function treesBuild({ place, view, spec, rng }) {
   if (spec.trees.kind === 'none') return null;
   const group = new THREE.Group();
-  const trees = treesPlan(view, place, spec, rng, { woods: false });
-  treesInstance(group, treesShapes(spec, rng, view), treesClumpedMaterial(), trees);
-  group.userData.treesCount = trees.length;
-  return group;
-}
-
-function treesBuildCards({ place, view, spec, rng }) {
-  if (spec.trees.kind === 'none') return null;
-  const group = new THREE.Group();
-  const trees = treesPlan(view, place, spec, rng, { woods: false });
-  const cards = treesCards(view, treesShapes(spec, rng, view));
-  treesInstance(group, cards.geometries, cards.material, trees, { shadows: false });
-  group.userData.treesCount = trees.length;
-  return group;
-}
-
-function treesBuildMixed({ place, view, spec, rng }, { onLand = false } = {}) {
-  if (spec.trees.kind === 'none') return null;
-  const group = new THREE.Group();
-  const heightAt = onLand ? treesLandOf(view, place) : null;
-  const trees = treesPlan(view, place, spec, rng, { woods: true, heightAt });
+  const trees = treesPlan(place, spec, rng, treesLandOf(view, place));
   const shapes = treesShapes(spec, rng, view);
   const cards = treesCards(view, shapes);
-  const near = trees.filter((tree) => !tree.haze && !tree.hill && Math.hypot(tree.x, tree.z) < TREES_NEAR);
+  const near = trees.filter((tree) => !tree.hill && Math.hypot(tree.x, tree.z) < TREES_NEAR);
   const far = trees.filter((tree) => !near.includes(tree));
   treesInstance(group, cards.geometries, cards.material, far, { shadows: false });
   treesInstance(group, shapes, treesClumpedMaterial(), near);
@@ -548,96 +477,13 @@ function treesBuildMixed({ place, view, spec, rng }, { onLand = false } = {}) {
   return group;
 }
 
-// ---- Models (Quaternius, CC0) -------------------------------------------------
-
-const TREES_MODEL_NAMES = { broadleaf: ['CommonTree_1', 'CommonTree_3'], pine: ['PineTree_2', 'PineTree_3'] };
-
-function treesDecode(base64, Type) {
-  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-  return new Type(bytes.buffer);
-}
-
-/** A packed model as a flat-shaded geometry, its parts coloured for the place and scaled to `height` metres. */
-function treesModelGeometry(name, leaf, bark, height) {
-  const data = TREES_MODELS_DATA[name];
-  const q = treesDecode(data.positions, Int16Array);
-  const index = treesDecode(data.index, Uint16Array);
-  const scale = height / (data.max[1] - data.min[1]);
-  const positions = new Float32Array(index.length * 3);
-  const colours = new Float32Array(index.length * 3);
-  const parts = [bark, leaf, leaf.clone().multiplyScalar(0.72)];
-  let partEnd = data.counts[0];
-  let part = 0;
-  const c = new THREE.Color();
-  const top = (data.max[1] - data.min[1]) * scale;
-  for (let i = 0; i < index.length; i++) {
-    while (i >= partEnd && part < 2) partEnd += data.counts[++part];
-    for (let k = 0; k < 3; k++) {
-      const raw = (q[index[i] * 3 + k] + 32768) / 65535;
-      const value = data.min[k] + raw * (data.max[k] - data.min[k]);
-      positions[i * 3 + k] = (k === 1 ? value - data.min[1] : value) * scale;
-    }
-    const y = positions[i * 3 + 1];
-    c.copy(parts[part]).multiplyScalar(part ? 0.6 + 0.5 * treesSmooth(0.2, 1, y / top) : 1);
-    colours.set([c.r, c.g, c.b], i * 3);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(colours, 3));
-  g.computeVertexNormals();
-  g.computeBoundingSphere();
-  return g;
-}
-
-function treesBuildModels({ place, view, spec, rng }) {
-  if (spec.trees.kind === 'none') return null;
-  const group = new THREE.Group();
-  const trees = treesPlan(view, place, spec, rng, { woods: false });
-  const kind = spec.trees.kind === 'pine' ? 'pine' : 'broadleaf';
-  // The models' own colours are dark and saturated; the place's leaf colour, lifted, reads better here.
-  const leaf = new THREE.Color(spec.trees.colour).multiplyScalar(1.15);
-  const bark = new THREE.Color(spec.trees.bark);
-  const geometries = TREES_MODEL_NAMES[kind].map((name, i) => treesModelGeometry(name, leaf, bark, kind === 'pine' ? 8 + i : 7 + i));
-  treesInstance(group, geometries, treesClumpedMaterial(), trees);
-  group.userData.treesCount = trees.length;
-  return group;
-}
-
 /** Variants: { id, label, blurb, replaces: [tags], build({ place, view, spec, rng }) -> THREE.Group, apply?({ place, view, spec, group }) }. */
 export const TREE_VARIANTS = [
   {
-    id: 'trees-clumped',
-    label: 'Trees: clumped (4a)',
-    blurb: 'Procedural trees: broadleaf crowns of noise-displaced clumps with baked shading, pines of ragged drooping skirts; instanced, ~450 triangles a tree.',
-    replaces: ['trees'],
-    build: treesBuildClumped,
-  },
-  {
-    id: 'trees-cards',
-    label: 'Trees: cards (4b)',
-    blurb: 'Impostors: the clumped trees rendered once into an atlas, drawn as three crossed alpha-tested quads (12 triangles a tree).',
-    replaces: ['trees'],
-    build: treesBuildCards,
-  },
-  {
-    id: 'trees-mixed',
-    label: 'Trees: mixed (4a near, 4b far)',
-    blurb: 'Clumped trees near the ground, cards beyond 30 m, and more of them: woods round the field and meadow, pines up the sengoku mountains.',
-    replaces: ['trees'],
-    build: treesBuildMixed,
-  },
-  {
     id: 'trees-on-land',
-    label: 'Trees: mixed, standing on raised land',
-    blurb: 'The mixed trees, each standing on the land a terrain part has raised, and woods in clusters up its hills. List it after the terrain part.',
+    label: 'Trees on the land',
+    blurb: 'Clumped trees near the fight, cards beyond 30 m, each standing on the land the foothills raise, and woods in clusters up the hills. List it after the land part.',
     replaces: ['trees'],
-    build: (context) => treesBuildMixed(context, { onLand: true }),
-  },
-  {
-    id: 'trees-models',
-    label: 'Trees: CC0 models (4c)',
-    blurb: 'Quaternius low-poly tree models (CC0), packed into a data module and instanced; ~1.7–2.9k triangles a tree.',
-    replaces: ['trees'],
-    build: treesBuildModels,
+    build: treesBuild,
   },
 ];

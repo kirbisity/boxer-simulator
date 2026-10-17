@@ -26,8 +26,8 @@ test('every registered look has what the plumbing reads', () => {
   }
 });
 
-test('the five looks to compare, and toon, are registered, one file each', () => {
-  assert.deepEqual(LOOKS.map((look) => look.id), ['toon', 'physical-sky', 'hdr-post', 'probe-lite', 'quality-physical', 'photo-hdri']);
+test('the two looks, realistic and toon, are registered, one file each', () => {
+  assert.deepEqual(LOOKS.map((look) => look.id), ['probe-lite', 'toon']);
   const files = readdirSync(new URL('../src/looks/', import.meta.url)).filter((name) => name !== 'kit.js' && !name.endsWith('-data.js')).map((name) => name.replace(/\.js$/, ''));
   assert.deepEqual(files.sort(), LOOKS.map((look) => look.id).sort(), 'a look is a file named by its id in src/looks/');
   assert.deepEqual(lookList().map((look) => look.id), LOOKS.map((look) => look.id));
@@ -47,7 +47,7 @@ test('toon is the default and has no hooks: it changes nothing', () => {
 
 test('setting a look sets the style, and toon puts everything back', async () => {
   try {
-    assert.equal((await setLook('physical-sky')).id, 'physical-sky');
+    assert.equal((await setLook('probe-lite')).id, 'probe-lite');
     assert.equal(STYLE.current, 'soft');
     assert.equal((await setLook('toon')).id, 'toon');
     assert.equal(STYLE.current, 'toon');

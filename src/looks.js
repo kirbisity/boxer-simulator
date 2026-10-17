@@ -4,8 +4,11 @@
 // whether ink outlines are drawn, and the frame itself (a post-processing
 // chain). The registry below lists them; each is one file in src/looks/, the
 // kit they import is src/looks/kit.js, and the type is `Look` there.
-// 'toon' is today's drawing and the default: it has no hooks, so with it
-// chosen nothing in this file changes a pixel or costs a millisecond.
+// Two remain: 'probe-lite', the realistic look the game is committed to and
+// a first visit starts in, and 'toon', the classic cartoon look and the safe
+// fallback: it has no hooks, so with it chosen nothing in this file changes
+// a pixel or costs a millisecond. (Four other looks were tried and removed in
+// October 2026: physical-sky, hdr-post, quality-physical and photo-hdri.)
 //
 // ---- Comparing looks (shoot and measure) ------------------------------------
 //
@@ -17,7 +20,7 @@
 //   await __looks.stage('colosseum')                the scene, seeded and frozen at a stated moment
 //   await __looks.capture('colosseum-<id>')         1280x720 PNG into shots/ (git-ignored, written by tools/serve.py)
 //   await __looks.stats(120)                        CPU and GPU-wait ms of a frame, draw calls, triangles, textures
-//   await __looks.set('hdr-post')                   another look in the same page; stage() again before capturing
+//   await __looks.set('toon')                       another look in the same page; stage() again before capturing
 //   await __looks.shoot('field-cavalry')            stage + capture, named <scene>-<look>
 //   __looks.list(), __looks.scenes(), __looks.tune({ yaw, pitch, distance, fov, height })
 //   __looks.colourCheck()                           an unlit swatch must read back as its own hex (see the trap below)
@@ -96,15 +99,11 @@
 // warning. Look at ARCHITECTURE.md (Looks) for the life cycle.
 
 import { TOON_LOOK } from './looks/toon.js';
-import { PHYSICAL_SKY_LOOK } from './looks/physical-sky.js';
-import { HDR_POST_LOOK } from './looks/hdr-post.js';
 import { PROBE_LITE_LOOK } from './looks/probe-lite.js';
-import { QUALITY_PHYSICAL_LOOK } from './looks/quality-physical.js';
-import { PHOTO_HDRI_LOOK } from './looks/photo-hdri.js';
 import { loadScripts, releaseOwned, replaceEnvironment, scriptsLoaded, setRenderer, sweepMaterials } from './looks/kit.js';
 
 /** The looks, in the order of the selector. */
-export const LOOKS = [TOON_LOOK, PHYSICAL_SKY_LOOK, HDR_POST_LOOK, PROBE_LITE_LOOK, QUALITY_PHYSICAL_LOOK, PHOTO_HDRI_LOOK];
+export const LOOKS = [PROBE_LITE_LOOK, TOON_LOOK];
 /** The safe look: what a look that cannot be set up falls back to. */
 export const DEFAULT_LOOK_ID = TOON_LOOK.id;
 /** The game's official look, the one a first visit starts in (the cheap realistic one: probe-lite). */
@@ -128,10 +127,12 @@ export function lookIdFromSearch(search) {
   return new URLSearchParams(search).get('look');
 }
 
-/** The look chosen last time (localStorage may be absent or blocked: then none). */
+/** The look chosen last time, if it still exists (localStorage may be absent or blocked: then none). */
 export function rememberedLookId() {
   try {
-    return localStorage.getItem(STORAGE_KEY);
+    const id = localStorage.getItem(STORAGE_KEY);
+    // A look chosen before it was removed: start in the official look, not the fallback.
+    return lookById(id) ? id : null;
   } catch {
     return null;
   }

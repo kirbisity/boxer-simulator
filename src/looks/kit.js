@@ -201,7 +201,7 @@ export function assignColour(material, slot, authored) {
 
 // ---- Bending a view to a look -----------------------------------------------
 
-/** A look's own scratch space on a view (a composer, a sky, a probe): `stateOf(view, 'hdr-post').composer`. Kept for the life of the view; free it in `dispose`. */
+/** A look's own scratch space on a view (a composer, a sky, a probe): `stateOf(view, 'probe-lite').dome`. Kept for the life of the view; free it in `dispose`. */
 export function stateOf(view, lookId) {
   return ((view.lookState ??= {})[lookId] ??= {});
 }
