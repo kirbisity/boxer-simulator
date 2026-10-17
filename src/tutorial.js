@@ -23,7 +23,45 @@ export const TUTORIAL = {
   finishSeconds: 7,
   // s between the partner's swings at the guard step.
   swingEvery: 2.2,
+  // Where a visitor's having been through the yard (finished, skipped or left) is kept.
+  storageKey: 'gladiator.tutorialDone',
 };
+
+// ---- Been through it --------------------------------------------------------------
+// A first visit opens in the yard; once finished, skipped or left, the home
+// screen. localStorage may be missing or refuse (a private window, blocked
+// storage): then it is remembered for this page load only.
+
+const tutorialMemory = { done: false };
+
+/** Whether this visitor has been through the yard (`storage`: localStorage, or a stand-in). */
+export function tutorialDone(storage = globalThis.localStorage) {
+  try {
+    return tutorialMemory.done || storage?.getItem(TUTORIAL.storageKey) === '1';
+  } catch {
+    return tutorialMemory.done;
+  }
+}
+
+/** Remember that he has been through it. */
+export function markTutorialDone(storage = globalThis.localStorage) {
+  tutorialMemory.done = true;
+  try {
+    storage?.setItem(TUTORIAL.storageKey, '1');
+  } catch {
+    // Remembered for this page only.
+  }
+}
+
+/** Open the page in the yard? Only the first time, and not for an automated browser (tests). */
+export function tutorialWanted(storage = globalThis.localStorage, agent = globalThis.navigator) {
+  return !tutorialDone(storage) && !agent?.webdriver;
+}
+
+/** Test hook: forget this page's memory of it (the storage is the caller's). */
+export function forgetTutorial() {
+  tutorialMemory.done = false;
+}
 
 /**
  * The steps, in order: a title, what to do by touch and by mouse and keys,
@@ -150,9 +188,10 @@ export function createTutorialRun(steps = TUTORIAL_STEPS) {
 const cardElement = (tag, className, html) => Object.assign(document.createElement(tag), { className, ...(html ? { innerHTML: html } : {}) });
 
 /**
- * The tutorial's card over the fight. `hooks`: now() (s), stage(key) (the
- * yard does what a step needs as it begins), observe() (the yard's state for
- * the run, each frame), exit() (back to the menu), again() (from the start).
+ * The tutorial's card over the fight, and a Skip tutorial button in the top
+ * corner. `hooks`: now() (s), stage(key) (the yard does what a step needs as
+ * it begins), observe() (the yard's state for the run, each frame), exit()
+ * (back to the menu), again() (from the start).
  * Returns { start, stop, update, signal, setDevice, run }.
  */
 export function installTutorial(root, hooks) {
@@ -160,7 +199,13 @@ export function installTutorial(root, hooks) {
   card.hidden = true;
   card.setAttribute('aria-live', 'polite');
   card.innerHTML = '<div class="head"><em class="count"></em><b class="title"></b><span class="tick">✓</span></div><p class="text"></p>'
-    + '<div class="actions"><button type="button" class="skip">Skip step</button><button type="button" class="exit">Exit</button></div>';
+    + '<div class="actions"><button type="button" class="skip">Skip step</button><button type="button" class="exit" hidden>Menu</button></div>';
+  // Out of the whole yard to the home screen, at any moment: big, in the corner, always there.
+  const skipAll = root.appendChild(cardElement('button', 'tutorial-skip', 'Skip tutorial <b>›</b>'));
+  skipAll.type = 'button';
+  skipAll.hidden = true;
+  skipAll.setAttribute('aria-label', 'Skip the tutorial: go to the menu');
+  skipAll.addEventListener('click', () => hooks.exit());
   let run = null;
   let device = 'touch';
   let doneAt = null;
@@ -176,14 +221,16 @@ export function installTutorial(root, hooks) {
       card.querySelector('.title').textContent = 'Well done';
       card.querySelector('.text').innerHTML = 'That is every control. Lock on, cut where you tap, guard when he swings, and the special button does the rest. Back to the menu in a moment.';
       card.querySelector('.skip').textContent = 'Again';
-      card.querySelector('.exit').textContent = 'Menu';
+      card.querySelector('.exit').hidden = false;
+      skipAll.hidden = true;
       return;
     }
-    card.querySelector('.count').textContent = `Step ${run.index + 1} of ${TUTORIAL_STEPS.length}`;
+    card.querySelector('.count').textContent = `Training yard · ${run.index + 1} of ${TUTORIAL_STEPS.length}`;
     card.querySelector('.title').textContent = step.title;
     card.querySelector('.text').innerHTML = device === 'mouse' ? step.mouse : step.touch;
     card.querySelector('.skip').textContent = 'Skip step';
-    card.querySelector('.exit').textContent = 'Exit';
+    card.querySelector('.exit').hidden = true;
+    skipAll.hidden = false;
   }
 
   function begin(step) {
@@ -218,6 +265,7 @@ export function installTutorial(root, hooks) {
     stop() {
       run = null;
       card.hidden = true;
+      skipAll.hidden = true;
     },
     /** Each frame: the yard observed, a done step ticked and then the next. */
     update() {
