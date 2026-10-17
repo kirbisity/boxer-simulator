@@ -17,6 +17,7 @@ import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
 import { arenaColosseum } from './props/arena.js';
 import { harbourPort } from './props/harbour.js';
+import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks, coastPalms, coastPier, coastSampans, coastShip, coastShipMaterials } from './props/coast.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
@@ -764,41 +765,16 @@ function buildCoast({ fort }) {
   sea.rotation.x = -Math.PI / 2;
   sea.position.set(95, -0.05, 0);
   place.add(sea);
+  let fortTick = null;
   if (fort) {
-    // The fort on its rise: a square of red brick, bastions at the corners, the flag.
-    const brick = lit(0x9a4a32);
-    const walls = new THREE.Group();
-    const core = new THREE.Mesh(new THREE.BoxGeometry(18, 6, 18), brick);
-    core.position.y = 3;
-    walls.add(core);
-    for (const [x, z] of [[-9, -9], [9, -9], [-9, 9], [9, 9]]) {
-      const bastion = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 6.4, 4), brick);
-      bastion.rotation.y = Math.PI / 4;
-      bastion.position.set(x, 3.2, z);
-      walls.add(bastion);
-    }
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 8, 6), lit(0x3a2a1c));
-    pole.position.set(0, 10, 0);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 2), new THREE.MeshStandardMaterial({ color: 0xd06a1a, side: THREE.DoubleSide }));
-    flag.position.set(1.5, 13, 0);
-    walls.add(pole, flag);
-    // Guns on the bastions, each looking out over its corner.
-    const gunMetal = lit(0x26282c, { roughness: 0.5, metalness: 0.5 });
-    for (const [x, z] of [[-9, -9], [9, -9], [-9, 9], [9, 9]]) {
-      const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.6, 8), gunMetal);
-      gun.rotation.set(Math.PI / 2, Math.atan2(x, z), 0, 'YXZ');
-      gun.position.set(x * 1.12, 6.8, z * 1.12);
-      walls.add(gun);
-    }
-    walls.position.set(-8, 0, -42);
-    place.add(walls);
+    // Fort Zeelandia on its rise: brick curtains and bastions, the gate toward the fight, the Company's flag (src/props/coast.js).
+    const zeelandia = coastFort();
+    zeelandia.group.position.set(-8, 0, -42);
+    place.add(zeelandia.group);
+    fortTick = zeelandia.tick;
     // Gabions (earth-filled wicker baskets) thrown up before the fort, and palms along the shore.
-    const gabion = new THREE.CylinderGeometry(0.55, 0.55, 1.1, 10);
-    gabion.translate(0, 0.55, 0);
     const gabions = Array.from({ length: 14 }, (_, index) => [-20 + index * 1.25, -16 - (index % 2) * 0.5, 1, 0]);
     const random = scatterRandom(83);
-    const trunk = new THREE.CylinderGeometry(0.16, 0.24, 6, 6);
-    trunk.translate(0, 3, 0);
     // Palms on the open sand: none inside the fort's walls (x −21…5, z −55…−29).
     const palms = [];
     while (palms.length < 18) {
@@ -806,73 +782,14 @@ function buildCoast({ fort }) {
       if (spot[0] > -21 && spot[0] < 5 && spot[1] > -55 && spot[1] < -29) continue;
       palms.push(spot);
     }
-    // Each crown: six fronds out from the top of the trunk, drooping; all the palms' fronds one draw.
-    const frond = new THREE.BoxGeometry(2.6, 0.05, 0.55);
-    frond.translate(1.3, 0, 0);
-    const fronds = new THREE.InstancedMesh(frond, lit(0x3a6a2e), palms.length * 6);
-    const at = new THREE.Object3D();
-    palms.forEach(([x, z, scale, turn], palm) => {
-      for (let leaf = 0; leaf < 6; leaf += 1) {
-        at.position.set(x, 6 * scale, z);
-        at.rotation.set(0, turn + (leaf * Math.PI) / 3, -0.45 - (leaf % 2) * 0.2, 'YXZ');
-        at.scale.setScalar(scale);
-        at.updateMatrix();
-        fronds.setMatrixAt(palm * 6 + leaf, at.matrix);
-      }
-    });
-    place.add(
-      scatter(gabion, lit(0x7a6240), gabions),
-      scatter(trunk, lit(0x6a5236), palms),
-      fronds,
-    );
+    place.add(...coastGabions(gabions), ...coastPalms(palms));
   } else {
-    // A fishing village: low houses, white walls, grey tiled roofs, boats drawn up.
-    const wall = lit(0xe8e2d4);
-    const tile = lit(0x4a4e56);
-    for (let index = 0; index < 9; index += 1) {
-      const house = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), wall);
-      body.position.y = 1.5;
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.9, 1.6, 4), tile);
-      roof.rotation.y = Math.PI / 4;
-      roof.scale.set(1.3, 1, 1);
-      roof.position.y = 3.8;
-      house.add(body, roof);
-      house.position.set(-30 + (index % 3) * 8, 0, -30 + Math.floor(index / 3) * 9 + (index % 2) * 2);
-      place.add(house);
-    }
-    for (let index = 0; index < 4; index += 1) {
-      const boat = new THREE.Group();
-      const hull = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 2), lit(0x5a3a22));
-      hull.position.y = 0.4;
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6), lit(0x4a3220));
-      mast.position.set(0.8, 2.9, 0);
-      boat.add(hull, mast);
-      boat.position.set(24, 0, -12 + index * 7);
-      boat.rotation.y = 0.3;
-      place.add(boat);
-    }
-    // Nets hung to dry on poles, and a stone pier running out into the sea.
-    const netPost = lit(0x5a4228);
-    const netMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a30, transparent: true, opacity: 0.55, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
-    for (const [x, z] of [[14, -22], [17, -24], [14, 22]]) {
-      const rack = new THREE.Group();
-      for (const end of [-1.5, 1.5]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.2, 5), netPost);
-        post.position.set(0, 1.1, end);
-        rack.add(post);
-      }
-      const net = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6), netMaterial);
-      net.position.y = 1.2;
-      net.rotation.y = Math.PI / 2;
-      rack.add(net);
-      rack.position.set(x, 0, z);
-      place.add(rack);
-    }
-    const pier = new THREE.Mesh(new THREE.BoxGeometry(16, 1, 2.6), lit(0x8a8478));
-    pier.position.set(31, 0.2, 24);
-    pier.receiveShadow = true;
-    place.add(pier);
+    // A fishing village of the Zhejiang coast: whitewashed houses under grey tile, sampans drawn up, nets drying, a pier.
+    const houses = Array.from({ length: 9 }, (_, index) => [-30 + (index % 3) * 8, -30 + Math.floor(index / 3) * 9 + (index % 2) * 2]);
+    place.add(...coastHouses(houses));
+    place.add(...coastSampans(Array.from({ length: 4 }, (_, index) => [24, -12 + index * 7, 0.3])));
+    place.add(...coastNetRacks([[14, -22], [17, -24], [14, 22]]));
+    place.add(...coastPier({ x0: 23, x1: 39, z: 24, width: 2.6, deck: 0.75 }));
   }
   // The shore: the wet sand the tide left, the surf breaking along it.
   const shoreX = 25;
@@ -904,38 +821,27 @@ function buildCoast({ fort }) {
     // Beach grass stays on the dry sand, short of the tide line.
     ...fieldLitter(fort ? 71 : 73, keep, { grass: 0x8a9a4a, stone: 0x9a8e74, tufts: 500, stones: 60, half: [40, 48], allowed: (x) => x < shoreX - 5 }),
   );
-  // Ships at anchor, rising and rolling on the swell.
+  // Ships at anchor, rising and rolling on the swell: Dutch fluyts off the fort, junks off the village. Near enough to
+  // stand inside the camera's 60 m reach from the fight; shown whole or not at all, the open sea drawn on beyond that
+  // reach to the horizon (coastFarPlaneGuard).
   const ships = [];
-  const shipHull = lit(fort ? 0x3a2a1e : 0x5a3a22);
-  const sailcloth = new THREE.MeshStandardMaterial({ color: fort ? 0xe8e0cc : 0x8a5a3a, side: THREE.DoubleSide, roughness: 0.9 });
-  for (const [x, z, masts] of fort ? [[62, -24, 3], [74, 18, 3], [90, -4, 2]] : [[48, -16, 2], [60, 14, 2]]) {
-    const ship = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(14, 3, 4), shipHull);
-    hull.position.y = 0.8;
-    const stern = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 3.8), shipHull);
-    stern.position.set(-5.5, 3.3, 0);
-    ship.add(hull, stern);
-    for (let mast = 0; mast < masts; mast += 1) {
-      const along = -3 + mast * (8 / Math.max(1, masts - 1));
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 12, 6), shipHull);
-      pole.position.set(along, 8, 0);
-      const sail = new THREE.Mesh(new THREE.PlaneGeometry(fort ? 4.6 : 3.6, fort ? 5 : 6.4), sailcloth);
-      sail.position.set(along, 8.6, 0);
-      sail.rotation.y = Math.PI / 2;
-      ship.add(pole, sail);
-    }
+  const rig = coastShipMaterials(fort);
+  for (const [x, z, masts] of fort ? [[38, -24, 3], [44, 15, 3], [50, -5, 2]] : [[40, -18, 2], [46, 12, 2]]) {
+    const ship = coastShip({ dutch: fort, masts, materials: rig });
     ship.position.set(x, 0, z);
     ship.rotation.y = 0.4 + x * 0.01;
     ship.userData.phase = x * 0.13;
     ships.push(ship);
     place.add(ship);
   }
+  place.add(...coastFarPlaneGuard(ships));
   place.userData.tick = (time) => {
     for (const ship of ships) {
       ship.position.y = Math.sin(time * 0.7 + ship.userData.phase) * 0.18;
       ship.rotation.z = Math.sin(time * 0.55 + ship.userData.phase) * 0.03;
     }
     surf[0].material.opacity = 0.45 + 0.15 * Math.sin(time * 0.9);
+    fortTick?.(time);
   };
   return place;
 }
