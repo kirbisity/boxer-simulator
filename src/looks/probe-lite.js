@@ -248,7 +248,7 @@ function probeLiteBuild(st, place, view) {
 
 export const PROBE_LITE_LOOK = defineLook({
   id: PROBE_LITE_ID,
-  label: 'Probe lite',
+  label: 'Realistic (default)',
   blurb: 'Budget realistic: a light probe from a procedural sky, one sun with one shadow map, Lambert skin and cloth, steel on a baked sky cube. Cheaper than toon: no outlines, no post, no extra scripts.',
   style: 'soft',
   outlines: false,

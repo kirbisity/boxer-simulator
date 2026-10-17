@@ -7,7 +7,7 @@ import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
-import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
+import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
@@ -80,7 +80,7 @@ const shortName = (name) => {
 };
 
 // The look (looks.js): ?look= over the one remembered. One that needs nothing loaded is in force before the scene is made; the others are switched to once the page is up.
-const startingLookId = lookIdFromSearch(location.search) ?? rememberedLookId() ?? DEFAULT_LOOK_ID;
+const startingLookId = lookIdFromSearch(location.search) ?? rememberedLookId() ?? OFFICIAL_LOOK_ID;
 activateLookNow(startingLookId);
 
 const scene = createScene($('#stage'));

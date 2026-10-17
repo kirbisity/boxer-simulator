@@ -9,7 +9,7 @@ import { defineLook } from './kit.js';
 
 export const TOON_LOOK = defineLook({
   id: 'toon',
-  label: 'Toon',
+  label: 'Classic cartoon',
   blurb: 'Cel-shaded with ink outlines and a painted sky: the game as it has always looked. Loads nothing extra.',
   style: 'toon',
   outlines: true,

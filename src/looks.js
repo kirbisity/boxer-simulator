@@ -105,7 +105,10 @@ import { loadScripts, releaseOwned, replaceEnvironment, scriptsLoaded, setRender
 
 /** The looks, in the order of the selector. */
 export const LOOKS = [TOON_LOOK, PHYSICAL_SKY_LOOK, HDR_POST_LOOK, PROBE_LITE_LOOK, QUALITY_PHYSICAL_LOOK, PHOTO_HDRI_LOOK];
+/** The safe look: what a look that cannot be set up falls back to. */
 export const DEFAULT_LOOK_ID = TOON_LOOK.id;
+/** The game's official look, the one a first visit starts in (the cheap realistic one: probe-lite). */
+export const OFFICIAL_LOOK_ID = PROBE_LITE_LOOK.id;
 const STORAGE_KEY = 'gladiator.look';
 // A linear look re-checks the whole scene this often (frames), besides whenever the scene gained a child: what is built inside an existing group is only found this way.
 const LINEAR_SWEEP_FRAMES = 30;
