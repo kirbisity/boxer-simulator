@@ -210,6 +210,10 @@ for ( int i = 0; i < ${LIVING_WATER_LAMPS}; i ++ ) {
 }
 gl_FragColor.rgb += livingGlint * livingLampGain;
 gl_FragColor.rgb *= mix( vec3( 1.0 ), bloodDyeFilter, livingBlood );
+// Blood clouds the water: it hides what lies under it (stone tops, mud), so a
+// thin, see-through puddle reads evenly red instead of red only over the pale.
+// (Scaled from the water's own alpha, so the puddle's soft edge stays soft.)
+gl_FragColor.a = mix( gl_FragColor.a, min( 0.92, gl_FragColor.a * 4.0 ), smoothstep( 0.0, 0.6, livingBlood ) );
 if ( livingOil.z > 0.0 ) {
   float livingFilm = 1.0 - smoothstep( livingOil.z * 0.4, livingOil.z, length( vLivingWorld.xz - livingOil.xy ) );
   float livingBand = sin( vLivingWorld.x * 3.1 + vLivingWorld.z * 2.3 + sin( vLivingWorld.z * 4.7 ) * 1.5 ) * 0.5 + 0.5;
@@ -504,6 +508,9 @@ function livingNormalCanvas(heightCanvas, strength = 2) {
   g.putImageData(image, 0, 0);
   return out;
 }
+
+// The draw order of standing water: after the ground's see-through layers (decals, films, mud), which keep order 0.
+const LIVING_WATER_ORDER = 2;
 
 /** A soft round alpha (white centre to black rim) for puddles and films. */
 function livingRadialAlpha(size = 128, inner = 0.55) {
@@ -1084,6 +1091,8 @@ function livingPond({ land, view, rng, pond }) {
     livingWaterMaterial({ color: 0x1c2a22, roughness: 0.06, metalness: 0.08, wave: 0.7, envMap: view.steelEnv, alphaMap: livingRadialAlpha(128, 0.82) }),
   );
   water.onBeforeRender = livingTick;
+  // Water lies over the mud, films and decals round it: drawn after them (they are all see-through, so order, not depth, decides).
+  water.renderOrder = LIVING_WATER_ORDER;
   group.userData.waters = [water.material];
   group.userData.bloodDyeWater = [livingWaterAt([{ ...pond, turn: 0.3 }], 4, 0.82, () => 1.2)];
   // The bank: dark wet earth round the water, a little raised.
@@ -1363,6 +1372,8 @@ function livingCobbles({ view, arena, rng }) {
   }
   const water = new THREE.Mesh(livingBlobGeometry(spots, 0.02, 3), livingWaterMaterial({ color: 0x3a3a36, roughness: 0.04, wave: 0.25, envMap: view.steelEnv, alphaMap: livingRadialAlpha(128, 0.6) }));
   water.onBeforeRender = livingTick;
+  // Water lies over the mud, films and decals round it: drawn after them (they are all see-through, so order, not depth, decides).
+  water.renderOrder = LIVING_WATER_ORDER;
   group.add(water);
   group.userData.waters = [water.material];
   group.userData.bloodDyeWater = [livingWaterAt(spots, 3, 0.6)];
@@ -1528,6 +1539,8 @@ function livingWetConcrete({ view, arena, grounds, rng }) {
   });
   const water = new THREE.Mesh(livingBlobGeometry(spots, 0.005, 6), material);
   water.onBeforeRender = livingTick;
+  // Water lies over the mud, films and decals round it: drawn after them (they are all see-through, so order, not depth, decides).
+  water.renderOrder = LIVING_WATER_ORDER;
   water.receiveShadow = true;
   group.add(water);
   // Darker wet rims round each puddle and dark oil stains on the apron.
