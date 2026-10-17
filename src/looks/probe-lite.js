@@ -207,10 +207,14 @@ const PROBE_LITE_PLACES = {
 };
 const probeLiteKind = (place) => (PROBE_LITE_PLACES.night.includes(place) ? 'night' : PROBE_LITE_PLACES.hall.includes(place) ? 'hall' : 'day');
 
-// Indoor lighting description per hall place: base ambient and the warm panels.
+// Indoor lighting description per hall place: base ambient, the warm panels,
+// and keyGain on the overhead key. A fight-night ring sits under a bank of
+// lamps far brighter than the hall around it, so the stage is lit to read
+// at least as well as toon's (toon has a hemisphere fill and a rim this look
+// switches off); the hall around it stays dark.
 const PROBE_LITE_HALLS = {
-  ring: { hallBase: [0.07, 0.08, 0.12], panel: [1.0, 0.9, 0.72], probe: 0.55 },
-  stadium: { hallBase: [0.05, 0.06, 0.1], panel: [1.0, 0.97, 0.9], probe: 0.5 },
+  ring: { hallBase: [0.07, 0.08, 0.12], panel: [1.0, 0.9, 0.72], probe: 1.0, keyGain: 1.6 },
+  stadium: { hallBase: [0.05, 0.06, 0.1], panel: [1.0, 0.97, 0.9], probe: 0.9, keyGain: 1.5 },
   subway: { hallBase: [0.07, 0.1, 0.08], panel: [0.82, 1.0, 0.86], probe: 0.55 },
 };
 
@@ -273,6 +277,7 @@ export const PROBE_LITE_LOOK = defineLook({
     });
 
     if (record.kind === 'hall') {
+      lights.key.intensity *= PROBE_LITE_HALLS[place].keyGain ?? 1;
       lights.sun.visible = false;
       lights.rim.visible = false;
       setShadowMapSize(lights.key, PROBE_LITE_TUNE.shadowSize);
