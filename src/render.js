@@ -15,6 +15,8 @@ import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
+import { arenaColosseum } from './props/arena.js';
+import { harbourPort } from './props/harbour.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
@@ -319,84 +321,22 @@ function buildColosseum() {
   floor.receiveShadow = true;
   floor.userData.scenery = 'ground';
   place.add(floor);
-  // The podium wall: dressed stone, a dark base, marble on top.
+  // The amphitheatre's stone: the podium and its gates, the stepped cavea,
+  // the arcaded outer wall and attic, the velarium (src/props/arena.js).
   const podiumHeight = 3.2;
-  const wallTexture = paintedTexture(512, 128, (g, w, h) => {
-    g.fillStyle = '#c8b089';
-    g.fillRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(90,70,45,0.45)';
-    g.lineWidth = 2;
-    for (let row = 0; row < 4; row += 1) {
-      const y = (row + 1) * (h / 4);
-      g.beginPath();
-      g.moveTo(0, y);
-      g.lineTo(w, y);
-      g.stroke();
-      for (let x = (row % 2) * 32; x < w; x += 64) {
-        g.beginPath();
-        g.moveTo(x, y - h / 4);
-        g.lineTo(x, y);
-        g.stroke();
-      }
-    }
-    for (let index = 0; index < 1500; index += 1) {
-      g.fillStyle = `rgba(80,60,40,${Math.random() * 0.12})`;
-      g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
-    }
-  }, [24, 1]);
-  const podium = new THREE.Mesh(oval(new THREE.CylinderGeometry(1, 1, podiumHeight, 96, 1, true)), stone(0xffffff, { map: wallTexture, side: THREE.BackSide }));
-  podium.position.y = podiumHeight / 2;
-  podium.receiveShadow = true;
-  const base = new THREE.Mesh(oval(new THREE.CylinderGeometry(0.995, 0.995, 0.45, 96, 1, true)), stone(0x6b5a44, { side: THREE.BackSide }));
-  base.position.y = 0.22;
-  const coping = new THREE.Mesh(oval(new THREE.CylinderGeometry(1.03, 1.0, 0.22, 96, 1, true)), stone(0xeee8dc, { side: THREE.DoubleSide, roughness: 0.6 }));
-  coping.position.y = podiumHeight + 0.11;
-  place.add(podium, base, coping);
-  // Gates at the two ends and the middle of each side: dark arches in the wall.
-  const gate = stone(0x1b140e);
-  for (const angle of [0, Math.PI, Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, (Math.PI * 3) / 4, (-Math.PI * 3) / 4]) {
-    const x = Math.cos(angle) * rx * 0.992;
-    const z = Math.sin(angle) * rz * 0.992;
-    const big = Math.abs(Math.sin(angle)) < 0.1;
-    const width = big ? 2.2 : 1.3;
-    const height = big ? 2.6 : 2.0;
-    const opening = new THREE.Mesh(new THREE.PlaneGeometry(width, height - width / 2), gate);
-    const top = new THREE.Mesh(new THREE.CircleGeometry(width / 2, 16, 0, Math.PI), gate);
-    const facing = Math.atan2(-x / (rx * rx), -z / (rz * rz));
-    for (const [mesh, y] of [[opening, (height - width / 2) / 2], [top, height - width / 2]]) {
-      mesh.position.set(x, y, z);
-      mesh.rotation.y = facing;
-      place.add(mesh);
-    }
-    // A bronze grille across the big gates.
-    if (big) {
-      for (let bar = -4; bar <= 4; bar += 1) {
-        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, height - 0.1, 6), stone(0x4a3a24, { metalness: 0.6, roughness: 0.4 }));
-        const along = new THREE.Vector3(Math.cos(facing), 0, -Math.sin(facing)).multiplyScalar((bar * width) / 10);
-        rod.position.set(x + along.x, (height - 0.1) / 2, z + along.z);
-        place.add(rod);
-      }
-    }
-  }
-  // The cavea: tiers of seats rising back from the podium, and a crowd on them.
   const tiers = 9;
-  const tierStone = [0xd9c6a3, 0xcdb894];
+  const colosseum = arenaColosseum({ rx, rz, podiumHeight, tiers, rise: 0.62, step: 0.075, firstTread: podiumHeight + 0.2 });
+  place.add(colosseum.group);
+  // The crowd's places on the tiers: an aisle every so often, none inside a vomitorium; the rest of the tier is filled.
   const crowdSpots = [];
   for (let tier = 0; tier < tiers; tier += 1) {
     const inner = 1.04 + tier * 0.075;
     const outer = inner + 0.075;
     const y = podiumHeight + 0.2 + tier * 0.62;
-    const tread = new THREE.Mesh(oval(new THREE.RingGeometry(inner, outer, 96, 1).rotateX(-Math.PI / 2)), stone(tierStone[tier % 2], { side: THREE.DoubleSide }));
-    tread.position.y = y;
-    const riser = new THREE.Mesh(oval(new THREE.CylinderGeometry(inner, inner, 0.62, 96, 1, true)), stone(0xb9a37d, { side: THREE.DoubleSide }));
-    riser.position.y = y - 0.31;
-    tread.receiveShadow = true;
-    place.add(tread, riser);
-    // An aisle every so often; the rest of the tier is filled.
     const seats = Math.round(150 + tier * 14);
     for (let seat = 0; seat < seats; seat += 1) {
       const angle = (seat / seats) * Math.PI * 2 + tier * 0.013;
-      if (Math.abs(Math.sin(angle * 8)) < 0.12 || Math.random() < 0.18) continue;
+      if (Math.abs(Math.sin(angle * 8)) < 0.12 || Math.random() < 0.18 || colosseum.blocksSeat(tier, angle)) continue;
       const radius = (inner + outer) / 2;
       crowdSpots.push([Math.cos(angle) * rx * radius, y, Math.sin(angle) * rz * radius, angle]);
     }
@@ -420,40 +360,6 @@ function buildColosseum() {
     heads.setColorAt(index, new THREE.Color(skins[Math.floor(Math.random() * skins.length)]));
   });
   place.add(bodies, heads);
-  // The outer wall: tiers of arches, and the attic storey above them.
-  const top = podiumHeight + 0.2 + tiers * 0.62;
-  const outerRadius = 1.04 + tiers * 0.075 + 0.08;
-  const arches = paintedTexture(512, 256, (g, w, h) => {
-    g.fillStyle = '#d8c4a0';
-    g.fillRect(0, 0, w, h);
-    for (let storey = 0; storey < 2; storey += 1) {
-      const y0 = storey * (h / 2);
-      for (let x = 0; x < w; x += 64) {
-        g.fillStyle = 'rgba(40,30,20,0.85)';
-        g.beginPath();
-        g.moveTo(x + 14, y0 + h / 2 - 8);
-        g.lineTo(x + 14, y0 + 34);
-        g.arc(x + 32, y0 + 34, 18, Math.PI, 0);
-        g.lineTo(x + 50, y0 + h / 2 - 8);
-        g.closePath();
-        g.fill();
-        g.fillStyle = 'rgba(120,95,65,0.6)';
-        g.fillRect(x + 2, y0 + 6, 6, h / 2 - 14);
-      }
-      g.fillStyle = 'rgba(120,95,65,0.7)';
-      g.fillRect(0, y0 + h / 2 - 8, w, 8);
-    }
-  }, [28, 1]);
-  const facade = new THREE.Mesh(oval(new THREE.CylinderGeometry(outerRadius, outerRadius, 7, 96, 1, true)), stone(0xffffff, { map: arches, side: THREE.DoubleSide }));
-  facade.position.y = top + 3.5;
-  place.add(facade);
-  // Velarium masts round the top.
-  for (let mast = 0; mast < 40; mast += 1) {
-    const angle = (mast / 40) * Math.PI * 2;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3, 6), stone(0x6a4a2a));
-    pole.position.set(Math.cos(angle) * rx * outerRadius, top + 8.5, Math.sin(angle) * rz * outerRadius);
-    place.add(pole);
-  }
   // Ground beyond, under the stands.
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), stone(0xb9a07a));
   ground.rotation.x = -Math.PI / 2;
@@ -1232,11 +1138,6 @@ function buildTown() {
 function buildPort() {
   const place = new THREE.Group();
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...options });
-  const shaded = (mesh) => {
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
-  };
   // The night sky: deep blue to black, stars, a moon low over the water.
   const night = paintedTexture(1024, 512, (g, w, h) => {
     const gradient = g.createLinearGradient(0, 0, 0, h);
@@ -1326,128 +1227,9 @@ function buildPort() {
   // Cut the apron at the quay: a concrete face down to the water.
   ground.geometry = new THREE.PlaneGeometry(80, 40 + edgeZ);
   ground.position.z = edgeZ - (40 + edgeZ) / 2;
-  const face = shaded(new THREE.Mesh(new THREE.BoxGeometry(80, 1.7, 0.4), lit(0x3a3c40)));
-  face.position.set(0, -0.85, edgeZ + 0.2);
-  place.add(face);
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(80, 0.04, 0.25), lit(0xd8b028, { roughness: 0.6 }));
-  stripe.position.set(0, 0.02, edgeZ - 0.15);
-  place.add(stripe);
-  const iron = lit(0x1e2024, { metalness: 0.6, roughness: 0.5 });
-  for (let x = -24; x <= 24; x += 6) {
-    const bollard = shaded(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.6, 12), iron));
-    bollard.position.set(x, 0.3, edgeZ - 0.5);
-    const cap = shaded(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.08, 12), iron));
-    cap.position.set(x, 0.62, edgeZ - 0.5);
-    place.add(bollard, cap);
-  }
-  // A ship's dark hull moored along the quay.
-  const hull = shaded(new THREE.Mesh(new THREE.BoxGeometry(46, 6, 9), lit(0x1a2230, { metalness: 0.3, roughness: 0.6 })));
-  hull.position.set(6, 1.2, edgeZ + 6);
-  place.add(hull);
-  for (let index = 0; index < 18; index += 1) {
-    const portLight = new THREE.Mesh(new THREE.CircleGeometry(0.12, 8), new THREE.MeshBasicMaterial({ color: 0xffd890 }));
-    portLight.position.set(-14 + index * 2.4, 2.6 + (index % 3) * 0.9, edgeZ + 1.45);
-    portLight.rotation.y = Math.PI;
-    if (index % 4 !== 1) place.add(portLight);
-  }
-  // Containers: corrugated steel boxes in faded company colours, stacked.
-  const CONTAINER = ['#8a2a1e', '#1f4f7a', '#2f6a3a', '#b5651d', '#6a6e74', '#d8d4c8', '#7a2a52', '#1d6a6a'];
-  const skins = CONTAINER.map((colour, index) => paintedTexture(256, 128, (g, w, h) => {
-    g.fillStyle = colour;
-    g.fillRect(0, 0, w, h);
-    for (let x = 0; x < w; x += 8) {
-      g.fillStyle = 'rgba(0,0,0,0.22)';
-      g.fillRect(x, 0, 3, h);
-      g.fillStyle = 'rgba(255,255,255,0.08)';
-      g.fillRect(x + 4, 0, 2, h);
-    }
-    for (let index2 = 0; index2 < 60; index2 += 1) {
-      g.fillStyle = `rgba(90,50,25,${Math.random() * 0.25})`;
-      g.fillRect(Math.random() * w, Math.random() * h, 4 + Math.random() * 18, 2 + Math.random() * 10);
-    }
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    g.font = 'bold 22px sans-serif';
-    g.fillText(['MAERA', 'KOSCO', 'HAPAG', 'ONELINE', 'EVERGO', 'NYKO', 'CMAS', 'YANGLU'][index], 18, 40);
-    g.fillStyle = 'rgba(0,0,0,0.5)';
-    g.fillRect(0, 0, w, 6);
-    g.fillRect(0, h - 6, w, 6);
-  }));
-  const containerMaterials = skins.map((map) => lit(0xffffff, { map, roughness: 0.6, metalness: 0.35 }));
-  const container = (x, z, level, turn, index) => {
-    const box = shaded(new THREE.Mesh(new THREE.BoxGeometry(6.06, 2.59, 2.44), containerMaterials[index % containerMaterials.length]));
-    box.position.set(x, 1.295 + level * 2.59, z);
-    box.rotation.y = turn;
-    place.add(box);
-  };
-  let count = 0;
-  // A wall of stacks behind each side of the lane, and rows inland, gapped.
-  for (const z of [-7.8, -10.4]) {
-    for (let x = -20; x <= 20; x += 6.2) {
-      if (Math.abs(x + 4) < 3 && z === -7.8) continue;
-      const high = 1 + ((count * 7) % 3);
-      for (let level = 0; level < high; level += 1) container(x + (level % 2) * 0.2, z, level, 0, count + level);
-      count += 1;
-    }
-  }
-  for (const x of [-12.5, 12.5]) {
-    for (let z = -4.5; z <= 4.5; z += 3) {
-      const high = 1 + ((count * 5) % 2);
-      for (let level = 0; level < high; level += 1) container(x, z, level, Math.PI / 2, count + level * 3);
-      count += 1;
-    }
-  }
-  // Pallets and drums by the stacks.
-  const drum = lit(0x2a4a7a, { metalness: 0.4, roughness: 0.5 });
-  for (const [x, z] of [[-9, -6.4], [-8.4, -6.6], [7.8, -6.5], [10.6, 5.6], [-10.5, 5.4]]) {
-    const barrel = shaded(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.88, 14), drum));
-    barrel.position.set(x, 0.44, z);
-    place.add(barrel);
-  }
-  const pallet = lit(0x7a6248);
-  for (const [x, z] of [[3, -6.6], [4.3, -6.4], [-11, 2]]) {
-    const stack = shaded(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.14 * 5, 1), pallet));
-    stack.position.set(x, 0.35, z);
-    place.add(stack);
-  }
-  // Gantry cranes: legs on the quay, boom out over the water.
-  const craneSteel = lit(0x8a3a2a, { metalness: 0.4, roughness: 0.6 });
-  for (const x of [-18, 16]) {
-    const crane = new THREE.Group();
-    for (const [dx, dz] of [[-4, -4], [4, -4], [-4, 2], [4, 2]]) {
-      const leg = shaded(new THREE.Mesh(new THREE.BoxGeometry(0.6, 22, 0.6), craneSteel));
-      leg.position.set(dx, 11, dz);
-      crane.add(leg);
-    }
-    const beam = shaded(new THREE.Mesh(new THREE.BoxGeometry(9, 1.2, 1.2), craneSteel));
-    beam.position.set(0, 20, -4);
-    const beam2 = beam.clone();
-    beam2.position.z = 2;
-    const boom = shaded(new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 40), craneSteel));
-    boom.position.set(0, 22, 10);
-    crane.add(beam, beam2, boom);
-    const warning = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3020 }));
-    warning.position.set(0, 23, 29);
-    crane.add(warning);
-    crane.position.set(x, 0, edgeZ - 3);
-    place.add(crane);
-  }
-  // Sodium lamps: tall poles, a dim orange pool under each.
-  const pole = lit(0x30343a, { metalness: 0.5, roughness: 0.5 });
-  const sodium = new THREE.MeshBasicMaterial({ color: 0xffb35c });
-  const glowMaterial = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.12, depthWrite: false });
-  for (const [x, z] of [[-7, -6.4], [6, -6.4], [-3, 7.6], [9, 7.6]]) {
-    const post = shaded(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 7, 8), pole));
-    post.position.set(x, 3.5, z);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.2), pole);
-    arm.position.set(x, 7, z + (z < 0 ? 0.6 : -0.6));
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.12, 0.5), sodium);
-    head.position.set(x, 6.92, z + (z < 0 ? 1.1 : -1.1));
-    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 8), glowMaterial);
-    halo.position.copy(head.position);
-    const lamp = new THREE.PointLight(0xffa24a, 2, 16, 2);
-    lamp.position.set(head.position.x, 6.6, head.position.z);
-    place.add(post, arm, head, halo, lamp);
-  }
+  // The quay edge, the ship moored along it, the stacks, the cranes, the
+  // sodium lamps, drums and pallets (src/props/harbour.js).
+  place.add(harbourPort({ edgeZ }).group);
   // Rain over the yard, slanting a little with the wind off the water.
   const rain = buildRain({ halfX: 16, halfZ: 12, height: 14, count: 1600, slant: [0.6, 0, -0.25] });
   place.add(rain);
