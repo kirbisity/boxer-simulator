@@ -130,12 +130,14 @@ const GENERATED_PLACES = {
  * photograph's horizon. No volcanoes: the photograph has its own.
  */
 // farTint is the photograph's own ground just below its horizon (its mean
-// colour from 2 to 6 degrees down): the far hills take it on, so the land
-// runs into the picture's land without a change of colour.
+// colour from 1 to 7 degrees down): the far hills take it on, so the land
+// runs into the picture's land without a change of colour. The plain keeps
+// its volcanoes: no CC0 photograph shows Popocatépetl and Iztaccíhuatl, so
+// they are built, in front of a photograph of a dry plateau's far ranges.
 const GENERATED_FOOTHILLS = {
-  meadow: { ...GENERATED_PLACES.meadow, bump: 0.8, slope: 0.075, ramp: 12, radius: 360, cap: 22, farTint: 0x56663d },
-  field: { ...GENERATED_PLACES.field, bump: 0.7, slope: 0.065, ramp: 14, radius: 360, cap: 20, farTint: 0x56663d },
-  plain: { ...GENERATED_PLACES.plain, bump: 0.6, slope: 0.08, ramp: 16, radius: 360, cap: 24, volcanoes: [], farTint: 0x6a5e4c },
+  meadow: { ...GENERATED_PLACES.meadow, bump: 0.8, slope: 0.075, ramp: 12, radius: 360, cap: 22, farTint: 0x6a724c },
+  field: { ...GENERATED_PLACES.field, bump: 0.7, slope: 0.065, ramp: 14, radius: 360, cap: 20, farTint: 0x6a724c },
+  plain: { ...GENERATED_PLACES.plain, bump: 0.6, slope: 0.06, ramp: 16, radius: 360, cap: 16, farTint: 0x9a908b },
   sengoku: { ...GENERATED_PLACES.sengoku, bump: 0.9, slope: 0.11, ramp: 12, radius: 360, cap: 32, farTint: 0x858759 },
 };
 

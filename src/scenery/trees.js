@@ -345,9 +345,12 @@ function treesOnHills(place, spec, rng, heightAt, { count, from, to, perWood }) 
 }
 
 // How many trees go up each place's hills when the land rises (in woods of perWood).
+// The share of a place's own broadleaf trees kept when the land rises behind them.
+const TREES_ON_LAND_KEEP = 0.55;
+
 const TREES_HILL_WOODS = {
-  meadow: { count: 260, from: 45, to: 200, perWood: 16 },
-  field: { count: 320, from: 75, to: 220, perWood: 18 },
+  meadow: { count: 160, from: 50, to: 200, perWood: 12 },
+  field: { count: 180, from: 75, to: 220, perWood: 12 },
   sengoku: { count: 700, from: 40, to: 230, perWood: 28 },
 };
 
@@ -488,12 +491,13 @@ function treesPlan(view, place, spec, rng, { woods, heightAt = null }) {
   const trees = treesScatter(place, spec, rng, { count, from, to, spacing: kind === 'pine' ? 2.6 : 3.4 });
   if (!woods) return trees;
   if (heightAt) {
-    // On raised land: the spec's trees stand on it, and the hills carry woods instead of the old cones' pines.
-    for (const tree of trees) tree.y = heightAt(tree.x, tree.z) - 0.1;
-    const extra = place === 'meadow' ? treesScatter(place, spec, rng, { count: 30, from: 30, to: 39, spacing: 2.4, woods: 5, perWood: 12, taken: trees }) : [];
-    for (const tree of extra) tree.y = heightAt(tree.x, tree.z) - 0.1;
+    // On raised land: the spec's trees stand on it (broadleaf thinned, so the
+    // hills show through the gaps), and the hills carry woods instead of the
+    // old cones' pines.
+    const kept = kind === 'pine' ? trees : trees.filter(() => rng() < TREES_ON_LAND_KEEP);
+    for (const tree of kept) tree.y = heightAt(tree.x, tree.z) - 0.1;
     const hills = TREES_HILL_WOODS[place] ? treesOnHills(place, spec, rng, heightAt, TREES_HILL_WOODS[place]) : [];
-    return [...trees, ...extra, ...hills];
+    return [...kept, ...hills];
   }
   if (place === 'field') {
     // The field's spec trees become woods and hedgerow along the hills.

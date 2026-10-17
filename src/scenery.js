@@ -1,7 +1,8 @@
 // Scenery variants (proof of concept): different ways to draw what lies
 // beyond the fighting ground (hills, mountains, trees, the ground's far
-// reach) in the open-air places. 'current' is the game as built in
-// render.js. A variant names the kinds of current scenery it replaces
+// reach) in the open-air places. 'default' is the photograph over generated
+// foothills in the realistic looks and 'current' (the game as built in
+// render.js) in the classic cartoon look. A variant names the kinds of current scenery it replaces
 // (render.js tags them userData.scenery = 'ground' | 'hills' | 'mountains' |
 // 'trees' | 'plants') and builds its own group into the place; a composite
 // variant is a list of parts. Switched from the console or the looks bench:
@@ -11,6 +12,7 @@
 import { SKYBALL_VARIANTS } from './scenery/skyball.js';
 import { GENERATED_VARIANTS } from './scenery/generated.js';
 import { TREE_VARIANTS } from './scenery/trees.js';
+import { activeLook } from './looks.js';
 
 /**
  * What each open-air place has beyond its ground, for a variant to draw in
@@ -54,6 +56,9 @@ export const PLACE_SCENERY = {
 };
 
 const CURRENT = { id: 'current', label: 'Current (as built)', replaces: [] };
+// The default: the photograph over generated foothills in the realistic looks; the classic cartoon look keeps its painted hills.
+const DEFAULT_SCENERY = { id: 'default', label: 'Default for the look' };
+const sceneryForLook = () => (activeLook().id === 'toon' ? 'current' : 'photo-foothills');
 
 // The head-to-head: each way of drawing the land, with the same trees.
 const SCENERY_COMPOSITES = [
@@ -65,9 +70,9 @@ const SCENERY_COMPOSITES = [
 ];
 
 /** Every variant: current, then each method's own, then the composites. */
-export const SCENERY_VARIANTS = [CURRENT, ...SKYBALL_VARIANTS, ...GENERATED_VARIANTS, ...TREE_VARIANTS, ...SCENERY_COMPOSITES];
+export const SCENERY_VARIANTS = [DEFAULT_SCENERY, CURRENT, ...SKYBALL_VARIANTS, ...GENERATED_VARIANTS, ...TREE_VARIANTS, ...SCENERY_COMPOSITES];
 
-let sceneryInForce = 'current';
+let sceneryInForce = 'default';
 
 export const sceneryById = (id) => SCENERY_VARIANTS.find((variant) => variant.id === id);
 export const activeScenery = () => sceneryInForce;
@@ -76,7 +81,7 @@ export const activeScenery = () => sceneryInForce;
 export function setScenery(id) {
   if (!sceneryById(id)) {
     console.warn(`no scenery ${id}; the variants are ${SCENERY_VARIANTS.map((variant) => variant.id).join(', ')}`);
-    id = 'current';
+    id = 'default';
   }
   sceneryInForce = id;
   return id;
@@ -97,7 +102,8 @@ export function applyScenery(view, place) {
   const group = view.places?.[place];
   const spec = PLACE_SCENERY[place];
   if (!group) return;
-  const parts = spec ? partsOf(sceneryById(sceneryInForce)) : [CURRENT];
+  const chosen = sceneryInForce === 'default' ? sceneryForLook() : sceneryInForce;
+  const parts = spec ? partsOf(sceneryById(chosen)) : [CURRENT];
   const replaced = new Set(parts.flatMap((part) => part.replaces ?? []));
   const wanted = new Set(parts.map((part) => part.id));
   group.traverse((object) => {

@@ -4,6 +4,6 @@ Panoramas by Poly Haven (https://polyhaven.com/hdris), licence CC0 (public domai
 
 | Asset | Source | Author | Licence | Used for |
 |---|---|---|---|---|
-| evening_meadow | https://polyhaven.com/a/evening_meadow | Alexander Scholten | CC0 | meadow, field |
-| kiara_5_noon | https://polyhaven.com/a/kiara_5_noon | Greg Zaal | CC0 | plain |
+| golden_gate_hills | https://polyhaven.com/a/golden_gate_hills | Dimitrios Savva, Jarod Guest | CC0 | meadow, field |
+| drakensberg_solitary_mountain | https://polyhaven.com/a/drakensberg_solitary_mountain | Dimitrios Savva, Jarod Guest | CC0 | plain (far ranges; the volcanoes in front are generated) |
 | alps_field | https://polyhaven.com/a/alps_field | Andreas Mischok | CC0 | sengoku |
