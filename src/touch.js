@@ -15,6 +15,7 @@ import { hurtShare } from './ai.js';
 import { ACTIONS, attackAt, attackLayout, attackWhere, contextAction, moveName, strikeOutcome } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
+import { fightUiInstall } from './fightui/index.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -98,6 +99,8 @@ export function installFightControls(root, hooks) {
   let markAt = -Infinity;
   const awake = new Map();
   let active = false;
+  // Other attack controls to try (fightui/): none until one is chosen, and today's pad stays.
+  const fightUi = fightUiInstall(root, hooks);
 
   /**
    * The place in the world a point on the screen means: on a man if the line
@@ -179,6 +182,7 @@ export function installFightControls(root, hooks) {
         orders.stick = null;
         stick.hidden = true;
       } else if (event.type === 'tap') {
+        if (fightUi.tap(event)) continue;
         // Always an attack, at once: the move whose place on the pad the tap is nearest.
         const [x, y] = padCoordinates(event.at[0], event.at[1]);
         const chosen = attackAt(hooks.player().style, x, y);
@@ -439,6 +443,7 @@ export function installFightControls(root, hooks) {
     const orders = hooks.orders();
     if (!world || !me) return;
     if (me.style !== padStyle) drawPad(me.style);
+    fightUi.update();
     callStrike(world, me, now);
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
     // The special button: one place, its label what it would do now.
@@ -500,9 +505,10 @@ export function installFightControls(root, hooks) {
     call.hidden = true;
     lastTapAt = null;
     rightButtons.clear();
+    fightUi.reset();
   }
 
-  return { update, setActive, reset, toggleLock, setDevice, get device() { return device; } };
+  return { update, setActive, reset, toggleLock, setDevice, get device() { return device; }, fightUi: fightUi.choose };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */
