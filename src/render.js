@@ -286,8 +286,8 @@ function buildMeadow() {
 /**
  * The Colosseum, open to the sky: an oval of raked sand, the podium wall
  * round it with its gates and marble balustrade, the stepped stone tiers of
- * the cavea rising behind, filled with a crowd, and the arched travertine
- * outer wall above them.
+ * the cavea rising behind, empty between games and worn by use, and the
+ * arched travertine outer wall above them.
  */
 function buildColosseum() {
   const place = new THREE.Group();
@@ -323,44 +323,12 @@ function buildColosseum() {
   floor.userData.scenery = 'ground';
   place.add(floor);
   // The amphitheatre's stone: the podium and its gates, the stepped cavea,
-  // the arcaded outer wall and attic, the velarium (src/props/arena.js).
+  // the arcaded outer wall and attic, the velarium, and the signs of use:
+  // grime, stains, repairs, litter in the stands, a rake by a gate (src/props/arena.js).
   const podiumHeight = 3.2;
   const tiers = 9;
   const colosseum = arenaColosseum({ rx, rz, podiumHeight, tiers, rise: 0.62, step: 0.075, firstTread: podiumHeight + 0.2 });
   place.add(colosseum.group);
-  // The crowd's places on the tiers: an aisle every so often, none inside a vomitorium; the rest of the tier is filled.
-  const crowdSpots = [];
-  for (let tier = 0; tier < tiers; tier += 1) {
-    const inner = 1.04 + tier * 0.075;
-    const outer = inner + 0.075;
-    const y = podiumHeight + 0.2 + tier * 0.62;
-    const seats = Math.round(150 + tier * 14);
-    for (let seat = 0; seat < seats; seat += 1) {
-      const angle = (seat / seats) * Math.PI * 2 + tier * 0.013;
-      if (Math.abs(Math.sin(angle * 8)) < 0.12 || Math.random() < 0.18 || colosseum.blocksSeat(tier, angle)) continue;
-      const radius = (inner + outer) / 2;
-      crowdSpots.push([Math.cos(angle) * rx * radius, y, Math.sin(angle) * rz * radius, angle]);
-    }
-  }
-  // The crowd: small robed figures in many colours, looking down at the sand.
-  const robes = [0xe8e2d4, 0xc23b2a, 0x6b4a8a, 0x2e5f8a, 0xd9a441, 0x7a8a4a, 0xb7b1a4, 0x8a3a2a, 0xf0ece2];
-  const bodies = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.22, 0.8, 6), stone(0xffffff, { roughness: 0.9 }), crowdSpots.length);
-  const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6), stone(0xffffff, { roughness: 0.8 }), crowdSpots.length);
-  const placer = new THREE.Object3D();
-  const skins = [0xe0b48c, 0xc48c64, 0x9a6a46, 0x6e4a32, 0xf0c8a0];
-  crowdSpots.forEach(([x, y, z], index) => {
-    placer.position.set(x, y + 0.4, z);
-    placer.rotation.set(0, 0, 0);
-    placer.scale.setScalar(0.9 + Math.random() * 0.25);
-    placer.updateMatrix();
-    bodies.setMatrixAt(index, placer.matrix);
-    bodies.setColorAt(index, new THREE.Color(robes[Math.floor(Math.random() * robes.length)]));
-    placer.position.y = y + 0.92;
-    placer.updateMatrix();
-    heads.setMatrixAt(index, placer.matrix);
-    heads.setColorAt(index, new THREE.Color(skins[Math.floor(Math.random() * skins.length)]));
-  });
-  place.add(bodies, heads);
   // Ground beyond, under the stands.
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), stone(0xb9a07a));
   ground.rotation.x = -Math.PI / 2;

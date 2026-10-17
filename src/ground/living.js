@@ -1247,6 +1247,31 @@ function livingArenaSand({ arena, grounds, rng }) {
   for (let index = 0; index < 22; index += 1) {
     livingTrail(relief, rng, { x: (rng() - 0.5) * rx * 1.4, z: (rng() - 0.5) * rz * 1.4, heading: rng() * 6.28, steps: 6 + rng() * 14, colour: 'rgba(60,60,60,0.7)', wander: 0.6, foot: 0.25 });
   }
+  // Near the two great gates: the ruts of a handcart's wheels in from the
+  // east one, the broad drag mark of a body hauled out through the west one.
+  const arenaPath = (x0, z0, x1, z1, bend) => Array.from({ length: 25 }, (_, index) => {
+    const f = index / 24;
+    return [x0 + (x1 - x0) * f, z0 + (z1 - z0) * f + Math.sin(f * Math.PI) * bend];
+  });
+  const groove = (context, points, width, styles) => {
+    for (const [share, style] of styles) {
+      context.strokeStyle = style;
+      context.lineWidth = width * share * scale;
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.beginPath();
+      points.forEach(([x, z], index) => {
+        const [cx, cy] = px(x, z);
+        if (index) context.lineTo(cx, cy);
+        else context.moveTo(cx, cy);
+      });
+      context.stroke();
+    }
+  };
+  const ruts = [-0.45, 0.45].map((side) => arenaPath(rx * 0.995, side, rx * 0.58, side * 1.05 + 1.1, 0.25));
+  const drag = arenaPath(-rx * 0.995, 0.15, -rx * 0.6, -0.9, -0.2);
+  for (const rut of ruts) groove(g, rut, 0.075, [[2.2, 'rgba(165,165,165,0.45)'], [1, 'rgba(55,55,55,0.75)']]);
+  groove(g, drag, 0.34, [[1.5, 'rgba(150,150,150,0.3)'], [1, 'rgba(100,100,100,0.45)'], [0.4, 'rgba(85,85,85,0.35)']]);
   const normals = livingNormalCanvas(relief.canvas, 3.5);
   // The colour layer: darker in the hollows, lighter on the ridges, a few dark stains.
   const source = g.getImageData(0, 0, relief.canvas.width, relief.canvas.height).data;
@@ -1270,6 +1295,18 @@ function livingArenaSand({ arena, grounds, rng }) {
     const [cx, cy] = colour.px((rng() - 0.5) * rx * 1.3, (rng() - 0.5) * rz * 1.3);
     for (let blot = 0; blot < 6; blot += 1) livingBlot(colour.g, cx + (rng() - 0.5) * 0.4 * scale, cy + (rng() - 0.5) * 0.4 * scale, (0.08 + rng() * 0.2) * scale, (0.06 + rng() * 0.14) * scale, `rgba(${80 + rng() * 20},${40 + rng() * 10},${28},${0.2 + rng() * 0.2})`, rng() * 3);
   }
+  // The drag mark smeared dark, and the damp dark line where the sand meets the podium's foot.
+  groove(colour.g, drag, 0.3, [[1.3, 'rgba(110,80,52,0.18)'], [0.8, 'rgba(96,58,38,0.28)'], [0.3, 'rgba(84,36,24,0.3)']]);
+  for (const rut of ruts) groove(colour.g, rut, 0.07, [[1, 'rgba(84,62,40,0.38)']]);
+  const { width: cw, height: ch } = colour.canvas;
+  colour.g.lineWidth = 0.06 * scale;
+  for (let k = 0; k < 16; k += 1) {
+    const reach = 0.948 + k * 0.0034;
+    colour.g.strokeStyle = `rgba(68,50,33,${0.04 + 0.3 * (k / 15) ** 2})`;
+    colour.g.beginPath();
+    colour.g.ellipse(cw / 2, ch / 2, (cw / 2) * reach, (ch / 2) * reach, 0, 0, Math.PI * 2);
+    colour.g.stroke();
+  }
   // Clip to the oval.
   colour.g.globalCompositeOperation = 'destination-in';
   colour.g.beginPath();
@@ -1281,8 +1318,8 @@ function livingArenaSand({ arena, grounds, rng }) {
   const mounds = [];
   for (let index = 0; index < 110 * Math.max(0.5, LIVING_DENSITY); index += 1) {
     const angle = rng() * Math.PI * 2;
-    const reach = 0.95 + rng() * 0.04;
-    mounds.push({ x: Math.cos(angle) * rx * reach, y: -0.03, z: Math.sin(angle) * rz * reach, sx: 0.6 + rng() * 1.2, sy: 0.05 + rng() * 0.09, sz: 0.25 + rng() * 0.35, ry: -Math.atan2(Math.sin(angle) * rx, Math.cos(angle) * rz) + Math.PI / 2 + (rng() - 0.5) * 0.3 });
+    const reach = 0.962 + rng() * 0.03;
+    mounds.push({ x: Math.cos(angle) * rx * reach, y: -0.03, z: Math.sin(angle) * rz * reach, sx: 0.6 + rng() * 1.2, sy: 0.04 + rng() * 0.06, sz: 0.25 + rng() * 0.35, ry: -Math.atan2(Math.sin(angle) * rx, Math.cos(angle) * rz) + Math.PI / 2 + (rng() - 0.5) * 0.3 });
   }
   const mound = new THREE.SphereGeometry(1, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2);
   const sandMaterial = floor ? floor.material.clone() : livingSolid({ color: 0xc9a675 });

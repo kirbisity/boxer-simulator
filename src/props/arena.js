@@ -524,36 +524,105 @@ function arenaTravertine() {
   });
 }
 
-/** Marble revetment, 2.4 m a repeat: slabs 1.2 by 0.8 m, white with grey veins, fine joints. */
+/** A value 0..1 for whole numbers (a, b): the same every build. */
+export const arenaHash = (a, b = 0) => {
+  const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+/** Smooth noise along a line, 0..1, a feature every `width`. */
+export const arenaNoise1 = (x, width, seed = 0) => {
+  const f = x / width;
+  const i = Math.floor(f);
+  const t = f - i;
+  return arenaHash(i, seed) + (arenaHash(i + 1, seed) - arenaHash(i, seed)) * t * t * (3 - 2 * t);
+};
+
+// The marble's repeat (m): long enough that its repairs and chips do not read as a pattern.
+const ARENA_MARBLE_TILE = 4.8;
+
+/**
+ * Marble revetment, 4.8 m a repeat: slabs 1.2 by 0.8 m, white with grey
+ * veins, fine joints, and years of use: a slab replaced in a greyer stone,
+ * corners knocked off down to the brick core, the holes of lost iron cramps
+ * bleeding rust, hairline cracks, grime in the joints.
+ */
 function arenaMarble() {
   return arenaPainted('marble', () => {
-    const s = arenaSheet(512, '#e4dfd5', 0.6, 23);
+    const size = 1024;
+    const s = arenaSheet(size, '#e4dfd5', 0.6, 23);
     const { rr } = s;
-    const slabW = 512 / 2;
-    const slabH = 512 / 3;
-    for (let row = 0; row < 3; row += 1) {
-      for (let col = 0; col < 2; col += 1) {
+    const cols = 4;
+    const rows = 6;
+    const slabW = size / cols;
+    const slabH = size / rows;
+    const slabs = [];
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
         const x = col * slabW + (row % 2) * slabW * 0.5;
-        const tone = rr(84, 92);
-        s.rect(x, row * slabH, slabW, slabH, `hsl(${rr(30, 45)},${rr(8, 16)}%,${tone}%)`, 0.6);
+        const y = row * slabH;
+        // One slab in eleven a later repair: a cooler, greyer marble.
+        const repair = rr(0, 1) < 0.09;
+        const tone = repair ? rr(72, 76) : rr(77, 86);
+        s.rect(x, y, slabW, slabH, repair ? `hsl(${rr(200, 220)},${rr(3, 6)}%,${tone}%)` : `hsl(${rr(32, 42)},${rr(12, 20)}%,${tone}%)`, repair ? 0.62 : 0.6);
+        slabs.push({ x, y });
         // Each slab's veins run one way: it was sawn from one block.
         const turn = rr(-0.6, 0.6);
-        for (let vein = 0; vein < 5; vein += 1) {
+        for (let vein = 0; vein < (repair ? 3 : 5); vein += 1) {
           let vx = x + rr(0, slabW);
-          let vy = row * slabH + rr(0, slabH);
+          let vy = y + rr(0, slabH);
           const points = [[vx, vy]];
           for (let step = 0; step < 14; step += 1) {
             vx += Math.cos(turn) * rr(4, 14);
             vy += Math.sin(turn) * rr(4, 14) + rr(-6, 6);
             points.push([vx, vy]);
           }
-          s.line(points, rr(0.6, 2.4), `rgba(${Math.round(rr(110, 140))},${Math.round(rr(108, 130))},${Math.round(rr(105, 125))},${rr(0.15, 0.45)})`, null);
+          s.line(points, rr(0.6, 2.4), `rgba(${Math.round(rr(100, 140))},${Math.round(rr(100, 130))},${Math.round(rr(100, 125))},${rr(0.15, 0.45)})`, null);
         }
-        s.rect(x - 1, row * slabH, 2, slabH, 'rgba(120,110,95,0.55)', 0.3);
+        // Grime worked into the joints.
+        s.rect(x - 1.5, y, 3, slabH, 'rgba(96,86,70,0.65)', 0.3);
+        // Dirt settled on the slab's face, heavier toward its foot.
+        for (let smudge = 0; smudge < 6; smudge += 1) s.blob(x + rr(0, slabW), y + slabH * rr(0.4, 1), rr(20, 60), rr(8, 24), 0, `rgba(120,100,75,${rr(0.03, 0.08)})`, null);
       }
-      s.rect(0, row * slabH - 1, 512, 2, 'rgba(120,110,95,0.55)', 0.3);
+      s.rect(0, row * slabH - 1.5, size, 3, 'rgba(96,86,70,0.65)', 0.3);
     }
-    for (let index = 0; index < 500; index += 1) s.blob(rr(0, 512), rr(0, 512), rr(1, 4), rr(1, 3), 0, `rgba(150,135,110,${rr(0.05, 0.18)})`, null);
+    // Corners knocked off: the marble broken back to the brick behind it.
+    for (const { x, y } of slabs) {
+      if (rr(0, 1) > 0.25) continue;
+      const cx = x + (rr(0, 1) < 0.5 ? rr(0, 14) : slabW - rr(0, 14));
+      const cy = y + (rr(0, 1) < 0.5 ? rr(0, 12) : slabH - rr(0, 12));
+      const r = rr(6, 18);
+      s.blob(cx, cy, r * 1.15, r * 0.9, rr(0, 3), 'rgba(176,162,140,0.85)', 0.42);
+      s.blob(cx, cy, r * 0.7, r * 0.55, rr(0, 3), `rgba(${Math.round(rr(128, 142))},${Math.round(rr(112, 122))},${Math.round(rr(96, 104))},0.9)`, 0.3);
+    }
+    // Iron cramps long since robbed: a hole at a joint, rust run down the slab below it.
+    for (let index = 0; index < 7; index += 1) {
+      const hx = Math.floor(rr(0, cols * 2)) * (slabW / 2) + rr(-3, 3);
+      const hy = Math.floor(rr(1, rows)) * slabH + rr(-2, 2);
+      s.blob(hx, hy, rr(3, 5), rr(4, 6), 0, 'rgba(50,38,28,0.9)', 0.2);
+      let px = hx;
+      const points = [[px, hy]];
+      const end = hy + rr(60, 160);
+      for (let y = hy; y < end; y += 10) {
+        px += rr(-1.5, 1.5);
+        points.push([px, y]);
+      }
+      s.line(points, rr(3, 7), `rgba(${Math.round(rr(130, 160))},${Math.round(rr(70, 90))},40,${rr(0.12, 0.22)})`, null);
+    }
+    // Hairline cracks.
+    for (let index = 0; index < 9; index += 1) {
+      let cx = rr(0, size);
+      let cy = rr(0, size);
+      const points = [[cx, cy]];
+      const turn = rr(0, Math.PI * 2);
+      for (let step = 0; step < 8; step += 1) {
+        cx += Math.cos(turn + rr(-0.7, 0.7)) * rr(6, 16);
+        cy += Math.sin(turn + rr(-0.7, 0.7)) * rr(6, 16);
+        points.push([cx, cy]);
+      }
+      s.line(points, rr(0.8, 1.6), 'rgba(70,62,52,0.55)', 0.4);
+    }
+    for (let index = 0; index < 1200; index += 1) s.blob(rr(0, size), rr(0, size), rr(1, 4), rr(1, 3), 0, `rgba(140,122,98,${rr(0.05, 0.2)})`, null);
     return arenaFinish(s, { relief: 3, blur: 1 });
   });
 }
@@ -664,13 +733,15 @@ const ARENA_ATTIC = [ARENA_STOREY * 3, 16.0];
  * The amphitheatre round an elliptical arena (half-axes rx, rz): the podium
  * wall (podiumHeight) and its eight gates, `tiers` treads rising `rise` and
  * stepping back `step` (a share of the ellipse) from firstTread, and the
- * outer wall. Returns the group and `blocksSeat(tier, angle)`: true where a
- * vomitorium stands, so no spectator is put inside it.
+ * outer wall, empty and worn by use. Returns the group and its triangle count.
  */
 export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstTread }) {
   const group = new THREE.Group();
   const random = arenaRandom(1906);
   const travertine = arenaBuilder();
+  // The outer wall and the ambulatories behind it: hidden from the sand by the
+  // wall above the top walk, which casts the same shadow, so they cast none.
+  const facade = arenaBuilder();
   const marble = arenaBuilder();
   const inscribed = arenaBuilder();
   const iron = arenaBuilder();
@@ -692,7 +763,7 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
   // where the rain never washes (under the cornices), each bay its own tone.
   const weathered = (shade, base = 1) => (p, n) => {
     const foot = 0.74 + 0.26 * arenaSmooth(0, 1.4, p.y);
-    const sheltered = n.y < -0.5 ? 0.78 : 1;
+    const sheltered = n.y < -0.5 ? 0.62 : 1;
     const deep = p.z < -0.45 ? 0.62 : 1;
     const v = base * shade * foot * sheltered * deep;
     return [v, v * 0.985, v * 0.96];
@@ -723,38 +794,38 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
       shape.lineTo(half, top);
       for (let k = 1; k < 6; k += 1) shape.lineTo(half - (bay * k) / 6, top);
       shape.lineTo(-half, top);
-      travertine.add(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }), arenaAt(u, 0, -depth), { warp: outer.warp, tile: 2, colour });
+      facade.add(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 }), arenaAt(u, 0, -depth), { warp: outer.warp, tile: 2, colour });
       // Storeys two and three: a parapet across the foot of each arch.
-      if (sill) travertine.add(new THREE.BoxGeometry(ARENA_ARCH * 2, sill, depth * 0.6, 3, 1, 1), arenaAt(u, floor + sill / 2, -depth * 0.35), { warp: outer.warp, tile: 2, colour });
+      if (sill) facade.add(new THREE.BoxGeometry(ARENA_ARCH * 2, sill, depth * 0.6, 3, 1, 1), arenaAt(u, floor + sill / 2, -depth * 0.35), { warp: outer.warp, tile: 2, colour });
       // The archivolt round the arch, its keystone, the impost mouldings it springs from.
       const ring = new THREE.Shape();
       ring.absarc(0, 0, ARENA_ARCH + 0.16, 0, Math.PI, false);
       ring.absarc(0, 0, ARENA_ARCH, Math.PI, 0, true);
-      travertine.add(new THREE.ExtrudeGeometry(ring, { depth: 0.05, bevelEnabled: false, curveSegments: 12 }), arenaAt(u, spring, 0), { warp: outer.warp, tile: 2, colour });
-      travertine.add(new THREE.BoxGeometry(0.17, 0.24, 0.09), arenaAt(u, spring + ARENA_ARCH + 0.06, 0.045), { warp: outer.warp, tile: 2, colour });
-      travertine.add(new THREE.BoxGeometry(bay - ARENA_ARCH * 2 + 0.24, 0.1, 0.06), arenaAt(pier, spring - 0.05, 0.03), { warp: outer.warp, tile: 2, colour });
+      facade.add(new THREE.ExtrudeGeometry(ring, { depth: 0.05, bevelEnabled: false, curveSegments: 12 }), arenaAt(u, spring, 0), { warp: outer.warp, tile: 2, colour });
+      facade.add(new THREE.BoxGeometry(0.17, 0.24, 0.09), arenaAt(u, spring + ARENA_ARCH + 0.06, 0.045), { warp: outer.warp, tile: 2, colour });
+      facade.add(new THREE.BoxGeometry(bay - ARENA_ARCH * 2 + 0.24, 0.1, 0.06), arenaAt(pier, spring - 0.05, 0.03), { warp: outer.warp, tile: 2, colour });
       // The engaged half-column on the pier: Tuscan below, Ionic, then Corinthian.
       const base = floor + sill;
-      if (sill) travertine.add(new THREE.BoxGeometry(0.58, sill, 0.32), arenaAt(pier, floor + sill / 2, 0.06), { warp: outer.warp, tile: 2, colour });
-      travertine.add(new THREE.BoxGeometry(0.54, 0.08, 0.3), arenaAt(pier, base + 0.04, 0.05), { warp: outer.warp, tile: 2, colour });
-      travertine.add(halfColumn(0.24, 0.26, 0.08), arenaAt(pier, base + 0.12, 0), { warp: outer.warp, tile: 2, colour });
+      if (sill) facade.add(new THREE.BoxGeometry(0.58, sill, 0.32), arenaAt(pier, floor + sill / 2, 0.06), { warp: outer.warp, tile: 2, colour });
+      facade.add(new THREE.BoxGeometry(0.54, 0.08, 0.3), arenaAt(pier, base + 0.04, 0.05), { warp: outer.warp, tile: 2, colour });
+      facade.add(halfColumn(0.24, 0.26, 0.08), arenaAt(pier, base + 0.12, 0), { warp: outer.warp, tile: 2, colour });
       const capital = [0.2, 0.2, 0.34][storey];
       const shaftFrom = base + 0.16;
       const shaftTo = top - capital;
-      travertine.add(halfColumn(0.19, 0.21, shaftTo - shaftFrom), arenaAt(pier, (shaftFrom + shaftTo) / 2, 0), { warp: outer.warp, tile: 2, colour });
+      facade.add(halfColumn(0.19, 0.21, shaftTo - shaftFrom), arenaAt(pier, (shaftFrom + shaftTo) / 2, 0), { warp: outer.warp, tile: 2, colour });
       if (storey === 0) {
-        travertine.add(halfColumn(0.26, 0.19, 0.12), arenaAt(pier, shaftTo + 0.06, 0), { warp: outer.warp, tile: 2, colour });
-        travertine.add(new THREE.BoxGeometry(0.56, 0.08, 0.3), arenaAt(pier, top - 0.04, 0.12), { warp: outer.warp, tile: 2, colour });
+        facade.add(halfColumn(0.26, 0.19, 0.12), arenaAt(pier, shaftTo + 0.06, 0), { warp: outer.warp, tile: 2, colour });
+        facade.add(new THREE.BoxGeometry(0.56, 0.08, 0.3), arenaAt(pier, top - 0.04, 0.12), { warp: outer.warp, tile: 2, colour });
       } else if (storey === 1) {
-        travertine.add(halfColumn(0.23, 0.19, 0.1), arenaAt(pier, shaftTo + 0.05, 0), { warp: outer.warp, tile: 2, colour });
+        facade.add(halfColumn(0.23, 0.19, 0.1), arenaAt(pier, shaftTo + 0.05, 0), { warp: outer.warp, tile: 2, colour });
         // The volutes: a scroll rolled across the face of the capital.
-        travertine.add(new THREE.CylinderGeometry(0.06, 0.06, 0.6, 10), arenaAt(pier, shaftTo + 0.1, 0.17, 0, 0, Math.PI / 2), { warp: outer.warp, tile: 2, colour });
-        travertine.add(new THREE.BoxGeometry(0.56, 0.05, 0.3), arenaAt(pier, top - 0.025, 0.12), { warp: outer.warp, tile: 2, colour });
+        facade.add(new THREE.CylinderGeometry(0.06, 0.06, 0.6, 10), arenaAt(pier, shaftTo + 0.1, 0.17, 0, 0, Math.PI / 2), { warp: outer.warp, tile: 2, colour });
+        facade.add(new THREE.BoxGeometry(0.56, 0.05, 0.3), arenaAt(pier, top - 0.025, 0.12), { warp: outer.warp, tile: 2, colour });
       } else {
         // The bell of acanthus, flaring to a thin abacus.
-        travertine.add(halfColumn(0.27, 0.19, 0.26), arenaAt(pier, shaftTo + 0.13, 0), { warp: outer.warp, tile: 2, colour });
-        travertine.add(halfColumn(0.23, 0.2, 0.12), arenaAt(pier, shaftTo + 0.07, 0.02), { warp: outer.warp, tile: 2, colour: (p, n) => tone(0.92, colour(p, n)) });
-        travertine.add(new THREE.BoxGeometry(0.62, 0.07, 0.34), arenaAt(pier, top - 0.035, 0.12), { warp: outer.warp, tile: 2, colour });
+        facade.add(halfColumn(0.27, 0.19, 0.26), arenaAt(pier, shaftTo + 0.13, 0), { warp: outer.warp, tile: 2, colour });
+        facade.add(halfColumn(0.23, 0.2, 0.12), arenaAt(pier, shaftTo + 0.07, 0.02), { warp: outer.warp, tile: 2, colour: (p, n) => tone(0.92, colour(p, n)) });
+        facade.add(new THREE.BoxGeometry(0.62, 0.07, 0.34), arenaAt(pier, top - 0.035, 0.12), { warp: outer.warp, tile: 2, colour });
       }
     }
     // The attic: a solid wall with a small window in every other bay,
@@ -776,48 +847,56 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
       hole.lineTo(0.26, attic0 + 1.75);
       hole.lineTo(0.26, attic0 + 0.9);
       skin.holes.push(hole);
-      travertine.add(new THREE.PlaneGeometry(0.52, 0.85), arenaAt(u, attic0 + 1.325, -0.195), { warp: outer.warp, colour: [0.12, 0.11, 0.1] });
+      facade.add(new THREE.PlaneGeometry(0.52, 0.85), arenaAt(u, attic0 + 1.325, -0.195), { warp: outer.warp, colour: [0.12, 0.11, 0.1] });
     }
-    travertine.add(new THREE.ExtrudeGeometry(skin, { depth: 0.2, bevelEnabled: false }), arenaAt(u, 0, -0.2), { warp: outer.warp, tile: 2, colour });
-    travertine.add(new THREE.BoxGeometry(bay, attic1 - attic0, 0.25, 6, 1, 1), arenaAt(u, (attic0 + attic1) / 2, -0.325), { warp: outer.warp, tile: 2, colour });
-    travertine.add(new THREE.BoxGeometry(0.4, 0.12, 0.16), arenaAt(pier, attic0 + 0.06, 0.08), { warp: outer.warp, tile: 2, colour });
-    travertine.add(new THREE.BoxGeometry(0.34, attic1 - attic0 - 0.34, 0.11), arenaAt(pier, (attic0 + attic1) / 2 - 0.05, 0.055), { warp: outer.warp, tile: 2, colour });
-    travertine.add(new THREE.BoxGeometry(0.46, 0.22, 0.15), arenaAt(pier, attic1 - 0.13, 0.075), { warp: outer.warp, tile: 2, colour });
+    facade.add(new THREE.ExtrudeGeometry(skin, { depth: 0.2, bevelEnabled: false }), arenaAt(u, 0, -0.2), { warp: outer.warp, tile: 2, colour });
+    facade.add(new THREE.BoxGeometry(bay, attic1 - attic0, 0.25, 6, 1, 1), arenaAt(u, (attic0 + attic1) / 2, -0.325), { warp: outer.warp, tile: 2, colour });
+    facade.add(new THREE.BoxGeometry(0.4, 0.12, 0.16), arenaAt(pier, attic0 + 0.06, 0.08), { warp: outer.warp, tile: 2, colour });
+    facade.add(new THREE.BoxGeometry(0.34, attic1 - attic0 - 0.34, 0.11), arenaAt(pier, (attic0 + attic1) / 2 - 0.05, 0.055), { warp: outer.warp, tile: 2, colour });
+    facade.add(new THREE.BoxGeometry(0.46, 0.22, 0.15), arenaAt(pier, attic1 - 0.13, 0.075), { warp: outer.warp, tile: 2, colour });
     for (let k = 1; k <= 3; k += 1) {
       const at = pier + (bay * k) / 4;
-      travertine.add(new THREE.BoxGeometry(0.15, 0.22, 0.2), arenaAt(at, 15.0, 0.1), { warp: outer.warp, tile: 2, colour });
+      facade.add(new THREE.BoxGeometry(0.15, 0.22, 0.2), arenaAt(at, 15.0, 0.1), { warp: outer.warp, tile: 2, colour });
       // A mast stands on each corbel, up through a hole in the cornice.
       wood.add(new THREE.CylinderGeometry(0.06, 0.075, 4.3, 7), arenaAt(at, 15.11 + 2.15, 0.12), { warp: outer.warp, tile: 1.2, colour: tone(0.8 + random() * 0.25) });
     }
   }
   // Mouldings run all the way round: the stepped platform at the foot, each storey's entablature, the attic's cornice.
   const wallShade = weathered(0.98);
-  arenaRun(travertine, [[-0.1, 0], [0.9, 0], [0.9, 0.14], [0.45, 0.14], [0.45, 0.28], [-0.1, 0.28]], { length: outer.length, y: 0, warp: outer.warp, tile: 2, colour: wallShade });
+  arenaRun(facade, [[-0.1, 0], [0.9, 0], [0.9, 0.14], [0.45, 0.14], [0.45, 0.28], [-0.1, 0.28]], { length: outer.length, y: 0, warp: outer.warp, tile: 2, colour: wallShade });
   for (let storey = 0; storey < 3; storey += 1) {
-    arenaRun(travertine, [[-0.12, 0], [0.26, 0], [0.26, 0.17], [0.22, 0.17], [0.22, 0.34], [0.27, 0.34], [0.39, 0.45], [0.39, 0.52], [-0.12, 0.52]], { length: outer.length, y: storey * ARENA_STOREY + ARENA_ENTABLATURE, warp: outer.warp, tile: 2, colour: wallShade });
+    arenaRun(facade, [[-0.12, 0], [0.26, 0], [0.26, 0.17], [0.22, 0.17], [0.22, 0.34], [0.27, 0.34], [0.39, 0.45], [0.39, 0.52], [-0.12, 0.52]], { length: outer.length, y: storey * ARENA_STOREY + ARENA_ENTABLATURE, warp: outer.warp, tile: 2, colour: wallShade });
   }
-  arenaRun(travertine, [[-0.45, 0], [0.12, 0], [0.12, 0.12], [0.3, 0.3], [0.3, 0.42], [-0.45, 0.42]], { length: outer.length, y: ARENA_ATTIC[1], warp: outer.warp, tile: 2, colour: wallShade });
+  arenaRun(facade, [[-0.45, 0], [0.12, 0], [0.12, 0.12], [0.3, 0.3], [0.3, 0.42], [-0.45, 0.42]], { length: outer.length, y: ARENA_ATTIC[1], warp: outer.warp, tile: 2, colour: wallShade });
   // Behind the arcades: the ambulatories, their inner walls and vaults, in shade.
   const gloom = (value) => (p) => {
     const v = value * (0.8 + 0.2 * arenaSmooth(0, 2, p.y % ARENA_STOREY));
     return [v, v * 0.97, v * 0.92];
   };
   const steps = 320;
-  arenaSweep(travertine, [[scaled(1.55), 3.95], [scaled(1.55), 0]], { steps, colour: gloom(0.42) });
-  arenaSweep(travertine, [[off(-0.55), 3.95], [scaled(1.55), 3.95]], { steps, colour: gloom(0.3) });
-  arenaSweep(travertine, [[scaled(1.55), 0.02], [off(-0.4), 0.02]], { steps, colour: gloom(0.5) });
+  arenaSweep(facade, [[scaled(1.55), 3.95], [scaled(1.55), 0]], { steps, colour: gloom(0.42) });
+  arenaSweep(facade, [[off(-0.55), 3.95], [scaled(1.55), 3.95]], { steps, colour: gloom(0.3) });
+  arenaSweep(facade, [[scaled(1.55), 0.02], [off(-0.4), 0.02]], { steps, colour: gloom(0.5) });
   // Storey two's inner wall stands under the top tread's front edge, the highest it can without rising through the seats.
   const upper = treadIn(tiers - 1);
-  arenaSweep(travertine, [[scaled(upper), ARENA_STOREY], [off(-0.55), ARENA_STOREY]], { steps, colour: gloom(0.5) });
-  arenaSweep(travertine, [[scaled(upper), topTread - 0.25], [scaled(upper), ARENA_STOREY]], { steps, colour: gloom(0.42) });
-  arenaSweep(travertine, [[off(-0.55), topTread - 0.25], [scaled(upper), topTread - 0.25]], { steps, colour: gloom(0.3) });
+  arenaSweep(facade, [[scaled(upper), ARENA_STOREY], [off(-0.55), ARENA_STOREY]], { steps, colour: gloom(0.5) });
+  arenaSweep(facade, [[scaled(upper), topTread - 0.25], [scaled(upper), ARENA_STOREY]], { steps, colour: gloom(0.42) });
+  arenaSweep(facade, [[off(-0.55), topTread - 0.25], [scaled(upper), topTread - 0.25]], { steps, colour: gloom(0.3) });
   // The walk round the top of the cavea, and the wall behind it up to the attic's top.
   const backWall = lastOut + 0.01;
   arenaSweep(travertine, [[scaled(lastOut), topTread], [off(-0.4), topTread]], { steps, colour: tone(0.8) });
   arenaSweep(travertine, [[scaled(backWall), ARENA_STOREY * 3], [scaled(backWall), topTread]], { steps, colour: gloom(0.5) });
   arenaSweep(travertine, [[off(-0.4), ARENA_STOREY * 3], [scaled(backWall), ARENA_STOREY * 3]], { steps, colour: gloom(0.35) });
   const capTop = ARENA_ATTIC[1] + 0.42;
-  arenaSweep(travertine, [[scaled(backWall), topTread], [scaled(backWall), capTop]], { steps, colour: (p) => tone(0.8 + 0.12 * arenaSmooth(topTread, topTread + 3, p.y)) });
+  // The wall above the top walk: grime in the corner at its foot, and dark
+  // streaks run down from under its coping where the rain drips.
+  const backFace = (p) => {
+    const angle = Math.atan2(p.z / rz, p.x / rx);
+    const streak = arenaNoise1(angle, 0.022, 9) ** 3 * arenaSmooth(topTread + 0.5, capTop - 0.6, p.y);
+    const foot = 1 - 0.38 * (1 - arenaSmooth(topTread, topTread + 0.35, p.y));
+    return tone((0.8 + 0.12 * arenaSmooth(topTread, topTread + 3, p.y)) * foot * (1 - 0.4 * streak), [1, 0.97, 0.92]);
+  };
+  arenaSweep(travertine, [[scaled(backWall), topTread], [scaled(backWall), topTread + 0.35], [scaled(backWall), topTread + 2.2], [scaled(backWall), capTop - 0.6], [scaled(backWall), capTop]], { steps: 400, colour: backFace });
   arenaSweep(travertine, [[scaled(backWall), capTop], [off(-0.45), capTop]], { steps, colour: tone(0.85) });
   // Doorways from the top walk into the building, one a bay, and a string course along the wall.
   for (let index = 0; index < ARENA_BAYS; index += 1) {
@@ -833,17 +912,32 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     const k = Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 16);
     return 0.93 + ((k * 7919) % 13) / 13 * 0.1;
   };
+  // Wear on the treads: darker and smoother where feet went (along the
+  // stairways and the back of each tread, where the row above rested its
+  // feet), grime in the corner where tread meets riser, a block here and
+  // there replaced in fresher stone, a dark stain of spilt wine or oil.
+  const trodden = (p, tier, y) => {
+    const angle = Math.atan2(p.z / rz, p.x / rx);
+    const share = Math.hypot(p.x / rx, p.z / rz);
+    const f = (((angle * 8) / Math.PI) % 1 + 1) % 1;
+    const aisle = 1 - arenaSmooth(0.35, 0.9, Math.min(f, 1 - f) * (Math.PI / 8) * share * 9);
+    const across = (share - treadIn(tier)) / step;
+    const feet = arenaSmooth(0.3, 0.6, across) * (1 - arenaSmooth(0.85, 1, across));
+    const corner = arenaSmooth(0.8, 1, across) + (p.y < y - 0.05 ? 1 - arenaSmooth(y - rise, y - rise + 0.4, p.y) : 0);
+    const cell = arenaHash(Math.floor(angle / 0.1), tier);
+    const patch = cell < 0.05 ? [1.1, 1.09, 1.08] : cell < 0.13 ? [0.74, 0.7, 0.66] : [1, 1, 1];
+    const v = (1 - 0.18 * aisle) * (1 - 0.1 * feet) * (1 - 0.4 * Math.min(1, corner));
+    return [v * patch[0], v * 0.97 * patch[1], v * 0.93 * patch[2]];
+  };
   for (let tier = 0; tier < tiers; tier += 1) {
     const s0 = treadIn(tier);
     const s1 = s0 + step;
     const y = treadY(tier);
     // The senators' tiers nearest the sand in finer, paler stone.
     const base = tier < 2 ? 0.98 : 0.86 - (tier % 2) * 0.03;
-    const colour = (p, n) => {
-      const v = base * sector(p) * (n.y > 0.5 ? 1 : 0.86);
-      return [v, v * 0.98, v * 0.94];
-    };
-    const profile = tier === 0 ? [[scaled(s0), y], [scaled(s1), y]] : [[scaled(s0), y - rise], [scaled(s0), y - 0.05], [scaled(s0 + 0.004), y], [scaled(s1), y]];
+    const colour = (p, n) => tone(base * sector(p) * (n.y > 0.5 ? 1 : 0.86), trodden(p, tier, y));
+    const top = [[scaled(s0 + step * 0.45), y], [scaled(s1 - step * 0.15), y], [scaled(s1), y]];
+    const profile = tier === 0 ? [[scaled(s0), y], ...top] : [[scaled(s0), y - rise], [scaled(s0), y - 0.05], [scaled(s0 + 0.004), y], ...top];
     arenaSweep(travertine, profile, { steps: 360, colour });
   }
   // Sixteen stairways: a half-step on the back of every tread.
@@ -856,7 +950,6 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     }
   }
   // Eight vomitoria, the mouths the crowd came in by, between the stairways halfway up.
-  const vomitoria = [];
   const vomTier = 4;
   for (let index = 0; index < 8; index += 1) {
     const t = ((index * 2 + 1) * Math.PI) / 8 + Math.PI / 16;
@@ -873,7 +966,6 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     arenaBlock(travertine, scaled(s0), scaled(s1), y0 + 1.05, y1, t - open, t + open, { colour });
     const back = treadIn(vomTier + 1);
     arenaBlock(travertine, scaled(back - 0.004), scaled(back - 0.001), y0, y0 + 1.05, t - open, t + open, { colour: tone(0.1) });
-    vomitoria.push({ t, reach: (0.5 + 0.22 + 0.35) / metre });
   }
 
   // ---- The podium: marble-faced wall, plinth and cornice, the inscribed balustrade, the gates ----
@@ -883,9 +975,29 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     const width = big ? 2.2 : 1.3;
     return { u: inner.uOf(angle), big, width, height: big ? 2.6 : 2.0, span: width + 1.2 };
   }).sort((a, b) => a.u - b.u);
+  // The podium's face (author space: x along the wall, y up): sand and dirt
+  // kicked up its foot, a dark damp line where the sand meets it, and
+  // grime washed down from under the cornice in streaks.
   const podiumFace = (p) => {
-    const v = 0.88 * (0.76 + 0.24 * arenaSmooth(0, 1.4, p.y));
-    return [v, v * 0.99, v * 0.97];
+    const splash = 0.7 + 0.3 * arenaSmooth(0, 1.3, p.y);
+    const damp = 1 - 0.3 * (1 - arenaSmooth(0.05, 0.4, p.y));
+    const streak = arenaNoise1(p.x, 0.42, 5) ** 3 * (0.4 + 0.6 * arenaNoise1(p.x, 2.1, 6)) * arenaSmooth(0.6, podiumHeight - 0.35, p.y);
+    const under = 1 - 0.18 * arenaSmooth(podiumHeight - 0.7, podiumHeight - 0.27, p.y);
+    const v = 0.9 * splash * damp * under * (1 - 0.6 * streak);
+    const warm = 1 - 0.06 * (1 - arenaSmooth(0, 1.2, p.y));
+    return [v, v * 0.98 * warm, v * 0.95 * warm * warm];
+  };
+  // Soot over each gate's arch, from the torches that lit the passage.
+  const sooted = (u, crown, base) => (p, n) => {
+    const d = ((p.x - u) / 0.9) ** 2 + ((p.y - crown - 0.25) / 0.7) ** 2;
+    const soot = 1 - 0.55 * Math.exp(-d) * arenaSmooth(crown - 0.9, crown, p.y);
+    return tone(soot, base(p, n));
+  };
+  // The marble deck behind the balustrade: scuffed paths, a wine stain or two.
+  const deck = (p) => {
+    const angle = Math.atan2(p.z / rz, p.x / rx);
+    const v = 0.9 * (1 - 0.12 * arenaNoise1(angle, 0.05, 7)) * (arenaHash(Math.floor(angle / 0.04), 8) < 0.06 ? 0.78 : 1);
+    return [v, v * 0.97, v * 0.93];
   };
   const wallDepth = 0.6;
   gates.forEach((gate, index) => {
@@ -893,7 +1005,7 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     const from = gate.u + gate.span / 2;
     const to = next.u - next.span / 2 + (index === gates.length - 1 ? inner.length : 0);
     const length = to - from;
-    marble.add(new THREE.BoxGeometry(length, podiumHeight, wallDepth, Math.ceil(length / 0.35), 1, 1), arenaAt(from + length / 2, podiumHeight / 2, wallDepth / 2), { warp: inner.warp, tile: 2.4, colour: podiumFace, offset: [random(), 0] });
+    marble.add(new THREE.BoxGeometry(length, podiumHeight, wallDepth, Math.ceil(length / 0.22), 6, 1), arenaAt(from + length / 2, podiumHeight / 2, wallDepth / 2), { warp: inner.warp, tile: ARENA_MARBLE_TILE, colour: podiumFace, offset: [random(), 0] });
     // The gate: an arch through the wall, a travertine surround, the passage behind.
     const { u, width, height, big } = gate;
     const radius = width / 2;
@@ -909,12 +1021,12 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     shape.lineTo(half, podiumHeight);
     for (let k = 1; k < 6; k += 1) shape.lineTo(half - (gate.span * k) / 6, podiumHeight);
     shape.lineTo(-half, podiumHeight);
-    travertine.add(new THREE.ExtrudeGeometry(shape, { depth: wallDepth, bevelEnabled: false, curveSegments: 12 }), arenaAt(u, 0, 0), { warp: inner.warp, tile: 2, colour: weathered(0.95) });
+    travertine.add(new THREE.ExtrudeGeometry(shape, { depth: wallDepth, bevelEnabled: false, curveSegments: 12 }), arenaAt(u, 0, 0), { warp: inner.warp, tile: 2, colour: sooted(u, height, weathered(0.95)) });
     const ring = new THREE.Shape();
     ring.absarc(0, 0, radius + 0.2, 0, Math.PI, false);
     ring.absarc(0, 0, radius, Math.PI, 0, true);
-    travertine.add(new THREE.ExtrudeGeometry(ring, { depth: 0.06, bevelEnabled: false, curveSegments: 14 }), arenaAt(u, spring, 0, 0, Math.PI), { warp: inner.warp, tile: 2, colour: weathered(1.02) });
-    travertine.add(new THREE.BoxGeometry(0.2, 0.3, 0.1), arenaAt(u, height + 0.1, -0.05), { warp: inner.warp, tile: 2, colour: weathered(1.04) });
+    travertine.add(new THREE.ExtrudeGeometry(ring, { depth: 0.06, bevelEnabled: false, curveSegments: 14 }), arenaAt(u, spring, 0, 0, Math.PI), { warp: inner.warp, tile: 2, colour: sooted(u, height, weathered(1.02)) });
+    travertine.add(new THREE.BoxGeometry(0.2, 0.3, 0.1), arenaAt(u, height + 0.1, -0.05), { warp: inner.warp, tile: 2, colour: sooted(u, height, weathered(1.04)) });
     for (const side of [-1, 1]) {
       travertine.add(new THREE.BoxGeometry(0.2, spring, 0.06), arenaAt(u + side * (radius + 0.1), spring / 2, -0.03), { warp: inner.warp, tile: 2, colour: weathered(1.02) });
       travertine.add(new THREE.BoxGeometry(0.28, 0.1, 0.1), arenaAt(u + side * (radius + 0.1), spring - 0.05, -0.05), { warp: inner.warp, tile: 2, colour: weathered(1.04) });
@@ -958,14 +1070,21 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     const next = gates[(index + 1) % gates.length];
     const from = gate.u + gate.width / 2 + 0.2;
     const to = next.u - next.width / 2 - 0.2 + (index === gates.length - 1 ? inner.length : 0);
-    lip(from, to - from, [[0.05, 0], [-0.12, 0], [-0.12, 0.26], [-0.05, 0.34], [0.05, 0.34]], 0, travertine, weathered(0.8));
+    lip(from, to - from, [[0.05, 0], [-0.12, 0], [-0.12, 0.13], [-0.12, 0.26], [-0.05, 0.34], [0.05, 0.34]], 0, travertine, (p, n) => tone(0.6 + 0.4 * arenaSmooth(0, 0.26, p.y), weathered(0.8)(p, n)));
   });
   lip(0, inner.length, [[0.05, 0], [-0.04, 0], [-0.04, 0.07], [-0.15, 0.18], [-0.15, 0.25], [0.05, 0.25]], podiumHeight - 0.25, marble, tone(0.95));
   // The balustrade on the podium's edge, the inscribed face toward the sand, a rounded coping, the marble deck behind.
   const parapetTop = podiumHeight + 0.85;
-  inscribed.add(new THREE.BoxGeometry(inner.length, 0.85, 0.2, 360, 1, 1), arenaAt(inner.length / 2, podiumHeight + 0.425, 0.12), { warp: inner.warp, tile: [-4.8, 0.9], offset: [0, -podiumHeight / 0.9], colour: tone(0.97) });
-  arenaRun(marble, [[0.0, 0], [0.26, 0], [0.26, 0.05], [0.22, 0.1], [0.04, 0.1], [0.0, 0.05]], { length: inner.length, y: parapetTop, warp: inner.warp, tile: 2.4, colour: tone(0.98) });
-  arenaSweep(marble, [[arenaOffset(rx, rz, 0.2), podiumHeight + 0.2], [scaled(treadIn(0)), podiumHeight + 0.2]], { steps: 320, tile: 2.4, colour: tone(0.9) });
+  // Its face weathered: dirt washed down from the coping in streaks, darker toward the foot.
+  const balustrade = (p) => {
+    const y = (p.y - podiumHeight) / 0.85;
+    const streak = arenaNoise1(p.x, 0.36, 11) ** 3 * (0.5 + 0.5 * arenaNoise1(p.x, 1.7, 12)) * (1 - 0.6 * y);
+    const v = 0.93 * (0.86 + 0.14 * arenaSmooth(0, 0.6, y)) * (1 - 0.4 * streak);
+    return [v, v * 0.98, v * 0.95];
+  };
+  inscribed.add(new THREE.BoxGeometry(inner.length, 0.85, 0.2, 480, 2, 1), arenaAt(inner.length / 2, podiumHeight + 0.425, 0.12), { warp: inner.warp, tile: [-4.8, 0.9], offset: [0, -podiumHeight / 0.9], colour: balustrade });
+  arenaRun(marble, [[0.0, 0], [0.26, 0], [0.26, 0.05], [0.22, 0.1], [0.04, 0.1], [0.0, 0.05]], { length: inner.length, y: parapetTop, warp: inner.warp, tile: ARENA_MARBLE_TILE, colour: tone(0.98) });
+  arenaSweep(marble, [[arenaOffset(rx, rz, 0.2), podiumHeight + 0.2], [scaled(treadIn(0)), podiumHeight + 0.2]], { steps: 320, tile: ARENA_MARBLE_TILE, colour: deck });
 
   // ---- The velarium: the awning drawn over the side away from the sun, on ropes from the masts ----
   const mastTop = 19.3;
@@ -998,6 +1117,10 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     if (covered && index % 2 === 0) ropes.push(mx, mastTop, mz, ix, 15.5, iz);
   }
 
+  // ---- Left behind: litter in the empty stands, the arena hands' tools by a great gate ----
+  arenaLitter({ travertine, linen, rx, rz, treadIn, treadY, step });
+  arenaGateTools({ wood, iron, u: gates.find((gate) => gate.big).u, warp: inner.warp });
+
   const materials = {
     travertine: arenaMaterial(arenaTravertine(), { roughness: 0.92 }),
     marble: arenaMaterial(arenaMarble(), { roughness: 0.5 }),
@@ -1010,15 +1133,117 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     const mesh = builder.mesh(material);
     if (mesh) group.add(mesh);
   }
+  group.add(facade.mesh(materials.travertine, { cast: false }));
   if (ropes.length) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(ropes, 3));
     group.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x6a5a44 })));
   }
-  const blocksSeat = (tier, angle) => {
-    if (tier !== vomTier && tier !== vomTier + 1) return false;
-    const a = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    return vomitoria.some(({ t, reach }) => Math.abs(((a - t + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < reach);
+  return { group, triangles: [travertine, facade, marble, inscribed, iron, wood, linen].reduce((sum, b) => sum + b.triangles, 0) };
+}
+
+// ---- signs of use ------------------------------------------------------------------
+
+/**
+ * A frame on a tread of the cavea: origin on the tread at `inset` (share of
+ * its depth back from the front edge) at parametric angle t, x along the
+ * tread, y up, z toward the sand.
+ */
+function arenaTreadFrame({ rx, rz, treadIn, treadY, step }, tier, t, inset = 0) {
+  const share = treadIn(tier) + step * inset;
+  const along = new THREE.Vector3(-rx * Math.sin(t), 0, rz * Math.cos(t)).normalize();
+  const inward = new THREE.Vector3().crossVectors(along, new THREE.Vector3(0, 1, 0));
+  return new THREE.Matrix4().makeBasis(along, new THREE.Vector3(0, 1, 0), inward).setPosition(rx * share * Math.cos(t), treadY(tier), rz * share * Math.sin(t));
+}
+
+/**
+ * What the crowd left in the empty stands: a wool cloak dropped over a
+ * tread's edge, seat cushions, a broken amphora and its shards.
+ */
+function arenaLitter({ travertine, linen, ...cavea }) {
+  const frame = (tier, t, inset) => arenaTreadFrame(cavea, tier, t, inset);
+  const place = (base, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => base.clone().multiply(arenaAt(x, y, z, rx, ry, rz, sx, sy, sz));
+  // The cloak: lying across the tread, over the nosing and hanging down the riser, in loose folds.
+  const cloak = (tier, t, colour) => {
+    const geometry = new THREE.PlaneGeometry(0.95, 1, 16, 18);
+    const position = geometry.attributes.position;
+    const flat = 0.42;
+    const bend = 0.035 * Math.PI / 2;
+    for (let index = 0; index < position.count; index += 1) {
+      const x = position.getX(index);
+      const s = position.getY(index) + 0.5;
+      const ripple = 0.022 * Math.abs(Math.sin(x * 11 + s * 4)) + 0.012 * Math.sin(x * 23 + 1);
+      let y;
+      let z;
+      if (s < flat) {
+        z = -0.02 - (flat - s);
+        y = 0.012 + ripple * (1 - s / flat * 0.5);
+      } else if (s < flat + bend) {
+        const a = ((s - flat) / bend) * Math.PI / 2;
+        z = -0.02 + 0.035 * Math.sin(a);
+        y = -0.023 + 0.035 * Math.cos(a);
+      } else {
+        z = 0.015 + 0.02 * Math.abs(Math.sin(x * 9));
+        y = -0.023 - (s - flat - bend) * 0.95;
+      }
+      position.setXYZ(index, x + 0.04 * Math.sin(s * 5), y, z);
+    }
+    geometry.computeVertexNormals();
+    linen.add(geometry, frame(tier, t, 0), { tile: 1.5, colour: (p, n) => tone3(colour, 0.85 + 0.15 * Math.max(0, n.y)) });
   };
-  return { group, blocksSeat, triangles: [travertine, marble, inscribed, iron, wood, linen].reduce((sum, b) => sum + b.triangles, 0) };
+  const tone3 = ([r, g, b], v) => [r * v, g * v, b * v];
+  // (Up the cavea, where they show over the balustrade from the sand.)
+  cloak(4, 0.3, [0.62, 0.2, 0.15]);
+  cloak(6, -2.75, [0.42, 0.4, 0.3]);
+  // Cushions, flattened by a day's sitting, one kicked askew.
+  for (const [tier, t, inset, turn, colour] of [[3, 0.62, 0.35, 0.3, [0.45, 0.32, 0.2]], [5, 2.7, 0.4, -0.5, [0.35, 0.42, 0.28]], [2, -1.05, 0.3, 0.1, [0.55, 0.22, 0.18]], [6, 0.9, 0.5, 0.9, [0.45, 0.32, 0.2]], [4, -2.2, 0.45, 0.2, [0.62, 0.52, 0.36]], [2, 3.3, 0.4, -0.2, [0.55, 0.22, 0.18]]]) {
+    linen.add(new THREE.SphereGeometry(1, 12, 6), place(frame(tier, t, inset), 0, 0.035, 0, 0.04, turn, 0.03, 0.22, 0.045, 0.18), { tile: 1, colour });
+  }
+  // An amphora knocked over and broken open, its shards round it.
+  const amphora = (tier, t, inset, turn) => {
+    const base = frame(tier, t, inset);
+    const outline = [[0.0, 0], [0.035, 0.015], [0.11, 0.13], [0.15, 0.3], [0.145, 0.45], [0.09, 0.58], [0.045, 0.62], [0.042, 0.74], [0.058, 0.76], [0.045, 0.78]].map(([r, y]) => new THREE.Vector2(r, y));
+    const matrix = place(base, 0.1, 0.14, 0.05, 0.12, turn, Math.PI / 2 - 0.08);
+    const clay = (v) => (p, n) => tone3([0.92, 0.55, 0.38], v * (0.8 + 0.2 * Math.max(0, n.y)));
+    travertine.add(new THREE.LatheGeometry(outline, 14, 1.68, Math.PI * 1.35), matrix, { tile: 0.6, colour: clay(1) });
+    travertine.add(new THREE.LatheGeometry(outline, 14, 1.68, Math.PI * 1.35), matrix, { tile: 0.6, colour: clay(0.45), flip: true });
+    const random = arenaRandom(Math.round(t * 1000));
+    for (let index = 0; index < 7; index += 1) {
+      const size = 0.08 + random() * 0.08;
+      const arc = 0.6 + random() * 0.6;
+      travertine.add(new THREE.CylinderGeometry(0.15, 0.15, size, 4, 1, true, -arc / 2, arc), place(base, 0.2 + random() * 0.7, 0.012, -0.25 + random() * 0.3, 0, random() * 6, 0).multiply(arenaAt(0, 0, 0, -Math.PI / 2 + (random() - 0.5) * 0.3)).multiply(arenaAt(0, 0, -0.15)), { tile: 0.6, colour: clay(0.95) });
+    }
+  };
+  amphora(3, 0.5, 0.45, 0.4);
+  amphora(6, -2.45, 0.5, -0.2);
+}
+
+/**
+ * The arena hands' tools by a great gate (author space along the podium,
+ * the sand toward −z): a rake leant against the wall, a bucket beside it.
+ */
+function arenaGateTools({ wood, iron, u, warp }) {
+  const between = (from, to, geometry, builder, options) => {
+    const a = new THREE.Vector3(...from);
+    const b = new THREE.Vector3(...to);
+    const direction = b.clone().sub(a);
+    const matrix = new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize()), new THREE.Vector3(1, direction.length(), 1));
+    builder.add(geometry, matrix, { warp, ...options });
+  };
+  const x = u + 2.25;
+  // The rake: an ash handle, the head of boards up against the wall, its tines toward the sand.
+  const foot = [x - 0.15, 0.0, -0.66];
+  const top = [x, 1.92, -0.08];
+  between(foot, top, new THREE.CylinderGeometry(0.02, 0.022, 1, 7), wood, { tile: 1.2, colour: [0.95, 0.85, 0.7] });
+  wood.add(new THREE.BoxGeometry(0.56, 0.06, 0.045), arenaAt(x, 1.95, -0.1, 0.25, 0, 0), { warp, tile: 1.2, colour: [0.8, 0.72, 0.6] });
+  for (let tine = 0; tine < 9; tine += 1) {
+    const tx = x - 0.24 + tine * 0.06;
+    between([tx, 1.93, -0.12], [tx, 1.88, -0.23], new THREE.CylinderGeometry(0.008, 0.01, 1, 5), wood, { tile: 1.2, colour: [0.7, 0.62, 0.5] });
+  }
+  // The bucket, its staves bound in iron, a dark wet inside.
+  const bucketAt = arenaAt(x + 0.55, 0.15, -0.34);
+  wood.add(new THREE.CylinderGeometry(0.15, 0.12, 0.3, 14, 1, true), bucketAt, { warp, tile: 0.6, colour: [0.85, 0.78, 0.66] });
+  wood.add(new THREE.CylinderGeometry(0.15, 0.12, 0.3, 14, 1, true), bucketAt, { warp, tile: 0.6, colour: [0.35, 0.3, 0.25], flip: true });
+  wood.add(new THREE.CircleGeometry(0.12, 14).rotateX(-Math.PI / 2), arenaAt(x + 0.55, 0.02, -0.34), { warp, tile: 0.6, colour: [0.3, 0.26, 0.2] });
+  for (const y of [0.05, 0.25]) iron.add(new THREE.CylinderGeometry(0.125 + y * 0.1 + 0.006, 0.125 + y * 0.1 + 0.004, 0.025, 14, 1, true), arenaAt(x + 0.55, y, -0.34), { warp, colour: [0.7, 0.6, 0.5] });
 }
