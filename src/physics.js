@@ -21,7 +21,7 @@ import { formUp } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
-import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
+import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -133,7 +133,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // Velocity blows and collisions have put into the trunk, which the legs
     // must absorb; what topples a fighter is this, not their own movement.
     knock: [0, 0, 0],
-    stats: { thrown: 0, landed: 0, blocked: 0, maxHandSpeed: 0, lastHandSpeed: 0, knockdownsScored: 0 },
+    stats: { thrown: 0, landed: 0, blocked: 0, struckHorse: 0, maxHandSpeed: 0, lastHandSpeed: 0, knockdownsScored: 0 },
     contacts: new Set(),
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
@@ -1482,6 +1482,12 @@ function updateIntent(world, fighter, dt) {
   };
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
+  // On horseback his trunk rides the horse's gait: leaned with its speed, rocked and swayed with its stride (physics/mounted.js).
+  if (fighter.mount) {
+    const sit = ridingLean(fighter, dt);
+    intent.lean += sit.lean;
+    intent.roll = sit.roll;
+  }
   // Dazed: the head lolls and he sways, unsteady, his guard pulled in.
   const dazed = dazedShare(fighter);
   if (dazed > 0) {

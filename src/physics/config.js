@@ -548,11 +548,18 @@ export const WORLD = {
   //   their rows, abreast at the team spacing, the rows behind); the riders ride on the
   //   foot's flanks, `spacing` m apart across, and those who do not fit across the field
   //   form a rank `rankBack` m behind the last of the foot. Riders only: a line abreast.
+  //   `spacing` is the room a horse wants (~2.4 m long, 0.7-0.9 m across, and the
+  //   room to wheel without touching its neighbour): 3 m between horses' lines.
   // - seat: the knock (m/s of the trunk, as on foot) a man in a war saddle
   //   (high pommel and cantle) takes before he is thrown: `speed`, against the
   //   2.1 m/s that puts a man on foot over (WORLD.balance.speed); the seat
   //   couples him to the horse, so a share (`horseShare`) of the horse's mass
-  //   resists a blow on him with his own (the cantle at his back, the stirrups).
+  //   resists a blow on him with his own (the cantle at his back, the stirrups,
+  //   and the knees gripping the barrel: a rider braced on a horse is harder to
+  //   unseat than one sitting on it). A horse that goes down slower than
+  //   `kickFree` m/s lets its rider step clear: he is carried down with it but not flung
+  //   (his speed is `carried` of what it was, he lands as a ragdoll); a faster fall
+  //   throws him at the speed his horse lost, less the `grip` share his knees held.
   //   A lance's ~10 ms contact engages only the part of the horse the
   //   saddle's give lets it reach: a tenth, ~50-60 kg.
   // - coupling: a blow from the saddle has behind it the rider's body and, through
@@ -624,11 +631,29 @@ export const WORLD = {
   //   momentum by their laden masses; a shove across its
   //   line is `shove`, a velocity of its own that dies away in 1/`shoveDecay` s
   //   (its legs find the ground again). The harm to each horse is the general
-  //   crash rule's (WORLD.crash `horse`: through its barding).
+  //   crash rule's (WORLD.crash `horse`: through its barding). Two horses of
+  //   one side meet softly: closing slower than `alliedFrom` m/s they are only
+  //   eased apart and their pace evened out (the legs find room; riders carried, no
+  //   knock, no fall, no harm); a hard head-on at more is a crash as any other.
+  // - stamina: a gallop tires a horse. At full effort (a gallop; effort is 0 at
+  //   `easy` of its gallop speed and less) it is spent in `gallopSeconds`; at a walk it
+  //   recovers in `restSeconds`; spent, its top speed is `slows` less.
+  // - motion: the body of a horse rises, falls, pitches and rocks as it goes, from the
+  //   same stride phase its legs and the drawn horse use (a gait's blend over `blend`
+  //   m/s at the changes of gait). Per gait: `bob` [peak of the withers, rises a
+  //   stride, stride phase at the top], `pitch` [rad nose up, phase at nose-up] once a stride,
+  //   `rock` [rad leaning to its left, times a stride, phase]. A walk sways slowly, a trot
+  //   bounces hard twice a stride (the suspension between diagonals), a canter rocks fore and
+  //   aft once a stride in three beats, a gallop is low and smooth. The rider's seat is on
+  //   the body, so it rises and falls with the horse. The trunk's lag, the lower back
+  //   absorbing it: `seatSpring` (natural frequency `hz`, damping ratio `damping`) on
+  //   the height the trunk is carried at; `lean`: forward lean (rad) of the trunk by
+  //   gait, followed by a spring (`hz`, `damping`) which takes `follow` of the horse's
+  //   pitch and leans back by `surge` rad per m/s² of the horse's acceleration.
   mount: {
     startApart: 12,
-    line: { spacing: 1.8, rankBack: 5, margin: 1.5 },
-    seat: { speed: 3.0, horseShare: 0.1 },
+    line: { spacing: 3, rankBack: 5, margin: 1.5 },
+    seat: { speed: 3.8, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
     coupling: { forms: { couched: 0.6, twoThrust: 0.35, oneThrust: 0.12, twoSwing: 0.04, oneSwing: 0.03 }, across: 0.4, horse: 0.167 },
     twist: 1.3,
     swingPitch: 0.3,
@@ -639,6 +664,17 @@ export const WORLD = {
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     hooves: { height: 0.08, stance: 0.5, seconds: 0.08, every: 0.35 },
     brace: { length: 1.5, still: 0.5, share: 0.5 },
-    crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3 },
+    crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
+    stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
+    motion: {
+      blend: 0.5,
+      stand: { bob: [0, 2, 0], pitch: [0, 0], rock: [0, 1, 0] },
+      walk: { bob: [0.005, 2, 0.12], pitch: [0.025, 0.9], rock: [0.025, 1, 0.25] },
+      trot: { bob: [0.024, 2, 0.475], pitch: [0.012, 0.1], rock: [0.012, 2, 0.2] },
+      canter: { bob: [0.018, 1, 0.9], pitch: [0.03, 0.15], rock: [0.015, 1, 0.5] },
+      gallop: { bob: [0.012, 1, 0.8], pitch: [0.025, 0.1], rock: [0.006, 1, 0.5] },
+      seatSpring: { hz: 1.6, damping: 0.7 },
+      lean: { walk: 0, trot: 0.03, canter: 0.06, gallop: 0.12, hz: 2, damping: 0.8, follow: 0.7, surge: 0.012 },
+    },
   },
 };

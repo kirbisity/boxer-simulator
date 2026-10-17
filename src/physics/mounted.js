@@ -107,21 +107,73 @@ function turnRateAt(horse, speed) {
 const forwardOf = (yaw) => yawRotate([1, 0, 0], yaw);
 const leftOf = (yaw) => yawRotate([0, 0, 1], yaw);
 
-/** A point given in the horse's own frame (m), in the world, as it stands (or lies). */
+/**
+ * A point given in the horse's own frame (m), in the world, as it stands (or lies):
+ * rocked about its barrel (the stride's sway, or falling over onto its side), pitched
+ * nose up or down about the middle of its barrel (the stride's rocking), and raised by
+ * the stride's bob. The drawn horse (horseview.js) turns its body and group the same way.
+ */
 export function horsePoint(horse, local) {
   let [x, y, z] = local;
-  if (horse.roll) {
+  const roll = (horse.roll ?? 0) + (horse.rock ?? 0);
+  if (roll) {
     // Falling over onto its side about the barrel's line.
     const pivot = 0.76 * horse.withers;
-    const cos = Math.cos(horse.roll);
-    const sin = Math.sin(horse.roll);
+    const cos = Math.cos(roll);
+    const sin = Math.sin(roll);
     const dy = y - pivot;
-    y = pivot + dy * cos - z * sin - horse.fall * (pivot - 0.21 * horse.withers);
+    y = pivot + dy * cos - z * sin - (horse.fall ?? 0) * (pivot - 0.21 * horse.withers);
     z = dy * sin + z * cos;
+  }
+  if (horse.pitch) {
+    const cos = Math.cos(horse.pitch);
+    const sin = Math.sin(horse.pitch);
+    const dy = y - 0.76 * horse.withers;
+    [x, y] = [x * cos - dy * sin, 0.76 * horse.withers + x * sin + dy * cos];
   }
   const f = forwardOf(horse.yaw);
   const l = leftOf(horse.yaw);
   return [horse.at[0] + f[0] * x + l[0] * z, y + (horse.bob ?? 0), horse.at[1] + f[2] * x + l[2] * z];
+}
+
+/** How much of each gait a speed is in (they blend over `motion.blend` m/s at the changes: the motion has no jump). */
+function gaitWeights(speed) {
+  const blend = WORLD.mount.motion.blend;
+  let lower = -Infinity;
+  const weights = [];
+  for (const gait of GAITS) {
+    const rise = lower === -Infinity ? 1 : Math.max(0, Math.min(1, (speed - (lower - blend)) / (2 * blend)));
+    const fall = gait.upTo === Infinity ? 1 : Math.max(0, Math.min(1, (gait.upTo + blend - speed) / (2 * blend)));
+    weights.push([gait.name, Math.min(rise, fall)]);
+    lower = gait.upTo;
+  }
+  return weights;
+}
+
+/**
+ * How the body of a horse moves with its stride (WORLD.mount.motion): its rise and
+ * fall, its pitch and its rock, the sum of the gaits it is in, each a cosine of the
+ * stride phase (the one phase its legs and the drawn horse go by).
+ */
+export function horseMotion(horse) {
+  const motion = { bob: 0, pitch: 0, rock: 0 };
+  if (horse.state !== 'up') return motion;
+  const speed = Math.abs(horse.speed);
+  const gate = Math.min(1, speed / 0.8);
+  if (gate <= 0) return motion;
+  const table = WORLD.mount.motion;
+  const cycle = horse.stride;
+  for (const [name, weight] of gaitWeights(speed)) {
+    if (weight <= 0) continue;
+    const spec = table[name];
+    motion.bob += weight * spec.bob[0] * Math.cos(Math.PI * 2 * spec.bob[1] * (cycle - spec.bob[2]));
+    motion.pitch += weight * spec.pitch[0] * Math.cos(Math.PI * 2 * (cycle - spec.pitch[1]));
+    motion.rock += weight * spec.rock[0] * Math.cos(Math.PI * 2 * spec.rock[1] * (cycle - spec.rock[2]));
+  }
+  motion.bob *= gate * horse.withers;
+  motion.pitch *= gate;
+  motion.rock *= gate;
+  return motion;
 }
 
 /** The horse's velocity at a point of it (its run and its turning). */
@@ -141,11 +193,14 @@ export function poseHorse(horse) {
   const scale = (p) => [p[0] * W, p[1] * W, p[2] * W];
   const gait = gaitAt(horse.speed);
   const stride = gait.hz > 0 ? Math.min(0.7 * W, Math.abs(horse.speed) / gait.hz) : 0;
+  // The body rises and falls, pitches and rocks with the stride.
+  const motion = horseMotion(horse);
+  horse.bob = motion.bob;
+  horse.pitch = motion.pitch;
+  horse.rock = motion.rock;
   const capsules = horse.capsules;
   capsules.length = 0;
   for (const part of HORSE_SHAPE.parts) capsules.push({ key: part.key, part: part.part, a: horsePoint(horse, scale(part.a)), b: horsePoint(horse, scale(part.b)), radius: part.radius * W, mass: part.mass });
-  // The body rises and falls a little with the stride.
-  horse.bob = gait.hz > 0 && horse.state === 'up' ? Math.abs(Math.sin(horse.stride * Math.PI * 2)) * 0.012 * Math.min(1, Math.abs(horse.speed) / 6) * W : 0;
   for (const leg of HORSE_SHAPE.legs) {
     const root = scale(leg.root);
     let hoof;
@@ -165,6 +220,8 @@ export function poseHorse(horse) {
       }
       hoof = [root[0] + along, 0.03 * W + lift, root[2]];
     }
+    // (A hoof on the ground stays there as the body rises over it and pitches: the leg is longer or shorter.)
+    if (horse.state === 'up') hoof[1] -= horse.bob + horse.pitch * hoof[0];
     // The knee bends forward on a foreleg, the hock back on a hind leg.
     const knee = twoBoneIK(root, hoof, HORSE_SHAPE.upperLeg * W, HORSE_SHAPE.lowerLeg * W, [leg.fore ? 1 : -1, 0, 0]);
     const world = { root: horsePoint(horse, root), knee: horsePoint(horse, knee), hoof: horsePoint(horse, hoof) };
@@ -190,12 +247,19 @@ export function stepHorse(world, horse, h) {
     }
   } else {
     const goal = horse.goal;
-    const top = horse.paces.gallop * (horse.lame ? 0.3 : 1) * (1 - 0.5 * Math.min(1, horse.bloodLost / collapseShare()));
+    const top = horse.paces.gallop * (horse.lame ? 0.3 : 1) * (1 - 0.5 * Math.min(1, horse.bloodLost / collapseShare())) * (1 - WORLD.mount.stamina.slows * (horse.tire ?? 0));
     const wanted = Math.max(-1, Math.min(top, goal.speed));
     const change = wanted - horse.speed;
     // Pulling up is harder than getting away (a horse sits back on its hocks).
     const most = horse.accel * (change < 0 ? 1.4 : 1) * h;
+    const before = horse.speed;
     horse.speed += Math.max(-most, Math.min(most, change));
+    // (Its pace changing, as the rider's trunk feels it: smoothed over a tenth of a second.)
+    horse.acceleration = (horse.acceleration ?? 0) + ((horse.speed - before) / h - (horse.acceleration ?? 0)) * Math.min(1, h * 10);
+    // A gallop tires it, a canter or slower rests it.
+    const stamina = WORLD.mount.stamina;
+    const effort = Math.max(0, Math.min(1, (Math.abs(horse.speed) / horse.paces.gallop - stamina.easy) / (1 - stamina.easy)));
+    horse.tire = Math.max(0, Math.min(1, (horse.tire ?? 0) + h * (effort / stamina.gallopSeconds - (1 - effort) / stamina.restSeconds)));
     let turn = goal.heading - horse.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     const rate = turnRateAt(horse, horse.speed);
@@ -222,6 +286,8 @@ export function stepHorse(world, horse, h) {
   horse.stride = (horse.stride + gait.hz * h) % 1;
   horse.velocity = [f[0] * horse.speed + horse.shove[0], 0, f[2] * horse.speed + horse.shove[1]];
   poseHorse(horse);
+  const rider = horse.rider === null ? null : world.fighters[horse.rider];
+  if (rider?.mount === horse) absorbMotion(rider, horse, h);
 }
 
 /** The share of its blood lost that drops a horse (as a man's). */
@@ -241,11 +307,12 @@ export const SEATED_PARTICLES = new Set(SEATED);
 function seatPoints(fighter, horse) {
   const W = horse.withers;
   const L = fighter.body.lengths;
-  const seat = vec.add(horsePoint(horse, [HORSE_SHAPE.seat[0] * W, HORSE_SHAPE.seat[1] * W, 0]), [0, WORLD.mount.seatHeight, 0]);
+  const seat = seatOf(horse);
   const f = forwardOf(horse.yaw);
   const l = leftOf(horse.yaw);
   const points = {};
-  points[P.pelvis] = seat;
+  // His hips and thighs are at the saddle; his pelvis is carried at the height his lower back lets it (absorbMotion).
+  points[P.pelvis] = fighter.seated ? [seat[0], fighter.seated.y, seat[2]] : seat;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     const hip = vec.add(seat, vec.scale(l, sign * L.hipSpan / 2));
     const out = 0.62 * Math.min(1.2, W / 1.5);
@@ -257,6 +324,55 @@ function seatPoints(fighter, horse) {
     points[P[`${side}Foot`]] = vec.add(knee, vec.scale(shank, L.shank));
   }
   return points;
+}
+
+/** Where the saddle's seat is now (m), with the horse's body rising, pitching and rocking under it. */
+function seatOf(horse) {
+  const W = horse.withers;
+  return vec.add(horsePoint(horse, [HORSE_SHAPE.seat[0] * W, HORSE_SHAPE.seat[1] * W, 0]), [0, WORLD.mount.seatHeight, 0]);
+}
+
+/**
+ * The rider takes up the horse's motion, once a substep (a damped spring, WORLD.mount.motion
+ * `seatSpring`): the height his trunk is carried at follows the saddle's rise and fall with a
+ * lag, his lower back absorbing what his hips are given (his hips and thighs are held to the
+ * saddle: seatRider). A spring of a natural frequency below the stride's bounce lets a trot's
+ * jolt through reduced and late, and follows a walk's sway nearly exactly.
+ */
+function absorbMotion(fighter, horse, h) {
+  const spec = WORLD.mount.motion.seatSpring;
+  const seat = seatOf(horse)[1];
+  const carry = (fighter.seated ??= { y: seat, v: 0, lean: 0, leanV: 0 });
+  const omega = Math.PI * 2 * spec.hz;
+  carry.v += (omega * omega * (seat - carry.y) - 2 * spec.damping * omega * carry.v) * h;
+  carry.y += carry.v * h;
+}
+
+/**
+ * How the rider's trunk sits on the moving horse, once a step: leaned forward by the gait
+ * (the faster, the further), rocked back and forth by the horse's pitch (a canter's
+ * three-beat rock, a gallop's surge) and thrown back as it gets away, followed with a lag by a
+ * spring (WORLD.mount.motion `lean`); and leaned a little across with the horse's rock.
+ * Returns { lean, roll } in rad for his pose.
+ */
+export function ridingLean(fighter, dt) {
+  const horse = fighter.mount;
+  const spec = WORLD.mount.motion.lean;
+  const carry = (fighter.seated ??= { y: seatOf(horse)[1], v: 0, lean: 0, leanV: 0 });
+  const speed = Math.abs(horse.speed);
+  let gait = 0;
+  for (const [name, weight] of gaitWeights(speed)) gait += weight * (spec[name] ?? 0);
+  // (Making a blow, he holds his trunk to the gait's lean: the rocking does not carry his weapon off its mark.)
+  const rock = fighter.punch ? 0 : 1;
+  const target = horse.state === 'up' ? gait - rock * (spec.follow * (horse.pitch ?? 0) + spec.surge * (horse.acceleration ?? 0)) : 0;
+  const omega = Math.PI * 2 * spec.hz;
+  // (Sub-stepped: the spring is stiff for a 60 Hz step.)
+  const steps = Math.max(1, Math.ceil(dt / 0.004));
+  for (let k = 0; k < steps; k += 1) {
+    carry.leanV += (omega * omega * (target - carry.lean) - 2 * spec.damping * omega * carry.leanV) * (dt / steps);
+    carry.lean += carry.leanV * (dt / steps);
+  }
+  return { lean: carry.lean, roll: -0.6 * (horse.rock ?? 0) };
 }
 
 /**
@@ -367,9 +483,16 @@ export function keepSeat(world, fighter) {
   // (The speed his horse lost to a crash, as he still has it: he is flung with it if he goes.)
   const lost = fighter.joltLost ?? [0, 0, 0];
   fighter.joltLost = lost.map((value) => value * decay);
-  if (fighter.state !== 'up') return unhorse(world, fighter, fighter.state === 'out' ? 'slumps from the saddle' : 'falls from the saddle', false, lost);
-  if (horse.state !== 'up') return unhorse(world, fighter, 'thrown as his horse goes down', true, lost);
-  if (knock > WORLD.mount.seat.speed * fighter.body.gear.balance) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true, lost);
+  const seat = WORLD.mount.seat;
+  // (What his knees held of the speed his horse lost goes with it, not with him.)
+  const flung = lost.map((value) => value * (1 - seat.grip));
+  if (fighter.state !== 'up') return unhorse(world, fighter, fighter.state === 'out' ? 'slumps from the saddle' : 'falls from the saddle', false, flung);
+  if (horse.state !== 'up') {
+    // A horse going down slowly lets him step clear: carried down with it, not flung.
+    if (Math.abs(horse.speed) < seat.kickFree) return unhorse(world, fighter, 'comes off as his horse goes down', true, flung, seat.carried);
+    return unhorse(world, fighter, 'thrown as his horse goes down', true, flung);
+  }
+  if (knock > seat.speed * fighter.body.gear.balance) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true, flung);
 }
 
 /**
@@ -396,12 +519,21 @@ export function seatMass(fighter) {
 
 /**
  * Off the horse: from here he is a man on foot, falling from the saddle
- * with the horse's speed in him (his particles keep it). `thrown`: down, as
+ * with the horse's speed in him (his particles keep it, or `carried` of it). `thrown`: down, as
  * a fall (not counted as a knockdown). The horse runs off a while.
  */
-export function unhorse(world, fighter, reason, thrown, lost = null) {
+export function unhorse(world, fighter, reason, thrown, lost = null, carried = 1) {
   const horse = fighter.mount;
   if (!horse) return;
+  // He leaves with `carried` of the horse's speed (a slow fall: he comes off at half of it).
+  if (carried < 1) {
+    for (let index = 0; index < fighter.x.length / 3; index += 1) {
+      for (const axis of [0, 2]) {
+        fighter.v[index * 3 + axis] *= carried;
+        fighter.prev[index * 3 + axis] = fighter.x[index * 3 + axis] - fighter.v[index * 3 + axis] * world.lastDt;
+      }
+    }
+  }
   // He leaves the saddle at the speed the crash took from his horse, not the horse's new one.
   if (lost) {
     for (let index = 0; index < fighter.x.length / 3; index += 1) {
@@ -410,6 +542,7 @@ export function unhorse(world, fighter, reason, thrown, lost = null) {
     fighter.joltLost = [0, 0, 0];
   }
   fighter.mount = null;
+  fighter.seated = null;
   fighter.carrier = null;
   fighter.lift = 0;
   horse.rider = null;
@@ -511,6 +644,7 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   if (closing < WORLD.minImpactSpeed) return false;
   punch.hits.add(`horse${horse.id}`);
   punch.landed = true;
+  attacker.stats.struckHorse += 1;
   const bladed = bladeStrike(attacker, weapon, punch, relative, distance);
   const along = bladed.along;
   // A long point set against the horse's charge, its butt to the ground and the man standing behind it: his weight is behind the point.
@@ -730,6 +864,29 @@ export function collideHorses(world, h) {
   }
 }
 
+/** A man of the horse's own side in its way: eased out of it (he steps aside, the lighter further), no blow, no harm. */
+function yieldTo(horse, man, pelvis, neck, radius) {
+  let deepest = null;
+  for (const capsule of horse.capsules) {
+    if (capsule.part === 'legs') continue;
+    const closest = closestBetween(pelvis, neck, capsule.a, capsule.b);
+    const offset = vec.sub(closest.onFirst, closest.onSecond);
+    const gap = vec.length(offset) - radius - capsule.radius;
+    if (gap >= 0 || (deepest && gap >= deepest.gap)) continue;
+    const flat = [offset[0], 0, offset[2]];
+    deepest = { gap, normal: vec.length(flat) > 1e-6 ? vec.normalize(flat) : [-forwardOf(horse.yaw)[2], 0, forwardOf(horse.yaw)[0]] };
+  }
+  if (!deepest) return;
+  for (let index = 0; index < man.x.length / 3; index += 1) {
+    for (const axis of [0, 2]) {
+      man.x[index * 3 + axis] += deepest.normal[axis] * -deepest.gap;
+      man.prev[index * 3 + axis] += deepest.normal[axis] * -deepest.gap;
+    }
+  }
+  man.root[0] += deepest.normal[0] * -deepest.gap;
+  man.root[1] += deepest.normal[2] * -deepest.gap;
+}
+
 /**
  * A horse (with its rider) running into men on foot. The men it touches,
  * and those standing in close order with them, are one block: its mass and
@@ -756,6 +913,11 @@ function rideDown(world, horse) {
     if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
     const neck = point(fighter.x, P.neck);
     const radius = fighter.body.segments.trunk.skinRadius;
+    // A man of its own side is not ridden down: he gives way (a horse and a man that yield to one another, as friendly horses do).
+    if (fighter.corner === horse.corner) {
+      yieldTo(horse, fighter, pelvis, neck, radius);
+      continue;
+    }
     let best = null;
     for (const capsule of horse.capsules) {
       if (capsule.part === 'legs') continue;
@@ -877,7 +1039,8 @@ function trodOn(world, horse) {
   const spec = WORLD.mount.hooves;
   const weight = ladenMass(world, horse) * WORLD.gravity;
   for (const fighter of world.fighters) {
-    if (fighter.mount || fighter.state === 'up' || (fighter.state === 'out' && fighter.outFor > 20)) continue;
+    // (Its own side's men lying there it steps over.)
+    if (fighter.mount || fighter.state === 'up' || fighter.corner === horse.corner || (fighter.state === 'out' && fighter.outFor > 20)) continue;
     const pelvis = point(fighter.x, P.pelvis);
     if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
     const neck = point(fighter.x, P.neck);
@@ -941,6 +1104,16 @@ function horsesMeet(world, first, second) {
   second.at[1] += normal[2] * depth * (a / (a + b));
   const closing = vec.dot(vec.sub(horseVelocityAt(first, deepest.at), horseVelocityAt(second, deepest.at)), normal);
   if (closing <= 0.1) return;
+  // Horses of one side brushing or crowding each other (closing slower than `crash.alliedFrom`): eased apart and their
+  // paces evened out, as two bodies that yield (no restitution), their riders carried: no knock, no shock, no harm.
+  if (first.corner === second.corner && closing < WORLD.mount.crash.alliedFrom) {
+    const push = (a * b) / (a + b) * closing;
+    first.shove[0] -= (normal[0] * push) / a;
+    first.shove[1] -= (normal[2] * push) / a;
+    second.shove[0] += (normal[0] * push) / b;
+    second.shove[1] += (normal[2] * push) / b;
+    return;
+  }
   const { impulse } = crashOf(a, b, closing);
   const sizes = [jolt(world, first, vec.scale(normal, -impulse / a)), jolt(world, second, vec.scale(normal, impulse / b))];
   // The crash of the parts that met (a chest, a neck, a head, and the horse behind it as far as it is going in): blunt harm to each, through its barding.

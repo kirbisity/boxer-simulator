@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { MOVES, moveRange } from './moves.js';
 import { aimPoint, bladeFor, dropWeapon, point, throwPunch, toLocal, WORLD } from './physics.js';
-import { steerInside } from './physics/mounted.js';
+import { steerInside, turnRadius } from './physics/mounted.js';
 import { vec, yawRotate } from './pose.js';
 
 /**
@@ -31,11 +31,32 @@ import { vec, yawRotate } from './pose.js';
  *   radius off his ring.
  * - melee: two riders within `within` m closing slower than `closing` m/s
  *   fight beside each other: he rides to his man's side, at his pace and
- *   up to `closeIn` m/s more per m he is off it (`slowest` at least).
+ *   up to `closeIn` m/s more per m he is off it (`slowest` at least while he is
+ *   a metre or more from his place: arrived, he may stand, turning on the spot). Two
+ *   riders slower than `still` m/s each stand and let the other come, by a draw of
+ *   `standing` (a chance) every `reroll` s.
  * - brace: a man on foot with a weapon this long (m) or more stands to a
  *   charging horse with it; `charging`: a horse closing faster than this
  *   (m/s) within `within` m is a charge.
  * - dodge: a man on foot without one gets off the horse's line (running).
+ * - noise: the small differences each pass is drawn with, once at the start of
+ *   each charge (so two riders who would do the same thing do not): the aim line
+ *   `aim` m to either side of the one he would ride, a pause before he commits
+ *   of up to `pause` s (the charges of a line start a little apart), his pace
+ *   `pace` slower at most (a share), the side he turns to when his man is behind
+ *   him (a bias of `wheel` rad on his turn).
+ * - wheel: turning more than `from` rad towards a point, he slows to a pace
+ *   whose turning circle is `room` of the distance to it (a horse that cannot
+ *   turn inside the circle of a man standing in it would ride round him for
+ *   ever), no slower than `slowest` m/s (a step).
+ * - patience: after `passes` passes, or `seconds` s, without a blow landing
+ *   (on a man or his horse) a rider stops riding past and rides in beside his
+ *   man at a pace that lets him strike (as two riders who are together do).
+ * - lane: friends' horses are steered clear of: a friend that will pass within
+ *   `gap` m of him inside `look` s (at the speeds they have now) is ridden away
+ *   from (`push` of the turn), and one ahead in his lane is not ridden up
+ *   to (he eases to its pace); so are men of his own side on foot, standing
+ *   within `footGap` m of his line ahead.
  */
 export const RIDING = {
   lookAhead: 1.6,
@@ -46,9 +67,13 @@ export const RIDING = {
   rest: 0.35,
   passing: 3, early: 0.06, cone: 0.8,
   archer: { radius: 11, inward: 0.6 },
-  melee: { within: 4, closing: 4, slowest: 1.5, closeIn: 1.5 },
+  melee: { within: 4, closing: 4, slowest: 1.5, closeIn: 1.5, still: 2, standing: 0.5, reroll: 3 },
   brace: { length: 1.8 },
   charging: 3, within: 14,
+  noise: { aim: 0.3, pause: 0.6, pace: 0.1, wheel: 0.3 },
+  wheel: { room: 0.45, from: 0.3, slowest: 0.5 },
+  patience: { passes: 3, seconds: 25 },
+  lane: { gap: 2.6, look: 1.6, push: 1.8, footGap: 1.6 },
 };
 
 const aheadOf = (yaw) => yawRotate([1, 0, 0], yaw);
@@ -69,6 +94,87 @@ function weightedPick(weights, random) {
 function groundVelocity(fighter) {
   if (fighter.mount) return fighter.mount.velocity ?? [0, 0, 0];
   return [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]];
+}
+
+/**
+ * The small differences of one pass, drawn at the start of it (the only
+ * randomness of a rider's approach, so a seed gives the same fight): which side he
+ * turns to, how far off his line he rides, how soon he commits, how hard he rides.
+ */
+function drawPass(world, ride, now) {
+  const random = world.random;
+  const noise = RIDING.noise;
+  ride.plan = { aim: (random() * 2 - 1) * noise.aim, side: random() < 0.5 ? -1 : 1, pace: 1 - random() * noise.pace };
+  ride.holdUntil = now + random() * noise.pause;
+}
+
+/** Whether a rider has landed a blow (or struck his man's horse) since he last looked; keeps count of passes and time without one. */
+function keepPatience(world, fighter, ride) {
+  const made = fighter.stats.landed + fighter.stats.blocked + fighter.stats.struckHorse;
+  if (ride.made === undefined || made !== ride.made) {
+    ride.made = made;
+    ride.since = world.time;
+    ride.passes = 0;
+  }
+  return ride.passes >= RIDING.patience.passes || world.time - ride.since > RIDING.patience.seconds;
+}
+
+/**
+ * A heading and pace turned clear of his side's other horses: each friend whose
+ * path, carried on as it goes now, will pass within `lane.gap` of his own inside
+ * `lane.look` s pushes him across (away from it; to the side he turns to if it is
+ * dead ahead) and, if it is ahead in his lane, holds him to its pace.
+ */
+function keepLane(world, fighter, heading, speed) {
+  const horse = fighter.mount;
+  const lane = RIDING.lane;
+  const wanted = aheadOf(heading);
+  const left = leftwardOf(heading);
+  const mine = horse.velocity ?? [0, 0, 0];
+  let across = 0;
+  let pace = speed;
+  for (const other of world.horses) {
+    if (other === horse || other.corner !== horse.corner) continue;
+    const theirs = other.velocity ?? [0, 0, 0];
+    const gap = [other.at[0] - horse.at[0], other.at[1] - horse.at[1]];
+    const relative = [theirs[0] - mine[0], theirs[2] - mine[2]];
+    const closing = relative[0] * relative[0] + relative[1] * relative[1];
+    const when = closing > 1e-6 ? Math.max(0, Math.min(lane.look, -(gap[0] * relative[0] + gap[1] * relative[1]) / closing)) : 0;
+    const there = [gap[0] + relative[0] * when, gap[1] + relative[1] * when];
+    const apart = Math.hypot(there[0], there[1]);
+    if (apart >= lane.gap) continue;
+    // Which side of his way it will be: pushed to the other. Dead ahead, the side he has drawn for this pass.
+    const sideways = there[0] * left[0] + there[1] * left[2];
+    const urgency = (1 - apart / lane.gap) * (1 - 0.5 * when / lane.look);
+    const sign = Math.abs(sideways) < 0.3 ? fighter.ride?.plan?.side ?? 1 : -Math.sign(sideways);
+    across += sign * urgency;
+    // Ahead of him in his lane (not beside): no faster than it goes.
+    const ahead = gap[0] * wanted[0] + gap[1] * wanted[2];
+    if (ahead > 0 && Math.abs(sideways) < lane.gap * 0.5) pace = Math.min(pace, Math.max(horse.paces.walk, Math.hypot(theirs[0], theirs[2]) + 0.5 * Math.max(0, ahead - 2.4)));
+  }
+  // Men of his own side on foot (a rider unhorsed, the foot of his line) are steered round as well, as they stand.
+  for (const man of world.fighters) {
+    if (man.mount || man.corner !== horse.corner || man.state === 'out') continue;
+    const at = point(man.x, P.pelvis);
+    const gap = [at[0] - horse.at[0], at[2] - horse.at[1]];
+    const ahead = gap[0] * wanted[0] + gap[1] * wanted[2];
+    const sideways = gap[0] * left[0] + gap[1] * left[2];
+    if (ahead < 0 || ahead > lane.look * Math.max(4, Math.abs(horse.speed)) || Math.abs(sideways) >= lane.footGap) continue;
+    const sign = Math.abs(sideways) < 0.3 ? fighter.ride?.plan?.side ?? 1 : -Math.sign(sideways);
+    across += sign * (1 - Math.abs(sideways) / lane.footGap) * Math.max(0, 1 - ahead / (lane.look * Math.max(4, Math.abs(horse.speed))));
+  }
+  if (across === 0) return { heading, speed: pace };
+  const push = Math.max(-1, Math.min(1, across)) * lane.push;
+  const turned = [wanted[0] + left[0] * push, wanted[2] + left[2] * push];
+  return { heading: headingOf(turned[0], turned[1]), speed: pace };
+}
+
+/** The pace to turn at, slowed until his turning circle fits inside the room he has to his man. */
+function wheelPace(horse, distance) {
+  const room = distance * RIDING.wheel.room;
+  let pace = WORLD.mount.turnSpeed;
+  while (pace > RIDING.wheel.slowest && turnRadius(horse, pace) > room) pace = Math.max(RIDING.wheel.slowest, pace * 0.85);
+  return pace;
 }
 
 /** From the shoulder, how far a move reaches: the arm and, with a weapon, the weapon. */
@@ -161,6 +267,8 @@ function strikeInPassing(world, fighter, target, attacks, markOf, zoneOf, forwar
   if (ride) {
     // His move for the pass, drawn by his style's weights (not whichever comes into its moment first), made when its moment comes.
     ride.pick ??= weightedPick(usable, world.random);
+    // Close and slow (a mêlée, not a pass): a move that cannot be made from here is not waited for; he draws again from those that can.
+    if (choices[ride.pick] === undefined && vec.length(vec.sub(theirs, mine)) <= RIDING.passing && Object.keys(choices).length) ride.pick = weightedPick(choices, world.random);
     move = choices[ride.pick] === undefined ? null : ride.pick;
   } else move = weightedPick(choices, world.random);
   if (!move) return false;
@@ -207,8 +315,14 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   const distance = Math.hypot(to[0], to[2]);
   const along = distance > 1e-6 ? [to[0] / distance, 0, to[2] / distance] : aheadOf(horse.yaw);
   const forward = aheadOf(horse.yaw);
-  const setGoal = (heading, speed) => {
-    horse.goal = { heading: steerInside(world, horse, heading), speed };
+  // (The way he rides is turned clear of his friends' horses, and from the arena's edge.)
+  // Turning towards a point `room` m off, he is slowed to a pace his turning circle fits inside (a horse that rides round and round a point it cannot turn inside never gets there).
+  const setGoal = (heading, speed, room = Infinity) => {
+    let off = heading - horse.yaw;
+    off = Math.atan2(Math.sin(off), Math.cos(off));
+    if (Math.abs(off) > RIDING.wheel.from) speed = Math.min(speed, wheelPace(horse, room));
+    const clear = keepLane(world, fighter, heading, speed);
+    horse.goal = { heading: steerInside(world, horse, clear.heading), speed: clear.speed };
   };
   // A man down (or getting up) is let be: walk on, round him.
   if (opponent.state !== 'up') {
@@ -220,52 +334,76 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   if (gun) {
     gunfight(world, fighter, opponent, distance, gun, dt);
     const spec = RIDING.archer;
-    // On the left: the heading a quarter turn clockwise of the way to him, turned in or out to keep the ring.
-    const off = Math.max(-1, Math.min(1, (distance - spec.radius) / spec.radius));
+    fighter.ride ??= { phase: 'charge' };
+    if (!fighter.ride.plan) drawPass(world, fighter.ride, world.time);
+    // On the left: the heading a quarter turn clockwise of the way to him, turned in or out to keep the ring (his own, a little different each).
+    const radius = spec.radius * (1 + fighter.ride.plan.aim);
+    const off = Math.max(-1, Math.min(1, (distance - radius) / radius));
     setGoal(headingOf(along[0], along[2]) - Math.PI / 2 + spec.inward * off, horse.paces.canter);
     return true;
   }
   if (style.ranged && fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
   fighter.ride ??= { phase: 'charge' };
   const ride = fighter.ride;
+  if (!ride.plan) drawPass(world, ride, world.time);
   const lance = style.couchedCharge && fighter.weapon?.held && fighter.weapon.kind === style.weapon ? style.couchedCharge : null;
   const ahead = vec.dot(along, forward);
+  const impatient = keepPatience(world, fighter, ride);
+  // To one side of him, his weapon side (the right): pass to his left.
+  const reach = Math.max(...Object.keys(style.attacks).map((name) => (MOVES[name]?.kind === 'strike' ? reachFromShoulder(fighter, MOVES[name]) : 0)), 0.7);
+  // Beside a man on foot, near enough that his body is well within the reach from the shoulder (above him).
+  const drop = point(fighter.x, P.rShoulder)[1] - aimPoint(opponent, markZone(opponent))[1];
+  const beside = Math.sqrt(Math.max(0, (reach * WORLD.mount.passReach) ** 2 - drop * drop)) + fighter.body.lengths.shoulderSpan / 2;
+  const pass = lance ? WORLD.mount.passLance : opponent.mount ? WORLD.mount.passMounted : Math.max(WORLD.mount.pass, beside);
+  const leftOfLine = [-along[2], 0, along[0]];
   // Two riders close and going the same way: a mêlée, not a pass — he keeps beside his man (his
-  // man on his weapon side) at his pace and fights there, as long as they stay together.
-  const together = opponent.mount && distance < RIDING.melee.within && vec.length(vec.sub(theirs, groundVelocity(fighter))) < RIDING.melee.closing;
-  if (together && !lance) {
-    const leftOfLine = [-along[2], 0, along[0]];
-    const beside = vec.add(target, vec.scale(leftOfLine, WORLD.mount.passMounted));
-    const aim = [beside[0] - me[0], beside[2] - me[2]];
+  // man on his weapon side) at his pace and fights there, as long as they stay together. So does a
+  // rider who has ridden past his man and not struck him, three times or for long enough: he rides in beside him.
+  const together = !lance && ((opponent.mount && distance < RIDING.melee.within && vec.length(vec.sub(theirs, groundVelocity(fighter))) < RIDING.melee.closing) || impatient);
+  if (together) {
+    const alongside = vec.add(target, vec.scale(leftOfLine, pass));
+    const aim = [alongside[0] - me[0], alongside[2] - me[2]];
     const gap = Math.hypot(aim[0], aim[1]);
-    setGoal(gap > 0.3 ? headingOf(aim[0], aim[1]) : opponent.mount.yaw, Math.max(RIDING.melee.slowest, Math.min(horse.paces.canter, vec.length(theirs) + RIDING.melee.closeIn * gap)));
+    // His man in reach of his blade from where he is: he stops and turns on the spot to put him on his weapon side (a horse that
+    // must keep walking circles a metre across round a man standing in them never gets within reach). Two riders slowly
+    // chasing places beside one another ride round and round: each takes it in turns (drawn, every few seconds) to stand and
+    // let the other come.
+    const shoulder = point(fighter.x, P.rShoulder);
+    const mark = aimPoint(opponent, markZone(opponent));
+    if (opponent.mount && world.time >= (ride.rollAt ?? 0)) {
+      ride.stand = world.random() < RIDING.melee.standing;
+      ride.rollAt = world.time + RIDING.melee.reroll;
+    }
+    const stand = opponent.mount && ride.stand && vec.length(theirs) < RIDING.melee.still;
+    if (stand || Math.hypot(mark[0] - shoulder[0], mark[1] - shoulder[1], mark[2] - shoulder[2]) <= reach * RIDING.reachShare) setGoal(Math.atan2(-along[0], -along[2]), 0);
+    else setGoal(gap > 0.3 ? headingOf(aim[0], aim[1]) : opponent.mount?.yaw ?? horse.yaw, Math.max(RIDING.melee.slowest * Math.min(1, gap), Math.min(horse.paces.canter, vec.length(theirs) + RIDING.melee.closeIn * gap)), gap);
     ride.phase = 'charge';
   } else if (ride.phase === 'charge') {
-    // To one side of him, his weapon side (the right): pass to his left.
-    const reach = Math.max(...Object.keys(style.attacks).map((name) => (MOVES[name]?.kind === 'strike' ? reachFromShoulder(fighter, MOVES[name]) : 0)), 0.7);
-    // Beside a man on foot, near enough that his body is well within the reach from the shoulder (above him).
-    const drop = point(fighter.x, P.rShoulder)[1] - aimPoint(opponent, markZone(opponent))[1];
-    const beside = Math.sqrt(Math.max(0, (reach * WORLD.mount.passReach) ** 2 - drop * drop)) + fighter.body.lengths.shoulderSpan / 2;
-    const pass = lance ? WORLD.mount.passLance : opponent.mount ? WORLD.mount.passMounted : Math.max(WORLD.mount.pass, beside);
-    const leftOfLine = [-along[2], 0, along[0]];
-    const passAt = vec.add(target, vec.scale(leftOfLine, pass));
+    // Each charge on a line of its own, a little off the one he would ride, and a little less than flat out.
+    const passAt = vec.add(target, vec.scale(leftOfLine, pass + ride.plan.aim * (lance ? 0.3 : 1)));
     const aim = [passAt[0] - me[0], passAt[2] - me[2]];
     // Close in, the line is held (no swerve at the last moment).
     const heading = distance > 3 ? headingOf(aim[0], aim[1]) : horse.goal.heading;
-    setGoal(heading, horse.paces.gallop);
+    setGoal(heading, world.time < ride.holdUntil ? 0 : horse.paces.gallop * ride.plan.pace);
     if (ahead < -0.1 || distance < 1) {
       ride.phase = 'past';
       ride.pick = null;
+      ride.passes += 1;
     }
   } else if (ride.phase === 'past') {
     // Ridden past: on, straight, until there is room to turn.
     setGoal(horse.yaw, horse.paces.gallop);
     // (Or sooner, with the arena's edge coming.)
-    if (distance > WORLD.mount.wheelAt || horse.goal.heading !== horse.yaw) ride.phase = 'wheel';
+    if (distance > WORLD.mount.wheelAt || horse.goal.heading !== horse.yaw) {
+      ride.phase = 'wheel';
+      drawPass(world, ride, world.time);
+    }
   } else {
-    // Wheeling round: slowed to turn, then the charge again once his man is ahead.
-    setGoal(headingOf(along[0], along[2]), WORLD.mount.turnSpeed);
-    if (ahead > Math.cos(0.45)) ride.phase = 'charge';
+    // Wheeling round (to the side he has drawn if his man is behind him): slowed to a pace his turning circle fits the room he has,
+    // then the charge again once his man is ahead (and he has made up his mind).
+    const turning = Math.atan2(-along[2], along[0]) - ride.plan.side * (ahead < 0 ? RIDING.noise.wheel : 0);
+    setGoal(turning, WORLD.mount.turnSpeed, distance);
+    if (ahead > Math.cos(0.45) && world.time >= ride.holdUntil) ride.phase = 'charge';
   }
   if (fighter.punch) steerBlow(fighter, opponent);
   if (fighter.punch || fighter.cooldown > 0) return true;

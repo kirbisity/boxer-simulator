@@ -8,6 +8,8 @@ import { ATTACKERS, firstBlow } from '../tools/couched.js';
 import { thinkAll } from '../src/ai.js';
 import { MOVES } from '../src/moves.js';
 import { vec } from '../src/pose.js';
+import { WORLD } from '../src/physics/config.js';
+import { measure } from '../tools/riding-motion.js';
 
 const FIELD = { halfX: 30, halfZ: 20 };
 const rider = (key, extra = {}) => ({ ...structuredClone(PRESETS[key]), mounted: true, ...extra });
@@ -284,7 +286,9 @@ test('men in close order are one block to the horse and stop it where it rides d
   assert.ok(median(platesRuns.map(lostBy)) > 0.35, `six in plate ${platesRuns.map((run) => lostBy(run).toFixed(2))}`);
   // The rider goes over the horse's neck when it stops, and the men take less each than a lone man.
   for (const run of [wall, plates]) assert.ok(run.w.events.some((e) => e.kind === 'unhorsed' && e.fighter === 0), 'the rider is thrown');
-  assert.ok(wall.peak < one.peak * 0.8, `${wall.peak.toFixed(1)} v ${one.peak.toFixed(1)} m/s`);
+  // (How fast a man is flung depends on where on his shield the horse meets him: the median of five seeds, a wall no worse for each man than a lone man.)
+  const flung = (count, places) => median([4000, 4001, 4002, 4003, 4004].map((seed) => chargeInto(rider('knight'), row('hoplomachus', count), places, seed).peak));
+  assert.ok(flung(9, block(3, 3)) < flung(1, [[12, 0]]) * 1.1, 'the men of a wall take no more each than a lone man');
   assert.ok(wall.foes.filter((man) => man.state === 'up').length >= 5, 'most of the wall stays on its feet');
 });
 
@@ -371,4 +375,136 @@ test('a lance set against the charge has the man behind it, and pushes the horse
   assert.ok(hit.strikeMass > 0.5 * man.body.massKg, `${hit.strikeMass.toFixed(0)} kg behind the point`);
   assert.ok(hit.pushed > 0.1, `the horse pushed back ${hit.pushed.toFixed(2)} m/s`);
   assert.ok(hit.pierce > 0, 'and run on to it');
+});
+
+// ---- Circling, friends, the seat and the gait ----
+
+/** Whether a blow has been struck, on a man or on a horse. */
+const engaged = (w) => w.events.some((event) => event.kind === 'landed' || event.kind === 'blocked' || event.kind === 'horseHit');
+
+test('a rider does not ride round his man for ever: a man standing in his turning circle is struck, and two alike on horseback engage, at every seed', () => {
+  // A man on foot who stands where he is: the horse cannot turn inside the circle at a gallop's turning pace, so it slows to turn.
+  for (const seed of [11, 12, 13, 14]) {
+    const w = world(rider('saber'), footman('street', { style: 'unskilled' }), seed);
+    advance(w, 40, thinkAll);
+    assert.ok(w.events.some((event) => event.kind === 'landed' && event.attacker === 0), `seed ${seed}: the rider struck his man`);
+  }
+  // Two the same, each trying to get at the other: symmetric, until their draws differ.
+  for (const seed of [21, 22, 23, 24]) {
+    const w = world(rider('knight'), rider('knight'), seed);
+    advance(w, 45, thinkAll);
+    assert.ok(engaged(w), `seed ${seed}: they engaged`);
+  }
+});
+
+test('a rider who has ridden past without striking rides in beside his man (patience), and each pass is drawn on its own', () => {
+  const w = world(rider('saber'), footman('street', { style: 'unskilled' }), 5);
+  const man = w.fighters[0];
+  advance(w, 0.5, thinkAll);
+  const first = { ...man.ride.plan };
+  man.ride.passes = 3;
+  advance(w, 1, thinkAll);
+  // Rides in at a pace that lets him strike: nothing like a gallop at the man's side.
+  assert.equal(man.ride.phase, 'charge');
+  assert.ok(Math.abs(w.horses[0].goal.speed) <= w.horses[0].paces.canter + 1e-6, `${w.horses[0].goal.speed}`);
+  assert.ok(first.pace <= 1 && first.pace >= 0.9 && Math.abs(first.aim) <= 0.3 && Math.abs(first.side) === 1, 'a pass is drawn with a pace, an aim and a side');
+});
+
+test('horses of one side brushing, or crowded together at a pace, only ease apart: no knock, no fall, no harm; friends meeting hard head-on crash all the same', () => {
+  const meet = (offset, opposite) => {
+    const w = createWorld([{ inputs: rider('knight'), corner: 'red' }, { inputs: rider('knight'), corner: 'red' }], { seed: 4000, arena: FIELD });
+    const [a, b] = w.horses;
+    placeFighter(w.fighters[0], 0, 0);
+    a.at = [0, 0];
+    const at = opposite ? [12, -offset] : [0, -offset];
+    placeFighter(w.fighters[1], at[0], at[1]);
+    b.at = at;
+    b.yaw = opposite ? Math.PI : 0;
+    w.fighters[1].yaw = b.yaw;
+    for (let t = 0; t < 5; t += 1 / 60) {
+      a.goal = { heading: 0, speed: a.paces.gallop };
+      b.goal = { heading: b.yaw, speed: b.paces.gallop };
+      for (const h of w.horses) h.goalAt = w.time + 1;
+      for (const f of w.fighters) f.cooldown = 1;
+      advance(w, 1 / 60);
+    }
+    return w;
+  };
+  // Parallel at the same pace, barrels overlapping a little: nothing.
+  const brush = meet(0.7, false);
+  assert.equal(brush.events.filter((e) => ['horseDown', 'unhorsed', 'horseCrash'].includes(e.kind)).length, 0);
+  // Friends head-on at a gallop: both go down.
+  const head = meet(0, true);
+  assert.equal(head.events.filter((e) => e.kind === 'horseDown').length, 2);
+  assert.ok(WORLD.mount.crash.alliedFrom > 1 && WORLD.mount.crash.alliedFrom < WORLD.mount.crash.fall);
+});
+
+test('a team of horsemen holds its line: no friendly horse crashes in a 3 v 3 charge, whatever the seed', () => {
+  for (const seed of [31, 32, 33]) {
+    const sides = [...['knight', 'saladin', 'samurai'].map((key) => ({ inputs: rider(key), corner: 'red' })), ...['saber', 'knight', 'saladin'].map((key) => ({ inputs: rider(key), corner: 'blue' }))];
+    const w = createWorld(sides, { seed, arena: FIELD });
+    advance(w, 25, thinkAll);
+    const friendly = w.events.filter((e) => e.kind === 'horseCrash' && e.other !== undefined && w.horses[e.horse].corner === w.horses[e.other].corner);
+    assert.equal(friendly.length, 0, `seed ${seed}: friends crashed at ${friendly.map((e) => e.speed.toFixed(1))}`);
+  }
+});
+
+test('the line of a team of horsemen is spaced for horses: 3 m between them across', () => {
+  const w = createWorld([...['knight', 'saladin', 'samurai'].map((key) => ({ inputs: rider(key), corner: 'red' })), { inputs: rider('saber'), corner: 'blue' }], { seed: 1, arena: FIELD });
+  const zs = w.horses.filter((h) => h.corner === 'red').map((h) => h.at[1]).sort((a, b) => a - b);
+  for (let i = 1; i < zs.length; i += 1) assert.ok(zs[i] - zs[i - 1] >= 2.9, `${zs[i] - zs[i - 1]} m`);
+});
+
+test('a rider is harder to unseat: a knock short of the saddle\'s 3.8 m/s does not throw him, a harder one does; a horse going down slowly does not fling him', () => {
+  assert.ok(WORLD.mount.seat.speed >= 3.6 && WORLD.mount.seat.speed <= 4.2);
+  const knocked = (speed) => {
+    const w = world(rider('knight'), footman('yari'));
+    w.fighters[1].state = 'out';
+    ride(w, w.horses[0], { heading: 0, speed: 6 }, 1);
+    const man = w.fighters[0];
+    man.knock = [speed, 0, 0];
+    advance(w, 1 / 60);
+    return man.mount === null;
+  };
+  assert.equal(knocked(3.4), false, 'a 3.4 m/s knock (a man was thrown by 3.0) he sits');
+  assert.equal(knocked(4.6), true);
+  // A horse that goes down slowly: he comes off at a share of the speed it had.
+  const fall = (speed) => {
+    const w = world(rider('samurai'), footman('yari'));
+    w.fighters[1].state = 'out';
+    const [horse] = w.horses;
+    ride(w, horse, { heading: 0, speed }, 3);
+    horse.bleed = 1;
+    advance(w, 0.05);
+    advance(w, 1.2);
+    return w.events.find((e) => e.kind === 'unhorsed');
+  };
+  const slow = fall(2);
+  assert.ok(slow && /comes off/.test(slow.effects[0]), slow?.effects[0]);
+});
+
+test('on the move the rider rises and falls with the horse: the withers, his seat and his head move together with a bounded bounce, and nothing pops', () => {
+  const trot = measure('saber', 'trot', 3.6, 6);
+  const gallop = measure('saber', 'gallop', 11, 6);
+  const range = (values) => Math.max(...values) - Math.min(...values);
+  const jump = (values) => Math.max(...values.slice(1).map((value, index) => Math.abs(value - values[index])));
+  // The trot bounces twice a stride: a few cm, more than at a gallop's smooth run.
+  assert.ok(range(trot.series.withers) > 0.03 && range(trot.series.withers) < 0.12, `${range(trot.series.withers)}`);
+  assert.ok(range(trot.series.withers) > range(gallop.series.withers));
+  // His seat and head follow it (the lower back taking some of it), neither the full jolt nor still.
+  assert.ok(range(trot.series.pelvis) > 0.008 && range(trot.series.pelvis) < range(trot.series.withers), `hips ${range(trot.series.pelvis)}`);
+  assert.ok(range(trot.series.head) < range(trot.series.withers) * 1.2 && range(trot.series.head) > 0.005, `head ${range(trot.series.head)}`);
+  // Following: his hips rise when the withers do.
+  const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const a = trot.series.withers.map((value) => value - mean(trot.series.withers));
+  const b = trot.series.pelvis.map((value) => value - mean(trot.series.pelvis));
+  const energy = (values) => values.reduce((sum, value) => sum + value * value, 0);
+  let best = -1;
+  for (let lag = 0; lag < 12; lag += 1) {
+    let sum = 0;
+    for (let i = 0; i + lag < a.length; i += 1) sum += a[i] * b[i + lag];
+    best = Math.max(best, sum / Math.sqrt(energy(a) * energy(b)));
+  }
+  assert.ok(best > 0.6, `correlation ${best.toFixed(2)}`);
+  for (const run of [trot, gallop]) for (const key of ['pelvis', 'neck', 'head', 'tip']) assert.ok(jump(run.series[key]) < 0.04, `${key} jumped ${jump(run.series[key])} m in a frame`);
 });

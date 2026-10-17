@@ -130,7 +130,7 @@ export function desiredPose(body, intent = {}) {
   out[P.rHip] = vec.add(pelvis, vec.scale(hipAxis, -L.hipSpan / 2));
 
   const lean = stance.lean + (intent.lean ?? 0);
-  const neck = vec.add(pelvis, [Math.sin(lean) * L.trunk, Math.cos(lean) * L.trunk, 0]);
+  const neck = vec.add(pelvis, [Math.sin(lean) * L.trunk, Math.cos(lean) * L.trunk, intent.roll ? Math.sin(intent.roll) * L.trunk : 0]);
   out[P.neck] = neck;
   const shoulderAxis = across(blade);
   const shoulderBase = vec.add(neck, [0, -0.025 * H, 0]);
