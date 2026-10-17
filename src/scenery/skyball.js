@@ -17,6 +17,9 @@ const SKYBALL = {
 const SKYBALL_DEG = Math.PI / 180;
 // Below the horizon the photograph's own ground fades into the fog colour between these elevations.
 const SKYBALL_FADE = [-7 * SKYBALL_DEG, -1.5 * SKYBALL_DEG];
+// Steeply below the horizon (degrees down) the ball is the colour of dark earth, never the picture's sky: the
+// ground always covers it from above, and a camera that somehow got under the floor sees dark, not the sky's underside.
+const SKYBALL_UNDER = { from: -25, colour: 0x17140f };
 
 // ---- the ball ---------------------------------------------------------------
 
@@ -137,6 +140,9 @@ export const SKYBALL_VARIANTS = [
       // Under the look's dome (which is hidden while this shows).
       ball.renderOrder = -1001;
       group.add(ball);
+      const under = skyballBall(new THREE.MeshBasicMaterial({ color: SKYBALL_UNDER.colour, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false }), -90, SKYBALL_UNDER.from);
+      under.renderOrder = -1001;
+      group.add(under);
       group.userData.buildMs = performance.now() - started;
       group.userData.photo = choice.photo;
       return group;

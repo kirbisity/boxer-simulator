@@ -36,7 +36,41 @@ export const WATCH_CAM = {
   tapMs: 400,
   doubleMs: 380,
   doubleNear: 34,
+  // The camera never goes nearer the ground under it than this (m): it rises over the target instead of sinking through the floor.
+  clearance: 0.3,
+  // The steepest it rises to stay above the ground (rad): above the target, looking down.
+  steepest: 1.45,
 };
+
+/**
+ * Keep an orbit's camera above the ground: raise its pitch (no more than
+ * needed) until the camera stands `clearance` m above `groundAt(x, z)` (the
+ * floor's height there; flat ground: 0). Returns whether it was raised. The
+ * orbit is changed in place, so a drag that keeps pushing down rests at the
+ * limit instead of fighting it.
+ */
+export function orbitAboveGround(orbit, groundAt = () => 0, clearance = WATCH_CAM.clearance) {
+  const { yaw, distance, target } = orbit;
+  if (!(distance > 0)) return false;
+  const heightAt = (pitch) => {
+    const out = Math.cos(pitch) * distance;
+    const x = target.x + Math.cos(yaw) * out;
+    const z = target.z + Math.sin(yaw) * out;
+    return { camera: target.y + Math.sin(pitch) * distance, floor: Math.max(0, groundAt(x, z) || 0) + clearance };
+  };
+  let pitch = orbit.pitch;
+  let raised = false;
+  // The ground under the camera moves as it rises (a slope): a few passes settle it.
+  for (let pass = 0; pass < 4; pass += 1) {
+    const { camera, floor } = heightAt(pitch);
+    if (camera >= floor - 1e-6) break;
+    const lowest = Math.asin(Math.max(-1, Math.min(1, (floor - target.y) / distance)));
+    pitch = Math.min(WATCH_CAM.steepest, Math.max(pitch, lowest) + 1e-4);
+    raised = true;
+  }
+  if (raised) orbit.pitch = Math.max(orbit.pitch, pitch);
+  return raised;
+}
 
 export function createWatchCam() {
   return { mode: 'auto', focus: null, anchor: null, anchorFocus: null, reframing: false, spread: 0 };

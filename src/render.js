@@ -15,6 +15,7 @@ import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
+import { orbitAboveGround } from './watchcam.js';
 import { arenaColosseum } from './props/arena.js';
 import { harbourPort } from './props/harbour.js';
 import { subwayPuddleFilm, subwayStation, subwayTrain } from './props/subway.js';
@@ -1256,10 +1257,20 @@ export function resize(view, width, height) {
   resizeLook(view, width, height);
 }
 
-/** The camera on its orbit round the target, the target eased towards `focus` (`ease` of the way each frame, at `height` m). */
-export function placeCamera(view, focus, { ease = 0.06, height = 1.1 } = {}) {
+/** The height of the ground at (x, z) in the place shown: the land a scenery part raised (the foothills), else flat. */
+export function groundHeightAt(view) {
+  const land = view.places?.[view.place]?.children.find((child) => child.visible && child.userData.heightAt);
+  return land ? land.userData.heightAt : () => 0;
+}
+
+/**
+ * The camera on its orbit round the target, the target eased towards `focus` (`ease` of the way each frame, at `height` m).
+ * With `ground`, the orbit is first kept above the ground (watchcam.js orbitAboveGround): never under the floor.
+ */
+export function placeCamera(view, focus, { ease = 0.06, height = 1.1, ground = false } = {}) {
   const orbit = view.orbit;
   if (focus) orbit.target.lerp(new THREE.Vector3(focus[0], height, focus[2]), ease);
+  if (ground) orbitAboveGround(orbit, groundHeightAt(view));
   const { yaw, pitch, distance, target } = orbit;
   view.camera.position.set(
     target.x + Math.cos(pitch) * Math.cos(yaw) * distance,

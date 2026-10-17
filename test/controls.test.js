@@ -181,6 +181,20 @@ test('the camera holds its heading while he is down, keeps both men in view lock
   assert.ok(view.distance > FOLLOW_CAM.distance * 1.3, `${view.distance.toFixed(2)} m on a phone`);
 });
 
+test('entering play lands the view on him at once: behind him at the follow distance, whatever the view was before', () => {
+  for (const aspect of [16 / 9, 390 / 788]) {
+    const cam = createFollowCam();
+    // The watching camera was 26 m out over an army, aimed at its middle: none of that is carried over.
+    const first = frame(cam, { me: [12, 0.9, -7], facing: 1.1, aspect, from: { yaw: -0.5, pitch: 0.45, distance: 26, target: [0, 1.1, 0] } }, 0);
+    let settled = first;
+    for (let time = 1 / 60; time < 4; time += 1 / 60) settled = frame(cam, { me: [12, 0.9, -7], facing: 1.1, aspect }, time);
+    assert.ok(Math.abs(first.distance - settled.distance) < 0.05, `starts at ${first.distance.toFixed(2)} m, settles at ${settled.distance.toFixed(2)} m`);
+    assert.ok(Math.hypot(first.target[0] - 12, first.target[2] + 7) < 1, 'looking at him');
+    assert.ok(Math.abs(first.yaw - behindYaw(1.1)) < 1e-6, 'behind him');
+    assert.ok(Math.abs(first.pitch - FOLLOW_CAM.pitch) < 1e-6);
+  }
+});
+
 test('the camera stays inside the walls: it comes in along its line', () => {
   const room = cameraRoom('colosseum', { halfX: 6.5, halfZ: 4.4 });
   assert.ok(room(0, 0) && !room(10.5, 0));

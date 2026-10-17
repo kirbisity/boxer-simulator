@@ -86,28 +86,31 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
   }
   reset();
 
-  /** Start where the view would settle, at once (a new bout, play just begun). */
+  /**
+   * Start where the view would settle, at once (a new bout, play just begun): behind him, at the
+   * follow distance. Nothing is carried over from the view before (the watching camera may have
+   * been 26 m out over an army, aimed at its middle): the first frame lands the view on him.
+   */
   function place(input) {
     const anchor = input.me.slice();
     cam.anchor = anchor;
     cam.foe = input.foe ? input.foe.slice() : null;
-    cam.facing = behindYaw(input.facing);
+    cam.facing = input.foe ? Math.atan2(anchor[2] - input.foe[2], anchor[0] - input.foe[0]) + spec.lockAngle : behindYaw(input.facing);
     cam.goalYaw = cam.facing;
-    cam.yaw = input.from?.yaw ?? cam.goalYaw;
+    cam.yaw = cam.goalYaw;
     cam.yawV = 0;
-    cam.pitch = input.from?.pitch ?? spec.pitch;
+    cam.pitch = spec.pitch;
     cam.pitchV = 0;
-    cam.distance = input.from?.distance ?? spec.distance;
+    cam.distance = null;
     cam.distanceV = 0;
-    cam.target = input.from?.target ? input.from.target.slice() : [anchor[0], anchor[1] + spec.aboveHips, anchor[2]];
+    cam.target = null;
     cam.targetV = [0, 0, 0];
     cam.ready = true;
   }
 
   /**
    * One frame. `input`: { me: [x, y, z] (his pelvis), facing (his yaw), down (on the floor or rising),
-   * foe: [x, y, z] (the man locked on's pelvis, or null), moving (walking free), aspect (the screen's width over height),
-   * from (the view as it is, the first time) },
+   * foe: [x, y, z] (the man locked on's pelvis, or null), moving (walking free), aspect (the screen's width over height) },
    * `now` (s, real time) and `dt` (s). Returns { target, yaw, pitch, distance }.
    */
   function update(input, now, dt) {
@@ -150,16 +153,19 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
     // What it looks at: over his shoulder (to the view's right), or between the two men.
     const right = [Math.sin(cam.yaw), -Math.cos(cam.yaw)];
     const across = (input.aspect ?? 16 / 9) * Math.tan(((spec.fov / 2) * Math.PI) / 180);
+    // How far back: further, the further apart they stand; his zoom (the walls come after).
+    const apart = locked ? Math.hypot(cam.foe[0] - cam.anchor[0], cam.foe[2] - cam.anchor[2]) : 0;
+    const halfWidth = locked ? spec.lockMargin + apart * 0.5 : spec.minHalfWidth;
+    const wanted = Math.max(spec.distance + apart * spec.lockBack, halfWidth / across) * cam.zoom;
+    if (cam.distance === null) cam.distance = wanted;
     const shoulder = Math.min(spec.shoulder, cam.distance * across * spec.shoulderShare);
     const height = cam.anchor[1] + spec.aboveHips;
     const goalTarget = locked
       ? [cam.anchor[0] + (cam.foe[0] - cam.anchor[0]) * spec.lockAt, height, cam.anchor[2] + (cam.foe[2] - cam.anchor[2]) * spec.lockAt]
       : [cam.anchor[0] + right[0] * shoulder, height, cam.anchor[2] + right[1] * shoulder];
+    if (!cam.target) cam.target = goalTarget.slice();
     for (let axis = 0; axis < 3; axis += 1) [cam.target[axis], cam.targetV[axis]] = spring(cam.target[axis], cam.targetV[axis], goalTarget[axis], spec.targetRate, dt);
-    // How far back: further, the further apart they stand; his zoom; then no further than the walls allow.
-    const apart = locked ? Math.hypot(cam.foe[0] - cam.anchor[0], cam.foe[2] - cam.anchor[2]) : 0;
-    const halfWidth = locked ? spec.lockMargin + apart * 0.5 : spec.minHalfWidth;
-    const wanted = Math.max(spec.distance + apart * spec.lockBack, halfWidth / across) * cam.zoom;
+    // The distance eases to it; then no further back than the walls allow.
     [cam.distance, cam.distanceV] = spring(cam.distance, cam.distanceV, wanted, spec.distanceRate, dt);
     const allowed = roomFor(cam.target, cam.yaw, cam.pitch, cam.distance);
     if (allowed < cam.distance) {

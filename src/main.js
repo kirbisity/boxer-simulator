@@ -656,7 +656,8 @@ function drawWorld(dt, drawIt = true) {
   if (followed) followCamera(followed, dt);
   else if (!sheet) watchCamera(world, pelvisMid, dt);
   // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
-  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid);
+  // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall).
+  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   showCameraBar(!followed && !sheet);

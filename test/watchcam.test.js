@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, WATCH_CAM, zoomBy, zoomLimits } from '../src/watchcam.js';
+import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, orbitAboveGround, pickMan, stepFree, stepReframe, WATCH_CAM, zoomBy, zoomLimits } from '../src/watchcam.js';
 
 const orbit = (extra = {}) => ({ yaw: 0, pitch: 0.2, distance: 5.2, target: { x: 0, y: 1.1, z: 0 }, ...extra });
 const man = (id, x, z, extra = {}) => ({ id, x, y: 1.5, z, up: true, gone: false, ...extra });
@@ -137,4 +137,31 @@ test('a tap is told from a drag, and two taps close together are a double tap', 
   tapper.press(100, 100, 6000);
   tapper.cancel();
   assert.equal(tapper.release(100, 100, 6050), null);
+});
+
+test('the camera never goes under the floor: a pitch below it rises just to the clearance, a slope under the camera counts', () => {
+  const height = (view) => view.target.y + Math.sin(view.pitch) * view.distance;
+  const zoomedOut = orbit({ pitch: -0.05, distance: 26 });
+  assert.ok(height(zoomedOut) < 0, 'it would be under the floor');
+  assert.ok(orbitAboveGround(zoomedOut));
+  assert.ok(Math.abs(height(zoomedOut) - WATCH_CAM.clearance) < 0.01, `${height(zoomedOut).toFixed(3)} m up`);
+  // Already above: left alone.
+  const above = orbit({ pitch: 0.3 });
+  assert.equal(orbitAboveGround(above), false);
+  assert.equal(above.pitch, 0.3);
+  // A drag that keeps pushing down rests at the limit: the same pitch every frame, no jitter.
+  const dragged = orbit({ pitch: -0.05, distance: 26 });
+  const pitches = [];
+  for (let frame = 0; frame < 5; frame += 1) {
+    dragged.pitch = Math.max(-0.05, dragged.pitch - 0.02);
+    orbitAboveGround(dragged);
+    pitches.push(dragged.pitch);
+  }
+  assert.ok(Math.max(...pitches) - Math.min(...pitches) < 1e-3, pitches.join(', '));
+  // A hill rising behind the target (the camera's side, +x): it stands above the hill there.
+  const hill = (x) => Math.max(0, (x - 3) * 0.5);
+  const onHill = orbit({ yaw: 0, pitch: 0.05, distance: 12 });
+  orbitAboveGround(onHill, hill);
+  const x = onHill.target.x + Math.cos(onHill.pitch) * onHill.distance;
+  assert.ok(height(onHill) >= hill(x) + WATCH_CAM.clearance - 1e-3, `${height(onHill).toFixed(2)} m over ground at ${hill(x).toFixed(2)}`);
 });
