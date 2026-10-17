@@ -4,9 +4,10 @@
 // wall tile streaked with soot, rust and seepage, steel I-beam columns and
 // ceiling girders painted green and chipped to the primer, fluorescent tubes
 // in wire cages behind yellowed diffusers, the dark wet track bed (ties,
-// ballast, the running rails and the covered third rail), and a train of
-// R160-type cars standing at the platform: stainless steel, fluted, with
-// paired sliding doors. Water seeps through the ceiling joints: drops fall,
+// ballast, the running rails and the covered third rail) open below the
+// edge, no train in: a man shoved over the edge falls the 1.1 m onto it
+// (the arena's drop, SUBWAY_ARENA). Litter where people drop it: flattened
+// cups, a newspaper, a fare card. Water seeps through the ceiling joints: drops fall,
 // ring where they land, and leave puddles on the platform (the puddles are
 // in src/ground/living.js, in the realistic look) and wet streaks down a
 // column and the wall.
@@ -28,6 +29,17 @@ import { arenaAt, arenaBuilder, arenaFinish, arenaMaterial, arenaPainted, arenaR
  * the car side is a hand's breadth.
  */
 export const SUBWAY_CAR = { length: 18.35, width: 3.05, height: 3.7, floor: 1.1, gap: 0.1, doorWidth: 1.27, doorHeight: 1.93, doorsAt: [-7.15, -2.4, 2.4, 7.15], couple: 0.8 };
+
+/**
+ * The fight's floor: the strip of platform between the stair wall and the
+ * edge strip (half-sizes in x and z), and on the track side (+z) the edge
+ * itself, 0.75 m past it, a drop (physics.js floorUnder): over it lies the
+ * track bed, the ties and rails about 1.2 m below the platform's top (the
+ * car floor's 1.1 m to the rail head, the ties a little lower), as far as
+ * the far wall. The fighters keep off the edge as off any arena edge; a
+ * shove, a throw or a knockdown can still put a man over it.
+ */
+export const SUBWAY_ARENA = { halfX: 4.2, halfZ: 1.35, drop: { at: 1.35 + 0.75, floor: -1.2, to: 6.0, reason: 'fell onto the tracks' } };
 
 /** Standard gauge (m) and how high the rail head stands over the ties. */
 const SUBWAY_GAUGE = 1.435;
@@ -74,7 +86,7 @@ export function subwayDrip(leak, t, fall) {
 /** The station's layout from the fighting floor: the wall, the edge, the track, the fixtures. */
 export function subwayLayout(arena) {
   const wallZ = -(arena.halfZ + 0.9);
-  const edgeZ = arena.halfZ + 0.75;
+  const edgeZ = arena.drop?.at ?? arena.halfZ + 0.75;
   const trackZ = edgeZ + SUBWAY_CAR.gap + SUBWAY_CAR.width / 2;
   const railTop = -SUBWAY_CAR.floor;
   const fixtures = [];
@@ -130,7 +142,7 @@ function subwayPool(fixtures, x, z) {
  */
 function subwayConcrete() {
   return arenaPainted('subway-concrete', () => {
-    const s = arenaSheet(512, '#8a8577', 0.5, 501);
+    const s = arenaSheet(512, '#7c776a', 0.5, 501);
     const { rr } = s;
     for (let index = 0; index < 2600; index += 1) {
       const v = rr(70, 150);
@@ -144,10 +156,30 @@ function subwayConcrete() {
       s.colour.fillStyle = gradient;
       s.colour.fillRect(X - r, Y - r, r * 2, r * 2);
     });
-    for (let index = 0; index < 70; index += 1) soft(rr(0, 512), rr(0, 512), rr(25, 90), '38,34,28', rr(0.08, 0.2));
-    for (let index = 0; index < 10; index += 1) soft(rr(0, 512), rr(0, 512), rr(8, 22), '70,48,25', rr(0.15, 0.3));
-    // Gum, flattened: 1–3 cm discs, black, grey and the odd pale one.
-    for (let index = 0; index < 150; index += 1) {
+    for (let index = 0; index < 130; index += 1) soft(rr(0, 512), rr(0, 512), rr(25, 90), '34,30,24', rr(0.1, 0.26));
+    // Grime in the slab's pores: a fine dark mottle all over.
+    for (let index = 0; index < 900; index += 1) soft(rr(0, 512), rr(0, 512), rr(3, 9), '28,25,20', rr(0.08, 0.2));
+    for (let index = 0; index < 26; index += 1) soft(rr(0, 512), rr(0, 512), rr(8, 26), '66,44,22', rr(0.18, 0.36));
+    // Dried spills (soda, coffee, worse): a splash of overlapping blots, runs off it, darker where it pooled; and black heel scuffs.
+    for (let index = 0; index < 12; index += 1) {
+      const x = rr(0, 512);
+      const y = rr(0, 512);
+      const tone = `${rr(45, 70)},${rr(32, 45)},${rr(16, 26)}`;
+      for (let part = 0; part < 6; part += 1) {
+        const r = rr(3, 12);
+        s.blob(x + rr(-14, 14), y + rr(-10, 10), r, r * rr(0.5, 1), rr(0, 3), `rgba(${tone},${rr(0.12, 0.26)})`, null);
+      }
+      for (let run = 0; run < 3; run += 1) s.line([[x, y], [x + rr(-30, 30), y + rr(-30, 30)]], rr(1, 2.5), `rgba(${tone},${rr(0.12, 0.22)})`, null);
+    }
+    for (let index = 0; index < 60; index += 1) {
+      const x = rr(0, 512);
+      const y = rr(0, 512);
+      const turn = rr(0, Math.PI);
+      const length = rr(4, 16);
+      s.line([[x, y], [x + Math.cos(turn) * length, y + Math.sin(turn) * length]], rr(0.8, 2), `rgba(12,11,10,${rr(0.3, 0.6)})`, null);
+    }
+    // Gum, flattened: 1–3 cm discs, black, grey and the odd pale one; a busy platform is spotted with it.
+    for (let index = 0; index < 420; index += 1) {
       const tone = rr(0, 1);
       const fill = tone < 0.6 ? `rgba(${rr(20, 40)},${rr(20, 38)},${rr(18, 34)},${rr(0.75, 0.95)})` : tone < 0.92 ? `rgba(${rr(70, 95)},${rr(70, 92)},${rr(66, 86)},0.85)` : 'rgba(150,140,128,0.8)';
       s.blob(rr(0, 512), rr(0, 512), rr(1.6, 4.2), rr(1.4, 3.6), rr(0, 3), fill, 0.53);
@@ -277,34 +309,6 @@ function subwayPaint() {
 }
 
 /**
- * The car's stainless sides, 1 m a repeat: vertical fluting at 5 cm pitch
- * (the fluted panels of the older R-cars, and what the eye takes for an NYC
- * car), brushed grain, and dull grime tracks down from the window corners.
- */
-function subwayFluting() {
-  return arenaPainted('subway-fluting', () => {
-    const s = arenaSheet(512, '#c4c6c6', 0.5, 509);
-    const { rr } = s;
-    const pitch = 512 / 20;
-    for (let flute = 0; flute < 20; flute += 1) {
-      const x = flute * pitch;
-      s.rect(x, 0, pitch * 0.55, 512, null, 0.78);
-      s.rect(x + pitch * 0.55, 0, pitch * 0.15, 512, 'rgba(0,0,0,0.06)', 0.5);
-      s.rect(x + pitch * 0.7, 0, pitch * 0.3, 512, 'rgba(0,0,0,0.09)', 0.25);
-    }
-    for (let index = 0; index < 500; index += 1) {
-      const y = rr(0, 512);
-      s.line([[rr(0, 512), y], [rr(0, 512), y + rr(-1, 1)]], rr(0.5, 1.2), `rgba(${rr(0, 1) < 0.5 ? '255,255,255' : '0,0,0'},${rr(0.03, 0.07)})`, null);
-    }
-    for (let index = 0; index < 30; index += 1) {
-      const x = rr(0, 512);
-      s.line([[x, rr(0, 300)], [x + rr(-2, 2), 512]], rr(3, 14), `rgba(60,55,45,${rr(0.05, 0.14)})`, null);
-    }
-    return arenaFinish(s, { relief: 5, blur: 1 });
-  });
-}
-
-/**
  * The track bed, 1.5 m a repeat: dark crushed stone and concrete, black
  * with brake dust and oil, wet in the low places, rubbish thrown down:
  * paper, cups, a rat's worth of crumbs.
@@ -360,34 +364,6 @@ function subwayNameCanvas() {
   return texture;
 }
 
-/** The lead car's front: the lit route bullet (Q, yellow) and the destination sign in amber. */
-function subwaySignCanvas() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  const g = canvas.getContext('2d');
-  g.fillStyle = '#0c0d0e';
-  g.fillRect(0, 0, 512, 128);
-  g.fillStyle = '#fccc0a';
-  g.beginPath();
-  g.arc(64, 64, 46, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#111';
-  g.font = 'bold 66px Helvetica, Arial, sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText('Q', 64, 68);
-  g.fillStyle = '#ffae2a';
-  g.font = 'bold 44px Helvetica, Arial, sans-serif';
-  g.textAlign = 'left';
-  g.fillText('96 ST', 150, 50);
-  g.font = '28px Helvetica, Arial, sans-serif';
-  g.fillText('2 AV LCL', 150, 95);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 4;
-  return texture;
-}
-
 // ---- the station ------------------------------------------------------------------------
 
 /** Mark a merged mesh as never in the way (see-through leaves it be) and add it. */
@@ -421,10 +397,13 @@ export function subwayStation(arena) {
     tile: 2,
     colour: (p) => {
       const pool = subwayPool(fixtures, p.x, p.z);
-      const foot = 1 - 0.55 * (1 - arenaSmooth(0, 0.45, p.z - wallZ));
-      const nearEdge = 1 - 0.3 * arenaSmooth(edgeZ - stripWidth - 0.5, edgeZ - stripWidth, p.z);
-      const blot = 0.78 + 0.32 * subwayNoise(p.x, p.z, 1.3, 1) - 0.18 * arenaSmooth(0.6, 0.85, subwayNoise(p.x, p.z, 0.7, 2));
-      const trodden = 1 - 0.12 * Math.exp(-((p.z + 0.1) ** 2) / 0.8);
+      // Black grime packed along the wall's foot, where no mop reaches.
+      const foot = 1 - 0.75 * (1 - arenaSmooth(0, 0.6, p.z - wallZ));
+      const nearEdge = 1 - 0.4 * arenaSmooth(edgeZ - stripWidth - 0.5, edgeZ - stripWidth, p.z);
+      const blot = 0.74 + 0.34 * subwayNoise(p.x, p.z, 1.3, 1) - 0.24 * arenaSmooth(0.55, 0.85, subwayNoise(p.x, p.z, 0.7, 2));
+      // The trodden paths: a dark polished lane down the middle and another where people wait by the strip, wandering a little.
+      const lane = (centre, width) => Math.exp(-((p.z - centre - 0.25 * (subwayNoise(p.x, 0, 3, 13) - 0.5)) ** 2) / width);
+      const trodden = 1 - 0.22 * lane(-0.1, 0.5) - 0.18 * lane(edgeZ - stripWidth - 0.45, 0.12);
       return subwayScale(warm, (0.5 + 0.6 * pool) * foot * nearEdge * blot * trodden);
     },
   });
@@ -444,13 +423,15 @@ export function subwayStation(arena) {
     colour: (p) => {
       const pool = subwayPool(fixtures, p.x, p.z);
       const worn = arenaSmooth(0.5, 0.8, subwayNoise(p.x, p.z, 0.9, 5));
-      const lip = 1 - 0.45 * arenaSmooth(edgeZ - 0.1, edgeZ, p.z);
-      return subwayScale(subwayMix([1, 0.97, 0.85], [0.62, 0.62, 0.66], worn * 0.7), (0.55 + 0.55 * pool) * lip * (0.85 + 0.2 * subwayNoise(p.x, p.z, 0.4, 6)));
+      // Black at the lip, and grime ground into the yellow in patches.
+      const lip = 1 - 0.6 * arenaSmooth(edgeZ - 0.14, edgeZ, p.z);
+      const grime = 1 - 0.3 * arenaSmooth(0.45, 0.8, subwayNoise(p.x, p.z, 0.5, 14));
+      return subwayScale(subwayMix([0.92, 0.86, 0.72], [0.5, 0.5, 0.5], worn * 0.8), (0.55 + 0.55 * pool) * lip * grime * (0.8 + 0.2 * subwayNoise(p.x, p.z, 0.4, 6)));
     },
   });
   subwayAdd(group, tactile.mesh(arenaMaterial(subwayTactile(), { roughness: 0.7 }), { cast: false }));
 
-  // The tiled wall, and the far wall over the track (mostly behind the train).
+  // The tiled wall, and the far wall over the open track: soot-black low down where the trains blow the brake dust.
   const tiles = arenaBuilder();
   const wall = new THREE.PlaneGeometry(length, ceiling, 92, 6);
   tiles.add(wall, arenaAt(0, ceiling / 2, wallZ), {
@@ -460,7 +441,7 @@ export function subwayStation(arena) {
       return subwayScale([1, 0.98, 0.93], (0.55 + 0.5 * pool) * (0.82 + 0.25 * subwayNoise(p.x, p.y, 2.2, 7)));
     },
   });
-  tiles.add(new THREE.PlaneGeometry(length, ceiling - railTop, 46, 4), arenaAt(0, (ceiling + railTop) / 2, farZ, 0, Math.PI), { tile: [4, ceiling], colour: (p) => subwayScale([0.5, 0.47, 0.4], 0.5 + 0.4 * subwayNoise(p.x, p.y, 2, 8)) });
+  tiles.add(new THREE.PlaneGeometry(length, ceiling - railTop, 46, 4), arenaAt(0, (ceiling + railTop) / 2, farZ, 0, Math.PI), { tile: [4, ceiling], colour: (p) => subwayScale([0.5, 0.47, 0.4], (0.5 + 0.4 * subwayNoise(p.x, p.y, 2, 8)) * (0.35 + 0.65 * arenaSmooth(railTop + 0.2, railTop + 2.2, p.y))) });
   subwayAdd(group, tiles.mesh(arenaMaterial(subwayTiles(), { roughness: 0.35 }), { cast: false }));
 
   // The mosaic name band, twice along the wall.
@@ -561,6 +542,8 @@ export function subwayStation(arena) {
   group.add(subwayWetStreaks(layout, columns, columnZ));
   // Falling drops and the rings they make.
   group.add(subwayDrips(layout));
+  // What people drop: cups, a newspaper, a fare card, receipts, butts by the can.
+  group.add(subwayLitter(layout, bedY));
 
   // Not shadow casters: the fixtures would print their boxes on the platform under a key that stands in for all the tubes at once.
   subwayAdd(group, dark.mesh(new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.8, metalness: 0.1 }), { cast: false }));
@@ -569,6 +552,225 @@ export function subwayStation(arena) {
   subwayAdd(group, metal.mesh(metalMaterial, { cast: false }));
 
   return { group, layout };
+}
+
+/**
+ * The litter's sheet, 4 by 2 cells of 128 px: a paper coffee cup trodden
+ * flat, a tabloid opened out, a fare card (86 by 54 mm, gold with its
+ * black magnetic stripe), a curled receipt, cigarette butts, a foil gum
+ * wrapper, a crushed soda can's lid-up top, a napkin. Transparent round them.
+ */
+function subwayLitterCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const g = canvas.getContext('2d');
+  const random = arenaRandom(777);
+  const rr = (a, b) => a + (b - a) * random();
+  const cell = (index, draw) => {
+    g.save();
+    g.translate((index % 4) * 128, Math.floor(index / 4) * 128);
+    draw();
+    g.restore();
+  };
+  // The cup: a white waxed cylinder stamped flat to a fan, its rim a rolled line, a coffee ring dried on it, dirty from shoes.
+  cell(0, () => {
+    g.fillStyle = '#e8e4da';
+    g.beginPath();
+    g.moveTo(20, 30);
+    g.lineTo(108, 22);
+    g.lineTo(98, 104);
+    g.lineTo(34, 110);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = '#cfc8b8';
+    g.lineWidth = 6;
+    g.beginPath();
+    g.moveTo(20, 30);
+    g.lineTo(108, 22);
+    g.stroke();
+    g.fillStyle = 'rgba(110,70,35,0.55)';
+    g.beginPath();
+    g.ellipse(64, 40, 34, 8, -0.1, 0, Math.PI * 2);
+    g.fill();
+    for (let index = 0; index < 5; index += 1) {
+      g.strokeStyle = `rgba(90,85,75,${rr(0.2, 0.4)})`;
+      g.lineWidth = rr(1, 2);
+      g.beginPath();
+      g.moveTo(rr(25, 100), rr(30, 105));
+      g.lineTo(rr(25, 100), rr(30, 105));
+      g.stroke();
+    }
+    g.fillStyle = 'rgba(60,55,45,0.35)';
+    g.beginPath();
+    g.ellipse(70, 80, 26, 18, 0.4, 0, Math.PI * 2);
+    g.fill();
+  });
+  // The tabloid, opened: grey newsprint, a black headline band, columns of type, a photo block, a footprint across it.
+  cell(1, () => {
+    g.fillStyle = '#c9c4b6';
+    g.fillRect(6, 14, 116, 100);
+    g.fillStyle = '#1c1c1c';
+    g.fillRect(12, 20, 50, 9);
+    g.fillRect(68, 20, 48, 9);
+    g.fillStyle = '#6b6862';
+    g.fillRect(70, 34, 44, 28);
+    for (let column = 0; column < 4; column += 1) {
+      for (let y = 34 + (column >= 2 ? 32 : 0); y < 108; y += 3) {
+        g.fillStyle = `rgba(40,40,40,${rr(0.35, 0.6)})`;
+        g.fillRect(12 + column * 26, y, rr(16, 22), 1.2);
+      }
+    }
+    g.fillStyle = 'rgba(160,155,145,1)';
+    g.fillRect(63, 14, 2, 100);
+    g.fillStyle = 'rgba(50,45,38,0.35)';
+    g.beginPath();
+    g.ellipse(40, 72, 12, 26, 0.2, 0, Math.PI * 2);
+    g.fill();
+  });
+  // A fare card: gold, rounded corners, the black stripe along one edge, a blue block of print.
+  cell(2, () => {
+    g.fillStyle = '#e0b52a';
+    g.beginPath();
+    g.roundRect ? g.roundRect(14, 30, 100, 63, 6) : g.rect(14, 30, 100, 63);
+    g.fill();
+    g.fillStyle = '#141414';
+    g.fillRect(14, 78, 100, 10);
+    g.fillStyle = '#21407a';
+    g.fillRect(22, 38, 46, 12);
+    g.fillRect(22, 54, 30, 4);
+    g.fillStyle = 'rgba(60,50,30,0.3)';
+    g.fillRect(60, 40, 40, 30);
+  });
+  // A receipt, curled: thermal paper, faint grey print.
+  cell(3, () => {
+    g.fillStyle = '#ece9e2';
+    g.fillRect(44, 4, 40, 120);
+    for (let y = 12; y < 118; y += 5) {
+      g.fillStyle = `rgba(80,80,80,${rr(0.2, 0.45)})`;
+      g.fillRect(48, y, rr(12, 32), 1.4);
+    }
+    g.fillStyle = 'rgba(120,115,100,0.35)';
+    g.fillRect(44, 60, 40, 30);
+  });
+  // Cigarette butts, five, flattened: the orange cork tipping, the white burnt to grey ash at the end.
+  cell(4, () => {
+    for (let index = 0; index < 5; index += 1) {
+      g.save();
+      g.translate(rr(24, 104), rr(24, 104));
+      g.rotate(rr(0, Math.PI));
+      g.fillStyle = '#c9893f';
+      g.fillRect(-12, -3, 12, 6);
+      g.fillStyle = '#e6e2d8';
+      g.fillRect(0, -3, rr(4, 10), 6);
+      g.fillStyle = '#6a645c';
+      g.fillRect(8, -3, 3, 6);
+      g.restore();
+    }
+  });
+  // A foil gum wrapper, crumpled silver.
+  cell(5, () => {
+    g.fillStyle = '#a9adb2';
+    g.fillRect(24, 50, 80, 28);
+    for (let index = 0; index < 20; index += 1) {
+      const v = rr(120, 230);
+      g.fillStyle = `rgba(${v},${v},${v + 6},0.8)`;
+      g.fillRect(rr(24, 96), rr(50, 72), rr(3, 9), rr(2, 6));
+    }
+  });
+  // A soda can trodden flat, seen from above: a red oval with the silver ends.
+  cell(6, () => {
+    g.fillStyle = '#a8aaac';
+    g.beginPath();
+    g.ellipse(64, 64, 48, 26, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#9e1c1c';
+    g.beginPath();
+    g.ellipse(64, 64, 38, 24, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.35)';
+    g.lineWidth = 2;
+    for (let index = 0; index < 4; index += 1) {
+      g.beginPath();
+      g.moveTo(rr(34, 94), rr(44, 84));
+      g.lineTo(rr(34, 94), rr(44, 84));
+      g.stroke();
+    }
+  });
+  // A paper napkin, wadded and trodden: off-white, grey with dirt.
+  cell(7, () => {
+    g.fillStyle = '#d6d2c8';
+    g.beginPath();
+    for (let index = 0; index < 12; index += 1) {
+      const angle = (index / 12) * Math.PI * 2;
+      const r = rr(28, 48);
+      g.lineTo(64 + Math.cos(angle) * r, 64 + Math.sin(angle) * r);
+    }
+    g.closePath();
+    g.fill();
+    g.fillStyle = 'rgba(70,65,55,0.35)';
+    g.beginPath();
+    g.ellipse(70, 60, 20, 14, 0.5, 0, Math.PI * 2);
+    g.fill();
+  });
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/**
+ * Litter where a station's litter lies: along the wall's foot, by the can and
+ * the bench, along the edge strip, a little on the fighting floor, and
+ * some thrown down on the track bed. Flat cards on the floor, one merged
+ * mesh; each item lit as the floor under it (the tubes' pools).
+ */
+function subwayLitter(layout, bedY) {
+  const { wallZ, edgeZ, trackZ, fixtures } = layout;
+  // [cell, x, z, length (m), width (m), turn]; cells as in subwayLitterCanvas.
+  const items = [
+    [0, -3.5, wallZ + 0.35, 0.13, 0.12, 0.6], [0, 0.95, edgeZ - 0.75, 0.12, 0.11, 2.1], [0, 7.4, wallZ + 0.25, 0.13, 0.12, 4.0],
+    [1, 3.6, wallZ + 0.55, 0.56, 0.48, 0.3], [1, -8.2, 0.4, 0.56, 0.48, 1.9],
+    [2, 0.6, -0.85, 0.11, 0.11, 0.7],
+    [3, -0.8, 1.2, 0.2, 0.2, 1.2], [3, 5.2, edgeZ - 0.4, 0.2, 0.2, 2.6],
+    [4, 4.7, wallZ + 0.55, 0.16, 0.16, 0.2], [4, -5.2, edgeZ - 0.5, 0.16, 0.16, 1.4], [4, 1.6, wallZ + 0.2, 0.16, 0.16, 2.2],
+    [5, 1.8, -1.35, 0.08, 0.08, 0.9], [5, -4.1, 0.25, 0.08, 0.08, 2.4],
+    [6, -2.2, wallZ + 0.3, 0.15, 0.15, 1.1],
+    [7, 2.9, 1.05, 0.11, 0.11, 0.4], [7, -6.8, wallZ + 0.3, 0.11, 0.11, 1.7],
+  ];
+  // Thrown down on the track bed, between the platform and the near rail.
+  const track = [[1, 2.4, trackZ - 1.05, 0.5, 0.44, 2.6], [0, -3.1, trackZ - 1.2, 0.13, 0.12, 1.0], [6, 5.6, trackZ + 0.2, 0.11, 0.11, 0.3], [7, -0.6, trackZ - 1.0, 0.11, 0.11, 2.0]];
+  const positions = [];
+  const uvs = [];
+  const colours = [];
+  const index = [];
+  const put = ([cellIndex, x, z, length, width, turn], y, light) => {
+    const first = positions.length / 3;
+    const u0 = (cellIndex % 4) / 4;
+    const v0 = 1 - (Math.floor(cellIndex / 4) + 1) / 2;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const lx = (a * length) / 2;
+      const lz = (b * width) / 2;
+      positions.push(x + lx * cos - lz * sin, y, z + lx * sin + lz * cos);
+      uvs.push(u0 + ((a + 1) / 2) * 0.25, v0 + ((1 - b) / 2) * 0.5);
+      colours.push(light, light, light);
+    }
+    index.push(first, first + 2, first + 1, first, first + 3, first + 2);
+  };
+  for (const item of items) put(item, 0.004, 0.5 + 0.6 * subwayPool(fixtures, item[1], item[2]));
+  for (const item of track) put(item, bedY + 0.11, 0.45);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(positions.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geometry.setIndex(index);
+  const material = new THREE.MeshStandardMaterial({ map: subwayLitterCanvas(), vertexColors: true, roughness: 0.85, alphaTest: 0.4, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.receiveShadow = true;
+  mesh.userData.seeThrough = false;
+  return mesh;
 }
 
 /** Dark glossy films where water runs: down the face of a column and the tiles, a wet stain spreading at the foot. */
@@ -668,105 +870,4 @@ export function subwayPuddleFilm(layout) {
   mesh.userData.scenery = 'ground';
   mesh.userData.seeThrough = false;
   return mesh;
-}
-
-// ---- the train --------------------------------------------------------------------------
-
-/**
- * Two R160 cars standing at the platform, the lead car's cab end toward +x
- * at `frontX`. Stainless steel on the look's reflection map, the doors and
- * windows on the platform side, lit inside; under the floor the trucks and
- * the equipment boxes, black with brake dust.
- */
-export function subwayTrain(layout, { frontX = 12.4 } = {}) {
-  const { trackZ, railTop } = layout;
-  const car = SUBWAY_CAR;
-  const half = car.width / 2;
-  const sill = railTop + 0.95;
-  const eave = railTop + car.height - 0.25;
-  const steel = arenaBuilder();
-  const glass = arenaBuilder();
-  const dark = arenaBuilder();
-  const side = trackZ - half;
-  const grime = (cx) => (p) => {
-    const low = 1 - 0.4 * arenaSmooth(sill + 0.7, sill, p.y);
-    const roof = p.y > eave - 0.02 ? 0.55 : 1;
-    const n = 0.88 + 0.16 * subwayNoise(p.x + cx, p.y, 1.1, 12);
-    return subwayScale([0.98, 0.97, 0.94], low * roof * n);
-  };
-  const centres = [frontX - car.length / 2, frontX - car.length * 1.5 - car.couple];
-  centres.forEach((cx, number) => {
-    const lead = number === 0;
-    const colour = grime(cx);
-    steel.add(subwayBox(car.length, eave - sill, car.width), arenaAt(cx, (sill + eave) / 2, trackZ), { tile: 1, colour });
-    steel.add(new THREE.CylinderGeometry(1, 1, 1, 18, 1, true, 0, Math.PI), arenaAt(cx, eave, trackZ, 0, 0, Math.PI / 2, 0.25, car.length, half), { tile: 1, colour: () => [0.5, 0.48, 0.45] });
-    // The ends: the cab's rounded nose on the lead car, a flat end with its door and diaphragm at the coupled ends.
-    for (const end of [-1, 1]) {
-      const x = cx + (end * car.length) / 2;
-      if (lead && end === 1) {
-        steel.add(new THREE.CylinderGeometry(1, 1, 1, 18, 1, true, 0, Math.PI), arenaAt(x, (sill + eave) / 2, trackZ, 0, 0, 0, 0.22, eave - sill, half), { tile: 1, colour });
-        steel.add(new THREE.SphereGeometry(1, 18, 5, 0, Math.PI, 0, Math.PI / 2), arenaAt(x, eave, trackZ, 0, Math.PI / 2, 0, half, 0.25, 0.22), { tile: 1, colour: () => [0.5, 0.48, 0.45] });
-        // Storm door window and the cab windows, the sign over them, headlights and markers.
-        for (const [z, w] of [[0, 0.55], [-0.95, 0.6], [0.95, 0.6]]) dark.add(subwayBox(0.06, 0.9, w + 0.08), arenaAt(x + 0.2 - Math.abs(z) * 0.05, sill + 1.55, trackZ + z, 0, (z / half) * 0.45), { colour: [0.05, 0.05, 0.05] });
-        for (const [z, w] of [[0, 0.55], [-0.95, 0.6], [0.95, 0.6]]) glass.add(subwayBox(0.04, 0.82, w), arenaAt(x + 0.22 - Math.abs(z) * 0.05, sill + 1.55, trackZ + z, 0, (z / half) * 0.45), { colour: [0.45, 0.42, 0.36] });
-        for (const z of [-0.85, 0.85]) glass.add(subwayBox(0.04, 0.09, 0.2), arenaAt(x + 0.18, sill + 0.55, trackZ + z, 0, (z / half) * 0.45), { colour: [1.0, 0.98, 0.9] });
-        for (const z of [-1.1, 1.1]) glass.add(subwayBox(0.04, 0.07, 0.1), arenaAt(x + 0.15, sill + 2.45, trackZ + z, 0, (z / half) * 0.45), { colour: [1.0, 0.7, 0.25] });
-      } else {
-        dark.add(subwayBox(0.08, eave - sill - 0.2, car.width - 0.4), arenaAt(x + end * 0.01, (sill + eave) / 2, trackZ), { colour: [0.12, 0.12, 0.12] });
-        dark.add(subwayBox(0.4, 2.1, 1.2), arenaAt(x + end * 0.2, sill + 1.25, trackZ), { colour: [0.06, 0.06, 0.06] });
-      }
-    }
-    // Platform side: the door pairs (leaves, black gaskets, their windows) and the fixed windows between them.
-    const pane = (x, y, w, h, outside = side - 0.006) => {
-      dark.add(subwayBox(w + 0.07, h + 0.07, 0.012), arenaAt(x, y, outside), { colour: [0.04, 0.04, 0.04] });
-      // The lit car seen through the glass: the ceiling's light strip bright at the top, seat backs and riders' shoulders dark below.
-      glass.add(new THREE.BoxGeometry(w, h, 0.012, 1, 8, 1), arenaAt(x, y, outside - 0.004), { colour: (p) => subwayScale([1.0, 0.95, 0.82], p.y < y - h * 0.15 ? 0.22 : 0.4 + 0.45 * arenaSmooth(y - h * 0.15, y + h * 0.5, p.y)) });
-    };
-    for (const at of car.doorsAt) {
-      const dx = cx + at;
-      for (const leaf of [-1, 1]) {
-        const lx = dx + (leaf * car.doorWidth) / 4;
-        steel.add(subwayBox(car.doorWidth / 2 - 0.01, car.doorHeight, 0.02), arenaAt(lx, car.doorHeight / 2, side - 0.01), { tile: 1, colour: (p) => subwayScale(colour(p), 0.92) });
-        pane(lx, 1.38, 0.4, 0.72, side - 0.026);
-      }
-      dark.add(subwayBox(0.03, car.doorHeight, 0.03), arenaAt(dx, car.doorHeight / 2, side - 0.02), { colour: [0.03, 0.03, 0.03] });
-      dark.add(subwayBox(car.doorWidth + 0.08, 0.04, 0.03), arenaAt(dx, car.doorHeight + 0.02, side - 0.012), { colour: [0.05, 0.05, 0.05] });
-    }
-    for (let k = 0; k < car.doorsAt.length - 1; k += 1) {
-      const mid = cx + (car.doorsAt[k] + car.doorsAt[k + 1]) / 2;
-      for (const offset of [-0.85, 0.85]) pane(mid + offset, 1.4, 1.25, 0.8);
-    }
-    for (const end of [-1, 1]) pane(cx + end * (car.length / 2 - 0.55), 1.4, 0.55, 0.8);
-    // A grey car-number plate and the blue line under the windows? R160s have neither on the side: plain steel. A thin rub rail along the sill.
-    steel.add(subwayBox(car.length, 0.06, 0.04), arenaAt(cx, sill + 0.35, side - 0.01), { tile: 1, colour: (p) => subwayScale(colour(p), 0.8) });
-    // Under the floor: the equipment boxes between the trucks, the trucks over each pair of axles.
-    for (let x = -car.length / 2 + 4.2; x < car.length / 2 - 4.2; x += 1.6) {
-      const w = 0.9 + subwayHash(x, number) * 0.6;
-      dark.add(subwayBox(w, 0.5, car.width - 0.5), arenaAt(cx + x, sill - 0.25, trackZ), { colour: [0.09, 0.085, 0.08] });
-    }
-    for (const truck of [-1, 1]) {
-      const tx = cx + truck * (car.length / 2 - 2.6);
-      dark.add(subwayBox(2.6, 0.32, 2.1), arenaAt(tx, railTop + 0.62, trackZ), { colour: [0.1, 0.09, 0.08] });
-      for (const axle of [-1.05, 1.05]) for (const rail of [-1, 1]) dark.add(new THREE.CylinderGeometry(0.43, 0.43, 0.12, 14), arenaAt(tx + axle, railTop + 0.43, trackZ + (rail * SUBWAY_GAUGE) / 2, Math.PI / 2), { colour: [0.16, 0.13, 0.11] });
-    }
-  });
-  const group = new THREE.Group();
-  const steelMaterial = arenaMaterial(subwayFluting(), { roughness: 0.32, metalness: 0.4 });
-  steelMaterial.userData.reflects = 1.3;
-  for (const [builder, material, cast] of [
-    [steel, steelMaterial, false],
-    [glass, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true }), false],
-    [dark, new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.75, metalness: 0.2 }), false],
-  ]) {
-    const mesh = builder.mesh(material, { cast });
-    mesh.userData.seeThrough = false;
-    group.add(mesh);
-  }
-  // The route sign over the cab windows.
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), new THREE.MeshBasicMaterial({ map: subwaySignCanvas() }));
-  sign.position.set(frontX + 0.232, sill + 2.25, trackZ);
-  sign.rotation.y = Math.PI / 2;
-  sign.userData.seeThrough = false;
-  group.add(sign);
-  return group;
 }

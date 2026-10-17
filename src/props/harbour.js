@@ -560,6 +560,18 @@ function harbourCrane(parts, { x, z, spreaderY }) {
   parts.glow.add(new THREE.SphereGeometry(0.22, 8, 6), at(0, 33.5, -1), { colour: [1, 0.15, 0.08] });
 }
 
+/** The glow of a lamp in fog: bright at the core, falling off as light scattered in mist does (about 1/r², softened). */
+function harbourGlowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const g = canvas.getContext('2d');
+  const gradient = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  for (const [stop, alpha] of [[0, 1], [0.08, 0.7], [0.2, 0.32], [0.4, 0.12], [0.7, 0.03], [1, 0]]) gradient.addColorStop(stop, `rgba(255,255,255,${alpha})`);
+  g.fillStyle = gradient;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(canvas);
+}
+
 /** A sodium street lamp: base shroud, tapered octagonal post, swept arm, the cobra-head housing with its lens. Returns the lens centre. */
 function harbourLamp(parts, x, z, toward) {
   const grey = [0.35, 0.37, 0.4];
@@ -654,12 +666,21 @@ export function harbourPort({ edgeZ }) {
   harbourCrane(parts, { x: -20, z: edgeZ - 3, spreaderY: 15 });
   harbourCrane(parts, { x: 19, z: edgeZ - 3, spreaderY: 13.5 });
   // Sodium lamps over the yard, each throwing its own orange pool.
+  const glow = harbourGlowTexture();
   for (const [x, z] of [[-7, -6.4], [6, -6.4], [-3, 7.6], [9, 7.6]]) {
     const head = harbourLamp(parts, x, z, z < 0 ? 1 : -1);
     parts.halo.add(new THREE.SphereGeometry(0.6, 12, 8), arenaAt(head.x, head.y - 0.1, head.z));
     const lamp = new THREE.PointLight(0xffa24a, 2, 16, 2);
     lamp.position.set(head.x, 6.6, head.z);
     group.add(lamp);
+    // In sea fog (a level's weather: render.js applyWeather shows it) the lamp's light scatters into a soft orange ball round it.
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffa04a, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    halo.position.set(head.x, head.y - 0.25, head.z);
+    halo.scale.set(5, 5, 1);
+    halo.userData.fogHalo = true;
+    halo.userData.seeThrough = false;
+    halo.visible = false;
+    group.add(halo);
   }
   const materials = {
     skin: arenaMaterial(harbourCorrugated(), { roughness: 0.55, metalness: 0.3 }),

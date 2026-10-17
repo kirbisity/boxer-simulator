@@ -6,6 +6,7 @@ import { FRAMES, normaliseInputs, PRESETS } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
+import { SUBWAY_ARENA } from './props/subway.js';
 import { drilledSoldier, europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 // Rome against Han: fifty a side, ten to a rank; a centurion to every
@@ -27,7 +28,14 @@ export function legionSides(random, count = LEGION.perSide) {
  * at first light; the morning of Sekigahara was famously foggy; Maidstone's
  * square, a June dawn. Pyongyang uses the same place as Sekigahara, clear.
  */
-export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [12, 120] };
+export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [12, 120], port: [8, 45] };
+
+/**
+ * Pier 9's sea fog at 2 a.m.: a light fog off the water, dim warm grey where
+ * the sodium lamps light it, from 8 m gone by 45 (the cranes and the far
+ * stacks fade into it); the lamps glow in it.
+ */
+const WEATHER_SEA_FOG = { fog: WEATHER_MIST.port, colour: 0x3c362e, sky: 0.85, halos: true };
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round
@@ -276,6 +284,7 @@ export const SCENARIOS = {
     scene: 'port',
     arena: { halfX: 10, halfZ: 6 },
     camera: { yaw: -0.6, pitch: 0.36, distance: 9, maxDistance: 11 },
+    weather: WEATHER_SEA_FOG,
     roster: 'Four SWAT officers · six yakuza',
     formation: { red: { front: 4.5, spacing: 1.4 }, blue: { front: 4.5, spacing: 1.3, loose: 0.4 } },
     cast: (random) => ({
@@ -312,8 +321,8 @@ export const SCENARIOS = {
     place: 'New York subway platform, 1:40 a.m.',
     blurb: 'A shoulder barged on the stairs. No ring, no gloves, no referee — a strip of platform between the pillars and the yellow edge.',
     scene: 'subway',
-    // The platform between the stair wall and the edge strip, along the train.
-    arena: { halfX: 4.2, halfZ: 1.35 },
+    // The platform between the stair wall and the edge strip; past the strip, the edge drops to the tracks.
+    arena: SUBWAY_ARENA,
     camera: { yaw: -0.25, pitch: 0.14, distance: 5.4 },
     fighters: [
       {

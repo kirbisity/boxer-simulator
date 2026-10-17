@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 import { SCENARIOS, WEATHER_MIST } from '../src/scenarios.js';
 import { JIANGNAN_PLAN } from '../src/props/jiangnan.js';
 
-test('the misty levels are the wokou raid, the rebellion and Sekigahara; Pyongyang, in the same place as Sekigahara, is clear', () => {
+test('the misty levels are the wokou raid, the rebellion, Sekigahara and Pier 9 (sea fog); Pyongyang, in the same place as Sekigahara, is clear', () => {
   const misty = Object.entries(SCENARIOS).filter(([, scenario]) => scenario.weather?.fog).map(([id]) => id).sort();
-  assert.deepEqual(misty, ['rebellion', 'sekigahara', 'wokou']);
+  assert.deepEqual(misty, ['port', 'rebellion', 'sekigahara', 'wokou']);
+  // Pier 9's fog is a night fog: dim and warm (the sodium light in it), and the lamps glow.
+  const sea = SCENARIOS.port.weather;
+  const [r, g, b] = [(sea.colour >> 16) & 255, (sea.colour >> 8) & 255, sea.colour & 255];
+  assert.ok(r >= g && g >= b && r < 80, 'dim warm grey');
+  assert.equal(sea.halos, true);
   assert.equal(SCENARIOS.pyongyang.scene, SCENARIOS.sekigahara.scene);
   assert.equal(SCENARIOS.pyongyang.weather, undefined);
 });
