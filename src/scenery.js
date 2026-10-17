@@ -154,7 +154,11 @@ export const PLACE_GROUND = {
 };
 
 const CURRENT_GROUND = { id: 'current', label: 'Current ground', hidesGround: false };
-export const GROUND_STYLES = [CURRENT_GROUND, ...PAINTED_GROUND, ...PHOTO_GROUND, ...LIVING_GROUND];
+const GROUND_COMPOSITES = [
+  { id: 'painted-living', label: 'Painted ground + living ground', parts: ['ground-painted', 'ground-living'] },
+  { id: 'photo-living', label: 'Photo ground + living ground', parts: ['ground-photo', 'ground-living'] },
+];
+export const GROUND_STYLES = [CURRENT_GROUND, ...PAINTED_GROUND, ...PHOTO_GROUND, ...LIVING_GROUND, ...GROUND_COMPOSITES];
 let groundInForce = 'current';
 export const groundById = (id) => GROUND_STYLES.find((style) => style.id === id);
 export const activeGround = () => groundInForce;
@@ -171,24 +175,29 @@ export function setGround(id) {
 
 function applyGround(view, place, group) {
   const info = PLACE_GROUND[place];
-  const style = info ? groundById(groundInForce) : CURRENT_GROUND;
-  for (const child of group.children) if (child.userData.groundStyle) child.visible = child.userData.groundStyle === style.id;
+  const chosen = info ? groundById(groundInForce) : CURRENT_GROUND;
+  // A composite style is a list of styles laid one on another (a surface, then life on it).
+  const styles = chosen.parts ? chosen.parts.map(groundById) : [chosen];
+  const wanted = new Set(styles.map((style) => style.id));
+  for (const child of group.children) if (child.userData.groundStyle) child.visible = wanted.has(child.userData.groundStyle);
   const grounds = [];
   group.traverse((object) => {
     if (object.userData.scenery === 'ground') grounds.push(object);
   });
-  if (style.hidesGround) for (const ground of grounds) ground.visible = false;
-  if (!style.build) return;
-  const context = { place, view, kind: info.kind, about: info.about, arena: PLACE_ARENAS[place], grounds };
-  let built = group.children.find((child) => child.userData.groundStyle === style.id);
-  if (!built) {
-    built = style.build({ ...context, rng: sceneryRandom(place, `ground:${style.id}`) });
-    if (!built) return;
-    built.userData.groundStyle = style.id;
-    group.add(built);
+  if (styles.some((style) => style.hidesGround)) for (const ground of grounds) ground.visible = false;
+  for (const style of styles) {
+    if (!style.build) continue;
+    const context = { place, view, kind: info.kind, about: info.about, arena: PLACE_ARENAS[place], grounds };
+    let built = group.children.find((child) => child.userData.groundStyle === style.id);
+    if (!built) {
+      built = style.build({ ...context, rng: sceneryRandom(place, `ground:${style.id}`) });
+      if (!built) continue;
+      built.userData.groundStyle = style.id;
+      group.add(built);
+    }
+    built.visible = true;
+    style.apply?.({ ...context, group: built });
   }
-  built.visible = true;
-  style.apply?.({ ...context, group: built });
 }
 
 /** A seeded generator per place and variant, so a variant draws the same land every time. */
