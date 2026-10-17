@@ -137,7 +137,8 @@ export function applyScenery(view, place) {
 // Every open-air place's own ground mesh is tagged userData.scenery = 'ground'
 // in render.js. A style builds its group once per place (cached on the place
 // group as userData.groundStyle) and, if hidesGround, hides the place's own
-// ground meshes. The fighting floor (PLACE_ARENAS) must stay flat at y = 0:
+// ground meshes. 'default' is painted + living in the realistic looks and
+// the place's own ground in the classic cartoon look. The fighting floor (PLACE_ARENAS) must stay flat at y = 0:
 // the physics stands on it. Switched by __looks.ground(id).
 
 /** What each place's ground is made of, for a style to draw in its own way. */
@@ -154,12 +155,15 @@ export const PLACE_GROUND = {
 };
 
 const CURRENT_GROUND = { id: 'current', label: 'Current ground', hidesGround: false };
+// The default: painted ground with the living layer on it in the realistic looks; the classic cartoon look keeps its flat painted ground.
+const DEFAULT_GROUND = { id: 'default', label: 'Default for the look' };
+const groundForLook = () => (activeLook().id === 'toon' ? 'current' : 'painted-living');
 const GROUND_COMPOSITES = [
   { id: 'painted-living', label: 'Painted ground + living ground', parts: ['ground-painted', 'ground-living'] },
   { id: 'photo-living', label: 'Photo ground + living ground', parts: ['ground-photo', 'ground-living'] },
 ];
-export const GROUND_STYLES = [CURRENT_GROUND, ...PAINTED_GROUND, ...PHOTO_GROUND, ...LIVING_GROUND, ...GROUND_COMPOSITES];
-let groundInForce = 'current';
+export const GROUND_STYLES = [DEFAULT_GROUND, CURRENT_GROUND, ...PAINTED_GROUND, ...PHOTO_GROUND, ...LIVING_GROUND, ...GROUND_COMPOSITES];
+let groundInForce = 'default';
 export const groundById = (id) => GROUND_STYLES.find((style) => style.id === id);
 export const activeGround = () => groundInForce;
 
@@ -167,7 +171,7 @@ export const activeGround = () => groundInForce;
 export function setGround(id) {
   if (!groundById(id)) {
     console.warn(`no ground style ${id}; the styles are ${GROUND_STYLES.map((style) => style.id).join(', ')}`);
-    id = 'current';
+    id = 'default';
   }
   groundInForce = id;
   return id;
@@ -175,7 +179,7 @@ export function setGround(id) {
 
 function applyGround(view, place, group) {
   const info = PLACE_GROUND[place];
-  const chosen = info ? groundById(groundInForce) : CURRENT_GROUND;
+  const chosen = info ? groundById(groundInForce === 'default' ? groundForLook() : groundInForce) : CURRENT_GROUND;
   // A composite style is a list of styles laid one on another (a surface, then life on it).
   const styles = chosen.parts ? chosen.parts.map(groundById) : [chosen];
   const wanted = new Set(styles.map((style) => style.id));
