@@ -1,5 +1,6 @@
-// The way in: a home screen, and from it Quick Battle, Levels, Deadliest
-// Warrior and the Sandbox; and a character creator that goes one plain
+// The way in: a home screen, and from it (in this order) Career (to come),
+// Levels, Deadliest Warrior, Quick Battle and the Sandbox; and a character
+// creator that goes one plain
 // question at a time. The menus only choose fighters and places; the
 // fights themselves are the same world as everywhere else (main.js does
 // the starting, through the hooks it hands over).
@@ -74,9 +75,10 @@ function screen(id, title, subtitle, onBack) {
   return body;
 }
 
-/** A big choice: glyph, kicker, title, a line of text. */
+/** A big choice: glyph, kicker, title, a line of text. Without `onClick`, not open yet: shown, dimmed, and saying so. */
 function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
-  return el('button', { className: `choice ${tone}`, type: 'button', onclick: onClick },
+  const open = Boolean(onClick);
+  return el('button', { className: `choice ${tone}${open ? '' : ' soon'}`, type: 'button', onclick: onClick ?? null, ariaDisabled: open ? null : 'true' },
     el('span', { className: 'glyph', textContent: glyph, ariaHidden: 'true' }),
     el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), el('span', { textContent: text })));
 }
@@ -96,34 +98,34 @@ export function installMenus(game) {
   const close = () => show(null);
 
   // ---- Home ------------------------------------------------------------
+  // In order. Career is first and not open yet (it needs a store of its own, to come): when it is, it gets its onClick.
   function home() {
     game.attract();
     const body = screen('home', 'Gladiator', 'Fighters of bone, muscle and steel — every blow simulated.', null);
     body.parentElement.classList.add('home');
-    body.append(el('div', { className: 'choices four' },
-      choice({ glyph: '⚡', kicker: 'Play now', title: 'Quick Battle', text: 'A prize fight or the arena: you, or a random fighter, against whoever comes.', onClick: quickEvent, tone: 'gold' }),
-      choice({ glyph: '🗺️', kicker: 'Stories', title: 'Levels', text: 'Set fights in set places: a subway platform at 1:40 a.m., a village in revolt.', onClick: levels }),
-      choice({ glyph: '☠️', kicker: 'Who would win?', title: 'Deadliest Warrior', text: 'Pick any two: a knight against a samurai, a sumo against a hoplomachus.', onClick: versus }),
-      choice({ glyph: '🧪', kicker: 'Everything', title: 'Sandbox', text: 'Every setting: teams of eight, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })),
-      // The intro (intro.js) again: the legends, then back here.
-      el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } }));
+    body.append(el('div', { className: 'choices home-choices' },
+      choice({ glyph: '🏆', kicker: 'Coming soon', title: 'Career', text: 'One fighter, bout after bout, as he rises. Being built now.', tone: 'career' }),
+      choice({ glyph: '🗺️', kicker: 'Stories', title: 'Levels', text: 'Set fights in set places. Start with the tutorial.', onClick: levels, tone: 'gold' }),
+      choice({ glyph: '☠️', kicker: 'Who would win?', title: 'Deadliest Warrior', text: 'Pick any two warriors and watch them, or fight as one.', onClick: versus }),
+      choice({ glyph: '⚡', kicker: 'Play now', title: 'Quick Battle', text: 'A random fighter against whoever comes. One tap.', onClick: quickEvent }),
+      choice({ glyph: '🧪', kicker: 'Expert', title: 'Sandbox', text: 'Every setting: teams, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })),
+      el('div', { className: 'home-links' },
+        el('button', { className: 'replay-intro', type: 'button', textContent: '🎯 Tutorial', onclick: () => { close(); game.tutorial(); } }),
+        // The intro (intro.js) again: the legends, then back here.
+        el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } })));
     show('home');
   }
 
   // ---- Quick Battle ------------------------------------------------------
+  // One tap from here to the fight (then the side): a random fighter for you. Making your own is the smaller way.
   function quickEvent() {
-    const body = screen('quick', 'Quick Battle', 'Choose the fight.', home);
-    body.append(el('div', { className: 'choices two' }, ...Object.entries(EVENTS).map(([key, event]) => choice({ glyph: event.glyph, kicker: event.kicker, title: event.title, text: event.blurb, onClick: () => quickFighter(key) }))));
-    show('quick');
-  }
-
-  function quickFighter(eventKey) {
-    const event = EVENTS[eventKey];
-    const body = screen('quick', event.title, 'Who fights for you?', quickEvent);
-    const random = () => (eventKey === 'boxing' ? randomBoxer() : randomGladiator());
-    body.append(el('div', { className: 'choices two' },
-      choice({ glyph: '🎲', kicker: 'Fastest', title: 'Random fighter', text: 'Someone is picked for you. Straight into the fight.', onClick: () => startQuick(eventKey, random()) }),
-      choice({ glyph: '🛠️', kicker: 'Step by step', title: 'Make your fighter', text: 'Body, training, style, gear and looks — one question at a time.', onClick: () => wizard({ event: eventKey, start: random(), finish: 'Fight!', onDone: (inputs) => startQuick(eventKey, inputs), onBack: () => quickFighter(eventKey) }) })));
+    const body = screen('quick', 'Quick Battle', 'Tap a fight: you get a random fighter.', home);
+    const random = (eventKey) => (eventKey === 'boxing' ? randomBoxer() : randomGladiator());
+    body.append(
+      el('div', { className: 'choices two' }, ...Object.entries(EVENTS).map(([key, event]) => choice({ glyph: event.glyph, kicker: event.kicker, title: event.title, text: event.blurb, onClick: () => startQuick(key, random(key)) }))),
+      el('div', { className: 'quick-make' }, el('span', { textContent: 'Or make your own fighter first:' }),
+        ...Object.entries(EVENTS).map(([key, event]) => el('button', { type: 'button', textContent: `🛠️ ${event.title}`, onclick: () => wizard({ event: key, start: random(key), finish: 'Fight!', onDone: (inputs) => startQuick(key, inputs), onBack: quickEvent }) }))),
+    );
     show('quick');
   }
 
@@ -143,13 +145,10 @@ export function installMenus(game) {
 
   // ---- Levels --------------------------------------------------------------
   function levels() {
-    const body = screen('levels-screen', 'Levels', 'Set fights in set places, with their own people.', home);
+    const body = screen('levels-screen', 'Levels', 'Tap a level, then choose your side.', home);
     // The training yard first: every control, one at a time.
-    const yard = choice({ glyph: '🎯', kicker: 'Start here · about two minutes', title: 'Tutorial: the training yard', text: 'Every control, one at a time: look, move, lock on, cut where you tap, guard, and the special button. A katana against Sir Edric in full plate, who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
-    body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(([key, level]) => {
-      const who = level.roster ?? level.fighters.map((fighter) => `${fighter.name} · ${fighter.heightCm} cm, ${fighter.weightKg ? `${fighter.weightKg} kg` : `${Math.round(fighter.bodyFat * 100)}% fat`}`).join(' — ');
-      return choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: `${level.blurb} ${who}`, onClick: () => { close(); game.level(key); } });
-    })));
+    const yard = choice({ glyph: '🎯', kicker: 'Start here · two minutes', title: 'Tutorial', text: 'Every control, one at a time, against a knight who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
+    body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(([key, level]) => choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } }))));
     show('levels-screen');
   }
 
@@ -209,8 +208,8 @@ export function installMenus(game) {
         swiped = false;
         click.stopPropagation();
       }, true);
-      const section = el('section', { className: `dw-side ${corner}` }, el('span', { className: 'dw-corner', textContent: corner === 'red' ? 'RED' : 'BLUE' }), tabs, prev, stage, next, title, own);
-      sides[corner] = { section, cards: [], title, stage, tabs, portraits };
+      const section = el('section', { className: `dw-side ${corner}` }, el('span', { className: 'dw-corner', textContent: corner === 'red' ? 'RED' : 'BLUE' }), tabs, prev, stage, next, title);
+      sides[corner] = { section, cards: [], title, stage, tabs, portraits, own };
     }
     // The faction's warriors as cards on the stage (each portrait made once, kept).
     function build(corner) {
@@ -246,6 +245,8 @@ export function installMenus(game) {
         // The chosen in the middle; the next two coming in on the right, smaller and turned; one behind on the left.
         card.dataset.slot = String(Math.max(-2, Math.min(3, offset)));
         card.classList.toggle('chosen', offset === 0 && !custom[corner]);
+        // Only the one in the middle takes a press; the arrows and a swipe turn to the others.
+        card.inert = offset !== 0;
         if (offset >= -1 && offset <= 2 && !image.src) game.portrait(warrior.key, warrior.inputs).then((url) => { image.src = url; });
       }
       const shown = entry(corner);
@@ -260,7 +261,8 @@ export function installMenus(game) {
         mounted[corner] = !mounted[corner];
         draw(corner);
       };
-      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }), mount);
+      // Under his name: on horseback or not, and making your own instead, side by side.
+      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }), el('div', { className: 'dw-buttons' }, mount, side.own));
       if (custom[corner]) side.title.prepend(el('em', { textContent: 'Your fighter' }));
     }
     const fightButton = el('button', { className: 'primary big dw-fight', type: 'button', textContent: 'Fight' });
@@ -274,7 +276,7 @@ export function installMenus(game) {
       // Horsemen fight on the open field: room to charge and wheel round.
       const place = red.mounted || blue.mounted ? 'field' : armed ? 'colosseum' : 'ring';
       close();
-      const fight = () => game.match({ red: [red], blue: [blue], place, game: 'versus', label: 'Deadliest Warrior', next: { text: 'Rematch', run: fight } });
+      const fight = () => game.match({ red: [red], blue: [blue], place, game: 'versus', label: 'Deadliest Warrior', next: { text: 'Rematch', retry: true, run: fight } });
       fight();
     };
     body.append(sides.red.section, el('div', { className: 'dw-middle' }, el('span', { className: 'dw-vs', textContent: 'VS' }), fightButton), sides.blue.section);
@@ -473,5 +475,5 @@ export function installMenus(game) {
 
   // Back to the menu from a fight.
   game.onMenu(home);
-  return { home, levels, versus, quickEvent };
+  return { home, levels, versus, quickEvent, close };
 }

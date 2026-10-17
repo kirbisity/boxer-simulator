@@ -600,3 +600,99 @@ body[data-game="intro"] .hud, body[data-game="intro"] .controls, body[data-game=
   .intro-caption em { font-size: 10px; letter-spacing: 0.1em; }
 }
 .intro-title.low { align-content: end; padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, rgba(5, 6, 10, 0.75), rgba(5, 6, 10, 0) 45%); }
+
+/* ---- Usable on a finger: home order, big targets, nothing covering a button ---- */
+/* Layers, bottom to top: the fight's controls, the footer, the menus, the side pick, the banner, the builder. */
+.fight-ui { z-index: 1; }
+.controls { z-index: 2; }
+.banner { z-index: 8; }
+.builder { z-index: 9; }
+/* A bout over: the fight surface and its buttons step aside, so nothing of the fight takes a press meant for Menu, Retry or Next. */
+.banner:not([hidden]) ~ .fight-ui .touch-surface, .banner:not([hidden]) ~ .fight-ui .fight-button { pointer-events: none; }
+.banner:not([hidden]) ~ .fight-ui .fight-button, .banner:not([hidden]) ~ .fight-ui .stick, .banner:not([hidden]) ~ .fight-ui .attack-pad, .banner:not([hidden]) ~ .fight-ui .zone-hints { visibility: hidden; }
+/* Choosing a side, and the sandbox's builder, are screens of their own: the footer waits behind them. */
+.side-pick:not([hidden]) ~ .controls, body:has(.builder:not([hidden])) .controls { display: none; }
+.banner { width: max-content; max-width: calc(100% - 32px); }
+.banner p { text-wrap: balance; }
+.banner-actions { flex-wrap: wrap; }
+.banner-actions button { min-height: 48px; min-width: 96px; padding: 10px 18px; font-size: 16px; border-radius: 10px; }
+@media (max-width: 560px) {
+  .banner { padding: 16px 16px; }
+  .banner p { font-size: 26px; }
+  .banner-actions button { flex: 1; min-width: 0; padding: 10px 12px; }
+}
+/* The footer's fixed three (Menu, Pause, Restart) always finger-sized. */
+#open-menu, #pause, #restart { min-height: 44px; min-width: 64px; }
+.screen-head .back, .side-pick .back { min-height: 44px; padding: 8px 16px; font-size: 15px; }
+.side-pick .side-back { position: absolute; background: var(--panel-solid); left: calc(16px + env(safe-area-inset-left, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); }
+.side-pick .side em { font: 500 11px var(--mono); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.side-pick .watch { min-height: 48px; padding: 10px 22px; font-size: 15px; }
+.replay-intro { min-height: 44px; }
+.home-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* Home: Career on top across the whole row (to come: dimmed), then Levels, Deadliest Warrior, Quick Battle, Sandbox. */
+.choices.home-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.choices.home-choices .career { grid-column: 1 / -1; min-height: 0; grid-template-rows: none; grid-template-columns: auto 1fr; align-items: center; padding: 12px 18px; }
+.choice.soon { opacity: 0.55; cursor: default; border-style: dashed; }
+.choice.soon:hover, .choice.soon:focus-visible { transform: none; border-color: var(--line); background: rgba(20, 24, 36, 0.9); }
+@media (max-width: 760px) {
+  .choices.home-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .choices.home-choices .career { padding: 10px 12px; }
+}
+@media (max-width: 420px) {
+  /* The words under each choice come back, short as they now are. */
+  .choices.home-choices .choice .words > span, .choices.two .choice .words > span, .choices.levels .choice .words > span { display: block; }
+}
+/* Quick Battle: the two fights are the buttons; making your own the smaller way under them. */
+.quick-make { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; color: var(--muted); }
+.quick-make button { min-height: 44px; padding: 8px 16px; }
+
+/* The character creator's small parts, finger-sized. */
+.steps { flex-wrap: wrap; gap: 4px; }
+.steps button { width: 44px; height: 44px; }
+.chip { min-height: 44px; }
+.swatch { width: 44px; height: 44px; }
+.slider input[type=range] { height: 44px; }
+.wizard input[type=text] { min-height: 44px; }
+.wizard-nav button { min-height: 48px; }
+
+/* Deadliest Warrior: tabs, arrows, the mount and make-your-own, finger-sized. */
+.dw-tab { min-height: 44px; min-width: 44px; justify-content: center; }
+.dw-mount, .dw-own { min-height: 44px; margin-top: 0; padding: 6px 14px; font-size: 13px; border-radius: 999px; }
+/* "Make your own" sits beside the mount under his name (not over the tabs): the tabs take the top line, after the corner's name. */
+.dw-own { position: static; }
+.dw-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 4px; }
+.dw-corner { top: 20px; }
+.dw-tabs { margin-top: 0; padding-left: 56px; }
+.dw-side { grid-template-columns: 44px 1fr 44px; }
+.dw-arrow { min-width: 44px; }
+.dw-fight { min-height: 52px; }
+@media (max-width: 760px) {
+  .dw-side { grid-template-columns: 44px 1fr 44px; }
+  .dw-tabs { margin-top: 0; padding-left: 50px; }
+}
+/* Not much height: the line under his name goes, so the portrait keeps its room. */
+@media (max-height: 760px) {
+  .dw-name > span:not(.dw-stars) { display: none; }
+}
+@media (max-height: 480px) {
+  .dw-tabs { margin-top: 0; padding: 0 4px 0 54px; }
+}
+
+/* The tutorial: Skip tutorial big in the top corner, always; the card under it where they would meet. */
+.tutorial-card .actions button { min-height: 44px; padding: 8px 16px; font-size: 14px; }
+.tutorial-skip { position: absolute; z-index: 4; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); pointer-events: auto; min-height: 48px; min-width: 120px; padding: 10px 18px; border-radius: 999px; background: rgba(10, 12, 18, 0.75); border: 1px solid rgba(255, 255, 255, 0.35); font: 600 15px var(--body); letter-spacing: 0.02em; backdrop-filter: blur(4px); }
+.tutorial-skip b { color: var(--gold); margin-left: 2px; }
+.tutorial-skip:hover, .tutorial-skip:focus-visible { border-color: var(--gold); color: var(--gold); outline: none; }
+@media (max-width: 900px) {
+  .tutorial-card { top: calc(66px + env(safe-area-inset-top, 0px)); }
+  body[data-game="tutorial"] .strike-call { top: calc(200px + env(safe-area-inset-top, 0px)); }
+}
+@media (max-width: 560px) {
+  body[data-game="tutorial"] .strike-call { top: calc(250px + env(safe-area-inset-top, 0px)); }
+}
+/* A phone on its side: little height, room across: the card stays at the top, between the corner button and the left. */
+@media (max-width: 900px) and (max-height: 480px) and (min-width: 700px) {
+  .tutorial-card { top: calc(10px + env(safe-area-inset-top, 0px)); width: min(540px, calc(100% - 340px)); }
+  body[data-game="tutorial"] .strike-call { top: calc(132px + env(safe-area-inset-top, 0px)); }
+}

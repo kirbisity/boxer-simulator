@@ -12,13 +12,14 @@ import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
-import { introPlaying, introWanted, playIntro, skipIntro, stepIntro } from './intro.js';
+import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createSeeThrough } from './seethrough.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
-import { installTutorial, TUTORIAL, TUTORIAL_STEPS } from './tutorial.js';
+import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
+import { checkButtons } from './uicheck.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -928,9 +929,15 @@ $('#pause').addEventListener('click', () => {
   state.paused = !state.paused;
   $('#pause').textContent = state.paused ? 'Play' : 'Pause';
 });
-$('#restart').addEventListener('click', newBout);
+// Restart: the bout from the beginning, running (not left paused).
+$('#restart').addEventListener('click', () => {
+  newBout();
+  state.paused = false;
+  $('#pause').textContent = 'Pause';
+});
 $('#banner-again').addEventListener('click', () => (state.next ? state.next.run() : newBout()));
 $('#banner-menu').addEventListener('click', () => goHome());
+$('#banner-retry').addEventListener('click', newBout);
 $('#open-menu').addEventListener('click', () => goHome());
 
 // The fighter the player controls: his side's lead (the side is chosen with the Play buttons).
@@ -1479,6 +1486,8 @@ let goHome = () => {};
 function setGame(game, next = null) {
   if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
   if (game !== 'tutorial') {
+    // Out of the yard, however he left it (finished, skipped, the menu): a next visit opens on the home screen.
+    if (state.game === 'tutorial') markTutorialDone();
     tutorial.stop();
     delete document.body.dataset.tutorialStep;
   }
@@ -1486,6 +1495,8 @@ function setGame(game, next = null) {
   state.next = next;
   document.body.dataset.game = game;
   $('#banner-again').textContent = next?.text ?? 'Next bout';
+  // Retry the same bout, beside a next that is something else (a new opponent); a next that is itself a retry stands alone.
+  $('#banner-retry').hidden = !next || Boolean(next.retry);
   $('#builder').hidden = true;
   state.paused = false;
   $('#pause').textContent = 'Pause';
@@ -1521,13 +1532,17 @@ function askSide() {
     const lead = team[0]?.body.inputs;
     if (!lead) continue;
     const faction = FACTIONS[factionOf(lead)]?.label ?? '';
-    pick.querySelector(`[data-side="${corner}"]`).innerHTML = `<b>${lead.name}</b><span>${[faction, team.length > 1 ? `${team.length} fighters` : STYLES[lead.style]?.label].filter(Boolean).join(' · ')}</span>`;
+    pick.querySelector(`[data-side="${corner}"]`).innerHTML = `<em>Play as</em><b>${lead.name}</b><span>${[faction, team.length > 1 ? `${team.length} fighters` : STYLES[lead.style]?.label].filter(Boolean).join(' · ')}</span>`;
   }
   pick.hidden = false;
   state.paused = true;
 }
 
 $('#side-pick').addEventListener('click', (press) => {
+  if (press.target.closest('.side-back')) {
+    goHome();
+    return;
+  }
   const side = press.target.closest('button')?.dataset.side;
   if (!side) return;
   $('#side-pick').hidden = true;
@@ -1549,7 +1564,7 @@ function attract() {
 }
 
 function enterLevel(key) {
-  setGame('level', { text: 'Again', run: () => chooseLevel(key) });
+  setGame('level', { text: 'Retry', retry: true, run: () => chooseLevel(key) });
   chooseLevel(key);
   askSide();
 }
@@ -1662,7 +1677,7 @@ function observeYard() {
 function enterTutorial() {
   state.sideAsked = true;
   $('#side-pick').hidden = true;
-  match({ red: [YARD.trainee], blue: [YARD.partner], place: YARD.place, game: 'tutorial', next: { text: 'Again', run: enterTutorial } });
+  match({ red: [YARD.trainee], blue: [YARD.partner], place: YARD.place, game: 'tutorial', next: { text: 'Again', retry: true, run: enterTutorial } });
   $('#modes button[data-value="play"]:not([data-side])').click();
   tutorial.start();
 }
@@ -1898,8 +1913,9 @@ const menus = installMenus({
   onMenu: (home) => { goHome = home; },
 });
 fit();
-// The first visit opens on the intro, then the menu; after, straight to the menu.
-if (introWanted()) playIntro(introStage, menus.home);
+// The first visit opens straight in the training yard (Skip tutorial in its corner goes to the menu); after, the menu.
+// The intro is kept for the home screen's "Watch the intro": half a minute is too long before the first fight.
+if (tutorialWanted()) enterTutorial();
 else menus.home();
 requestAnimationFrame(frame);
 // A look that needs its scripts loaded or its scene prepared (or one not found: it warns and stays toon) comes now, over the first bout.
@@ -2097,9 +2113,24 @@ const boxer = window.boxer = {
   fight,
   // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.
   level: chooseLevel,
-  // The training yard, as the Levels menu opens it; its run (step, progress).
-  tutorial: enterTutorial,
+  // The training yard, as the Levels menu opens it (any menu screen closed); its run (step, progress).
+  tutorial: () => {
+    menus.close();
+    enterTutorial();
+  },
   tutorialRun: () => tutorial.run,
+  // Whether this visitor has been through the yard; forget it (the next load opens in the yard again).
+  tutorialDone,
+  forgetTutorial: () => {
+    forgetTutorial();
+    try {
+      localStorage.removeItem(TUTORIAL.storageKey);
+    } catch {
+      // Nothing kept to forget.
+    }
+  },
+  // Dev tool: every control on the screen now, judged for size, place and whether anything covers it (uicheck.js).
+  checkButtons,
   preview,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
