@@ -1,14 +1,15 @@
-// POC C, target on the body: a small figure of his man by the Guard, cut
-// into six places to hit (head, body and legs, each on the left or right of
-// the screen). Tap where you want to hit; the game picks the move of his
-// style that reaches there best (each place shows its move's icon); a
-// quick second tap on the same place takes the next best (a jab, then a
-// hook). A tap on the man himself in the fight does the same, by where it
-// lands on him. The place struck lights in how it went.
+// Body (C, the default): a small figure of his man by the Guard, cut into
+// six places to hit (head, body and legs, each on the left or right of the
+// screen). Tap where you want to hit; the game picks the move of his style
+// that reaches there best (each place shows its move's icon, in the colour
+// of its kind); a quick second tap on the same place takes the next best (a
+// jab, then a hook). A tap on the man himself in the fight does the same,
+// by where it lands on him. The place tapped lights in the colour of the
+// move chosen, with its icon, until the blow is done; then flashes how it went.
 
 import { P } from '../body.js';
 import { opponentFor } from '../physics.js';
-import { fightUiReady, fightUiTarget, FIGHT_UI } from './logic.js';
+import { fightUiColour, fightUiReady, fightUiTarget, FIGHT_UI } from './logic.js';
 import { fightUiIcon } from './icons.js';
 import { fightUiElement, fightUiFlash, fightUiPaintReady } from './kit.js';
 
@@ -39,8 +40,10 @@ export function fightUiTargetBody(root, kit, hooks) {
       strikeAt(place.zone, place.side, element);
     });
     element.addEventListener('contextmenu', (event) => event.preventDefault());
-    return { ...place, element, pick: null };
+    return { ...place, element, pick: null, litUntil: null };
   });
+  // A place stays lit this long (s) after the tap, unless the blow takes longer.
+  const litFor = 0.9;
 
   /** A tap on a place on him: its best move (the next on a quick second tap). */
   function strikeAt(zone, side, source) {
@@ -49,21 +52,46 @@ export function fightUiTargetBody(root, kit, hooks) {
     const pick = fightUiTarget(kit.moves(), zone, side, again);
     if (!pick) return;
     last = { zone, side, at: now, again };
-    kit.throwMove(pick.move, pick.zone, source);
-    fightUiFlash(source, 'asked');
+    kit.throwMove(pick.entry, pick.zone, side, source, { again: again > 0 });
+    const colour = fightUiColour(pick.entry.group);
+    fightUiFlash(source, 'asked', colour);
     nameLine.textContent = pick.entry.name;
+    nameLine.style.setProperty('--fu-col', colour);
+    const place = places.find((item) => item.element === source);
+    if (place) {
+      for (const other of places) if (other !== place && other.litUntil !== null) unlight(other);
+      place.element.querySelector('.fu-zone-icon').innerHTML = fightUiIcon(pick.entry);
+      place.element.style.setProperty('--fu-lit', colour);
+      place.element.classList.add('fu-lit');
+      place.litUntil = now + litFor;
+    }
+  }
+
+  /** A place back to its own move. */
+  function unlight(place) {
+    place.litUntil = null;
+    place.element.classList.remove('fu-lit');
+    paintPlace(place);
+  }
+
+  function paintPlace(place) {
+    place.element.querySelector('.fu-zone-icon').innerHTML = place.pick ? fightUiIcon(place.pick.entry) : '';
+    place.element.style.setProperty('--fu-col', place.pick ? fightUiColour(place.pick.entry.group) : '#ffffff');
   }
 
   function build() {
     style = kit.me()?.style;
     for (const place of places) {
       place.pick = fightUiTarget(kit.moves(), place.zone, place.side, 0);
-      place.element.querySelector('.fu-zone-icon').innerHTML = place.pick ? fightUiIcon(place.pick.entry) : '';
+      place.litUntil = null;
+      place.element.classList.remove('fu-lit');
+      paintPlace(place);
       place.element.title = place.pick?.entry.name ?? '';
       // No move of his reaches there (a boxer at the legs): the best he has, dimmed.
       place.element.classList.toggle('fu-cant', !place.pick?.reaches);
     }
     nameLine.textContent = 'Tap where to hit';
+    nameLine.style.removeProperty('--fu-col');
   }
 
   /** A tap in the fight on his man: the place on him it landed on, struck. True if it was on him. */
@@ -91,15 +119,27 @@ export function fightUiTargetBody(root, kit, hooks) {
   }
 
   kit.listen({
-    thrown: (strike) => fightUiFlash(strike.source, 'thrown'),
-    outcome: (strike) => fightUiFlash(strike.source, strike.outcome),
+    thrown: (strike) => {
+      const place = places.find((item) => item.element === strike.source);
+      // Lit while the blow is on its way.
+      if (place?.litUntil != null) place.litUntil = Math.max(place.litUntil, hooks.now() + 0.6);
+    },
+    outcome: (strike) => {
+      const place = places.find((item) => item.element === strike.source);
+      if (place?.litUntil != null) place.litUntil = hooks.now() + 0.45;
+      fightUiFlash(strike.source, strike.outcome);
+    },
   });
 
   function update() {
     const me = kit.me();
     if (!me) return;
     if (me.style !== style) build();
-    for (const place of places) if (place.pick) fightUiPaintReady(place.element, fightUiReady(me, place.pick.move));
+    const now = hooks.now();
+    for (const place of places) {
+      if (place.litUntil !== null && now > place.litUntil) unlight(place);
+      if (place.pick) fightUiPaintReady(place.element, fightUiReady(me, place.pick.move));
+    }
   }
 
   return {

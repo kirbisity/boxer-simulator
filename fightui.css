@@ -1,7 +1,6 @@
-/* The fight's other attack controls (src/fightui/): POCs to try, none drawn unless chosen (?fightui=<id>). */
+/* The fight's attack controls (src/fightui/): the figure of his man (Body, the default) or a button for each kind of blow (Buttons).
+   One colour for each kind of blow, set on each element as --fu-col (the kind's) or --fu-lit (the move just asked for): see FIGHT_UI.colours. */
 
-/* Chosen: today's pad labels and its strike call give way to the design's own. */
-.fight-ui[data-fightui] .attack-pad, .fight-ui[data-fightui] .strike-call { display: none; }
 /* The special button lit when it has something to do. */
 .fight-ui[data-fightui] .action-button:not(.idle) { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 16px rgba(255, 207, 74, 0.55); animation: fu-ready 1.6s ease-in-out infinite; }
 @keyframes fu-ready { 50% { box-shadow: 0 0 26px rgba(255, 207, 74, 0.9); } }
@@ -11,43 +10,71 @@
 /* Shared states: greyed when it cannot be thrown; a sweep while a blow is in flight; a flash for what happened. */
 .fu-tired { opacity: 0.38; filter: grayscale(1); }
 .fu-busy::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; background: conic-gradient(rgba(0, 0, 0, 0) calc(var(--fu-cool, 0) * 360deg), rgba(0, 0, 0, 0.42) 0); }
-.fu-flash { animation: fu-flash 0.55s ease-out; }
-[data-fu-flash="asked"] { --fu-flash: #ffffff; }
-[data-fu-flash="thrown"] { --fu-flash: var(--gold); }
-[data-fu-flash="hit"] { --fu-flash: var(--gold); animation-duration: 0.8s; }
-[data-fu-flash="glance"] { --fu-flash: #c8cdd7; }
-[data-fu-flash="blocked"], [data-fu-flash="parried"] { --fu-flash: #9cd0ff; animation-duration: 0.8s; }
-[data-fu-flash="miss"] { --fu-flash: #7c8496; }
-@keyframes fu-flash { 0% { box-shadow: 0 0 0 0 var(--fu-flash), inset 0 0 0 40px color-mix(in srgb, var(--fu-flash) 45%, transparent); scale: 1.12; } 100% { box-shadow: 0 0 0 16px transparent, inset 0 0 0 40px transparent; scale: 1; } }
+.fu-flash { animation: fu-flash 0.5s ease-out; }
+[data-fu-flash="asked"] { --fu-flash: var(--fu-lit, #ffffff); }
+[data-fu-flash="hit"] { --fu-flash: #ffffff; }
+[data-fu-flash="glance"] { --fu-flash: #ffe9a8; }
+[data-fu-flash="blocked"], [data-fu-flash="parried"] { --fu-flash: #b7c3d0; }
+[data-fu-flash="miss"] { --fu-flash: #8a93a6; }
+@keyframes fu-flash { 0% { box-shadow: 0 0 0 0 var(--fu-flash), inset 0 0 0 40px color-mix(in srgb, var(--fu-flash) 55%, transparent); scale: 1.14; } 100% { box-shadow: 0 0 0 18px transparent, inset 0 0 0 40px transparent; scale: 1; } }
 [data-fu-flash="miss"].fu-flash { animation-name: fu-miss; }
 @keyframes fu-miss { 0%, 100% { translate: 0 0; } 25% { translate: -5px 0; } 75% { translate: 5px 0; } }
 
-/* The word of the blow, beside the man it went at. */
-.fu-toast { position: fixed; left: 0; top: 0; z-index: 3; translate: 0 -50%; display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 999px; background: rgba(10, 12, 18, 0.72); border: 1px solid rgba(255, 255, 255, 0.18); pointer-events: none; opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
-.fu-toast.left { translate: -100% -50%; flex-direction: row-reverse; padding: 4px 4px 4px 12px; }
-.fu-toast.show { opacity: 1; animation: fu-pop 0.22s ease-out; }
+/* The word of the blow, beside the man it went at: its icon and name in its kind's colour, then how it went. */
+.fu-toast { --fu-col: #ffffff; position: fixed; left: 0; top: 0; z-index: 3; translate: 0 -50%; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 999px; background: rgba(10, 12, 18, 0.78); border: 2px solid var(--fu-col); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); pointer-events: none; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
+.fu-toast.left { translate: -100% -50%; flex-direction: row-reverse; padding: 4px 4px 4px 6px; }
+.fu-toast.show { opacity: 1; animation: fu-pop 0.2s ease-out; }
 @keyframes fu-pop { from { scale: 1.3; } to { scale: 1; } }
-.fu-toast-icon { width: 30px; height: 30px; color: var(--gold); }
-.fu-toast-name { font: 700 16px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg); }
-.fu-toast-outcome { padding: 2px 8px; border-radius: 999px; font: 700 12px var(--mono); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; }
-.fu-toast-outcome:empty { display: none; }
-.fu-toast[data-outcome="hit"] { border-color: var(--gold); box-shadow: 0 0 18px rgba(255, 207, 74, 0.55); }
-.fu-toast[data-outcome="hit"] .fu-toast-outcome { background: var(--gold); color: #191300; }
-.fu-toast[data-outcome="glance"] .fu-toast-outcome { background: #c8cdd7; color: #12141a; }
-.fu-toast[data-outcome="blocked"] .fu-toast-outcome, .fu-toast[data-outcome="parried"] .fu-toast-outcome { background: #9cd0ff; color: #0b1830; }
-.fu-toast[data-outcome="miss"] .fu-toast-outcome { background: rgba(10, 12, 18, 0.6); color: var(--muted); border: 1px solid var(--line); }
+.fu-toast-icon { width: 30px; height: 30px; color: var(--fu-col); }
+.fu-toast-name { padding-right: 6px; font: 700 16px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fu-col); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+.fu-toast-outcome { display: flex; align-items: center; gap: 4px; padding: 3px 9px 3px 6px; border-radius: 999px; font: 700 12px var(--mono); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; }
+.fu-toast-outcome i { width: 15px; height: 15px; }
+.fu-toast[data-outcome=""] .fu-toast-outcome { display: none; }
+.fu-toast[data-outcome="hit"] { box-shadow: 0 0 20px color-mix(in srgb, var(--fu-col) 70%, transparent); }
+.fu-toast[data-outcome="hit"] .fu-toast-outcome { background: var(--fu-col); color: #10121a; }
+.fu-toast[data-outcome="glance"] .fu-toast-outcome { background: #ffe9a8; color: #2a2108; }
+.fu-toast[data-outcome="blocked"] .fu-toast-outcome, .fu-toast[data-outcome="parried"] .fu-toast-outcome { background: #b7c3d0; color: #0e1724; }
+.fu-toast[data-outcome="miss"] { opacity: 0.85; }
+.fu-toast[data-outcome="miss"] .fu-toast-outcome { color: #c3c9d6; border: 1.5px dashed #8a93a6; }
 
-/* ---- A: action buttons round the Guard ---- */
+/* Hit: the edge of the screen the blow came from pulses red. */
+.fu-danger { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(circle at var(--fu-dx, 50%) var(--fu-dy, 100%), rgba(255, 36, 36, 0.62), rgba(255, 36, 36, 0.18) 22%, rgba(255, 36, 36, 0) 42%); }
+.fu-danger.on { animation: fu-danger 0.5s ease-out; }
+@keyframes fu-danger { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
+
+/* The colours of the blows: a column at the left in his first fights; a box over the footer when the footer's key asks for it. */
+.fu-legend { display: grid; gap: 4px; font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: #eef0f5; }
+.fu-key { display: flex; align-items: center; gap: 6px; color: #eef0f5; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+.fu-key i { width: 30px; height: 30px; flex: none; padding: 2px; border-radius: 7px; color: var(--fu-col); background: rgba(10, 12, 18, 0.7); border: 2px solid var(--fu-col); }
+.fu-legend-first { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: 38%; translate: 0 -50%; padding: 8px 10px; border-radius: 12px; background: rgba(10, 12, 18, 0.55); pointer-events: none; animation: fu-legend 7s ease-in-out forwards; }
+@keyframes fu-legend { 0% { opacity: 0; } 6%, 85% { opacity: 1; } 100% { opacity: 0; } }
+.fu-legend-pop { position: fixed; z-index: 6; left: 50%; bottom: calc(var(--controls-height, 56px) + 10px); translate: -50% 0; grid-template-columns: repeat(3, auto); column-gap: 14px; row-gap: 8px; padding: 10px 14px 12px; border-radius: 14px; background: rgba(12, 14, 22, 0.92); border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); cursor: pointer; }
+.fu-legend-pop > b { grid-column: 1 / -1; font: 700 12px var(--mono); letter-spacing: 0.1em; color: var(--muted); }
+body:not(.playing) .fu-legend-pop { display: none; }
+
+/* The switch in the footer, in a fight only. */
+.fu-pick { align-items: stretch; }
+body:not(.playing) .fu-pick { display: none; }
+.fu-pick-label { display: flex; align-items: center; padding: 0 8px 0 12px; font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.fu-pick button { min-height: 44px; min-width: 44px; }
+.fu-pick button.on { background: var(--gold); color: #191300; }
+.fu-pick .fu-pick-key { padding-inline: 10px; }
+.fu-pick .fu-pick-key.on { background: rgba(255, 255, 255, 0.18); color: var(--fg); }
+@media (max-width: 520px) { .fu-pick-label { display: none; } }
+
+/* ---- Buttons: one for each kind of blow round the Guard, ringed in its colour ---- */
 .fu-buttons { --fu-s: 1; position: absolute; inset: 0; pointer-events: none; }
-.fu-btn { position: absolute; right: calc(var(--fu-x) * var(--fu-s) + env(safe-area-inset-right, 0px) - 34px); bottom: calc(var(--controls-height, 56px) + var(--fu-y) * var(--fu-s) - 34px); width: 68px; height: 68px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; pointer-events: auto; touch-action: none; border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(10, 12, 18, 0.55); color: var(--fg); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); }
-.fu-btn:active { background: rgba(255, 207, 74, 0.25); }
-.fu-btn-icon { width: 34px; height: 34px; color: var(--fg); }
-.fu-btn-name { max-width: 60px; max-height: 2.1em; overflow: hidden; text-align: center; font: 600 9px/1.05 var(--mono); letter-spacing: 0.02em; text-transform: uppercase; color: rgba(238, 240, 245, 0.9); }
+.fu-btn { --fu-col: #ffffff; position: absolute; right: calc(var(--fu-x) * var(--fu-s) + env(safe-area-inset-right, 0px) - 34px); bottom: calc(var(--controls-height, 56px) + var(--fu-y) * var(--fu-s) - 34px); width: 68px; height: 68px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; pointer-events: auto; touch-action: none; border: 3px solid var(--fu-col); background: radial-gradient(circle, rgba(10, 12, 18, 0.5) 55%, color-mix(in srgb, var(--fu-col) 22%, rgba(10, 12, 18, 0.6))); color: var(--fg); box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.45); }
+.fu-btn:active { background: color-mix(in srgb, var(--fu-col) 40%, rgba(10, 12, 18, 0.6)); }
+.fu-btn-icon { width: 34px; height: 34px; color: var(--fu-col); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
+.fu-btn-name { max-width: 60px; max-height: 2.1em; overflow: hidden; text-align: center; font: 700 9px/1.05 var(--mono); letter-spacing: 0.02em; text-transform: uppercase; color: #eef0f5; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
 .fu-btn-dots { position: absolute; top: 4px; display: flex; gap: 3px; }
 .fu-btn-dots i { width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
-.fu-btn-dots i.on { background: var(--gold); }
+.fu-btn-dots i.on { background: var(--fu-col); }
 .fu-btn kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: 5px; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(255, 255, 255, 0.3); font: 600 10px var(--mono); color: var(--muted); }
 .fight-ui[data-device="mouse"] .fu-btn kbd { display: block; }
+.fu-btn.fu-flash[data-fu-flash="asked"] { animation: fu-press 0.45s ease-out; }
+@keyframes fu-press { 0% { scale: 0.9; box-shadow: 0 0 0 0 var(--fu-lit), inset 0 0 0 40px color-mix(in srgb, var(--fu-lit) 70%, transparent); } 35% { scale: 1.12; } 100% { scale: 1; box-shadow: 0 0 0 20px transparent, inset 0 0 0 40px transparent; } }
 .fight-ui[data-fightui="buttons"] .guard-button { width: 104px; height: 104px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 12px); }
 .fight-ui[data-fightui="buttons"] .lock-button { width: 66px; height: 66px; right: calc(19px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 268px); }
 .fight-ui[data-fightui="buttons"] .lock-button b { font-size: 24px; }
@@ -59,51 +86,20 @@
   .fight-ui[data-fightui="buttons"] .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 226px); }
 }
 
-/* ---- B: the directional pad ---- */
-.fu-compass { --fu-size: 204px; position: absolute; right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 54px); width: var(--fu-size); height: var(--fu-size); border-radius: 50%; pointer-events: auto; touch-action: none; cursor: crosshair; background: radial-gradient(circle, rgba(10, 12, 18, 0.25) 0 38%, rgba(10, 12, 18, 0.5) 39% 100%); border: 2px solid rgba(255, 255, 255, 0.35); box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4); }
-.fu-compass.pressed { border-color: var(--gold); }
-.fu-compass-ring { position: absolute; inset: 0; pointer-events: none; }
-.fu-slot { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; border-radius: 50%; padding: 6px; box-sizing: border-box; color: rgba(238, 240, 245, 0.85); background: rgba(10, 12, 18, 0.35); transform: translate(-50%, -50%) rotate(var(--fu-a)) translateX(calc(var(--fu-size) / 2 - 30px)) rotate(calc(-1 * var(--fu-a))); transition: background 0.1s, color 0.1s; }
-.fu-slot.lit { background: var(--gold); color: #191300; box-shadow: 0 0 16px rgba(255, 207, 74, 0.8); }
-.fu-compass-hub { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 78px; height: 78px; border-radius: 50%; display: grid; place-items: center; align-content: center; pointer-events: none; border: 1px dashed rgba(255, 255, 255, 0.3); }
-.fu-hub-icon { width: 34px; height: 34px; color: var(--fg); }
-.fu-compass-hub.picking .fu-hub-icon { color: var(--gold); }
-.fu-hub-name { max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 9px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: rgba(238, 240, 245, 0.85); }
-.fu-compass-hub.picking .fu-hub-name { color: var(--gold); font-size: 10px; }
-.fu-compass-trail { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; transition: opacity 0.1s; }
-.fu-compass-trail.on { opacity: 1; }
-.fu-compass-trail line { stroke: var(--gold); stroke-width: 6; stroke-linecap: round; opacity: 0.8; }
-.fu-compass-trail circle { fill: var(--gold); }
-@media (max-width: 520px) { .fu-compass { --fu-size: 184px; right: calc(116px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 70px); } }
-
-/* ---- C: the figure to tap where to hit ---- */
-.fu-target { position: absolute; right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 12px); width: 136px; height: 246px; border-radius: 16px; background: rgba(10, 12, 18, 0.5); border: 1px solid rgba(255, 255, 255, 0.22); pointer-events: auto; touch-action: none; box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4); }
+/* ---- Body: the figure to tap where to hit; each place's icon in its move's colour; the place tapped lit in the colour of the move chosen ---- */
+.fu-target { position: absolute; right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 12px); width: 136px; height: 246px; border-radius: 16px; background: rgba(10, 12, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.22); pointer-events: auto; touch-action: none; box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4); }
 .fu-figure { position: absolute; left: 12px; top: 8px; width: 112px; height: 210px; fill: rgba(255, 255, 255, 0.16); pointer-events: none; }
 .fu-figure-mid { stroke: rgba(255, 255, 255, 0.18); stroke-dasharray: 3 4; fill: none; }
-.fu-zone { position: absolute; width: 62px; padding: 0; border-radius: 10px; display: grid; place-items: center; background: transparent; border: 1px dashed rgba(255, 255, 255, 0.14); color: rgba(238, 240, 245, 0.9); touch-action: none; }
+.fu-zone { --fu-col: #ffffff; position: absolute; width: 62px; padding: 0; border-radius: 10px; display: grid; place-items: center; background: transparent; border: 1px dashed rgba(255, 255, 255, 0.16); color: var(--fu-col); touch-action: none; transition: background 0.12s, border-color 0.12s; }
 .fu-zone.left { left: 5px; }
 .fu-zone.right { right: 5px; }
 .fu-zone.head { top: 5px; height: 54px; }
 .fu-zone.body { top: 62px; height: 80px; }
 .fu-zone.legs { top: 145px; height: 72px; }
-.fu-zone:active { background: rgba(255, 207, 74, 0.2); }
-.fu-zone-icon { width: 30px; height: 30px; }
-.fu-target-name { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 600 10px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(238, 240, 245, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-@media (max-width: 520px) { .fu-target { right: calc(114px + env(safe-area-inset-right, 0px)); } }
-
-/* ---- D: the hand and its wheel ---- */
-.fu-hand { position: absolute; right: calc(124px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); width: 94px; height: 94px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 1px; pointer-events: auto; touch-action: none; border: 3px solid rgba(255, 255, 255, 0.55); background: rgba(10, 12, 18, 0.55); color: var(--fg); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45); }
-.fu-hand.on { border-color: var(--gold); background: rgba(255, 207, 74, 0.2); }
-.fu-hand-icon { width: 38px; height: 38px; }
-.fu-hand-name { max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 10px var(--mono); letter-spacing: 0.03em; text-transform: uppercase; }
-.fu-hand small { font: 500 8.5px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.fu-wheel { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 4; pointer-events: none; }
-.fu-wheel::before { content: ''; position: absolute; left: -146px; top: -146px; width: 292px; height: 292px; border-radius: 50%; background: radial-gradient(circle, rgba(10, 12, 18, 0.35) 0 22%, rgba(10, 12, 18, 0.7) 23% 100%); border: 2px solid rgba(255, 255, 255, 0.25); }
-.fu-wheel-hub { position: absolute; left: -36px; top: -36px; width: 72px; height: 72px; display: grid; place-items: center; color: rgba(255, 255, 255, 0.5); }
-.fu-wheel-hub .fu-icon { position: absolute; inset: 0; }
-.fu-wheel-hub span { position: relative; max-width: 70px; text-align: center; font: 600 9px/1.1 var(--mono); text-transform: uppercase; color: var(--fg); }
-.fu-wedge { position: absolute; left: calc(var(--fu-dx) - 33px); top: calc(var(--fu-dy) - 33px); width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; align-content: center; padding-top: 4px; box-sizing: border-box; background: rgba(10, 12, 18, 0.75); border: 2px solid rgba(255, 255, 255, 0.4); color: var(--fg); transition: scale 0.08s, background 0.08s; }
-.fu-wedge .fu-icon { width: 32px; height: 32px; }
-.fu-wedge span { max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 8.5px var(--mono); text-transform: uppercase; }
-.fu-wedge.lit { scale: 1.2; background: var(--gold); color: #191300; border-color: var(--gold); box-shadow: 0 0 18px rgba(255, 207, 74, 0.8); }
+.fu-zone:active { background: color-mix(in srgb, var(--fu-col) 25%, transparent); }
+.fu-zone-icon { width: 30px; height: 30px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.85)); }
 .fu-zone.fu-cant .fu-zone-icon { opacity: 0.35; }
+.fu-zone.fu-lit { color: #10121a; background: var(--fu-lit); border: 2px solid #ffffff; box-shadow: 0 0 16px var(--fu-lit); z-index: 1; }
+.fu-zone.fu-lit .fu-zone-icon { width: 36px; height: 36px; filter: none; opacity: 1; }
+.fu-target-name { --fu-col: rgba(238, 240, 245, 0.85); position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 700 10px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fu-col); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+@media (max-width: 520px) { .fu-target { right: calc(114px + env(safe-area-inset-right, 0px)); } }
