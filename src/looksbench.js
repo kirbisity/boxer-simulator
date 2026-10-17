@@ -59,6 +59,15 @@ export const COMPARE_SCENES = {
     blue: [{ preset: 'steppeBow', mounted: true }, { preset: 'saber', mounted: true }, { preset: 'maceShield', mounted: true }],
     camera: { focus: { at: [0, 0], height: 1.7 }, yaw: 1.2, pitch: 0.06, distance: 14.5, fov: 42 },
   },
+  'sky-hero': {
+    about: 'One knight in plate barding on the open field, shot low against the sky: metal, sun, sky and horizon haze.',
+    place: 'field',
+    seed: 5,
+    frames: 100,
+    red: [{ preset: 'knight', mounted: true }],
+    blue: [{ preset: 'steppeBow', mounted: true }],
+    camera: { focus: { fighter: 0, height: 1.9 }, yaw: 1.0, pitch: -0.02, distance: 4.6, fov: 42 },
+  },
   'ring-portrait': {
     about: 'Two boxers in the indoor ring, a tight shot of one face and torso: skin.',
     place: 'ring',
