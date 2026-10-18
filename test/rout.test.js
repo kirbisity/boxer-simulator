@@ -75,3 +75,39 @@ test('the player can go down to crawl and is still in the fight; up again if his
   breakJoint(world, me, 'lKnee');
   assert.equal(playerCrawl(world, me, false), false, 'a broken knee will not stand him up');
 });
+
+test('fear: the deadlier his weapon than mine, the more I fear; equal arms little; the ring damps it; adrenaline most in an even fight', async () => {
+  const { fearTarget, weaponDread } = await import('../src/ai.js');
+  const { WEAPONS } = await import('../src/weapons.js');
+  const world = createWorld([{ inputs: structuredClone(PRESETS.contender), corner: 'red' }, { inputs: structuredClone(PRESETS.contender), corner: 'blue' }], { seed: 1, arena: { halfX: 6.5, halfZ: 4.4 } });
+  const [me, him] = world.fighters;
+  const arm = (fighter, kind) => { fighter.weapon = kind ? { held: true, kind, spec: WEAPONS[kind] } : null; };
+  const dread = (mine, his) => { arm(me, mine); arm(him, his); return weaponDread(me, him); };
+  assert.equal(dread(null, null), 0);
+  assert.ok(dread(null, 'knife') < dread(null, 'katana') && dread(null, 'katana') < dread(null, 'rifle'), 'knife < sword < gun');
+  assert.ok(dread('katana', 'katana') < 0.15, 'sword against sword: little');
+  assert.ok(dread('knife', 'katana') > dread('katana', 'katana'), 'a knife against a sword: more');
+  arm(me, null); arm(him, null);
+  const even = fearTarget(world, me, 0, him);
+  arm(him, 'katana');
+  const armed = fearTarget(world, me, -0.6, him);
+  assert.ok(armed > even * 3 && armed > 0.5, `unarmed and outmatched against a sword: ${armed.toFixed(2)}`);
+  // The ring: the same bout, unarmed, fears less.
+  arm(him, null);
+  me.legDamage.l = 1e3;
+  const open = fearTarget(world, me, -0.5, him);
+  world.arena = { ...world.arena, ring: true };
+  assert.ok(fearTarget(world, me, -0.5, him) < open * 0.6, 'the ring damps fear');
+  world.arena = { halfX: 6.5, halfZ: 4.4 };
+  // Adrenaline: takes away more of the fear of an even fight than of a hopeless one.
+  me.broken.add('lElbow');
+  const share = (nerve, weapon) => {
+    arm(him, weapon);
+    me.adrenaline = 0;
+    const calm = fearTarget(world, me, nerve, him);
+    me.adrenaline = 1;
+    const rushed = fearTarget(world, me, nerve, him);
+    return rushed / calm;
+  };
+  assert.ok(share(0, null) < share(-0.9, 'rifle') - 0.3, `kept with adrenaline: even ${share(0, null).toFixed(2)}, hopeless ${share(-0.9, 'rifle').toFixed(2)}`);
+});

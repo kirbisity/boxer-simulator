@@ -134,8 +134,20 @@ export const AI = {
   crawl: { from: 0.45, rate: 0.8, adrenaline: 0.9, away: 3, rethink: 1.5, arrived: 0.6, pressed: 2, limbFrom: 0.45, limbRate: 0.5, perArm: 0.6 },
   // `standardDown`: fear, for every man of a side, while its standard lies
   // fallen (or, without one, for `leaderLostFor` s after its leader falls).
-  // `brokenArm`: fear for each arm of his broken.
-  panic: { settle: 1.5, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.62, rate: 0.85, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6, brokenArm: 0.25 },
+  // `brokenArm` / `brokenLeg`: fear for each arm or leg of his broken.
+  // A weapon is fear in itself, the more the deadlier (WEAPONS threat:
+  // fists 1, a knife 2.2, a sword 3–4.9, a gun 5–7): `armed` at full for one
+  // `lethalSpan` deadlier than what he holds himself (his own counted at
+  // `ownWeapon`: a sword in your hand is comfort against a sword, not
+  // against a rifle). Being outmatched — by size and strength (nerve) or by
+  // the weapon — multiplies the rest: × (1 + `mismatch` × how outmatched).
+  // In the ring, unarmed (a sport, a referee, a bell), fear is `ring` of it.
+  // A man who has broken once breaks the easier: `breakAt` falls by
+  // `brokeBefore` each time, to `breakAtLeast`.
+  panic: {
+    settle: 1.5, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.62, rate: 0.85, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
+    brokenArm: 0.25, brokenLeg: 0.35, armed: 0.55, lethalSpan: 4, ownWeapon: 0.92, mismatch: 1.2, ring: 0.45, brokeBefore: 0.1, breakAtLeast: 0.42,
+  },
   // Routs. Few battles are fought to the last man: as a side's men fall,
   // crawl off or break, fear runs through the rest. In a side of at least
   // `minSide`, each man fears `losses` at full as the share of his side lost
@@ -148,8 +160,11 @@ export const AI = {
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
-  // and sex (see adrenalineGain), and it takes away `nerve` of his fear.
-  adrenaline: { knockdown: 0.45, hardHit: 0.35, hardFrom: 0.6, halfLife: 35, nerve: 0.6 },
+  // and sex (see adrenalineGain), and it takes away `nerve` of his fear in
+  // an even fight, down to `nerveOutmatched` when hopelessly outmatched (no
+  // rush of blood makes a man unafraid of a rifle). It holds him from
+  // breaking over `holds` in an even fight, `holdsOutmatched` outmatched.
+  adrenaline: { knockdown: 0.45, hardHit: 0.35, hardFrom: 0.6, halfLife: 35, nerve: 0.85, nerveOutmatched: 0.3, holdsOutmatched: 0.85 },
   // Fear per metre of reach the other has on me.
   reachFear: 0.6,
   // His weapon is out of line when it points this far off me (cosine).
@@ -1121,23 +1136,55 @@ function rout(world, fighter, opponent) {
   return true;
 }
 
+/** How deadly what he holds is (WEAPONS threat; bare hands 1). */
+const lethality = (fighter) => (fighter?.weapon?.held ? fighter.weapon.spec.threat ?? 1 : 1);
+
+/** How much deadlier his weapon is than mine, 0..1 (one `lethalSpan` deadlier: 1). */
+export function weaponDread(fighter, opponent) {
+  const spec = AI.panic;
+  return Math.max(0, Math.min(1, (lethality(opponent) - Math.max(1, spec.ownWeapon * lethality(fighter))) / spec.lethalSpan));
+}
+
+/** A ring bout: the ropes, and nobody armed. */
+const ringBout = (world, fighter, opponent) => Boolean(world.arena.ring) && !fighter.weapon?.held && !opponent?.weapon?.held;
+
+/**
+ * What he fears now, 0..1: being outmatched (`nerve` −1..1: size, strength,
+ * skill; `dread`: the weapon), being hurt and broken, his side's state; all
+ * multiplied by how outmatched he is, damped by armour, by adrenaline (most
+ * in an even fight) and by the ring.
+ */
+export function fearTarget(world, fighter, nerve, opponent) {
+  const spec = AI.panic;
+  const outmatched = Math.max(0, -nerve);
+  const dread = opponent ? weaponDread(fighter, opponent) : 0;
+  const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
+  const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
+  const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
+  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter);
+  const mismatch = Math.min(1, outmatched + dread);
+  const rush = AI.adrenaline.nerve + (AI.adrenaline.nerveOutmatched - AI.adrenaline.nerve) * mismatch;
+  const ring = opponent && ringBout(world, fighter, opponent) ? spec.ring : 1;
+  return Math.max(0, Math.min(1, felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring));
+}
+
 /**
  * Fear, settling towards what he feels now; past breaking point he may
  * break (unless adrenaline holds him), and once calm again he recovers.
  */
-function feelFear(world, fighter, nerve, dt) {
+function feelFear(world, fighter, nerve, dt, opponent = null) {
   const spec = AI.panic;
   fighter.adrenaline = (fighter.adrenaline ?? 0) * 0.5 ** (dt / AI.adrenaline.halfLife);
-  // Adrenaline drowns fear out (`AI.adrenaline.nerve` of it, at full adrenaline).
-  // The standard down (or the leader fallen): every man of the side sees it.
-  const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
-  const arms = brokenArms(fighter) * spec.brokenArm;
-  const target = Math.max(0, Math.min(1, (spec.outmatched * Math.max(0, -nerve) + spec.hurt * hurtShare(fighter) + shaken + arms + routFear(world, fighter)) * (1 - fighter.body.gear.courage) * (1 - AI.adrenaline.nerve * fighter.adrenaline)));
+  const target = fearTarget(world, fighter, nerve, opponent);
   fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
-  const held = fighter.adrenaline > spec.adrenalineHolds;
+  // Adrenaline holds him from breaking: easily in an even fight, hardly against a much deadlier man.
+  const mismatch = Math.min(1, Math.max(0, -nerve) + (opponent ? weaponDread(fighter, opponent) : 0));
+  const held = fighter.adrenaline > spec.adrenalineHolds + (AI.adrenaline.holdsOutmatched - spec.adrenalineHolds) * mismatch;
+  const breakAt = Math.max(spec.breakAtLeast, spec.breakAt - spec.brokeBefore * (fighter.panics ?? 0));
   if (!fighter.panicked) {
-    if (fighter.fear > spec.breakAt && !held && world.random() < spec.rate * ((fighter.fear - spec.breakAt) / (1 - spec.breakAt)) * dt) {
+    if (fighter.fear > breakAt && !held && world.random() < spec.rate * ((fighter.fear - breakAt) / (1 - breakAt)) * dt) {
       fighter.panicked = true;
+      fighter.panics = (fighter.panics ?? 0) + 1;
       fighter.calmFor = 0;
       fighter.punch = null;
       fighter.clinch = null;
@@ -1426,7 +1473,7 @@ export function think(world, fighter, dt) {
   const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;
   // Fear builds and may break him; broken, or passive by choice, he only covers up and gets away.
-  feelFear(world, fighter, nerve, dt);
+  feelFear(world, fighter, nerve, dt, opponent);
   if (fighter.panicked && rout(world, fighter, opponent)) return;
   if (style.passive || fighter.panicked) {
     keepAway(world, fighter, opponent, dt);

@@ -303,11 +303,12 @@ const PLACE_LIGHT = {
 
 /** The fighting floor of each sandbox place (half-sizes in x and z). */
 export const PLACE_ARENAS = {
-  ring: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
+  // `ring`: a sport's ring, with its ropes and rules (fear runs lower there: ai.js fearTarget).
+  ring: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true },
   colosseum: { halfX: 6.5, halfZ: 4.4 },
   subway: SUBWAY_ARENA,
   meadow: { halfX: 9, halfZ: 7 },
-  stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf },
+  stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true },
   town: { halfX: 9, halfZ: 7 },
   port: { halfX: 10, halfZ: 6 },
   sengoku: { halfX: 11, halfZ: 7 },

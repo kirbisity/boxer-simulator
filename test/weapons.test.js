@@ -257,7 +257,8 @@ test('a sword holds its range against fists, attacks often, and fends punches of
   for (let seed = 1200; seed < 1212; seed += 1) {
     const world = createWorld([fighterFor('contender:longsword'), fighterFor('contender:street')], { seed });
     let elapsed = 0;
-    while (elapsed < 60 && !boutWinner(world)) {
+    // Measured while they fight: not once the man with fists has broken and runs (he often does, against a sword).
+    while (elapsed < 60 && !boutWinner(world) && !world.fighters[1].panicked) {
       advance(world, 0.1, (current, dt) => thinkAll(current, dt));
       elapsed += 0.1;
       const [a, b] = world.fighters;

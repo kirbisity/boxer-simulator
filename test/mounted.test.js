@@ -444,7 +444,9 @@ test('a team of horsemen holds its line: no friendly horse crashes in a 3 v 3 ch
     const sides = [...['knight', 'saladin', 'samurai'].map((key) => ({ inputs: rider(key), corner: 'red' })), ...['saber', 'knight', 'saladin'].map((key) => ({ inputs: rider(key), corner: 'blue' }))];
     const w = createWorld(sides, { seed, arena: FIELD });
     advance(w, 25, thinkAll);
-    const friendly = w.events.filter((e) => e.kind === 'horseCrash' && e.other !== undefined && w.horses[e.horse].corner === w.horses[e.other].corner);
+    // Two horses with their riders up (loose horses, their riders down, wander where they will).
+    const ridden = (e) => e.rider !== undefined && w.events.some((pair) => pair.kind === 'horseCrash' && pair.time === e.time && pair.horse === e.other && pair.rider !== undefined);
+    const friendly = w.events.filter((e) => e.kind === 'horseCrash' && e.other !== undefined && w.horses[e.horse].corner === w.horses[e.other].corner && ridden(e));
     assert.equal(friendly.length, 0, `seed ${seed}: friends crashed at ${friendly.map((e) => e.speed.toFixed(1))}`);
   }
 });

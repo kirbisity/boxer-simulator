@@ -4,11 +4,15 @@
 
 import { PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { advance, boutWinner, createWorld } from '../src/physics.js';
+import { advance, boutWinner, createWorld, WORLD } from '../src/physics.js';
 import { fighterFor } from './weapons.js';
 
 export const PANIC_PAIRINGS = [
+  ['heavy:boxing', 'light:boxing', 'ring'],
+  ['contender:boxing', 'contender:boxing', 'ring'],
   ['heavy:boxing', 'light:boxing'],
+  ['contender:katana', 'contender:katana'],
+  ['contender:katana', 'contender:unskilled'],
   ['contender:katana', 'contender:boxing'],
   ['contender:longsword:knight', 'contender:street'],
   ['contender:knife', 'contender:unskilled'],
@@ -18,10 +22,12 @@ export const PANIC_PAIRINGS = [
 const build = (spec) => (PRESETS[spec] ? { ...PRESETS[spec] } : fighterFor(spec));
 
 export function panicOutcomes(bouts = 6, seconds = 90, pairings = PANIC_PAIRINGS) {
-  return pairings.map(([red, blue]) => {
-    const row = { pairing: `${red} v ${blue}`, panics: [0, 0], rallies: 0, brokenSeconds: 0, firstAt: [], wins: { red: 0, blue: 0, none: 0 } };
+  return pairings.map(([red, blue, place]) => {
+    const row = { pairing: `${red} v ${blue}${place ? ` (${place})` : ''}`, panics: [0, 0], rallies: 0, brokenSeconds: 0, firstAt: [], wins: { red: 0, blue: 0, none: 0 } };
     for (let bout = 0; bout < bouts; bout += 1) {
-      const world = createWorld([build(red), build(blue)], { seed: 800 + bout, arena: { halfX: 6.5, halfZ: 4.4 } });
+      // In the ring (the ropes, a sport) or on open ground.
+      const arena = place === 'ring' ? { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true } : { halfX: 6.5, halfZ: 4.4 };
+      const world = createWorld([build(red), build(blue)], { seed: 800 + bout, arena });
       let elapsed = 0;
       while (elapsed < seconds && !boutWinner(world)) {
         advance(world, 0.1, (current, dt) => thinkAll(current, dt));
@@ -46,6 +52,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const seconds = Number(process.argv[3] ?? 90);
   for (const row of panicOutcomes(bouts, seconds)) {
     const first = row.firstAt.length ? `first at ${Math.min(...row.firstAt).toFixed(0)} s` : '';
-    console.log(`${row.pairing.padEnd(42)} panics red ${row.panics[0]} blue ${row.panics[1]} | rallies ${row.rallies} | broken ${(row.brokenSeconds / bouts).toFixed(0)} s/bout ${first} | red ${row.wins.red} blue ${row.wins.blue} none ${row.wins.none}`);
+    console.log(`${row.pairing.padEnd(50)} panics red ${row.panics[0]} blue ${row.panics[1]} | rallies ${row.rallies} | broken ${(row.brokenSeconds / bouts).toFixed(0)} s/bout ${first} | red ${row.wins.red} blue ${row.wins.blue} none ${row.wins.none}`);
   }
 }

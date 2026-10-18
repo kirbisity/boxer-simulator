@@ -1,6 +1,7 @@
 // Weapon arms: how often an arm holding a weapon folds back — the elbow
 // pointing behind the shoulder, or the hand drawn back past it — measured in
-// the fighter's own frame (x forward) over the time he stands holding it.
+// the fighter's own frame (x forward) over the time he stands holding it
+// and fights (not while either man has broken and runs).
 // Usage: [STYLES=guandao,naginata] node tools/arms.js [bouts per style] [seconds]
 
 import { P, PRESETS } from '../src/body.js';
@@ -19,7 +20,8 @@ export function armFolding(style, bouts = 3, seconds = 40) {
     for (let tick = 0; tick < seconds * 30 && !boutWinner(world); tick += 1) {
       advance(world, 1 / 30, (current, dt) => thinkAll(current, dt));
       for (const fighter of world.fighters) {
-        if (fighter.state !== 'up' || !fighter.weapon?.held) continue;
+        // In the fight: not a man running, or chasing one who runs.
+        if (fighter.state !== 'up' || !fighter.weapon?.held || world.fighters.some((each) => each.panicked)) continue;
         const sides = fighter.weapon.spec.grip === 'two' || fighter.weapon.twoHanded ? ['l', 'r'] : [fighter.weapon.main];
         for (const side of sides) {
           const shoulder = toLocal(fighter, point(fighter.x, P[`${side}Shoulder`]));
