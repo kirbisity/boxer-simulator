@@ -717,7 +717,8 @@ function segmentRun(name, policy, seed, log) {
   const endAt = RESTS[spec.to].at;
   const from = spec.from ? nearestSample(samples, startAt[0], startAt[1], startAt[2]).sample.idx : 0;
   const to = nearestSample(samples, endAt[0], endAt[1], endAt[2]).sample.idx;
-  const plan = full.filter((entry) => entry.base >= from && entry.base <= to);
+  // (From the turnkey's fire he does not go back for the cell: that is a walk through the cellar, and the cellar's men are another stretch's.)
+  const plan = full.filter((entry) => entry.base >= from && entry.base <= to && !(spec.from === 'rest2b' && entry.stop && entry.acts.some((act) => act.kind === 'gate')));
   const run = new Run({
     policy, seed, plan, log, maxDeaths: 1, endAt,
     setup: (self) => {
