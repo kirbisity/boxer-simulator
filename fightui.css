@@ -99,3 +99,18 @@ body:not(.playing) .fu-pick { display: none; }
 .fu-reticle.fu-flash[data-fu-flash="nudge"] svg { animation: fu-nudge 0.6s ease-out; }
 @keyframes fu-nudge { 0%, 60% { opacity: 0.7; scale: 1.3; } 100% { scale: 1; } }
 .fu-reticle.fu-flash[data-fu-flash="miss"] svg { animation: fu-reticle 0.5s ease-out, fu-miss 0.3s; }
+
+/* ---- Orders to his men, in a battle (fightui/command.js): small pills down the top left, out of the fight's way; the standing order gold ---- */
+.fu-orders { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); display: grid; gap: 6px; justify-items: start; pointer-events: none; }
+.fu-order { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; min-width: 88px; padding: 0 12px 0 10px; border-radius: 18px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(10, 12, 18, 0.55); color: var(--fg); font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); cursor: pointer; }
+.fu-order:active { background: rgba(255, 207, 74, 0.35); }
+.fu-order.on { background: var(--gold); border-color: var(--gold); color: #191300; text-shadow: none; }
+.fu-order-icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fu-order kbd { display: none; margin-left: auto; padding-left: 6px; font: 600 10px var(--mono); color: var(--muted); }
+.fu-order.on kbd { color: rgba(25, 19, 0, 0.6); }
+.fight-ui[data-device="mouse"] .fu-order kbd { display: block; }
+.fu-order-said { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px) + 4 * 36px + 3 * 6px + 8px); padding: 3px 10px; border-radius: 999px; background: rgba(10, 12, 18, 0.6); font: 700 13px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; }
+.fu-order-said-in { animation: fu-order-said 1.6s ease-out forwards; }
+@keyframes fu-order-said { 0% { opacity: 0; translate: -6px 0; } 12% { opacity: 1; translate: 0 0; } 75% { opacity: 1; } 100% { opacity: 0; } }
+.banner:not([hidden]) ~ .fight-ui .fu-orders, .banner:not([hidden]) ~ .fight-ui .fu-order-said { visibility: hidden; }
+body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said { display: none; }
