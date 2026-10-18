@@ -1733,7 +1733,8 @@ export function gearTraits(inputs) {
   const feet = (female && look.femaleFeet) || look.feet;
   return {
     ...MOVEMENT[spec.movement],
-    balance: (bySex.balance ?? spec.balance ?? 1) * heelFooting(feet?.heels),
+    // (A man's own `outfit.balance` before the kit's: a giant who swings a poleaxe and keeps his feet.)
+    balance: (inputs.outfit?.balance ?? bySex.balance ?? spec.balance ?? 1) * heelFooting(feet?.heels),
     // Heels stand the body higher by this much (m).
     heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,

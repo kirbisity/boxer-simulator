@@ -183,7 +183,8 @@ class Run {
     this.clashAt = 0;
     this.closing = false;
     this.result = null;
-    this.me.mayTarget = (other) => this.wanted(other);
+    this.targetable = (other) => this.wanted(other);
+    this.me.mayTarget = this.targetable;
     setup?.(this);
   }
 
@@ -244,6 +245,8 @@ class Run {
     }
     if (me.state === 'out') return;
     thinkAll(world, dt, PLAYER);
+    // (A rest or a death makes him new in place: what he may target is put on him again.)
+    me.mayTarget = this.targetable;
     this.control(dt);
   }
 
@@ -316,8 +319,13 @@ class Run {
     if (this.policy === 'trace') return 0;
     const me = this.me;
     const { sample } = nearestSample(routeTrace(), hipX(me), feetFloor(me), hipZ(me));
-    const found = this.plan.findIndex((entry) => entry.base >= (sample?.idx ?? 0));
-    return found >= 0 ? found : 0;
+    let found = this.plan.findIndex((entry) => entry.base >= (sample?.idx ?? 0));
+    if (found < 0) return 0;
+    // A gate just behind him that is still shut is still to be opened.
+    for (let back = found - 1; back >= Math.max(0, found - 3); back -= 1) {
+      if (this.plan[back].acts.some((act) => act.kind === 'gate' && this.world.stage.mechanisms[act.id] !== 'open')) found = back;
+    }
+    return found;
   }
 
   // ---- What he does -----------------------------------------------------------------------------------
@@ -420,8 +428,8 @@ class Run {
       return;
     }
     me.walking = false;
-    if (this.closing) {
-      const target = near[0].fighter;
+    if (this.closing && aware[0]) {
+      const target = aware[0].fighter;
       me.goTo = [hipX(target), 0, hipZ(target)];
       me.move = 1;
       me.running = false;
@@ -663,6 +671,11 @@ const VARIANTS = {
   },
   // Rested: whole, the pouch as the stage starts him.
   healed: () => {},
+  // Rested, and in a dead guard's brigandine (taken from Corporal Rae or the like).
+  brigandine: (run) => {
+    const guard = levelPreset('dunnottarGuard');
+    reclothe(run.world, run.me, { ...run.me.body.inputs, outfit: structuredClone(guard.outfit), accessories: [] });
+  },
   // Rested, and in a dead man-at-arms' plate (taken from Sir Lauder or Sir Rannoch).
   plate: (run) => {
     const knight = levelPreset('dunnottarKnight');
@@ -863,7 +876,7 @@ async function main() {
     return;
   }
   if (command === 'vaelen') {
-    const variants = String(options.variant ?? 'unhealed,healed,plate').split(',');
+    const variants = String(options.variant ?? 'unhealed,healed,brigandine,plate').split(',');
     const lists = variants.flatMap((variant) => Array.from({ length: runs }, (_, index) => ['boss', variant, String(seed0 + index)]));
     const results = await farm(lists, jobs);
     for (const variant of variants) {

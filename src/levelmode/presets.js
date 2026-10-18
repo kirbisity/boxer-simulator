@@ -99,8 +99,8 @@ export const LEVEL_PRESETS = {
   // to knock down (`poise`); skill 0.8 of which the helm leaves him three quarters (skillFactor).
   // Tuned (tools/dunnottar.js): a rested operative with the sword and buckler beats him about one time in four.
   vaelen: {
-    name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.2, calories: 4835, skill: 0.8,
-    outfit: { kind: 'tournament', design: 1, extraMass: 0.3 }, accessories: [],
+    name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.35, calories: 5515, skill: 0.85,
+    outfit: { kind: 'tournament', design: 1, extraMass: 0.3, balance: 1.5 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#1c1c20', facialHair: 'beard', eyeColor: 'grey' },
   },
 };
