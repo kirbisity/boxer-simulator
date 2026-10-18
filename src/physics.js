@@ -1712,13 +1712,28 @@ function crawlPose(fighter, intent, dt) {
   intent.bladeDir = null;
   intent.offBladeDir = null;
   intent.guardTight = false;
+  const { knee, foot, hand } = crawlStance(fighter.body);
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     // Turning right (yaw growing), the left knee is on the outside: its stride the longer.
     const step = sign * swing * (1 + sign * turning * spec.turnStride);
-    intent[`${side}Knee`] = [0.02 * H + step, L.ankle + 0.02 + (sign > 0 ? lift : 0), sign * 0.1 * H];
-    intent[`${side}Foot`] = [0.02 * H + step - L.shank * 0.95, L.ankle, sign * 0.11 * H];
-    intent[`${side}Hand`] = [0.3 * H - step, 0.05 * H + (sign < 0 ? lift : 0), sign * 0.14 * H];
+    intent[`${side}Knee`] = [0.02 * H + step, L.ankle + 0.02 + (sign > 0 ? lift : 0), sign * knee];
+    intent[`${side}Foot`] = [0.02 * H + step - L.shank * 0.95, L.ankle, sign * foot];
+    intent[`${side}Hand`] = [0.3 * H - step, 0.05 * H + (sign < 0 ? lift : 0), sign * hand];
   }
+}
+
+/**
+ * How far out from his middle (m) his knees, feet and hands go on all fours,
+ * by his build: the knees under the hip joints, pushed apart by the thickness
+ * of his thighs (a thin man's nearly together, a heavy man's well apart);
+ * the hands under the shoulders, out by the thickness of his arms.
+ */
+export function crawlStance(body) {
+  const spec = WORLD.crawl;
+  const thigh = body.segments.lThigh.skinRadius;
+  const arm = body.segments.lUpperArm.skinRadius;
+  const knee = body.lengths.hipSpan / 2 + Math.max(0, thigh - spec.leanThigh) * spec.thighApart;
+  return { knee, foot: knee + spec.footOut * body.heightM, hand: body.lengths.shoulderSpan / 2 + arm * spec.armApart };
 }
 
 /**
@@ -1742,12 +1757,12 @@ export function startCrawl(world, fighter, reason) {
 
 /** Still in the fight: not out, and not crawling away. */
 export function inFight(fighter) {
-  // A player walking about on his knees (walk mode) has not left it.
-  return fighter.state !== 'out' && !(fighter.crawling && !fighter.walking);
+  // A player walking about on his knees (walk mode), or crawling by choice, has not left it; a man who fled the field has.
+  return fighter.state !== 'out' && !fighter.fled && !(fighter.crawling && !fighter.walking && !fighter.crawlChosen);
 }
 
 /** A leg that will not bear him: a knee or hip broken. */
-function legBroken(fighter) {
+export function legBroken(fighter) {
   return ['lKnee', 'rKnee', 'lHip', 'rHip'].some((joint) => fighter.broken.has(joint));
 }
 

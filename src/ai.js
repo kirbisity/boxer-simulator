@@ -128,10 +128,23 @@ export const AI = {
   // nearest enemy, `away` m at a time.
   // He keeps the way he chose for `rethink` s, or till within `arrived` m of it.
   // At a wall he crawls along it only with an enemy within `pressed` m.
-  crawl: { from: 0.55, rate: 0.5, adrenaline: 0.9, away: 3, rethink: 1.5, arrived: 0.6, pressed: 2 },
+  // A broken limb alone (an arm, a leg that will not bear him; `limbFrom` of
+  // legShare and `perArm` for each broken arm) puts a man on his knees too,
+  // panicked or not, at up to `limbRate` a second.
+  crawl: { from: 0.45, rate: 0.8, adrenaline: 0.9, away: 3, rethink: 1.5, arrived: 0.6, pressed: 2, limbFrom: 0.45, limbRate: 0.5, perArm: 0.6 },
   // `standardDown`: fear, for every man of a side, while its standard lies
   // fallen (or, without one, for `leaderLostFor` s after its leader falls).
-  panic: { settle: 1.5, outmatched: 0.5, hurt: 0.85, perKnockdown: 0.22, breakAt: 0.7, rate: 0.6, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6 },
+  // `brokenArm`: fear for each arm of his broken.
+  panic: { settle: 1.5, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.62, rate: 0.85, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6, brokenArm: 0.25 },
+  // Routs. Few battles are fought to the last man: as a side's men fall,
+  // crawl off or break, fear runs through the rest. In a side of at least
+  // `minSide`, each man fears `losses` at full as the share of his side lost
+  // goes from `lossesFrom` to `lossesFull`, and `contagion` for each of his
+  // own he sees broken within `within` m (up to `contagionMost`). A broken
+  // man of such a side runs for his own rear; at the field's edge (within
+  // `edge` m) with no enemy within `clearOf` m he has fled: out of the battle,
+  // and he does not come back. History has most battles end so.
+  rout: { minSide: 4, losses: 0.5, lossesFrom: 0.15, lossesFull: 0.6, contagion: 0.12, contagionMost: 0.36, within: 5, edge: 1.6, clearOf: 4 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
@@ -224,6 +237,7 @@ function pick(weights, random) {
 /** One AI decision tick for every fighter not driven by the player. */
 export function thinkAll(world, dt, playerIds = new Set()) {
   keepLeaders(world);
+  keepSides(world);
   moveFormations(world, dt);
   // In a big fight, a fighter with nothing happening near him thinks ten
   // times a second (each on his own beat) rather than every step.
@@ -1022,6 +1036,91 @@ function couchedCharge(world, fighter, opponent, style, distance) {
   return true;
 }
 
+/** How many of his arms are broken (0, 1 or 2). */
+const brokenArms = (fighter) => (fighter.broken.has('lElbow') ? 1 : 0) + (fighter.broken.has('rElbow') ? 1 : 0);
+
+/**
+ * A broken limb puts a man on his knees, panicked or not: a leg that will
+ * barely bear him, or an arm hanging. Less likely with adrenaline in him.
+ */
+function crawlOnBrokenLimb(world, fighter, dt) {
+  const crawl = AI.crawl;
+  if (fighter.state !== 'up' || fighter.crawling || fighter.mount) return;
+  const limbs = Math.min(1, Math.max(legShare(fighter), brokenArms(fighter) * crawl.perArm));
+  if (limbs <= crawl.limbFrom) return;
+  const rate = crawl.limbRate * ((limbs - crawl.limbFrom) / (1 - crawl.limbFrom)) * (1 - crawl.adrenaline * fighter.adrenaline);
+  if (world.random() < rate * dt) startCrawl(world, fighter, 'goes down on his knees, the limb broken');
+}
+
+/**
+ * Each side's state for the rout (world.sides): its men at the start, the
+ * share lost (out, crawling off, broken or fled), where the broken stand,
+ * and the way to its rear (away from the other side, as they stood at the start).
+ */
+function keepSides(world) {
+  const sides = (world.sides ??= {});
+  for (const corner of ['red', 'blue']) {
+    const men = world.fighters.filter((fighter) => fighter.corner === corner);
+    if (!men.length) continue;
+    const side = (sides[corner] ??= { men: men.length, rear: null });
+    const lost = men.filter((fighter) => !inFight(fighter) || fighter.panicked).length;
+    side.lost = lost / side.men;
+    side.broken = men.filter((fighter) => fighter.panicked && inFight(fighter)).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
+  }
+  for (const [corner, other] of [['red', 'blue'], ['blue', 'red']]) {
+    if (!sides[corner] || !sides[other] || sides[corner].rear) continue;
+    const middle = (side) => {
+      const men = world.fighters.filter((fighter) => fighter.corner === side);
+      return [men.reduce((sum, fighter) => sum + fighter.x[P.pelvis * 3], 0) / men.length, men.reduce((sum, fighter) => sum + fighter.x[P.pelvis * 3 + 2], 0) / men.length];
+    };
+    const [mine, theirs] = [middle(corner), middle(other)];
+    const length = Math.hypot(mine[0] - theirs[0], mine[1] - theirs[1]) || 1;
+    sides[corner].rear = [(mine[0] - theirs[0]) / length, (mine[1] - theirs[1]) / length];
+  }
+}
+
+/** Fear from how his side goes: its losses, and his own broken near him. Only in a side big enough. */
+export function routFear(world, fighter) {
+  const spec = AI.rout;
+  const side = world.sides?.[fighter.corner];
+  if (!side || side.men < spec.minSide) return 0;
+  const losses = spec.losses * Math.max(0, Math.min(1, (side.lost - spec.lossesFrom) / (spec.lossesFull - spec.lossesFrom)));
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  let near = 0;
+  for (const other of side.broken) if (Math.hypot(other[0] - at[0], other[1] - at[1]) < spec.within) near += 1;
+  if (fighter.panicked) near -= 1;
+  return losses + Math.min(spec.contagionMost, spec.contagion * Math.max(0, near));
+}
+
+/**
+ * A broken man of a big side runs for its rear, off the field; once at the
+ * edge with no enemy near, he has fled. True while this has him.
+ */
+function rout(world, fighter, opponent) {
+  const spec = AI.rout;
+  const side = world.sides?.[fighter.corner];
+  if (!side?.rear || side.men < spec.minSide) return false;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  const { halfX, halfZ } = world.arena;
+  const atEdge = Math.abs(at[0]) > halfX - spec.edge || Math.abs(at[1]) > halfZ - spec.edge;
+  const nearest = opponent ? Math.hypot(opponent.x[P.pelvis * 3] - at[0], opponent.x[P.pelvis * 3 + 2] - at[1]) : Infinity;
+  if (atEdge && nearest > spec.clearOf) {
+    fighter.fled = true;
+    fighter.goTo = null;
+    fighter.move = 0;
+    fighter.running = false;
+    world.events.push({ time: world.time, kind: 'fled', fighter: fighter.id, effects: ['flees the field'] });
+    return true;
+  }
+  // Pressed close, he first gets clear of the man on him.
+  if (nearest < AI.passive.safeDistance) return false;
+  const margin = spec.edge * 0.5;
+  fighter.goTo = [Math.max(-(halfX - margin), Math.min(halfX - margin, at[0] + side.rear[0] * 30)), 0, Math.max(-(halfZ - margin), Math.min(halfZ - margin, at[1] + side.rear[1] * 30))];
+  fighter.move = 1;
+  fighter.running = fighter.stamina > AI.passive.runWhile;
+  return true;
+}
+
 /**
  * Fear, settling towards what he feels now; past breaking point he may
  * break (unless adrenaline holds him), and once calm again he recovers.
@@ -1032,7 +1131,8 @@ function feelFear(world, fighter, nerve, dt) {
   // Adrenaline drowns fear out (`AI.adrenaline.nerve` of it, at full adrenaline).
   // The standard down (or the leader fallen): every man of the side sees it.
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
-  const target = Math.max(0, Math.min(1, (spec.outmatched * Math.max(0, -nerve) + spec.hurt * hurtShare(fighter) + shaken) * (1 - fighter.body.gear.courage) * (1 - AI.adrenaline.nerve * fighter.adrenaline)));
+  const arms = brokenArms(fighter) * spec.brokenArm;
+  const target = Math.max(0, Math.min(1, (spec.outmatched * Math.max(0, -nerve) + spec.hurt * hurtShare(fighter) + shaken + arms + routFear(world, fighter)) * (1 - fighter.body.gear.courage) * (1 - AI.adrenaline.nerve * fighter.adrenaline)));
   fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
   const held = fighter.adrenaline > spec.adrenalineHolds;
   if (!fighter.panicked) {
@@ -1045,6 +1145,7 @@ function feelFear(world, fighter, nerve, dt) {
       if (fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
       world.events.push({ time: world.time, kind: 'panic', fighter: fighter.id, effects: ['breaks and runs'] });
     }
+    crawlOnBrokenLimb(world, fighter, dt);
     return;
   }
   // Badly hurt as well as broken: down on his knees, crawling for safety.
@@ -1054,6 +1155,9 @@ function feelFear(world, fighter, nerve, dt) {
     const rate = crawl.rate * ((severity - crawl.from) / (1 - crawl.from)) * (1 - crawl.adrenaline * fighter.adrenaline);
     if (world.random() < rate * dt) startCrawl(world, fighter, 'crawls away');
   }
+  crawlOnBrokenLimb(world, fighter, dt);
+  // Once off the field he stays off.
+  if (fighter.fled) return;
   fighter.calmFor = fighter.fear < spec.calmAt ? (fighter.calmFor ?? 0) + dt : 0;
   if (held || fighter.calmFor > spec.calmSeconds) {
     fighter.panicked = false;
@@ -1286,6 +1390,12 @@ export function think(world, fighter, dt) {
     crawlAway(world, fighter, dt);
     return;
   }
+  // Off the field: he stands well back, out of it.
+  if (fighter.fled) {
+    fighter.goTo = null;
+    fighter.move = 0;
+    return;
+  }
   // On his knees with the pain: nothing until he is up.
   if (fighter.pain) {
     fighter.move = 0;
@@ -1317,6 +1427,7 @@ export function think(world, fighter, dt) {
   fighter.aiConfidence = nerve;
   // Fear builds and may break him; broken, or passive by choice, he only covers up and gets away.
   feelFear(world, fighter, nerve, dt);
+  if (fighter.panicked && rout(world, fighter, opponent)) return;
   if (style.passive || fighter.panicked) {
     keepAway(world, fighter, opponent, dt);
     return;

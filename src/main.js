@@ -13,7 +13,7 @@ import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
-import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders } from './control.js';
+import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { createFightUiMarks } from './fightui/marker.js';
 import { fightUiChoose } from './fightui/index.js';
@@ -301,7 +301,14 @@ function thinkForBout(world, dt) {
   world.keepFull = new Set(players);
   // Standing still: no thinking at all; he stays where he is, guard down, and takes what comes.
   const still = new Set(players);
-  if (state.standStill && !state.scenario) {
+  // Crawling (the sandbox's look at it): that side down on its knees, still in the fight; the player's man as he chooses.
+  const crawlSide = !state.scenario && state.standStill.startsWith('crawl:') ? state.standStill.slice(6) : null;
+  for (const fighter of world.fighters) {
+    if (players.has(fighter.id)) continue;
+    if (fighter.corner === crawlSide && !fighter.crawling) playerCrawl(world, fighter, true);
+    else if (fighter.corner !== crawlSide && fighter.crawlChosen) playerCrawl(world, fighter, false);
+  }
+  if (state.standStill && !crawlSide && !state.scenario) {
     for (const fighter of world.fighters) {
       if (fighter.corner !== state.standStill || players.has(fighter.id)) continue;
       still.add(fighter.id);
@@ -1024,6 +1031,9 @@ window.addEventListener('keydown', (press) => {
   } else if (press.key === 'Tab') {
     press.preventDefault();
     fightControls.toggleLock();
+  } else if (key === 'c') {
+    // Down on his knees to crawl, or up again.
+    playerCrawl(state.world, player(), !player().crawling);
   } else if (key === 'f') {
     // The special action, whatever it is now (the button's label).
     const action = contextAction(state.world, player());

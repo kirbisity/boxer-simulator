@@ -542,7 +542,12 @@ export const WORLD = {
   // round where he is; `turnStride`: how much longer the outer knee's step.
   // On his knees with the pain (a lash, physics/whip.js): how far the hips drop and the trunk bows.
   pain: { dip: 0.27, lean: 0.35 },
-  crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6 },
+  // The stance on all fours (crawlStance): each knee under the hip joint, and
+  // out from it by `thighApart` × the thigh's radius over a lean man's
+  // (`leanThigh` m): thick thighs meet and push the knees apart, so a thin man
+  // crawls knees nearly together and a heavy one well apart; each foot `footOut` of his height further out, the
+  // hands out from the shoulders by `armApart` of the arm's thickness.
+  crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6, thighApart: 2, leanThigh: 0.06, footOut: 0.008, armApart: 0.8 },
   pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 4, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
   // On horseback (physics/mounted.js; the breeds and barding in horses.js).
   // The rider sits his saddle: hips, knees and feet go where the saddle and

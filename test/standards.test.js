@@ -93,7 +93,8 @@ test('a man crawling goes on his knees, low, away from the enemy, and is let go'
   const apart = () => Math.hypot(crawler.x[P.pelvis * 3] - enemy.x[P.pelvis * 3], crawler.x[P.pelvis * 3 + 2] - enemy.x[P.pelvis * 3 + 2]);
   advance(world, 1.5, think);
   const before = apart();
-  advance(world, 2, think);
+  // He turns on his knees by stepping round (slowly), then goes.
+  advance(world, 3, think);
   assert.ok(crawler.x[P.pelvis * 3 + 1] < 0.6 * crawler.body.lengths.thigh + 0.3, `pelvis at ${crawler.x[P.pelvis * 3 + 1]}`);
   assert.ok(crawler.x[P.lKnee * 3 + 1] < 0.12 && crawler.x[P.rKnee * 3 + 1] < 0.12, 'knees on the floor');
   assert.ok(apart() > before, 'crawling away');
