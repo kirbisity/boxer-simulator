@@ -189,7 +189,7 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   if (style.weapon) fighter.mixed = null;
   if (shield && style.shield && !fighter.shield) {
     const spec = SHIELDS[style.shield];
-    fighter.shield = { kind: style.shield, spec };
+    fighter.shield = { kind: style.shield, spec, strain: undefined };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
   }
@@ -517,7 +517,7 @@ function updatePickup(world, fighter, dt) {
   fighter.pickup = null;
   if (debris.kind === 'shield') {
     const spec = SHIELDS[debris.shield];
-    fighter.shield = { kind: debris.shield, spec };
+    fighter.shield = { kind: debris.shield, spec, strain: undefined };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
     world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, effects: [`takes up the ${spec.label.toLowerCase()}`] });
@@ -1388,6 +1388,9 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     // How far an untrained hand turns the blade off true (rad): the edge meeting at a slant, the point off its line.
     edgeTilt: edgeTilt(world, fighter, spec),
     wander,
+    // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
+    riposte: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
+    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
@@ -3386,7 +3389,7 @@ export function capsuleEnds(fighter, capsule) {
 }
 
 /** How far the point (px, py, pz) is from the segment a to b (in numbers rather than vectors: asked of every near pair, every substep). */
-function distanceToSegment(px, py, pz, ax, ay, az, bx, by, bz) {
+function gapToSegment(px, py, pz, ax, ay, az, bx, by, bz) {
   const abx = bx - ax;
   const aby = by - ay;
   const abz = bz - az;
@@ -3515,12 +3518,17 @@ function collideCrowd(world, time, substep) {
   }
 }
 
+/** A striker with every field set (unset ones undefined), so all strikers share one shape. */
+function strikerOf(key, a, b, radius, side, { weapon, bash, shin, pa, pb } = {}) {
+  return { key, weapon, bash, shin, a, b, pa, pb, radius, side };
+}
+
 // The two hands as strikers, by fist radius (gloved or bare): nothing in them changes, so they are made once.
 const handStrikerCache = new Map();
 function handStrikers(fist) {
   let hands = handStrikerCache.get(fist);
   if (!hands) {
-    hands = ['l', 'r'].map((side) => ({ key: `${side}Hand`, a: P[`${side}Hand`], b: P[`${side}Hand`], radius: fist, side }));
+    hands = ['l', 'r'].map((side) => strikerOf(`${side}Hand`, P[`${side}Hand`], P[`${side}Hand`], fist, side));
     handStrikerCache.set(fist, hands);
   }
   return hands;
@@ -3540,7 +3548,7 @@ function strikers(fighter) {
     const spec = fighter.shield.spec;
     const reach = (spec.shape ? spec.height / 2 : spec.radius) * 0.75;
     const face = vec.add(shield.centre, vec.scale(shield.normal, 0.02));
-    list[0] = { key: 'lHand', bash: true, a: P.lHand, b: P.lHand, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)), radius: spec.shape ? spec.width * 0.4 : spec.radius * 0.75, side: 'l' };
+    list[0] = strikerOf('lHand', P.lHand, P.lHand, spec.shape ? spec.width * 0.4 : spec.radius * 0.75, 'l', { bash: true, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)) });
   }
   // Each blade in his hands (two blades: the off hand's too, `offWeapon`).
   for (const weapon of heldBlades(fighter)) {
@@ -3548,19 +3556,19 @@ function strikers(fighter) {
     if (weapon.spec.rope) continue;
     // The weapon, from where it starts to strike to its tip.
     const hand = P[`${weapon.main}Hand`];
-    list.push({ key: weapon === fighter.weapon ? 'weapon' : 'offWeapon', weapon, a: hand, b: hand, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip, radius: weapon.spec.radius, side: weapon.main });
+    list.push(strikerOf(weapon === fighter.weapon ? 'weapon' : 'offWeapon', hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip }));
   }
   const punch = fighter.punch;
   if (!punch || punch.t > punch.spec.extendUntil + 0.06) return list;
   const limb = punch.spec.limb;
   const side = limb[0];
-  if (limb.endsWith('Elbow')) list.push({ key: limb, a: P[limb], b: P[limb], radius: 0.05, side });
-  else if (limb.endsWith('Knee')) list.push({ key: limb, a: P[limb], b: P[limb], radius: 0.07, side });
-  else if (limb.endsWith('Foot')) list.push({ key: limb, a: P[`${side}Knee`], b: P[limb], radius: 0.05, side, shin: true });
+  if (limb.endsWith('Elbow')) list.push(strikerOf(limb, P[limb], P[limb], 0.05, side));
+  else if (limb.endsWith('Knee')) list.push(strikerOf(limb, P[limb], P[limb], 0.07, side));
+  else if (limb.endsWith('Foot')) list.push(strikerOf(limb, P[`${side}Knee`], P[limb], 0.05, side, { shin: true }));
   return list;
 }
 
-// Two segments, p1 to q1 and p2 to q2, as twelve numbers: what segmentDistance reads.
+// Two segments, p1 to q1 and p2 to q2, as twelve numbers: what segmentsGap reads.
 const segmentPair = new Float64Array(12);
 
 /** The end points of a capsule's axis (capsuleEnds' arithmetic) written into `into` at `at`. */
@@ -3591,7 +3599,7 @@ function writeCapsuleEnds(into, at, fighter, capsule) {
  * closestBetween's onFirst minus onSecond, in numbers rather than vectors (a
  * crowd asks it of thousands of pairs a substep, nearly all of them clear).
  */
-function segmentDistance() {
+function segmentsGap() {
   const pair = segmentPair;
   const d1x = pair[3] - pair[0];
   const d1y = pair[4] - pair[1];
@@ -3733,7 +3741,7 @@ function collideStriker(world, attacker, defender, striker, time) {
     const aAt = striker.a * 3;
     const bAt = striker.b * 3;
     const hipsAt = P.pelvis * 3;
-    const gap = distanceToSegment(
+    const gap = gapToSegment(
       defender.x[hipsAt], defender.x[hipsAt + 1], defender.x[hipsAt + 2],
       from ? from[0] : ends[aAt], from ? from[1] : ends[aAt + 1], from ? from[2] : ends[aAt + 2],
       to ? to[0] : ends[bAt], to ? to[1] : ends[bAt + 1], to ? to[2] : ends[bAt + 2],
@@ -3814,7 +3822,7 @@ function collideStriker(world, attacker, defender, striker, time) {
   // Nowhere near him: no part of his body can be touched (a crowd is mostly
   // this). Forget any contact with him, so the next real one counts.
   const hips = point(defender.x, P.pelvis);
-  if (distanceToSegment(hips[0], hips[1], hips[2], sa[0], sa[1], sa[2], sb[0], sb[1], sb[2]) > WORLD.bodyReach + striker.radius) {
+  if (gapToSegment(hips[0], hips[1], hips[2], sa[0], sa[1], sa[2], sb[0], sb[1], sb[2]) > WORLD.bodyReach + striker.radius) {
     if (touching) {
       for (const key of attacker.contacts) if (key.startsWith(prefix) && !guardKey(key)) attacker.contacts.delete(key);
     }
@@ -3850,7 +3858,7 @@ function collideStriker(world, attacker, defender, striker, time) {
     const lengthY = pair[10] - pair[7];
     const lengthZ = pair[11] - pair[8];
     const out = apart - strikerHalf - Math.sqrt(lengthX * lengthX + lengthY * lengthY + lengthZ * lengthZ) / 2 >= reach;
-    if ((out ? Infinity : segmentDistance()) >= reach) {
+    if ((out ? Infinity : segmentsGap()) >= reach) {
       if (touching) {
         const contactKey = `${prefix}${capsule.key}`;
         attacker.contacts.delete(contactKey);
@@ -3923,7 +3931,7 @@ function pushApart(world, first, second) {
     // Clear of each other is told in numbers; the vectors are made only for parts that touch.
     writeCapsuleEnds(segmentPair, 0, first, one);
     writeCapsuleEnds(segmentPair, 6, second, two);
-    const distance = segmentDistance();
+    const distance = segmentsGap();
     // A head meets another in whatever it wears (a great helm is a can well wider than the head).
     const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
     if (distance >= reach || distance < 1e-9) continue;

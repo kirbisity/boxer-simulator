@@ -1096,6 +1096,9 @@ export function createWeapon(kind) {
     dir: [1, 0, 0], spin: [0, 0, 0], tip: [0, 0, 0], tipPrev: null, tipVelocity: [0, 0, 0], strain: 0,
     // A gun with a charge (a matchlock) starts loaded.
     loaded: true, reloaded: 0,
+    // What a weapon gains in the fight, named here (unset) so that every weapon has one shape.
+    handling: undefined, charges: undefined, colour: undefined, edge: undefined, dulled: undefined, spent: undefined,
+    draw: undefined, facing: undefined, rope: undefined,
   };
 }
 
