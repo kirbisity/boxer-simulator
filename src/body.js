@@ -527,6 +527,17 @@ export const PRESETS = {
     outfit: { kind: 'samurai', design: 3 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // Musashibō Benkei (d. 1189), the sōhei of Mount Hiei who served
+  // Minamoto no Yoshitsune: remembered as huge and immensely strong (the
+  // tales make him over two metres; ~190 cm here), the naginata his
+  // weapon, a lifetime of temple drill behind it (`skill`), and dead on his
+  // feet at the Koromo river bridge, standing.
+  sohei: {
+    name: 'Musashibō Benkei', style: 'naginata', sex: 'male', heightCm: 190, frame: 'large', age: 30, exercise: 0.92, calories: 6200, skill: 0.95,
+    outfit: { kind: 'sohei', design: 0 }, accessories: [],
+    // Shaven-headed under the hood, the veil to his eyes.
+    look: { skinTone: 'lightTan', hairStyle: 'bald', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
   // A peasant up in arms with his hay fork (the rebels are built on him).
   spear: {
     name: 'Hob Miller', style: 'pitchfork', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,

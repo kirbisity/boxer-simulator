@@ -1138,6 +1138,36 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       }
       break;
     }
+    case 'katozukin': {
+      // The sōhei's katō-zukin: white cloth wound over the crown and round
+      // the head, its end drawn across the face to the eyes, the rest falling
+      // over the shoulders. Head frame: +x the face, +y up; three.js sphere
+      // angle φ 0 is behind (−x), π in front.
+      const wrap = cloth;
+      wrap.side = THREE.DoubleSide;
+      const slit = 0.26 * Math.PI;
+      // Over the crown and brow, down to just above the eyes.
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 10, 0, Math.PI * 2, 0, 0.43 * Math.PI), wrap);
+      // Round the sides and back, below the brow: open in front for the eyes.
+      const sides = new THREE.Mesh(new THREE.SphereGeometry(1.17 * r, 20, 8, Math.PI + slit, Math.PI * 2 - 2 * slit, 0.42 * Math.PI, 0.38 * Math.PI), wrap);
+      // The veil across nose, mouth and chin, from under the eyes.
+      const veil = new THREE.Mesh(new THREE.SphereGeometry(1.2 * r, 14, 8, Math.PI - slit - 0.05, 2 * slit + 0.1, 0.53 * Math.PI, 0.3 * Math.PI), wrap);
+      // A fold at the brow, the edge of the wrap over the eyes.
+      const brow = new THREE.Mesh(new THREE.TorusGeometry(1.15 * r, 0.07 * r, 6, 24, Math.PI * 0.55), wrap);
+      brow.rotation.set(Math.PI / 2, 0, -Math.PI * 0.275);
+      brow.position.y = 0.2 * r;
+      // The cloth falling round the neck to the shoulders, behind and at the
+      // sides (CylinderGeometry's angle 0 is +z; behind, −x, is 3π/2), the
+      // veil's ends hanging in front.
+      const behind = Math.PI * 1.4;
+      const drape = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.5 * r, 1.5 * r, 18, 2, true, Math.PI * 1.5 - behind / 2, behind), wrap);
+      drape.position.set(-0.08 * r, -1.05 * r, 0);
+      const bib = new THREE.Mesh(new THREE.CylinderGeometry(0.95 * r, 1.25 * r, 0.9 * r, 10, 1, true, Math.PI * 0.5 - 0.6, 1.2), wrap);
+      bib.position.set(0.02 * r, -1.05 * r, 0);
+      group.add(bib);
+      group.add(crown, sides, veil, brow, drape);
+      break;
+    }
     case 'mingHat': {
       // The Ming soldier's iron helmet: a round crown, a wide brim almost
       // flat, a short spike and a red tassel at its foot.
@@ -2331,6 +2361,20 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       skirt.position.y = -length / 2;
       drape.group.add(skirt);
       dangles.push(drape);
+    } else if (extra.kind === 'juzu') {
+      // The monk's prayer beads (juzu): a long loop of wooden beads round the
+      // neck and down over the chest, every tenth bead larger. Rigid on the collar.
+      const wood = surface(new THREE.Color(color).getHex(), { roughness: 0.45 });
+      const width = (body.lengths.shoulderSpan ?? 0.4 * scale) * 0.32;
+      const count = 36;
+      for (let index = 0; index < count; index += 1) {
+        // Round the back of the neck, then a U down the front to the breastbone.
+        const angle = (index / count) * Math.PI * 2;
+        const front = Math.max(0, -Math.cos(angle));
+        const bead = new THREE.Mesh(new THREE.SphereGeometry((index % 9 ? 0.011 : 0.017) * scale, 8, 6), wood);
+        bead.position.set(-0.03 * scale + front * 0.21 * scale, 0.05 * scale - front * front * 0.3 * scale, Math.sin(angle) * width * (1 + 0.25 * front));
+        collar.add(bead);
+      }
     } else if (extra.kind === 'mantle') {
       // A great mantle from the shoulders to the ankles, open in front, soft
       // (softDrape: chains round the shoulders and down the back), a cross on

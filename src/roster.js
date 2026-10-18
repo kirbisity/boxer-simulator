@@ -38,6 +38,7 @@ export const WARRIORS = [
   // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
   { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true, legend: { order: 3, kicker: 'Great-armour samurai', line: 'The great archer of the Hōgen war, in ō-yoroi: the long yumi, then the blade.' } },
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
+  warrior('sohei', 'Musashibō Benkei', PRESETS.sohei),
   warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
   warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', calories: 4050, exercise: 0.75, sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
   warrior('archer', 'Nasu no Yoichi', PRESETS.bow),

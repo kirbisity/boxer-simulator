@@ -158,6 +158,19 @@ function steppeDesign(label, armor, deel, trim, head, feet = '#141210') {
   return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, leather: '#4a2e1a', ...armor }, head, feet: { kind: 'jinBoot', color: feet } };
 }
 // A rōnin: kosode, hakama, the cloak and his pieces of armour (roninDo); his sugegasa is worn loose (HEADGEAR kasa).
+// A sōhei, a warrior monk of the great temples (Enryakuji, Kōfukuji): the
+// white katō-zukin hood wrapped over the head and across the face to the
+// eyes, a dark monk's robe over a laced dō-maru with its shoulder boards,
+// the hakama, straw sandals, and the prayer beads (juzu) round the neck.
+function soheiDesign(label, { hood, robe, hakama, lacquer, lace, beads }) {
+  return {
+    label, top: { kind: 'kosode', color: robe }, bottom: { kind: 'hakama', color: hakama },
+    armor: { kind: 'lamellar', color: lacquer, lace, gold: '#8a7a5a', leather: '#3a2a1c', trim: false, sode: 0.9 },
+    head: { kind: 'katozukin', color: hood },
+    feet: { kind: 'sandal', color: '#6a4a2a' },
+    extras: [{ kind: 'mantle', color: robe, length: 1.05 }, { kind: 'juzu', color: beads }],
+  };
+}
 function roninDesign(label, { kosode, hakama, cloak, steel, lace, sash, band, gaiters }) {
   return {
     label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama },
@@ -1307,6 +1320,28 @@ export const OUTFITS = {
       roninDesign('Brown cloak, white kosode', { kosode: '#e4dfd2', hakama: '#4a3e34', cloak: '#4a3020', steel: '#2a2a2e', lace: '#2a3a6a', sash: '#e8e2d2', band: '#c9a23a', gaiters: '#5a6270' }),
       roninDesign('Grey cloak, indigo kosode', { kosode: '#2a3550', hakama: '#3a3a40', cloak: '#55534e', steel: '#3b3e44', lace: '#b3161b', sash: '#e8e2d2', band: '#b3161b', gaiters: '#2a2c30' }),
       roninDesign('Black cloak, grey kosode', { kosode: '#8a8780', hakama: '#2a2622', cloak: '#1c1a18', steel: '#6b4a32', lace: '#c9a23a', sash: '#d8cfb8', band: '#3a2416', gaiters: '#4a4a50' }),
+    ],
+  },
+  // Sōhei, the warrior monks: armoured as a samurai but for the helmet (the
+  // hood is cloth: a cut through it is a cut), the naginata their weapon
+  // and the katana at the hip; trained all their lives in the temple yards
+  // (`skill`), and steadied by their faith (`courage`).
+  sohei: {
+    skill: 0.95,
+    faction: 'japanese', plated: true,
+    label: 'Sōhei — warrior monk', movement: 'good', fists: 'bare',
+    arrowproof: true,
+    sidearm: 'katana',
+    extraMass: 0.3,
+    protection: {
+      blunt: 0.65, cut: 0.88, pierce: 0.6, bullet: { head: 0, torso: 0.4, limb: 0.05 },
+      regions: { head: { blunt: 0.08, cut: 0.12, pierce: 0.02 }, Forearm: { blunt: 0.1, cut: 0.2, pierce: 0.05 }, Shank: { blunt: 0.1, cut: 0.15, pierce: 0.05 } },
+    },
+    courage: 0.5,
+    designs: [
+      soheiDesign('White hood, black robe', { hood: '#ece7da', robe: '#1e1c22', hakama: '#3a3630', lacquer: '#1a1a1e', lace: '#2a2e3a', beads: '#6a3a2a' }),
+      soheiDesign('White hood, ochre kesa', { hood: '#e4ddcc', robe: '#7a5a22', hakama: '#2a2620', lacquer: '#2a1e14', lace: '#4a3a22', beads: '#7a3e2c' }),
+      soheiDesign('Grey hood, indigo robe', { hood: '#b8b4aa', robe: '#1f2a44', hakama: '#e8e2d2', lacquer: '#16161a', lace: '#5a1c1c', beads: '#4a2a20' }),
     ],
   },
   // A Chinese sea raider (wokou): a loose jacket, rolled trousers, a cloth
