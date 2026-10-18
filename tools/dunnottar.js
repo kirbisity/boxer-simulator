@@ -28,7 +28,7 @@ import { levelAware } from '../src/levelmode/adapter.js';
 import { createLevelWorld, levelThink, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
 import { interactions } from '../src/levelmode/interact.js';
 import { feetFloor, holdPlayer, useItem } from '../src/levelmode/items.js';
-import { regionContains, setMechanism, updateStage } from '../src/levelmode/stage.js';
+import { regionContains, setMechanism, stageFloor, updateStage } from '../src/levelmode/stage.js';
 import { OUTFITS } from '../src/outfits.js';
 import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 
@@ -429,6 +429,20 @@ class Run {
       return;
     }
     think(world, me, dt);
+    this.keepFromEdge();
+  }
+
+  /** A man in a fight does not step back off a cliff: if the way he is moving leads over a drop, he stops. */
+  keepFromEdge() {
+    const me = this.me;
+    const world = this.world;
+    const forward = [Math.cos(me.yaw), -Math.sin(me.yaw)];
+    const side = [forward[1], -forward[0]];
+    const floor = feetFloor(me);
+    const ahead = Math.sign(me.move) || 0;
+    const open = (dx, dz) => [0.9, 1.6].every((reach) => stageFloor(world, hipX(me) + dx * reach, hipZ(me) + dz * reach, floor) >= floor - 1.5);
+    if (ahead && !open(forward[0] * ahead, forward[1] * ahead)) me.move = 0;
+    if (me.strafe && !(open(side[0], side[1]) && open(-side[0], -side[1]))) me.strafe = 0;
   }
 
   /** After a fight, a poleaxe lying near (the answer to plate): walk to it and take it up. True while at it. */
@@ -690,7 +704,8 @@ const RESTS = Object.fromEntries(DUNNOTTAR.sections.filter((section) => section.
 export const SEGMENTS = {
   start_rest1: { from: null, to: 'rest1', note: 'the cliff path' },
   rest1_rest2: { from: 'rest1', to: 'rest2', note: 'gorge, gatehouse, oillet stair, ascent, quad' },
-  rest2_rest3: { from: 'rest2', to: 'rest3', note: 'vault, keep, stair tower, wall walk' },
+  rest2_rest2b: { from: 'rest2', to: 'rest2b', note: 'the quad, the cellar to the turnkey\'s fire' },
+  rest2b_rest3: { from: 'rest2b', to: 'rest3', note: 'keep, stair tower, wall walk' },
 };
 
 /** One walk of a segment from full health: { result: through | died | timeout, by, seconds, harm, bandages, tonics }. */

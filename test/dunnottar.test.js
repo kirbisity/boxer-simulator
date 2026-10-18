@@ -23,10 +23,10 @@ test('dunnottar: registered, sound, eight sections with the cast the spec calls 
   assert.deepEqual(DUNNOTTAR.sections.map((section) => section.id), ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel', 'cell']);
   const spawns = DUNNOTTAR.sections.flatMap((section) => section.spawns);
   const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead);
-  assert.ok(enemies.length >= 18 && enemies.length <= 32, `${enemies.length} enemies`);
+  assert.ok(enemies.length >= 12 && enemies.length <= 32, `${enemies.length} enemies`);
   assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 2);
   assert.ok(spawns.some((spawn) => spawn.role === 'boss' && spawn.preset === 'vaelen'));
-  assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest3']);
+  assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest2b', 'rest3']);
   assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'innerdoor', 'irongate', 'ladder1'].sort());
   const notes = DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'note').map((item) => item.note).sort();
   assert.deepEqual(notes, ['ledger', 'order', 'powder', 'servant', 'soldier']);

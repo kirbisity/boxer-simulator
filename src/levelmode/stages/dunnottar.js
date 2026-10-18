@@ -340,7 +340,6 @@ function buildGate() {
 
   // Men: a guard in the hall, one at the stair head, and the gunners behind the loops.
   dnSpawn(sec, 'hallguard', 'dunnottarGuard', 'enemy', 2, [-1.5, Y.gorge, 44.2], DN_FACE.S, { inputs: { name: 'Corporal Rae' } });
-  dnSpawn(sec, 'headguard', 'dunnottarSoldier', 'enemy', 1, [17.6, A, 49], DN_FACE.W, { inputs: { name: 'Fergus' } });
   dnSpawn(sec, 'gunner1', 'dunnottarMatchlock', 'enemy', 2, [23.4, A, 43.2], DN_FACE.W, { inputs: { name: 'Gunner Mackie' }, station: 'oillet', hole: 0 });
 
   dnItem(sec, 'note-powder', 'note', [3.6, Y.gorge, 42.9], { note: 'powder', lift: 0.9 });
@@ -560,7 +559,9 @@ function buildVault() {
   // The turnkey's end: a desk, a peg of keys, a brazier.
   dnProp(sec, 'table', [30.0, V, -25.2], { yaw: 0 });
   dnProp(sec, 'stool', [29.6, V, -24.2], { yaw: 0 });
-  dnProp(sec, 'brazier', [31.8, V, -19.8], { lit: true });
+  dnProp(sec, 'brazier', [31.8, V, -19.8], { lit: true, rest: true });
+  // Rest 2b: the turnkey's fire, past his post, before the stair up to the keep.
+  sec.rest = { id: 'rest2b', name: "The Turnkey's Fire", at: [31.2, V, -20.9] };
   dnProp(sec, 'keys', [31.6, V + 1.2, -26.4], {});
   dnProp(sec, 'barrel', [1.4, V, -25.6], { yaw: 0.3 });
   dnProp(sec, 'barrel', [2.6, V, -25.8], { yaw: 1.3 });
@@ -589,8 +590,7 @@ function buildVault() {
 
   // Men: skeletons are scenery; the jailers and the turnkey are not. Two prisoners behind the barred door.
   dnSpawn(sec, 'jailer1', 'dunnottarGuard', 'enemy', 2, [12, V, -21.4], DN_FACE.W, { inputs: { name: 'Jailer Wyllie' }, patrol: [[12, -21.4], [12, -24.2]] });
-  dnSpawn(sec, 'jailer2', 'dunnottarSoldier', 'enemy', 1, [20, V, -23.4], DN_FACE.W, { inputs: { name: 'Pate' } });
-  dnSpawn(sec, 'turnkey', 'turnkey', 'enemy', 2, [30.8, V, -22.4], DN_FACE.W, { inputs: { name: 'The Turnkey' } });
+  dnSpawn(sec, 'turnkey', 'turnkey', 'enemy', 2, [23.5, V, -22.4], DN_FACE.W, { inputs: { name: 'The Turnkey' } });
   dnSpawn(sec, 'miner', 'cabyMiner', 'prisoner', 0, [14.4, V, -33.2], DN_FACE.S, { inputs: { name: 'Bran the miner' }, follows: true });
   dnSpawn(sec, 'captive', 'cabySoldier', 'prisoner', 0, [18.8, V, -33.2], DN_FACE.S, { inputs: { name: 'One-Eye Colm' }, follows: true });
 
@@ -717,9 +717,7 @@ function buildTower() {
   // The garrison: a guard in the hall, a knight on the stair, then the wall: a guard, a knight, a crossbow, the last knight.
   dnSpawn(sec, 'keepguard', 'dunnottarGuard', 'enemy', 2, [51, Q, -19.4], DN_FACE.W, { inputs: { name: 'Sergeant Hay' } });
   const stairAt = windingTread(DN_SPIRAL, 36);
-  dnSpawn(sec, 'stairknight', 'dunnottarKnight', 'enemy', 3, [stairAt[0], Q + 37 * 0.15, stairAt[1]], Math.PI / 2 - (DN_SPIRAL.start + (DN_SPIRAL.turn / DN_SPIRAL.steps) * 36.5), { inputs: { name: 'Sir Calder' } });
-  dnSpawn(sec, 'wallguard', 'dunnottarGuard', 'enemy', 2, [55, W, -36.2], DN_FACE.E, { inputs: { name: 'Sergeant Dow' } });
-  dnSpawn(sec, 'wallknight1', 'dunnottarGuard', 'enemy', 2, [41, W, -36], DN_FACE.E, { inputs: { name: 'Sergeant Rannoch' } });
+  dnSpawn(sec, 'stairknight', 'dunnottarGuard', 'enemy', 2, [stairAt[0], Q + 37 * 0.15, stairAt[1]], Math.PI / 2 - (DN_SPIRAL.start + (DN_SPIRAL.turn / DN_SPIRAL.steps) * 36.5), { inputs: { name: 'Sergeant Calder' } });
   dnSpawn(sec, 'wallknight2', 'dunnottarKnight', 'enemy', 3, [10, L, -36.4], DN_FACE.E, { inputs: { name: 'Sir Lauder' } });
 
   const midStair = windingTread(DN_SPIRAL, 56);
