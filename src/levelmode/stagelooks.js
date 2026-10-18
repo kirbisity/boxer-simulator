@@ -24,6 +24,10 @@
 //   rain               { opacity: how visible the streaks, share: what part of the drops fall (0..1) } (opacity 0 is dry).
 //   wet                how soaked the stone is (0..1): darker, glossier, moss greener.
 //   pools              how much standing water lies on what faces up (0..1, optional): dark glassy patches that mirror the sky.
+//   bakedShadow        how much of the sun the castle's own shadow takes (0..1, optional, 0 if absent): the shadow of the walls on themselves, the ground and the rock, drawn once
+//                      from the look's sun when the look is put on (levelmode/kitshadow.js). It is the share of the sun's light, not of the sky's, that is lost in the shade,
+//                      so it should follow how much of a real sun there is: strong where one shines through the cloud, faint where it is only a brighter place in the overcast,
+//                      none where the light is the sky's own.
 //   lightning          { gap: [least, most] seconds between strikes, strength: how hard the flash lights the scene (1 is the old storm's) } or null for none.
 //   torch              how bright the torches and braziers burn (1: as built).
 //   shaft              a shaft of light through the cloud onto the castle: { colour, opacity, width (m) } or null.
@@ -50,6 +54,8 @@ export const STAGE_LOOKS = {
     rain: { opacity: 0.28, share: 0.8 },
     wet: 0.8,
     pools: 0.75,
+    // A warm sun through the tear, but the storm is still over most of the sky: the shade is deep, not black (the cloud fills it).
+    bakedShadow: 0.85,
     lightning: { gap: [7, 16], strength: 0.75 },
     torch: 0.9,
     shaft: { colour: [255, 206, 150], opacity: 0.15, width: 70 },
@@ -73,6 +79,8 @@ export const STAGE_LOOKS = {
     sea: { colour: 0x17202c, roughness: 0.42, metalness: 0.3, normal: 0.55, reflect: 1.1, scroll: 1 },
     rain: { opacity: 0.32, share: 1 },
     wet: 0.55,
+    // Only a pale break low in the west, a weak sun (0.8): the walls shade themselves a little.
+    bakedShadow: 0.35,
     lightning: { gap: [4, 11], strength: 1 },
     torch: 1,
     shaft: null,
@@ -96,6 +104,8 @@ export const STAGE_LOOKS = {
     sea: { colour: 0x1a2a38, roughness: 0.3, metalness: 0.35, normal: 0.5, reflect: 1.5, scroll: 0.8 },
     rain: { opacity: 0.2, share: 0.45 },
     wet: 0.75,
+    // The open break: a hard low sun (2.5) on the castle; the shade is only the cold fill.
+    bakedShadow: 1,
     lightning: { gap: [14, 28], strength: 0.3 },
     torch: 0.8,
     shaft: { colour: [255, 210, 150], opacity: 0.2, width: 70 },
@@ -119,6 +129,8 @@ export const STAGE_LOOKS = {
     sea: { colour: 0x7a8a8e, roughness: 0.55, metalness: 0.1, normal: 0.35, reflect: 0.6, scroll: 0.5 },
     rain: { opacity: 0.1, share: 0.25 },
     wet: 0.85,
+    // A haar: the light is all the sky's, nothing casts.
+    bakedShadow: 0,
     lightning: null,
     torch: 1.4,
     shaft: null,
@@ -142,6 +154,8 @@ export const STAGE_LOOKS = {
     sea: { colour: 0x080e1a, roughness: 0.25, metalness: 0.4, normal: 0.7, reflect: 1.4, scroll: 1.7 },
     rain: { opacity: 0.36, share: 0.9 },
     wet: 1,
+    // Night: the moon is behind the cloud and the only hard light is the lightning, which has no one direction for a baked shadow to hold.
+    bakedShadow: 0,
     lightning: { gap: [2.5, 6.5], strength: 1.5 },
     torch: 1.7,
     shaft: null,
@@ -165,6 +179,8 @@ export const STAGE_LOOKS = {
     sea: { colour: 0x2c3a3c, roughness: 0.55, metalness: 0.05, normal: 0.4, reflect: 0.3, scroll: 0.7 },
     rain: { opacity: 0.16, share: 0.4 },
     wet: 0.6,
+    // Flat overcast: soft light from everywhere, nothing casts.
+    bakedShadow: 0,
     lightning: null,
     torch: 0.6,
     shaft: null,
@@ -188,6 +204,8 @@ export const STAGE_LOOKS = {
     sea: { colour: 0x2a2a3a, roughness: 0.28, metalness: 0.35, normal: 0.5, reflect: 1.6, scroll: 0.7 },
     rain: { opacity: 0, share: 0 },
     wet: 0.8,
+    // A real low gold sun (2.6) after the storm: long clean shadows down the path.
+    bakedShadow: 1,
     lightning: null,
     torch: 0.9,
     shaft: { colour: [255, 190, 120], opacity: 0.14, width: 90 },

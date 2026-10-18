@@ -18,7 +18,9 @@ import { ceilingAt, pushOut } from '../physics/terrain.js';
 import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
 import { stormFollow, stormTorch } from './storm.js';
-import { ktDispose, ktMaterials, ktRandom } from './kittex.js';
+import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
+import { skyDirection } from './stagesky.js';
+import { ktDispose, ktMaterials, ktRandom, ktWeather } from './kittex.js';
 
 const KIT_SLAB_TOP = { grass: 'grass', path: 'path', rock: 'rock', flags: 'flags', cobble: 'cobble', boards: 'boards', stone: 'ashlar' };
 const KIT_WALL = { ashlar: 'ashlar', rubble: 'rubble', ruin: 'ruin', rock: 'rock', tower: 'ashlar', parapet: 'ashlar' };
@@ -1162,6 +1164,7 @@ export function createCastleView(stage) {
     // Under a roof the sky is not what the wet stone shows: its reflections fade (and come back in the open).
     state.shelter += ((indoors ? 0.1 : 1) - state.shelter) * Math.min(1, dt * 4);
     for (const [name, base] of Object.entries(state.reflect)) mats[name].envMapIntensity = base * state.shelter;
+    ktWeather.uKitPoolSky.value = state.shelter;
     // What the camera can see (when it is given): a section outside its frustum is not drawn or animated at all; one beside
     // the sections the man is in is drawn in detail only if the way between them is in view (else its silhouette, which is
     // what is behind a wall); the frustum culling of the meshes does the rest.
@@ -1271,7 +1274,40 @@ export function createCastleView(stage) {
     mats.water.needsUpdate = true;
   };
 
+  /**
+   * Bake the castle's shadow for a look (levelmode/kitshadow.js): the land and every section's detail, seen once from the look's sun, into a map the kit's shaders
+   * read. `look.bakedShadow` (0..1) is how much of the sun the shadow takes; 0 (or none) frees the map. Costs one draw of the castle, at a look's change; none in play.
+   * Returns the milliseconds it took.
+   */
+  view.bakeShadow = (renderer, look) => {
+    const strength = look.bakedShadow ?? 0;
+    if (!state.casters) {
+      // What casts: the opaque kit meshes of the land and of each section's detail, but not the gates (they move), the things to take, the flames and ravens.
+      const opaque = new Set(['ashlar', 'ruin', 'rubble', 'rock', 'cobble', 'flags', 'grass', 'path', 'boards', 'wood', 'iron', 'bone', 'cloth', 'straw', 'black'].map((name) => mats[name]));
+      const skip = new Set();
+      for (const entry of Object.values(parts)) {
+        for (const owner of [...entry.moving, ...entry.marks, entry.dynamic]) owner.group.traverse((object) => skip.add(object));
+      }
+      state.casters = [];
+      for (const root of [land, ...Object.values(parts).map((entry) => entry.detail.group)]) {
+        root.traverse((object) => {
+          if (object.isMesh && opaque.has(object.material) && !skip.has(object)) state.casters.push(object);
+        });
+      }
+    }
+    // (Every section's detail is drawn for it, whether or not it is near the player now.)
+    const holders = Object.values(parts).flatMap((entry) => [entry.detail.group, entry.far.group]).map((holder) => [holder, holder.visible]);
+    for (const entry of Object.values(parts)) {
+      entry.detail.group.visible = true;
+      entry.far.group.visible = false;
+    }
+    state.shadowMs = ktShadowBake(renderer, group, state.casters, skyDirection(look.sun.az, look.sun.el), strength, stage.id);
+    for (const [holder, visible] of holders) holder.visible = visible;
+    return state.shadowMs;
+  };
+
   view.dispose = () => {
+    ktShadowRelease();
     group.traverse((object) => {
       object.geometry?.dispose();
     });

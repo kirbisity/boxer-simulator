@@ -80,3 +80,14 @@ test('the noise the stone is painted from tiles, and the macro map has four chan
   for (let k = 0; k < data.length; k += 1) mean[k % 4] += data[k] / (64 * 64);
   assert.ok(mean.every((m) => m > 5 && m < 250), `each channel has something in it: ${mean.map((m) => m.toFixed(0))}`);
 });
+
+test('the castle shadows itself in the looks that have a sun, and not in those that have only sky', () => {
+  for (const [name, look] of Object.entries(STAGE_LOOKS)) {
+    const strength = look.bakedShadow ?? 0;
+    assert.ok(strength >= 0 && strength <= 1, `${name}: bakedShadow is 0..1`);
+    // A shadow is a share of the sun's light: a look whose sun is weak cannot have a hard one, and one with a real sun (a shaft through the cloud) has it deep.
+    if (look.sun.intensity < 0.6) assert.ok(strength <= 0.35, `${name}: a weak sun, a faint shadow`);
+    if (look.shaft && look.sun.intensity > 1.5) assert.ok(strength >= 0.8, `${name}: a hard sun, a deep shadow`);
+  }
+  assert.ok(STAGE_LOOKS[DEFAULT_STAGE_LOOK].bakedShadow > 0, 'the default look has the shadow it was asked for');
+});

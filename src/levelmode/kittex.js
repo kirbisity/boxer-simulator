@@ -9,6 +9,7 @@
 // north faces, the tops of things and in the dark of a crevice) and rain streaks running down the walls; wet stone darker and
 // glossier where the vertex colour says the wall is in shadow at its foot; and a fog that thickens toward the sea (height fog).
 
+import { KT_SHADOW_FUNCTION, KT_SHADOW_PARS, ktShadow, ktShadowInit } from './kitshadow.js';
 import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
 
 export { ktRandom } from './kitpaint.js';
@@ -91,9 +92,10 @@ function ktMacroTexture() {
 /**
  * What the weather does to every surface of the stage, and what the fog does with height: shared by all its materials, set by the stage's look
  * (stagelooks.js). `uKitWet` (0..1): how soaked the stone is. `uKitFog`: (density per metre at the base, the height (m) it is at full density below,
- * how fast it thins above that (per metre), 0).
+ * how fast it thins above that (per metre), 0). `uKitPools`: how much standing water lies on the paving (0..1). `uKitPoolSky` (0..1): how much of the sky the puddles
+ * show: all in the open, a tenth under a roof (kit.js).
  */
-export const ktWeather = { uKitWet: { value: 0.3 }, uKitPools: { value: 0 }, uKitFog: { value: null } };
+export const ktWeather = { uKitWet: { value: 0.3 }, uKitPools: { value: 0 }, uKitPoolSky: { value: 1 }, uKitFog: { value: null } };
 
 // ---- the cut-away and the detail -----------------------------------------------------------------------
 
@@ -141,11 +143,12 @@ const ktMapChunk = (two, pools = 0) => `
   #endif
   kitWet = clamp(uKitWet * (0.35 + 1.6 * smoothstep(0.08, 0.5, kitShade) + 0.7 * smoothstep(0.45, 0.8, kitM.b)), 0.0, 1.0);
   diffuseColor.rgb *= 1.0 - 0.34 * kitWet;
-  // Standing water on what faces up: patches from a broader read of the macro map, dark and glassy (the sky in them).
+  // Standing water on what faces up: patches from a broader read of the macro map. The water is a mirror (the sky in it: see KT_POOL_SKY), so the stone under it
+  // is only a little darker, and darker at the middle of a puddle than at its rim (a thin film there: the stone shows through it).
   float kitFlat = smoothstep(0.85, 0.97, kitN.y);
   float kitPoolNoise = texture2D(uKitMacro, kitP * 0.19 + vec2(0.43, 0.71)).b + 0.3 * (kitM.b - 0.5);
   kitPool = uKitPools * ${pools.toFixed(2)} * kitFlat * smoothstep(0.47, 0.54, kitPoolNoise);
-  diffuseColor.rgb *= 1.0 - 0.45 * kitPool;
+  diffuseColor.rgb *= 1.0 - kitPool * (0.12 + 0.12 * smoothstep(0.5, 0.62, kitPoolNoise));
   kitWet = max(kitWet, kitPool);
   // Moss: in patches, thicker on north faces and on tops, thicker in the dark of a crevice.
   float kitUp = smoothstep(0.3, 0.95, kitN.y);
@@ -156,6 +159,21 @@ const ktMapChunk = (two, pools = 0) => `
   diffuseColor.rgb *= 1.0 - uKitDetail.w * kitM.a * (1.0 - kitUp) * (0.3 + 0.7 * kitWet);
 #endif
 `;
+
+/**
+ * What a puddle shows: the look's sky (the environment the wet stone uses), mirrored in a flat surface and seen at the angle the camera has to it (the shader's
+ * own Fresnel makes it faint looking down and strong looking along), brighter than the stone's own gloss (\`gain\`), a little stirred (the ripple), and faded
+ * under a roof (\`uKitPoolSky\`). It replaces the stone's reflection where there is water, by how much water there is.
+ */
+const KT_POOL_SKY = `
+#if defined( USE_ENVMAP ) && defined( RE_IndirectSpecular ) && defined( USE_MAP )
+  if (kitPool > 0.003) {
+    vec3 kitUp = (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
+    vec3 kitStir = (viewMatrix * vec4(kitM.r - 0.5, 0.0, kitM.g - 0.5, 0.0)).xyz;
+    vec3 kitSky = getLightProbeIndirectRadiance(geometry.viewDir, normalize(kitUp + kitStir * 0.06), 0.04, maxMipLevel) / max(envMapIntensity, 0.02);
+    radiance = mix(radiance, (kitSky * 1.9 + vec3(0.05, 0.05, 0.06)) * uKitPoolSky, kitPool);
+  }
+#endif`;
 
 /** The fog chunk: the stage's distance fog, thickened with height (a mist that lies on the sea and the low ground and thins above). */
 const KT_FOG = `
@@ -169,13 +187,30 @@ const KT_FOG = `
 `;
 
 /**
- * Give a material the castle's shader: the cut-away (`cutaway`), the detail over its map (`detail`: { macro, hue, moss, streak, two }) and the height fog
- * (any material that has fog on). Patched once, before its first draw.
+ * three's own lights chunk with one line added: the light that comes from the sun (the directional one that points where the look's sun is: the rim light is another)
+ * is multiplied by how much of it the baked map lets through (kitshadow.js). The ambient (the probe, the hemisphere) is not.
  */
-export function ktPatch(material, { cutaway = false, detail = null, fog = true } = {}) {
+let ktSunChunk = null;
+function ktSunShaded() {
+  if (!ktSunChunk) {
+    const line = 'getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );';
+    const own = THREE.ShaderChunk.lights_fragment_begin;
+    ktSunChunk = own.includes(line)
+      ? `float kitSunShadeNow = kitSunShade(vKitPos, normalize(vKitNrm));\n  vec3 kitSunView = normalize((viewMatrix * vec4(uKitSunDir, 0.0)).xyz);\n${own.replace(line, `${line}\n\t\tdirectLight.color *= mix(1.0, kitSunShadeNow, step(0.995, dot(directLight.direction, kitSunView)));`)}`
+      : '#include <lights_fragment_begin>';
+  }
+  return ktSunChunk;
+}
+
+/**
+ * Give a material the castle's shader: the cut-away (`cutaway`), the detail over its map (`detail`: { macro, hue, moss, streak, two }), the height fog
+ * (any material that has fog on) and the baked shadow of the castle on the sun's light (`shadow`: kitshadow.js). Patched once, before its first draw.
+ */
+export function ktPatch(material, { cutaway = false, detail = null, fog = true, shadow = false } = {}) {
   const two = detail ? detail.two ?? 0 : 0;
   const mean = material.map?.kitMean ?? [0.5, 0.5, 0.5];
   ktWeather.uKitFog.value ??= new THREE.Vector4(0, 0, 0.05, 0);
+  if (shadow) ktShadowInit();
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = `varying vec3 vKitPos;\nvarying vec3 vKitNrm;\n${shader.vertexShader}`.replace(
       '#include <begin_vertex>',
@@ -194,11 +229,18 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true }
       shader.uniforms.uKitMean = { value: new THREE.Vector3(...mean) };
       shader.uniforms.uKitWet = ktWeather.uKitWet;
       shader.uniforms.uKitPools = ktWeather.uKitPools;
-      uniforms += 'uniform sampler2D uKitMacro;\nuniform vec4 uKitDetail;\nuniform vec3 uKitMean;\nuniform float uKitWet;\nuniform float uKitPools;\n';
+      shader.uniforms.uKitPoolSky = ktWeather.uKitPoolSky;
+      uniforms += 'uniform sampler2D uKitMacro;\nuniform vec4 uKitDetail;\nuniform vec3 uKitMean;\nuniform float uKitWet;\nuniform float uKitPools;\nuniform float uKitPoolSky;\n';
       fragment = fragment
         .replace('#include <map_fragment>', ktMapChunk(two, detail.pools ?? 0))
         .replace('void main() {', 'void main() {\n  float kitWet = 0.0;\n  float kitPool = 0.0;')
+        .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>${KT_POOL_SKY}`)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor *= 1.0 - 0.5 * kitWet;\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);');
+    }
+    if (shadow) {
+      Object.assign(shader.uniforms, ktShadow);
+      uniforms += KT_SHADOW_PARS;
+      fragment = fragment.replace('#include <lights_pars_begin>', `#include <lights_pars_begin>\n${KT_SHADOW_FUNCTION}`).replace('#include <lights_fragment_begin>', ktSunShaded());
     }
     if (fog) {
       shader.uniforms.uKitFog = ktWeather.uKitFog;
@@ -207,7 +249,7 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true }
     }
     shader.fragmentShader = `${uniforms}${fragment}`;
   };
-  material.customProgramCacheKey = () => `kit-${cutaway ? 'c' : ''}${detail ? `d${two}` : ''}${fog ? 'f' : ''}`;
+  material.customProgramCacheKey = () => `kit-${cutaway ? 'c' : ''}${detail ? `d${two}p${detail.pools ?? 0}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
 }
 
 /** Tell the castle's materials where the camera and the man are: the tube between them is let through. */
@@ -256,15 +298,15 @@ export function ktMaterials() {
   m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 });
   m.wood = make(ktTexture(128, 20, (g, s, r) => ktBoards(g, s, r, [70, 52, 36])), 2, { roughness: 0.85 });
   m.iron = make(ktTexture(128, 21, ktIron), 1.5, { roughness: 0.45, metalness: 0.55 });
-  for (const name of Object.keys(detail)) ktPatch(m[name], { cutaway: true, detail: detail[name] });
+  for (const name of Object.keys(detail)) ktPatch(m[name], { cutaway: true, detail: detail[name], shadow: true });
   const flat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, vertexColors: true, roughness: 0.9, ...options });
   m.bone = flat(0xb9b29a, { roughness: 0.8 });
   m.cloth = flat(0x6a3a32, { roughness: 0.95, side: THREE.DoubleSide });
   m.straw = flat(0x8a7a4a, { roughness: 1 });
   m.black = flat(0x101114, { roughness: 0.9 });
-  for (const name of ['bone', 'cloth', 'straw', 'black']) ktPatch(m[name], { cutaway: true });
+  for (const name of ['bone', 'cloth', 'straw', 'black']) ktPatch(m[name], { cutaway: true, shadow: true });
   m.silhouette = flat(0x23252b, { roughness: 1 });
-  ktPatch(m.silhouette);
+  ktPatch(m.silhouette, { shadow: true });
   m.flame = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   m.glow = new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   m.raven = flat(0x0b0c10, { roughness: 0.6 });

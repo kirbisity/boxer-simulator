@@ -1171,6 +1171,7 @@ function chooseStageLook(name, options) {
     }
   }
   stageView?.setEnvironment?.(stormEnvironment(scene.renderer));
+  stageView?.bakeShadow?.(scene.renderer, STAGE_LOOKS[chosen]);
   document.body.style.setProperty('--stage-vignette', STAGE_LOOKS[chosen].vignette);
   stageLookSelect.value = chosen;
   return { look: chosen, looks: stageLookNames() };
