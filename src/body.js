@@ -387,7 +387,7 @@ export const PRESETS = {
   },
   revolver: {
     name: 'Lady Ashford', style: 'revolver', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2550,
-    outfit: { kind: 'victorianLady', design: 0 }, accessories: [],
+    outfit: { kind: 'victorianLady', design: 0 }, accessories: ['hairDecor'],
     look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#4a2a1a', facialHair: 'none', eyeColor: 'green' },
   },
   // Armed SWAT: an 80 kg officer with a service pistol, in the full kit.

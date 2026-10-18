@@ -1398,6 +1398,8 @@ export const OUTFITS = {
   victorianLady: {
     faction: 'street',
     label: 'Victorian — corset and gown', movement: 'limited', fists: 'bare',
+    // Her hair decoration (the gothic flower, the tilted hat's plume, the widow's cap) is hers to wear or leave off: the headgear choice; on to begin with.
+    optionalHead: 'hairDecor', headgear: ['hairDecor'], defaultHeadgear: 'hairDecor',
     protection: { blunt: 0, cut: 0.3, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
     // Dealt: the three silhouettes of the reign, and the gothic high-low (design 4, chosen 2026-10-08).
     picked: [0, 1, 2, 4],
@@ -1521,6 +1523,8 @@ export const HEADGEAR = {
   // A straw hat tied loosely under the chin: a hard blow or a fall takes it off.
   kasa: { label: 'Kasa', knock: 0.3, falls: true, icon: '👒' },
   // A cut on the helmet carrying at least `cutFrom` J of edge takes the crest off with it.
+  // A lady's hair decoration (the design's own head piece, shown or not: OUTFITS optionalHead); never knocked off.
+  hairDecor: { label: 'Hair decoration', knock: 0, falls: false, icon: '🌸' },
   crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6 },
 };
 

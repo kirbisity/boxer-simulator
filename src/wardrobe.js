@@ -3,7 +3,7 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
-import { heelLift, outfitOf, resolveColor } from './outfits.js';
+import { heelLift, OUTFITS, outfitOf, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
@@ -36,7 +36,10 @@ export function dressFor(inputs, cornerHex) {
   // lacing, the helmet), and a banner on the back (sashimono).
   const tint = inputs.outfit?.tint;
   const armor = look.armor && tint ? { ...look.armor, color: tint.armor ?? look.armor.color, lace: tint.lace ?? look.armor.lace } : look.armor;
-  const head = look.head && tint?.armor ? { ...look.head, color: tint.armor, lace: tint.lace ?? look.head.lace } : look.head;
+  // A head piece that is the wearer's choice (a lady's hair decoration: OUTFITS `optionalHead`) is drawn only when she has it on.
+  const optionalHead = OUTFITS[kind]?.optionalHead;
+  const headChosen = !optionalHead || (inputs.accessories ?? []).includes(optionalHead);
+  const head = !headChosen ? null : look.head && tint?.armor ? { ...look.head, color: tint.armor, lace: tint.lace ?? look.head.lace } : look.head;
   return { kind, design, look, top, bottom, armor, feet, head, extras: look.extras ?? [], tattoo: look.tattoo, female, color, banner: inputs.outfit?.banner ?? null };
 }
 

@@ -117,3 +117,23 @@ test('fear: the deadlier his weapon than mine, the more I fear; equal arms littl
   };
   assert.ok(share(0, null) < share(-0.9, 'rifle') - 0.3, `kept with adrenaline: even ${share(0, null).toFixed(2)}, hopeless ${share(-0.9, 'rifle').toFixed(2)}`);
 });
+
+test('a Victorian lady\'s hair decoration is hers to wear or leave off', async () => {
+  // dressFor is the wardrobe's; it only needs THREE to be defined when the module loads.
+  const stub = new Proxy(function () {}, { get: () => stub, construct: () => ({}), apply: () => stub });
+  globalThis.THREE = stub;
+  try {
+    const { dressFor } = await import('../src/wardrobe.js');
+    const { headgearOptions, defaultHeadgear } = await import('../src/outfits.js');
+    const lady = (design, accessories) => ({ ...structuredClone(PRESETS.victorianLady), outfit: { kind: 'victorianLady', design }, accessories });
+    assert.ok(headgearOptions('victorianLady').includes('hairDecor'), 'offered');
+    assert.deepEqual(defaultHeadgear('victorianLady'), ['hairDecor'], 'on to begin with');
+    for (const design of [1, 2, 4]) {
+      assert.ok(dressFor(lady(design, ['hairDecor']), 0).head, `design ${design}: the decoration on`);
+      assert.equal(dressFor(lady(design, []), 0).head, null, `design ${design}: and left off`);
+    }
+    assert.ok(dressFor({ ...structuredClone(PRESETS.knight) }, 0).head, 'a knight\'s helmet is not optional');
+  } finally {
+    delete globalThis.THREE;
+  }
+});

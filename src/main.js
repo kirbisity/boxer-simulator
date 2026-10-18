@@ -1008,6 +1008,20 @@ $('#banner-menu').addEventListener('click', () => goHome());
 $('#banner-retry').addEventListener('click', newBout);
 $('#open-menu').addEventListener('click', () => goHome());
 
+// The sandbox's tools sit in a panel behind the Sandbox button at the top: a tap opens it, another (or Esc, or a tap outside, or the choice of Watch / Play / Build) closes it.
+function setSandboxPanel(open) {
+  document.body.classList.toggle('sandbox-open', open);
+  $('#sandbox-menu').setAttribute('aria-expanded', String(open));
+}
+$('#sandbox-menu').addEventListener('click', () => setSandboxPanel(!document.body.classList.contains('sandbox-open')));
+document.addEventListener('pointerdown', (press) => {
+  if (document.body.classList.contains('sandbox-open') && !press.target.closest('#sandbox-panel, #sandbox-menu, .menu-popup')) setSandboxPanel(false);
+});
+window.addEventListener('keydown', (press) => { if (press.key === 'Escape') setSandboxPanel(false); });
+$('#modes').addEventListener('click', () => setSandboxPanel(false));
+$('#open-builder').addEventListener('click', () => setSandboxPanel(false));
+$('#open-menu').addEventListener('click', () => setSandboxPanel(false));
+
 // The fighter the player controls: his side's lead (the side is chosen with the Play buttons).
 const player = () => state.world.fighters.find((fighter) => fighter.corner === state.playSide) ?? state.world.fighters[0];
 // Keys: punches on the right hand's home row, kicks and knees above and

@@ -66,38 +66,42 @@
 
   <footer class="controls">
     <button id="open-menu" class="menu-button">☰ Menu</button>
-    <div class="seg sandbox-only" id="layers" aria-label="Layer">
-      <button data-value="skin" class="on">Skin</button>
-      <button data-value="muscle">Muscle</button>
-      <button data-value="bone">Bone</button>
-      <button data-value="physics">Physics</button>
-    </div>
-    <label class="teams look-pick sandbox-only" aria-label="Look" title="How the game is drawn: the toon look as it has always been, or another approach to compare (also ?look=<id>)"><span>Look</span><select id="look"></select></label>
-    <div class="seg" id="speeds" aria-label="Speed">
-      <button data-value="0.25">¼×</button>
-      <button data-value="1" class="on">1×</button>
-      <button data-value="4">4×</button>
-    </div>
-    <div class="teams sandbox-only" aria-label="Fighters a side">
-      <label class="team red"><span>Red</span><select id="team-red"></select></label>
-      <button class="dice" data-corner="red" title="Re-roll Red's other fighters as anyone at random">🎲</button>
-      <span class="versus">v</span>
-      <label class="team blue"><span>Blue</span><select id="team-blue"></select></label>
-      <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random">🎲</button>
-    </div>
-    <label class="teams scene-pick sandbox-only" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option><option value="meadow">Village green</option><option value="stadium">Stadium</option><option value="town">Town square</option><option value="port">Port at night</option><option value="sengoku">Sengoku battlefield</option><option value="plain">Valley of Mexico</option><option value="coastFort">Shore and fort</option><option value="coastVillage">Coastal village</option><option value="field">Open field</option></select></label>
-    <button type="button" id="mounted" class="mount-pick sandbox-only" title="Put everyone who can ride on horseback, or all on foot; each fighter's own choice is in Build fighters">🐎 Mount all</button>
-    <label class="teams still-pick sandbox-only" aria-label="Stand still or crawl" title="That side stands still, no guard, no blows (a target for testing armour), or goes down on its knees and crawls (still in the fight)"><span>Stand still</span><select id="stand-still"><option value="">Nobody</option><option value="red">Red</option><option value="blue">Blue</option><option value="crawl:red">Red crawls</option><option value="crawl:blue">Blue crawls</option></select></label>
-    <div class="seg" id="modes" aria-label="Mode">
-      <button data-value="watch" class="on">Watch</button>
-      <button data-value="play">Play red</button>
-      <button data-value="play" data-side="blue">Play blue</button>
+    <!-- The sandbox's tools: out of sight until the Sandbox button at the top is tapped, so the view is clear and the footer is the same as in any game. -->
+    <button type="button" id="sandbox-menu" class="sandbox-menu sandbox-only" aria-expanded="false" aria-controls="sandbox-panel" title="Layers, scene, teams, who stands still, watch or play, and the fighter builder">⚙ Sandbox</button>
+    <div class="sandbox-panel sandbox-only" id="sandbox-panel" role="group" aria-label="Sandbox tools">
+      <div class="seg sandbox-only" id="layers" aria-label="Layer">
+        <button data-value="skin" class="on">Skin</button>
+        <button data-value="muscle">Muscle</button>
+        <button data-value="bone">Bone</button>
+        <button data-value="physics">Physics</button>
+      </div>
+      <label class="teams look-pick sandbox-only" aria-label="Look" title="How the game is drawn: the toon look as it has always been, or another approach to compare (also ?look=<id>)"><span>Look</span><select id="look"></select></label>
+      <div class="seg" id="speeds" aria-label="Speed">
+        <button data-value="0.25">¼×</button>
+        <button data-value="1" class="on">1×</button>
+        <button data-value="4">4×</button>
+      </div>
+      <div class="teams sandbox-only" aria-label="Fighters a side">
+        <label class="team red"><span>Red</span><select id="team-red"></select></label>
+        <button class="dice" data-corner="red" title="Re-roll Red's other fighters as anyone at random">🎲</button>
+        <span class="versus">v</span>
+        <label class="team blue"><span>Blue</span><select id="team-blue"></select></label>
+        <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random">🎲</button>
+      </div>
+      <label class="teams scene-pick sandbox-only" aria-label="Scene"><span>Scene</span><select id="place"><option value="ring">Ring</option><option value="colosseum">Colosseum</option><option value="subway">Subway</option><option value="meadow">Village green</option><option value="stadium">Stadium</option><option value="town">Town square</option><option value="port">Port at night</option><option value="sengoku">Sengoku battlefield</option><option value="plain">Valley of Mexico</option><option value="coastFort">Shore and fort</option><option value="coastVillage">Coastal village</option><option value="field">Open field</option></select></label>
+      <button type="button" id="mounted" class="mount-pick sandbox-only" title="Put everyone who can ride on horseback, or all on foot; each fighter's own choice is in Build fighters">🐎 Mount all</button>
+      <label class="teams still-pick sandbox-only" aria-label="Stand still or crawl" title="That side stands still, no guard, no blows (a target for testing armour), or goes down on its knees and crawls (still in the fight)"><span>Stand still</span><select id="stand-still"><option value="">Nobody</option><option value="red">Red</option><option value="blue">Blue</option><option value="crawl:red">Red crawls</option><option value="crawl:blue">Blue crawls</option></select></label>
+      <div class="seg" id="modes" aria-label="Mode">
+        <button data-value="watch" class="on">Watch</button>
+        <button data-value="play">Play red</button>
+        <button data-value="play" data-side="blue">Play blue</button>
+      </div>
+      <button id="open-builder" class="primary sandbox-only">Build fighters</button>
     </div>
     <!-- How the player attacks in a fight (fightui/toggle.js): tapping his man, or a button for each kind of blow; the key shows the colours. -->
     <div class="seg fu-pick" id="fightui-pick" role="group" aria-label="Controls"><span class="fu-pick-label">Controls</span><button type="button" data-value="target">Body</button><button type="button" data-value="buttons">Buttons</button><button type="button" class="fu-pick-key" aria-label="Colours of the blows" aria-expanded="false" title="Colours of the blows">🎨</button></div>
     <button id="pause">Pause</button>
     <button id="restart">Restart</button>
-    <button id="open-builder" class="primary sandbox-only">Build fighters</button>
   </footer>
 
   <div class="builder" id="builder" hidden>
