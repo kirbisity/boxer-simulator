@@ -314,7 +314,7 @@ function readEvents(world, aware) {
       for (const [one, two] of [[event.attacker, event.defender], [event.defender, event.attacker]]) {
         const mind = aware.minds[one];
         const other = world.fighters[two];
-        if (mind && other && mind.kind === 'guard' && other.corner === 'red') alarm(world, aware, mind, world.fighters[one], 'bump', other);
+        if (mind && other && mind.kind === 'guard' && other.corner === 'red' && !world.stage.ghost) alarm(world, aware, mind, world.fighters[one], 'bump', other);
       }
       continue;
     }
@@ -518,6 +518,14 @@ function doReturn(world, aware, mind, fighter) {
 
 function lookGuard(world, aware, mind, fighter) {
   const config = aware.config;
+  // Ghost walk (a designer's debug, the sandbox): the garrison neither sees nor hears him; a hunt already on is given up.
+  if (world.stage.ghost) {
+    if (mind.state === 'aggro' || mind.state === 'search') setState(world, aware, mind, fighter, 'return', 'ghost');
+    if (mind.state === 'idle') doIdle(world, aware, mind, fighter);
+    else if (mind.state === 'patrol') doPatrol(world, aware, mind, fighter);
+    else if (mind.state === 'return') doReturn(world, aware, mind, fighter);
+    return;
+  }
   if (mind.state === 'aggro') {
     lookAggro(world, aware, mind, fighter);
     return;

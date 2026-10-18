@@ -1117,6 +1117,12 @@ document.addEventListener('pointerdown', (press) => {
 window.addEventListener('keydown', (press) => { if (press.key === 'Escape') setSandboxPanel(false); });
 $('#modes').addEventListener('click', () => setSandboxPanel(false));
 $('#open-builder').addEventListener('click', () => setSandboxPanel(false));
+// The sandbox's ghost walk: the Dunnottar stage, unseen by its garrison, to walk and look it over.
+$('#ghost-walk').addEventListener('click', () => {
+  setSandboxPanel(false);
+  enterStage('dunnottar', { ghost: true });
+  boxer.finishBuilding();
+});
 $('#open-menu').addEventListener('click', () => setSandboxPanel(false));
 
 // The fighter the player controls: his side's lead (the side is chosen with the Play buttons).
@@ -1671,6 +1677,7 @@ let goHome = () => {};
 
 /** Show which part of the game is on: the footer keeps only what it uses. */
 function setGame(game, next = null) {
+  document.body.classList.remove('ghost-walk');
   if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
   if (game !== 'tutorial') {
     // Out of the yard, however he left it (finished, skipped, the menu): a next visit opens on the home screen.
@@ -1878,14 +1885,17 @@ let stageView = null;
 let awarenessOverlay = null;
 
 /** Open a stage in play mode: the player (walking) at its start, the world of terrain drawn in grey boxes. */
-function enterStage(key) {
+function enterStage(key, { ghost = false } = {}) {
   const stage = STAGES[key];
   if (!stage) throw new Error(`no stage called ${key}`);
-  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key) });
+  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key, { ghost }) });
   state.scenario = null;
   state.seed += 1;
   // The operative (a fixed preset), in his combat stance: the stick within the run threshold fights, past it runs (control.js).
   state.world = createLevelWorld(stage, levelPreset('forger'), { seed: state.seed });
+  // Ghost walk (the sandbox's debug for designing the stage): the garrison never notices him (levelmode/awareness.js).
+  state.world.stage.ghost = ghost;
+  document.body.classList.toggle('ghost-walk', ghost);
   clearGore(scene);
   // (A stage may be set in a place of its own: the storm of Dunnottar, levelmode/storm.js.)
   const place = stage.place ?? 'stage';
@@ -2373,9 +2383,9 @@ const boxer = window.boxer = {
   // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.
   level: chooseLevel,
   // Level mode: open a stage (a key of STAGES, levelmode/stages.js) in play mode, walking; returns the sections active at its start.
-  levelMode: (key = 'testyard') => {
+  levelMode: (key = 'testyard', options = {}) => {
     menus.close();
-    enterStage(key);
+    enterStage(key, options);
     boxer.finishBuilding();
     return state.world.stage.active;
   },

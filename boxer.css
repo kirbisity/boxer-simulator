@@ -776,3 +776,6 @@ body.playing .sandbox-panel { top: calc(48px + env(safe-area-inset-top, 0px)); }
   .boss-track { height: 9px; }
   .boss-title { display: none; }
 }
+
+/* Ghost walk (the sandbox's stage debug): a quiet tag by the clock, so it is never mistaken for the real stage. */
+body.ghost-walk #clock::after { content: ' · 👻 Ghost'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
