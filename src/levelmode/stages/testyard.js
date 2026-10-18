@@ -10,10 +10,18 @@
 //     - the corridor: walls, a low ceiling, an iron gate (closed) and its lever
 //   hall (x 30..50, z -10..10): three men standing dormant until the player comes down the corridor,
 //     a civilian and a prisoner (neutral), a bandage, a rest point.
+//   vault (x 50..76, z -10..10; stages/testyard-vault.js): an iron gate opened by hand from the hall
+//     side, a key and a note, a cell with a prisoner behind a locked door, a matchlock gunner with
+//     damp powder, and a boss dummy with a health bar.
+//
+// The player's systems (levelmode/level.js) are shown here: in the yard, bandages, a note, a rest
+// point by the start, a fallen knight in better harness to loot, a lever and its gate, and a ladder
+// to kick down from the 6 m ledge.
 //
 // Written with the terrain builders (physics/terrain.js); every number is a metre.
 
 import { ceilingOf, rampOf, slabOf, stairsOf, wallLine, wallOf, windingStairs } from '../../physics/terrain.js';
+import { testVault } from './testyard-vault.js';
 
 const WALL = 2.5;
 const WINDING = { at: [-12, 4], inner: 0.6, outer: 2.4, start: -Math.PI / 2, turn: Math.PI * 1.5, steps: 24, from: 0, rise: 0.15 };
@@ -54,14 +62,26 @@ const testYard = {
     ceilingOf([25, 0], [10.4, 4.4], 3.2, { top: 3.8 }),
   ],
   portals: [{ to: 'hall', area: { at: [27, 0], size: [6, 4.4] } }],
-  spawns: [],
-  items: [{ id: 'tonic1', kind: 'tonic', at: [-16, 0, 9] }],
+  // A knight who fell here, his halberd beside him and his harness better than the operative's.
+  spawns: [{ id: 'fallen', preset: 'knight', inputs: { name: 'Fallen knight' }, role: 'enemy', tier: 3, dead: true, post: [-13.5, 0, -4], facing: 0.4 }],
+  items: [
+    { id: 'tonic1', kind: 'tonic', at: [-16, 0, 9] },
+    { id: 'bandage0', kind: 'bandage', at: [-16.5, 0, -1] },
+    { id: 'bandage1', kind: 'bandage', at: [-15.5, 0, -1] },
+    { id: 'note1', kind: 'note', at: [-19.3, 0, 0.5], note: 'powder' },
+  ],
+  // A place to rest by where he starts.
+  rest: { at: [-19, 0, -7], name: 'the yard brazier' },
   levers: [{ id: 'lever1', at: [18.5, 0, -2], target: 'gate1', state: 'open' }],
   gates: [{
     id: 'gate1', at: [22, 0, 0], state: 'closed',
     states: { closed: [wallOf([22, 0], [0.3, 4.4], 0, 2.8, { id: 'gate1' })], open: [] },
   }],
-  ladders: [],
+  // A ladder against the 6 m ledge's south edge, drawn up: kicked down from the ledge it becomes a ramp to the ground.
+  ladders: [{
+    id: 'ladder1', at: [-0.5, 6, -7], state: 'up', kickFrom: { at: [-0.5, -9], size: [5, 5], y: [5, 8] },
+    states: { up: [], down: [rampOf([-0.5, -2], [9, 1.6], 6, 0, { yaw: -Math.PI / 2, bottom: 0, id: 'ladder1' })] },
+  }],
 };
 
 const testHall = {
@@ -73,7 +93,7 @@ const testHall = {
     wallOf([38, 4], [1, 1], 0, 4, { id: 'pillarN' }),
     wallOf([38, -4], [1, 1], 0, 4, { id: 'pillarS' }),
   ],
-  portals: [{ to: 'yard', area: { at: [33, 0], size: [6, 20] } }],
+  portals: [{ to: 'yard', area: { at: [33, 0], size: [6, 20] } }, { to: 'vault', area: { at: [48, 0], size: [4, 20] } }],
   spawns: [
     { id: 'guard1', preset: 'knight', role: 'enemy', tier: 2, post: [44, 0, -3], facing: Math.PI },
     { id: 'guard2', preset: 'ronin', role: 'enemy', tier: 1, post: [44, 0, 3], facing: Math.PI },
@@ -93,5 +113,5 @@ export const TESTYARD = {
   title: 'The Test Yard',
   sea: -8,
   start: { section: 'yard', at: [-18, 0, -3], facing: 0 },
-  sections: [testYard, testHall],
+  sections: [testYard, testHall, testVault],
 };

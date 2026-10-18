@@ -158,6 +158,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
     // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).
     dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
+    // Level mode (levelmode/level.js): hands at a wound while a bandage goes on ({ t, seconds }).
+    tending: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
@@ -490,13 +492,16 @@ const STYLE_KEYS_ALL = Object.keys(STYLES);
 const WEAPON_LABEL = (kind) => WEAPONS[kind].label.toLowerCase();
 
 /** Stoop for a weapon on the floor: he crouches and reaches for it. */
-export function startPickup(world, fighter, debris) {
+export function startPickup(world, fighter, debris, { swap = false } = {}) {
   // The standard is taken up whatever is in the hands: that is let fall.
   const standard = WEAPONS[debris.weapon]?.flag;
   // A shield is taken up on the other arm, whatever is in the hand.
   const shield = debris.kind === 'shield';
-  if (shield && fighter.shield) return false;
-  if (fighter.state !== 'up' || (fighter.weapon?.held && !standard && !shield) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
+  // `swap` (level mode, looting a body): what he holds of that kind is let fall for it, as for a standard.
+  if (shield && fighter.shield && !swap) return false;
+  if (fighter.state !== 'up' || (fighter.weapon?.held && !standard && !shield && !swap) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
+  if (swap && shield && fighter.shield) dropShield(world, fighter, 'dropped');
+  if (swap && !shield && !standard && fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   // Stooping for a standard, he lets go of what is in his hands first: a two-handed grip would keep the hand from it.
   if (standard && fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   fighter.pickup = { debris: debris.id, t: 0 };
@@ -1081,6 +1086,77 @@ export function placeOnFloor(fighter, x, z, floor, yaw) {
   fighter.lift = floor;
   fighter.yaw = yaw;
   plantFeet(fighter);
+}
+
+// ---- Level mode: a man made over in place -------------------------------------------------
+
+/** The headgear props a fighter's inputs ask for (worn, on his head). */
+function wornProps(fighter) {
+  return (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false }));
+}
+
+/** His headgear props replaced by those his inputs now ask for, worn again. */
+function refreshProps(world, fighter) {
+  world.props = (world.props ?? []).filter((prop) => prop.owner !== fighter.id);
+  world.props.push(...wornProps(fighter));
+}
+
+/**
+ * Level mode: put a fighter in other clothes (a dead man's outfit, a helm taken off) where he stands.
+ * His body is built again from `inputs` (masses, radii, gear: armour, helm, footing) and the weight of
+ * what he holds put back on it; everything that has happened to him (wounds, blood, bones, stamina,
+ * his weapon and where it points, his place and pose) is left as it is. The caller redraws him.
+ */
+export function reclothe(world, fighter, inputs) {
+  const body = buildBody(inputs);
+  fighter.body = body;
+  fighter.invMass = body.masses.map((mass) => 1 / mass);
+  fighter.radius = particleRadii(body);
+  for (const weapon of [fighter.weapon, fighter.offWeapon]) {
+    if (!weapon?.held || weapon.spec.mounted) continue;
+    const second = weapon === fighter.offWeapon;
+    if (second) addParticleMass(fighter, P.lHand, weapon.spec.mass);
+    else {
+      const shares = handShares(weapon.spec);
+      addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * shares.main);
+      if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * shares.off);
+    }
+    weapon.handling = handling(body, weapon.spec);
+  }
+  if (fighter.shield) {
+    addParticleMass(fighter, P.lHand, fighter.shield.spec.mass * 0.6);
+    addParticleMass(fighter, P.lElbow, fighter.shield.spec.mass * 0.4);
+  }
+  fighter.capsuleCache = undefined;
+  fighter.damageVersion += 1;
+  refreshProps(world, fighter);
+}
+
+/**
+ * Level mode: a fighter made new where he is, as the same object (his id, corner, section and
+ * arena kept): a body built from `inputs` with nothing wrong with it, standing at `at` = [x, y, z]
+ * facing `yaw`. `shield`: undefined for what his style gives, null for none, or a shield kind.
+ * What he had dropped lies no more; his headgear is on his head. The caller redraws him.
+ */
+export function reviveFighter(world, fighter, inputs, { at, yaw = fighter.yaw, shield } = {}) {
+  const { id, corner, arena, spawn, dormant, walking } = fighter;
+  const fresh = createFighter(inputs, { id, corner, x: at[0], facing: yaw, random: world.random });
+  if (shield !== undefined && fresh.shield && fresh.shield.kind !== shield) {
+    addParticleMass(fresh, P.lHand, -fresh.shield.spec.mass * 0.6);
+    addParticleMass(fresh, P.lElbow, -fresh.shield.spec.mass * 0.4);
+    fresh.shield = null;
+  }
+  if (shield && !fresh.shield) {
+    const spec = SHIELDS[shield];
+    fresh.shield = { kind: shield, spec, strain: undefined };
+    addParticleMass(fresh, P.lHand, spec.mass * 0.6);
+    addParticleMass(fresh, P.lElbow, spec.mass * 0.4);
+  }
+  for (const key of Object.keys(fighter)) if (!(key in fresh)) delete fighter[key];
+  Object.assign(fighter, fresh, { arena, spawn, dormant, walking });
+  placeOnFloor(fighter, at[0], at[2], at[1], yaw);
+  for (const piece of world.debris) if (piece.owner === id && !piece.taken) piece.taken = true;
+  refreshProps(world, fighter);
 }
 
 function addConstraint(fighter, a, b, compliance) {
@@ -1672,6 +1748,7 @@ function updateIntent(world, fighter, dt) {
   }
   if (fighter.crawling) crawlPose(fighter, intent, dt);
   if (fighter.pain) painPose(fighter, intent);
+  if (fighter.tending) tendingPose(fighter, intent);
   if (fighter.netted) {
     // Bound: the arms pinned in close to the chest, the weapon with them.
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.16 * H, 0.62 * H, sign * 0.1 * H];
@@ -1705,6 +1782,21 @@ function updateIntent(world, fighter, dt) {
  * opposite hand go forward together, as far as his pace carries him; a leg
  * whose joint is broken has no muscle and drags.
  */
+/**
+ * Level mode: tending a wound (a bandage going on). Stooped a little over it, both hands at his
+ * side, the weapon pointed down out of the way; eased in over the first quarter second.
+ */
+function tendingPose(fighter, intent) {
+  const share = Math.min(1, fighter.tending.t / 0.25);
+  const H = fighter.body.heightM;
+  intent.dip += WORLD.tend.dip * share;
+  intent.lean += WORLD.tend.lean * share;
+  intent.lHand = vec.lerp(intent.lHand ?? [0.2 * H, 0.6 * H, 0.12 * H], [0.16 * H, 0.56 * H, 0.1 * H], share);
+  intent.rHand = vec.lerp(intent.rHand ?? [0.2 * H, 0.6 * H, -0.12 * H], [0.12 * H, 0.6 * H, -0.04 * H], share);
+  intent.bladeDir = [0.3, -1, 0];
+  intent.offBladeDir = null;
+}
+
 /**
  * On his knees with the pain (a lash): the hips down, the trunk bowed over a
  * little, the free hand pressed to where it struck, the weapon hand low;
@@ -4434,6 +4526,8 @@ export function shieldHarm(world, bearer, { crash, closing, at, normal, offCentr
  */
 function crashIntoShield(world, mover, bearer) {
   if (!bearer.shield || bearer.state === 'out') return;
+  // Level mode: a man left lying is no one charging a shield (stooping over a body to loot it must not knock the shield off).
+  if (world.stage && mover.state === 'out') return;
   const disc = shieldDisc(bearer);
   const hit = shieldContact(point(mover.x, P.pelvis), point(mover.x, P.neck), disc, mover.body.segments.trunk.skinRadius);
   if (!hit) return;

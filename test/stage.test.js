@@ -12,14 +12,28 @@ import { floorAt, rampOf, rayBlocked, slabOf } from '../src/physics/terrain.js';
 import { hipsAt, walk } from './walker.js';
 
 const hero = () => structuredClone(PRESETS.ronin);
-const yard = () => createStageWorld(TESTYARD, hero(), { seed: 3 });
+/**
+ * The test yard as the engine's tests know it: the yard and the hall, the men of the hall only. What the player's
+ * systems added to it (the vault, the fallen knight, the ladder: levelplayer.test.js) is left off.
+ */
+const BASE = (() => {
+  const stage = structuredClone(TESTYARD);
+  stage.sections = stage.sections.filter((section) => section.id !== 'vault');
+  for (const section of stage.sections) section.portals = section.portals.filter((portal) => portal.to !== 'vault');
+  stage.sections[0].spawns = [];
+  stage.sections[0].ladders = [];
+  return stage;
+})();
+const yard = () => createStageWorld(BASE, hero(), { seed: 3 });
 const where = (fighter) => Array.from(fighter.x);
 const asleep = (world) => world.fighters.filter((fighter) => fighter.dormant).map((fighter) => fighter.spawn.id);
 
 test('the registry holds the test yard, and its data is sound', () => {
   assert.equal(STAGES.testyard, TESTYARD);
   assert.deepEqual(checkStage(TESTYARD), []);
-  assert.deepEqual(mechanismsOf(TESTYARD).map((mechanism) => [mechanism.id, mechanism.section, mechanism.state]), [['gate1', 'yard', 'closed']]);
+  assert.deepEqual(mechanismsOf(TESTYARD).map((mechanism) => [mechanism.id, mechanism.section, mechanism.state]), [['gate1', 'yard', 'closed'], ['ladder1', 'yard', 'up'], ['gate2', 'vault', 'closed'], ['cell1', 'vault', 'closed']]);
+  assert.deepEqual(checkStage(BASE), []);
+  assert.deepEqual(mechanismsOf(BASE).map((mechanism) => mechanism.id), ['gate1']);
 });
 
 test('checkStage names what is wrong', () => {
@@ -61,7 +75,7 @@ test('activeSections: the section he is in, and those whose portal area he stand
   assert.deepEqual(activeSections(TESTYARD, [26, 0, 0]), ['yard', 'hall'], 'the corridor, in the portal');
   assert.deepEqual(activeSections(TESTYARD, [31, 0, 0]), ['yard', 'hall'], 'the hall, at its mouth');
   assert.deepEqual(activeSections(TESTYARD, [40, 0, 0]), ['hall']);
-  assert.deepEqual(activeSections(TESTYARD, [60, 0, 0]), [], 'outside any section');
+  assert.deepEqual(activeSections(TESTYARD, [90, 0, 0]), [], 'outside any section');
   assert.deepEqual(activeSections(TESTYARD, [0, 0, 40]), []);
 });
 
@@ -175,7 +189,7 @@ test('the active terrain is the union of the active sections: the hall has no fl
   assert.equal(floorAt(world.arena.terrain, 40, 0, 0.3), -Infinity);
   assert.equal(stageFloor(world, 40, 0, 0), -Infinity);
   assert.equal(floorAt(world.arena.terrain, 0, 0, 0.3), 0);
-  const both = stageTerrain(TESTYARD, ['yard', 'hall'], world.stage.mechanisms);
+  const both = stageTerrain(BASE, ['yard', 'hall'], world.stage.mechanisms);
   assert.equal(floorAt(both, 40, 0, 0.3), 0);
   assert.ok(both.solids.length > world.arena.terrain.solids.length);
   assert.equal(world.arena.terrain.sea, -8);

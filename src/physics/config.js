@@ -421,6 +421,18 @@ export const WORLD = {
   // Walking about (the player's walk mode): upright and square, feet under
   // the hips, no guard; the arms swing with the stride, more the faster he goes.
   walk: { stance: { blade: 0, crouch: 0, width: 0.5, lean: 0.03, guardHeight: 0 }, strideHz: 0.9, runStrideHz: 1.5 },
+  // Level mode, tending a wound (a bandage going on): the pose, as shares of a full dip and lean (the stoop over the hands at his side).
+  tend: { dip: 0.04, lean: 0.12 },
+  // Level mode, a matchlock's damp or sabotaged powder (only in a stage's world; Battle Mode guns keep the shot's own `misfire`).
+  // - misfire: the chance, per shot, that the charge does not fire. It is the old redstone-cut powder of the lore: one in
+  //   four is bad (the Dunnottar note: "third misfire this week"), a hard but not hopeless gunner.
+  // - misfireKinds: what a misfire is, by weight. `click` (the match drops, nothing is spent: he can pull again at once),
+  //   `puff` (the pan flashes, the charge is wasted: a whole reload, as the old misfire), `reprime` (the pan is fouled but
+  //   the ball is in: he must prime it again, `primeSeconds`, a third of a reload).
+  // - hangFire: the chance, per shot that did not misfire, that it hangs: the charge smoulders and goes off after a
+  //   delay of hangMin to hangMax s, from the barrel as it points then. One in six, and long enough (half a second to
+  //   a second and a half) that a man walks out of the line, or into it, and a gunner may lower the gun, thinking it dead.
+  damp: { misfire: 0.25, misfireKinds: { click: 0.3, puff: 0.4, reprime: 0.3 }, primeSeconds: 5, hangFire: 0.17, hangMin: 0.5, hangMax: 1.5 },
   // Out this long (s), a body is left where it lies: no more simulation for it.
   goneSeconds: 20,
   // m/s: faster than this, a man cannot go on loading a gun (he waits).

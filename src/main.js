@@ -5,14 +5,14 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
+import { advance, boutWinner, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
-import { LEVEL_PRESETS } from './levelmode/presets.js';
+import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
@@ -36,7 +36,11 @@ import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
-import { createStageWorld, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { contextFor, createLevelWorld, drainRebuilds, drainUi, interact, interactions, levelBusy, levelThink, respawnPlayer, restAtPoint, useItem } from './levelmode/level.js';
+import { holdPlayer } from './levelmode/items.js';
+import { installLevelHud } from './levelmode/hud.js';
+import { NOTES, showDeath, showNote } from './levelmode/story.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -143,6 +147,8 @@ const fightControls = installFightControls($('#fight-ui'), {
   order: (kind) => orderSide(kind),
 });
 fightUiWireToggle($('#fightui-pick'));
+// Level mode's own controls on top of the fight's: the context pill, the items, the action bar (levelmode/hud.js).
+const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds });
 
 // The ring on the floor round the man locked on.
 const lockRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
@@ -344,8 +350,12 @@ function showMustering() {
 // ---- Loop -------------------------------------------------------------------
 
 function thinkForBout(world, dt) {
-  // A level-mode stage: the sections around the player awake, the rest dormant (levelmode/stage.js).
-  if (world.stage) updateStage(world);
+  // A level-mode stage: the sections around the player awake, the rest dormant (levelmode/stage.js); then his own
+  // systems (levelmode/level.js): an action in hand, tonics at work, a death, the boss's second phase.
+  if (world.stage) {
+    updateStage(world);
+    if (world.stage.level) levelThink(world, dt);
+  }
   // The intro's legends stand in their guard: nobody to fight.
   if (state.game === 'intro') return;
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
@@ -379,8 +389,10 @@ function thinkForBout(world, dt) {
   }
   thinkAll(world, dt, still);
   if (!players.size) return;
+  // At a bandage, a change of harness, a stoop for a weapon: he stands where he is.
+  if (world.stage?.level && levelBusy(world)) holdPlayer(player());
   // Walking about (V), the keys steer him; otherwise he does as the orders say.
-  if (player().walking) walkAbout(player());
+  else if (player().walking) walkAbout(player());
   else {
     // The movement keys: a stick, the way the camera looks.
     state.orders.keyStick = keyStick(fightKeys, floorAxes(), state.walkRunning);
@@ -510,6 +522,7 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     }
   }
   consumeEvents();
+  if (state.world.stage?.level) drainLevel();
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
   if (state.game === 'intro' || state.game === 'tutorial' || state.world.stage) return;
   const winner = boutWinner(state.world);
@@ -524,6 +537,41 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', drowned: 'Lost to the sea', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
     const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
     $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
+  }
+}
+
+// ---- Level mode: what the player's systems tell the screen ---------------------------------------
+
+/** A fighter's model built again (his body was made over: an outfit changed, a helm off, a man revived). */
+function rebuildFighterView(id) {
+  const fighter = state.world.fighters[id];
+  const at = state.views.findIndex((view) => view.fighter.id === id);
+  if (!fighter || at < 0) return;
+  disposeFighterView(scene, state.views[at]);
+  state.views[at] = state.buildView(fighter);
+  if (fighter.dormant) {
+    state.views[at].group.visible = false;
+    state.views[at].stale = true;
+  }
+}
+
+/** The level's messages since the last step: toasts, a note to read, the death, the second phase. */
+function drainLevel() {
+  const world = state.world;
+  for (const id of drainRebuilds(world)) rebuildFighterView(id);
+  for (const message of drainUi(world)) {
+    if (message.type === 'toast') levelHud.toast(message.text);
+    else if (message.type === 'note') showNote(NOTES[message.key] ?? { title: 'A note', body: String(message.key) });
+    else if (message.type === 'death') showDeath(() => {
+      // Behind the dark: wake at the last rest (unless the bout has been left or begun again).
+      if (state.world !== world) return;
+      respawnPlayer(world);
+      for (const id of drainRebuilds(world)) rebuildFighterView(id);
+      state.orders = newOrders();
+      fightControls.reset();
+      followCam.reset();
+    });
+    else if (message.type === 'phase2') levelHud.toast('The helm comes off');
   }
 }
 
@@ -786,6 +834,7 @@ function drawWorld(dt, drawIt = true) {
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
   fightControls.update();
+  levelHud.update();
   tutorial.update();
 }
 
@@ -1822,7 +1871,8 @@ function enterStage(key) {
   setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key) });
   state.scenario = null;
   state.seed += 1;
-  state.world = createStageWorld(stage, normaliseInputs({ ...structuredClone(PRESETS.ronin), name: 'The Forger' }), { seed: state.seed });
+  // The operative (a fixed preset), in his combat stance: the stick within the run threshold fights, past it runs (control.js).
+  state.world = createLevelWorld(stage, levelPreset('forger'), { seed: state.seed });
   clearGore(scene);
   setPlace(scene, 'stage', PLACE_ARENAS.stage);
   if (stageView) disposeStageView(stageView);
@@ -1849,7 +1899,8 @@ function enterStage(key) {
   state.sideAsked = true;
   $('#side-pick').hidden = true;
   $('#modes button[data-value="play"]:not([data-side])').click();
-  setWalking(true);
+  state.walkRunning = false;
+  levelHud.reset();
   renderHud();
 }
 
@@ -2306,6 +2357,18 @@ const boxer = window.boxer = {
     return state.world.stage.active;
   },
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
+  // The player's systems in the stage (levelmode/level.js): the run, what the button offers, and the verbs (for the console and tests).
+  level: () => {
+    const world = state.world;
+    return {
+      run: world.stage?.level ?? null, world,
+      context: () => contextFor(world), near: () => interactions(world).map((entry) => `${entry.id}:${entry.distance.toFixed(2)}`),
+      act: () => interact(world), use: (kind) => useItem(world, kind), rest: () => restAtPoint(world, world.stage.def.sections.find((section) => section.rest).rest),
+      // Stand the player at a place of the stage ([x, y, z]), facing yaw.
+      put: (at, yaw = 0) => { placeOnFloor(world.fighters[0], at[0], at[2], at[1], yaw); return true; },
+      hurt: (amount = 0.05) => { const me = world.fighters[0]; me.bleed = (me.bleed ?? 0) + amount; me.bleedOutside = (me.bleedOutside ?? 0) + amount; return me.bleed; },
+    };
+  },
   stage: () => ({ run: state.world.stage ?? null, set: (id, to) => setMechanism(state.world, id, to), pull: (id) => pullLever(state.world, id), view: stageView }),
   // The training yard, as the Levels menu opens it (any menu screen closed); its run (step, progress).
   tutorial: () => {

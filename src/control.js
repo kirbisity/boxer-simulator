@@ -507,6 +507,8 @@ export function blockFor(fighter) {
   return 'guard';
 }
 
+const BLOCKS = new Set(['guard', 'weaponBlock', 'shieldBlock']);
+
 /** A tap of the guard: out of the way of what is coming, as his style would; with nothing coming, a step back. */
 export function evasionFor(world, fighter) {
   const style = STYLES[fighter.style];
@@ -700,7 +702,8 @@ function goPickUp(world, fighter) {
     return true;
   }
   fighter.move = 0;
-  startPickup(world, fighter, debris);
+  // (In a stage, what he holds of that kind is let fall for it: looting a body.)
+  startPickup(world, fighter, debris, { swap: Boolean(world.stage) });
   fighter.orderPickup = null;
   return true;
 }
@@ -734,6 +737,14 @@ export function directFighter(world, fighter, orders, dt) {
   if (goPin(world, fighter)) return;
   if (fighter.orderPickup !== undefined && fighter.orderPickup !== null && goPickUp(world, fighter)) return;
   if (!goClinch(world, fighter, opponent)) steer(world, fighter, orders, opponent, dt);
+  // Level mode: running (the stick past the run threshold, or Shift) is not fighting. No guard, no block and no
+  // attack while at it: what was asked is let go (not kept for when he stops), and a block he held comes down.
+  if (world.stage && fighter.running) {
+    orders.requests.length = 0;
+    orders.evasions = [];
+    if (BLOCKS.has(fighter.defence?.name)) fighter.defence = null;
+    return;
+  }
   defend(world, fighter, orders);
   continueCombo(world, fighter);
   attack(world, fighter, orders, opponent);

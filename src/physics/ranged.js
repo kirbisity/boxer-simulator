@@ -291,12 +291,56 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   if (victim.gunshot >= 1 && victim.state !== 'out') knockOut(world, victim, event, region === 'head' ? 'an arrow through the head' : 'shot down by arrows', 'killed');
 }
 
+/** A stage's damp powder (a stage may set `world.stage.damp`), else the world's. */
+const dampSpec = (world) => world.stage.damp ?? WORLD.damp;
+
+/**
+ * Level mode, one pull of a matchlock's trigger on bad powder: what happens to the charge, or null when the
+ * shot is sound. 'click' (nothing is spent: he can pull again), 'reprime' (the ball stays, the pan wants
+ * priming: a short reload), 'puff' (the pan flashes and the charge is wasted), 'hang' (it goes off later).
+ */
+export function dampShot(world, fighter, weapon, shot) {
+  const spec = dampSpec(world);
+  const random = world.random;
+  if (random() < spec.misfire) {
+    let pick = random() * Object.values(spec.misfireKinds).reduce((sum, weight) => sum + weight, 0);
+    let kind = 'puff';
+    for (const [name, weight] of Object.entries(spec.misfireKinds)) {
+      pick -= weight;
+      if (pick <= 0) {
+        kind = name;
+        break;
+      }
+    }
+    if (kind === 'click') world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['the match drops and nothing happens'] });
+    if (kind === 'reprime') {
+      weapon.loaded = false;
+      weapon.reloaded = Math.max(0, shot.reloadSeconds - spec.primeSeconds);
+      world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['the pan is fouled and must be primed again'] });
+    }
+    return kind;
+  }
+  return random() < spec.hangFire ? 'hang' : null;
+}
+
+/** A shot that hung fire, going off now (if the man still holds the gun; else it spends itself on the floor). */
+function goOffHanging(world, fighter) {
+  const list = world.hangFires;
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const entry = list[index];
+    if (entry.fighter !== fighter.id || world.time < entry.at) continue;
+    list.splice(index, 1);
+    if (fighter.state !== 'out' && entry.weapon.held) fire(world, fighter, entry.weapon, entry.aimedAt, entry.aimedId, { delayed: true });
+  }
+}
+
 /**
  * Reloading a fired gun (a matchlock): only while he means to (`reloading`,
  * set by the AI or the player), standing, and not in the middle of a move;
  * stopped, the work done so far is kept. Done, the gun is loaded.
  */
 export function reload(world, fighter, dt) {
+  if (world.hangFires?.length) goOffHanging(world, fighter);
   const weapon = fighter.weapon;
   if (!weapon?.held || !weapon.spec.shot || weapon.loaded) return;
   if (!fighter.reloading || fighter.state !== 'up' || fighter.punch) return;
@@ -349,25 +393,39 @@ export function comradeInLine(world, fighter, weapon = fighter.weapon, aimedAt =
  * error. The gun in hand on its shot's mark, or another (`weapon`: a second
  * forearm gun) at a world point (`aimedAt`) on a man (`aimedId`, kept on the shot).
  */
-export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, aimedId = null) {
+export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, aimedId = null, { delayed = false } = {}) {
   const punch = fighter.punch;
   const own = weapon === fighter.weapon;
-  if (own) punch.fired = true;
+  if (own && punch) punch.fired = true;
   if (!weapon?.held || !weapon.spec.ranged) return;
   if (weapon.spec.bow) return loose(world, fighter);
   // A gun with a charge to load (a matchlock) fires only loaded, and once.
+  // (`delayed`: a shot that hung fire, going off now: its charge was spent when the trigger was pulled.)
   const shot = weapon.spec.shot ?? null;
   const random = world.random;
-  if (shot) {
+  if (shot && !delayed) {
     if (!weapon.loaded) return;
     // A comrade on the line: he holds the shot (and keeps the charge).
     if (comradeInLine(world, fighter, weapon, aimedAt)) return;
+    // Level mode, bad powder: the shot may only click or fail to prime, which spends nothing or little (dampShot).
+    const damp = world.stage && !shot.bolt ? dampShot(world, fighter, weapon, shot) : null;
+    if (damp === 'click' || damp === 'reprime') return;
     // Several barrels (the three-eyed gun) or a magazine (`rounds`): each shot in turn, empty after the last.
     weapon.charges = (weapon.charges ?? shot.rounds ?? shot.barrels ?? 1) - 1;
     weapon.loaded = weapon.charges > 0;
     weapon.reloaded = 0;
     if (!weapon.loaded && own) emptied(world, fighter);
-    if (random() < shot.misfire) {
+    if (damp === 'puff') {
+      world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['a puff of smoke from the pan, and no shot'] });
+      return;
+    }
+    if (damp === 'hang') {
+      const spec = dampSpec(world);
+      (world.hangFires ??= []).push({ fighter: fighter.id, weapon, aimedAt, aimedId, at: world.time + spec.hangMin + random() * (spec.hangMax - spec.hangMin) });
+      world.events.push({ time: world.time, kind: 'hangfire', fighter: fighter.id, effects: ['the charge smoulders and does not go'] });
+      return;
+    }
+    if (!world.stage && random() < shot.misfire) {
       world.events.push({ time: world.time, kind: 'misfire', fighter: fighter.id, effects: ['flash in the pan'] });
       return;
     }

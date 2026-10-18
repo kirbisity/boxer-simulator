@@ -114,3 +114,35 @@ body:not(.playing) .fu-pick { display: none; }
 @keyframes fu-order-said { 0% { opacity: 0; translate: -6px 0; } 12% { opacity: 1; translate: 0 0; } 75% { opacity: 1; } 100% { opacity: 0; } }
 .banner:not([hidden]) ~ .fight-ui .fu-orders, .banner:not([hidden]) ~ .fight-ui .fu-order-said { visibility: hidden; }
 body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said { display: none; }
+
+/* ==== Level Mode: the player (src/levelmode/hud.js) ==== */
+/* The run threshold shows on the stick: past it the ring and the knob go gold, and the Guard button is greyed (a man running does not guard). */
+.stick.running::before { border-color: var(--gold); background: rgba(255, 207, 74, 0.08); }
+.guard-button.blocked { opacity: 0.3; pointer-events: none; }
+/* The context pill: bottom centre, above the controls and the player's status; only where something can be done. */
+.lv-context { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: flex; align-items: center; gap: 8px; height: 46px; min-width: 132px; max-width: calc(100vw - 200px); padding: 0 16px 0 14px; border-radius: 23px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 207, 74, 0.7); background: rgba(10, 12, 18, 0.7); color: var(--gold); font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 10px rgba(0, 0, 0, 0.45), 0 0 14px rgba(255, 207, 74, 0.18); cursor: pointer; animation: lv-pill-in 0.18s ease-out; }
+.lv-context:active { background: rgba(255, 207, 74, 0.35); }
+.lv-context.disabled { color: var(--muted); border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 1px 10px rgba(0, 0, 0, 0.45); }
+.lv-context .lv-label { overflow: hidden; text-overflow: ellipsis; }
+.lv-context kbd { display: none; margin-left: auto; padding-left: 4px; font: 600 10px var(--mono); color: var(--muted); }
+.fight-ui[data-device="mouse"] .lv-context kbd { display: block; }
+.lv-icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes lv-pill-in { from { opacity: 0; translate: -50% 6px; } }
+/* The items: top left, two buttons with their counts and keys. */
+.lv-items { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; pointer-events: none; }
+.lv-item { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 64px; height: 48px; border-radius: 24px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(10, 12, 18, 0.55); color: var(--fg); font: 600 13px var(--mono); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); cursor: pointer; padding: 0; }
+.lv-item:active { background: rgba(255, 207, 74, 0.35); }
+.lv-item.empty { opacity: 0.35; }
+.lv-item[data-item="bandage"] .lv-icon { color: #f2efe6; }
+.lv-item[data-item="tonic"] .lv-icon { color: #7fb8ff; }
+.lv-item kbd { display: none; position: absolute; right: 9px; top: 2px; font: 600 9px var(--mono); color: var(--muted); }
+.fight-ui[data-device="mouse"] .lv-item kbd { display: block; }
+/* While a bandage goes on or a harness is changed: a bar where the pill would be. */
+.lv-action { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: grid; gap: 5px; width: 168px; pointer-events: none; text-align: center; font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.lv-action i { display: block; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.lv-action b { display: block; height: 100%; width: 0; background: var(--gold); }
+/* What just happened, in a line near the top. */
+.lv-toast { position: absolute; left: 50%; translate: -50% 0; top: calc(72px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); padding: 4px 14px; border-radius: 999px; background: rgba(10, 12, 18, 0.62); font: 600 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; text-align: center; }
+.lv-toast-in { animation: lv-toast 2.6s ease-out forwards; }
+@keyframes lv-toast { 0% { opacity: 0; translate: -50% -4px; } 10% { opacity: 1; translate: -50% 0; } 80% { opacity: 1; } 100% { opacity: 0; } }
+.banner:not([hidden]) ~ .fight-ui .lv-context, .banner:not([hidden]) ~ .fight-ui .lv-items, .banner:not([hidden]) ~ .fight-ui .lv-action { visibility: hidden; }

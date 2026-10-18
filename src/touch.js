@@ -355,6 +355,8 @@ export function installFightControls(root, hooks) {
     fightUi.update();
     commandBar.update();
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
+    // Level mode: a man running does not guard (control.js directFighter); the button is greyed.
+    guard.classList.toggle('blocked', Boolean(world.stage && me.running));
     // The special button: one place, its label what it would do now.
     const name = contextAction(world, me);
     if (name !== lastAction) {

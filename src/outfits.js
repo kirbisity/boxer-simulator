@@ -1638,7 +1638,9 @@ export function factionOf(inputs) {
 export function outfitOf(inputs) {
   const kind = OUTFITS[inputs.outfit?.kind] ? inputs.outfit.kind : 'boxing';
   const design = Math.max(0, Math.min(OUTFITS[kind].designs.length - 1, inputs.outfit?.design ?? 0));
-  return { kind, design, spec: OUTFITS[kind], look: OUTFITS[kind].designs[design] };
+  // Level mode (a boss's second phase): `outfit.bareHead`, the helm taken off; the rest of the kit as it was.
+  const look = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : OUTFITS[kind].designs[design];
+  return { kind, design, spec: OUTFITS[kind], look };
 }
 
 /**
@@ -1719,6 +1721,11 @@ export const HELMETS = {
 };
 const NO_HELMET = { mass: 0, padding: 0, curve: 0 };
 
+/** A kit's protection with nothing over the head (its helm off): a bare head takes a blow, a cut and a ball as skin does. */
+function bareHeaded(protection) {
+  return { ...protection, bullet: { ...protection.bullet, head: 0 }, regions: { ...protection.regions, head: { blunt: 0, cut: 0, pierce: 0, deflects: false } } };
+}
+
 export function gearTraits(inputs) {
   const { spec, look } = outfitOf(inputs);
   const female = inputs.sex === 'female';
@@ -1731,10 +1738,10 @@ export function gearTraits(inputs) {
     heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,
     extraMass: spec.extraMass ?? 0,
-    protection: { ...NO_PROTECTION, ...spec.protection },
+    protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : { ...NO_PROTECTION, ...spec.protection },
     deflects: Boolean(spec.deflects),
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
-    headLocked: Boolean(spec.headLocked),
+    headLocked: Boolean(spec.headLocked) && !inputs.outfit?.bareHead,
     // His skill in this kit, as a share of his own (a man who cannot turn his head fights by feel).
     skillFactor: spec.skillFactor ?? 1,
     // Poise beyond the armour's weight and shell (physics poiseOf): one rigid shell bolted together.
@@ -1750,7 +1757,7 @@ export function gearTraits(inputs) {
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
     headBulk: spec.headBulk ?? 1,
     // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve; or the kit's own (`helmet`: a machine's head shell).
-    helmet: spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET,
+    helmet: inputs.outfit?.bareHead ? NO_HELMET : spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET,
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.
