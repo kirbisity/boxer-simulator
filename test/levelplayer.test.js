@@ -61,9 +61,8 @@ test('level mode: running blocks the guard and attacks; the same stick inside th
   assert.equal(me.running, true);
   // The block comes down, and what he asked for while running is let go (not saved for later).
   running.guard = true;
-  running.requests.push({ at: world.time, line: 'mid', strength: 'quick' });
-  const stats = me.stats.thrown;
   run(world, 0.3, running);
+  const stats = me.stats.thrown;
   assert.equal(me.running, false, 'asking for the guard slows him to a walk (control.js)');
   running.guard = false;
   running.requests.push({ at: world.time, line: 'mid', strength: 'quick' });
@@ -202,18 +201,26 @@ test('items lying about are taken at the button: bandages and tonics into the po
   assert.equal(level.inventory.tonic, 2);
 });
 
-test('the button hides while an aware enemy is within 6 m, and shows nearest first', () => {
+test('the button hides while an enemy aware of him is within 6 m (awareness.js: aggro or search), and not for one who has not noticed him', () => {
   const world = yard();
-  standAt(world, 40, 0, 0);
   // The hall's rest point is at (48, 0, 0): the guards stand about it.
   standAt(world, 46.8, 0, 0.5);
-  const near = interactions(world);
-  assert.ok(near.some((entry) => entry.kind === 'rest'), 'the rest point is within reach');
-  assert.equal(contextFor(world), null, 'with guards awake within 6 m: nothing offered');
-  // The guards put out of the way (out of the fight): the button is back.
-  for (const id of ['guard1', 'guard2', 'guard3']) fighterOf(world, id).state = 'out';
-  assert.ok(contextFor(world), 'the button is back');
-  assert.ok(interactions(world).some((entry) => entry.kind === 'rest'));
+  assert.ok(interactions(world).some((entry) => entry.kind === 'rest'), 'the rest point is within reach');
+  const minds = world.stage.aware.minds;
+  const guard = fighterOf(world, 'guard1');
+  assert.notEqual(minds[guard.id].state, 'aggro');
+  assert.equal(contextFor(world)?.kind, 'rest', 'guards who have not noticed him do not hide it');
+  minds[guard.id].state = 'aggro';
+  assert.equal(contextFor(world), null, 'one who fights him, within 6 m: nothing offered');
+  minds[guard.id].state = 'search';
+  assert.equal(contextFor(world), null, 'one who is looking for him too');
+  // Beyond 6 m, or put out of the fight: the button is back.
+  placeOnFloor(guard, 38, 8, 0, 0);
+  assert.equal(contextFor(world)?.kind, 'rest', 'six metres off or more');
+  placeOnFloor(guard, 45, 2, 0, 0);
+  assert.equal(contextFor(world), null);
+  guard.state = 'out';
+  assert.equal(contextFor(world)?.kind, 'rest');
 });
 
 test('the nearest of several things is the one offered; a locked door shows as locked until the key is held', () => {
@@ -402,12 +409,14 @@ test('a rest heals the operative whole, refills his items, puts the enemies back
   standAt(world, 47.6, 0, 0);
   const guard = fighterOf(world, 'guard1');
   const post = TESTYARD.sections[1].spawns[0].post;
+  // (Guards who have not noticed him do not hide the button; one who has, within 6 m, does.)
+  assert.equal(contextFor(world)?.kind, 'rest');
+  world.stage.aware.minds[guard.id].state = 'aggro';
+  assert.equal(contextFor(world), null);
   guard.state = 'out';
   guard.bloodLost = 99;
   const other = fighterOf(world, 'guard2');
   placeOnFloor(other, 35, 5, 0, 1);
-  // (With the guards awake and near the button would be hidden, which is tested above: here the rest is taken by the point.)
-  assert.equal(contextFor(world), null);
   assert.ok(interactions(world).some((entry) => entry.kind === 'rest' && entry.label === 'Rest'));
   restAtPoint(world, { id: 'hall', at: TESTYARD.sections[1].rest.at, name: 'The Hall' });
   // The man: whole.

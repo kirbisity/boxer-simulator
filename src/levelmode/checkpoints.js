@@ -10,6 +10,7 @@ import { reviveFighter } from '../physics.js';
 import { LEVEL_CONFIG } from './config.js';
 import { levelOf, say, feetFloor } from './items.js';
 import { regionContains, updateStage } from './stage.js';
+import { levelResetMinds } from './adapter.js';
 
 /** The operative's gear as it is now: his inputs (outfit, headgear, style) and the shield on his arm. */
 export function snapshotGear(me) {
@@ -89,6 +90,8 @@ function reviveWorld(world, { followersAt = true } = {}) {
     }
   }
   world.hangFires = [];
+  // Every mind starts over (the awareness AI), the followers are brought to his side.
+  levelResetMinds(world);
   updateStage(world, true);
 }
 

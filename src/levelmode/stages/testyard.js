@@ -8,6 +8,8 @@
 //     - a winding stair (24 steps, three quarters of a turn, 3.6 m) up to a landing
 //     - a ramp to a low platform; a wall maze; a sea cliff (the yard ends at z 11, the sea is 8 m below)
 //     - the corridor: walls, a low ceiling, an iron gate (closed) and its lever
+//     - five men to practise on (a sentry with his back to the start, one facing the yard, a roamer on a
+//       round, a gardener and a stray prisoner, neutral)
 //   hall (x 30..50, z -10..10): three men standing dormant until the player comes down the corridor,
 //     a civilian and a prisoner (neutral), a bandage, a rest point.
 //   vault (x 50..76, z -10..10; stages/testyard-vault.js): an iron gate opened by hand from the hall
@@ -30,6 +32,8 @@ const WINDING_EXIT = WINDING.start + (WINDING.turn * 23.5) / WINDING.steps;
 const testYard = {
   id: 'yard',
   name: 'The Yard',
+  // How far a man sees here (m): the yard is wide, so the practice is closer in than the 25 m of full light.
+  vision: 16,
   bounds: [{ at: [0, 0], size: [40, 28] }, { at: [25, 0], size: [10, 4.4] }],
   terrain: [
     // The ground: down to the sea, so that its edge is a cliff.
@@ -62,8 +66,18 @@ const testYard = {
     ceilingOf([25, 0], [10.4, 4.4], 3.2, { top: 3.8 }),
   ],
   portals: [{ to: 'hall', area: { at: [27, 0], size: [6, 4.4] } }],
-  // A knight who fell here, his halberd beside him and his harness better than the operative's.
-  spawns: [{ id: 'fallen', preset: 'knight', inputs: { name: 'Fallen knight' }, role: 'enemy', tier: 3, dead: true, post: [-13.5, 0, -4], facing: 0.4 }],
+  // Men of the garrison to practise on: sentry1 stands with his back to the start (walk up behind him), sentry2 faces the yard
+  // (the way you come), a roamer walks his round, and a gardener and a stray prisoner are neutral. The first two look
+  // the way they are facing: where they see you, they fight.
+  spawns: [
+    { id: 'sentry1', preset: 'light', role: 'enemy', tier: 1, post: [-8, 0, 3], facing: 0 },
+    { id: 'sentry2', preset: 'knight', role: 'enemy', tier: 2, post: [19, 0, 4], facing: Math.PI },
+    { id: 'roamer', preset: 'ronin', role: 'enemy', tier: 1, post: [5, 0, 9], facing: -Math.PI / 2, patrol: [[5, 9], [5, 0]] },
+    { id: 'gardener', preset: 'amateur', role: 'civilian', post: [-6, 0, 8], facing: Math.PI / 2, patrol: [[-6, 8], [-6, 10]], refuge: [-18, 0, 9] },
+    { id: 'stray', preset: 'veteran', role: 'prisoner', post: [-15, 0, 7], facing: 0, refuge: [-18, 0, 9] },
+    // A knight who fell here, his halberd beside him and his harness better than the operative's (a body to loot).
+    { id: 'fallen', preset: 'knight', inputs: { name: 'Fallen knight' }, role: 'enemy', tier: 3, dead: true, post: [-13.5, 0, -4], facing: 0.4 },
+  ],
   items: [
     { id: 'tonic1', kind: 'tonic', at: [-16, 0, 9] },
     { id: 'bandage0', kind: 'bandage', at: [-16.5, 0, -1] },
@@ -113,5 +127,7 @@ export const TESTYARD = {
   title: 'The Test Yard',
   sea: -8,
   start: { section: 'yard', at: [-18, 0, -3], facing: 0 },
+  // Followers (freed prisoners) stop on the low platform, as they would at the chapel gate.
+  followStopsAt: { at: [12.5, 7], size: [4, 4] },
   sections: [testYard, testHall, testVault],
 };

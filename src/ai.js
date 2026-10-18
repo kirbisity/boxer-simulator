@@ -6,7 +6,7 @@ import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './form
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -271,8 +271,8 @@ export function thinkAll(world, dt, playerIds = new Set()) {
   const staggered = fightTier(world) >= 3;
   for (const fighter of world.fighters) {
     if (playerIds.has(fighter.id)) continue;
-    // Level mode: a dormant man (his section is not active) is not thought for; nor is a neutral one (corner 'grey': civilians, prisoners), whom levelmode drives itself.
-    if (fighter.dormant || fighter.corner === 'grey') continue;
+    // Level mode: a dormant man (his section is not active) is not thought for; nor is a neutral one (corner 'grey': civilians, prisoners), nor one levelmode drives itself (`driven`: unaware, searching, following; levelmode/awareness.js).
+    if (fighter.dormant || fighter.corner === 'grey' || fighter.driven) continue;
     if (!staggered || fighter.detail === 'full' || fighter.detail === undefined) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
@@ -559,6 +559,15 @@ function pickDefence(style, incoming, random, heavy = 0, long = false) {
 }
 
 /**
+ * Whether `other` is a man `fighter` may fight: of the other side, awake, and, in level mode, not neutral
+ * (hostile) and one his awareness allows (`mayTarget`, levelmode/awareness.js: a follower fights only whom
+ * the player fights). In a battle, simply the other side.
+ */
+function foeOf(fighter, other) {
+  return hostile(other, fighter) && !other.dormant && (!fighter.mayTarget || fighter.mayTarget(other));
+}
+
+/**
  * Who to fight. Whoever just hit me, if it is not the man I am on; a new man
  * when mine is down; otherwise the one I am on. A new man is the nearest one
  * standing, passing over those my team-mates already have in hand.
@@ -588,10 +597,10 @@ function chooseFocus(world, fighter) {
     return world.fighters[hitBy];
   }
   if (current && current.state === 'up' && !current.crawling && !closerAtHand(world, fighter, current)) return current;
-  const standing = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up' && !other.crawling);
+  const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !other.crawling);
   if (!standing.length) {
     fighter.focus = undefined;
-    return nearestOpponent(world, fighter);
+    return fighter.mayTarget ? null : nearestOpponent(world, fighter);
   }
   const at = point(fighter.x, P.pelvis);
   // How many of his side already go for each man: counted once, not per comparison.
@@ -630,7 +639,7 @@ function closerAtHand(world, fighter, current) {
   const away = (other) => Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
   const mine = away(current);
   for (const other of world.fighters) {
-    if (other === current || other.corner === fighter.corner || other.state !== 'up' || other.crawling) continue;
+    if (other === current || !foeOf(fighter, other) || other.state !== 'up' || other.crawling) continue;
     const distance = away(other);
     if (distance < mine - spec.margin && distance < mine * spec.ratio) return true;
   }
@@ -751,7 +760,7 @@ function goForWeapon(world, fighter, opponent, dt) {
   }
   const at = point(fighter.x, P.pelvis);
   const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
-  const enemies = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up');
+  const enemies = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up');
   const attackingMe = enemies.some((other) => other.punch?.target === fighter.id);
   // Still worth it: loose, on the floor, and nearer me than any of them.
   const worth = (debris) => {
@@ -1132,8 +1141,9 @@ export function routFear(world, fighter) {
 function rout(world, fighter, opponent) {
   const spec = AI.rout;
   const side = world.sides?.[fighter.corner];
-  // An open arena (level mode: the box is only a far limit, not an edge to flee over) is never fled.
-  if (!side?.rear || side.men < spec.minSide || world.arena.open) return false;
+  // An open arena (level mode: the box is only a far limit, not an edge to flee over) is never fled over: a stage's garrison runs for its section's rear instead (levelmode/awareness.js).
+  if (world.arena.open) return world.stage?.rout?.(world, fighter, opponent) ?? false;
+  if (!side?.rear || side.men < spec.minSide) return false;
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   const { halfX, halfZ } = world.arena;
   const atEdge = Math.abs(at[0]) > halfX - spec.edge || Math.abs(at[1]) > halfZ - spec.edge;
@@ -1243,7 +1253,7 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
 /** Passive: get away from whoever is nearest, covering up when one swings. */
 function keepAway(world, fighter, opponent, dt) {
   const at = point(fighter.x, P.pelvis);
-  const enemies = world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up');
+  const enemies = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up');
   let nearest = opponent;
   let nearestDistance = Infinity;
   for (const enemy of enemies) {
@@ -1292,7 +1302,7 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   const weapon = fighter.weapon;
   if (weapon.spec.shot && !weapon.loaded) {
     fighter.aimAt = undefined;
-    const nearest = Math.min(...world.fighters.filter((other) => other.corner !== fighter.corner && other.state === 'up').map((other) => vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis)))));
+    const nearest = Math.min(...world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up').map((other) => vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis)))));
     if (nearest > gun.reloadSafe) {
       fighter.reloading = true;
       fighter.goTo = null;
@@ -1377,6 +1387,9 @@ function room(world, at) {
  * from him, with room behind it, and not past him.
  */
 function escapePoint(world, fighter, opponent) {
+  // On a stage's terrain: along walkable ground, never over a ledge or into a wall (levelmode/awareness.js).
+  const safe = world.stage?.escape?.(world, fighter, opponent);
+  if (safe) return safe;
   const kite = AI.gunKite;
   const me = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   const him = [opponent.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2]];
@@ -1562,7 +1575,7 @@ export function think(world, fighter, dt) {
   }
   // A couched point levelled at him and coming: he does not run onto it (AI.offLine), whatever else he meant to do.
   // (Looked for only by a man about to run in: a charger, or one charging in after the bow.)
-  const levelled = (fighter.aiCharge || (fighter.body.inputs.charging ?? 1) > 1) && world.fighters.some((other) => other.corner !== fighter.corner && other.punch?.spec.couched && other.punch.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
+  const levelled = (fighter.aiCharge || (fighter.body.inputs.charging ?? 1) > 1) && world.fighters.some((other) => foeOf(fighter, other) && other.punch?.spec.couched && other.punch.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
   // Charging in after the bow: flat out until he is within the sword's reach, then the fight.
   if (fighter.aiCharge && !fighter.slot && !levelled) {
     if (world.time < fighter.aiCharge.until && distance > reachOf(fighter) * AI.chargeInto) {
@@ -1635,7 +1648,7 @@ export function think(world, fighter, dt) {
   // In a crowd, the strike to answer is whichever is coming at me.
   // Only a blow aimed at him: one at a team-mate is not his to answer.
   // A man in a helm bolted to his breast sees only through its slit (sightAngle): a blow from outside it comes unseen.
-  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
+  const striker = world.fighters.find((other) => hostile(other, fighter) && other.punch?.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
   const incoming = striker?.punch;
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;

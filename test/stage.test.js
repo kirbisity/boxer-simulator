@@ -13,10 +13,10 @@ import { hipsAt, walk } from './walker.js';
 
 const hero = () => structuredClone(PRESETS.ronin);
 /**
- * The test yard as the engine's tests know it: the yard and the hall, the men of the hall only. What the player's
- * systems added to it (the vault, the fallen knight, the ladder: levelplayer.test.js) is left off.
+ * The test yard as the engine's tests know it: the yard (empty: its practice men are for the awareness tests, its fallen knight and
+ * ladder for the player's systems) and the hall, the men of the hall only; no vault.
  */
-const BASE = (() => {
+const QUIET = (() => {
   const stage = structuredClone(TESTYARD);
   stage.sections = stage.sections.filter((section) => section.id !== 'vault');
   for (const section of stage.sections) section.portals = section.portals.filter((portal) => portal.to !== 'vault');
@@ -24,7 +24,8 @@ const BASE = (() => {
   stage.sections[0].ladders = [];
   return stage;
 })();
-const yard = () => createStageWorld(BASE, hero(), { seed: 3 });
+const BASE = QUIET;
+const yard = () => createStageWorld(QUIET, hero(), { seed: 3 });
 const where = (fighter) => Array.from(fighter.x);
 const asleep = (world) => world.fighters.filter((fighter) => fighter.dormant).map((fighter) => fighter.spawn.id);
 
@@ -34,6 +35,12 @@ test('the registry holds the test yard, and its data is sound', () => {
   assert.deepEqual(mechanismsOf(TESTYARD).map((mechanism) => [mechanism.id, mechanism.section, mechanism.state]), [['gate1', 'yard', 'closed'], ['ladder1', 'yard', 'up'], ['gate2', 'vault', 'closed'], ['cell1', 'vault', 'closed']]);
   assert.deepEqual(checkStage(BASE), []);
   assert.deepEqual(mechanismsOf(BASE).map((mechanism) => mechanism.id), ['gate1']);
+});
+
+test('the test yard has men to practise on in the yard itself, and a place where followers stop', () => {
+  assert.deepEqual(TESTYARD.sections[0].spawns.map((spawn) => [spawn.id, spawn.role]), [['sentry1', 'enemy'], ['sentry2', 'enemy'], ['roamer', 'enemy'], ['gardener', 'civilian'], ['stray', 'prisoner'], ['fallen', 'enemy']]);
+  assert.ok(regionContains(TESTYARD.followStopsAt, 12.5, 7, 1.2));
+  assert.equal(createStageWorld(TESTYARD, hero(), { seed: 3 }).awake, 7, 'the player and the six of the yard (five to practise on, and a fallen knight)');
 });
 
 test('checkStage names what is wrong', () => {
