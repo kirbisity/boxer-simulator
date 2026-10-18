@@ -6,7 +6,8 @@
 // his man himself where to hit, or a button for each kind of blow, with the
 // name of each attack he makes and how it went), a big Guard button, a Lock
 // button above it, one special button in a fixed place, and the fight-mode
-// HUD (the player's status low down, his man's over his head).
+// HUD (the player's status low down, his man's over his head); in a battle,
+// a small column of orders to his men at the top left (fightui/command.js).
 // Only this surface takes the browser's gestures from it: menus and text
 // elsewhere stay selectable and scroll as usual.
 
@@ -16,6 +17,7 @@ import { ACTIONS, contextAction, moveName } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
+import { fightUiCommandBar } from './fightui/command.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -45,7 +47,7 @@ const uiElement = (tag, className, text) => Object.assign(document.createElement
  * project([x, y, z]) → [px, py, inFront], ray(px, py) → { origin, dir } (the
  * line of sight through a point on the screen), floorAxes() → { ahead, right }
  * (the camera's on the floor), now() (s), marks() (the marks of a blow in the
- * fight: fightui/marker.js). Returns { update, setActive, reset, ... }.
+ * fight: fightui/marker.js), order(kind) (an order to his side: command.js). Returns { update, setActive, reset, ... }.
  */
 export function installFightControls(root, hooks) {
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
@@ -84,6 +86,8 @@ export function installFightControls(root, hooks) {
   let active = false;
   // The attack controls (fightui/): tapping his man himself, or the buttons, as the player chose.
   const fightUi = fightUiInstall(root, hooks);
+  // Orders to his side, in a battle (fightui/command.js).
+  const commandBar = fightUiCommandBar(root, hooks);
 
   /**
    * The place in the world a point on the screen means: on a man if the line
@@ -349,6 +353,7 @@ export function installFightControls(root, hooks) {
     const orders = hooks.orders();
     if (!world || !me) return;
     fightUi.update();
+    commandBar.update();
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
     // The special button: one place, its label what it would do now.
     const name = contextAction(world, me);
@@ -406,6 +411,7 @@ export function installFightControls(root, hooks) {
     incoming = null;
     rightButtons.clear();
     fightUi.reset();
+    commandBar.reset();
   }
 
   return { update, setActive, reset, toggleLock, setDevice, get device() { return device; }, fightUi: fightUi.choose };

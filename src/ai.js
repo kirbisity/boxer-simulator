@@ -3,6 +3,7 @@
 // choosing from its style's moves those that reach from where it stands.
 
 import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
+import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
@@ -254,6 +255,8 @@ export function thinkAll(world, dt, playerIds = new Set()) {
   keepLeaders(world);
   keepSides(world);
   moveFormations(world, dt);
+  // The player's orders to his side (command.js).
+  keepOrders(world);
   // In a big fight, a fighter with nothing happening near him thinks ten
   // times a second (each on his own beat) rather than every step.
   const staggered = fightTier(world) >= 3;
@@ -368,6 +371,8 @@ function takeUpStandard(world, fighter) {
  * past his leash after a blow); anyone else keeps near his side's standard.
  */
 function keepPlace(world, fighter) {
+  // Under an order (command.js), the order says where he stands.
+  if (orderKeepsPlace(world, fighter)) return;
   const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
   if (!formation) {
     keepWithLeader(world, fighter);
@@ -1448,7 +1453,8 @@ export function think(world, fighter, dt) {
     fighter.move = 0;
     return;
   }
-  const opponent = chooseFocus(world, fighter);
+  // His own choice, or the man the player's order sends him at (command.js).
+  const opponent = orderedFocus(world, fighter, chooseFocus(world, fighter));
   if (!opponent) {
     fighter.move = 0;
     return;
@@ -1479,8 +1485,11 @@ export function think(world, fighter, dt) {
     keepAway(world, fighter, opponent, dt);
     return;
   }
+  // The player's order (command.js): to him, a charge, a hold; over his place in the ranks.
+  const order = obeyOrder(world, fighter, opponent, style, dt);
+  if (order === 'obeyed') return;
   // In the ranks: his place first.
-  if (holdRank(world, fighter, opponent, style, dt)) return;
+  if (order !== 'fight' && holdRank(world, fighter, opponent, style, dt)) return;
   const bold = AI.confidence;
   const basePlan = chooseStrategy(world, fighter, opponent, dt);
   // Confidence presses: closer, more often inside, quicker to throw, slower

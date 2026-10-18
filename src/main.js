@@ -15,6 +15,7 @@ import { installMenus } from './menu.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
+import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
 import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
@@ -132,6 +133,7 @@ const fightControls = installFightControls($('#fight-ui'), {
   floorAxes: () => floorAxes(),
   marks: () => (state.mode === 'play' ? fightMarks : null),
   clock: () => fightMarksClock,
+  order: (kind) => orderSide(kind),
 });
 fightUiWireToggle($('#fightui-pick'));
 
@@ -141,6 +143,47 @@ lockRing.rotation.x = -Math.PI / 2;
 lockRing.renderOrder = 2;
 lockRing.visible = false;
 scene.scene.add(lockRing);
+
+// The way of a charge just ordered: a gold arrow on the floor before him, fading.
+const CHARGE_ARROW = { ahead: 2.2, seconds: 1.6 };
+const chargeArrow = new THREE.Group();
+{
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.7, -0.09);
+  shape.lineTo(0.25, -0.09);
+  shape.lineTo(0.25, -0.3);
+  shape.lineTo(0.8, 0);
+  shape.lineTo(0.25, 0.3);
+  shape.lineTo(0.25, 0.09);
+  shape.lineTo(-0.7, 0.09);
+  const flat = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+  flat.rotation.x = -Math.PI / 2;
+  flat.renderOrder = 2;
+  chargeArrow.add(flat);
+}
+chargeArrow.visible = false;
+scene.scene.add(chargeArrow);
+let chargeArrowAt = -Infinity;
+
+/** Give the player's side an order (command.js): a charge goes the way the camera looks, or at the man he is locked on. */
+function orderSide(kind) {
+  const me = player();
+  if (state.mode !== 'play' || !canCommand(state.world, me)) return;
+  const locked = lockedTarget();
+  const dir = locked ? [locked.x[P.pelvis * 3] - me.x[P.pelvis * 3], locked.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]] : floorAxes().ahead;
+  const command = giveOrder(state.world, me, kind, { dir });
+  if (command?.kind !== 'charge') return;
+  chargeArrow.position.set(command.at[0] + command.dir[0] * CHARGE_ARROW.ahead, 0.03, command.at[1] + command.dir[1] * CHARGE_ARROW.ahead);
+  chargeArrow.rotation.y = Math.atan2(-command.dir[1], command.dir[0]);
+  chargeArrowAt = realSeconds();
+}
+
+/** The charge's arrow, fading out. */
+function placeChargeArrow() {
+  const age = realSeconds() - chargeArrowAt;
+  chargeArrow.visible = state.mode === 'play' && age < CHARGE_ARROW.seconds;
+  if (chargeArrow.visible) chargeArrow.children[0].material.opacity = 0.85 * (1 - age / CHARGE_ARROW.seconds);
+}
 
 /** The lock's ring under his man's feet, turning slowly. */
 function placeLockRing() {
@@ -701,6 +744,7 @@ function drawWorld(dt, drawIt = true) {
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
+  placeChargeArrow();
   // The marks keep the fight's pace: slowed with it (a slow-motion moment, ¼×), still while it is paused.
   fightMarksClock += dt * (state.paused ? 0 : state.speed * timeScale(state.drama, realSeconds()));
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
@@ -944,6 +988,8 @@ segmented('#modes', (mode, button) => {
   watchCam = createWatchCam();
   cameraNote = '';
   fightKeys.clear();
+  // Orders given while playing are taken back: his side goes its own way.
+  clearOrders(state.world);
   fightControls.setActive(mode === 'play');
   document.body.classList.toggle('playing', mode === 'play');
 });
@@ -972,6 +1018,8 @@ const KEYS = {
   j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
   c: 'clinch', r: 'rush', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', y: 'rHook', g: 'collarTie',
 };
+// Orders to his side, in a battle (command.js): 7 To me, 8 Charge, 9 Hold, 0 Free (1–6 are the attack buttons).
+const ORDER_KEYS = Object.fromEntries(COMMAND_ORDERS.map((entry) => [entry.key, entry.kind]));
 // The movement keys held in the fight (not walk mode), and when Space went down.
 const fightKeys = new Set();
 let spaceDown = null;
@@ -1041,6 +1089,9 @@ window.addEventListener('keydown', (press) => {
       (state.orders.actions ??= []).push(action);
       tutorial.signal('action', action);
     }
+  } else if (ORDER_KEYS[key]) {
+    press.preventDefault();
+    orderSide(ORDER_KEYS[key]);
   } else if (KEYS[key]) {
     press.preventDefault();
     command(KEYS[key]);
