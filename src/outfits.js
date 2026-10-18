@@ -1261,6 +1261,35 @@ export const OUTFITS = {
       escaupilDesign('Escaupil, blue sleeves', '#d8cfb8', '#22356a', 'cabasset'),
     ],
   },
+  // ---- Level Mode (Dunnottar): kits no random deal and no picker offers (`levelOnly`) ----
+  // The Forgers' operative: a padded gambeson over a dark arming doublet, hose and boots, the head bare.
+  // Light and quiet: some cut and point protection from the quilting, none against a blow.
+  forger: {
+    levelOnly: true,
+    faction: 'knights',
+    label: 'Forger — gambeson', movement: 'excellent', fists: 'bare',
+    sidearm: 'dagger',
+    extraMass: 0.1,
+    protection: { blunt: 0.2, cut: 0.4, pierce: 0.25, bullet: { head: 0, torso: 0.05, limb: 0 } },
+    courage: 0.4,
+    designs: [
+      { label: 'Storm-grey gambeson', top: { kind: 'longsleeve', color: '#2f3438' }, bottom: { kind: 'pants', color: '#26282a' }, armor: { kind: 'escaupil', color: '#6a6446', cloth: '#6a6446', cloth2: '#4a452f' }, head: null, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+    ],
+  },
+  // The garrison's levy: a quilted jack and a kettle hat, the cheapest kit a lord could issue.
+  levy: {
+    levelOnly: true,
+    faction: 'knights',
+    label: 'Levy — quilted jack', movement: 'good', fists: 'bare',
+    sidearm: 'dagger',
+    extraMass: 0.06,
+    protection: { blunt: 0.12, cut: 0.25, pierce: 0.12, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
+    courage: 0.05,
+    designs: [
+      { label: 'Faded jack', top: { kind: 'longsleeve', color: '#6a5a46' }, bottom: { kind: 'pants', color: '#3a3326' }, armor: { kind: 'escaupil', color: '#8a7b62', cloth: '#8a7b62', cloth2: '#6b5e49' }, head: { kind: 'kettleHat', color: '#7d8087', brim: 1.7 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Wool-stained jack', top: { kind: 'longsleeve', color: '#4a4a52' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#6e6a5a', cloth: '#6e6a5a', cloth2: '#524f43' }, head: { kind: 'kettleHat', color: '#6a6d74', brim: 1.8 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+    ],
+  },
   // A Mexica warrior: the ichcahuipilli (quilted cotton armour, soaked in
   // brine), a loincloth, sandals, a feathered band. Little against steel.
   mexicaWarrior: {
@@ -1506,6 +1535,8 @@ export const OUTFITS = {
 };
 
 export const OUTFIT_KEYS = Object.keys(OUTFITS);
+/** The outfits the builders offer: not Level Mode's own (`levelOnly`). */
+export const PICKABLE_OUTFIT_KEYS = OUTFIT_KEYS.filter((key) => !OUTFITS[key].levelOnly);
 
 /**
  * Headgear and head decoration, one at a time, knocked off by a blow that

@@ -12,6 +12,7 @@ import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
+import { LEVEL_PRESETS } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
@@ -27,7 +28,7 @@ import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
 import { checkButtons } from './uicheck.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
-import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
+import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen } from './crowdlod.js';
@@ -1266,7 +1267,7 @@ const colorName = (hex) => (hex ? Object.keys(PICKER_COLORS).find((name) => PICK
 const outfitField = (inputs) => (inputs.outfit ??= { kind: 'boxing', design: 0 });
 const OUTFIT_FIELDS = [
   {
-    key: 'kind', label: 'Outfit', options: OUTFIT_KEYS, names: Object.fromEntries(OUTFIT_KEYS.map((key) => [key, OUTFITS[key].label])),
+    key: 'kind', label: 'Outfit', options: PICKABLE_OUTFIT_KEYS, names: Object.fromEntries(PICKABLE_OUTFIT_KEYS.map((key) => [key, OUTFITS[key].label])),
     get: (inputs) => outfitField(inputs).kind,
     set: (inputs, value) => {
       Object.assign(outfitField(inputs), { kind: value, design: 0, colors: randomColors(value) });
@@ -1901,7 +1902,7 @@ const introStage = {
     if (state.mode === 'play') $('#modes button[data-value="watch"]').click();
     state.sideAsked = false;
     $('#side-pick').hidden = true;
-    for (const id of ['home', 'quick', 'levels-screen', 'versus', 'wizard']) $(`#${id}`).hidden = true;
+    for (const id of ['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard']) $(`#${id}`).hidden = true;
     setGame('intro');
     state.scenario = null;
     for (const view of state.views) disposeFighterView(scene, view);
@@ -2156,7 +2157,7 @@ function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
  * partial inputs over the contender preset), at a distance, paused or not.
  */
 function fight(red, blue, { seed = 1, distance = null, paused = false, place = state.place } = {}) {
-  const build = ({ preset = 'contender', ...inputs }) => ({ ...structuredClone(PRESETS[preset]), ...inputs });
+  const build = ({ preset = 'contender', ...inputs }) => ({ ...structuredClone(PRESETS[preset] ?? LEVEL_PRESETS[preset]), ...inputs });
   const entries = [...red.map((inputs) => ({ inputs: build(inputs), corner: 'red' })), ...blue.map((inputs) => ({ inputs: build(inputs), corner: 'blue' }))];
   document.body.classList.remove('sheet');
   document.querySelector('#sheet-labels')?.replaceChildren();

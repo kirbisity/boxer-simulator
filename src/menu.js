@@ -1,5 +1,5 @@
 // The way in: a home screen, and from it (in this order) Career (to come),
-// Levels, Deadliest Warrior, Quick Battle and the Sandbox; and a character
+// Battle Mode, Level Mode, Deadliest Warrior, Quick Battle and the Sandbox; and a character
 // creator that goes one plain
 // question at a time. The menus only choose fighters and places; the
 // fights themselves are the same world as everywhere else (main.js does
@@ -8,13 +8,14 @@
 import { normaliseInputs, PRESETS } from './body.js';
 import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
-import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
+import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, PICKABLE_OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
 import { SCENARIOS } from './scenarios.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { canRide, HORSES, mountOf } from './horses.js';
 import { SKIN_TONES } from './render.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
+import { STAGE_LIST } from './levelmode/story.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
 export const EVENTS = {
@@ -93,7 +94,7 @@ const STYLE_FACTION = (key) => {
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
   const show = (id) => {
-    for (const other of ['home', 'quick', 'levels-screen', 'versus', 'wizard']) document.getElementById(other).hidden = other !== id;
+    for (const other of ['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
   };
   const close = () => show(null);
@@ -106,7 +107,8 @@ export function installMenus(game) {
     body.parentElement.classList.add('home');
     body.append(el('div', { className: 'choices home-choices' },
       choice({ glyph: '🏆', kicker: 'Coming soon', title: 'Career', text: 'One fighter, bout after bout, as he rises. Being built now.', tone: 'career' }),
-      choice({ glyph: '🗺️', kicker: 'Stories', title: 'Levels', text: 'Set fights in set places. Start with the tutorial.', onClick: levels, tone: 'gold' }),
+      choice({ glyph: '🗺️', kicker: 'Set fights', title: 'Battle Mode', text: 'Historical battles in set places. Start with the tutorial.', onClick: levels, tone: 'gold' }),
+      choice({ glyph: '🏰', kicker: 'New · Stage 1', title: 'Level Mode', text: 'Fight your way up a storm-swept fortress, one stage at a time.', onClick: stages, tone: 'storm' }),
       choice({ glyph: '☠️', kicker: 'Who would win?', title: 'Deadliest Warrior', text: 'Pick any two warriors and watch them, or fight as one.', onClick: versus }),
       choice({ glyph: '⚡', kicker: 'Play now', title: 'Quick Battle', text: 'A random fighter against whoever comes. One tap.', onClick: quickEvent }),
       choice({ glyph: '🧪', kicker: 'Expert', title: 'Sandbox', text: 'Every setting: teams, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })),
@@ -146,9 +148,20 @@ export function installMenus(game) {
     fight();
   }
 
-  // ---- Levels --------------------------------------------------------------
+  // ---- Level Mode: the stages ---------------------------------------------------
+  // Stage 1 starts through `game.onStage(key)` (main.js wires it; unwired, the card does nothing); the rest are shown, not open yet.
+  function stages() {
+    const body = screen('stages-screen', 'Level Mode', 'One fighter, one climb. Pick a stage.', home);
+    body.append(el('div', { className: 'choices levels stages' }, ...STAGE_LIST.map((stage) => choice({
+      glyph: stage.glyph, kicker: stage.kicker, title: stage.title, text: stage.blurb, tone: stage.ready ? 'storm' : '',
+      onClick: stage.ready ? () => { if (!game.onStage) return; close(); game.onStage(stage.key); } : null,
+    }))));
+    show('stages-screen');
+  }
+
+  // ---- Battle Mode: the levels --------------------------------------------------
   function levels() {
-    const body = screen('levels-screen', 'Levels', 'Tap a level, then choose your side.', home);
+    const body = screen('levels-screen', 'Battle Mode', 'Tap a battle, then choose your side.', home);
     // The training yard first: every control, one at a time.
     const yard = choice({ glyph: '🎯', kicker: 'Start here · two minutes', title: 'Tutorial', text: 'Every control, one at a time, against a knight who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
     body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(([key, level]) => choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } }))));
@@ -438,7 +451,7 @@ export function installMenus(game) {
       }
     }
     function stepGear(content) {
-      const kinds = OUTFIT_KEYS;
+      const kinds = PICKABLE_OUTFIT_KEYS;
       const outfit = inputs.outfit ?? { kind: 'boxing', design: 0 };
       const designs = OUTFITS[outfit.kind].designs.map((design, at) => [design, at]).filter(([design]) => !design.levelOnly);
       content.append(
@@ -478,5 +491,5 @@ export function installMenus(game) {
 
   // Back to the menu from a fight.
   game.onMenu(home);
-  return { home, levels, versus, quickEvent, close };
+  return { home, levels, stages, versus, quickEvent, close };
 }

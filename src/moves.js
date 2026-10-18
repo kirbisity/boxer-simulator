@@ -1679,6 +1679,18 @@ STYLES.kheshigBow = {
   ranged: { ...STYLES.steppeBow.ranged, between: [0.25, 0.4], holdGround: true, charge: 3, volley: 5 },
 };
 
+// The Forger's own (Level Mode): the arming sword and an iron buckler held out to parry, a quicker and lighter hand than the heater.
+STYLES.armingBuckler = {
+  ...STYLES.templar,
+  label: 'Arming sword and buckler', hidden: true, shield: 'buckler',
+  shieldGuard: [0.32, 0.74, 0.05],
+  tempo: 1.35,
+  defences: { shieldBlock: 0.7, stepBack: 0.3 },
+  defendChance: 0.66,
+  headMovement: 0.1,
+  pressure: 0.2,
+};
+
 /** Styles a player can pick (a fallback such as the drawn gladius is not one). */
 export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden);
 
