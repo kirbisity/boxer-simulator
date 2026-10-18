@@ -25,31 +25,31 @@ export const LEVEL_PRESETS = {
   // ---- The garrison, c. 1500 -----------------------------------------------------------------
   // Tier 1: levy spearmen, little armour, little drill.
   dunnottarSoldier: {
-    name: 'Dunnottar levy', style: 'spear', sex: 'male', heightCm: 172, frame: 'medium', age: 27, exercise: 0.45, calories: 2977, skill: 0.3,
+    name: 'Dunnottar levy', style: 'spear', sex: 'male', heightCm: 168, frame: 'small', age: 27, exercise: 0.06, calories: 1984, skill: 0.04,
     outfit: { kind: 'levy', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'stubble', eyeColor: 'blue' },
   },
   // Tier 2: brigandine, a poleaxe (the halberd's stand-in).
   dunnottarGuard: {
-    name: 'Dunnottar guard', style: 'warhammer', sex: 'male', heightCm: 177, frame: 'large', age: 32, exercise: 0.55, calories: 3865, skill: 0.5,
+    name: 'Dunnottar guard', style: 'warhammer', sex: 'male', heightCm: 177, frame: 'large', age: 32, exercise: 0.3, calories: 3174, skill: 0.4,
     outfit: { kind: 'footman', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#4a3020', facialHair: 'beard', eyeColor: 'brown' },
   },
   dunnottarCrossbow: {
-    name: 'Dunnottar crossbowman', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 30, exercise: 0.55, calories: 3344, skill: 0.5,
+    name: 'Dunnottar crossbowman', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 30, exercise: 0.3, calories: 2737, skill: 0.3,
     outfit: { kind: 'footman', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // His powder is damp: the stage makes him misfire (matchlock misfire and hang-fire chances are level config).
   dunnottarMatchlock: {
-    name: 'Dunnottar matchlock', style: 'matchlock', sex: 'male', heightCm: 174, frame: 'medium', age: 34, exercise: 0.5, calories: 3325, skill: 0.5,
+    name: 'Dunnottar matchlock', style: 'matchlock', sex: 'male', heightCm: 174, frame: 'medium', age: 34, exercise: 0.3, calories: 2836, skill: 0.3,
     outfit: { kind: 'footman', design: 4 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#6b4a2a', facialHair: 'stubble', eyeColor: 'green' },
   },
   // Tier 3: a man-at-arms in the blackened plate, the sword and heater. (A level may swap the style
   // to `longsword` or `warhammer` for a poleaxe man: it is only the style key.)
   dunnottarKnight: {
-    name: 'Dunnottar man-at-arms', style: 'templar', sex: 'male', heightCm: 182, frame: 'large', age: 33, exercise: 0.7, calories: 4737, skill: 0.7,
+    name: 'Dunnottar man-at-arms', style: 'templar', sex: 'male', heightCm: 182, frame: 'large', age: 33, exercise: 0.5, calories: 4047, skill: 0.5,
     outfit: { kind: 'knight', design: 2 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'grey' },
   },
@@ -98,7 +98,7 @@ export const LEVEL_PRESETS = {
   // very strong; a master's skill (0.9) of which the helm leaves him three quarters (skillFactor).
   vaelen: {
     name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.95, calories: 9256, skill: 0.9,
-    outfit: { kind: 'tournament', design: 1 }, accessories: [],
+    outfit: { kind: 'tournament', design: 1, extraMass: 0.3 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#1c1c20', facialHair: 'beard', eyeColor: 'grey' },
   },
 };

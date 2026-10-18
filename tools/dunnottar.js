@@ -176,8 +176,10 @@ class Run {
     this.lootGoal = null;
     this.bossAware = false;
     this.restsMade = new Set();
+    this.ignore = new Map();
+    this.closeAt = 0;
     this.result = null;
-    this.me.mayTarget = (other) => other.corner === 'blue' && !other.dormant && other.state !== 'out' && levelAware(this.world, other);
+    this.me.mayTarget = (other) => this.wanted(other);
     setup?.(this);
   }
 
@@ -192,24 +194,31 @@ class Run {
     return DUNNOTTAR.sections.find((section) => regionContains(section.bounds, hipX(me), hipZ(me), y))?.id ?? '?';
   }
 
+  /** Whether he fights this man: awake, aware of him, and not one he has given up on (across a fence, say). */
+  wanted(other) {
+    if (other.corner !== 'blue' || other.dormant || other.state === 'out' || !levelAware(this.world, other)) return false;
+    const until = this.ignore.get(other.id);
+    return !(until > this.world.time && apart(this.me, other) > 5);
+  }
+
   /** Enemies awake and aware of him: [{ fighter, d }] nearest first. */
   aware() {
     const me = this.me;
     const found = [];
     for (const fighter of this.world.fighters) {
-      if (fighter.corner !== 'blue' || fighter.dormant || fighter.state === 'out' || !levelAware(this.world, fighter)) continue;
+      if (!this.wanted(fighter)) continue;
       found.push({ fighter, d: apart(me, fighter) });
     }
     return found.sort((a, b) => a.d - b.d);
   }
 
   /** Play until the stage is done (the boss down), failed (too many deaths) or out of time. */
-  play({ seconds = 3000 } = {}) {
+  play({ seconds = 2400, final = true } = {}) {
     const world = this.world;
     const end = world.time + seconds;
     const think = (current, dt) => this.step(current, dt);
     while (!this.result && world.time < end) advance(world, STEP, think);
-    if (!this.result) this.result = this.policy === 'trace' ? 'traced' : 'timeout';
+    if (!this.result && final) this.result = this.policy === 'trace' ? 'traced' : 'timeout';
     return this.report();
   }
 
@@ -279,7 +288,8 @@ class Run {
     respawnPlayer(world);
     level.ui.length = 0;
     level.rebuild.clear();
-    this.me.mayTarget = (other) => other.corner === 'blue' && !other.dormant && other.state !== 'out' && levelAware(this.world, other);
+    this.me.mayTarget = (other) => this.wanted(other);
+    this.ignore.clear();
     this.mode = 'route';
     this.retreat = null;
     this.retreatUsed = false;
@@ -333,6 +343,19 @@ class Run {
       this.retreat = null;
     }
     if (spec.heal && this.tend(aware)) return;
+    // A stand-off (they are across a rail and cannot reach him, nor he them): he goes on his way and they are let be a while.
+    if (this.mode === 'fight') {
+      if (nearest <= 5 || (this.lastHit && world.time - this.lastHit.time < 3)) this.closeAt = world.time;
+      else if (world.time - this.closeAt > 8) {
+        for (const entry of aware) this.ignore.set(entry.fighter.id, world.time + 25);
+        this.note('gives up the stand-off');
+        this.mode = 'route';
+        me.focus = undefined;
+        this.best = Infinity;
+        this.progressAt = world.time;
+        return this.route(dt);
+      }
+    } else this.closeAt = world.time;
     if (fighting) return this.fight(aware, dt);
     if (spec.loot && this.loot(aware)) return;
     this.route(dt);
@@ -587,7 +610,7 @@ function bossDuel(variant, seed, log) {
       setMechanism(self.world, 'chapelgate', 'open');
       restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
       self.level.ui.length = 0;
-      self.me.mayTarget = (other) => other.corner === 'blue' && !other.dormant && other.state !== 'out' && levelAware(self.world, other);
+      self.me.mayTarget = (other) => self.wanted(other);
       VARIANTS[variant](self);
     },
   });
@@ -689,7 +712,7 @@ async function main() {
   if (command === 'one') {
     const [, policy, seed] = options._;
     const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });
-    const report = run.play({ seconds: Number(options.seconds ?? 3000) });
+    const report = run.play({ seconds: Number(options.seconds ?? 2400) });
     console.log(JSON.stringify({ ...report, seed: Number(seed) }));
     return;
   }
@@ -715,7 +738,7 @@ async function main() {
     return;
   }
   const policies = String(options.policy ?? 'careful,reckless').split(',');
-  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--deaths', String(options.deaths ?? 10)]));
+  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 2400)]));
   const results = await farm(lists, jobs);
   printSweep(results);
   printSummary(results);

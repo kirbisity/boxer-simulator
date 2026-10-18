@@ -1737,7 +1737,8 @@ export function gearTraits(inputs) {
     // Heels stand the body higher by this much (m).
     heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,
-    extraMass: spec.extraMass ?? 0,
+    // The kit's weight as a share of the body's; a man's own (`outfit.extraMass`) before the kit's (a giant in a harness that weighs what a harness weighs).
+    extraMass: inputs.outfit?.extraMass ?? spec.extraMass ?? 0,
     protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : { ...NO_PROTECTION, ...spec.protection },
     deflects: Boolean(spec.deflects),
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
