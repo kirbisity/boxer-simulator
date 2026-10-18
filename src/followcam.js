@@ -180,10 +180,20 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
     return { target: cam.target.slice(), yaw: cam.yaw, pitch: cam.pitch, distance: cam.distance };
   }
 
-  /** The furthest the camera may stand back along its line (no nearer than `nearest`). */
+  /**
+   * The furthest the camera may stand back along its line (no nearer than `nearest`). A room that is a wall of a place
+   * (colosseum, subway) is tested at the end of the line and bisected; a room with `march` (the walls and roofs of a
+   * level-mode stage: `room(x, z, y)`) is walked along from the target in steps, so that a thin wall is not leapt over.
+   */
   function roomFor(target, yaw, pitch, distance) {
     if (!room) return distance;
-    const at = (d) => [target[0] + Math.cos(pitch) * Math.cos(yaw) * d, target[2] + Math.cos(pitch) * Math.sin(yaw) * d];
+    const at = (d) => [target[0] + Math.cos(pitch) * Math.cos(yaw) * d, target[2] + Math.cos(pitch) * Math.sin(yaw) * d, target[1] + Math.sin(pitch) * d];
+    if (room.march) {
+      for (let d = spec.nearest; d <= distance + 1e-6; d += 0.3) {
+        if (!room(...at(d))) return Math.max(spec.nearest, d - 0.3 - 0.2);
+      }
+      return room(...at(distance)) ? distance : Math.max(spec.nearest, distance - 0.5);
+    }
     if (room(...at(distance))) return distance;
     let inside = spec.nearest;
     let outside = distance;

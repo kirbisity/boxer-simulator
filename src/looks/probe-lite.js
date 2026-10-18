@@ -29,6 +29,8 @@ export const PROBE_LITE_TUNE = {
 // The kinds of sky. horizon doubles as the fog colour.
 const PROBE_LITE_SKIES = {
   day: { zenith: [0.2, 0.42, 0.82], horizon: [0.8, 0.88, 0.96], haze: [0.96, 0.93, 0.86], sunColour: [1, 0.93, 0.78], ground: [0.3, 0.27, 0.2], groundHaze: false },
+  // A storm over the sea (Stage 1, Dunnottar): the ambient is a bruised violet-grey, cold and low; the place draws its own clouded sky.
+  storm: { zenith: [0.2, 0.19, 0.27], horizon: [0.3, 0.28, 0.35], haze: [0.5, 0.46, 0.48], sunColour: [0.7, 0.64, 0.62], ground: [0.1, 0.1, 0.13], groundHaze: false },
   night: { zenith: [0.02, 0.04, 0.1], horizon: [0.07, 0.1, 0.19], haze: [0.1, 0.13, 0.24], sunColour: [0.55, 0.65, 1], ground: [0.03, 0.04, 0.06], groundHaze: false },
 };
 
@@ -204,9 +206,10 @@ function probeLiteSetDome(dome, sky, sunDir) {
 
 const PROBE_LITE_PLACES = {
   night: ['port'],
+  storm: ['dunnottar'],
   hall: ['ring', 'subway', 'stadium'],
 };
-const probeLiteKind = (place) => (PROBE_LITE_PLACES.night.includes(place) ? 'night' : PROBE_LITE_PLACES.hall.includes(place) ? 'hall' : 'day');
+const probeLiteKind = (place) => (PROBE_LITE_PLACES.storm.includes(place) ? 'storm' : PROBE_LITE_PLACES.night.includes(place) ? 'night' : PROBE_LITE_PLACES.hall.includes(place) ? 'hall' : 'day');
 
 // Indoor lighting description per hall place: base ambient, the warm panels,
 // and keyGain on the overhead key. A fight-night ring sits under a bank of
@@ -242,13 +245,13 @@ function probeLiteBuild(st, place, view) {
     // The sky colours follow the place's own horizon (its fog/background), so each place keeps its weather.
     const base = PROBE_LITE_SKIES[kind];
     const bg = new THREE.Color(view.light.background);
-    const sky = { ...base, horizon: kind === 'night' ? base.horizon : [bg.r, bg.g, bg.b] };
+    const sky = { ...base, horizon: kind === 'night' || kind === 'storm' ? base.horizon : [bg.r, bg.g, bg.b] };
     st.skies ??= {};
     st.skies[key] = sky;
     cube = probeLiteBakeCube(tune.cubeSize, (x, y, z, out) => probeLiteSky(sky, x, y, z, sunArr, true, out));
     // The ambient has no sun disc in it: the sun is its own light. Ground bounce comes from the sky function's ground.
     probeLiteProject(probe.sh, (x, y, z, out) => probeLiteSky(sky, x, y, z, sunArr, false, out));
-    probe.intensity = tune.probeIntensity;
+    probe.intensity = tune.probeIntensity * (kind === 'storm' ? 2.1 : 1);
   }
   const record = { kind, cube, probe, sun };
   st.baked[key] = record;
@@ -291,6 +294,19 @@ export const PROBE_LITE_LOOK = defineLook({
       return;
     }
 
+    // A storm: the place's own painted sky (levelmode/storm.js), the haze of its fog, a dim cold sun and no key.
+    if (record.kind === 'storm') {
+      if (st.dome) st.dome.visible = false;
+      view.scene.background = new THREE.Color(view.light.background);
+      view.scene.fog.color.set(view.light.background);
+      lights.key.visible = false;
+      lights.rim.visible = false;
+      lights.sun.visible = true;
+      lights.sun.color.fromArray(st.skies.storm.sunColour);
+      lights.sun.position.set(-8, 7, 5);
+      lights.sun.target.position.set(0, 0, 0);
+      return;
+    }
     // Open air: the dome, the haze, the sun.
     hidePaintedSky(view);
     const sky = st.skies[record.kind === 'night' ? 'night' : 'day'];

@@ -35,6 +35,7 @@ import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 import { prepareScenery, updateSceneryLod } from './scenerylod.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
+import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -103,7 +104,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena, weather = null) {
   if (place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, stage: buildStageSky };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -114,7 +115,10 @@ export function setPlace(view, place, arena, weather = null) {
       object.material.envMapIntensity = share;
     });
     view.scene.add(view.places[place]);
+    // A place with weather of its own takes the scene's lights to flash (levelmode/storm.js).
+    view.places[place].userData.bind?.(view);
   }
+  if (view.place === 'dunnottar' && place !== 'dunnottar') stormRelease(view);
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
   view.place = place;
   // A level's own weather (scenarios.js `weather`): the same place is clear for the sandbox and for other levels.
@@ -296,6 +300,8 @@ const PLACE_LIGHT = {
   plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
   // A level-mode stage: open sky and a sea below; the stage's own terrain stands in it (levelmode/terrainview.js).
   stage: { background: 0xbcd8f0, fog: [60, 220], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // Stage 1, Dunnottar: a storm at dusk over a black sea; a bruised purple-grey haze that thickens with distance (levelmode/storm.js).
+  dunnottar: { background: 0x3a3646, fog: [45, 360], far: 720, key: 0x8e8aa8, keyIntensity: 0.05, rim: 0x5c6488, sun: 0.75, hemi: 0.58 },
   // An open field for horsemen: a clear day, the haze far off.
   field: { background: 0xb4d2ee, fog: [45, 140], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xd6e6ff, sun: 1.0 },
   // A tropical shore: bright, hazy over the sea.
@@ -330,6 +336,7 @@ export const PLACE_ARENAS = {
   jiangnan: { halfX: 14, halfZ: 9 },
   // A level-mode stage: the terrain is the floor (the box is only a far limit).
   stage: { halfX: 40, halfZ: 40 },
+  dunnottar: { halfX: 40, halfZ: 40 },
 };
 
 /** The warmers' programs are built for the lights in force by the first frames drawn after they change; the group is drawn only for these. */

@@ -45,6 +45,9 @@ import { installLevelHud } from './levelmode/hud.js';
 import { NOTES, showDeath, showNote } from './levelmode/story.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
+import { stormEnvironment, stormReset } from './levelmode/storm.js';
+import { stageCameraRoom } from './levelmode/kit.js';
+import { ktSightline } from './levelmode/kittex.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -109,7 +112,9 @@ let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}
 
 // The third-person camera of play mode (followcam.js), kept out of the place's walls.
 let cameraWalls = null;
-const followCam = createFollowCam(undefined, { room: (x, z) => !cameraWalls || cameraWalls(x, z) });
+// (A stage's walls and roofs are walked along from the target, so that a thin wall is not leapt over: `march`, set by enterStage.)
+const cameraRoomTest = (x, z, y) => !cameraWalls || cameraWalls(x, z, y);
+const followCam = createFollowCam(undefined, { room: cameraRoomTest });
 
 // The camera when watching (watchcam.js): framing everyone, or taken over by the viewer's zoom and tap.
 let watchCam = createWatchCam();
@@ -276,6 +281,7 @@ function newBout() {
   fightMarks.reset();
   fightMarks.warm();
   cameraWalls = cameraRoom(place, arena);
+  cameraRoomTest.march = false;
   followCam.reset();
   // A level frames its own place; anything else starts from the usual ringside view.
   Object.assign(scene.orbit, scenario?.camera ?? { yaw: -0.5, pitch: 0.2, distance: 5.2 });
@@ -792,6 +798,8 @@ function drawWorld(dt, drawIt = true) {
   // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
   // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall).
   placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet });
+  // In a stage the walls and roofs between the camera and the man played let him through (a dithered fade: levelmode/kittex.js).
+  if (world.stage && followed) ktSightline(scene.camera.position, [followed.x[P.neck * 3], followed.x[P.neck * 3 + 1], followed.x[P.neck * 3 + 2]], true);
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   showCameraBar(!followed && !sheet);
@@ -1879,19 +1887,27 @@ function enterStage(key) {
   // The operative (a fixed preset), in his combat stance: the stick within the run threshold fights, past it runs (control.js).
   state.world = createLevelWorld(stage, levelPreset('forger'), { seed: state.seed });
   clearGore(scene);
-  setPlace(scene, 'stage', PLACE_ARENAS.stage);
+  // (A stage may be set in a place of its own: the storm of Dunnottar, levelmode/storm.js.)
+  const place = stage.place ?? 'stage';
+  setPlace(scene, place, PLACE_ARENAS[place]);
   if (stageView) disposeStageView(stageView);
   stageView = createStageView(stage);
-  scene.places.stage.add(stageView.group);
-  placeStageSea(scene.places.stage, stage);
+  scene.places[place].add(stageView.group);
+  placeStageSea(scene.places[place], stage);
+  if (place === 'dunnottar') {
+    stormReset(stage.weather?.seed);
+    stageView.setEnvironment?.(stormEnvironment(scene.renderer));
+  }
   fightMarks.reset();
   fightMarks.warm();
-  cameraWalls = null;
+  // The follow camera is held off the stage's walls and roofs (levelmode/kit.js).
+  cameraWalls = stageCameraRoom(() => state.world.arena.terrain);
+  cameraRoomTest.march = true;
   followCam.reset();
   Object.assign(scene.orbit, { yaw: Math.PI + 0.3, pitch: 0.25, distance: 5.2 });
   watchCam = createWatchCam();
   cameraNote = '';
-  document.body.dataset.place = 'stage';
+  document.body.dataset.place = place;
   $('#place').closest('label').hidden = true;
   rebuildViews({ progressive: true });
   state.eventCursor = 0;

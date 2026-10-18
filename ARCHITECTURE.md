@@ -65,7 +65,16 @@ its own tread; a man off a ledge is in the air (`fighter.air`) and lands by
 `levelmode/stage.js` is the stage data (header comment: every field), the active
 sections, dormant fighters (`fighter.dormant`: not stepped, thought for, collided or
 drawn) and gates and ladders that swap solids. Civilians and prisoners are corner
-`grey` (`hostile`). `levelmode/terrainview.js` draws the terrain as grey boxes.
+`grey` (`hostile`). `levelmode/terrainview.js` draws the terrain as grey boxes, or, for a
+stage with a `landform`, hands over to the castle kit. Stage 1 (`levelmode/stages/dunnottar.js`)
+is eight sections of data, with `decor` (wall runs with their openings, vaults, props) that only
+the drawing reads. `levelmode/kit.js` draws it from the same solids and decor: merged batches per
+material and chunk (`kitgeo.js`), painted textures (`kittex.js`), props (`kitprops.js`), the
+headland as a heightfield under every floor, the detail of the sections near the player and a block
+silhouette of the rest, gates and the ladder that move with their state, flames, ravens, and a pool
+of four real lights. `storm.js` is the weather (place `dunnottar`: sky, sea, rain, seeded lightning),
+and the kit's materials fade in a screen-door tube between camera and man (`ktSightline`) while the
+follow camera is kept off the stage's walls and roofs (`stageCameraRoom`, `followcam.js` `march`).
 
 ## Drawing (browser only)
 

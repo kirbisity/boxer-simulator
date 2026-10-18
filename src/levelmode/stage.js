@@ -25,7 +25,7 @@
 //     // Who stands in it. Each becomes a fighter, in this order, after the player (id 0).
 //     spawns: [ {
 //       id: 'guard1',                     // unique in the stage
-//       preset: 'knight',                 // a key of PRESETS (body.js); default 'contender'
+//       preset: 'knight',                 // a key of PRESETS (body.js) or LEVEL_PRESETS (levelmode/presets.js); default 'contender'
 //       inputs: { name: 'Hob' },          // fighter inputs laid over the preset (any field)
 //       role: 'enemy',                    // enemy | boss (corner 'blue'); civilian | prisoner (corner 'grey', neutral); ally (corner 'red', with the player)
 //       tier: 1,                          // strength of the garrison, for the AI to read (not used here)
@@ -69,6 +69,17 @@ import { P, PRESETS } from '../body.js';
 import { createWorld, placeOnFloor } from '../physics.js';
 import { createTerrain, floorAt } from '../physics/terrain.js';
 import { createAwareness, rehomeFollowers, updateAwareness } from './awareness.js';
+import { LEVEL_PRESETS, levelPreset } from './presets.js';
+
+/** Whether a preset key is known: the game's own (body.js PRESETS) or the level cast's (presets.js LEVEL_PRESETS). */
+const knownPreset = (key) => !!(PRESETS[key] || LEVEL_PRESETS[key]);
+
+/** The fighter inputs a spawn starts from: its preset (the level cast's, normalised, or the game's), `inputs` laid over it. */
+function spawnInputs(spawn) {
+  const key = spawn.preset ?? 'contender';
+  const base = LEVEL_PRESETS[key] ? levelPreset(key) : structuredClone(PRESETS[key]);
+  return { ...base, ...structuredClone(spawn.inputs ?? {}) };
+}
 
 const ROLE_CORNER = { enemy: 'blue', boss: 'blue', civilian: 'grey', prisoner: 'grey', ally: 'red' };
 
@@ -143,7 +154,7 @@ export function checkStage(stage) {
       if (spawns.has(spawn.id)) problems.push(`two spawns are called ${spawn.id}`);
       spawns.add(spawn.id);
       if (!(spawn.role in ROLE_CORNER)) problems.push(`spawn ${spawn.id} has the role ${spawn.role}`);
-      if (spawn.preset && !PRESETS[spawn.preset]) problems.push(`spawn ${spawn.id} has the preset ${spawn.preset}, which is not there`);
+      if (spawn.preset && !knownPreset(spawn.preset)) problems.push(`spawn ${spawn.id} has the preset ${spawn.preset}, which is not there`);
       if (!spawn.post || spawn.post.length !== 3) problems.push(`spawn ${spawn.id} needs a post [x, y, z]`);
     }
   }
@@ -199,7 +210,7 @@ export function createStageWorld(stage, playerInputs, { seed = 1, awareness = tr
   const posts = [{ at: stage.start.at, facing: stage.start.facing ?? 0, spawn: null }];
   for (const section of stage.sections) {
     for (const spawn of section.spawns ?? []) {
-      entries.push({ inputs: { ...structuredClone(PRESETS[spawn.preset ?? 'contender']), ...structuredClone(spawn.inputs ?? {}) }, corner: ROLE_CORNER[spawn.role] });
+      entries.push({ inputs: spawnInputs(spawn), corner: ROLE_CORNER[spawn.role] });
       posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id } });
     }
   }

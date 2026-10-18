@@ -7,6 +7,8 @@
 // mechanism in its present state. The group goes into the stage's place in the scene
 // (render.js setPlace 'stage'); `view.group.parent` is that place while it is there.
 
+import { createCastleView } from './kit.js';
+
 const COLORS = { slab: 0x8a8f95, ramp: 0x9a9388, stairs: 0xa4a9ae, wall: 0x6c6f78, ceiling: 0x575a62 };
 const ALTERNATE = 0xb9bec3;
 
@@ -79,6 +81,8 @@ function solidsGroup(solids, floorY) {
 
 /** The drawing of a stage: { group, sections: { id: Group }, mechanisms: [{ id, state, section, group }] }. */
 export function createStageView(stage) {
+  // A stage with a landform of its own is drawn as a castle (kit.js); the others in plain boxes.
+  if (stage.landform) return createCastleView(stage);
   const floorY = Number.isFinite(stage.sea) ? stage.sea : -4;
   const group = new THREE.Group();
   group.name = `stage:${stage.id}`;
@@ -100,6 +104,10 @@ export function createStageView(stage) {
 
 /** Show what is in force: the active sections, and each gate or ladder as it stands. */
 export function updateStageView(view, world) {
+  if (view.update) {
+    view.update(world);
+    return;
+  }
   const run = world.stage;
   for (const [id, group] of Object.entries(view.sections)) group.visible = run.active.includes(id);
   for (const mechanism of view.mechanisms) mechanism.group.visible = run.active.includes(mechanism.section) && run.mechanisms[mechanism.id] === mechanism.state;
@@ -114,6 +122,10 @@ export function placeStageSea(place, stage) {
 /** Let go of a view's geometry and materials. */
 export function disposeStageView(view) {
   view.group.parent?.remove(view.group);
+  if (view.dispose) {
+    view.dispose();
+    return;
+  }
   view.group.traverse((object) => {
     object.geometry?.dispose();
     object.material?.dispose();
