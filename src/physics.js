@@ -135,6 +135,26 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     knock: [0, 0, 0],
     stats: { thrown: 0, landed: 0, blocked: 0, struckHorse: 0, maxHandSpeed: 0, lastHandSpeed: 0, knockdownsScored: 0 },
     contacts: new Set(),
+    // What the fight adds later, named here (unset) so that every fighter has the
+    // one shape: fighters that gain fields in their own order each get their own,
+    // and the engine reading them all (a hundred men, a hundred shapes) slows to a crawl.
+    shield: undefined, weapon: undefined, offWeapon: undefined, arena: undefined, slot: undefined, formation: undefined, inFront: undefined,
+    shieldPose: undefined, shieldOpen: undefined, strafe: undefined, running: undefined, aimAt: undefined, focus: undefined, goTo: undefined,
+    nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
+    weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined,
+    stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
+    bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined,
+    loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
+    restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
+    sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
+    mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
+    panicked: undefined, panics: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined,
+    aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined,
+    aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
+    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
+    aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
+    aiFleeing: undefined, aiFleeSince: undefined, aiCharge: undefined,
+    mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
