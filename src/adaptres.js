@@ -11,8 +11,9 @@
 export const ADAPTIVE_RESOLUTION = {
   // A fight of fewer fighters than this is never adapted (and is put back to full at once if one shrinks to it): a 1v1 is drawn exactly as ever.
   fewestFighters: 9,
-  // Each step's share of the full pixel ratio. Fill cost is the pixel count, so 0.75 of the ratio is 0.56 of the pixels, and 0.625 is 0.39.
-  steps: [1, 0.75, 0.625],
+  // Each step's share of the full pixel ratio. Fill cost is the pixel count, so 0.75 of the ratio is 0.56 of the pixels, 0.625 is 0.39 and 0.5 is a quarter.
+  // On a ratio-2 screen: 2, 1.5, 1.25, 1. The last is the floor, for a graphics card that is far behind.
+  steps: [1, 0.75, 0.625, 0.5],
   // Never drawn below this ratio, whatever the steps say: under 1 the picture turns to mush.
   floor: 1,
   // ms between frames above which the game is losing frames (a 60 Hz screen asks 16.7; 21 is under 48 fps).

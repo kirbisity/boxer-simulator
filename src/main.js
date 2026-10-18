@@ -923,6 +923,8 @@ function switchLook(id, { remember = false } = {}) {
     lookSelect.value = look.id;
     if (remember) rememberLook(look.id);
     reapplyPlace(scene);
+    // The scenery's meshes may have been swapped (scenerylod.js): see-through finds its pieces anew.
+    seeThrough.forget();
     // Templates keep the materials of the look they were built in.
     clearCrowdTemplates(scene);
     rebuildViews({ progressive: true });

@@ -20,18 +20,22 @@
 import { mayBlock, SEE_THROUGH } from './seethrough.js';
 
 export const SCENERY_LOD = {
-  // m: the cell an instanced scatter is cut into. A fight and its camera
-  // fill a few of these; the rest of a 60 m view is thinned or culled.
-  cell: 12,
-  // A cell is made at least this big (instances) by merging neighbours: below it the extra draw call costs more than the culling saves.
-  cellMinInstances: 160,
+  // m: the cell a wide instanced scatter (trees all round the place, litter over the field) is cut into. A 60 m view holds a handful of these; the rest are culled or thinned.
+  cell: 24,
+  // A cell holds at least this many triangles (neighbours are joined to make it): a draw call costs the processor about as much as the card takes to draw this many, so a smaller cell loses what culling gains.
+  cellMinTriangles: 12000,
+  // A scatter of fewer triangles than this is left as built, never cut or thinned: a few hundred trees of 12-triangle cards, or two dozen stones, cost less than the draw calls they would be cut into.
+  leastTriangles: 20000,
+  // m: a scatter whose copies all lie within this of their middle (the living ground's sectors) is one cell as it is: it already is a piece to cull, and cutting it further only adds draw calls.
+  compactRadius: 28,
   // m: a scatter whose copies are mostly this small (a tuft, a clump of tall grass, a flower, a stone, a leaf) may be thinned; trees, posts and walls never are.
   thinRadius: 2.5,
   // m from the camera to a cell's nearest edge: full density up to `thinFrom`, falling to `thinFloor` of it at `thinTo` and beyond.
-  // Grass and stones close to the camera, where the fight is, are exactly as built; far off a tuft is a few pixels and a sparser sprinkle reads the same.
-  thinFrom: 16,
-  thinTo: 48,
-  thinFloor: 0.35,
+  // Grass and stones near the camera, where the fight is, are exactly as built; far off a tuft is a few pixels and a sparser sprinkle reads the same.
+  // (Measured on an M1 Pro: all 18 000 copies gone changes the frame by under 0.4 ms, so this is for weaker graphics cards. Set `thinFloor` to 1 to turn it off.)
+  thinFrom: 20,
+  thinTo: 50,
+  thinFloor: 0.5,
   // m: a group of meshes is merged only when it is no wider than a see-through piece (seethrough.js pieceMax), so it fades as one thing as before.
   mergeWidth: SEE_THROUGH.pieceMax,
   // m: loose meshes (not in a group) are merged only within one cell this wide, and only the thin or low ones that see-through never fades.
@@ -92,7 +96,7 @@ export function shuffled(items, seed = 7) {
 // ---- state ---------------------------------------------------------------------
 
 let enabled = true;
-/** place group -> { done: WeakSet, undo: [() => void], thinned: [{ mesh, full, centre, radius }], moving: Set | null } */
+/** place group -> { done: WeakSet of what was looked at, undo: [() => void], thinned: [{ mesh, full, radius, local, centre }], counts, moving: Set } */
 const states = new WeakMap();
 
 export const sceneryLodOn = () => enabled;
@@ -162,19 +166,30 @@ function movingObjects(place) {
   everything.forEach((object, index) => {
     if (snapshots.some((snapshot) => snapshot[index].some((value, at) => value !== snapshots[0][index][at]))) moving.add(object);
   });
-  // The place goes back to where the first read left it; the next frame's tick moves it on.
+  // The place is left where the last read put it; the next frame's tick moves it on.
   return moving;
 }
 
-/** Visit what is visible below `object`, leaving moving things and whatever a visitor says is taken. */
-function walk(object, place, state, visitor) {
+/** Visit what is visible below `object`, leaving what is done and what the place's clock moves. */
+function walk(object, state, visitor) {
   for (const child of object.children.slice()) {
     if (!child.visible || state.done.has(child) || state.moving.has(child)) continue;
-    if (visitor(child) !== false) walk(child, place, state, visitor);
+    if (visitor(child) !== false) walk(child, state, visitor);
   }
 }
 
 // ---- instanced scatters ---------------------------------------------------------
+
+/** How far the copies reach from their middle: the radius of a sphere over all of them. */
+function spreadOf(points, sizes) {
+  let x = 0;
+  let z = 0;
+  for (const point of points) {
+    x += point[0] / points.length;
+    z += point[1] / points.length;
+  }
+  return Math.max(...points.map((point, index) => Math.hypot(point[0] - x, point[1] - z) + sizes[index]));
+}
 
 const shapeRadii = new WeakMap();
 /** The radius of one copy's shape. Not `boundingSphere`: a scatter that was cut by hand sets that to take in all its copies. */
@@ -191,7 +206,7 @@ function shapeRadius(geometry) {
 function chunkInstanced(place, state) {
   const config = SCENERY_LOD;
   const found = [];
-  walk(place, place, state, (object) => {
+  walk(place, state, (object) => {
     if (object.isInstancedMesh && !state.done.has(object)) found.push(object);
   });
   for (const mesh of found) {
@@ -210,8 +225,11 @@ function chunkInstanced(place, state) {
       sizes.push(matrix.getMaxScaleOnAxis() * reach);
     }
     if (!points.length) continue;
+    const perCopy = (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3;
+    if (perCopy * points.length < config.leastTriangles) continue;
     const small = [...sizes].sort((a, b) => a - b)[sizes.length >> 1] <= config.thinRadius && !mesh.userData.treeReach && !mesh.castShadow;
-    const cells = clusterByCell(points, cellEdge(points, config.cell, config.cellMinInstances));
+    const spread = spreadOf(points, sizes);
+    const cells = spread <= config.compactRadius ? [points.map((_, index) => index)] : clusterByCell(points, cellEdge(points, config.cell, Math.ceil(config.cellMinTriangles / perCopy)));
     const group = new THREE.Group();
     group.name = 'scenery-lod-chunks';
     // The cells sit in the original mesh's own space; the group carries its transform, the chunks none.
@@ -236,7 +254,7 @@ function chunkInstanced(place, state) {
 
 /** Whether a mesh is plain enough to be cut: its own instance data only, no per-instance geometry attributes, nothing else reading it. */
 function chunkable(mesh) {
-  if (mesh.userData.seeThrough === true || PINNED_KEYS.some((key) => mesh.userData[key] !== undefined && key !== 'seeThrough')) return false;
+  if (PINNED_KEYS.some((key) => mesh.userData[key] !== undefined)) return false;
   if (Array.isArray(mesh.material)) return false;
   if (Object.values(mesh.geometry.attributes).some((attribute) => attribute.isInstancedBufferAttribute)) return false;
   return mesh.count > 0;
@@ -282,12 +300,13 @@ function chunkOf(mesh, order, points, sizes, small, state) {
   if (mesh.userData.treeReach) chunk.userData.treeReach = order.map((from) => mesh.userData.treeReach[from]);
   chunk.userData.lodChunk = true;
   state.done.add(chunk);
-  if (small) state.thinned.push({ mesh: chunk, full: order.length, centre: null, radius, local: centre.clone(), parent: mesh });
+  if (small) state.thinned.push({ mesh: chunk, full: order.length, centre: null, radius, local: centre.clone() });
   return chunk;
 }
 
-/** Once a frame, after the camera is placed: thin the far cells of the small scatters. */
 let lodScratch = null;
+
+/** Once a frame, after the camera is placed: thin the far cells of the small scatters. */
 export function updateSceneryLod(view) {
   if (!enabled) return;
   const place = view.places?.[view.place];
