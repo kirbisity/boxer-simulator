@@ -10,7 +10,7 @@ import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
-import { desiredPose, lockedHead, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
+import { desiredPose, lockedHead, restPose, twoBoneIK, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
@@ -2505,9 +2505,19 @@ export function standingTarget(fighter, index) {
     return { target: swivelIntoRange(axes, 'leg', side, hip, knee, foot, { margin: WORLD.limbTwist.softBand }), velocity: point(fighter.v, info.hip) };
   }
   if (info.anchor === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
+  // Most parts: where the pose puts it from its anchor, turned to the way he faces, from where the anchor is.
   const anchor = info.anchor;
-  const offset = yawRotate(vec.sub(desired, fighter.desired[anchor]), fighter.yaw);
-  return { target: vec.add(point(fighter.x, anchor), offset), velocity: point(fighter.v, anchor) };
+  const from = fighter.desired[anchor];
+  const cos = yawCos(fighter.yaw);
+  const sin = yawSin(fighter.yaw);
+  const x = fighter.x;
+  const at = anchor * 3;
+  const dx = desired[0] - from[0];
+  const dz = desired[2] - from[2];
+  return {
+    target: [x[at] + (dx * cos + dz * sin), x[at + 1] + (desired[1] - from[1]), x[at + 2] + (-dx * sin + dz * cos)],
+    velocity: point(fighter.v, anchor),
+  };
 }
 
 // Scratch for the integrator's muscle drive (one particle at a time), and

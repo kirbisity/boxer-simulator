@@ -58,10 +58,35 @@ export const vec = {
   lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
 };
 
+// A fighter's yaw is asked many times running (every part, every substep):
+// its cosine and sine are kept until the angle changes.
+let lastYaw = 0;
+let lastCos = 1;
+let lastSin = 0;
+function keepYaw(angle) {
+  if (Object.is(angle, lastYaw)) return;
+  lastYaw = angle;
+  lastCos = Math.cos(angle);
+  lastSin = Math.sin(angle);
+}
+
+/** cos(angle), as yawRotate takes it. */
+export function yawCos(angle) {
+  keepYaw(angle);
+  return lastCos;
+}
+
+/** sin(angle), as yawRotate takes it. */
+export function yawSin(angle) {
+  keepYaw(angle);
+  return lastSin;
+}
+
 /** Rotate a vector about the vertical axis; a positive angle brings the left side (+z) forward (+x). */
 export function yawRotate(point, angle) {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
+  keepYaw(angle);
+  const cos = lastCos;
+  const sin = lastSin;
   return [point[0] * cos + point[2] * sin, point[1], -point[0] * sin + point[2] * cos];
 }
 
