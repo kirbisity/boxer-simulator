@@ -35,6 +35,9 @@ import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
+import { createStageWorld, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { STAGES } from './levelmode/stages.js';
+import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -340,6 +343,8 @@ function showMustering() {
 // ---- Loop -------------------------------------------------------------------
 
 function thinkForBout(world, dt) {
+  // A level-mode stage: the sections around the player awake, the rest dormant (levelmode/stage.js).
+  if (world.stage) updateStage(world);
   // The intro's legends stand in their guard: nobody to fight.
   if (state.game === 'intro') return;
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
@@ -505,7 +510,7 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   }
   consumeEvents();
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
-  if (state.game === 'intro' || state.game === 'tutorial') return;
+  if (state.game === 'intro' || state.game === 'tutorial' || state.world.stage) return;
   const winner = boutWinner(state.world);
   // Behind the menus, one fight follows another.
   if (state.game === 'home' && state.finishedAt !== null && state.world.time > state.finishedAt + 3) state.next.run();
@@ -515,7 +520,7 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     const name = team.length > 1 ? `${winner === 'red' ? 'Red' : 'Blue'} team` : team[0].body.inputs.name;
     $('#banner').hidden = state.game === 'home';
     // How it ended: the last fighter out on the losing side says.
-    const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
+    const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', drowned: 'Lost to the sea', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
     const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
     $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
   }
@@ -744,12 +749,20 @@ function drawWorld(dt, drawIt = true) {
   beginCrowdBatches(scene);
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
   selectCrowdDraw(scene, state.views, safeMen(world, followed));
+  if (world.stage && stageView) updateStageView(stageView, world);
   for (const view of state.views) {
+    // A dormant man (his section of a stage is not active) is not drawn, and posed afresh when he wakes.
+    if (view.fighter.dormant) {
+      view.group.visible = false;
+      view.stale = true;
+      continue;
+    }
     // Off screen (a crowd man the camera does not see): not posed or counted, and posed afresh the frame he is back.
     if (view.culled) {
       view.stale = true;
       continue;
     }
+    view.group.visible = true;
     updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
     updateArms(scene, view, drawnTime);
     updateStumps(view);
@@ -862,6 +875,7 @@ function logEvent(event) {
   else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'drowned') text = `🌊 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
   else if (event.kind === 'parry') text = `⚔️ <b>${name(event.fighter)}</b> parries <b>${name(event.attacker)}</b>'s ${event.punch} · <em>${event.effects.join(', ')}${event.answering ? ', cutting as he does' : ''}</em>`;
@@ -891,7 +905,7 @@ function logEvent(event) {
   }
   const row = document.createElement('li');
   row.innerHTML = text;
-  if (['knockout', 'broken', 'severed', 'killed', 'bledOut', 'pinned'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
+  if (['knockout', 'broken', 'severed', 'killed', 'bledOut', 'drowned', 'pinned'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
   const log = $('#log');
   log.prepend(row);
   while (log.children.length > 5) log.lastChild.remove();
@@ -1794,6 +1808,50 @@ function enterTutorial() {
   tutorial.start();
 }
 
+// ---- Level mode: stages -----------------------------------------------------------
+// A stage (levelmode/stage.js) is a walkable world of sections; the player walks about in it, third
+// person, with the sections around him awake. `boxer.levelMode(key)` opens one (STAGES).
+
+let stageView = null;
+
+/** Open a stage in play mode: the player (walking) at its start, the world of terrain drawn in grey boxes. */
+function enterStage(key) {
+  const stage = STAGES[key];
+  if (!stage) throw new Error(`no stage called ${key}`);
+  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key) });
+  state.scenario = null;
+  state.seed += 1;
+  state.world = createStageWorld(stage, normaliseInputs({ ...structuredClone(PRESETS.ronin), name: 'The Forger' }), { seed: state.seed });
+  clearGore(scene);
+  setPlace(scene, 'stage', PLACE_ARENAS.stage);
+  if (stageView) disposeStageView(stageView);
+  stageView = createStageView(stage);
+  scene.places.stage.add(stageView.group);
+  placeStageSea(scene.places.stage, stage);
+  fightMarks.reset();
+  fightMarks.warm();
+  cameraWalls = null;
+  followCam.reset();
+  Object.assign(scene.orbit, { yaw: Math.PI + 0.3, pitch: 0.25, distance: 5.2 });
+  watchCam = createWatchCam();
+  cameraNote = '';
+  document.body.dataset.place = 'stage';
+  $('#place').closest('label').hidden = true;
+  rebuildViews({ progressive: true });
+  state.eventCursor = 0;
+  state.finishedAt = null;
+  resetDrama(state.drama);
+  $('#log').replaceChildren();
+  $('#banner').hidden = true;
+  state.orders = newOrders();
+  fightControls.reset();
+  state.sideAsked = true;
+  $('#side-pick').hidden = true;
+  $('#modes button[data-value="play"]:not([data-side])').click();
+  setWalking(true);
+  renderHud();
+}
+
 /** The sandbox as it was left: its own fighters, sides and place. */
 function enterSandbox() {
   setGame('sandbox');
@@ -2239,6 +2297,15 @@ const boxer = window.boxer = {
   fight,
   // Open a level (its key in SCENARIOS), as its menu button does; null for the sandbox.
   level: chooseLevel,
+  // Level mode: open a stage (a key of STAGES, levelmode/stages.js) in play mode, walking; returns the sections active at its start.
+  levelMode: (key = 'testyard') => {
+    menus.close();
+    enterStage(key);
+    boxer.finishBuilding();
+    return state.world.stage.active;
+  },
+  // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
+  stage: () => ({ run: state.world.stage ?? null, set: (id, to) => setMechanism(state.world, id, to), pull: (id) => pullLever(state.world, id), view: stageView }),
   // The training yard, as the Levels menu opens it (any menu screen closed); its run (step, progress).
   tutorial: () => {
     menus.close();

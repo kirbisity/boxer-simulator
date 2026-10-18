@@ -103,7 +103,7 @@ export function createScene(canvas) {
  */
 export function setPlace(view, place, arena, weather = null) {
   if (place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, stage: buildStageSky };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -294,6 +294,8 @@ const PLACE_LIGHT = {
   sengoku: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
   // The high plain of the Valley of Mexico: thin bright air, a hard sun.
   plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // A level-mode stage: open sky and a sea below; the stage's own terrain stands in it (levelmode/terrainview.js).
+  stage: { background: 0xbcd8f0, fog: [60, 220], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
   // An open field for horsemen: a clear day, the haze far off.
   field: { background: 0xb4d2ee, fog: [45, 140], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xd6e6ff, sun: 1.0 },
   // A tropical shore: bright, hazy over the sea.
@@ -326,6 +328,8 @@ export const PLACE_ARENAS = {
   coastVillage: { halfX: 12, halfZ: 8 },
   // The square between the shops and the canal: room for the wokou raid's formations.
   jiangnan: { halfX: 14, halfZ: 9 },
+  // A level-mode stage: the terrain is the floor (the box is only a far limit).
+  stage: { halfX: 40, halfZ: 40 },
 };
 
 /** The warmers' programs are built for the lights in force by the first frames drawn after they change; the group is drawn only for these. */
@@ -608,6 +612,18 @@ function buildField(arena = PLACE_ARENAS.field) {
     hill.userData.scenery = 'hills';
     place.add(hill);
   }
+  return place;
+}
+
+/** The open sky and a sea for a level-mode stage (the sea's height is set by the stage: levelmode/terrainview.js). */
+function buildStageSky() {
+  const place = new THREE.Group();
+  place.add(daySky());
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: 0x35586b, roughness: 0.35, metalness: 0.1 }));
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.y = -8;
+  sea.name = 'stage-sea';
+  place.add(sea);
   return place;
 }
 
