@@ -22,7 +22,7 @@ import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createSeeThrough } from './seethrough.js';
-import { createAdaptiveResolution } from './adaptres.js';
+import { adaptiveSize, createAdaptiveResolution } from './adaptres.js';
 import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
@@ -30,8 +30,8 @@ import { checkButtons } from './uicheck.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
-import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
-import { crowdLod, protectedMen } from './crowdlod.js';
+import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
+import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
@@ -47,7 +47,8 @@ import { createLevelMarkers } from './levelmode/markers.js';
 import { createShards } from './levelmode/endingview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
-import { stormEnvironment, stormReset, stormStrikeNow } from './levelmode/storm.js';
+import { stormEnvironment, stormLook, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
+import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
 import { ktSightline } from './levelmode/kittex.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -330,7 +331,8 @@ function rebuildViews({ progressive = false } = {}) {
   state.horseViews = (state.world.horses ?? []).map((horse) => buildHorseView(scene, horse, { detail: crowded ? 'low' : 'full' }));
   if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
-  const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
+  // (In a stage the man played is the one lead: the first man met on the other side is no better drawn than the rest of his garrison.)
+  const leads = new Set(state.world.stage ? [state.world.fighters[0].id] : ['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
   const build = (fighter) => {
     const view = buildFighterView(scene, fighter, { simple: crowd && !leads.has(fighter.id) });
     setLayer(view, state.layer);
@@ -495,7 +497,7 @@ function frame(now) {
   const dt = Math.min(0.1, interval / 1000);
   last = now;
   try {
-    resolution.frame(scene, interval, state.world?.fighters.length ?? 0);
+    resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)));
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
@@ -612,7 +614,8 @@ function drainLevel() {
 function snapshot(world) {
   return {
     world,
-    fighters: world.fighters.map((fighter) => ({ x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
+    // (A dormant man of a stage is not drawn and does not move: nothing to blend.)
+    fighters: world.fighters.map((fighter) => (fighter.dormant ? null : { x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
     debris: world.debris.map((piece) => ({ x: piece.x?.slice(), q: piece.q?.slice() })),
     horses: (world.horses ?? []).map((horse) => ({ at: horse.at.slice(), yaw: horse.yaw, stride: horse.stride })),
   };
@@ -636,7 +639,8 @@ function blendWorld(world, before, share) {
     if (!then) return;
     const now = { fighter, x: fighter.x.slice(), dir: fighter.weapon?.dir, offDir: fighter.offWeapon?.dir };
     kept.push(now);
-    fighter.x.set(blend(then.x, now.x, share));
+    const x = fighter.x;
+    for (let at = 0; at < x.length; at += 1) x[at] = then.x[at] + (now.x[at] - then.x[at]) * share;
     if (then.dir && now.dir) fighter.weapon.dir = unit(blend(then.dir, now.dir, share));
     if (then.offDir && now.offDir) fighter.offWeapon.dir = unit(blend(then.offDir, now.offDir, share));
   });
@@ -825,8 +829,12 @@ function drawWorld(dt, drawIt = true) {
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
-  selectCrowdDraw(scene, state.views, safeMen(world, followed));
-  if (world.stage && stageView) updateStageView(stageView, world);
+  selectCrowdDraw(scene, state.views, safeMen(world, followed), world.stage ? STAGE_CROWD_VIEW : CROWD_VIEW);
+  if (world.stage && stageView) {
+    updateStageView(stageView, world, scene.camera);
+    // (The castle's shaders are built in the first frame, not as each is first wanted: levelmode/kit.js.)
+    stageView.warm?.(() => render(scene));
+  }
   if (world.stage) awarenessOverlay?.update(world, scene.camera);
   for (const view of state.views) {
     // A dormant man (his section of a stage is not active) is not drawn, and posed afresh when he wakes.
@@ -1148,6 +1156,42 @@ $('#ghost-walk').addEventListener('click', () => {
   boxer.finishBuilding();
   syncGhostBar();
 });
+// The stage's look (levelmode/stagelooks.js): a name in the ghost bar's Look select, `boxer.stageLook(name)`, or ?stagelook=; kept for next time.
+const stageLookKey = 'boxer.stageLook';
+const stageLookSelect = $('#ghost-look');
+stageLookSelect.append(...stageLookNames().map((name) => new Option(STAGE_LOOKS[name].label, name)));
+/** Change the stage's look now (whatever place is open: the choice is kept for the next time the stage opens); returns { look, looks }. */
+function chooseStageLook(name, options) {
+  const chosen = stormSetLook(name, options);
+  if (name !== undefined) {
+    try {
+      localStorage.setItem(stageLookKey, chosen);
+    } catch {
+      // Nothing kept.
+    }
+  }
+  stageView?.setEnvironment?.(stormEnvironment(scene.renderer));
+  stageView?.bakeShadow?.(scene.renderer, STAGE_LOOKS[chosen]);
+  document.body.style.setProperty('--stage-vignette', STAGE_LOOKS[chosen].vignette);
+  stageLookSelect.value = chosen;
+  return { look: chosen, looks: stageLookNames() };
+}
+stageLookSelect.addEventListener('change', () => {
+  chooseStageLook(stageLookSelect.value);
+  stageLookSelect.blur();
+});
+/** The look this visitor last chose (or the address's `?stagelook=`), else the default's. */
+function rememberedStageLook() {
+  const wanted = new URLSearchParams(location.search).get('stagelook');
+  if (STAGE_LOOKS[wanted]) return wanted;
+  try {
+    const saved = localStorage.getItem(stageLookKey);
+    if (STAGE_LOOKS[saved]) return saved;
+  } catch {
+    // Nothing kept.
+  }
+  return DEFAULT_STAGE_LOOK;
+}
 const ghostAs = $('#ghost-as');
 ghostAs.append(
   Object.assign(document.createElement('optgroup'), { label: 'Dunnottar' }),
@@ -2009,7 +2053,7 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   };
   if (place === 'dunnottar') {
     stormReset(stage.weather?.seed);
-    stageView.setEnvironment?.(stormEnvironment(scene.renderer));
+    chooseStageLook(rememberedStageLook());
   }
   fightMarks.reset();
   fightMarks.warm();
@@ -2574,6 +2618,8 @@ const boxer = window.boxer = {
     boxer.finishBuilding();
     return state.world.stage.active;
   },
+  // The look of the Dunnottar stage (levelmode/stagelooks.js): `stageLook()` says which (and the names); `stageLook(name)` changes it now; `stageLook(undefined, { still: true })` stops the lightning.
+  stageLook: (name, options) => (name === undefined && !options ? { look: stormLook(), looks: stageLookNames() } : chooseStageLook(name, options)),
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
   // The player's systems in the stage (levelmode/level.js): the run, what the button offers, and the verbs (for the console and tests).
   // (Named levelRun: `level` above opens a Battle Mode level, and a second `level:` key would shadow it.)

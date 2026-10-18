@@ -2183,19 +2183,21 @@ function inShadowMap(count) {
  * when far or outside the shadow map, ink only near the camera (beyond
  * CROWD_VIEW.inkDistance an outline is a pixel or two, and each costs a draw
  * call, two with its shadow). `safe`: ids of the men always drawn in full
- * (protectedMen). Sets `culled` on a view that is not drawn this frame, for
+ * (protectedMen). `config`: the distances (CROWD_VIEW, or a stage's: crowdlod.js). Sets `culled` on a view that is not drawn this frame, for
  * the caller to skip his update.
  */
-export function selectCrowdDraw(view, fighterViews, safe) {
+export function selectCrowdDraw(view, fighterViews, safe, config = CROWD_VIEW) {
   const camera = view.camera;
   camera.updateMatrixWorld();
   drawFrustum.setFromProjectionMatrix(drawMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
   const lit = crowdLod.enabled ? shadowCasters(view) : 0;
-  drawSphere.radius = CROWD_VIEW.cullRadius;
-  const inkRange = CROWD_VIEW.inkDistance * CROWD_VIEW.inkDistance;
+  drawSphere.radius = config.cullRadius;
+  const inkRange = config.inkDistance * config.inkDistance;
   for (const fighterView of fighterViews) {
     if (!fighterView.baked) continue;
     const fighter = fighterView.fighter;
+    // A dormant man of a stage is not drawn at all (main.js).
+    if (fighter.dormant) continue;
     const px = fighter.x[P.pelvis * 3];
     const py = fighter.x[P.pelvis * 3 + 1];
     const pz = fighter.x[P.pelvis * 3 + 2];
@@ -2214,7 +2216,7 @@ export function selectCrowdDraw(view, fighterViews, safe) {
         safe: safe.has(fighter.id),
         inView: drawFrustum.intersectsSphere(drawSphere),
         inShadow: inShadowMap(lit),
-      });
+      }, config);
     }
     fighterView.culled = draw.culled;
     fighterView.group.visible = !draw.culled;

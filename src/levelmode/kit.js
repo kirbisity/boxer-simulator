@@ -1,14 +1,15 @@
 // The castle kit: the stage's own data (its solids, its wall runs and vaults and props) drawn as a castle, so that what
 // is drawn is what is stood on. `createCastleView(stage)` gives the same view object as the grey-box terrainview did
-// ({ stage, group, sections, mechanisms }) with an `update(world)` that terrainview.updateStageView calls each frame.
+// ({ stage, group, sections, mechanisms }) with an `update(world, camera)` that terrainview.updateStageView calls each frame.
 //
 // What is drawn, and when:
 //  - the land: the mainland hillside with the fenced switchback cut into it, and the headland: a ragged black rock
 //    (a heightfield that stands under every floor and flight and falls from their edges in cliffs to the sea), with surf
 //    at its foot; always.
 //  - for each section, its detail (walls with their arches, windows and oillets, stair flights, vaults, props, gates,
-//    items): while the section is active or next to an active one (a portal leads to it); otherwise its
-//    silhouette, the same solids as plain blocks, which is all that is seen of it from far off.
+//    items): while the section is active, or next to an active one with the way between them in the camera's view (a
+//    portal leads to it); otherwise its silhouette, the same solids as plain blocks, which is all that is seen of it from
+//    far off or from behind a wall. A section outside the camera's frustum is not drawn or animated at all.
 //  - what moves: gates and ladders with their state, flames, ravens, drips, light shafts, the markers on things to take.
 // Every mesh is a merged batch per material per chunk of ground, with frustum culling on.
 
@@ -16,8 +17,10 @@ import { P } from '../body.js';
 import { ceilingAt, pushOut } from '../physics/terrain.js';
 import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
-import { stormFollow } from './storm.js';
-import { ktDispose, ktMaterials, ktRandom } from './kittex.js';
+import { stormFollow, stormTorch } from './storm.js';
+import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
+import { skyDirection } from './stagesky.js';
+import { ktDispose, ktMaterials, ktRandom, ktWeather } from './kittex.js';
 
 const KIT_SLAB_TOP = { grass: 'grass', path: 'path', rock: 'rock', flags: 'flags', cobble: 'cobble', boards: 'boards', stone: 'ashlar' };
 const KIT_WALL = { ashlar: 'ashlar', rubble: 'rubble', ruin: 'ruin', rock: 'rock', tower: 'ashlar', parapet: 'ashlar' };
@@ -232,7 +235,15 @@ function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
   const rows = heights.length - 1;
   const columns = heights[0].length - 1;
   const tris = { grass: { p: [], n: [], u: [], c: [] }, rock: { p: [], n: [], u: [], c: [] } };
-  const vertex = (r, k) => [x0 + k * cell, heights[r][k], z0 + r * cell];
+  // Each vertex remembers its place in the grid, for the smooth normal of the ground (the slope of the heightfield there).
+  const vertex = (r, k) => [x0 + k * cell, heights[r][k], z0 + r * cell, r, k];
+  const at = (r, k) => heights[Math.max(0, Math.min(rows, r))][Math.max(0, Math.min(columns, k))];
+  const smooth = (v) => {
+    const sx = (at(v[3], v[4] - 1) - at(v[3], v[4] + 1)) / (2 * cell);
+    const sz = (at(v[3] - 1, v[4]) - at(v[3] + 1, v[4])) / (2 * cell);
+    const length = Math.hypot(sx, 1, sz);
+    return [sx / length, 1 / length, sz / length];
+  };
   const emit = (p, q, s) => {
     const ux = q[0] - p[0];
     const uy = q[1] - p[1];
@@ -254,16 +265,30 @@ function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
       ny = -ny;
       nz = -nz;
     }
-    const bucket = ny < steep || order.every((v) => v[1] < sea + 1.5) ? tris.rock : tris.grass;
+    // The line between grass and rock wanders (a noise on the slope that decides), so the cliff top is not a staircase of cells.
+    const wander = 0.09 * kitNoise((p[0] + q[0] + s[0]) * 0.11, (p[2] + q[2] + s[2]) * 0.11);
+    const bucket = ny < steep + wander || order.every((v) => v[1] < sea + 1.5) ? tris.rock : tris.grass;
     for (const v of order) {
-      bucket.p.push(...v);
-      bucket.n.push(nx, ny, nz);
+      bucket.p.push(v[0], v[1], v[2]);
+      // Grass lies in smooth slopes (no facets of a grid); rock keeps half its facets, so a cliff is still broken.
+      const sm = smooth(v);
+      const keep = bucket === tris.rock ? 0.5 : 0.1;
+      const sx = sm[0] + (nx - sm[0]) * keep;
+      const sy = sm[1] + (ny - sm[1]) * keep;
+      const sz = sm[2] + (nz - sm[2]) * keep;
+      const sl = Math.hypot(sx, sy, sz) || 1;
+      bucket.n.push(sx / sl, sy / sl, sz / sl);
       // Steep faces take their texture sideways (a plan view of a cliff is a smear).
       if (bucket === tris.rock && ny < 0.62) bucket.u.push(v[0] * Math.abs(nz) + v[2] * Math.abs(nx), v[1]);
       else bucket.u.push(v[0], v[2]);
       const low = Math.max(0, Math.min(1, (v[1] - sea) / 8));
-      const tone = 0.62 + 0.38 * low;
-      bucket.c.push(tone, tone, tone * 0.97);
+      let tone = 0.62 + 0.38 * low;
+      // Ground that is not one colour: swells of light and dark over tens of metres, patches of bare earth and of rank green, a darker skirt where it steepens.
+      const swell = kitNoise(v[0] * 0.045 + 11, v[2] * 0.045) * 0.5 + kitNoise(v[0] * 0.13, v[2] * 0.13 + 5) * 0.3;
+      const patch = kitNoise(v[0] * 0.3 + 3, v[2] * 0.3 + 9);
+      tone *= 1 + swell * 0.28 - (1 - ny) * 0.3;
+      if (bucket === tris.grass) bucket.c.push(tone * (1 + patch * 0.16 + 0.04), tone * (1 - Math.max(0, patch) * 0.12), tone * (0.95 - patch * 0.2));
+      else bucket.c.push(tone, tone, tone * 0.97);
     }
   };
   for (let r = 0; r < rows; r += 1) {
@@ -1038,6 +1063,18 @@ function kitNeighbours(stage, active) {
   return near;
 }
 
+/** Margin (m) round a section's region in the visibility tests: its walls, towers and the rock under it reach past the ground it covers. */
+const KIT_SEEN_MARGIN = 8;
+
+/** The boxes (THREE.Box3, a margin round each, floor to sky) of a region: one entry, or a list of them. */
+function kitRegionBoxes(region, sea) {
+  const entries = Array.isArray(region) && !Array.isArray(region[0]) ? region : [region];
+  return entries.filter(Boolean).map(({ at, size }) => new THREE.Box3(
+    new THREE.Vector3(at[0] - size[0] / 2 - KIT_SEEN_MARGIN, (Number.isFinite(sea) ? sea : -30) - 4, at[1] - size[1] / 2 - KIT_SEEN_MARGIN),
+    new THREE.Vector3(at[0] + size[0] / 2 + KIT_SEEN_MARGIN, 80, at[1] + size[1] / 2 + KIT_SEEN_MARGIN),
+  ));
+}
+
 /**
  * The castle of a stage with a `landform`: its land, its sections' detail and silhouettes, its gates, its things to take.
  * Returns the stage view (terrainview.js's shape, with `update(world)` and the rest): { stage, group, sections, mechanisms, update, setEnvironment, dispose, stats }.
@@ -1089,11 +1126,19 @@ export function createCastleView(stage) {
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
     group.add(holder);
   }
-  // A few real lights, moved to the nearest of the flames and torches.
+  // Where each section lies, and the ways between them (a portal's area is where its two sections meet), for what the camera can see.
+  const boxes = Object.fromEntries(stage.sections.map((section) => [section.id, kitRegionBoxes(section.bounds, stage.sea)]));
+  const links = stage.sections.flatMap((section) => (section.portals ?? []).map((portal) => ({ a: section.id, b: portal.to, boxes: kitRegionBoxes(portal.area, stage.sea) })));
+  const camera = { frustum: new THREE.Frustum(), matrix: new THREE.Matrix4(), set: false };
+  // A few real lights, moved to the nearest of the flames and torches. Every lit surface of the picture pays for each light in the scene, lit or
+  // not (a third of the graphics card's time out in the rain, where no torch is near), so the four are in the scene only while a torch lights
+  // something (all together: two shaders to keep, with the lights and without, `view.warm` builds them both before they are wanted).
   const pool = [];
   for (let k = 0; k < 4; k += 1) {
     const light = new THREE.PointLight(0xffa050, 0, 12, 2);
     light.name = `kit-light-${k}`;
+    light.userData.torch = true;
+    light.visible = false;
     group.add(light);
     pool.push(light);
   }
@@ -1101,7 +1146,7 @@ export function createCastleView(stage) {
   const view = { stage, group, sections, mechanisms: [], mats, stats };
 
   /** Show what is in force: detail near the player, silhouettes elsewhere; gates and ladders as they stand; the flames. */
-  view.update = (world) => {
+  view.update = (world, eye = null) => {
     const run = world.stage;
     const now = performance.now() / 1000;
     const dt = state.last === null ? 0 : Math.min(0.1, now - state.last);
@@ -1119,19 +1164,35 @@ export function createCastleView(stage) {
     // Under a roof the sky is not what the wet stone shows: its reflections fade (and come back in the open).
     state.shelter += ((indoors ? 0.1 : 1) - state.shelter) * Math.min(1, dt * 4);
     for (const [name, base] of Object.entries(state.reflect)) mats[name].envMapIntensity = base * state.shelter;
+    ktWeather.uKitPoolSky.value = state.shelter;
+    // What the camera can see (when it is given): a section outside its frustum is not drawn or animated at all; one beside
+    // the sections the man is in is drawn in detail only if the way between them is in view (else its silhouette, which is
+    // what is behind a wall); the frustum culling of the meshes does the rest.
+    camera.set = false;
+    if (eye) {
+      eye.updateMatrixWorld();
+      camera.frustum.setFromProjectionMatrix(camera.matrix.multiplyMatrices(eye.projectionMatrix, eye.matrixWorldInverse));
+      camera.set = true;
+    }
+    const sees = (list) => !camera.set || list.some((box) => camera.frustum.intersectsBox(box));
+    const seenThrough = (id) => links.some((link) => ((link.a === id && active.has(link.b)) || (link.b === id && active.has(link.a))) && sees(link.boxes));
     for (const section of stage.sections) {
       const entry = parts[section.id];
+      const inView = sees(boxes[section.id]);
       const shown = near.has(section.id);
-      entry.detail.group.visible = shown;
-      entry.far.group.visible = !shown;
+      const detailed = shown && inView && (active.has(section.id) || seenThrough(section.id));
+      entry.detail.group.visible = detailed;
+      entry.far.group.visible = !detailed && inView;
       if (!shown) continue;
-      kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time);
+      // (Gates and ladders keep their motion whether or not they are seen, so that one shut behind him is shut when he turns round.)
       for (const moving of entry.moving) {
         const target = ['open', 'down'].includes(run.mechanisms[moving.id]) ? 1 : 0;
         if (moving.open < 0) moving.open = target;
         else moving.open += Math.max(-1, Math.min(1, (target - moving.open) * Math.min(1, dt * 2.6)));
         moving.apply(moving.open);
       }
+      if (!detailed) continue;
+      kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time);
       const taken = run.level?.taken;
       for (const mark of entry.marks) {
         const gone = taken?.has(mark.item.id);
@@ -1156,6 +1217,7 @@ export function createCastleView(stage) {
       state.lit = candidates.slice(0, pool.length).map((c) => c.l);
     }
     pool.forEach((light, k) => {
+      light.visible = state.lit.length > 0;
       const l = state.lit[k];
       if (!l) {
         light.intensity = 0;
@@ -1164,10 +1226,37 @@ export function createCastleView(stage) {
       light.position.set(l.at[0], l.at[1], l.at[2]);
       light.color.setHex(l.color);
       light.distance = l.range;
-      light.intensity = l.power * (0.9 + 0.12 * Math.sin(state.time * 13 + k * 2) + 0.06 * Math.sin(state.time * 31 + k)) * 2.2;
+      light.intensity = l.power * (0.9 + 0.12 * Math.sin(state.time * 13 + k * 2) + 0.06 * Math.sin(state.time * 31 + k)) * 2.2 * stormTorch();
     });
     foam.map.offset.set(state.time * 0.02, state.time * 0.05);
     foam.opacity = 0.3 + 0.1 * Math.sin(state.time * 0.9);
+  };
+
+  /**
+   * Draw the castle once, every piece of it, with the torches' lights on and again with them off, by `draw()`, so that every shader
+   * the picture will want is built now, in the frame the stage opens, and not in the middle of a fight as a man walks up to his first torch.
+   * (Once only; the picture of these two frames is the one drawn after them.)
+   */
+  view.warm = (draw) => {
+    if (state.warmed) return;
+    state.warmed = true;
+    const kept = [];
+    group.traverse((object) => {
+      if (object.isMesh || object.isLine || object.isPoints) kept.push([object, object.frustumCulled, object.visible]);
+    });
+    const holders = Object.values(parts).flatMap((entry) => [entry.detail.group, entry.far.group]).map((holder) => [holder, holder.visible]);
+    const lamps = pool.map((light) => light.visible);
+    for (const [object] of kept) object.frustumCulled = false;
+    for (const [holder] of holders) holder.visible = true;
+    for (const on of [true, false]) {
+      for (const light of pool) light.visible = on;
+      draw();
+    }
+    for (const [object, culled, visible] of kept) Object.assign(object, { frustumCulled: culled, visible });
+    for (const [holder, visible] of holders) holder.visible = visible;
+    pool.forEach((light, k) => {
+      light.visible = lamps[k];
+    });
   };
 
   /** Give the wet stone and the puddles a reflection: `env` is a cube or equirect environment map. */
@@ -1185,7 +1274,40 @@ export function createCastleView(stage) {
     mats.water.needsUpdate = true;
   };
 
+  /**
+   * Bake the castle's shadow for a look (levelmode/kitshadow.js): the land and every section's detail, seen once from the look's sun, into a map the kit's shaders
+   * read. `look.bakedShadow` (0..1) is how much of the sun the shadow takes; 0 (or none) frees the map. Costs one draw of the castle, at a look's change; none in play.
+   * Returns the milliseconds it took.
+   */
+  view.bakeShadow = (renderer, look) => {
+    const strength = look.bakedShadow ?? 0;
+    if (!state.casters) {
+      // What casts: the opaque kit meshes of the land and of each section's detail, but not the gates (they move), the things to take, the flames and ravens.
+      const opaque = new Set(['ashlar', 'ruin', 'rubble', 'rock', 'cobble', 'flags', 'grass', 'path', 'boards', 'wood', 'iron', 'bone', 'cloth', 'straw', 'black'].map((name) => mats[name]));
+      const skip = new Set();
+      for (const entry of Object.values(parts)) {
+        for (const owner of [...entry.moving, ...entry.marks, entry.dynamic]) owner.group.traverse((object) => skip.add(object));
+      }
+      state.casters = [];
+      for (const root of [land, ...Object.values(parts).map((entry) => entry.detail.group)]) {
+        root.traverse((object) => {
+          if (object.isMesh && opaque.has(object.material) && !skip.has(object)) state.casters.push(object);
+        });
+      }
+    }
+    // (Every section's detail is drawn for it, whether or not it is near the player now.)
+    const holders = Object.values(parts).flatMap((entry) => [entry.detail.group, entry.far.group]).map((holder) => [holder, holder.visible]);
+    for (const entry of Object.values(parts)) {
+      entry.detail.group.visible = true;
+      entry.far.group.visible = false;
+    }
+    state.shadowMs = ktShadowBake(renderer, group, state.casters, skyDirection(look.sun.az, look.sun.el), strength, stage.id);
+    for (const [holder, visible] of holders) holder.visible = visible;
+    return state.shadowMs;
+  };
+
   view.dispose = () => {
+    ktShadowRelease();
     group.traverse((object) => {
       object.geometry?.dispose();
     });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
 import { BONE } from '../src/rig.js';
 import { CROWD_VIEW, simplifyTemplate } from '../src/crowdview.js';
-import { chooseDraw, pastLimit, protectedMen } from '../src/crowdlod.js';
+import { chooseDraw, pastLimit, protectedMen, STAGE_CROWD_VIEW } from '../src/crowdlod.js';
 
 /** A fighter with only the pelvis placed: all the choice of who is protected looks at. */
 const man = (id, x, z = 0, y = 1) => {
@@ -65,6 +65,15 @@ test('beyond the lod distance the far body; beyond the shadow distance no shadow
   const distant = chooseDraw(draw(), { ...seen, distance: CROWD_VIEW.shadowDistance + 1 });
   assert.equal(distant.shadow, false);
   assert.equal(chooseDraw(draw(), { ...seen, inShadow: false }).shadow, false);
+});
+
+test('a stage draws its men simply sooner than a battle does, and the protected as ever', () => {
+  assert.ok(STAGE_CROWD_VIEW.lodDistance < CROWD_VIEW.lodDistance);
+  const between = (STAGE_CROWD_VIEW.lodDistance + CROWD_VIEW.lodDistance) / 2 + STAGE_CROWD_VIEW.lodMargin;
+  assert.equal(chooseDraw(draw(), { ...seen, distance: between }).far, false, 'in a battle he is still near');
+  assert.equal(chooseDraw(draw(), { ...seen, distance: between }, STAGE_CROWD_VIEW).far, true, 'in a stage he is far');
+  assert.equal(chooseDraw(draw(), { ...seen, distance: between, safe: true }, STAGE_CROWD_VIEW).far, false, 'the man fought is never simplified');
+  assert.equal(STAGE_CROWD_VIEW.protectRadius, CROWD_VIEW.protectRadius);
 });
 
 test('off screen, he is culled; the protected are never culled, simplified or unshadowed', () => {

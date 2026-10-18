@@ -102,9 +102,9 @@ export function createStageView(stage) {
   return { stage, group, sections, mechanisms };
 }
 
-/** Show what is in force: the active sections, and each gate or ladder as it stands. */
-export function updateStageView(view, world) {
-  if (view.update) view.update(world);
+/** Show what is in force: the active sections, and each gate or ladder as it stands. `camera`: what is seen (the castle draws only that). */
+export function updateStageView(view, world, camera = null) {
+  if (view.update) view.update(world, camera);
   else {
     const run = world.stage;
     for (const [id, group] of Object.entries(view.sections)) group.visible = run.active.includes(id);

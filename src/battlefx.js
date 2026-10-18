@@ -469,8 +469,13 @@ function battleFxNearestLamp(view, fx, uniforms) {
   if (fx.lampsFor !== view.place) {
     fx.lampsFor = view.place;
     fx.lamps = [];
-    view.scene.traverseVisible((object) => {
-      if (object.isPointLight && !object.userData.battleFx && object.distance > 0) fx.lamps.push(object);
+    // (A light that is out of the scene while nothing is lit by it, a castle's torch pool, is a lamp all the same: `userData.torch`.)
+    const shown = (object) => {
+      for (let up = object.parent; up; up = up.parent) if (!up.visible) return false;
+      return true;
+    };
+    view.scene.traverse((object) => {
+      if (object.isPointLight && (object.visible || object.userData.torch) && !object.userData.battleFx && object.distance > 0 && shown(object)) fx.lamps.push(object);
     });
   }
   uniforms.uLampRange.value = 0;

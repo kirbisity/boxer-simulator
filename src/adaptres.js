@@ -39,6 +39,14 @@ export const ADAPTIVE_RESOLUTION = {
   stallMs: 250,
 };
 
+/**
+ * The size of a scene as adaptation counts it: the fighters in it, except that a stage (Level Mode) is always a big one, however small its
+ * garrison (the castle, the sea and the rain fill the pixels, not the men).
+ */
+export function adaptiveSize(fighters, stage = false, config = ADAPTIVE_RESOLUTION) {
+  return stage ? Math.max(config.fewestFighters, fighters) : fighters;
+}
+
 /** The pixel ratios the steps give from a `full` ratio: descending, none under the floor, each once. */
 export function ratioSteps(full, config = ADAPTIVE_RESOLUTION) {
   const ratios = config.steps.map((share) => Math.max(config.floor, Math.round(full * share * 1000) / 1000)).map((ratio) => Math.min(full, ratio));
