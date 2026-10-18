@@ -50,6 +50,12 @@
   <div class="screen" id="versus" hidden></div>
   <div class="wizard" id="wizard" hidden></div>
 
+  <!-- The ghost walk's own bar (the sandbox's stage debug): the pace, and who he walks as. -->
+  <div class="ghost-bar" id="ghost-bar" role="group" aria-label="Ghost walk">
+    <button type="button" data-speed="0.25">¼×</button><button type="button" data-speed="1">1×</button><button type="button" data-speed="4">4×</button>
+    <label><span>As</span><select id="ghost-as"></select></label>
+  </div>
+
   <div class="banner" id="banner" hidden>
     <p id="banner-text"></p>
     <div class="banner-actions"><button id="banner-menu">☰ Menu</button><button id="banner-retry" hidden>↻ Retry</button><button id="banner-again" class="primary">Next bout</button></div>

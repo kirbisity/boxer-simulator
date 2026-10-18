@@ -44,6 +44,11 @@ export const LEVEL_CONFIG = {
     outfitSeconds: 3,
   },
 
+  // ---- The marker over a man's head, and Lock ---------------------------------------------------------------
+  // m: an enemy who is aware of the player gets his name and health over his head within `aware`; any enemy within
+  // `near` does too (close enough to be locked on and struck first).
+  marker: { aware: 14, near: 6.5 },
+
   // ---- Rest and death ------------------------------------------------------------------------------
   rest: {
     // m: the men who stand with him (the freed) are put this far apart, beside him, after a rest or a death.

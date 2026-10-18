@@ -723,7 +723,7 @@ body.playing .sandbox-panel { top: calc(48px + env(safe-area-inset-top, 0px)); }
 .story-prompt { margin: 0; font: 500 12px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: rgba(214, 222, 240, 0.7); }
 
 /* The opening: a storm over the cliff. Cold blue-grey, the title in Oswald, the lore in Plex. */
-.story-opening { background: radial-gradient(ellipse at 50% 30%, rgba(46, 54, 84, 0.9), rgba(10, 12, 20, 0.97) 70%), linear-gradient(180deg, #080a12, #040509); gap: 10px; }
+.story-opening { background: radial-gradient(ellipse at 50% 38%, rgba(30, 38, 64, 0.8), rgba(6, 8, 15, 0.9) 78%); gap: 10px; }
 .story-chapter { margin: 0; font: 500 clamp(11px, 2.6vw, 14px) var(--mono); letter-spacing: 0.26em; text-transform: uppercase; color: #9fb0d8; }
 .story-title { margin: 0; font: 700 clamp(34px, 8.5vw, 84px)/1.02 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #e8ecf6; text-shadow: 0 0 34px rgba(120, 150, 230, 0.4), 0 4px 22px rgba(0, 0, 0, 0.85); text-wrap: balance; }
 .story-rule { width: min(260px, 52vw); height: 1px; margin: 8px 0 4px; background: linear-gradient(90deg, transparent, rgba(190, 205, 240, 0.7), transparent); }
@@ -759,6 +759,21 @@ body.playing .sandbox-panel { top: calc(48px + env(safe-area-inset-top, 0px)); }
 .story-line.gone { display: none; }
 .story-line.story-end { margin-top: 6px; font: 500 clamp(11px, 3vw, 13px) var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
 .story-ending .story-prompt { opacity: 0.5; }
+/* Over the scene: the cell stays in view, the words sit on a dark foot at the bottom and the world runs behind them. */
+.story-ending.over { background: linear-gradient(180deg, rgba(2, 2, 5, 0.25) 0, rgba(2, 2, 5, 0) 22%, rgba(2, 2, 5, 0) 46%, rgba(2, 2, 5, 0.88) 80%); place-content: end center; gap: 14px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+.story-ending.over .story-line { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.95); }
+
+/* The opening card stands alone: the fight's controls and the clock are not seen behind it. */
+body.card-up .hud, body.card-up .fight-ui, body.card-up .controls, body.card-up .boss-bar { visibility: hidden; }
+
+/* The card after the ending: where the stage stops. */
+.story-finale { background: radial-gradient(ellipse at 50% 40%, rgba(24, 28, 44, 0.9), rgba(4, 5, 9, 0.97) 75%); cursor: default; gap: 10px; }
+.story-fin-title { margin: 0; font: 700 clamp(30px, 8vw, 64px)/1.05 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #e8ecf6; text-shadow: 0 0 30px rgba(120, 150, 230, 0.35); }
+.story-fin-sub { margin: 0; font: 400 clamp(13px, 3.4vw, 17px) var(--body); color: rgba(210, 217, 236, 0.8); }
+.story-buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 12px; }
+.story-button { min-height: 48px; padding: 0 26px; border-radius: 6px; border: 1px solid rgba(190, 205, 240, 0.4); background: rgba(14, 18, 30, 0.8); color: #dfe5f4; font: 600 14px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; }
+.story-button.story-primary { border-color: var(--gold); color: var(--gold); }
+.story-button:hover, .story-button:focus-visible { background: rgba(40, 48, 74, 0.9); outline: none; }
 
 /* The boss's bar: bottom centre, above the footer, under the fight's buttons (they draw over it) and deaf to taps. */
 .boss-bar { position: fixed; z-index: 0; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 8px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100vw - 32px)); display: grid; gap: 4px; pointer-events: none; opacity: 0; transition: opacity 0.6s; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95); }
@@ -779,3 +794,11 @@ body.playing .sandbox-panel { top: calc(48px + env(safe-area-inset-top, 0px)); }
 
 /* Ghost walk (the sandbox's stage debug): a quiet tag by the clock, so it is never mistaken for the real stage. */
 body.ghost-walk #clock::after { content: ' · 👻 Ghost'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
+
+/* The ghost walk's bar: under the clock, small; only while ghost walking. */
+.ghost-bar { display: none; }
+body.ghost-walk .ghost-bar { display: flex; position: fixed; z-index: 7; left: 50%; top: calc(62px + env(safe-area-inset-top, 0px)); translate: -50% 0; gap: 4px; align-items: center; padding: 4px 6px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font: 600 12px var(--body); color: var(--muted); }
+.ghost-bar button { padding: 4px 9px; border-radius: 999px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.ghost-bar button.on { background: var(--gold); color: #111; }
+.ghost-bar label { display: flex; gap: 5px; align-items: center; padding-left: 6px; }
+.ghost-bar select { max-width: 9.5em; font: inherit; background: transparent; color: var(--ink, #eee); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; }

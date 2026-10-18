@@ -5,7 +5,7 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, startCrawl, throwPunch, WORLD } from './physics.js';
+import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
@@ -39,13 +39,15 @@ import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './h
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { pullLever, setMechanism, updateStage } from './levelmode/stage.js';
-import { contextFor, createLevelWorld, drainRebuilds, drainUi, interact, interactions, levelBusy, levelThink, respawnPlayer, restAtPoint, useItem } from './levelmode/level.js';
-import { holdPlayer } from './levelmode/items.js';
+import { bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
+import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { installLevelHud } from './levelmode/hud.js';
-import { NOTES, showDeath, showNote } from './levelmode/story.js';
+import { NOTES, STAGE_ONE, closeStory, showDeath, showEnding, showFinale, showNote, showOpening, storyBusy } from './levelmode/story.js';
+import { createLevelMarkers } from './levelmode/markers.js';
+import { createShards } from './levelmode/endingview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
-import { stormEnvironment, stormReset } from './levelmode/storm.js';
+import { stormEnvironment, stormReset, stormStrikeNow } from './levelmode/storm.js';
 import { stageCameraRoom } from './levelmode/kit.js';
 import { ktSightline } from './levelmode/kittex.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -152,6 +154,8 @@ const fightControls = installFightControls($('#fight-ui'), {
   marks: () => (state.mode === 'play' ? fightMarks : null),
   clock: () => fightMarksClock,
   order: (kind) => orderSide(kind),
+  // In a stage the man he is on is one near or aware of him, not the nearest of the garrison.
+  opponent: (world, me) => (world.stage?.level ? levelOpponent(world, me) : opponentFor(world, me)),
 });
 fightUiWireToggle($('#fightui-pick'));
 // Level mode's own controls on top of the fight's: the context pill, the items, the action bar (levelmode/hud.js).
@@ -256,6 +260,7 @@ function shuffleColors(inputs) {
 }
 
 function newBout() {
+  leaveStage();
   state.seed += 1;
   // A scenario is the same world on its own floor, with its own people.
   const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
@@ -517,6 +522,11 @@ const SIM_BUDGET_MS = 20;
 function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   // The training yard begins again when a man in it is out (between frames: never while one is drawn).
   if (state.game === 'tutorial' && yard.restart) newBout();
+  // A level-mode card (the opening, a note, the finale) holds the world still behind it.
+  if (state.world.stage?.level && storyBusy()) {
+    state.accumulator = 0;
+    return;
+  }
   state.accumulator += seconds;
   const started = performance.now();
   while (state.accumulator >= STEP) {
@@ -532,8 +542,9 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   consumeEvents();
   if (state.world.stage?.level) drainLevel();
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
-  if (state.game === 'intro' || state.game === 'tutorial' || state.world.stage) return;
-  const winner = boutWinner(state.world);
+  if (state.game === 'intro' || state.game === 'tutorial') return;
+  // (A stage has no banner: bannerWinner is none there.)
+  const winner = bannerWinner(state.world);
   // Behind the menus, one fight follows another.
   if (state.game === 'home' && state.finishedAt !== null && state.world.time > state.finishedAt + 3) state.next.run();
   if (winner && state.finishedAt === null && !momentPlaying(state.drama, realSeconds())) {
@@ -580,6 +591,12 @@ function drainLevel() {
       followCam.reset();
     });
     else if (message.type === 'phase2') levelHud.toast('The helm comes off');
+    else if (message.type === 'ending') beginEnding(world);
+    else if (message.type === 'rested') {
+      // From now on the footer's Restart goes back to this rest, not the start.
+      $('#restart').textContent = 'Last rest';
+      $('#restart').title = 'Begin again from the last rest you reached';
+    }
   }
 }
 
@@ -684,6 +701,7 @@ function followCamera(fighter, dt) {
   }, realSeconds(), dt);
   Object.assign(orbit, { yaw: view.yaw, pitch: view.pitch, distance: view.distance });
   orbit.target.set(...view.target);
+  if (endingCam) endingCamera(dt);
 }
 
 /** The men as the watching camera sees them: where each stands, how high his neck is, and whether he is left lying. */
@@ -1096,6 +1114,11 @@ $('#pause').addEventListener('click', () => {
 });
 // Restart: the bout from the beginning, running (not left paused).
 $('#restart').addEventListener('click', () => {
+  // In a stage: from the last rest if one was reached (the button says so), else from the start.
+  if (state.world.stage?.level) {
+    restartStage();
+    return;
+  }
   newBout();
   state.paused = false;
   $('#pause').textContent = 'Pause';
@@ -1117,12 +1140,51 @@ document.addEventListener('pointerdown', (press) => {
 window.addEventListener('keydown', (press) => { if (press.key === 'Escape') setSandboxPanel(false); });
 $('#modes').addEventListener('click', () => setSandboxPanel(false));
 $('#open-builder').addEventListener('click', () => setSandboxPanel(false));
-// The sandbox's ghost walk: the Dunnottar stage, unseen by its garrison, to walk and look it over.
+// The sandbox's ghost walk: the Dunnottar stage, unseen by its garrison, to walk and look it over. He goes in as the
+// sandbox's red lead; the ghost bar under the clock changes the pace (as the sandbox's speeds) and who he is, in place.
 $('#ghost-walk').addEventListener('click', () => {
   setSandboxPanel(false);
-  enterStage('dunnottar', { ghost: true });
+  enterStage('dunnottar', { ghost: true, player: state.rosters.red[0] });
   boxer.finishBuilding();
+  syncGhostBar();
 });
+const ghostAs = $('#ghost-as');
+ghostAs.append(
+  Object.assign(document.createElement('optgroup'), { label: 'Dunnottar' }),
+  Object.assign(document.createElement('optgroup'), { label: 'Everyone' }),
+);
+ghostAs.children[0].append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => new Option(preset.name, `level:${key}`)));
+ghostAs.children[1].append(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, `preset:${key}`)));
+ghostAs.addEventListener('change', () => ghostPlayAs(ghostAs.value));
+for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) {
+  button.addEventListener('click', () => {
+    $(`#speeds button[data-value="${button.dataset.speed}"]`)?.click();
+    syncGhostBar();
+  });
+}
+
+/** The ghost bar shows the pace now and who he is. */
+function syncGhostBar() {
+  for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) button.classList.toggle('on', Number(button.dataset.speed) === state.speed);
+  const name = state.world?.fighters[0]?.body.inputs.name;
+  const match = [...ghostAs.options].find((option) => option.text === name);
+  if (match) ghostAs.value = match.value;
+}
+
+/** In the ghost walk, he becomes someone else where he stands (made new, whole: a look at the stage as that man). */
+function ghostPlayAs(choice) {
+  const world = state.world;
+  if (!world?.stage?.ghost) return;
+  const [kind, key] = choice.split(':');
+  const inputs = kind === 'level' ? levelPreset(key) : normaliseInputs(structuredClone(PRESETS[key]));
+  const me = world.fighters[0];
+  reviveFighter(world, me, inputs, { at: [me.x[P.pelvis * 3], feetFloor(me), me.x[P.pelvis * 3 + 2]], yaw: me.yaw });
+  rebuildFighterView(0);
+  state.stageOptions = { ...state.stageOptions, player: inputs };
+  state.orders = newOrders();
+  fightControls.reset();
+  ghostAs.blur();
+}
 $('#open-menu').addEventListener('click', () => setSandboxPanel(false));
 
 // The fighter the player controls: his side's lead (the side is chosen with the Play buttons).
@@ -1687,6 +1749,8 @@ function setGame(game, next = null) {
   }
   state.game = game;
   state.next = next;
+  $('#restart').textContent = 'Restart';
+  $('#restart').title = '';
   document.body.dataset.game = game;
   $('#banner-again').textContent = next?.text ?? 'Next bout';
   // Retry the same bout, beside a next that is something else (a new opponent); a next that is itself a retry stands alone.
@@ -1881,18 +1945,50 @@ function enterTutorial() {
 // person, with the sections around him awake. `boxer.levelMode(key)` opens one (STAGES).
 
 let stageView = null;
+// What goes with the stage's drawing: the markers on things to use, the prince's shards; the ending's camera (a push-in on the prince); and
+// which run is on (a card that comes back after the stage was left, or begun again, is ignored).
+let stageMarkers = null;
+let stageShards = null;
+let endingCam = null;
+let stageRun = 0;
 // A development overlay of what each man is doing (boxer.stage().overlay(true)).
 let awarenessOverlay = null;
 
-/** Open a stage in play mode: the player (walking) at its start, the world of terrain drawn in grey boxes. */
-function enterStage(key, { ghost = false } = {}) {
+/**
+ * Take a stage down when the screen goes to anything else (the menu, a battle, the sandbox): its cards, its drawing, its
+ * markers; and the storm is let go (render.js setPlace does that when the place changes, so no rain or fog is left behind).
+ */
+function leaveStage() {
+  if (!stageView && !stageMarkers) return;
+  stageRun += 1;
+  closeStory();
+  levelHud.reset();
+  stageMarkers?.dispose();
+  stageShards?.dispose();
+  stageMarkers = stageShards = null;
+  endingCam = null;
+  if (stageView) disposeStageView(stageView);
+  stageView = null;
+  awarenessOverlay?.show(false);
+  cameraRoomTest.march = false;
+}
+
+/**
+ * Open a stage in play mode: the player at its start (the operative, or `player`'s inputs: the ghost walk's choice). `ghost`:
+ * the sandbox's ghost walk, unseen by the garrison. `opening`: the title card over the storm first (the menu's way in; the
+ * world holds still behind it, and play begins when it is tapped away); a replay from the finale skips the lore.
+ */
+function enterStage(key, { opening = false, ghost = false, player = null } = {}) {
   const stage = STAGES[key];
   if (!stage) throw new Error(`no stage called ${key}`);
-  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key, { ghost }) });
+  leaveStage();
+  const run = (stageRun += 1);
+  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key, { ghost, player }) });
+  state.stageOptions = { ghost, player };
   state.scenario = null;
   state.seed += 1;
   // The operative (a fixed preset), in his combat stance: the stick within the run threshold fights, past it runs (control.js).
-  state.world = createLevelWorld(stage, levelPreset('forger'), { seed: state.seed });
+  state.world = createLevelWorld(stage, player ? normaliseInputs(structuredClone(player)) : levelPreset('forger'), { seed: state.seed });
   // Ghost walk (the sandbox's debug for designing the stage): the garrison never notices him (levelmode/awareness.js).
   state.world.stage.ghost = ghost;
   document.body.classList.toggle('ghost-walk', ghost);
@@ -1904,6 +2000,13 @@ function enterStage(key, { ghost = false } = {}) {
   stageView = createStageView(stage);
   scene.places[place].add(stageView.group);
   placeStageSea(scene.places[place], stage);
+  // Things drawn with the stage and kept up with its own update each frame.
+  stageMarkers = createLevelMarkers(stageView.group);
+  stageShards = stage.ending ? createShards(stageView.group) : null;
+  stageView.extras = (world) => {
+    stageMarkers?.update(world);
+    stageShards?.update(world);
+  };
   if (place === 'dunnottar') {
     stormReset(stage.weather?.seed);
     stageView.setEnvironment?.(stormEnvironment(scene.renderer));
@@ -1933,6 +2036,88 @@ function enterStage(key, { ghost = false } = {}) {
   state.walkRunning = false;
   levelHud.reset();
   renderHud();
+  if (opening) showOpening(() => { if (run === stageRun) followCam.reset(); }, stageStory(stage));
+}
+
+/** The footer's Restart in a stage: back to the last rest reached (his gear and items from then; what he opened stays open), else the stage from its start. */
+function restartStage() {
+  const world = state.world;
+  const key = world.stage.def.id;
+  if (!restartFromRest(world)) {
+    enterStage(key, state.stageOptions);
+    return;
+  }
+  closeStory();
+  endingCam = null;
+  for (const id of drainRebuilds(world)) rebuildFighterView(id);
+  state.orders = newOrders();
+  fightControls.reset();
+  followCam.reset();
+  state.paused = false;
+  $('#pause').textContent = 'Pause';
+}
+
+/** The story's text for a stage (its card's title and lore): Stage 1's. */
+const stageStory = () => STAGE_ONE;
+
+/**
+ * The ending (levelmode/ending.js has staged the cell): the player held, the cards over the scene, the camera pushing in on
+ * the prince with each line, then the finale card: return to the menu, or play again from the start.
+ */
+function beginEnding(world) {
+  const run = stageRun;
+  const key = world.stage.def.id;
+  state.orders = newOrders();
+  fightControls.reset();
+  endingCam = { k: 0, goal: 0 };
+  // How far the push-in goes with each line (0: the player; 1: close on the prince, who is what the lines are about: a narrow phone screen frames him first).
+  const beats = [0.45, 0.58, 0.68, 0.76, 0.83, 0.88, 0.92, 0.95];
+  showEnding({
+    civiliansHarmed: world.stage.civiliansHarmed,
+    onLine: (index) => {
+      if (run !== stageRun || !endingCam) return;
+      // (An upright phone cannot hold the player and the prince in one picture: it goes to the prince at once.)
+      endingCam.goal = Math.max(beats[Math.min(index, beats.length - 1)], scene.camera.aspect < 1 ? 0.85 : 0);
+      // The storm begins to break: a last strike on the closing line.
+      if (index === beats.length - 2) stormStrikeNow(false);
+    },
+  }, () => {
+    if (run !== stageRun) return;
+    endingDone(world);
+    showFinale({ onMenu: () => goHome(), onAgain: () => enterStage(key) });
+  });
+}
+
+/** The follow camera, pushed in toward the prince as the ending's lines come (a slow ease). */
+function endingCamera(dt) {
+  const prince = princeOf(state.world);
+  if (!endingCam || !prince) return;
+  const orbit = scene.orbit;
+  endingCam.k += (endingCam.goal - endingCam.k) * (1 - Math.exp(-dt / 2.4));
+  const k = endingCam.k;
+  const head = [prince.x[P.head * 3], prince.x[P.head * 3 + 1] - 0.1, prince.x[P.head * 3 + 2]];
+  orbit.target.set(orbit.target.x + (head[0] - orbit.target.x) * k, orbit.target.y + (head[1] - orbit.target.y) * k, orbit.target.z + (head[2] - orbit.target.z) * k);
+  const wanted = Math.max(1.6, orbit.distance * (1 - 0.45 * k));
+  orbit.pitch += (0.1 - orbit.pitch) * Math.min(1, k * 1.5);
+  // Swung round to the side, so the player does not stand between the lens and the prince: to whichever side the cell's walls
+  // leave room for (the first that gives most of the distance, else the one that gives the most).
+  const swing = Math.min(1, k * 4);
+  const reach = (yaw) => {
+    for (let along = 1; along <= wanted; along += 0.25) {
+      const flat = Math.cos(orbit.pitch) * along;
+      if (!cameraRoomTest(orbit.target.x + Math.cos(yaw) * flat, orbit.target.z + Math.sin(yaw) * flat, orbit.target.y + Math.sin(orbit.pitch) * along)) return Math.max(1, along - 0.25);
+    }
+    return wanted;
+  };
+  let best = null;
+  for (const turn of [0.95, -0.95, 0.5, -0.5, 0]) {
+    const yaw = orbit.yaw + turn * swing;
+    const distance = reach(yaw);
+    if (!best || distance > best.distance) best = { yaw, distance };
+    if (distance >= wanted * 0.85) break;
+  }
+  orbit.yaw = best.yaw;
+  orbit.distance = best.distance;
 }
 
 /** The sandbox as it was left: its own fighters, sides and place. */
@@ -2160,8 +2345,8 @@ tutorial = installTutorial($('#fight-ui'), {
 tutorial.setDevice(fightControls.device);
 const menus = installMenus({
   intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait,
-  // Level Mode: a stage from its card (levelmode/stages.js).
-  onStage: (key) => { enterStage(key); boxer.finishBuilding(); },
+  // Level Mode: a stage from its card (levelmode/stages.js): its men built at once, the title card over the storm, the world held still behind it.
+  onStage: (key) => { enterStage(key, { opening: true }); boxer.finishBuilding(); },
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
@@ -2391,7 +2576,8 @@ const boxer = window.boxer = {
   },
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
   // The player's systems in the stage (levelmode/level.js): the run, what the button offers, and the verbs (for the console and tests).
-  level: () => {
+  // (Named levelRun: `level` above opens a Battle Mode level, and a second `level:` key would shadow it.)
+  levelRun: () => {
     const world = state.world;
     return {
       run: world.stage?.level ?? null, world,
@@ -2399,6 +2585,8 @@ const boxer = window.boxer = {
       act: () => interact(world), use: (kind) => useItem(world, kind), rest: () => restAtPoint(world, world.stage.def.sections.find((section) => section.rest).rest),
       // Stand the player at a place of the stage ([x, y, z]), facing yaw.
       put: (at, yaw = 0) => { placeOnFloor(world.fighters[0], at[0], at[2], at[1], yaw); return true; },
+      // The boss struck down by hand (the ending follows: his door opens, the cell scene when the player is near the prince).
+      killBoss: () => killBoss(world),
       hurt: (amount = 0.05) => { const me = world.fighters[0]; me.bleed = (me.bleed ?? 0) + amount; me.bleedOutside = (me.bleedOutside ?? 0) + amount; return me.bleed; },
     };
   },
