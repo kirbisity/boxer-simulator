@@ -2238,6 +2238,37 @@ const boxer = window.boxer = {
       draw(dt);
     }
   },
+  // Profiling: a level entered as its menu button does, watched (or played as `side`), its armies built.
+  enterLevel: (key, side = 'watch') => {
+    menus.close();
+    enterLevel(key);
+    if (!$('#side-pick').hidden) $(`#side-pick [data-side="${side}"]`).click();
+    boxer.finishBuilding();
+  },
+  // Profiling: `frames` frames of 1/60 s, each timed in its three parts (ms, averaged): the
+  // simulation (no time budget), the views updated, and the picture drawn (waited for on the GPU).
+  bench: (frames = 60) => {
+    const gl = scene.renderer.getContext();
+    const pixel = new Uint8Array(4);
+    const finish = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    const totals = { physics: 0, views: 0, render: 0 };
+    finish();
+    for (let index = 0; index < frames; index += 1) {
+      const started = performance.now();
+      tick(STEP, { budget: Infinity });
+      const stepped = performance.now();
+      draw(STEP, { render: false });
+      const updated = performance.now();
+      render(scene);
+      finish();
+      totals.physics += stepped - started;
+      totals.views += updated - stepped;
+      totals.render += performance.now() - updated;
+    }
+    const average = (value) => Math.round((value / frames) * 100) / 100;
+    const info = scene.renderer.info.render;
+    return { physics: average(totals.physics), views: average(totals.views), render: average(totals.render), frame: average(totals.physics + totals.views + totals.render), calls: info.calls, triangles: info.triangles, fighters: state.world.fighters.length, down: state.world.fighters.filter((fighter) => fighter.state !== 'up').length, time: Math.round(state.world.time * 10) / 10 };
+  },
   // Finish an army's models now (tests; the page builds them a few a frame).
   finishBuilding: () => {
     while (state.viewQueue?.length) state.views.push(state.buildView(state.viewQueue.shift()));
