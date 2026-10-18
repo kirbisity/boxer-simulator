@@ -3530,6 +3530,84 @@ function strikers(fighter) {
   return list;
 }
 
+// Two segments, p1 to q1 and p2 to q2, as twelve numbers: what segmentDistance reads.
+const segmentPair = new Float64Array(12);
+
+/** The end points of a capsule's axis (capsuleEnds' arithmetic) written into `into` at `at`. */
+function writeCapsuleEnds(into, at, fighter, capsule) {
+  const x = fighter.x;
+  const aAt = capsule.a * 3;
+  const bAt = capsule.b * 3;
+  const ax = x[aAt];
+  const ay = x[aAt + 1];
+  const az = x[aAt + 2];
+  into[at] = ax;
+  into[at + 1] = ay;
+  into[at + 2] = az;
+  if (capsule.bLength) {
+    const along = capsule.bLength;
+    into[at + 3] = ax + (x[bAt] - ax) * along;
+    into[at + 4] = ay + (x[bAt + 1] - ay) * along;
+    into[at + 5] = az + (x[bAt + 2] - az) * along;
+  } else {
+    into[at + 3] = x[bAt];
+    into[at + 4] = x[bAt + 1];
+    into[at + 5] = x[bAt + 2];
+  }
+}
+
+/**
+ * The distance between the segments in `segmentPair`: the length of
+ * closestBetween's onFirst minus onSecond, in numbers rather than vectors (a
+ * crowd asks it of thousands of pairs a substep, nearly all of them clear).
+ */
+function segmentDistance() {
+  const pair = segmentPair;
+  const d1x = pair[3] - pair[0];
+  const d1y = pair[4] - pair[1];
+  const d1z = pair[5] - pair[2];
+  const d2x = pair[9] - pair[6];
+  const d2y = pair[10] - pair[7];
+  const d2z = pair[11] - pair[8];
+  const rx = pair[0] - pair[6];
+  const ry = pair[1] - pair[7];
+  const rz = pair[2] - pair[8];
+  const a = d1x * d1x + d1y * d1y + d1z * d1z;
+  const e = d2x * d2x + d2y * d2y + d2z * d2z;
+  const f = d2x * rx + d2y * ry + d2z * rz;
+  let s;
+  let t;
+  if (a < 1e-12 && e < 1e-12) {
+    s = 0;
+    t = 0;
+  } else if (a < 1e-12) {
+    s = 0;
+    t = Math.max(0, Math.min(1, f / e));
+  } else {
+    const c = d1x * rx + d1y * ry + d1z * rz;
+    if (e < 1e-12) {
+      t = 0;
+      s = Math.max(0, Math.min(1, -c / a));
+    } else {
+      const b = d1x * d2x + d1y * d2y + d1z * d2z;
+      const denominator = a * e - b * b;
+      s = denominator > 1e-12 ? Math.max(0, Math.min(1, (b * f - c * e) / denominator)) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) {
+        t = 0;
+        s = Math.max(0, Math.min(1, -c / a));
+      } else if (t > 1) {
+        t = 1;
+        s = Math.max(0, Math.min(1, (b - c) / a));
+      }
+    }
+  }
+  const ox = pair[0] + d1x * s - (pair[6] + d2x * t);
+  const oy = pair[1] + d1y * s - (pair[7] + d2y * t);
+  const oz = pair[2] + d1z * s - (pair[8] + d2z * t);
+  return Math.sqrt(ox * ox + oy * oy + oz * oz);
+}
+
 /** Closest points between two segments: parameters s on the first, t on the second. */
 export function closestBetween(p1, q1, p2, q2) {
   const d1 = vec.sub(q1, p1);
@@ -3717,20 +3795,32 @@ function collideStriker(world, attacker, defender, striker, time) {
   let pushBudget = WORLD.contactStep;
   // The striker as a ball round its middle: a part further than both
   // half-lengths and the reach from it cannot be touched (the closest test skipped).
-  const strikerMiddle = [(sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2, (sa[2] + sb[2]) / 2];
+  const middleX = (sa[0] + sb[0]) / 2;
+  const middleY = (sa[1] + sb[1]) / 2;
+  const middleZ = (sa[2] + sb[2]) / 2;
   const strikerHalf = vec.length(vec.sub(sb, sa)) / 2;
   for (const capsule of capsules(defender)) {
     // Kicks and weapons hit legs and bodies; gloves only collide above the waist.
     if (!striker.shin && capsule.leg && !striking) continue;
-    const [a, b] = capsuleEnds(defender, capsule);
     const reach = capsule.radius + striker.radius;
-    const apart = vec.length([(a[0] + b[0]) / 2 - strikerMiddle[0], (a[1] + b[1]) / 2 - strikerMiddle[1], (a[2] + b[2]) / 2 - strikerMiddle[2]]);
-    const out = apart - strikerHalf - vec.length([b[0] - a[0], b[1] - a[1], b[2] - a[2]]) / 2 >= reach;
-    const closest = out ? null : closestBetween(sa, sb, a, b);
-    if (closest) closest.t *= capsule.bLength ?? 1;
-    const offset = closest ? vec.sub(closest.onFirst, closest.onSecond) : null;
-    const distance = closest ? vec.length(offset) : Infinity;
-    if (distance >= reach) {
+    // Whether the part is clear is worked in numbers; the vectors are made only for one in reach.
+    const pair = segmentPair;
+    pair[0] = sa[0];
+    pair[1] = sa[1];
+    pair[2] = sa[2];
+    pair[3] = sb[0];
+    pair[4] = sb[1];
+    pair[5] = sb[2];
+    writeCapsuleEnds(pair, 6, defender, capsule);
+    const offsetX = (pair[6] + pair[9]) / 2 - middleX;
+    const offsetY = (pair[7] + pair[10]) / 2 - middleY;
+    const offsetZ = (pair[8] + pair[11]) / 2 - middleZ;
+    const apart = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
+    const lengthX = pair[9] - pair[6];
+    const lengthY = pair[10] - pair[7];
+    const lengthZ = pair[11] - pair[8];
+    const out = apart - strikerHalf - Math.sqrt(lengthX * lengthX + lengthY * lengthY + lengthZ * lengthZ) / 2 >= reach;
+    if ((out ? Infinity : segmentDistance()) >= reach) {
       if (touching) {
         const contactKey = `${prefix}${capsule.key}`;
         attacker.contacts.delete(contactKey);
@@ -3738,6 +3828,11 @@ function collideStriker(world, attacker, defender, striker, time) {
       }
       continue;
     }
+    const [a, b] = capsuleEnds(defender, capsule);
+    const closest = closestBetween(sa, sb, a, b);
+    closest.t *= capsule.bLength ?? 1;
+    const offset = vec.sub(closest.onFirst, closest.onSecond);
+    const distance = vec.length(offset);
     // Past a shield's rim the blow finds him; through its face it does not.
     if (shadow && behindShield(closest.onFirst, shadow)) continue;
     const contactKey = `${prefix}${capsule.key}`;
@@ -3784,25 +3879,28 @@ function collideStriker(world, attacker, defender, striker, time) {
  * inverse mass, so a heavy fighter moves a light one; and a charge that
  * arrives fast hands its momentum over in a collision.
  */
+const PUSH_PAIRS = [['trunk', 'trunk'], ['head', 'head'], ['head', 'trunk'], ['trunk', 'head']];
 function pushApart(world, first, second) {
-  const pairs = [['trunk', 'trunk'], ['head', 'head'], ['head', 'trunk'], ['trunk', 'head']];
   capsules(first);
   capsules(second);
   const firstCapsules = first.capsuleCache.byKey;
   const secondCapsules = second.capsuleCache.byKey;
-  for (const [firstKey, secondKey] of pairs) {
+  for (const [firstKey, secondKey] of PUSH_PAIRS) {
     const one = firstCapsules[firstKey];
     const two = secondCapsules[secondKey];
     // A part cut off no longer meets anything.
     if (!one || !two) continue;
+    // Clear of each other is told in numbers; the vectors are made only for parts that touch.
+    writeCapsuleEnds(segmentPair, 0, first, one);
+    writeCapsuleEnds(segmentPair, 6, second, two);
+    const distance = segmentDistance();
+    // A head meets another in whatever it wears (a great helm is a can well wider than the head).
+    const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
+    if (distance >= reach || distance < 1e-9) continue;
     const [a1, b1] = capsuleEnds(first, one);
     const [a2, b2] = capsuleEnds(second, two);
     const closest = closestBetween(a1, b1, a2, b2);
     const offset = vec.sub(closest.onFirst, closest.onSecond);
-    const distance = vec.length(offset);
-    // A head meets another in whatever it wears (a great helm is a can well wider than the head).
-    const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
-    if (distance >= reach || distance < 1e-9) continue;
     const normal = vec.scale(offset, 1 / distance);
     crashBodies(world, first, second, firstKey, secondKey, normal);
     const shares = [
