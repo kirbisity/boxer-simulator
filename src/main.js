@@ -21,6 +21,8 @@ import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createSeeThrough } from './seethrough.js';
+import { createAdaptiveResolution } from './adaptres.js';
+import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
 import { checkButtons } from './uicheck.js';
@@ -451,12 +453,17 @@ function setCrawling(on) {
 }
 
 let last = performance.now();
+// A big battle that cannot keep up is drawn with fewer pixels (adaptres.js); a duel never.
+const resolution = createAdaptiveResolution();
 function frame(now) {
   // The next frame is asked for first: an error in this one must never stop the game.
   requestAnimationFrame(frame);
-  const dt = Math.min(0.1, (now - last) / 1000);
+  const started = performance.now();
+  const interval = now - last;
+  const dt = Math.min(0.1, interval / 1000);
   last = now;
   try {
+    resolution.frame(scene, interval, state.world?.fighters.length ?? 0);
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
@@ -470,6 +477,7 @@ function frame(now) {
       console.error('Gladiator frame error (the game carries on):', error);
     }
   }
+  resolution.worked(performance.now() - started);
 }
 const frameErrors = new Set();
 
@@ -2187,6 +2195,20 @@ const boxer = window.boxer = {
   // The intro: end it now (true if it was playing), as Skip does; or play it again.
   skipIntro,
   playIntro: () => playIntro(introStage, () => goHome()),
+  // Cheaper scenery (scenerylod.js) on or off, to compare in the same page; no argument: whether it is on. `sceneryLodStats` says what was swapped in the place shown.
+  sceneryLod: (on) => {
+    if (on !== undefined) {
+      setSceneryLod(scene, on);
+      seeThrough.forget();
+    }
+    return sceneryLodOn();
+  },
+  sceneryLodStats: () => sceneryLodStats(scene),
+  // Adaptive resolution (adaptres.js): on or off (off: the full pixel ratio, kept), and what it is doing now; no argument: just that.
+  adaptiveResolution: (on) => {
+    if (on !== undefined) resolution.set(on, scene);
+    return resolution.info(scene);
+  },
   introPlaying,
   // Move the intro on (its own clock, s) without frames; the shot it is on, null once over.
   introStep: stepIntro,
@@ -2246,6 +2268,37 @@ const boxer = window.boxer = {
   advance: (seconds) => {
     tick(seconds, { budget: Infinity });
     draw(0);
+  },
+  // Profiling: a level entered as its menu button does, watched (or played as `side`), its armies built.
+  enterLevel: (key, side = 'watch') => {
+    menus.close();
+    enterLevel(key);
+    if (!$('#side-pick').hidden) $(`#side-pick [data-side="${side}"]`).click();
+    boxer.finishBuilding();
+  },
+  // Profiling: `frames` frames of 1/60 s, each timed in its three parts (ms, averaged): the
+  // simulation (no time budget), the views updated, and the picture drawn (waited for on the GPU).
+  bench: (frames = 60) => {
+    const gl = scene.renderer.getContext();
+    const pixel = new Uint8Array(4);
+    const finish = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    const totals = { physics: 0, views: 0, render: 0 };
+    finish();
+    for (let index = 0; index < frames; index += 1) {
+      const started = performance.now();
+      tick(STEP, { budget: Infinity });
+      const stepped = performance.now();
+      draw(STEP, { render: false });
+      const updated = performance.now();
+      render(scene);
+      finish();
+      totals.physics += stepped - started;
+      totals.views += updated - stepped;
+      totals.render += performance.now() - updated;
+    }
+    const average = (value) => Math.round((value / frames) * 100) / 100;
+    const info = scene.renderer.info.render;
+    return { physics: average(totals.physics), views: average(totals.views), render: average(totals.render), frame: average(totals.physics + totals.views + totals.render), calls: info.calls, triangles: info.triangles, fighters: state.world.fighters.length, down: state.world.fighters.filter((fighter) => fighter.state !== 'up').length, time: Math.round(state.world.time * 10) / 10 };
   },
   // Blood (tests, shots): throw `count` drops from a point; let the blood alone run on `seconds` (drops fall, stains, clouds in water).
   blood: {

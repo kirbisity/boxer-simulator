@@ -32,6 +32,7 @@ import { disposeObject, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
+import { prepareScenery, updateSceneryLod } from './scenerylod.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
@@ -86,8 +87,9 @@ export function createScene(canvas) {
   const places = { ring: buildRing(), subway: null, colosseum: null };
   // One reflection map for every piece of steel in the scene.
   const steelEnv = steelEnvironment(renderer);
-  scene.add(places.ring, shaderWarmers());
-  const view = { renderer, scene, camera, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim, sun, hemi }, place: 'ring', steelEnv };
+  const warmers = shaderWarmers();
+  scene.add(places.ring, warmers);
+  const view = { renderer, scene, camera, warmers, warmFrames: WARM_FRAMES, orbit: { yaw: -0.5, pitch: 0.2, distance: 5.2, target: new THREE.Vector3(0, 1.1, 0) }, places, lights: { key, rim, sun, hemi }, place: 'ring', steelEnv };
   // What a look will be undone to: the renderer and rig as built here, and the steel's map (built decoded from sRGB too when a linear look wants it).
   captureViewDefaults(view, (linear) => steelEnvironment(renderer, { linear }));
   return view;
@@ -117,6 +119,7 @@ export function setPlace(view, place, arena, weather = null) {
   view.weather = weather;
   lightPlace(view, place);
   applyScenery(view, place);
+  prepareScenery(view);
   applyWeather(view);
 }
 
@@ -142,6 +145,7 @@ export function forgetPlaces(view) {
 export function reapplyPlace(view) {
   lightPlace(view, view.place);
   applyScenery(view, view.place);
+  prepareScenery(view);
   applyWeather(view);
 }
 
@@ -167,6 +171,7 @@ function lightPlace(view, place) {
   view.lights.sun.intensity = light.sun ?? 0;
   view.lights.hemi.intensity = light.hemi ?? 0.62;
   view.lights.key.castShadow = !light.sun;
+  warmShaders(view);
   applyLook(view, place);
 }
 
@@ -321,13 +326,21 @@ export const PLACE_ARENAS = {
   jiangnan: { halfX: 14, halfZ: 9 },
 };
 
+/** The warmers' programs are built for the lights in force by the first frames drawn after they change; the group is drawn only for these. */
+const WARM_FRAMES = 3;
+
+/** Draw the warmers for the next few frames (the lights, the look or the place changed). */
+function warmShaders(view) {
+  view.warmFrames = WARM_FRAMES;
+  if (view.warmers) view.warmers.visible = true;
+}
+
 /**
  * Shader programs for things that first appear in the middle of a fight —
  * a severed limb (an unskinned body-coloured piece and its ink outline), the first blood and stains, an arrow's vanes, a shot's streak — compiled before the fight instead of on the frame they appear,
  * where a compile stalls the page. (A gun's smoke and flash, sparks and glints are
- * batches of their own, in the scene from the first frame: see battlefx.js.) Each is one zero-area triangle, drawn
- * every frame (no pixels), so its program is built with the scene's lights
- * whenever they change (a new place, at a bout's start) and never released.
+ * batches of their own, in the scene from the first frame: see battlefx.js.) Each is one zero-area triangle (no pixels), drawn
+ * for a few frames whenever the lights change (`warmShaders`: a new place, a look), so its program is built with the scene's lights and never released.
  */
 function shaderWarmers() {
   const group = new THREE.Group();
@@ -2284,5 +2297,8 @@ export function updateSpray(view, dt) {
 export function render(view) {
   // A place that moves (rain, a ship at anchor) moves with the clock.
   view.places?.[view.place]?.userData.tick?.(performance.now() / 1000);
+  updateSceneryLod(view);
   drawFrame(view);
+  // The warmers have done their work once drawn a few times; seven calls a frame for nothing after that.
+  if (view.warmFrames > 0 && (view.warmFrames -= 1) === 0 && view.warmers) view.warmers.visible = false;
 }
