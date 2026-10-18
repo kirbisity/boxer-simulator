@@ -31,18 +31,18 @@ export const LEVEL_PRESETS = {
   },
   // Tier 2: brigandine, a poleaxe (the halberd's stand-in).
   dunnottarGuard: {
-    name: 'Dunnottar guard', style: 'warhammer', sex: 'male', heightCm: 177, frame: 'large', age: 32, exercise: 0.2, calories: 2887, skill: 0.4,
+    name: 'Dunnottar guard', style: 'warhammer', sex: 'male', heightCm: 177, frame: 'large', age: 32, exercise: 0.1, calories: 2681, skill: 0.25,
     outfit: { kind: 'footman', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#4a3020', facialHair: 'beard', eyeColor: 'brown' },
   },
   dunnottarCrossbow: {
-    name: 'Dunnottar crossbowman', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 30, exercise: 0.3, calories: 2737, skill: 0.3,
+    name: 'Dunnottar crossbowman', style: 'crossbow', sex: 'male', heightCm: 170, frame: 'medium', age: 30, exercise: 0.3, calories: 2737, skill: 0.2,
     outfit: { kind: 'footman', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // His powder is damp: the stage makes him misfire (matchlock misfire and hang-fire chances are level config).
   dunnottarMatchlock: {
-    name: 'Dunnottar matchlock', style: 'matchlock', sex: 'male', heightCm: 174, frame: 'medium', age: 34, exercise: 0.3, calories: 2836, skill: 0.3,
+    name: 'Dunnottar matchlock', style: 'matchlock', sex: 'male', heightCm: 174, frame: 'medium', age: 34, exercise: 0.3, calories: 2836, skill: 0.2,
     outfit: { kind: 'footman', design: 4 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#6b4a2a', facialHair: 'stubble', eyeColor: 'green' },
   },

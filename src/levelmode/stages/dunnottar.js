@@ -346,8 +346,6 @@ function buildGate() {
   dnSpawn(sec, 'hallguard', 'dunnottarGuard', 'enemy', 2, [-1.5, Y.gorge, 44.2], DN_FACE.S, { inputs: { name: 'Corporal Rae' } });
   dnSpawn(sec, 'headguard', 'dunnottarSoldier', 'enemy', 1, [17.6, A, 49], DN_FACE.W, { inputs: { name: 'Fergus' } });
   dnSpawn(sec, 'gunner1', 'dunnottarMatchlock', 'enemy', 2, [23.4, A, 43.2], DN_FACE.W, { inputs: { name: 'Gunner Mackie' }, station: 'oillet', hole: 0 });
-  dnSpawn(sec, 'bowman1', 'dunnottarCrossbow', 'enemy', 2, [23.4, A, 45.2], DN_FACE.W, { inputs: { name: 'Crossbow Dunn' }, station: 'oillet', hole: 1 });
-  dnSpawn(sec, 'gunner2', 'dunnottarMatchlock', 'enemy', 2, [23.4, A, 47.2], DN_FACE.W, { inputs: { name: 'Gunner Orr' }, station: 'oillet', hole: 2 });
 
   dnItem(sec, 'note-powder', 'note', [3.6, Y.gorge, 42.9], { note: 'powder', lift: 0.9 });
   dnItem(sec, 'bandage3', 'bandage', [-4.4, Y.gorge, 50.6]);
@@ -404,7 +402,6 @@ function buildAscent() {
   sec.portals.push({ to: 'quad', area: { at: [17, 10], size: [8, 9] } });
 
   dnSpawn(sec, 'stairguard1', 'dunnottarGuard', 'enemy', 2, [15.4, B, 21.8], DN_FACE.S, { inputs: { name: 'Sergeant Lorne' } });
-  dnSpawn(sec, 'stairguard2', 'dunnottarSoldier', 'enemy', 1, [17.1, b.treadY(14), 10.8], DN_FACE.S, { inputs: { name: 'Eck' } });
   dnItem(sec, 'bandage4', 'bandage', [24.4, B, 22.4]);
   dnItem(sec, 'tonic2', 'tonic', [11.6, B, 24]);
   return sec;
@@ -509,7 +506,7 @@ function buildQuad() {
   // Men: patrols, a guard at the Lodging; the servants at the well; a priest; ladies of another age, sheltering in the ruin.
   dnSpawn(sec, 'patrol1', 'dunnottarSoldier', 'enemy', 1, [13, Q, -5], DN_FACE.N, { inputs: { name: 'Lachie' }, patrol: [[13, -5], [13, -17], [20, -17], [20, -5]] });
   dnSpawn(sec, 'patrol2', 'dunnottarSoldier', 'enemy', 1, [24, Q, -26], DN_FACE.E, { inputs: { name: 'Findlay' }, patrol: [[24, -26], [32, -30], [32, -22]] });
-  dnSpawn(sec, 'lodgeguard', 'dunnottarGuard', 'enemy', 2, [38.5, Q, 0.2], DN_FACE.W, { inputs: { name: 'Sergeant Keith' } });
+  dnSpawn(sec, 'lodgeguard', 'dunnottarGuard', 'enemy', 2, [38.5, Q, 0.2], DN_FACE.E, { inputs: { name: 'Sergeant Keith' } });
   dnSpawn(sec, 'servant1', 'dunnottarServant', 'civilian', 0, [28.4, Q, -3.6], DN_FACE.E, { inputs: { name: 'Meg' } });
   dnSpawn(sec, 'servant2', 'dunnottarServant', 'civilian', 0, [34.6, Q, -0.4], DN_FACE.W, { inputs: { name: 'Isobel' } });
   dnSpawn(sec, 'priest', 'dunnottarPriest', 'civilian', 0, [38, Q, -8], DN_FACE.S, { inputs: { name: 'Father Anselm' } });
@@ -727,7 +724,7 @@ function buildTower() {
   const stairAt = windingTread(DN_SPIRAL, 36);
   dnSpawn(sec, 'stairknight', 'dunnottarKnight', 'enemy', 3, [stairAt[0], Q + 37 * 0.15, stairAt[1]], Math.PI / 2 - (DN_SPIRAL.start + (DN_SPIRAL.turn / DN_SPIRAL.steps) * 36.5), { inputs: { name: 'Sir Calder' } });
   dnSpawn(sec, 'wallguard', 'dunnottarGuard', 'enemy', 2, [55, W, -36.2], DN_FACE.E, { inputs: { name: 'Sergeant Dow' } });
-  dnSpawn(sec, 'wallknight1', 'dunnottarKnight', 'enemy', 3, [41, W, -36], DN_FACE.E, { inputs: { name: 'Sir Rannoch' } });
+  dnSpawn(sec, 'wallknight1', 'dunnottarGuard', 'enemy', 2, [41, W, -36], DN_FACE.E, { inputs: { name: 'Sergeant Rannoch' } });
   dnSpawn(sec, 'wallbow', 'dunnottarCrossbow', 'enemy', 2, [17, L, -36], DN_FACE.E, { inputs: { name: 'Crossbow Murray' } });
   dnSpawn(sec, 'wallknight2', 'dunnottarKnight', 'enemy', 3, [10, L, -36.4], DN_FACE.E, { inputs: { name: 'Sir Lauder' } });
 
@@ -805,7 +802,7 @@ const DN_SECTIONS = [buildCliff(), buildGate(), buildAscent(), buildQuad(), buil
 // How the garrison sees and flees (levelmode/awareness.js): the light in each section (the storm outside, torches below, the cell
 // nearly black), the point a routed man runs for (`rear`), and where the civilians and prisoners run to hide (`refuge`).
 const DN_MIND = {
-  light: { cliff: 0.75, gate: 0.55, ascent: 0.5, quad: 0.75, vault: 0.3, tower: 0.55, chapel: 0.7, cell: 0.15 },
+  light: { cliff: 0.75, gate: 0.55, ascent: 0.5, quad: 0.55, vault: 0.3, tower: 0.55, chapel: 0.7, cell: 0.15 },
   rear: { cliff: [-58, 0, 30], gate: [10, 4.18, 46], ascent: [17, 8.18, 20], quad: [20, 12.18, 2], vault: [5.7, 6, -17], tower: [51, 12.18, -23], chapel: [-14, 17.18, -38] },
   refuge: {
     servant1: [36.5, 12.18, -5], servant2: [37.5, 12.18, -6.5], priest: [41, 12.18, -12.5], lady1: [5, 12.18, -30], lady2: [5, 12.18, -29],

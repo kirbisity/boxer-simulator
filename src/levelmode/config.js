@@ -21,9 +21,9 @@ export const LEVEL_CONFIG = {
   // A man starts a stage with these, and a rest refills him to at least these. Three bandages: a long fight
   // (a pair of tier 2 guards) costs one or two, so three carry him through a section to the next rest.
   // One tonic: it is the answer to a mistake, not a habit.
-  start: { bandage: 3, tonic: 1 },
+  start: { bandage: 4, tonic: 2 },
   // The most he can carry: five rolls of cloth fit a belt; three flasks fit a pouch.
-  cap: { bandage: 5, tonic: 3 },
+  cap: { bandage: 6, tonic: 3 },
   bandage: {
     // s: the brief's number. Long enough that doing it in a fight is a real gamble (a guard's halberd cut takes
     // about 1.5 s to come round again), short enough to do in the gap after one has been killed.
