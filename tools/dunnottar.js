@@ -1,0 +1,726 @@
+// A bot that plays Level Mode Stage 1, "Memories of Dunnottar", from the cliff path on, headless, to judge how
+// hard it is ("How it will be judged: Difficulty" in the spec). The player follows DUNNOTTAR_ROUTE; when enemies
+// have noticed him he fights with the existing fight AI (ai.js `think`, limited by `mayTarget` to the men who are
+// aware of him), then goes back to the route. Deaths wake at the last rest, as in the game; ten deaths is a fail.
+//
+//   careful   fights what has noticed him, one at a time where it can (backs off along the way he came when two or
+//             more come), bandages when he bleeds and nobody aware is within 6 m, drinks the tonic when badly hurt,
+//             rests at every rest point near the route, takes the items near the route, changes into a dead man's
+//             harness when it protects more, takes the cell key and frees the prisoners.
+//   reckless  runs the route, fights only what is within a few metres, never heals, never loots; rests only at
+//             a rest within a few metres of his way.
+//
+// Usage:
+//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10]
+//   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,plate]   the boss alone, from the chapel gate
+//   node tools/dunnottar.js one <policy> <seed> [--log]                            one run, JSON (the sweep's worker)
+//
+// Output: a table per run (furthest section, deaths and by whom, time, items used, Vaelen reached/beaten) and a summary.
+
+import { spawn } from 'node:child_process';
+import { cpus } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { hurtShare, think, thinkAll } from '../src/ai.js';
+import { P } from '../src/body.js';
+import { advance, bodyHarm, collapseAt, reclothe } from '../src/physics.js';
+import { levelPreset } from '../src/levelmode/presets.js';
+import { levelAware } from '../src/levelmode/adapter.js';
+import { createLevelWorld, levelThink, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
+import { interactions } from '../src/levelmode/interact.js';
+import { feetFloor, holdPlayer, useItem } from '../src/levelmode/items.js';
+import { regionContains, setMechanism, updateStage } from '../src/levelmode/stage.js';
+import { OUTFITS } from '../src/outfits.js';
+import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+
+const STEP = 1 / 60;
+/** The sections in the order the route reaches them (the cell is a side room). */
+const ORDER = ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'];
+const PLAYER = new Set([0]);
+const hipX = (fighter) => fighter.x[P.pelvis * 3];
+const hipZ = (fighter) => fighter.x[P.pelvis * 3 + 2];
+const apart = (a, b) => Math.hypot(hipX(a) - hipX(b), hipZ(a) - hipZ(b));
+
+/** How the policies differ (all in the open here, so that the tuning can read them). */
+const POLICY = {
+  careful: { engage: 16, release: 22, heal: true, loot: true, items: 9, rest: 20, run: false, retreatAt: 2 },
+  reckless: { engage: 3.5, release: 6, heal: false, loot: false, items: 0, rest: 3.5, run: true, retreatAt: 99 },
+  // The route with nobody about, to learn where the walker goes (a trace of positions).
+  trace: { engage: 0, release: 0, heal: false, loot: false, items: 0, rest: 0, run: false, retreatAt: 99 },
+};
+
+/** How much a harness protects: the mean of its blunt, cut and pierce proofing. */
+function protection(inputs) {
+  const spec = OUTFITS[inputs.outfit?.kind]?.protection;
+  return spec ? (spec.blunt + spec.cut + spec.pierce) / 3 : 0;
+}
+
+// ---- The route ------------------------------------------------------------------------------------------
+
+/** The route as one list of points: [{ p: [x, z], acts: [] }], the chapel gate to be opened at the end of the wall walk. */
+function basePlan() {
+  const plan = [];
+  for (const leg of DUNNOTTAR_ROUTE) {
+    if (leg.open?.length && plan.length) plan.at(-1).acts.push(...leg.open.map((id) => ({ kind: 'gate', id })));
+    for (const p of leg.points) plan.push({ p, acts: [], leg: leg.name, base: plan.length });
+  }
+  return plan;
+}
+
+let traceCache = null;
+/** Where a man walking the route goes, nobody about: samples { x, y, z, idx } each half second. */
+function routeTrace() {
+  if (!traceCache) {
+    const run = new Run({ policy: 'trace', seed: 1 });
+    run.play({ seconds: 900 });
+    traceCache = run.samples;
+  }
+  return traceCache;
+}
+
+/** The nearest trace sample to a point (3 m of height counts as a far step: floors above and below are not near). */
+function nearestSample(samples, x, y, z) {
+  let best = null;
+  let bestD = Infinity;
+  for (const sample of samples) {
+    const d = Math.hypot(sample.x - x, sample.z - z) + 4 * Math.abs(sample.y - y);
+    if (d < bestD) {
+      bestD = d;
+      best = sample;
+    }
+  }
+  return { sample: best, d: bestD, flat: best ? Math.hypot(best.x - x, best.z - z) : Infinity, dy: best ? Math.abs(best.y - y) : Infinity };
+}
+
+/** The route with the detours a policy takes: the items within reach of the way, the rests, the cell key and door. */
+function planFor(policy) {
+  const plan = basePlan();
+  const spec = POLICY[policy];
+  if (!spec || (!spec.items && !spec.rest)) return plan;
+  const samples = routeTrace();
+  const stops = [];
+  for (const section of DUNNOTTAR.sections) {
+    for (const item of section.items) {
+      if (item.kind === 'note' || !spec.items) continue;
+      const { sample, flat, dy } = nearestSample(samples, item.at[0], item.at[1], item.at[2]);
+      if (sample && flat <= spec.items && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [item.at[0], item.at[2]], acts: [{ kind: 'item', id: item.id }], before: sample.idx, item });
+    }
+    if (section.rest) {
+      const { sample, flat, dy } = nearestSample(samples, section.rest.at[0], section.rest.at[1], section.rest.at[2]);
+      if (sample && flat <= spec.rest && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [section.rest.at[0], section.rest.at[2]], acts: [{ kind: 'rest', id: section.rest.id, name: section.rest.name }], before: sample.idx });
+    }
+  }
+  stops.sort((a, b) => a.order - b.order);
+  // Gates that open with a key follow the key: unlock the door once the key is in hand.
+  const withDoors = [];
+  for (const stop of stops) {
+    withDoors.push(stop);
+    if (stop.item?.kind !== 'key') continue;
+    for (const section of DUNNOTTAR.sections) {
+      for (const gate of section.gates) {
+        if (gate.key !== stop.item.id) continue;
+        const at = [gate.at[0], gate.at[2] + 1.2];
+        withDoors.push({ p: at, acts: [{ kind: 'gate', id: gate.id }], before: stop.before });
+      }
+    }
+  }
+  // Insert, last first, so the earlier indices hold.
+  const byBefore = new Map();
+  for (const stop of withDoors) {
+    if (!byBefore.has(stop.before)) byBefore.set(stop.before, []);
+    byBefore.get(stop.before).push(stop);
+  }
+  const out = [];
+  plan.forEach((entry, index) => {
+    for (const stop of byBefore.get(index) ?? []) out.push({ p: stop.p, acts: stop.acts, leg: 'detour', stop: true, base: index });
+    out.push(entry);
+  });
+  return out;
+}
+
+// ---- A run ----------------------------------------------------------------------------------------------
+
+class Run {
+  /**
+   * @param policy careful | reckless | trace
+   * @param seed the world's seed
+   * @param maxDeaths the deaths after which the run is a fail
+   * @param plan the points to walk (default: the policy's plan)
+   * @param setup a function given the world before the first step (the boss duel's)
+   */
+  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false }) {
+    this.policy = policy;
+    this.spec = POLICY[policy];
+    this.log = log ? [] : null;
+    this.world = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed });
+    this.me = this.world.fighters[0];
+    this.level = this.world.stage.level;
+    this.maxDeaths = maxDeaths;
+    this.plan = plan ?? planFor(policy);
+    this.idx = 0;
+    this.samples = [];
+    this.sampleAt = 0;
+    this.deaths = [];
+    this.stats = { bandages: 0, tonics: 0, swaps: 0, rests: 0, kills: 0, stuck: 0, retreats: 0 };
+    this.furthest = 0;
+    this.vaelen = { reached: false, attempts: 0, beaten: false, atArrival: [] };
+    this.cursor = 0;
+    this.lastHit = null;
+    this.mode = 'route';
+    this.trail = [];
+    this.retreat = null;
+    this.retreatUsed = false;
+    this.best = Infinity;
+    this.progressAt = 0;
+    this.tried = new Map();
+    this.looted = new Set();
+    this.lootGoal = null;
+    this.bossAware = false;
+    this.restsMade = new Set();
+    this.result = null;
+    this.me.mayTarget = (other) => other.corner === 'blue' && !other.dormant && other.state !== 'out' && levelAware(this.world, other);
+    setup?.(this);
+  }
+
+  note(text) {
+    this.log?.push(`${this.world.time.toFixed(1).padStart(7)}  ${this.sectionName()}  ${text}`);
+  }
+
+  /** The section the man stands in. */
+  sectionName() {
+    const me = this.me;
+    const y = feetFloor(me);
+    return DUNNOTTAR.sections.find((section) => regionContains(section.bounds, hipX(me), hipZ(me), y))?.id ?? '?';
+  }
+
+  /** Enemies awake and aware of him: [{ fighter, d }] nearest first. */
+  aware() {
+    const me = this.me;
+    const found = [];
+    for (const fighter of this.world.fighters) {
+      if (fighter.corner !== 'blue' || fighter.dormant || fighter.state === 'out' || !levelAware(this.world, fighter)) continue;
+      found.push({ fighter, d: apart(me, fighter) });
+    }
+    return found.sort((a, b) => a.d - b.d);
+  }
+
+  /** Play until the stage is done (the boss down), failed (too many deaths) or out of time. */
+  play({ seconds = 3000 } = {}) {
+    const world = this.world;
+    const end = world.time + seconds;
+    const think = (current, dt) => this.step(current, dt);
+    while (!this.result && world.time < end) advance(world, STEP, think);
+    if (!this.result) this.result = this.policy === 'trace' ? 'traced' : 'timeout';
+    return this.report();
+  }
+
+  /** One step before the physics: the stage, the player's own systems, the men, the bot. */
+  step(world, dt) {
+    const level = this.level;
+    const me = this.me;
+    updateStage(world);
+    if (this.policy === 'trace') for (const fighter of world.fighters.slice(1)) fighter.dormant = true;
+    levelThink(world, dt);
+    level.ui.length = 0;
+    level.rebuild.clear();
+    this.watch();
+    if (level.dying) {
+      this.die();
+      return;
+    }
+    if (me.state === 'out') return;
+    thinkAll(world, dt, PLAYER);
+    this.control(dt);
+  }
+
+  /** The events since last step: who struck him; the boss; how far he has got. */
+  watch() {
+    const world = this.world;
+    const events = world.events;
+    if (this.cursor > events.length) this.cursor = events.length;
+    for (; this.cursor < events.length; this.cursor += 1) {
+      const event = events[this.cursor];
+      if (event.defender === 0 && ['landed', 'shot', 'arrow', 'crash'].includes(event.kind)) this.lastHit = { attacker: event.attacker, kind: event.kind, time: event.time };
+      if (event.kind === 'rested') this.stats.rests += 1;
+      if (event.attacker === 0 && ['knockout', 'killed'].includes(event.kind) && event.fighter !== 0) this.stats.kills += 1;
+    }
+    const here = ORDER.indexOf(this.sectionName());
+    if (here > this.furthest) this.furthest = here;
+    const boss = this.level.boss ? world.fighters[this.level.boss.id] : null;
+    if (boss) {
+      const aware = !boss.dormant && boss.state !== 'out' && levelAware(world, boss);
+      if (aware && !this.bossAware) {
+        this.vaelen.reached = true;
+        this.vaelen.attempts += 1;
+        this.vaelen.atArrival.push({ harm: Number(bodyHarm(this.me).toFixed(2)), bandages: this.level.inventory.bandage, tonics: this.level.inventory.tonic, armour: Number(protection(this.me.body.inputs).toFixed(2)), t: Number(world.time.toFixed(0)) });
+        this.note('Vaelen sees him');
+      }
+      this.bossAware = aware;
+      if (boss.state === 'out' && !this.vaelen.beaten) {
+        this.vaelen.beaten = true;
+        this.result = 'beaten';
+        this.note('Vaelen is down');
+      }
+    }
+  }
+
+  /** The man is out: note where and by whom, wake at the last rest, or give up. */
+  die() {
+    const world = this.world;
+    const level = this.level;
+    const hit = this.lastHit && world.time - this.lastHit.time < 30 ? this.lastHit : null;
+    const killer = hit ? world.fighters[hit.attacker]?.spawn?.id ?? hit.kind : 'bled';
+    const section = this.sectionName();
+    this.deaths.push({ section, by: killer, at: Number(world.time.toFixed(0)), boss: this.bossAware });
+    this.note(`dies to ${killer}`);
+    if (this.deaths.length >= this.maxDeaths) {
+      this.result = 'fail';
+      return;
+    }
+    respawnPlayer(world);
+    level.ui.length = 0;
+    level.rebuild.clear();
+    this.me.mayTarget = (other) => other.corner === 'blue' && !other.dormant && other.state !== 'out' && levelAware(this.world, other);
+    this.mode = 'route';
+    this.retreat = null;
+    this.retreatUsed = false;
+    this.bossAware = false;
+    this.lootGoal = null;
+    this.trail.length = 0;
+    this.lastHit = null;
+    this.idx = this.planIndexHere();
+    this.best = Infinity;
+    this.progressAt = world.time;
+  }
+
+  /** After a rest or a death: the point of the plan to head for from where he stands (stops already done are passed at once). */
+  planIndexHere() {
+    if (this.policy === 'trace') return 0;
+    const me = this.me;
+    const { sample } = nearestSample(routeTrace(), hipX(me), feetFloor(me), hipZ(me));
+    const found = this.plan.findIndex((entry) => entry.base >= (sample?.idx ?? 0));
+    return found >= 0 ? found : 0;
+  }
+
+  // ---- What he does -----------------------------------------------------------------------------------
+
+  /** Heal or fight or walk, one step. */
+  control(dt) {
+    const me = this.me;
+    const level = this.level;
+    const world = this.world;
+    const spec = this.spec;
+    if (level.action || me.pickup) {
+      holdPlayer(me);
+      return;
+    }
+    if (this.policy === 'trace') return this.route(dt);
+    const aware = this.aware();
+    const nearest = aware[0]?.d ?? Infinity;
+    // Fighting: from engage to release.
+    const fighting = this.mode === 'fight' ? nearest <= spec.release : nearest <= spec.engage;
+    if (this.mode !== 'fight' && fighting) {
+      this.mode = 'fight';
+      this.retreatUsed = false;
+      this.note(`engages ${aware.filter((entry) => entry.d <= spec.release).map((entry) => entry.fighter.spawn.id).join(',')}`);
+    }
+    if (this.mode === 'fight' && !fighting) {
+      this.mode = 'route';
+      me.focus = undefined;
+      me.goTo = null;
+      this.note(`clear (harm ${bodyHarm(me).toFixed(2)})`);
+      this.best = Infinity;
+      this.progressAt = world.time;
+      this.retreat = null;
+    }
+    if (spec.heal && this.tend(aware)) return;
+    if (fighting) return this.fight(aware, dt);
+    if (spec.loot && this.loot(aware)) return;
+    this.route(dt);
+  }
+
+  /** Bandage and tonic. True if he took an action this step (so he does nothing else). */
+  tend(aware) {
+    const me = this.me;
+    const level = this.level;
+    const nearest = aware[0]?.d ?? Infinity;
+    const harm = bodyHarm(me);
+    if (me.state === 'up' && !level.tonics.length && level.inventory.tonic > 0 && (harm >= 0.4 || (me.bloodLost ?? 0) / collapseAt() >= 0.4)) {
+      if (useItem(this.world, 'tonic')) {
+        this.stats.tonics += 1;
+        this.note(`tonic (harm ${harm.toFixed(2)})`);
+      }
+    }
+    if (me.state === 'up' && (me.bleed ?? 0) > 1e-4 && level.inventory.bandage > 0 && nearest > 6 && !me.punch) {
+      if (useItem(this.world, 'bandage')) {
+        this.stats.bandages += 1;
+        this.note('bandage');
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The fight AI for the player, limited to the men aware of him; two or more coming: back along the way he came, first. */
+  fight(aware, dt) {
+    const me = this.me;
+    const world = this.world;
+    const spec = this.spec;
+    const near = aware.filter((entry) => entry.d <= spec.release);
+    if (!this.retreatUsed && near.length >= spec.retreatAt && near[0].d > 5 && this.trail.length > 6) {
+      this.retreatUsed = true;
+      this.retreat = { until: world.time + 5, to: this.trail[Math.max(0, this.trail.length - 9)] };
+      this.stats.retreats += 1;
+    }
+    if (this.retreat && (world.time > this.retreat.until || near[0]?.d <= 4)) this.retreat = null;
+    if (this.retreat) {
+      me.walking = true;
+      me.goTo = [this.retreat.to[0], 0, this.retreat.to[1]];
+      me.move = 1;
+      me.running = true;
+      me.strafe = 0;
+      return;
+    }
+    me.walking = false;
+    think(world, me, dt);
+  }
+
+  /** After a fight, a dead man's harness that protects more: walk to him and change. True while at it. */
+  loot(aware) {
+    const me = this.me;
+    const world = this.world;
+    if (aware.length && aware[0].d < 20) return false;
+    const mine = protection(me.body.inputs);
+    if (!this.lootGoal) {
+      let best = null;
+      for (const dead of world.fighters) {
+        if (dead === me || dead.state !== 'out' || dead.dormant || dead.corner !== 'blue' || this.looted.has(dead.id)) continue;
+        const d = apart(me, dead);
+        if (d > 14 || Math.abs(dead.x[P.pelvis * 3 + 1] - me.x[P.pelvis * 3 + 1]) > 1.6) continue;
+        const gain = protection(dead.body.inputs) - mine;
+        if (gain > 0.05 && (!best || gain > best.gain)) best = { dead, gain };
+      }
+      if (!best) return false;
+      this.lootGoal = { id: best.dead.id, until: world.time + 14 };
+      this.looted.add(best.dead.id);
+    }
+    const dead = world.fighters[this.lootGoal.id];
+    if (world.time > this.lootGoal.until || dead.state !== 'out') {
+      this.lootGoal = null;
+      return false;
+    }
+    const d = apart(me, dead);
+    if (d > 1.0) {
+      me.walking = true;
+      me.running = false;
+      me.goTo = [hipX(dead), 0, hipZ(dead)];
+      me.move = 1;
+      return true;
+    }
+    me.move = 0;
+    const choice = interactions(world).find((entry) => entry.id === `outfit:${dead.id}`);
+    if (choice && choice.run(world)) {
+      this.stats.swaps += 1;
+      this.note(`changes into ${dead.spawn?.id}'s harness`);
+    }
+    this.lootGoal = null;
+    return true;
+  }
+
+  /** Walk the plan. */
+  route(dt) {
+    const me = this.me;
+    const world = this.world;
+    me.walking = true;
+    me.strafe = 0;
+    const entry = this.plan[this.idx];
+    if (!entry) {
+      if (this.policy === 'trace') this.result = 'traced';
+      else this.finish();
+      return;
+    }
+    const [tx, tz] = entry.p;
+    const d = Math.hypot(tx - hipX(me), tz - hipZ(me));
+    if (d < (entry.stop ? 0.5 : 0.6)) {
+      if (this.act(entry)) return;
+      this.idx += 1;
+      this.best = Infinity;
+      this.progressAt = world.time;
+      return;
+    }
+    // Nearer to it for four seconds out of the last; else it is a wall and he goes on.
+    if (d < this.best - 0.05) {
+      this.best = d;
+      this.progressAt = world.time;
+    } else if (world.time - this.progressAt > 4) {
+      this.stats.stuck += 1;
+      this.note(`stuck going to ${tx.toFixed(1)},${tz.toFixed(1)}`);
+      this.idx += 1;
+      this.best = Infinity;
+      this.progressAt = world.time;
+      return;
+    }
+    me.goTo = [tx, 0, tz];
+    me.move = 1;
+    me.running = this.spec.run;
+    if (this.policy !== 'trace') this.keepTrail();
+    else this.sample();
+  }
+
+  keepTrail() {
+    const last = this.trail.at(-1);
+    const here = [hipX(this.me), hipZ(this.me)];
+    if (!last || Math.hypot(last[0] - here[0], last[1] - here[1]) >= 1) {
+      this.trail.push(here);
+      if (this.trail.length > 40) this.trail.shift();
+    }
+  }
+
+  sample() {
+    if (this.world.time < this.sampleAt) return;
+    this.sampleAt = this.world.time + 0.5;
+    this.samples.push({ x: hipX(this.me), y: feetFloor(this.me), z: hipZ(this.me), idx: this.idx });
+  }
+
+  /** The things done at a plan point: take, open, rest. True while there is something still to do. */
+  act(entry) {
+    const world = this.world;
+    const level = this.level;
+    const me = this.me;
+    if (!entry.acts.length) return false;
+    const act = entry.acts[0];
+    const key = `${this.idx}:${act.kind}:${act.id}`;
+    const tries = (this.tried.get(key) ?? 0) + 1;
+    this.tried.set(key, tries);
+    let done = tries > 40;
+    me.move = 0;
+    if (act.kind === 'item') done ||= level.taken.has(act.id);
+    if (act.kind === 'gate') done ||= world.stage.mechanisms[act.id] === 'open';
+    if (act.kind === 'rest') {
+      const need = bodyHarm(me) > 0.03 || level.inventory.bandage < level.startItems.bandage || level.inventory.tonic < level.startItems.tonic || !this.restsMade.has(act.id);
+      done ||= !need || level.checkpoint.id === act.id;
+    }
+    if (!done) {
+      const choice = interactions(world).find((entry2) => (act.kind === 'item' && entry2.id === `item:${act.id}`) || (act.kind === 'gate' && entry2.id === `gate:${act.id}`) || (act.kind === 'rest' && entry2.kind === 'rest'));
+      if (choice && !choice.disabled && this.aware().every((enemy) => enemy.d > 6)) {
+        if (choice.run(world) !== false) {
+          if (act.kind === 'rest') {
+            this.restsMade.add(act.id);
+            this.note(`rests at ${act.name ?? act.id}`);
+            this.idx = this.planIndexHere();
+            this.trail.length = 0;
+            return true;
+          }
+          this.note(`${act.kind} ${act.id}`);
+          done = true;
+        }
+      }
+    }
+    if (done) {
+      entry.acts = entry.acts.slice(1);
+      return entry.acts.length > 0;
+    }
+    return true;
+  }
+
+  /** The plan is walked: the boss is the last thing. If he has not seen him, go to him. */
+  finish() {
+    const me = this.me;
+    const boss = this.level.boss ? this.world.fighters[this.level.boss.id] : null;
+    me.walking = true;
+    if (!boss || boss.state === 'out') {
+      me.move = 0;
+      return;
+    }
+    me.goTo = [hipX(boss), 0, hipZ(boss)];
+    me.move = 1;
+    me.running = false;
+  }
+
+  /** The run's numbers. */
+  report() {
+    const level = this.level;
+    return {
+      policy: this.policy,
+      result: this.result,
+      furthest: ORDER[this.furthest],
+      deaths: this.deaths,
+      seconds: Number(this.world.time.toFixed(0)),
+      stats: this.stats,
+      vaelen: this.vaelen,
+      freed: [...level.freed],
+      armour: Number(protection(this.me.body.inputs).toFixed(2)),
+      log: this.log,
+    };
+  }
+}
+
+// ---- The boss alone ---------------------------------------------------------------------------------------
+
+/** What the operative brings to the chapel gate. */
+const VARIANTS = {
+  // Hurt and out of everything: half his blood gone, the pouch empty.
+  unhealed: (run) => {
+    run.me.bloodLost = 0.5 * collapseAt();
+    run.me.concussion = 0.25 * run.me.concussion + 0.1;
+    run.level.inventory = { bandage: 0, tonic: 0 };
+  },
+  // Rested: whole, the pouch as the stage starts him.
+  healed: () => {},
+  // Rested, and in a dead man-at-arms' plate (taken from Sir Lauder or Sir Rannoch).
+  plate: (run) => {
+    const knight = levelPreset('dunnottarKnight');
+    reclothe(run.world, run.me, { ...run.me.body.inputs, outfit: structuredClone(knight.outfit), accessories: [] });
+  },
+};
+
+function bossDuel(variant, seed, log) {
+  const chapel = DUNNOTTAR_ROUTE.find((leg) => leg.to === 'chapel');
+  const plan = chapel.points.map((p) => ({ p, acts: [], leg: chapel.name }));
+  const run = new Run({
+    policy: 'careful',
+    seed,
+    plan,
+    log,
+    maxDeaths: 1,
+    setup: (self) => {
+      const rest = DUNNOTTAR.sections.find((section) => section.rest?.id === 'rest3').rest;
+      setMechanism(self.world, 'chapelgate', 'open');
+      restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
+      self.level.ui.length = 0;
+      self.me.mayTarget = (other) => other.corner === 'blue' && !other.dormant && other.state !== 'out' && levelAware(self.world, other);
+      VARIANTS[variant](self);
+    },
+  });
+  // The plan is the chapel leg: the points from the gate to Vaelen; items and rests are not in it.
+  run.play({ seconds: 240 });
+  const boss = run.world.fighters[run.level.boss.id];
+  return { variant, seed, result: boss.state === 'out' ? 'beaten' : run.deaths.length ? 'died' : 'timeout', seconds: run.report().seconds, by: run.deaths[0]?.by ?? '', bossHurt: Number(hurtShare(boss).toFixed(2)), log: run.log };
+}
+
+// ---- The command line ------------------------------------------------------------------------------------
+
+function parseArgs(argv) {
+  const options = { _: [] };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg.startsWith('--')) {
+      const next = argv[index + 1];
+      if (next === undefined || next.startsWith('--')) options[arg.slice(2)] = true;
+      else {
+        options[arg.slice(2)] = next;
+        index += 1;
+      }
+    } else options._.push(arg);
+  }
+  return options;
+}
+
+/** Run `jobs` child processes at a time over the argument lists; each prints one JSON line. */
+function farm(lists, jobs) {
+  const script = fileURLToPath(import.meta.url);
+  return new Promise((resolve) => {
+    const results = new Array(lists.length);
+    let next = 0;
+    let running = 0;
+    let finished = 0;
+    const launch = () => {
+      while (running < jobs && next < lists.length) {
+        const mine = next;
+        next += 1;
+        running += 1;
+        const child = spawn(process.execPath, [script, ...lists[mine]], { stdio: ['ignore', 'pipe', 'inherit'] });
+        let out = '';
+        child.stdout.on('data', (chunk) => { out += chunk; });
+        child.on('close', () => {
+          running -= 1;
+          finished += 1;
+          try {
+            results[mine] = JSON.parse(out.trim().split('\n').at(-1));
+          } catch {
+            results[mine] = { result: 'crash', deaths: [], stats: {}, vaelen: {} };
+          }
+          process.stderr.write(`\r${finished}/${lists.length} done `);
+          if (finished === lists.length) {
+            process.stderr.write('\n');
+            resolve(results);
+          } else launch();
+        });
+      }
+    };
+    launch();
+  });
+}
+
+const pad = (value, width) => String(value).padEnd(width);
+
+function printSweep(runs) {
+  console.log(`${pad('policy', 9)}${pad('seed', 5)}${pad('result', 9)}${pad('furthest', 9)}${pad('deaths', 7)}${pad('time', 6)}${pad('band', 5)}${pad('tonic', 6)}${pad('swap', 5)}${pad('rest', 5)}${pad('vael', 10)}  died (section:by)`);
+  for (const run of runs) {
+    const vaelen = run.vaelen.beaten ? 'beaten' : run.vaelen.reached ? `seen x${run.vaelen.attempts}` : '-';
+    console.log(`${pad(run.policy, 9)}${pad(run.seed, 5)}${pad(run.result, 9)}${pad(run.furthest ?? '-', 9)}${pad(run.deaths.length, 7)}${pad(run.seconds ?? '', 6)}${pad(run.stats.bandages ?? '', 5)}${pad(run.stats.tonics ?? '', 6)}${pad(run.stats.swaps ?? '', 5)}${pad(run.stats.rests ?? '', 5)}${pad(vaelen, 10)}  ${run.deaths.map((death) => `${death.section}:${death.by}`).join(' ')}`);
+  }
+}
+
+function printSummary(runs) {
+  for (const policy of [...new Set(runs.map((run) => run.policy))]) {
+    const mine = runs.filter((run) => run.policy === policy);
+    const share = (test) => `${mine.filter(test).length}/${mine.length}`;
+    const deaths = mine.map((run) => run.deaths.length);
+    const sum = deaths.reduce((a, b) => a + b, 0);
+    const bySection = {};
+    const byKiller = {};
+    for (const run of mine) for (const death of run.deaths) {
+      bySection[death.section] = (bySection[death.section] ?? 0) + 1;
+      byKiller[death.by] = (byKiller[death.by] ?? 0) + 1;
+    }
+    const attempts = mine.reduce((total, run) => total + (run.vaelen.attempts ?? 0), 0);
+    const wins = mine.filter((run) => run.vaelen.beaten).length;
+    const sorted = (object) => Object.entries(object).sort((a, b) => b[1] - a[1]).map(([key, count]) => `${key} ${count}`).join(', ');
+    console.log(`\n${policy}: reached Vaelen ${share((run) => run.vaelen.reached)}, beat him ${share((run) => run.vaelen.beaten)} (${wins}/${attempts} attempts), failed ${share((run) => run.result === 'fail')}, mean deaths ${(sum / mine.length).toFixed(1)}, median time ${[...mine.map((run) => run.seconds)].sort((a, b) => a - b)[Math.floor(mine.length / 2)]} s`);
+    console.log(`  deaths by section: ${sorted(bySection) || 'none'}`);
+    console.log(`  deaths by: ${sorted(byKiller) || 'none'}`);
+  }
+}
+
+async function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const command = options._[0] ?? 'sweep';
+  const jobs = Number(options.jobs ?? Math.max(1, cpus().length - 2));
+  if (command === 'one') {
+    const [, policy, seed] = options._;
+    const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });
+    const report = run.play({ seconds: Number(options.seconds ?? 3000) });
+    console.log(JSON.stringify({ ...report, seed: Number(seed) }));
+    return;
+  }
+  if (command === 'boss') {
+    const [, variant, seed] = options._;
+    console.log(JSON.stringify(bossDuel(variant, Number(seed), Boolean(options.log))));
+    return;
+  }
+  const runs = Number(options.runs ?? 10);
+  const seed0 = Number(options.seed0 ?? 1);
+  if (command === 'vaelen') {
+    const variants = String(options.variant ?? 'unhealed,healed,plate').split(',');
+    const lists = variants.flatMap((variant) => Array.from({ length: runs }, (_, index) => ['boss', variant, String(seed0 + index)]));
+    const results = await farm(lists, jobs);
+    for (const variant of variants) {
+      const mine = results.filter((result) => result.variant === variant);
+      const won = mine.filter((result) => result.result === 'beaten').length;
+      const by = {};
+      for (const result of mine) if (result.by) by[result.by] = (by[result.by] ?? 0) + 1;
+      const median = [...mine.map((result) => result.seconds)].sort((a, b) => a - b)[Math.floor(mine.length / 2)];
+      console.log(`vaelen vs ${pad(variant, 9)} beaten ${won}/${mine.length}  died ${mine.filter((result) => result.result === 'died').length}  timed out ${mine.filter((result) => result.result === 'timeout').length}  median ${median} s  killed by ${Object.keys(by).join(',') || '-'}`);
+    }
+    return;
+  }
+  const policies = String(options.policy ?? 'careful,reckless').split(',');
+  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--deaths', String(options.deaths ?? 10)]));
+  const results = await farm(lists, jobs);
+  printSweep(results);
+  printSummary(results);
+}
+
+export { Run, planFor, routeTrace, bossDuel, POLICY, VARIANTS };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
