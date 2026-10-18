@@ -734,29 +734,98 @@ export function behindShield(p, shield) {
   return side.inside && side.height < 0;
 }
 
+// What measureSide finds, in numbers rather than vectors: a crowd asks it for every
+// sample of every trunk against every shield, every substep.
+const measured = { inside: false, height: 0, onX: 0, onY: 0, onZ: 0, outX: 0, outY: 0, outZ: 0 };
+
+/**
+ * A point (px, py, pz) against a shield, worked into `measured`: the nearest
+ * point on it (shieldClosest's), whether that is within its outline, the face's
+ * outward normal there and the point's height over the face (shieldSide's answer).
+ */
+function measureSide(px, py, pz, shield) {
+  const spec = shield.spec;
+  const centre = shield.centre;
+  const normal = shield.normal;
+  if (!spec?.shape) {
+    // A flat disc: the point's offset from the centre, less its height over the face, held within the radius.
+    const ox = px - centre[0];
+    const oy = py - centre[1];
+    const oz = pz - centre[2];
+    const over = ox * normal[0] + oy * normal[1] + oz * normal[2];
+    const fx = ox - normal[0] * over;
+    const fy = oy - normal[1] * over;
+    const fz = oz - normal[2] * over;
+    const out = Math.sqrt(fx * fx + fy * fy + fz * fz);
+    if (out <= shield.radius) {
+      measured.onX = centre[0] + fx;
+      measured.onY = centre[1] + fy;
+      measured.onZ = centre[2] + fz;
+    } else {
+      const squeeze = shield.radius / out;
+      measured.onX = centre[0] + fx * squeeze;
+      measured.onY = centre[1] + fy * squeeze;
+      measured.onZ = centre[2] + fz * squeeze;
+    }
+    const rx = measured.onX - centre[0];
+    const ry = measured.onY - centre[1];
+    const rz = measured.onZ - centre[2];
+    measured.inside = Math.sqrt(rx * rx + ry * ry + rz * rz) < shield.radius - 1e-3;
+    measured.outX = normal[0];
+    measured.outY = normal[1];
+    measured.outZ = normal[2];
+  } else {
+    // A curved rectangle bending back round an upright axis.
+    const up = shield.up;
+    const across = shield.across;
+    const ax = centre[0] - normal[0] * spec.curve;
+    const ay = centre[1] - normal[1] * spec.curve;
+    const az = centre[2] - normal[2] * spec.curve;
+    const dx = px - ax;
+    const dy = py - ay;
+    const dz = pz - az;
+    const rise = Math.max(-spec.height / 2, Math.min(spec.height / 2, dx * up[0] + dy * up[1] + dz * up[2]));
+    const most = spec.width / 2 / spec.curve;
+    const around = Math.max(-most, Math.min(most, Math.atan2(dx * across[0] + dy * across[1] + dz * across[2], dx * normal[0] + dy * normal[1] + dz * normal[2])));
+    const cos = Math.cos(around) * spec.curve;
+    const sin = Math.sin(around) * spec.curve;
+    const onX = ax + (up[0] * rise + (normal[0] * cos + across[0] * sin));
+    const onY = ay + (up[1] * rise + (normal[1] * cos + across[1] * sin));
+    const onZ = az + (up[2] * rise + (normal[2] * cos + across[2] * sin));
+    measured.onX = onX;
+    measured.onY = onY;
+    measured.onZ = onZ;
+    const ex = onX - ax;
+    const ey = onY - ay;
+    const ez = onZ - az;
+    const height = ex * up[0] + ey * up[1] + ez * up[2];
+    const angle = Math.atan2(ex * across[0] + ey * across[1] + ez * across[2], ex * normal[0] + ey * normal[1] + ez * normal[2]);
+    measured.inside = Math.abs(height) < spec.height / 2 - 1e-3 && Math.abs(angle) < spec.width / 2 / spec.curve - 1e-3;
+    const bend = 1 / spec.curve;
+    measured.outX = (ex - up[0] * height) * bend;
+    measured.outY = (ey - up[1] * height) * bend;
+    measured.outZ = (ez - up[2] * height) * bend;
+  }
+  measured.height = (px - measured.onX) * measured.outX + (py - measured.onY) * measured.outY + (pz - measured.onZ) * measured.outZ;
+}
+
 /**
  * A point against a shield: the nearest point on it, whether that is within
  * its outline (not on the rim), the face's outward normal there (the side
  * away from the man holding it), and the point's height over the face.
  */
 function shieldSide(p, shield) {
-  const spec = shield.spec;
-  const onShield = shieldClosest(p, shield);
-  let inside;
-  let outward;
-  if (!spec?.shape) {
-    inside = vec.length(vec.sub(onShield, shield.centre)) < shield.radius - 1e-3;
-    outward = shield.normal;
-  } else {
-    const axis = vec.sub(shield.centre, vec.scale(shield.normal, spec.curve));
-    const d = vec.sub(onShield, axis);
-    const up = vec.dot(d, shield.up);
-    const angle = Math.atan2(vec.dot(d, shield.across), vec.dot(d, shield.normal));
-    inside = Math.abs(up) < spec.height / 2 - 1e-3 && Math.abs(angle) < spec.width / 2 / spec.curve - 1e-3;
-    outward = vec.scale(vec.sub(d, vec.scale(shield.up, up)), 1 / spec.curve);
-  }
-  return { onShield, inside, outward, height: vec.dot(vec.sub(p, onShield), outward) };
+  measureSide(p[0], p[1], p[2], shield);
+  const outward = shield.spec?.shape ? [measured.outX, measured.outY, measured.outZ] : shield.normal;
+  return { onShield: [measured.onX, measured.onY, measured.onZ], inside: measured.inside, outward, height: measured.height };
 }
+
+// The samples along a segment, as shieldContact takes them: up to 25.
+const sampleInside = new Uint8Array(25);
+const sampleHeight = new Float64Array(25);
+const sampleOn = new Float64Array(75);
+const sampleOut = new Float64Array(75);
+const sampleAt = new Float64Array(75);
 
 /**
  * A segment (a blade, a limb, of this radius) against a shield, sampled along
@@ -770,36 +839,76 @@ export function shieldContact(a, b, shield, radius) {
   // A ball (a fist) is one point; a blade a point every 8 cm or so.
   const length = vec.length(vec.sub(b, a));
   const samples = length < 1e-6 ? 0 : Math.max(4, Math.min(24, Math.ceil(length / 0.08)));
-  const points = [];
   let before = false;
   let behind = false;
   for (let index = 0; index <= samples; index += 1) {
     const along = samples ? index / samples : 0;
-    const p = vec.lerp(a, b, along);
-    const side = shieldSide(p, shield);
-    if (side.inside) {
-      if (side.height >= 0) before = true;
+    const at = index * 3;
+    const px = a[0] + (b[0] - a[0]) * along;
+    const py = a[1] + (b[1] - a[1]) * along;
+    const pz = a[2] + (b[2] - a[2]) * along;
+    measureSide(px, py, pz, shield);
+    sampleAt[at] = px;
+    sampleAt[at + 1] = py;
+    sampleAt[at + 2] = pz;
+    sampleOn[at] = measured.onX;
+    sampleOn[at + 1] = measured.onY;
+    sampleOn[at + 2] = measured.onZ;
+    sampleOut[at] = measured.outX;
+    sampleOut[at + 1] = measured.outY;
+    sampleOut[at + 2] = measured.outZ;
+    sampleHeight[index] = measured.height;
+    sampleInside[index] = measured.inside ? 1 : 0;
+    if (measured.inside) {
+      if (measured.height >= 0) before = true;
       else behind = true;
     }
-    points.push({ along, p, side });
   }
   const through = before && behind;
-  let best = null;
-  for (const { along, p, side } of points) {
+  const flat = !shield.spec?.shape;
+  let bestDepth = 0;
+  let bestIndex = -1;
+  let bestOutward = true;
+  let awayX = 0;
+  let awayY = 0;
+  let awayZ = 0;
+  for (let index = 0; index <= samples; index += 1) {
+    const at = index * 3;
     let depth;
-    let away;
-    if (side.inside && (side.height >= 0 || through)) {
-      depth = radius - side.height;
-      away = side.outward;
-    } else if (!side.inside) {
-      const offset = vec.sub(p, side.onShield);
-      const distance = vec.length(offset);
+    let outward = true;
+    let x = sampleOut[at];
+    let y = sampleOut[at + 1];
+    let z = sampleOut[at + 2];
+    if (sampleInside[index] && (sampleHeight[index] >= 0 || through)) {
+      depth = radius - sampleHeight[index];
+    } else if (!sampleInside[index]) {
+      const ox = sampleAt[at] - sampleOn[at];
+      const oy = sampleAt[at + 1] - sampleOn[at + 1];
+      const oz = sampleAt[at + 2] - sampleOn[at + 2];
+      const distance = Math.sqrt(ox * ox + oy * oy + oz * oz);
       depth = radius - distance;
-      away = distance > 1e-6 ? vec.scale(offset, 1 / distance) : side.outward;
+      if (distance > 1e-6) {
+        const scale = 1 / distance;
+        x = ox * scale;
+        y = oy * scale;
+        z = oz * scale;
+        outward = false;
+      }
     } else continue;
-    if (depth > 0 && (!best || depth > best.depth)) best = { depth, point: side.onShield, along, from: p, away };
+    if (depth > 0 && (bestIndex < 0 || depth > bestDepth)) {
+      bestDepth = depth;
+      bestIndex = index;
+      bestOutward = outward;
+      awayX = x;
+      awayY = y;
+      awayZ = z;
+    }
   }
-  return best;
+  if (bestIndex < 0) return null;
+  const at = bestIndex * 3;
+  // (A flat shield's outward is its own normal, the very array; an offset's away is new.)
+  const away = bestOutward && flat ? shield.normal : [awayX, awayY, awayZ];
+  return { depth: bestDepth, point: [sampleOn[at], sampleOn[at + 1], sampleOn[at + 2]], along: samples ? bestIndex / samples : 0, from: [sampleAt[at], sampleAt[at + 1], sampleAt[at + 2]], away };
 }
 
 // Cutting and piercing, in joules of a contact's collision energy after
@@ -987,6 +1096,9 @@ export function createWeapon(kind) {
     dir: [1, 0, 0], spin: [0, 0, 0], tip: [0, 0, 0], tipPrev: null, tipVelocity: [0, 0, 0], strain: 0,
     // A gun with a charge (a matchlock) starts loaded.
     loaded: true, reloaded: 0,
+    // What a weapon gains in the fight, named here (unset) so that every weapon has one shape.
+    handling: undefined, charges: undefined, colour: undefined, edge: undefined, dulled: undefined, spent: undefined,
+    draw: undefined, facing: undefined, rope: undefined,
   };
 }
 

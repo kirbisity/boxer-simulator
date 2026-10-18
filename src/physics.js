@@ -10,7 +10,7 @@ import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
-import { desiredPose, lockedHead, restPose, twoBoneIK, vec, yawRotate } from './pose.js';
+import { desiredPose, lockedHead, restPose, twoBoneIK, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
@@ -135,6 +135,26 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     knock: [0, 0, 0],
     stats: { thrown: 0, landed: 0, blocked: 0, struckHorse: 0, maxHandSpeed: 0, lastHandSpeed: 0, knockdownsScored: 0 },
     contacts: new Set(),
+    // What the fight adds later, named here (unset) so that every fighter has the
+    // one shape: fighters that gain fields in their own order each get their own,
+    // and the engine reading them all (a hundred men, a hundred shapes) slows to a crawl.
+    shield: undefined, weapon: undefined, offWeapon: undefined, arena: undefined, slot: undefined, formation: undefined, inFront: undefined,
+    shieldPose: undefined, shieldOpen: undefined, strafe: undefined, running: undefined, aimAt: undefined, focus: undefined, goTo: undefined,
+    nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
+    weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined,
+    stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
+    bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined,
+    loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
+    restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
+    sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
+    mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
+    panicked: undefined, panics: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined,
+    aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined,
+    aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
+    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
+    aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
+    aiFleeing: undefined, aiFleeSince: undefined, aiCharge: undefined,
+    mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
@@ -169,7 +189,7 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   if (style.weapon) fighter.mixed = null;
   if (shield && style.shield && !fighter.shield) {
     const spec = SHIELDS[style.shield];
-    fighter.shield = { kind: style.shield, spec };
+    fighter.shield = { kind: style.shield, spec, strain: undefined };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
   }
@@ -497,7 +517,7 @@ function updatePickup(world, fighter, dt) {
   fighter.pickup = null;
   if (debris.kind === 'shield') {
     const spec = SHIELDS[debris.shield];
-    fighter.shield = { kind: debris.shield, spec };
+    fighter.shield = { kind: debris.shield, spec, strain: undefined };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
     world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, effects: [`takes up the ${spec.label.toLowerCase()}`] });
@@ -1368,6 +1388,9 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     // How far an untrained hand turns the blade off true (rad): the edge meeting at a slant, the point off its line.
     edgeTilt: edgeTilt(world, fighter, spec),
     wander,
+    // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
+    riposte: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
+    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
@@ -2505,9 +2528,19 @@ export function standingTarget(fighter, index) {
     return { target: swivelIntoRange(axes, 'leg', side, hip, knee, foot, { margin: WORLD.limbTwist.softBand }), velocity: point(fighter.v, info.hip) };
   }
   if (info.anchor === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
+  // Most parts: where the pose puts it from its anchor, turned to the way he faces, from where the anchor is.
   const anchor = info.anchor;
-  const offset = yawRotate(vec.sub(desired, fighter.desired[anchor]), fighter.yaw);
-  return { target: vec.add(point(fighter.x, anchor), offset), velocity: point(fighter.v, anchor) };
+  const from = fighter.desired[anchor];
+  const cos = yawCos(fighter.yaw);
+  const sin = yawSin(fighter.yaw);
+  const x = fighter.x;
+  const at = anchor * 3;
+  const dx = desired[0] - from[0];
+  const dz = desired[2] - from[2];
+  return {
+    target: [x[at] + (dx * cos + dz * sin), x[at + 1] + (desired[1] - from[1]), x[at + 2] + (-dx * sin + dz * cos)],
+    velocity: point(fighter.v, anchor),
+  };
 }
 
 // Scratch for the integrator's muscle drive (one particle at a time), and
@@ -3355,65 +3388,33 @@ export function capsuleEnds(fighter, capsule) {
   return [a, capsule.bLength ? vec.lerp(a, b, capsule.bLength) : b];
 }
 
-function closestOnSegment(p, a, b) {
-  const ab = vec.sub(b, a);
-  const lengthSquared = vec.dot(ab, ab);
-  const t = lengthSquared < 1e-12 ? 0 : Math.max(0, Math.min(1, vec.dot(vec.sub(p, a), ab) / lengthSquared));
-  return { t, point: vec.add(a, vec.scale(ab, t)) };
+/** How far the point (px, py, pz) is from the segment a to b (in numbers rather than vectors: asked of every near pair, every substep). */
+function gapToSegment(px, py, pz, ax, ay, az, bx, by, bz) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abz = bz - az;
+  const lengthSquared = abx * abx + aby * aby + abz * abz;
+  const t = lengthSquared < 1e-12 ? 0 : Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby + (pz - az) * abz) / lengthSquared));
+  const dx = ax + abx * t - px;
+  const dy = ay + aby * t - py;
+  const dz = az + abz * t - pz;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 function collideFighters(world, h, time, substep = 0) {
   const fighters = world.fighters;
+  if (fighters.length > WORLD.tiers.full) {
+    collideCrowd(world, time, substep);
+    return;
+  }
   // Two bodies whose hips are further apart than a kick and a body can
   // span cannot touch: skip them. In a crowd most pairs are like that.
   const hips = fighters.map((fighter) => point(fighter.x, P.pelvis));
-  // (A proxy touches nothing in a big fight: no bound needed.)
-  const big = fighters.length > WORLD.tiers.full;
-  for (const fighter of fighters) if (!big || fighter.detail !== 'proxy') fighter.reachBound = reachBound(fighter);
+  for (const fighter of fighters) fighter.reachBound = reachBound(fighter);
   // A weapon reaching past what a body can (a lance's point, ~2.8 m out) widens the range by as much:
   // otherwise its point could never meet a man before he was inside it.
   const beyond = fighters.map((fighter) => (fighter.weapon?.held ? Math.max(0, (fighter.reachBound ?? 0) - REACH_MARGIN - WORLD.bodyReach) : 0));
   const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange + beyond[a] + beyond[b];
-  // A big fight finds its near pairs through a grid, in the same order as
-  // the all-pairs test; a proxy (posed, not simulated) touches nothing.
-  if (fighters.length > WORLD.tiers.full) {
-    // Candidates once a step (the grid, its lookups and sorts were a tenth of
-    // a big fight's step when made every substep); the exact range each substep.
-    if (world.contactCache?.time !== world.time || world.contactCache.count !== fighters.length) {
-      const grid = spatialGrid(hips.map((hip) => [hip[0], hip[2]]), WORLD.contactRange + WORLD.contactMargin);
-      world.contactCache = { time: world.time, count: fighters.length, near: fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index))) };
-    }
-    // (Among the grid's candidates: a long weapon's extra reach counts out to contactMargin.)
-    const within = (a, b) => (hips[a][0] - hips[b][0]) ** 2 + (hips[a][2] - hips[b][2]) ** 2 < (WORLD.contactRange + beyond[a] + beyond[b]) ** 2;
-    // Two coarse fighters move only on their substeps: they are tested then.
-    const stride = coarseStride(world);
-    const meet = (a, b) => fighters[b].detail !== 'proxy' && (substep % stride === stride - 1 || fighters[a].detail === 'full' || fighters[b].detail === 'full');
-    // In a big fight a hand or blade not striking (guarding, hanging) is
-    // tested on every other substep; the strike in flight on every one.
-    const idleEvery = fightTier(world) >= 3 ? 2 : 1;
-    const neighbours = fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : world.contactCache.near[index].filter((other) => within(index, other) && meet(index, other))));
-    fighters.forEach((attacker, a) => {
-      if (!neighbours[a].length) return;
-      const limbs = strikers(attacker);
-      for (const d of neighbours[a]) {
-        const defender = fighters[d];
-        if (attacker.corner === defender.corner && !attacker.punch) continue;
-        for (const striker of limbs) {
-          const striking = striker.weapon ? Boolean(strokeOf(attacker, striker.weapon)) : attacker.punch?.spec.limb === striker.key;
-          if (striking || substep % idleEvery === 0) collideStriker(world, attacker, defender, striker, time);
-        }
-      }
-    });
-    fighters.forEach((first, a) => {
-      for (const b of neighbours[a]) {
-        if (b <= a) continue;
-        const second = fighters[b];
-        pushApart(world, first, second);
-        if (first.corner !== second.corner) clashBlades(world, first, second);
-      }
-    });
-    return;
-  }
   fighters.forEach((attacker, a) => {
     const limbs = strikers(attacker);
     fighters.forEach((defender, d) => {
@@ -3433,6 +3434,106 @@ function collideFighters(world, h, time, substep = 0) {
   }
 }
 
+// What collideCrowd works from, kept between substeps rather than rebuilt: each fighter's
+// hips (x, z) and extra reach as the substep began, and the near fighters among its candidates.
+let crowdHipX = new Float64Array(0);
+let crowdHipZ = new Float64Array(0);
+let crowdBeyond = new Float64Array(0);
+const crowdNeighbours = [];
+
+/**
+ * A big fight's contacts: near pairs are found through a grid, in the same
+ * order as the all-pairs test of a small one; a proxy (posed, not simulated)
+ * touches nothing.
+ */
+function collideCrowd(world, time, substep) {
+  const fighters = world.fighters;
+  const count = fighters.length;
+  if (crowdHipX.length < count) {
+    crowdHipX = new Float64Array(count * 2);
+    crowdHipZ = new Float64Array(count * 2);
+    crowdBeyond = new Float64Array(count * 2);
+  }
+  const hipX = crowdHipX;
+  const hipZ = crowdHipZ;
+  const beyond = crowdBeyond;
+  for (let index = 0; index < count; index += 1) {
+    const fighter = fighters[index];
+    hipX[index] = fighter.x[P.pelvis * 3];
+    hipZ[index] = fighter.x[P.pelvis * 3 + 2];
+    if (fighter.detail !== 'proxy') fighter.reachBound = reachBound(fighter);
+    // A weapon reaching past what a body can (a lance's point, ~2.8 m out) widens the range by as much:
+    // otherwise its point could never meet a man before he was inside it.
+    beyond[index] = fighter.weapon?.held ? Math.max(0, (fighter.reachBound ?? 0) - REACH_MARGIN - WORLD.bodyReach) : 0;
+  }
+  // Candidates once a step (the grid, its lookups and sorts were a tenth of
+  // a big fight's step when made every substep); the exact range each substep.
+  if (world.contactCache?.time !== world.time || world.contactCache.count !== count) {
+    const hips = [];
+    for (let index = 0; index < count; index += 1) hips.push([hipX[index], hipZ[index]]);
+    const grid = spatialGrid(hips, WORLD.contactRange + WORLD.contactMargin);
+    world.contactCache = { time: world.time, count, near: fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index))) };
+  }
+  const candidates = world.contactCache.near;
+  // Two coarse fighters move only on their substeps: they are tested then.
+  const stride = coarseStride(world);
+  const coarseSubstep = substep % stride === stride - 1;
+  // In a big fight a hand or blade not striking (guarding, hanging) is
+  // tested on every other substep; the strike in flight on every one.
+  const idleEvery = fightTier(world) >= 3 ? 2 : 1;
+  for (let a = 0; a < count; a += 1) {
+    const list = (crowdNeighbours[a] ??= []);
+    list.length = 0;
+    if (fighters[a].detail === 'proxy') continue;
+    const mine = candidates[a];
+    // (Among the grid's candidates: a long weapon's extra reach counts out to contactMargin.)
+    for (let k = 0; k < mine.length; k += 1) {
+      const b = mine[k];
+      if (!((hipX[a] - hipX[b]) ** 2 + (hipZ[a] - hipZ[b]) ** 2 < (WORLD.contactRange + beyond[a] + beyond[b]) ** 2)) continue;
+      if (fighters[b].detail !== 'proxy' && (coarseSubstep || fighters[a].detail === 'full' || fighters[b].detail === 'full')) list.push(b);
+    }
+  }
+  for (let a = 0; a < count; a += 1) {
+    const list = crowdNeighbours[a];
+    if (!list.length) continue;
+    const attacker = fighters[a];
+    const limbs = strikers(attacker);
+    for (let k = 0; k < list.length; k += 1) {
+      const defender = fighters[list[k]];
+      if (attacker.corner === defender.corner && !attacker.punch) continue;
+      for (const striker of limbs) {
+        const striking = striker.weapon ? Boolean(strokeOf(attacker, striker.weapon)) : attacker.punch?.spec.limb === striker.key;
+        if (striking || substep % idleEvery === 0) collideStriker(world, attacker, defender, striker, time);
+      }
+    }
+  }
+  for (let a = 0; a < count; a += 1) {
+    const list = crowdNeighbours[a];
+    for (let k = 0; k < list.length; k += 1) {
+      const b = list[k];
+      if (b <= a) continue;
+      pushApart(world, fighters[a], fighters[b]);
+      if (fighters[a].corner !== fighters[b].corner) clashBlades(world, fighters[a], fighters[b]);
+    }
+  }
+}
+
+/** A striker with every field set (unset ones undefined), so all strikers share one shape. */
+function strikerOf(key, a, b, radius, side, { weapon, bash, shin, pa, pb } = {}) {
+  return { key, weapon, bash, shin, a, b, pa, pb, radius, side };
+}
+
+// The two hands as strikers, by fist radius (gloved or bare): nothing in them changes, so they are made once.
+const handStrikerCache = new Map();
+function handStrikers(fist) {
+  let hands = handStrikerCache.get(fist);
+  if (!hands) {
+    hands = ['l', 'r'].map((side) => strikerOf(`${side}Hand`, P[`${side}Hand`], P[`${side}Hand`], fist, side));
+    handStrikerCache.set(fist, hands);
+  }
+  return hands;
+}
+
 /**
  * What of the attacker can hit: both gloves always (they block and push),
  * and the limb of a strike in flight — an elbow or knee as a ball, a kick as
@@ -3440,14 +3541,14 @@ function collideFighters(world, h, time, substep = 0) {
  */
 function strikers(fighter) {
   const fist = fistsOf(fighter.body).radius;
-  const list = ['l', 'r'].map((side) => ({ key: `${side}Hand`, a: P[`${side}Hand`], b: P[`${side}Hand`], radius: fist, side }));
+  const list = handStrikers(fist).slice();
   // A shield bash: the left hand's blow lands with the shield's face, a broad capsule up its middle.
   if (fighter.punch?.spec.bash && fighter.shield) {
     const shield = shieldDisc(fighter);
     const spec = fighter.shield.spec;
     const reach = (spec.shape ? spec.height / 2 : spec.radius) * 0.75;
     const face = vec.add(shield.centre, vec.scale(shield.normal, 0.02));
-    list[0] = { key: 'lHand', bash: true, a: P.lHand, b: P.lHand, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)), radius: spec.shape ? spec.width * 0.4 : spec.radius * 0.75, side: 'l' };
+    list[0] = strikerOf('lHand', P.lHand, P.lHand, spec.shape ? spec.width * 0.4 : spec.radius * 0.75, 'l', { bash: true, pa: vec.sub(face, vec.scale(shield.up, reach)), pb: vec.add(face, vec.scale(shield.up, reach)) });
   }
   // Each blade in his hands (two blades: the off hand's too, `offWeapon`).
   for (const weapon of heldBlades(fighter)) {
@@ -3455,16 +3556,94 @@ function strikers(fighter) {
     if (weapon.spec.rope) continue;
     // The weapon, from where it starts to strike to its tip.
     const hand = P[`${weapon.main}Hand`];
-    list.push({ key: weapon === fighter.weapon ? 'weapon' : 'offWeapon', weapon, a: hand, b: hand, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip, radius: weapon.spec.radius, side: weapon.main });
+    list.push(strikerOf(weapon === fighter.weapon ? 'weapon' : 'offWeapon', hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip }));
   }
   const punch = fighter.punch;
   if (!punch || punch.t > punch.spec.extendUntil + 0.06) return list;
   const limb = punch.spec.limb;
   const side = limb[0];
-  if (limb.endsWith('Elbow')) list.push({ key: limb, a: P[limb], b: P[limb], radius: 0.05, side });
-  else if (limb.endsWith('Knee')) list.push({ key: limb, a: P[limb], b: P[limb], radius: 0.07, side });
-  else if (limb.endsWith('Foot')) list.push({ key: limb, a: P[`${side}Knee`], b: P[limb], radius: 0.05, side, shin: true });
+  if (limb.endsWith('Elbow')) list.push(strikerOf(limb, P[limb], P[limb], 0.05, side));
+  else if (limb.endsWith('Knee')) list.push(strikerOf(limb, P[limb], P[limb], 0.07, side));
+  else if (limb.endsWith('Foot')) list.push(strikerOf(limb, P[`${side}Knee`], P[limb], 0.05, side, { shin: true }));
   return list;
+}
+
+// Two segments, p1 to q1 and p2 to q2, as twelve numbers: what segmentsGap reads.
+const segmentPair = new Float64Array(12);
+
+/** The end points of a capsule's axis (capsuleEnds' arithmetic) written into `into` at `at`. */
+function writeCapsuleEnds(into, at, fighter, capsule) {
+  const x = fighter.x;
+  const aAt = capsule.a * 3;
+  const bAt = capsule.b * 3;
+  const ax = x[aAt];
+  const ay = x[aAt + 1];
+  const az = x[aAt + 2];
+  into[at] = ax;
+  into[at + 1] = ay;
+  into[at + 2] = az;
+  if (capsule.bLength) {
+    const along = capsule.bLength;
+    into[at + 3] = ax + (x[bAt] - ax) * along;
+    into[at + 4] = ay + (x[bAt + 1] - ay) * along;
+    into[at + 5] = az + (x[bAt + 2] - az) * along;
+  } else {
+    into[at + 3] = x[bAt];
+    into[at + 4] = x[bAt + 1];
+    into[at + 5] = x[bAt + 2];
+  }
+}
+
+/**
+ * The distance between the segments in `segmentPair`: the length of
+ * closestBetween's onFirst minus onSecond, in numbers rather than vectors (a
+ * crowd asks it of thousands of pairs a substep, nearly all of them clear).
+ */
+function segmentsGap() {
+  const pair = segmentPair;
+  const d1x = pair[3] - pair[0];
+  const d1y = pair[4] - pair[1];
+  const d1z = pair[5] - pair[2];
+  const d2x = pair[9] - pair[6];
+  const d2y = pair[10] - pair[7];
+  const d2z = pair[11] - pair[8];
+  const rx = pair[0] - pair[6];
+  const ry = pair[1] - pair[7];
+  const rz = pair[2] - pair[8];
+  const a = d1x * d1x + d1y * d1y + d1z * d1z;
+  const e = d2x * d2x + d2y * d2y + d2z * d2z;
+  const f = d2x * rx + d2y * ry + d2z * rz;
+  let s;
+  let t;
+  if (a < 1e-12 && e < 1e-12) {
+    s = 0;
+    t = 0;
+  } else if (a < 1e-12) {
+    s = 0;
+    t = Math.max(0, Math.min(1, f / e));
+  } else {
+    const c = d1x * rx + d1y * ry + d1z * rz;
+    if (e < 1e-12) {
+      t = 0;
+      s = Math.max(0, Math.min(1, -c / a));
+    } else {
+      const b = d1x * d2x + d1y * d2y + d1z * d2z;
+      const denominator = a * e - b * b;
+      s = denominator > 1e-12 ? Math.max(0, Math.min(1, (b * f - c * e) / denominator)) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) {
+        t = 0;
+        s = Math.max(0, Math.min(1, -c / a));
+      } else if (t > 1) {
+        t = 1;
+        s = Math.max(0, Math.min(1, (b - c) / a));
+      }
+    }
+  }
+  const ox = pair[0] + d1x * s - (pair[6] + d2x * t);
+  const oy = pair[1] + d1y * s - (pair[7] + d2y * t);
+  const oz = pair[2] + d1z * s - (pair[8] + d2z * t);
+  return Math.sqrt(ox * ox + oy * oy + oz * oz);
 }
 
 /** Closest points between two segments: parameters s on the first, t on the second. */
@@ -3553,13 +3732,21 @@ function guardKey(key) {
 }
 
 function collideStriker(world, attacker, defender, striker, time) {
-  const sa = striker.pa ?? point(attacker.x, striker.a);
-  const sb = striker.pb ?? point(attacker.x, striker.b);
+  const from = striker.pa;
+  const to = striker.pb;
   // Out of reach of all of him, shield and blade too (most pairs in a
   // crowd): nothing to test, only contacts to forget, as below.
   if (defender.reachBound !== undefined) {
-    const hips = point(defender.x, P.pelvis);
-    if (vec.length(vec.sub(closestOnSegment(hips, sa, sb).point, hips)) - striker.radius > defender.reachBound) {
+    const ends = attacker.x;
+    const aAt = striker.a * 3;
+    const bAt = striker.b * 3;
+    const hipsAt = P.pelvis * 3;
+    const gap = gapToSegment(
+      defender.x[hipsAt], defender.x[hipsAt + 1], defender.x[hipsAt + 2],
+      from ? from[0] : ends[aAt], from ? from[1] : ends[aAt + 1], from ? from[2] : ends[aAt + 2],
+      to ? to[0] : ends[bAt], to ? to[1] : ends[bAt + 1], to ? to[2] : ends[bAt + 2],
+    );
+    if (gap - striker.radius > defender.reachBound) {
       if (attacker.contacts.size) {
         const prefix = `${defender.id}:${striker.key}:`;
         if (defender.shield && defender.state !== 'out') attacker.contacts.delete(`${prefix}shield`);
@@ -3570,6 +3757,8 @@ function collideStriker(world, attacker, defender, striker, time) {
       return;
     }
   }
+  const sa = from ?? point(attacker.x, striker.a);
+  const sb = to ?? point(attacker.x, striker.b);
   // Whether he has any contact with this limb to forget: the keys are only
   // built when he does (most tests touch nothing and remember nothing).
   const prefix = `${defender.id}:${striker.key}:`;
@@ -3633,7 +3822,7 @@ function collideStriker(world, attacker, defender, striker, time) {
   // Nowhere near him: no part of his body can be touched (a crowd is mostly
   // this). Forget any contact with him, so the next real one counts.
   const hips = point(defender.x, P.pelvis);
-  if (vec.length(vec.sub(closestOnSegment(hips, sa, sb).point, hips)) > WORLD.bodyReach + striker.radius) {
+  if (gapToSegment(hips[0], hips[1], hips[2], sa[0], sa[1], sa[2], sb[0], sb[1], sb[2]) > WORLD.bodyReach + striker.radius) {
     if (touching) {
       for (const key of attacker.contacts) if (key.startsWith(prefix) && !guardKey(key)) attacker.contacts.delete(key);
     }
@@ -3644,20 +3833,32 @@ function collideStriker(world, attacker, defender, striker, time) {
   let pushBudget = WORLD.contactStep;
   // The striker as a ball round its middle: a part further than both
   // half-lengths and the reach from it cannot be touched (the closest test skipped).
-  const strikerMiddle = [(sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2, (sa[2] + sb[2]) / 2];
+  const middleX = (sa[0] + sb[0]) / 2;
+  const middleY = (sa[1] + sb[1]) / 2;
+  const middleZ = (sa[2] + sb[2]) / 2;
   const strikerHalf = vec.length(vec.sub(sb, sa)) / 2;
   for (const capsule of capsules(defender)) {
     // Kicks and weapons hit legs and bodies; gloves only collide above the waist.
     if (!striker.shin && capsule.leg && !striking) continue;
-    const [a, b] = capsuleEnds(defender, capsule);
     const reach = capsule.radius + striker.radius;
-    const apart = vec.length([(a[0] + b[0]) / 2 - strikerMiddle[0], (a[1] + b[1]) / 2 - strikerMiddle[1], (a[2] + b[2]) / 2 - strikerMiddle[2]]);
-    const out = apart - strikerHalf - vec.length([b[0] - a[0], b[1] - a[1], b[2] - a[2]]) / 2 >= reach;
-    const closest = out ? null : closestBetween(sa, sb, a, b);
-    if (closest) closest.t *= capsule.bLength ?? 1;
-    const offset = closest ? vec.sub(closest.onFirst, closest.onSecond) : null;
-    const distance = closest ? vec.length(offset) : Infinity;
-    if (distance >= reach) {
+    // Whether the part is clear is worked in numbers; the vectors are made only for one in reach.
+    const pair = segmentPair;
+    pair[0] = sa[0];
+    pair[1] = sa[1];
+    pair[2] = sa[2];
+    pair[3] = sb[0];
+    pair[4] = sb[1];
+    pair[5] = sb[2];
+    writeCapsuleEnds(pair, 6, defender, capsule);
+    const offsetX = (pair[6] + pair[9]) / 2 - middleX;
+    const offsetY = (pair[7] + pair[10]) / 2 - middleY;
+    const offsetZ = (pair[8] + pair[11]) / 2 - middleZ;
+    const apart = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
+    const lengthX = pair[9] - pair[6];
+    const lengthY = pair[10] - pair[7];
+    const lengthZ = pair[11] - pair[8];
+    const out = apart - strikerHalf - Math.sqrt(lengthX * lengthX + lengthY * lengthY + lengthZ * lengthZ) / 2 >= reach;
+    if ((out ? Infinity : segmentsGap()) >= reach) {
       if (touching) {
         const contactKey = `${prefix}${capsule.key}`;
         attacker.contacts.delete(contactKey);
@@ -3665,6 +3866,11 @@ function collideStriker(world, attacker, defender, striker, time) {
       }
       continue;
     }
+    const [a, b] = capsuleEnds(defender, capsule);
+    const closest = closestBetween(sa, sb, a, b);
+    closest.t *= capsule.bLength ?? 1;
+    const offset = vec.sub(closest.onFirst, closest.onSecond);
+    const distance = vec.length(offset);
     // Past a shield's rim the blow finds him; through its face it does not.
     if (shadow && behindShield(closest.onFirst, shadow)) continue;
     const contactKey = `${prefix}${capsule.key}`;
@@ -3711,25 +3917,28 @@ function collideStriker(world, attacker, defender, striker, time) {
  * inverse mass, so a heavy fighter moves a light one; and a charge that
  * arrives fast hands its momentum over in a collision.
  */
+const PUSH_PAIRS = [['trunk', 'trunk'], ['head', 'head'], ['head', 'trunk'], ['trunk', 'head']];
 function pushApart(world, first, second) {
-  const pairs = [['trunk', 'trunk'], ['head', 'head'], ['head', 'trunk'], ['trunk', 'head']];
   capsules(first);
   capsules(second);
   const firstCapsules = first.capsuleCache.byKey;
   const secondCapsules = second.capsuleCache.byKey;
-  for (const [firstKey, secondKey] of pairs) {
+  for (const [firstKey, secondKey] of PUSH_PAIRS) {
     const one = firstCapsules[firstKey];
     const two = secondCapsules[secondKey];
     // A part cut off no longer meets anything.
     if (!one || !two) continue;
+    // Clear of each other is told in numbers; the vectors are made only for parts that touch.
+    writeCapsuleEnds(segmentPair, 0, first, one);
+    writeCapsuleEnds(segmentPair, 6, second, two);
+    const distance = segmentsGap();
+    // A head meets another in whatever it wears (a great helm is a can well wider than the head).
+    const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
+    if (distance >= reach || distance < 1e-9) continue;
     const [a1, b1] = capsuleEnds(first, one);
     const [a2, b2] = capsuleEnds(second, two);
     const closest = closestBetween(a1, b1, a2, b2);
     const offset = vec.sub(closest.onFirst, closest.onSecond);
-    const distance = vec.length(offset);
-    // A head meets another in whatever it wears (a great helm is a can well wider than the head).
-    const reach = one.radius * (firstKey === 'head' ? first.body.gear.headBulk ?? 1 : 1) + two.radius * (secondKey === 'head' ? second.body.gear.headBulk ?? 1 : 1);
-    if (distance >= reach || distance < 1e-9) continue;
     const normal = vec.scale(offset, 1 / distance);
     crashBodies(world, first, second, firstKey, secondKey, normal);
     const shares = [

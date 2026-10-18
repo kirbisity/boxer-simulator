@@ -31,6 +31,9 @@ const FIGHTS = {
   'police v katana': [duel('police', 'katana', { distance: 6 }), 15],
   'rhodes 1522': [level('rhodes'), 12],
   'sekigahara': [level('sekigahara'), 6],
+  // The big battles: the legion's march and first melee, and the proxies and crossbows with it.
+  'legion': [level('legion'), 30],
+  'otumba': [level('otumba'), 10],
 };
 
 /** A 32-bit FNV-1a hash of a world's particles (rounded to 0.1 mm) and its event count. */
