@@ -23,12 +23,39 @@
 //   sea                { colour (hex), roughness, metalness, normal: how big the waves read (0..1), reflect: how much sky it mirrors, scroll: how fast it heaves }.
 //   rain               { opacity: how visible the streaks, share: what part of the drops fall (0..1) } (opacity 0 is dry).
 //   wet                how soaked the stone is (0..1): darker, glossier, moss greener.
+//   pools              how much standing water lies on what faces up (0..1, optional): dark glassy patches that mirror the sky.
 //   lightning          { gap: [least, most] seconds between strikes, strength: how hard the flash lights the scene (1 is the old storm's) } or null for none.
 //   torch              how bright the torches and braziers burn (1: as built).
 //   shaft              a shaft of light through the cloud onto the castle: { colour, opacity, width (m) } or null.
 //   vignette           how dark the corners of the picture (0..1).
 
 export const STAGE_LOOKS = {
+  stormBreak: {
+    label: 'Storm breaking',
+    blurb: 'The bruised storm with a tear in it: purple-grey banks and rain, a warm low sun breaking through over the sea, thick mist on the water and the low ground, and standing water on the cobbles and flags.',
+    sky: {
+      zenith: '#14121e', high: '#232231', mid: '#3a3848', horizon: '#56535e',
+      clouds: { count: 560, size: [28, 120], dark: [11, 10, 18], light: [140, 132, 148], darkShare: 0.66, aDark: 0.21, aLight: 0.11, flat: 0.32, from: 0.02, to: 0.47 },
+      glow: { az: 50, el: 7, colour: [250, 206, 150], size: 18, strength: 0.9, hole: 0.85, disc: 0.4 },
+      stars: 0,
+    },
+    // A warm low sun, weaker than the open break (the storm is still over it), and a cool violet fill from the cloud.
+    sun: { az: 50, el: 12, colour: [0.96, 0.76, 0.54], intensity: 1.7 },
+    ambient: { tint: [0.9, 0.94, 1.12], gain: 0.9 },
+    hemi: { sky: 0x625e78, ground: 0x26242c, intensity: 0.54 },
+    exposure: 1,
+    // Thicker than either parent: the far rock goes grey at a couple of hundred metres, and a sea mist lies on the water and the gorge.
+    fog: { colour: 0x56535e, near: 22, far: 240, mist: { density: 0.03, base: 2, falloff: 0.1 } },
+    sea: { colour: 0x18222e, roughness: 0.36, metalness: 0.32, normal: 0.52, reflect: 1.3, scroll: 0.9 },
+    rain: { opacity: 0.28, share: 0.8 },
+    wet: 0.8,
+    pools: 0.75,
+    lightning: { gap: [7, 16], strength: 0.75 },
+    torch: 0.9,
+    shaft: { colour: [255, 206, 150], opacity: 0.15, width: 70 },
+    vignette: 0.34,
+  },
+
   bruised: {
     label: 'Bruised storm',
     blurb: 'Purple-grey cloud banks over a black sea, one pale break low in the west, rain and a bolt every few seconds. The old storm, with a real cloud sky and less grey on the stone.',
@@ -169,7 +196,7 @@ export const STAGE_LOOKS = {
 };
 
 /** The look the stage opens with, and why: see the report; the one that reads as Dunnottar at a glance and still gives the lightning its place. */
-export const DEFAULT_STAGE_LOOK = 'bruised';
+export const DEFAULT_STAGE_LOOK = 'stormBreak';
 
 /** The looks' names, in the order the menu shows them. */
 export const stageLookNames = () => Object.keys(STAGE_LOOKS);

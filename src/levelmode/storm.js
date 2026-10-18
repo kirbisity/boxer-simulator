@@ -359,6 +359,7 @@ export function buildStormPlace({ buildRain }) {
     scene.background = fogColour.clone();
     ktWeather.uKitFog.value.set(look.fog.mist.density, look.fog.mist.base, look.fog.mist.falloff, 0);
     ktWeather.uKitWet.value = look.wet;
+    ktWeather.uKitPools.value = look.pools ?? 0;
     stormState.torch = look.torch;
     // The light: the one sun (direction, colour, strength), the sky's ambient (the probe the realistic look lights with, or the hemisphere), all times the exposure.
     const [sx, sy, sz] = skyDirection(look.sun.az, look.sun.el);

@@ -93,7 +93,7 @@ function ktMacroTexture() {
  * (stagelooks.js). `uKitWet` (0..1): how soaked the stone is. `uKitFog`: (density per metre at the base, the height (m) it is at full density below,
  * how fast it thins above that (per metre), 0).
  */
-export const ktWeather = { uKitWet: { value: 0.3 }, uKitFog: { value: null } };
+export const ktWeather = { uKitWet: { value: 0.3 }, uKitPools: { value: 0 }, uKitFog: { value: null } };
 
 // ---- the cut-away and the detail -----------------------------------------------------------------------
 
@@ -114,8 +114,8 @@ const KT_CUTAWAY = `
     if (kitFade > kitNoise * 0.95 + 0.02) discard;
   }`;
 
-/** The map chunk: the texture read once or twice, the macro map over it, moss, damp and streaks. `two`: 0 once, 1 again at another scale (hard patches), 2 again turned (soft). */
-const ktMapChunk = (two) => `
+/** The map chunk: the texture read once or twice, the macro map over it, moss, damp, standing water (`pools`: how much this surface holds, 0..1) and streaks. `two`: 0 once, 1 again at another scale (hard patches), 2 again turned (soft). */
+const ktMapChunk = (two, pools = 0) => `
 #ifdef USE_MAP
   vec3 kitN = normalize(vKitNrm);
   vec3 kitAbs = abs(kitN);
@@ -141,6 +141,12 @@ const ktMapChunk = (two) => `
   #endif
   kitWet = clamp(uKitWet * (0.35 + 1.6 * smoothstep(0.08, 0.5, kitShade) + 0.7 * smoothstep(0.45, 0.8, kitM.b)), 0.0, 1.0);
   diffuseColor.rgb *= 1.0 - 0.34 * kitWet;
+  // Standing water on what faces up: patches from a broader read of the macro map, dark and glassy (the sky in them).
+  float kitFlat = smoothstep(0.85, 0.97, kitN.y);
+  float kitPoolNoise = texture2D(uKitMacro, kitP * 0.19 + vec2(0.43, 0.71)).b + 0.3 * (kitM.b - 0.5);
+  kitPool = uKitPools * ${pools.toFixed(2)} * kitFlat * smoothstep(0.47, 0.54, kitPoolNoise);
+  diffuseColor.rgb *= 1.0 - 0.45 * kitPool;
+  kitWet = max(kitWet, kitPool);
   // Moss: in patches, thicker on north faces and on tops, thicker in the dark of a crevice.
   float kitUp = smoothstep(0.3, 0.95, kitN.y);
   float kitNorth = smoothstep(-0.1, 0.85, -kitN.z);
@@ -187,11 +193,12 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true }
       shader.uniforms.uKitDetail = { value: new THREE.Vector4(detail.macro ?? 0.6, detail.hue ?? 1, detail.moss ?? 0, detail.streak ?? 0) };
       shader.uniforms.uKitMean = { value: new THREE.Vector3(...mean) };
       shader.uniforms.uKitWet = ktWeather.uKitWet;
-      uniforms += 'uniform sampler2D uKitMacro;\nuniform vec4 uKitDetail;\nuniform vec3 uKitMean;\nuniform float uKitWet;\n';
+      shader.uniforms.uKitPools = ktWeather.uKitPools;
+      uniforms += 'uniform sampler2D uKitMacro;\nuniform vec4 uKitDetail;\nuniform vec3 uKitMean;\nuniform float uKitWet;\nuniform float uKitPools;\n';
       fragment = fragment
-        .replace('#include <map_fragment>', ktMapChunk(two))
-        .replace('void main() {', 'void main() {\n  float kitWet = 0.0;')
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor *= 1.0 - 0.5 * kitWet;');
+        .replace('#include <map_fragment>', ktMapChunk(two, detail.pools ?? 0))
+        .replace('void main() {', 'void main() {\n  float kitWet = 0.0;\n  float kitPool = 0.0;')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor *= 1.0 - 0.5 * kitWet;\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);');
     }
     if (fog) {
       shader.uniforms.uKitFog = ktWeather.uKitFog;
@@ -226,17 +233,17 @@ export function ktMaterials() {
   ktFade.uKitSubject.value ??= new THREE.Vector3(0, -100, 0);
   // (Courses stay level, so a masonry texture is read again at another scale, not turned: `two` 1; the ground and the rock may turn: `two` 2.)
   const detail = {
-    ashlar: { macro: 0.7, hue: 1, moss: 0.5, streak: 0.5, two: 1 },
-    ruin: { macro: 0.8, hue: 1, moss: 1.0, streak: 0.55, two: 1 },
-    rubble: { macro: 0.75, hue: 1, moss: 0.9, streak: 0.5, two: 2 },
-    rock: { macro: 0.7, hue: 0.6, moss: 0.5, streak: 0.5, two: 2 },
-    cobble: { macro: 0.7, hue: 0.6, moss: 0.4, streak: 0, two: 2 },
-    flags: { macro: 0.7, hue: 0.6, moss: 0.6, streak: 0, two: 2 },
-    grass: { macro: 0.9, hue: 1.6, moss: 0, streak: 0, two: 2 },
-    path: { macro: 0.8, hue: 1, moss: 0.2, streak: 0, two: 2 },
-    boards: { macro: 0.6, hue: 0.4, moss: 0.2, streak: 0.3, two: 0 },
-    wood: { macro: 0.6, hue: 0.4, moss: 0.2, streak: 0.3, two: 0 },
-    iron: { macro: 0.5, hue: 0, moss: 0, streak: 0.4, two: 0 },
+    ashlar: { macro: 0.7, hue: 1, moss: 0.5, streak: 0.5, two: 1, pools: 0.5 },
+    ruin: { macro: 0.8, hue: 1, moss: 1.0, streak: 0.55, two: 1, pools: 0.35 },
+    rubble: { macro: 0.75, hue: 1, moss: 0.9, streak: 0.5, two: 2, pools: 0.35 },
+    rock: { macro: 0.7, hue: 0.6, moss: 0.5, streak: 0.5, two: 2, pools: 0.5 },
+    cobble: { macro: 0.7, hue: 0.6, moss: 0.4, streak: 0, two: 2, pools: 1 },
+    flags: { macro: 0.7, hue: 0.6, moss: 0.6, streak: 0, two: 2, pools: 1 },
+    grass: { macro: 0.9, hue: 1.6, moss: 0, streak: 0, two: 2, pools: 0.1 },
+    path: { macro: 0.8, hue: 1, moss: 0.2, streak: 0, two: 2, pools: 0.85 },
+    boards: { macro: 0.6, hue: 0.4, moss: 0.2, streak: 0.3, two: 0, pools: 0.3 },
+    wood: { macro: 0.6, hue: 0.4, moss: 0.2, streak: 0.3, two: 0, pools: 0 },
+    iron: { macro: 0.5, hue: 0, moss: 0, streak: 0.4, two: 0, pools: 0 },
   };
   m.ashlar = make(ktTexture(512, 11, ktAshlar), 4, { roughness: 0.66 });
   m.ruin = make(ktTexture(512, 12, ktRuinWall), 4, { roughness: 0.74 });
