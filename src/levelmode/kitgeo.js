@@ -35,14 +35,15 @@ export class KitBatch {
    * of the foot of the piece, below which the surface darkens (up to `aoSpan` m above it it lightens to full);
    * `uvShift`: a random phase to the texture (on by default, so neighbouring walls do not repeat).
    */
-  add(material, geometry, matrix = null, { tint = 1, aoFrom = null, aoSpan = 2.6, aoMin = 0.55, jitter = 0.06 } = {}) {
+  add(material, geometry, matrix = null, { tint = 1, aoFrom = null, aoSpan = 2.6, aoMin = 0.55, jitter = 0.06, shift: shifted = true } = {}) {
     const position = geometry.attributes.position;
     const normal = geometry.attributes.normal;
     const uv = geometry.attributes.uv;
     const index = geometry.index;
     const count = index ? index.count : position.count;
     const [tr, tg, tb] = Array.isArray(tint) ? tint : [tint, tint, tint];
-    const shift = this.random();
+    const shift = shifted ? this.random() : 0;
+    const phase = this.random();
     const bucket = (() => {
       const first = index ? index.getX(0) : 0;
       const v = new THREE.Vector3(position.getX(first), position.getY(first), position.getZ(first));
@@ -52,7 +53,7 @@ export class KitBatch {
     const normalMatrix = matrix ? new THREE.Matrix3().getNormalMatrix(matrix) : null;
     const v = new THREE.Vector3();
     const n = new THREE.Vector3();
-    const variation = 1 + (this.random() - 0.5) * 2 * jitter;
+    const variation = 1 + (phase - 0.5) * 2 * jitter;
     for (let k = 0; k < count; k += 1) {
       const i = index ? index.getX(k) : k;
       v.set(position.getX(i), position.getY(i), position.getZ(i));
@@ -185,7 +186,7 @@ export function kgFloor(batch, material, x0, x1, z0, z1, y, options = {}) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  batch.add(material, geometry, null, { jitter: 0.04, ...options });
+  batch.add(material, geometry, null, { jitter: 0.04, shift: false, ...options });
   geometry.dispose();
 }
 

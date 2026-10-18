@@ -47,7 +47,8 @@ import { createLevelMarkers } from './levelmode/markers.js';
 import { createShards } from './levelmode/endingview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
-import { stormEnvironment, stormReset, stormStrikeNow } from './levelmode/storm.js';
+import { stormEnvironment, stormLook, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
+import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
 import { ktSightline } from './levelmode/kittex.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -1155,6 +1156,41 @@ $('#ghost-walk').addEventListener('click', () => {
   boxer.finishBuilding();
   syncGhostBar();
 });
+// The stage's look (levelmode/stagelooks.js): a name in the ghost bar's Look select, `boxer.stageLook(name)`, or ?stagelook=; kept for next time.
+const stageLookKey = 'boxer.stageLook';
+const stageLookSelect = $('#ghost-look');
+stageLookSelect.append(...stageLookNames().map((name) => new Option(STAGE_LOOKS[name].label, name)));
+/** Change the stage's look now (whatever place is open: the choice is kept for the next time the stage opens); returns { look, looks }. */
+function chooseStageLook(name, options) {
+  const chosen = stormSetLook(name, options);
+  if (name !== undefined) {
+    try {
+      localStorage.setItem(stageLookKey, chosen);
+    } catch {
+      // Nothing kept.
+    }
+  }
+  stageView?.setEnvironment?.(stormEnvironment(scene.renderer));
+  document.body.style.setProperty('--stage-vignette', STAGE_LOOKS[chosen].vignette);
+  stageLookSelect.value = chosen;
+  return { look: chosen, looks: stageLookNames() };
+}
+stageLookSelect.addEventListener('change', () => {
+  chooseStageLook(stageLookSelect.value);
+  stageLookSelect.blur();
+});
+/** The look this visitor last chose (or the address's `?stagelook=`), else the default's. */
+function rememberedStageLook() {
+  const wanted = new URLSearchParams(location.search).get('stagelook');
+  if (STAGE_LOOKS[wanted]) return wanted;
+  try {
+    const saved = localStorage.getItem(stageLookKey);
+    if (STAGE_LOOKS[saved]) return saved;
+  } catch {
+    // Nothing kept.
+  }
+  return DEFAULT_STAGE_LOOK;
+}
 const ghostAs = $('#ghost-as');
 ghostAs.append(
   Object.assign(document.createElement('optgroup'), { label: 'Dunnottar' }),
@@ -2016,7 +2052,7 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   };
   if (place === 'dunnottar') {
     stormReset(stage.weather?.seed);
-    stageView.setEnvironment?.(stormEnvironment(scene.renderer));
+    chooseStageLook(rememberedStageLook());
   }
   fightMarks.reset();
   fightMarks.warm();
@@ -2581,6 +2617,8 @@ const boxer = window.boxer = {
     boxer.finishBuilding();
     return state.world.stage.active;
   },
+  // The look of the Dunnottar stage (levelmode/stagelooks.js): `stageLook()` says which (and the names); `stageLook(name)` changes it now; `stageLook(undefined, { still: true })` stops the lightning.
+  stageLook: (name, options) => (name === undefined && !options ? { look: stormLook(), looks: stageLookNames() } : chooseStageLook(name, options)),
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
   // The player's systems in the stage (levelmode/level.js): the run, what the button offers, and the verbs (for the console and tests).
   // (Named levelRun: `level` above opens a Battle Mode level, and a second `level:` key would shadow it.)

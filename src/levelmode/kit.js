@@ -17,7 +17,7 @@ import { P } from '../body.js';
 import { ceilingAt, pushOut } from '../physics/terrain.js';
 import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
-import { stormFollow } from './storm.js';
+import { stormFollow, stormTorch } from './storm.js';
 import { ktDispose, ktMaterials, ktRandom } from './kittex.js';
 
 const KIT_SLAB_TOP = { grass: 'grass', path: 'path', rock: 'rock', flags: 'flags', cobble: 'cobble', boards: 'boards', stone: 'ashlar' };
@@ -233,7 +233,15 @@ function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
   const rows = heights.length - 1;
   const columns = heights[0].length - 1;
   const tris = { grass: { p: [], n: [], u: [], c: [] }, rock: { p: [], n: [], u: [], c: [] } };
-  const vertex = (r, k) => [x0 + k * cell, heights[r][k], z0 + r * cell];
+  // Each vertex remembers its place in the grid, for the smooth normal of the ground (the slope of the heightfield there).
+  const vertex = (r, k) => [x0 + k * cell, heights[r][k], z0 + r * cell, r, k];
+  const at = (r, k) => heights[Math.max(0, Math.min(rows, r))][Math.max(0, Math.min(columns, k))];
+  const smooth = (v) => {
+    const sx = (at(v[3], v[4] - 1) - at(v[3], v[4] + 1)) / (2 * cell);
+    const sz = (at(v[3] - 1, v[4]) - at(v[3] + 1, v[4])) / (2 * cell);
+    const length = Math.hypot(sx, 1, sz);
+    return [sx / length, 1 / length, sz / length];
+  };
   const emit = (p, q, s) => {
     const ux = q[0] - p[0];
     const uy = q[1] - p[1];
@@ -255,16 +263,30 @@ function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
       ny = -ny;
       nz = -nz;
     }
-    const bucket = ny < steep || order.every((v) => v[1] < sea + 1.5) ? tris.rock : tris.grass;
+    // The line between grass and rock wanders (a noise on the slope that decides), so the cliff top is not a staircase of cells.
+    const wander = 0.09 * kitNoise((p[0] + q[0] + s[0]) * 0.11, (p[2] + q[2] + s[2]) * 0.11);
+    const bucket = ny < steep + wander || order.every((v) => v[1] < sea + 1.5) ? tris.rock : tris.grass;
     for (const v of order) {
-      bucket.p.push(...v);
-      bucket.n.push(nx, ny, nz);
+      bucket.p.push(v[0], v[1], v[2]);
+      // Grass lies in smooth slopes (no facets of a grid); rock keeps half its facets, so a cliff is still broken.
+      const sm = smooth(v);
+      const keep = bucket === tris.rock ? 0.5 : 0.1;
+      const sx = sm[0] + (nx - sm[0]) * keep;
+      const sy = sm[1] + (ny - sm[1]) * keep;
+      const sz = sm[2] + (nz - sm[2]) * keep;
+      const sl = Math.hypot(sx, sy, sz) || 1;
+      bucket.n.push(sx / sl, sy / sl, sz / sl);
       // Steep faces take their texture sideways (a plan view of a cliff is a smear).
       if (bucket === tris.rock && ny < 0.62) bucket.u.push(v[0] * Math.abs(nz) + v[2] * Math.abs(nx), v[1]);
       else bucket.u.push(v[0], v[2]);
       const low = Math.max(0, Math.min(1, (v[1] - sea) / 8));
-      const tone = 0.62 + 0.38 * low;
-      bucket.c.push(tone, tone, tone * 0.97);
+      let tone = 0.62 + 0.38 * low;
+      // Ground that is not one colour: swells of light and dark over tens of metres, patches of bare earth and of rank green, a darker skirt where it steepens.
+      const swell = kitNoise(v[0] * 0.045 + 11, v[2] * 0.045) * 0.5 + kitNoise(v[0] * 0.13, v[2] * 0.13 + 5) * 0.3;
+      const patch = kitNoise(v[0] * 0.3 + 3, v[2] * 0.3 + 9);
+      tone *= 1 + swell * 0.28 - (1 - ny) * 0.3;
+      if (bucket === tris.grass) bucket.c.push(tone * (1 + patch * 0.16 + 0.04), tone * (1 - Math.max(0, patch) * 0.12), tone * (0.95 - patch * 0.2));
+      else bucket.c.push(tone, tone, tone * 0.97);
     }
   };
   for (let r = 0; r < rows; r += 1) {
@@ -1201,7 +1223,7 @@ export function createCastleView(stage) {
       light.position.set(l.at[0], l.at[1], l.at[2]);
       light.color.setHex(l.color);
       light.distance = l.range;
-      light.intensity = l.power * (0.9 + 0.12 * Math.sin(state.time * 13 + k * 2) + 0.06 * Math.sin(state.time * 31 + k)) * 2.2;
+      light.intensity = l.power * (0.9 + 0.12 * Math.sin(state.time * 13 + k * 2) + 0.06 * Math.sin(state.time * 31 + k)) * 2.2 * stormTorch();
     });
     foam.map.offset.set(state.time * 0.02, state.time * 0.05);
     foam.opacity = 0.3 + 0.1 * Math.sin(state.time * 0.9);

@@ -69,10 +69,13 @@ drawn) and gates and ladders that swap solids. Civilians and prisoners are corne
 stage with a `landform`, hands over to the castle kit. Stage 1 (`levelmode/stages/dunnottar.js`)
 is eight sections of data, with `decor` (wall runs with their openings, vaults, props) that only
 the drawing reads. `levelmode/kit.js` draws it from the same solids and decor: merged batches per
-material and chunk (`kitgeo.js`), painted textures (`kittex.js`), props (`kitprops.js`), the
+material and chunk (`kitgeo.js`), painted textures (`kitpaint.js`: Voronoi stones and course-by-course masonry from noise, no two stones alike) and
+the materials made of them (`kittex.js`: a shader patch that reads each texture twice, at two scales blended by a world-space macro map, with moss, damp,
+rain streaks and a height fog), props (`kitprops.js`), the
 headland as a heightfield under every floor, the detail of the sections near the player and a block
 silhouette of the rest, gates and the ladder that move with their state, flames, ravens, and a pool
-of four real lights. `storm.js` is the weather (place `dunnottar`: sky, sea, rain, seeded lightning),
+of four real lights. `storm.js` is the weather (place `dunnottar`: sky, sea, rain, seeded lightning) in one of the stage's looks
+(`stagelooks.js`: six data entries, each a sky, light, fog, sea, rain, strikes and torches; `stagesky.js` paints the sky; `boxer.stageLook(name)`, the ghost bar's Look select or `?stagelook=` choose),
 and the kit's materials fade in a screen-door tube between camera and man (`ktSightline`) while the
 follow camera is kept off the stage's walls and roofs (`stageCameraRoom`, `followcam.js` `march`).
 
