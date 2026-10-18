@@ -1,14 +1,15 @@
 // The castle kit: the stage's own data (its solids, its wall runs and vaults and props) drawn as a castle, so that what
 // is drawn is what is stood on. `createCastleView(stage)` gives the same view object as the grey-box terrainview did
-// ({ stage, group, sections, mechanisms }) with an `update(world)` that terrainview.updateStageView calls each frame.
+// ({ stage, group, sections, mechanisms }) with an `update(world, camera)` that terrainview.updateStageView calls each frame.
 //
 // What is drawn, and when:
 //  - the land: the mainland hillside with the fenced switchback cut into it, and the headland: a ragged black rock
 //    (a heightfield that stands under every floor and flight and falls from their edges in cliffs to the sea), with surf
 //    at its foot; always.
 //  - for each section, its detail (walls with their arches, windows and oillets, stair flights, vaults, props, gates,
-//    items): while the section is active or next to an active one (a portal leads to it); otherwise its
-//    silhouette, the same solids as plain blocks, which is all that is seen of it from far off.
+//    items): while the section is active, or next to an active one with the way between them in the camera's view (a
+//    portal leads to it); otherwise its silhouette, the same solids as plain blocks, which is all that is seen of it from
+//    far off or from behind a wall. A section outside the camera's frustum is not drawn or animated at all.
 //  - what moves: gates and ladders with their state, flames, ravens, drips, light shafts, the markers on things to take.
 // Every mesh is a merged batch per material per chunk of ground, with frustum culling on.
 
@@ -1038,6 +1039,18 @@ function kitNeighbours(stage, active) {
   return near;
 }
 
+/** Margin (m) round a section's region in the visibility tests: its walls, towers and the rock under it reach past the ground it covers. */
+const KIT_SEEN_MARGIN = 8;
+
+/** The boxes (THREE.Box3, a margin round each, floor to sky) of a region: one entry, or a list of them. */
+function kitRegionBoxes(region, sea) {
+  const entries = Array.isArray(region) && !Array.isArray(region[0]) ? region : [region];
+  return entries.filter(Boolean).map(({ at, size }) => new THREE.Box3(
+    new THREE.Vector3(at[0] - size[0] / 2 - KIT_SEEN_MARGIN, (Number.isFinite(sea) ? sea : -30) - 4, at[1] - size[1] / 2 - KIT_SEEN_MARGIN),
+    new THREE.Vector3(at[0] + size[0] / 2 + KIT_SEEN_MARGIN, 80, at[1] + size[1] / 2 + KIT_SEEN_MARGIN),
+  ));
+}
+
 /**
  * The castle of a stage with a `landform`: its land, its sections' detail and silhouettes, its gates, its things to take.
  * Returns the stage view (terrainview.js's shape, with `update(world)` and the rest): { stage, group, sections, mechanisms, update, setEnvironment, dispose, stats }.
@@ -1089,11 +1102,19 @@ export function createCastleView(stage) {
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
     group.add(holder);
   }
-  // A few real lights, moved to the nearest of the flames and torches.
+  // Where each section lies, and the ways between them (a portal's area is where its two sections meet), for what the camera can see.
+  const boxes = Object.fromEntries(stage.sections.map((section) => [section.id, kitRegionBoxes(section.bounds, stage.sea)]));
+  const links = stage.sections.flatMap((section) => (section.portals ?? []).map((portal) => ({ a: section.id, b: portal.to, boxes: kitRegionBoxes(portal.area, stage.sea) })));
+  const camera = { frustum: new THREE.Frustum(), matrix: new THREE.Matrix4(), set: false };
+  // A few real lights, moved to the nearest of the flames and torches. Every lit surface of the picture pays for each light in the scene, lit or
+  // not (a third of the graphics card's time out in the rain, where no torch is near), so the four are in the scene only while a torch lights
+  // something (all together: two shaders to keep, with the lights and without, `view.warm` builds them both before they are wanted).
   const pool = [];
   for (let k = 0; k < 4; k += 1) {
     const light = new THREE.PointLight(0xffa050, 0, 12, 2);
     light.name = `kit-light-${k}`;
+    light.userData.torch = true;
+    light.visible = false;
     group.add(light);
     pool.push(light);
   }
@@ -1101,7 +1122,7 @@ export function createCastleView(stage) {
   const view = { stage, group, sections, mechanisms: [], mats, stats };
 
   /** Show what is in force: detail near the player, silhouettes elsewhere; gates and ladders as they stand; the flames. */
-  view.update = (world) => {
+  view.update = (world, eye = null) => {
     const run = world.stage;
     const now = performance.now() / 1000;
     const dt = state.last === null ? 0 : Math.min(0.1, now - state.last);
@@ -1119,19 +1140,34 @@ export function createCastleView(stage) {
     // Under a roof the sky is not what the wet stone shows: its reflections fade (and come back in the open).
     state.shelter += ((indoors ? 0.1 : 1) - state.shelter) * Math.min(1, dt * 4);
     for (const [name, base] of Object.entries(state.reflect)) mats[name].envMapIntensity = base * state.shelter;
+    // What the camera can see (when it is given): a section outside its frustum is not drawn or animated at all; one beside
+    // the sections the man is in is drawn in detail only if the way between them is in view (else its silhouette, which is
+    // what is behind a wall); the frustum culling of the meshes does the rest.
+    camera.set = false;
+    if (eye) {
+      eye.updateMatrixWorld();
+      camera.frustum.setFromProjectionMatrix(camera.matrix.multiplyMatrices(eye.projectionMatrix, eye.matrixWorldInverse));
+      camera.set = true;
+    }
+    const sees = (list) => !camera.set || list.some((box) => camera.frustum.intersectsBox(box));
+    const seenThrough = (id) => links.some((link) => ((link.a === id && active.has(link.b)) || (link.b === id && active.has(link.a))) && sees(link.boxes));
     for (const section of stage.sections) {
       const entry = parts[section.id];
+      const inView = sees(boxes[section.id]);
       const shown = near.has(section.id);
-      entry.detail.group.visible = shown;
-      entry.far.group.visible = !shown;
+      const detailed = shown && inView && (active.has(section.id) || seenThrough(section.id));
+      entry.detail.group.visible = detailed;
+      entry.far.group.visible = !detailed && inView;
       if (!shown) continue;
-      kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time);
+      // (Gates and ladders keep their motion whether or not they are seen, so that one shut behind him is shut when he turns round.)
       for (const moving of entry.moving) {
         const target = ['open', 'down'].includes(run.mechanisms[moving.id]) ? 1 : 0;
         if (moving.open < 0) moving.open = target;
         else moving.open += Math.max(-1, Math.min(1, (target - moving.open) * Math.min(1, dt * 2.6)));
         moving.apply(moving.open);
       }
+      if (!detailed) continue;
+      kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time);
       const taken = run.level?.taken;
       for (const mark of entry.marks) {
         const gone = taken?.has(mark.item.id);
@@ -1156,6 +1192,7 @@ export function createCastleView(stage) {
       state.lit = candidates.slice(0, pool.length).map((c) => c.l);
     }
     pool.forEach((light, k) => {
+      light.visible = state.lit.length > 0;
       const l = state.lit[k];
       if (!l) {
         light.intensity = 0;
@@ -1168,6 +1205,33 @@ export function createCastleView(stage) {
     });
     foam.map.offset.set(state.time * 0.02, state.time * 0.05);
     foam.opacity = 0.3 + 0.1 * Math.sin(state.time * 0.9);
+  };
+
+  /**
+   * Draw the castle once, every piece of it, with the torches' lights on and again with them off, by `draw()`, so that every shader
+   * the picture will want is built now, in the frame the stage opens, and not in the middle of a fight as a man walks up to his first torch.
+   * (Once only; the picture of these two frames is the one drawn after them.)
+   */
+  view.warm = (draw) => {
+    if (state.warmed) return;
+    state.warmed = true;
+    const kept = [];
+    group.traverse((object) => {
+      if (object.isMesh || object.isLine || object.isPoints) kept.push([object, object.frustumCulled, object.visible]);
+    });
+    const holders = Object.values(parts).flatMap((entry) => [entry.detail.group, entry.far.group]).map((holder) => [holder, holder.visible]);
+    const lamps = pool.map((light) => light.visible);
+    for (const [object] of kept) object.frustumCulled = false;
+    for (const [holder] of holders) holder.visible = true;
+    for (const on of [true, false]) {
+      for (const light of pool) light.visible = on;
+      draw();
+    }
+    for (const [object, culled, visible] of kept) Object.assign(object, { frustumCulled: culled, visible });
+    for (const [holder, visible] of holders) holder.visible = visible;
+    pool.forEach((light, k) => {
+      light.visible = lamps[k];
+    });
   };
 
   /** Give the wet stone and the puddles a reflection: `env` is a cube or equirect environment map. */

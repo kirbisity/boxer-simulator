@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ADAPTIVE_RESOLUTION as CONFIG, newAdaptiveState, ratioSteps, stepAdaptive } from '../src/adaptres.js';
+import { ADAPTIVE_RESOLUTION as CONFIG, adaptiveSize, newAdaptiveState, ratioSteps, stepAdaptive } from '../src/adaptres.js';
 
 const run = (state, seconds, ms, { fighters = 100, work = 8 } = {}) => {
   let level = state.level;
@@ -89,4 +89,12 @@ test('the dead band between fast and slow holds the step', () => {
   const state = newAdaptiveState();
   run(state, 10, 40);
   assert.equal(run(state, 60, 19, { work: 6 }), 3, '19 ms is neither slow nor easy');
+});
+
+test('a stage is a big scene however few its men: it adapts, a duel does not', () => {
+  assert.equal(adaptiveSize(3, false), 3, 'a duel counts its men');
+  assert.equal(adaptiveSize(3, true), CONFIG.fewestFighters, 'a stage with three men is as big as the smallest battle');
+  assert.equal(adaptiveSize(41, true), 41);
+  const state = newAdaptiveState();
+  assert.equal(run(state, 30, 40, { fighters: adaptiveSize(2, true) }), 3, 'slow in a small stage: down to the last step');
 });

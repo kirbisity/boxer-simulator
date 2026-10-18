@@ -1,0 +1,172 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Stage bench</title>
+<!--
+  A page that holds the game in an iframe of any size (a window cannot always be resized) and times Level Mode
+  stage 1 at fixed places. Serve the repository (tools/serve.py 8962), open /tools/stagebench.html, then in the console:
+
+    await SB.load(1279, 639)             // the game at that CSS size (device pixel ratio is the window's)
+    await SB.table()                      // per place: physics, views, render, frame (ms, the least of 5 runs of 30 frames), draw calls, triangles, GPU ms
+    await SB.table({ only: ['chapel'], gpu: false })
+    SB.hop('chapel')                      // stand the player at a place, the stage woken round him
+
+  `gpu` is the render's time on the graphics card (EXT_disjoint_timer_query): steadier than the wall clock when
+  the machine is shared. Everything here is synchronous: a hidden tab's timers are throttled to nothing.
+-->
+<body style="margin:0">
+<script type="module">
+  const PLACES = [
+    ['cliff-start', [-110, 14, -4], 0], ['cliff-path', [-80, 12, -4], 0], ['cliff-leg3', [-70, 4.5, 20], 0],
+    ['gorge', [-44, 0, 41.5], 0], ['ledge', [-3, 0, 54.2], 0], ['gatehouse', [2.2, 0, 46.2], 0],
+    ['oillet', [17.7, 6, 37], -1.57], ['ascent', [17, 11, 10], -1.57], ['quad', [12, 12.18, -1], -1.57],
+    ['vault', [24, 6, -22.5], 0], ['keep', [52, 12.18, -23.8], 0], ['wallwalk', [30, 24.93, -36], 3.14],
+    ['chapel', [-6, 17.18, -36], 3.14], ['cell', [-9, 17.18, -46], 1.57],
+  ];
+  const { floorAt } = await import('/src/physics/terrain.js');
+  let frame = null;
+  const game = () => frame.contentWindow;
+  const SB = window.SB = {
+    places: PLACES,
+    /** The game in a fresh iframe of w x h CSS pixels; resolves when it is ready. */
+    load(w, h) {
+      return new Promise((done) => {
+        frame?.remove();
+        frame = document.createElement('iframe');
+        frame.style.cssText = `width:${w}px;height:${h}px;border:0;position:absolute;left:0;top:0`;
+        frame.src = `/?${Math.random()}`;
+        frame.onload = () => {
+          const wait = () => (game().boxer ? done(game()) : setTimeout(wait, 100));
+          wait();
+        };
+        document.body.appendChild(frame);
+      });
+    },
+    game,
+    /** The stage entered afresh, the player standing at `place` (a name above, or [x, floorHint, z]). Returns { floor, state, y }. */
+    hop(place, yaw = 0) {
+      const g = game();
+      const found = PLACES.find(([name]) => name === place);
+      const [at, facing] = found ? [found[1], found[2]] : [place, yaw];
+      g.boxer.skipIntro();
+      g.boxer.adaptiveResolution(false);
+      g.boxer.levelMode('dunnottar');
+      const level = g.boxer.level();
+      // (Whole steps only: a part of a step is drawn blended with draw(0), whose camera does not like a zero dt.)
+      // First onto the spot (the sections wake on the first step), then onto the floor found there.
+      level.put([at[0], at[1] + 0.3, at[2]], facing);
+      g.boxer.advance(2 / 60);
+      const world = g.boxer.state.world;
+      const floor = floorAt(world.arena.terrain, at[0], at[2], at[1] + 1.5);
+      if (floor == null) return { floor: null, state: 'lost' };
+      level.put([at[0], floor, at[2]], facing);
+      g.boxer.advance(24 / 60);
+      const me = world.fighters[0];
+      return { floor: +floor.toFixed(2), state: me.state, y: +me.x[25].toFixed(2) };
+    },
+    /** The GPU time of `frames` draws (ms): { med, n }. */
+    async gpu(frames = 12) {
+      const g = game();
+      const renderer = g.boxer.scene.renderer;
+      const gl = renderer.getContext();
+      const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+      if (!ext) return { med: -1, n: 0 };
+      const original = renderer.render;
+      const queries = [];
+      renderer.render = function (...args) {
+        const query = gl.createQuery();
+        gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+        try {
+          return original.apply(this, args);
+        } finally {
+          gl.endQuery(ext.TIME_ELAPSED_EXT);
+          queries.push(query);
+        }
+      };
+      g.boxer.bench(frames);
+      renderer.render = original;
+      gl.finish();
+      // (A query's answer arrives a turn of the event loop later.)
+      await new Promise((done) => setTimeout(done, 60));
+      const times = [];
+      for (const query of queries) {
+        if (gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) times.push(gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6);
+        gl.deleteQuery(query);
+      }
+      times.sort((a, b) => a - b);
+      return times.length ? { med: +times[Math.floor(times.length / 2)].toFixed(2), n: times.length } : { med: -1, n: 0 };
+    },
+    /**
+     * What the picture is made of now: triangles and meshes drawn (visible, and meeting the camera's frustum) by kind:
+     * land, each section's detail and silhouette, the sea and sky, the men (by how they are drawn), the rest.
+     */
+    census() {
+      const g = game();
+      const THREE_ = g.THREE;
+      const scene = g.boxer.scene;
+      scene.camera.updateMatrixWorld();
+      const frustum = new THREE_.Frustum().setFromProjectionMatrix(new THREE_.Matrix4().multiplyMatrices(scene.camera.projectionMatrix, scene.camera.matrixWorldInverse));
+      const stats = {};
+      const shown = (object) => {
+        for (let up = object; up; up = up.parent) if (!up.visible) return false;
+        return true;
+      };
+      const menOf = new Map();
+      for (const view of g.boxer.state.views) menOf.set(view.group, view);
+      const kindOf = (object) => {
+        for (let up = object; up; up = up.parent) {
+          if (menOf.has(up)) {
+            const view = menOf.get(up);
+            return `man:${view.fighter.spawn?.id ?? 'player'}${view.baked ? (view.draw?.far ? ' far' : ' near') : ' full'}`;
+          }
+          if (/^(detail|silhouette):/.test(up.name)) return up.name;
+          if (up.name === 'land' || up.name === 'stage-sea') return up.name;
+        }
+        return 'other';
+      };
+      scene.scene.traverse((object) => {
+        if (!(object.isMesh || object.isLine || object.isPoints) || !shown(object)) return;
+        const geometry = object.geometry;
+        const triangles = ((geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3) * (object.isInstancedMesh ? object.count : 1);
+        let inView = true;
+        if (object.frustumCulled !== false) {
+          if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+          inView = frustum.intersectsSphere(geometry.boundingSphere.clone().applyMatrix4(object.matrixWorld));
+        }
+        const kind = kindOf(object);
+        const entry = (stats[kind] ??= { meshes: 0, triangles: 0 });
+        if (inView) {
+          entry.meshes += 1;
+          entry.triangles += Math.round(triangles);
+        }
+      });
+      return Object.entries(stats).filter(([, v]) => v.meshes).map(([k, v]) => `${k.padEnd(24)} meshes ${String(v.meshes).padStart(3)} tris ${v.triangles}`).join('\n');
+    },
+    /** One row per place. `lines`: the rows as text (default) or objects. */
+    async table({ only = null, frames = 30, gpu = true, raw = false } = {}) {
+      const g = game();
+      const rows = [];
+      for (const [name] of PLACES) {
+        if (only && !only.includes(name)) continue;
+        const where = SB.hop(name);
+        if (where.state === 'lost' || where.state === 'out') {
+          rows.push({ name, error: where });
+          break;
+        }
+        g.boxer.bench(8);
+        // The least of several runs of each part: a shared machine only ever adds time.
+        const runs = [0, 1, 2, 3, 4].map(() => g.boxer.bench(frames));
+        const least = (key) => Math.min(...runs.map((run) => run[key]));
+        const m = { physics: least('physics'), views: least('views'), render: least('render'), frame: least('frame'), calls: runs[0].calls, triangles: runs[0].triangles };
+        let card = null;
+        if (gpu) {
+          const cards = [];
+          for (let k = 0; k < 5; k += 1) cards.push((await SB.gpu(12)).med);
+          card = Math.min(...cards);
+        }
+        rows.push({ name, physics: m.physics, views: m.views, render: m.render, frame: m.frame, calls: m.calls, triangles: m.triangles, gpu: card });
+      }
+      if (raw) return rows;
+      return rows.map((r) => (r.error ? `${r.name} ${JSON.stringify(r.error)}` : `${r.name.padEnd(11)} ph ${r.physics} vw ${r.views} rd ${r.render} fr ${r.frame} calls ${r.calls} tri ${r.triangles}${r.gpu === null ? '' : ` gpu ${r.gpu}`}`)).join('\n');
+    },
+  };
+</script>

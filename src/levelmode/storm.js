@@ -263,6 +263,8 @@ export function buildStormPlace({ buildRain }) {
   sea.rotation.x = -Math.PI / 2;
   sea.position.set(STORM.centre[0], -9, STORM.centre[2]);
   sea.name = 'stage-sea';
+  // Drawn after the castle and the land (which hide a good part of it): the sea is the most expensive pixel of the picture, and one the depth test can refuse is not shaded.
+  sea.renderOrder = 1;
   place.add(sea);
   // Rain, which comes down round the player.
   const rain = buildRain(STORM.rain);

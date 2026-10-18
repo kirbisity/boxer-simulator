@@ -22,7 +22,7 @@ import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createSeeThrough } from './seethrough.js';
-import { createAdaptiveResolution } from './adaptres.js';
+import { adaptiveSize, createAdaptiveResolution } from './adaptres.js';
 import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
@@ -30,8 +30,8 @@ import { checkButtons } from './uicheck.js';
 import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
-import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
-import { crowdLod, protectedMen } from './crowdlod.js';
+import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
+import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
@@ -325,7 +325,8 @@ function rebuildViews({ progressive = false } = {}) {
   state.horseViews = (state.world.horses ?? []).map((horse) => buildHorseView(scene, horse, { detail: crowded ? 'low' : 'full' }));
   if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
-  const leads = new Set(['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
+  // (In a stage the man played is the one lead: the first man met on the other side is no better drawn than the rest of his garrison.)
+  const leads = new Set(state.world.stage ? [state.world.fighters[0].id] : ['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
   const build = (fighter) => {
     const view = buildFighterView(scene, fighter, { simple: crowd && !leads.has(fighter.id) });
     setLayer(view, state.layer);
@@ -490,7 +491,7 @@ function frame(now) {
   const dt = Math.min(0.1, interval / 1000);
   last = now;
   try {
-    resolution.frame(scene, interval, state.world?.fighters.length ?? 0);
+    resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)));
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
@@ -595,7 +596,8 @@ function drainLevel() {
 function snapshot(world) {
   return {
     world,
-    fighters: world.fighters.map((fighter) => ({ x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
+    // (A dormant man of a stage is not drawn and does not move: nothing to blend.)
+    fighters: world.fighters.map((fighter) => (fighter.dormant ? null : { x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
     debris: world.debris.map((piece) => ({ x: piece.x?.slice(), q: piece.q?.slice() })),
     horses: (world.horses ?? []).map((horse) => ({ at: horse.at.slice(), yaw: horse.yaw, stride: horse.stride })),
   };
@@ -619,7 +621,8 @@ function blendWorld(world, before, share) {
     if (!then) return;
     const now = { fighter, x: fighter.x.slice(), dir: fighter.weapon?.dir, offDir: fighter.offWeapon?.dir };
     kept.push(now);
-    fighter.x.set(blend(then.x, now.x, share));
+    const x = fighter.x;
+    for (let at = 0; at < x.length; at += 1) x[at] = then.x[at] + (now.x[at] - then.x[at]) * share;
     if (then.dir && now.dir) fighter.weapon.dir = unit(blend(then.dir, now.dir, share));
     if (then.offDir && now.offDir) fighter.offWeapon.dir = unit(blend(then.offDir, now.offDir, share));
   });
@@ -807,8 +810,12 @@ function drawWorld(dt, drawIt = true) {
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
-  selectCrowdDraw(scene, state.views, safeMen(world, followed));
-  if (world.stage && stageView) updateStageView(stageView, world);
+  selectCrowdDraw(scene, state.views, safeMen(world, followed), world.stage ? STAGE_CROWD_VIEW : CROWD_VIEW);
+  if (world.stage && stageView) {
+    updateStageView(stageView, world, scene.camera);
+    // (The castle's shaders are built in the first frame, not as each is first wanted: levelmode/kit.js.)
+    stageView.warm?.(() => render(scene));
+  }
   if (world.stage) awarenessOverlay?.update(world, scene.camera);
   for (const view of state.views) {
     // A dormant man (his section of a stage is not active) is not drawn, and posed afresh when he wakes.

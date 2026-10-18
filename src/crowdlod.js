@@ -4,6 +4,13 @@
 import { CROWD_VIEW } from './crowdview.js';
 import { P } from './body.js';
 
+/**
+ * How a stage (Level Mode) draws its crowd: the same rules as a battle's, a little sooner. The man played is seen over the shoulder from
+ * a few metres, not from the height of a battlefield: past 8.5 m a man is a hundred pixels or so, and a body of a fifth of the triangles
+ * is enough. Those he is fighting (`protectRadius`) are drawn in full as ever.
+ */
+export const STAGE_CROWD_VIEW = { ...CROWD_VIEW, lodDistance: 8.5, inkDistance: 10 };
+
 /** The switch for before/after comparison (`boxer.lod(false)`): off, a crowd is drawn as it was, every man in full. */
 export const crowdLod = { enabled: true };
 
@@ -49,10 +56,9 @@ export function pastLimit(distance, wasPast, limit, margin) {
  * `distance`: pelvis to camera (m); `fallen`: down or out (he is drawn
  * simpler sooner); `safe`: in the protected set; `inView`: his bounding
  * sphere meets the camera's frustum; `inShadow`: it meets the shadow
- * camera's.
+ * camera's. `config`: the distances (CROWD_VIEW, or a stage's).
  */
-export function chooseDraw(draw, { distance, fallen, safe, inView, inShadow }) {
-  const config = CROWD_VIEW;
+export function chooseDraw(draw, { distance, fallen, safe, inView, inShadow }, config = CROWD_VIEW) {
   draw.culled = !safe && !inView;
   draw.far = !safe && pastLimit(distance, draw.far, fallen ? config.fallenLodDistance : config.lodDistance, config.lodMargin);
   const shadowLimit = fallen ? config.fallenShadowDistance : config.shadowDistance;
