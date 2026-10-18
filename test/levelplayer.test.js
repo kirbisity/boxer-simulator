@@ -503,6 +503,10 @@ test('death: YOU DIED is asked for once; the respawn is at the last rest with th
   assert.equal(miner.state, 'up');
   const apart = Math.hypot(miner.root[0] - me.root[0], miner.root[1] - me.root[1]);
   assert.ok(apart > 0.5 && apart < 3, `beside him: ${apart.toFixed(2)} m`);
+  // The awareness AI's minds start over: the guard idles at his post, the freed man follows.
+  assert.ok(['idle', 'patrol'].includes(world.stage.aware.minds[guard.id].state));
+  assert.equal(world.stage.aware.minds[miner.id].kind, 'ally');
+  assert.equal(world.stage.aware.minds[miner.id].state, 'follow');
   assert.ok(drainUi(world).some((message) => message.type === 'respawned'));
   // The knight's body is as the stage laid it (it is no enemy to put back).
   assert.equal(dead.state, 'out');
