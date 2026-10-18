@@ -271,6 +271,8 @@ export function thinkAll(world, dt, playerIds = new Set()) {
   const staggered = fightTier(world) >= 3;
   for (const fighter of world.fighters) {
     if (playerIds.has(fighter.id)) continue;
+    // Level mode: a dormant man (his section is not active) is not thought for; nor is a neutral one (corner 'grey': civilians, prisoners), whom levelmode drives itself.
+    if (fighter.dormant || fighter.corner === 'grey') continue;
     if (!staggered || fighter.detail === 'full' || fighter.detail === undefined) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
@@ -1130,7 +1132,8 @@ export function routFear(world, fighter) {
 function rout(world, fighter, opponent) {
   const spec = AI.rout;
   const side = world.sides?.[fighter.corner];
-  if (!side?.rear || side.men < spec.minSide) return false;
+  // An open arena (level mode: the box is only a far limit, not an edge to flee over) is never fled.
+  if (!side?.rear || side.men < spec.minSide || world.arena.open) return false;
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   const { halfX, halfZ } = world.arena;
   const atEdge = Math.abs(at[0]) > halfX - spec.edge || Math.abs(at[1]) > halfZ - spec.edge;

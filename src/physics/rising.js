@@ -88,7 +88,7 @@ function tidyPose(fighter, at) {
 }
 
 function onFloor(fighter, positions) {
-  return positions.map((position, index) => [position[0], Math.max(position[1], fighter.radius[index]), position[2]]);
+  return positions.map((position, index) => [position[0], Math.max(position[1], fighter.radius[index] + (fighter.lift ?? 0)), position[2]]);
 }
 
 /** The roll onto his front: the angle about the trunk that turns his chest to the floor (0 if it already faces it). */
@@ -215,7 +215,7 @@ export function riseTarget(fighter, index) {
   const offset = vec.sub(from, centre);
   const target = vec.add(centre, turnAbout(offset, axis, angle));
   const rate = u < 1 ? (rise.roll * easeRate(u)) / seconds : 0;
-  return { target: [target[0], Math.max(target[1], fighter.radius[index]), target[2]], velocity: vec.scale(vec.cross(axis, turnAbout(offset, axis, angle)), rate) };
+  return { target: [target[0], Math.max(target[1], fighter.radius[index] + (fighter.lift ?? 0)), target[2]], velocity: vec.scale(vec.cross(axis, turnAbout(offset, axis, angle)), rate) };
 }
 
 const ARMS = new Set(SIDES.flatMap(([side]) => [P[`${side}Hand`], P[`${side}Elbow`]]));
@@ -246,7 +246,7 @@ function drawFootIn(fighter, foot) {
   const hip = point(fighter.x, P.rHip);
   const reach = (L.thigh + L.shank) * WORLD.rise.legReach;
   const at = foot.planted;
-  const height = hip[1] - fighter.desired[P.rFoot][1];
+  const height = hip[1] - (fighter.lift ?? 0) - fighter.desired[P.rFoot][1];
   const across = Math.hypot(at[0] - hip[0], at[2] - hip[2]);
   if (height >= reach || across < 1e-6) return;
   const most = Math.sqrt(reach * reach - height * height);
@@ -359,7 +359,7 @@ export function supportLimit(fighter, acceleration) {
   const spec = WORLD.rise;
   const force = fighter.body.muscleForce ?? fighter.body.motorForce;
   const scale = Math.max(0, fighter.motorScale);
-  const down = (index) => fighter.x[index * 3 + 1] - fighter.radius[index] <= spec.contact;
+  const down = (index) => fighter.x[index * 3 + 1] - fighter.radius[index] - (fighter.lift ?? 0) <= spec.contact;
   const pushing = (push, index) => {
     const strength = push.muscles.reduce((sum, [part, share]) => sum + force[part] * share, 0) * scale * (push.standing ? 1 : spec.pushShare);
     const root = point(fighter.x, push.root);

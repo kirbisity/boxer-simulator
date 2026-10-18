@@ -1957,7 +1957,7 @@ export function updateBlood(view, world, dt) {
     drop.velocity.y -= 9.81 * dt;
     drop.position.addScaledVector(drop.velocity, dt);
     // Past a drop edge (the subway's platform) it falls on to the track bed.
-    const ground = floorUnder(world?.arena, drop.position.z);
+    const ground = floorUnder(world?.arena, drop.position.z, drop.position.x, drop.position.y);
     if (drop.position.y > ground + floor) return true;
     // Into standing water: it sinks and spreads, no stain.
     if (bloodDyeLand(view, blood.dye, drop.position.x, drop.position.z, (drop.size / GORE.dropRadius) ** 3, now)) return false;

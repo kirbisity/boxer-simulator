@@ -396,6 +396,26 @@ export const WORLD = {
   //   a pedestrian (~5 kJ); a horse at the gallop into a man standing gives
   //   his chest ~10 m/s and ~7 kN: ribs broken, in plate a third of the harm.
   crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05 },
+  // Static scenery in the physics (physics/terrain.js), only in an arena that
+  // carries `terrain`; none of this is read otherwise.
+  //   cell, margin: the lookup grid's cell (m), and how far past a solid's edge it is
+  //     registered (so a part up to this radius is found from the one cell it is in).
+  //   stepUp: the most (m) a foot rises in stride, and a part is lifted by the floor: a tread, a kerb (stairs of risers to about 0.22 m are climbed freely, two treads ahead in a stride); a taller face is a ledge, a wall.
+  //   stepDown: the most a foot reaches down to the floor below it; further, there is no floor to stand
+  //     on and he is in the air. airReach: how far under the hips a hanging foot is held. airDamping: the drag (per second) on a body in the air (the floor's is far more: a fall must reach its speed); airborne: how far (m) the hips of a man not on his feet are over the floor for him to be falling. fallingSpeed: a man coming down faster than this (m/s) is in the air until a foot is within `touching` m of the floor.
+  //   bodyRadius, bodyHeight: the standing man as the walls see him (the root's push out of a wall).
+  //   liftRate: how fast (per second) the stance's height follows the floor under the feet. sag: how far (m) under the lower foot's floor the stance is held (a straight leg lifts its planted foot as the hips pass over it, and a stance as tall as the legs reach cannot climb). rise: how fast (m/s) a part run into a higher tread is lifted onto it, up to `ride` m of it (past that it is a fall and stops on the floor).
+  //   fall: a man landing on his feet (a part of a man on the floor otherwise takes the ordinary
+  //     floor impact past `bodyFrom` m/s, times `body`): at `safe` m/s or less it costs nothing (a drop of about a metre);
+  //     past it each leg takes `legs` of the speed beyond as leg damage (against legCapacity); from
+  //     `ankleFrom` the ankle may break, surely by `ankleTo`; past `stumble` he cannot stay up; past
+  //     `compressFrom` the spine takes `compress` of the speed beyond as trunk injury (WORLD.damageCapacity);
+  //     `together` s: two feet landing within it are one landing. Speeds: a drop of 1 m lands at
+  //     4.4 m/s, 3 m at 7.7, 6 m at 10.8, 10 m at 14.0. Calibrated in test/terrain.test.js.
+  terrain: {
+    cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, ride: 0.15,
+    fall: { safe: 5, legs: 1.6, bodyFrom: 4.5, body: 1, stumble: 6.5, ankleFrom: 6.8, ankleTo: 11, compress: 12, compressFrom: 8, together: 0.3 },
+  },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
   // Walking about (the player's walk mode): upright and square, feet under

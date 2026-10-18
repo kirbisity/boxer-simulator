@@ -17,6 +17,7 @@ import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN,
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { beginRise, restedToRise, riseTarget, supportLimit, updateRise } from './physics/rising.js';
+import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { formUp } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
@@ -155,6 +156,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
     aiFleeing: undefined, aiFleeSince: undefined, aiCharge: undefined,
     mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
+    // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).
+    dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
@@ -1064,6 +1067,22 @@ export function placeFighter(fighter, x, z = fighter.root[1]) {
   plantFeet(fighter);
 }
 
+/**
+ * Stand a fighter on terrain (an arena's `terrain`): at (x, z), facing `yaw`, on the floor
+ * at height `floor` (the stance lifted to it, every part moved up by as much).
+ */
+export function placeOnFloor(fighter, x, z, floor, yaw) {
+  placeFighter(fighter, x, z);
+  const rise = floor - (fighter.lift ?? 0);
+  for (let index = 1; index < fighter.x.length; index += 3) {
+    fighter.x[index] += rise;
+    fighter.prev[index] += rise;
+  }
+  fighter.lift = floor;
+  fighter.yaw = yaw;
+  plantFeet(fighter);
+}
+
 function addConstraint(fighter, a, b, compliance) {
   const i = P[a];
   const j = P[b];
@@ -1143,14 +1162,15 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   for (const fighter of fighters) fighter.arena = arena;
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
-  const standards = raiseStandards(fighters, random);
+  // (`rules.noStandards`, level mode: no side raises a standard or forms up on a leader.)
+  const standards = rules.noStandards ? {} : raiseStandards(fighters, random);
   // `rules`: a level's own (noPins: a man down gets up again; nobody holds him there).
   // Each rider's horse under him (physics/mounted.js).
   const horses = [];
   if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
   const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
   // Drilled men form up on their side's leader (formation.js).
-  formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
+  if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
   return world;
 }
 
@@ -1287,7 +1307,7 @@ export function toLocal(fighter, world) {
  */
 export function opponentFor(world, fighter) {
   const focus = fighter.focus === undefined ? null : world.fighters[fighter.focus];
-  if (focus && focus.corner !== fighter.corner && inFight(focus)) return focus;
+  if (focus && hostile(focus, fighter) && inFight(focus)) return focus;
   return nearestOpponent(world, fighter);
 }
 
@@ -1295,7 +1315,7 @@ export function nearestOpponent(world, fighter) {
   let best = null;
   let bestDistance = Infinity;
   for (const other of world.fighters) {
-    if (other.corner === fighter.corner || !inFight(other)) continue;
+    if (!hostile(other, fighter) || !inFight(other)) continue;
     const distance = vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis)));
     if (distance < bestDistance) {
       best = other;
@@ -1781,7 +1801,15 @@ export function startCrawl(world, fighter, reason) {
 /** Still in the fight: not out, and not crawling away. */
 export function inFight(fighter) {
   // A player walking about on his knees (walk mode), or crawling by choice, has not left it; a man who fled the field has.
-  return fighter.state !== 'out' && !fighter.fled && !(fighter.crawling && !fighter.walking && !fighter.crawlChosen);
+  return fighter.state !== 'out' && !fighter.fled && !fighter.dormant && !(fighter.crawling && !fighter.walking && !fighter.crawlChosen);
+}
+
+/**
+ * Whether two men are enemies: of different corners, neither in the neutral corner ('grey': the
+ * civilians and prisoners of level mode, whom nobody targets and who target nobody).
+ */
+export function hostile(first, second) {
+  return first.corner !== second.corner && first.corner !== 'grey' && second.corner !== 'grey';
 }
 
 /** A leg that will not bear him: a knee or hip broken. */
@@ -1888,7 +1916,7 @@ export function plantFeet(fighter) {
   fighter.feet = {};
   for (const side of ['l', 'r']) {
     const index = P[`${side}Foot`];
-    fighter.feet[side] = { index, planted: point(fighter.x, index), step: null };
+    fighter.feet[side] = { index, planted: point(fighter.x, index), step: null, floor: undefined };
   }
 }
 
@@ -1928,7 +1956,8 @@ function updateFeet(fighter, dt) {
     // Step to where the stance will be, not where it is: lead the motion.
     const lead = spec.lead * spec.seconds;
     const to = [worst.desired[0] + fighter.rootVelocity[0] * lead, worst.desired[1], worst.desired[2] + fighter.rootVelocity[1] * lead];
-    worst.step = { from: [...worst.planted], to, t: 0 };
+    // (floorFrom, floorTo: the floor under the foot at each end of the step, set on terrain: groundStance.)
+    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined };
   }
   for (const foot of feet) {
     if (!foot.step) continue;
@@ -1959,11 +1988,111 @@ function onTheFloor(fighter, target) {
 
 function rawFootTarget(fighter, foot) {
   if (foot.lifted) return toWorld(fighter, fighter.desired[foot.index]);
-  if (!foot.step) return [foot.planted[0], fighter.desired[foot.index][1], foot.planted[2]];
+  if (!foot.step) return [foot.planted[0], foot.floor === undefined ? fighter.desired[foot.index][1] : fighter.desired[foot.index][1] + foot.floor, foot.planted[2]];
   const t = foot.step.t;
   const ease = t * t * (3 - 2 * t);
   const along = vec.lerp(foot.step.from, foot.step.to, ease);
+  // On terrain the foot rises to the next tread early (and drops to a lower one late), and clears the edge.
+  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + WORLD.step.lift * Math.sin(Math.PI * t) + stepHeight(foot.step, t), along[2]];
   return [along[0], fighter.desired[foot.index][1] + WORLD.step.lift * Math.sin(Math.PI * t), along[2]];
+}
+
+/** The floor height under a foot a share `t` of the way through a step onto terrain, and the clearance it needs over the edge. */
+function stepHeight(step, t) {
+  return stepBase(step.floorFrom, step.floorTo, t) + Math.max(0, step.floorTo - step.floorFrom) * 0.25 * Math.sin(Math.PI * t);
+}
+
+/** The floor height a foot a share `t` through a step from one floor to another has come to (it rises early, drops late). */
+function stepBase(from, to, t) {
+  const change = to - from;
+  const early = Math.min(1, t * 1.7);
+  const late = Math.min(1, Math.max(0, t * 1.5 - 0.4));
+  return from + change * (change > 0 ? early * early * (3 - 2 * early) : late * late * (3 - 2 * late));
+}
+
+/**
+ * On terrain, each step: the floor under each foot, and the height the stance
+ * stands at: that of the lower foot (his legs are straight when standing: the hips cannot be higher than
+ * the lower foot can reach, and the higher foot's knee bends). A foot that can reach its floor (within a
+ * step up and WORLD.terrain.stepDown down of the stance) plants there; one that cannot dangles a step below; with neither on a floor he is
+ * in the air and the stance falls with him. Not on his feet (down, rising, kneeling), the
+ * stance's floor is the one under his hips, and fixed while he rises.
+ */
+function groundStance(fighter, dt) {
+  const terrain = fighter.arena.terrain;
+  const spec = WORLD.terrain;
+  const lift = fighter.lift ?? 0;
+  const pelvis = P.pelvis * 3;
+  const feet = fighter.feet;
+  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin)) {
+    fighter.air = false;
+    if (fighter.state !== 'rising') {
+      const under = floorAt(terrain, fighter.x[pelvis], fighter.x[pelvis + 2], fighter.x[pelvis + 1] + spec.stepUp);
+      if (under > -Infinity) fighter.lift = under;
+      // Well clear of the floor (thrown, fallen, knocked off a ledge): falling.
+      fighter.air = fighter.x[pelvis + 1] - (under > -Infinity ? under : -Infinity) > spec.airborne;
+    }
+    feet.l.floor = feet.r.floor = fighter.lift ?? 0;
+    return;
+  }
+  const reach = lift - spec.stepDown;
+  const sides = ['l', 'r'];
+  const real = [-Infinity, -Infinity];
+  let bearing = 0;
+  let lowest = Infinity;
+  for (let k = 0; k < 2; k += 1) {
+    const foot = feet[sides[k]];
+    if (foot.lifted) continue;
+    // A step just begun is aimed to land on one floor, not astride the edge of two, and no
+    // more than a stride up: where the tread it points at is too high, it is cut short.
+    if (foot.step && foot.step.floorFrom === undefined) {
+      const { from, to } = foot.step;
+      let share = 1;
+      while (share > 0.2 && floorAt(terrain, from[0] + (to[0] - from[0]) * share, from[2] + (to[2] - from[2]) * share, lift + spec.stepUp + 0.6) > lift + spec.sag + spec.stepUp) share -= 0.2;
+      const aim = awayFromEdges(terrain, [from[0] + (to[0] - from[0]) * share, from[2] + (to[2] - from[2]) * share], lift + spec.stepUp);
+      foot.step.to = [aim[0], to[1], aim[1]];
+    }
+    const at = foot.step ? foot.step.to : foot.planted;
+    real[k] = floorAt(terrain, at[0], at[2], lift + spec.stepUp);
+    if (real[k] >= reach) {
+      bearing += 1;
+      // The stance rises with the foot, not ahead of it: a foot part way through a step has come that far.
+      lowest = Math.min(lowest, foot.step ? stepBase(foot.step.floorFrom ?? foot.floor ?? real[k], real[k], foot.step.t) : real[k]);
+    }
+  }
+  let now = lift;
+  const falling = fighter.air === true && fighter.v[pelvis + 1] < -spec.fallingSpeed;
+  fighter.air = bearing === 0;
+  // Coming down fast, he is in the air until a foot is on the floor (not caught by his legs in mid-air).
+  if (falling && !fighter.air) {
+    let touching = false;
+    for (const side of sides) {
+      const foot = feet[side];
+      const y = fighter.x[foot.index * 3 + 1] - fighter.radius[foot.index];
+      if (y - floorAt(terrain, fighter.x[foot.index * 3], fighter.x[foot.index * 3 + 2], y + spec.stepUp) < spec.touching) touching = true;
+    }
+    fighter.air = !touching;
+  }
+  if (fighter.air) {
+    // Nothing under his feet: the stance goes down with him, the feet hanging under it.
+    now = Math.min(lift, fighter.x[pelvis + 1] - fighter.desired[P.pelvis][1]);
+    for (const side of sides) {
+      const foot = feet[side];
+      if (foot.step) foot.planted = foot.step.to;
+      foot.step = null;
+      if (!foot.lifted) foot.planted = [fighter.x[foot.index * 3], fighter.desired[foot.index][1], fighter.x[foot.index * 3 + 2]];
+    }
+  } else now = lift + (lowest - spec.sag - lift) * Math.min(1, dt * spec.liftRate);
+  fighter.lift = now;
+  for (let k = 0; k < 2; k += 1) {
+    const foot = feet[sides[k]];
+    if (foot.lifted) continue;
+    const floor = fighter.air ? now - spec.airReach : real[k] >= reach ? real[k] : now - spec.stepDown;
+    if (foot.step) {
+      foot.step.floorFrom ??= foot.floor ?? floor;
+      foot.step.floorTo = floor;
+    } else foot.floor = floor;
+  }
 }
 
 // ---- Stepping -------------------------------------------------------------
@@ -1986,6 +2115,7 @@ export function step(world, dt) {
     const span = fighter.detail === 'proxy' ? dt * WORLD.tiers.proxyEvery : dt;
     updateIntent(world, fighter, span);
     updateFeet(fighter, span);
+    if (fighter.arena.terrain) groundStance(fighter, span);
   }
   chooseDetail(world);
   const h = dt / WORLD.substeps;
@@ -2039,16 +2169,18 @@ export function step(world, dt) {
     for (const impulse of world.pendingImpulses) deliverImpulse(impulse);
     world.pendingImpulses = [];
   }
-  for (const fighter of world.fighters) if (fighter.detail === 'proxy' && proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+  for (const fighter of world.fighters) if (fighter.detail === 'proxy' && !fighter.dormant && proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
   for (const horse of world.horses) {
     horseTimers(world, horse, dt);
     if (horse.rider === null) loseHorse(world, horse);
   }
   for (const fighter of world.fighters) {
+    if (fighter.dormant) continue;
     trackHandSpeed(fighter);
     if (fighter.mount) keepSeat(world, fighter);
     else checkBalance(world, fighter);
     if (fighter.state !== 'up' && fighter.state !== 'rising') knockOff(world, fighter, null);
+    if (world.arena.terrain) lostToSea(world, fighter);
   }
   moveProps(world, dt);
   moveDebris(world, dt);
@@ -2205,7 +2337,8 @@ function moveRoot(world, fighter, dt) {
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
-  const scale = size > limit ? limit / size : 1;
+  // (Off the ground, the legs push on nothing.)
+  const scale = fighter.air ? 0 : size > limit ? limit / size : 1;
   fighter.rootVelocity[0] += change[0] * scale;
   fighter.rootVelocity[1] += change[1] * scale;
   const { halfX, halfZ, drop } = world.arena;
@@ -2224,6 +2357,26 @@ function moveRoot(world, fighter, dt) {
   fighter.root[0] = Math.max(-(halfX - margin), Math.min(halfX - margin, fighter.root[0]));
   // ... but a shove can: out across the strip to the edge and over it.
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
+  if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter);
+}
+
+/**
+ * On terrain, the stance's root is kept out of the walls and ledge faces, the speed into them gone:
+ * the feet are aimed from the root, and a root inside a wall would set them fighting it.
+ */
+function keepClearOfSolids(terrain, fighter) {
+  const spec = WORLD.terrain;
+  const lift = fighter.lift ?? 0;
+  const at = [fighter.root[0], fighter.root[1]];
+  // A face a foot can be put on (stepUp) is not a wall to him.
+  if (!pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, spec.stepUp)) return;
+  fighter.root[0] = at[0];
+  fighter.root[1] = at[1];
+  const into = fighter.rootVelocity[0] * terrain.normal[0] + fighter.rootVelocity[1] * terrain.normal[1];
+  if (into < 0) {
+    fighter.rootVelocity[0] -= into * terrain.normal[0];
+    fighter.rootVelocity[1] -= into * terrain.normal[1];
+  }
 }
 
 // ---- Detail by the size of the fight ----------------------------------------------
@@ -2235,7 +2388,8 @@ function coarseStride(world) {
 
 /** Which tier of detail the fight is in, by its size: 1 (a one-on-one's) to 4. */
 export function fightTier(world) {
-  const count = world.fighters.length;
+  // In a level, only the men awake count (world.awake, kept by levelmode/stage.js).
+  const count = world.awake ?? world.fighters.length;
   const tiers = WORLD.tiers;
   return count <= tiers.full ? 1 : count <= tiers.grid ? 2 : count <= tiers.coarse ? 3 : 4;
 }
@@ -2258,6 +2412,7 @@ function chooseDetail(world) {
     const grid = spatialGrid(hips, WORLD.tiers.engageRange);
     const targeted = new Set(world.fighters.filter((fighter) => fighter.punch).map((fighter) => fighter.punch.target));
     world.fighters.forEach((fighter, index) => {
+      if (fighter.dormant) return;
       if (gone(fighter)) {
         fighter.detail = 'coarse';
         return;
@@ -2274,6 +2429,8 @@ function chooseDetail(world) {
       else fighter.detail = grid.near(index).some((other) => world.fighters[other].corner !== fighter.corner && world.fighters[other].state !== 'out') ? 'coarse' : 'proxy';
     });
   }
+  // A dormant man is a pose that is never worked out: out of the contacts like any proxy, and not drawn.
+  if (world.awake !== undefined) for (const fighter of world.fighters) if (fighter.dormant) fighter.detail = 'proxy';
   // Back into the physics from a pose: moving as the pose was.
   world.fighters.forEach((fighter, index) => {
     if (previous[index] === 'proxy' && fighter.detail !== 'proxy') {
@@ -2552,14 +2709,18 @@ function integrate(fighter, h, time) {
   const fatigue = 0.55 + 0.45 * fighter.stamina;
   const alive = fighter.state === 'up' || fighter.state === 'rising';
   const rising = fighter.state === 'rising';
-  const damping = Math.exp(-h * (alive ? WORLD.damping.up : WORLD.damping.down));
+  const damping = Math.exp(-h * (fighter.air ? WORLD.terrain.airDamping : alive ? WORLD.damping.up : WORLD.damping.down));
   // A hand's health is the same for both its particles: once per side.
   const hands = { l: fatigue * handHealth(fighter, 'l'), r: fatigue * handHealth(fighter, 'r') };
+  // The muscles hold each part up against gravity, except in the air (terrain): a man off a ledge falls.
+  const holding = fighter.air ? 0 : WORLD.gravity;
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const info = PARTICLE_INFO[index];
     const base = index * 3;
     const { target, velocity } = motorTarget(fighter, index);
     fighter.targets[index] = target;
+    // In the air the muscles keep the pose but do not brake the fall.
+    if (fighter.air) velocity[1] = fighter.v[base + 1];
     let acceleration = [0, -WORLD.gravity, 0];
     const scale = fighter.motorScale * (info.arm ? hands[info.side] : 1) * reflexShare(fighter, time - fighter.hitAt[index]);
     if (scale > 0.01) {
@@ -2567,7 +2728,7 @@ function integrate(fighter, h, time) {
       for (let axis = 0; axis < 3; axis += 1) {
         // Spring towards the target, damper towards its velocity, and hold
         // the part up against gravity — all within the muscle's force.
-        want[axis] = omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? WORLD.gravity : 0);
+        want[axis] = omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? holding : 0);
       }
       const size = vec.length(want);
       let cap = motorForceNow(fighter, index, info) * scale * fighter.invMass[index];
@@ -2844,9 +3005,9 @@ function asleep(fighter) {
   return gone(fighter) || (isLimp(fighter) && (fighter.stillFor ?? 0) > WORLD.ragdoll.sleepSeconds);
 }
 
-/** Out of the fight long enough (`WORLD.goneSeconds`) that his body is left lying, unsimulated. */
+/** Out of the fight long enough (`WORLD.goneSeconds`) that his body is left lying, unsimulated; or dormant (his section of a level is not active: kept as he is). */
 function gone(fighter) {
-  return fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds;
+  return fighter.dormant === true || (fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds);
 }
 
 /** Hips and shoulders turn against each other about the trunk by at most `limit`. */
@@ -3135,7 +3296,89 @@ function foldLimit(fighter, rootIndex, endIndex, minimum) {
   correctJoint(fighter, endIndex, [rootIndex], vec.scale(offset, (minimum - distance) / distance));
 }
 
+/**
+ * Terrain (physics/terrain.js) for the ground: each part stands on the floor under it (the highest within
+ * a step of its lowest point), is pushed out of walls and the faces of ledges with its speed into them
+ * gone, and is held under a ceiling. Where there is no floor it falls; below the sea the fighter is lost
+ * (lostToSea). Edges of the arena's box apply unless the arena is `open`.
+ */
+function collideTerrain(world, fighter, h, arena) {
+  const terrain = arena.terrain;
+  const spec = WORLD.terrain;
+  const friction = Math.exp(-WORLD.groundFriction * h);
+  const at = [0, 0];
+  for (let index = 0; index < PARTICLES.length; index += 1) {
+    const base = index * 3;
+    const radius = fighter.radius[index];
+    at[0] = fighter.x[base];
+    at[1] = fighter.x[base + 2];
+    if (pushOut(terrain, at, radius, fighter.x[base + 1] - radius, fighter.x[base + 1] + radius, spec.stepUp)) {
+      const nx = terrain.normal[0];
+      const nz = terrain.normal[1];
+      // Its motion this substep, without the part going into the wall.
+      let vx = fighter.x[base] - fighter.prev[base];
+      let vz = fighter.x[base + 2] - fighter.prev[base + 2];
+      const into = vx * nx + vz * nz;
+      if (into < 0) {
+        vx -= into * nx;
+        vz -= into * nz;
+      }
+      fighter.x[base] = at[0];
+      fighter.x[base + 2] = at[1];
+      fighter.prev[base] = at[0] - vx;
+      fighter.prev[base + 2] = at[1] - vz;
+    }
+    const floor = radius + floorAt(terrain, fighter.x[base], fighter.x[base + 2], fighter.x[base + 1] - radius + spec.stepUp);
+    if (fighter.x[base + 1] < floor) {
+      // Arriving this substep (it was clear of the floor): how fast it hit. The part's speed as it fell
+      // (not only how far it moved: a joint's correction can push a resting knee down a few centimetres at once).
+      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, Math.min((fighter.prev[base + 1] - fighter.x[base + 1]) / h, WORLD.gravity * h - fighter.v[base + 1]));
+      // Run into a higher tread (a knee against the stair ahead) it is lifted a little each substep, not at once:
+      // a part snapped up by centimetres throws the limb it is joined to. Fallen on the floor, it stops there.
+      const lift = floor - fighter.x[base + 1];
+      const landed = fighter.prev[base + 1] >= floor - 1e-4;
+      const reached = landed || lift > spec.ride ? floor : fighter.x[base + 1] + Math.min(lift, spec.rise * h);
+      fighter.x[base + 1] = reached;
+      fighter.prev[base + 1] = Math.max(fighter.prev[base + 1], reached);
+      fighter.x[base] = fighter.prev[base] + (fighter.x[base] - fighter.prev[base]) * friction;
+      fighter.x[base + 2] = fighter.prev[base + 2] + (fighter.x[base + 2] - fighter.prev[base + 2]) * friction;
+    }
+    if (terrain.ceilings) {
+      const ceiling = ceilingAt(terrain, fighter.x[base], fighter.x[base + 2], fighter.x[base + 1] - radius) - radius;
+      if (fighter.x[base + 1] > ceiling) {
+        fighter.x[base + 1] = ceiling;
+        fighter.prev[base + 1] = Math.min(fighter.prev[base + 1], ceiling);
+      }
+    }
+    if (!arena.open) {
+      for (const axis of [0, 2]) {
+        const limit = axis === 0 ? arena.halfX : arena.halfZ;
+        if (fighter.x[base + axis] > limit) {
+          fighter.x[base + axis] = limit;
+          fighter.prev[base + axis] = Math.min(fighter.prev[base + axis], limit);
+        }
+        if (fighter.x[base + axis] < -limit) {
+          fighter.x[base + axis] = -limit;
+          fighter.prev[base + axis] = Math.max(fighter.prev[base + axis], -limit);
+        }
+      }
+    }
+  }
+}
+
+/** Below the sea level of the terrain a fighter is lost: out, with no count. */
+function lostToSea(world, fighter) {
+  const sea = world.arena.terrain.sea;
+  if (fighter.state === 'out' || fighter.x[P.pelvis * 3 + 1] >= sea) return;
+  const event = { time: world.time, kind: 'drowned', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, point: point(fighter.x, P.pelvis), effects: [] };
+  knockOut(world, fighter, event, 'lost to the sea', 'drowned');
+}
+
 function collideGround(world, fighter, h, arena) {
+  if (arena.terrain) {
+    collideTerrain(world, fighter, h, arena);
+    return;
+  }
   const friction = Math.exp(-WORLD.groundFriction * h);
   const drop = arena.drop;
   for (let index = 0; index < PARTICLES.length; index += 1) {
@@ -3178,7 +3421,12 @@ function collideGround(world, fighter, h, arena) {
  * The floor's height at z: 0, or past an arena's drop edge (`arena.drop`, on
  * the +z side: a subway platform's edge over the track bed) the lower floor.
  */
-export function floorUnder(arena, z) {
+export function floorUnder(arena, z, x = 0, y = 0) {
+  // On terrain, the floor under (x, y, z): the highest within a stride of y (the sea level where there is none).
+  if (arena?.terrain) {
+    const floor = floorAt(arena.terrain, x, z, y + WORLD.terrain.stepUp);
+    return floor === -Infinity ? arena.terrain.sea : floor;
+  }
   const drop = arena?.drop;
   return drop && z > drop.at ? drop.floor : 0;
 }
@@ -3222,10 +3470,19 @@ function groundImpact(world, fighter, index, speed) {
   if (fighter.state === 'out' || speed <= spec.minSpeed) return;
   const name = PARTICLES[index];
   const gear = fighter.body.gear;
-  const through = speed - spec.minSpeed;
   const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
+  // On terrain, a man landing on his feet is hurt through his legs and spine (landOnFeet); anything
+  // else hits as hard as it fell: the speed past `bodyFrom` (not the ordinary floor's), times `body`.
+  const landing = world.arena.terrain ? WORLD.terrain.fall : null;
+  if (landing && PARTICLE_INFO[index].foot) {
+    landOnFeet(world, fighter, index, speed);
+    return;
+  }
+  const through = landing ? speed - landing.bodyFrom : speed - spec.minSpeed;
+  if (through <= 0) return;
+  const scale = landing ? landing.body : 1;
   if (name === 'head') {
-    const deltaV = through * spec.head * (1 - (protectionAt(gear, 'head').blunt ?? 0));
+    const deltaV = through * spec.head * scale * (1 - (protectionAt(gear, 'head').blunt ?? 0));
     if (deltaV < 0.5) return;
     // Credit for what the floor does goes to whoever put him there.
     const event = { time: world.time, kind: 'impact', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, fighter: fighter.id, defender: fighter.id, target: 'head', speed, headDeltaV: deltaV, harmDeltaV: deltaV, effects: ['head hit the ground'], point: point(fighter.x, index) };
@@ -3235,13 +3492,48 @@ function groundImpact(world, fighter, index, speed) {
   }
   const part = IMPACT_PART[name];
   if (!part) return;
-  const bruise = (through * spec.body * (1 - (protectionAt(gear, part).blunt ?? 0))) / bone;
+  const bruise = (through * spec.body * scale * (1 - (protectionAt(gear, part).blunt ?? 0))) / bone;
   addDamage(fighter, part, bruise, false);
   if (part === 'trunk') bleedInside(fighter, bruise);
   const joint = IMPACT_JOINT[name];
   if (joint && !fighter.broken.has(joint) && speed > spec.fractureSpeed * bone) {
     breakJoint(world, fighter, joint);
     world.events.push({ time: world.time, kind: 'impact', fighter: fighter.id, target: part, speed, effects: [`${name.slice(1).toLowerCase()} broken in the fall`], point: point(fighter.x, index) });
+  }
+}
+
+/**
+ * A fall landed on the feet (terrain only; WORLD.terrain.fall): a landing past `safe` m/s hurts the legs
+ * in proportion to the speed beyond it, may break an ankle (from `ankleFrom`, surely by `ankleTo`),
+ * jars the spine past `compressFrom`, and throws him down from `stumble`.
+ */
+function landOnFeet(world, fighter, index, speed) {
+  const spec = WORLD.terrain.fall;
+  const through = speed - spec.safe;
+  if (through <= 0) return;
+  const side = PARTICLE_INFO[index].side;
+  const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
+  const gear = fighter.body.gear;
+  // The first foot down starts the landing; the second, a moment later, is the same fall.
+  const first = world.time - (fighter.landedAt ?? -Infinity) > spec.together;
+  if (first) fighter.landedAt = world.time;
+  fighter.legDamage[side] += (spec.legs * through * (1 - (protectionAt(gear, `${side}Shank`).blunt ?? 0))) / bone;
+  const effects = ['lands hard'];
+  const joint = `${side}Knee`;
+  if (first && speed > spec.ankleFrom && !fighter.broken.has(joint) && world.random() < Math.min(1, (speed - spec.ankleFrom) / (spec.ankleTo - spec.ankleFrom)) / bone) {
+    breakJoint(world, fighter, joint);
+    effects.push('ankle broken in the fall');
+  }
+  if (first && speed > spec.compressFrom) {
+    const jar = ((speed - spec.compressFrom) * spec.compress * (1 - (protectionAt(gear, 'trunk').blunt ?? 0))) / bone;
+    addDamage(fighter, 'trunk', jar, false);
+    bleedInside(fighter, jar);
+    effects.push('spine jarred');
+  }
+  world.events.push({ time: world.time, kind: 'impact', fighter: fighter.id, target: 'legs', speed, effects, point: point(fighter.x, index) });
+  if (first && speed > spec.stumble && fighter.state === 'up') {
+    fighter.knock = [0, 0, 0];
+    fall(world, fighter, 'lands hard');
   }
 }
 
@@ -3332,7 +3624,7 @@ function moveProps(world, dt) {
     prop.v[1] -= WORLD.gravity * dt;
     prop.x = vec.add(prop.x, vec.scale(prop.v, dt));
     prop.turn = vec.add(prop.turn, vec.scale(prop.spin, dt));
-    const propFloor = spec.radius + floorUnder(world.arena, prop.x[2]);
+    const propFloor = spec.radius + floorUnder(world.arena, prop.x[2], prop.x[0], prop.x[1]);
     if (prop.x[1] < propFloor) {
       prop.x[1] = propFloor;
       prop.v = [prop.v[0] * spec.slide, -prop.v[1] * spec.restitution, prop.v[2] * spec.slide];
@@ -3414,8 +3706,9 @@ function collideFighters(world, h, time, substep = 0) {
   // A weapon reaching past what a body can (a lance's point, ~2.8 m out) widens the range by as much:
   // otherwise its point could never meet a man before he was inside it.
   const beyond = fighters.map((fighter) => (fighter.weapon?.held ? Math.max(0, (fighter.reachBound ?? 0) - REACH_MARGIN - WORLD.bodyReach) : 0));
-  const near = (a, b) => Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange + beyond[a] + beyond[b];
+  const near = (a, b) => !fighters[a].dormant && !fighters[b].dormant && Math.hypot(hips[a][0] - hips[b][0], hips[a][2] - hips[b][2]) < WORLD.contactRange + beyond[a] + beyond[b];
   fighters.forEach((attacker, a) => {
+    if (attacker.dormant) return;
     const limbs = strikers(attacker);
     fighters.forEach((defender, d) => {
       if (attacker === defender || !near(a, d)) return;
@@ -5058,7 +5351,7 @@ function moveDebris(world, dt) {
     const lowest = piece.plate
       ? piece.x[1] - piece.radius * Math.sqrt(Math.max(0, 1 - axis[1] * axis[1])) - piece.half * Math.abs(axis[1])
       : Math.min(piece.x[1] + axis[1] * piece.half, piece.x[1] - axis[1] * piece.half) - piece.radius;
-    const ground = floorUnder(world.arena, piece.x[2]);
+    const ground = floorUnder(world.arena, piece.x[2], piece.x[0], piece.x[1]);
     if (lowest < ground && piece.plate) {
       piece.x[1] += ground - lowest;
       piece.v = [piece.v[0] * spec.slide, Math.abs(piece.v[1]) * spec.restitution * 0.5, piece.v[2] * spec.slide];
