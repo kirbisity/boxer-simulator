@@ -2294,6 +2294,8 @@ tutorial = installTutorial($('#fight-ui'), {
 tutorial.setDevice(fightControls.device);
 const menus = installMenus({
   intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait,
+  // Level Mode: a stage from its card (levelmode/stages.js).
+  onStage: (key) => { enterStage(key); boxer.finishBuilding(); },
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
