@@ -319,7 +319,14 @@ export function createSeeThrough(spec = SEE_THROUGH) {
   /** What is faded now, for tests: [{ name, opacity }]. */
   const faded = () => active.map((piece) => ({ name: piece.object.name || piece.object.type, opacity: piece.fade.opacity, box: [piece.min, piece.max] }));
 
+  /** Forget every place's pieces (the scenery's meshes were swapped: scenerylod.js), all solid again; they are found anew at the next update. */
+  const forget = () => {
+    for (const pieces of byPlace.values()) restore(pieces);
+    byPlace.clear();
+    active = [];
+  };
+
   // enabled: false draws every piece solid (a before-and-after, a test).
-  const api = { update, refresh, faded, enabled: true };
+  const api = { update, refresh, faded, forget, enabled: true };
   return api;
 }
