@@ -31,7 +31,7 @@ export const LEVEL_PRESETS = {
   },
   // Tier 2: brigandine, a poleaxe (the halberd's stand-in).
   dunnottarGuard: {
-    name: 'Dunnottar guard', style: 'warhammer', sex: 'male', heightCm: 177, frame: 'large', age: 32, exercise: 0.3, calories: 3174, skill: 0.4,
+    name: 'Dunnottar guard', style: 'warhammer', sex: 'male', heightCm: 177, frame: 'large', age: 32, exercise: 0.2, calories: 2887, skill: 0.4,
     outfit: { kind: 'footman', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#4a3020', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -92,12 +92,14 @@ export const LEVEL_PRESETS = {
   },
 
   // ---- The boss -------------------------------------------------------------------------------
-  // Lord Vaelen, the Queen's chief jailer: 210 cm, a body of about 150 kg (three quarters of it
-  // lean: fed and drilled to it from a boy), in a jousting harness (the Stechzeug and its helm, ~40 kg
-  // more) with the poleaxe in both hands. Slow in the harness, hard to knock down (`poise`), and
-  // very strong; a master's skill (0.9) of which the helm leaves him three quarters (skillFactor).
+  // Lord Vaelen, the Queen's chief jailer: 210 cm, a body of 150 kg (a big man gone soft in the Queen's service:
+  // little drilled, `exercise` 0.2, so his strength is a giant's, not a strongman's) in a jousting harness (the
+  // Stechzeug and its helm) that weighs what one weighs, ~45 kg (`outfit.extraMass` 0.3 of his body, where the
+  // kit's own 0.8 would make it 120 kg), 195 kg in all, with the poleaxe in both hands. Slow in the harness, hard
+  // to knock down (`poise`); skill 0.8 of which the helm leaves him three quarters (skillFactor).
+  // Tuned (tools/dunnottar.js): a rested operative with the sword and buckler beats him about one time in four.
   vaelen: {
-    name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.95, calories: 9256, skill: 0.9,
+    name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.2, calories: 4835, skill: 0.8,
     outfit: { kind: 'tournament', design: 1, extraMass: 0.3 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#1c1c20', facialHair: 'beard', eyeColor: 'grey' },
   },
