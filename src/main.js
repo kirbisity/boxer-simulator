@@ -2294,14 +2294,12 @@ tutorial = installTutorial($('#fight-ui'), {
 tutorial.setDevice(fightControls.device);
 const menus = installMenus({
   intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait,
-  // Level Mode: a stage from its card (levelmode/stages.js).
-  onStage: (key) => { enterStage(key); boxer.finishBuilding(); },
+  // Level Mode: a stage from its card (levelmode/stages.js): its men built at once, the title card over the storm, the world held still behind it.
+  onStage: (key) => { enterStage(key, { opening: true }); boxer.finishBuilding(); },
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
   onMenu: (home) => { goHome = home; },
-  // Level Mode's stage list: Stage 1 opens with its title card (menu.js).
-  onStage: (key) => enterStage(key, { opening: true }),
 });
 fit();
 // The first visit opens straight in the training yard (Skip tutorial in its corner goes to the menu); after, the menu.
@@ -2527,7 +2525,8 @@ const boxer = window.boxer = {
   },
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
   // The player's systems in the stage (levelmode/level.js): the run, what the button offers, and the verbs (for the console and tests).
-  level: () => {
+  // (Named levelRun: `level` above opens a Battle Mode level, and a second `level:` key would shadow it.)
+  levelRun: () => {
     const world = state.world;
     return {
       run: world.stage?.level ?? null, world,
