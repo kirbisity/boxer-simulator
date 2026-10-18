@@ -25,7 +25,8 @@ import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, bu
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
-import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, stretchedInverses } from './crowdview.js';
+import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, simplifyTemplate, stretchedInverses } from './crowdview.js';
+import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
@@ -47,6 +48,7 @@ const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getH
 // as characters rather than as small-headed mannequins.
 const HEAD_SCALE = 1.12;
 const HEAD_SEAT = 0.18; // head radii the head sits lower than the physics head
+const HEAD_SCALES = new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE);
 const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 
 // ---- Scene -----------------------------------------------------------------
@@ -1685,8 +1687,32 @@ function bakeCrowdTemplate(view, fighter) {
     shod: full.shod,
     vertices: own + added,
   };
+  template.far = farTemplate(template);
   disposeFighterView(view, full);
   return template;
+}
+
+/** The template's far body (see simplifyTemplate), as GPU attributes shared by every man who uses it. */
+function farTemplate(template) {
+  const { position, normal, skinIndex, skinWeight, ...rest } = simplifyTemplate(template);
+  // Far, the steel can be drawn as part of the skin's mesh (one draw call fewer a man), dull in place of shining.
+  if (!CROWD_VIEW.farSteelApart) {
+    const joined = (a, b) => Uint32Array.from([...a, ...b]);
+    rest.bodyIndex = joined(rest.bodyIndex, rest.steelIndex);
+    rest.bodyOutlineIndex = joined(rest.bodyOutlineIndex, rest.steelOutlineIndex);
+    rest.steelIndex = new Uint32Array(0);
+    rest.steelOutlineIndex = new Uint32Array(0);
+  }
+  return {
+    attributes: {
+      position: new THREE.BufferAttribute(position, 3),
+      normal: new THREE.BufferAttribute(normal, 3),
+      skinIndex: new THREE.Uint16BufferAttribute(skinIndex, 4),
+      skinWeight: new THREE.Float32BufferAttribute(skinWeight, 4),
+    },
+    lacquer: template.lacquer,
+    ...rest,
+  };
 }
 
 /** A crowd fighter's view: the template's baked body over his own bones. */
@@ -1706,43 +1732,51 @@ function crowdView(view, fighter, template) {
   const frames = boneFrames(bindPoints(body), body);
   const skeleton = new THREE.Skeleton(bones, stretchedInverses(template.frames, frames, body.lengths.headRadius / template.headRadius));
   // His own colours (bruises) and index (a part cut off); the rest is shared.
-  const geometry = new THREE.BufferGeometry();
-  for (const [name, attribute] of Object.entries(template.attributes)) geometry.setAttribute(name, attribute);
-  geometry.setAttribute('color', new THREE.BufferAttribute(template.colors.slice(), 3));
-  geometry.setIndex(new THREE.BufferAttribute(template.bodyIndex.slice(), 1));
-  geometry.userData.sharedAttributes = Object.keys(template.attributes);
-  const skinned = (meshGeometry, material) => {
-    const mesh = new THREE.SkinnedMesh(meshGeometry, material);
-    mesh.bind(skeleton, new THREE.Matrix4());
-    mesh.frustumCulled = false;
-    return mesh;
+  const skinMaterial = surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 });
+  const steelPaint = steelMaterial(view.steelEnv, { skinning: true, ...template.lacquer });
+  // A body of `source` (the template, or its far body) on his skeleton: the skin and the steel, each with its ink.
+  const bodyOf = (source) => {
+    const geometry = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(source.attributes)) geometry.setAttribute(name, attribute);
+    geometry.setAttribute('color', new THREE.BufferAttribute(source.colors.slice(), 3));
+    geometry.setIndex(new THREE.BufferAttribute(source.bodyIndex.slice(), 1));
+    geometry.userData.sharedAttributes = Object.keys(source.attributes);
+    const skinned = (meshGeometry, material) => {
+      const mesh = new THREE.SkinnedMesh(meshGeometry, material);
+      mesh.bind(skeleton, new THREE.Matrix4());
+      mesh.frustumCulled = false;
+      return mesh;
+    };
+    const mesh = skinned(geometry, skinMaterial);
+    mesh.castShadow = true;
+    // The ink has its own index over the same vertices (and loses a cut-off part with the body).
+    const inked = (meshGeometry, index) => {
+      const outlineGeometry = new THREE.BufferGeometry();
+      for (const [name, attribute] of Object.entries(meshGeometry.attributes)) outlineGeometry.setAttribute(name, attribute);
+      outlineGeometry.setIndex(new THREE.BufferAttribute(index.slice(), 1));
+      outlineGeometry.userData.sharedAttributes = Object.keys(meshGeometry.attributes);
+      return outlineFor({ isSkinnedMesh: true, geometry: outlineGeometry, skeleton, bindMatrix: new THREE.Matrix4() });
+    };
+    const outline = inked(geometry, source.bodyOutlineIndex);
+    mesh.userData.ink = outline;
+    let steel = null;
+    let steelOutline = null;
+    if (source.steelIndex.length) {
+      const steelGeometry = new THREE.BufferGeometry();
+      for (const [name, attribute] of Object.entries(geometry.attributes)) steelGeometry.setAttribute(name, attribute);
+      steelGeometry.setIndex(new THREE.BufferAttribute(source.steelIndex.slice(), 1));
+      // The colour is his own, but the skin's geometry frees it.
+      steelGeometry.userData.sharedAttributes = Object.keys(geometry.attributes);
+      steel = skinned(steelGeometry, steelPaint);
+      steelOutline = inked(steelGeometry, source.steelOutlineIndex);
+      steel.userData.ink = steelOutline;
+    }
+    return { mesh, outline, steel, steelOutline, baseColors: source.colors, vertexSegment: source.vertexSegment };
   };
-  const skinMesh = skinned(geometry, surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }));
-  skinMesh.castShadow = true;
-  // The ink has its own index over the same vertices (and loses a cut-off part with the body).
-  const inked = (meshGeometry, index) => {
-    const outlineGeometry = new THREE.BufferGeometry();
-    for (const [name, attribute] of Object.entries(meshGeometry.attributes)) outlineGeometry.setAttribute(name, attribute);
-    outlineGeometry.setIndex(new THREE.BufferAttribute(index.slice(), 1));
-    outlineGeometry.userData.sharedAttributes = Object.keys(meshGeometry.attributes);
-    const outline = outlineFor({ isSkinnedMesh: true, geometry: outlineGeometry, skeleton, bindMatrix: new THREE.Matrix4() });
-    return outline;
-  };
-  const skinOutline = inked(geometry, template.bodyOutlineIndex);
-  skinMesh.userData.ink = skinOutline;
+  const near = bodyOf(template);
+  const { mesh: skinMesh, outline: skinOutline, steel: steelMesh } = near;
   layers.skin.add(skinMesh, skinOutline);
-  let steelMesh = null;
-  if (template.steelIndex.length) {
-    const steelGeometry = new THREE.BufferGeometry();
-    for (const [name, attribute] of Object.entries(geometry.attributes)) steelGeometry.setAttribute(name, attribute);
-    steelGeometry.setIndex(new THREE.BufferAttribute(template.steelIndex.slice(), 1));
-    // The colour is his own, but the skin's geometry frees it.
-    steelGeometry.userData.sharedAttributes = Object.keys(geometry.attributes);
-    steelMesh = skinned(steelGeometry, steelMaterial(view.steelEnv, { skinning: true, ...template.lacquer }));
-    const steelOutline = inked(steelGeometry, template.steelOutlineIndex);
-    steelMesh.userData.ink = steelOutline;
-    layers.skin.add(steelMesh, steelOutline);
-  }
+  if (steelMesh) layers.skin.add(steelMesh, near.steelOutline);
   // What is his own: the head props he can lose, and anything painted on cloth.
   const headGroup = new THREE.Group();
   headGroup.matrixAutoUpdate = false;
@@ -1776,15 +1810,27 @@ function crowdView(view, fighter, template) {
       banner = { batch, collar, local, matrix: new THREE.Matrix4() };
     }
   }
+  // The bone and physics layers of a crowd man are built when one is shown (ensureCrowdLayers): a man is 45 objects more in the scene, each drawn into nothing and each walked every frame.
   const boneGroups = BONES.map(() => new THREE.Group());
-  for (const piece of boneGroups) layers.bone.add(piece);
-  const physicsLayer = buildPhysicsLayer(fighter, layers);
   thinOut(layers.skin, skinMesh);
+  // The far body, on the same skeleton: shown instead of the near one beyond CROWD_VIEW.lodDistance (see selectCrowdDraw).
+  const far = bodyOf(template.far);
+  // A small piece of steel has no ink near, and none far.
+  if (far.steelOutline && near.steelOutline && !near.steelOutline.parent) {
+    far.steel.userData.ink = null;
+    far.steelOutline = null;
+  }
+  far.mesh.visible = false;
+  layers.skin.add(far.mesh, far.outline);
+  if (far.steel) layers.skin.add(far.steel, far.steelOutline);
+  for (const mesh of [far.outline, far.steelOutline, far.steel]) if (mesh) mesh.visible = false;
+  // He is at the origin, his bones in world coordinates: nothing in him needs a matrix of its own made each frame.
+  for (const holder of [group, ...Object.values(layers)]) holder.matrixAutoUpdate = false;
   view.scene.add(group);
   return {
-    fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], shod: template.shod,
+    fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], shod: template.shod, near, far,
     baseColors: template.colors, vertexSegment: template.vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles: [], steelMesh,
-    ...physicsLayer, head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner,
+    head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner,
   };
 }
 
@@ -1840,7 +1886,10 @@ export function clearCrowdTemplates(view) {
     for (const [name, attribute] of Object.entries(attributes)) holder.setAttribute(name, attribute);
     holder.dispose();
   };
-  for (const template of view.crowdTemplates?.values() ?? []) release(template.attributes);
+  for (const template of view.crowdTemplates?.values() ?? []) {
+    release(template.attributes);
+    release(template.far.attributes);
+  }
   for (const batch of view.crowdBatches?.values() ?? []) batch.dispose();
   view.crowdTemplates = new Map();
   view.crowdBatches = new Map();
@@ -1948,9 +1997,17 @@ function buildHood(body, collar, colorHex) {
   return dangles;
 }
 
+/** A crowd man's bone and physics layers, made the first time a layer other than the skin is shown. */
+function ensureCrowdLayers(fighterView) {
+  if (fighterView.particles) return;
+  for (const piece of fighterView.skeleton) fighterView.layers.bone.add(piece);
+  Object.assign(fighterView, buildPhysicsLayer(fighterView.fighter, fighterView.layers));
+}
+
 /** Which layers show: skin; muscle (with bone); bone over a ghost; physics over a ghost. */
 export function setLayer(fighterView, layer) {
   fighterView.layer = layer;
+  if (fighterView.baked && layer !== 'skin') ensureCrowdLayers(fighterView);
   if (layer === 'muscle') ensureMuscle(fighterView);
   const { layers, skinMesh, skinOutline, head, attachments } = fighterView;
   const ghost = layer === 'physics' ? 0.25 : layer === 'bone' ? 0.12 : 1;
@@ -1991,14 +2048,20 @@ export function updateFighterView(fighterView, dt, time) {
   // A crowd fighter lying still (out, his body asleep) is drawn as he was:
   // nothing of him has moved since (his hips and head are where they were).
   if (fighterView.baked && fighter.state === 'out') {
-    const still = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 1], fighter.x[P.pelvis * 3 + 2], fighter.x[P.head * 3], fighter.x[P.head * 3 + 1], fighter.x[P.head * 3 + 2]];
-    const was = fighterView.lyingAt;
-    fighterView.lyingAt = still;
-    if (was && still.every((value, index) => value === was[index])) return;
+    const x = fighter.x;
+    const [hip, head] = [P.pelvis * 3, P.head * 3];
+    const was = (fighterView.lyingAt ??= [NaN, NaN, NaN, NaN, NaN, NaN]);
+    const same = was[0] === x[hip] && was[1] === x[hip + 1] && was[2] === x[hip + 2] && was[3] === x[head] && was[4] === x[head + 1] && was[5] === x[head + 2];
+    for (let axis = 0; axis < 3; axis += 1) {
+      was[axis] = x[hip + axis];
+      was[3 + axis] = x[head + axis];
+    }
+    if (same) return;
   }
   // A crowd fighter standing posed in the ranks (a proxy) is redrawn every
   // other frame: his pose barely moves, and a big battle has a hundred of him.
-  if (fighterView.baked && fighter.detail === 'proxy') {
+  // (Not the frame he comes back from off screen: his last pose is long gone.)
+  if (fighterView.baked && fighter.detail === 'proxy' && !fighterView.stale) {
     fighterView.restFrame = !fighterView.restFrame;
     if (fighterView.restFrame) {
       addBanner(fighterView);
@@ -2006,11 +2069,15 @@ export function updateFighterView(fighterView, dt, time) {
     }
   }
   const points = PARTICLES.map((_, index) => point(fighter.x, index));
-  const frames = coherentFrames(boneFrames(points, fighter.body), fighterView.frames);
+  // Left out of the picture for a while (culled): his last pose says nothing about this one, so no turn is held back.
+  const frames = coherentFrames(boneFrames(points, fighter.body), fighterView.stale ? null : fighterView.frames);
   fighterView.frames = frames;
+  fighterView.stale = false;
   frames.forEach((frame, index) => {
     const matrix = frameMatrix(frame);
     fighterView.bones[index].matrixWorld.fromArray(matrix);
+    // A crowd man's bone pieces are in the scene only once his bone layer is built.
+    if (fighterView.baked && !fighterView.particles) return;
     fighterView.skeleton[index].matrix.fromArray(matrix);
     fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
   });
@@ -2020,10 +2087,10 @@ export function updateFighterView(fighterView, dt, time) {
     fighterView.bones[index].matrixWorld.makeScale(1e-4, 1e-4, 1e-4).setPosition(at[0], at[1], at[2]);
   }
   const headFrame = frames[BONE.head];
-  // Seated a little down the neck, as drawn heads are.
+  // Seated a little down the neck, as drawn heads are. (A crowd man's head is baked: his group holds only what he can lose.)
   const seat = fighter.body.lengths.headRadius * HEAD_SEAT;
-  if (!fighterView.headDetached) {
-    fighterView.head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE));
+  if (!fighterView.headDetached && !(fighterView.baked && !fighterView.headProps.length)) {
+    fighterView.head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(HEAD_SCALES);
     fighterView.head.group.matrixWorldNeedsUpdate = true;
   }
   for (const { object, bone, at } of fighterView.attachments) {
@@ -2047,23 +2114,90 @@ export function updateFighterView(fighterView, dt, time) {
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
 
+const drawFrustum = new THREE.Frustum();
+const drawMatrix = new THREE.Matrix4();
+const drawSphere = new THREE.Sphere();
+
+const shadowFrusta = [new THREE.Frustum(), new THREE.Frustum()];
+
+/** The lights that cast a shadow now, each as a frustum of what its shadow map holds: how many (in `shadowFrusta`). */
+function shadowCasters(view) {
+  let count = 0;
+  for (const light of [view.lights.sun, view.lights.key]) {
+    if (!light.castShadow || light.intensity <= 0) continue;
+    light.updateMatrixWorld();
+    light.target.updateMatrixWorld();
+    light.shadow.updateMatrices(light);
+    const { camera } = light.shadow;
+    shadowFrusta[count].setFromProjectionMatrix(drawMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    count += 1;
+  }
+  return count;
+}
+
+/** Whether the sphere meets any of the first `count` shadow frusta. */
+function inShadowMap(count) {
+  for (let light = 0; light < count; light += 1) if (shadowFrusta[light].intersectsSphere(drawSphere)) return true;
+  return false;
+}
+
 /**
- * Ink on crowd fighters only near the camera: beyond CROWD_VIEW.inkDistance
- * an outline is a pixel or two, and in a big battle each costs a draw call
- * (two with its shadow) for every man.
+ * How each baked crowd man is drawn this frame (see crowdlod.js): left out
+ * if he is off screen, his far body beyond CROWD_VIEW.lodDistance, no shadow
+ * when far or outside the shadow map, ink only near the camera (beyond
+ * CROWD_VIEW.inkDistance an outline is a pixel or two, and each costs a draw
+ * call, two with its shadow). `safe`: ids of the men always drawn in full
+ * (protectedMen). Sets `culled` on a view that is not drawn this frame, for
+ * the caller to skip his update.
  */
-export function inkNearCamera(view, fighterViews) {
-  const camera = view.camera.position;
-  const far = CROWD_VIEW.inkDistance * CROWD_VIEW.inkDistance;
+export function selectCrowdDraw(view, fighterViews, safe) {
+  const camera = view.camera;
+  camera.updateMatrixWorld();
+  drawFrustum.setFromProjectionMatrix(drawMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+  const lit = crowdLod.enabled ? shadowCasters(view) : 0;
+  drawSphere.radius = CROWD_VIEW.cullRadius;
+  const inkRange = CROWD_VIEW.inkDistance * CROWD_VIEW.inkDistance;
   for (const fighterView of fighterViews) {
     if (!fighterView.baked) continue;
     const fighter = fighterView.fighter;
-    const dx = fighter.x[P.pelvis * 3] - camera.x;
-    const dy = fighter.x[P.pelvis * 3 + 1] - camera.y;
-    const dz = fighter.x[P.pelvis * 3 + 2] - camera.z;
-    const near = dx * dx + dy * dy + dz * dz < far;
-    for (const mesh of [fighterView.skinMesh, fighterView.steelMesh]) if (mesh?.userData.ink) mesh.userData.ink.visible = near;
+    const px = fighter.x[P.pelvis * 3];
+    const py = fighter.x[P.pelvis * 3 + 1];
+    const pz = fighter.x[P.pelvis * 3 + 2];
+    const dx = px - camera.position.x;
+    const dy = py - camera.position.y;
+    const dz = pz - camera.position.z;
+    const draw = (fighterView.draw ??= { culled: false, far: false, shadow: true });
+    // Another layer (muscle, bone, physics) shows the full body, ghosted: the view is as built.
+    if (!crowdLod.enabled || fighterView.layer !== 'skin' || fighterView.severedBones?.size) {
+      Object.assign(draw, { culled: false, far: false, shadow: true });
+    } else {
+      drawSphere.center.set(px, py, pz);
+      chooseDraw(draw, {
+        distance: Math.sqrt(dx * dx + dy * dy + dz * dz),
+        fallen: fighter.state !== 'up',
+        safe: safe.has(fighter.id),
+        inView: drawFrustum.intersectsSphere(drawSphere),
+        inShadow: inShadowMap(lit),
+      });
+    }
+    fighterView.culled = draw.culled;
+    fighterView.group.visible = !draw.culled;
+    if (draw.culled) continue;
+    const ink = dx * dx + dy * dy + dz * dz < inkRange;
+    const skinLayer = fighterView.layer === 'skin';
+    showBody(fighterView.near, !draw.far, ink, draw.shadow, skinLayer);
+    showBody(fighterView.far, draw.far, ink, draw.shadow, skinLayer);
   }
+}
+
+/** One of a man's two bodies: shown or not, with its ink and its shadow (the ghosted layers set their own, see setLayer). */
+function showBody(body, shown, ink, shadow, skinLayer) {
+  for (const mesh of [body.mesh, body.steel]) {
+    if (!mesh) continue;
+    mesh.visible = shown;
+    if (skinLayer && mesh.userData.ink) mesh.userData.ink.visible = shown && ink;
+  }
+  if (skinLayer) body.mesh.castShadow = shadow;
 }
 
 /** A baked crowd fighter's banner, into its side's batch for this frame. */
@@ -2127,17 +2261,21 @@ function paintDamage(fighterView) {
   const fighter = fighterView.fighter;
   fighterView.damageVersion = fighter.damageVersion;
   const brokenSegments = new Set([...fighter.broken].flatMap((joint) => JOINT_SEGMENTS[joint]));
-  const colors = fighterView.skinMesh.geometry.attributes.color;
-  const base = fighterView.baseColors;
   const mixed = new THREE.Color();
-  fighterView.vertexSegment.forEach((segment, vertex) => {
-    if (!segment) return;
-    mixed.setRGB(base[vertex * 3], base[vertex * 3 + 1], base[vertex * 3 + 2]);
-    if (brokenSegments.has(segment)) mixed.copy(BROKEN);
-    else mixed.lerp(BRUISE, Math.min(1, fighter.damage[segment] ?? 0) * 0.85);
-    colors.setXYZ(vertex, mixed.r, mixed.g, mixed.b);
-  });
-  colors.needsUpdate = true;
+  // A crowd man's far body is tinted too, from its own base colours.
+  const bodies = [{ mesh: fighterView.skinMesh, base: fighterView.baseColors, segments: fighterView.vertexSegment }];
+  if (fighterView.far) bodies.push({ mesh: fighterView.far.mesh, base: fighterView.far.baseColors, segments: fighterView.far.vertexSegment });
+  for (const { mesh, base, segments } of bodies) {
+    const colors = mesh.geometry.attributes.color;
+    segments.forEach((segment, vertex) => {
+      if (!segment) return;
+      mixed.setRGB(base[vertex * 3], base[vertex * 3 + 1], base[vertex * 3 + 2]);
+      if (brokenSegments.has(segment)) mixed.copy(BROKEN);
+      else mixed.lerp(BRUISE, Math.min(1, fighter.damage[segment] ?? 0) * 0.85);
+      colors.setXYZ(vertex, mixed.r, mixed.g, mixed.b);
+    });
+    colors.needsUpdate = true;
+  }
   for (const joint of fighter.broken) {
     for (const bone of JOINT_BONES[joint]) {
       fighterView.skeleton[BONE[bone]].traverse((object) => {

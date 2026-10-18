@@ -21,6 +21,45 @@ export const CROWD_VIEW = {
   inkDistance: 16,
   // Copies an instanced batch starts with room for (it doubles when full).
   batchCapacity: 64,
+  // Beyond this (m) a man is drawn with his far body, a fifth of the
+  // triangles: at 12 m he is a hundred pixels tall and the lost detail is
+  // finer than that. Kept far until 1.5 m inside it (`lodMargin`), so a man
+  // standing on the line does not flicker between the two.
+  lodDistance: 12,
+  lodMargin: 1.5,
+  // A man down or out is seen as a shape on the ground and rarely looked at:
+  // his far body is used from this near.
+  fallenLodDistance: 6,
+  // Men beyond this (m) from the camera cast no shadow (one mesh drawn twice
+  // for a smudge on the ground); nor do men outside the shadow camera's box.
+  shadowDistance: 20,
+  fallenShadowDistance: 7,
+  // Every man within this of the player (m) is drawn in full, with his
+  // shadow, whatever the distance: the men he is fighting (see protectedMen).
+  protectRadius: 3,
+  // A man is drawn if a sphere this big (m) round his pelvis meets the
+  // camera's view: it covers his longest weapon held out (a lance, 3.5 m) and
+  // the length his shadow is thrown, so he does not blink out as he leaves
+  // the screen with his spear (or his shadow) still in it.
+  cullRadius: 4.5,
+  // The far body is the near one with its vertices merged in cells this big
+  // (m): 10 cm is a few pixels at 12 m, and leaves a man of about three
+  // thousand triangles (a fifth of the near body's) whose limbs still bend
+  // at the joints.
+  farCell: 0.1,
+  // Vertices only merge if their colours are within this step of each other
+  // (0..1 per channel), so a belt, a sleeve and a face keep their own colours.
+  farColorStep: 0.12,
+  // 6: only vertices facing the same way (to the nearest of the six axes) merge,
+  // so a cloth baked twice (front and back) or a thin blade does not fold
+  // into one flat sheet; 1: any facing (half the vertices, but black patches
+  // on a helmet's brim). Bare skin, a closed surface, merges at any facing.
+  farFacings: 6,
+  // Far, steel keeps its own mesh and its shine (a draw call a man more).
+  farSteelApart: true,
+  // The head's cells are this fraction of the others: a helmet or a face is
+  // what tells one man from another, in a few hundred triangles.
+  farHeadCell: 0.6,
 };
 
 /**
@@ -91,6 +130,118 @@ export function bakePieces(pieces) {
     });
   }
   return out;
+}
+
+/**
+ * A coarser copy of a template by vertex clustering: vertices in the same
+ * cell (`cell` m) with the same strongest bone, colour and facing become one
+ * (position, normal, colour and skin weights averaged), and triangles that
+ * fall in on themselves or repeat are dropped. Its bones are the template's,
+ * so the same skeleton poses both. Plain arrays out (see farTemplate in render.js).
+ */
+export function simplifyTemplate(template, { cell = CROWD_VIEW.farCell, colorStep = CROWD_VIEW.farColorStep, facings = CROWD_VIEW.farFacings } = {}) {
+  const position = template.attributes.position.array;
+  const normal = template.attributes.normal.array;
+  const skinIndex = template.attributes.skinIndex.array;
+  const skinWeight = template.attributes.skinWeight.array;
+  const colors = template.colors;
+  const count = position.length / 3;
+  const clusterOf = new Uint32Array(count);
+  const keys = new Map();
+  // Per cluster: its first vertex (whose bones it keeps) and the number it merged.
+  const first = [];
+  const members = [];
+  const colorLevels = Math.ceil(1 / colorStep);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    const [nx, ny, nz] = [normal[vertex * 3], normal[vertex * 3 + 1], normal[vertex * 3 + 2]];
+    const [ax, ay, az] = [Math.abs(nx), Math.abs(ny), Math.abs(nz)];
+    const facing = facings < 6 || template.vertexSegment[vertex] ? 0 : ax >= ay && ax >= az ? (nx > 0 ? 0 : 1) : ay >= az ? (ny > 0 ? 2 : 3) : nz > 0 ? 4 : 5;
+    // One number for the cell, strongest bone, colour class and facing.
+    let key = 0;
+    // A head has smaller cells: a helmet or a face is read from afar, and is a few hundred triangles in a small space.
+    const size = skinIndex[vertex * 4] === BONE.head ? cell * CROWD_VIEW.farHeadCell : cell;
+    for (let axis = 0; axis < 3; axis += 1) key = key * 256 + Math.min(255, Math.max(0, Math.floor(position[vertex * 3 + axis] / size) + 128));
+    key = key * 32 + skinIndex[vertex * 4];
+    for (let axis = 0; axis < 3; axis += 1) key = key * colorLevels + Math.min(colorLevels - 1, Math.floor(colors[vertex * 3 + axis] / colorStep));
+    key = key * 8 + facing;
+    let cluster = keys.get(key);
+    if (cluster === undefined) {
+      cluster = first.length;
+      keys.set(key, cluster);
+      first.push(vertex);
+      members.push(0);
+    }
+    clusterOf[vertex] = cluster;
+    members[cluster] += 1;
+  }
+  const total = first.length;
+  const out = {
+    position: new Float32Array(total * 3),
+    normal: new Float32Array(total * 3),
+    skinIndex: new Uint16Array(total * 4),
+    skinWeight: new Float32Array(total * 4),
+    colors: new Float32Array(total * 3),
+    vertexSegment: new Array(total).fill(null),
+  };
+  for (let cluster = 0; cluster < total; cluster += 1) {
+    for (let slot = 0; slot < 4; slot += 1) out.skinIndex[cluster * 4 + slot] = skinIndex[first[cluster] * 4 + slot];
+  }
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    const cluster = clusterOf[vertex];
+    for (let axis = 0; axis < 3; axis += 1) {
+      out.position[cluster * 3 + axis] += position[vertex * 3 + axis] / members[cluster];
+      out.normal[cluster * 3 + axis] += normal[vertex * 3 + axis];
+      out.colors[cluster * 3 + axis] += colors[vertex * 3 + axis] / members[cluster];
+    }
+    // His weights go to the bones the cluster keeps (those of its first vertex).
+    for (let slot = 0; slot < 4; slot += 1) {
+      const weight = skinWeight[vertex * 4 + slot];
+      if (weight <= 0) continue;
+      for (let kept = 0; kept < 4; kept += 1) {
+        if (out.skinIndex[cluster * 4 + kept] === skinIndex[vertex * 4 + slot]) {
+          out.skinWeight[cluster * 4 + kept] += weight;
+          break;
+        }
+      }
+    }
+    out.vertexSegment[cluster] ??= template.vertexSegment[vertex];
+  }
+  for (let cluster = 0; cluster < total; cluster += 1) {
+    const length = Math.hypot(out.normal[cluster * 3], out.normal[cluster * 3 + 1], out.normal[cluster * 3 + 2]) || 1;
+    let sum = 0;
+    for (let slot = 0; slot < 4; slot += 1) sum += out.skinWeight[cluster * 4 + slot];
+    for (let axis = 0; axis < 3; axis += 1) out.normal[cluster * 3 + axis] /= length;
+    for (let slot = 0; slot < 4; slot += 1) out.skinWeight[cluster * 4 + slot] = sum > 0 ? out.skinWeight[cluster * 4 + slot] / sum : slot === 0 ? 1 : 0;
+  }
+  const remap = (indices) => {
+    const seen = new Set();
+    const kept = [];
+    const base = total + 1;
+    for (let corner = 0; corner + 2 < indices.length; corner += 3) {
+      const [a, b, c] = [clusterOf[indices[corner]], clusterOf[indices[corner + 1]], clusterOf[indices[corner + 2]]];
+      if (a === b || b === c || a === c) continue;
+      // The same triangle, whichever corner it starts from.
+      const [x, y, z] = a < b && a < c ? [a, b, c] : b < c ? [b, c, a] : [c, a, b];
+      const id = (x * base + y) * base + z;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      kept.push(a, b, c);
+    }
+    return Uint32Array.from(kept);
+  };
+  return {
+    position: out.position,
+    normal: out.normal,
+    skinIndex: out.skinIndex,
+    skinWeight: out.skinWeight,
+    colors: out.colors,
+    bodyIndex: remap(template.bodyIndex),
+    steelIndex: remap(template.steelIndex),
+    bodyOutlineIndex: remap(template.bodyOutlineIndex),
+    steelOutlineIndex: remap(template.steelOutlineIndex),
+    vertexSegment: out.vertexSegment,
+    vertices: total,
+  };
 }
 
 /** A plain, solid, untextured mesh: one that can be baked. */

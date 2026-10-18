@@ -59,7 +59,7 @@ crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
 and clothes as lofted rings; `ARMOR_KINDS`), `src/wardrobe.js` (helmets, hats,
 footwear, banners), `src/weaponview.js` (weapon meshes, debris, arrows, gore),
-`src/crowdview.js` (instanced crowds), `src/horsemesh.js` (a horse's meshes as plain arrays, built once per breed, barding, coat and level of detail: lofted barrel, neck and head over surfaces the tack and barding lie on, legs in segments, coats and markings by seed, `HORSE_BUILD` per breed; `buildHorseModel`, a `low` detail for crowds), `src/horsehair.js` (Verlet chains for what hangs: tail, trapper, loose stirrups), `src/horseview.js` (horses: the shared meshes moved each frame: gait-placed legs bending at knee, fetlock and hoof, head and neck nod, ears, mane, tail, trapper, stirrups at the rider's feet, reins from the bit to his hand; a fallen horse rolled, a broken leg hanging), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue; the helm in its first drawing, `STECHHELM`, or drawn to a profile, `STECHHELM_STYLES`, picked by the design's `head.style`), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
+`src/crowdview.js` (instanced crowds, the far body), `src/crowdlod.js` (which crowd men are drawn, how, and which are protected), `src/horsemesh.js` (a horse's meshes as plain arrays, built once per breed, barding, coat and level of detail: lofted barrel, neck and head over surfaces the tack and barding lie on, legs in segments, coats and markings by seed, `HORSE_BUILD` per breed; `buildHorseModel`, a `low` detail for crowds), `src/horsehair.js` (Verlet chains for what hangs: tail, trapper, loose stirrups), `src/horseview.js` (horses: the shared meshes moved each frame: gait-placed legs bending at knee, fetlock and hoof, head and neck nod, ears, mane, tail, trapper, stirrups at the rider's feet, reins from the bit to his hand; a fallen horse rolled, a broken leg hanging), `src/stechzeug.js` (the jousting harness: the frog-mouthed helm, its plume and mantling, the tilting targe and queue; the helm in its first drawing, `STECHHELM`, or drawn to a profile, `STECHHELM_STYLES`, picked by the design's `head.style`), `src/arenaview.js` (the gladiators' kit in detail: helmets, scutum and parmula, sica, trident, net, the scissor's scales), `src/toon.js` (materials, outlines,
 `disposeObject`). `src/main.js` runs the loop and input; playing, the camera
 follows the player's man from behind (`src/followcam.js`: a smoothed anchor,
 critically damped springs, a dead band on his facing, the heading held while
@@ -307,4 +307,11 @@ and adjust only the numbers of each side.
   M-series); in the browser ~50 fps before contact, ~25 fps at contact, the
   drawing (one skinned body per man) about half of it. Crowd views draw
   posed men every other frame, still bodies not at all, and ink only within
-  `CROWD_VIEW.inkDistance` of the camera.
+  `CROWD_VIEW.inkDistance` of the camera. Each template also has a far body
+  (`simplifyTemplate`: its vertices merged in cells, on the same skeleton),
+  shown beyond `lodDistance`; a man the camera does not see is not posed or
+  drawn; and a man far from the camera or outside the shadow map casts no
+  shadow (`src/crowdlod.js` decides, `selectCrowdDraw` in `render.js` applies
+  it). The man played, his lock and opponent, anyone within 3 m of him and the
+  man a watching camera follows are never simplified, culled or unshadowed
+  (`protectedMen`). `boxer.lod(false)` turns it all off, to compare.
