@@ -258,16 +258,12 @@ function buildCliff() {
   dnProp(sec, 'bones', [-22, Y.gorge, 52], { yaw: 0.6 });
   dnProp(sec, 'banner', [-110, 14, -9.8], { yaw: 0, torn: true });
 
-  // Men: pairs of levy on the legs, one more pair in the gorge.
+  // Men: a levy on each leg, one more on his round in the gorge.
   const post = (x, y, z) => [x, y, z];
   dnSpawn(sec, 'levy1', 'dunnottarSoldier', 'enemy', 1, post(-84, DN_L1(-84), -4.9), DN_FACE.W, { inputs: { name: 'Hob' } });
-  dnSpawn(sec, 'levy2', 'dunnottarSoldier', 'enemy', 1, post(-81, DN_L1(-81), -3.3), DN_FACE.W, { inputs: { name: 'Wat' } });
   dnSpawn(sec, 'levy3', 'dunnottarSoldier', 'enemy', 1, post(-74, DN_L2(-74), 7.1), DN_FACE.E, { inputs: { name: 'Davie' } });
-  dnSpawn(sec, 'levy4', 'dunnottarSoldier', 'enemy', 1, post(-71, DN_L2(-71), 9), DN_FACE.E, { inputs: { name: 'Tam' } });
   dnSpawn(sec, 'levy5', 'dunnottarSoldier', 'enemy', 1, post(-86, DN_L3(-86), 21.2), DN_FACE.W, { inputs: { name: 'Rab' } });
-  dnSpawn(sec, 'levy6', 'dunnottarSoldier', 'enemy', 1, post(-83, DN_L3(-83), 18.9), DN_FACE.W, { inputs: { name: 'Geordie' } });
   dnSpawn(sec, 'levy7', 'dunnottarSoldier', 'enemy', 1, post(-24, Y.gorge, 45), DN_FACE.W, { inputs: { name: 'Sandy' }, patrol: [[-24, 45], [-34, 43]] });
-  dnSpawn(sec, 'levy8', 'dunnottarSoldier', 'enemy', 1, post(-22, Y.gorge, 49.4), DN_FACE.W, { inputs: { name: 'Jock' } });
 
   // Things to find.
   dnItem(sec, 'bandage1', 'bandage', [-96, DN_L1(-96), -4.4]);
@@ -505,8 +501,7 @@ function buildQuad() {
 
   // Men: patrols, a guard at the Lodging; the servants at the well; a priest; ladies of another age, sheltering in the ruin.
   dnSpawn(sec, 'patrol1', 'dunnottarSoldier', 'enemy', 1, [13, Q, -5], DN_FACE.N, { inputs: { name: 'Lachie' }, patrol: [[13, -5], [13, -17], [20, -17], [20, -5]] });
-  dnSpawn(sec, 'patrol2', 'dunnottarSoldier', 'enemy', 1, [24, Q, -26], DN_FACE.E, { inputs: { name: 'Findlay' }, patrol: [[24, -26], [32, -30], [32, -22]] });
-  dnSpawn(sec, 'lodgeguard', 'dunnottarGuard', 'enemy', 2, [38.5, Q, 0.2], DN_FACE.E, { inputs: { name: 'Sergeant Keith' } });
+  dnSpawn(sec, 'lodgeguard', 'dunnottarGuard', 'enemy', 2, [45.5, Q, 0.2], DN_FACE.E, { inputs: { name: 'Sergeant Keith' } });
   dnSpawn(sec, 'servant1', 'dunnottarServant', 'civilian', 0, [28.4, Q, -3.6], DN_FACE.E, { inputs: { name: 'Meg' } });
   dnSpawn(sec, 'servant2', 'dunnottarServant', 'civilian', 0, [34.6, Q, -0.4], DN_FACE.W, { inputs: { name: 'Isobel' } });
   dnSpawn(sec, 'priest', 'dunnottarPriest', 'civilian', 0, [38, Q, -8], DN_FACE.S, { inputs: { name: 'Father Anselm' } });
@@ -725,7 +720,6 @@ function buildTower() {
   dnSpawn(sec, 'stairknight', 'dunnottarKnight', 'enemy', 3, [stairAt[0], Q + 37 * 0.15, stairAt[1]], Math.PI / 2 - (DN_SPIRAL.start + (DN_SPIRAL.turn / DN_SPIRAL.steps) * 36.5), { inputs: { name: 'Sir Calder' } });
   dnSpawn(sec, 'wallguard', 'dunnottarGuard', 'enemy', 2, [55, W, -36.2], DN_FACE.E, { inputs: { name: 'Sergeant Dow' } });
   dnSpawn(sec, 'wallknight1', 'dunnottarGuard', 'enemy', 2, [41, W, -36], DN_FACE.E, { inputs: { name: 'Sergeant Rannoch' } });
-  dnSpawn(sec, 'wallbow', 'dunnottarCrossbow', 'enemy', 2, [17, L, -36], DN_FACE.E, { inputs: { name: 'Crossbow Murray' } });
   dnSpawn(sec, 'wallknight2', 'dunnottarKnight', 'enemy', 3, [10, L, -36.4], DN_FACE.E, { inputs: { name: 'Sir Lauder' } });
 
   const midStair = windingTread(DN_SPIRAL, 56);
@@ -880,7 +874,7 @@ export const DUNNOTTAR_ROUTE = [
 /** The three shortcuts and the doors: what to set, and a short way to walk to show it open. */
 export const DUNNOTTAR_SHORTCUTS = [
   { name: 'the cliff gate (from the gatehouse side)', mechanism: 'cliffgate', start: [-3, DN_Y.gorge, 46.2], facing: DN_FACE.W, points: [[-10, 46.2], [-20, 46.2]], blockedWhenClosed: true },
-  { name: 'the ladder, kicked down from the upper wall', mechanism: 'ladder1', state: 'down', start: [14.3, DN_Y.quad, -22], facing: DN_FACE.N, points: [[14.3, -26], [14.3, -31], [14.3, -33.5], [14.3, -36]], blockedWhenClosed: true },
+  { name: 'the ladder, kicked down from the upper wall', mechanism: 'ladder1', state: 'down', start: [14.3, DN_Y.quad, -22], facing: DN_FACE.N, points: [[14.3, -26], [14.3, -28], [14.3, -30], [14.3, -31], [14.3, -32.5], [14.3, -33.5], [14.3, -36]], blockedWhenClosed: true },
   { name: 'the iron gate up from the vault', mechanism: 'irongate', start: [24.7, DN_Y.vault, -21], facing: DN_FACE.S, points: [[24.7, -18.6], [24.7, -14], [24.7, -9], [24.7, -5]], blockedWhenClosed: true },
   { name: 'the cell door', mechanism: 'celldoor', start: [16.7, DN_Y.vault, -23.5], facing: DN_FACE.N, points: [[16.7, -27], [16.7, -31]], blockedWhenClosed: true },
   { name: 'the chapel gate', mechanism: 'chapelgate', start: [1, DN_Y.ladderRoom, -36], facing: DN_FACE.W, points: [[-3, -36], [-8, -36]], blockedWhenClosed: true },

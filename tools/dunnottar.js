@@ -202,7 +202,8 @@ class Run {
   wanted(other) {
     if (other.corner !== 'blue' || other.dormant || other.state === 'out' || other.crawling || !levelAware(this.world, other)) return false;
     const until = this.ignore.get(other.id);
-    return !(until > this.world.time && apart(this.me, other) > 5);
+    const struck = this.lastHit?.attacker === other.id && this.world.time - this.lastHit.time < 4;
+    return !(until > this.world.time && !struck);
   }
 
   /** Enemies awake and aware of him: [{ fighter, d }] nearest first. */
@@ -382,7 +383,7 @@ class Run {
     const level = this.level;
     const nearest = aware[0]?.d ?? Infinity;
     const harm = bodyHarm(me);
-    if (me.state === 'up' && !level.tonics.length && level.inventory.tonic > 0 && (harm >= 0.4 || (me.bloodLost ?? 0) / collapseAt() >= 0.4)) {
+    if (me.state === 'up' && !level.tonics.length && level.inventory.tonic > 0 && (harm >= 0.3 || (me.bloodLost ?? 0) / collapseAt() >= 0.3)) {
       if (useItem(this.world, 'tonic')) {
         this.stats.tonics += 1;
         this.note(`tonic (harm ${harm.toFixed(2)})`);
