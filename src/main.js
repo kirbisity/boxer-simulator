@@ -5,7 +5,7 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, boutWinner, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
+import { advance, boutWinner, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, point, startCrawl, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
@@ -28,8 +28,9 @@ import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, endCrowdBatches } from './crowdview.js';
+import { crowdLod, protectedMen } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
-import { buildFighterView, clearCrowdTemplates, inkNearCamera, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -703,6 +704,12 @@ function draw(dt, { render: drawIt = true } = {}) {
   }
 }
 
+/** The men a big battle always draws in full (see protectedMen): who the viewer plays, has locked on, or follows. */
+function safeMen(world, followed) {
+  const looked = !followed && watchCam.focus !== null ? world.fighters[watchCam.focus] : null;
+  return protectedMen({ player: followed, lock: lockedTarget(), opponent: followed ? opponentFor(world, followed) : null, focus: looked, fighters: world.fighters });
+}
+
 function drawWorld(dt, drawIt = true) {
   const world = state.world;
   // The moment on screen: between the last two steps, as the bodies are drawn.
@@ -728,12 +735,17 @@ function drawWorld(dt, drawIt = true) {
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
+  selectCrowdDraw(scene, state.views, safeMen(world, followed));
   for (const view of state.views) {
+    // Off screen (a crowd man the camera does not see): not posed or counted, and posed afresh the frame he is back.
+    if (view.culled) {
+      view.stale = true;
+      continue;
+    }
     updateFighterView(view, dt * (state.paused ? 0 : state.speed), world.time);
     updateArms(scene, view, drawnTime);
     updateStumps(view);
   }
-  inkNearCamera(scene, state.views);
   updateProps(scene, state.views, world);
   updateDebris(scene, world);
   endCrowdBatches(scene);
@@ -2230,6 +2242,11 @@ const boxer = window.boxer = {
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
   // Send a fighter crawling away, as a badly hurt man in a panic does.
   crawl: (who = 0) => startCrawl(state.world, state.world.fighters[who], 'crawls away'),
+  // Crowd drawing by distance (far bodies, off-screen men left out, fewer shadows) on or off, to compare the two in one page; returns whether it is on.
+  lod: (on) => {
+    if (on !== undefined) crowdLod.enabled = Boolean(on);
+    return crowdLod.enabled;
+  },
   // Play `count` real frames of `dt` s each, as the page's own loop would (tests, profiling).
   playFrames: (count, dt = 1 / 60) => {
     for (let index = 0; index < count; index += 1) {
@@ -2237,6 +2254,37 @@ const boxer = window.boxer = {
       if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
       draw(dt);
     }
+  },
+  // Profiling: a level entered as its menu button does, watched (or played as `side`), its armies built.
+  enterLevel: (key, side = 'watch') => {
+    menus.close();
+    enterLevel(key);
+    if (!$('#side-pick').hidden) $(`#side-pick [data-side="${side}"]`).click();
+    boxer.finishBuilding();
+  },
+  // Profiling: `frames` frames of 1/60 s, each timed in its three parts (ms, averaged): the
+  // simulation (no time budget), the views updated, and the picture drawn (waited for on the GPU).
+  bench: (frames = 60) => {
+    const gl = scene.renderer.getContext();
+    const pixel = new Uint8Array(4);
+    const finish = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    const totals = { physics: 0, views: 0, render: 0 };
+    finish();
+    for (let index = 0; index < frames; index += 1) {
+      const started = performance.now();
+      tick(STEP, { budget: Infinity });
+      const stepped = performance.now();
+      draw(STEP, { render: false });
+      const updated = performance.now();
+      render(scene);
+      finish();
+      totals.physics += stepped - started;
+      totals.views += updated - stepped;
+      totals.render += performance.now() - updated;
+    }
+    const average = (value) => Math.round((value / frames) * 100) / 100;
+    const info = scene.renderer.info.render;
+    return { physics: average(totals.physics), views: average(totals.views), render: average(totals.render), frame: average(totals.physics + totals.views + totals.render), calls: info.calls, triangles: info.triangles, fighters: state.world.fighters.length, down: state.world.fighters.filter((fighter) => fighter.state !== 'up').length, time: Math.round(state.world.time * 10) / 10 };
   },
   // Finish an army's models now (tests; the page builds them a few a frame).
   finishBuilding: () => {

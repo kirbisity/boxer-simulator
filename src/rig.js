@@ -218,6 +218,9 @@ export function coherentFrames(frames, previous, maxTurn = RIG.maxTurnPerFrame) 
   return frames.map((frame, index) => {
     const before = previous[index];
     if (!before) return frame;
+    // Nearly every bone is within its turn: that is answered with no arrays made.
+    const quick = twistAngle(before, frame);
+    if (quick !== null && Math.abs(quick) <= maxTurn) return frame;
     const carried = vec.normalize(swing(before.x, before.y, frame.y));
     const angle = Math.atan2(vec.dot(vec.cross(carried, frame.x), frame.y), vec.dot(carried, frame.x));
     if (Math.abs(angle) <= maxTurn) return frame;
@@ -226,6 +229,38 @@ export function coherentFrames(frames, previous, maxTurn = RIG.maxTurnPerFrame) 
     const x = vec.normalize(vec.add(vec.add(vec.scale(carried, Math.cos(turn)), vec.scale(vec.cross(axis, carried), Math.sin(turn))), vec.scale(axis, vec.dot(axis, carried) * (1 - Math.cos(turn)))));
     return { ...frame, x, z: vec.cross(x, frame.y) };
   });
+}
+
+/**
+ * How far the new frame's x is turned about its y from the old x carried
+ * over (swung by the smallest rotation taking the old y to the new), with no
+ * arrays: the same sum as coherentFrames' own. Null where the swing is a
+ * degenerate one (the old and new y parallel or opposed), left to that.
+ */
+function twistAngle(before, frame) {
+  const [ax, ay, az] = before.y;
+  const [bx, by, bz] = frame.y;
+  const cos = Math.max(-1, Math.min(1, ax * bx + ay * by + az * bz));
+  let kx = ay * bz - az * by;
+  let ky = az * bx - ax * bz;
+  let kz = ax * by - ay * bx;
+  const sin = Math.sqrt(kx * kx + ky * ky + kz * kz);
+  if (sin < 1e-8) return null;
+  kx /= sin;
+  ky /= sin;
+  kz /= sin;
+  const [vx, vy, vz] = before.x;
+  const along = (kx * vx + ky * vy + kz * vz) * (1 - cos);
+  let cx = vx * cos + (ky * vz - kz * vy) * sin + kx * along;
+  let cy = vy * cos + (kz * vx - kx * vz) * sin + ky * along;
+  let cz = vz * cos + (kx * vy - ky * vx) * sin + kz * along;
+  const length = Math.sqrt(cx * cx + cy * cy + cz * cz) || 1;
+  cx /= length;
+  cy /= length;
+  cz /= length;
+  const [fx, fy, fz] = frame.x;
+  const across = (cy * fz - cz * fy) * bx + (cz * fx - cx * fz) * by + (cx * fy - cy * fx) * bz;
+  return Math.atan2(across, cx * fx + cy * fy + cz * fz);
 }
 
 /** A neutral A-pose for binding the skin: standing straight, arms 25° out. */
