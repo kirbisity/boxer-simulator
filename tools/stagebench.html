@@ -50,7 +50,7 @@
       g.boxer.skipIntro();
       g.boxer.adaptiveResolution(false);
       g.boxer.levelMode('dunnottar');
-      const level = g.boxer.level();
+      const level = g.boxer.levelRun();
       // (Whole steps only: a part of a step is drawn blended with draw(0), whose camera does not like a zero dt.)
       // First onto the spot (the sections wake on the first step), then onto the floor found there.
       level.put([at[0], at[1] + 0.3, at[2]], facing);

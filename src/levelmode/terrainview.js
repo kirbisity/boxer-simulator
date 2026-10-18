@@ -4,7 +4,7 @@
 //
 // createStageView(stage) builds one group per section and one per (gate or ladder, state);
 // updateStageView(view, world) shows the ones in force: the active sections, and each
-// mechanism in its present state. The group goes into the stage's place in the scene
+// mechanism in its present state (then `view.extras(world)`, if the screen set it). The group goes into the stage's place in the scene
 // (render.js setPlace 'stage'); `view.group.parent` is that place while it is there.
 
 import { createCastleView } from './kit.js';
@@ -104,13 +104,14 @@ export function createStageView(stage) {
 
 /** Show what is in force: the active sections, and each gate or ladder as it stands. `camera`: what is seen (the castle draws only that). */
 export function updateStageView(view, world, camera = null) {
-  if (view.update) {
-    view.update(world, camera);
-    return;
+  if (view.update) view.update(world, camera);
+  else {
+    const run = world.stage;
+    for (const [id, group] of Object.entries(view.sections)) group.visible = run.active.includes(id);
+    for (const mechanism of view.mechanisms) mechanism.group.visible = run.active.includes(mechanism.section) && run.mechanisms[mechanism.id] === mechanism.state;
   }
-  const run = world.stage;
-  for (const [id, group] of Object.entries(view.sections)) group.visible = run.active.includes(id);
-  for (const mechanism of view.mechanisms) mechanism.group.visible = run.active.includes(mechanism.section) && run.mechanisms[mechanism.id] === mechanism.state;
+  // What the screen adds to the stage (markers, a prop in a man's hands): `view.extras(world)`.
+  view.extras?.(world);
 }
 
 /** Put a stage's sea at its level, in the place that holds it (render.js buildStageSky). */

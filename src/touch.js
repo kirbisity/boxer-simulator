@@ -171,7 +171,7 @@ export function installFightControls(root, hooks) {
       } else if (event.type === 'tap') {
         // The attack controls take it: with Body, a tap on his man strikes there.
         fightUi.tap(event);
-        const target = orders.lock ?? opponentFor(world, hooks.player())?.id;
+        const target = orders.lock ?? foeFor(world, hooks.player())?.id;
         if (target !== undefined && target !== null) awake.set(target, hooks.now());
       } else if (event.type === 'hold') {
         const aim = aimAt(event.at[0], event.at[1]);
@@ -295,6 +295,9 @@ export function installFightControls(root, hooks) {
     navigator.vibrate?.(15);
   });
 
+  // The man he is on: the nearest foe, or whoever the page says (a stage run: only one near or aware of him).
+  const foeFor = (world, me) => (hooks.opponent ? hooks.opponent(world, me) : opponentFor(world, me));
+
   /** Lock on the man he is on (the nearest), or let go. */
   function toggleLock() {
     const orders = hooks.orders();
@@ -303,7 +306,7 @@ export function installFightControls(root, hooks) {
       signal('unlock');
       return;
     }
-    const target = opponentFor(hooks.world(), hooks.player());
+    const target = foeFor(hooks.world(), hooks.player());
     if (!target) return;
     orders.lock = target.id;
     awake.set(target.id, hooks.now());
@@ -376,7 +379,7 @@ export function installFightControls(root, hooks) {
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
     status.querySelector('.stamina i').style.width = `${Math.round(me.stamina * 100)}%`;
     // His man: the one locked, or the one he is on; a marker over his head.
-    const target = locked ?? opponentFor(world, me);
+    const target = locked ?? foeFor(world, me);
     for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) awake.set(event.defender, now);
     if (!target) {
       marker.hidden = true;
@@ -431,6 +434,8 @@ function capture(element, pointerId) {
 /** A man's first name; a rank or title ("Sir Edric", "Sgt. Cole") gives way to the name after it. */
 const firstNameOf = (fighter) => {
   const words = fighter.body.inputs.name.split(' ');
+  // "The Forger": the article is part of it (a bare "The" says nothing).
+  if (words[0] === 'The' && words[1]) return `The ${words[1]}`;
   return (/\.$/.test(words[0]) || ['Sir', 'Officer'].includes(words[0])) && words[1] ? words[1] : words[0];
 };
 

@@ -82,6 +82,8 @@ export const STORY_TIMING = {
 // ---- The cards -----------------------------------------------------------------
 
 let storyUp = 0;
+// Every card that is up, to take them all down at once (leaving the stage).
+const cardsUp = new Set();
 /** Whether a card that wants the fight held still is on screen (the opening, a note, the ending; not the death fade or the boss bar). */
 export const storyBusy = () => storyUp > 0;
 
@@ -96,7 +98,7 @@ function storyEl(tag, className, text) {
  * A full-window card that takes the keys and the taps. `onAdvance` runs for each; the card is `close`d by the caller.
  * Returns { root, close }.
  */
-function storyCard(className, onAdvance, { holds = true } = {}) {
+function storyCard(className, onAdvance, { holds = true, bodyClass = null } = {}) {
   const root = storyEl('div', `story-card ${className}`);
   root.setAttribute('role', 'dialog');
   const advance = () => onAdvance();
@@ -116,18 +118,29 @@ function storyCard(className, onAdvance, { holds = true } = {}) {
   window.addEventListener('keydown', swallow, true);
   window.addEventListener('keyup', swallow, true);
   document.body.append(root);
+  if (bodyClass) document.body.classList.add(bodyClass);
   if (holds) storyUp += 1;
   let closed = false;
   const close = () => {
     if (closed) return;
     closed = true;
+    cardsUp.delete(close);
+    if (bodyClass) document.body.classList.remove(bodyClass);
     if (holds) storyUp = Math.max(0, storyUp - 1);
     window.removeEventListener('keydown', key, true);
     window.removeEventListener('keydown', swallow, true);
     window.removeEventListener('keyup', swallow, true);
     root.remove();
   };
+  cardsUp.add(close);
   return { root, close };
+}
+
+/** Take down every card and the boss's bar (the stage is left behind). */
+export function closeStory() {
+  for (const close of [...cardsUp]) close();
+  storyUp = 0;
+  bossBar.hide();
 }
 
 /** Fade a card out and take it down, then say so. */
@@ -148,7 +161,7 @@ export function showOpening(onDone, stage = STAGE_ONE) {
     if (!ready || leaving) return;
     leaving = true;
     storyFadeOut(card, 0.9, onDone);
-  });
+  }, { bodyClass: 'card-up' });
   card.root.style.setProperty('--story-fade', `${STORY_TIMING.openingFade}s`);
   card.root.append(
     storyEl('p', 'story-chapter', stage.chapter),
@@ -200,7 +213,7 @@ export function showDeath(onDone) {
  * The ending in the cell: lines rise one by one over black (a tap brings the next at once); `onLine(index, text)` says
  * which is up, so the stage can pose the cell behind it; the last tap closes the card and runs onDone.
  */
-export function showEnding({ civiliansHarmed = false, onLine = null } = {}, onDone) {
+export function showEnding({ civiliansHarmed = false, onLine = null, over = true } = {}, onDone) {
   const lines = endingLines({ civiliansHarmed });
   const shown = [];
   let at = -1;
@@ -223,17 +236,49 @@ export function showEnding({ civiliansHarmed = false, onLine = null } = {}, onDo
     if (at < lines.length - 1) timer = setTimeout(next, STORY_TIMING.endingLineHold * 1000);
     else card.root.classList.add('last');
   };
-  const card = storyCard('story-ending', () => {
+  // Over the scene (the default): the cell stays in view above the words, and the world runs behind them.
+  const card = storyCard(over ? 'story-ending over' : 'story-ending', () => {
     if (!ready || finished) return;
     if (at < lines.length - 1) { next(); return; }
     finished = true;
     storyFadeOut(card, 1.2, onDone);
-  });
+  }, { holds: !over, bodyClass: over ? 'card-up' : null });
   card.root.style.setProperty('--story-fade', `${STORY_TIMING.endingLineFade}s`);
   card.root.append(stack, storyEl('p', 'story-prompt', 'Tap'));
   setTimeout(() => { ready = true; }, STORY_TIMING.endingLock * 1000);
   setTimeout(next, 900);
   return { close: () => { clearTimeout(timer); card.close(); } };
+}
+
+/**
+ * The card after the ending: where the stage stops. "Return to menu" and "Play again" (each runs its callback once, the card
+ * taking itself down). Enter works the button that has the focus.
+ */
+export function showFinale({ onMenu, onAgain }, stage = STAGE_ONE) {
+  let done = false;
+  const card = storyCard('story-finale', () => document.activeElement?.closest?.('.story-finale') && document.activeElement.click?.(), { bodyClass: 'card-up' });
+  const choose = (callback) => () => {
+    if (done) return;
+    done = true;
+    storyFadeOut(card, 0.6, callback);
+  };
+  const button = (text, className, callback) => {
+    const control = storyEl('button', `story-button ${className}`, text);
+    control.type = 'button';
+    control.addEventListener('click', (event) => { event.stopPropagation(); choose(callback)(); });
+    return control;
+  };
+  const again = button('Play again', 'story-primary', onAgain);
+  card.root.append(
+    storyEl('p', 'story-chapter', stage.chapter),
+    storyEl('h2', 'story-fin-title', `Stage 1 complete`),
+    storyEl('p', 'story-fin-sub', stage.title),
+    storyEl('div', 'story-rule'),
+    storyEl('div', 'story-buttons'),
+  );
+  card.root.querySelector('.story-buttons').append(again, button('Return to menu', '', onMenu));
+  setTimeout(() => again.focus({ preventScroll: true }), 400);
+  return { close: card.close };
 }
 
 // ---- The boss's bar ---------------------------------------------------------------------------
