@@ -8,7 +8,7 @@ import { advance, createWorld, fightTier, hostile, nearestOpponent, opponentFor,
 import { activeSections, checkStage, createStageWorld, mechanismsOf, pullLever, regionContains, setMechanism, stageFloor, stageTerrain, stageThink, updateStage } from '../src/levelmode/stage.js';
 import { STAGES } from '../src/levelmode/stages.js';
 import { TESTYARD } from '../src/levelmode/stages/testyard.js';
-import { floorAt, rampOf, rayBlocked, slabOf, wallOf } from '../src/physics/terrain.js';
+import { floorAt, rampOf, rayBlocked, slabOf } from '../src/physics/terrain.js';
 import { hipsAt, walk } from './walker.js';
 
 const hero = () => structuredClone(PRESETS.ronin);
@@ -80,11 +80,10 @@ test('createStageWorld: the player is fighter 0 (red, walking), the spawns follo
   assert.deepEqual(world.stage.mechanisms, { gate1: 'closed' });
   assert.deepEqual(world.standards, {}, 'no standards raised');
   // Everyone on his post, on the floor.
-  const [x, y, z] = [-18, 0, -3];
+  const [x, z] = [-18, -3];
   assert.ok(Math.hypot(world.fighters[0].root[0] - x, world.fighters[0].root[1] - z) < 1e-9);
   assert.ok(Math.abs(world.fighters[1].root[0] - 44) < 1e-9 && Math.abs(world.fighters[1].root[1] + 3) < 1e-9);
   assert.equal(world.fighters[1].lift, 0);
-  assert.ok(y === 0);
 });
 
 test('the men of sections not active are dormant, and the count awake is kept for the tiers of detail', () => {
@@ -314,5 +313,4 @@ test('the walls of the test yard: a line of sight along the corridor is held by 
   assert.equal(rayBlocked(terrain, [-15, -9], [3, -9], 7.5), false, 'over them');
   assert.equal(rayBlocked(terrain, [21, 1.9], [29, 1.9], 1.7), true, 'through the corridor wall');
   assert.equal(rayBlocked(terrain, [20, 0], [30, 0], 1.7), true, 'the gate');
-  assert.ok(wallOf);
 });

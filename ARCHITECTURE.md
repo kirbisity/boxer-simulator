@@ -54,6 +54,19 @@ taking over when he is out.
 nerve (fear, less likely with adrenaline: `AI.crawl`), goes on his knees and
 crawls away (`startCrawl`, `WORLD.crawl`); he is out of the fight (`inFight`).
 
+**Terrain and stages (level mode).** An arena that carries `terrain`
+(`physics/terrain.js`: slabs, ramps, stair flights, winding stairs, walls,
+ceilings and a sea level, in a grid index) stands on it instead of the flat floor;
+without it nothing here runs (the fingerprint proves it). `collideTerrain` puts
+each part on the floor under it and out of walls and ledge faces; `groundStance`
+lifts the stance (`fighter.lift`) to the lower foot's floor and plants each foot on
+its own tread; a man off a ledge is in the air (`fighter.air`) and lands by
+`landOnFeet` (`WORLD.terrain.fall`); below the sea he is lost (`drowned`).
+`levelmode/stage.js` is the stage data (header comment: every field), the active
+sections, dormant fighters (`fighter.dormant`: not stepped, thought for, collided or
+drawn) and gates and ladders that swap solids. Civilians and prisoners are corner
+`grey` (`hostile`). `levelmode/terrainview.js` draws the terrain as grey boxes.
+
 ## Drawing (browser only)
 
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body
