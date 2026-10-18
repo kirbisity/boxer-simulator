@@ -1857,8 +1857,8 @@ function crowdView(view, fighter, template) {
     far.steelOutline = null;
   }
   far.mesh.visible = false;
-  layers.skin.add(far.mesh, far.outline);
-  if (far.steel) layers.skin.add(far.steel, far.steelOutline);
+  // (A far body may go without ink: only what there is is added.)
+  for (const mesh of [far.mesh, far.outline, far.steel, far.steelOutline]) if (mesh) layers.skin.add(mesh);
   for (const mesh of [far.outline, far.steelOutline, far.steel]) if (mesh) mesh.visible = false;
   // He is at the origin, his bones in world coordinates: nothing in him needs a matrix of its own made each frame.
   for (const holder of [group, ...Object.values(layers)]) holder.matrixAutoUpdate = false;
