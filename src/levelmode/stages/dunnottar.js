@@ -771,7 +771,8 @@ function buildChapel() {
   dnProp(sec, 'raven', [-2.8, L + 5.4, -45], { yaw: 4 });
   dnProp(sec, 'weapon', [-6, L, -37], { what2: 'sword', yaw: 1.4 });
   dnItem(sec, 'note-order', 'note', [-16.6, L, -37.2], { note: 'order', lift: 1.0 });
-  sec.portals.push({ to: 'tower', area: { at: [-5.5, -36], size: [6, 7] } });
+  // (Overlapping the wall walk's end at x -2, so that the walk stays awake the whole way in: a gap here dropped the wall walk's floor for a step.)
+  sec.portals.push({ to: 'tower', area: { at: [-5, -36], size: [7, 7] } });
   sec.portals.push({ to: 'cell', area: { at: [-9, -43.5], size: [6, 4] } });
   dnSpawn(sec, 'vaelen', 'vaelen', 'boss', 4, [-11.4, L, -38.2], DN_FACE.E, { inputs: { name: 'Lord Vaelen' }, boss: { title: "The Queen's Chief Jailer" } });
   return sec;
@@ -835,6 +836,8 @@ export const DUNNOTTAR = {
   sea: DN_Y.sea,
   start: { section: 'cliff', at: [-114, DN_Y.start, -4], facing: DN_FACE.E },
   sections: DN_SECTIONS,
+  // After the boss: the inner cell's door opens, and near the prince (m) the scene begins; he shuffles into the corner (the straw's).
+  ending: { door: 'innerdoor', prince: 'prince', trigger: 3.8, corner: [-12.3, -54.3] },
   // The prisoners who follow him stop at the chapel gate.
   followStopsAt: { at: [1.5, -36], size: [7, 4.4], y: [DN_Y.ladderRoom - 1, DN_Y.ladderRoom + 3] },
   // For the drawing (levelmode/kit.js): the land round the castle, and the weather.

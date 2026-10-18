@@ -145,4 +145,11 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .lv-toast { position: absolute; left: 50%; translate: -50% 0; top: calc(72px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); padding: 4px 14px; border-radius: 999px; background: rgba(10, 12, 18, 0.62); font: 600 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; text-align: center; }
 .lv-toast-in { animation: lv-toast 2.6s ease-out forwards; }
 @keyframes lv-toast { 0% { opacity: 0; translate: -50% -4px; } 10% { opacity: 1; translate: -50% 0; } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* A phone held upright: the attack buttons fan out over the middle, so the pill and the action bar keep to the left, over the player's status (clear of the fan, the thumb's other side). */
+@media (max-width: 520px) {
+  .lv-context, .lv-action { left: calc(10px + env(safe-area-inset-left, 0px)); translate: 0 0; }
+  .lv-context { min-width: 0; max-width: 156px; padding: 0 12px 0 10px; gap: 6px; font-size: 11px; letter-spacing: 0.04em; animation-name: lv-pill-in-left; }
+  .lv-action { width: 150px; }
+}
+@keyframes lv-pill-in-left { from { opacity: 0; translate: 0 6px; } }
 .banner:not([hidden]) ~ .fight-ui .lv-context, .banner:not([hidden]) ~ .fight-ui .lv-items, .banner:not([hidden]) ~ .fight-ui .lv-action { visibility: hidden; }
