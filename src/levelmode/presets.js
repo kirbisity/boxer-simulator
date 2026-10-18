@@ -23,7 +23,12 @@ export const LEVEL_PRESETS = {
   },
 
   // ---- The garrison, c. 1500 -----------------------------------------------------------------
-  // Tier 1: levy spearmen, little armour, little drill.
+  // Tuned with tools/dunnottar.js (a bot plays the stage; see its header): the fights are a full simulation, where the
+  // operative's sword and buckler beat a spear or a poleaxe only about as often as they lose, so the garrison is a hungry,
+  // half-drilled one: low `exercise` (calories chosen to keep each man's body mass: weak, not fat) and low `skill`. A fight
+  // against a guard is still lost one time in six or seven: that is the sim, not the number. Plate is not beaten by an edge at
+  // all (the man-at-arms is for a poleaxe taken from a fallen guard, about even).
+  // Tier 1: levy spearmen, little armour, little drill (underfed conscripts, 62 kg: the operative wins nearly every duel with one).
   dunnottarSoldier: {
     name: 'Dunnottar levy', style: 'spear', sex: 'male', heightCm: 168, frame: 'small', age: 27, exercise: 0.06, calories: 1984, skill: 0.04,
     outfit: { kind: 'levy', design: 0 }, accessories: [],
@@ -99,7 +104,7 @@ export const LEVEL_PRESETS = {
   // to knock down (`poise`); skill 0.8 of which the helm leaves him three quarters (skillFactor).
   // Tuned (tools/dunnottar.js): a rested operative with the sword and buckler beats him about one time in four.
   vaelen: {
-    name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.35, calories: 5515, skill: 0.85,
+    name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.35, calories: 5515, skill: 0.9,
     outfit: { kind: 'tournament', design: 1, extraMass: 0.3, balance: 1.5 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#1c1c20', facialHair: 'beard', eyeColor: 'grey' },
   },

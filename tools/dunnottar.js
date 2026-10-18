@@ -6,17 +6,73 @@
 //   careful   fights what has noticed him, one at a time where it can (backs off along the way he came when two or
 //             more come), bandages when he bleeds and nobody aware is within 6 m, drinks the tonic when badly hurt,
 //             rests at every rest point near the route, takes the items near the route, changes into a dead man's
-//             harness when it protects more, takes the cell key and frees the prisoners.
+//             harness when it protects more, takes up a poleaxe lying near (the answer to plate), takes the cell key
+//             and frees the prisoners.
 //   reckless  runs the route, fights only what is within a few metres, never heals, never loots; rests only at
 //             a rest within a few metres of his way.
 //
 // Usage:
-//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10]
-//   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,plate]   the boss alone, from the chapel gate
-//   node tools/dunnottar.js one <policy> <seed> [--log]                            one run, JSON (the sweep's worker)
+//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 2400]
+//   node tools/dunnottar.js segments [--runs 20] [--segments start_rest1,rest1_rest2,...] [--logs]   rest to rest, from full health
+//   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
+//   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
+// A sweep of 16 + 16 runs takes about ten minutes on ten cores (a run is a few thousand simulated seconds at about 6x real time);
+// each run is its own process, `--jobs` of them at a time. `segments` is the quick way to tune: one stretch, many seeds.
 //
-// Output: a table per run (furthest section, deaths and by whom, time, items used, Vaelen reached/beaten) and a summary.
-
+// What the bot knows that a person would: it does not step back off a cliff in a fight, it gives up a stand-off across a rail, it
+// closes in on a man who will not come, it ignores a man crawling away. What it does not: use cover, the doors and the stair
+// as a choke, or the prisoners to hold a man. It fights with the game's own fight AI, so it is a fair stand-in for "a competent
+// operative", not for a good player (who should do better than these numbers).
+//
+// ---- What was tuned, and why (phase C3) -----------------------------------------------------------------------------------
+// The first sweep, the stage as built: the careful bot died ten times on the cliff path and never got past the first pair of levies
+// (the reckless one the same). The fights are the full simulation: the operative (sword and buckler, 76 kg, skill 0.75) beat a
+// levy with a spear 4 times in 10 and a guard with a poleaxe 5 in 10; plate cannot be cut at all; Vaelen (210 cm, 150 kg of
+// body and a harness that the kit makes 120 kg more, so 270 kg) killed him in 16 s and was beaten in none of 36 duels. So:
+//   levy (tier 1)  skill 0.3 -> 0.04, exercise 0.45 -> 0.06, 172 cm medium -> 168 cm small, calories 2977 -> 1984 (62 kg: the
+//                  calories come down with the exercise or the same man is fat, 139 kg, and stronger): underfed conscripts, won
+//                  by the operative 24 in 24 one to one, 21 in 24 two to one.
+//   guard (tier 2) skill 0.5 -> 0.25, exercise 0.55 -> 0.1, calories 3865 -> 2681 (80 kg, not 82): 12 in 14 one to one. Below that
+//                  skill buys nothing: a man in brigandine with a poleaxe kills a third of the operatives who face him however
+//                  slow his hands (one blow to the head), so a guard costs the operative about one life in six.
+//   crossbow, matchlock (tier 2) skill 0.5 -> 0.2, exercise 0.55/0.5 -> 0.3 (calories with it): about 3 in 4 one to one.
+//   man-at-arms (tier 3) skill 0.7 -> 0.5, exercise 0.7 -> 0.5 (calories 4737 -> 4047, 90 kg): the sword does nothing to plate, so
+//                  the careful bot takes a poleaxe from a fallen guard and wins about 4 in 10; with the sword, 0 in 24.
+//   Vaelen         harness 120 kg -> 42 kg (outfit.extraMass 0.3, a hook in outfits.js gearTraits that a man's own `outfit` may set;
+//                  nothing else uses it), 195 kg in all; exercise 0.95 -> 0.35 (calories 9256 -> 5515, same 150 kg, but a soft
+//                  giant, FFMI 30 -> 22: the strongman killed in 5 s whatever his skill); skill 0.9 kept (the helm takes a
+//                  quarter); outfit.balance 1.5 (the same kind of hook; he overreached and fell with his own poleaxe swing, which
+//                  is the broken knee seen at his waking). Phase 2 (config) unchanged.
+//   stage          gone: levy2, levy4, levy6, levy8 (the pairs: two at once cost the operative a third of his blood and lost one
+//                  fight in two), bowman1 and gunner2 (the three at the oillet killed 7 in 10; one matchlock and a levy: 1 in 10),
+//                  headguard (a levy who joined the hall guard's fight), stairguard2 (joined the stair guard's), patrol2,
+//                  jailer2 (joined the jailer), wallbow (a crossbow down the straight of the wall walk), wallguard,
+//                  wallknight1 (the wall walk had a guard and three knights in a row); the stair knight is a guard now (Sergeant
+//                  Calder), one man-at-arms (Sir Lauder) is left before the chapel. The lodge guard stands 7 m farther east and
+//                  looks east (he saw the well, the rest point, from his door); the turnkey stands at the middle of the cellar.
+//                  A fourth rest, rest2b "The Turnkey's Fire", at the turnkey's brazier before the stair up to the keep (the
+//                  stretch from the well to the chapel gate was one rest in nine men, and no one lived through it once in ten).
+//                  The courtyard is darker (light 0.75 -> 0.55: the well is seen from 14 m and not from 19).
+//   items          the stage starts him with 4 bandages and 2 tonics (3 and 1), the pouch holds 6 and 3 (5 and 3): a tonic is the only
+//                  thing that gives back blood, and the first fight is the one that needs it.
+// The bot is only part of the answer (it fought where a person would not: the log of every death is in `--log`), so the numbers
+// were checked by hand on single fights (duel.mjs-style one to one and one to two bouts, in the session's scratchpad).
+//
+// ---- The table ---------------------------------------------------------------------------------------------------------------
+// 16 runs a policy, seeds 1-16, 10 deaths a fail, 2400 simulated seconds a timeout (the stage as it was / as it is now):
+//                          reached Vaelen   beat him   failed (10 deaths)   mean deaths   where they died
+//   careful, as built       0/10             0/10       8/10 (rest timed out) 9.1          cliff 91 of 91 (levy 1, 2)
+//   careful, tuned          12/16            7/16       0/16                 1.9           gate 13 (the hall guard 11), tower 8, vault 4
+//   reckless, as built      0/10             0/10       9/10                 9.6          cliff 96 of 96
+//   reckless, tuned         1/16             0/16       12/16                8.3          tower 58, gate 32, ascent 19, vault 9
+// Vaelen alone from the chapel gate (20 runs each; as built, 12 each, in brackets):
+//   unhealed (half the blood gone, empty pouch)  beaten 1/20  (0/12)   median death at 82 s (26 s)
+//   healed, sword and gambeson                   beaten 2/20  (0/12)   (16 s)
+//   healed, a guard's brigandine                 beaten 3/20  (0/12)
+//   healed, a man-at-arms' plate                 beaten 15/20 (2/12)
+// and 7 of 26 attempts at him in the careful sweep were wins (27%; they wear what they took off the last knight, plate half the time).
+// A person who comes to him healed with brigandine and a poleaxe is where the spec wants the odds, about one in three.
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -60,8 +116,9 @@ function protection(inputs) {
 function basePlan() {
   const plan = [];
   for (const leg of DUNNOTTAR_ROUTE) {
-    if (leg.open?.length && plan.length) plan.at(-1).acts.push(...leg.open.map((id) => ({ kind: 'gate', id })));
     for (const p of leg.points) plan.push({ p, acts: [], leg: leg.name, base: plan.length });
+    // (The gates a leg lists are the ones its end comes to: the chapel gate at the end of the wall walk.)
+    if (leg.open?.length) plan.at(-1).acts.push(...leg.open.map((id) => ({ kind: 'gate', id })));
   }
   return plan;
 }

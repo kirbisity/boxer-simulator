@@ -17,6 +17,10 @@ import { holdPlayer } from '../src/levelmode/items.js';
 import { LEVEL_CONFIG } from '../src/levelmode/config.js';
 import { snapshotGear } from '../src/levelmode/checkpoints.js';
 
+// The counts the stage starts him with and the pouch holds (the config's: tuned with tools/dunnottar.js).
+const { bandage: START_BANDAGES, tonic: START_TONICS } = LEVEL_CONFIG.start;
+const CAP_BANDAGES = LEVEL_CONFIG.cap.bandage;
+
 const yard = (seed = 3) => createLevelWorld(TESTYARD, levelPreset('forger'), { seed });
 const fighterOf = (world, id) => world.fighters.find((fighter) => fighter.spawn?.id === id);
 const at = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 1], fighter.x[P.pelvis * 3 + 2]];
@@ -94,14 +98,14 @@ test('a bandage is a 2.5 s action that stops all bleeding; the man stands still 
   const world = yard();
   const me = world.fighters[0];
   const level = world.stage.level;
-  assert.deepEqual(level.inventory, { bandage: 3, tonic: 1 });
+  assert.deepEqual(level.inventory, { bandage: START_BANDAGES, tonic: START_TONICS });
   assert.equal(useItem(world, 'bandage'), false, 'not bleeding: not used');
-  assert.equal(level.inventory.bandage, 3);
+  assert.equal(level.inventory.bandage, START_BANDAGES);
   me.bleed = 0.08;
   me.bleedInside = 0.03;
   me.bleedOutside = 0.05;
   assert.equal(useItem(world, 'bandage'), true);
-  assert.equal(level.inventory.bandage, 2);
+  assert.equal(level.inventory.bandage, START_BANDAGES - 1);
   assert.ok(levelBusy(world));
   const orders = newOrders();
   orders.keyStick = { dir: [1, 0], amount: 1 };
@@ -130,7 +134,7 @@ test('a hit interrupts a bandage: the wound is still open and the bandage is spe
   run(world, 0.1);
   assert.equal(world.stage.level.action, null, 'the action is gone');
   assert.ok(me.bleed > 0, 'still bleeding');
-  assert.equal(world.stage.level.inventory.bandage, 2);
+  assert.equal(world.stage.level.inventory.bandage, START_BANDAGES - 1);
   assert.ok(drainUi(world).some((message) => /interrupted/.test(message.text ?? '')));
   // A blow in the events does it too.
   me.bleed = 0.08;
@@ -155,7 +159,7 @@ test('a tonic mends blood lost, strain and bruising over 4 s, and not a broken l
   me.knockdowns = 2;
   const before = me.bloodLost;
   assert.equal(useItem(world, 'tonic'), true);
-  assert.equal(level.inventory.tonic, 0);
+  assert.equal(level.inventory.tonic, START_TONICS - 1);
   run(world, 2);
   assert.ok(me.bloodLost < before * 0.6 && me.bloodLost > before * 0.4, 'about half done at 2 s');
   run(world, 2.2);
@@ -166,6 +170,7 @@ test('a tonic mends blood lost, strain and bruising over 4 s, and not a broken l
   assert.ok(me.broken.has('lElbow'), 'a broken limb stays broken');
   assert.equal(me.knockdowns, 0);
   assert.equal(level.tonics.length, 0);
+  level.inventory.tonic = 0;
   assert.equal(useItem(world, 'tonic'), false, 'none left');
 });
 
@@ -178,15 +183,16 @@ test('items lying about are taken at the button: bandages and tonics into the po
   assert.equal(contextFor(world).kind, 'item');
   assert.equal(contextFor(world).label, 'Take bandage');
   assert.equal(interact(world), true);
-  assert.equal(level.inventory.bandage, 4);
+  assert.equal(level.inventory.bandage, START_BANDAGES + 1);
   assert.ok(level.taken.has('bandage0') || level.taken.has('bandage1'));
   interact(world);
-  assert.equal(level.inventory.bandage, 5);
+  assert.equal(level.inventory.bandage, START_BANDAGES + 2);
   assert.equal(contextFor(world), null, 'both taken: nothing here');
   // The pouch holds no more.
   level.taken.delete('bandage0');
+  level.inventory.bandage = CAP_BANDAGES;
   assert.equal(interact(world), false);
-  assert.equal(level.inventory.bandage, 5);
+  assert.equal(level.inventory.bandage, CAP_BANDAGES);
   assert.ok(!level.taken.has('bandage0'), 'left where it lies');
   // The note: read, and it stays to be read again.
   standAt(world, -19.3, 0, 0.5);
@@ -198,7 +204,7 @@ test('items lying about are taken at the button: bandages and tonics into the po
   // The tonic in the corner.
   standAt(world, -16, 0, 8);
   interact(world);
-  assert.equal(level.inventory.tonic, 2);
+  assert.equal(level.inventory.tonic, START_TONICS + 1);
 });
 
 test('the button hides while an enemy aware of him is within 6 m (awareness.js: aggro or search), and not for one who has not noticed him', () => {
@@ -428,7 +434,7 @@ test('a rest heals the operative whole, refills his items, puts the enemies back
   assert.equal(me.knockdowns, 0);
   assert.equal(me.stamina, 1);
   assert.equal(me.state, 'up');
-  assert.deepEqual(level.inventory, { bandage: 3, tonic: 1 }, 'items refilled to the start counts');
+  assert.deepEqual(level.inventory, { bandage: START_BANDAGES, tonic: START_TONICS }, 'items refilled to the start counts');
   assert.equal(me.body.inputs.outfit.kind, gearKind, 'in the gear he had');
   assert.equal(level.checkpoint.id, 'hall');
   assert.equal(level.checkpoint.gear.inputs.outfit.kind, gearKind);
@@ -448,9 +454,9 @@ test('a rest heals the operative whole, refills his items, puts the enemies back
 test('a rest refills only up to the start counts: a man with more keeps them', () => {
   const world = yard();
   const level = world.stage.level;
-  level.inventory = { bandage: 5, tonic: 0 };
+  level.inventory = { bandage: CAP_BANDAGES, tonic: 0 };
   restAtPoint(world, { id: 'yard', at: [-19, 0, -7], name: "the brazier" });
-  assert.deepEqual(level.inventory, { bandage: 5, tonic: 1 });
+  assert.deepEqual(level.inventory, { bandage: CAP_BANDAGES, tonic: START_TONICS });
 });
 
 test('death: YOU DIED is asked for once; the respawn is at the last rest with the gear he had there; enemies, shortcuts and followers as they should be', () => {
@@ -492,7 +498,7 @@ test('death: YOU DIED is asked for once; the respawn is at the last rest with th
   assert.equal(me.state, 'up');
   assert.equal(me.body.inputs.outfit.kind, kind, 'the gear of the last rest');
   assert.ok(Math.hypot(me.root[0] - spot[0], me.root[1] - spot[2]) < 0.05, 'at the rest');
-  assert.deepEqual(level.inventory, { bandage: 3, tonic: 1 }, 'the items he had at the rest');
+  assert.deepEqual(level.inventory, { bandage: START_BANDAGES, tonic: START_TONICS }, 'the items he had at the rest');
   assert.equal(guard.state, 'up');
   assert.ok(Math.hypot(guard.root[0] - 44, guard.root[1] + 3) < 0.01, 'the enemy at his post');
   assert.equal(world.stage.mechanisms.gate1, 'open', 'the gate stays open');
