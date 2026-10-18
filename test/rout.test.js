@@ -87,6 +87,12 @@ test('fear: the deadlier his weapon than mine, the more I fear; equal arms littl
   assert.ok(dread(null, 'knife') < dread(null, 'katana') && dread(null, 'katana') < dread(null, 'rifle'), 'knife < sword < gun');
   assert.ok(dread('katana', 'katana') < 0.15, 'sword against sword: little');
   assert.ok(dread('knife', 'katana') > dread('katana', 'katana'), 'a knife against a sword: more');
+  // Far off, a sword is no fear yet; a gun still is, a little.
+  const away = (metres) => { for (let index = 0; index < him.x.length; index += 3) him.x[index] += metres; };
+  away(20);
+  assert.equal(dread(null, 'katana'), 0, 'a sword 20 m off');
+  assert.ok(dread(null, 'rifle') > 0 && dread(null, 'rifle') < 0.5, 'a rifle 20 m off: some');
+  away(-20);
   arm(me, null); arm(him, null);
   const even = fearTarget(world, me, 0, him);
   arm(him, 'katana');

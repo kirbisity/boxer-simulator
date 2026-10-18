@@ -142,12 +142,17 @@ export const AI = {
   // `ownWeapon`: a sword in your hand is comfort against a sword, not
   // against a rifle). Being outmatched — by size and strength (nerve) or by
   // the weapon — multiplies the rest: × (1 + `mismatch` × how outmatched).
+  // The weapon is feared at full within `dreadNear` m of its reach, fading
+  // out over `dreadFade` m beyond; a bow or gun beyond that is still
+  // `dreadAtRange` of it (men stood under volleys; few broke at the first).
   // In the ring, unarmed (a sport, a referee, a bell), fear is `ring` of it.
+  // A drilled man still in his ranks (gear.drill, a slot) fears `drilled` of
+  // it: the files at his shoulders, and the training (legions broke seldom).
   // A man who has broken once breaks the easier: `breakAt` falls by
   // `brokeBefore` each time, to `breakAtLeast`.
   panic: {
     settle: 1.5, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.62, rate: 0.85, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
-    brokenArm: 0.25, brokenLeg: 0.35, armed: 0.55, lethalSpan: 4, ownWeapon: 0.92, mismatch: 1.2, ring: 0.45, brokeBefore: 0.1, breakAtLeast: 0.42,
+    brokenArm: 0.25, brokenLeg: 0.35, armed: 0.55, lethalSpan: 4, ownWeapon: 0.92, dreadNear: 1.5, dreadFade: 5, dreadAtRange: 0.3, drilled: 0.7, mismatch: 1.2, ring: 0.45, brokeBefore: 0.1, breakAtLeast: 0.42,
   },
   // Routs. Few battles are fought to the last man: as a side's men fall,
   // crawl off or break, fear runs through the rest. In a side of at least
@@ -1083,8 +1088,10 @@ function keepSides(world) {
     const men = world.fighters.filter((fighter) => fighter.corner === corner);
     if (!men.length) continue;
     const side = (sides[corner] ??= { men: men.length, rear: null });
-    const lost = men.filter((fighter) => !inFight(fighter) || fighter.panicked).length;
-    side.lost = lost / side.men;
+    // A man gone counts whole; one broken but still on the field, half (he may yet rally).
+    const gone = men.filter((fighter) => !inFight(fighter)).length;
+    const broken = men.filter((fighter) => inFight(fighter) && fighter.panicked).length;
+    side.lost = (gone + 0.5 * broken) / side.men;
     side.broken = men.filter((fighter) => fighter.panicked && inFight(fighter)).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
   }
   for (const [corner, other] of [['red', 'blue'], ['blue', 'red']]) {
@@ -1144,10 +1151,15 @@ function rout(world, fighter, opponent) {
 /** How deadly what he holds is (WEAPONS threat; bare hands 1). */
 const lethality = (fighter) => (fighter?.weapon?.held ? fighter.weapon.spec.threat ?? 1 : 1);
 
-/** How much deadlier his weapon is than mine, 0..1 (one `lethalSpan` deadlier: 1). */
+/** How much deadlier his weapon is than mine, 0..1 (one `lethalSpan` deadlier: 1), as near as he is. */
 export function weaponDread(fighter, opponent) {
   const spec = AI.panic;
-  return Math.max(0, Math.min(1, (lethality(opponent) - Math.max(1, spec.ownWeapon * lethality(fighter))) / spec.lethalSpan));
+  const deadlier = Math.max(0, Math.min(1, (lethality(opponent) - Math.max(1, spec.ownWeapon * lethality(fighter))) / spec.lethalSpan));
+  if (!deadlier) return 0;
+  const apart = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+  const near = Math.max(0, Math.min(1, 1 - (apart - reachOf(opponent) - spec.dreadNear) / spec.dreadFade));
+  const shoots = opponent.weapon?.held && (opponent.weapon.spec.ranged || opponent.weapon.spec.shot);
+  return deadlier * Math.max(near, shoots ? spec.dreadAtRange : 0);
 }
 
 /** A ring bout: the ropes, and nobody armed. */
@@ -1170,7 +1182,8 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const mismatch = Math.min(1, outmatched + dread);
   const rush = AI.adrenaline.nerve + (AI.adrenaline.nerveOutmatched - AI.adrenaline.nerve) * mismatch;
   const ring = opponent && ringBout(world, fighter, opponent) ? spec.ring : 1;
-  return Math.max(0, Math.min(1, felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring));
+  const ranks = fighter.body.gear.drill && fighter.slot ? spec.drilled : 1;
+  return Math.max(0, Math.min(1, felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring * ranks));
 }
 
 /**
