@@ -145,14 +145,18 @@ export const AI = {
   // The weapon is feared at full within `dreadNear` m of its reach, fading
   // out over `dreadFade` m beyond; a bow or gun beyond that is still
   // `dreadAtRange` of it (men stood under volleys; few broke at the first).
+  // Until he has felt it (`proven` clean blows taken), a weapon is feared at
+  // `unproven` of that, and the mismatch multiplier at `unprovenMismatch`:
+  // a man does not break at the sight of a sword before a blow has landed,
+  // as often he does after one.
   // In the ring, unarmed (a sport, a referee, a bell), fear is `ring` of it.
   // A drilled man still in his ranks (gear.drill, a slot) fears `drilled` of
   // it: the files at his shoulders, and the training (legions broke seldom).
   // A man who has broken once breaks the easier: `breakAt` falls by
   // `brokeBefore` each time, to `breakAtLeast`.
   panic: {
-    settle: 1.5, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.62, rate: 0.85, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
-    brokenArm: 0.25, brokenLeg: 0.35, armed: 0.55, lethalSpan: 4, ownWeapon: 0.92, dreadNear: 1.5, dreadFade: 5, dreadAtRange: 0.3, drilled: 0.7, mismatch: 1.2, ring: 0.45, brokeBefore: 0.1, breakAtLeast: 0.42,
+    settle: 2, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.83, rate: 0.5, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
+    brokenArm: 0.2, brokenLeg: 0.3, armed: 0.35, lethalSpan: 4, ownWeapon: 0.92, dreadNear: 1.5, dreadFade: 5, dreadAtRange: 0.3, drilled: 0.7, unproven: 0.4, unprovenMismatch: 0.75, proven: 2, mismatch: 0.7, ring: 0.45, brokeBefore: 0.06, breakAtLeast: 0.5,
   },
   // Routs. Few battles are fought to the last man: as a side's men fall,
   // crawl off or break, fear runs through the rest. In a side of at least
@@ -162,7 +166,7 @@ export const AI = {
   // man of such a side runs for his own rear; at the field's edge (within
   // `edge` m) with no enemy within `clearOf` m he has fled: out of the battle,
   // and he does not come back. History has most battles end so.
-  rout: { minSide: 4, losses: 0.5, lossesFrom: 0.15, lossesFull: 0.6, contagion: 0.12, contagionMost: 0.36, within: 5, edge: 1.6, clearOf: 4 },
+  rout: { minSide: 4, losses: 0.35, lossesFrom: 0.3, lossesFull: 0.75, contagion: 0.06, contagionMost: 0.18, within: 5, edge: 1.6, clearOf: 4 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
@@ -1159,7 +1163,8 @@ export function weaponDread(fighter, opponent) {
   const apart = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
   const near = Math.max(0, Math.min(1, 1 - (apart - reachOf(opponent) - spec.dreadNear) / spec.dreadFade));
   const shoots = opponent.weapon?.held && (opponent.weapon.spec.ranged || opponent.weapon.spec.shot);
-  return deadlier * Math.max(near, shoots ? spec.dreadAtRange : 0);
+  const felt = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
+  return deadlier * Math.max(near, shoots ? spec.dreadAtRange : 0) * (spec.unproven + (1 - spec.unproven) * felt);
 }
 
 /** A ring bout: the ropes, and nobody armed. */
@@ -1179,7 +1184,9 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
   const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
   const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter);
-  const mismatch = Math.min(1, outmatched + dread);
+  // How outmatched he is multiplies the rest, a little less before a blow has landed.
+  const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
+  const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);
   const rush = AI.adrenaline.nerve + (AI.adrenaline.nerveOutmatched - AI.adrenaline.nerve) * mismatch;
   const ring = opponent && ringBout(world, fighter, opponent) ? spec.ring : 1;
   const ranks = fighter.body.gear.drill && fighter.slot ? spec.drilled : 1;

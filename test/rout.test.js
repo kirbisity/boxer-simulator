@@ -24,9 +24,9 @@ test('a side losing men fears it; a lone man or a pair do not', () => {
   thinkAll(world, 1 / 60);
   const man = world.fighters[0];
   assert.equal(routFear(world, man), 0, 'nobody lost yet');
-  for (const fallen of world.fighters.slice(1, 7)) fallen.state = 'out';
+  for (const fallen of world.fighters.slice(1, 9)) fallen.state = 'out';
   thinkAll(world, 1 / 60);
-  assert.ok(routFear(world, man) >= AI.rout.losses * 0.99, `${AI.rout.lossesFull * 100}% of his side lost: the full fear of the rout`);
+  assert.ok(routFear(world, man) >= AI.rout.losses * 0.99, `80% of his side lost (over the ${AI.rout.lossesFull * 100}% that is full): the full fear of the rout`);
   const pair = duel('contender', 'contender');
   thinkAll(pair, 1 / 60);
   pair.fighters[0].state = 'out';
