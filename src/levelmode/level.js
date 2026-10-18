@@ -11,8 +11,10 @@
 //   tonics []   tonic effects at work
 //   checkpoint { id, name, at, facing, section, gear, inventory }    where, in what, with what he wakes
 //   boss { id, phase } | null
+//   ending { phase: 'locked' | 'open' | 'scene' | 'done' } | null    the boss out, the inner door, the scene (ending.js)
 //   ui []        what the screen is to be told, in order: { type: 'toast', text } | { type: 'note', key, id }
 //                | { type: 'death' } | { type: 'respawned' } | { type: 'rested', name } | { type: 'phase2', id }
+//                | { type: 'bossDown' } | { type: 'ending' }
 //   rebuild Set  fighter ids whose drawing is out of date (their bodies were remade)
 //   spawns { id: { def, section } }   spawnInputs { fighterId: inputs }   what the stage made them from
 //
@@ -24,12 +26,13 @@
 
 import { hurtShare } from '../ai.js';
 import { P } from '../body.js';
-import { advance, knockOut, reclothe } from '../physics.js';
+import { advance, boutWinner, knockOut, opponentFor, reclothe } from '../physics.js';
 import { LEVEL_CONFIG } from './config.js';
 import { levelOf, updateAction, updateTonics } from './items.js';
-import { noteDeath, playerStands, setCheckpoint, spawnDefinitions } from './checkpoints.js';
+import { noteDeath, playerStands, respawnPlayer, setCheckpoint, spawnDefinitions } from './checkpoints.js';
 import { levelAware } from './adapter.js';
 import { createStageWorld } from './stage.js';
+import { endingBusy, watchEnding } from './ending.js';
 
 /** Give a stage world its run. Returns the level. */
 export function startLevel(world, { settle = true } = {}) {
@@ -40,7 +43,7 @@ export function startLevel(world, { settle = true } = {}) {
     inventory: { ...startItems }, startItems,
     taken: new Set(), notes: new Set(), keys: new Set(), pulled: new Set(), opened: new Set(), freed: new Set(),
     action: null, tonics: [], checkpoint: null, boss: null, dying: false, deaths: 0, rests: 0,
-    ui: [], rebuild: new Set(), spawns, spawnInputs: {},
+    ui: [], rebuild: new Set(), spawns, spawnInputs: {}, ending: stage.ending ? { phase: 'locked' } : null,
   };
   world.stage.level = level;
   // The operative fights from his guard (the stick within the run threshold); the walk mode's guardless stance is for exploring.
@@ -73,7 +76,28 @@ export function createLevelWorld(stage, playerInputs, options = {}) {
 /** Whether the man is held where he stands (an action, a stoop to take something up). */
 export function levelBusy(world) {
   const level = levelOf(world);
-  return Boolean(level?.action) || Boolean(world.fighters[0].pickup);
+  return Boolean(level?.action) || Boolean(world.fighters[0].pickup) || endingBusy(world);
+}
+
+/**
+ * The side the bout banner would name: none in a stage. A level run is not a bout: one enemy falling, or the player
+ * standing alone, is not an end; it ends by his death (YOU DIED, then the last rest) or by the ending (ending.js).
+ */
+export function bannerWinner(world) {
+  return world.stage ? null : boutWinner(world);
+}
+
+/**
+ * The man the player's marker and Lock are on in a stage: the nearest foe, if he is aware of the player and within
+ * LEVEL_CONFIG.marker.aware m, or any foe within LEVEL_CONFIG.marker.near m (an unaware man close by can be locked on and
+ * struck first); otherwise none (a far, unaware man gets no name over his head).
+ */
+export function levelOpponent(world, me) {
+  const foe = opponentFor(world, me);
+  if (!foe || foe.dormant) return null;
+  const apart = Math.hypot(foe.x[P.pelvis * 3] - me.x[P.pelvis * 3], foe.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]);
+  const { aware, near } = LEVEL_CONFIG.marker;
+  return apart <= near || (apart <= aware && levelAware(world, foe)) ? foe : null;
 }
 
 /** Each step: the actions and tonics go on, a death is noticed, the boss's second phase is watched for. */
@@ -88,6 +112,7 @@ export function levelThink(world, dt) {
   updateAction(world, dt);
   updateTonics(world, dt);
   if (level.boss) watchBoss(world, level.boss);
+  watchEnding(world);
 }
 
 // ---- The boss -----------------------------------------------------------------------------------------------
@@ -146,6 +171,21 @@ export function drainRebuilds(world) {
   return ids;
 }
 
+/**
+ * Begin again from the last rest he reached (no YOU DIED): false if he has reached none (the caller begins the stage over).
+ * A scene half-played is put back to its door being open.
+ */
+export function restartFromRest(world) {
+  const level = levelOf(world);
+  if (!level.rests) return false;
+  if (level.ending?.phase === 'scene') level.ending.phase = 'open';
+  level.ui.length = 0;
+  respawnPlayer(world);
+  level.ui.length = 0;
+  return true;
+}
+
 export { respawnPlayer, restAtPoint } from './checkpoints.js';
 export { contextFor, interact, interactions, hostileNear } from './interact.js';
 export { useItem } from './items.js';
+export { endingBusy, endingDone, endingOf, killBoss, princeOf } from './ending.js';

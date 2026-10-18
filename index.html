@@ -50,6 +50,12 @@
   <div class="screen" id="versus" hidden></div>
   <div class="wizard" id="wizard" hidden></div>
 
+  <!-- The ghost walk's own bar (the sandbox's stage debug): the pace, and who he walks as. -->
+  <div class="ghost-bar" id="ghost-bar" role="group" aria-label="Ghost walk">
+    <button type="button" data-speed="0.25">¼×</button><button type="button" data-speed="1">1×</button><button type="button" data-speed="4">4×</button>
+    <label><span>As</span><select id="ghost-as"></select></label>
+  </div>
+
   <div class="banner" id="banner" hidden>
     <p id="banner-text"></p>
     <div class="banner-actions"><button id="banner-menu">☰ Menu</button><button id="banner-retry" hidden>↻ Retry</button><button id="banner-again" class="primary">Next bout</button></div>
@@ -97,6 +103,7 @@
         <button data-value="play">Play red</button>
         <button data-value="play" data-side="blue">Play blue</button>
       </div>
+      <button type="button" id="ghost-walk" class="sandbox-only" title="Walk the Dunnottar stage unseen: the garrison never notices you (for looking the castle over)">👻 Ghost walk · Dunnottar</button>
       <button id="open-builder" class="primary sandbox-only">Build fighters</button>
     </div>
     <!-- How the player attacks in a fight (fightui/toggle.js): tapping his man, or a button for each kind of blow; the key shows the colours. -->

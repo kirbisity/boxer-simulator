@@ -161,6 +161,10 @@ export function checkStage(stage) {
   for (const section of stage.sections) {
     for (const lever of section.levers ?? []) if (!mechanisms.has(lever.target)) problems.push(`lever ${lever.id} works ${lever.target}, which is not there`);
   }
+  if (stage.ending) {
+    if (!mechanisms.has(stage.ending.door)) problems.push(`the ending opens ${stage.ending.door}, which is not there`);
+    if (!spawns.has(stage.ending.prince)) problems.push(`the ending is with ${stage.ending.prince}, who is not there`);
+  }
   return problems;
 }
 

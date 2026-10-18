@@ -314,7 +314,7 @@ function readEvents(world, aware) {
       for (const [one, two] of [[event.attacker, event.defender], [event.defender, event.attacker]]) {
         const mind = aware.minds[one];
         const other = world.fighters[two];
-        if (mind && other && mind.kind === 'guard' && other.corner === 'red') alarm(world, aware, mind, world.fighters[one], 'bump', other);
+        if (mind && other && mind.kind === 'guard' && other.corner === 'red' && !world.stage.ghost) alarm(world, aware, mind, world.fighters[one], 'bump', other);
       }
       continue;
     }
@@ -518,6 +518,14 @@ function doReturn(world, aware, mind, fighter) {
 
 function lookGuard(world, aware, mind, fighter) {
   const config = aware.config;
+  // Ghost walk (a designer's debug, the sandbox): the garrison neither sees nor hears him; a hunt already on is given up.
+  if (world.stage.ghost) {
+    if (mind.state === 'aggro' || mind.state === 'search') setState(world, aware, mind, fighter, 'return', 'ghost');
+    if (mind.state === 'idle') doIdle(world, aware, mind, fighter);
+    else if (mind.state === 'patrol') doPatrol(world, aware, mind, fighter);
+    else if (mind.state === 'return') doReturn(world, aware, mind, fighter);
+    return;
+  }
   if (mind.state === 'aggro') {
     lookAggro(world, aware, mind, fighter);
     return;
@@ -648,6 +656,7 @@ function flight(world, fighter, threat, { refuge = null, rear = null } = {}) {
 }
 
 function lookNeutral(world, aware, mind, fighter) {
+  if (mind.scripted) return doScripted(world, aware, mind, fighter);
   const config = aware.config;
   // What frightens him: a fight near, an aggro enemy in sight, a blow on himself.
   let threat = null;
@@ -681,6 +690,31 @@ function lookNeutral(world, aware, mind, fighter) {
     case 'return': return doReturn(world, aware, mind, fighter);
     default: return undefined;
   }
+}
+
+/**
+ * A civilian cowering for good, as a scene wants him (the prince in the cell): on his knees, he shuffles away from the
+ * player toward `corner` ([x, z]) while the player is within `near` m, and otherwise stays down where he is. Nothing calms him.
+ * Returns false if there is no such man.
+ */
+export function cowerFor(world, id, { corner, near = 3.5 }) {
+  const aware = world.stage?.aware;
+  const fighter = world.fighters.find((each) => each.spawn?.id === id);
+  const mind = fighter && aware?.minds[fighter.id];
+  if (!mind || fighter.state === 'out') return false;
+  mind.scripted = { corner, near };
+  setState(world, aware, mind, fighter, 'cower', 'the scene');
+  fighter.crawling || startCrawl(world, fighter, 'cowers');
+  return true;
+}
+
+function doScripted(world, aware, mind, fighter) {
+  const { corner, near } = mind.scripted;
+  if (!fighter.crawling) startCrawl(world, fighter, 'cowers');
+  const player = world.fighters[0];
+  const toCorner = Math.hypot(corner[0] - hipX(fighter), corner[1] - hipZ(fighter));
+  if (flatApart(player, fighter) < near && toCorner > 0.5) head(fighter, corner[0], corner[1], 1);
+  else stand(fighter, yawToward(hipX(fighter) - hipX(player), hipZ(fighter) - hipZ(player)));
 }
 
 function doFlee(world, aware, mind, fighter, threat) {
@@ -742,6 +776,8 @@ const followers = (world, aware) => aware.minds.filter((mind) => mind && mind.ki
 /** Whom a follower may fight: aggro enemies, and anyone who is striking at him. */
 function mayFight(world, aware, mind, fighter, other) {
   const theirs = aware.minds[other.id];
+  // The boss is the player's alone: the freed stay out of that fight (the duel with Lord Vaelen is one to one).
+  if (other.spawn?.role === 'boss') return false;
   if (theirs) return theirs.state === 'aggro';
   return other.punch?.target === fighter.id;
 }
@@ -763,7 +799,7 @@ function lookAlly(world, aware, mind, fighter) {
   for (const other of aware.minds) {
     if (!other || other.kind !== 'guard' || other.state !== 'aggro') continue;
     const guard = world.fighters[other.id];
-    if (!upright(guard)) continue;
+    if (!upright(guard) || guard.spawn.role === 'boss') continue;
     if (flatApart(guard, fighter) < config.allyReach || (mind.state !== 'stayed' && flatApart(guard, player) < config.allyReach)) {
       fight = true;
       break;
@@ -874,7 +910,8 @@ export function rehomeFollowers(world, ids) {
   for (const mind of aware.minds) {
     if (!mind || mind.kind !== 'ally') continue;
     const fighter = world.fighters[mind.id];
-    if (fighter.state === 'out' || ids.includes(fighter.spawn.section)) continue;
+    // (One who has stayed at the gate stays in his section: he sleeps with it, and wakes standing, rather than be woken over a floor that is gone.)
+    if (fighter.state === 'out' || mind.state === 'stayed' || ids.includes(fighter.spawn.section)) continue;
     if (flatApart(fighter, player) < aware.config.rehome) fighter.spawn.section = ids[0];
   }
 }

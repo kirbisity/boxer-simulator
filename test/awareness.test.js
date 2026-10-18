@@ -43,6 +43,20 @@ test('a guard facing the player, in the open, sees him and turns aggro; the figh
   assert.ok(Math.hypot(now[0] - start[0], now[1] - start[1]) > 2, 'he comes for the player');
 });
 
+test('ghost walk (the sandbox debug): a guard facing the player never notices him, and one already hunting gives up', () => {
+  const w = world({ spawns: [guard('g', 12, 0, Math.PI)] });
+  w.stage.ghost = true;
+  run(w, 4);
+  assert.equal(state(w, 'g'), 'idle', 'in plain sight, unseen');
+  w.stage.ghost = false;
+  run(w, 2);
+  assert.equal(state(w, 'g'), 'aggro');
+  w.stage.ghost = true;
+  run(w, 1);
+  assert.notEqual(state(w, 'g'), 'aggro', 'the hunt is given up');
+  assert.equal(man(w, 'g').driven, true);
+});
+
 test('a guard with his back to the player stays idle however near: the player can walk up behind him', () => {
   const w = world({ spawns: [guard('g', 12, 0, 0)] });
   const me = w.fighters[0];
