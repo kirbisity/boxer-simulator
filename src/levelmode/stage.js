@@ -68,6 +68,7 @@
 import { P, PRESETS } from '../body.js';
 import { createWorld, placeOnFloor } from '../physics.js';
 import { createTerrain, floorAt } from '../physics/terrain.js';
+import { createAwareness, rehomeFollowers, updateAwareness } from './awareness.js';
 
 const ROLE_CORNER = { enemy: 'blue', boss: 'blue', civilian: 'grey', prisoner: 'grey', ally: 'red' };
 
@@ -191,7 +192,7 @@ export function stageTerrain(stage, ids, states) {
  * section, each standing on his post; the sections around the player's start active, the rest of
  * the men dormant. `playerInputs`: his fighter inputs (a preset's, normalised or not).
  */
-export function createStageWorld(stage, playerInputs, { seed = 1 } = {}) {
+export function createStageWorld(stage, playerInputs, { seed = 1, awareness = true } = {}) {
   const problems = checkStage(stage);
   if (problems.length) throw new Error(`stage ${stage.id}: ${problems.join('; ')}`);
   const entries = [{ inputs: playerInputs, corner: 'red' }];
@@ -216,6 +217,8 @@ export function createStageWorld(stage, playerInputs, { seed = 1 } = {}) {
   world.fighters[0].walking = true;
   world.stage = { def: stage, active: [], mechanisms: Object.fromEntries(mechanismsOf(stage).map((mechanism) => [mechanism.id, mechanism.state])), steps: 0 };
   arena.terrain = stageTerrain(stage, [], world.stage.mechanisms);
+  // Who has noticed whom, and what the unaware do (levelmode/awareness.js); `awareness: false` leaves every man to the fight AI.
+  if (awareness) createAwareness(world);
   updateStage(world, true);
   return world;
 }
@@ -240,10 +243,13 @@ export function updateStage(world, force = false) {
   const ids = activeSections(run.def, playerAt(world));
   let changed = false;
   if (ids.length && (force || ids.join() !== run.active.join())) {
+    // The followers go with him: none is left behind asleep.
+    rehomeFollowers(world, ids);
     apply(world, ids);
     changed = true;
   }
   if (run.steps % REHOME_EVERY === 0) rehome(world);
+  updateAwareness(world);
   return changed;
 }
 

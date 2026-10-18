@@ -36,6 +36,8 @@ import { updateNets } from './arenaview.js';
 import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
+import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
+import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { createStageWorld, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
@@ -751,6 +753,7 @@ function drawWorld(dt, drawIt = true) {
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
   selectCrowdDraw(scene, state.views, safeMen(world, followed));
   if (world.stage && stageView) updateStageView(stageView, world);
+  if (world.stage) awarenessOverlay?.update(world, scene.camera);
   for (const view of state.views) {
     // A dormant man (his section of a stage is not active) is not drawn, and posed afresh when he wakes.
     if (view.fighter.dormant) {
@@ -1814,6 +1817,8 @@ function enterTutorial() {
 // person, with the sections around him awake. `boxer.levelMode(key)` opens one (STAGES).
 
 let stageView = null;
+// A development overlay of what each man is doing (boxer.stage().overlay(true)).
+let awarenessOverlay = null;
 
 /** Open a stage in play mode: the player (walking) at its start, the world of terrain drawn in grey boxes. */
 function enterStage(key) {
@@ -2306,7 +2311,18 @@ const boxer = window.boxer = {
     return state.world.stage.active;
   },
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
-  stage: () => ({ run: state.world.stage ?? null, set: (id, to) => setMechanism(state.world, id, to), pull: (id) => pullLever(state.world, id), view: stageView }),
+  // `awareness()`: what each man is doing (idle, patrol, aggro, search, return, flee, cower, follow, stayed); `free(id)`: a prisoner (spawn id) becomes an ally who follows; `gather()`: the followers to the player's side; `overlay(on)`: a letter over each head.
+  stage: () => ({
+    run: state.world.stage ?? null, set: (id, to) => setMechanism(state.world, id, to), pull: (id) => pullLever(state.world, id), view: stageView,
+    awareness: () => awarenessReport(state.world),
+    free: (id) => freePrisoner(state.world, id),
+    gather: () => gatherFollowers(state.world),
+    overlay: (on = true) => {
+      awarenessOverlay ??= createAwarenessOverlay(scene.renderer.domElement);
+      awarenessOverlay.show(on);
+      return on;
+    },
+  }),
   // The training yard, as the Levels menu opens it (any menu screen closed); its run (step, progress).
   tutorial: () => {
     menus.close();

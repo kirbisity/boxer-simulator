@@ -12,7 +12,10 @@ import { floorAt, rampOf, rayBlocked, slabOf } from '../src/physics/terrain.js';
 import { hipsAt, walk } from './walker.js';
 
 const hero = () => structuredClone(PRESETS.ronin);
-const yard = () => createStageWorld(TESTYARD, hero(), { seed: 3 });
+// These tests are about an empty yard and the hall's men; the yard's own practice men (for the awareness tests) are left out.
+const QUIET = structuredClone(TESTYARD);
+QUIET.sections[0].spawns = [];
+const yard = () => createStageWorld(QUIET, hero(), { seed: 3 });
 const where = (fighter) => Array.from(fighter.x);
 const asleep = (world) => world.fighters.filter((fighter) => fighter.dormant).map((fighter) => fighter.spawn.id);
 
@@ -20,6 +23,12 @@ test('the registry holds the test yard, and its data is sound', () => {
   assert.equal(STAGES.testyard, TESTYARD);
   assert.deepEqual(checkStage(TESTYARD), []);
   assert.deepEqual(mechanismsOf(TESTYARD).map((mechanism) => [mechanism.id, mechanism.section, mechanism.state]), [['gate1', 'yard', 'closed']]);
+});
+
+test('the test yard has men to practise on in the yard itself, and a place where followers stop', () => {
+  assert.deepEqual(TESTYARD.sections[0].spawns.map((spawn) => [spawn.id, spawn.role]), [['sentry1', 'enemy'], ['sentry2', 'enemy'], ['roamer', 'enemy'], ['gardener', 'civilian'], ['stray', 'prisoner']]);
+  assert.ok(regionContains(TESTYARD.followStopsAt, 12.5, 7, 1.2));
+  assert.equal(createStageWorld(TESTYARD, hero(), { seed: 3 }).awake, 6, 'the player and the five of the yard');
 });
 
 test('checkStage names what is wrong', () => {
