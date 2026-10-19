@@ -64,7 +64,7 @@ function stubThree() {
   };
 }
 
-test('the castle materials: mipmapped, trilinear, anisotropic textures; floors offset; decals off the stone', async () => {
+test('the castle materials: mipmapped, trilinear, anisotropic textures; floors offset; decals toward the camera', async () => {
   const kept = { THREE: globalThis.THREE, document: globalThis.document };
   globalThis.THREE = stubThree();
   globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => quietContext() }) };

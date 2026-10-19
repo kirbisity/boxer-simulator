@@ -20,6 +20,7 @@ import { kpBuild } from './kitprops.js';
 import { kwDecorate } from './kitwear.js';
 import { stormFollow, stormTorch } from './storm.js';
 import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
+import { FaceRegistry } from '../depthrange.js';
 import { lampShare, newLamps, pickLit, stepLamps, torchFlicker } from './torchpool.js';
 import { skyDirection } from './stagesky.js';
 import { ktDispose, ktMaterials, ktRandom, ktWeather } from './kittex.js';
@@ -692,8 +693,8 @@ function kitWaymarks(dyn, trail) {
 }
 
 /** The detail of a section: its solids as masonry, its decor, its props. Returns { group, dyn }. */
-function kitSection(section, mats, seed, levels = []) {
-  const batch = new KitBatch(mats, seed);
+function kitSection(section, mats, seed, levels = [], faces = null) {
+  const batch = new KitBatch(mats, seed, faces);
   const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [] };
   kitSolids(batch, section);
   const cellar = section.id === 'vault' || section.id === 'cell';
@@ -729,8 +730,8 @@ function kitSection(section, mats, seed, levels = []) {
 }
 
 /** The silhouette of a section: its solids as plain blocks. */
-function kitSilhouette(section, mats, seed) {
-  const batch = new KitBatch(mats, seed);
+function kitSilhouette(section, mats, seed, faces = null) {
+  const batch = new KitBatch(mats, seed, faces);
   kitSolids(batch, section, { silhouette: true });
   const group = new THREE.Group();
   group.name = `silhouette:${section.id}`;
@@ -775,9 +776,9 @@ function kitFoamTexture() {
 }
 
 /** The land: the mainland hillside, the cliffs of the headland slabs, the rock under the gatehouse and its tunnel, and the surf at their feet. */
-function kitLand(stage, mats, blocks, foam) {
+function kitLand(stage, mats, blocks, foam, faces = null) {
   const sea = stage.sea;
-  const batch = new KitBatch(mats, 99);
+  const batch = new KitBatch(mats, 99, faces);
   const form = stage.landform;
   kitMainland(batch, stage, blocks, null, sea);
   const strips = [];
@@ -1210,7 +1211,10 @@ export function createCastleView(stage) {
   const group = new THREE.Group();
   group.name = `stage:${stage.id}`;
   const blocks = kitBlocks(stage);
-  const land = kitLand(stage, mats, blocks, foam);
+  // (The faces placed so far, so that no two on one plane are drawn, in the detail and in the silhouettes alike (a silhouette is seen beside a neighbour's detail): depthrange.js.)
+  const detailFaces = new FaceRegistry();
+  const farFaces = detailFaces;
+  const land = kitLand(stage, mats, blocks, foam, detailFaces);
   group.add(land);
   const sections = {};
   const parts = {};
@@ -1221,8 +1225,8 @@ export function createCastleView(stage) {
   let seed = 7;
   for (const section of stage.sections) {
     seed += 13;
-    const detail = kitSection(section, mats, seed, stage.levels ?? []);
-    const far = kitSilhouette(section, mats, seed + 1);
+    const detail = kitSection(section, mats, seed, stage.levels ?? [], detailFaces);
+    const far = kitSilhouette(section, mats, seed + 1, farFaces);
     const dynamic = kitDynamics(detail.dyn, mats, textures);
     detail.group.add(dynamic.group);
     const holder = new THREE.Group();

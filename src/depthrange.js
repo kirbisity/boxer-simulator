@@ -51,3 +51,55 @@ export const KIT_FLOOR_OFFSET = {
   cobble: { factor: -1, units: -4 },
   boards: { factor: -1, units: -5 },
 };
+
+// ---- no two faces on one plane ----------------------------------------------------------------------------------------------------------------
+
+/** The least distance (m) two overlapping faces of the same facing must stand apart after their lifts: a hair above the depth buffer's step at the range they are seen in detail. */
+export const KIT_SEPARATION = 0.00025;
+
+/**
+ * The lift (m) for a piece whose faces would lie on the same plane as faces already placed: `offsets` are, for each such face, how far (m) the other stands
+ * out from this piece's own (unlifted) plane; the lift must keep at least `separation` from every one. Tries the level the build order gives (`preferred`,
+ * 0..levels - 1) first, then the others; if every level is taken (a crowd of faces on one plane) the preferred one stands.
+ */
+export function chooseLift(offsets, preferred, config = KIT_LIFT, separation = KIT_SEPARATION) {
+  for (let k = 0; k < config.levels; k += 1) {
+    const lift = config.step * ((preferred + k) % config.levels);
+    if (offsets.every((offset) => Math.abs(lift - offset) >= separation)) return lift;
+  }
+  return config.step * preferred;
+}
+
+/**
+ * The big flat faces placed so far, to find where a new one would lie on the same plane (and the same facing) and overlap. A face is
+ * { axis (0 x, 1 y, 2 z), sign (+1 or -1: which way it faces), height (m along its normal: sign * the plane's coordinate, with the lift), rect: [a0, a1, b0, b1]
+ * (its extent along the other two axes, in order) }.
+ */
+export class FaceRegistry {
+  constructor(cell = 0.004) {
+    this.cell = cell;
+    this.cells = new Map();
+  }
+
+  add(axis, sign, height, rect) {
+    const key = `${axis}${sign > 0 ? '+' : '-'}${Math.round(height / this.cell)}`;
+    let list = this.cells.get(key);
+    if (!list) this.cells.set(key, (list = []));
+    list.push({ height, rect });
+  }
+
+  /** The heights of the faces within `reach` m of `height` that overlap `rect` (positively: a shared edge is not an overlap). */
+  near(axis, sign, height, rect, reach = 0.0045) {
+    const found = [];
+    const steps = Math.ceil(reach / this.cell);
+    const centre = Math.round(height / this.cell);
+    for (let d = -steps; d <= steps; d += 1) {
+      for (const face of this.cells.get(`${axis}${sign > 0 ? '+' : '-'}${centre + d}`) ?? []) {
+        if (Math.abs(face.height - height) > reach) continue;
+        const r = face.rect;
+        if (Math.min(r[1], rect[1]) - Math.max(r[0], rect[0]) > 1e-4 && Math.min(r[3], rect[3]) - Math.max(r[2], rect[2]) > 1e-4) found.push(face.height);
+      }
+    }
+    return found;
+  }
+}

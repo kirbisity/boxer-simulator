@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMERA_NEAR, DEPTH_BITS, KIT_FLOOR_OFFSET, KIT_LIFT, depthStep, kitLift, kitLiftMost, resolvedUpTo } from '../src/depthrange.js';
+import { CAMERA_NEAR, DEPTH_BITS, FaceRegistry, KIT_FLOOR_OFFSET, KIT_LIFT, KIT_SEPARATION, chooseLift, depthStep, kitLift, kitLiftMost, resolvedUpTo } from '../src/depthrange.js';
 import { TORCH_POOL, lampShare, newLamps, pickLit, stepLamps, torchFlicker } from '../src/levelmode/torchpool.js';
 
 test('the camera sees from 20 cm: far enough from the 5 cm that crawled the stone, nearer than any wall the follow camera allows', () => {
@@ -38,6 +38,38 @@ test('the kit lifts: neighbouring pieces differ, the most is under the decals 2 
   assert.equal(kitLift(0), 0);
   // Resolved at 30 m with the camera's near plane: one lift step is more than a depth step there.
   assert.ok(KIT_LIFT.step > depthStep(30, CAMERA_NEAR));
+});
+
+test('faces on one plane are found and kept apart: same facing, overlapping, within a few mm', () => {
+  const registry = new FaceRegistry();
+  // A wall face (axis 0, facing +x) at x = 45.6, over z -34..-19 and y 11..21, lifted 1.5 mm.
+  registry.add(0, 1, 45.6015, [-34, -19, 11, 21]);
+  // Another that overlaps it on the same plane: found, at that height.
+  assert.deepEqual(registry.near(0, 1, 45.6, [-32, -18, 12, 18]), [45.6015]);
+  // Not the other way round (the face of the wall's far side), not a face that only touches, not one a hand off.
+  assert.deepEqual(registry.near(0, -1, -45.6, [-32, -18, 12, 18]), []);
+  assert.deepEqual(registry.near(0, 1, 45.6, [-19, -10, 12, 18]), []);
+  assert.deepEqual(registry.near(0, 1, 45.7, [-32, -18, 12, 18]), []);
+  assert.deepEqual(registry.near(1, 1, 45.6, [-32, -18, 12, 18]), []);
+  // Across a cell border of the hash: still found.
+  registry.add(2, 1, 0.0039, [0, 1, 0, 1]);
+  assert.equal(registry.near(2, 1, 0.0041, [0, 1, 0, 1]).length, 1);
+  // The lift that keeps off every one: the preferred level when it is clear, the next clear one when not, and every face apart by the separation.
+  const first = chooseLift([], 4);
+  assert.equal(first, KIT_LIFT.step * 4);
+  const clash = chooseLift([KIT_LIFT.step * 4], 4);
+  assert.ok(clash !== KIT_LIFT.step * 4);
+  assert.ok(Math.abs(clash - KIT_LIFT.step * 4) >= KIT_SEPARATION);
+  const crowded = Array.from({ length: KIT_LIFT.levels }, (_, level) => KIT_LIFT.step * level);
+  assert.equal(chooseLift(crowded, 3), KIT_LIFT.step * 3, 'with every level taken the preferred stands');
+  // Wall after wall on one plane (three pieces in the same place): each ends on a level of its own.
+  const placed = [];
+  for (let piece = 0; piece < 6; piece += 1) {
+    const lift = chooseLift(placed, (piece * KIT_LIFT.stride) % KIT_LIFT.levels);
+    for (const other of placed) assert.ok(Math.abs(lift - other) >= KIT_SEPARATION);
+    placed.push(lift);
+  }
+  assert.ok(Math.max(...placed) <= kitLiftMost());
 });
 
 test('the floors win a tie with what is under them: negative offsets, the dressing over the earth', () => {

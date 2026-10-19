@@ -1813,7 +1813,8 @@ export function coastFarPlaneGuard(ships) {
         ship.localToWorld(corner).applyMatrix4(camera.matrixWorldInverse);
         deepest = Math.max(deepest, -corner.z);
       }
-      ship.visible = deepest < camera.far * 0.995;
+      // (With a margin both ways: a ship at the far plane's edge, with the camera swaying, took turns being shown and hidden, frame after frame.)
+      ship.visible = deepest < camera.far * (ship.visible ? 0.995 : 0.985);
     });
   };
   return [marker, band];

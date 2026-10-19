@@ -4,7 +4,7 @@
 // foot of a wall). Nothing here touches the DOM; THREE is the page's.
 
 import { ktRandom } from './kittex.js';
-import { kitLift } from '../depthrange.js';
+import { KIT_LIFT, chooseLift } from '../depthrange.js';
 
 /** Chunk size (m) of the ground the merged meshes are cut into, so that frustum culling has something to cull. */
 const KG_CHUNK = 36;
@@ -13,21 +13,48 @@ const kgClamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** Triangles waiting to become meshes, by material and chunk. */
 export class KitBatch {
-  constructor(materials, seed = 1) {
+  /** `faces`: a FaceRegistry shared by the batches of one stage's detail (or of its silhouettes), so that faces on one plane in different sections are found too. */
+  constructor(materials, seed = 1, faces = null) {
     this.materials = materials;
     this.buckets = new Map();
     this.random = ktRandom(seed);
     this.triangles = 0;
     this.pieces = 0;
+    this.faces = faces;
   }
 
   /**
-   * The lift (m) of the next piece: every piece of a batch stands a different hair off its faces' plane (depthrange.js), so that where two overlap on
-   * one plane (a wall and its neighbour's, a stair's tread and the landing's slab) the same one wins in every frame, and the depth buffer
-   * does not flicker between them.
+   * The lift (m) of a piece (depthrange.js): every piece stands a hair off its faces' plane, so that where two overlap on one plane (a wall and its
+   * neighbour's, a stair's tread and the landing's slab) the same one wins in every frame, and the depth buffer does not flicker between them. By default the
+   * level the build order gives (neighbours in it differ); where the batch has a registry of faces and the piece's big flat ones would lie on a plane taken by a
+   * face of the same facing already placed and overlapping it, a level that keeps them apart. `world`, `norms`: the piece's vertices and normals (xyz each, three to a
+   * triangle), as they would stand without a lift.
    */
-  nextLift() {
-    return kitLift(this.pieces++);
+  settle(world, norms) {
+    const preferred = (this.pieces++ * KIT_LIFT.stride) % KIT_LIFT.levels;
+    if (!this.faces) return KIT_LIFT.step * preferred;
+    const flat = [];
+    for (let i = 0; i + 2 < world.length / 3; i += 3) {
+      const nx = norms[i * 3];
+      const ny = norms[i * 3 + 1];
+      const nz = norms[i * 3 + 2];
+      const axis = Math.abs(nx) > 0.9995 ? 0 : Math.abs(ny) > 0.9995 ? 1 : Math.abs(nz) > 0.9995 ? 2 : -1;
+      if (axis < 0) continue;
+      const along = [world[i * 3 + axis], world[i * 3 + 3 + axis], world[i * 3 + 6 + axis]];
+      if (Math.max(...along) - Math.min(...along) > 1e-4) continue;
+      const [u, w] = [(axis + 1) % 3, (axis + 2) % 3];
+      const us = [world[i * 3 + u], world[i * 3 + 3 + u], world[i * 3 + 6 + u]];
+      const ws = [world[i * 3 + w], world[i * 3 + 3 + w], world[i * 3 + 6 + w]];
+      const rect = [Math.min(...us), Math.max(...us), Math.min(...ws), Math.max(...ws)];
+      if ((rect[1] - rect[0]) * (rect[3] - rect[2]) < 0.005) continue;
+      const sign = (axis === 0 ? nx : axis === 1 ? ny : nz) > 0 ? 1 : -1;
+      flat.push({ axis, sign, height: sign * (along[0] + along[1] + along[2]) / 3, rect });
+    }
+    const offsets = [];
+    for (const face of flat) for (const other of this.faces.near(face.axis, face.sign, face.height, face.rect)) offsets.push(other - face.height);
+    const lift = offsets.length ? chooseLift(offsets, preferred) : KIT_LIFT.step * preferred;
+    for (const face of flat) this.faces.add(face.axis, face.sign, face.height + lift, face.rect);
+    return lift;
   }
 
   bucket(material, x, z) {
@@ -44,10 +71,10 @@ export class KitBatch {
   /**
    * Append a geometry (indexed or not) under a matrix. `tint`: a grey multiplier or [r, g, b]; `aoFrom`: the height
    * of the foot of the piece, below which the surface darkens (up to `aoSpan` m above it it lightens to full);
-   * `uvShift`: a random phase to the texture (on by default, so neighbouring walls do not repeat). `lift`: how far (m) the faces stand off along their
-   * normals (by default the batch's next piece's: see `nextLift`; 0 where the caller has lifted the piece itself).
+   * `uvShift`: a random phase to the texture (on by default, so neighbouring walls do not repeat). The piece is lifted (see `settle`): `inflate`: a box
+   * about the origin of its own, made larger by the lift all round (so its edges stay joined) and not its faces moved apart; `lift`: a lift given (0 for none).
    */
-  add(material, geometry, matrix = null, { tint = 1, aoFrom = null, aoSpan = 2.6, aoMin = 0.55, jitter = 0.06, shift: shifted = true, lift: given = null } = {}) {
+  add(material, geometry, matrix = null, { tint = 1, aoFrom = null, aoSpan = 2.6, aoMin = 0.55, jitter = 0.06, shift: shifted = true, lift: given = null, inflate = false } = {}) {
     const position = geometry.attributes.position;
     const normal = geometry.attributes.normal;
     const uv = geometry.attributes.uv;
@@ -66,14 +93,32 @@ export class KitBatch {
     const v = new THREE.Vector3();
     const n = new THREE.Vector3();
     const variation = 1 + (phase - 0.5) * 2 * jitter;
-    const lift = given ?? this.nextLift();
-    for (let k = 0; k < count; k += 1) {
+    const at = (k, lift) => {
       const i = index ? index.getX(k) : k;
-      v.set(position.getX(i), position.getY(i), position.getZ(i));
+      const x = position.getX(i);
+      const y = position.getY(i);
+      const z = position.getZ(i);
+      if (inflate) v.set(x + Math.sign(x) * lift, y + Math.sign(y) * lift, z + Math.sign(z) * lift);
+      else v.set(x, y, z);
       if (matrix) v.applyMatrix4(matrix);
       n.set(normal.getX(i), normal.getY(i), normal.getZ(i));
       if (normalMatrix) n.applyMatrix3(normalMatrix).normalize();
-      if (lift) v.addScaledVector(n, lift);
+      if (lift && !inflate) v.addScaledVector(n, lift);
+      return i;
+    };
+    let lift = given;
+    if (lift === null) {
+      const world = new Float64Array(count * 3);
+      const norms = new Float64Array(count * 3);
+      for (let k = 0; k < count; k += 1) {
+        at(k, 0);
+        world.set([v.x, v.y, v.z], k * 3);
+        norms.set([n.x, n.y, n.z], k * 3);
+      }
+      lift = this.settle(world, norms);
+    }
+    for (let k = 0; k < count; k += 1) {
+      const i = at(k, lift);
       bucket.position.push(v.x, v.y, v.z);
       bucket.normal.push(n.x, n.y, n.z);
       bucket.uv.push(uv ? uv.getX(i) + shift * 3 : 0, uv ? uv.getY(i) + shift * 5 : 0);
@@ -135,11 +180,9 @@ export function kgPlace(x, y, z, yaw = 0) {
  * `faces`: which to draw: 'top', 'bottom', 'ends', 'sides' (the long faces); default all but the bottom.
  */
 export function kgBox(batch, material, cx, cy, cz, w, h, d, yaw = 0, { faces = ['top', 'ends', 'sides'], ...options } = {}) {
-  // (A box is made larger by its lift all round, not its faces moved apart: its edges stay joined.)
-  const lift = options.lift ?? batch.nextLift();
-  const hw = w / 2 + lift;
-  const hh = h / 2 + lift;
-  const hd = d / 2 + lift;
+  const hw = w / 2;
+  const hh = h / 2;
+  const hd = d / 2;
   const position = [];
   const normal = [];
   const uv = [];
@@ -166,7 +209,7 @@ export function kgBox(batch, material, cx, cy, cz, w, h, d, yaw = 0, { faces = [
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const matrix = new THREE.Matrix4().makeRotationY(yaw);
   matrix.setPosition(cx, cy, cz);
-  batch.add(material, geometry, matrix, { ...options, lift: 0 });
+  batch.add(material, geometry, matrix, { inflate: true, ...options });
   geometry.dispose();
 }
 
