@@ -79,6 +79,19 @@ of four real lights. `storm.js` is the weather (place `dunnottar`: sky, sea, rai
 and the kit's materials fade in a screen-door tube between camera and man (`ktSightline`) while the
 follow camera is kept off the stage's walls and roofs (`stageCameraRoom`, `followcam.js` `march`).
 
+**What a stage paints (conditional painting).** A stage is one scene but each frame paints only what can be seen. `levelmode/visibility.js` (pure; `test/visibility.test.js`)
+decides: the sections the man is in are painted in `detail`; so is any section reached from them, up to three portals deep, through openings that are inside the camera's frustum
+and that a sight line from the eye reaches (`terrain.js` `rayBlocked` with the bars of a gate and the ladders left out: `seeThroughIds`; a shut door or a wall closes the way);
+a section in view but not reached is a silhouette (`far`); the rest is `off` (not drawn, not animated), as is anything past the fog's far end. A section held in detail lingers 0.5 s
+after the view stops reaching it. Inside the detailed sections the merged meshes are drawn by reach (`kit.js` `kitReach`: the fog's, and for the wear decals, which are cut in 14 m chunks,
+drips, ravens and light shafts, the quality tier's), and a man whom no line from the eye or from the man played's head reaches, who is not near and not in the protected set,
+is not posed or drawn (`kitMen`; held 0.35 s). `boxer.painted()` says what is painted now. The sea is not shaded past the fog's far end (`storm.js`).
+**Quality** (`levelmode/quality.js`, `adaptres.js`): three tiers (`high`, `medium`, `low`: reaches in metres and the rain's share) and a ladder of rungs (pixel ratio and tier) that `auto` walks by the
+frame times: pixels first, then medium, then low at the floor ratio; a frame far behind steps down in 0.3 s, a slow one in 0.8 s, back up after 6 s or more of ease. The tier is two uniforms of the kit's shader
+(`kittex.js` `ktLod`: the reach of the sky's reflection in the stone, of the second read of the map, of standing water and of the soft edge of the baked shadow, each fading out over its
+last quarter; the macro map and the shadow's taps), so a change of tier compiles nothing. `boxer.quality('auto' | 'high' | 'low')` (remembered in `localStorage`; the ghost bar has the select)
+holds a rung or lets the frame times decide. `tools/stagebench.html` has the means of measuring (`SB.prof`, `SB.ab`, `SB.compare`).
+
 ## Drawing (browser only)
 
 `src/render.js` (scene, fighter views, camera), `src/loftbody.js` (the body

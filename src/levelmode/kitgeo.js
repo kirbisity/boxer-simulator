@@ -7,6 +7,8 @@ import { ktRandom } from './kittex.js';
 
 /** Chunk size (m) of the ground the merged meshes are cut into, so that frustum culling has something to cull. */
 const KG_CHUNK = 36;
+/** Decals are cut finer (they are painted only within a reach of the eye, quality.js): chunks of this size (m). */
+const KG_WEAR_CHUNK = 14;
 
 const kgClamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -20,7 +22,8 @@ export class KitBatch {
   }
 
   bucket(material, x, z) {
-    const key = `${material}|${Math.floor(x / KG_CHUNK)}|${Math.floor(z / KG_CHUNK)}`;
+    const size = material === 'wear' ? KG_WEAR_CHUNK : KG_CHUNK;
+    const key = `${material}|${Math.floor(x / size)}|${Math.floor(z / size)}`;
     let bucket = this.buckets.get(key);
     if (!bucket) {
       if (!this.materials[material]) throw new Error(`kit: no material ${material}`);

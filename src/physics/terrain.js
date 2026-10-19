@@ -271,8 +271,9 @@ export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.s
  * blocked, for a line of sight at `height` m (an eye; `heightB` at b, if it
  * differs). Blocked by a wall whose height range the line crosses, and by a
  * slab, ramp or flight standing higher than the line there (a ledge in the way).
+ * `seeThrough`: a Set of solid ids the line passes (the drawing's sight, levelmode/visibility.js: a gate of bars is stood behind, not seen behind).
  */
-export function rayBlocked(terrain, a, b, height = 1.5, heightB = height) {
+export function rayBlocked(terrain, a, b, height = 1.5, heightB = height, seeThrough = null) {
   const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const stepLength = terrain.cell * 0.5;
   const count = Math.max(1, Math.ceil(length / stepLength));
@@ -284,7 +285,7 @@ export function rayBlocked(terrain, a, b, height = 1.5, heightB = height) {
       const part = list[index];
       if (part.stamp === stamp) continue;
       part.stamp = stamp;
-      if (part.shape !== 'ceiling' && segmentHits(part, a, b, height, heightB)) return true;
+      if (part.shape !== 'ceiling' && !(seeThrough && part.id !== null && seeThrough.has(part.id)) && segmentHits(part, a, b, height, heightB)) return true;
     }
   }
   return false;

@@ -47,6 +47,7 @@ import { createLevelMarkers } from './levelmode/markers.js';
 import { createShards } from './levelmode/endingview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
+import { pinnedRung, QUALITY_MODES, readQuality, writeQuality } from './levelmode/quality.js';
 import { stormEnvironment, stormLook, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
@@ -495,6 +496,12 @@ function setCrawling(on) {
 let last = performance.now();
 // A big battle that cannot keep up is drawn with fewer pixels (adaptres.js); a duel never.
 const resolution = createAdaptiveResolution();
+// The quality of a stage's picture (levelmode/quality.js): 'auto' (the frame times pick the rung of the ladder: pixels, then tiers), or one held: 'high', 'low'. Remembered.
+let qualityMode = readQuality(typeof localStorage === 'undefined' ? null : localStorage);
+const holdQuality = (view = null) => resolution.pin(qualityMode === 'auto' ? null : pinnedRung(qualityMode, Infinity), view);
+holdQuality();
+// The tier a rung gives goes to the stage's drawing (and, there being none yet, to the one made next: enterStage).
+resolution.onTier = (tier) => stageView?.setQuality?.(tier);
 function frame(now) {
   // The next frame is asked for first: an error in this one must never stop the game.
   requestAnimationFrame(frame);
@@ -503,7 +510,7 @@ function frame(now) {
   const dt = Math.min(0.1, interval / 1000);
   last = now;
   try {
-    resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)));
+    resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)), { tiered: Boolean(state.world?.stage) });
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
@@ -835,8 +842,11 @@ function drawWorld(dt, drawIt = true) {
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
-  selectCrowdDraw(scene, state.views, safeMen(world, followed), world.stage ? STAGE_CROWD_VIEW : CROWD_VIEW);
+  const safe = safeMen(world, followed);
+  selectCrowdDraw(scene, state.views, safe, world.stage ? STAGE_CROWD_VIEW : CROWD_VIEW);
   if (world.stage && stageView) {
+    // (Who is not hidden by sight: levelmode/visibility.js.)
+    stageView.safe = safe;
     updateStageView(stageView, world, scene.camera);
     // (The castle's shaders are built in the first frame, not as each is first wanted: levelmode/kit.js.)
     stageView.warm?.(() => render(scene));
@@ -849,7 +859,12 @@ function drawWorld(dt, drawIt = true) {
       view.stale = true;
       continue;
     }
-    // Off screen (a crowd man the camera does not see): not posed or counted, and posed afresh the frame he is back.
+    // Off screen (a crowd man the camera does not see), or behind a wall of the stage from the eye: not posed or counted, and posed afresh the frame he is back.
+    if (world.stage && stageView?.manHidden?.(view.fighter.id)) {
+      view.group.visible = false;
+      view.stale = true;
+      continue;
+    }
     if (view.culled) {
       view.stale = true;
       continue;
@@ -1182,6 +1197,14 @@ function chooseStageLook(name, options) {
   stageLookSelect.value = chosen;
   return { look: chosen, looks: stageLookNames() };
 }
+// The quality of the picture (levelmode/quality.js), beside the look: auto, high or low.
+const qualitySelect = $('#ghost-quality');
+qualitySelect.append(...QUALITY_MODES.map((mode) => new Option(mode, mode)));
+qualitySelect.value = qualityMode;
+qualitySelect.addEventListener('change', () => {
+  boxer.quality(qualitySelect.value);
+  qualitySelect.blur();
+});
 stageLookSelect.addEventListener('change', () => {
   chooseStageLook(stageLookSelect.value);
   stageLookSelect.blur();
@@ -2064,6 +2087,7 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   setPlace(scene, place, PLACE_ARENAS[place]);
   if (stageView) disposeStageView(stageView);
   stageView = createStageView(stage);
+  stageView.setQuality?.(resolution.tier);
   scene.places[place].add(stageView.group);
   placeStageSea(scene.places[place], stage);
   // Things drawn with the stage and kept up with its own update each frame.
@@ -2617,6 +2641,18 @@ const boxer = window.boxer = {
     if (on !== undefined) resolution.set(on, scene);
     return resolution.info(scene);
   },
+  // The quality of the stage's picture: 'auto' (a ladder of pixels and tiers walked by the frame times), 'high' (everything, full pixels) or 'low' (the cheapest
+  // picture, the fewest pixels); remembered. No argument: what it is doing now ({ mode, tier, ratio, ... }).
+  quality: (mode) => {
+    if (QUALITY_MODES.includes(mode)) {
+      qualityMode = mode;
+      writeQuality(typeof localStorage === 'undefined' ? null : localStorage, mode);
+      holdQuality(scene);
+    }
+    return { mode: qualityMode, ...resolution.info(scene) };
+  },
+  // What the stage paints now (levelmode/visibility.js): sections in detail, silhouettes, chunks, decals, hidden men, and each section's state.
+  painted: () => stageView?.painted?.() ?? null,
   introPlaying,
   // Move the intro on (its own clock, s) without frames; the shot it is on, null once over.
   introStep: stepIntro,

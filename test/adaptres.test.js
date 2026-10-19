@@ -35,8 +35,8 @@ test('slow frames step down one at a time, with time between, and stop at the la
   }
   assert.equal(levels[0], 0);
   assert.equal(levels.at(-1), 3, 'the last step, not past it');
-  assert.ok(levels.indexOf(1) > 30, 'a second or so of slowness first, not the first slow frame');
-  assert.ok(levels.indexOf(2) - levels.indexOf(1) > 30, 'one step at a time');
+  assert.ok(levels.indexOf(1) > 20, 'most of a second of slowness first, not the first slow frame');
+  assert.ok(levels.indexOf(2) - levels.indexOf(1) > 20, 'one step at a time');
   assert.ok(!levels.includes(4));
 });
 
@@ -97,4 +97,25 @@ test('a stage is a big scene however few its men: it adapts, a duel does not', (
   assert.equal(adaptiveSize(41, true), 41);
   const state = newAdaptiveState();
   assert.equal(run(state, 30, 40, { fighters: adaptiveSize(2, true) }), 3, 'slow in a small stage: down to the last step');
+});
+
+test('a frame far behind steps down within half a second, one step at a time', () => {
+  const state = newAdaptiveState();
+  const levels = [];
+  for (let frame = 0; frame < 120; frame += 1) levels.push(stepAdaptive(state, { ms: 50, fighters: 100, levels: 5, work: 8 }));
+  const first = levels.indexOf(1);
+  assert.ok(first > 4 && first * 0.05 <= 0.5, `a step down after ${first} frames of 50 ms`);
+  assert.ok(levels.indexOf(2) > first, 'one step at a time');
+});
+
+test('a rung ladder: pixels first, then the tier, and a 1x screen has the tiers alone', async () => {
+  const { rungsFor, QUALITY_RUNGS } = await import('../src/levelmode/quality.js');
+  assert.deepEqual(rungsFor(2).map((r) => `${r.ratio}${r.tier[0]}`), ['2h', '1.5h', '1.5m', '1.25m', '1l']);
+  assert.deepEqual(rungsFor(1).map((r) => `${r.ratio}${r.tier[0]}`), ['1h', '1m', '1l']);
+  assert.equal(rungsFor(2, 1, QUALITY_RUNGS).length, 5);
+  for (const full of [3, 2, 1.5, 1]) {
+    const rungs = rungsFor(full);
+    assert.ok(rungs.every((r) => r.ratio >= 1 && r.ratio <= full), `${full}`);
+    assert.deepEqual(rungs.map((r) => r.ratio), rungs.map((r) => r.ratio).sort((a, b) => b - a));
+  }
 });

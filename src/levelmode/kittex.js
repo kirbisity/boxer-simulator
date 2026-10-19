@@ -98,6 +98,27 @@ function ktMacroTexture() {
  */
 export const ktWeather = { uKitWet: { value: 0.3 }, uKitPools: { value: 0 }, uKitPoolSky: { value: 1 }, uKitFog: { value: null } };
 
+/**
+ * How much of the shader's finer work a pixel gets, by distance and by the quality tier (quality.js; kit.js `setQuality` sets it): shared by all the stage's materials, so
+ * a change of tier is a change of two uniforms, not a new program. `uKitLod` (metres): x the reach of the environment's reflection, y the reach of the second read of the
+ * stone's map (the one that hides the tiling), z the reach of standing water, w the reach of the soft edge of the baked shadow. Each term fades to nothing over its last
+ * quarter, so there is no line where it stops. `uKitFlags`: x 1 if the macro map is read at all, y the baked shadow's taps (1: one, 2 or more: the five and the soft edge).
+ */
+export const ktLod = { uKitLod: { value: null }, uKitFlags: { value: null } };
+
+/** The reaches of a tier of the picture (quality.js gives the numbers). */
+export function ktSetLod({ env, tile, pool, penumbra, macro = 1, taps = 2 }) {
+  ktLodInit();
+  const reach = (metres) => Math.max(0.01, metres);
+  ktLod.uKitLod.value.set(reach(env), reach(tile), reach(pool), reach(penumbra));
+  ktLod.uKitFlags.value.set(macro, taps, 0, 0);
+}
+
+function ktLodInit() {
+  ktLod.uKitLod.value ??= new THREE.Vector4(1e4, 1e4, 1e4, 1e4);
+  ktLod.uKitFlags.value ??= new THREE.Vector4(1, 2, 0, 0);
+}
+
 // ---- the cut-away and the detail -----------------------------------------------------------------------
 
 /** Shared uniforms of the screen-door fade: the camera, what it looks at, how wide the clear tube is, and whether it is on. */
@@ -122,14 +143,23 @@ const ktMapChunk = (two, pools = 0) => `
 #ifdef USE_MAP
   vec3 kitN = normalize(vKitNrm);
   vec3 kitAbs = abs(kitN);
+  // How far this pixel is from the eye: the finer terms below are for what is near, and thin out (to nothing, with no step) with the distance (uKitLod, kittex.js ktLod).
+  float kitDist = length(vViewPosition);
+  // (The slopes of the map's coordinates are taken here, in step for the whole quad, for the reads inside the branches below.)
+  vec2 kitDx = dFdx(vUv);
+  vec2 kitDy = dFdy(vUv);
   // The macro map in the plane of the surface: plan view on a floor, along the wall on a wall (v is up, so the streaks run down).
   vec2 kitP = kitAbs.y > max(kitAbs.x, kitAbs.z) ? vKitPos.xz : (kitAbs.x > kitAbs.z ? vec2(vKitPos.z, vKitPos.y) : vec2(vKitPos.x, vKitPos.y));
-  vec4 kitM = texture2D(uKitMacro, kitP * 0.0625);
+  vec2 kitPx = dFdx(kitP);
+  vec2 kitPy = dFdy(kitP);
+  vec4 kitM = uKitFlags.x > 0.5 ? texture2D(uKitMacro, kitP * 0.0625) : vec4(0.5, 0.5, 0.5, 0.0);
   vec4 texelColor = texture2D(map, vUv);
-  ${two === 0 ? '' : `vec2 kitUvB = ${two === 2 ? 'mat2(0.8, -0.6, 0.6, 0.8) * vUv * 0.67 + vec2(0.31, 0.57)' : 'vUv * 0.71 + vec2(0.37, 0.19)'};
-  vec3 kitB = texture2D(map, kitUvB).rgb;
-  float kitW = smoothstep(${two === 2 ? '0.3, 0.7' : '0.44, 0.56'}, kitM.g);
-  ${two === 2 ? 'texelColor.rgb = uKitMean + (mix(texelColor.rgb, kitB, kitW) - uKitMean) * inversesqrt(kitW * kitW + (1.0 - kitW) * (1.0 - kitW));\n  texelColor.rgb = max(texelColor.rgb, vec3(0.0));' : 'texelColor.rgb = mix(texelColor.rgb, kitB, kitW);'}`}
+  ${two === 0 ? '' : `float kitW = smoothstep(${two === 2 ? '0.3, 0.7' : '0.44, 0.56'}, kitM.g) * (1.0 - smoothstep(0.75 * uKitLod.y, uKitLod.y, kitDist));
+  if (kitW > 0.0) {
+    ${two === 2 ? 'vec2 kitUvB = mat2(0.8, -0.6, 0.6, 0.8) * vUv * 0.67 + vec2(0.31, 0.57);\n    vec2 kitBx = mat2(0.8, -0.6, 0.6, 0.8) * kitDx * 0.67;\n    vec2 kitBy = mat2(0.8, -0.6, 0.6, 0.8) * kitDy * 0.67;' : 'vec2 kitUvB = vUv * 0.71 + vec2(0.37, 0.19);\n    vec2 kitBx = kitDx * 0.71;\n    vec2 kitBy = kitDy * 0.71;'}
+    vec3 kitB = textureGrad(map, kitUvB, kitBx, kitBy).rgb;
+    ${two === 2 ? 'texelColor.rgb = uKitMean + (mix(texelColor.rgb, kitB, kitW) - uKitMean) * inversesqrt(kitW * kitW + (1.0 - kitW) * (1.0 - kitW));\n    texelColor.rgb = max(texelColor.rgb, vec3(0.0));' : 'texelColor.rgb = mix(texelColor.rgb, kitB, kitW);'}
+  }`}
   texelColor = mapTexelToLinear(texelColor);
   diffuseColor *= texelColor;
   float kitLum = dot(texelColor.rgb, vec3(0.3, 0.55, 0.15));
@@ -146,10 +176,12 @@ const ktMapChunk = (two, pools = 0) => `
   diffuseColor.rgb *= 1.0 - 0.34 * kitWet;
   // Standing water on what faces up: patches from a broader read of the macro map. The water is a mirror (the sky in it: see KT_POOL_SKY), so the stone under it
   // is only a little darker, and darker at the middle of a puddle than at its rim (a thin film there: the stone shows through it).
-  float kitFlat = smoothstep(0.85, 0.97, kitN.y);
-  float kitPoolNoise = texture2D(uKitMacro, kitP * 0.19 + vec2(0.43, 0.71)).b + 0.3 * (kitM.b - 0.5);
-  kitPool = uKitPools * ${pools.toFixed(2)} * kitFlat * smoothstep(0.47, 0.54, kitPoolNoise);
-  diffuseColor.rgb *= 1.0 - kitPool * (0.12 + 0.12 * smoothstep(0.5, 0.62, kitPoolNoise));
+  ${pools > 0 ? `float kitFlat = smoothstep(0.85, 0.97, kitN.y) * (1.0 - smoothstep(0.75 * uKitLod.z, uKitLod.z, kitDist));
+  if (uKitPools > 0.0 && kitFlat > 0.0) {
+    float kitPoolNoise = textureGrad(uKitMacro, kitP * 0.19 + vec2(0.43, 0.71), kitPx * 0.19, kitPy * 0.19).b + 0.3 * (kitM.b - 0.5);
+    kitPool = uKitPools * ${pools.toFixed(2)} * kitFlat * smoothstep(0.47, 0.54, kitPoolNoise);
+    diffuseColor.rgb *= 1.0 - kitPool * (0.12 + 0.12 * smoothstep(0.5, 0.62, kitPoolNoise));
+  }` : ''}
   kitWet = max(kitWet, kitPool);
   // Moss: in patches, thicker on north faces and on tops, thicker in the dark of a crevice.
   float kitUp = smoothstep(0.3, 0.95, kitN.y);
@@ -174,6 +206,24 @@ const KT_POOL_SKY = `
     vec3 kitSky = getLightProbeIndirectRadiance(geometry.viewDir, normalize(kitUp + kitStir * 0.06), 0.04, maxMipLevel) / max(envMapIntensity, 0.02);
     radiance = mix(radiance, (kitSky * 1.9 + vec3(0.05, 0.05, 0.06)) * uKitPoolSky, kitPool);
   }
+#endif`;
+
+/**
+ * The environment's share of the light (the reflection of the sky in the wet stone, the sky's wash on it: both read from the prefiltered environment map, which is
+ * the dearest part of the standard shader) for the pixels near enough to show it, and nothing for the rest (fading out over the last quarter of `uKitLod.x`).
+ */
+const KT_ENV_REACH = `
+#if defined( RE_IndirectSpecular ) && defined( RE_IndirectDiffuse )
+  float kitEnvFade = 1.0 - smoothstep(0.75 * uKitLod.x, uKitLod.x, kitDist);
+  vec3 kitRadiance0 = radiance;
+  vec3 kitIbl0 = iblIrradiance;
+  if (kitEnvFade > 0.0) {
+    #include <lights_fragment_maps>
+    radiance = mix(kitRadiance0, radiance, kitEnvFade);
+    iblIrradiance = mix(kitIbl0, iblIrradiance, kitEnvFade);
+  }
+#else
+  #include <lights_fragment_maps>
 #endif`;
 
 /** The fog chunk: the stage's distance fog, thickened with height (a mist that lies on the sea and the low ground and thins above). */
@@ -212,12 +262,14 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true, 
   const mean = material.map?.kitMean ?? [0.5, 0.5, 0.5];
   ktWeather.uKitFog.value ??= new THREE.Vector4(0, 0, 0.05, 0);
   if (shadow) ktShadowInit();
+  ktLodInit();
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = `varying vec3 vKitPos;\nvarying vec3 vKitNrm;\n${shader.vertexShader}`.replace(
       '#include <begin_vertex>',
       '#include <begin_vertex>\n  vKitPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vKitNrm = normalize(mat3(modelMatrix) * objectNormal);',
     );
-    let uniforms = 'varying vec3 vKitPos;\nvarying vec3 vKitNrm;\n';
+    Object.assign(shader.uniforms, ktLod);
+    let uniforms = 'varying vec3 vKitPos;\nvarying vec3 vKitNrm;\nuniform vec4 uKitLod;\nuniform vec4 uKitFlags;\n';
     let fragment = shader.fragmentShader;
     if (cutaway) {
       Object.assign(shader.uniforms, ktFade);
@@ -235,7 +287,7 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true, 
       fragment = fragment
         .replace('#include <map_fragment>', ktMapChunk(two, detail.pools ?? 0))
         .replace('void main() {', 'void main() {\n  float kitWet = 0.0;\n  float kitPool = 0.0;')
-        .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>${KT_POOL_SKY}`)
+        .replace('#include <lights_fragment_maps>', `${KT_ENV_REACH}${KT_POOL_SKY}`)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor *= 1.0 - 0.5 * kitWet;\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);');
     }
     if (shadow) {

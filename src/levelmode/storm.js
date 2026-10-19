@@ -45,6 +45,9 @@ const stormState = {
   still: false,
   torch: 1,
   time: 0,
+  // The share of the look's rain that is drawn (quality.js): 1 on a machine that keeps up, less on one that does not.
+  rainShare: 1,
+  rainDirty: false,
 };
 
 /** Tell the weather where the player is (and whether he is under a roof). */
@@ -53,6 +56,16 @@ export function stormFollow(x, y, z, indoors = false) {
   stormState.follow[1] = y;
   stormState.follow[2] = z;
   stormState.indoors = indoors;
+}
+
+/** How far the fog reaches now (m): its far end, where nothing is seen. */
+export const stormFogFar = () => stormState.fog?.far ?? Infinity;
+
+/** Draw this share (0..1) of the look's rain (a quality tier's, levelmode/quality.js). */
+export function stormRain(share) {
+  if (share === stormState.rainShare) return;
+  stormState.rainShare = share;
+  stormState.rainDirty = true;
 }
 
 /** Start a run of the storm over: a new seed (the stage's), strikes from the beginning. */
@@ -351,6 +364,8 @@ export function buildStormPlace({ buildRain }) {
   const seaPatch = sea.material.onBeforeCompile;
   sea.material.onBeforeCompile = (shader, renderer) => {
     seaPatch(shader, renderer);
+    // Past the fog's far end the water is the fog's colour and nothing else: it is not shaded (the sea is the dearest pixel of the picture, and out toward the horizon most of it).
+    shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'void main() {\n#ifdef USE_FOG\n  if (fogDepth > fogFar) {\n    gl_FragColor = vec4(fogColor, 1.0);\n    return;\n  }\n#endif');
     shader.fragmentShader = shader.fragmentShader.replace(
       'vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;',
       `vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;
@@ -375,6 +390,13 @@ export function buildStormPlace({ buildRain }) {
   const boltCore = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
   const boltGlow = new THREE.MeshBasicMaterial({ color: 0x9fb4ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
   place.userData.storm = { sea, rain, waves, boltCore, boltGlow, shaft };
+
+  /** The rain's streaks drawn: the look's share of them, times the quality tier's. */
+  const applyRain = (look) => {
+    stormState.rainDirty = false;
+    const drops = Math.max(2, Math.round(STORM.rain.count * look.rain.share * stormState.rainShare)) * 2;
+    for (const layer of rain.children) layer.geometry.setDrawRange(0, drops);
+  };
 
   /** Put the scene in the look: sky, fog, the lights, the sea, the rain. Run when the look changes, and when the scene's fog is made anew (a look of the game, a place). */
   const applyLook = (view) => {
@@ -420,10 +442,8 @@ export function buildStormPlace({ buildRain }) {
     material.envMap = stormEnvironment(view.renderer);
     material.envMapIntensity = look.sea.reflect;
     // The rain.
-    const streaks = rain.children;
-    streaks[0].material.opacity = look.rain.opacity;
-    const drops = Math.max(2, Math.round(STORM.rain.count * look.rain.share)) * 2;
-    for (const layer of streaks) layer.geometry.setDrawRange(0, drops);
+    rain.children[0].material.opacity = look.rain.opacity;
+    applyRain(look);
     shaft.userData.base = look.shaft?.opacity ?? 0;
     stormAimShaft(shaft, look);
   };
@@ -444,6 +464,7 @@ export function buildStormPlace({ buildRain }) {
     waves.offset.set((time * 0.006 * look.sea.scroll) % 1, (time * 0.011 * look.sea.scroll) % 1);
     const [fx, fy, fz] = stormState.follow;
     // The rain falls round him, stops under a roof, and runs on the same clock as the weather.
+    if (stormState.rainDirty) applyRain(look);
     rain.visible = !stormState.indoors && look.rain.opacity > 0;
     rain.userData.tick(time);
     rain.position.set(fx, fy - 4, fz);

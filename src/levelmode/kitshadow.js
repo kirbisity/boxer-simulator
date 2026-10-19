@@ -49,6 +49,10 @@ export const KT_SHADOW_FUNCTION = `
 float kitSunShade(vec3 p, vec3 n) {
   float strength = uKitShadowInfo.x;
   if (strength <= 0.0) return 1.0;
+  // Far off, in the haze, the shadow thins to nothing (no line where it stops): nothing is read there.
+  float dist = length(vViewPosition);
+  strength *= 1.0 - smoothstep(70.0, 110.0, dist);
+  if (strength <= 0.001) return 1.0;
   float ndl = dot(n, uKitSunDir);
   if (ndl <= 0.0) return 1.0;
   float texel = uKitShadowInfo.y;
@@ -63,8 +67,11 @@ float kitSunShade(vec3 p, vec3 n) {
   // One tap, \`at\` texels away from the point: 1 lit, 0 in shadow.
   #define KT_TAP(at) ( unpackRGBAToDepth( texture2D( uKitShadowMap, ( floor( home + (at) ) + 0.5 ) / size ) ) > s.z + dot( ( floor( home + (at) ) + 0.5 ) - home, slope ) - bias ? 1.0 : 0.0 )
   float r = ${KT_SHADOW.softness.toFixed(2)};
-  float lit = KT_TAP(vec2(0.0)) + KT_TAP(vec2(-r, -r)) + KT_TAP(vec2(r, -r)) + KT_TAP(vec2(-r, r)) + KT_TAP(vec2(r, r));
-  if (lit > 0.5 && lit < 4.5) {
+  // The cheapest tier takes one tap, the others five, and the soft edge (sixteen more) only for the pixels near enough (uKitLod.w).
+  float lit = KT_TAP(vec2(0.0));
+  if (uKitFlags.y < 1.5) lit *= 5.0;
+  else lit += KT_TAP(vec2(-r, -r)) + KT_TAP(vec2(r, -r)) + KT_TAP(vec2(-r, r)) + KT_TAP(vec2(r, r));
+  if (lit > 0.5 && lit < 4.5 && dist < uKitLod.w) {
     lit = 0.0;
     for (int i = 0; i < 4; i += 1) {
       for (int j = 0; j < 4; j += 1) {
@@ -74,7 +81,8 @@ float kitSunShade(vec3 p, vec3 n) {
     lit /= 16.0;
     lit = smoothstep(0.0, 1.0, lit);
   } else {
-    lit = lit > 2.5 ? 1.0 : 0.0;
+    // (A hard edge of the five taps, softened a little: a step of 0.2 for each tap that is lit.)
+    lit = smoothstep(0.1, 0.9, lit / 5.0);
   }
   return 1.0 - strength * (1.0 - lit);
 }

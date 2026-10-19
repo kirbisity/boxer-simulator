@@ -5,7 +5,7 @@
   A page that holds the game in an iframe of any size (a window cannot always be resized) and times Level Mode
   stage 1 at fixed places. Serve the repository (tools/serve.py 8962), open /tools/stagebench.html, then in the console:
 
-    await SB.load(1279, 639)             // the game at that CSS size (device pixel ratio is the window's)
+    await SB.load(1279, 639)             // the game at that CSS size (device pixel ratio is the window's); a third argument is another copy of the game's folder, to compare with
     await SB.table()                      // per place: physics, views, render, frame (ms, the least of 5 runs of 30 frames), draw calls, triangles, GPU ms
     await SB.table({ only: ['chapel'], gpu: false })
     SB.hop('chapel')                      // stand the player at a place, the stage woken round him
@@ -28,12 +28,12 @@
   const SB = window.SB = {
     places: PLACES,
     /** The game in a fresh iframe of w x h CSS pixels; resolves when it is ready. */
-    load(w, h) {
+    load(w, h, base = '/') {
       return new Promise((done) => {
         frame?.remove();
         frame = document.createElement('iframe');
         frame.style.cssText = `width:${w}px;height:${h}px;border:0;position:absolute;left:0;top:0`;
-        frame.src = `/?${Math.random()}`;
+        frame.src = `${base}?${Math.random()}`;
         frame.onload = () => {
           const wait = () => (game().boxer ? done(game()) : setTimeout(wait, 100));
           wait();
@@ -140,6 +140,311 @@
         }
       });
       return Object.entries(stats).filter(([, v]) => v.meshes).map(([k, v]) => `${k.padEnd(24)} meshes ${String(v.meshes).padStart(3)} tris ${v.triangles}`).join('\n');
+    },
+    /**
+     * What each kind of thing in the picture costs here: for every category, its draw calls and triangles drawn alone, and the card's time (ms, the median of
+     * `frames` draws, EXT_disjoint_timer_query) with everything, with only that kind, and with all but that kind (so the saving of hiding it is the difference).
+     * The scene is not updated between draws, so the numbers compare like with like. `ratio`: the renderer's pixel ratio for the run (default: as it is).
+     */
+    async prof({ frames = 14, ratio = null, gpu = true } = {}) {
+      const g = game();
+      const view = g.boxer.scene;
+      const renderer = view.renderer;
+      const gl = renderer.getContext();
+      const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+      if (ratio) renderer.setPixelRatio(ratio);
+      const stageView = g.boxer.stage().view;
+      const mats = stageView.mats;
+      const menOf = new Map();
+      for (const v of g.boxer.state.views) menOf.set(v.group, v);
+      const categoryOf = (object) => {
+        if (object.material === mats.wear) return 'decals';
+        for (let up = object; up; up = up.parent) {
+          if (menOf.has(up)) {
+            const v = menOf.get(up);
+            return v.fighter.id === 0 ? 'man:player' : v.baked ? (v.draw?.far ? 'man:far' : 'man:near') : 'man:full';
+          }
+          if (/^(detail):/.test(up.name)) return 'castle';
+          if (/^silhouette:/.test(up.name)) return 'silhouette';
+          if (up.name === 'land') return 'land';
+          if (up.name === 'stage-sea') return 'sea';
+          if (up.name?.startsWith('dyn:')) return 'dynamics';
+          if (up.name === 'storm' && object.material?.side === g.THREE.BackSide) return 'sky';
+          if (up.name === 'storm') return object.isLineSegments ? 'rain' : 'weather-other';
+        }
+        return 'other';
+      };
+      const all = [];
+      view.scene.traverse((object) => {
+        if (object.isMesh || object.isLine || object.isPoints || object.isSprite) all.push([object, categoryOf(object)]);
+      });
+      const names = [...new Set(all.map(([, c]) => c))].sort();
+      const set = (show) => {
+        for (const [object, c] of all) {
+          if (object.userData.__v === undefined) object.userData.__v = object.visible;
+          object.visible = object.userData.__v && show(c);
+        }
+      };
+      const restore = () => {
+        for (const [object] of all) {
+          object.visible = object.userData.__v ?? object.visible;
+          delete object.userData.__v;
+        }
+      };
+      // (A read of one pixel is what makes the page wait for the card: `finish` does not, in Chrome.)
+      const pixel = new Uint8Array(4);
+      const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      const med = (a) => (a.length ? +a.sort((x, y) => x - y)[Math.floor(a.length / 2)].toFixed(2) : -1);
+      // One round: n draws back to back and the card waited for: the mean time of a draw (steadier than one query each when the machine is shared), and the page's own
+      // time to issue one (the card idle first, so it is not the queue being waited for).
+      const round = async (n) => {
+        sync();
+        const t0 = performance.now();
+        for (let k = 0; k < n; k += 1) renderer.render(view.scene, view.camera);
+        sync();
+        const wall = (performance.now() - t0) / n;
+        const cpu = [];
+        for (let k = 0; k < Math.min(n, 6); k += 1) {
+          sync();
+          const t1 = performance.now();
+          renderer.render(view.scene, view.camera);
+          cpu.push(performance.now() - t1);
+        }
+        return { gpu: +wall.toFixed(2), cpu: med(cpu) };
+      };
+      // The least of three rounds of each: a shared machine only ever adds time.
+      const time = async (n) => {
+        const runs = [];
+        for (let k = 0; k < 3; k += 1) runs.push(await round(n));
+        return { gpu: Math.min(...runs.map((r) => r.gpu)), cpu: Math.min(...runs.map((r) => r.cpu)) };
+      };
+      const count = () => {
+        renderer.render(view.scene, view.camera);
+        return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+      };
+      await time(4);
+      const rows = {};
+      const full = { ...count(), ...(await time(frames)) };
+      rows.ALL = full;
+      for (const name of names) {
+        set((c) => c === name);
+        const alone = { ...count(), ...(await time(frames)) };
+        restore();
+        set((c) => c !== name);
+        const without = await time(frames);
+        restore();
+        rows[name] = { ...alone, savedGpu: +(full.gpu - without.gpu).toFixed(2), savedCpu: +(full.cpu - without.cpu).toFixed(2) };
+      }
+      restore();
+      return rows;
+    },
+    /** `prof` as text: one line per category. */
+    async profText(options) {
+      const rows = await SB.prof(options);
+      return Object.entries(rows).map(([k, v]) => `${k.padEnd(14)} calls ${String(v.calls).padStart(3)} tris ${String(v.tris).padStart(6)} ms ${v.gpu} cpu ${v.cpu}${v.savedGpu === undefined ? '' : ` | saves ${v.savedGpu} / ${v.savedCpu}`}`).join('\n');
+    },
+    /**
+     * `prof` at several places, in the background (a call that waits longer than the browser tool's limit is cut off): `SB.suite(['quad', 'vault'], { frames: 8 })`,
+     * then poll `SB.done`; `SB.print()` is the table: per place, per kind, [calls, thousands of triangles, ms], and the ms hiding it saves.
+     */
+    suite(places, options = {}) {
+      SB.done = false;
+      SB.results = {};
+      (async () => {
+        for (const name of places) {
+          SB.hop(name);
+          game().boxer.bench(10);
+          SB.results[name] = await SB.prof(options);
+        }
+        SB.done = true;
+      })();
+      return 'started';
+    },
+    print(only = null) {
+      return Object.entries(SB.results ?? {}).filter(([n]) => !only || only.includes(n)).map(([name, rows]) => `${name}: ` + Object.entries(rows).map(([k, v]) => `${k.replace('weather-other', 'wx').replace('silhouette', 'sil').replace('dynamics', 'dyn').replace('man:', 'm.')} ${v.calls}/${(v.tris / 1000).toFixed(1)}k/${v.gpu}${v.savedGpu === undefined ? '' : `/s${v.savedGpu}`}`).join(' | ')).join('\n');
+    },
+    /**
+     * A/B on the frozen picture at a place: `variants` is { name: [apply, undo] } (functions of the game's window); each is drawn `frames` times back to back, the
+     * rounds interleaved (the least of them is kept: a shared machine only ever adds time). Resolves { name: ms }. The first variant should be { base: [() => {}, () => {]] }.
+     */
+    async ab(variants, { rounds = 5, frames = 10 } = {}) {
+      const g = game();
+      const view = g.boxer.scene;
+      const gl = view.renderer.getContext();
+      const pixel = new Uint8Array(4);
+      const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      const best = {};
+      const calls = {};
+      for (let r = 0; r < rounds; r += 1) {
+        for (const [name, [apply, undo]] of Object.entries(variants)) {
+          apply(g);
+          sync();
+          const t0 = performance.now();
+          for (let k = 0; k < frames; k += 1) view.renderer.render(view.scene, view.camera);
+          sync();
+          const ms = (performance.now() - t0) / frames;
+          calls[name] = [view.renderer.info.render.calls, view.renderer.info.render.triangles];
+          undo(g);
+          best[name] = Math.min(best[name] ?? Infinity, ms);
+          await new Promise((done) => setTimeout(done, 0));
+        }
+      }
+      return Object.fromEntries(Object.entries(best).map(([k, v]) => [k, `${v.toFixed(2)}ms ${calls[k][0]}c ${(calls[k][1] / 1000).toFixed(0)}kt`]));
+    },
+    /** The usual A/B variants (see `ab`): the picture with one kind of thing, or one cost of the shader, taken away. */
+    async standard() {
+      const g = game();
+      const ks = await g.eval("import('/src/levelmode/kitshadow.js')");
+      const view = g.boxer.scene;
+      const mats = g.boxer.stage().view.mats;
+      const hide = (test) => {
+        const list = [];
+        view.scene.traverse((o) => {
+          if ((o.isMesh || o.isLine || o.isPoints || o.isSprite) && test(o)) list.push(o);
+        });
+        return [() => list.forEach((o) => { o.userData.__vis = o.visible; o.visible = false; }), () => list.forEach((o) => { o.visible = o.userData.__vis; })];
+      };
+      const under = (o, name) => {
+        for (let up = o; up; up = up.parent) if (up.name === name) return true;
+        return false;
+      };
+      const menGroups = new Set(g.boxer.state.views.map((v) => v.group));
+      const isMan = (o) => {
+        for (let up = o; up; up = up.parent) if (menGroups.has(up)) return true;
+        return false;
+      };
+      const info = ks.ktShadow.uKitShadowInfo.value;
+      let kept = 0;
+      return {
+        base: [() => {}, () => {}],
+        'no baked shadow': [() => { kept = info.x; info.x = 0; }, () => { info.x = kept; }],
+        'no decals': hide((o) => o.material === mats.wear),
+        'no sea': hide((o) => under(o, 'stage-sea')),
+        'no sky': hide((o) => under(o, 'storm') && o.material?.side === g.THREE.BackSide),
+        'no rain': hide((o) => o.isLineSegments),
+        'no men': hide(isMan),
+        'no castle': hide((o) => /^detail:/.test(o.parent?.name ?? '') || (o.parent && /^detail:|^dyn:/.test(o.parent.parent?.name ?? ''))),
+        'no land': hide((o) => under(o, 'land')),
+        'flat shading': [() => { view.scene.overrideMaterial = new g.THREE.MeshBasicMaterial({ color: 0x808080 }); }, () => { view.scene.overrideMaterial = null; }],
+        'ratio 1': [() => view.renderer.setPixelRatio(1), () => view.renderer.setPixelRatio(2)],
+      };
+    },
+    /** A/B variants on the lights and the material's cost (see `ab`). */
+    async lighting() {
+      const g = game();
+      const view = g.boxer.scene;
+      const T = g.THREE;
+      const mats = g.boxer.stage().view.mats;
+      const lights = view.scene.children.filter((c) => c.isLight);
+      const flat = (make) => {
+        let m = null;
+        return [() => { m ??= make(); view.scene.overrideMaterial = m; }, () => { view.scene.overrideMaterial = null; }];
+      };
+      const light = (test) => {
+        const list = lights.filter(test);
+        return [() => list.forEach((l) => { l.userData.__v = l.visible; l.visible = false; }), () => list.forEach((l) => { l.visible = l.userData.__v; })];
+      };
+      return {
+        base: [() => {}, () => {}],
+        'std plain': flat(() => new T.MeshStandardMaterial({ vertexColors: true, color: 0x808080 })),
+        'std+map': flat(() => new T.MeshStandardMaterial({ vertexColors: true, map: mats.ashlar.map })),
+        'lambert+map': flat(() => new T.MeshLambertMaterial({ vertexColors: true, map: mats.ashlar.map })),
+        'no key spot': light((l) => l.isSpotLight),
+        'no rim': light((l) => l.isDirectionalLight && !l.castShadow && l.intensity < 0.5 && l.intensity > 0.05),
+        'no points': light((l) => l.isPointLight),
+        'no probe/hemi': light((l) => l.isHemisphereLight || l.isLightProbe),
+      };
+    },
+    /** A/B variants on the kit shader's parts (see `ab`). */
+    async shader() {
+      const g = game();
+      const mats = g.boxer.stage().view.mats;
+      const ks = await g.eval("import('/src/levelmode/kitshadow.js')");
+      const kt = await g.eval("import('/src/levelmode/kittex.js')");
+      const stone = ['ashlar', 'ruin', 'rubble', 'rock', 'cobble', 'flags', 'path', 'iron'];
+      const env = (on) => stone.forEach((n) => { mats[n].envMap = on ? mats.water.envMap : null; mats[n].needsUpdate = true; });
+      const info = ks.ktShadow.uKitShadowInfo.value;
+      let held = 0;
+      return {
+        base: [() => {}, () => {}],
+        'no stone env': [() => env(false), () => env(true)],
+        'no shadow': [() => { held = info.x; info.x = 0; }, () => { info.x = held; }],
+        'no pools': [() => { kt.ktWeather.uKitPools.value = 0; }, () => { kt.ktWeather.uKitPools.value = 0.6; }],
+      };
+    },
+    /** A/B: the kit shaders without their `discard` (the cut-away's dither), which can turn off a card's early depth test. */
+    async discard() {
+      const g = game();
+      const mats = g.boxer.stage().view.mats;
+      const names = Object.keys(mats).filter((n) => Object.prototype.hasOwnProperty.call(mats[n], 'customProgramCacheKey') && /^kit-c/.test(mats[n].customProgramCacheKey()));
+      const saved = {};
+      const strip = (on) => {
+        for (const n of names) {
+          const m = mats[n];
+          if (on) {
+            saved[n] = [m.onBeforeCompile, m.customProgramCacheKey];
+            const original = m.onBeforeCompile;
+            const key = m.customProgramCacheKey;
+            m.onBeforeCompile = (shader, r) => { original(shader, r); shader.fragmentShader = shader.fragmentShader.replace('discard;', ';'); };
+            m.customProgramCacheKey = () => `${key()}-nd`;
+          } else {
+            [m.onBeforeCompile, m.customProgramCacheKey] = saved[n];
+          }
+          m.needsUpdate = true;
+        }
+      };
+      return { base: [() => {}, () => {}], 'no discard': [() => strip(true), () => strip(false)] };
+    },
+    /**
+     * This copy of the game against another (`base`: a folder served beside it, e.g. a `git archive` of an earlier commit linked as /.base/), in turns, the least of
+     * `rounds` fresh runs of each at each place: { place: { new: {...}, base: {...} } } into SB.cmp (poll SB.done). `ratio`: a pixel ratio to set on both.
+     */
+    compare(places, { base = '/.base/', rounds = 3, frames = 30, width = 1279, height = 639, ratio = null, setup = null } = {}) {
+      SB.done = false;
+      SB.cmp = {};
+      (async () => {
+        try {
+          for (const name of places) {
+            const out = (SB.cmp[name] = {});
+            for (let r = 0; r < rounds; r += 1) {
+              for (const [side, root] of [['new', '/'], ['base', base]]) {
+                await SB.load(width, height, root);
+                const where = SB.hop(name);
+                const g = game();
+                if (ratio) g.boxer.scene.renderer.setPixelRatio(ratio);
+                if (setup) await setup(g, side);
+                g.boxer.bench(20);
+                const runs = [0, 1, 2].map(() => g.boxer.bench(frames));
+                const least = (key) => Math.min(...runs.map((run) => run[key]));
+                const row = { render: least('render'), frame: least('frame'), views: least('views'), calls: runs[0].calls, tris: runs[0].triangles };
+                const best = out[side];
+                out[side] = best ? Object.fromEntries(Object.keys(row).map((k) => [k, Math.min(best[k], row[k])])) : row;
+                if (where.state === 'lost') out[side].error = true;
+              }
+            }
+          }
+        } catch (error) {
+          SB.cmp.error = String(error.stack).slice(0, 500);
+        }
+        SB.done = true;
+      })();
+      return 'started';
+    },
+    printCompare() {
+      return Object.entries(SB.cmp ?? {}).map(([name, v]) => (v?.new ? `${name.padEnd(12)} new rd ${v.new.render} fr ${v.new.frame} c ${v.new.calls} t ${(v.new.tris / 1000).toFixed(0)}k | base rd ${v.base.render} fr ${v.base.frame} c ${v.base.calls} t ${(v.base.tris / 1000).toFixed(0)}k` : `${name} ${JSON.stringify(v)}`)).join('\n');
+    },
+    /** A/B variants on the quality tiers (see `ab`): the picture at each tier at the same pixel ratio, and the lowest rung (low tier, the floor ratio). */
+    async tiers() {
+      const g = game();
+      const view = g.boxer.scene;
+      const stageView = g.boxer.stage().view;
+      const to = (tier, ratio = 2) => () => {
+        stageView.setQuality(tier);
+        view.renderer.setPixelRatio(ratio);
+        g.boxer.playFrames(1, 1 / 60);
+      };
+      const off = to('high');
+      return { high: [to('high'), off], medium: [to('medium'), off], low: [to('low'), off], 'low@1': [to('low', 1), off], 'medium@1.5': [to('medium', 1.5), off] };
     },
     /** One row per place. `lines`: the rows as text (default) or objects. */
     async table({ only = null, frames = 30, gpu = true, raw = false } = {}) {

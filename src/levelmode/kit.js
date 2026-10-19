@@ -7,21 +7,26 @@
 //    (a heightfield that stands under every floor and flight and falls from their edges in cliffs to the sea), with surf
 //    at its foot; always.
 //  - for each section, its detail (walls with their arches, windows and oillets, stair flights, vaults, props, gates,
-//    items): while the section is active, or next to an active one with the way between them in the camera's view (a
-//    portal leads to it); otherwise its silhouette, the same solids as plain blocks, which is all that is seen of it from
-//    far off or from behind a wall. A section outside the camera's frustum is not drawn or animated at all.
+//    items): while the section is active, or reached from an active one through portals whose opening is in the camera's
+//    view and not shut or walled off (levelmode/visibility.js: up to three deep); otherwise its silhouette, the same solids
+//    as plain blocks, which is all that is seen of it from far off or from behind a wall. A section outside the camera's
+//    frustum, or past the reach of the fog, is not drawn or animated at all. Within a detailed section the small things (decals,
+//    drips, ravens, light shafts) are drawn only within a reach of the eye, and a chunk of ground past the fog's far end not at all;
+//    the reaches are the quality tier's (levelmode/quality.js, `view.setQuality`).
 //  - what moves: gates and ladders with their state, flames, ravens, drips, light shafts, the markers on things to take.
 // Every mesh is a merged batch per material per chunk of ground, with frustum culling on.
 
 import { P } from '../body.js';
-import { ceilingAt, pushOut } from '../physics/terrain.js';
+import { ceilingAt, pushOut, rayBlocked } from '../physics/terrain.js';
 import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgRock, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
 import { kwDecorate } from './kitwear.js';
-import { stormFollow, stormTorch } from './storm.js';
+import { stormFogFar, stormFollow, stormRain, stormTorch } from './storm.js';
 import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
 import { skyDirection } from './stagesky.js';
-import { ktDispose, ktMaterials, ktRandom, ktWeather } from './kittex.js';
+import { ktDispose, ktMaterials, ktRandom, ktSetLod, ktWeather } from './kittex.js';
+import { TIER_NAMES, tierOf } from './quality.js';
+import { chooseSections, fogReach, holdSections, holdMan, manDrawn, manSeen, nearestBoxDistance, pastReachHeld, sectionGraph, seeThroughIds, VISIBILITY } from './visibility.js';
 
 const KIT_SLAB_TOP = { grass: 'grass', path: 'path', rock: 'rock', flags: 'flags', cobble: 'cobble', boards: 'boards', stone: 'ashlar' };
 const KIT_WALL = { ashlar: 'ashlar', rubble: 'rubble', ruin: 'ruin', rock: 'rock', tower: 'ashlar', parapet: 'ashlar' };
@@ -1044,14 +1049,18 @@ function kitDynamics(dyn, mats, textures) {
     patch.rotation.x = -Math.PI / 2;
     patch.position.set(s.at[0], s.at[1] - height - 0.05, s.at[2]);
     group.add(patch);
+    parts.shafts.push(patch);
   }
   return { group, parts };
 }
 
 const KIT_TMP = new THREE.Object3D();
 
-/** Move a section's dynamic parts to time `t` (s): flames flicker, ravens turn their heads, drips fall. */
-function kitAnimate(parts, dyn, t) {
+/**
+ * Move a section's dynamic parts to time `t` (s): flames flicker, ravens turn their heads, drips fall. `q`: the quality tier (quality.js) whose reaches decide what is
+ * drawn and moved at all; `away`: the section's distance from the eye (m), `eye` the eye [x, y, z].
+ */
+function kitAnimate(parts, dyn, t, q, away, eye) {
   // The way-marks breathe, slow and faint (a sign on the floor, not a lamp).
   if (parts.waymarks) parts.waymarks.material.opacity = 0.42 + 0.2 * Math.sin(t * 1.6);
   if (parts.flames) {
@@ -1067,6 +1076,11 @@ function kitAnimate(parts, dyn, t) {
     parts.flames.instanceMatrix.needsUpdate = true;
   }
   for (const raven of parts.ravens) {
+    // (A raven past its reach is not drawn, and does not turn its head.)
+    const g = raven.group.position;
+    const seen = q.ravens > 0 && Math.hypot(g.x - eye[0], g.y - eye[1], g.z - eye[2]) < q.ravens;
+    raven.group.visible = seen;
+    if (!seen) continue;
     const slow = t * 0.45 + raven.seed;
     // Still, still, then a quick look to one side, a preen, still.
     const phase = slow % 6;
@@ -1078,7 +1092,11 @@ function kitAnimate(parts, dyn, t) {
     raven.group.position.y += 0;
     raven.group.rotation.z = Math.sin(t * 0.8 + raven.seed) * 0.015;
   }
+  for (const card of parts.shafts) card.visible = q.shafts > 0 && away < q.shafts;
   if (parts.drips) {
+    const near = q.drips > 0 && away < q.drips;
+    parts.drips.visible = near;
+    if (!near) return;
     parts.dripState.forEach((d, k) => {
       const cycle = (t * 0.55 + d.phase) % 1;
       const fall = cycle * cycle * d.fall;
@@ -1089,6 +1107,42 @@ function kitAnimate(parts, dyn, t) {
       parts.drips.setMatrixAt(k, KIT_TMP.matrix);
     });
     parts.drips.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/**
+ * Which men are not drawn this frame, into `state.hidden` (a Set of fighter ids): those awake whom no line from the eye, nor from the man played's head, reaches
+ * through the terrain (visibility.js manSeen), who are not near either, and not in `safe` (the man played, his opponent, whom he is locked on, the camera's focus).
+ * The lines are tried a few times a second for each man, and a man stays drawn a moment after he was last seen.
+ */
+function kitMen(state, world, terrain, safe, dt) {
+  const me = world.fighters[0];
+  const head = [me.x[P.head * 3], me.x[P.head * 3 + 1], me.x[P.head * 3 + 2]];
+  const eye = state.eye;
+  const blocked = (a, b, ya, yb) => rayBlocked(terrain, a, b, ya, yb, state.sight);
+  const near2 = VISIBILITY.menNear * VISIBILITY.menNear;
+  const eye2 = VISIBILITY.eyeNear * VISIBILITY.eyeNear;
+  for (const fighter of world.fighters) {
+    if (fighter.id === 0 || fighter.dormant) continue;
+    const x = fighter.x[P.pelvis * 3];
+    const y = fighter.x[P.pelvis * 3 + 1];
+    const z = fighter.x[P.pelvis * 3 + 2];
+    const closeTo = (dx, dy, dz, limit) => dx * dx + dy * dy + dz * dz < limit;
+    const near = closeTo(x - head[0], y - head[1], z - head[2], near2) || closeTo(x - eye[0], y - eye[1], z - eye[2], eye2);
+    const safeMan = Boolean(safe?.has(fighter.id));
+    let seen = true;
+    if (!safeMan && !near) {
+      const cached = state.menSeen.get(fighter.id);
+      if (cached && state.time - cached.at < 0.1) seen = cached.seen;
+      else {
+        const foot = [x, y - 0.95, z];
+        seen = manSeen(eye, foot, blocked) || manSeen(head, foot, blocked);
+        state.menSeen.set(fighter.id, { seen, at: state.time });
+      }
+    }
+    const sectionState = state.states.get(fighter.spawn?.section) ?? 'detail';
+    const drawn = holdMan(state.menHeld, fighter.id, manDrawn({ safe: safeMan, near, sectionState, seen }), dt);
+    if (!drawn) state.hidden.add(fighter.id);
   }
 }
 
@@ -1185,16 +1239,31 @@ function kitNeighbours(stage, active) {
   return near;
 }
 
-/** Margin (m) round a section's region in the visibility tests: its walls, towers and the rock under it reach past the ground it covers. */
-const KIT_SEEN_MARGIN = 8;
+/**
+ * The chunks (the merged meshes kitgeo.js builds, in world metres) that are drawn by reach: { mesh, centre, radius, reach, past }. Their geometry is in world metres already (kitgeo.js), so
+ * the bounding sphere is the world sphere; `reach` is set by the quality tier or the fog.
+ */
+function kitChunks(meshes, test = () => true) {
+  const chunks = [];
+  for (const mesh of meshes) {
+    if (!mesh.isMesh || !test(mesh)) continue;
+    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+    const sphere = mesh.geometry.boundingSphere;
+    chunks.push({ mesh, centre: sphere.center.clone(), radius: sphere.radius, reach: Infinity, past: false });
+  }
+  return chunks;
+}
 
-/** The boxes (THREE.Box3, a margin round each, floor to sky) of a region: one entry, or a list of them. */
-function kitRegionBoxes(region, sea) {
-  const entries = Array.isArray(region) && !Array.isArray(region[0]) ? region : [region];
-  return entries.filter(Boolean).map(({ at, size }) => new THREE.Box3(
-    new THREE.Vector3(at[0] - size[0] / 2 - KIT_SEEN_MARGIN, (Number.isFinite(sea) ? sea : -30) - 4, at[1] - size[1] / 2 - KIT_SEEN_MARGIN),
-    new THREE.Vector3(at[0] + size[0] / 2 + KIT_SEEN_MARGIN, 80, at[1] + size[1] / 2 + KIT_SEEN_MARGIN),
-  ));
+/** Show each chunk that is within its reach of the eye (with a hysteresis), hide the rest. Returns how many are shown. */
+function kitReach(chunks, ex, ey, ez) {
+  let shown = 0;
+  for (const chunk of chunks) {
+    const d = Math.hypot(chunk.centre.x - ex, chunk.centre.y - ey, chunk.centre.z - ez);
+    chunk.past = pastReachHeld(d, chunk.radius, chunk.reach, chunk.past);
+    chunk.mesh.visible = !chunk.past;
+    if (!chunk.past) shown += 1;
+  }
+  return shown;
 }
 
 /**
@@ -1222,7 +1291,12 @@ export function createCastleView(stage) {
     seed += 13;
     const detail = kitSection(section, mats, seed, stage.levels ?? []);
     const far = kitSilhouette(section, mats, seed + 1);
+    // (The merged meshes of the section, before anything that moves is put in with them.)
+    const chunks = kitChunks(detail.group.children, (mesh) => mesh.material !== mats.wear);
+    const decals = kitChunks(detail.group.children, (mesh) => mesh.material === mats.wear);
+    const silhouette = kitChunks(far.group.children);
     const dynamic = kitDynamics(detail.dyn, mats, textures);
+    dynamic.group.name = `dyn:${section.id}`;
     detail.group.add(dynamic.group);
     const holder = new THREE.Group();
     holder.name = `section:${section.id}`;
@@ -1244,14 +1318,24 @@ export function createCastleView(stage) {
     }
     for (const l of detail.dyn.lights) lights.push({ ...l, section: section.id });
     sections[section.id] = holder;
-    parts[section.id] = { detail, far, dynamic, moving, marks };
+    parts[section.id] = { detail, far, dynamic, moving, marks, chunks, decals, silhouette };
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
     group.add(holder);
   }
-  // Where each section lies, and the ways between them (a portal's area is where its two sections meet), for what the camera can see.
-  const boxes = Object.fromEntries(stage.sections.map((section) => [section.id, kitRegionBoxes(section.bounds, stage.sea)]));
-  const links = stage.sections.flatMap((section) => (section.portals ?? []).map((portal) => ({ a: section.id, b: portal.to, boxes: kitRegionBoxes(portal.area, stage.sea) })));
+  // Where each section lies, and the ways between them (a portal's area is where its two sections meet), for what the camera can see (visibility.js).
+  const graph = sectionGraph(stage);
+  const solidBoxes = new Map();
+  const box3 = (b) => {
+    let box = solidBoxes.get(b);
+    if (!box) {
+      box = new THREE.Box3(new THREE.Vector3(b.x0, b.y0, b.z0), new THREE.Vector3(b.x1, b.y1, b.z1));
+      solidBoxes.set(b, box);
+    }
+    return box;
+  };
   const camera = { frustum: new THREE.Frustum(), matrix: new THREE.Matrix4(), set: false };
+  // The land's chunks are drawn by the fog's reach too.
+  const landChunks = kitChunks(land.children, (mesh) => mesh.material !== foam);
   // A few real lights, moved to the nearest of the flames and torches. Every lit surface of the picture pays for each light in the scene, lit or
   // not (a third of the graphics card's time out in the rain, where no torch is near), so the four are in the scene only while a torch lights
   // something (all together: two shaders to keep, with the lights and without, `view.warm` builds them both before they are wanted).
@@ -1264,8 +1348,52 @@ export function createCastleView(stage) {
     group.add(light);
     pool.push(light);
   }
-  const state = { time: 0, last: null, lightClock: 0, near: new Set(), lit: [], shelter: 1, reflect: {} };
-  const view = { stage, group, sections, mechanisms: [], mats, stats };
+  const state = {
+    time: 0, last: null, lightClock: 0, near: new Set(), lit: [], shelter: 1, reflect: {},
+    // The quality tier in force (quality.js), and what visibility.js has decided: the state of each section as painted ('detail', 'far', 'off'), the men not drawn.
+    tier: 'high', q: tierOf('high'), held: {}, states: new Map(), hidden: new Set(), menHeld: {}, menSeen: new Map(), open: new Map(), stamp: null,
+    sight: seeThroughIds(stage), eye: [0, 0, 0], fogFar: Infinity, paint: { sections: 0, far: 0, chunks: 0, decals: 0 },
+  };
+  const view = { stage, group, sections, mechanisms: [], mats, stats, safe: null };
+
+  /** Put the picture in a quality tier (quality.js: 'high', 'medium', 'low'): the reaches of the small things and of the shader's finer terms, the rain. */
+  view.setQuality = (name) => {
+    state.tier = TIER_NAMES.includes(name) ? name : 'high';
+    state.q = tierOf(state.tier);
+    stormRain(state.q.rain);
+    for (const entry of Object.values(parts)) for (const chunk of entry.decals) chunk.reach = state.q.decals;
+  };
+  view.quality = () => state.tier;
+  /** Whether a man (fighter id) is hidden this frame by sight (see kitMen). */
+  view.manHidden = (id) => state.hidden.has(id);
+  /** What is painted now: { sections (in detail), far (silhouettes), chunks, decals, hiddenMen }, and each section's state. */
+  view.painted = () => ({ ...state.paint, hiddenMen: state.hidden.size, states: Object.fromEntries(state.states) });
+
+  /** Whether the way through a link (a portal) is clear to the eye: some line from it to the opening's middle or corners is not stopped by a wall, a shut gate or a floor. */
+  const linkOpen = (link, terrain, eye, py) => {
+    const cached = state.open.get(link);
+    if (cached && state.time - cached.at < 0.12 && cached.stamp === state.stamp) return cached.value;
+    let value = false;
+    const heights = [eye[1], py + 1];
+    for (const box of link.boxes) {
+      const cx = (box.x0 + box.x1) / 2;
+      const cz = (box.z0 + box.z1) / 2;
+      const qx = (box.x1 - box.x0) / 4;
+      const qz = (box.z1 - box.z0) / 4;
+      for (const [x, z] of [[cx, cz], [cx - qx, cz - qz], [cx + qx, cz - qz], [cx - qx, cz + qz], [cx + qx, cz + qz]]) {
+        for (const h of heights) {
+          if (!rayBlocked(terrain, [eye[0], eye[2]], [x, z], eye[1], h, state.sight)) {
+            value = true;
+            break;
+          }
+        }
+        if (value) break;
+      }
+      if (value) break;
+    }
+    state.open.set(link, { value, at: state.time, stamp: state.stamp });
+    return value;
+  };
 
   /** Show what is in force: detail near the player, silhouettes elsewhere; gates and ladders as they stand; the flames. */
   view.update = (world, eye = null) => {
@@ -1287,34 +1415,63 @@ export function createCastleView(stage) {
     state.shelter += ((indoors ? 0.1 : 1) - state.shelter) * Math.min(1, dt * 4);
     for (const [name, base] of Object.entries(state.reflect)) mats[name].envMapIntensity = base * state.shelter;
     ktWeather.uKitPoolSky.value = state.shelter;
-    // What the camera can see (when it is given): a section outside its frustum is not drawn or animated at all; one beside
-    // the sections the man is in is drawn in detail only if the way between them is in view (else its silhouette, which is
-    // what is behind a wall); the frustum culling of the meshes does the rest.
+    // The shader's finer terms thin out with distance, and under a roof the sky's wash on the stone is for the nearest walls only (kittex.js ktLod).
+    const q = state.q;
+    ktSetLod({ env: q.env * (0.12 + 0.88 * state.shelter), tile: q.tile, pool: q.pool, penumbra: q.penumbra, macro: q.macro, taps: q.taps });
+    // What the camera can see (when it is given): a section outside its frustum is not drawn or animated at all; one reached from the sections the man is in
+    // by openings that are in view and clear is drawn in detail (else its silhouette, which is what is behind a wall); the frustum culling of the meshes does the rest.
     camera.set = false;
     if (eye) {
       eye.updateMatrixWorld();
       camera.frustum.setFromProjectionMatrix(camera.matrix.multiplyMatrices(eye.projectionMatrix, eye.matrixWorldInverse));
       camera.set = true;
+      state.eye[0] = eye.position.x;
+      state.eye[1] = eye.position.y;
+      state.eye[2] = eye.position.z;
     }
-    const sees = (list) => !camera.set || list.some((box) => camera.frustum.intersectsBox(box));
-    const seenThrough = (id) => links.some((link) => ((link.a === id && active.has(link.b)) || (link.b === id && active.has(link.a))) && sees(link.boxes));
+    const [ex, ey, ez] = state.eye;
+    state.fogFar = stormFogFar();
+    const fogLimit = fogReach(state.fogFar);
+    const inView = (list) => !camera.set || list.some((box) => camera.frustum.intersectsBox(box3(box)));
+    const terrain = world.arena.terrain;
+    // (A change of the terrain in force, a gate worked or a section woken, makes the openings be looked at again.)
+    state.stamp = terrain?.solids;
+    const open = camera.set && terrain ? (link) => linkOpen(link, terrain, state.eye, py) : () => true;
+    const reach = camera.set ? (id) => nearestBoxDistance(graph.bounds[id], ex, ey, ez) <= fogLimit : () => true;
+    const states = holdSections(state.held, chooseSections(graph, { active, inView, open, reach }), dt);
+    state.states = states;
+    const paint = state.paint;
+    paint.sections = 0;
+    paint.far = 0;
+    paint.chunks = 0;
+    paint.decals = 0;
     for (const section of stage.sections) {
       const entry = parts[section.id];
-      const inView = sees(boxes[section.id]);
-      const shown = near.has(section.id);
-      const detailed = shown && inView && (active.has(section.id) || seenThrough(section.id));
+      const painted = states.get(section.id);
+      const detailed = painted === 'detail';
       entry.detail.group.visible = detailed;
-      entry.far.group.visible = !detailed && inView;
-      if (!shown) continue;
+      entry.far.group.visible = painted === 'far';
+      if (detailed) paint.sections += 1;
+      else if (painted === 'far') paint.far += 1;
       // (Gates and ladders keep their motion whether or not they are seen, so that one shut behind him is shut when he turns round.)
-      for (const moving of entry.moving) {
-        const target = ['open', 'down'].includes(run.mechanisms[moving.id]) ? 1 : 0;
-        if (moving.open < 0) moving.open = target;
-        else moving.open += Math.max(-1, Math.min(1, (target - moving.open) * Math.min(1, dt * 2.6)));
-        moving.apply(moving.open);
+      if (near.has(section.id) || detailed) {
+        for (const moving of entry.moving) {
+          const target = ['open', 'down'].includes(run.mechanisms[moving.id]) ? 1 : 0;
+          if (moving.open < 0) moving.open = target;
+          else moving.open += Math.max(-1, Math.min(1, (target - moving.open) * Math.min(1, dt * 2.6)));
+          moving.apply(moving.open);
+        }
+      }
+      if (painted === 'far') {
+        for (const chunk of entry.silhouette) chunk.reach = fogLimit;
+        kitReach(entry.silhouette, ex, ey, ez);
       }
       if (!detailed) continue;
-      kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time);
+      for (const chunk of entry.chunks) chunk.reach = fogLimit;
+      paint.chunks += kitReach(entry.chunks, ex, ey, ez);
+      paint.decals += kitReach(entry.decals, ex, ey, ez);
+      const away = nearestBoxDistance(graph.bounds[section.id], ex, ey, ez);
+      kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time, q, away, state.eye);
       const taken = run.level?.taken;
       for (const mark of entry.marks) {
         const gone = taken?.has(mark.item.id);
@@ -1325,6 +1482,11 @@ export function createCastleView(stage) {
         mark.glint.material.opacity = 0.55 + 0.35 * Math.sin(state.time * 3.1 + mark.item.at[2]);
       }
     }
+    for (const chunk of landChunks) chunk.reach = fogLimit;
+    kitReach(landChunks, ex, ey, ez);
+    // The men: one behind a wall from the eye (and from the man played), and not near, is not drawn (visibility.js manDrawn).
+    state.hidden.clear();
+    if (camera.set && terrain) kitMen(state, world, terrain, view.safe, dt);
     // The lights: the four nearest of the lit things in the sections shown, a few times a second.
     state.lightClock -= dt;
     if (state.lightClock <= 0) {
@@ -1368,7 +1530,10 @@ export function createCastleView(stage) {
     });
     const holders = Object.values(parts).flatMap((entry) => [entry.detail.group, entry.far.group]).map((holder) => [holder, holder.visible]);
     const lamps = pool.map((light) => light.visible);
-    for (const [object] of kept) object.frustumCulled = false;
+    for (const [object] of kept) {
+      object.frustumCulled = false;
+      object.visible = true;
+    }
     for (const [holder] of holders) holder.visible = true;
     for (const on of [true, false]) {
       for (const light of pool) light.visible = on;
@@ -1423,7 +1588,13 @@ export function createCastleView(stage) {
       entry.detail.group.visible = true;
       entry.far.group.visible = false;
     }
+    // (And every chunk, whether or not it is within the eye's reach now.)
+    const shown = state.casters.map((mesh) => mesh.visible);
+    for (const mesh of state.casters) mesh.visible = true;
     state.shadowMs = ktShadowBake(renderer, group, state.casters, skyDirection(look.sun.az, look.sun.el), strength, stage.id);
+    state.casters.forEach((mesh, k) => {
+      mesh.visible = shown[k];
+    });
     for (const [holder, visible] of holders) holder.visible = visible;
     return state.shadowMs;
   };

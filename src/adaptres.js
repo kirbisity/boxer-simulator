@@ -8,6 +8,8 @@
 
 /* global THREE */
 
+import { rungsFor } from './levelmode/quality.js';
+
 export const ADAPTIVE_RESOLUTION = {
   // A fight of fewer fighters than this is never adapted (and is put back to full at once if one shrinks to it): a 1v1 is drawn exactly as ever.
   fewestFighters: 9,
@@ -23,7 +25,10 @@ export const ADAPTIVE_RESOLUTION = {
   // Weight of each new frame in the smoothed time: a hitch (a garbage collection, a shader compiling) must not count as a slow second.
   smoothing: 0.08,
   // s the smoothed time must stay slow before one step down (long enough that a hitch is not it, short enough that a battle's first seconds are not a slideshow).
-  slowSeconds: 1.2,
+  slowSeconds: 0.8,
+  // A frame this long (smoothed) is far behind, not a little: one step after only `severeSeconds`, so a slideshow at the stage's start is not endured for seconds.
+  severeMs: 33,
+  severeSeconds: 0.3,
   // s it must stay fast before one step up is tried. A screen held at 60 Hz looks the same at every step that keeps up, so this is the only way to find headroom: try, and go back if it was not there.
   fastSeconds: 6,
   // A frame is slow for want of pixels only if the page's own work (simulation, views, the draw calls) fills less than this share of it: the rest was spent waiting for the graphics card.
@@ -34,7 +39,7 @@ export const ADAPTIVE_RESOLUTION = {
   retryFactor: 2,
   fastSecondsMost: 60,
   // Frames ignored after a change (the canvas is reallocated: that frame is slow, and a smoothed time from before means nothing now).
-  settleFrames: 8,
+  settleFrames: 6,
   // ms: a frame this long was a stall (the tab was in the background), not the cost of drawing: ignored.
   stallMs: 250,
 };
@@ -54,7 +59,7 @@ export function ratioSteps(full, config = ADAPTIVE_RESOLUTION) {
 }
 
 export function newAdaptiveState() {
-  return { level: 0, smoothed: null, work: null, slowFor: 0, fastFor: 0, sinceStep: Infinity, lastStep: 0, fastNeeded: null, settle: 0 };
+  return { level: 0, smoothed: null, work: null, slowFor: 0, severeFor: 0, fastFor: 0, sinceStep: Infinity, lastStep: 0, fastNeeded: null, settle: 0 };
 }
 
 /**
@@ -81,15 +86,18 @@ export function stepAdaptive(state, { ms, fighters, levels, work = null }, confi
   const waiting = state.work === null || state.work < config.gpuWaitShare * state.smoothed;
   if (state.smoothed > config.slowMs && waiting) {
     state.slowFor += dt;
+    state.severeFor = state.smoothed > config.severeMs ? state.severeFor + dt : 0;
     state.fastFor = 0;
   } else if (state.smoothed <= config.fastMs) {
     state.fastFor += dt;
     state.slowFor = 0;
+    state.severeFor = 0;
   } else {
     state.slowFor = 0;
+    state.severeFor = 0;
     state.fastFor = 0;
   }
-  if (state.slowFor >= config.slowSeconds && state.level < levels - 1) {
+  if ((state.slowFor >= config.slowSeconds || state.severeFor >= config.severeSeconds) && state.level < levels - 1) {
     // Down again soon after going up: the headroom was not there, so wait longer before the next try.
     if (state.lastStep < 0 && state.sinceStep < config.failSeconds) state.fastNeeded = Math.min(config.fastSecondsMost, state.fastNeeded * config.retryFactor);
     moved(state, 1, config);
@@ -104,15 +112,16 @@ function moved(state, direction, config) {
   state.lastStep = direction;
   state.sinceStep = 0;
   state.slowFor = 0;
+  state.severeFor = 0;
   state.fastFor = 0;
   state.smoothed = null;
   state.settle = config.settleFrames;
 }
 
 /**
- * The controller for a view: `frame(view, ms, fighters)` once a frame sets the
- * renderer's pixel ratio; `set(false)` puts it back to full and keeps it there.
- * A ratio someone else set (a look's own) is taken as the new full one.
+ * The controller for a view: `frame(view, ms, fighters, { tiered })` once a frame sets the renderer's pixel ratio (and, in a stage, tells `onTier` which quality tier
+ * the rung it is on has: quality.js); `set(false)` puts it back to full and keeps it there. A ratio someone else set (a look's own) is taken as the new full one.
+ * `pin(rung)` holds one rung (0: the best, `Infinity`: the last) whatever the frame times say; `pin(null)` lets go.
  */
 export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
   const state = newAdaptiveState();
@@ -120,6 +129,10 @@ export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
   let full = null;
   let applied = null;
   let work = null;
+  let pinned = null;
+  let tier = 'high';
+  let tiered = false;
+  let onTier = null;
 
   function apply(view, ratio) {
     const renderer = view.renderer;
@@ -131,11 +144,27 @@ export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
     view.look?.resize?.(view, size.x, size.y);
   }
 
+  /** The rungs: pixel ratios with a tier each in a stage; ratios alone elsewhere. */
+  const ladder = () => (tiered ? rungsFor(full, config.floor) : ratioSteps(full, config).map((ratio) => ({ ratio, tier: 'high' })));
+
+  function setTier(next) {
+    if (next === tier) return;
+    tier = next;
+    onTier?.(tier);
+  }
+
   const api = {
     config,
     state,
     get enabled() {
       return enabled;
+    },
+    get tier() {
+      return tier;
+    },
+    /** Called with the tier's name whenever the rung changes it. */
+    set onTier(callback) {
+      onTier = callback;
     },
     /** On or off (off: full ratio now, and left alone). */
     set(on, view) {
@@ -146,27 +175,54 @@ export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
       }
       return enabled;
     },
-    /** What it is doing now: { enabled, level, ratio, full, smoothedMs }. */
+    /** Hold one rung (a number; `Infinity` is the last one), or null to let the frame times decide. The best rung (0) is the full picture. */
+    pin(rung, view = null) {
+      pinned = rung;
+      Object.assign(state, newAdaptiveState());
+      if (view && full !== null) {
+        const rungs = ladder();
+        const at = rung === null ? 0 : Math.min(rung, rungs.length - 1);
+        apply(view, rungs[at].ratio);
+        setTier(rungs[at].tier);
+        if (at === 0) applied = null;
+      }
+      return pinned;
+    },
+    /** What it is doing now: { enabled, level, ratio, full, tier, pinned, smoothedMs }. */
     info(view) {
-      return { enabled, level: state.level, ratio: view.renderer.getPixelRatio(), full, smoothedMs: state.smoothed === null ? null : Math.round(state.smoothed * 10) / 10 };
+      return { enabled, level: state.level, ratio: view.renderer.getPixelRatio(), full, tier, pinned, smoothedMs: state.smoothed === null ? null : Math.round(state.smoothed * 10) / 10 };
     },
     /** The page's own work in the frame just done (ms), for the next `frame` to tell waiting for the graphics card from being held up by the processor. */
     worked(ms) {
       work = ms;
     },
-    frame(view, ms, fighters) {
+    frame(view, ms, fighters, options = {}) {
       const current = view.renderer.getPixelRatio();
+      // A stage has tiers; the first frame of one starts at the best.
+      if (Boolean(options.tiered) !== tiered) {
+        tiered = Boolean(options.tiered);
+        Object.assign(state, newAdaptiveState());
+        if (!tiered) setTier('high');
+      }
       // Anything but our own change is a new full ratio (a look, the page's zoom).
       if (full === null || (applied !== null ? current !== applied : current !== full)) {
         full = current;
         applied = null;
         Object.assign(state, newAdaptiveState());
       }
+      const rungs = ladder();
+      if (pinned !== null) {
+        const at = Math.min(pinned, rungs.length - 1);
+        if (rungs[at].ratio !== current) apply(view, rungs[at].ratio);
+        if (tiered) setTier(rungs[at].tier);
+        if (at === 0) applied = null;
+        return;
+      }
       if (!enabled) return;
-      const ratios = ratioSteps(full, config);
-      const level = stepAdaptive(state, { ms, fighters, levels: ratios.length, work }, config);
-      const ratio = ratios[level];
-      if (ratio !== current) apply(view, ratio);
+      const level = stepAdaptive(state, { ms, fighters, levels: rungs.length, work }, config);
+      const rung = rungs[level];
+      if (rung.ratio !== current) apply(view, rung.ratio);
+      if (tiered) setTier(rung.tier);
       if (level === 0) applied = null;
     },
   };
