@@ -434,8 +434,19 @@ export const WORLD = {
   // - carry: the weapon at his side. A short weapon (up to `longFrom` m) hangs point down and a little back from a hand at the hip
   //   (`hand`, share of height; z mirrored for the left hand); a long one is carried on the shoulder, held up and forward
   //   (`longHand`, `longDir`); a shield arm hangs at `shield`.
+  // - recovery: the share of the usual stamina recovery (WORLD.staminaRecovery) he gets while running, so that the cost of running
+  //   (CONTROL.run.staminaPerSecond) is a drain over minutes rather than being cancelled by his recovery.
+  // - turn: the pose in a sprint turn (`fighter.turn` is the heading's rate in rad/s, smoothed over `smooth` s; all of it scales with the run
+  //   pose, and a straight run has none). `bank`: the trunk rolls into the turn by this many rad for each rad/s × m/s of it, up to `bankMax`
+  //   (a sprinter at 4.4 m/s turning at 2 rad/s banks ~0.3 rad); `lead`: the shoulders lead the turn by this many rad per rad/s (up to
+  //   `leadMax`) while the hips lag it by `hipLag` per rad/s (up to `hipLagMax`), so the trunk winds into the turn and the hips follow the
+  //   feet; `full`: the rate (rad/s) at which the footwork below is at its full. The feet: each lands at least `gap` (share of height)
+  //   to its own side of the line of travel (a turn must not cross them); the foot on the inside lands `inner` shorter and `wide`
+  //   wider, the outside one `outer` longer (shares of height), in step with the turn's share.
   runMode: {
     speedFactor: 4,
+    recovery: 0.25,
+    turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.035, inner: 0.07, wide: 0.03, outer: 0.03 },
     stance: { blade: 0, crouch: 0.02, width: 0.55, lean: 0.03, guardHeight: 0 },
     lean: 0.3, dip: 0.03, swing: 0.15, ease: 6,
     step: { seconds: 0.15, overlap: 0.55, lead: 1.4, threshold: 0.2, lift: 0.12 },

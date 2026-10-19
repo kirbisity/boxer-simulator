@@ -47,6 +47,14 @@ export const AWARE = {
   searchCone: 170,
   // Seconds between a man's looks.
   every: 0.2,
+  // The player's sprint (run mode, `fighter.runMode`) is not noticed: while he sprints, and for `sprintGrace` s after, no man not
+  // already aggro turns aggro from seeing him, from a clash of arms or from being bumped, and a man searching goes on
+  // searching without converting. A man glimpses a sprinter late (he is past before the eye has made him out). Men already aggro keep
+  // fighting as he passes, a blow that lands on an unaware man still alarms him, and an aggro man's shout still reaches his friends.
+  // The grace is 0.6 s (three of a guard's looks, `every`): long enough that stopping dead beside a guard is not seen as a man
+  // appearing out of the air at that instant (he was running a moment ago), short enough that standing there is soon seen.
+  sprintUnseen: true,
+  sprintGrace: 0.6,
   // An aggro man who has not seen a foe for this long (s) searches; within `meleeSense` m he sees (hears) one regardless.
   loseSeconds: 8,
   meleeSense: 2.5,
@@ -138,6 +146,7 @@ export function createAwareness(world, config = {}) {
     targetsAt: -1,
     targets: [],
     looks: 0,
+    sprintAt: -Infinity,
   };
   run.aware = aware;
   run.civiliansHarmed = false;
@@ -266,11 +275,17 @@ function targetsOf(world, aware) {
   return aware.targets;
 }
 
-/** The first of the targets this man sees, or null. */
+/** Whether the player is sprinting past unnoticed now: in run mode, or within AWARE.sprintGrace s of it (AWARE.sprintUnseen). */
+export function sprintUnseen(world, aware = world.stage?.aware) {
+  return Boolean(aware?.config.sprintUnseen) && world.time - aware.sprintAt < aware.config.sprintGrace + 1e-9;
+}
+
+/** The first of the targets this man sees, or null. A sprinting player is not one of them. */
 function spot(world, aware, fighter, mind) {
   const range = rangeOf(aware, world, fighter);
   const cone = coneOf(aware, fighter, mind);
-  for (const target of targetsOf(world, aware)) if (target !== fighter && sees(world, fighter, target, range, cone)) return target;
+  const player = sprintUnseen(world, aware) ? world.fighters[0] : null;
+  for (const target of targetsOf(world, aware)) if (target !== fighter && target !== player && sees(world, fighter, target, range, cone)) return target;
   return null;
 }
 
@@ -314,7 +329,7 @@ function readEvents(world, aware) {
       for (const [one, two] of [[event.attacker, event.defender], [event.defender, event.attacker]]) {
         const mind = aware.minds[one];
         const other = world.fighters[two];
-        if (mind && other && mind.kind === 'guard' && other.corner === 'red' && !world.stage.ghost) alarm(world, aware, mind, world.fighters[one], 'bump', other);
+        if (mind && other && mind.kind === 'guard' && other.corner === 'red' && !world.stage.ghost && !(other === world.fighters[0] && sprintUnseen(world, aware))) alarm(world, aware, mind, world.fighters[one], 'bump', other);
       }
       continue;
     }
@@ -379,9 +394,10 @@ function keepTrail(world, aware) {
 export function updateAwareness(world) {
   const aware = world.stage?.aware;
   if (!aware) return;
+  const time = world.time;
+  if (world.fighters[0]?.runMode) aware.sprintAt = time;
   readEvents(world, aware);
   keepTrail(world, aware);
-  const time = world.time;
   for (const mind of aware.minds) {
     if (!mind || time < mind.next) continue;
     mind.next = time + aware.config.every;
@@ -536,7 +552,7 @@ function lookGuard(world, aware, mind, fighter) {
     return;
   }
   // A clash of arms near: he goes to see (unless he is already looking for trouble).
-  const noise = mind.state === 'search' ? null : clashNear(aware, world, fighter, config.noiseRadius, config.noiseSeconds);
+  const noise = mind.state === 'search' || sprintUnseen(world, aware) ? null : clashNear(aware, world, fighter, config.noiseRadius, config.noiseSeconds);
   if (noise && (mind.heardAt ?? -Infinity) < noise.time) {
     mind.heardAt = noise.time;
     mind.lastSeen = { x: noise.x, z: noise.z, y: noise.y };

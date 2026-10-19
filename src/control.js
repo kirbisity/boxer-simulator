@@ -9,10 +9,11 @@ import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
 import { dropWeapon, hostile, inFight, legBroken, legShare, manNear, opponentFor, perform, point, reachOf, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
-import { floorAt } from './physics/terrain.js';
+import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { handling } from './handling.js';
+import { runSteer } from './runsteer.js';
 
 export const CONTROL = {
   // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`;
@@ -28,9 +29,17 @@ export const CONTROL = {
   // - backFrom, backDot: the stick at `backFrom` or more, its way against his heading (cosine) below `backDot`: pulled back, the lock ends.
   // - edgeAhead, edgeDrop: a locked run with no finger on the screen must not carry him off a ledge or into the sea: if the floor `edgeAhead` m
   //   ahead of him is `edgeDrop` m or more below the floor under him (stairs are 0.2 m a step), the lock ends and he stops.
-  // - staminaPerSecond: what running costs (stamina is 0..1; it recovers at WORLD.staminaRecovery × aerobic, so the net is modest:
-  //   an athletic man runs ~20 s from fresh); below `windedBelow` he is winded and runs no more until stamina is back to `recoveredTo`.
-  run: { doubleTap: 0.3, lockHold: 0.4, steerFrom: 0.3, steerRate: 3.5, backFrom: 0.5, backDot: -0.6, edgeAhead: 1.6, edgeDrop: 0.9, staminaPerSecond: 0.12, windedBelow: 0.06, recoveredTo: 0.25 },
+  // - staminaPerSecond: what running costs (stamina is 0..1; divided by his aerobic; it recovers at WORLD.staminaRecovery × aerobic, and
+  //   at WORLD.runMode.recovery of that while he runs). Was 0.12 (an athletic man winded in ~20 s: a run across one section tired him);
+  //   now 0.02: a fit man (the forger, aerobic 0.9) loses ~0.006 a second net, so ~2.5 minutes of sprinting from fresh before he is
+  //   winded, a man in plate (aerobic 0.73) a little over a minute. A dash across a courtyard or a tower stair costs a few percent.
+  //   Below `windedBelow` he is winded and runs no more until stamina is back to `recoveredTo` (a few seconds' rest: the latch is
+  //   lower and shorter than it was, 0.06 / 0.25, as the drain is so much gentler).
+  // - Auto-steer along walls, corners and winding stairs (runsteer.js RUN_STEER; the player's intent only, in worlds with terrain, and
+  //   not locked on a man): the heading the stick (or the locked run) gives is bent along a wall in his way at a glancing angle.
+  run: {
+    doubleTap: 0.3, lockHold: 0.4, steerFrom: 0.3, steerRate: 3.5, backFrom: 0.5, backDot: -0.6, edgeAhead: 1.6, edgeDrop: 0.9, staminaPerSecond: 0.02, windedBelow: 0.05, recoveredTo: 0.2,
+  },
   // Facing. Not locked on and with no foe near, he keeps the heading he has (or the way he goes) and does not turn to a man
   // far off: `foeWithin` m (a man at the other end of a courtyard is not a man to square up to). A man with a gun or bow
   // always faces his man (he aims); in a level stage only a man aware of him counts as near.
@@ -70,7 +79,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, requests: [], runLock: null, runHeld: 0, runBroken: false, winded: false };
+  return { lock: null, stick: null, keyStick: null, guard: false, requests: [], runLock: null, runHeld: 0, runBroken: false, winded: false, runSteer: { bend: 0 } };
 }
 
 /**
@@ -145,14 +154,19 @@ function turnWay(from, to, most) {
   return [Math.cos(now), Math.sin(now)];
 }
 
-/** Whether the floor ahead along `dir` falls away (a ledge, a stair's head, the sea's edge): CONTROL.run.edgeDrop m or more. */
+/** Whether the floor ahead along `dir` falls away (a ledge, a stair's head, the sea's edge): CONTROL.run.edgeDrop m or more. A wall there is no edge. */
 function dropsAhead(world, fighter, dir) {
   const terrain = world.arena?.terrain;
   if (!terrain) return false;
   const [x, y, z] = point(fighter.x, P.pelvis);
   const here = floorAt(terrain, x, z, y);
-  const ahead = floorAt(terrain, x + dir[0] * CONTROL.run.edgeAhead, z + dir[1] * CONTROL.run.edgeAhead, y);
-  return here - ahead >= CONTROL.run.edgeDrop;
+  const at = [x + dir[0] * CONTROL.run.edgeAhead, z + dir[1] * CONTROL.run.edgeAhead];
+  const ahead = floorAt(terrain, at[0], at[1], y);
+  if (here - ahead < CONTROL.run.edgeDrop) return false;
+  // (Standing at the wall of a tower stair, the floor past the tread is the wall's footing: he cannot go there.)
+  const lift = fighter.lift ?? 0;
+  const spec = WORLD.terrain;
+  return !pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, spec.stepUp, lift + spec.sag);
 }
 
 /** What stops a run: not on his feet, hurt, reeling, on a horse, held, or at some work with his hands. */
@@ -246,8 +260,14 @@ function steer(world, fighter, orders, opponent, dt) {
       fighter.strafe = (way[0] * left[0] + way[1] * left[2]) * pace * slow;
       fighter.running = running && ahead > 0.7 && !orders.guard;
     } else {
-      // Free: he turns and goes that way.
-      fighter.goTo = [pelvis[0] + way[0] * 3, 0, pelvis[2] + way[1] * 3];
+      // Free: he turns and goes that way (a run bent along any wall in his way: runsteer.js).
+      let go = way;
+      orders.runSteer ??= { bend: 0 };
+      if (running && !orders.guard && !fighter.mount && world.arena?.terrain) {
+        go = runSteer(world, fighter, orders.runSteer, way, dt, { adopt: Boolean(orders.runLock), drops: (dir) => dropsAhead(world, fighter, dir) });
+        if (orders.runLock && orders.runSteer.adopt) orders.runLock.dir = orders.runSteer.adopt;
+      } else orders.runSteer.bend = 0;
+      fighter.goTo = [pelvis[0] + go[0] * 3, 0, pelvis[2] + go[1] * 3];
       fighter.move = pace * slow;
       fighter.running = running && !orders.guard;
     }

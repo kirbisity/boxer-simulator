@@ -705,6 +705,8 @@ function followCamera(fighter, dt) {
     facing: fighter.yaw,
     down: fighter.state !== 'up',
     foe: locked ? point(locked.x, P.pelvis) : null,
+    running: Boolean(fighter.runMode),
+    speed: Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]),
     moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick || state.orders.runLock) && state.orders.lock === null)),
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
