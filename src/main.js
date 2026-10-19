@@ -38,7 +38,7 @@ import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.j
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
-import { pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { installLevelHud } from './levelmode/hud.js';
@@ -2055,6 +2055,8 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   state.world = createLevelWorld(stage, player ? normaliseInputs(structuredClone(player)) : levelPreset('forger'), { seed: state.seed });
   // Ghost walk (the sandbox's debug for designing the stage): the garrison never notices him (levelmode/awareness.js).
   state.world.stage.ghost = ghost;
+  // Exploring: every gate and door stands open and every ladder is down, so the whole castle can be walked.
+  if (ghost) for (const mechanism of mechanismsOf(stage)) setMechanism(state.world, mechanism.id, 'open' in mechanism.states ? 'open' : 'down' in mechanism.states ? 'down' : Object.keys(mechanism.states).at(-1));
   document.body.classList.toggle('ghost-walk', ghost);
   clearGore(scene);
   // (A stage may be set in a place of its own: the storm of Dunnottar, levelmode/storm.js.)
