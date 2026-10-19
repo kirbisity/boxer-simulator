@@ -1625,6 +1625,30 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   return true;
 }
 
+/**
+ * The pose of a sprint turn (WORLD.runMode.turn): the heading's rate `fighter.turn` (rad/s, positive turning to his right) smoothed,
+ * and from it the trunk banked into the turn (`roll`), the shoulders led into it and the hips lagging it (`twist`, `hipYaw`).
+ * All of it is the run pose's share; a straight run, and a man not running, have none.
+ */
+function runTurnPose(fighter, intent, dt) {
+  const spec = WORLD.runMode.turn;
+  const share = fighter.runPose;
+  if (fighter.yawWas === undefined || dt <= 0) fighter.turn = 0;
+  else {
+    const rate = Math.atan2(Math.sin(fighter.yaw - fighter.yawWas), Math.cos(fighter.yaw - fighter.yawWas)) / dt;
+    fighter.turn = (fighter.turn ?? 0) + (rate - (fighter.turn ?? 0)) * (1 - Math.exp(-dt / spec.smooth));
+  }
+  fighter.yawWas = fighter.yaw;
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const cap = (value, most) => Math.max(-most, Math.min(most, value));
+  return {
+    // (Local +z is his left: a positive rate turns him to his right, so the roll and the leads are the other way.)
+    roll: (intent.roll ?? 0) - cap(fighter.turn * speed * spec.bank, spec.bankMax) * share,
+    twist: intent.twist + cap(fighter.turn * spec.lead, spec.leadMax) * share,
+    hipYaw: -cap(fighter.turn * spec.hipLag, spec.hipLagMax) * share,
+  };
+}
+
 function updateIntent(world, fighter, dt) {
   const H = fighter.body.heightM;
   const style = STYLES[fighter.style];
@@ -1643,6 +1667,10 @@ function updateIntent(world, fighter, dt) {
     intent.lean = intent.lean * (1 - runPose) + spec.lean * runPose;
     intent.dip = intent.dip * (1 - runPose) + spec.dip * runPose;
     intent.shift *= 1 - runPose;
+    Object.assign(intent, runTurnPose(fighter, intent, dt));
+  } else if (fighter.turn !== undefined) {
+    fighter.turn = 0;
+    fighter.yawWas = undefined;
   }
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
@@ -2095,6 +2123,7 @@ function updateFeet(fighter, dt) {
     // Step to where the stance will be, not where it is: lead the motion.
     const lead = spec.lead * spec.seconds;
     const to = [worst.desired[0] + fighter.rootVelocity[0] * lead, worst.desired[1], worst.desired[2] + fighter.rootVelocity[1] * lead];
+    if (run) turnedStep(fighter, worst, to);
     // (floorFrom, floorTo: the floor under the foot at each end of the step, set on terrain: groundStance.)
     worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined };
   }
@@ -2106,6 +2135,33 @@ function updateFeet(fighter, dt) {
       foot.step = null;
     }
   }
+}
+
+/**
+ * A step in a sprint turn (WORLD.runMode.turn): the landing `to` is moved in place so that the foot lands in the direction of travel and
+ * on its own side of the line, not across it (the stance is turned to the facing, the travel is not), the foot on the inside of the turn
+ * shorter and wider, the one on the outside longer. Nothing at a straight run (no turn, no change).
+ */
+function turnedStep(fighter, foot, to) {
+  const spec = WORLD.runMode.turn;
+  const share = Math.min(1, Math.abs(fighter.turn ?? 0) / spec.full);
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  if (share < 0.05 || speed < 0.5) return;
+  const H = fighter.body.heightM;
+  const ux = fighter.rootVelocity[0] / speed;
+  const uz = fighter.rootVelocity[1] / speed;
+  // (Where he will be when it lands: the stance's own place for the foot, from him, is the same.)
+  const dx = foot.desired[0] - fighter.root[0];
+  const dz = foot.desired[2] - fighter.root[1];
+  const across = -dx * uz + dz * ux;
+  const along = dx * ux + dz * uz;
+  // Left of the line of travel is +, as the foot index says: the left foot is on that side.
+  const side = foot.index === P.lFoot ? 1 : -1;
+  const inner = side * fighter.turn < 0;
+  const wanted = side * Math.max(side * across, spec.gap * H * share) + (inner ? side * spec.wide * H * share : 0);
+  const length = along + (inner ? -spec.inner : spec.outer) * H * share;
+  to[0] += (length - along) * ux - (wanted - across) * uz;
+  to[2] += (length - along) * uz + (wanted - across) * ux;
 }
 
 function footTarget(fighter, foot) {
@@ -2814,7 +2870,7 @@ function updateTimers(world, fighter, dt) {
   countPin(world, fighter, dt);
   updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
-  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * dt);
+  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;
