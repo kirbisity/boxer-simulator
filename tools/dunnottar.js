@@ -924,8 +924,11 @@ class Run {
     const me = this.me;
     const world = this.world;
     let pick = path[0];
+    const floor = feetFloor(me);
     for (let i = 0; i < Math.min(path.length, 12); i += 1) {
       if (!this.lineClear(path[i][0], path[i][1], 0.4)) break;
+      // (Not to a cell on another floor than his own, up a step he would have to climb from the side: the way is by the stair's foot.)
+      if (path[i][2] !== undefined && Math.abs(path[i][2] - floor) > 0.45) break;
       pick = path[i];
     }
     // (Not the cell he is standing on.)

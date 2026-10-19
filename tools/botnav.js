@@ -20,7 +20,7 @@ export function standable(terrain, x, z, y, radius) {
 }
 
 /**
- * A path over the terrain from `from` ({ x, z, y }) to near `to` ([x, z]): [[x, z], ...] from the first step to the last (the goal point
+ * A path over the terrain from `from` ({ x, z, y }) to near `to` ([x, z]): [[x, z, floor], ...] from the first step to the last (the goal point
  * itself when it can be stood on, else the nearest cell to it), or `null` if there is none within `reach` m of either. `options.toY`: the
  * floor the goal is on, where floors lie over one another (the vault over the crypt: a point of the cellar is a point of the crypt too): the
  * goal is only reached on that floor (within two metres), and a cell is a different cell on each floor (a stair's foot is not its head).
@@ -115,7 +115,7 @@ function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 
   // (Near enough, or the nearest it came: a goal on a wall's far side with no way round is no path.)
   if (near(best.ix, best.iz) > 3) return null;
   const path = [];
-  for (let node = best; node; node = node.parent) path.push([cx(node.ix), cx(node.iz)]);
+  for (let node = best; node; node = node.parent) path.push([cx(node.ix), cx(node.iz), node.y]);
   path.reverse();
   path.shift();
   return path;
