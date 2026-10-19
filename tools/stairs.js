@@ -1,5 +1,5 @@
 // Runs and walks every stair flight of Dunnottar (and the test yard's) up and down, and reports falls and injuries.
-// Usage: node tools/stairs.js [walk|run] [seeds]
+// Usage: node tools/stairs.js [walk|run|sprint] [seeds]
 import { P, PRESETS } from '../src/body.js';
 import { advance, legShare, placeOnFloor } from '../src/physics.js';
 import { floorAt } from '../src/physics/terrain.js';
@@ -42,10 +42,17 @@ export function stairsOfStage(stage, margin = 1) {
   return out;
 }
 
+/** The gaits: 'walk'; 'run', the AI's (fighter.running); 'sprint', the player's run mode (control.js sets running and runMode together). */
+export const GAITS = ['walk', 'run', 'sprint'];
+export function setGait(fighter, gait) {
+  fighter.running = gait !== 'walk';
+  fighter.runMode = gait === 'sprint';
+}
+
 /** Run (or walk) a man along waypoints on a stage's terrain; returns what happened to him. */
-export function trek(world, fighter, waypoints, { running = true, seconds = 120, within = 0.5 } = {}) {
+export function trek(world, fighter, waypoints, { gait = 'run', seconds = 120, within = 0.8 } = {}) {
   fighter.walking = true;
-  fighter.running = running;
+  setGait(fighter, gait);
   const log = { air: 0, minHip: Infinity, maxDown: 0, reached: 0, stateChanges: [] };
   let lastState = fighter.state;
   const started = world.time;
@@ -62,7 +69,7 @@ export function trek(world, fighter, waypoints, { running = true, seconds = 120,
       if (d < best - 0.05) { best = d; lastCloser = world.time; } else if (world.time - lastCloser > 3) return finish(log, world, fighter, listed, false);
       fighter.goTo = [x, 0, z];
       fighter.move = 1;
-      fighter.running = running;
+      setGait(fighter, gait);
       advance(world, 1 / 60, (w) => { updateStage(w); });
       if (fighter.state !== lastState) { log.stateChanges.push([+(world.time - started).toFixed(2), lastState, fighter.state, +hx.toFixed(1), +hz.toFixed(1)]); lastState = fighter.state; }
       if (fighter.air) log.air += 1;
@@ -88,7 +95,7 @@ function finish(log, world, fighter, listed, done) {
 
 /** A world of `stage` with only the player awake, standing on the floor at `at` ([x, z]), facing `yaw`. */
 export function lone(stage, bodyName, seed, at, floor, yaw) {
-  const world = createStageWorld(stage, BODIES[bodyName](), { seed });
+  const world = createStageWorld(stage, (BODIES[bodyName] ?? (() => structuredClone(PRESETS[bodyName])))(), { seed });
   const me = world.fighters[0];
   for (const mechanism of mechanismsOf(stage)) setMechanism(world, mechanism.id, 'open');
   placeOnFloor(me, at[0], at[1], floor, yaw);
@@ -98,14 +105,14 @@ export function lone(stage, bodyName, seed, at, floor, yaw) {
 }
 
 /** One trek up (dir 'up') or down a stair. Returns the log. */
-export function climbStair(stage, stair, body, seed, dir, running) {
+export function climbStair(stage, stair, body, seed, dir, gait) {
   const route = dir === 'up' ? stair.route : [...stair.route].reverse();
   const start = route[0];
   const next = route[1];
   const yaw = Math.atan2(-(next[1] - start[1]), next[0] - start[0]);
   const floor = dir === 'up' ? (stair.winding ? stair.floor : stair.floor) : stair.top;
   const { world, me } = lone(stage, body, seed, start, floor, yaw);
-  const log = trek(world, me, route.slice(1), { running });
+  const log = trek(world, me, route.slice(1), { gait });
   log.fighter = me;
   log.world = world;
   return log;
@@ -114,7 +121,6 @@ export function climbStair(stage, stair, body, seed, dir, running) {
 if (process.argv[1]?.endsWith('tools/stairs.js')) {
   const mode = process.argv[2] ?? 'run';
   const seeds = Number(process.argv[3] ?? 3);
-  const running = mode === 'run';
   let bad = 0;
   let total = 0;
   for (const stair of stairsOfStage(DUNNOTTAR)) {
@@ -123,7 +129,7 @@ if (process.argv[1]?.endsWith('tools/stairs.js')) {
       for (let seed = 1; seed <= seeds; seed += 1) {
         for (const dir of ['up', 'down']) {
           total += 1;
-          const log = climbStair(DUNNOTTAR, stair, body, seed, dir, running);
+          const log = climbStair(DUNNOTTAR, stair, body, seed, dir, mode);
           if (!log.ok) { bad += 1; failures.push(`${body}${seed}${dir}: ${JSON.stringify({ done: log.done, reached: log.reached, air: log.air, ev: log.events, st: log.stateChanges, legs: log.legs, trunk: log.trunk, br: log.broken, maxDown: +log.maxDown.toFixed(1), minHip: +log.minHip.toFixed(2) })}`); }
         }
       }
