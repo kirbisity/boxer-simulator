@@ -816,7 +816,9 @@ class Run {
     }
     // A wall between him and the point (a fight, a looting, a thing fetched has left him on the far side of one): round it, by the
     // path finder, to the point itself.
-    const walled = !this.lineClear(tx, tz, 0.3);
+    // (Or not getting nearer for two seconds with the line clear: a step too high to climb from the side, a stair's foot to go round to: the path finder knows the heights.)
+    if (this.policy !== 'trace' && world.time - this.progressAt > 2) this.navUntil = world.time + 6;
+    const walled = !this.lineClear(tx, tz, 0.3) || world.time < (this.navUntil ?? 0);
     if (walled && this.policy !== 'trace') {
       const way = this.wayRound(entry);
       if (way) {
