@@ -316,7 +316,8 @@ export function buildCrypt() {
   dnProp(sec, 'weapon', [4.4, C, -38.5], { what2: 'halberd', yaw: 0.8 });
   sec.levers.push({ id: 'seagatelever', at: [8.6, C, -37.2], target: 'cryptgate', state: 'open', label: 'Pull the hidden lever' });
 
-  sec.portals.push({ to: 'vault', area: [{ at: DN_SHAFT.at, size: [11.4, 11.4], y: [-1, 12] }, { at: [1.7, -32.3], size: [3.6, 10], y: [-1, 12] }] });
+  // (The stair's foot, in the sea-gate chamber, a metre to its side too: a man who stands there is in the stair's way, and the stair is the vault's.)
+  sec.portals.push({ to: 'vault', area: [{ at: DN_SHAFT.at, size: [11.4, 11.4], y: [-1, 12] }, { at: [1.7, -32.3], size: [3.6, 10], y: [-1, 12] }, { at: [2.4, -36.2], size: [5, 2.6], y: [-1, 12] }] });
 
   dnSpawn(sec, 'crypt1', 'dunnottarSoldier', 'enemy', 1, [26.8, C, -24.4], DN_FACE.W, { inputs: { name: 'Watchman Gib' }, patrol: [[26.8, -24.4], [14.6, -24.4]] });
   dnSpawn(sec, 'cryptwarden', 'dunnottarGuard', 'enemy', 2, [15.4, C, -31.4], DN_FACE.E, { inputs: { name: 'The Ossuary Warden' } });

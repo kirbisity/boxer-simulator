@@ -835,10 +835,44 @@ class Run {
       this.nav = null;
       return;
     }
-    me.goTo = [tx, 0, tz];
+    const [gx, gz] = this.sidestep(tx, tz);
+    me.goTo = [gx, 0, gz];
     me.move = 1;
     me.running = this.spec.run;
     if (this.policy === 'trace') this.sample();
+  }
+
+  /**
+   * A man does not walk over a dead man lying in his way (he trips on him: in a drain 3.4 m wide, with the dead man along one wall, the bot got up and fell
+   * again for minutes): the point to head for, a pace to the side of a body that lies within a metre of the line to (x, z) and ahead, on the side with room.
+   */
+  sidestep(x, z) {
+    const me = this.me;
+    const a = [hipX(me), hipZ(me)];
+    const length = Math.hypot(x - a[0], z - a[1]);
+    if (length < 0.5) return [x, z];
+    const u = [(x - a[0]) / length, (z - a[1]) / length];
+    let nearest = null;
+    for (const other of this.world.fighters) {
+      if (other === me || other.dormant || other.state !== 'out') continue;
+      const dx = hipX(other) - a[0];
+      const dz = hipZ(other) - a[1];
+      const along = dx * u[0] + dz * u[1];
+      const across = dx * -u[1] + dz * u[0];
+      if (along < 0.2 || along > Math.min(length, 4) + 0.5 || Math.abs(across) > 1.1) continue;
+      if (!nearest || along < nearest.along) nearest = { other, along, across };
+    }
+    if (!nearest) return [x, z];
+    const bx = hipX(nearest.other);
+    const bz = hipZ(nearest.other);
+    // (The side away from the body first, then the other, and the point 1.5 m from him: the first that is clear of walls.)
+    const side = nearest.across > 0 ? -1 : 1;
+    for (const s of [side, -side]) {
+      const px = bx + -u[1] * s * 1.5;
+      const pz = bz + u[0] * s * 1.5;
+      if (this.lineClear(px, pz, 0.3)) return [px, pz];
+    }
+    return [x, z];
   }
 
   /** The path round the walls to a plan point: { entry, path, at } (replanned every two seconds); null if there is none. */
@@ -870,7 +904,8 @@ class Run {
     }
     // (Not the cell he is standing on.)
     if (path.length > 1 && Math.hypot(pick[0] - hipX(me), pick[1] - hipZ(me)) < 0.6) pick = path[Math.min(path.length - 1, path.indexOf(pick) + 1)];
-    me.goTo = [pick[0], 0, pick[1]];
+    const [gx, gz] = this.sidestep(pick[0], pick[1]);
+    me.goTo = [gx, 0, gz];
     me.move = 1;
     me.running = false;
     // (Crawling, he covers a third of the ground: stuck is not having moved for much longer.)

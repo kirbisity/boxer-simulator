@@ -6,9 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
+import { advance, placeOnFloor } from '../src/physics.js';
 import { OUTFITS } from '../src/outfits.js';
 import { floorAt } from '../src/physics/terrain.js';
-import { activeSections, mechanismsOf, sectionById, setMechanism, stageTerrain } from '../src/levelmode/stage.js';
+import { activeSections, mechanismsOf, sectionById, setMechanism, stageTerrain, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { travelPlaces } from '../src/levelmode/travel.js';
@@ -136,4 +137,22 @@ test('sewer: the sea-gate lever lifts the heavy door, and the route from the sea
   assert.deepEqual(lever.open, ['cryptgate']);
   const joined = DUNNOTTAR_SEWER_ROUTE.slice(-DUNNOTTAR_ROUTE.slice(5).length);
   assert.deepEqual(joined.map((leg) => leg.name), DUNNOTTAR_ROUTE.slice(5).map((leg) => leg.name));
+});
+
+test('sewer: a man knocked down on a floor below y 0 (the cave, the cistern, the drain) gets up again, as he does on the floors above it', () => {
+  // (The share of a height that getting up asks for, physics/rising.js, was a share of a negative number below y 0: a higher mark, which no man reaches. The bot lay in the cistern for an hour.)
+  for (const [name, x, y, z] of [['the gorge', -30, 0, 46], ['the crypt', 16, 1.4, -24.4], ['the cistern', -48.5, -5, 14], ['the long drain', -30, -1.6, -37.9]]) {
+    const w = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 3 });
+    const me = w.fighters[0];
+    placeOnFloor(me, x, z, y, 0);
+    updateStage(w, true);
+    const think = (current, dt) => {
+      quiet(current);
+      levelThink(current, dt);
+    };
+    advance(w, 1 / 60, think);
+    Object.assign(me, { state: 'down', knockdowns: 1, downTimer: 0.5, motorScale: 0 });
+    for (let step = 0; step < 60 * 14; step += 1) advance(w, 1 / 60, think);
+    assert.equal(me.state, 'up', `${name}: on his feet again after fourteen seconds (lift ${me.lift})`);
+  }
 });
