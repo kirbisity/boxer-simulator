@@ -32,6 +32,7 @@ import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
+import { CAMERA_NEAR } from './depthrange.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 import { prepareScenery, updateSceneryLod } from './scenerylod.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
@@ -63,7 +64,7 @@ export function createScene(canvas) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0d14);
   scene.fog = new THREE.Fog(0x0b0d14, 9, 22);
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 60);
+  const camera = new THREE.PerspectiveCamera(40, 1, CAMERA_NEAR, 60);
 
   const hemi = new THREE.HemisphereLight(0xb8c6e0, 0x3a2e24, 0.62);
   scene.add(hemi);

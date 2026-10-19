@@ -20,6 +20,8 @@ import { kpBuild } from './kitprops.js';
 import { kwDecorate } from './kitwear.js';
 import { stormFollow, stormTorch } from './storm.js';
 import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
+import { FaceRegistry } from '../depthrange.js';
+import { lampShare, newLamps, pickLit, stepLamps, torchFlicker } from './torchpool.js';
 import { skyDirection } from './stagesky.js';
 import { ktDispose, ktMaterials, ktRandom, ktWeather } from './kittex.js';
 
@@ -691,8 +693,8 @@ function kitWaymarks(dyn, trail) {
 }
 
 /** The detail of a section: its solids as masonry, its decor, its props. Returns { group, dyn }. */
-function kitSection(section, mats, seed, levels = []) {
-  const batch = new KitBatch(mats, seed);
+function kitSection(section, mats, seed, levels = [], faces = null) {
+  const batch = new KitBatch(mats, seed, faces);
   const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [] };
   kitSolids(batch, section);
   const cellar = section.id === 'vault' || section.id === 'cell';
@@ -728,8 +730,8 @@ function kitSection(section, mats, seed, levels = []) {
 }
 
 /** The silhouette of a section: its solids as plain blocks. */
-function kitSilhouette(section, mats, seed) {
-  const batch = new KitBatch(mats, seed);
+function kitSilhouette(section, mats, seed, faces = null) {
+  const batch = new KitBatch(mats, seed, faces);
   kitSolids(batch, section, { silhouette: true });
   const group = new THREE.Group();
   group.name = `silhouette:${section.id}`;
@@ -774,9 +776,9 @@ function kitFoamTexture() {
 }
 
 /** The land: the mainland hillside, the cliffs of the headland slabs, the rock under the gatehouse and its tunnel, and the surf at their feet. */
-function kitLand(stage, mats, blocks, foam) {
+function kitLand(stage, mats, blocks, foam, faces = null) {
   const sea = stage.sea;
-  const batch = new KitBatch(mats, 99);
+  const batch = new KitBatch(mats, 99, faces);
   const form = stage.landform;
   kitMainland(batch, stage, blocks, null, sea);
   const strips = [];
@@ -1209,7 +1211,10 @@ export function createCastleView(stage) {
   const group = new THREE.Group();
   group.name = `stage:${stage.id}`;
   const blocks = kitBlocks(stage);
-  const land = kitLand(stage, mats, blocks, foam);
+  // (The faces placed so far, so that no two on one plane are drawn, in the detail and in the silhouettes alike (a silhouette is seen beside a neighbour's detail): depthrange.js.)
+  const detailFaces = new FaceRegistry();
+  const farFaces = detailFaces;
+  const land = kitLand(stage, mats, blocks, foam, detailFaces);
   group.add(land);
   const sections = {};
   const parts = {};
@@ -1220,8 +1225,8 @@ export function createCastleView(stage) {
   let seed = 7;
   for (const section of stage.sections) {
     seed += 13;
-    const detail = kitSection(section, mats, seed, stage.levels ?? []);
-    const far = kitSilhouette(section, mats, seed + 1);
+    const detail = kitSection(section, mats, seed, stage.levels ?? [], detailFaces);
+    const far = kitSilhouette(section, mats, seed + 1, farFaces);
     const dynamic = kitDynamics(detail.dyn, mats, textures);
     detail.group.add(dynamic.group);
     const holder = new THREE.Group();
@@ -1264,7 +1269,7 @@ export function createCastleView(stage) {
     group.add(light);
     pool.push(light);
   }
-  const state = { time: 0, last: null, lightClock: 0, near: new Set(), lit: [], shelter: 1, reflect: {} };
+  const state = { time: 0, last: null, lightClock: 0, near: new Set(), lit: [], lamps: newLamps(pool.length), shelter: 1, reflect: {} };
   const view = { stage, group, sections, mechanisms: [], mats, stats };
 
   /** Show what is in force: detail near the player, silhouettes elsewhere; gates and ladders as they stand; the flames. */
@@ -1335,12 +1340,14 @@ export function createCastleView(stage) {
         const d = Math.hypot(l.at[0] - px, l.at[2] - pz);
         if (d < l.range * 2.2) candidates.push({ l, d });
       }
-      candidates.sort((a, b) => a.d - b.d);
-      state.lit = candidates.slice(0, pool.length).map((c) => c.l);
+      state.lit = pickLit(candidates, state.lit, pool.length);
     }
+    // (A light stays with its torch, and fades in and out: torchpool.js.)
+    stepLamps(state.lamps, state.lit, dt);
     pool.forEach((light, k) => {
-      light.visible = state.lit.length > 0;
-      const l = state.lit[k];
+      const lamp = state.lamps[k];
+      light.visible = state.lit.length > 0 || state.lamps.some((other) => other.l);
+      const l = lamp.l;
       if (!l) {
         light.intensity = 0;
         return;
@@ -1348,7 +1355,7 @@ export function createCastleView(stage) {
       light.position.set(l.at[0], l.at[1], l.at[2]);
       light.color.setHex(l.color);
       light.distance = l.range;
-      light.intensity = l.power * (0.9 + 0.12 * Math.sin(state.time * 13 + k * 2) + 0.06 * Math.sin(state.time * 31 + k)) * 2.2 * stormTorch();
+      light.intensity = l.power * torchFlicker(state.time, k) * lampShare(lamp) * 2.2 * stormTorch();
     });
     foam.map.offset.set(state.time * 0.02, state.time * 0.05);
     foam.opacity = 0.3 + 0.1 * Math.sin(state.time * 0.9);

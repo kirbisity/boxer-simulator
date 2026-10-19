@@ -1,0 +1,515 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Flicker bench</title>
+<!--
+  A flicker score for the scenery. Holds the game in an iframe, stands the camera still at a place (the world paused, the
+  lightning stilled, the clock frozen), draws frames and compares them pixel for pixel. Serve the repository
+  (tools/serve.py 9006), open /tools/flickerbench.html, then in the console:
+
+    await FB.load(960, 540)                    // the game at that CSS size
+    await FB.table()                           // per view: temporal score, nudge score, shimmer score (percent of pixels)
+    await FB.table({ only: ['chapel'] })
+    FB.hop('keep'); FB.show('nudge')           // stand at a view, then paint its difference picture on this page
+    FB.report                                  // the last table's rows, with the heat grids
+
+  Four scores per view, each the share of pixels (in per cent) whose colour differs by 12/255 or more:
+    temporal  the same camera, the same instant, 4 frames: any difference is noise in the draw itself (a random seed per
+              frame, an unstable discard pattern, a race in the shadow bake);
+    nudge     the camera moved 1 cm sideways and back-and-forth: a sound picture changes only along the edges
+              (a thin band); z-fighting changes in speckle across flat surfaces. `nudgeFill` counts only the pixels
+              whose four neighbours changed too (so the 1-pixel edges do not count): the z-fight share;
+    depth     the same camera, the near plane out at 0.5 m (the cameras of `aim` keep 0.6 m from every wall): only where the depth buffer picked the wrong
+              face does the picture change (the z-fight score, free of parallax);
+    shimmer   the camera creeping 1 mm a frame for 8 frames: pixels that flip more than twice (aliasing, mip shimmer).
+  A view's heat grid is the share of changed pixels per cell of a 12 x 6 grid ("hot" cells show where).
+-->
+<body style="margin:0;background:#222;color:#ddd;font:12px monospace">
+<div id="out" style="position:absolute;left:0;top:0"></div>
+<script type="module">
+  // [name, [x, floorY, z], yaw]: stage 1's places (as tools/stagebench.html), and Battle Mode places by key.
+  const STAGE = [
+    ['cliff-start', [-110, 14, -4], 0], ['cliff-path', [-80, 12, -4], 0], ['cliff-leg3', [-70, 4.5, 20], 0],
+    ['gorge', [-44, 0, 41.5], 0], ['ledge', [-3, 0, 54.2], 0], ['gatehouse', [2.2, 0, 46.2], 0],
+    ['oillet', [17.7, 6, 37], -1.57], ['ascent', [17, 11, 10], -1.57], ['quad', [12, 12.18, -1], -1.57],
+    ['vault', [24, 6, -22.5], 0], ['keep', [52, 12.18, -23.8], 0], ['wallwalk', [30, 24.93, -36], 3.14],
+    ['chapel', [-6, 17.18, -36], 3.14], ['cell', [-9, 17.18, -46], 1.57],
+  ];
+  const BATTLE = ['ring', 'colosseum', 'subway', 'meadow', 'stadium', 'town', 'port', 'sengoku', 'plain', 'coastFort', 'coastVillage', 'field', 'jiangnan'];
+  const { floorAt } = await import('/src/physics/terrain.js');
+  const THRESHOLD = 12;
+  const REF_NEAR = 0.5;
+  const GRID = [12, 6];
+  let frame = null;
+  let current = null;
+  const game = () => frame.contentWindow;
+
+  /** Pixels of the drawn frame (RGBA, rows bottom first), read at once after the draw. */
+  function noCutaway(g) {
+    const at = g.boxer.scene.camera.position;
+    FB.kt?.ktSightline({ x: at.x, y: at.y, z: at.z }, [at.x, at.y - 100, at.z], false);
+  }
+  function grab(g) {
+    const canvas = g.boxer.scene.renderer.domElement;
+    const gl = g.boxer.scene.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const data = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    return { data, w, h, canvas };
+  }
+  /** The frame, drawn by the game's own path (the camera follows, the scenery updates), then read. */
+  function shoot(g) {
+    g.boxer.advance(0);
+    return redraw(g);
+  }
+  /** The frame drawn again with the camera as it is (nothing else touched), then read. */
+  function redraw(g) {
+    const s = g.boxer.scene;
+    noCutaway(g);
+    s.renderer.render(s.scene, s.camera);
+    return grab(g);
+  }
+  function moveCamera(g, dx, dy = 0, dz = 0) {
+    const camera = g.boxer.scene.camera;
+    camera.position.x += dx;
+    camera.position.y += dy;
+    camera.position.z += dz;
+    camera.updateMatrixWorld(true);
+  }
+  /** Which pixels differ (Uint8 mask) between two frames. */
+  function differ(a, b) {
+    const n = a.w * a.h;
+    const mask = new Uint8Array(n);
+    for (let i = 0; i < n; i += 1) {
+      const j = i * 4;
+      const d = Math.max(Math.abs(a.data[j] - b.data[j]), Math.abs(a.data[j + 1] - b.data[j + 1]), Math.abs(a.data[j + 2] - b.data[j + 2]));
+      if (d >= THRESHOLD) mask[i] = 1;
+    }
+    return mask;
+  }
+  /** Only the pixels whose four neighbours differ as well: speckle across a surface, not a moved edge. */
+  function interior(mask, w, h) {
+    const out = new Uint8Array(mask.length);
+    for (let y = 1; y < h - 1; y += 1) {
+      for (let x = 1; x < w - 1; x += 1) {
+        const i = y * w + x;
+        if (mask[i] && mask[i - 1] + mask[i + 1] + mask[i - w] + mask[i + w] >= 3) out[i] = 1;
+      }
+    }
+    return out;
+  }
+  /** Per-cent of changed pixels; and a 12 x 6 heat grid of it (top row first). */
+  function stats(mask, w, h) {
+    let count = 0;
+    const cells = new Float64Array(GRID[0] * GRID[1]);
+    for (let y = 0; y < h; y += 1) {
+      const row = Math.min(GRID[1] - 1, Math.floor(((h - 1 - y) / h) * GRID[1]));
+      for (let x = 0; x < w; x += 1) {
+        if (!mask[y * w + x]) continue;
+        count += 1;
+        cells[row * GRID[0] + Math.min(GRID[0] - 1, Math.floor((x / w) * GRID[0]))] += 1;
+      }
+    }
+    const cellPixels = (w * h) / (GRID[0] * GRID[1]);
+    const grid = [];
+    for (let r = 0; r < GRID[1]; r += 1) grid.push(Array.from(cells.slice(r * GRID[0], (r + 1) * GRID[0]), (c) => +((100 * c) / cellPixels).toFixed(1)));
+    return { pct: +((100 * count) / (w * h)).toFixed(3), grid };
+  }
+  const worst = (grid) => {
+    let best = { v: 0, r: 0, c: 0 };
+    grid.forEach((row, r) => row.forEach((v, c) => { if (v > best.v) best = { v, r, c }; }));
+    return best;
+  };
+
+  const FB = window.FB = {
+    stage: STAGE,
+    battle: BATTLE,
+    report: [],
+    load(w, h) {
+      return new Promise((done) => {
+        frame?.remove();
+        frame = document.createElement('iframe');
+        frame.style.cssText = `width:${w}px;height:${h}px;border:0;position:absolute;left:0;top:0`;
+        frame.src = `/?${Math.random()}`;
+        frame.onload = () => {
+          const wait = () => {
+            if (!game().boxer) return setTimeout(wait, 100);
+            // The castle's materials, to switch the screen-door cut-away off while measuring (it dissolves the walls between the camera and the man by design,
+            // and a camera set by `aim` is not the one it was cut for).
+            game().eval("import('/src/levelmode/kittex.js')").then((kt) => { FB.kt = kt; done(game()); });
+          };
+          wait();
+        };
+        document.body.appendChild(frame);
+      });
+    },
+    game,
+    /**
+     * The build before this fix, to measure against (call before `hop`): no lifts, no floor offsets, the near plane at 5 cm. `FB.legacy(false)` puts them back.
+     * (The castle is rebuilt at each `hop`, so a change made here is in the next one.)
+     */
+    async legacy(on = true) {
+      const g = game();
+      const range = await g.eval("import('/src/depthrange.js')");
+      FB.saved ??= { step: range.KIT_LIFT.step, floors: JSON.parse(JSON.stringify(range.KIT_FLOOR_OFFSET)) };
+      range.KIT_LIFT.step = on ? 0 : FB.saved.step;
+      for (const [name, o] of Object.entries(range.KIT_FLOOR_OFFSET)) Object.assign(o, on ? { factor: 0, units: 0 } : FB.saved.floors[name]);
+      FB.nearOverride = on ? 0.05 : range.CAMERA_NEAR;
+      return on ? 'legacy: no lifts, no floor offsets, near 0.05' : 'current build';
+    },
+    /** Stand the camera at a view: a stage place (name or [x, y, z]), or a Battle Mode place key. The clock and storm are held. */
+    hop(place, yaw = 0, { distance = null } = {}) {
+      const g = game();
+      g.boxer.skipIntro();
+      g.boxer.adaptiveResolution(false);
+      let result;
+      const found = STAGE.find(([name]) => name === place);
+      if (found || Array.isArray(place)) {
+        const [at, facing] = found ? [found[1], found[2]] : [place, yaw];
+        g.boxer.levelMode('dunnottar', { ghost: true });
+        g.boxer.stageLook(undefined, { still: true });
+        const level = g.boxer.levelRun();
+        level.put([at[0], at[1] + 0.3, at[2]], facing);
+        g.boxer.advance(2 / 60);
+        const world = g.boxer.state.world;
+        const floor = floorAt(world.arena.terrain, at[0], at[2], at[1] + 1.5);
+        if (floor == null) return { floor: null, state: 'lost' };
+        level.put([at[0], floor, at[2]], facing);
+        g.boxer.advance(24 / 60);
+        for (let k = 0; k < 30; k += 1) g.boxer.advance(1 / 20); // the camera settles
+        result = { floor: +floor.toFixed(2) };
+      } else {
+        g.boxer.fight([{}], [{}], { place, paused: false, seed: 3, distance: distance ?? 2.2 });
+        g.boxer.finishBuilding();
+        g.boxer.advance(30 / 60);
+        result = { place };
+      }
+      g.boxer.state.paused = true;
+      if (FB.nearOverride) { // (set by `legacy`; the game's own CAMERA_NEAR when not legacy)
+        g.boxer.scene.camera.near = FB.nearOverride;
+        g.boxer.scene.camera.updateProjectionMatrix();
+      }
+      // The clock held: the places that move with it (rain, sea, torches) are drawn at one instant.
+      g.performance.now = () => 123456.789;
+      g.boxer.advance(0);
+      g.boxer.advance(0);
+      current = place;
+      return result;
+    },
+    /** The scores of the view now stood at. */
+    score({ frames = 4, nudge = 0.01, creep = 0.001, creepFrames = 8, free = false } = {}) {
+      const g = game();
+      const out = {};
+      // Temporal: the same camera, the same instant. (`free`: the camera as `aim` left it, the follow camera not asked.)
+      const base = free ? redraw(g) : shoot(g);
+      let worstT = null;
+      for (let k = 0; k < frames - 1; k += 1) {
+        const next = redraw(g);
+        const s = stats(differ(base, next), base.w, base.h);
+        if (!worstT || s.pct > worstT.pct) worstT = s;
+      }
+      out.temporal = worstT.pct;
+      out.temporalGrid = worstT.grid;
+      // Nudge: 1 cm each way.
+      const camera = g.boxer.scene.camera;
+      const home = camera.position.clone();
+      const nudged = [];
+      for (const [dx, dy] of [[nudge, 0], [-nudge, 0], [0, nudge]]) {
+        camera.position.copy(home);
+        moveCamera(g, dx, dy);
+        nudged.push(redraw(g));
+      }
+      camera.position.copy(home);
+      camera.updateMatrixWorld(true);
+      let worstN = null;
+      let fill = null;
+      for (let a = 0; a < nudged.length; a += 1) {
+        const mask = differ(base, nudged[a]);
+        const s = stats(mask, base.w, base.h);
+        const f = stats(interior(mask, base.w, base.h), base.w, base.h);
+        if (!worstN || s.pct > worstN.pct) worstN = s;
+        if (!fill || f.pct > fill.pct) fill = f;
+      }
+      out.nudge = worstN.pct;
+      out.nudgeFill = fill.pct;
+      out.nudgeGrid = fill.grid;
+      // Depth precision: the same camera with the near plane brought out to REF_NEAR m (the same for every build, so that builds compare): the picture must not
+      // change but where the depth buffer chose the wrong face. This is the z-fight signal; it is not mixed with parallax.
+      const near0 = camera.near;
+            camera.near = REF_NEAR;
+      camera.updateProjectionMatrix();
+      const precise = redraw(g);
+      camera.near = near0;
+      camera.updateProjectionMatrix();
+      const pmask = differ(base, precise);
+      const ps = stats(pmask, base.w, base.h);
+      out.depth = ps.pct;
+      out.depthGrid = ps.grid;
+      FB.depthMask = pmask;
+      // Shimmer: the camera creeping; pixels that flip direction.
+      const frames8 = [];
+      for (let k = 0; k < creepFrames; k += 1) {
+        camera.position.copy(home);
+        moveCamera(g, creep * k);
+        frames8.push(redraw(g));
+      }
+      camera.position.copy(home);
+      camera.updateMatrixWorld(true);
+      const n = base.w * base.h;
+      const flips = new Uint8Array(n);
+      for (let i = 0; i < n; i += 1) {
+        const j = i * 4;
+        let last = 0;
+        let count = 0;
+        for (let k = 1; k < frames8.length; k += 1) {
+          const d = frames8[k].data[j] + frames8[k].data[j + 1] + frames8[k].data[j + 2] - (frames8[k - 1].data[j] + frames8[k - 1].data[j + 1] + frames8[k - 1].data[j + 2]);
+          const sign = d > 3 * THRESHOLD ? 1 : d < -3 * THRESHOLD ? -1 : 0;
+          if (sign && last && sign !== last) count += 1;
+          if (sign) last = sign;
+        }
+        if (count >= 2) flips[i] = 1;
+      }
+      const sh = stats(flips, base.w, base.h);
+      out.shimmer = sh.pct;
+      out.shimmerGrid = sh.grid;
+      FB.last = { base, nudged, flips, mask: differ(base, nudged[0]), fill: interior(differ(base, nudged[0]), base.w, base.h) };
+      return out;
+    },
+    /** What lies under a pixel of the frame (x, y in the picture's CSS pixels, from the top left): every face the ray meets, near to far,
+     * with its mesh's name path and material; two faces a hair apart (gap under 2 cm) are the z-fight suspects. */
+    probe(px, py, limit = 8) {
+      const g = game();
+      const s = g.boxer.scene;
+      const THREE_ = g.THREE;
+      const ray = new THREE_.Raycaster();
+      ray.setFromCamera(new THREE_.Vector2((px / g.innerWidth) * 2 - 1, -(py / g.innerHeight) * 2 + 1), s.camera);
+      const hits = [];
+      s.scene.traverse((o) => {
+        if (!o.isMesh || !o.visible || o.isInstancedMesh) return;
+        for (let up = o; up; up = up.parent) if (!up.visible) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        const saveSide = m.side;
+        m.side = THREE_.DoubleSide;
+        for (const h of ray.intersectObject(o, false)) {
+          const path = [];
+          for (let up = o; up; up = up.parent) path.unshift(up.name || up.type);
+          const box = new THREE_.Box3().setFromPoints([h.face.a, h.face.b, h.face.c].map((i) => new THREE_.Vector3().fromBufferAttribute(o.geometry.attributes.position, i).applyMatrix4(o.matrixWorld)));
+          hits.push({ box: [box.min, box.max].map((v) => v.toArray().map((q) => +q.toFixed(2)).join(',')).join(' .. '), d: +h.distance.toFixed(4), path: path.slice(-3).join('/'), mat: m.name || m.type, tri: h.faceIndex, n: h.face ? h.face.normal.toArray().map((v) => +v.toFixed(2)).join(',') : '', tr: m.transparent ? 't' : '', dw: m.depthWrite ? '' : 'nodw', po: m.polygonOffset ? 'po' : '' });
+        }
+        m.side = saveSide;
+      });
+      hits.sort((a, b) => a.d - b.d);
+      const close = [];
+      for (let i = 0; i + 1 < hits.length; i += 1) if (hits[i + 1].d - hits[i].d < 0.02) close.push(i);
+      return { hits: hits.slice(0, limit), closeAt: close.slice(0, 4) };
+    },
+    /** Put the camera `turn` radians round the man from behind him, `dist` m from his chest, `rise` m above it, looking at him (then `score({ free: true })`). */
+    aim(turn = 0, dist = 3.5, rise = 0.5) {
+      const g = game();
+      const me = g.boxer.state.world.fighters[0];
+      const T = g.THREE;
+      const camera = g.boxer.scene.camera;
+      const chest = new T.Vector3(me.x[24], me.x[25] + 0.5, me.x[26]);
+      const away = new T.Vector3().subVectors(camera.position, chest);
+      const yaw = Math.atan2(away.x, away.z) + turn;
+      // (Not through a wall: the way from him out to the camera is cut short at the first face it meets, less 0.6 m.)
+      const way = new T.Vector3(Math.sin(yaw) * dist, rise, Math.cos(yaw) * dist);
+      const ray = new T.Raycaster(chest, way.clone().normalize(), 0.05, way.length());
+      const solids = [];
+      g.boxer.scene.scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+        for (let up = o; up; up = up.parent) if (!up.visible) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        if (m.transparent || !m.depthWrite) return;
+        let kit = false;
+        for (let up = o; up; up = up.parent) if (/^(detail|silhouette|land|section)/.test(up.name)) kit = true;
+        if (kit) solids.push(o);
+      });
+      const saved = solids.map((o) => (Array.isArray(o.material) ? o.material[0] : o.material));
+      saved.forEach((m) => { m.userData.sideWas = m.side; m.side = T.DoubleSide; });
+      const hit = ray.intersectObjects(solids, false)[0];
+      saved.forEach((m) => { m.side = m.userData.sideWas; });
+      if (hit) way.setLength(Math.max(0.8, hit.distance - 0.6));
+      camera.position.set(chest.x + way.x, chest.y + way.y, chest.z + way.z);
+      camera.lookAt(chest);
+      camera.updateMatrixWorld(true);
+      return camera.position.toArray().map((v) => +v.toFixed(2));
+    },
+    /** Sample pixels of the last score's mask ('depth', 'fill' or 'shimmer'), probe each, and tally what the nearest two faces are
+     * (the first face's mesh/normal, and the second's, with the gap between them in cm). */
+    diagnose(kind = 'depth', samples = 40) {
+      const g = game();
+      const { base } = FB.last;
+      const mask = { depth: FB.depthMask, fill: FB.last.fill, shimmer: FB.last.flips }[kind];
+      const where = [];
+      for (let i = 0; i < mask.length; i += 1) if (mask[i]) where.push(i);
+      const tally = {};
+      const dpr = base.w / g.innerWidth;
+      for (let k = 0; k < Math.min(samples, where.length); k += 1) {
+        const i = where[Math.floor((k + 0.5) * (where.length / Math.min(samples, where.length)))];
+        const px = (i % base.w) / dpr;
+        const py = (base.h - 1 - Math.floor(i / base.w)) / dpr;
+        const { hits } = FB.probe(px, py, 3);
+        if (hits.length < 2) { tally.none = (tally.none ?? 0) + 1; continue; }
+        const [a, b] = hits;
+        const key = `${a.path}[${a.n}] / ${b.path}[${b.n}] gap ${Math.round((b.d - a.d) * 1000) / 10}cm`;
+        tally[key] = (tally[key] ?? 0) + 1;
+      }
+      return Object.entries(tally).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${v}  ${k}`).join('\n');
+    },
+    /**
+     * Faces that share a plane and overlap, in the opaque meshes drawn now (the z-fight suspects, found from the geometry itself):
+     * every triangle's seven sample points are looked up in the other triangles of the same plane (normal to 0.02, offset to 3 mm)
+     * with the same facing. Returns the tally (overlap area in m2) by "mesh a / mesh b" and examples ({ at: [x, y, z], n }).
+     */
+    coplanar({ eps = 0.003, only = null } = {}) {
+      const g = game();
+      const THREE_ = g.THREE;
+      const planes = new Map();
+      const tris = [];
+      const a = new THREE_.Vector3(), b = new THREE_.Vector3(), c = new THREE_.Vector3(), n = new THREE_.Vector3();
+      g.boxer.scene.scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+        for (let up = o; up; up = up.parent) if (!up.visible) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        if (m.transparent || !m.depthWrite) return;
+        const path = [];
+        for (let up = o; up; up = up.parent) path.unshift(up.name || up.type);
+        const label = `${path.slice(-3).join('/')}:${m.side === THREE_.DoubleSide ? '2s' : '1s'}`;
+        if (only && !only.test(label)) return;
+        o.updateWorldMatrix(true, false);
+        const pos = o.geometry.attributes.position;
+        const index = o.geometry.index;
+        const count = (index ? index.count : pos.count) / 3;
+        for (let t = 0; t < count; t += 1) {
+          const i0 = index ? index.getX(t * 3) : t * 3, i1 = index ? index.getX(t * 3 + 1) : t * 3 + 1, i2 = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+          a.fromBufferAttribute(pos, i0).applyMatrix4(o.matrixWorld);
+          b.fromBufferAttribute(pos, i1).applyMatrix4(o.matrixWorld);
+          c.fromBufferAttribute(pos, i2).applyMatrix4(o.matrixWorld);
+          n.subVectors(c, b).cross(new THREE_.Vector3().subVectors(a, b));
+          const area = n.length() / 2;
+          if (area < 1e-7) continue;
+          n.normalize();
+          const d = n.dot(a);
+          const tri = { label, area, n: n.clone(), d, p: [a.clone(), b.clone(), c.clone()], dbl: m.side === THREE_.DoubleSide, tri: t };
+          tris.push(tri);
+          const key = `${Math.round(n.x * 50)},${Math.round(n.y * 50)},${Math.round(n.z * 50)},${Math.round(d / (eps * 2))}`;
+          if (!planes.has(key)) planes.set(key, []);
+          planes.get(key).push(tri);
+        }
+      });
+      const inside = (p, tri) => {
+        // barycentric test in 3D
+        const [A, B, C] = tri.p;
+        const v0 = new THREE_.Vector3().subVectors(C, A), v1 = new THREE_.Vector3().subVectors(B, A), v2 = new THREE_.Vector3().subVectors(p, A);
+        const d00 = v0.dot(v0), d01 = v0.dot(v1), d02 = v0.dot(v2), d11 = v1.dot(v1), d12 = v1.dot(v2);
+        const inv = 1 / (d00 * d11 - d01 * d01);
+        const u = (d11 * d02 - d01 * d12) * inv, v = (d00 * d12 - d01 * d02) * inv;
+        return u > 0.02 && v > 0.02 && u + v < 0.98;
+      };
+      const SAMPLES = [[1 / 3, 1 / 3], [0.15, 0.15], [0.7, 0.15], [0.15, 0.7], [0.45, 0.45], [0.1, 0.45], [0.45, 0.1]];
+      const tally = {};
+      const examples = {};
+      for (const tri of tris) {
+        const nk = [Math.round(tri.n.x * 50), Math.round(tri.n.y * 50), Math.round(tri.n.z * 50)];
+        const dk = Math.round(tri.d / (eps * 2));
+        const near = [];
+        for (const dd of [-1, 0, 1]) near.push(...(planes.get(`${nk},${dk + dd}`) ?? []));
+        if (near.length < 2) continue;
+        const hit = new Set();
+        for (const [s, t] of SAMPLES) {
+          const p = new THREE_.Vector3().copy(tri.p[0]).addScaledVector(new THREE_.Vector3().subVectors(tri.p[1], tri.p[0]), s).addScaledVector(new THREE_.Vector3().subVectors(tri.p[2], tri.p[0]), t);
+          for (const o of near) {
+            if (o === tri || hit.has(o.label)) continue;
+            if (o.n.dot(tri.n) < 0.98 && !(o.dbl && tri.dbl)) continue;
+            if (Math.abs(o.n.dot(p) - o.d) > eps) continue;
+            if (inside(p, o)) {
+              hit.add(o.label);
+              const key = tri.label < o.label ? `${tri.label} || ${o.label}` : `${o.label} || ${tri.label}`;
+              tally[key] = (tally[key] ?? 0) + tri.area / SAMPLES.length;
+              (examples[key] ??= []).length < 3 && examples[key].push({ at: p.toArray().map((v) => +v.toFixed(2)), n: tri.n.toArray().map((v) => +v.toFixed(2)) });
+            }
+          }
+        }
+      }
+      return { triangles: tris.length, pairs: Object.entries(tally).sort((x, y) => y[1] - x[1]).slice(0, 25).map(([k, v]) => `${v.toFixed(2)}m2  ${k}  ${JSON.stringify(examples[k][0])}`) };
+    },
+    /** Paint a difference picture of the last score on this page: 'nudge', 'fill', 'shimmer' or 'base'. */
+    show(kind = 'fill', scale = 1) {
+      const { base, flips, mask, fill } = FB.last;
+      const c = document.getElementById('shot') ?? Object.assign(document.createElement('canvas'), { id: 'shot' });
+      c.width = base.w;
+      c.height = base.h;
+      c.style.cssText = `position:absolute;left:0;top:0;z-index:10;width:${base.w * scale}px`;
+      const ctx = c.getContext('2d');
+      const image = ctx.createImageData(base.w, base.h);
+      const pick = { nudge: mask, fill, shimmer: flips, depth: FB.depthMask }[kind];
+      for (let y = 0; y < base.h; y += 1) {
+        for (let x = 0; x < base.w; x += 1) {
+          const i = (base.h - 1 - y) * base.w + x;
+          const o = (y * base.w + x) * 4;
+          const dim = kind === 'base' ? 1 : 0.35;
+          image.data[o] = base.data[i * 4] * dim;
+          image.data[o + 1] = base.data[i * 4 + 1] * dim;
+          image.data[o + 2] = base.data[i * 4 + 2] * dim;
+          image.data[o + 3] = 255;
+          if (pick?.[i]) { image.data[o] = 255; image.data[o + 1] = 40; image.data[o + 2] = 40; }
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+      document.body.appendChild(c);
+      return `${kind} drawn`;
+    },
+    /**
+     * The worst scores of each named view over the follow camera and `turns` cameras round the man (see `aim`): lines of text, and `FB.worst[name]`.
+     * (A few views per call: a call that runs long is cut off by the browser tool.)
+     */
+    sweep(names, turns = [0, 0.9, 1.8, 2.7, 3.6, 4.5, 5.4]) {
+      const lines = [];
+      FB.worst ??= {};
+      for (const name of names) {
+        FB.hop(name);
+        const best = { depth: 0, shimmer: 0, fill: 0, depthAt: '-', shimmerAt: '-', cameras: [] };
+        const s0 = FB.score();
+        best.depth = s0.depth; best.shimmer = s0.shimmer; best.fill = s0.nudgeFill; best.depthAt = 'follow'; best.shimmerAt = 'follow';
+        for (const turn of turns) {
+          const at = FB.aim(turn);
+          const s = FB.score({ free: true });
+          best.cameras.push({ turn, at, depth: s.depth, shimmer: s.shimmer });
+          if (s.depth > best.depth) { best.depth = s.depth; best.depthAt = turn; }
+          if (s.shimmer > best.shimmer) { best.shimmer = s.shimmer; best.shimmerAt = turn; }
+          best.fill = Math.max(best.fill, s.nudgeFill);
+        }
+        FB.worst[name] = best;
+        lines.push(`${name.padEnd(12)} depth ${best.depth} @${best.depthAt}   shimmer ${best.shimmer} @${best.shimmerAt}   fill ${best.fill}`);
+      }
+      return lines.join('\n');
+    },
+    /** One row per view. `only`: names; `battle`: the Battle Mode places too (or only, with only: []). */
+    async table({ only = null, battle = false, stage = true, ...options } = {}) {
+      const rows = [];
+      const names = [];
+      if (stage) for (const [name] of STAGE) if (!only || only.includes(name)) names.push(name);
+      if (battle) for (const name of BATTLE) if (!only || only.includes(name)) names.push(name);
+      for (const name of names) {
+        const where = FB.hop(name);
+        if (where.state === 'lost') { rows.push({ name, error: 'lost' }); continue; }
+        const s = FB.score(options);
+        if (options.turns) {
+          for (const turn of options.turns) {
+            FB.aim(turn);
+            const t = FB.score({ ...options, free: true });
+            for (const k of ['depth', 'shimmer', 'nudgeFill']) s[k] = Math.max(s[k], t[k]);
+            s.depthGrid = s.depthGrid.map((row, r) => row.map((v, c) => Math.max(v, t.depthGrid[r][c])));
+          }
+        }
+        const hot = worst(s.depthGrid);
+        rows.push({ name, ...s, hot: hot.v ? `r${hot.r}c${hot.c}=${hot.v}%` : '-' });
+        FB.report = rows;
+        await new Promise((done) => setTimeout(done, 0));
+      }
+      FB.report = rows;
+      return rows.map((r) => (r.error ? `${r.name} ${r.error}` : `${r.name.padEnd(13)} temporal ${String(r.temporal).padStart(7)}  depth ${String(r.depth).padStart(7)}  nudge ${String(r.nudge).padStart(7)}  fill ${String(r.nudgeFill).padStart(7)}  shimmer ${String(r.shimmer).padStart(7)}  hot ${r.hot}`)).join('\n');
+    },
+  };
+</script>
