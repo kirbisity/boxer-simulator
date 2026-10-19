@@ -192,6 +192,9 @@ export const AI = {
   // the line to their man as in the line of fire.
   mateSpacing: 1.0,
   lineOfFire: 0.4,
+  // m: in level mode a shooter holds his shot with a team-mate (the player among them) this near the line to his man: a shaft or a ball
+  // does not fly true and the man moves as it comes. (Battles keep `lineOfFire`: their fingerprints.)
+  shotLineOfFire: 0.9,
   // m: a heavy gun holds its shot at a man with a comrade this near him.
   gunCrowd: 1.2,
   pastTarget: 0.45, // m: a team-mate this close behind my man is in the line too
@@ -650,7 +653,7 @@ function closerAtHand(world, fighter, current) {
  * Team-mates: where to sidestep (+ left) to stay apart and keep the line to
  * my man clear, and whether one stands in that line now.
  */
-function teamSpacing(world, fighter, opponent) {
+function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
   const at = point(fighter.x, P.pelvis);
   const to = point(opponent.x, P.pelvis);
   const line = vec.sub(to, at);
@@ -668,7 +671,7 @@ function teamSpacing(world, fighter, opponent) {
     const across = vec.dot(offset, left);
     const apart = Math.hypot(offset[0], offset[2]);
     // In the way: between me and him, or crowding him, near the line.
-    if (along > 0.1 && along < length + AI.pastTarget && Math.abs(across) < AI.lineOfFire) {
+    if (along > 0.1 && along < length + AI.pastTarget && Math.abs(across) < lineOfFire) {
       blocked = true;
       strafe += across >= 0 ? -1 : 1;
     } else if (apart < AI.mateSpacing) strafe += (across >= 0 ? -1 : 1) * (1 - apart / AI.mateSpacing);
@@ -1363,7 +1366,7 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   fighter.move = gun.advance ?? (!gun.holdGround && roomBehind > AI.gunKite.wallMargin ? -0.6 : 0);
   fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
   if (fighter.punch || fighter.cooldown > 0) return;
-  if (teamSpacing(world, fighter, opponent).blocked) return;
+  if (teamSpacing(world, fighter, opponent, world.stage ? AI.shotLineOfFire : AI.lineOfFire).blocked) return;
   // One slow, heavy shot is not fired into a man with comrades round him.
   if (weapon.spec.shot && world.fighters.some((mate) => mate !== fighter && mate.corner === fighter.corner && mate.state !== 'out' && vec.length(vec.sub(point(mate.x, P.pelvis), point(opponent.x, P.pelvis))) < AI.gunCrowd)) {
     if (world.random() < AI.refocusRate * dt) fighter.focus = undefined;

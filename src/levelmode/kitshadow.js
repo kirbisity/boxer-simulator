@@ -13,8 +13,8 @@
 // angle changes depth fast across a texel), and then a few taps are taken: five to find out whether the pixel is anywhere near an edge,
 // and only if it is, sixteen more for a soft one.
 
-/** What the map is made of, and how soft the edge is. `size`: texels along the longer side (2048: a texel is about 12 cm over the headland; 16 MB). */
-export const KT_SHADOW = { size: 2048, bias: 0.05, normalOffset: 1.0, softness: 2.4 };
+/** What the map is made of, and how soft the edge is. `size`: texels along the longer side (2048: a texel is about 12 cm over the headland; 16 MB); `grazingShare`: the share of the shadow kept on a surface a very low sun grazes. */
+export const KT_SHADOW = { size: 2048, bias: 0.05, normalOffset: 1.0, softness: 2.4, grazingShare: 0.25 };
 
 /** The uniforms every shadowed kit material shares (made on the first material, when THREE is there). */
 export const ktShadow = { uKitShadowMap: { value: null }, uKitShadowMat: { value: null }, uKitShadowAxes: { value: null }, uKitShadowInfo: { value: null }, uKitSunDir: { value: null }, uKitShadowSize: { value: null } };
@@ -76,6 +76,9 @@ float kitSunShade(vec3 p, vec3 n) {
   } else {
     lit = lit > 2.5 ? 1.0 : 0.0;
   }
+  // A surface a low sun only grazes (the grass in the storm look: ten degrees) shows a texel stretched over metres: a thin rail's shadow there is a streak a
+  // texel wide that the taps find or miss by chance, a patch of blocks. The sun gives such a surface little light, so the shadow on it is taken in part only.
+  strength *= mix(${KT_SHADOW.grazingShare.toFixed(2)}, 1.0, smoothstep(0.12, 0.45, ndl));
   return 1.0 - strength * (1.0 - lit);
 }
 `;
