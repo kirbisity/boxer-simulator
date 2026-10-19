@@ -4,11 +4,13 @@
 //  - the item row, top left: a bandage and a tonic, each a button with its count and its key (1, 2);
 //  - the action bar, over the pill's place, while a bandage goes on or a harness is changed;
 //  - a toast line for what just happened;
-//  - the boss's bar (story.js) kept at his health, while he is in the fight.
+//  - the boss's bar (story.js) kept at his health, while he is in the fight;
+//  - the team (teamview.js): the comrades' names and health above the player's card, a pip over each one's head.
 // Plain DOM over the fight; nothing here knows the physics beyond level.js's answers.
 
 import { bossStatus, contextFor, interact, useItem } from './level.js';
 import { bossBar, storyBusy } from './story.js';
+import { createTeamView } from './teamview.js';
 
 export const LEVEL_HUD = {
   // The toast stays this long (s).
@@ -39,7 +41,7 @@ const levelElement = (tag, className, html = '') => Object.assign(document.creat
 
 /**
  * Put the level's controls in `root` (the fight's, so they show only while the fight does). `hooks`:
- * world(), active() (a stage run is being played), now() (s). Returns { update, reset, toast, destroy }.
+ * world(), active() (a stage run is being played), now() (s), camera() (the scene's, for the pips). Returns { update, reset, toast, destroy }.
  */
 export function installLevelHud(root, hooks) {
   const pill = root.appendChild(levelElement('button', 'lv-context', `${levelIcon('hand')}<span class="lv-label"></span><kbd>E</kbd>`));
@@ -61,6 +63,7 @@ export function installLevelHud(root, hooks) {
   }));
   const bar = root.appendChild(levelElement('div', 'lv-action', '<span class="lv-action-label"></span><i><b></b></i>'));
   bar.hidden = true;
+  const team = createTeamView(root, hooks);
   const toastLine = root.appendChild(levelElement('div', 'lv-toast'));
   toastLine.hidden = true;
   let toastUntil = -Infinity;
@@ -106,6 +109,7 @@ export function installLevelHud(root, hooks) {
   function update() {
     const world = hooks.world();
     const on = hooks.active() && Boolean(world?.stage?.level);
+    team.update();
     if (!on) {
       if (pill.hidden === false || items.hidden === false || bar.hidden === false) reset();
       return;
@@ -134,17 +138,22 @@ export function installLevelHud(root, hooks) {
     if (!choice) shown = null;
     if (toastLine.hidden === false && hooks.now() > toastUntil) toastLine.hidden = true;
     const boss = bossStatus(world);
-    if (boss.show && !bossShown) {
+    // (The bar of a boss who is out stays only if it was up: it empties and fades, and the cutscene's title takes over.)
+    if (boss.show && !bossShown && !boss.felled) {
       bossBar.show(boss.name, boss.title);
       bossShown = true;
     } else if (!boss.show && bossShown) {
       bossBar.hide();
       bossShown = false;
     }
-    if (bossShown) bossBar.set(boss.fraction);
+    if (bossShown) {
+      if (boss.felled) bossBar.fell();
+      else bossBar.set(boss.fraction);
+    }
   }
 
   function reset() {
+    team.reset();
     pill.hidden = true;
     items.hidden = true;
     bar.hidden = true;
@@ -156,5 +165,5 @@ export function installLevelHud(root, hooks) {
     }
   }
 
-  return { update, reset, toast, destroy: () => { window.removeEventListener('keydown', onKey, true); for (const node of [pill, items, bar, toastLine]) node.remove(); } };
+  return { update, reset, toast, destroy: () => { window.removeEventListener('keydown', onKey, true); team.destroy(); for (const node of [pill, items, bar, toastLine]) node.remove(); } };
 }

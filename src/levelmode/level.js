@@ -11,10 +11,11 @@
 //   tonics []   tonic effects at work
 //   checkpoint { id, name, at, facing, section, gear, inventory }    where, in what, with what he wakes
 //   boss { id, phase } | null
-//   ending { phase: 'locked' | 'open' | 'scene' | 'done' } | null    the boss out, the inner door, the scene (ending.js)
+//   ending { phase: 'locked' | 'felled' | 'open' | 'scene' | 'done', held?, watched? } | null    the boss out, the cutscene, the inner door, the scene (ending.js)
 //   ui []        what the screen is to be told, in order: { type: 'toast', text } | { type: 'note', key, id }
 //                | { type: 'death' } | { type: 'respawned' } | { type: 'rested', name } | { type: 'phase2', id }
-//                | { type: 'bossDown' } | { type: 'ending' }
+//                | { type: 'bossDown' } (the cutscene begins) | { type: 'doorsOpen' } (it is through) | { type: 'ending' }
+//   team { fallen: Set of spawn ids, gateTold }   the comrades who have fallen (they stay fallen), and whether the gate has been spoken of (team.js)
 //   rebuild Set  fighter ids whose drawing is out of date (their bodies were remade)
 //   spawns { id: { def, section } }   spawnInputs { fighterId: inputs }   what the stage made them from
 //
@@ -32,7 +33,8 @@ import { levelOf, updateAction, updateTonics } from './items.js';
 import { noteDeath, playerStands, respawnPlayer, setCheckpoint, spawnDefinitions } from './checkpoints.js';
 import { levelAware } from './adapter.js';
 import { createStageWorld } from './stage.js';
-import { endingBusy, watchEnding } from './ending.js';
+import { endingBusy, endingRelease, watchEnding } from './ending.js';
+import { watchTeam } from './team.js';
 
 /** Give a stage world its run. Returns the level. */
 export function startLevel(world, { settle = true } = {}) {
@@ -43,7 +45,7 @@ export function startLevel(world, { settle = true } = {}) {
     inventory: { ...startItems }, startItems,
     taken: new Set(), notes: new Set(), keys: new Set(), pulled: new Set(), opened: new Set(), freed: new Set(),
     action: null, tonics: [], checkpoint: null, boss: null, dying: false, deaths: 0, rests: 0,
-    ui: [], rebuild: new Set(), spawns, spawnInputs: {}, ending: stage.ending ? { phase: 'locked' } : null,
+    ui: [], rebuild: new Set(), spawns, spawnInputs: {}, team: { fallen: new Set(), gateTold: false }, ending: stage.ending ? { phase: 'locked' } : null,
   };
   world.stage.level = level;
   // The operative fights from his guard (the stick within the run threshold); the walk mode's guardless stance is for exploring.
@@ -104,6 +106,7 @@ export function levelOpponent(world, me) {
 export function levelThink(world, dt) {
   const level = levelOf(world);
   const me = world.fighters[0];
+  watchTeam(world);
   if (me.state === 'out') {
     noteDeath(world);
     return;
@@ -142,8 +145,9 @@ function watchBoss(world, boss) {
 }
 
 /**
- * What the boss's bar says: { show, name, title, fraction } (fraction: what is left of his health, the measure of
- * the health bars: 1 - hurtShare). Shown while he is awake, aware of the player and not far; gone when he is out.
+ * What the boss's bar says: { show, name, title, fraction, felled } (fraction: what is left of his health, the measure of
+ * the health bars: 1 - hurtShare). Shown while he is awake, aware of the player and not far; when he is out it stays, empty and
+ * struck through (felled), for as long as the cutscene plays (the ending's phase 'felled'), then goes.
  */
 export function bossStatus(world) {
   const level = levelOf(world);
@@ -152,7 +156,8 @@ export function bossStatus(world) {
   const me = world.fighters[0];
   const near = Math.hypot(fighter.x[P.pelvis * 3] - me.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]) <= LEVEL_CONFIG.boss.barRange;
   const def = level.spawns[fighter.spawn.id].def;
-  return { show: fighter.state !== 'out' && !fighter.dormant && near && levelAware(world, fighter), name: fighter.body.inputs.name, title: def.boss?.title ?? '', fraction: 1 - hurtShare(fighter) };
+  const felled = fighter.state === 'out' && level.ending?.phase === 'felled';
+  return { show: felled || (fighter.state !== 'out' && !fighter.dormant && near && levelAware(world, fighter)), name: fighter.body.inputs.name, title: def.boss?.title ?? '', fraction: felled ? 0 : 1 - hurtShare(fighter), felled };
 }
 
 // ---- What the screen is told ------------------------------------------------------------------------------------
@@ -179,6 +184,8 @@ export function restartFromRest(world) {
   const level = levelOf(world);
   if (!level.rests) return false;
   if (level.ending?.phase === 'scene') level.ending.phase = 'open';
+  // A cutscene half-played: it is over, and the door is open.
+  endingRelease(world);
   level.ui.length = 0;
   respawnPlayer(world);
   level.ui.length = 0;
@@ -188,4 +195,4 @@ export function restartFromRest(world) {
 export { respawnPlayer, restAtPoint } from './checkpoints.js';
 export { contextFor, interact, interactions, hostileNear } from './interact.js';
 export { useItem } from './items.js';
-export { endingBusy, endingDone, endingOf, killBoss, princeOf } from './ending.js';
+export { endingBusy, endingDone, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, princeOf } from './ending.js';

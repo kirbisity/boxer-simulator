@@ -84,6 +84,26 @@ export const LEVEL_PRESETS = {
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#8a6a3a', facialHair: 'none', eyeColor: 'blue' },
   },
 
+  // ---- The team: three Forger comrades who start beside the operative and die for good ------------------------------
+  // Resistance fighters of the same cell, in the same padded gambeson (outfit 'forger'), a little less drilled than the operative
+  // (skill 0.55 against his 0.75) and a little more than the garrison's best: each a different weapon, so the three read apart
+  // at a glance. Bodies in range for their frames (calories chosen with physiology.js caloriesForWeight: 74, 62 and 80 kg).
+  forgerArcher: {
+    name: 'Forger archer', style: 'bow', sex: 'male', heightCm: 178, frame: 'medium', age: 31, exercise: 0.5, calories: 3366, skill: 0.55,
+    outfit: { kind: 'forger', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'midLong', hairColor: '#4a3322', facialHair: 'beard', eyeColor: 'hazel' },
+  },
+  forgerSpear: {
+    name: 'Forger spearwoman', style: 'spear', sex: 'female', heightCm: 168, frame: 'medium', age: 26, exercise: 0.55, calories: 2646, skill: 0.55,
+    outfit: { kind: 'forger', design: 0 }, accessories: ['headWrap'],
+    look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'green' },
+  },
+  forgerHammer: {
+    name: 'Forger hammerman', style: 'warhammer', sex: 'male', heightCm: 172, frame: 'large', age: 52, exercise: 0.4, calories: 3236, skill: 0.5,
+    outfit: { kind: 'forger', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#8d8d8d', facialHair: 'beard', eyeColor: 'brown' },
+  },
+
   // ---- Civilians: they flee or cower, and fight with whatever they can only if cornered ------
   dunnottarServant: {
     name: 'Castle servant', style: 'passive', sex: 'female', heightCm: 160, frame: 'small', age: 34, exercise: 0.3, calories: 1901,

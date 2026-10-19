@@ -330,7 +330,7 @@ export const bossBar = {
     bossFill.style.transform = 'scaleX(1)';
     bossLag.style.transform = 'scaleX(1)';
     bossRoot.hidden = false;
-    bossRoot.classList.remove('fading');
+    bossRoot.classList.remove('fading', 'felled', 'empty');
     // One frame to be laid out hidden-then-shown, so the fade in runs.
     requestAnimationFrame(() => bossRoot.classList.add('shown'));
   },
@@ -342,10 +342,18 @@ export const bossBar = {
     bossLag.style.transform = `scaleX(${bossFraction})`;
     bossRoot.classList.toggle('empty', bossFraction <= 0);
   },
+  /** He is out: the bar is empty and his name struck through; it holds a moment and fades (boxer.css). */
+  fell() {
+    if (!bossRoot || bossRoot.hidden) return;
+    bossFraction = 0;
+    bossFill.style.transform = 'scaleX(0)';
+    bossLag.style.transform = 'scaleX(0)';
+    bossRoot.classList.add('empty', 'felled');
+  },
   /** Take it down. */
   hide() {
     if (!bossRoot) return;
-    bossRoot.classList.remove('shown');
+    bossRoot.classList.remove('shown', 'felled');
     bossRoot.hidden = true;
   },
   get visible() { return Boolean(bossRoot) && !bossRoot.hidden; },
