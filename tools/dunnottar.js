@@ -104,6 +104,23 @@
 // death brings back whichever comrades the last rest recorded alive (levelmode/checkpoints.js), so the bot's deaths no longer thin the team.
 // Not re-run for the table; the numbers above are the three-comrade stage's.
 //
+// ---- Phase F (two ways in: the plate knight at the front gate, the old drain round him) --------------------------------------------
+// Sir Alasdair (`dunnottarPlateKnight`: the man-at-arms' blackened full plate, skill 0.25) holds the ledge to the postern; the sea cave under the gorge shelf
+// leads by the old drain (stages/dunnottar-sewer.js) to the sea-gate, the lever, and the stair behind the heavy door up into the vault. `--route front,sewer`
+// sweeps each (`DUNNOTTAR_ROUTE`, `DUNNOTTAR_SEWER_ROUTE`; the sewer's rest is the smugglers' brazier). Careful, `--allies 2`, seeds 1-12, 10 deaths a fail, 3600 s:
+//                          reached Vaelen   beat him   failed (10 deaths)   timed out   mean deaths   where they died
+//   front                  10/12            9/12       2/12                 1/12        4.6           cliff 45 (Sir Alasdair 47 of 55), gate 4, chapel 3
+//   sewer                  10/12            10/12      0/12                 2/12        2.2           vault 15 (jailer, questioner), chapel 7 (Vaelen), sewer 4
+// The knight turned on him 63 times, 12 of them wins (19%): he is the front way's wall (47 of its 55 deaths), and every run beat him in the end (a death is a
+// fresh try from the gorge brazier). His skill was tuned with `knights` (120 duels from rest 1, the stage awake, two comrades: skill 0.5 loses to the
+// operative's sword 15 times in 100, 0.35 22, 0.25 27, 0.2 36). Nothing is multiplied: plate turns an edge, a thrust finds a gap, the comrades draw his blows.
+// What the sewer taught the bot (all of it a person would do): it walks round a dead man in a 3.4 m drain (it fell over him again and again); it goes by the
+// path finder when it gets no nearer (a stair's side is a step too high to climb: the foot is the way), over the whole stage's terrain with each cell on its floor
+// (the torture chamber lies over the sea-gate chamber: a point of one is a point of the other, and the vault's stair is not in the awake terrain until he is at its
+// foot); it closes in on a man who pokes from the end of his reach and goes round a wall to one across it; it pulls the sea-gate lever. And the stage taught
+// the physics: a man knocked down on a floor below y 0 never stood again (physics/rising.js asked for a share of a negative height), so in the sea cave and the
+// drain, the bot lay where he fell.
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
