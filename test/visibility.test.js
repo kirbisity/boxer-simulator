@@ -239,3 +239,20 @@ test('a 1x screen has no pixels to give, so the tiers carry it', () => {
   assert.equal(controller.tier, 'low');
   assert.equal(rungsFor(1).length, 3);
 });
+
+test('a section that is active only (the crypt) is painted in detail only while it is active, never through a portal', () => {
+  const stage = row();
+  stage.sections[2].activeOnly = true;
+  const graph = sectionGraph(stage, { margin: 0, openingMargin: 0 });
+  assert.ok(graph.activeOnly.has('c'));
+  const seen = chooseSections(graph, { active: new Set(['b']) });
+  assert.equal(seen.get('c'), 'far', 'next to the man, but only a silhouette');
+  assert.equal(seen.get('d'), 'far', 'and nothing is reached through it');
+  assert.equal(seen.get('a'), 'detail');
+  const inside = chooseSections(graph, { active: new Set(['c']) });
+  assert.equal(inside.get('c'), 'detail');
+  assert.equal(inside.get('d'), 'detail', 'from inside it the way on is followed');
+  const real = sectionGraph(STAGES.dunnottar);
+  assert.ok(real.activeOnly.has('crypt'));
+  assert.notEqual(chooseSections(real, { active: new Set(['vault']) }).get('crypt'), 'detail');
+});
