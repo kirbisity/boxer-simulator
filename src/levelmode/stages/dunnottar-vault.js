@@ -19,6 +19,7 @@
 //     the sea-gate         x 0..9.6, z -39.2..-35.2 (a barred arch over the sea, the hidden lever, a dead man in plate)
 
 import { wallOf, windingStairs } from '../../physics/terrain.js';
+import { DN_SEAGATE_DOOR } from './dunnottar-sewer.js';
 import { DN_FACE, dnBounds, dnBox, dnCeiling, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnProp, dnRoom, dnRun, dnSection, dnSlab, dnSpawn, Y } from './dnbuild.js';
 
 // The stair flights from the quadrangle into the vault share these numbers: 31 treads from the cellar floor (y 6) to the court.
@@ -271,7 +272,8 @@ export function buildCrypt() {
   // The sea-gate: a landing over the sea, a barred arch, the lever behind a loose stone; the stair back up is the vault's.
   dnRoom(sec, {
     x0: 0, x1: 9.6, z0: -39.2, z1: -35.2, floor: C, head: 3.6, walls: ['n', 'e', 'w'], foot: C - 1, vault: { crown: 1.2, ribs: 3.7 },
-    doors: { n: [{ at: 4.8, width: 4.2, top: C + 3.4, solid: true }] },
+    // (The west wall has a low door: the old drain's last stretch comes in by it, `dunnottar-sewer.js`.)
+    doors: { n: [{ at: 4.8, width: 4.2, top: C + 3.4, solid: true }], w: [{ at: DN_SEAGATE_DOOR.z, width: DN_SEAGATE_DOOR.width, top: C + 3.0 }] },
   });
   dnRun(sec, [3.4, -34.7], [10.6, -34.7], 1, C - 1, top, 'rubble', [{ at: 6.2 - 3.4, width: 3.2, sill: C, top: C + 3.4, shape: 'round' }]);
   sec.decor.push({ kind: 'seagate', a: [2.7, -39.7], b: [6.9, -39.7], y0: C, y1: C + 3.4 });
@@ -309,7 +311,7 @@ export function buildCrypt() {
   dnProp(sec, 'chest', [8.6, C, -37.6], { yaw: Math.PI });
   dnProp(sec, 'bed', [7.0, C, -38.6], { yaw: 0 });
   dnProp(sec, 'brazier', [8.8, C, -35.9], { lit: true });
-  dnProp(sec, 'torch', [0.5, C + 2.4, -36.5], { face: 'E', dim: true });
+  dnProp(sec, 'torch', [0.5, C + 2.4, -35.8], { face: 'E', dim: true });
   dnProp(sec, 'lever', [9.5, C + 1.2, -37.2], { face: 'W' });
   dnProp(sec, 'weapon', [4.4, C, -38.5], { what2: 'halberd', yaw: 0.8 });
   sec.levers.push({ id: 'seagatelever', at: [8.6, C, -37.2], target: 'cryptgate', state: 'open', label: 'Pull the hidden lever' });

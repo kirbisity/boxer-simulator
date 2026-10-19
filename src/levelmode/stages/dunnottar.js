@@ -9,9 +9,9 @@
 // The world, one continuous map (x east, z south, y up; every number is a metre):
 //
 //   cliff   The Cliff Path     mainland x -126..-50, z -10..58 : start (-114, 14, -4) down three fenced legs and a
-//                              stair to the gorge shelf (y 0, x -64..-7), Rest 1 at its brazier
+//                              stair to the gorge shelf (y 0, x -64..-7), Rest 1 at its brazier; at the shelf's foot the sea cave's stair
 //   gate    Gatehouse & Oillets x -8..31, z 38..58           : the great gate (closed: Shortcut 1) and the ledge round to a
-//                              postern; the guard hall, a steep stair up to the oillet wall, and the gallery behind it
+//                              postern, where Sir Alasdair (a man-at-arms in full plate) holds the way; the guard hall, a steep stair up to the oillet wall, and the gallery behind it
 //   ascent  Tunnelled Ascent    x 9..29, z 5..42             : vestibule, two stair flights and a guard room up to the quad (y 12.18)
 //   quad    The Quadrangle      x -2..46, z -38..8  (y>=9.8)  : grass court, the well (Rest 2), ruined ranges, the stairs down to the vault
 //   vault   Whigs' Vault        x -2..46, z -39..-3 (y 3..11.5): the long cellar (floor y 6), the cell hall, the iron gate up to the quad
@@ -19,6 +19,9 @@
 //                              the well shaft (dunnottar-vault.js)
 //   crypt   The Crypt           x -1..34, z -40..-18 (y -1..5.4): under the cellar, by the shaft's winding stair: gallery, ossuary, tombs, a
 //                              flooded way on a causeway to the sea-gate and a hidden lever (a loop back up through the torture chamber)
+//   sewer   The Old Drain      x -56..0, z -40..56 (y -5..1.4): the way round the guarded gate: a sea cave at the foot of the gorge shelf (its mouth, its stair and its
+//                              lantern are the cliff path's), a grotto, a long drain, a flooded cistern, two stairs, and a low door into the crypt's sea-gate chamber,
+//                              whose lever lifts the heavy door of the stair up into the torture chamber (dunnottar-sewer.js)
 //   tower   Tower House & Upper Walls: the keep hall (y 12.18), the winding tower stair (to y 24.93), the north wall walk, a stair
 //                              down to the ladder room (y 17.18: Shortcut 2 kicks a ladder down into the quad) and Rest 3
 //   chapel  The Sanctuary       x -35..-2, z -48..-24 (y 17.18): the fully vaulted summit nave, 30 x 20 m, Lord Vaelen; the cell's double doors in its west end
@@ -30,6 +33,7 @@
 import { ceilingOf, rampOf, stairsOf, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
 import { buildChapel, buildCell, DN_ENDING } from './dunnottar-chapel.js';
 import { buildCrypt, buildVault, DN_COVERED, DN_SHAFT_SPIRAL, DN_VAULT_STEPS } from './dunnottar-vault.js';
+import { buildSeaCave, buildSewer, DN_CAVE } from './dunnottar-sewer.js';
 import { DN_FACE, DN_LEVELS, DN_PATH, DN_Y, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnLerp, dnProp, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
 export { DN_FACE, DN_LEVELS, DN_PATH, DN_Y } from './dnbuild.js';
@@ -70,7 +74,8 @@ const DN_L3 = dnLerp(-100.5, -62.5, Y.pathB, Y.pathC);
 
 function buildCliff() {
   const sec = dnSection('cliff', 'The Cliff Path');
-  dnBounds(sec, { at: [-88, 14], size: [76, 56] }, { at: [-36, 47], size: [60, 22] });
+  // (The mainland and the gorge are above y -1: the sea cave and the old drain run under them, in the `sewer` section; the cave's stair and landing are the third region.)
+  dnBounds(sec, { at: [-88, 14], size: [76, 56], y: [-1, 60] }, { at: [-36, 47], size: [60, 22], y: [-1, 60] }, { at: [-43, 58.5], size: [26, 5], y: [-6.5, 0.6] });
   // The mainland, where the way begins: a plateau, then L1. The path is DN_PATH wide, rails 0.2 outside its edges; each turn is a landing a little wider.
   const h = DN_PATH / 2;
   const r = h + 0.2;
@@ -84,7 +89,10 @@ function buildCliff() {
   // The stair down to the gorge: 19 treads of 0.2 (3.8 m).
   const down = dnFlight(sec, { foot: [-58, 38.4], dir: 'N', steps: 19, tread: 0.4, width: DN_PATH, from: Y.gorge, rise: 0.2, style: 'cobble' });
   // The gorge shelf: black rock, a cliff to the sea on its south and west; a low rock face on the north.
-  dnSlab(sec, -64, -6.8, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
+  // (The shelf is whole but for a plate over the sea cave, 15 m wide and 1.5 thick, with the cave under it: `faceless`, as the cave's mouth is in its face.)
+  dnSlab(sec, -64, -56, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
+  dnSlab(sec, -56, -41, 38, 56, Y.gorge, 'rock', { bottom: Y.gorge - 1.5, extra: { land: true, faceless: true } });
+  dnSlab(sec, -41, -6.8, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
   dnBox(sec, -64, -58 - r, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
   dnBox(sec, -58 + r, -6.8, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
 
@@ -140,6 +148,9 @@ function buildCliff() {
   sec.decor.push({ kind: 'waymarks', points: [[-66, 20, DN_L3(-66)], [-60.5, 22, Y.pathC], [-58.5, 28, Y.pathC]], gap: 2.0, first: 0.8 });
   // The way on: the corridor to the gatehouse is a portal while he is in it.
   sec.portals.push({ to: 'gate', area: { at: [-17, 47], size: [20, 18] } });
+  // The sea cave (the old drain): its mouth at the foot of the shelf's cliff, and the way down to it.
+  sec.portals.push({ to: 'sewer', area: { at: [DN_CAVE.x, 58], size: [15, 7], y: [-6.5, 0.5] } });
+  buildSeaCave(sec);
 
   // Story props: a rotting trebuchet and a ram on the mainland, dropped weapons, ravens, wreckage.
   dnProp(sec, 'trebuchet', [-117, 14, 14], { yaw: 0.3, scale: 1.2 });
@@ -249,6 +260,8 @@ function buildGate() {
   // Men: a guard in the hall, one at the stair head, and the gunners behind the loops.
   dnSpawn(sec, 'hallguard', 'dunnottarGuard', 'enemy', 2, [-1.5, Y.gorge, 44.2], DN_FACE.S, { inputs: { name: 'Corporal Rae' } });
   dnSpawn(sec, 'gunner1', 'dunnottarMatchlock', 'enemy', 2, [23.4, A, 43.2], DN_FACE.W, { inputs: { name: 'Gunner Mackie' }, station: 'oillet', hole: 0 });
+  // The front way's door: a man-at-arms in full plate on the ledge to the postern, looking back along it (the ledge is 3.4 m wide: there is no way past him). The sea cave is the way round.
+  dnSpawn(sec, 'gateknight', 'dunnottarKnight', 'enemy', 3, [-3, Y.gorge, 54.1], DN_FACE.W, { inputs: { name: 'Sir Alasdair' } });
 
   dnItem(sec, 'note-powder', 'note', [3.6, Y.gorge, 42.9], { note: 'powder', lift: 0.9 });
   dnItem(sec, 'bandage3', 'bandage', [-4.4, Y.gorge, 50.6]);
@@ -563,13 +576,13 @@ function buildTower() {
 
 // ---- The stage ----------------------------------------------------------------------------------------
 
-const DN_SECTIONS = [buildCliff(), buildGate(), buildAscent(), buildQuad(), buildVault(), buildCrypt(), buildTower(), buildChapel(), buildCell()];
+const DN_SECTIONS = [buildCliff(), buildGate(), buildAscent(), buildQuad(), buildVault(), buildCrypt(), buildSewer(), buildTower(), buildChapel(), buildCell()];
 
 // How the garrison sees and flees (levelmode/awareness.js): the light in each section (the storm outside, torches below, the cell
 // nearly black), the point a routed man runs for (`rear`), and where the civilians and prisoners run to hide (`refuge`).
 const DN_MIND = {
-  light: { cliff: 0.75, gate: 0.55, ascent: 0.5, quad: 0.55, vault: 0.3, crypt: 0.22, tower: 0.55, chapel: 0.62, cell: 0.15 },
-  rear: { cliff: [-58, 0, 30], gate: [10, 4.18, 46], ascent: [17, 8.18, 20], quad: [20, 12.18, 2], vault: [5.7, 6, -17], crypt: [16.7, 1.4, -24.4], tower: [51, 12.18, -23], chapel: [-20, 17.18, -34] },
+  light: { cliff: 0.75, gate: 0.55, ascent: 0.5, quad: 0.55, vault: 0.3, crypt: 0.22, sewer: 0.18, tower: 0.55, chapel: 0.62, cell: 0.15 },
+  rear: { cliff: [-58, 0, 30], gate: [10, 4.18, 46], ascent: [17, 8.18, 20], quad: [20, 12.18, 2], vault: [5.7, 6, -17], crypt: [16.7, 1.4, -24.4], sewer: [-48.5, -5, 30], tower: [51, 12.18, -23], chapel: [-20, 17.18, -34] },
   refuge: {
     servant1: [36.5, 12.18, -5], servant2: [37.5, 12.18, -6.5], priest: [41, 12.18, -12.5], lady1: [5, 12.18, -30], lady2: [5, 12.18, -29],
     miner: [12.6, 6, -34], captive: [20.6, 6, -34],
@@ -706,6 +719,8 @@ export const DUNNOTTAR = {
     // The mainland hillside: a plane y = a + b x + c (z - d) sloping to the gorge, capped at the plateau; paths and landings are cut into it.
     // Where the headland's rock is kept clear of a door at its foot: the great gate and the postern.
     clear: [[-12, -4.6, 43.6, 48.8, DN_Y.gorge - 0.35], [0.4, 4, 50.6, 53.6, DN_Y.gorge - 0.35], [-2, 11, -50, -39.2, DN_Y.crypt + 0.8]],
+    // Where the hillside is cut away, for the sea cave's stair and landing under the shelf's edge: [x0, x1, z0, z1, top].
+    carve: [[-57, -31.5, 55.4, 64, DN_Y.sea - 1]],
     mainland: { polygon: [[-136, -50], [-12, -50], [-12, 58], [-136, 58]], plane: [12, 0, -0.27, -4], cap: 16 },
   },
   weather: { kind: 'storm', seed: 1500 },
@@ -737,6 +752,26 @@ export const DUNNOTTAR_ROUTE = [
   { name: 'the winding stair', to: 'tower', points: dnSpiralWaypoints(2) },
   { name: 'the wall walk', to: 'tower', points: [[63.4, -28.4], [63.4, -31], [63.4, -36], [50, -36], [44, -36], [37, -36], [30, -36], [24, -36], [20, -36], [10, -36], [5, -36], [0, -36]], open: ['chapelgate'] },
   { name: 'the chapel', to: 'chapel', points: [[-6, -36], [-14, -36], [-22, -36]] },
+];
+
+/**
+ * The way round the guarded gate, as DUNNOTTAR_ROUTE is the way through it: down the cliff path as before, then not east to the postern but along
+ * the shelf to the head of the sea cave's stair, down it, in at the cave and along the old drain (the grotto, the first drain, the cistern's
+ * causeway, the second drain and its stair, the long drain and its stair) to the sea-gate chamber, the hidden lever there, and up the stair behind
+ * the heavy door into the vault's torture chamber and the cellar, where it joins the main route. `lever` names the lever a leg ends at (a walker
+ * can set the mechanism it works instead, `open`).
+ */
+export const DUNNOTTAR_SEWER_ROUTE = [
+  DUNNOTTAR_ROUTE[0],
+  { name: 'the shelf to the sea cave stair', to: 'cliff', points: [[-50, 46], [-43, 50], [-36.7, 52.6], [-36.7, 56.6]] },
+  { name: 'down the stair to the landing', to: 'cliff', points: [[-40, 57.6], [-44, 57.6], [-47.8, 57.6], [-48.5, 56.6]] },
+  { name: 'the grotto and the first drain', to: 'sewer', points: [[-48.5, 53], [-48.5, 48], [-48.5, 44], [-48.5, 38], [-48.5, 30], [-48.5, 24]] },
+  { name: 'the cistern causeway', to: 'sewer', points: [[-48.5, 20], [-48.5, 14], [-48.5, 8], [-48.5, 2]] },
+  { name: 'the second drain and its stair', to: 'sewer', points: [[-48.5, -4], [-48.5, -8], [-48.5, -12], [-48.5, -16], [-48.5, -24], [-48.5, -32], [-48.5, -36.4]] },
+  { name: 'the long drain', to: 'sewer', points: [[-46, -37.9], [-40, -37.9], [-30, -37.9], [-20, -37.9], [-13, -37.9], [-9, -37.9], [-4, -37.9]] },
+  { name: 'the sea-gate and the lever', to: 'crypt', points: [[0.8, -37.9], [4, -37.7], [6.6, -36.9]], lever: 'seagatelever', open: ['cryptgate'] },
+  { name: 'the stair behind the heavy door', to: 'vault', points: [[3, -37.6], [1.7, -36.2], [1.7, -34.6], [1.7, -32], [1.7, -30.4], [1.7, -29], [3, -28.4], [6.4, -27.8], [6.6, -26.3], [6.6, -23.6]] },
+  ...DUNNOTTAR_ROUTE.slice(5),
 ];
 
 /** The three shortcuts and the doors: what to set, and a short way to walk to show it open. */

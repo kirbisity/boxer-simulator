@@ -445,6 +445,8 @@ function kitMainland(batch, stage, blocks, terrain, sea) {
       const w = kitSmooth(1.4, 7, nearD);
       h = py - 0.05 + (h - (py - 0.05)) * w;
     }
+    // Boxes where the hillside is cut away to a height (the sea cave's stair and landing under the shelf's edge): [x0, x1, z0, z1, top].
+    for (const [cx0, cx1, cz0, cz1, top] of form.carve ?? []) if (x >= cx0 && x <= cx1 && z >= cz0 && z <= cz1) h = Math.min(h, top);
     return Math.max(h, sea - 6);
   };
   const heights = [];
@@ -704,7 +706,7 @@ function kitSection(section, mats, seed, levels = [], faces = null) {
   const batch = new KitBatch(mats, seed, faces);
   const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [] };
   kitSolids(batch, section);
-  const cellar = section.id === 'vault' || section.id === 'cell' || section.id === 'crypt';
+  const cellar = ['vault', 'cell', 'crypt', 'sewer'].includes(section.id);
   let fences = 0;
   for (const decor of section.decor ?? []) {
     switch (decor.kind) {
@@ -755,6 +757,8 @@ function kitIsCliff(block, form) {
   if (s.kind !== 'slab') return false;
   // The headland's own cliffs are the island's (kitIsland); the wall walk's face is masonry; the gorge shelf is a ledge on the mainland.
   if (s.walk) return true;
+  // (A plate with a sea cave under it draws its own face, with the cave's mouth in it.)
+  if (s.faceless) return false;
   return Boolean(s.land) && s.style === 'rock' && s.at[0] < -7 && s.at[1] > -34;
 }
 

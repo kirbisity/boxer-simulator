@@ -54,7 +54,8 @@ export function buildChapel() {
   const sideTop = L + 8.3;
   const floor = L;
   // The floor: flagstones, a roof over all.
-  dnSlab(sec, -35.2, -2, -47.6, -24.4, floor, 'flags', { extra: { room: true, summit: true } });
+  // (Two metres thick, not a column to the sea: the old drain runs under it.)
+  dnSlab(sec, -35.2, -2, -47.6, -24.4, floor, 'flags', { bottom: floor - 2, extra: { room: true, summit: true } });
   // The long walls (north and south): a tall window in every bay, between the arcade's pillars.
   const windows = CH.pillarX.map((x) => ({ x, width: 1.9, sill: floor + 2.4, top: floor + 7.1 }));
   const wallWindows = windows.map((w) => ({ at: -2 - w.x, width: w.width, sill: w.sill, top: w.top, shape: 'lancet', solid: true }));
@@ -129,7 +130,7 @@ export function buildCell() {
   sec.interior = DN_CELL_INTERIOR;
   // Directly behind the chancel's double doors: a room of 9 m by 10, a low vault, a slit of cold light.
   dnRoom(sec, {
-    x0: -44.4, x1: -35.2, z0: -41.2, z1: -30.8, floor: L, head: 4.0, thick: 1.4, style: 'rubble', walls: ['n', 's', 'w'], foot: L - 2, slab: { extra: { room: true } },
+    x0: -44.4, x1: -35.2, z0: -41.2, z1: -30.8, floor: L, head: 4.0, thick: 1.4, style: 'rubble', walls: ['n', 's', 'w'], foot: L - 2, slab: { bottom: L - 2, extra: { room: true } },
     doors: { w: [{ at: -36, width: 0.6, sill: L + 2.6, top: L + 3.9, shape: 'slit', solid: true }] }, vault: { crown: 1.4, ribs: 4.6 },
   });
   dnProp(sec, 'straw', [-42.8, L, -39.4], {});
