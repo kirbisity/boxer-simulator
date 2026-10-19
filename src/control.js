@@ -7,13 +7,14 @@
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
-import { dropWeapon, hostile, inFight, legBroken, legShare, manNear, opponentFor, perform, point, reachOf, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
+import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { handling } from './handling.js';
 import { runSteer } from './runsteer.js';
+import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
 
 export const CONTROL = {
   // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`;
@@ -53,6 +54,12 @@ export const CONTROL = {
   bufferSeconds: 0.35,
   // He turns to face the place he strikes at for this long (s).
   faceSeconds: 0.6,
+  // With no enemy within `foeEngaged` m, an attack goes at whoever is nearest within `anyoneWithin` m, enemy or not (a civilian, a prisoner, a
+  // team-mate, a man on the floor): the player can strike at anything. An enemy nearer than `foeEngaged` owns the blow.
+  anyoneWithin: 2.2,
+  foeEngaged: 4,
+  // Lock, with no enemy to take, takes the nearest man of any side within this (m).
+  lockAnyoneWithin: 5,
   // A pad attack goes at his man within its reach (m more for each unit of a lunge's step, and this slack), else at the air.
   padStepReach: 0.5,
   padSlack: 0.3,
@@ -396,7 +403,7 @@ export const MOVE_NAMES = {
   hammerOverhead: ['Hammer', 'overhead'], hammerSide: ['Hammer', 'side blow'], hammerThrust: ['Hammer', 'spike thrust'],
   naginataSweep: ['Sweep', 'low cut'], naginataCut: ['Cut', 'overhead'], naginataRising: ['Rising cut'], naginataThrust: ['Thrust'],
   spearThrust: ['Spear thrust'], spearJab: ['Spear jab'], spearSweep: ['Spear sweep'], spearHigh: ['High thrust'], spearLow: ['Low thrust'], lanceThrust: ['Lance thrust'], lanceHigh: ['Lance at the face'], lanceJab: ['Lance jab'],
-  stab: ['Stab'], upStab: ['Rising stab'], highStab: ['High stab'],
+  stab: ['Stab'], upStab: ['Rising stab'], highStab: ['High stab'], execute: ['Finisher', 'dagger thrust'],
   gladiusThrust: ['Thrust'], gladiusCut: ['Cut'], swordLunge: ['Lunge'], quickThrust: ['Quick thrust'], flickCut: ['Flick cut'],
   sicaHook: ['Hooked cut'], sicaThrust: ['Thrust'], crescentSlash: ['Crescent slash'], staffButt: ['Butt strike'],
   maceOverhead: ['Mace', 'overhead'], maceSide: ['Mace', 'side blow'], maceOverheadLeft: ['Mace', 'overhead'], maceSideLeft: ['Mace', 'side blow'],
@@ -524,6 +531,58 @@ export function lineFor(fighter, at, man) {
   return 'mid';
 }
 
+/** A place in the air before the fighter, at a zone's height, `share` of his reach out: where a blow goes with nobody there. */
+export function airAhead(fighter, zone, share = 1) {
+  const hips = point(fighter.x, P.pelvis);
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  const reach = (reachOf(fighter) + fighter.body.lengths.headRadius) * share;
+  const height = zone === 'head' ? fighter.x[P.head * 3 + 1] : zone === 'legs' ? hips[1] * 0.6 : fighter.x[P.neck * 3 + 1] - 0.3;
+  return [hips[0] + forward[0] * reach, height, hips[2] + forward[2] * reach];
+}
+
+/**
+ * Who an attack goes at: his enemy if one is engaged (within `foeEngaged` m) or he is locked on one; else whoever stands nearest within
+ * `anyoneWithin` m, enemy or not; else the enemy he has (far off), else nobody (the blow goes into the air).
+ */
+export function attackMark(world, fighter, orders, opponent) {
+  if (opponent && (orders.lock !== null || reachBetween(fighter, opponent) <= CONTROL.foeEngaged)) return opponent;
+  return nearestAnyone(world, fighter, CONTROL.anyoneWithin) ?? opponent;
+}
+
+/** The man Lock takes: the enemy he is on (`foe`), else the nearest man of any side within `lockAnyoneWithin` m (a civilian, a prisoner, a team-mate); null if none. */
+export function lockCandidate(world, fighter, foe) {
+  return foe ?? nearestAnyone(world, fighter, CONTROL.lockAnyoneWithin);
+}
+
+/** The distance on the floor between two men's hips. */
+function reachBetween(fighter, other) {
+  return Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+}
+
+/** An attack asked for while a man lies helpless within reach (and none stands on him): the finisher instead. True if it began. */
+export function finishOnAttack(world, fighter, orders) {
+  if (fighter.punch) return false;
+  const prey = finishTarget(world, fighter, { locked: orders.lock });
+  return Boolean(prey) && startFinisher(world, fighter, prey);
+}
+
+/**
+ * A strike thrown by a key: at his enemy as before, or with none near at whoever stands nearest within reach, or into the air.
+ * Returns whether it was thrown. (The pad and the body tap go through orders.requests, which does the same.)
+ */
+export function swingAt(world, fighter, orders, name, zone) {
+  if (finishOnAttack(world, fighter, orders)) return true;
+  const mark = attackMark(world, fighter, orders, opponentFor(world, fighter));
+  const spec = MOVES[name];
+  if (spec?.kind !== 'strike') return throwPunch(world, fighter, name, zone);
+  if (mark && (hostile(mark, fighter) || orders.lock === mark.id)) return throwPunch(world, fighter, name, zone);
+  if (mark) {
+    fighter.faceAt = { at: point(mark.x, P.pelvis), until: world.time + CONTROL.faceSeconds };
+    return throwPunch(world, fighter, name, zone, { at: aimPoint(mark, zone) });
+  }
+  return throwPunch(world, fighter, name, zone, { at: airAhead(fighter, zone) });
+}
+
 /**
  * Carry out the first attack asked for: thrown at once, wherever it is aimed,
  * a man there or not (kept a moment only while the hands are busy). A request
@@ -544,12 +603,19 @@ function attack(world, fighter, orders, opponent) {
     return;
   }
   if (fighter.punch || fighter.rush || fighter.pickup || fighter.pin || fighter.state !== 'up') return;
+  // A man helpless on the floor within reach, and none on his feet on him: the attack is the finisher (finisher.js).
+  if (finishOnAttack(world, fighter, orders)) {
+    requests.shift();
+    return;
+  }
+  opponent = attackMark(world, fighter, orders, opponent);
   if (request.move) {
     padAttack(world, fighter, request, opponent);
     requests.shift();
     return;
   }
-  const aim = request.point ?? null;
+  // (With nobody to strike at, the blow still goes: into the air before him, at the height of its line.)
+  const aim = request.point ?? (opponent ? null : airAhead(fighter, request.line === 'low' ? 'legs' : request.line === 'high' ? 'head' : 'body', 1));
   const man = aim ? manNear(world, fighter, aim, WORLD.aimedAtWithin) : opponent;
   const line = aim ? lineFor(fighter, aim, man) : request.line;
   const chosen = chooseAttack(world, fighter, man, line, request.strength, aim);
@@ -557,11 +623,13 @@ function attack(world, fighter, orders, opponent) {
   if (!chosen) return;
   if (aim) fighter.faceAt = { at: aim, until: world.time + CONTROL.faceSeconds };
   // A rush or a clinch goes at the man; a strike at the place.
-  const thrown = MOVES[chosen.move].kind === 'strike' ? throwPunch(world, fighter, chosen.move, chosen.zone, { heavy: chosen.heavy, at: aim }) : throwPunch(world, fighter, chosen.move);
+  // (A man who is no enemy is struck at as the place he is: throwPunch's own man is an enemy.)
+  const at = aim ?? (man && !hostile(man, fighter) ? aimPoint(man, chosen.zone) : null);
+  const thrown = MOVES[chosen.move].kind === 'strike' ? throwPunch(world, fighter, chosen.move, chosen.zone, { heavy: chosen.heavy, at }) : throwPunch(world, fighter, chosen.move);
   if (thrown) {
     fighter.orderCombo = chosen.combo;
     fighter.orderComboZone = chosen.zone;
-    fighter.orderComboAt = aim;
+    fighter.orderComboAt = at;
     fighter.orderAt = world.time;
   }
 }
@@ -588,6 +656,10 @@ function padAttack(world, fighter, request, opponent) {
     }
   } else if (!opponent) return;
   const combo = request.strength === 'combo' && spec.kind === 'strike' ? comboAfter(style, request.move, []) : null;
+  // A man who is no enemy (a civilian, a team-mate) struck at: he turns to him.
+  if (opponent && !hostile(opponent, fighter)) fighter.faceAt = { at: point(opponent.x, P.pelvis), until: world.time + CONTROL.faceSeconds };
+  // (He is thrown at as the place he is: throwPunch's own man is an enemy.)
+  if (!at && spec.kind === 'strike' && opponent && !hostile(opponent, fighter)) at = aimPoint(opponent, request.zone);
   const thrown = spec.kind === 'strike' ? throwPunch(world, fighter, request.move, request.zone, { at }) : throwPunch(world, fighter, request.move);
   if (thrown) {
     fighter.orderCombo = combo;
@@ -699,6 +771,7 @@ export const ACTIONS = {
   clinch: { label: 'Clinch', icon: '🫂' },
   crawl: { label: 'Crawl', icon: '🐾' },
   stand: { label: 'Stand', icon: '⤒' },
+  finish: { label: 'Finish him', icon: '🔪' },
 };
 
 /** Who holds him in a clinch, if anyone. */
@@ -738,6 +811,8 @@ export function contextAction(world, fighter) {
   const style = STYLES[fighter.style];
   if (fighter.clinch) return style?.throws || style?.clinchDrive ? 'throw' : 'disengage';
   if (holder(world, fighter)) return 'disengage';
+  // A man helpless on the floor within reach and none on his feet on him: the finisher (finisher.js).
+  if (finishTarget(world, fighter, { locked: fighter.focus })) return 'finish';
   const weapon = fighter.weapon?.held ? fighter.weapon : null;
   const opponent = opponentFor(world, fighter);
   const distance = opponent ? vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis))) : Infinity;
@@ -819,6 +894,10 @@ export function doAction(world, fighter, name) {
     return true;
   }
   if (name === 'crawl' || name === 'stand') return playerCrawl(world, fighter, name === 'crawl');
+  if (name === 'finish') {
+    const prey = finishTarget(world, fighter, { locked: fighter.focus });
+    return Boolean(prey) && !fighter.punch && startFinisher(world, fighter, prey);
+  }
   return false;
 }
 
@@ -869,10 +948,19 @@ function goPickUp(world, fighter) {
  */
 export function directFighter(world, fighter, orders, dt) {
   if (!fighter || fighter.state === 'out') return;
+  // Down on his knees over a man, a dagger going in: that holds him until it is done or he is struck (finisher.js).
+  if (fighter.finisher && updateFinisher(world, fighter, dt)) {
+    orders.requests.length = 0;
+    orders.actions = [];
+    endRun(orders);
+    return;
+  }
   // The man locked on is the man he fights; a lock on a man out of the fight lets go.
   const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
   if (locked && !inFight(locked)) orders.lock = null;
   fighter.focus = orders.lock ?? undefined;
+  // Locked on a man who is no enemy (a civilian, a team-mate): he is still the man he fights, for his blows and his facing.
+  fighter.focusAny = Boolean(locked) && orders.lock !== null && !hostile(locked, fighter);
   fighter.faceFoe = facesFoe(world, fighter, orders);
   fighter.runMode = false;
   const opponent = opponentFor(world, fighter);

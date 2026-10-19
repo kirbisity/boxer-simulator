@@ -7,6 +7,7 @@
 
 import { P } from '../body.js';
 import { opponentFor } from '../physics.js';
+import { attackMark } from '../control.js';
 import { FIGHT_UI, fightUiColour, fightUiMoves, fightUiZoneOf } from './logic.js';
 import { FIGHT_UI_OUTCOME_GLYPHS, fightUiIcon } from './icons.js';
 
@@ -131,7 +132,7 @@ export function fightUiKit(root, hooks) {
     const fighter = me();
     if (!fightWorld || !fighter) return null;
     const orders = hooks.orders();
-    return (orders.lock !== null ? fightWorld.fighters[orders.lock] : null) ?? opponentFor(fightWorld, fighter);
+    return (orders.lock !== null ? fightWorld.fighters[orders.lock] : null) ?? attackMark(fightWorld, fighter, orders, opponentFor(fightWorld, fighter));
   }
 
   /** Mark a blow on his man: where it goes, its way, its colour. */

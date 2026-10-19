@@ -8,6 +8,7 @@
 
 import { P } from '../body.js';
 import { opponentFor } from '../physics.js';
+import { attackMark } from '../control.js';
 import { fightUiColour, fightUiReady, fightUiTarget, FIGHT_UI } from './logic.js';
 import { fightUiElement, fightUiFlash, fightUiPaintReady } from './kit.js';
 
@@ -55,7 +56,7 @@ export function fightUiTargetBody(root, kit, hooks) {
     const me = kit.me();
     if (!world || !me) return null;
     const orders = hooks.orders();
-    return (orders.lock !== null ? world.fighters[orders.lock] : null) ?? opponentFor(world, me);
+    return (orders.lock !== null ? world.fighters[orders.lock] : null) ?? attackMark(world, me, orders, opponentFor(world, me));
   }
 
   const onScreen = (target, index) => hooks.project([target.x[index * 3], target.x[index * 3 + 1], target.x[index * 3 + 2]]);

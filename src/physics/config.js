@@ -135,6 +135,8 @@ export const WORLD = {
   daze: { from: 0.5, minSeconds: 1.5, maxSeconds: 6, reaction: 0.2, strength: 0.3, staggerMore: 0.5, sway: 0.03 },
   // A strike thrown at a place is aimed at a man of the other side standing within this (m) of it.
   aimedAtWithin: 0.7,
+  // A man who is no enemy (a civilian, a team-mate, one lying out) counts this much (m) further off when the player aims at a place: an enemy there is struck first.
+  aimedAtOthers: 0.2,
   footing: { turnRate: 6, followPushed: 2.5, edgeMargin: 0.3 },
   // A drop edge (an arena's `drop`: a subway platform over the track bed):
   // hips more than `footing` m past it and his feet are gone from under him;
