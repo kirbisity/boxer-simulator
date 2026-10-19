@@ -12,7 +12,7 @@
 //             a rest within a few metres of his way.
 //
 // Usage:
-//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 2400] [--allies 3]
+//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 3600] [--allies 3] [--logs] [--allies 3]
 //   node tools/dunnottar.js segments [--runs 20] [--segments start_rest1,rest1_rest2,...] [--logs]   rest to rest, from full health
 //   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
 //   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
@@ -73,12 +73,39 @@
 // and 7 of 26 attempts at him in the careful sweep were wins (27%; they wear what they took off the last knight, plate half the time).
 // A person who comes to him healed with brigandine and a poleaxe is where the spec wants the odds, about one in three.
 //
+// ---- Phase D (after the stage grew: run mode, narrow path, crags, props, the vault's branches, a team of three comrades) -------------
+// The bot as C3 left it timed out in every full run (2400 s): it was the bot's, not the stage's. What was wrong, and what the bot does now:
+//   - It walked straight lines between points. A fight or a looting left it on the far side of a wall (the lodge guard dies inside Benholm's
+//     Lodging; a cell, a gate, a gatehouse wall) and every point after it was through that wall: the stuck rule gave the points up one by one,
+//     for ever. Now `botnav.js` (an A* over the terrain as the physics keeps a man off it) finds the way round whenever a wall is between it and
+//     its point; a point nobody can reach is given up (a detour to a thing behind a shut door for good).
+//   - The fight AI stands in for the operative, and it is a man: afraid, it panics, throws his weapon down and crawls away; a broken arm puts it
+//     on its knees. A man crawling is out of the fight for everyone (the garrison leaves him alone, `inFight`): the bot sat for 2000 s with a jailer
+//     at its feet. Now it does not panic (a person decides that), it stands up from a crawl unless a leg is broken (`playerCrawl`), picks up a
+//     weapon when it has none, and with a broken leg crawls to the nearest rest, which makes it whole.
+//   - A stand-off (two men who each wait for the other) is broken by a blow when the man is within reach (`chooseAttack`), not only by walking at him.
+//   - Vaelen falls with his own swing and crawls off on a broken knee; the fight AI leaves a crawler to go. The bot now kills him where he lies with
+//     the ground finisher (finisher.js), as a player does: the stage cannot be finished otherwise.
+//   - A comrade's arrow (the archer's) killed the operative in the corridors of the vault (2 in 20): in level mode a shooter holds his shot with the
+//     player (or a comrade) within 0.9 m of the line to his man, not 0.4 (ai.js `shotLineOfFire`; battles keep theirs).
+//   - 3600 s is the timeout now: the stage has a long way to walk and ten more men to meet. (The route alone is 500 s.)
+// The table, 16 runs a policy, seeds 1-16, 3 comrades (`--allies 3`, the stage's own), 10 deaths a fail, 3600 s a timeout:
+//                          reached Vaelen   beat him   failed (10 deaths)   timed out   mean deaths   where they died
+//   careful, the C3 bot  2/8 (8 runs)     0/8        0/8                  8/8 (2400 s)  1.4           gate 7 (the hall guard), then stuck in the quad or the vault
+//   careful                 15/16            15/16      0/16                 1/16        2.2           chapel 18 (Vaelen), gate 8 (hall guard), tower 4, quad 3
+//   reckless                1/16             1/16       12/16                4/16        9.0           tower 95 (the wall knight, the stair knight), quad 17, ascent 12
+// 15 of 33 attempts at Vaelen were wins (45%: the finisher takes a crawling Vaelen; they wear what they took off the last knight, plate half the time).
+// Vaelen alone from the chapel gate (20 runs each): unhealed 1/20, healed (sword and gambeson) 4/20, brigandine 1/20 (7 timeouts), plate 16/20.
+// (`--allies 0` leaves the comrades dead at the start: the stage as it was; it was seen to stall once in eight runs on a frightened levy that will not fight. Use 3.)
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hurtShare, think, thinkAll } from '../src/ai.js';
 import { P } from '../src/body.js';
-import { advance, bodyHarm, collapseAt, knockOut, reclothe, startPickup } from '../src/physics.js';
+import { advance, bodyHarm, collapseAt, knockOut, legBroken, point, reclothe, startPickup, throwPunch } from '../src/physics.js';
+import { chooseAttack, playerCrawl } from '../src/control.js';
+import { FINISHER, finishTarget, helplessOnFloor, startFinisher, updateFinisher } from '../src/finisher.js';
 import { comradesOf } from '../src/levelmode/team.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { levelAware } from '../src/levelmode/adapter.js';
@@ -86,6 +113,8 @@ import { createLevelWorld, levelThink, respawnPlayer, restAtPoint } from '../src
 import { interactions } from '../src/levelmode/interact.js';
 import { feetFloor, holdPlayer, useItem } from '../src/levelmode/items.js';
 import { regionContains, setMechanism, stageFloor, updateStage } from '../src/levelmode/stage.js';
+import { rayBlocked } from '../src/physics/terrain.js';
+import { findPath } from './botnav.js';
 import { OUTFITS } from '../src/outfits.js';
 import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 
@@ -211,7 +240,7 @@ class Run {
    * @param plan the points to walk (default: the policy's plan)
    * @param setup a function given the world before the first step (the boss duel's)
    */
-  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false, endAt = null, only = null }) {
+  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false, endAt = null, only = null, allies = ALLIES }) {
     this.endAt = endAt;
     this.only = only;
     this.policy = policy;
@@ -219,7 +248,7 @@ class Run {
     this.log = log ? [] : null;
     this.world = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed });
     // (Fewer comrades than the stage gives: the rest lie dead, said or not.)
-    comradesOf(this.world).slice(ALLIES).forEach((fighter) => {
+    comradesOf(this.world).slice(allies).forEach((fighter) => {
       knockOut(this.world, fighter, { time: this.world.time, effects: [] }, 'lies dead', 'killed');
       this.world.stage.level.team.fallen.add(fighter.spawn.id);
     });
@@ -231,7 +260,7 @@ class Run {
     this.samples = [];
     this.sampleAt = 0;
     this.deaths = [];
-    this.stats = { bandages: 0, tonics: 0, swaps: 0, hammers: 0, rests: 0, kills: 0, stuck: 0, retreats: 0 };
+    this.stats = { bandages: 0, tonics: 0, swaps: 0, hammers: 0, rests: 0, kills: 0, stuck: 0, retreats: 0, finishers: 0, lunges: 0, crawls: 0 };
     this.furthest = 0;
     this.vaelen = { reached: false, attempts: 0, beaten: false, atArrival: [] };
     this.cursor = 0;
@@ -240,6 +269,8 @@ class Run {
     this.trail = [];
     this.retreat = null;
     this.retreatUsed = false;
+    this.nav = null;
+    this.mark = null;
     this.best = Infinity;
     this.progressAt = 0;
     this.tried = new Map();
@@ -288,7 +319,7 @@ class Run {
   }
 
   /** Play until the stage is done (the boss down), failed (too many deaths) or out of time. */
-  play({ seconds = 2400, final = true } = {}) {
+  play({ seconds = 3600, final = true } = {}) {
     const world = this.world;
     const end = world.time + seconds;
     const think = (current, dt) => this.step(current, dt);
@@ -374,6 +405,8 @@ class Run {
     this.retreat = null;
     this.retreatUsed = false;
     this.bossAware = false;
+    this.nav = null;
+    this.mark = null;
     this.lootGoal = null;
     this.hammerGoal = null;
     this.trail.length = 0;
@@ -399,6 +432,84 @@ class Run {
 
   // ---- What he does -----------------------------------------------------------------------------------
 
+  /**
+   * Vaelen on the floor (he falls with his own swing and drags himself away on a broken knee) is killed where he lies, as a player does
+   * with the ground finisher (finisher.js); the fight AI leaves a crawling man to go. True while at it.
+   */
+  finishBoss(dt) {
+    const me = this.me;
+    const world = this.world;
+    if (me.finisher && updateFinisher(world, me, dt)) return true;
+    const boss = this.level.boss ? world.fighters[this.level.boss.id] : null;
+    if (!boss || boss.dormant || !helplessOnFloor(boss) || me.state !== 'up') return false;
+    const d = apart(me, boss);
+    if (d > 30) return false;
+    if (d <= FINISHER.reach && finishTarget(world, me)?.id === boss.id && startFinisher(world, me, boss)) {
+      this.stats.finishers += 1;
+      this.note('puts the dagger to Vaelen on the floor');
+      return true;
+    }
+    me.walking = true;
+    me.goTo = [hipX(boss), 0, hipZ(boss)];
+    me.move = 1;
+    me.strafe = 0;
+    me.running = d > 4;
+    return true;
+  }
+
+  /**
+   * A knee broken, he cannot stand (the men leave a man crawling alone): he crawls to the nearest rest, which makes him whole. True while at it.
+   */
+  crawlHome() {
+    const me = this.me;
+    const world = this.world;
+    if (!(me.crawling && legBroken(me))) {
+      this.crawlGoal = null;
+      return false;
+    }
+    if (!this.crawlGoal) {
+      const mine = [hipX(me), hipZ(me), feetFloor(me)];
+      let best = null;
+      for (const rest of Object.values(RESTS)) {
+        const cost = Math.hypot(rest.at[0] - mine[0], rest.at[2] - mine[1]) + 4 * Math.abs(rest.at[1] - mine[2]);
+        if (!best || cost < best.cost) best = { rest, cost };
+      }
+      this.crawlGoal = best.rest;
+      this.crawlEntry = null;
+      this.mode = 'route';
+      this.stats.crawls += 1;
+      this.note(`crawls to ${best.rest.name} (${best.cost.toFixed(0)} m)`);
+    }
+    const goal = this.crawlGoal;
+    const d = Math.hypot(goal.at[0] - hipX(me), goal.at[2] - hipZ(me));
+    me.walking = true;
+    me.strafe = 0;
+    if (d < 1.1) {
+      const choice = interactions(world).find((entry) => entry.kind === 'rest');
+      me.move = 0;
+      if (choice?.run(world) !== false) {
+        this.restsMade.add(goal.id);
+        this.note(`rests at ${goal.name}`);
+        this.crawlGoal = null;
+        this.nav = null;
+        this.trail.length = 0;
+        this.idx = this.planIndexHere();
+      }
+      return true;
+    }
+    const at = [goal.at[0], goal.at[2]];
+    if (!this.lineClear(at[0], at[1], 0.3)) {
+      this.crawlEntry ??= { p: at };
+      const way = this.wayRound(this.crawlEntry);
+      if (way && !this.follow(way)) return true;
+      this.nav = null;
+    }
+    me.goTo = [at[0], 0, at[1]];
+    me.move = 1;
+    me.running = false;
+    return true;
+  }
+
   /** Heal or fight or walk, one step. */
   control(dt) {
     const me = this.me;
@@ -410,6 +521,12 @@ class Run {
       return;
     }
     if (this.policy === 'trace') return this.route(dt);
+    if (this.finishBoss(dt)) return;
+    // (On his knees from a broken arm, or the fight AI's panic, he stands: only a broken leg keeps a man down.)
+    if (me.crawling && !legBroken(me)) playerCrawl(world, me, false);
+    if (this.crawlHome()) return;
+    // (His trail is kept in a fight and at a looting too, to get out by the way he went in.)
+    this.keepTrail();
     const aware = this.aware();
     const nearest = aware[0]?.d ?? Infinity;
     // Fighting: from engage to release.
@@ -447,7 +564,7 @@ class Run {
         this.progressAt = world.time;
         return this.route(dt);
       }
-      this.closing = idle > 6 && nearest > 2 && nearest <= 9;
+      this.closing = idle > 6 && nearest <= 9;
     }
     if (fighting) return this.fight(aware, dt);
     if (spec.loot && this.loot(aware)) return;
@@ -503,8 +620,20 @@ class Run {
       me.move = 1;
       me.running = false;
       me.strafe = 0;
+      // (Within reach of a man who will not fight, a blow: two men who each wait for the other to come make no fight, and a person strikes.)
+      if (!me.punch && !me.rush && !me.clinch && me.cooldown <= 0) {
+        const chosen = chooseAttack(world, me, target, 'mid', 'quick');
+        if (chosen?.reaches) {
+          me.focus = target.id;
+          me.faceAt = { at: point(target.x, P.pelvis), until: world.time + 0.3 };
+          if (throwPunch(world, me, chosen.move, chosen.zone)) this.stats.lunges += 1;
+        }
+      }
       return;
     }
+    // (An operative does not break and run, throw his weapon down and crawl away, as the fight AI's fear would have the man it stands in
+    // for do: a person decides that. A limb really broken does put him on his knees: `crawlHome`.)
+    me.panicked = false;
     think(world, me, dt);
     this.keepFromEdge();
   }
@@ -529,7 +658,7 @@ class Run {
     if (me.weapon?.kind === 'warhammer' || me.pickup) return false;
     if (!this.hammerGoal) {
       const floor = feetFloor(me);
-      const found = world.debris.find((debris) => debris.kind === 'weapon' && debris.weapon === 'warhammer' && !debris.taken && debris.resting && debris.x
+      const found = world.debris.find((debris) => debris.kind === 'weapon' && (debris.weapon === 'warhammer' || !me.weapon?.held) && !debris.taken && debris.resting && debris.x
         && Math.hypot(debris.x[0] - hipX(me), debris.x[2] - hipZ(me)) < 10 && Math.abs(debris.x[1] - floor) < 1.2 && !this.tried.get(`hammer${debris.id}`));
       if (!found) return false;
       this.hammerGoal = { id: found.id, until: world.time + 12 };
@@ -606,6 +735,7 @@ class Run {
     const world = this.world;
     me.walking = true;
     me.strafe = 0;
+    while (this.plan[this.idx]?.skip) this.idx += 1;
     const entry = this.plan[this.idx];
     if (!entry) {
       if (this.policy === 'trace') this.result = 'traced';
@@ -621,23 +751,103 @@ class Run {
       this.progressAt = world.time;
       return;
     }
-    // Nearer to it for four seconds out of the last; else it is a wall and he goes on.
+    // A wall between him and the point (a fight, a looting, a thing fetched has left him on the far side of one): round it, by the
+    // path finder, to the point itself.
+    const walled = !this.lineClear(tx, tz, 0.3);
+    if (walled && this.policy !== 'trace') {
+      const way = this.wayRound(entry);
+      if (way) {
+        this.best = Infinity;
+        this.progressAt = world.time;
+        if (this.follow(way)) {
+          this.stats.stuck += 1;
+          this.note(`stuck going round to ${tx.toFixed(1)},${tz.toFixed(1)}`);
+          if (entry.stop) entry.skip = true;
+          this.idx += 1;
+          this.best = Infinity;
+          this.progressAt = world.time;
+        }
+        return;
+      }
+    } else this.nav = null;
+    // Nearer to it for four seconds out of the last; else it is a wall and he goes on (a detour to a thing behind a shut door is given
+    // up for good).
     if (d < this.best - 0.05) {
       this.best = d;
       this.progressAt = world.time;
     } else if (world.time - this.progressAt > 4) {
       this.stats.stuck += 1;
       this.note(`stuck going to ${tx.toFixed(1)},${tz.toFixed(1)}`);
+      if (entry.stop) entry.skip = true;
       this.idx += 1;
       this.best = Infinity;
       this.progressAt = world.time;
+      this.nav = null;
       return;
     }
     me.goTo = [tx, 0, tz];
     me.move = 1;
     me.running = this.spec.run;
-    if (this.policy !== 'trace') this.keepTrail();
-    else this.sample();
+    if (this.policy === 'trace') this.sample();
+  }
+
+  /** The path round the walls to a plan point: { entry, path, at } (replanned every two seconds); null if there is none. */
+  wayRound(entry) {
+    const me = this.me;
+    const world = this.world;
+    if (!this.nav || this.nav.entry !== entry || world.time - this.nav.at > 2) {
+      const path = findPath(world.arena.terrain, { x: hipX(me), z: hipZ(me), y: feetFloor(me) }, entry.p);
+      this.nav = { entry, path, at: world.time };
+      if (!path) this.note(`no way round to ${entry.p[0].toFixed(1)},${entry.p[1].toFixed(1)}`);
+      else if (!this.navNoted) {
+        this.navNoted = true;
+        this.note(`goes round to ${entry.p[0].toFixed(1)},${entry.p[1].toFixed(1)} (${path.length} cells)`);
+      }
+    }
+    return this.nav.path?.length ? this.nav.path : null;
+  }
+
+  /** Walk a path: to the furthest of its next cells the way to which is clear. Stuck (not moved for four seconds): the plan point is given up. */
+  follow(path) {
+    const me = this.me;
+    const world = this.world;
+    let pick = path[0];
+    for (let i = 0; i < Math.min(path.length, 12); i += 1) {
+      if (!this.lineClear(path[i][0], path[i][1], 0.4)) break;
+      pick = path[i];
+    }
+    // (Not the cell he is standing on.)
+    if (path.length > 1 && Math.hypot(pick[0] - hipX(me), pick[1] - hipZ(me)) < 0.6) pick = path[Math.min(path.length - 1, path.indexOf(pick) + 1)];
+    me.goTo = [pick[0], 0, pick[1]];
+    me.move = 1;
+    me.running = false;
+    // (Crawling, he covers a third of the ground: stuck is not having moved for much longer.)
+    const here = [hipX(me), hipZ(me)];
+    const crawling = Boolean(me.crawling);
+    if (!this.mark || Math.hypot(here[0] - this.mark.p[0], here[1] - this.mark.p[1]) > (crawling ? 0.25 : 0.5)) this.mark = { p: here, t: world.time };
+    else if (world.time - this.mark.t > (crawling ? 12 : 5)) {
+      this.nav = null;
+      this.mark = null;
+      return true;
+    }
+    return false;
+  }
+
+  /** Whether the way from where he stands to a point is free of walls (lines at the height of his hips, `width` m to either side too). */
+  lineClear(x, z, width = 0) {
+    const me = this.me;
+    const floor = feetFloor(me);
+    const there = stageFloor(this.world, x, z, floor + 2);
+    const a = [hipX(me), hipZ(me)];
+    const length = Math.hypot(x - a[0], z - a[1]) || 1;
+    const side = [-(z - a[1]) / length, (x - a[0]) / length];
+    const high = floor + 0.9;
+    const highThere = (Number.isFinite(there) ? there : floor) + 0.9;
+    const terrain = this.world.arena.terrain;
+    for (const shift of width ? [0, width, -width] : [0]) {
+      if (rayBlocked(terrain, [a[0] + side[0] * shift, a[1] + side[1] * shift], [x + side[0] * shift, z + side[1] * shift], high, highThere)) return false;
+    }
+    return true;
   }
 
   keepTrail() {
@@ -645,7 +855,7 @@ class Run {
     const here = [hipX(this.me), hipZ(this.me)];
     if (!last || Math.hypot(last[0] - here[0], last[1] - here[1]) >= 1) {
       this.trail.push(here);
-      if (this.trail.length > 40) this.trail.shift();
+      if (this.trail.length > 60) this.trail.shift();
     }
   }
 
@@ -915,7 +1125,7 @@ async function main() {
   if (command === 'one') {
     const [, policy, seed] = options._;
     const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });
-    const report = run.play({ seconds: Number(options.seconds ?? 2400) });
+    const report = run.play({ seconds: Number(options.seconds ?? 3600) });
     console.log(JSON.stringify({ ...report, seed: Number(seed) }));
     return;
   }
@@ -962,12 +1172,17 @@ async function main() {
     return;
   }
   const policies = String(options.policy ?? 'careful,reckless').split(',');
-  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--allies', String(ALLIES), '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 2400)]));
+  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--allies', String(ALLIES), '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 3600), ...(options.logs ? ['--log'] : [])]));
   const results = await farm(lists, jobs);
   printSweep(results);
+  // (`--logs`: the tail of the log of each run that did not beat him, to see where it was at the end.)
+  if (options.logs) for (const run of results.filter((entry) => !entry.vaelen?.beaten)) console.log(`--- ${run.policy} seed ${run.seed} ${run.result} at ${run.seconds} s\n${(run.log ?? []).slice(-12).join('\n')}`);
   printSummary(results);
 }
 
-export { Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, POLICY, VARIANTS };
+/** (For scripts that build runs themselves.) */
+const setAllies = (count) => { ALLIES = count; };
+
+export { setAllies, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, POLICY, VARIANTS };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
