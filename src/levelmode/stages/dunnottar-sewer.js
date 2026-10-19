@@ -3,7 +3,7 @@
 // flooded cistern on a causeway, more drain climbing in two stairs under the mainland's hill and the headland's rock, and at the end a low door into
 // the crypt's sea-gate chamber (the crypt's `buildCrypt` has the door). From the sea-gate the stair behind the heavy door (lifted by the hidden lever)
 // comes up into the vault's torture chamber: the way into the dungeon level that never goes near the gatehouse. It is dark, wet and long (about 150 m
-// of passage), and not a place to rest in: no rest point. The garrison has forgotten it; a few levies the quartermaster sent down to watch the sea
+// of passage), and not a place to rest in but for one smugglers' brazier half way. The garrison has forgotten it; a few levies the quartermaster sent down to watch the sea
 // door, and one sergeant at the cistern, have not.
 //
 //   sewer  (y -5 .. 1.4)  x -56..0, z -40..56 (it runs under the shelf, the mainland and the rock of the headland: nothing else is there)
@@ -11,7 +11,7 @@
 //     the first drain      x -50.2..-46.8, z 22..44           (a wet barrel-vaulted passage, 3.4 m wide)
 //     the cistern          x -55..-42, z 4..22                (a flooded hall of eight pillars, the causeway down its middle, the bed 0.4 lower)
 //     the second drain     x -50.2..-46.8, z -35..3           (a stair of 17 treads up to y -1.6 at z -7..-13.8)
-//     the long drain       x -50.2..-13, z -39.6..-36.2       (east along the foot of the chapel's rock) and a stair of 15 treads up to y 1.4
+//     the long drain       x -52.8..-13, z -39.6..-36.2       (east along the foot of the chapel's rock; the smugglers' brazier, the way's one rest, in the pocket at its west end) and a stair of 15 treads up to y 1.4
 //     the low door         x -7..0                            (into the crypt's sea-gate chamber at x 0)
 //
 // A section's `decor` is for the drawing only (levelmode/kit.js); the solids carry a `style`.
@@ -91,7 +91,7 @@ export function buildSewer() {
     { at: [X, -2], size: [5.4, 14], y: low },
     { at: [X, -11.2], size: [5.4, 8.4], y: mid },
     { at: [X, -25.6], size: [5.4, 22.4], y: mid },
-    { at: [-24.6, -37.9], size: [50.6, 5.4], y: high });
+    { at: [-25.9, -37.9], size: [53.2, 5.4], y: high });
   // The mouth: standing in the grotto's south end or at the landing makes the cliff path's section (its plate and its face) active too, and the other way about.
   sec.portals.push({ to: 'cliff', area: { at: [X, 58], size: [15, 7], y: [-6.5, 0.5] } });
   // The low door: the crypt's sea-gate chamber is active from the drain's last stretch, and the drain from the chamber's west end.
@@ -155,7 +155,7 @@ export function buildSewer() {
 
   // East, along the foot of the rock under the chapel: 36 m, a door to the sea-gate at its end. The stair up (15 treads of 0.2, y -1.6 to the crypt's 1.4) and the last 6 m.
   swDrain(sec, {
-    x0: west - 1.3, x1: -13, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's', 'w'], doors: { s: [{ at: X, width: SW_WIDE, top: D + 3 }] },
+    x0: west - 2.6, x1: -13, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's', 'w'], doors: { s: [{ at: X, width: SW_WIDE, top: D + 3 }] },
   });
   const second = dnFlight(sec, { foot: [-13, -37.9], dir: 'E', steps: 15, tread: 0.4, width: SW_WIDE, from: D, rise: 0.2, style: 'stone' });
   dnFlightWalls(sec, second, { thick: 1, head: 3.0, style: 'rubble' });
@@ -166,6 +166,11 @@ export function buildSewer() {
   for (const x of [-38, -26]) dnProp(sec, 'drip', [x, D + 3.0, -37.9], {});
   dnProp(sec, 'bones', [-36.4, D, -37.0], { yaw: 0.3 });
   dnProp(sec, 'torch', [-3, C + 2.3, -36.3], { face: 'N', dim: true });
+  // A place to rest: the smugglers' brazier in the pocket where the drain turns east (the one place on the way that is dry and has a fire), after the second stair: four men behind him, the sea-gate and the cellar's men ahead.
+  sec.rest = { id: 'restdrain', name: "The Smugglers' Brazier", at: [-49.2, D, -37.9] };
+  dnProp(sec, 'brazier', [-51.4, D, -37.9], { lit: true, rest: true });
+  dnProp(sec, 'barrel', [-52.0, D, -39.0], { yaw: 0.5 });
+  dnProp(sec, 'sack', [-52.2, D, -36.8], {});
   sec.decor.push({ kind: 'waymarks', points: [[-46.2, -37.9, D], [-30, -37.9, D], [-14, -37.9, D], [-4, -37.9, C]], gap: 2.6, first: 0.6 });
 
   // Men: a levy the quartermaster sent to watch the sea door, a second in the first drain, a sergeant at the cistern, a third at the turn of the long drain.

@@ -23,10 +23,10 @@ const cliff = sectionById(DUNNOTTAR, 'cliff');
 const pelvisY = (fighter) => fighter.x[P.pelvis * 3 + 1];
 const quiet = (current) => current.fighters.slice(1).forEach((fighter) => { fighter.dormant = true; });
 
-test('sewer: a section of its own, dark and without a rest, with a sergeant and a few levies and things to take', () => {
+test('sewer: a section of its own, dark, with one rest half way, a sergeant and a few levies and things to take', () => {
   assert.ok(sewer);
   assert.ok(sewer.activeOnly, 'drawn only while he is in it');
-  assert.equal(sewer.rest, undefined);
+  assert.equal(sewer.rest.id, 'restdrain', 'one smugglers\' brazier on the way');
   assert.ok(sewer.light <= 0.25, 'dark');
   const men = sewer.spawns.filter((spawn) => spawn.role === 'enemy');
   assert.equal(men.filter((spawn) => spawn.preset === 'dunnottarGuard').length, 1, 'one sewer guard');

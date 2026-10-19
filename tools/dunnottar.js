@@ -118,7 +118,7 @@ import { levelAware } from '../src/levelmode/adapter.js';
 import { beginAttempt, createLevelWorld, levelThink, livingComrades, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
 import { interactions } from '../src/levelmode/interact.js';
 import { feetFloor, holdPlayer, useItem } from '../src/levelmode/items.js';
-import { regionContains, setMechanism, stageFloor, updateStage } from '../src/levelmode/stage.js';
+import { regionContains, setMechanism, stageFloor, stageTerrain, updateStage } from '../src/levelmode/stage.js';
 import { rayBlocked } from '../src/physics/terrain.js';
 import { findPath } from './botnav.js';
 import { OUTFITS } from '../src/outfits.js';
@@ -394,6 +394,7 @@ class Run {
       const event = events[this.cursor];
       if (event.defender === 0 && ['landed', 'shot', 'arrow', 'crash'].includes(event.kind)) this.lastHit = { attacker: event.attacker, kind: event.kind, time: event.time };
       if ((event.attacker === 0 || event.defender === 0) && ['landed', 'blocked', 'bladeBlock', 'shot', 'arrow'].includes(event.kind)) this.clashAt = event.time;
+      if (event.attacker === 0 && event.kind === 'landed') this.landedAt = event.time;
       if (event.kind === 'rested') this.stats.rests += 1;
       if (event.attacker === 0 && ['knockout', 'killed'].includes(event.kind) && event.fighter !== 0) this.stats.kills += 1;
     }
@@ -605,7 +606,7 @@ class Run {
     this.closing = false;
     if (this.mode === 'fight') {
       const idle = world.time - Math.max(this.clashAt, this.engagedAt);
-      if (idle > 14 && nearest > 3) {
+      if (idle > 14 && (nearest > 3 || !this.lineClear(hipX(aware[0].fighter), hipZ(aware[0].fighter), 0.3))) {
         for (const entry of aware) this.ignore.set(entry.fighter.id, world.time + 25);
         this.note('gives up the stand-off');
         this.mode = 'route';
@@ -614,7 +615,9 @@ class Run {
         this.progressAt = world.time;
         return this.route(dt);
       }
-      this.closing = idle > 6 && nearest <= 9;
+      // (Or twenty seconds with not a blow of his own landed: a spearman who pokes from the far end of his reach keeps `idle` at nought and nobody comes to blows.)
+      const unscored = world.time - Math.max(this.landedAt ?? 0, this.engagedAt);
+      this.closing = (idle > 6 || unscored > 20) && nearest <= 9;
     }
     if (fighting) return this.fight(aware, dt);
     if (spec.loot && this.loot(aware)) return;
@@ -666,6 +669,16 @@ class Run {
     me.walking = false;
     if (this.closing && aware[0]) {
       const target = aware[0].fighter;
+      // A man across a wall who will not come (the jailer at the torture chamber's door, he in the chamber, two metres apart): round by the door, by the path finder.
+      if (!this.lineClear(hipX(target), hipZ(target), 0.3)) {
+        if (this.chase?.id !== target.id) this.chase = { id: target.id };
+        Object.assign(this.chase, { p: [hipX(target), hipZ(target)], y: feetFloor(target) });
+        const way = this.wayRound(this.chase);
+        if (way) {
+          this.follow(way);
+          return;
+        }
+      }
       me.goTo = [hipX(target), 0, hipZ(target)];
       me.move = 1;
       me.running = false;
@@ -875,6 +888,17 @@ class Run {
     return [x, z];
   }
 
+  /**
+   * The whole stage's terrain, the doors as they stand (the world's own is only that of the sections awake: a stair into the next section is not in it
+   * until he is at its foot, and the way round is often by one). Made again when a door or a lever changes.
+   */
+  wholeTerrain() {
+    const states = this.world.stage.mechanisms;
+    const key = JSON.stringify(states);
+    if (this.whole?.key !== key) this.whole = { key, terrain: stageTerrain(DUNNOTTAR, DUNNOTTAR.sections.map((section) => section.id), states) };
+    return this.whole.terrain;
+  }
+
   /** The path round the walls to a plan point: { entry, path, at } (replanned every two seconds); null if there is none. */
   wayRound(entry) {
     const me = this.me;
@@ -882,7 +906,7 @@ class Run {
     if (!this.nav || this.nav.entry !== entry || world.time - this.nav.at > 2) {
       // (The floor of the goal: a stop's own (an item's, a rest's), else the one the trace found at that point of the route.)
       const toY = entry.y ?? (entry.base === undefined ? undefined : this.floors?.get(entry.base) ?? (this.floors ??= planFloors()).get(entry.base));
-      const path = findPath(world.arena.terrain, { x: hipX(me), z: hipZ(me), y: feetFloor(me) }, entry.p, { toY });
+      const path = findPath(this.wholeTerrain(), { x: hipX(me), z: hipZ(me), y: feetFloor(me) }, entry.p, { toY });
       this.nav = { entry, path, at: world.time };
       if (!path) this.note(`no way round to ${entry.p[0].toFixed(1)},${entry.p[1].toFixed(1)}`);
       else if (!this.navNoted) {
