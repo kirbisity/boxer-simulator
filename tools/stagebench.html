@@ -446,6 +446,98 @@
       const off = to('high');
       return { high: [to('high'), off], medium: [to('medium'), off], low: [to('low'), off], 'low@1': [to('low', 1), off], 'medium@1.5': [to('medium', 1.5), off] };
     },
+    /** A/B variants adding the layers of the picture one by one (see `ab`): nothing but the clear, the sky, the sea, the land, the castle, the men, everything. */
+    async layers() {
+      const g = game();
+      const view = g.boxer.scene;
+      const mats = g.boxer.stage().view.mats;
+      const menGroups = new Set(g.boxer.state.views.map((v) => v.group));
+      const kind = (o) => {
+        if (o.material === mats.wear) return 'castle';
+        for (let up = o; up; up = up.parent) {
+          if (menGroups.has(up)) return 'men';
+          if (/^(detail|silhouette):|^dyn:/.test(up.name)) return 'castle';
+          if (up.name === 'land') return 'land';
+          if (up.name === 'stage-sea') return 'sea';
+          if (up.name === 'storm') return o.material?.side === g.THREE.BackSide ? 'sky' : 'weather';
+        }
+        return 'other';
+      };
+      const all = [];
+      view.scene.traverse((o) => {
+        if (o.isMesh || o.isLine || o.isPoints || o.isSprite) all.push([o, kind(o)]);
+      });
+      const only = (list) => [() => all.forEach(([o, k]) => { o.userData.__v = o.visible; o.visible = o.visible && list.includes(k); }), () => all.forEach(([o]) => { o.visible = o.userData.__v; })];
+      return {
+        nothing: only([]),
+        sky: only(['sky']),
+        'sky+sea': only(['sky', 'sea']),
+        '+land': only(['sky', 'sea', 'land']),
+        '+castle': only(['sky', 'sea', 'land', 'castle']),
+        '+men': only(['sky', 'sea', 'land', 'castle', 'men']),
+        '+weather': only(['sky', 'sea', 'land', 'castle', 'men', 'weather']),
+        all: only(['sky', 'sea', 'land', 'castle', 'men', 'weather', 'other']),
+      };
+    },
+    /**
+     * The picture at a place as a PNG data URL, drawn once now (the buffer is read in the same turn it is drawn). `setup(g)`: anything to set first (the storm held
+     * still, a tier). The lightning is stilled and the rain hidden so that two copies of the game can be told apart by what they paint.
+     */
+    snap(g, { still = true, rain = false } = {}) {
+      if (still) g.boxer.stageLook(undefined, { still: true });
+      const hidden = [];
+      if (!rain) g.boxer.scene.scene.traverse((o) => { if (o.isLineSegments && o.visible) { o.visible = false; hidden.push(o); } });
+      g.boxer.advance(0);
+      const url = g.boxer.scene.renderer.domElement.toDataURL('image/png');
+      hidden.forEach((o) => { o.visible = true; });
+      return url;
+    },
+    /** Send a data URL to the server's /__shot (tools/serve.py): it is written to shots/<name>.png. */
+    async save(name, url) {
+      await fetch(`/__shot?name=${encodeURIComponent(name)}`, { method: 'POST', body: url });
+    },
+    /**
+     * This copy and `base` at a place, the same picture each: saves `<tag>-<place>-new|base|diff` and returns how different they are
+     * ({ mean, over }: the mean difference of a channel 0..255, and the share of pixels differing by more than 24). `setup(g, side)` before the shot.
+     */
+    async shotDiff(place, { tag = 'diff', base = '/.base/', width = 1279, height = 639, setup = null, yaw = null } = {}) {
+      const urls = {};
+      for (const [side, root] of [['new', '/'], ['base', base]]) {
+        await SB.load(width, height, root);
+        SB.hop(place, yaw ?? 0);
+        const g = game();
+        // (The storm held still, and a strike that was already on let to fade: a flash is a picture of its own.)
+        g.boxer.stageLook(undefined, { still: true });
+        g.boxer.advance(1);
+        if (setup) await setup(g, side);
+        urls[side] = SB.snap(g);
+      }
+      const load = (url) => new Promise((done) => { const image = new Image(); image.onload = () => done(image); image.src = url; });
+      const [a, b] = await Promise.all([load(urls.new), load(urls.base)]);
+      const canvas = document.createElement('canvas');
+      canvas.width = a.width;
+      canvas.height = a.height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      context.drawImage(a, 0, 0);
+      const pa = context.getImageData(0, 0, a.width, a.height);
+      context.drawImage(b, 0, 0);
+      const pb = context.getImageData(0, 0, a.width, a.height);
+      let sum = 0;
+      let over = 0;
+      const out = context.createImageData(a.width, a.height);
+      for (let k = 0; k < pa.data.length; k += 4) {
+        const d = Math.max(Math.abs(pa.data[k] - pb.data[k]), Math.abs(pa.data[k + 1] - pb.data[k + 1]), Math.abs(pa.data[k + 2] - pb.data[k + 2]));
+        sum += d;
+        if (d > 24) over += 1;
+        out.data[k] = out.data[k + 1] = out.data[k + 2] = Math.min(255, d * 4);
+        out.data[k + 3] = 255;
+      }
+      context.putImageData(out, 0, 0);
+      await SB.save(`${tag}-${place}-new`, urls.new);
+      await SB.save(`${tag}-${place}-base`, urls.base);
+      await SB.save(`${tag}-${place}-diff`, canvas.toDataURL('image/png'));
+      return { place, mean: +(sum / (pa.data.length / 4)).toFixed(3), over: +((100 * over) / (pa.data.length / 4)).toFixed(3) };
+    },
     /** One row per place. `lines`: the rows as text (default) or objects. */
     async table({ only = null, frames = 30, gpu = true, raw = false } = {}) {
       const g = game();

@@ -12,7 +12,7 @@
 export const QUALITY_TIERS = {
   high: {
     // Shader reaches (kittex.js ktLod), metres. The environment's reflection is the dearest term: the nearer walls only.
-    env: 38, tile: 45, pool: 45, penumbra: 40, macro: 1, taps: 2,
+    env: 60, tile: 70, pool: 70, penumbra: 60, macro: 1, taps: 2,
     // Decals (kitwear.js: wear, dirt), drips, ravens, light shafts: the farthest each is drawn (m; 0: not at all).
     decals: 60, drips: 22, ravens: 40, shafts: 70,
     // The share of the rain drawn (storm.js).

@@ -349,7 +349,13 @@ export function buildStormPlace({ buildRain }) {
     new THREE.MeshBasicMaterial({ map: stormSkyTexture(stormState.look), side: THREE.BackSide, fog: false, depthWrite: false }),
   );
   sky.position.set(...STORM.centre);
-  sky.renderOrder = -1;
+  // The sky is drawn after the castle, the land and the sea, on the far plane (so it is behind all of them as it always was, the sea that runs past its dome included):
+  // the pixels they cover are refused by the depth test and are not shaded, where drawn first the whole screen was.
+  sky.renderOrder = 2;
+  sky.material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  gl_Position.z = gl_Position.w * 0.999999;');
+  };
+  sky.material.customProgramCacheKey = () => 'storm-sky';
   place.add(sky);
   // The sea: heaving normals scrolled over a dark glossy plane.
   const waves = stormWaveTexture();
