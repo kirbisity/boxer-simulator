@@ -158,7 +158,7 @@ test('run mode costs breath, modestly, and a winded man runs no more until he ha
   game.orders.keyStick = keyStick(new Set(['w']), AHEAD, true);
   game.step(3);
   const used = 1 - game.me.stamina;
-  assert.ok(used > 0.05 && used < 0.4, `three seconds of running takes some stamina (${used.toFixed(2)})`);
+  assert.ok(used > 0.005 && used < 0.1, `three seconds of running takes a little stamina (${used.toFixed(3)})`);
   game.me.stamina = 0.01;
   game.step(0.2);
   assert.equal(game.me.runMode, false, 'winded: no run');

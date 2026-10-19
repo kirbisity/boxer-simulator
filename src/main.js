@@ -14,7 +14,7 @@ import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
-import { askRunLock, breakRun, CONTROL, contextAction, directFighter, endRun, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
+import { askRunLock, breakRun, CONTROL, contextAction, directFighter, endRun, keyStick, MOVE_KEYS, newOrders, playerCrawl, swingAt } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
@@ -38,6 +38,7 @@ import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.j
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
+import { travelPlaces } from './levelmode/travel.js';
 import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
@@ -716,6 +717,8 @@ function followCamera(fighter, dt) {
     facing: fighter.yaw,
     down: fighter.state !== 'up',
     foe: locked ? point(locked.x, P.pelvis) : null,
+    running: Boolean(fighter.runMode),
+    speed: Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]),
     moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick || state.orders.runLock) && state.orders.lock === null)),
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
@@ -1227,6 +1230,24 @@ for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) {
   });
 }
 
+// Fast travel (the ghost walk): jump to any part of the stage; the Go to menu is filled from the stage's own data when it opens.
+const ghostGo = $('#ghost-go');
+let ghostPlaces = [];
+function fillGhostGo() {
+  ghostPlaces = state.world?.stage ? travelPlaces(state.world.stage.def) : [];
+  ghostGo.replaceChildren(new Option('Go to…', ''), ...ghostPlaces.map((place, index) => new Option(place.label, String(index))));
+}
+ghostGo.addEventListener('change', () => {
+  const place = ghostPlaces[Number(ghostGo.value)];
+  ghostGo.value = '';
+  ghostGo.blur();
+  const world = state.world;
+  if (!place || !world?.stage?.ghost) return;
+  const me = world.fighters[0];
+  placeOnFloor(me, place.at[0], place.at[2], place.at[1], place.yaw);
+  followCam.reset();
+});
+
 /** The ghost bar shows the pace now and who he is. */
 function syncGhostBar() {
   for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) button.classList.toggle('on', Number(button.dataset.speed) === state.speed);
@@ -1294,7 +1315,7 @@ function command(name) {
   const spec = MOVES[name];
   if (spec?.kind === 'strike') {
     const zone = spec.zones.includes('legs') ? 'legs' : state.aimBody ? 'body' : 'head';
-    throwPunch(state.world, player(), name, zone);
+    swingAt(state.world, player(), state.orders, name, zone);
   } else perform(state.world, player(), name);
 }
 
@@ -2075,6 +2096,7 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   // Exploring: every gate and door stands open and every ladder is down, so the whole castle can be walked.
   if (ghost) for (const mechanism of mechanismsOf(stage)) setMechanism(state.world, mechanism.id, 'open' in mechanism.states ? 'open' : 'down' in mechanism.states ? 'down' : Object.keys(mechanism.states).at(-1));
   document.body.classList.toggle('ghost-walk', ghost);
+  if (ghost) fillGhostGo();
   clearGore(scene);
   // (A stage may be set in a place of its own: the storm of Dunnottar, levelmode/storm.js.)
   const place = stage.place ?? 'stage';
