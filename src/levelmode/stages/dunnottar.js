@@ -973,6 +973,20 @@ for (const section of DN_SECTIONS) {
   for (const spawn of section.spawns) if (DN_MIND.refuge[spawn.id]) spawn.refuge = DN_MIND.refuge[spawn.id];
 }
 
+// ==== The team (begin) ======================================================================================================
+// Three Forger comrades stand beside the operative where the cliff path begins (his start, [-114, 14, -4], facing east): they
+// follow him (levelmode/awareness.js followers), fight what he fights, stop at the chapel gate (`followStopsAt`) and, once they die,
+// stay dead (levelmode/checkpoints.js, team.js). Appended last in the cliff section.
+const DN_TEAM = [
+  ['brann', 'forgerArcher', [-116.4, Y.start, -2.4], 'Brann'],
+  ['maren', 'forgerSpear', [-116.4, Y.start, -5.6], 'Maren'],
+  ['tobin', 'forgerHammer', [-118.2, Y.start, -4], 'Old Tobin'],
+];
+for (const [id, preset, post, name] of DN_TEAM) {
+  dnSpawn(DN_SECTIONS.find((section) => section.id === 'cliff'), id, preset, 'ally', 2, post, DN_FACE.E, { inputs: { name }, team: true });
+}
+// ==== The team (end) ========================================================================================================
+
 export const DUNNOTTAR = {
   id: 'dunnottar',
   title: 'Memories of Dunnottar',

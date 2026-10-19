@@ -11,6 +11,7 @@ import { LEVEL_CONFIG } from './config.js';
 import { levelOf, say, feetFloor } from './items.js';
 import { regionContains, updateStage } from './stage.js';
 import { levelResetMinds } from './adapter.js';
+import { endingRelease } from './ending.js';
 
 /** The operative's gear as it is now: his inputs (outfit, headgear, style) and the shield on his arm. */
 export function snapshotGear(me) {
@@ -65,7 +66,10 @@ function remake(world, fighter, inputs, options, { force = false } = {}) {
   if (draw) level.rebuild.add(fighter.id);
 }
 
-/** The enemies back at their posts, whole and as they were made; the freed beside the player. */
+/**
+ * The enemies back at their posts, whole and as they were made; the comrades (the team and the freed) beside the player, the
+ * living only: one who has fallen stays fallen through every rest and every death (team.js), where he lies.
+ */
 function reviveWorld(world, { followersAt = true } = {}) {
   const level = levelOf(world);
   const me = world.fighters[0];
@@ -84,6 +88,7 @@ function reviveWorld(world, { followersAt = true } = {}) {
       remake(world, fighter, inputs, { at: def.post, yaw: def.facing ?? 0, shield: undefined });
       if (def.role === 'boss') level.boss = { id: fighter.id, phase: 1 };
     } else if (fighter.corner === 'red' && followersAt) {
+      if (fighter.state === 'out') continue;
       remake(world, fighter, inputs, { at: beside(me, follower), yaw: me.yaw, shield: undefined });
       fighter.spawn.section = level.checkpoint.section;
       follower += 1;
@@ -142,6 +147,8 @@ export function respawnPlayer(world) {
   remake(world, me, point.gear.inputs, { at: point.at, yaw: point.facing, shield: point.gear.shield }, { force: true });
   me.orderPickup = null;
   level.dying = false;
+  // (He died while the boss's cutscene played, or after it: the boss is down, the door is open.)
+  endingRelease(world);
   // Where he is decides which sections are awake, before the men are put back.
   updateStage(world, true);
   reviveWorld(world);

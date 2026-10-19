@@ -11,7 +11,8 @@ import { levelPreset } from '../src/levelmode/presets.js';
 import { DUNNOTTAR } from '../src/levelmode/stages/dunnottar.js';
 import { TESTYARD } from '../src/levelmode/stages/testyard.js';
 import { checkStage, setMechanism, updateStage } from '../src/levelmode/stage.js';
-import { bannerWinner, createLevelWorld, drainUi, endingBusy, endingDone, endingOf, killBoss, levelBusy, levelOpponent, levelThink, princeOf, restartFromRest, restAtPoint } from '../src/levelmode/level.js';
+import { bannerWinner, createLevelWorld, drainUi, endingBusy, endingDone, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, levelBusy, levelOpponent, levelThink, princeOf, restartFromRest, restAtPoint } from '../src/levelmode/level.js';
+import { ENDING_WAIT } from '../src/levelmode/ending.js';
 import { cowerFor, freePrisoner, mindState } from '../src/levelmode/awareness.js';
 import { markerCandidates } from '../src/levelmode/markers.js';
 import { holdPlayer } from '../src/levelmode/items.js';
@@ -64,7 +65,13 @@ test('level flow: Dunnottar names its ending (the door and the prince are in it)
   assert.ok(checkStage(broken).some((problem) => problem.includes('nodoor')));
 });
 
-test('level flow: the boss out opens the inner door and tells the screen; the boss on his feet leaves it shut', () => {
+/** The boss struck down, and the world's own wait for the cutscene (no screen: the tests') run out: the door is open. */
+const fell = (world) => {
+  assert.ok(killBoss(world));
+  run(world, ENDING_WAIT.headless + 0.3);
+};
+
+test('level flow: the boss out begins the cutscene and then opens the inner door; the boss on his feet leaves it shut', () => {
   const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
   standAt(world, -4, L, -37, Math.PI);
   assert.equal(world.stage.mechanisms.innerdoor, 'closed');
@@ -73,19 +80,51 @@ test('level flow: the boss out opens the inner door and tells the screen; the bo
   assert.equal(world.stage.mechanisms.innerdoor, 'closed');
   assert.ok(killBoss(world));
   run(world, 0.2);
+  // The cutscene is the screen's to play: the door waits for it.
+  assert.equal(endingOf(world).phase, 'felled');
+  assert.equal(world.stage.mechanisms.innerdoor, 'closed');
+  assert.ok(drainUi(world).some((message) => message.type === 'bossDown'), 'the screen is told to begin the cutscene');
+  // A world with no screen opens it itself.
+  run(world, ENDING_WAIT.headless);
   assert.equal(endingOf(world).phase, 'open');
   assert.equal(world.stage.mechanisms.innerdoor, 'open');
   const messages = drainUi(world);
-  assert.ok(messages.some((message) => message.type === 'bossDown'));
+  assert.ok(messages.some((message) => message.type === 'doorsOpen'));
+  assert.ok(messages.some((message) => message.type === 'toast'));
   assert.ok(!messages.some((message) => message.type === 'ending'), 'not yet: the player is not at the prince');
   assert.equal(killBoss(world), false, 'he is already down');
+});
+
+test('level flow: a screen that plays the cutscene holds the player and opens the door when it is through, not before', () => {
+  const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
+  standAt(world, -4, L, -37, Math.PI);
+  assert.ok(killBoss(world));
+  run(world, 0.2);
+  endingWatched(world);
+  endingHold(world, true);
+  assert.ok(endingBusy(world) && levelBusy(world), 'held while the cutscene plays');
+  // However long the world runs (the slow motion), the door waits for the screen.
+  run(world, ENDING_WAIT.headless * 3);
+  assert.equal(endingOf(world).phase, 'felled');
+  assert.equal(world.stage.mechanisms.innerdoor, 'closed');
+  assert.equal(guideOf(world), null, 'no guide before the door is open');
+  assert.ok(endingRelease(world));
+  assert.equal(endingOf(world).phase, 'open');
+  assert.equal(world.stage.mechanisms.innerdoor, 'open');
+  assert.equal(levelBusy(world), false, 'the player is free again');
+  assert.equal(endingRelease(world), false, 'the door opens once');
+  // The guide runs from the door to the prince, read from the stage's own data.
+  const guide = guideOf(world);
+  const prince = hips(princeOf(world));
+  assert.ok(guide);
+  assert.ok(Math.abs(guide.door[0] - -9) < 0.5 && Math.abs(guide.door[2] - -46.2) < 0.5, `the door is ${guide.door}`);
+  assert.ok(Math.hypot(guide.prince[0] - prince[0], guide.prince[2] - prince[1]) < 0.01);
 });
 
 test('level flow: the player near the prince begins the scene: held, the prince cowers and shuffles into the corner, the cards are asked for', () => {
   const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
   standAt(world, -4, L, -37, Math.PI);
-  killBoss(world);
-  run(world, 0.2);
+  fell(world);
   drainUi(world);
   // Far from the prince (in the chapel, the door open): nothing yet.
   standAt(world, -9, L, -43, Math.PI / 2);
@@ -132,8 +171,7 @@ test('level flow: restart from a rest is for a run that reached one; a scene hal
   assert.equal(restartFromRest(world), false, 'no rest reached: the stage is begun over by the screen');
   standAt(world, -4, L, -37, Math.PI);
   restAtPoint(world, { id: 'test', at: [4.6, L, -36], name: 'Test' });
-  killBoss(world);
-  run(world, 0.2);
+  fell(world);
   standAt(world, -9, L, -48.4, Math.PI / 2);
   run(world, 0.3);
   assert.equal(endingOf(world).phase, 'scene');
