@@ -48,15 +48,15 @@ export const STAGE_LOOKS = {
     ambient: { tint: [0.9, 0.94, 1.12], gain: 0.9 },
     hemi: { sky: 0x625e78, ground: 0x26242c, intensity: 0.54 },
     exposure: 1,
-    // Thicker than either parent: the far rock goes grey at a couple of hundred metres, and a sea mist lies on the water and the gorge.
-    fog: { colour: 0x56535e, near: 22, far: 240, mist: { density: 0.03, base: 2, falloff: 0.1 } },
+    // Thicker than either parent, and thicker again for the start: from the cliff path the castle is a dim silhouette in the mist (its shape, not its stones), clearer as he nears; a sea mist lies on the water and the gorge.
+    fog: { colour: 0x56535e, near: 16, far: 175, mist: { density: 0.05, base: 2, falloff: 0.1 } },
     sea: { colour: 0x18222e, roughness: 0.36, metalness: 0.32, normal: 0.52, reflect: 1.3, scroll: 0.9 },
     rain: { opacity: 0.28, share: 0.8 },
     wet: 0.8,
     pools: 0.75,
     // A warm sun through the tear, but the storm is still over most of the sky: the shade is deep, not black (the cloud fills it).
     bakedShadow: 0.85,
-    lightning: { gap: [7, 16], strength: 0.75 },
+    lightning: { gap: [15, 35], strength: 0.75 },
     torch: 0.9,
     shaft: { colour: [255, 206, 150], opacity: 0.15, width: 70 },
     vignette: 0.34,
@@ -81,7 +81,7 @@ export const STAGE_LOOKS = {
     wet: 0.55,
     // Only a pale break low in the west, a weak sun (0.8): the walls shade themselves a little.
     bakedShadow: 0.35,
-    lightning: { gap: [4, 11], strength: 1 },
+    lightning: { gap: [9, 24], strength: 1 },
     torch: 1,
     shaft: null,
     vignette: 0.38,
@@ -106,7 +106,7 @@ export const STAGE_LOOKS = {
     wet: 0.75,
     // The open break: a hard low sun (2.5) on the castle; the shade is only the cold fill.
     bakedShadow: 1,
-    lightning: { gap: [14, 28], strength: 0.3 },
+    lightning: { gap: [28, 55], strength: 0.3 },
     torch: 0.8,
     shaft: { colour: [255, 210, 150], opacity: 0.2, width: 70 },
     vignette: 0.3,
@@ -156,7 +156,7 @@ export const STAGE_LOOKS = {
     wet: 1,
     // Night: the moon is behind the cloud and the only hard light is the lightning, which has no one direction for a baked shadow to hold.
     bakedShadow: 0,
-    lightning: { gap: [2.5, 6.5], strength: 1.5 },
+    lightning: { gap: [6, 15], strength: 1.5 },
     torch: 1.7,
     shaft: null,
     vignette: 0.5,

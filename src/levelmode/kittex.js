@@ -10,6 +10,7 @@
 // glossier where the vertex colour says the wall is in shadow at its foot; and a fog that thickens toward the sea (height fog).
 
 import { KT_SHADOW_FUNCTION, KT_SHADOW_PARS, ktShadow, ktShadowInit } from './kitshadow.js';
+import { kwTexture } from './kitwear.js';
 import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
 
 export { ktRandom } from './kitpaint.js';
@@ -287,10 +288,11 @@ export function ktMaterials() {
     wood: { macro: 0.6, hue: 0.4, moss: 0.2, streak: 0.3, two: 0, pools: 0 },
     iron: { macro: 0.5, hue: 0, moss: 0, streak: 0.4, two: 0, pools: 0 },
   };
-  m.ashlar = make(ktTexture(512, 11, ktAshlar), 4, { roughness: 0.66 });
-  m.ruin = make(ktTexture(512, 12, ktRuinWall), 4, { roughness: 0.74 });
-  m.rubble = make(ktTexture(512, 13, ktRubble), 4, { roughness: 0.76 });
-  m.rock = make(ktTexture(512, 14, ktRock), 6, { roughness: 0.6 });
+  // (Masonry is drawn on both faces: a wall seen from inside its own thickness, or a vault from above, has a face to show and is not a hole into the void.)
+  m.ashlar = make(ktTexture(512, 11, ktAshlar), 4, { roughness: 0.66, side: THREE.DoubleSide });
+  m.ruin = make(ktTexture(512, 12, ktRuinWall), 4, { roughness: 0.74, side: THREE.DoubleSide });
+  m.rubble = make(ktTexture(512, 13, ktRubble), 4, { roughness: 0.76, side: THREE.DoubleSide });
+  m.rock = make(ktTexture(512, 14, ktRock), 6, { roughness: 0.6, side: THREE.DoubleSide });
   m.cobble = make(ktTexture(512, 15, ktCobbles), 3, { roughness: 0.5 });
   m.flags = make(ktTexture(512, 16, ktFlags), 4, { roughness: 0.52 });
   m.grass = make(ktTexture(512, 17, ktGrass), 6, { roughness: 0.95 });
@@ -305,6 +307,9 @@ export function ktMaterials() {
   m.straw = flat(0x8a7a4a, { roughness: 1 });
   m.black = flat(0x101114, { roughness: 0.9 });
   for (const name of ['bone', 'cloth', 'straw', 'black']) ktPatch(m[name], { cutaway: true, shadow: true });
+  // The wear and dirt: decals over the stone (kitwear.js), alpha-blended, a hair off the face, with the castle's fog and cut-away.
+  m.wear = new THREE.MeshStandardMaterial({ map: kwTexture(), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  ktPatch(m.wear, { cutaway: true });
   m.silhouette = flat(0x23252b, { roughness: 1 });
   ktPatch(m.silhouette, { shadow: true });
   m.flame = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });

@@ -2639,6 +2639,8 @@ const boxer = window.boxer = {
     return state.world.stage.active;
   },
   // The look of the Dunnottar stage (levelmode/stagelooks.js): `stageLook()` says which (and the names); `stageLook(name)` changes it now; `stageLook(undefined, { still: true })` stops the lightning.
+  // A strike now (`stageStrike(true)` holds it at its first crack, for a picture; `stageStrike(null)` lets go).
+  stageStrike: (hold = false) => { stormStrikeNow(hold); return true; },
   stageLook: (name, options) => (name === undefined && !options ? { look: stormLook(), looks: stageLookNames() } : chooseStageLook(name, options)),
   // The stage now: its world's `stage` (def, active sections, mechanism states), and the verbs: put a gate or ladder in a state, pull a lever.
   // The player's systems in the stage (levelmode/level.js): the run, what the button offers, and the verbs (for the console and tests).
