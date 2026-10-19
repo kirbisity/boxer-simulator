@@ -348,7 +348,12 @@ function readEvents(world, aware) {
     }
     // Hit, or blocked: the man knows. A guard fights; an ally answers; a civilian runs.
     if (mind.kind === 'guard') alarm(world, aware, mind, defender, 'hit', attacker);
-    else if (mind.kind === 'ally') engage(world, aware, mind, defender, 'hit');
+    else if (mind.kind === 'ally') {
+      // A comrade struck by the player (friendly fire is real: a blow, a stray arrow) does not turn on him: he flinches as the blow
+      // makes him (the physics), is not brought into a fight he has none in, goes on following, and says so (team.js 'Watch it!').
+      if (attacker === world.fighters[0]) aware.struckAlly = { id: defender.id, time };
+      else engage(world, aware, mind, defender, 'hit');
+    }
     else mind.hurtAt = time;
     aware.clashes.push({ x: hipX(defender), z: hipZ(defender), y: floorOf(defender), time, by: event.attacker });
   }

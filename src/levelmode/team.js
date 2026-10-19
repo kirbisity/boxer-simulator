@@ -4,6 +4,7 @@
 //   teamStatus(world)   [{ id, spawn, name, alive, state, fraction, distance, near }] in fighter order, the fallen too
 //   watchTeam(world)    each step: a comrade who falls is said so once ('Brann has fallen'), and the first time any holds at the
 //                       chapel gate the player is told they do ('Your comrades hold the gate')
+// Friendly fire is real (the player can strike anyone): a comrade he hits keeps his loyalty, flinches as any man does, and says so once in a while.
 // The rule the rest of the run keeps (checkpoints.js reviveWorld): a comrade who has fallen stays fallen, through every rest and
 // every death of the operative; the living are gathered beside him each time. Nothing here revives anyone.
 
@@ -18,6 +19,9 @@ export const TEAM = {
   // What the screen is told.
   gateText: 'Your comrades hold the gate',
   fallenText: (name) => `${name} has fallen`,
+  // The player's own blow on a comrade: what he says (at most once in this many seconds: a flurry is one complaint).
+  struckText: (name) => `${name}: "Watch it!"`,
+  struckEvery: 3,
 };
 
 /** The comrades, in fighter order (the player excluded). */
@@ -52,6 +56,15 @@ export function watchTeam(world) {
   const level = levelOf(world);
   if (!level) return;
   const team = (level.team ??= { fallen: new Set(), gateTold: false });
+  const struck = world.stage.aware?.struckAlly;
+  if (struck && struck.time !== team.struckAt) {
+    team.struckAt = struck.time;
+    const victim = world.fighters[struck.id];
+    if (victim.state !== 'out' && world.time - (team.struckSaid ?? -Infinity) >= TEAM.struckEvery) {
+      team.struckSaid = world.time;
+      say(world, { type: 'toast', text: TEAM.struckText(victim.body.inputs.name) });
+    }
+  }
   for (const fighter of comradesOf(world)) {
     if (fighter.state === 'out' && !team.fallen.has(fighter.spawn.id)) {
       team.fallen.add(fighter.spawn.id);

@@ -13,6 +13,8 @@ import { createLevelWorld, drainUi, levelThink, respawnPlayer, restAtPoint } fro
 import { freePrisoner, mindState } from '../src/levelmode/awareness.js';
 import { TEAM, comradesOf, teamAlive, teamStatus } from '../src/levelmode/team.js';
 import { holdPlayer } from '../src/levelmode/items.js';
+import { directFighter, newOrders, swingAt } from '../src/control.js';
+import { finishTarget } from '../src/finisher.js';
 import { levelBusy } from '../src/levelmode/level.js';
 import { hipsAt, walk } from './walker.js';
 
@@ -167,4 +169,54 @@ test('team: walking the cliff path, the gorge and the ledge, the stair and the q
     assert.deepEqual(teamStatus(world).map((entry) => entry.alive), [true, true, true], `${leg.name}: nobody lost`);
     assert.ok(comradesOf(world).every((fighter) => !fighter.dormant && apartFrom(world, fighter) < 25), `${leg.name}: they are with him`);
   }
+});
+
+// ---- Friendly fire: the player can strike anyone (control.js), and a comrade is anyone ----------------------------------------
+
+test('team: a comrade the player strikes stays loyal (does not fight back, keeps following), says so, and is not offered the finisher', () => {
+  const world = dunnottar(6);
+  garrisonAsleep(world);
+  const me = world.fighters[0];
+  const maren = man(world, 'maren');
+  run(world, 0.5);
+  placeOnFloor(maren, hipsAt(me)[0] + 1.0, hipsAt(me)[1], DN_Y.start, Math.PI);
+  const orders = newOrders();
+  drainUi(world);
+  const step = (seconds) => advance(world, seconds, (current, dt) => {
+    updateStage(current);
+    garrisonAsleep(current);
+    levelThink(current, dt);
+    thinkAll(current, dt, new Set([0]));
+    directFighter(current, me, orders, dt);
+  });
+  step(0.2);
+  assert.ok(swingAt(world, me, orders, 'oberhau', 'head'));
+  step(1.2);
+  const hits = world.events.filter((event) => event.kind === 'landed' && event.attacker === 0 && event.defender === maren.id);
+  assert.ok(hits.length > 0, 'the blow lands on a team-mate');
+  assert.deepEqual(toasts(drainUi(world)), ['Maren: "Watch it!"']);
+  // She does not turn on him: nothing of hers is aimed at him, and she is not in a fight.
+  assert.ok(!world.events.some((event) => event.attacker === maren.id && event.defender === 0), 'she struck no one');
+  step(3);
+  assert.equal(mindState(world, maren.id), 'follow', 'she goes on following');
+  // Down, a comrade is not a man the finisher is offered for (only an enemy, or a man he has locked on).
+  placeOnFloor(maren, hipsAt(me)[0] + 1.0, hipsAt(me)[1], DN_Y.start, Math.PI);
+  maren.state = 'down';
+  assert.equal(finishTarget(world, me), null);
+});
+
+test('team: a flurry of blows on a comrade is one complaint, and one he does not survive is a fall, said once', () => {
+  const world = dunnottar(6);
+  run(world, 0.3);
+  drainUi(world);
+  const brann = man(world, 'brann');
+  const aware = world.stage.aware;
+  aware.struckAlly = { id: brann.id, time: world.time };
+  run(world, 0.1);
+  aware.struckAlly = { id: brann.id, time: world.time + 0.01 };
+  run(world, 0.1);
+  assert.deepEqual(toasts(drainUi(world)), ['Brann: "Watch it!"']);
+  fall(world, brann);
+  run(world, 0.3);
+  assert.deepEqual(toasts(drainUi(world)), ['Brann has fallen']);
 });
