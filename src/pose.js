@@ -142,8 +142,10 @@ export function desiredPose(body, intent = {}) {
   const across = (angle) => yawRotate([0, 0, 1], angle);
 
   const hipHeight = L.ankle + L.shank + L.thigh - stance.crouch * H - (intent.dip ?? 0) * H;
-  out[P.lFoot] = intent.lFoot ?? [POSE.leadFoot[0] * H * stance.width, L.ankle, POSE.leadFoot[1] * H * stance.width];
-  out[P.rFoot] = intent.rFoot ?? [POSE.rearFoot[0] * H * stance.width, L.ankle, POSE.rearFoot[1] * H * stance.width];
+  // (`stagger` scales how far one foot stands ahead of the other: 1 a fighter's guard, 0 side by side, as a runner's feet pass.)
+  const stagger = stance.stagger ?? 1;
+  out[P.lFoot] = intent.lFoot ?? [POSE.leadFoot[0] * H * stance.width * stagger, L.ankle, POSE.leadFoot[1] * H * stance.width];
+  out[P.rFoot] = intent.rFoot ?? [POSE.rearFoot[0] * H * stance.width * stagger, L.ankle, POSE.rearFoot[1] * H * stance.width];
   if (intent.check && !intent.lFoot) {
     // Checking a kick: the lead knee comes up and out, the shin a shield.
     out[P.lFoot] = [POSE.leadFoot[0] * H * stance.width + 0.04 * H, hipHeight * 0.42, POSE.leadFoot[1] * H + 0.03 * H];

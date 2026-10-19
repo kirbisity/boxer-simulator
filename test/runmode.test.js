@@ -1,11 +1,11 @@
-// The player's run mode (control.js runStep, physics.js runPose): a real running gait, locked on with a held
-// stick or the keys, and the player turning only to a man near him. Generic: Battle Mode and Level Mode alike.
+// The player's run mode (control.js runStep, physics.js runPose): a real running gait, held on the stick
+// or the keys (there is no run lock), and the player turning only to a man near him. Generic: Battle Mode and Level Mode alike.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { askRunLock, CONTROL, directFighter, keyStick, newOrders } from '../src/control.js';
+import { CONTROL, directFighter, keyStick, newOrders } from '../src/control.js';
 import { advance, createWorld, placeFighter, placeOnFloor } from '../src/physics.js';
 import { WORLD } from '../src/physics/config.js';
 import { levelPreset } from '../src/levelmode/presets.js';
@@ -168,118 +168,71 @@ test('run mode costs breath, modestly, and a winded man runs no more until he ha
   assert.equal(game.me.runMode, true, 'with some breath back, he runs again');
 });
 
-test('run lock: the stick held at a run for a moment locks it; the finger lifts and he runs on', () => {
+test('drag only: the stick held at a run keeps him running, and letting go stops him (there is no lock)', () => {
   const game = yard();
   game.orders.stick = { dir: [1, 0], amount: 1 };
-  game.step(CONTROL.run.lockHold * 0.6);
-  assert.equal(game.orders.runLock, null, 'not yet: a dash is not a lock');
-  game.step(CONTROL.run.lockHold * 0.6 + 0.1);
-  assert.ok(game.orders.runLock, 'held long enough: locked');
+  game.step(1.5);
+  assert.equal(game.me.runMode, true, 'running while the stick is held out');
+  assert.equal(game.orders.runLock, undefined, 'no run lock in the orders');
   game.orders.stick = null;
+  game.step(0.2);
+  assert.equal(game.me.runMode, false, 'finger lifted: no run');
   const from = hips(game.me);
   game.step(1.5);
   const to = hips(game.me);
-  assert.ok(to[0] - from[0] > 3.5, `he ran on with no finger on the stick (${(to[0] - from[0]).toFixed(1)} m in 1.5 s)`);
-  assert.equal(game.me.runMode, true);
-  assert.ok(game.orders.runLock, 'still locked');
+  assert.ok(to[0] - from[0] < 0.6, `and he comes to rest (${(to[0] - from[0]).toFixed(2)} m in 1.5 s)`);
+  assert.ok(Math.hypot(...game.me.rootVelocity) < 0.3, 'standing');
 });
 
-test('run lock: steered by the stick smoothly, wherever it is put down', () => {
+test('drag only: the stick steers the run, wherever it is put down; Shift on the keys alike', () => {
   const game = yard();
   // (On the open flat east of the yard's stairs: a man running up a stair is held to the pace of the climb, and +z from the west end is its winding stair.)
   placeOnFloor(game.me, 0, -4, 0, 0);
   updateStage(game.world, true);
   game.orders.stick = { dir: [1, 0], amount: 1 };
   game.step(1.2);
-  game.orders.stick = null;
-  game.step(0.3);
-  // A drag to the side steers him round (+z), over a moment and not at once.
-  game.orders.stick = { dir: [0, 1], amount: 0.6 };
-  game.step(0.1);
-  const turned = game.orders.runLock.dir;
-  assert.ok(turned[1] > 0 && turned[1] < 0.9, `the heading begins to turn, not snaps (${turned.map((value) => value.toFixed(2))})`);
-  game.step(0.8);
-  assert.ok(game.orders.runLock.dir[1] > 0.99, 'and reaches the stick');
-  game.orders.stick = null;
-  game.step(0.6);
-  const velocity = game.me.rootVelocity;
-  assert.ok(velocity[1] > 2, 'running along +z after the stick is let go again');
-  assert.ok(game.orders.runLock, 'steering does not end the lock');
+  game.orders.stick = { dir: [0, 1], amount: 1 };
+  game.step(1.2);
+  assert.equal(game.me.runMode, true);
+  assert.ok(game.me.rootVelocity[1] > 2, 'running along +z with the stick put that way');
+  const keys = yard();
+  keys.orders.keyStick = keyStick(new Set(['w']), AHEAD, true);
+  keys.step(1);
+  assert.equal(keys.me.runMode, true, 'Shift and W run');
+  keys.orders.keyStick = keyStick(new Set(['w']), AHEAD, false);
+  keys.step(0.1);
+  assert.equal(keys.me.runMode, false, 'Shift let go: a walk');
 });
 
-test('run lock: pulling back, the guard, an attack, a lock on a man or a tap end it', () => {
-  const lockIn = () => {
+test('drag only: the guard, an attack or a blow stop a run held on the stick; an attack holds it off until the stick is eased back', () => {
+  const running = () => {
     const game = yard();
     game.orders.stick = { dir: [1, 0], amount: 1 };
     game.step(1);
-    game.orders.stick = null;
-    game.step(0.2);
-    assert.ok(game.orders.runLock && game.me.runMode, 'locked and running');
+    assert.ok(game.me.runMode, 'running');
     return game;
   };
-  const back = lockIn();
-  back.orders.stick = { dir: [-1, 0], amount: 0.8 };
-  back.step(0.1);
-  assert.equal(back.orders.runLock, null, 'pulled back: ended');
-  const guard = lockIn();
+  const guard = running();
   guard.orders.guard = true;
   guard.step(0.1);
-  assert.equal(guard.orders.runLock, null, 'the guard: ended');
-  assert.equal(guard.me.runMode, false);
-  const attack = lockIn();
+  assert.equal(guard.me.runMode, false, 'the guard: no run');
+  const attack = running();
   const thrown = attack.me.stats.thrown;
   attack.orders.requests.push({ at: attack.world.time, line: 'mid', strength: 'quick' });
   attack.step(0.15);
-  assert.equal(attack.orders.runLock, null, 'an attack: ended');
+  assert.equal(attack.me.runMode, false, 'an attack: no run');
   assert.ok(attack.me.stats.thrown > thrown || attack.me.punch, 'and it is thrown');
-  const lockOn = lockIn();
-  lockOn.orders.lock = 2;
-  lockOn.step(0.1);
-  assert.equal(lockOn.orders.runLock, null, 'locking on a man: ended');
-  const hit = lockIn();
+  attack.step(0.5);
+  assert.equal(attack.me.runMode, false, 'and the stick must be eased off before he runs again');
+  attack.orders.stick = { dir: [1, 0], amount: 0.5 };
+  attack.step(0.1);
+  attack.orders.stick = { dir: [1, 0], amount: 1 };
+  attack.step(0.3);
+  assert.equal(attack.me.runMode, true, 'eased off and pushed out again: a run');
+  const hit = running();
   hit.me.stagger = 0.4;
   hit.step(0.1);
-  assert.equal(hit.orders.runLock, null, 'reeling from a blow: ended');
-});
-
-test('run lock: never carries him off a ledge or into the sea; the lock ends short of the edge', () => {
-  const game = yard();
-  placeOnFloor(game.me, -19, 3, 0, -Math.PI / 2);
-  game.orders.stick = { dir: [0, 1], amount: 1 };
-  game.step(1);
-  game.orders.stick = null;
-  game.step(3);
-  assert.equal(game.orders.runLock, null, 'the lock let go at the cliff');
-  assert.equal(game.me.state, 'up');
-  assert.ok(game.me.x[P.pelvis * 3 + 1] > 0.5, 'still on the ground, not falling into the sea');
-  assert.ok(hips(game.me)[1] < 11, `he stopped on the ground (z ${hips(game.me)[1].toFixed(1)}; the yard ends at 11)`);
-});
-
-test('run lock on the keyboard: asked for (Shift+R, a double tap on forward), kept with the keys let go, ended by back', () => {
-  const game = yard();
-  game.orders.keyStick = keyStick(new Set(['w']), AHEAD, false);
-  game.step(0.3);
-  askRunLock(game.orders);
-  game.step(0.1);
-  assert.ok(game.orders.runLock, 'toggled on');
-  game.orders.keyStick = null;
-  game.step(1);
-  assert.equal(game.me.runMode, true, 'running with no key held');
-  // A key to the side steers.
-  game.orders.keyStick = keyStick(new Set(['d']), AHEAD, false);
-  game.step(1);
-  assert.ok(game.orders.runLock.dir[1] > 0.9, 'D turned him');
-  game.orders.keyStick = keyStick(new Set(['a']), AHEAD, false);
-  game.step(0.1);
-  assert.equal(game.orders.runLock, null, 'a key back against his heading ends it');
-  // Toggled off by the same key.
-  const again = yard();
-  askRunLock(again.orders, true);
-  again.step(0.2);
-  assert.ok(again.orders.runLock, 'asked on with nothing held: he runs the way he faces');
-  askRunLock(again.orders);
-  again.step(0.1);
-  assert.equal(again.orders.runLock, null, 'toggled off');
+  assert.equal(hit.me.runMode, false, 'reeling from a blow: no run');
 });
 
 test('Battle Mode: the AI is untouched by it; a fighter nobody plays never has the player-only flags', () => {

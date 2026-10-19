@@ -424,18 +424,33 @@ export const WORLD = {
   },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
-  // The player's run mode (control.js: the stick past its run threshold, Shift, or a locked run; set as `fighter.runMode`, which
+  // The player's run mode (control.js: the stick past its run threshold, or Shift; set as `fighter.runMode`, which
   // no AI ever sets): not a fighter hurrying but a man running, weapon carried low at his side, nothing guarded.
   // - speedFactor: footwork speed times this (the AI's run is `run.speedFactor`). 4.0 × 1.2 m/s × legs and gear: a fit man in a gambeson
   //   sprints at ~4.2 m/s with a sword (an unladen sprinter 7-9, a trot with kit 3-4), a man in plate ~2.5 (his gear's `foot`).
-  // - stance: the upright, narrow run (no blade angle, no crouch; the guard stance's are the style's); lean: the trunk's forward lean
-  //   into the run (rad); dip: knees a touch bent (share of height); swing: the empty arm's swing (share of height, `runCarry`'s
-  //   own is the walk's); ease: how fast (per second) the run pose and the guard trade places (0.17 s to be 63% there).
+  // - stance: the upright, narrow run (no blade angle, no crouch; the guard stance's are the style's); `stagger` 0: the feet side by side,
+  //   not one lead foot ahead of the other as in a guard (a runner's feet pass under him; the guard's 0.26 m stagger made one foot land
+  //   0.25 m further than the other); lean: the trunk's forward lean into the run (rad; ~14 degrees with the stance's, where a sprinter has
+  //   10-20 and a man at an easy run less); dip: knees a touch bent (share of height); bob: the body rises as the feet part and sinks
+  //   as they pass (share of height, 0.045 = 8 cm asked of the hips, ~3 cm got through their muscles; a runner's centre of mass moves 5-8 cm);
+  //   ease: how fast (per second) the run pose and the guard trade places (0.17 s to be 63% there).
   // - step: the footwork of a run (WORLD.step is a fighter's): each step takes `seconds`, the next foot goes once the last is `overlap` of the
   //   way, a step lands `lead` step-times ahead of the stance, a foot goes when the stance has drifted `threshold` m, and rises `lift` m.
+  //   It was 0.15 s, 0.55, 1.4, 0.2, 0.12: each foot swung for 0.15 s and came back 0.16 s later, six foot-falls a second, a shuffle with the
+  //   knees fixed at 60-90 degrees and the feet 5 cm off the floor. Now a swing of 0.42 s with the next foot away at 74% of it (a step every
+  //   0.31 s: ~3.2 steps a second, 190 a minute, as a man runs 4.4 m/s; a foot on the floor ~0.2 s, both in the air a short moment), the
+  //   landing 0.3 s of travel ahead of the stance (~0.45 m ahead of the hips as the foot lands; the foot lags its aim) and the ankle
+  //   rising 0.4 m at the middle of the swing (heel to the seat, the knee driven up and forward to near level). The stride is aimed again
+  //   through the swing (`retarget`, until `settle` of the swing has gone: nearly to the end, as a foot is placed as it comes down), so that it lands on the line he is now running, round a bend too.
+  // - stairs: on a stair or a slope steeper than `slope` (rise per m) the stride is the old short quick step (`step`'s old values): a foot to
+  //   a tread, as a man runs a flight, with no leaping stride to land past its edge or off the tread below.
+  // - arms: the carried hands swing against the legs, read from the feet (`span`: the feet this share of height apart fore and aft is the
+  //   full swing). `free` (an empty hand), `shield` and `weapon`: how far each swings fore and aft (shares of height; the weapon hand
+  //   less, the sword hangs from a loose hand); `lift`: it rises this much as it comes forward; `tilt`: the blade swings this much with it.
   // - carry: the weapon at his side. A short weapon (up to `longFrom` m) hangs point down and a little back from a hand at the hip
-  //   (`hand`, share of height; z mirrored for the left hand); a long one is carried on the shoulder, held up and forward
-  //   (`longHand`, `longDir`); a shield arm hangs at `shield`.
+  //   (`hand`, share of height; z mirrored for the left hand) that may go back past the shoulder (`reach`, share of height, where a held
+  //   weapon's hand is kept before it); a long one is carried on the shoulder, held up and forward (`longHand`, `longDir`); a shield arm
+  //   hangs at `shield`, an empty hand at `free`. These are the middle of the swing: with the elbows ~90 degrees (80-108 as it goes).
   // - recovery: the share of the usual stamina recovery (WORLD.staminaRecovery) he gets while running, so that the cost of running
   //   (CONTROL.run.staminaPerSecond) is a drain over minutes rather than being cancelled by his recovery.
   // - turn: the pose in a sprint turn (`fighter.turn` is the heading's rate in rad/s, smoothed over `smooth` s; all of it scales with the run
@@ -444,15 +459,19 @@ export const WORLD = {
   //   `leadMax`) while the hips lag it by `hipLag` per rad/s (up to `hipLagMax`), so the trunk winds into the turn and the hips follow the
   //   feet; `full`: the rate (rad/s) at which the footwork below is at its full. The feet: each lands at least `gap` (share of height)
   //   to its own side of the line of travel (a turn must not cross them); the foot on the inside lands `inner` shorter and `wide`
-  //   wider, the outside one `outer` longer (shares of height), in step with the turn's share.
+  //   wider, the outside one `outer` longer (shares of height), in step with the turn's share. (`gap`, `inner` and `wide` were 0.035, 0.07 and
+  //   0.03: with the long stride of the flat the inside foot crossed the other in a sharp turn, and wants more room.)
   runMode: {
     speedFactor: 4,
     recovery: 0.25,
-    turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.035, inner: 0.07, wide: 0.03, outer: 0.03 },
-    stance: { blade: 0, crouch: 0.02, width: 0.55, lean: 0.03, guardHeight: 0 },
-    lean: 0.3, dip: 0.03, swing: 0.15, ease: 6,
-    step: { seconds: 0.15, overlap: 0.55, lead: 1.4, threshold: 0.2, lift: 0.12 },
-    carry: { longFrom: 1.15, hand: [0.05, 0.5, 0.19], dir: [-0.3, -1, 0.05], longHand: [0.1, 0.62, 0.17], longDir: [0.45, 1, 0.1], shield: [0.04, 0.5, 0.2] },
+    turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.07, inner: 0.09, wide: 0.08, outer: 0.03 },
+    stance: { blade: 0, crouch: 0, width: 0.55, lean: 0.03, guardHeight: 0, stagger: 0 },
+    lean: 0.25, dip: 0.02, bob: 0.045, ease: 6,
+    arms: { span: 0.5, free: 0.17, shield: 0.09, weapon: 0.09, lift: 0.02, tilt: 0.25 },
+    step: { seconds: 0.42, overlap: 0.74, lead: 1.3, threshold: 0.2, lift: 0.4 },
+    settle: 0.95,
+    stairs: { slope: 0.15, step: { seconds: 0.15, overlap: 0.55, lead: 1.4, threshold: 0.2, lift: 0.12 } },
+    carry: { longFrom: 1.15, hand: [0.08, 0.46, 0.14], dir: [-0.3, -1, 0.05], longHand: [0.1, 0.62, 0.17], longDir: [0.45, 1, 0.1], shield: [0.07, 0.46, 0.15], free: [0.1, 0.46, 0.12], reach: -0.2 },
   },
   // Walking about (the player's walk mode): upright and square, feet under
   // the hips, no guard; the arms swing with the stride, more the faster he goes.

@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { thinkAll } from '../src/ai.js';
 import { P, PRESETS } from '../src/body.js';
-import { askRunLock, CONTROL, directFighter, newOrders } from '../src/control.js';
+import { CONTROL, directFighter, newOrders } from '../src/control.js';
 import { behindYaw, createFollowCam, FOLLOW_CAM, runFollowGoal, runFollowRate } from '../src/followcam.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { AWARE, mindState, sprintUnseen } from '../src/levelmode/awareness.js';
@@ -276,13 +276,12 @@ test('feelers: free distance per angle by the physics\' own test, the wall\'s no
 });
 
 /** A runner in the test yard's maze side: the wall z = -3 (x 6..17); `dir` the key stick's way; returns the path. */
-function runAtWall(degrees, { lock = false, seconds = 5 } = {}) {
+function runAtWall(degrees, { seconds = 5 } = {}) {
   const game = yard('forger', [7, -1]);
   const angle = (-degrees * Math.PI) / 180;
   const dir = [Math.cos(angle), Math.sin(angle)];
   const path = [];
   game.orders.keyStick = { dir, amount: 1 };
-  if (lock) askRunLock(game.orders, true);
   const began = game.world.time;
   game.step(seconds, () => path.push([...hips(game.me), Math.hypot(...game.me.rootVelocity), game.world.time - began]));
   return { ...game, path };
@@ -295,15 +294,6 @@ test('wall steer: a runner aimed at a wall at 20 degrees slides along it at spee
   assert.ok(Math.min(...along.map((row) => row[2])) > 3.9, `at a sprint all the way along (${Math.min(...along.map((row) => row[2])).toFixed(2)} m/s at the slowest)`);
   assert.ok(Math.min(...along.map((row) => row[1])) > -2.42, `without touching the wall (nearest ${Math.min(...along.map((row) => row[1])).toFixed(2)}, the wall at -3, a body 0.3 + its half thickness 0.2)`);
   assert.ok(run.path.at(-1)[0] > 20, `ends past its end (x ${run.path.at(-1)[0].toFixed(1)})`);
-});
-
-test('wall steer: the locked run does the same, and goes on along the wall rather than aiming into it again', () => {
-  const run = runAtWall(20, { lock: true, seconds: 3.2 });
-  const along = run.path.filter(([x]) => x > 9.5 && x < 17);
-  assert.ok(along.length > 40);
-  assert.ok(Math.min(...along.map((row) => row[2])) > 3.9);
-  assert.ok(Math.min(...along.map((row) => row[1])) > -2.42);
-  assert.ok(run.path.at(-1)[0] > 17.5, 'past the end of the wall');
 });
 
 test('wall steer: straight into a wall he stops against it, and does not jitter there', () => {
@@ -366,9 +356,9 @@ const SPIRAL = stairsOfStage(DUNNOTTAR).find((stair) => stair.winding);
 
 /**
  * The player runs the winding stair with a steady push "ahead": the camera behind him, so the stick is the way he faces
- * (`follow`), or a locked run. Returns { reached (s), ok, stuck (s) }.
+ * (`follow`). Returns { reached (s), ok, stuck (s) }.
  */
-function runSpiral(dir, { lock = false, steer = true, seconds = 45 } = {}) {
+function runSpiral(dir, { steer = true, seconds = 45 } = {}) {
   const route = dir === 'up' ? SPIRAL.route : [...SPIRAL.route].reverse();
   const yaw = Math.atan2(-(route[1][1] - route[0][1]), route[1][0] - route[0][0]);
   const { world, me } = lone(DUNNOTTAR, 'forger', 1, route[0], dir === 'up' ? SPIRAL.floor : SPIRAL.top, yaw);
@@ -378,9 +368,7 @@ function runSpiral(dir, { lock = false, steer = true, seconds = 45 } = {}) {
   let stuck = 0;
   let last = [...me.root];
   for (let frame = 0; frame < seconds * 60; frame += 1) {
-    if (lock) {
-      if (frame === 0) askRunLock(orders, true);
-    } else orders.keyStick = { dir: [Math.cos(me.yaw), -Math.sin(me.yaw)], amount: 1 };
+    orders.keyStick = { dir: [Math.cos(me.yaw), -Math.sin(me.yaw)], amount: 1 };
     advance(world, 1 / 60, (current, dt) => {
       updateStage(current);
       directFighter(current, me, orders, dt);
@@ -402,13 +390,9 @@ test('winding stair: a steady push up the tower stair carries him to the top wit
   assert.ok(up.reached < 30, `in ${up.reached.toFixed(0)} s: 85 treads of a 4 m/s sprint`);
 });
 
-test('winding stair: and down it, and by a locked run both ways', () => {
+test('winding stair: and down it', () => {
   const down = runSpiral('down');
   assert.ok(down.reached !== null && down.ok && down.stuck <= 1, `down: ${down.reached}`);
-  const lockedUp = runSpiral('up', { lock: true });
-  assert.ok(lockedUp.reached !== null && lockedUp.ok, `a locked run reaches the top (${lockedUp.reached})`);
-  const lockedDown = runSpiral('down', { lock: true });
-  assert.ok(lockedDown.reached !== null && lockedDown.ok, `and the bottom (${lockedDown.reached})`);
 });
 
 test('winding stair: without the steering the same push is held at the wall (the steer is what does it)', () => {
@@ -425,6 +409,7 @@ function sprintTurn(degrees, { off = false } = {}) {
   try {
     const game = yard('forger', [-10, 0]);
     const out = { crossed: 0, closest: Infinity, rollAtTurn: 0 };
+    let landing = { l: false, r: false };
     const angle = (degrees * Math.PI) / 180;
     for (let frame = 0; frame < 4 * 60; frame += 1) {
       game.orders.keyStick = { dir: frame < 90 ? [1, 0] : [Math.cos(angle), Math.sin(angle)], amount: 1 };
@@ -434,7 +419,11 @@ function sprintTurn(degrees, { off = false } = {}) {
       if (speed < 1) continue;
       const left = [-velocity[1] / speed, velocity[0] / speed];
       const lateral = (index) => (game.me.x[index * 3] - game.me.x[P.pelvis * 3]) * left[0] + (game.me.x[index * 3 + 2] - game.me.x[P.pelvis * 3 + 2]) * left[1];
-      const gap = lateral(P.lFoot) - lateral(P.rFoot);
+      // (Only with both feet on the floor: a foot swinging through the air passes the other, and is free to; it is where they stand that must not cross.)
+      // (Where they stand as a foot comes down: a foot swinging through the air passes the other, and is free to.)
+      const down = ['l', 'r'].some((side) => landing[side] && !game.me.feet[side].step);
+      landing = { l: Boolean(game.me.feet.l.step), r: Boolean(game.me.feet.r.step) };
+      const gap = down ? lateral(P.lFoot) - lateral(P.rFoot) : Infinity;
       if (gap < 0) out.crossed += 1;
       out.closest = Math.min(out.closest, gap);
       {
@@ -471,9 +460,9 @@ test('sprint turn: the feet land to their own side of the line of travel, never 
     assert.equal(turn.crossed, 0, `${degrees} degrees: the feet crossed on ${turn.crossed} frames (closest ${turn.closest.toFixed(3)} m)`);
     assert.ok(turn.closest > 0.005, `${degrees} degrees: the closest the feet came ${turn.closest.toFixed(3)} m apart across the line`);
   }
-  // A shallow turn crossed them before.
-  const was = sprintTurn(45, { off: true });
-  assert.ok(was.crossed > 0, 'the old footwork crossed his feet in a 45 degree turn');
+  // A sharp turn crossed them without the footwork.
+  const was = sprintTurn(160, { off: true });
+  assert.ok(was.crossed > 0, 'without it the feet cross in a 160 degree turn');
 });
 
 test('sprint turn: AI fighters and Battle Mode men have none of it', () => {
