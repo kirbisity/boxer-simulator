@@ -11,7 +11,7 @@
 
 import { ktPatch, ktRandom, ktWeather } from './kittex.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookOf } from './stagelooks.js';
-import { hexToRgb, skyDirection, stageShaftCanvas, stagePoolCanvas, stageSkyCanvas } from './stagesky.js';
+import { hexToRgb, skyDirection, stageShaftCanvas, stagePoolCanvas, stageSkyCanvas, stageSkyCapCanvas, stormSkyImage } from './stagesky.js';
 
 /** Where the weather is centred: round the stage, and the rain and bolts round the player. */
 const STORM = {
@@ -39,6 +39,8 @@ const stormState = {
   base: null,
   environments: new Map(),
   skies: new Map(),
+  caps: new Map(),
+  onSkyArrived: null,
   look: DEFAULT_STAGE_LOOK,
   dirty: true,
   fog: null,
@@ -81,6 +83,7 @@ export const stormTorch = () => stormState.torch;
 export function stormSetLook(name, { still } = {}) {
   if (still !== undefined) stormState.still = still;
   if (name !== undefined) stormState.look = STAGE_LOOKS[name] ? name : DEFAULT_STAGE_LOOK;
+  stormSkyWanted(stormState.look);
   stormState.dirty = true;
   stormState.nextStrike = stormGap(stormState.random() * 8 + 5);
   return stormState.look;
@@ -96,6 +99,49 @@ function stormSkyTexture(name) {
     stormState.skies.set(name, texture);
   }
   return texture;
+}
+
+/** The photographic cap of a look's sky (the upper hemisphere only; null for a painted look, and while the photograph is still being decoded). Made once. */
+function stormSkyCap(name) {
+  const sky = stageLookOf(name).sky;
+  if (!sky.photo) return null;
+  let texture = stormState.caps.get(name);
+  if (!texture) {
+    const canvas = stageSkyCapCanvas(sky);
+    if (!canvas) return null;
+    texture = new THREE.CanvasTexture(canvas);
+    stormState.caps.set(name, texture);
+  }
+  return texture;
+}
+
+/** Start decoding a look's photograph (if it has one); when it arrives the look's sky and environment are made again from it. */
+function stormSkyWanted(name) {
+  const photo = stageLookOf(name).sky.photo;
+  if (photo) stormSkyImage(photo.id, stormSkyArrived);
+}
+
+/** A photograph has been decoded: what was made without it (the plain gradient that stood in) is thrown away, and the next frame puts the look on again. */
+function stormSkyArrived(id) {
+  for (const name of stageLookNamesWithPhoto(id)) {
+    stormState.skies.get(name)?.dispose();
+    stormState.skies.delete(name);
+    const env = stormState.environments.get(name);
+    env?.texture.dispose();
+    stormState.environments.delete(name);
+  }
+  stormState.dirty = true;
+  stormState.onSkyArrived?.();
+}
+
+const stageLookNamesWithPhoto = (id) => Object.keys(STAGE_LOOKS).filter((name) => STAGE_LOOKS[name].sky.photo?.id === id);
+
+// (The default look's photograph is decoded from the start, so it is ready by the time the stage is up.)
+stormSkyWanted(DEFAULT_STAGE_LOOK);
+
+/** Tell the weather what to do when a look's photograph has arrived and the environment (for the stone and the sea) has been made anew: `callback()`. */
+export function stormOnSkyArrived(callback) {
+  stormState.onSkyArrived = callback;
 }
 
 /** A wave normal map: many waves of random direction and size (whole numbers of them to the tile, so it tiles), turned into normals. */
@@ -142,12 +188,14 @@ function stormWaveTexture(size = 128) {
 export function stormEnvironment(renderer, name = stormState.look) {
   const cached = stormState.environments.get(name);
   if (cached?.renderer === renderer) return cached.texture;
+  stormSkyWanted(name);
   const texture = new THREE.CanvasTexture(stageSkyCanvas(stageLookOf(name).sky, 512, 256));
   texture.mapping = THREE.EquirectangularReflectionMapping;
   const generator = new THREE.PMREMGenerator(renderer);
   const target = generator.fromEquirectangular(texture);
   generator.dispose();
   texture.dispose();
+  // (If the look's photograph is still being decoded this is only the gradient that stands in for it: the environment is made again when it arrives.)
   stormState.environments.set(name, { renderer, texture: target.texture });
   return target.texture;
 }
@@ -338,6 +386,15 @@ export function buildStormPlace({ buildRain }) {
   sky.position.set(...STORM.centre);
   sky.renderOrder = -1;
   place.add(sky);
+  // The dome of a photographic look: the upper hemisphere only, the picture's own rows from the zenith down to the horizon.
+  const capSky = new THREE.Mesh(
+    new THREE.SphereGeometry(STORM.skyRadius, 48, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, depthWrite: false }),
+  );
+  capSky.position.set(...STORM.centre);
+  capSky.renderOrder = -1;
+  capSky.visible = false;
+  place.add(capSky);
   // The sea: heaving normals scrolled over a dark glossy plane.
   const waves = stormWaveTexture();
   waves.repeat.set(70, 70);
@@ -382,7 +439,23 @@ export function buildStormPlace({ buildRain }) {
     const { scene, lights } = view;
     stormState.dirty = false;
     stormState.fog = scene.fog;
-    sky.material.map = stormSkyTexture(stormState.look);
+    stormSkyWanted(stormState.look);
+    const cap = stormSkyCap(stormState.look);
+    if (cap) {
+      capSky.material.map = cap;
+      capSky.material.needsUpdate = true;
+    } else {
+      sky.material.map = stormSkyTexture(stormState.look);
+    }
+    capSky.visible = Boolean(cap);
+    sky.visible = !cap;
+    // (Only the look in view keeps its photographic sky in memory, 5 MB each: a phone does not hold all of them.)
+    for (const [name, texture] of stormState.caps) {
+      if (texture !== cap) {
+        texture.dispose();
+        stormState.caps.delete(name);
+      }
+    }
     const fogColour = new THREE.Color(look.fog.colour);
     if (scene.fog) {
       scene.fog.color.copy(fogColour);
@@ -512,6 +585,7 @@ export function buildStormPlace({ buildRain }) {
         lights.sun.color.copy(base.sunColour);
       }
       sky.material.color.setScalar(1 + flash * 1.6 * dim);
+      capSky.material.color.setScalar(1 + flash * 1.6 * dim);
       const lift = Math.min(1, flash * 0.55 * dim);
       if (scene.fog && base.fog) scene.fog.color.copy(base.fog).lerp(FLASH_WHITE, lift);
       if (base.background?.isColor) scene.background = flash > 0 ? base.background.clone().lerp(FLASH_WHITE, lift) : base.background;

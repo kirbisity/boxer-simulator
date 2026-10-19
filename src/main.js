@@ -48,7 +48,7 @@ import { createLevelMarkers } from './levelmode/markers.js';
 import { createShards } from './levelmode/endingview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
-import { stormEnvironment, stormLook, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
+import { stormEnvironment, stormLook, stormOnSkyArrived, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
 import { ktSightline } from './levelmode/kittex.js';
@@ -1183,17 +1183,20 @@ function chooseStageLook(name, options) {
   stageLookSelect.value = chosen;
   return { look: chosen, looks: stageLookNames() };
 }
+// A look's photographic sky is decoded after the stage may already be up: when it arrives the stone and the puddles reflect it.
+stormOnSkyArrived(() => stageView?.setEnvironment?.(stormEnvironment(scene.renderer)));
 stageLookSelect.addEventListener('change', () => {
   chooseStageLook(stageLookSelect.value);
   stageLookSelect.blur();
 });
-/** The look this visitor last chose (or the address's `?stagelook=`), else the default's. */
-function rememberedStageLook() {
+/** The look this visitor last chose (or the address's `?stagelook=`), else the default's. The fair-weather looks are for the ghost walk (`sandboxOnly`): the real run keeps the storm. */
+function rememberedStageLook(ghost = false) {
+  const usable = (name) => STAGE_LOOKS[name] && (ghost || !STAGE_LOOKS[name].sandboxOnly);
   const wanted = new URLSearchParams(location.search).get('stagelook');
-  if (STAGE_LOOKS[wanted]) return wanted;
+  if (usable(wanted)) return wanted;
   try {
     const saved = localStorage.getItem(stageLookKey);
-    if (STAGE_LOOKS[saved]) return saved;
+    if (usable(saved)) return saved;
   } catch {
     // Nothing kept.
   }
@@ -2095,7 +2098,7 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   };
   if (place === 'dunnottar') {
     stormReset(stage.weather?.seed);
-    chooseStageLook(rememberedStageLook());
+    chooseStageLook(rememberedStageLook(ghost));
   }
   fightMarks.reset();
   fightMarks.warm();

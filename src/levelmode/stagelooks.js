@@ -6,6 +6,7 @@
 //
 // A look is:
 //   label, blurb       what the menu calls it, and what it is, in a sentence.
+//   sandboxOnly        true for the fair-weather looks: only the sandbox's ghost walk uses them (a run of the real stage keeps the storm).
 //   sky                the painted sky (levelmode/stagesky.js): the colours down the sky, the cloud banks, the glow of the sun or moon, the stars.
 //     zenith, high, mid  colours (hex) at the top, three-quarters up and half way up the vault; `horizon` the colour where it meets the fog.
 //     clouds             { count: how many soft masses, size: [least, most] in px of the 1024 px sky, dark: their shadow colour, light: their lit colour,
@@ -14,6 +15,12 @@
 //     glow               { az, el: degrees round and up the sky it stands at (az 0 is east, 90 south), colour [r,g,b] 0..255, size: its radius in degrees,
 //                          strength: 0..1, hole: how much of the cloud round it is cleared (0..1), disc: a hard bright disc (the moon, a low sun), 0..1 } or null.
 //     stars              how many (0 under cloud).
+//     photo              optional: a real thunderstorm photograph instead of painted cloud (levelmode/stormsky-data.js, CC0 Poly Haven panoramas, credits in
+//                        docs/credits-scenery-photo.md): { id: which, az: the azimuth its bright break (the sun, or the hole in the cloud) is turned to, mirror: flipped,
+//                        grade: { gain: [at the horizon, overhead], rise: [from, to] degrees of elevation over which one turns into the other, far: { gain, from, to }
+//                        (a further multiplier far from the break: the cloud is dark everywhere but round it), gamma (shadows deeper above 1), sat, tint [r,g,b] } }.
+//                        The picture is graded (stagesky.js skyGrade), `glow` is laid over it where its break is, and `horizon` must be the graded picture's horizon
+//                        band (photoHorizon: a test checks), which is also the fog's. A photographic look has no `clouds` (it paints none).
 //   sun                the one directional light on the stone and the men: { az, el (degrees), colour [r,g,b] 0..1, intensity }.
 //   ambient            the light of the sky itself, from every side: { tint: [r,g,b] what it is multiplied by (the baked sky is a cold violet-grey), gain }.
 //   hemi               the same for the toon look, which has a hemisphere light instead: { sky, ground (hex), intensity }.
@@ -36,30 +43,106 @@
 export const STAGE_LOOKS = {
   stormBreak: {
     label: 'Storm breaking',
-    blurb: 'The bruised storm with a tear in it: purple-grey banks and rain, a warm low sun breaking through over the sea, thick mist on the water and the low ground, and standing water on the cobbles and flags.',
+    blurb: 'A real thunderstorm sky: a black, heavy cloud deck overhead, the air brightening to a luminous pale band low over the sea, and one torn place where a hot low sun breaks through and strikes the castle. Thick mist on the water and the low ground, standing water on the cobbles and flags.',
     sky: {
-      zenith: '#14121e', high: '#232231', mid: '#3a3848', horizon: '#56535e',
-      clouds: { count: 560, size: [28, 120], dark: [11, 10, 18], light: [140, 132, 148], darkShare: 0.66, aDark: 0.21, aLight: 0.11, flat: 0.32, from: 0.02, to: 0.47 },
-      glow: { az: 50, el: 7, colour: [250, 206, 150], size: 18, strength: 0.9, hole: 0.85, disc: 0.4 },
+      zenith: '#14121e', high: '#232231', mid: '#3a3848', horizon: '#707380',
+      photo: { id: 'stormA', az: 50, grade: { gain: [0.82, 0.3], rise: [3, 70], far: { gain: 0.58, from: 12, to: 95 }, gamma: 1.3, sat: 0.84, tint: [0.97, 0.97, 1.05] } },
+      glow: { az: 50, el: 7.3, colour: [255, 200, 140], size: 14, strength: 0.7, hole: 0.85, disc: 0.3 },
       stars: 0,
     },
-    // A warm low sun, weaker than the open break (the storm is still over it), and a cool violet fill from the cloud.
-    sun: { az: 50, el: 12, colour: [0.96, 0.76, 0.54], intensity: 1.7 },
-    ambient: { tint: [0.9, 0.94, 1.12], gain: 0.9 },
-    hemi: { sky: 0x625e78, ground: 0x26242c, intensity: 0.54 },
+    // A hot low sun through the tear (only a break in the cloud: the sky above it is black), and a cool dim fill from the deck, so the sunlit stone stands out of the storm shade.
+    sun: { az: 50, el: 10, colour: [1, 0.78, 0.54], intensity: 2.6 },
+    ambient: { tint: [0.86, 0.92, 1.14], gain: 0.78 },
+    hemi: { sky: 0x58566e, ground: 0x22202a, intensity: 0.46 },
     exposure: 1,
-    // Thicker than either parent, and thicker again for the start: from the cliff path the castle is a dim silhouette in the mist (its shape, not its stones), clearer as he nears; a sea mist lies on the water and the gorge.
-    fog: { colour: 0x56535e, near: 16, far: 175, mist: { density: 0.05, base: 2, falloff: 0.1 } },
+    // Thick for the start: from the cliff path the castle is a dim silhouette in the mist (its shape, not its stones), clearer as he nears; a sea mist lies on the water and the gorge. The fog is the colour of the bright band at the horizon.
+    fog: { colour: 0x707380, near: 16, far: 175, mist: { density: 0.05, base: 2, falloff: 0.1 } },
     sea: { colour: 0x18222e, roughness: 0.36, metalness: 0.32, normal: 0.52, reflect: 1.3, scroll: 0.9 },
     rain: { opacity: 0.28, share: 0.8 },
     wet: 0.8,
     pools: 0.75,
-    // A warm sun through the tear, but the storm is still over most of the sky: the shade is deep, not black (the cloud fills it).
-    bakedShadow: 0.85,
+    // A hot sun through the tear, the storm over the rest of the sky: the shade is deep, not black (the cloud fills it).
+    bakedShadow: 1,
     lightning: { gap: [15, 35], strength: 0.75 },
     torch: 0.9,
-    shaft: { colour: [255, 206, 150], opacity: 0.15, width: 70 },
+    shaft: { colour: [255, 206, 150], opacity: 0.22, width: 70 },
     vignette: 0.34,
+  },
+
+  squallLine: {
+    label: 'Squall line',
+    blurb: 'The leading edge of a squall: a long, hard-edged shelf of black cloud over the sea, ragged scud under it, a curtain of rain hanging from it, and a pale washed-out band of daylight along the whole horizon. No sun, only the grey light under the cloud edge; hard rain, a bolt now and then.',
+    sky: {
+      zenith: '#1a1c28', high: '#2c3042', mid: '#4a4f62', horizon: '#6e738a',
+      photo: { id: 'stormB', az: 55, grade: { gain: [0.92, 0.5], rise: [3, 80], far: { gain: 0.9, from: 30, to: 110 }, gamma: 1.12, sat: 0.9, tint: [0.96, 0.98, 1.06] } },
+      glow: { az: 55, el: 25.9, colour: [235, 232, 222], size: 20, strength: 0.4, hole: 0.4, disc: 0 },
+      stars: 0,
+    },
+    sun: { az: 55, el: 16, colour: [0.82, 0.84, 0.9], intensity: 1.2 },
+    ambient: { tint: [0.92, 0.96, 1.1], gain: 0.9 },
+    hemi: { sky: 0x6a6e84, ground: 0x24242c, intensity: 0.52 },
+    exposure: 1,
+    fog: { colour: 0x6e738a, near: 20, far: 200, mist: { density: 0.04, base: 2, falloff: 0.1 } },
+    sea: { colour: 0x1a2430, roughness: 0.4, metalness: 0.3, normal: 0.6, reflect: 1.2, scroll: 1.2 },
+    rain: { opacity: 0.34, share: 1 },
+    wet: 0.9,
+    pools: 0.8,
+    // The light is the cloud edge's own, soft: the walls shade themselves only a little.
+    bakedShadow: 0.4,
+    lightning: { gap: [9, 22], strength: 0.95 },
+    torch: 1,
+    shaft: null,
+    vignette: 0.36,
+  },
+
+  supercell: {
+    label: 'Supercell base',
+    blurb: 'Under the base of a supercell: the whole sky one dark, lumpy, green-grey deck that hangs low and close, the horizon a sick pale yellow-green, the light thin and strange, hard rain and a bolt every few seconds.',
+    sky: {
+      zenith: '#0e1210', high: '#1a201c', mid: '#2c352f', horizon: '#607260',
+      photo: { id: 'stormA', az: 215, mirror: true, grade: { gain: [0.8, 0.26], rise: [2, 65], far: { gain: 0.6, from: 15, to: 95 }, gamma: 1.38, sat: 0.65, tint: [0.88, 1.02, 0.84] } },
+      glow: { az: 215, el: 7.3, colour: [208, 222, 150], size: 20, strength: 0.4, hole: 0.6, disc: 0 },
+      stars: 0,
+    },
+    sun: { az: 215, el: 9, colour: [0.78, 0.84, 0.58], intensity: 0.9 },
+    ambient: { tint: [0.84, 1, 0.9], gain: 0.85 },
+    hemi: { sky: 0x4c5a4e, ground: 0x1c2420, intensity: 0.42 },
+    exposure: 1,
+    fog: { colour: 0x607260, near: 18, far: 190, mist: { density: 0.045, base: 2, falloff: 0.1 } },
+    sea: { colour: 0x16221e, roughness: 0.38, metalness: 0.3, normal: 0.62, reflect: 1.2, scroll: 1.3 },
+    rain: { opacity: 0.34, share: 1 },
+    wet: 0.95,
+    pools: 0.85,
+    bakedShadow: 0.3,
+    lightning: { gap: [7, 16], strength: 1.1 },
+    torch: 1.1,
+    shaft: null,
+    vignette: 0.42,
+  },
+
+  sunHole: {
+    label: 'Sun hole',
+    blurb: 'The same storm with the cloud shut almost everywhere: a single small hole low over the sea, a hard white sun in it, its rays fanning down onto the castle and a bright patch on the water, the whole rest of the sky black and heavy. The sun at its hardest; the rain thin.',
+    sky: {
+      zenith: '#0c0d14', high: '#181a26', mid: '#2a2c3a', horizon: '#5b5e6a',
+      photo: { id: 'stormA', az: 50, grade: { gain: [0.7, 0.22], rise: [3, 70], far: { gain: 0.4, from: 10, to: 70 }, gamma: 1.4, sat: 0.85, tint: [0.96, 0.97, 1.06] } },
+      glow: { az: 50, el: 7.3, colour: [255, 214, 150], size: 11, strength: 1, hole: 0.95, disc: 0.75 },
+      stars: 0,
+    },
+    sun: { az: 50, el: 10, colour: [1, 0.8, 0.56], intensity: 2.9 },
+    ambient: { tint: [0.8, 0.9, 1.16], gain: 0.7 },
+    hemi: { sky: 0x4a4c64, ground: 0x1e1e26, intensity: 0.4 },
+    exposure: 1,
+    fog: { colour: 0x5b5e6a, near: 24, far: 220, mist: { density: 0.035, base: 1.5, falloff: 0.1 } },
+    sea: { colour: 0x16202c, roughness: 0.3, metalness: 0.35, normal: 0.5, reflect: 1.45, scroll: 0.85 },
+    rain: { opacity: 0.2, share: 0.5 },
+    wet: 0.8,
+    pools: 0.7,
+    bakedShadow: 1,
+    lightning: { gap: [28, 55], strength: 0.4 },
+    torch: 0.85,
+    shaft: { colour: [255, 210, 150], opacity: 0.3, width: 60 },
+    vignette: 0.38,
   },
 
   bruised: {
@@ -210,6 +293,112 @@ export const STAGE_LOOKS = {
     torch: 0.9,
     shaft: { colour: [255, 190, 120], opacity: 0.14, width: 90 },
     vignette: 0.25,
+  },
+
+  // ---- Fair weather (for the sandbox's ghost walk: the castle in full sun). Real daylight panoramas (CC0, Poly Haven), the sun of each where its photograph has it. ----
+
+  clearMorning: {
+    sandboxOnly: true,
+    label: 'Clear morning',
+    blurb: 'A clean bright morning: deep blue sky and a few small clouds low down, a warm sun a third of the way up casting long soft-edged shadows across the castle, dew-bright grass and green moss, a blue-green sea with the sun glittering on it, only a thin haze in the distance.',
+    sky: {
+      zenith: '#1a3f8f', high: '#2f5da8', mid: '#6d9ad0', horizon: '#b7ccde',
+      photo: { id: 'dayClear', az: 125, grade: { gain: [1, 0.92], rise: [3, 60], far: { gain: 1, from: 30, to: 100 }, gamma: 1.02, sat: 1.05, tint: [1, 1, 1] } },
+      glow: { az: 125, el: 28.2, colour: [255, 232, 190], size: 12, strength: 0.28, hole: 0.5, disc: 0.7 },
+      stars: 0,
+    },
+    sun: { az: 125, el: 28.2, colour: [1, 0.9, 0.74], intensity: 2.3 },
+    ambient: { tint: [1.12, 1.1, 1], gain: 1.15 },
+    hemi: { sky: 0x9ab8e8, ground: 0x586244, intensity: 0.7 },
+    exposure: 1,
+    fog: { colour: 0xb7ccde, near: 80, far: 520, mist: { density: 0.004, base: -1, falloff: 0.1 } },
+    sea: { colour: 0x0a2f42, roughness: 0.34, metalness: 0.04, normal: 0.4, reflect: 0.5, scroll: 0.8 },
+    rain: { opacity: 0, share: 0 },
+    wet: 0.1,
+    pools: 0,
+    bakedShadow: 1,
+    lightning: null,
+    torch: 0.3,
+    shaft: null,
+    vignette: 0.1,
+  },
+
+  brightNoon: {
+    sandboxOnly: true,
+    label: 'Bright noon',
+    blurb: 'High summer sun in a deep, clear blue sky with a thread of cloud: hard black-edged shadows straight down the walls, the stone pale and dry, the sea a hard blue with a white glitter under the sun, the air clear to the headland.',
+    sky: {
+      zenith: '#1a3f8f', high: '#2a58a4', mid: '#6a98d0', horizon: '#a1b4cf',
+      photo: { id: 'dayNoon', az: 100, grade: { gain: [1, 0.95], rise: [3, 60], far: { gain: 1, from: 30, to: 100 }, gamma: 1.05, sat: 1.1, tint: [0.98, 1, 1.04] } },
+      glow: { az: 100, el: 43, colour: [255, 244, 224], size: 10, strength: 0.2, hole: 0.5, disc: 0.5 },
+      stars: 0,
+    },
+    sun: { az: 100, el: 43, colour: [1, 0.96, 0.88], intensity: 2.6 },
+    ambient: { tint: [1.1, 1.1, 1.04], gain: 1.1 },
+    hemi: { sky: 0x9cbcf0, ground: 0x646a4c, intensity: 0.75 },
+    exposure: 1,
+    fog: { colour: 0xa1b4cf, near: 100, far: 700, mist: { density: 0.002, base: -2, falloff: 0.1 } },
+    sea: { colour: 0x0a2f42, roughness: 0.34, metalness: 0.04, normal: 0.4, reflect: 0.5, scroll: 0.8 },
+    rain: { opacity: 0, share: 0 },
+    wet: 0.05,
+    pools: 0,
+    bakedShadow: 1,
+    lightning: null,
+    torch: 0.25,
+    shaft: null,
+    vignette: 0.08,
+  },
+
+  hazyMorning: {
+    sandboxOnly: true,
+    label: 'Hazy summer morning',
+    blurb: 'A warm hazy morning: a milky gold sky with the sun a soft bright blur in it, a golden mist lying on the sea and in the gorge, soft pale shadows, the far headland fading into the glow, rays of light through the haze, the grass wet with dew.',
+    sky: {
+      zenith: '#6c7080', high: '#8c8c90', mid: '#b0a898', horizon: '#e5cd9f',
+      photo: { id: 'dayHaze', az: 140, grade: { gain: [1.25, 1.2], rise: [3, 60], far: { gain: 1, from: 30, to: 100 }, gamma: 0.88, sat: 1.25, tint: [1.14, 1, 0.74] } },
+      glow: { az: 140, el: 28.6, colour: [255, 220, 150], size: 18, strength: 0.35, hole: 0.5, disc: 0.4 },
+      stars: 0,
+    },
+    sun: { az: 140, el: 28.6, colour: [1, 0.86, 0.62], intensity: 1.9 },
+    ambient: { tint: [1.16, 1.08, 1], gain: 1.3 },
+    hemi: { sky: 0xd8caa8, ground: 0x6a6a4c, intensity: 0.85 },
+    exposure: 1,
+    fog: { colour: 0xe5cd9f, near: 45, far: 420, mist: { density: 0.018, base: 3, falloff: 0.1 } },
+    sea: { colour: 0x2e5260, roughness: 0.42, metalness: 0.12, normal: 0.35, reflect: 0.8, scroll: 0.7 },
+    rain: { opacity: 0, share: 0 },
+    wet: 0.15,
+    pools: 0,
+    bakedShadow: 0.9,
+    lightning: null,
+    torch: 0.35,
+    shaft: { colour: [255, 226, 170], opacity: 0.12, width: 100 },
+    vignette: 0.14,
+  },
+
+  fairClouds: {
+    sandboxOnly: true,
+    label: 'Fair clouds',
+    blurb: 'A breezy fair-weather day: a deep blue sky with big white cumulus drifting over, the sun high and bright between them, the castle in strong light and the sea sparkling; the sky fills the shade with bright blue.',
+    sky: {
+      zenith: '#1a3f8f', high: '#3a68b4', mid: '#7aa4d6', horizon: '#a5a7b5',
+      photo: { id: 'dayCloud', az: 110, grade: { gain: [1, 0.96], rise: [3, 60], far: { gain: 1, from: 30, to: 100 }, gamma: 1.04, sat: 1.08, tint: [1, 1, 1] } },
+      glow: { az: 110, el: 47.9, colour: [255, 244, 224], size: 9, strength: 0.15, hole: 0.5, disc: 0.4 },
+      stars: 0,
+    },
+    sun: { az: 110, el: 47.9, colour: [1, 0.95, 0.86], intensity: 2.4 },
+    ambient: { tint: [1.1, 1.1, 1.04], gain: 1.2 },
+    hemi: { sky: 0xa4c0ee, ground: 0x646a4c, intensity: 0.8 },
+    exposure: 1,
+    fog: { colour: 0xa5a7b5, near: 90, far: 600, mist: { density: 0.003, base: -2, falloff: 0.1 } },
+    sea: { colour: 0x0a2f42, roughness: 0.34, metalness: 0.04, normal: 0.4, reflect: 0.5, scroll: 0.8 },
+    rain: { opacity: 0, share: 0 },
+    wet: 0.1,
+    pools: 0,
+    bakedShadow: 0.95,
+    lightning: null,
+    torch: 0.3,
+    shaft: null,
+    vignette: 0.1,
   },
 };
 
