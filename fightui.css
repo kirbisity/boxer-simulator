@@ -183,3 +183,9 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .lv-pip b { font: 600 11px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: #cdf6e8; white-space: nowrap; }
 .lv-pip.fighting i { background: #ffcf4a; box-shadow: 0 0 10px rgba(255, 207, 74, 0.9), 0 0 2px rgba(0, 0, 0, 0.8); }
 .banner:not([hidden]) ~ .fight-ui .lv-team, .banner:not([hidden]) ~ .fight-ui .lv-pips { visibility: hidden; }
+
+/* With the army orders up (the player has men to command: his comrades), the item row sits beside them, not on top of them; on a narrow screen, under them. */
+.fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(134px + env(safe-area-inset-left, 0px)); }
+@media (max-width: 700px) {
+  .fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(184px + env(safe-area-inset-top, 0px)); }
+}
