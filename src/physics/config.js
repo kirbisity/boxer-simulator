@@ -418,6 +418,25 @@ export const WORLD = {
   },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
+  // The player's run mode (control.js: the stick past its run threshold, Shift, or a locked run; set as `fighter.runMode`, which
+  // no AI ever sets): not a fighter hurrying but a man running, weapon carried low at his side, nothing guarded.
+  // - speedFactor: footwork speed times this (the AI's run is `run.speedFactor`). 4.0 × 1.2 m/s × legs and gear: a fit man in a gambeson
+  //   sprints at ~4.2 m/s with a sword (an unladen sprinter 7-9, a trot with kit 3-4), a man in plate ~2.5 (his gear's `foot`).
+  // - stance: the upright, narrow run (no blade angle, no crouch; the guard stance's are the style's); lean: the trunk's forward lean
+  //   into the run (rad); dip: knees a touch bent (share of height); swing: the empty arm's swing (share of height, `runCarry`'s
+  //   own is the walk's); ease: how fast (per second) the run pose and the guard trade places (0.17 s to be 63% there).
+  // - step: the footwork of a run (WORLD.step is a fighter's): each step takes `seconds`, the next foot goes once the last is `overlap` of the
+  //   way, a step lands `lead` step-times ahead of the stance, a foot goes when the stance has drifted `threshold` m, and rises `lift` m.
+  // - carry: the weapon at his side. A short weapon (up to `longFrom` m) hangs point down and a little back from a hand at the hip
+  //   (`hand`, share of height; z mirrored for the left hand); a long one is carried on the shoulder, held up and forward
+  //   (`longHand`, `longDir`); a shield arm hangs at `shield`.
+  runMode: {
+    speedFactor: 4,
+    stance: { blade: 0, crouch: 0.02, width: 0.55, lean: 0.03, guardHeight: 0 },
+    lean: 0.3, dip: 0.03, swing: 0.15, ease: 6,
+    step: { seconds: 0.15, overlap: 0.55, lead: 1.4, threshold: 0.2, lift: 0.12 },
+    carry: { longFrom: 1.15, hand: [0.05, 0.5, 0.19], dir: [-0.3, -1, 0.05], longHand: [0.1, 0.62, 0.17], longDir: [0.45, 1, 0.1], shield: [0.04, 0.5, 0.2] },
+  },
   // Walking about (the player's walk mode): upright and square, feet under
   // the hips, no guard; the arms swing with the stride, more the faster he goes.
   walk: { stance: { blade: 0, crouch: 0, width: 0.5, lean: 0.03, guardHeight: 0 }, strideHz: 0.9, runStrideHz: 1.5 },
