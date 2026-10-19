@@ -77,8 +77,8 @@ export const TUTORIAL_STEPS = [
   },
   {
     key: 'move', title: 'Move',
-    touch: 'Drag on the <b>bottom half</b>: a stick appears under your thumb. Push it to the edge to run (weapon down, no guard; hold it there a moment and the run locks, so you can lift your finger). Walk up to Edric.',
-    mouse: '<b>W A S D</b> or the <b>arrow keys</b> walk the way the camera looks; <b>Shift</b> runs (weapon down, no guard); <b>Shift+R</b> or a double tap on <b>W</b> locks the run on. Walk up to Edric.',
+    touch: 'Drag on the <b>bottom half</b>: a stick appears under your thumb. Push it to the edge to run while you hold it there (weapon down, no guard). Walk up to Edric.',
+    mouse: '<b>W A S D</b> or the <b>arrow keys</b> walk the way the camera looks; <b>Shift</b> runs while held (weapon down, no guard). Walk up to Edric.',
     done: (progress) => progress.walked >= TUTORIAL.walkFor && progress.near,
   },
   {

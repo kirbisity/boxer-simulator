@@ -10,7 +10,7 @@ import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
-import { desiredPose, lockedHead, restPose, twoBoneIK, vec, yawCos, yawRotate, yawSin } from './pose.js';
+import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
@@ -686,14 +686,41 @@ function shieldOnLine(world, fighter, guard) {
  */
 function carriedTargets(fighter, weapon, target) {
   const spec = WORLD.runMode.carry;
-  const H = fighter.body.heightM;
   const long = weapon.spec.length > spec.longFrom || weapon.spec.hands === 'two';
   const side = weapon.main === 'l' ? 1 : -1;
-  const [x, y, z] = long ? spec.longHand : spec.hand;
-  const hand = vec.scale([x, y, side * z], H);
-  const dir = vec.normalize(long ? spec.longDir : [spec.dir[0], spec.dir[1], side * spec.dir[2]]);
+  const gait = runGait(fighter);
+  // (A long weapon rides steady on the shoulder; a short one hangs in a relaxed hand that swings, the blade a little with it.)
+  const hand = long ? vec.scale([spec.longHand[0], spec.longHand[1], side * spec.longHand[2]], fighter.body.heightM) : runHand(fighter, 'weapon', weapon.main);
+  const swing = long ? 0 : side * gait.swing * WORLD.runMode.arms.tilt;
+  const dir = vec.normalize(long ? spec.longDir : [spec.dir[0] - swing, spec.dir[1], side * spec.dir[2]]);
   const share = fighter.runPose;
   return { hand: vec.lerp(target.hand, hand, share), dir: vec.normalize(vec.lerp(target.dir, dir, share)) };
+}
+
+/**
+ * The stride of a run, read from where his feet are (WORLD.runMode.arms.span): `swing` from -1 to 1, positive with the right foot ahead
+ * of the left (so the left arm forward: the arms go against the legs), and `spread` (0..1) how far apart the feet are fore and aft:
+ * widest as one lands and the other leaves, together as they pass.
+ */
+function runGait(fighter) {
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  const x = fighter.x;
+  const ahead = (index) => (x[index * 3] - x[P.pelvis * 3]) * forward[0] + (x[index * 3 + 2] - x[P.pelvis * 3 + 2]) * forward[2];
+  const swing = Math.max(-1, Math.min(1, (ahead(P.rFoot) - ahead(P.lFoot)) / (WORLD.runMode.arms.span * fighter.body.heightM)));
+  return { swing, spread: Math.abs(swing) };
+}
+
+/**
+ * A hand carried in the run (kind 'free', 'shield' or 'weapon'; WORLD.runMode.carry and .arms): its place at his side, swung fore and
+ * aft against the legs and lifted as it comes forward. A local point, in metres.
+ */
+function runHand(fighter, kind, side) {
+  const spec = WORLD.runMode.carry;
+  const arms = WORLD.runMode.arms;
+  const H = fighter.body.heightM;
+  const [x, y, z] = kind === 'weapon' ? spec.hand : kind === 'shield' ? spec.shield : spec.free;
+  const forward = (side === 'l' ? 1 : -1) * runGait(fighter).swing;
+  return [(x + forward * arms[kind]) * H, (y + Math.max(0, forward) * arms.lift) * H, (side === 'l' ? z : -z) * H];
 }
 
 /** The run pose's share, eased towards 1 while the player runs with nothing else in his hands to do, back to 0 after (WORLD.runMode.ease). */
@@ -709,7 +736,7 @@ function easeRunPose(fighter, dt) {
 /** Two stances blended: `share` of `to`. */
 function blendStance(from, to, share) {
   const out = { ...from };
-  for (const key of Object.keys(to)) out[key] = (from[key] ?? to[key]) * (1 - share) + to[key] * share;
+  for (const key of Object.keys(to)) out[key] = (from[key] ?? (key === 'stagger' ? 1 : to[key])) * (1 - share) + to[key] * share;
   return out;
 }
 
@@ -730,7 +757,7 @@ function weaponIntent(world, fighter, intent) {
     if (fighter.shieldOpen > world.time) intent.lHand = toLocal(fighter, point(fighter.x, P.lHand));
     intent.shieldArm = 'l';
     // Running: the shield hangs at his side.
-    if (fighter.runPose > 0 && !blocking && !punch) intent.lHand = vec.lerp(intent.lHand, vec.scale(WORLD.runMode.carry.shield, H), fighter.runPose);
+    if (fighter.runPose > 0 && !blocking && !punch) intent.lHand = vec.lerp(intent.lHand, runHand(fighter, 'shield', 'l'), fighter.runPose);
   }
   // The net held out in the off hand, ready to throw.
   if (fighter.net?.held && style.netGuard && !fighter.shield) intent.lHand = vec.scale(style.netGuard, H);
@@ -830,6 +857,8 @@ function weaponIntent(world, fighter, intent) {
   }
   intent.weaponArms = oneHanded ? [main] : [main, weapon.off];
   intent.weaponReach = style.weaponGuard.reach ?? null;
+  // Running, the hand is not held out before the shoulder: it swings back past it.
+  if (fighter.runPose > 0 && !punch && !blocking) intent.weaponReach = (intent.weaponReach ?? POSE.weaponReach) * (1 - fighter.runPose) + WORLD.runMode.carry.reach * fighter.runPose;
   intent.polearmRear = weapon.spec.leadAhead && !oneHanded ? main : null;
   intent.windingUp = Boolean(stroke) && (stroke.load > 0 || stroke.t < stroke.spec.windup);
   // Swinging through, the arm goes as the stroke throws it (pose.js).
@@ -1735,6 +1764,8 @@ function updateIntent(world, fighter, dt) {
     intent.lean = intent.lean * (1 - runPose) + spec.lean * runPose;
     intent.dip = intent.dip * (1 - runPose) + spec.dip * runPose;
     intent.shift *= 1 - runPose;
+    // The body rises as the feet part (the flight) and sinks as they pass.
+    intent.dip += spec.bob * (1 - runGait(fighter).spread) * runPose;
     Object.assign(intent, runTurnPose(fighter, intent, dt));
   } else if (fighter.turn !== undefined) {
     fighter.turn = 0;
@@ -2095,7 +2126,7 @@ function runCarry(world, fighter, intent, dt) {
     if (held.has(side)) continue;
     // Elbows bent, hands by the hips, swinging opposite to the legs; from
     // wherever the hand was meant to be (the guard, if nothing else).
-    const swinging = [0.04 * H + sign * stride * (fighter.runPose > 0 ? WORLD.runMode.swing : spec.swing) * H, 0.52 * H, sign * 0.19 * H];
+    const swinging = fighter.runPose > 0 ? runHand(fighter, 'free', side) : [0.04 * H + sign * stride * spec.swing * H, 0.52 * H, sign * 0.19 * H];
     guard ??= desiredPose(fighter.body, { stance: intent.stance });
     intent[`${side}Hand`] = vec.lerp(intent[`${side}Hand`] ?? guard[P[`${side}Hand`]], swinging, fighter.carry);
   }
@@ -2182,7 +2213,9 @@ function updateFeet(fighter, dt) {
   // Getting up, he stands up off the feet where he put them; he steps once up.
   if (fighter.state === 'rising') return;
   // Running (the player's run mode): quicker, longer steps, the next foot away before the last has landed (WORLD.runMode.step).
-  const run = fighter.runPose > 0.3 ? WORLD.runMode.step : null;
+  // On a stair (or a steep slope) the stride is the short quick step of the stair, a foot to a tread, not the leaping stride of the flat.
+  const stair = fighter.runSlope > WORLD.runMode.stairs.slope;
+  const run = fighter.runPose > 0.3 ? (stair ? WORLD.runMode.stairs.step : WORLD.runMode.step) : null;
   const spec = run ? { ...WORLD.step, ...run } : WORLD.step;
   const feet = Object.values(fighter.feet);
   for (const [side, foot] of Object.entries(fighter.feet)) {
@@ -2207,20 +2240,40 @@ function updateFeet(fighter, dt) {
   }
   if (worst && !stepping) {
     // Step to where the stance will be, not where it is: lead the motion.
-    const lead = spec.lead * spec.seconds;
-    const to = [worst.desired[0] + fighter.rootVelocity[0] * lead, worst.desired[1], worst.desired[2] + fighter.rootVelocity[1] * lead];
-    if (run) turnedStep(fighter, worst, to);
+    const to = landingOf(fighter, worst, spec, run ? 1 : null, 0);
     // (floorFrom, floorTo: the floor under the foot at each end of the step, set on terrain: groundStance.)
-    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined };
+    // (A run's long stride is aimed again as it goes, while the foot is in the air: `retarget`.)
+    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined, seconds: spec.seconds, lift: run ? spec.lift : undefined, retarget: Boolean(run) && !stair };
   }
   for (const foot of feet) {
     if (!foot.step) continue;
-    foot.step.t += dt / spec.seconds;
+    foot.step.t += dt / foot.step.seconds;
+    if (foot.step.retarget) {
+      if (foot.step.t < WORLD.runMode.settle) foot.step.to = landingOf(fighter, foot, spec, 1, foot.step.t);
+      else foot.step.retarget = false;
+    }
     if (foot.step.t >= 1) {
       foot.planted = foot.step.to;
       foot.step = null;
     }
   }
+}
+
+/**
+ * Where a foot's step is to land: where the stance will be when it does, `ahead` (a stride's lead, WORLD.step.lead, with the swing `done` share
+ * gone) of his speed on. A run (`run` set) goes by the chord of the arc he is turning on, and the sprint turn's footwork (turnedStep).
+ */
+function landingOf(fighter, foot, spec, run, done) {
+  const time = done === 0 ? spec.lead * spec.seconds : spec.seconds * (1 - done) + (spec.lead - 1) * spec.seconds;
+  let [vx, vz] = fighter.rootVelocity;
+  if (run && fighter.turn) {
+    const half = (-fighter.turn * time) / 2;
+    const chord = Math.abs(half) > 1e-3 ? Math.sin(half) / half : 1;
+    [vx, vz] = [(vx * Math.cos(half) - vz * Math.sin(half)) * chord, (vx * Math.sin(half) + vz * Math.cos(half)) * chord];
+  }
+  const to = [foot.desired[0] + vx * time, foot.desired[1], foot.desired[2] + vz * time];
+  if (run) turnedStep(fighter, foot, to);
+  return to;
 }
 
 /**
@@ -2274,8 +2327,8 @@ function rawFootTarget(fighter, foot) {
   const ease = t * t * (3 - 2 * t);
   const along = vec.lerp(foot.step.from, foot.step.to, ease);
   // On terrain the foot rises to the next tread early (and drops to a lower one late), and clears the edge.
-  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + (fighter.runPose > 0.3 ? WORLD.runMode.step.lift : WORLD.step.lift) * Math.sin(Math.PI * t) + stepHeight(foot.step, t), along[2]];
-  return [along[0], fighter.desired[foot.index][1] + (fighter.runPose > 0.3 ? WORLD.runMode.step.lift : WORLD.step.lift) * Math.sin(Math.PI * t), along[2]];
+  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * Math.sin(Math.PI * t) + stepHeight(foot.step, t), along[2]];
+  return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * Math.sin(Math.PI * t), along[2]];
 }
 
 /** The floor height under a foot a share `t` of the way through a step onto terrain, and the clearance it needs over the edge. */
@@ -2326,7 +2379,7 @@ function groundStance(fighter, dt) {
     if (foot.lifted) continue;
     // A step just begun is aimed to land on one floor, not astride the edge of two, and no
     // more than a stride up: where the tread it points at is too high, it is cut short.
-    if (foot.step && foot.step.floorFrom === undefined) {
+    if (foot.step && (foot.step.floorFrom === undefined || foot.step.retarget)) {
       const { from, to } = foot.step;
       let share = 1;
       while (share > 0.2 && floorAt(terrain, from[0] + (to[0] - from[0]) * share, from[2] + (to[2] - from[2]) * share, lift + spec.stepUp + 0.6) > lift + spec.sag + spec.stepUp) share -= 0.2;
@@ -2720,6 +2773,8 @@ function climbShare(fighter, wanted) {
     if (!(Math.abs(ahead - here) <= spec.slopeMost) || !(Math.abs(here - behind) <= spec.slopeMost)) continue;
     steepest = Math.max(steepest, Math.abs(ahead - behind) / (2 * spec.slopeSpan));
   }
+  // (The run's step reads the slope: a stair is stepped, a flat is leapt along: updateFeet.)
+  if (fighter.runMode) fighter.runSlope = steepest;
   const rate = steepest * speed;
   return rate > spec.climb ? spec.climb / rate : 1;
 }

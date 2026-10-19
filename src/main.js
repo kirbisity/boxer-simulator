@@ -14,7 +14,7 @@ import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
-import { askRunLock, breakRun, CONTROL, contextAction, directFighter, endRun, keyStick, MOVE_KEYS, newOrders, playerCrawl, swingAt } from './control.js';
+import { breakRun, contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl, swingAt } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
@@ -418,7 +418,6 @@ function thinkForBout(world, dt) {
   if (!players.size) return;
   // At a bandage, a change of harness, a stoop for a weapon: he stands where he is.
   if (world.stage?.level && levelBusy(world)) {
-    endRun(state.orders);
     player().runMode = false;
     holdPlayer(player());
   }
@@ -726,7 +725,7 @@ function followCamera(fighter, dt) {
     foe: locked ? point(locked.x, P.pelvis) : null,
     running: Boolean(fighter.runMode),
     speed: Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]),
-    moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick || state.orders.runLock) && state.orders.lock === null)),
+    moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick) && state.orders.lock === null)),
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
   }, realSeconds(), dt);
@@ -1312,7 +1311,6 @@ const KEYS = {
 const ORDER_KEYS = Object.fromEntries(COMMAND_ORDERS.map((entry) => [entry.key, entry.kind]));
 // The movement keys held in the fight (not walk mode), and when Space went down.
 const fightKeys = new Set();
-let lastForward = { key: null, at: -Infinity };
 let spaceDown = null;
 const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
@@ -1361,19 +1359,8 @@ window.addEventListener('keydown', (press) => {
     }
   }
   if (key === 'shift') state.walkRunning = true;
-  // Shift+R locks the run (or lets it go); so does a second tap on forward within CONTROL.run.doubleTap. It then goes on with the keys let go.
-  if (press.shiftKey && key === 'r') {
-    press.preventDefault();
-    askRunLock(state.orders);
-    return;
-  }
   if (MOVE_KEYS[key]) {
     press.preventDefault();
-    if (MOVE_KEYS[key][0] > 0) {
-      const now = realSeconds();
-      if (lastForward.key === key && now - lastForward.at <= CONTROL.run.doubleTap) askRunLock(state.orders, true);
-      lastForward = { key, at: now };
-    }
     fightKeys.add(key);
   } else if (press.key === ' ') {
     // Held, the guard stays up; tapped, a dodge (as the Guard button).

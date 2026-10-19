@@ -27,9 +27,10 @@ export const RUN_STEER = {
   // that the centre ray has missed, a pillar going by).
   sideWithin: 0.75,
   sideGain: 0.5,
-  // A locked run takes up the heading along the wall, at `adoptRate` rad/s, once the wall holds him by `adoptFrom` (0..1).
-  adoptFrom: 0.25,
-  adoptRate: 5,
+  // A bend that would run him off a drop the straight way does not is not made: the floor `edgeAhead` m ahead is `edgeDrop` m or
+  // more below the floor under him (stairs are 0.2 m a step). (control.js dropsAhead.)
+  edgeAhead: 1.6,
+  edgeDrop: 0.9,
   // On a stair (or a ramp): the floor rises across `stairSpan` m by at least `stairRise` per m, and he pushes up it or down it within
   // `stairFull` rad of its line, fading to nothing at `stairFrom` rad: the heading is bent to follow the line of the stair
   // (the uphill way of the floor, or its opposite), which on a winding stair keeps turning with it.
@@ -112,16 +113,13 @@ export function stairBend(line, way, spec = RUN_STEER) {
 }
 
 /**
- * Steer a run: `way` is the floor way [x, z] (unit) the player's stick, or his locked run, asks for; the heading he is to be given is
- * returned, bent along a wall in the way. `state` ({ bend, adopt }) is kept between steps (`orders.runSteer`): `bend` the smoothed bend
- * and, for a locked run (`adopt` true), `adopt` the heading it should take up (turned from `way` towards the line of the wall that holds him, null if none does),
- * so that a run along a curving wall or stair goes on round it and on past its end instead of aiming into it again. `drops(dir)` says whether
- * a heading would take him off an edge (control.js dropsAhead): such a bend is not made. A world with no terrain, or a man in the
- * air, is not steered.
+ * Steer a run: `way` is the floor way [x, z] (unit) the player's stick asks for; the heading he is to be given is
+ * returned, bent along a wall in the way. `state` ({ bend }) is kept between steps (`orders.runSteer`): `bend` the smoothed bend.
+ * `drops(dir)` says whether a heading would take him off an edge (control.js dropsAhead): such a bend is not made. A world with no
+ * terrain, or a man in the air, is not steered.
  */
-export function runSteer(world, fighter, state, way, dt, { adopt = false, drops = () => false, spec = RUN_STEER } = {}) {
+export function runSteer(world, fighter, state, way, dt, { drops = () => false, spec = RUN_STEER } = {}) {
   const terrain = world.arena?.terrain;
-  state.adopt = null;
   if (!terrain || fighter.air || !fighter.root) {
     state.bend = 0;
     return way;
@@ -133,29 +131,18 @@ export function runSteer(world, fighter, state, way, dt, { adopt = false, drops 
   const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
   const within = Math.max(spec.wallWithin, speed * spec.lookAhead);
   const felt = feelers(terrain, fighter.root, ahead, fighter.lift ?? 0, fan, { reach: Math.max(spec.reach, within + 0.3) });
-  const { bend: wallBend, engaged, glide } = wantedBend(felt, ahead, spec, within);
+  const { bend: wallBend } = wantedBend(felt, ahead, spec, within);
   const wanted = Math.max(-spec.maxBend, Math.min(spec.maxBend, along + wallBend));
   state.bend += (wanted - state.bend) * (1 - Math.exp(-spec.rate * dt));
   const bent = rotateWay(way, state.bend);
-  // A locked run takes up the heading of the wall or stair (state.adopt); the bend is reckoned from that now, so the heading given stays the same.
-  const take = adopt ? (glide && engaged >= spec.adoptFrom ? glide : along ? ahead : null) : null;
-  let taken = 0;
-  if (take) {
-    const was = Math.atan2(way[1], way[0]);
-    const turn = wrapSteer(Math.atan2(take[1], take[0]) - was);
-    taken = Math.max(-spec.adoptRate * dt, Math.min(spec.adoptRate * dt, turn));
-    state.adopt = [Math.cos(was + taken), Math.sin(was + taken)];
-  }
-  if (Math.abs(state.bend) < 1e-3 && !taken) {
+  if (Math.abs(state.bend) < 1e-3) {
     state.bend = 0;
     return way;
   }
   // Never to an edge: a bend that would run him off a drop the straight way does not is not made.
   if (drops(bent) && !drops(way)) {
     state.bend = 0;
-    state.adopt = null;
     return way;
   }
-  state.bend -= taken;
   return bent;
 }
