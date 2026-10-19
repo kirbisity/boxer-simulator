@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames, stageLookOf } from '../src/levelmode/stagelooks.js';
-import { hexToRgb, skyDirection, skyPoint } from '../src/levelmode/stagesky.js';
+import { hexToRgb, photoHorizon, rgbToHex, skyAngle, skyDirection, skyGrade, skyPoint, skySmooth } from '../src/levelmode/stagesky.js';
+import { STORM_SKY_DATA } from '../src/levelmode/stormsky-data.js';
 import { ktField, ktMacroData } from '../src/levelmode/kitpaint.js';
 
 const hex = /^#[0-9a-f]{6}$/i;
@@ -17,8 +18,11 @@ test('every look is whole: a sky, a light, a fog, a sea, rain, and a sentence ab
     assert.ok(look.label && look.blurb.length > 60, `${name}: label and blurb`);
     for (const key of ['zenith', 'high', 'mid', 'horizon']) assert.match(look.sky[key], hex, `${name}: sky.${key}`);
     const clouds = look.sky.clouds;
-    assert.ok(clouds.count > 0 && clouds.size[0] < clouds.size[1] && clouds.flat > 0 && clouds.flat <= 1, `${name}: clouds`);
-    assert.ok(clouds.from < clouds.to && clouds.to <= 0.5, `${name}: clouds stay above the horizon`);
+    if (look.sky.photo) assert.equal(clouds, undefined, `${name}: a photographic sky paints no clouds`);
+    else {
+      assert.ok(clouds.count > 0 && clouds.size[0] < clouds.size[1] && clouds.flat > 0 && clouds.flat <= 1, `${name}: clouds`);
+      assert.ok(clouds.from < clouds.to && clouds.to <= 0.5, `${name}: clouds stay above the horizon`);
+    }
     assert.ok(look.sun.el > 0 && look.sun.el < 90 && look.sun.intensity > 0, `${name}: sun`);
     assert.equal(look.sun.colour.length, 3);
     assert.equal(look.ambient.tint.length, 3);
@@ -90,4 +94,67 @@ test('the castle shadows itself in the looks that have a sun, and not in those t
     if (look.shaft && look.sun.intensity > 1.5) assert.ok(strength >= 0.8, `${name}: a hard sun, a deep shadow`);
   }
   assert.ok(STAGE_LOOKS[DEFAULT_STAGE_LOOK].bakedShadow > 0, 'the default look has the shadow it was asked for');
+});
+
+test('a photographic look names a photograph that exists, a sane grade, and a horizon that is the graded photograph\'s own', () => {
+  const photographic = Object.entries(STAGE_LOOKS).filter(([, look]) => look.sky.photo);
+  assert.ok(photographic.length >= 4, 'the storm default and three more are photographic');
+  assert.ok(STAGE_LOOKS[DEFAULT_STAGE_LOOK].sky.photo, 'the default is a photograph');
+  for (const [name, look] of photographic) {
+    const { id, az, grade } = look.sky.photo;
+    const data = STORM_SKY_DATA[id];
+    assert.ok(data && data.jpeg.length > 1000 && data.rows * 4 === data.width, `${name}: photograph ${id}`);
+    assert.ok(az >= 0 && az < 360, `${name}: azimuth`);
+    assert.ok(grade.gain[0] > 0 && grade.gain[1] > 0, `${name}: gain`);
+    assert.ok(grade.rise[0] < grade.rise[1] && grade.gamma > 0 && grade.sat >= 0 && grade.tint.length === 3, `${name}: grade`);
+    const graded = photoHorizon(look.sky.photo);
+    const seen = hexToRgb(look.sky.horizon);
+    for (let k = 0; k < 3; k += 1) assert.ok(Math.abs(graded[k] - seen[k]) <= 3, `${name}: sky.horizon ${look.sky.horizon} is the graded photograph's horizon ${rgbToHex(graded)}`);
+  }
+});
+
+test('the grade darkens the sky overhead and far from the break, and keeps every channel in range', () => {
+  const grade = STAGE_LOOKS.stormBreak.sky.photo.grade;
+  const grey = [150, 150, 160];
+  const horizon = skyGrade(grey, 2, 0, grade);
+  const overhead = skyGrade(grey, 85, 90, grade);
+  const luma = (c) => c[0] + c[1] + c[2];
+  assert.ok(luma(overhead) < luma(horizon) * 0.35, 'black overhead, bright low down');
+  assert.ok(luma(skyGrade(grey, 40, 100, grade)) < luma(skyGrade(grey, 40, 5, grade)), 'darker far from the break');
+  for (const c of skyGrade([255, 255, 255], 0, 0, grade)) assert.ok(c >= 0 && c <= 255);
+});
+
+test('the sky maths: the smooth step, and the angle between two directions', () => {
+  assert.equal(skySmooth(0, 10, -5), 0);
+  assert.equal(skySmooth(0, 10, 15), 1);
+  assert.ok(Math.abs(skySmooth(0, 10, 5) - 0.5) < 1e-9);
+  assert.ok(Math.abs(skyAngle(0, 0, 90, 0) - 90) < 1e-9);
+  assert.ok(Math.abs(skyAngle(37, 20, 37, 80) - 60) < 1e-9);
+  assert.ok(skyAngle(10, 10, 10, 10) < 1e-6);
+});
+
+test('the default keeps a strong sun and a dim shade: only a break in the cloud', () => {
+  const look = STAGE_LOOKS[DEFAULT_STAGE_LOOK];
+  assert.ok(look.sun.intensity >= 2.4 && look.sun.intensity <= 3, 'sun 2.4..3');
+  assert.ok(look.bakedShadow >= 0.9, 'the walls shade themselves in a real sun');
+  assert.ok(look.ambient.gain * look.hemi.intensity < 0.5, 'the shade stays dim');
+});
+
+test('the fair-weather looks are for the sandbox only, bright, dry and lit by a real sun; the real stage keeps the storm', () => {
+  const fair = Object.entries(STAGE_LOOKS).filter(([, look]) => look.sandboxOnly);
+  assert.ok(fair.length >= 3, 'at least three fair-weather looks');
+  assert.ok(!STAGE_LOOKS[DEFAULT_STAGE_LOOK].sandboxOnly, 'the default is not one of them');
+  for (const [name, look] of fair) {
+    assert.ok(look.sky.photo, `${name}: a photographic sky`);
+    assert.equal(look.rain.opacity, 0, `${name}: dry`);
+    assert.equal(look.lightning, null, `${name}: no lightning`);
+    assert.ok(look.pools === 0 && look.wet <= 0.2, `${name}: no puddles, the stone nearly dry`);
+    assert.ok(look.bakedShadow >= 0.9, `${name}: the sun is real, so the walls cast shadows`);
+    assert.ok(look.sun.intensity >= 1.8 && look.sun.el >= 20, `${name}: a sun well up`);
+    assert.ok(look.torch <= 0.4, `${name}: the torches are pale in daylight`);
+    // The sun stands where the photograph's own sun does.
+    const data = STORM_SKY_DATA[look.sky.photo.id];
+    assert.ok(Math.abs(look.sun.el - data.breakEl) < 1, `${name}: the sun's elevation is the photograph's`);
+    assert.ok(Math.abs(look.sun.az - look.sky.photo.az) < 1e-9, `${name}: and its azimuth is where the picture is turned`);
+  }
 });

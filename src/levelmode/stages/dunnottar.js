@@ -14,183 +14,25 @@
 //                              postern; the guard hall, a steep stair up to the oillet wall, and the gallery behind it
 //   ascent  Tunnelled Ascent    x 9..29, z 5..42             : vestibule, two stair flights and a guard room up to the quad (y 12.18)
 //   quad    The Quadrangle      x -2..46, z -38..8  (y>=9.8)  : grass court, the well (Rest 2), ruined ranges, the stairs down to the vault
-//   vault   Whigs' Vault        x -2..46, z -36..-3 (y 3..11.5): the long cellar (floor y 6), the cell hall, the iron gate up to the quad
-//                              (Shortcut 3), the east stair up into the tower house
+//   vault   Whigs' Vault        x -2..46, z -39..-3 (y 3..11.5): the long cellar (floor y 6), the cell hall, the iron gate up to the quad
+//                              (Shortcut 3), the east stair up into the tower house; off the cellar the torture chamber, the stores and
+//                              the well shaft (dunnottar-vault.js)
+//   crypt   The Crypt           x -1..34, z -40..-18 (y -1..5.4): under the cellar, by the shaft's winding stair: gallery, ossuary, tombs, a
+//                              flooded way on a causeway to the sea-gate and a hidden lever (a loop back up through the torture chamber)
 //   tower   Tower House & Upper Walls: the keep hall (y 12.18), the winding tower stair (to y 24.93), the north wall walk, a stair
 //                              down to the ladder room (y 17.18: Shortcut 2 kicks a ladder down into the quad) and Rest 3
-//   chapel  The Chapel          x -19..-3, z -47..-29 (y 17.18): the roofless summit arena, Lord Vaelen
-//   cell    The Inner Cell      x -14..-4, z -55..-46          : after the boss: the prince
+//   chapel  The Sanctuary       x -35..-2, z -48..-24 (y 17.18): the fully vaulted summit nave, 30 x 20 m, Lord Vaelen; the cell's double doors in its west end
+//   cell    The Inner Cell      x -46..-34, z -42..-30         : directly behind the chancel doors; after the boss: the prince (dunnottar-chapel.js)
 //
 // A section's `decor` is for the drawing only (levelmode/kit.js): wall runs with openings, vaults, props. The solids
 // that make the physics carry a `style` (how they are drawn) and, when a run draws them instead, `skin: false`.
 
-import { ceilingOf, rampOf, slabOf, stairsOf, wallLine, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
+import { ceilingOf, rampOf, stairsOf, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
+import { buildChapel, buildCell, DN_ENDING } from './dunnottar-chapel.js';
+import { buildCrypt, buildVault, DN_COVERED, DN_SHAFT_SPIRAL, DN_VAULT_STEPS } from './dunnottar-vault.js';
+import { DN_FACE, DN_LEVELS, DN_PATH, DN_Y, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnLerp, dnProp, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
-/** The levels (y). */
-export const DN_Y = { sea: -9, start: 14, pathA: 10.6, pathB: 7.2, pathC: 3.8, gorge: 0, landing: 4.18, guardroom: 8.18, quad: 12.18, vault: 6.0, ladderRoom: 17.18, walk: 24.93 };
-const Y = DN_Y;
-/** The floors a man stands on (y), for the drawing's wear (levelmode/kitwear.js finds the floor a wall stands on among these). */
-export const DN_LEVELS = [Y.gorge, Y.landing, Y.guardroom, Y.quad, Y.vault, Y.ladderRoom, Y.walk];
-/** How wide the outdoor path is (m): a narrow way between rails, not a road (the fighting room is this less the rails: 2.9). */
-export const DN_PATH = 3.2;
-
-/** Facing: yaw 0 looks along +x, a positive yaw turns toward -z. */
-export const DN_FACE = { E: 0, N: Math.PI / 2, W: Math.PI, S: -Math.PI / 2 };
-const DIRS = { E: [1, 0, 0], W: [-1, 0, Math.PI], N: [0, -1, Math.PI / 2], S: [0, 1, -Math.PI / 2] };
-
-// ---- Builders -------------------------------------------------------------------------------
-
-const dnSection = (id, name) => ({ id, name, bounds: [], terrain: [], portals: [], spawns: [], items: [], levers: [], gates: [], ladders: [], decor: [] });
-
-/** A slab by extents. `style`: how the top is drawn (cobble, flags, grass, path, rock, boards, earth). */
-function dnSlab(sec, x0, x1, z0, z1, top, style, opts = {}) {
-  const solid = { ...slabOf([(x0 + x1) / 2, (z0 + z1) / 2], [x1 - x0, z1 - z0], top, { bottom: opts.bottom, id: opts.id }), style, ...(opts.extra ?? {}) };
-  if (opts.skin === false) solid.skin = false;
-  sec.terrain.push(solid);
-  return solid;
-}
-
-/** A wall box by extents. */
-function dnBox(sec, x0, x1, z0, z1, y0, y1, style = 'ashlar', opts = {}) {
-  const solid = { ...wallOf([(x0 + x1) / 2, (z0 + z1) / 2], [x1 - x0, z1 - z0], y0, y1, { id: opts.id }), style, ...(opts.extra ?? {}) };
-  if (opts.skin === false) solid.skin = false;
-  sec.terrain.push(solid);
-  return solid;
-}
-
-/** A ceiling by extents (its underside at `bottom`; `top` for the roof). */
-function dnCeiling(sec, x0, x1, z0, z1, bottom, top = bottom + 0.8, style = 'vault') {
-  sec.terrain.push({ ...ceilingOf([(x0 + x1) / 2, (z0 + z1) / 2], [x1 - x0, z1 - z0], bottom, { top }), style, skin: false });
-}
-
-/**
- * A wall from `a` to `b` (each [x, z], the centreline), `thick` thick, from y0 to y1, with openings:
- * { at: distance of the middle from a, width, sill (the floor; default y0), top, shape: 'round' | 'pointed' | 'square' | 'slit' | 'lancet', solid }.
- * An opening is clear to the physics from `sill` to `top` (a `solid` one - a window - blocks, and is only drawn open).
- * The kit draws the run as one wall with its openings (decor); the pieces carry `skin: false`.
- */
-function dnRun(sec, a, b, thick, y0, y1, style, openings = [], extra = {}) {
-  const dx = b[0] - a[0];
-  const dz = b[1] - a[1];
-  const length = Math.hypot(dx, dz);
-  const ux = dx / length;
-  const uz = dz / length;
-  const yaw = Math.atan2(-dz, dx);
-  const piece = (s0, s1, lo, hi) => {
-    if (s1 - s0 < 1e-3 || hi - lo < 1e-3) return;
-    const s = (s0 + s1) / 2;
-    sec.terrain.push({ ...wallOf([a[0] + ux * s, a[1] + uz * s], [s1 - s0, thick], lo, hi, { yaw }), style, skin: false });
-  };
-  let cursor = 0;
-  for (const o of [...openings].sort((p, q) => p.at - q.at)) {
-    const s0 = o.at - o.width / 2;
-    const s1 = o.at + o.width / 2;
-    piece(cursor, s0, y0, y1);
-    if (o.solid) piece(s0, s1, y0, y1);
-    else {
-      // (Under the sill, a hand's breadth below the floor: a wall whose top is flush with the floor would catch a foot that sags a little.)
-      if (o.sill !== undefined) piece(s0, s1, y0, o.sill - 0.15);
-      piece(s0, s1, o.top, y1);
-    }
-    cursor = s1;
-  }
-  piece(cursor, length, y0, y1);
-  sec.decor.push({ kind: 'run', a, b, thick, y0, y1, style, openings, ...extra });
-}
-
-
-/** A straight flight up in direction `dir` (E W N S) from the foot's middle `foot` = [x, z]. */
-function dnFlight(sec, { foot, dir, steps, tread = 0.34, width, from, rise, style = 'stone', id, bottom }) {
-  const [dx, dz, yaw] = DIRS[dir];
-  const length = steps * tread;
-  const at = [foot[0] + (dx * length) / 2, foot[1] + (dz * length) / 2];
-  const solid = { ...stairsOf(at, [length, width], steps, from, rise, { yaw, bottom, id }), style };
-  sec.terrain.push(solid);
-  const flight = {
-    dir, dx, dz, yaw, length, width, steps, tread, from, rise, foot, solid, top: from + steps * rise, end: [foot[0] + dx * length, foot[1] + dz * length],
-    /** The top of tread k (0-based). */
-    treadY: (k) => from + (k + 1) * rise,
-    /** The middle of tread k, `side` m to the left of the way up (+ is toward p = (-dz, dx)). */
-    treadAt: (k, side = 0) => [foot[0] + dx * (k + 0.5) * tread - dz * side, foot[1] + dz * (k + 0.5) * tread + dx * side],
-    /** The point `s` m along the flight, `side` across. */
-    along: (s, side = 0) => [foot[0] + dx * s - dz * side, foot[1] + dz * s + dx * side],
-  };
-  return flight;
-}
-
-/** Walls along both sides of a flight (retaining or tunnel walls), in pieces of `every` steps. */
-function dnFlightWalls(sec, flight, { thick = 1.6, head = 4.4, every = 2, style = 'ashlar', sides = [1, -1] } = {}) {
-  const { dx, dz, yaw, tread, width, steps } = flight;
-  for (let i = 0; i < steps; i += every) {
-    const last = Math.min(steps, i + every) - 1;
-    const s0 = i * tread;
-    const s1 = (last + 1) * tread;
-    const lo = flight.treadY(i) - 0.6;
-    const hi = flight.treadY(last) + head;
-    for (const side of sides) {
-      const offset = (width / 2 + thick / 2) * side;
-      const centre = [flight.foot[0] + dx * (s0 + s1) / 2 - dz * offset, flight.foot[1] + dz * (s0 + s1) / 2 + dx * offset];
-      sec.terrain.push({ ...wallOf(centre, [s1 - s0 + 0.02, thick], lo, hi, { yaw }), style });
-    }
-  }
-}
-
-/** Stepped ceilings over a flight, and the sloped barrel vault drawn under them. `from`/`to` limit it to steps [from, to). */
-function dnFlightVault(sec, flight, { head = 3.8, every = 2, first = 0, last = flight.steps, style = 'vault', crown = 0.9, roof = 0.7 } = {}) {
-  const { dx, dz, yaw, tread, width } = flight;
-  for (let i = first; i < last; i += every) {
-    const end = Math.min(last, i + every) - 1;
-    const s0 = i * tread;
-    const s1 = (end + 1) * tread;
-    const mid = flight.along((s0 + s1) / 2);
-    const bottom = flight.treadY(end) + head;
-    sec.terrain.push({ ...ceilingOf(mid, [s1 - s0 + 0.02, width], bottom, { yaw, top: bottom + roof }), style, skin: false });
-  }
-  const spring = (s) => flight.from + head + flight.rise * (s / tread) + 2 * flight.rise;
-  const s0 = first * tread;
-  const s1 = last * tread;
-  const a = flight.along(s0);
-  const b = flight.along(s1);
-  sec.decor.push({ kind: 'vault', a: [a[0], a[1], spring(s0)], b: [b[0], b[1], spring(s1)], width, crown: width / 2 * (0.6 + crown * 0.4), style });
-}
-
-/** Fence posts and rails along points [x, z, y]: the physics wall (a rail that blocks) and its drawing. */
-function dnFence(sec, points, { style = 'fence', height = 1.15, gaps = [], every = 3 } = {}) {
-  for (let i = 0; i + 1 < points.length; i += 1) {
-    const [x0, z0, y0] = points[i];
-    const [x1, z1, y1] = points[i + 1];
-    const length = Math.hypot(x1 - x0, z1 - z0);
-    const count = Math.max(1, Math.ceil(length / every));
-    for (let k = 0; k < count; k += 1) {
-      const t0 = k / count;
-      const t1 = (k + 1) / count;
-      const a = [x0 + (x1 - x0) * t0, z0 + (z1 - z0) * t0];
-      const b = [x0 + (x1 - x0) * t1, z0 + (z1 - z0) * t1];
-      const ya = y0 + (y1 - y0) * t0;
-      const yb = y0 + (y1 - y0) * t1;
-      const lo = Math.min(ya, yb) - 0.6;
-      const hi = Math.max(ya, yb) + height;
-      sec.terrain.push({ ...wallLine(a, b, 0.3, lo, hi), style, skin: false });
-    }
-  }
-  sec.decor.push({ kind: 'fence', points, style, height, gaps });
-}
-
-/** A gate or door: `closed` solids block; `open` ones (usually none) stand when it is open. `look` is how the kit draws and animates it. `at` is the point it is worked from (levelmode/interact.js); opts: opensFrom (a region), key (an item id), frees (spawn ids), label, lockedText. */
-function dnGate(sec, id, at, closed, look, opts = {}) {
-  const { opensFrom, key, frees, label, lockedText } = opts;
-  sec.gates.push({ id, at, state: opts.state ?? 'closed', states: { closed, open: opts.open ?? [] }, look, ...(opensFrom ? { opensFrom } : {}), ...(key ? { key } : {}), ...(frees ? { frees } : {}), ...(label ? { label } : {}), ...(lockedText ? { lockedText } : {}) });
-}
-
-/** A spawn. */
-function dnSpawn(sec, id, preset, role, tier, post, facing, extra = {}) {
-  sec.spawns.push({ id, preset, role, tier, post, facing, ...extra });
-}
-
-const dnItem = (sec, id, kind, at, extra = {}) => sec.items.push({ id, kind, at, ...extra });
-const dnProp = (sec, what, at, extra = {}) => sec.decor.push({ kind: 'prop', what, at, ...extra });
-const dnBounds = (sec, ...regions) => sec.bounds.push(...regions);
-const dnLerp = (x0, x1, y0, y1) => (x) => y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+export { DN_FACE, DN_LEVELS, DN_PATH, DN_Y } from './dnbuild.js';
 
 // ---- Scenery that is solid ----------------------------------------------------------------------
 
@@ -214,6 +56,9 @@ function dnCairn(sec, x, z) {
   sec.decor.push({ kind: 'cairn', at: [x, y, z] });
   sec.terrain.push({ ...wallOf([x, z], [1.4, 1.4], y - 0.5, y + 1.7, {}), style: 'hidden', skin: false });
 }
+
+/** The north edge of the wall walk and its stair (z): 5.2 m from the court-side parapet to the sea-side one, 4.65 clear (the stair was 3.45). */
+const DN_WALK_N = -39.2;
 
 // ---- 1. The Cliff Path ----------------------------------------------------------------------
 
@@ -343,12 +188,12 @@ function buildGate() {
   dnSlab(sec, -6.8, 6.8, 39.6, 52.8, Y.gorge, 'flags', { extra: { room: true } });
   dnRun(sec, [-6, 39.6], [-6, 52.8], 1.6, Y.gorge - 1, 5.8, 'ashlar', [{ at: 6.6, width: 3.2, sill: Y.gorge, top: 3.9, shape: 'round' }], { face: 'gate' });
   dnRun(sec, [-6.8, 40.4], [6.8, 40.4], 1.6, Y.gorge - 1, 5.8, 'ashlar', [{ at: 6, width: 0.5, sill: 2.9, top: 4.4, shape: 'slit', solid: true }, { at: 10.5, width: 0.5, sill: 2.9, top: 4.4, shape: 'slit', solid: true }]);
-  dnRun(sec, [-6.8, 52], [6.8, 52], 1.6, Y.gorge - 1, 5.8, 'ashlar', [{ at: 9, width: 2.4, sill: Y.gorge, top: 3.4, shape: 'round' }, { at: 3, width: 0.5, sill: 2.9, top: 4.4, shape: 'slit', solid: true }], { face: 'postern' });
+  dnRun(sec, [-6.8, 52], [6.8, 52], 1.6, Y.gorge - 1, 5.8, 'ashlar', [{ at: 9, width: 3.2, sill: Y.gorge, top: 3.6, shape: 'round' }, { at: 3, width: 0.5, sill: 2.9, top: 4.4, shape: 'slit', solid: true }], { face: 'postern' });
   dnRun(sec, [6, 41.2], [6, 51.2], 1.6, Y.gorge - 1, 5.8, 'ashlar', [{ at: 5, width: 5.4, sill: Y.gorge, top: 4.6, shape: 'round' }]);
   dnCeiling(sec, -5.2, 5.2, 41.2, 51.2, 4.8, 5.8);
   sec.decor.push({ kind: 'vault', a: [-5.2, 46.2, 4.8], b: [5.2, 46.2, 4.8], width: 10, crown: 2.6, style: 'vault' });
   // The great gate: barred from within. A lever on the inside throws the bar (Shortcut 1).
-  dnGate(sec, 'cliffgate', [-4.4, Y.gorge, 46.2], [{ ...wallOf([-6, 46.2], [0.4, 3.2], Y.gorge, 3.9, { id: 'cliffgate' }), style: 'iron', skin: false }], { kind: 'door', width: 3.2, height: 3.9, hinge: 'z-', leaf: 'oak' }, { opensFrom: { at: [-1.4, 46.2], size: [7.6, 9.6] }, label: 'Throw the bar' });
+  dnGate(sec, 'cliffgate', [-4.4, Y.gorge, 46.2], [{ ...wallOf([-6, 46.2], [0.4, 3.2], Y.gorge, 3.9, { id: 'cliffgate' }), style: 'iron', skin: false }], { kind: 'door', width: 3.2, height: 3.9, hinge: 'z-', leaf: 'oak' }, { opensFrom: { at: [-1.4, 46.2], size: [7.6, 9.6] }, label: 'Throw the bar of the great gate' });
   // Barrels, a table, a keg with something scratched on it.
   dnProp(sec, 'barrel', [-4.2, Y.gorge, 42.2], { yaw: 0.4 });
   dnProp(sec, 'barrel', [-3.1, Y.gorge, 41.9], { yaw: 1.4 });
@@ -372,7 +217,7 @@ function buildGate() {
   sec.terrain.push({ ...wallOf([13.9, 42.3], [0.8, 2.2], A - 1, A + 8, {}), style: 'ashlar', skin: false });
   // The landing before the oillet wall.
   dnSlab(sec, 14.28, 22.1, 39.6, 52.8, A, 'flags', { extra: { room: true } });
-  dnRun(sec, [14.28, 40.4], [30.6, 40.4], 1.6, A - 1, A + 5.2, 'ashlar', [{ at: 3.2, width: 5.4, sill: A, top: A + 3.9, shape: 'round' }, { at: 10.3, width: 2.4, sill: A, top: A + 3.4, shape: 'round' }], { face: 'vestibule' });
+  dnRun(sec, [14.28, 40.4], [30.6, 40.4], 1.6, A - 1, A + 5.2, 'ashlar', [{ at: 3.2, width: 5.4, sill: A, top: A + 3.9, shape: 'round' }, { at: 10.3, width: 3.2, sill: A, top: A + 3.6, shape: 'round' }], { face: 'vestibule' });
   dnRun(sec, [14.28, 52], [30.6, 52], 1.6, A - 1, A + 5.2, 'ashlar');
   dnCeiling(sec, 14.3, 20.5, 41.2, 51.2, A + 4.4, A + 5.2);
   sec.decor.push({ kind: 'vault', a: [14.3, 46.2, A + 4.4], b: [20.5, 46.2, A + 4.4], width: 10, crown: 2.2, style: 'vault' });
@@ -487,12 +332,6 @@ function dnSlabHoles(sec, [x0, x1, z0, z1], holes, top, style, opts = {}) {
   }
 }
 
-// The stair flights from the quadrangle into the vault share these numbers: 31 treads from the cellar floor (y 6) to the court.
-const DN_VAULT_STEPS = 31;
-const DN_VAULT_RISE = (Y.quad - Y.vault) / DN_VAULT_STEPS;
-/** The treads that lie under the court's own slab (a man's head clears it): the first 11. */
-const DN_COVERED = 11;
-
 function buildQuad() {
   const sec = dnSection('quad', 'The Quadrangle');
   dnBounds(sec, { at: [22, -13.5], size: [48, 43], y: [9.8, 45] });
@@ -511,8 +350,8 @@ function buildQuad() {
   dnRun(sec, [-0.8, -34], [-0.8, 7.6], 1.6, Q - 1, Q + 9, 'ruin', [{ at: 12, width: 0.5, sill: Q + 3.4, top: Q + 4.9, shape: 'slit', solid: true }, { at: 26, width: 0.5, sill: Q + 3.4, top: Q + 4.9, shape: 'slit', solid: true }, { at: 34, width: 0.5, sill: Q + 3.4, top: Q + 4.9, shape: 'slit', solid: true }]);
   dnRun(sec, [44.8, -34], [44.8, 7.6], 1.6, Q - 1, Q + 9, 'ashlar', [{ at: 11.5, width: 5.8, sill: Q - 0.4, top: Q + 4.4, shape: 'round' }]);
   // The north curtain, the foot of the wall walk: tall at the east end, lower toward the chapel (the walk steps down).
-  dnBox(sec, 0, 44, -38, -34, Q - 1, Y.ladderRoom - 1.5, 'ashlar', { extra: { part: 'curtain' } });
-  dnBox(sec, 36, 44, -38, -34, Q - 1, Y.walk - 1.5, 'ashlar', { extra: { part: 'curtain' } });
+  dnBox(sec, 0, 44, DN_WALK_N, -34, Q - 1, Y.ladderRoom - 1.5, 'ashlar', { extra: { part: 'curtain' } });
+  dnBox(sec, 36, 44, DN_WALK_N, -34, Q - 1, Y.walk - 1.5, 'ashlar', { extra: { part: 'curtain' } });
   // The west stair-house: a facade with an arched door at the head of the stair, the stair-house walls (the flight's) behind it.
   dnRun(sec, [1.4, -3.2], [10.0, -3.2], 1.4, Q - 1, Q + 6.2, 'ruin', [{ at: 4.3, width: 5.4, sill: Q, top: Q + 4.2, shape: 'pointed' }]);
   // The shortcut stair's head: low balustrades round the open part of the well.
@@ -591,113 +430,24 @@ function buildQuad() {
   return sec;
 }
 
-// ---- 5. Whigs' Vault ------------------------------------------------------------------------------
-
-function buildVault() {
-  const sec = dnSection('vault', "Whigs' Vault");
-  dnBounds(sec, { at: [22, -18], size: [50, 36], y: [3, 11.5] });
-  const V = Y.vault;
-  const rise = DN_VAULT_RISE;
-  const wallTop = V + 4.6;
-  // The long cellar: 33 m by 7, a segmental barrel vault on cross arches, the floor flagged and wet.
-  dnSlab(sec, -1.6, 34, -27.6, -17.4, V, 'flags', { extra: { room: true } });
-  dnRun(sec, [-0.8, -27.6], [-0.8, -17.4], 1.6, V - 1, wallTop, 'rubble');
-  dnRun(sec, [-1.6, -18.2], [33.4, -18.2], 1.6, V - 1, wallTop, 'rubble', [{ at: 7.3, width: 5.4, sill: V, top: V + 3.6, shape: 'round' }, { at: 26.3, width: 5.4, sill: V, top: V + 3.6, shape: 'round' }]);
-  dnRun(sec, [-1.6, -26.8], [33.4, -26.8], 1.6, V - 1, wallTop, 'rubble', [{ at: 18.3, width: 2.8, sill: V, top: V + 3.4, shape: 'round' }, { at: 6, width: 1.4, sill: V + 1.6, top: V + 3.2, shape: 'lancet', solid: true }, { at: 28, width: 1.4, sill: V + 1.6, top: V + 3.2, shape: 'lancet', solid: true }]);
-  dnRun(sec, [33.4, -27.6], [33.4, -17.4], 1.2, V - 1, wallTop, 'rubble', [{ at: 5.1, width: 5.8, sill: V, top: V + 3.8, shape: 'round' }]);
-  dnCeiling(sec, 0, 32.8, -26, -19, V + 3.3, V + 4.8);
-  sec.decor.push({ kind: 'vault', a: [0, -22.5, V + 3.0], b: [32.8, -22.5, V + 3.0], width: 7, crown: 1.4, ribs: 4.1, style: 'vault' });
-  // The west stair down from the court: 31 treads, the first 11 under the court's own slab.
-  const west = dnFlight(sec, { foot: [5.7, -14.6], dir: 'S', steps: DN_VAULT_STEPS, tread: 0.34, width: 5.4, from: V, rise, style: 'cobble' });
-  dnFlightWalls(sec, west, { thick: 1.6, head: 4.4, every: 3 });
-  dnFlightVault(sec, west, { head: 3.9, last: DN_COVERED + 1, roof: 0.5 });
-  dnSlab(sec, 1.4, 10, -19, -14.6, V, 'flags', { extra: { room: true } });
-  dnBox(sec, 1.4, 3, -19, -14.6, V - 1, V + 4.4, 'rubble');
-  dnBox(sec, 8.4, 10, -19, -14.6, V - 1, V + 4.4, 'rubble');
-  dnCeiling(sec, 3, 8.4, -19, -14.6, V + 3.6, V + 4.4);
-  // The shortcut stair up to the court by the well (Shortcut 3): behind an iron gate at its foot.
-  const gate = dnFlight(sec, { foot: [24.7, -17.4], dir: 'S', steps: DN_VAULT_STEPS, tread: 0.34, width: 5.4, from: V, rise, style: 'cobble' });
-  dnFlightWalls(sec, gate, { thick: 1.6, head: 4.4, every: 3 });
-  dnFlightVault(sec, gate, { head: 3.9, last: DN_COVERED + 1, roof: 0.5 });
-  dnGate(sec, 'irongate', [24.7, V, -19.6], [{ ...wallOf([24.7, -17.9], [5.4, 0.3], V, V + 3.6, { id: 'irongate' }), style: 'iron', skin: false }], { kind: 'bars', width: 5.4, height: 3.6 }, { opensFrom: { at: [24.7, -22.5], size: [8, 7], y: [V - 1, V + 4] }, label: 'Lift the gate bar' });
-  // The east stair up to the tower house: 31 treads, the first 11 under the court.
-  const east = dnFlight(sec, { foot: [34, -22.5], dir: 'E', steps: DN_VAULT_STEPS, tread: 0.34, width: 5.8, from: V, rise, style: 'cobble' });
-  dnFlightWalls(sec, east, { thick: 1.6, head: 4.4, every: 3 });
-  dnFlightVault(sec, east, { head: 3.9, last: DN_COVERED + 1, roof: 0.5 });
-  // The dungeon: a hall north of the cellar with its door barred (the turnkey's key), cells in it.
-  dnSlab(sec, 9.6, 23.4, -36, -26, V, 'flags', { extra: { room: true } });
-  dnRun(sec, [10.8, -35.2], [10.8, -26.8], 1.6, V - 1, wallTop, 'rubble');
-  dnRun(sec, [22.6, -35.2], [22.6, -26.8], 1.6, V - 1, wallTop, 'rubble');
-  dnRun(sec, [10, -35.2], [23.4, -35.2], 1.6, V - 1, wallTop, 'rubble', [{ at: 6.7, width: 1.2, sill: V + 2.2, top: V + 3.4, shape: 'slit', solid: true }]);
-  dnCeiling(sec, 11.6, 21.8, -34.4, -26.8, V + 3.3, V + 4.8);
-  sec.decor.push({ kind: 'vault', a: [11.6, -30.6, V + 3.0], b: [21.8, -30.6, V + 3.0], width: 7.6, crown: 1.4, style: 'vault' });
-  dnGate(sec, 'celldoor', [16.7, V, -25.4], [{ ...wallOf([16.7, -26.8], [2.8, 0.3], V, V + 3.4, { id: 'celldoor' }), style: 'iron', skin: false }], { kind: 'bars', width: 2.8, height: 3.4 }, { key: 'cellkey', frees: ['miner', 'captive'], label: 'Unlock the cell', lockedText: 'Locked. The turnkey keeps the key at his desk.' });
-  sec.decor.push({ kind: 'bars', a: [11.6, -31.8], b: [14.8, -31.8], y0: V, y1: V + 3.2 });
-  sec.decor.push({ kind: 'bars', a: [18.6, -31.8], b: [21.8, -31.8], y0: V, y1: V + 3.2 });
-  // The turnkey's end: a desk, a peg of keys, a brazier.
-  dnProp(sec, 'table', [30.0, V, -25.2], { yaw: 0 });
-  dnProp(sec, 'stool', [29.6, V, -24.2], { yaw: 0 });
-  dnProp(sec, 'brazier', [31.8, V, -19.8], { lit: true, rest: true });
-  // Rest 2b: the turnkey's fire, past his post, before the stair up to the keep.
-  sec.rest = { id: 'rest2b', name: "The Turnkey's Fire", at: [31.2, V, -20.9] };
-  dnProp(sec, 'keys', [31.6, V + 1.2, -26.4], {});
-  dnProp(sec, 'barrel', [1.4, V, -25.6], { yaw: 0.3 });
-  dnProp(sec, 'barrel', [2.6, V, -25.8], { yaw: 1.3 });
-  dnProp(sec, 'crate', [12.6, V, -25.4], { yaw: 0.2 });
-  // Skeletons: shackled to the walls, heaped in the corners.
-  for (const [x, z, yaw] of [[3.2, -26.2, 0], [8.6, -26.2, 0.1], [13.4, -19.2, Math.PI], [20.6, -19.2, Math.PI], [27.8, -26.2, 0], [15.2, -33.8, 0], [19, -33.8, 0]]) dnProp(sec, 'skeleton', [x, V, z], { yaw, chained: true });
-  dnProp(sec, 'bones', [9.8, V, -21.4], { yaw: 1 });
-  dnProp(sec, 'bones', [22.4, V, -24.4], { yaw: 2 });
-  dnProp(sec, 'bones', [14.6, V, -30], { yaw: 0.4 });
-  dnProp(sec, 'chains', [16.8, V + 2.2, -35.1], {});
-  dnProp(sec, 'straw', [13, V, -33], {});
-  dnProp(sec, 'straw', [20.4, V, -33], {});
-  dnProp(sec, 'torch', [6.1, V + 2.4, -26], { face: 'S' });
-  dnProp(sec, 'torch', [25, V + 2.4, -26], { face: 'S' });
-  dnProp(sec, 'torch', [16.6, V + 2.4, -27.2], { face: 'N' });
-  dnProp(sec, 'grating', [11, V + 4.5, -22.5], { size: [1.6, 1.6] });
-  dnProp(sec, 'grating', [27.4, V + 4.5, -22.5], { size: [1.6, 1.6] });
-  dnProp(sec, 'drip', [7.4, V + 4.1, -24], {});
-  dnProp(sec, 'drip', [18.6, V + 4.1, -21], {});
-  dnProp(sec, 'drip', [29.4, V + 4.1, -23.4], {});
-  dnProp(sec, 'puddle', [9, V, -22.4], { radius: 1.1 });
-  dnProp(sec, 'puddle', [20, V, -23.2], { radius: 1.4 });
-
-  sec.decor.push({ kind: 'waymarks', points: [[9, -22.5, V], [17, -22.5, V], [25, -22.5, V], [32, -22.5, V]], gap: 2.1, first: 0.4 });
-  sec.portals.push({ to: 'quad', area: [{ at: [5.7, -9], size: [13, 20], y: [8.4, 12] }, { at: [24.7, -11], size: [11, 18], y: [8.4, 12] }] });
-  sec.portals.push({ to: 'tower', area: { at: [41, -22.5], size: [14, 10], y: [8.4, 14.6] } });
-
-  // Men: skeletons are scenery; the jailers and the turnkey are not. Two prisoners behind the barred door.
-  dnSpawn(sec, 'jailer1', 'dunnottarGuard', 'enemy', 2, [12, V, -21.4], DN_FACE.W, { inputs: { name: 'Jailer Wyllie' }, patrol: [[12, -21.4], [12, -24.2]] });
-  dnSpawn(sec, 'turnkey', 'turnkey', 'enemy', 2, [23.5, V, -22.4], DN_FACE.W, { inputs: { name: 'The Turnkey' } });
-  dnSpawn(sec, 'miner', 'cabyMiner', 'prisoner', 0, [14.4, V, -33.2], DN_FACE.S, { inputs: { name: 'Bran the miner' }, follows: true });
-  dnSpawn(sec, 'captive', 'cabySoldier', 'prisoner', 0, [18.8, V, -33.2], DN_FACE.S, { inputs: { name: 'One-Eye Colm' }, follows: true });
-
-  dnItem(sec, 'note-ledger', 'note', [29.6, V, -25.4], { note: 'ledger', lift: 0.95 });
-  dnItem(sec, 'cellkey', 'key', [31.6, V, -26.2], { label: 'Take the cell key', lift: 1.2 });
-  dnItem(sec, 'bandage6', 'bandage', [2.4, V, -20]);
-  dnItem(sec, 'tonic4', 'tonic', [16.4, V, -29.4]);
-  return sec;
-}
-
 // ---- 6. The Tower House and the Upper Walls -------------------------------------------------------------
 
-// The keep (a hall on the court's level, reached from the vault), its round stair tower (85 treads of 0.15 round a newel, 12.75 m),
+// The keep (a hall on the court's level, reached from the vault), its round stair tower (85 treads of 0.15 round a newel, 12.75 m, 4.2 m long each: 17% more than the first 3.6),
 // the wall walk along the north cliff, a stair down to the ladder room (and the ladder), Rest 3.
-const DN_TOWER = { at: [62.6, -23.8], radius: 4.9, sides: 12 };
-const DN_SPIRAL = { at: DN_TOWER.at, inner: 0.6, outer: 4.2, start: Math.PI, turn: (85 * Math.PI * 2) / 26, steps: 85, from: Y.quad, rise: 0.15 };
+const DN_TOWER = { at: [63.4, -23.8], radius: 5.7, sides: 12 };
+const DN_SPIRAL = { at: DN_TOWER.at, inner: 0.6, outer: 5.1, start: Math.PI, turn: (85 * Math.PI * 2) / 26, steps: 85, from: Y.quad, rise: 0.15 };
 
 function buildTower() {
   const sec = dnSection('tower', 'The Tower House and the Upper Walls');
   const Q = Y.quad;
   const W = Y.walk;
   const L = Y.ladderRoom;
-  dnBounds(sec, { at: [57, -24], size: [28, 20], y: [Q - 3, 40] }, { at: [53, -35.5], size: [30, 9], y: [W - 4, 45] }, { at: [30, -36], size: [64, 8], y: [L - 4, 45] }, { at: [5, -36], size: [14, 9], y: [L - 4, 45] });
+  dnBounds(sec, { at: [57, -24], size: [28, 20], y: [Q - 3, 40] }, { at: [53, -36.1], size: [30, 10.2], y: [W - 4, 45] }, { at: [30, -36.6], size: [64, 9.2], y: [L - 4, 45] }, { at: [5, -36.6], size: [14, 9.2], y: [L - 4, 45] });
   // The hall of the keep (an L-plan house; the hall and the round tower are the part a man can enter).
   dnSlab(sec, 44.5, 58.4, -32.4, -15, Q, 'flags', { extra: { land: true } });
   dnRun(sec, [44.5, -31.6], [58.4, -31.6], 1.6, Q - 1, Q + 5.6, 'ashlar', [{ at: 4, width: 0.6, sill: Q + 3, top: Q + 4.6, shape: 'lancet', solid: true }, { at: 9, width: 0.6, sill: Q + 3, top: Q + 4.6, shape: 'lancet', solid: true }]);
   dnRun(sec, [44.5, -15.8], [58.4, -15.8], 1.6, Q - 1, Q + 5.6, 'ashlar', [{ at: 4, width: 0.6, sill: Q + 3, top: Q + 4.6, shape: 'lancet', solid: true }, { at: 9, width: 0.6, sill: Q + 3, top: Q + 4.6, shape: 'lancet', solid: true }]);
-  dnRun(sec, [57.6, -32.4], [57.6, -15], 1.6, Q - 1, Q + 5.6, 'ashlar', [{ at: 8.6, width: 2.4, sill: Q, top: Q + 3.8, shape: 'round' }]);
+  dnRun(sec, [57.6, -32.4], [57.6, -15], 1.6, Q - 1, Q + 5.6, 'ashlar', [{ at: 8.6, width: 2.8, sill: Q, top: Q + 3.8, shape: 'round' }]);
   dnBox(sec, 44.5, 45.6, -32.4, -26.2, Q - 1, Q + 5.6, 'ashlar');
   dnBox(sec, 44.5, 45.6, -18.8, -15, Q - 1, Q + 5.6, 'ashlar');
   dnCeiling(sec, 45.6, 56.8, -30.8, -16.6, Q + 5, Q + 5.8);
@@ -716,7 +466,7 @@ function buildTower() {
   // The round tower (a twelve-sided wall: a door in from the hall on the west, a door out onto the wall walk at the top on the north) and its winding stair.
   const [cx, cz] = DN_TOWER.at;
   const corner = (k) => [cx + DN_TOWER.radius * Math.cos(Math.PI / 12 + (k * Math.PI) / 6), cz + DN_TOWER.radius * Math.sin(Math.PI / 12 + (k * Math.PI) / 6)];
-  dnSlab(sec, cx - 5.6, cx + 5.6, cz - 5.6, cz + 5.6, Q, 'flags', { extra: { land: true } });
+  dnSlab(sec, cx - 6.4, cx + 6.4, cz - 6.4, cz + 6.4, Q, 'flags', { extra: { land: true } });
   for (let k = 0; k < DN_TOWER.sides; k += 1) {
     const a = corner(k);
     const b = corner(k + 1);
@@ -724,30 +474,30 @@ function buildTower() {
     const mx = (a[0] + b[0]) / 2 - cx;
     const mz = (a[1] + b[1]) / 2 - cz;
     const openings = [];
-    if (mx < -3.5 && Math.abs(mz) < 0.5) openings.push({ at: length / 2, width: 2.4, sill: Q, top: Q + 3.6, shape: 'round' });
-    else if (mz < -3.5 && Math.abs(mx) < 0.5) openings.push({ at: length / 2, width: 2.4, sill: W, top: W + 3.7, shape: 'round' });
+    if (mx < -3.5 && Math.abs(mz) < 0.5) openings.push({ at: length / 2, width: 2.8, sill: Q, top: Q + 3.6, shape: 'round' });
+    else if (mz < -3.5 && Math.abs(mx) < 0.5) openings.push({ at: length / 2, width: 2.8, sill: W, top: W + 3.7, shape: 'round' });
     else if (k % 3 === 1) openings.push({ at: length / 2, width: 0.5, sill: Q + 4 + k * 0.9, top: Q + 5.4 + k * 0.9, shape: 'slit', solid: true });
     dnRun(sec, a, b, 1.4, Q - 1, W + 3.4, 'ashlar', openings, { round: true });
   }
   // The doorstep at the top of the stair: a floor under the door's thickness, level with the last tread.
-  dnSlab(sec, cx - 1.3, cx + 1.3, cz - 5.6, cz - DN_SPIRAL.outer + 0.3, W, 'flags');
+  dnSlab(sec, cx - 1.5, cx + 1.5, cz - 6.4, cz - 4.5, W, 'flags');
   // ...and the quarter of the tower's floor at the top beyond the door, where no tread of this turn is: a landing over the turn below.
-  dnSlab(sec, cx, cx + 4.1, cz - 4.1, cz, W, 'flags', { bottom: W - 0.5 });
-  dnBox(sec, cx + 0.55, cx + 4.1, cz - 0.3, cz, W - 0.4, W + 1.2, 'parapet');
+  dnSlab(sec, cx, cx + 4.7, cz - 4.7, cz, W, 'flags', { bottom: W - 0.5 });
+  dnBox(sec, cx + 0.55, cx + 4.7, cz - 0.3, cz, W - 0.4, W + 1.2, 'parapet');
   const treads = windingStairs({ ...DN_SPIRAL, id: 'spiral' }).map((tread) => ({ ...tread, bottom: tread.top - 0.55, style: 'stone' }));
   sec.terrain.push(...treads);
   sec.terrain.push({ ...wallOf([cx, cz], [1.4, 1.4], Q - 0.5, W + 3, { id: 'newel' }), style: 'newel' });
-  sec.decor.push({ kind: 'spiral', ...DN_SPIRAL, rope: true });
+  sec.decor.push({ kind: 'spiral', ...DN_SPIRAL, rope: true, rail: 4.45 });
   sec.decor.push({ kind: 'waymarks', points: [[49, -23.8, Q], [53, -23.8, Q], [56.4, -23.8, Q]], gap: 1.9, first: 0.4 });
-  sec.decor.push({ kind: 'waymarks', points: [[cx, cz - 6.3, W], [cx, -35.2, W], [cx - 6, -35.2, W], [cx - 14, -35.2, W], [cx - 23, -35.2, W]], gap: 2.2, first: 0.4 });
+  sec.decor.push({ kind: 'waymarks', points: [[cx, cz - 7.1, W], [cx, -35.2, W], [cx - 6, -35.2, W], [cx - 14, -35.2, W], [cx - 23, -35.2, W]], gap: 2.2, first: 0.4 });
   // The top landing, the wall walk, and its parapets.
-  dnSlab(sec, cx - 1.8, cx + 1.8, -38, cz - 5.4, W, 'flags', { extra: { walk: true } });
-  dnSlab(sec, 44, cx + 1.8, -38, -32.4, W, 'flags', { extra: { walk: true } });
-  dnSlab(sec, 36, 44, -38, -34, W, 'flags', { bottom: W - 1.5, extra: { walk: true } });
+  dnSlab(sec, cx - 1.8, cx + 1.8, DN_WALK_N, cz - 6.2, W, 'flags', { extra: { walk: true } });
+  dnSlab(sec, 44, cx + 1.8, DN_WALK_N, -32.4, W, 'flags', { extra: { walk: true } });
+  dnSlab(sec, 36, 44, DN_WALK_N, -34, W, 'flags', { bottom: W - 1.5, extra: { walk: true } });
   // The keep's north face, the walk's inner side.
   dnBox(sec, 44, cx - 2.05, -32.9, -32.4, W - 0.4, W + 6.6, 'tower');
-  const stairs = dnFlight(sec, { foot: [36 - 38 * 0.34, -36], dir: 'E', steps: 38, tread: 0.34, width: 4, from: L, rise: (W - L) / 38, style: 'cobble', bottom: L - 1.5 });
-  dnSlab(sec, -2, 36 - 38 * 0.34, -38, -34, L, 'flags', { bottom: L - 1.5, extra: { walk: true } });
+  const stairs = dnFlight(sec, { foot: [36 - 39 * 0.34, (DN_WALK_N - 34) / 2], dir: 'E', steps: 39, tread: 0.34, width: -34 - DN_WALK_N, from: L, rise: (W - L) / 39, style: 'cobble', bottom: L - 1.5 });
+  dnSlab(sec, -2, 36 - 39 * 0.34, DN_WALK_N, -34, L, 'flags', { bottom: L - 1.5, extra: { walk: true } });
   // Parapets: the sea side whole (but for two breaches that let a man fall to the sea), the court side with the gaps.
   const breaches = [[50, 52.6], [8.2, 10.8]];
   const parapet = (x0, x1, z, top, bottom, gaps, thick = 0.55) => {
@@ -758,40 +508,40 @@ function buildTower() {
     }
     if (cursor < x1) dnBox(sec, cursor, x1, z - thick / 2, z + thick / 2, bottom, top, 'parapet');
   };
-  parapet(36, 66, -38.2, W + 1.3, W - 0.4, breaches.filter((g) => g[0] > 36));
-  parapet(-2, 23.08, -38.2, L + 1.3, L - 0.4, breaches.filter((g) => g[0] < 23));
-  parapet(0, 23.08, -33.8, L + 1.3, L - 0.4, [[5.6, 8.4], [13.4, 15.2]]);
+  parapet(36, 66, DN_WALK_N - 0.2, W + 1.3, W - 0.4, breaches.filter((g) => g[0] > 36));
+  parapet(-2, 22.74, DN_WALK_N - 0.2, L + 1.3, L - 0.4, breaches.filter((g) => g[0] < 23));
+  parapet(0, 22.74, -33.8, L + 1.3, L - 0.4, [[5.6, 8.4], [13.4, 15.2]]);
   parapet(36, 44, -33.8, W + 1.3, W - 0.4, []);
-  dnBox(sec, 66, 66.55, -38.5, -28.3, W - 0.4, W + 1.3, 'parapet');
-  dnBox(sec, cx - 2.05, cx - 1.6, -32.4, cz - 5.4, W - 0.4, W + 1.3, 'parapet');
-  dnBox(sec, cx + 1.8, cx + 2.3, -38.5, cz - 5.4, W - 0.4, W + 1.3, 'parapet');
+  dnBox(sec, 66, 66.55, DN_WALK_N - 0.5, -28.3, W - 0.4, W + 1.3, 'parapet');
+  dnBox(sec, cx - 2.05, cx - 1.6, -32.4, cz - 6.2, W - 0.4, W + 1.3, 'parapet');
+  dnBox(sec, cx + 1.8, cx + 2.3, DN_WALK_N - 0.5, cz - 6.2, W - 0.4, W + 1.3, 'parapet');
   // Along the stair down: parapets on both sides, stepped.
   for (let i = 0; i < stairs.steps; i += 3) {
     const last = Math.min(stairs.steps, i + 3) - 1;
-    for (const z of [-38.2, -33.8]) dnBox(sec, stairs.foot[0] + i * stairs.tread, stairs.foot[0] + (last + 1) * stairs.tread, z - 0.275, z + 0.275, stairs.treadY(i) - 0.6, stairs.treadY(last) + 1.3, 'parapet');
+    for (const z of [DN_WALK_N - 0.2, -33.8]) dnBox(sec, stairs.foot[0] + i * stairs.tread, stairs.foot[0] + (last + 1) * stairs.tread, z - 0.275, z + 0.275, stairs.treadY(i) - 0.6, stairs.treadY(last) + 1.3, 'parapet');
   }
-  sec.decor.push({ kind: 'walk', y: W, rect: [36, 66, -38, -32.4] }, { kind: 'walk', y: L, rect: [-2, 23.08, -38, -34] }, { kind: 'crenel', a: [36, -38.2], b: [66, -38.2], y: W + 1.3, gaps: breaches.filter((g) => g[0] > 36) }, { kind: 'crenel', a: [-2, -38.2], b: [23.08, -38.2], y: L + 1.3, gaps: breaches.filter((g) => g[0] < 23) });
+  sec.decor.push({ kind: 'walk', y: W, rect: [36, 66, DN_WALK_N, -32.4] }, { kind: 'walk', y: L, rect: [-2, 22.74, DN_WALK_N, -34] }, { kind: 'crenel', a: [36, DN_WALK_N - 0.2], b: [66, DN_WALK_N - 0.2], y: W + 1.3, gaps: breaches.filter((g) => g[0] > 36) }, { kind: 'crenel', a: [-2, DN_WALK_N - 0.2], b: [22.74, DN_WALK_N - 0.2], y: L + 1.3, gaps: breaches.filter((g) => g[0] < 23) });
   // The ladder: hauled up now (a barrier at the gap in the parapet); kicked down it is a stair of rungs to the court (Shortcut 2).
   const ladderDown = { ...stairsOf([14.3, -30.4], [6.9, 1.5], 23, Q, (L - Q) / 23, { yaw: Math.PI / 2, id: 'ladder1' }), style: 'ladder', skin: false };
   sec.ladders.push({
-    id: 'ladder1', at: [14.3, L, -35.2], state: 'up', kickFrom: { at: [14.3, -35.8], size: [6, 3.6], y: [L - 1, L + 3] }, label: 'Kick the ladder down',
+    id: 'ladder1', at: [14.3, L, -35.2], state: 'up', kickFrom: { at: [14.3, -36.6], size: [14, 5.2], y: [L - 1, L + 3] }, label: 'Kick the ladder down to the court',
     states: { up: [{ ...wallOf([14.3, -33.8], [1.8, 0.4], L - 0.4, L + 1.3, { id: 'ladder1' }), style: 'ladder', skin: false }], down: [ladderDown] },
     look: { kind: 'ladder', foot: [14.3, Q, -26.95], top: [14.3, L, -33.85], width: 1.5 },
   });
   // Rest 3, before the chapel gate.
-  sec.rest = { id: 'rest3', name: 'The Wall Brazier', at: [4.6, L, -36] };
-  dnProp(sec, 'brazier', [4.8, L, -37.1], { lit: true, rest: true });
+  sec.rest = { id: 'rest3', name: 'The Wall Brazier', at: [4.6, L, -37.0] };
+  dnProp(sec, 'brazier', [4.8, L, -38.3], { lit: true, rest: true });
   // The way on from the ladder room to the chapel's gate: marks along the walk.
   sec.decor.push({ kind: 'waymarks', points: [[26, -36, L], [18, -36, L], [11, -36, L], [7.2, -36, L]], gap: 2.2, first: 0.4 });
   dnProp(sec, 'brazier', [22.5, W - 3, -37.2], { lit: true });
   dnProp(sec, 'weapon', [31, stairs.treadY(26), -36.4], { what2: 'halberd', yaw: 0.2 });
   dnProp(sec, 'weapon', [47, W, -35.2], { what2: 'sword', yaw: 4 });
   dnProp(sec, 'bones', [38, W, -37.2], { yaw: 0.8 });
-  dnProp(sec, 'raven', [58.5, W + 1.3, -38.2], { yaw: 2 });
-  dnProp(sec, 'raven', [44.8, W + 1.3, -38.2], { yaw: 5 });
-  dnProp(sec, 'raven', [19.6, L + 1.3, -38.2], { yaw: 3.4 });
-  dnProp(sec, 'raven', [1.6, L + 1.3, -38.2], { yaw: 0.2 });
-  dnProp(sec, 'banner', [27, L + 4, -38.2], { yaw: Math.PI / 2, torn: true });
+  dnProp(sec, 'raven', [58.5, W + 1.3, DN_WALK_N - 0.2], { yaw: 2 });
+  dnProp(sec, 'raven', [44.8, W + 1.3, DN_WALK_N - 0.2], { yaw: 5 });
+  dnProp(sec, 'raven', [19.6, L + 1.3, DN_WALK_N - 0.2], { yaw: 3.4 });
+  dnProp(sec, 'raven', [1.6, L + 1.3, DN_WALK_N - 0.2], { yaw: 0.2 });
+  dnProp(sec, 'banner', [27, L + 4, DN_WALK_N - 0.2], { yaw: Math.PI / 2, torn: true });
 
   sec.portals.push({ to: 'vault', area: { at: [49, -24], size: [10, 10], y: [Q - 3, Q + 2] } });
   sec.portals.push({ to: 'quad', area: [{ at: [14.3, -32], size: [4, 8], y: [L - 6, L + 3] }, { at: [30, -35], size: [30, 6], y: [L - 2, W + 3] }] });
@@ -811,74 +561,15 @@ function buildTower() {
   return sec;
 }
 
-// ---- 7. The Chapel and 8. the Inner Cell -------------------------------------------------------------
-
-function buildChapel() {
-  const sec = dnSection('chapel', 'The Chapel');
-  const L = Y.ladderRoom;
-  dnBounds(sec, { at: [-10.5, -38], size: [17, 18], y: [L - 3, 40] });
-  dnSlab(sec, -19, -2, -47, -29.4, L, 'flags', { extra: { room: true, summit: true } });
-  // The walls of the roofless chapel, ragged at the top, lancet windows down the sides and a great east window.
-  const top = L + 7;
-  dnRun(sec, [-2.8, -29.4], [-2.8, -47], 1.6, L - 1, top - 1.5, 'ruin', [{ at: 6.6, width: 3.6, sill: L, top: L + 4.2, shape: 'pointed' }]);
-  dnRun(sec, [-18.2, -29.4], [-18.2, -47], 1.6, L - 1, top + 1.5, 'ruin', [{ at: 8.6, width: 3.2, sill: L + 1.8, top: L + 6.4, shape: 'lancet', solid: true }]);
-  dnRun(sec, [-19, -30.2], [-2, -30.2], 1.6, L - 1, top, 'ruin', [4, 7.4, 10.8, 14.2].map((at) => ({ at, width: 1.1, sill: L + 1.6, top: L + 5.4, shape: 'lancet', solid: true })));
-  dnRun(sec, [-19, -46.2], [-2, -46.2], 1.6, L - 1, top, 'ruin', [{ at: 10, width: 2.4, sill: L, top: L + 3.6, shape: 'round' }, ...[3.2, 6.2, 13.6, 16.2].map((at) => ({ at, width: 1.1, sill: L + 1.6, top: L + 5.4, shape: 'lancet', solid: true }))]);
-  dnGate(sec, 'chapelgate', [-0.6, L, -36], [{ ...wallOf([-2.8, -36], [0.4, 3.6], L, L + 4.2, { id: 'chapelgate' }), style: 'iron', skin: false }], { kind: 'door', width: 3.6, height: 4.2, hinge: 'z-', leaf: 'iron' }, { opensFrom: { at: [2.5, -36], size: [6, 4.4] }, label: 'Open the chapel gate' });
-  // The inner cell's door in the north wall: shut until the boss has fallen.
-  dnGate(sec, 'innerdoor', [-9.0, L, -46.2], [{ ...wallOf([-9, -46.2], [2.4, 0.4], L, L + 3.6, { id: 'innerdoor' }), style: 'iron', skin: false }], { kind: 'door', width: 2.4, height: 3.6, hinge: 'x-', leaf: 'oak' });
-  // Furniture of a ruin: the altar, broken pews, fallen masonry.
-  dnProp(sec, 'altar', [-16.6, L, -38.2], { yaw: 0 });
-  dnProp(sec, 'pew', [-11.6, L, -33.6], { yaw: 0 });
-  dnProp(sec, 'pew', [-8.8, L, -34], { yaw: 0.1, broken: true });
-  dnProp(sec, 'pew', [-11.4, L, -42.7], { yaw: 0 });
-  dnProp(sec, 'pew', [-7.6, L, -42.4], { yaw: -0.05, broken: true });
-  dnProp(sec, 'rubble', [-5.6, L, -43.6], { size: 1.2 });
-  dnProp(sec, 'rubble', [-15.8, L, -32.2], { size: 1.0 });
-  dnProp(sec, 'rubble', [-13.4, L, -44.8], { size: 0.8 });
-  dnProp(sec, 'brazier', [-15.2, L, -35], { lit: true });
-  dnProp(sec, 'brazier', [-15.2, L, -41.6], { lit: true });
-  dnProp(sec, 'gravestone', [-5.4, L, -31.4], { yaw: 0.2 });
-  dnProp(sec, 'raven', [-18.2, L + 8.5, -42], { yaw: 1 });
-  dnProp(sec, 'raven', [-2.8, L + 5.4, -45], { yaw: 4 });
-  dnProp(sec, 'weapon', [-6, L, -37], { what2: 'sword', yaw: 1.4 });
-  dnItem(sec, 'note-order', 'note', [-16.6, L, -37.2], { note: 'order', lift: 1.0 });
-  // (Overlapping the wall walk's end at x -2, so that the walk stays awake the whole way in: a gap here dropped the wall walk's floor for a step.)
-  sec.portals.push({ to: 'tower', area: { at: [-5, -36], size: [7, 7] } });
-  sec.portals.push({ to: 'cell', area: { at: [-9, -43.5], size: [6, 4] } });
-  dnSpawn(sec, 'vaelen', 'vaelen', 'boss', 4, [-11.4, L, -38.2], DN_FACE.E, { inputs: { name: 'Lord Vaelen' }, boss: { title: "The Queen's Chief Jailer" } });
-  return sec;
-}
-
-function buildCell() {
-  const sec = dnSection('cell', 'The Inner Cell');
-  const L = Y.ladderRoom;
-  dnBounds(sec, { at: [-9, -51], size: [12, 9], y: [L - 3, 40] });
-  dnSlab(sec, -14.6, -3.4, -56.2, -45.4, L, 'flags', { extra: { room: true } });
-  dnRun(sec, [-13.8, -55.4], [-13.8, -46.2], 1.6, L - 1, L + 5, 'rubble');
-  dnRun(sec, [-4.2, -55.4], [-4.2, -46.2], 1.6, L - 1, L + 5, 'rubble');
-  dnRun(sec, [-14.6, -55.4], [-3.4, -55.4], 1.6, L - 1, L + 5, 'rubble', [{ at: 5.6, width: 0.6, sill: L + 2.6, top: L + 3.9, shape: 'slit', solid: true }]);
-  dnCeiling(sec, -13, -5, -54.6, -47, L + 3.8, L + 5);
-  sec.decor.push({ kind: 'vault', a: [-13, -50.8, L + 3.0], b: [-5, -50.8, L + 3.0], width: 7.6, crown: 1.0, style: 'vault' });
-  dnProp(sec, 'straw', [-11, L, -53], {});
-  dnProp(sec, 'bucket', [-6.4, L, -53.6], {});
-  dnProp(sec, 'chains', [-9, L + 2.0, -55.1], {});
-  dnProp(sec, 'torch', [-12.6, L + 2.4, -48], { face: 'E', dim: true });
-  dnProp(sec, 'chalice', [-9.4, L + 0.3, -52.2], { shards: true });
-  sec.portals.push({ to: 'chapel', area: { at: [-9, -47.6], size: [6, 4] } });
-  dnSpawn(sec, 'prince', 'cabyPrince', 'civilian', 0, [-9, L, -51.6], DN_FACE.S, { inputs: { name: 'The Prince of Caby' } });
-  return sec;
-}
-
 // ---- The stage ----------------------------------------------------------------------------------------
 
-const DN_SECTIONS = [buildCliff(), buildGate(), buildAscent(), buildQuad(), buildVault(), buildTower(), buildChapel(), buildCell()];
+const DN_SECTIONS = [buildCliff(), buildGate(), buildAscent(), buildQuad(), buildVault(), buildCrypt(), buildTower(), buildChapel(), buildCell()];
 
 // How the garrison sees and flees (levelmode/awareness.js): the light in each section (the storm outside, torches below, the cell
 // nearly black), the point a routed man runs for (`rear`), and where the civilians and prisoners run to hide (`refuge`).
 const DN_MIND = {
-  light: { cliff: 0.75, gate: 0.55, ascent: 0.5, quad: 0.55, vault: 0.3, tower: 0.55, chapel: 0.7, cell: 0.15 },
-  rear: { cliff: [-58, 0, 30], gate: [10, 4.18, 46], ascent: [17, 8.18, 20], quad: [20, 12.18, 2], vault: [5.7, 6, -17], tower: [51, 12.18, -23], chapel: [-14, 17.18, -38] },
+  light: { cliff: 0.75, gate: 0.55, ascent: 0.5, quad: 0.55, vault: 0.3, crypt: 0.22, tower: 0.55, chapel: 0.62, cell: 0.15 },
+  rear: { cliff: [-58, 0, 30], gate: [10, 4.18, 46], ascent: [17, 8.18, 20], quad: [20, 12.18, 2], vault: [5.7, 6, -17], crypt: [16.7, 1.4, -24.4], tower: [51, 12.18, -23], chapel: [-20, 17.18, -34] },
   refuge: {
     servant1: [36.5, 12.18, -5], servant2: [37.5, 12.18, -6.5], priest: [41, 12.18, -12.5], lady1: [5, 12.18, -30], lady2: [5, 12.18, -29],
     miner: [12.6, 6, -34], captive: [20.6, 6, -34],
@@ -935,6 +626,11 @@ const DN_PROP_SOLIDS = {
   weaponrack: () => [2.2, 0.35, 2.4],
   altar: () => [1.8, 3.2, 1.3],
   pew: () => [0.55, 2.8, 0.9],
+  pillar: (p) => [1.2, 1.2, p.height ?? 11],
+  rack: () => [2.4, 1.1, 0.8],
+  sarcophagus: () => [2.2, 0.9, 0.9],
+  chest: () => [0.9, 0.6, 0.6],
+  skullpile: (p) => [1.4 * (p.size ?? 1), 1.2 * (p.size ?? 1), 0.7],
   gravestone: () => [0.25, 0.8, 1.2],
   gunrest: () => [0.3, 0.3, 1.1],
   brazier: (p) => (p.rest ? [1.3, 1.3, 1.1] : [1.05, 1.05, 1.0]),
@@ -958,6 +654,8 @@ const DN_DEAD = {
   ],
   quad: [['fallen3', 'dunnottarGuard', 2, [21.5, Y.quad, -27.2], 1.2, 'A guard, a crossbow bolt in his back']],
   tower: [['fallen4', 'dunnottarGuard', 2, [36.6, Y.walk, -37], 0.1, 'A guard, who held the wall']],
+  vault: [['fallen5', 'dunnottarGuard', 2, [6.6, Y.vault, -33.8], 2.6, 'A guard, killed at the rack: a poor man, the questioner\'s own sergeant']],
+  crypt: [['fallen6', 'dunnottarKnight', 3, [4.4, Y.crypt, -37.4], 0.5, 'A man-at-arms, his harness on, sat down by the sea-gate and did not rise']],
 };
 for (const section of DN_SECTIONS) {
   for (const [what, x, y, z, extra] of DN_CLUTTER[section.id] ?? []) dnProp(section, what, [x, y, z], extra);
@@ -973,6 +671,20 @@ for (const section of DN_SECTIONS) {
   for (const spawn of section.spawns) if (DN_MIND.refuge[spawn.id]) spawn.refuge = DN_MIND.refuge[spawn.id];
 }
 
+// ==== The team (begin) ======================================================================================================
+// Three Forger comrades stand beside the operative where the cliff path begins (his start, [-114, 14, -4], facing east): they
+// follow him (levelmode/awareness.js followers), fight what he fights, stop at the chapel gate (`followStopsAt`) and, once they die,
+// stay dead (levelmode/checkpoints.js, team.js). Appended last in the cliff section.
+const DN_TEAM = [
+  ['brann', 'forgerArcher', [-116.4, Y.start, -2.4], 'Brann'],
+  ['maren', 'forgerSpear', [-116.4, Y.start, -5.6], 'Maren'],
+  ['tobin', 'forgerHammer', [-118.2, Y.start, -4], 'Old Tobin'],
+];
+for (const [id, preset, post, name] of DN_TEAM) {
+  dnSpawn(DN_SECTIONS.find((section) => section.id === 'cliff'), id, preset, 'ally', 2, post, DN_FACE.E, { inputs: { name }, team: true });
+}
+// ==== The team (end) ========================================================================================================
+
 export const DUNNOTTAR = {
   id: 'dunnottar',
   title: 'Memories of Dunnottar',
@@ -984,7 +696,7 @@ export const DUNNOTTAR = {
   start: { section: 'cliff', at: [-114, DN_Y.start, -4], facing: DN_FACE.E },
   sections: DN_SECTIONS,
   // After the boss: the inner cell's door opens, and near the prince (m) the scene begins; he shuffles into the corner (the straw's).
-  ending: { door: 'innerdoor', prince: 'prince', trigger: 3.8, corner: [-12.3, -54.3] },
+  ending: DN_ENDING,
   // The prisoners who follow him stop at the chapel gate.
   followStopsAt: { at: [1.5, -36], size: [7, 4.4], y: [DN_Y.ladderRoom - 1, DN_Y.ladderRoom + 3] },
   // For the drawing (levelmode/kit.js): the land round the castle, and the weather.
@@ -993,7 +705,7 @@ export const DUNNOTTAR = {
     cell: 2.5,
     // The mainland hillside: a plane y = a + b x + c (z - d) sloping to the gorge, capped at the plateau; paths and landings are cut into it.
     // Where the headland's rock is kept clear of a door at its foot: the great gate and the postern.
-    clear: [[-12, -4.6, 43.6, 48.8, DN_Y.gorge - 0.35], [0.4, 4, 50.6, 53.6, DN_Y.gorge - 0.35]],
+    clear: [[-12, -4.6, 43.6, 48.8, DN_Y.gorge - 0.35], [0.4, 4, 50.6, 53.6, DN_Y.gorge - 0.35], [-2, 11, -50, -39.2, DN_Y.crypt + 0.8]],
     mainland: { polygon: [[-136, -50], [-12, -50], [-12, 58], [-136, 58]], plane: [12, 0, -0.27, -4], cap: 16 },
   },
   weather: { kind: 'storm', seed: 1500 },
@@ -1023,8 +735,8 @@ export const DUNNOTTAR_ROUTE = [
   { name: 'the long cellar', to: 'vault', points: [[6, -22.5], [14, -22.5], [24, -22.5], [32, -22.5], [36, -22.5], [44, -22.5]] },
   { name: 'the keep to the stair tower', to: 'tower', points: [[48, -22.5], [52, -23.8], [56, -23.8], [59, -23.8]] },
   { name: 'the winding stair', to: 'tower', points: dnSpiralWaypoints(2) },
-  { name: 'the wall walk', to: 'tower', points: [[62.6, -28.4], [62.6, -31], [62.6, -36], [50, -36], [44, -36], [37, -36], [30, -36], [24, -36], [20, -36], [10, -36], [5, -36], [0, -36]], open: ['chapelgate'] },
-  { name: 'the chapel', to: 'chapel', points: [[-6, -36], [-11, -38]] },
+  { name: 'the wall walk', to: 'tower', points: [[63.4, -28.4], [63.4, -31], [63.4, -36], [50, -36], [44, -36], [37, -36], [30, -36], [24, -36], [20, -36], [10, -36], [5, -36], [0, -36]], open: ['chapelgate'] },
+  { name: 'the chapel', to: 'chapel', points: [[-6, -36], [-14, -36], [-22, -36]] },
 ];
 
 /** The three shortcuts and the doors: what to set, and a short way to walk to show it open. */
@@ -1034,5 +746,27 @@ export const DUNNOTTAR_SHORTCUTS = [
   { name: 'the iron gate up from the vault', mechanism: 'irongate', start: [24.7, DN_Y.vault, -21], facing: DN_FACE.S, points: [[24.7, -18.6], [24.7, -14], [24.7, -9], [24.7, -5]], blockedWhenClosed: true },
   { name: 'the cell door', mechanism: 'celldoor', start: [16.7, DN_Y.vault, -23.5], facing: DN_FACE.N, points: [[16.7, -27], [16.7, -31]], blockedWhenClosed: true },
   { name: 'the chapel gate', mechanism: 'chapelgate', start: [1, DN_Y.ladderRoom, -36], facing: DN_FACE.W, points: [[-3, -36], [-8, -36]], blockedWhenClosed: true },
-  { name: 'the inner cell door', mechanism: 'innerdoor', start: [-9, DN_Y.ladderRoom, -43], facing: DN_FACE.N, points: [[-9, -46.2], [-9, -50]], blockedWhenClosed: true },
+  { name: 'the heavy door on the stair up from the sea-gate', mechanism: 'cryptgate', start: [1.7, DN_Y.crypt, -36.0], facing: DN_FACE.S, points: [[1.7, -34.6], [1.7, -32], [1.7, -31], [1.7, -29.8], [2.4, -28.4]], blockedWhenClosed: true },
+  { name: 'the inner cell door', mechanism: 'innerdoor', start: [-30.4, DN_Y.ladderRoom, -36], facing: DN_FACE.W, points: [[-34.4, -36], [-38, -36], [-42, -36]], blockedWhenClosed: true },
+];
+
+/** The well shaft's winding stair, from the landing down to the crypt: the treads to aim at. */
+const dnShaftWaypoints = (every = 2) => {
+  const points = [];
+  for (let step = DN_SHAFT_SPIRAL.steps - 1; step >= 0; step -= every) points.push(windingTread(DN_SHAFT_SPIRAL, step));
+  points.push(windingTread(DN_SHAFT_SPIRAL, 0));
+  return points;
+};
+
+/**
+ * The optional ways off the main route, each a walk from a start (a point [x, y, z] and a facing) that a man can make: `to` is the section he is in
+ * at the end (and `seen` the sections that wake along it), `open` the mechanisms to set first. They are the vault's branches: the torture chamber,
+ * the stores, the well shaft down to the crypt (its gallery, the ossuary, the keepers' tombs, the flooded way, the sea-gate), and the way back
+ * up the stair behind the heavy door into the torture chamber (`cryptgate`, opened by the hidden lever at the sea-gate).
+ */
+export const DUNNOTTAR_BRANCHES = [
+  { name: 'the torture chamber', start: [20, DN_Y.vault, -22.5], facing: DN_FACE.W, to: 'vault', points: [[9, -22.5], [6.6, -23.8], [6.6, -26.6], [6.6, -29], [5.4, -31], [5.2, -34], [9, -34.4], [9.2, -30.6], [7, -29.4]] },
+  { name: 'the stores', start: [20, DN_Y.vault, -22.5], facing: DN_FACE.W, to: 'vault', points: [[15.2, -22.5], [15.2, -19.5], [15.2, -16], [15.2, -14.6], [15.2, -12.5], [16.4, -10], [17.4, -8.6], [13.4, -8.4]] },
+  { name: 'the well shaft, the crypt and the sea-gate', start: [20, DN_Y.vault, -22.5], facing: DN_FACE.E, to: 'crypt', seen: ['crypt'], points: [[28.6, -22.5], [28.6, -25], [28.6, -27.6], [27.2, -29.4], ...dnShaftWaypoints(2), [28.6, -27.4], [28.6, -25.2], [26, -24.4], [18, -24.4], [16.9, -23.4], [16.9, -20.2], [16.6, -24.4], [16.6, -26.4], [16.6, -28.4], [15.4, -30.4], [16.6, -28.4], [16.6, -25.6], [12, -24.4], [8.5, -24.4], [6.2, -25.6], [6.2, -28], [6.2, -31.5], [6.2, -34.2], [5.8, -37.2]] },
+  { name: 'back up from the sea-gate, behind the heavy door', start: [1.7, DN_Y.crypt, -36.2], facing: DN_FACE.S, to: 'vault', open: ['cryptgate'], points: [[1.7, -34.6], [1.7, -32], [1.7, -30.4], [1.7, -29], [3, -28.4], [6.4, -27.8], [6.6, -26.3], [6.6, -23.6]] },
 ];

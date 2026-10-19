@@ -41,6 +41,7 @@
 //     // thing under two names (an open gate stops blocking; a kicked ladder becomes a ramp).
 //     gates:   [ { id: 'gate1', at: [x, y, z], state: 'closed', states: { closed: [solids], open: [solids] } } ],
 //     ladders: [ { id: 'ladder1', at: [x, y, z], state: 'up', states: { up: [solids], down: [solids] } } ],
+//     // `activeOnly: true`: the drawing shows this section in detail only while it is active, not when it is merely seen through a portal.
 //     // A place to rest (not used here).
 //     rest: { at: [x, y, z] },
 //   }
@@ -182,6 +183,15 @@ export function activeSections(stage, position) {
     for (const portal of section.portals ?? []) if (regionContains(portal.area, x, z, y)) ids.add(portal.to);
   }
   return stage.sections.filter((section) => ids.has(section.id)).map((section) => section.id);
+}
+
+/**
+ * The `interior` of the section a man stands in, at [x, y, z], if it has one (a section's own light: the vaulted chapel's amber dark, with the storm shut out): its
+ * fields are what levelmode/storm.js blends the weather's look toward (stagelooks.js `interiorLevels`). Null in the open and in a section without one.
+ */
+export function interiorAt(stage, x, y, z) {
+  for (const section of stage.sections) if (section.interior && regionContains(section.bounds, x, z, y)) return section.interior;
+  return null;
 }
 
 /** The solids in force for some active sections: their terrain, and each of their gates and ladders in its present state. */

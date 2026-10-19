@@ -5,10 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
 import { placeOnFloor } from '../src/physics.js';
-import { activeSections, checkStage, createStageWorld, mechanismsOf, regionContains, setMechanism, stageTerrain, updateStage } from '../src/levelmode/stage.js';
+import { activeSections, checkStage, createStageWorld, mechanismsOf, pullLever, regionContains, setMechanism, stageTerrain, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { STAGES } from '../src/levelmode/stages.js';
-import { DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS } from '../src/levelmode/stages/dunnottar.js';
+import { DN_Y, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS } from '../src/levelmode/stages/dunnottar.js';
 import { floodFill } from './edges.js';
 import { hipsAt, walk } from './walker.js';
 
@@ -17,19 +17,21 @@ const world = (seed = 7) => createStageWorld(DUNNOTTAR, levelPreset('forger'), {
 const quiet = (current) => current.fighters.slice(1).forEach((fighter) => { fighter.dormant = true; });
 const pelvisY = (fighter) => fighter.x[P.pelvis * 3 + 1];
 
-test('dunnottar: registered, sound, eight sections with the cast the spec calls for', () => {
+test('dunnottar: registered, sound, nine sections with the cast the spec calls for', () => {
   assert.equal(STAGES.dunnottar, DUNNOTTAR);
   assert.deepEqual(checkStage(DUNNOTTAR), []);
-  assert.deepEqual(DUNNOTTAR.sections.map((section) => section.id), ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel', 'cell']);
+  assert.deepEqual(DUNNOTTAR.sections.map((section) => section.id), ['cliff', 'gate', 'ascent', 'quad', 'vault', 'crypt', 'tower', 'chapel', 'cell']);
   const spawns = DUNNOTTAR.sections.flatMap((section) => section.spawns);
   const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead);
   assert.ok(enemies.length >= 12 && enemies.length <= 32, `${enemies.length} enemies`);
+  // The main line's cast stood at 14 (the bot's careful policy reaches Vaelen 12 in 16 against it); the vault's optional branches add at most six.
+  assert.ok(enemies.length >= 17 && enemies.length <= 20, `${enemies.length} enemies: 14 on the main line, 3 to 6 in the optional branches`);
   assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 2);
   assert.ok(spawns.some((spawn) => spawn.role === 'boss' && spawn.preset === 'vaelen'));
   assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest2b', 'rest3']);
-  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'innerdoor', 'irongate', 'ladder1'].sort());
+  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'ladder1'].sort());
   const notes = DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'note').map((item) => item.note).sort();
-  assert.deepEqual(notes, ['ledger', 'order', 'powder', 'servant', 'soldier']);
+  assert.deepEqual(notes, ['cellar', 'ledger', 'order', 'powder', 'seagate', 'servant', 'soldier', 'warden']);
   assert.ok(DUNNOTTAR.sections.some((section) => section.items.some((item) => item.kind === 'key')));
 });
 
@@ -59,7 +61,8 @@ test('dunnottar: a walker goes the whole way, cliff path to chapel, through ever
     last = w.time;
   }
   assert.ok(last > 300, `the route takes a while (${last.toFixed(0)} s)`);
-  for (const section of DUNNOTTAR.sections.filter((entry) => entry.id !== 'cell')) assert.ok(seen.has(section.id), `${section.id} was active`);
+  // (The crypt and the cell are off the main line: the branches' test and the ending's reach them.)
+  for (const section of DUNNOTTAR.sections.filter((entry) => !['cell', 'crypt'].includes(entry.id))) assert.ok(seen.has(section.id), `${section.id} was active`);
   assert.ok(pelvisY(me) > DN_Y.ladderRoom, 'he is in the chapel, on his feet');
 });
 
@@ -109,8 +112,51 @@ test('dunnottar: a man can walk off the map only where there is a cliff (every s
     const terrain = stageTerrain(DUNNOTTAR, DUNNOTTAR.sections.map((section) => section.id), states);
     const flood = floodFill(terrain, DUNNOTTAR.start.at);
     assert.ok(!flood.truncated);
-    assert.ok(flood.standing > (open ? 18000 : 17000), `${flood.standing} places to stand`);
+    assert.ok(flood.standing > (open ? 22000 : 19500), `${flood.standing} places to stand`);
     const stray = flood.edges.filter((edge) => !CLIFFS.some((allowed) => allowed(edge)));
     assert.deepEqual(stray.map((edge) => `${edge.at.map((v) => v.toFixed(1))} at ${edge.floor.toFixed(2)}`), [], `open ${open}`);
   }
+});
+
+test('dunnottar: the vault branches can be walked: torture chamber, stores, the well shaft down to the crypt, the sea-gate, and back up behind the heavy door', () => {
+  for (const branch of DUNNOTTAR_BRANCHES) {
+    const w = world(11);
+    const me = w.fighters[0];
+    placeOnFloor(me, branch.start[0], branch.start[2], branch.start[1], branch.facing);
+    for (const id of branch.open ?? []) setMechanism(w, id, 'open');
+    updateStage(w, true);
+    const seen = new Set(w.stage.active);
+    const result = walk(w, me, branch.points, { seconds: 200, think: quiet, each: () => w.stage.active.forEach((id) => seen.add(id)) });
+    assert.equal(result.reached, branch.points.length, `${branch.name}: stuck at ${JSON.stringify(branch.points[result.reached])} near ${result.stuckAt?.map((v) => v.toFixed(1))}`);
+    assert.ok(w.stage.active.includes(branch.to), `${branch.name}: ${branch.to} is active at the end (${w.stage.active})`);
+    for (const id of branch.seen ?? []) assert.ok(seen.has(id), `${branch.name}: ${id} woke along it`);
+    assert.ok(pelvisY(me) > 0, `${branch.name}: on his feet`);
+  }
+});
+
+test('dunnottar: the crypt sleeps until he is on the well shaft or at the stair from the sea-gate, and wakes its own men', () => {
+  const w = world(5);
+  const me = w.fighters[0];
+  placeOnFloor(me, 20, -22.5, DN_Y.vault, 0);
+  updateStage(w, true);
+  assert.ok(!w.stage.active.includes('crypt'), `the cellar does not wake the crypt (${w.stage.active})`);
+  const men = w.fighters.filter((fighter) => ['crypt1', 'cryptwarden', 'gatewarden'].includes(fighter.spawn?.id));
+  assert.equal(men.length, 3);
+  assert.ok(men.every((fighter) => fighter.dormant), 'its men are asleep');
+  placeOnFloor(me, 27.2, -29.6, DN_Y.vault, 0);
+  updateStage(w, true);
+  assert.ok(w.stage.active.includes('crypt'), 'on the landing of the well shaft the crypt wakes');
+  assert.ok(men.every((fighter) => !fighter.dormant), 'its men are awake');
+  placeOnFloor(me, 16, -24.4, DN_Y.crypt, 0);
+  updateStage(w, true);
+  assert.ok(w.stage.active.includes('crypt'), `down in the gallery the crypt is the section (${w.stage.active})`);
+});
+
+test('dunnottar: the hidden lever at the sea-gate lifts the heavy door of the stair, and only then', () => {
+  const w = world(6);
+  const lever = DUNNOTTAR.sections.find((section) => section.id === 'crypt').levers[0];
+  assert.equal(lever.target, 'cryptgate');
+  assert.equal(w.stage.mechanisms.cryptgate, 'closed');
+  assert.equal(pullLever(w, lever.id), true);
+  assert.equal(w.stage.mechanisms.cryptgate, 'open');
 });

@@ -24,7 +24,7 @@ export const STAGE_LIST = [
   { key: null, number: 2, ready: false, glyph: '🔒', kicker: 'Locked', title: 'Stage 2 · Coming soon', blurb: 'Not yet unlocked.' },
 ];
 
-// Five found papers, in the order the route meets them (the stage places them): what each is, and what it says.
+// Eight found papers: five along the main route, in the order it meets them, and three in the vault's optional branches (the stage places them): what each is, and what it says.
 export const NOTES = {
   powder: {
     title: 'Scratched on a powder keg',
@@ -41,6 +41,18 @@ export const NOTES = {
   soldier: {
     title: 'Cut into the parapet',
     body: 'The wind took the others over the wall and the sea kept them. Tell my mother the Queen never once climbed up to see who guarded her. If you read this, keep to the stones. The wet takes your feet, and the drop takes the rest.',
+  },
+  cellar: {
+    title: 'The quartermaster\'s tally',
+    body: 'Forty barrels of salt beef, six of powder, none of it sound. The far arch fell in at Martinmas and I have not had the men to clear it; there is a draught from it that smells of the sea. The turnkey keeps a second way down behind the well, and does not say where it goes.',
+  },
+  warden: {
+    title: 'Scratched on a tomb lid',
+    body: 'They bring the dead down by the well stair and put them where the water cannot reach, and still the water comes. The lever is a stone that does not match its neighbours, down where the way floods. Pull it and the old stair opens; I have never dared.',
+  },
+  seagate: {
+    title: 'A sailor\'s last page',
+    body: 'The gate looks out over a drop to the sea, and the sea does not look back. I came by the flooded way with a lamp and a good heart and the door behind me fell shut. Whoever follows: the stone by the chest is the lever. It was never meant for a man to keep in.',
   },
   order: {
     title: 'Sealed order: Alta to Vaelen',
@@ -318,7 +330,7 @@ export const bossBar = {
     bossFill.style.transform = 'scaleX(1)';
     bossLag.style.transform = 'scaleX(1)';
     bossRoot.hidden = false;
-    bossRoot.classList.remove('fading');
+    bossRoot.classList.remove('fading', 'felled', 'empty');
     // One frame to be laid out hidden-then-shown, so the fade in runs.
     requestAnimationFrame(() => bossRoot.classList.add('shown'));
   },
@@ -330,10 +342,18 @@ export const bossBar = {
     bossLag.style.transform = `scaleX(${bossFraction})`;
     bossRoot.classList.toggle('empty', bossFraction <= 0);
   },
+  /** He is out: the bar is empty and his name struck through; it holds a moment and fades (boxer.css). */
+  fell() {
+    if (!bossRoot || bossRoot.hidden) return;
+    bossFraction = 0;
+    bossFill.style.transform = 'scaleX(0)';
+    bossLag.style.transform = 'scaleX(0)';
+    bossRoot.classList.add('empty', 'felled');
+  },
   /** Take it down. */
   hide() {
     if (!bossRoot) return;
-    bossRoot.classList.remove('shown');
+    bossRoot.classList.remove('shown', 'felled');
     bossRoot.hidden = true;
   },
   get visible() { return Boolean(bossRoot) && !bossRoot.hidden; },

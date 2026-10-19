@@ -10,8 +10,8 @@
 // stay put round the stage.
 
 import { ktPatch, ktRandom, ktWeather } from './kittex.js';
-import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookOf } from './stagelooks.js';
-import { hexToRgb, skyDirection, stageShaftCanvas, stagePoolCanvas, stageSkyCanvas } from './stagesky.js';
+import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, interiorLevels, stageLookOf } from './stagelooks.js';
+import { hexToRgb, skyDirection, stageShaftCanvas, stagePoolCanvas, stageSkyCanvas, stageSkyCapCanvas, stormSkyImage } from './stagesky.js';
 
 /** Where the weather is centred: round the stage, and the rain and bolts round the player. */
 const STORM = {
@@ -39,6 +39,8 @@ const stormState = {
   base: null,
   environments: new Map(),
   skies: new Map(),
+  caps: new Map(),
+  onSkyArrived: null,
   look: DEFAULT_STAGE_LOOK,
   dirty: true,
   fog: null,
@@ -48,6 +50,13 @@ const stormState = {
   // The share of the look's rain that is drawn (quality.js): 1 on a machine that keeps up, less on one that does not.
   rainShare: 1,
   rainDirty: false,
+  // The interior he stands in (a section's `interior`, stage.js `interiorAt`), how far into it the light has blended (0 the open storm, 1 the interior), and the share of a flash that gets in.
+  interiorSpec: null,
+  interiorLast: null,
+  interiorK: 0,
+  interiorTime: null,
+  interiorFlash: 1,
+  flashNow: 0,
 };
 
 /** Tell the weather where the player is (and whether he is under a roof). */
@@ -67,6 +76,17 @@ export function stormRain(share) {
   stormState.rainShare = share;
   stormState.rainDirty = true;
 }
+
+/**
+ * Tell the weather the interior the player stands in now (a section's `interior`, or null in the open): the storm's look is blended toward it over its `blend` seconds,
+ * and back as he leaves (stagelooks.js `interiorLevels` says what each number does). Cheap to call every frame.
+ */
+export function stormInterior(spec) {
+  stormState.interiorSpec = spec ?? null;
+}
+
+/** How bright the lightning's flash is now (0..1): the kit's stained glass flashes with it. */
+export const stormFlashLevel = () => stormState.flashNow;
 
 /** Start a run of the storm over: a new seed (the stage's), strikes from the beginning. */
 export function stormReset(seed = 1500) {
@@ -94,6 +114,7 @@ export const stormTorch = () => stormState.torch;
 export function stormSetLook(name, { still } = {}) {
   if (still !== undefined) stormState.still = still;
   if (name !== undefined) stormState.look = STAGE_LOOKS[name] ? name : DEFAULT_STAGE_LOOK;
+  stormSkyWanted(stormState.look);
   stormState.dirty = true;
   stormState.nextStrike = stormGap(stormState.random() * 8 + 5);
   return stormState.look;
@@ -109,6 +130,49 @@ function stormSkyTexture(name) {
     stormState.skies.set(name, texture);
   }
   return texture;
+}
+
+/** The photographic cap of a look's sky (the upper hemisphere only; null for a painted look, and while the photograph is still being decoded). Made once. */
+function stormSkyCap(name) {
+  const sky = stageLookOf(name).sky;
+  if (!sky.photo) return null;
+  let texture = stormState.caps.get(name);
+  if (!texture) {
+    const canvas = stageSkyCapCanvas(sky);
+    if (!canvas) return null;
+    texture = new THREE.CanvasTexture(canvas);
+    stormState.caps.set(name, texture);
+  }
+  return texture;
+}
+
+/** Start decoding a look's photograph (if it has one); when it arrives the look's sky and environment are made again from it. */
+function stormSkyWanted(name) {
+  const photo = stageLookOf(name).sky.photo;
+  if (photo) stormSkyImage(photo.id, stormSkyArrived);
+}
+
+/** A photograph has been decoded: what was made without it (the plain gradient that stood in) is thrown away, and the next frame puts the look on again. */
+function stormSkyArrived(id) {
+  for (const name of stageLookNamesWithPhoto(id)) {
+    stormState.skies.get(name)?.dispose();
+    stormState.skies.delete(name);
+    const env = stormState.environments.get(name);
+    env?.texture.dispose();
+    stormState.environments.delete(name);
+  }
+  stormState.dirty = true;
+  stormState.onSkyArrived?.();
+}
+
+const stageLookNamesWithPhoto = (id) => Object.keys(STAGE_LOOKS).filter((name) => STAGE_LOOKS[name].sky.photo?.id === id);
+
+// (The default look's photograph is decoded from the start, so it is ready by the time the stage is up.)
+stormSkyWanted(DEFAULT_STAGE_LOOK);
+
+/** Tell the weather what to do when a look's photograph has arrived and the environment (for the stone and the sea) has been made anew: `callback()`. */
+export function stormOnSkyArrived(callback) {
+  stormState.onSkyArrived = callback;
 }
 
 /** A wave normal map: many waves of random direction and size (whole numbers of them to the tile, so it tiles), turned into normals. */
@@ -155,12 +219,14 @@ function stormWaveTexture(size = 128) {
 export function stormEnvironment(renderer, name = stormState.look) {
   const cached = stormState.environments.get(name);
   if (cached?.renderer === renderer) return cached.texture;
+  stormSkyWanted(name);
   const texture = new THREE.CanvasTexture(stageSkyCanvas(stageLookOf(name).sky, 512, 256));
   texture.mapping = THREE.EquirectangularReflectionMapping;
   const generator = new THREE.PMREMGenerator(renderer);
   const target = generator.fromEquirectangular(texture);
   generator.dispose();
   texture.dispose();
+  // (If the look's photograph is still being decoded this is only the gradient that stands in for it: the environment is made again when it arrives.)
   stormState.environments.set(name, { renderer, texture: target.texture });
   return target.texture;
 }
@@ -338,6 +404,19 @@ function stormProbe(scene) {
 }
 
 /**
+ * A sky dome drawn after the castle, the land and the sea, on the far plane: behind all of them as it always was (the sea that runs past the dome included), and the
+ * pixels they cover refused by the depth test, so not shaded (where it was drawn first the whole screen was; under a roof nearly none of it is).
+ */
+function stormFarPlane(mesh) {
+  mesh.renderOrder = 2;
+  mesh.material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  gl_Position.z = gl_Position.w * 0.999999;');
+  };
+  const key = `storm-far-${mesh.id}`;
+  mesh.material.customProgramCacheKey = () => key;
+}
+
+/**
  * The storm's place group: sky, sea, rain, and the bolt. `buildRain` is render.js's (injected, as it is private to it).
  * `place.userData.tick(time)` moves it; `place.userData.bind(view)` gives it the scene's lights to flash.
  */
@@ -351,12 +430,17 @@ export function buildStormPlace({ buildRain }) {
   sky.position.set(...STORM.centre);
   // The sky is drawn after the castle, the land and the sea, on the far plane (so it is behind all of them as it always was, the sea that runs past its dome included):
   // the pixels they cover are refused by the depth test and are not shaded, where drawn first the whole screen was.
-  sky.renderOrder = 2;
-  sky.material.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  gl_Position.z = gl_Position.w * 0.999999;');
-  };
-  sky.material.customProgramCacheKey = () => 'storm-sky';
+  stormFarPlane(sky);
   place.add(sky);
+  // The dome of a photographic look: the upper hemisphere only, the picture's own rows from the zenith down to the horizon.
+  const capSky = new THREE.Mesh(
+    new THREE.SphereGeometry(STORM.skyRadius, 48, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, depthWrite: false }),
+  );
+  capSky.position.set(...STORM.centre);
+  stormFarPlane(capSky);
+  capSky.visible = false;
+  place.add(capSky);
   // The sea: heaving normals scrolled over a dark glossy plane.
   const waves = stormWaveTexture();
   waves.repeat.set(70, 70);
@@ -410,7 +494,23 @@ export function buildStormPlace({ buildRain }) {
     const { scene, lights } = view;
     stormState.dirty = false;
     stormState.fog = scene.fog;
-    sky.material.map = stormSkyTexture(stormState.look);
+    stormSkyWanted(stormState.look);
+    const cap = stormSkyCap(stormState.look);
+    if (cap) {
+      capSky.material.map = cap;
+      capSky.material.needsUpdate = true;
+    } else {
+      sky.material.map = stormSkyTexture(stormState.look);
+    }
+    capSky.visible = Boolean(cap);
+    sky.visible = !cap;
+    // (Only the look in view keeps its photographic sky in memory, 5 MB each: a phone does not hold all of them.)
+    for (const [name, texture] of stormState.caps) {
+      if (texture !== cap) {
+        texture.dispose();
+        stormState.caps.delete(name);
+      }
+    }
     const fogColour = new THREE.Color(look.fog.colour);
     if (scene.fog) {
       scene.fog.color.copy(fogColour);
@@ -454,6 +554,45 @@ export function buildStormPlace({ buildRain }) {
     stormAimShaft(shaft, look);
   };
 
+  /** Blend the weather toward the interior he stands in, and back out (stagelooks.js `interiorLevels`): the lights, the probe's tint, the fog and the background, the mist and wet in the kit's shaders. */
+  const stormApplyInterior = (view, time) => {
+    const s = stormState;
+    const dt = s.interiorTime === null ? 0 : Math.min(0.1, Math.max(0, time - s.interiorTime));
+    s.interiorTime = time;
+    const spec = s.interiorSpec ?? s.interiorLast;
+    if (!spec) return;
+    if (s.interiorSpec) s.interiorLast = s.interiorSpec;
+    const goal = s.interiorSpec ? 1 : 0;
+    const before = s.interiorK;
+    const step = dt / (spec.blend ?? 1.5);
+    s.interiorK = goal > before ? Math.min(goal, before + step) : Math.max(goal, before - step);
+    if (before === 0 && s.interiorK === 0) return;
+    const look = stageLookOf(s.look);
+    const lv = interiorLevels(look, spec, s.interiorK);
+    const { scene, lights } = view;
+    lights.sun.intensity = lv.sun;
+    lights.hemi.intensity = lv.hemi;
+    lights.hemi.color.setHex(lv.hemiSky);
+    lights.hemi.groundColor.setHex(lv.hemiGround);
+    const probe = stormProbe(scene);
+    if (probe) {
+      const base = probe.userData.kitBase;
+      probe.sh.coefficients.forEach((c, k) => c.copy(base.sh[k]).multiply(new THREE.Vector3(...lv.tint)));
+      probe.intensity = base.intensity * lv.probe;
+    }
+    if (scene.fog) {
+      scene.fog.color.setHex(lv.fogColour);
+      scene.fog.near = lv.fogNear;
+      scene.fog.far = lv.fogFar;
+    }
+    if (scene.background?.isColor) scene.background.setHex(lv.fogColour);
+    ktWeather.uKitFog.value.set(lv.mist, look.fog.mist.base, look.fog.mist.falloff, 0);
+    ktWeather.uKitWet.value = lv.wet;
+    s.torch = lv.torch;
+    s.interiorFlash = lv.flash;
+    if (s.interiorK === 0) s.interiorLast = null;
+  };
+
   place.userData.bind = (view) => {
     stormState.view = view;
     stormState.place = place;
@@ -487,6 +626,8 @@ export function buildStormPlace({ buildRain }) {
     if (!view) return;
     const scene = view.scene;
     if (stormState.dirty || scene.fog !== stormState.fog) applyLook(view);
+    stormApplyInterior(view, time);
+    shaft.visible = Boolean(look.shaft) && !stormState.indoors;
     // Strikes, from the stage's seed.
     if (!stormState.strike && time > stormState.nextStrike) {
       const heading = new THREE.Vector3();
@@ -517,6 +658,7 @@ export function buildStormPlace({ buildRain }) {
     // The flash on the whole scene, for the few tenths of a second it lasts (nothing here runs when there is no strike): the ground, the castle and the men are lit
     // by a hard cold light from the bolt's side (the sun is turned to it), the sky light and the probe rise, and the sky, the fog and the background lift toward a cold white
     // (as much as the look's strikes are hard).
+    stormState.flashNow = flash * (stormState.interiorK > 0 ? 0.35 + 0.65 * (1 - stormState.interiorK) : 1);
     if (flash > 0 || stormState.flashed) {
       FLASH_WHITE ??= new THREE.Color(0xb9c4e4);
       const lights = view.lights;
@@ -525,7 +667,7 @@ export function buildStormPlace({ buildRain }) {
         stormState.base = { hemi: lights.hemi.intensity, sun: lights.sun.intensity, key: lights.key.intensity, probe: stormState.probe?.intensity ?? 0, fog: scene.fog?.color.clone(), background: scene.background, sunColour: lights.sun.color.clone(), sunAt: lights.sun.position.clone() };
       }
       const base = stormState.base;
-      const dim = (stormState.indoors ? 0.3 : 1) * (look.lightning?.strength ?? 1);
+      const dim = (stormState.interiorK > 0 ? stormState.interiorFlash : stormState.indoors ? 0.3 : 1) * (look.lightning?.strength ?? 1);
       lights.hemi.intensity = base.hemi + flash * 2.5 * dim;
       lights.sun.intensity = base.sun + flash * 2.8 * dim;
       lights.key.intensity = base.key + flash * 1.4 * dim;
@@ -539,6 +681,7 @@ export function buildStormPlace({ buildRain }) {
         lights.sun.color.copy(base.sunColour);
       }
       sky.material.color.setScalar(1 + flash * 1.6 * dim);
+      capSky.material.color.setScalar(1 + flash * 1.6 * dim);
       const lift = Math.min(1, flash * 0.55 * dim);
       if (scene.fog && base.fog) scene.fog.color.copy(base.fog).lerp(FLASH_WHITE, lift);
       if (base.background?.isColor) scene.background = flash > 0 ? base.background.clone().lerp(FLASH_WHITE, lift) : base.background;
@@ -569,6 +712,7 @@ export function stormRelease(view) {
   stormState.view = null;
   stormState.base = null;
   stormState.dirty = true;
+  Object.assign(stormState, { interiorSpec: null, interiorLast: null, interiorK: 0, interiorTime: null, interiorFlash: 1, flashNow: 0 });
 }
 
 /** Bring the next strike to now (for the weather's test, and a look at one). */

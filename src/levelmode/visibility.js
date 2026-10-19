@@ -78,7 +78,7 @@ export const nearestBoxDistance = (boxes, x, y, z) => boxes.reduce((best, box) =
 // ---- the sections ------------------------------------------------------------------------------------------
 
 /**
- * A stage's sections as a graph: `{ ids, bounds: { id: [boxes] }, links: [{ a, b, boxes }], near: { id: [link] } }`. A link is a portal (the hand-over area where
+ * A stage's sections as a graph: `{ ids, bounds: { id: [boxes] }, links: [{ a, b, boxes }], near: { id: [link] }, activeOnly: Set }`; a section with `activeOnly` (the crypt) is painted in detail only while it is active, never as seen through a portal. A link is a portal (the hand-over area where
  * two sections meet); it is followed either way, since the opening that lets the man out of a room lets the room's light in.
  */
 export function sectionGraph(stage, { margin = VISIBILITY.margin, openingMargin = VISIBILITY.openingMargin } = {}) {
@@ -86,7 +86,9 @@ export function sectionGraph(stage, { margin = VISIBILITY.margin, openingMargin 
   const bounds = {};
   const links = [];
   const near = {};
+  const activeOnly = new Set();
   for (const section of stage.sections) {
+    if (section.activeOnly) activeOnly.add(section.id);
     bounds[section.id] = regionBoxes(section.bounds, { margin, low: sea });
     near[section.id] = [];
   }
@@ -99,7 +101,7 @@ export function sectionGraph(stage, { margin = VISIBILITY.margin, openingMargin 
       near[link.b].push(link);
     }
   }
-  return { ids: stage.sections.map((section) => section.id), bounds, links, near };
+  return { ids: stage.sections.map((section) => section.id), bounds, links, near, activeOnly };
 }
 
 /**
@@ -129,7 +131,7 @@ export function chooseSections(graph, { active, inView = () => true, open = () =
     for (const id of frontier) {
       for (const link of graph.near[id]) {
         const other = link.a === id ? link.b : link.a;
-        if (result.get(other) === 'detail') continue;
+        if (result.get(other) === 'detail' || graph.activeOnly?.has(other)) continue;
         if (!inView(link.boxes) || !open(link)) continue;
         if (!viewed(other) || !reach(other)) continue;
         result.set(other, 'detail');

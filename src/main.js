@@ -45,11 +45,12 @@ import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { installLevelHud } from './levelmode/hud.js';
 import { NOTES, STAGE_ONE, closeStory, showDeath, showEnding, showFinale, showNote, showOpening, storyBusy } from './levelmode/story.js';
 import { createLevelMarkers } from './levelmode/markers.js';
-import { createShards } from './levelmode/endingview.js';
+import { createGuide, createShards } from './levelmode/endingview.js';
+import { createCutsceneDirector } from './levelmode/cutsceneview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
 import { pinnedRung, QUALITY_MODES, readQuality, writeQuality } from './levelmode/quality.js';
-import { stormEnvironment, stormLook, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
+import { stormEnvironment, stormLook, stormOnSkyArrived, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
 import { ktSightline } from './levelmode/kittex.js';
@@ -162,7 +163,16 @@ const fightControls = installFightControls($('#fight-ui'), {
 });
 fightUiWireToggle($('#fightui-pick'));
 // Level mode's own controls on top of the fight's: the context pill, the items, the action bar (levelmode/hud.js).
-const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds });
+// The boss's cutscene (levelmode/cutsceneview.js): the page's hooks to the camera, the storm and the flash.
+const cutsceneDirector = createCutsceneDirector({
+  orbit: () => scene.orbit,
+  roomTest: (x, z, y) => cameraRoomTest(x, z, y),
+  strike: () => stormStrikeNow(false),
+  flash: (strength) => { state.drama.flash = { start: realSeconds(), strength }; },
+});
+/** Simulated seconds per real second now: a big moment's slow motion, or the cutscene's (the slower of the two; never a stop). */
+const paceNow = () => Math.min(timeScale(state.drama, realSeconds()), cutsceneDirector.speed());
+const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds, camera: () => scene.camera });
 
 // The ring on the floor round the man locked on.
 const lockRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), new THREE.MeshBasicMaterial({ color: 0xffcf4a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
@@ -515,7 +525,7 @@ function frame(now) {
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
-    if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
+    if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow());
     draw(dt);
   } catch (error) {
     // Reported once per kind of error, not sixty times a second.
@@ -607,6 +617,7 @@ function drainLevel() {
       followCam.reset();
     });
     else if (message.type === 'phase2') levelHud.toast('The helm comes off');
+    else if (message.type === 'bossDown') cutsceneDirector.start(world);
     else if (message.type === 'ending') beginEnding(world);
     else if (message.type === 'rested') {
       // From now on the footer's Restart goes back to this rest, not the start.
@@ -722,6 +733,7 @@ function followCamera(fighter, dt) {
   Object.assign(orbit, { yaw: view.yaw, pitch: view.pitch, distance: view.distance });
   orbit.target.set(...view.target);
   if (endingCam) endingCamera(dt);
+  cutsceneDirector.steer(dt);
 }
 
 /** The men as the watching camera sees them: where each stands, how high his neck is, and whether he is left lying. */
@@ -840,6 +852,7 @@ function drawWorld(dt, drawIt = true) {
   if (world.stage && followed) ktSightline(scene.camera.position, [followed.x[P.neck * 3], followed.x[P.neck * 3 + 1], followed.x[P.neck * 3 + 2]], true);
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
+  cutsceneDirector.jolt(scene.camera);
   showCameraBar(!followed && !sheet);
   seeThrough.update(scene, document.body.classList.contains('sheet') ? [] : watchedPoints(world, followed), dt);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
@@ -889,13 +902,14 @@ function drawWorld(dt, drawIt = true) {
   placeLockRing();
   placeChargeArrow();
   // The marks keep the fight's pace: slowed with it (a slow-motion moment, ¼×), still while it is paused.
-  fightMarksClock += dt * (state.paused ? 0 : state.speed * timeScale(state.drama, realSeconds()));
+  fightMarksClock += dt * (state.paused ? 0 : state.speed * paceNow());
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
   if (drawIt) render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
   fightControls.update();
   levelHud.update();
+  cutsceneDirector.frame(state.paused ? 0 : dt);
   tutorial.update();
 }
 
@@ -1208,17 +1222,20 @@ qualitySelect.addEventListener('change', () => {
   boxer.quality(qualitySelect.value);
   qualitySelect.blur();
 });
+// A look's photographic sky is decoded after the stage may already be up: when it arrives the stone and the puddles reflect it.
+stormOnSkyArrived(() => stageView?.setEnvironment?.(stormEnvironment(scene.renderer)));
 stageLookSelect.addEventListener('change', () => {
   chooseStageLook(stageLookSelect.value);
   stageLookSelect.blur();
 });
-/** The look this visitor last chose (or the address's `?stagelook=`), else the default's. */
-function rememberedStageLook() {
+/** The look this visitor last chose (or the address's `?stagelook=`), else the default's. The fair-weather looks are for the ghost walk (`sandboxOnly`): the real run keeps the storm. */
+function rememberedStageLook(ghost = false) {
+  const usable = (name) => STAGE_LOOKS[name] && (ghost || !STAGE_LOOKS[name].sandboxOnly);
   const wanted = new URLSearchParams(location.search).get('stagelook');
-  if (STAGE_LOOKS[wanted]) return wanted;
+  if (usable(wanted)) return wanted;
   try {
     const saved = localStorage.getItem(stageLookKey);
-    if (STAGE_LOOKS[saved]) return saved;
+    if (usable(saved)) return saved;
   } catch {
     // Nothing kept.
   }
@@ -2057,6 +2074,7 @@ let stageView = null;
 // which run is on (a card that comes back after the stage was left, or begun again, is ignored).
 let stageMarkers = null;
 let stageShards = null;
+let stageGuide = null;
 let endingCam = null;
 let stageRun = 0;
 // A development overlay of what each man is doing (boxer.stage().overlay(true)).
@@ -2073,8 +2091,10 @@ function leaveStage() {
   levelHud.reset();
   stageMarkers?.dispose();
   stageShards?.dispose();
-  stageMarkers = stageShards = null;
+  stageGuide?.dispose();
+  stageMarkers = stageShards = stageGuide = null;
   endingCam = null;
+  cutsceneDirector.cancel();
   if (stageView) disposeStageView(stageView);
   stageView = null;
   awarenessOverlay?.show(false);
@@ -2115,13 +2135,16 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   // Things drawn with the stage and kept up with its own update each frame.
   stageMarkers = createLevelMarkers(stageView.group);
   stageShards = stage.ending ? createShards(stageView.group) : null;
+  // (And the way to the prince, once the boss's cutscene has opened the inner door.)
+  stageGuide = stage.ending ? createGuide(stageView.group) : null;
   stageView.extras = (world) => {
     stageMarkers?.update(world);
     stageShards?.update(world);
+    stageGuide?.update(world);
   };
   if (place === 'dunnottar') {
     stormReset(stage.weather?.seed);
-    chooseStageLook(rememberedStageLook());
+    chooseStageLook(rememberedStageLook(ghost));
   }
   fightMarks.reset();
   fightMarks.warm();
@@ -2161,6 +2184,7 @@ function restartStage() {
   }
   closeStory();
   endingCam = null;
+  cutsceneDirector.cancel();
   for (const id of drainRebuilds(world)) rebuildFighterView(id);
   state.orders = newOrders();
   fightControls.reset();
@@ -2715,6 +2739,9 @@ const boxer = window.boxer = {
       put: (at, yaw = 0) => { placeOnFloor(world.fighters[0], at[0], at[2], at[1], yaw); return true; },
       // The boss struck down by hand (the ending follows: his door opens, the cell scene when the player is near the prince).
       killBoss: () => killBoss(world),
+      // The boss's cutscene as it stands (null when none plays), and a skip.
+      cutscene: () => cutsceneDirector.state,
+      skipCutscene: () => cutsceneDirector.skip(),
       hurt: (amount = 0.05) => { const me = world.fighters[0]; me.bleed = (me.bleed ?? 0) + amount; me.bleedOutside = (me.bleedOutside ?? 0) + amount; return me.bleed; },
     };
   },
@@ -2766,7 +2793,7 @@ const boxer = window.boxer = {
   playFrames: (count, dt = 1 / 60) => {
     for (let index = 0; index < count; index += 1) {
       buildQueuedViews();
-      if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * timeScale(state.drama, realSeconds()));
+      if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow());
       draw(dt);
     }
   },

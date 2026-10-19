@@ -35,7 +35,7 @@
 import { P } from '../body.js';
 import { placeOnFloor, startCrawl } from '../physics.js';
 import { floorAt, rayBlocked } from '../physics/terrain.js';
-import { regionContains, sectionById } from './stage.js';
+import { regionContains, sectionById, stageTerrain } from './stage.js';
 
 export const AWARE = {
   // How far a man sees (m) in full light; at light 0 this share of it. A section's own `vision` overrides.
@@ -86,6 +86,8 @@ export const AWARE = {
   follow: { min: 2.5, max: 4, spacing: 1.3, runFrom: 9 },
   allyReach: 16,
   rehome: 30,
+  // A follower within this many m (less than rehome) who would be left standing on a floor that goes with a section is set down on the route behind the player.
+  catchUp: 30,
   // The player's route, remembered for the followers: a point each 0.7 m, so many of them.
   trailStep: 0.7,
   trailMax: 160,
@@ -346,7 +348,12 @@ function readEvents(world, aware) {
     }
     // Hit, or blocked: the man knows. A guard fights; an ally answers; a civilian runs.
     if (mind.kind === 'guard') alarm(world, aware, mind, defender, 'hit', attacker);
-    else if (mind.kind === 'ally') engage(world, aware, mind, defender, 'hit');
+    else if (mind.kind === 'ally') {
+      // A comrade struck by the player (friendly fire is real: a blow, a stray arrow) does not turn on him: he flinches as the blow
+      // makes him (the physics), is not brought into a fight he has none in, goes on following, and says so (team.js 'Watch it!').
+      if (attacker === world.fighters[0]) aware.struckAlly = { id: defender.id, time };
+      else engage(world, aware, mind, defender, 'hit');
+    }
     else mind.hurtAt = time;
     aware.clashes.push({ x: hipX(defender), z: hipZ(defender), y: floorOf(defender), time, by: event.attacker });
   }
@@ -917,19 +924,43 @@ export function gatherFollowers(world) {
 
 /**
  * Before the sections swap (stage.js apply): followers near the player go with him into whichever section is
- * now active, so that none is left dormant behind.
+ * now active, so that none is left dormant behind. One who stands where the swap takes the floor away (the
+ * ledge he was crossing belongs to a section that is going quiet) is set down on the player's route a few
+ * metres behind him, as a comrade who ran to catch up (`catchUp`): he would fall into the sea else.
  */
 export function rehomeFollowers(world, ids) {
   const aware = world.stage?.aware;
   if (!aware || !ids.length) return;
   const player = world.fighters[0];
+  const def = world.stage.def;
+  let moved = 0;
+  let after = null;
   for (const mind of aware.minds) {
     if (!mind || mind.kind !== 'ally') continue;
     const fighter = world.fighters[mind.id];
     // (One who has stayed at the gate stays in his section: he sleeps with it, and wakes standing, rather than be woken over a floor that is gone.)
     if (fighter.state === 'out' || mind.state === 'stayed' || ids.includes(fighter.spawn.section)) continue;
-    if (flatApart(fighter, player) < aware.config.rehome) fighter.spawn.section = ids[0];
+    const apart = flatApart(fighter, player);
+    if (apart >= aware.config.rehome) continue;
+    fighter.spawn.section = ids[0];
+    // (The terrain the swap will leave: is there still a floor under his feet?)
+    after ??= stageTerrain(def, ids, world.stage.mechanisms);
+    const standing = floorAt(after, hipX(fighter), hipZ(fighter), floorOf(fighter) + 0.6) > floorOf(fighter) - 0.8;
+    if (standing || apart >= aware.config.catchUp) continue;
+    const spot = aware.trail.length ? trailBehind(aware, aware.config.follow.min + moved * aware.config.follow.spacing) : null;
+    if (!spot) continue;
+    placeOnFloor(fighter, spot.x, spot.z, spot.y, player.yaw);
+    mind.go = null;
+    moved += 1;
   }
+}
+
+/** The point on the player's route `behind` m back from where he is: { x, z, y }. */
+function trailBehind(aware, behind) {
+  const route = aware.trail;
+  const goal = route[route.length - 1].s - behind;
+  for (let index = route.length - 1; index >= 0; index -= 1) if (route[index].s <= goal) return route[index];
+  return route[0];
 }
 
 // ---- Fear: the garrison runs for its rear, not off the field -----------------------------------------------------

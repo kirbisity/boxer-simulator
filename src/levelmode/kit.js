@@ -21,8 +21,12 @@ import { ceilingAt, pushOut, rayBlocked } from '../physics/terrain.js';
 import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgRock, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
 import { kwDecorate } from './kitwear.js';
-import { stormFogFar, stormFollow, stormRain, stormTorch } from './storm.js';
+import { stormFlashLevel, stormFogFar, stormFollow, stormInterior, stormRain, stormTorch } from './storm.js';
+import { interiorAt } from './stage.js';
+import { kcDecor, kcDoubleDoor, kcExtras, kcFar, kcMaterials } from './kitchapel.js';
 import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
+import { FaceRegistry } from '../depthrange.js';
+import { lampShare, newLamps, pickLit, stepLamps, torchFlicker } from './torchpool.js';
 import { skyDirection } from './stagesky.js';
 import { ktDispose, ktMaterials, ktRandom, ktSetLod, ktWeather } from './kittex.js';
 import { TIER_NAMES, tierOf } from './quality.js';
@@ -613,7 +617,7 @@ function kitMass(batch, mass) {
 /** The winding stair's rope and its posts. */
 function kitSpiral(batch, spiral) {
   const sweep = spiral.turn / spiral.steps;
-  const radius = spiral.outer - 0.3;
+  const radius = spiral.rail ?? spiral.outer - 0.3;
   const points = [];
   for (let k = 0; k < spiral.steps; k += 1) {
     const angle = spiral.start + sweep * (k + 0.5);
@@ -696,18 +700,18 @@ function kitWaymarks(dyn, trail) {
 }
 
 /** The detail of a section: its solids as masonry, its decor, its props. Returns { group, dyn }. */
-function kitSection(section, mats, seed, levels = []) {
-  const batch = new KitBatch(mats, seed);
+function kitSection(section, mats, seed, levels = [], faces = null) {
+  const batch = new KitBatch(mats, seed, faces);
   const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [] };
   kitSolids(batch, section);
-  const cellar = section.id === 'vault' || section.id === 'cell';
+  const cellar = section.id === 'vault' || section.id === 'cell' || section.id === 'crypt';
   let fences = 0;
   for (const decor of section.decor ?? []) {
     switch (decor.kind) {
       case 'run': kitRun(batch, decor, false, 0); break;
       case 'vault': {
         const timber = decor.style === 'timber';
-        kgVault(batch, timber ? 'boards' : cellar ? 'rubble' : 'ashlar', decor.a, decor.b, decor.width, decor.crown, { ribs: decor.ribs ?? (cellar ? 4.1 : 0), ribMaterial: timber ? 'wood' : 'ashlar', tint: cellar ? 0.8 : 0.9 });
+        kgVault(batch, decor.nave ? 'nave' : timber ? 'boards' : cellar ? 'rubble' : 'ashlar', decor.a, decor.b, decor.width, decor.crown, { ribs: decor.ribs ?? (cellar ? 4.1 : 0), ribMaterial: timber ? 'wood' : 'ashlar', tint: cellar ? 0.8 : 0.9, ...(decor.nave ? { ribWidth: 0.9, ribDrop: 0.34 } : {}) });
         break;
       }
       case 'fence': kitFence(batch, decor, seed * 31 + (fences += 1)); break;
@@ -722,7 +726,7 @@ function kitSection(section, mats, seed, levels = []) {
       case 'cairn': kitCairn(batch, decor); break;
       case 'face': kitFace(batch, decor); break;
       case 'waymarks': kitWaymarks(dyn, decor); break;
-      default: break;
+      default: kcDecor(batch, dyn, decor); break;
     }
   }
   kwDecorate(batch, section, levels);
@@ -733,9 +737,10 @@ function kitSection(section, mats, seed, levels = []) {
 }
 
 /** The silhouette of a section: its solids as plain blocks. */
-function kitSilhouette(section, mats, seed) {
-  const batch = new KitBatch(mats, seed);
+function kitSilhouette(section, mats, seed, faces = null) {
+  const batch = new KitBatch(mats, seed, faces);
   kitSolids(batch, section, { silhouette: true });
+  kcFar(batch, section);
   const group = new THREE.Group();
   group.name = `silhouette:${section.id}`;
   batch.build(group, { name: `${section.id}-far` });
@@ -779,9 +784,9 @@ function kitFoamTexture() {
 }
 
 /** The land: the mainland hillside, the cliffs of the headland slabs, the rock under the gatehouse and its tunnel, and the surf at their feet. */
-function kitLand(stage, mats, blocks, foam) {
+function kitLand(stage, mats, blocks, foam, faces = null) {
   const sea = stage.sea;
-  const batch = new KitBatch(mats, 99);
+  const batch = new KitBatch(mats, 99, faces);
   const form = stage.landform;
   kitMainland(batch, stage, blocks, null, sea);
   const strips = [];
@@ -1156,13 +1161,20 @@ function kitMechanism(section, mech, mats) {
   const batch = new KitBatch(mats, 41);
   const closed = mech.states.closed?.[0] ?? mech.states.up?.[0];
   let apply = () => {};
-  if (look.kind === 'door' || look.kind === 'bars') {
+  if (look.kind === 'door' || look.kind === 'bars' || look.kind === 'doubledoor') {
     const solid = closed;
     const alongU = solid.size[0] >= solid.size[1];
     const width = alongU ? solid.size[0] : solid.size[1];
     const yaw = (solid.yaw ?? 0) + (alongU ? 0 : -Math.PI / 2);
     const height = solid.top - solid.bottom;
-    if (look.kind === 'door') {
+    if (look.kind === 'doubledoor') {
+      // Two heavy arched leaves hinged at the jambs, opening into the room beyond (levelmode/kitchapel.js).
+      const made = kcDoubleDoor(mats, { width, height });
+      group.add(made.group);
+      group.position.set(solid.at[0], solid.bottom, solid.at[1]);
+      group.rotation.y = yaw;
+      apply = made.apply;
+    } else if (look.kind === 'door') {
       // Planks on a frame of iron straps, hinged at one end.
       kgBox(batch, 'wood', width / 2, height / 2, 0, width - 0.14, height - 0.1, 0.16, 0, { aoFrom: -1, jitter: 0.1 });
       for (const h of [0.2, 0.5, 0.8]) kgBox(batch, 'iron', width / 2, height * h, 0.1, width - 0.2, 0.12, 0.04, 0, { jitter: 0 });
@@ -1272,13 +1284,17 @@ function kitReach(chunks, ex, ey, ez) {
  */
 export function createCastleView(stage) {
   const mats = ktMaterials();
+  kcMaterials(mats);
   const foam = new THREE.MeshBasicMaterial({ map: kitFoamTexture(), transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
   foam.map.repeat.set(1, 1);
   const textures = { flame: kitFlameTexture(), glow: kitGlowTexture(), shaft: kitShaftTexture(), waymark: kitWaymarkTexture() };
   const group = new THREE.Group();
   group.name = `stage:${stage.id}`;
   const blocks = kitBlocks(stage);
-  const land = kitLand(stage, mats, blocks, foam);
+  // (The faces placed so far, so that no two on one plane are drawn, in the detail and in the silhouettes alike (a silhouette is seen beside a neighbour's detail): depthrange.js.)
+  const detailFaces = new FaceRegistry();
+  const farFaces = detailFaces;
+  const land = kitLand(stage, mats, blocks, foam, detailFaces);
   group.add(land);
   const sections = {};
   const parts = {};
@@ -1289,8 +1305,8 @@ export function createCastleView(stage) {
   let seed = 7;
   for (const section of stage.sections) {
     seed += 13;
-    const detail = kitSection(section, mats, seed, stage.levels ?? []);
-    const far = kitSilhouette(section, mats, seed + 1);
+    const detail = kitSection(section, mats, seed, stage.levels ?? [], detailFaces);
+    const far = kitSilhouette(section, mats, seed + 1, farFaces);
     // (The merged meshes of the section, before anything that moves is put in with them.)
     const chunks = kitChunks(detail.group.children, (mesh) => mesh.material !== mats.wear);
     const decals = kitChunks(detail.group.children, (mesh) => mesh.material === mats.wear);
@@ -1298,6 +1314,8 @@ export function createCastleView(stage) {
     const dynamic = kitDynamics(detail.dyn, mats, textures);
     dynamic.group.name = `dyn:${section.id}`;
     detail.group.add(dynamic.group);
+    const ext = kcExtras(section, mats, textures);
+    if (ext) detail.group.add(ext.group);
     const holder = new THREE.Group();
     holder.name = `section:${section.id}`;
     holder.add(detail.group, far.group);
@@ -1318,7 +1336,7 @@ export function createCastleView(stage) {
     }
     for (const l of detail.dyn.lights) lights.push({ ...l, section: section.id });
     sections[section.id] = holder;
-    parts[section.id] = { detail, far, dynamic, moving, marks, chunks, decals, silhouette };
+    parts[section.id] = { detail, far, dynamic, moving, marks, ext, chunks, decals, silhouette };
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
     group.add(holder);
   }
@@ -1349,7 +1367,7 @@ export function createCastleView(stage) {
     pool.push(light);
   }
   const state = {
-    time: 0, last: null, lightClock: 0, near: new Set(), lit: [], shelter: 1, reflect: {},
+    time: 0, last: null, lightClock: 0, near: new Set(), lit: [], lamps: newLamps(pool.length), shelter: 1, reflect: {},
     // The quality tier in force (quality.js), and what visibility.js has decided: the state of each section as painted ('detail', 'far', 'off'), the men not drawn.
     tier: 'high', q: tierOf('high'), held: {}, states: new Map(), hidden: new Set(), menHeld: {}, menSeen: new Map(), open: new Map(), stamp: null,
     sight: seeThroughIds(stage), eye: [0, 0, 0], fogFar: Infinity, paint: { sections: 0, far: 0, chunks: 0, decals: 0 },
@@ -1408,9 +1426,12 @@ export function createCastleView(stage) {
     const px = me.x[P.pelvis * 3];
     const py = me.x[P.pelvis * 3 + 1];
     const pz = me.x[P.pelvis * 3 + 2];
-    // The weather follows him, and the rain stops under a roof.
-    const indoors = world.arena.terrain ? ceilingAt(world.arena.terrain, px, pz, py) < py + 7 : false;
+    // The weather follows him, and the rain stops under a roof. A section with an `interior` (the vaulted chapel, with its ceiling twelve metres up) changes the light itself: the storm's sun, mist and flashes die away behind its walls (levelmode/storm.js).
+    const interior = interiorAt(stage, px, py, pz);
+    stormInterior(interior);
+    const indoors = interior ? true : world.arena.terrain ? ceilingAt(world.arena.terrain, px, pz, py) < py + 7 : false;
     stormFollow(px, py, pz, indoors);
+    const extra = { flash: stormFlashLevel(), door: run.mechanisms[stage.ending?.door] ?? 'closed', phase: run.level?.ending?.phase ?? null };
     // Under a roof the sky is not what the wet stone shows: its reflections fade (and come back in the open).
     state.shelter += ((indoors ? 0.1 : 1) - state.shelter) * Math.min(1, dt * 4);
     for (const [name, base] of Object.entries(state.reflect)) mats[name].envMapIntensity = base * state.shelter;
@@ -1472,6 +1493,7 @@ export function createCastleView(stage) {
       paint.decals += kitReach(entry.decals, ex, ey, ez);
       const away = nearestBoxDistance(graph.bounds[section.id], ex, ey, ez);
       kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time, q, away, state.eye);
+      entry.ext?.update(state.time, extra);
       const taken = run.level?.taken;
       for (const mark of entry.marks) {
         const gone = taken?.has(mark.item.id);
@@ -1493,16 +1515,19 @@ export function createCastleView(stage) {
       state.lightClock = 0.2;
       const candidates = [];
       for (const l of lights) {
-        if (!near.has(l.section)) continue;
+        // (The torches of a section that is not painted are out: they light nothing that is seen.)
+        if (!near.has(l.section) || states.get(l.section) !== 'detail') continue;
         const d = Math.hypot(l.at[0] - px, l.at[2] - pz);
         if (d < l.range * 2.2) candidates.push({ l, d });
       }
-      candidates.sort((a, b) => a.d - b.d);
-      state.lit = candidates.slice(0, pool.length).map((c) => c.l);
+      state.lit = pickLit(candidates, state.lit, pool.length);
     }
+    // (A light stays with its torch, and fades in and out: torchpool.js.)
+    stepLamps(state.lamps, state.lit, dt);
     pool.forEach((light, k) => {
-      light.visible = state.lit.length > 0;
-      const l = state.lit[k];
+      const lamp = state.lamps[k];
+      light.visible = state.lit.length > 0 || state.lamps.some((other) => other.l);
+      const l = lamp.l;
       if (!l) {
         light.intensity = 0;
         return;
@@ -1510,7 +1535,7 @@ export function createCastleView(stage) {
       light.position.set(l.at[0], l.at[1], l.at[2]);
       light.color.setHex(l.color);
       light.distance = l.range;
-      light.intensity = l.power * (0.9 + 0.12 * Math.sin(state.time * 13 + k * 2) + 0.06 * Math.sin(state.time * 31 + k)) * 2.2 * stormTorch();
+      light.intensity = l.power * torchFlicker(state.time, k) * lampShare(lamp) * 2.2 * stormTorch();
     });
     foam.map.offset.set(state.time * 0.02, state.time * 0.05);
     foam.opacity = 0.3 + 0.1 * Math.sin(state.time * 0.9);
@@ -1573,7 +1598,7 @@ export function createCastleView(stage) {
       const opaque = new Set(['ashlar', 'ruin', 'rubble', 'rock', 'cobble', 'flags', 'grass', 'path', 'boards', 'wood', 'iron', 'bone', 'cloth', 'straw', 'black'].map((name) => mats[name]));
       const skip = new Set();
       for (const entry of Object.values(parts)) {
-        for (const owner of [...entry.moving, ...entry.marks, entry.dynamic]) owner.group.traverse((object) => skip.add(object));
+        for (const owner of [...entry.moving, ...entry.marks, entry.dynamic, ...(entry.ext ? [entry.ext] : [])]) owner.group.traverse((object) => skip.add(object));
       }
       state.casters = [];
       for (const root of [land, ...Object.values(parts).map((entry) => entry.detail.group)]) {

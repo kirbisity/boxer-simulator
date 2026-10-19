@@ -9,6 +9,7 @@
 // north faces, the tops of things and in the dark of a crevice) and rain streaks running down the walls; wet stone darker and
 // glossier where the vertex colour says the wall is in shadow at its foot; and a fog that thickens toward the sea (height fog).
 
+import { KIT_FLOOR_OFFSET } from '../depthrange.js';
 import { KT_SHADOW_FUNCTION, KT_SHADOW_PARS, ktShadow, ktShadowInit } from './kitshadow.js';
 import { kwTexture } from './kitwear.js';
 import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
@@ -319,9 +320,11 @@ export function ktSightline(camera, subject, on = true) {
  * `{ ashlar, ruin, rubble, rock, cobble, flags, grass, path, boards, wood, iron, bone, cloth, straw, flame, glow, black }`.
  */
 export function ktMaterials() {
-  const make = (map, tile, options = {}) => {
+  // (A floor's dressing wins a tie with the face under it, by a few steps of the depth buffer: depthrange.js.)
+  const make = (map, tile, options = {}, layer = null) => {
     map.repeat.set(1 / tile, 1 / tile);
-    return new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.78, metalness: 0, ...options });
+    const offset = layer && (layer.factor || layer.units) ? { polygonOffset: true, polygonOffsetFactor: layer.factor, polygonOffsetUnits: layer.units } : {};
+    return new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.78, metalness: 0, ...offset, ...options });
   };
   const m = {};
   ktFade.uKitCam.value ??= new THREE.Vector3(0, 100, 0);
@@ -345,11 +348,11 @@ export function ktMaterials() {
   m.ruin = make(ktTexture(512, 12, ktRuinWall), 4, { roughness: 0.74, side: THREE.DoubleSide });
   m.rubble = make(ktTexture(512, 13, ktRubble), 4, { roughness: 0.76, side: THREE.DoubleSide });
   m.rock = make(ktTexture(512, 14, ktRock), 6, { roughness: 0.6, side: THREE.DoubleSide });
-  m.cobble = make(ktTexture(512, 15, ktCobbles), 3, { roughness: 0.5 });
-  m.flags = make(ktTexture(512, 16, ktFlags), 4, { roughness: 0.52 });
-  m.grass = make(ktTexture(512, 17, ktGrass), 6, { roughness: 0.95 });
-  m.path = make(ktTexture(512, 18, ktPath), 4, { roughness: 0.84 });
-  m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 });
+  m.cobble = make(ktTexture(512, 15, ktCobbles), 3, { roughness: 0.5 }, KIT_FLOOR_OFFSET.cobble);
+  m.flags = make(ktTexture(512, 16, ktFlags), 4, { roughness: 0.52 }, KIT_FLOOR_OFFSET.flags);
+  m.grass = make(ktTexture(512, 17, ktGrass), 6, { roughness: 0.95 }, KIT_FLOOR_OFFSET.grass);
+  m.path = make(ktTexture(512, 18, ktPath), 4, { roughness: 0.84 }, KIT_FLOOR_OFFSET.path);
+  m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 }, KIT_FLOOR_OFFSET.boards);
   m.wood = make(ktTexture(128, 20, (g, s, r) => ktBoards(g, s, r, [70, 52, 36])), 2, { roughness: 0.85 });
   m.iron = make(ktTexture(128, 21, ktIron), 1.5, { roughness: 0.45, metalness: 0.55 });
   for (const name of Object.keys(detail)) ktPatch(m[name], { cutaway: true, detail: detail[name], shadow: true });

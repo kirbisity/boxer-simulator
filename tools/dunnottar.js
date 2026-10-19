@@ -12,7 +12,7 @@
 //             a rest within a few metres of his way.
 //
 // Usage:
-//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 2400]
+//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 2400] [--allies 3]
 //   node tools/dunnottar.js segments [--runs 20] [--segments start_rest1,rest1_rest2,...] [--logs]   rest to rest, from full health
 //   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
 //   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
@@ -78,7 +78,8 @@ import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hurtShare, think, thinkAll } from '../src/ai.js';
 import { P } from '../src/body.js';
-import { advance, bodyHarm, collapseAt, reclothe, startPickup } from '../src/physics.js';
+import { advance, bodyHarm, collapseAt, knockOut, reclothe, startPickup } from '../src/physics.js';
+import { comradesOf } from '../src/levelmode/team.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { levelAware } from '../src/levelmode/adapter.js';
 import { createLevelWorld, levelThink, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
@@ -89,6 +90,12 @@ import { OUTFITS } from '../src/outfits.js';
 import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 
 const STEP = 1 / 60;
+/**
+ * How many of the three Forger comrades the stage starts the operative with (`--allies N`; the stage's own is 3). The bot treats them as
+ * given: they follow, fight and die by the game's own rules (levelmode/team.js); it does not command them. With fewer, the rest are
+ * dead where they stood from the start (what the stage was before it had a team: `--allies 0`).
+ */
+let ALLIES = 3;
 /** The sections in the order the route reaches them (the cell is a side room). */
 const ORDER = ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'];
 const PLAYER = new Set([0]);
@@ -211,6 +218,11 @@ class Run {
     this.spec = POLICY[policy];
     this.log = log ? [] : null;
     this.world = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed });
+    // (Fewer comrades than the stage gives: the rest lie dead, said or not.)
+    comradesOf(this.world).slice(ALLIES).forEach((fighter) => {
+      knockOut(this.world, fighter, { time: this.world.time, effects: [] }, 'lies dead', 'killed');
+      this.world.stage.level.team.fallen.add(fighter.spawn.id);
+    });
     this.me = this.world.fighters[0];
     this.level = this.world.stage.level;
     this.maxDeaths = maxDeaths;
@@ -776,6 +788,8 @@ export const SEGMENTS = {
   rest1_rest2: { from: 'rest1', to: 'rest2', note: 'gorge, gatehouse, oillet stair, ascent, quad' },
   rest2_rest2b: { from: 'rest2', to: 'rest2b', note: 'the quad, the cellar to the turnkey\'s fire' },
   rest2b_rest3: { from: 'rest2b', to: 'rest3', note: 'keep, stair tower, wall walk' },
+  // The vault alone (a bot that has to cross the quadrangle first is held up by the court's patrol): from the foot of the west stair to the turnkey's fire.
+  vault_rest2b: { from: null, fromAt: [5.7, 6, -17.4], to: 'rest2b', note: 'the long cellar, from the foot of the west stair' },
 };
 
 /** One walk of a segment from full health: { result: through | died | timeout, by, seconds, harm, bandages, tonics }. */
@@ -783,17 +797,17 @@ function segmentRun(name, policy, seed, log) {
   const spec = SEGMENTS[name];
   const full = planFor(policy);
   const samples = routeTrace();
-  const startAt = spec.from ? RESTS[spec.from].at : DUNNOTTAR.start.at;
+  const startAt = spec.fromAt ?? (spec.from ? RESTS[spec.from].at : DUNNOTTAR.start.at);
   const endAt = RESTS[spec.to].at;
-  const from = spec.from ? nearestSample(samples, startAt[0], startAt[1], startAt[2]).sample.idx : 0;
+  const from = spec.from || spec.fromAt ? nearestSample(samples, startAt[0], startAt[1], startAt[2]).sample.idx : 0;
   const to = nearestSample(samples, endAt[0], endAt[1], endAt[2]).sample.idx;
   // (From the turnkey's fire he does not go back for the cell: that is a walk through the cellar, and the cellar's men are another stretch's.)
   const plan = full.filter((entry) => entry.base >= from && entry.base <= to && !(spec.from === 'rest2b' && entry.stop && entry.acts.some((act) => act.kind === 'gate')));
   const run = new Run({
     policy, seed, plan, log, maxDeaths: 1, endAt,
     setup: (self) => {
-      if (spec.from) {
-        restAtPoint(self.world, { id: spec.from, at: startAt, name: RESTS[spec.from].name });
+      if (spec.from || spec.fromAt) {
+        restAtPoint(self.world, { id: spec.from ?? 'segment-start', at: startAt, name: spec.from ? RESTS[spec.from].name : 'The segment\'s start' });
         self.level.ui.length = 0;
       }
     },
@@ -897,6 +911,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const command = options._[0] ?? 'sweep';
   const jobs = Number(options.jobs ?? Math.max(1, cpus().length - 2));
+  ALLIES = Number(options.allies ?? 3);
   if (command === 'one') {
     const [, policy, seed] = options._;
     const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });
@@ -919,7 +934,7 @@ async function main() {
   if (command === 'segments') {
     const names = String(options.segments ?? Object.keys(SEGMENTS).join(',')).split(',');
     const policy = String(options.policy ?? 'careful');
-    const lists = names.flatMap((name) => Array.from({ length: runs }, (_, index) => ['seg', name, policy, String(seed0 + index), ...(options.logs ? ['--log'] : [])]));
+    const lists = names.flatMap((name) => Array.from({ length: runs }, (_, index) => ['seg', name, policy, String(seed0 + index), '--allies', String(ALLIES), ...(options.logs ? ['--log'] : [])]));
     const results = await farm(lists, jobs);
     for (const name of names) {
       const mine = results.filter((result) => result.segment === name);
@@ -947,7 +962,7 @@ async function main() {
     return;
   }
   const policies = String(options.policy ?? 'careful,reckless').split(',');
-  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 2400)]));
+  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--allies', String(ALLIES), '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 2400)]));
   const results = await farm(lists, jobs);
   printSweep(results);
   printSummary(results);

@@ -164,3 +164,22 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 }
 @keyframes lv-pill-in-left { from { opacity: 0; translate: 0 6px; } }
 .banner:not([hidden]) ~ .fight-ui .lv-context, .banner:not([hidden]) ~ .fight-ui .lv-items, .banner:not([hidden]) ~ .fight-ui .lv-action { visibility: hidden; }
+
+/* ---- Level Mode: the team ---- the comrades: names and health, top right (clear of the thumbs and of the pill), and a soft green pip with a name over each one's head. */
+.lv-team { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: min(150px, 30vw); display: grid; gap: 5px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.lv-mate { display: grid; grid-template-columns: 10px 1fr; grid-template-rows: auto 3px; column-gap: 7px; row-gap: 2px; align-items: center; padding: 5px 9px 6px 8px; border-radius: 8px; background: rgba(10, 12, 18, 0.5); border: 1px solid rgba(127, 224, 192, 0.28); }
+.lv-mate b { font: 600 12px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lv-dot { width: 8px; height: 8px; border-radius: 50%; background: #7fe0c0; box-shadow: 0 0 8px rgba(127, 224, 192, 0.8); }
+.lv-mate-bar { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.lv-mate-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #4fbf9f, #9be8cc); transition: width 0.2s linear; }
+.lv-mate.fighting .lv-dot { background: #ffcf4a; box-shadow: 0 0 8px rgba(255, 207, 74, 0.8); }
+.lv-mate.down .lv-dot { background: #ff9a48; box-shadow: 0 0 8px rgba(255, 154, 72, 0.8); }
+.lv-mate.fallen { opacity: 0.45; border-color: rgba(255, 255, 255, 0.12); }
+.lv-mate.fallen b { text-decoration: line-through; color: var(--muted); }
+.lv-mate.fallen .lv-dot { background: #555a66; box-shadow: none; }
+.lv-pips { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.lv-pip { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; will-change: transform; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95); }
+.lv-pip i { width: 11px; height: 11px; border-radius: 50%; background: #7fe0c0; border: 1px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 10px rgba(127, 224, 192, 0.9), 0 0 2px rgba(0, 0, 0, 0.8); }
+.lv-pip b { font: 600 11px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: #cdf6e8; white-space: nowrap; }
+.lv-pip.fighting i { background: #ffcf4a; box-shadow: 0 0 10px rgba(255, 207, 74, 0.9), 0 0 2px rgba(0, 0, 0, 0.8); }
+.banner:not([hidden]) ~ .fight-ui .lv-team, .banner:not([hidden]) ~ .fight-ui .lv-pips { visibility: hidden; }
