@@ -6,8 +6,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createStageWorld, mechanismsOf, setMechanism, stageTerrain } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
-import { DN_PATH, DUNNOTTAR, DUNNOTTAR_ROUTE, dnPropSolid } from '../src/levelmode/stages/dunnottar.js';
+import { DN_PATH, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, dnPropSolid } from '../src/levelmode/stages/dunnottar.js';
 import { floorAt, pushOut } from '../src/physics/terrain.js';
+import { placeOnFloor } from '../src/physics.js';
+import { updateStage } from '../src/levelmode/stage.js';
 import { hipsAt, walk } from './walker.js';
 import { P } from '../src/body.js';
 
@@ -164,4 +166,34 @@ test('scenery: the castle is hidden from the cliff path by rock that is solid (c
     const moved = pushOut(terrain, at, BODY, lump.at[1] + 0.2, lump.at[1] + 1.0, 0.35);
     assert.ok(moved && Math.hypot(at[0] - lump.at[0], at[1] - lump.at[2]) > 0.2, `rock at ${lump.at} is solid`);
   }
+});
+
+test('scenery: along every branch of the vault no drawn wall or vault stands across the way where the physics lets a man through', () => {
+  const offences = [];
+  for (const branch of DUNNOTTAR_BRANCHES) {
+    const w = createStageWorld(DUNNOTTAR, levelPreset('forger'), { seed: 9 });
+    const me = w.fighters[0];
+    const quiet = (current) => current.fighters.slice(1).forEach((fighter) => { fighter.dormant = true; });
+    placeOnFloor(me, branch.start[0], branch.start[2], branch.start[1], branch.facing);
+    for (const id of branch.open ?? []) setMechanism(w, id, 'open');
+    updateStage(w, true);
+    let tick = 0;
+    const seen = new Set();
+    walk(w, me, branch.points, {
+      seconds: 200,
+      think: quiet,
+      each: () => {
+        tick += 1;
+        if (tick % 15) return;
+        const [x, z] = hipsAt(me);
+        const y = me.x[P.pelvis * 3 + 1] - 1.0;
+        const hit = drawnBlock(x, y, z);
+        if (hit && !seen.has(hit)) {
+          seen.add(hit);
+          offences.push(`${branch.name}: ${hit}`);
+        }
+      },
+    });
+  }
+  assert.deepEqual(offences, []);
 });

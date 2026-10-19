@@ -27,10 +27,10 @@
 // A section's `decor` is for the drawing only (levelmode/kit.js): wall runs with openings, vaults, props. The solids
 // that make the physics carry a `style` (how they are drawn) and, when a run draws them instead, `skin: false`.
 
-import { ceilingOf, rampOf, slabOf, stairsOf, wallLine, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
+import { ceilingOf, rampOf, stairsOf, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
 import { buildChapel, buildCell, DN_ENDING } from './dunnottar-chapel.js';
 import { buildCrypt, buildVault, DN_COVERED, DN_SHAFT_SPIRAL, DN_VAULT_STEPS } from './dunnottar-vault.js';
-import { DIRS, DN_FACE, DN_LEVELS, DN_PATH, DN_Y, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnLerp, dnProp, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
+import { DN_FACE, DN_LEVELS, DN_PATH, DN_Y, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnLerp, dnProp, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
 export { DN_FACE, DN_LEVELS, DN_PATH, DN_Y } from './dnbuild.js';
 
@@ -193,7 +193,7 @@ function buildGate() {
   dnCeiling(sec, -5.2, 5.2, 41.2, 51.2, 4.8, 5.8);
   sec.decor.push({ kind: 'vault', a: [-5.2, 46.2, 4.8], b: [5.2, 46.2, 4.8], width: 10, crown: 2.6, style: 'vault' });
   // The great gate: barred from within. A lever on the inside throws the bar (Shortcut 1).
-  dnGate(sec, 'cliffgate', [-4.4, Y.gorge, 46.2], [{ ...wallOf([-6, 46.2], [0.4, 3.2], Y.gorge, 3.9, { id: 'cliffgate' }), style: 'iron', skin: false }], { kind: 'door', width: 3.2, height: 3.9, hinge: 'z-', leaf: 'oak' }, { opensFrom: { at: [-1.4, 46.2], size: [7.6, 9.6] }, label: 'Throw the bar' });
+  dnGate(sec, 'cliffgate', [-4.4, Y.gorge, 46.2], [{ ...wallOf([-6, 46.2], [0.4, 3.2], Y.gorge, 3.9, { id: 'cliffgate' }), style: 'iron', skin: false }], { kind: 'door', width: 3.2, height: 3.9, hinge: 'z-', leaf: 'oak' }, { opensFrom: { at: [-1.4, 46.2], size: [7.6, 9.6] }, label: 'Throw the bar of the great gate' });
   // Barrels, a table, a keg with something scratched on it.
   dnProp(sec, 'barrel', [-4.2, Y.gorge, 42.2], { yaw: 0.4 });
   dnProp(sec, 'barrel', [-3.1, Y.gorge, 41.9], { yaw: 1.4 });
@@ -496,8 +496,8 @@ function buildTower() {
   dnSlab(sec, 36, 44, DN_WALK_N, -34, W, 'flags', { bottom: W - 1.5, extra: { walk: true } });
   // The keep's north face, the walk's inner side.
   dnBox(sec, 44, cx - 2.05, -32.9, -32.4, W - 0.4, W + 6.6, 'tower');
-  const stairs = dnFlight(sec, { foot: [36 - 38 * 0.34, (DN_WALK_N - 34) / 2], dir: 'E', steps: 38, tread: 0.34, width: -34 - DN_WALK_N, from: L, rise: (W - L) / 38, style: 'cobble', bottom: L - 1.5 });
-  dnSlab(sec, -2, 36 - 38 * 0.34, DN_WALK_N, -34, L, 'flags', { bottom: L - 1.5, extra: { walk: true } });
+  const stairs = dnFlight(sec, { foot: [36 - 39 * 0.34, (DN_WALK_N - 34) / 2], dir: 'E', steps: 39, tread: 0.34, width: -34 - DN_WALK_N, from: L, rise: (W - L) / 39, style: 'cobble', bottom: L - 1.5 });
+  dnSlab(sec, -2, 36 - 39 * 0.34, DN_WALK_N, -34, L, 'flags', { bottom: L - 1.5, extra: { walk: true } });
   // Parapets: the sea side whole (but for two breaches that let a man fall to the sea), the court side with the gaps.
   const breaches = [[50, 52.6], [8.2, 10.8]];
   const parapet = (x0, x1, z, top, bottom, gaps, thick = 0.55) => {
@@ -509,8 +509,8 @@ function buildTower() {
     if (cursor < x1) dnBox(sec, cursor, x1, z - thick / 2, z + thick / 2, bottom, top, 'parapet');
   };
   parapet(36, 66, DN_WALK_N - 0.2, W + 1.3, W - 0.4, breaches.filter((g) => g[0] > 36));
-  parapet(-2, 23.08, DN_WALK_N - 0.2, L + 1.3, L - 0.4, breaches.filter((g) => g[0] < 23));
-  parapet(0, 23.08, -33.8, L + 1.3, L - 0.4, [[5.6, 8.4], [13.4, 15.2]]);
+  parapet(-2, 22.74, DN_WALK_N - 0.2, L + 1.3, L - 0.4, breaches.filter((g) => g[0] < 23));
+  parapet(0, 22.74, -33.8, L + 1.3, L - 0.4, [[5.6, 8.4], [13.4, 15.2]]);
   parapet(36, 44, -33.8, W + 1.3, W - 0.4, []);
   dnBox(sec, 66, 66.55, DN_WALK_N - 0.5, -28.3, W - 0.4, W + 1.3, 'parapet');
   dnBox(sec, cx - 2.05, cx - 1.6, -32.4, cz - 6.2, W - 0.4, W + 1.3, 'parapet');
@@ -520,17 +520,17 @@ function buildTower() {
     const last = Math.min(stairs.steps, i + 3) - 1;
     for (const z of [DN_WALK_N - 0.2, -33.8]) dnBox(sec, stairs.foot[0] + i * stairs.tread, stairs.foot[0] + (last + 1) * stairs.tread, z - 0.275, z + 0.275, stairs.treadY(i) - 0.6, stairs.treadY(last) + 1.3, 'parapet');
   }
-  sec.decor.push({ kind: 'walk', y: W, rect: [36, 66, DN_WALK_N, -32.4] }, { kind: 'walk', y: L, rect: [-2, 23.08, DN_WALK_N, -34] }, { kind: 'crenel', a: [36, DN_WALK_N - 0.2], b: [66, DN_WALK_N - 0.2], y: W + 1.3, gaps: breaches.filter((g) => g[0] > 36) }, { kind: 'crenel', a: [-2, DN_WALK_N - 0.2], b: [23.08, DN_WALK_N - 0.2], y: L + 1.3, gaps: breaches.filter((g) => g[0] < 23) });
+  sec.decor.push({ kind: 'walk', y: W, rect: [36, 66, DN_WALK_N, -32.4] }, { kind: 'walk', y: L, rect: [-2, 22.74, DN_WALK_N, -34] }, { kind: 'crenel', a: [36, DN_WALK_N - 0.2], b: [66, DN_WALK_N - 0.2], y: W + 1.3, gaps: breaches.filter((g) => g[0] > 36) }, { kind: 'crenel', a: [-2, DN_WALK_N - 0.2], b: [22.74, DN_WALK_N - 0.2], y: L + 1.3, gaps: breaches.filter((g) => g[0] < 23) });
   // The ladder: hauled up now (a barrier at the gap in the parapet); kicked down it is a stair of rungs to the court (Shortcut 2).
   const ladderDown = { ...stairsOf([14.3, -30.4], [6.9, 1.5], 23, Q, (L - Q) / 23, { yaw: Math.PI / 2, id: 'ladder1' }), style: 'ladder', skin: false };
   sec.ladders.push({
-    id: 'ladder1', at: [14.3, L, -35.2], state: 'up', kickFrom: { at: [14.3, -36.6], size: [14, 5.2], y: [L - 1, L + 3] }, label: 'Kick the ladder down',
+    id: 'ladder1', at: [14.3, L, -35.2], state: 'up', kickFrom: { at: [14.3, -36.6], size: [14, 5.2], y: [L - 1, L + 3] }, label: 'Kick the ladder down to the court',
     states: { up: [{ ...wallOf([14.3, -33.8], [1.8, 0.4], L - 0.4, L + 1.3, { id: 'ladder1' }), style: 'ladder', skin: false }], down: [ladderDown] },
     look: { kind: 'ladder', foot: [14.3, Q, -26.95], top: [14.3, L, -33.85], width: 1.5 },
   });
   // Rest 3, before the chapel gate.
-  sec.rest = { id: 'rest3', name: 'The Wall Brazier', at: [4.6, L, -36] };
-  dnProp(sec, 'brazier', [4.8, L, -37.1], { lit: true, rest: true });
+  sec.rest = { id: 'rest3', name: 'The Wall Brazier', at: [4.6, L, -37.0] };
+  dnProp(sec, 'brazier', [4.8, L, -38.3], { lit: true, rest: true });
   // The way on from the ladder room to the chapel's gate: marks along the walk.
   sec.decor.push({ kind: 'waymarks', points: [[26, -36, L], [18, -36, L], [11, -36, L], [7.2, -36, L]], gap: 2.2, first: 0.4 });
   dnProp(sec, 'brazier', [22.5, W - 3, -37.2], { lit: true });

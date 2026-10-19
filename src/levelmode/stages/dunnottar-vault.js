@@ -305,7 +305,7 @@ export function buildCrypt() {
   dnProp(sec, 'bones', [13.8, C, -19.0], { yaw: 0.4 });
   // The sea-gate: a chest, a rotted bed, the dead man's weapons, a brazier, the lever.
   dnProp(sec, 'chest', [8.6, C, -37.6], { yaw: Math.PI });
-  dnProp(sec, 'bed', [1.8, C, -38.2], { yaw: 0 });
+  dnProp(sec, 'bed', [7.0, C, -38.6], { yaw: 0 });
   dnProp(sec, 'brazier', [8.8, C, -35.9], { lit: true });
   dnProp(sec, 'torch', [0.5, C + 2.4, -36.5], { face: 'E', dim: true });
   dnProp(sec, 'lever', [9.5, C + 1.2, -37.2], { face: 'W' });
@@ -322,7 +322,7 @@ export function buildCrypt() {
   dnItem(sec, 'note-warden', 'note', [16.6, C, -33.4], { note: 'warden', lift: 1.0 });
   dnItem(sec, 'bandage11', 'bandage', [20.4, C, -34.4]);
   dnItem(sec, 'tonic8', 'tonic', [8.6, C, -37.6], { lift: 0.7 });
-  dnItem(sec, 'note-seagate', 'note', [2.4, C + 0.5, -38.4], { note: 'seagate' });
+  dnItem(sec, 'note-seagate', 'note', [7.0, C, -38.6], { note: 'seagate', lift: 0.7 });
   return sec;
 }
 

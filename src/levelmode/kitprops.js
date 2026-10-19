@@ -5,6 +5,7 @@
 
 import { kgBox, kgCylinder, kgLump, kgTube } from './kitgeo.js';
 import { ktRandom } from './kittex.js';
+import { kcProp } from './kitchapel.js';
 
 /** Where a prop's local (lx, lz) is in the world, for a prop at [x, z] turned `yaw`. */
 function kpAt(at, yaw) {
@@ -379,6 +380,7 @@ export function kpBuild(prop, ctx) {
       break;
     }
     default:
+      kcProp(prop, ctx);
       break;
   }
 }

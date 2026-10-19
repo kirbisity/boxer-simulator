@@ -35,11 +35,11 @@ export const dnChapelSoffit = (dz) => CH.spring + CH.crown * Math.sqrt(Math.max(
 /** The interior's light and air: see stagelooks.js `interiorLevels` for how each number is used. */
 export const DN_CHAPEL_INTERIOR = {
   // The storm's sun and its flashes are all but shut out; the sky's light comes only through coloured glass.
-  sun: 0.03, flash: 0.1, ambient: 0.4, probe: 0.5, tint: [1.3, 0.95, 0.66],
+  sun: 0.03, flash: 0.1, ambient: 0.2, probe: 0.22, tint: [1.3, 0.95, 0.66],
   hemi: { sky: 0x7a5434, ground: 0x1c120c },
   // A warm, low, smoky air: no sea mist, a near fog of burnt amber.
   fog: { colour: 0x20140c, near: 10, far: 70, mist: 0 },
-  wet: 0.25, torch: 1.25, blend: 1.5,
+  wet: 0.25, torch: 0.8, blend: 1.5,
 };
 
 /** The cell: dark, with the cold of a slit window; a small warm glow. */
@@ -63,22 +63,22 @@ export function buildChapel() {
   // The east end: the great gate below, a clerestory pair above it.
   dnRun(sec, [-2.8, -47.6], [-2.8, -24.4], 1.6, floor - 2, floor + 5.2, 'ashlar', [{ at: 47.6 - 36, width: CH.gate.width, sill: floor, top: floor + CH.gate.height, shape: 'pointed' }], { face: 'chapelEast' });
   dnRun(sec, [-2.8, -47.6], [-2.8, -24.4], 1.6, floor + 5.2, top, 'ashlar', [-41, -31].map((z) => ({ at: z + 47.6, width: 1.8, sill: floor + 6.4, top: floor + 10.6, shape: 'lancet', solid: true })), { face: 'chapelEastTop' });
-  dnGate(sec, 'chapelgate', [-0.6, L, -36], [{ ...wallOf([-2.8, -36], [0.4, CH.gate.width], L, L + CH.gate.height, { id: 'chapelgate' }), style: 'iron', skin: false }], { kind: 'door', width: CH.gate.width, height: CH.gate.height, hinge: 'z-', leaf: 'iron' }, { opensFrom: { at: [3, -36], size: [10, 5] }, label: 'Open the chapel gate' });
-  // The west end (the chancel's wall): the double doors to the cell low in it, a great window over them, a lancet to each side.
+  dnGate(sec, 'chapelgate', [-0.6, L, -36], [{ ...wallOf([-2.8, -36], [0.4, CH.gate.width], L, L + CH.gate.height, { id: 'chapelgate' }), style: 'iron', skin: false }], { kind: 'door', width: CH.gate.width, height: CH.gate.height, hinge: 'z-', leaf: 'iron' }, { opensFrom: { at: [3, -36.6], size: [10, 6] }, label: 'Open the chapel gate' });
+  // The west end (the chancel's wall): the double doors to the cell low in it, a great window over them.
   const door = CH.door;
-  dnRun(sec, [-34.4, -47.6], [-34.4, -24.4], 1.6, floor - 2, floor + 5.6, 'ashlar', [{ at: 47.6 - 36, width: door.width, sill: floor, top: floor + door.height, shape: 'pointed' }, ...[-42, -30].map((z) => ({ at: z + 47.6, width: 1.5, sill: floor + 2.4, top: floor + 5.2, shape: 'lancet', solid: true }))], { face: 'chapelWest' });
+  dnRun(sec, [-34.4, -47.6], [-34.4, -24.4], 1.6, floor - 2, floor + 5.6, 'ashlar', [{ at: 47.6 - 36, width: door.width, sill: floor, top: floor + door.height, shape: 'pointed' }], { face: 'chapelWest' });
   dnRun(sec, [-34.4, -47.6], [-34.4, -24.4], 1.6, floor + 5.6, top, 'ashlar', [{ at: 47.6 - 36, width: 5.2, sill: floor + 6.6, top: floor + 11.4, shape: 'pointed', solid: true }], { face: 'chapelWestTop' });
   // The cell's door: shut until the boss has fallen (the ending, levelmode/ending.js, opens it): two heavy arched leaves.
   dnGate(sec, 'innerdoor', [-33.2, L, -36], [{ ...wallOf([door.x, door.z], [0.4, door.width], L, L + door.height, { id: 'innerdoor' }), style: 'iron', skin: false }], { kind: 'doubledoor', width: door.width, height: door.height, leaf: 'oak', keyhole: [door.x + 0.28, L + 1.5, door.z] });
   // The vault: a ribbed barrel over the nave (the ceilings are the physics' own: stepped over it, never lower than the soffit).
   sec.decor.push({ kind: 'vault', a: [CH.x1, mid, CH.spring], b: [CH.x0, mid, CH.spring], width: CH.z1 - CH.z0, crown: CH.crown, ribs: 5, style: 'vault', nave: true });
-  const band = (z0, z1, bottom) => dnCeiling(sec, CH.x0, CH.x1, z0, z1, bottom, bottom + 0.8);
+  const band = (z0, z1, bottom) => dnCeiling(sec, CH.x0, CH.x1, z0, z1, bottom, bottom + 0.8, 'hidden');
   band(CH.z0, mid - 8.4, L + 7.5);
   band(mid - 8.4, mid - 6, L + 9.8);
   band(mid - 6, mid + 6, L + 11);
   band(mid + 6, mid + 8.4, L + 9.8);
   band(mid + 8.4, CH.z1, L + 7.5);
-  sec.decor.push({ kind: 'chapelroof', x0: -35.2, x1: -2, z0: -47.6, z1: -24.4, eave: sideTop, ridge: L + 14.6 });
+  sec.decor.push({ kind: 'chapelroof', x0: -35.2, x1: -2, z0: -47.6, z1: -24.4, eave: sideTop, ridge: L + 14.6, spring: CH.spring, crown: CH.crown, wall: 1.6 });
   // The arcade: a pillar to a bay either side of the axis, from the floor to the vault.
   for (const x of CH.pillarX) for (const dz of [-CH.pillarOffset, CH.pillarOffset]) dnProp(sec, 'pillar', [x, floor, mid + dz], { height: dnChapelSoffit(CH.pillarOffset) - L - 0.2 });
   // The glass: stained panes in every window (the same ones as the openings above), their colours by bay.
@@ -87,12 +87,11 @@ export function buildChapel() {
     for (const z of [-46.8, -25.2]) sec.decor.push({ kind: 'glass', at: [x, floor + 2.4, z], yaw: 0, width: 1.9, height: 4.7, shape: 'lancet', hue: hues[(k + (z < -36 ? 0 : 3)) % hues.length] });
   });
   for (const z of [-41, -31]) sec.decor.push({ kind: 'glass', at: [-2.8, floor + 6.4, z], yaw: Math.PI / 2, width: 1.8, height: 4.2, shape: 'lancet', hue: z < -36 ? 'blue' : 'red' });
-  for (const z of [-42, -30]) sec.decor.push({ kind: 'glass', at: [-34.4, floor + 2.4, z], yaw: Math.PI / 2, width: 1.5, height: 2.8, shape: 'lancet', hue: 'amber' });
   sec.decor.push({ kind: 'glass', at: [-34.4, floor + 6.6, -36], yaw: Math.PI / 2, width: 5.2, height: 4.8, shape: 'pointed', hue: 'rose' });
   // The light: four iron chandeliers down the axis (the lights of the nave), a ring of candles on each; a halo on the floor under each.
-  for (const x of [-9.1, -16.1, -23.1, -30.1]) sec.decor.push({ kind: 'chandelier', at: [x, L + 8.4, mid], radius: 1.35, candles: 10, chain: L + 11.2 });
+  for (const x of [-9.1, -16.1, -23.1, -30.1]) sec.decor.push({ kind: 'chandelier', at: [x, L + 8.4, mid], radius: 1.35, candles: 10, chain: L + 11.2, power: 0.6, range: 22 });
   // The doors' keyhole, its light across the floor, the marks that come when the boss is down.
-  sec.decor.push({ kind: 'doorlight', at: [door.x + 0.3, L + 1.5, door.z], floorTo: [-24, door.z], door: 'innerdoor' });
+  sec.decor.push({ kind: 'doorlight', at: [door.x + 0.3, L + 1.5, door.z], floorTo: [-24, door.z], door: 'innerdoor', width: door.width, height: door.height, marks: [6.8, 22] });
   // Votive candles: at the altar's foot, at the pillars' feet and in the aisles' corners, in clusters.
   const votives = [
     [-28.6, -33.6, 8], [-28.6, -38.4, 8], [-27.6, -36, 6],

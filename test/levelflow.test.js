@@ -18,6 +18,10 @@ import { holdPlayer } from '../src/levelmode/items.js';
 import { hipsAt, walk } from './walker.js';
 
 const L = DUNNOTTAR.sections.find((section) => section.id === 'chapel').spawns[0].post[1];
+// The prince is in the cell directly behind the chancel doors: near him (inside the doors), and far from him (in the nave).
+const PRINCE = DUNNOTTAR.sections.find((section) => section.id === 'cell').spawns.find((spawn) => spawn.id === 'prince').post;
+const NEAR = [PRINCE[0] + 2.8, L, PRINCE[2]];
+const FAR = [-20, L, PRINCE[2]];
 const man = (world, id) => world.fighters.find((fighter) => fighter.spawn?.id === id);
 const hips = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
 
@@ -40,6 +44,12 @@ const standAt = (world, x, y, z, yaw) => {
   placeOnFloor(world.fighters[0], x, z, y, yaw);
   updateStage(world, true);
   run(world, 0.1);
+};
+
+/** Walk up to the cell's doors first (the cell wakes as he comes: its prince has had his look round before the scene is begun, as in play, not in the same step as the cell wakes). */
+const enterCell = (world) => {
+  standAt(world, -31.5, L, PRINCE[2], Math.PI);
+  run(world, 0.8);
 };
 
 // ---- No banner in a stage -----------------------------------------------------------------------------------
@@ -88,11 +98,12 @@ test('level flow: the player near the prince begins the scene: held, the prince 
   run(world, 0.2);
   drainUi(world);
   // Far from the prince (in the chapel, the door open): nothing yet.
-  standAt(world, -9, L, -43, Math.PI / 2);
+  standAt(world, ...FAR, Math.PI);
   run(world, 0.5);
   assert.equal(endingOf(world).phase, 'open');
   // Near: the scene.
-  standAt(world, -9, L, -48.4, Math.PI / 2);
+  enterCell(world);
+  standAt(world, ...NEAR, Math.PI);
   run(world, 0.3);
   assert.equal(endingOf(world).phase, 'scene');
   assert.ok(endingBusy(world) && levelBusy(world), 'the player is held where he stands');
@@ -120,9 +131,10 @@ test('level flow: the player near the prince begins the scene: held, the prince 
 
 test('level flow: a scripted cower is not calmed, and a man who is not there cannot be told to', () => {
   const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
-  standAt(world, -9, L, -48.4, Math.PI / 2);
+  enterCell(world);
+  standAt(world, ...NEAR, Math.PI);
   assert.equal(cowerFor(world, 'nobody', { corner: [0, 0] }), false);
-  assert.ok(cowerFor(world, 'prince', { corner: [-12.3, -54.3], near: 5 }));
+  assert.ok(cowerFor(world, 'prince', { corner: DUNNOTTAR.ending.corner, near: 5 }));
   run(world, 20);
   assert.equal(mindState(world, princeOf(world).id), 'cower', 'the calm of a quiet fight never comes to him');
 });
@@ -134,7 +146,8 @@ test('level flow: restart from a rest is for a run that reached one; a scene hal
   restAtPoint(world, { id: 'test', at: [4.6, L, -36], name: 'Test' });
   killBoss(world);
   run(world, 0.2);
-  standAt(world, -9, L, -48.4, Math.PI / 2);
+  enterCell(world);
+  standAt(world, ...NEAR, Math.PI);
   run(world, 0.3);
   assert.equal(endingOf(world).phase, 'scene');
   assert.ok(restartFromRest(world));

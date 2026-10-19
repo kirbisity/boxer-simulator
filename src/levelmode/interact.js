@@ -104,7 +104,7 @@ export function interactions(world) {
       if (!ladder.kickFrom || stage.mechanisms[ladder.id] === 'down') continue;
       const distance = mechanismDistance(me, ladder);
       if (distance === null || distance > LEVEL_CONFIG.interact.mechanismReach || !regionContains(ladder.kickFrom, here[0], here[2], me.x[P.pelvis * 3 + 1])) continue;
-      found.push({ id: `ladder:${ladder.id}`, kind: 'ladder', label: 'Kick ladder down', icon: 'ladder', distance, run: (w) => { say(w, { type: 'toast', text: 'The ladder crashes down' }); return setMechanism(w, ladder.id, 'down'); } });
+      found.push({ id: `ladder:${ladder.id}`, kind: 'ladder', label: ladder.label ?? 'Kick ladder down', icon: 'ladder', distance, run: (w) => { say(w, { type: 'toast', text: 'The ladder crashes down' }); return setMechanism(w, ladder.id, 'down'); } });
     }
     if (section.rest) {
       const distance = nearAt(me, section.rest.at);

@@ -10,7 +10,7 @@
 // stay put round the stage.
 
 import { ktPatch, ktRandom, ktWeather } from './kittex.js';
-import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookOf } from './stagelooks.js';
+import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, interiorLevels, stageLookOf } from './stagelooks.js';
 import { hexToRgb, skyDirection, stageShaftCanvas, stagePoolCanvas, stageSkyCanvas } from './stagesky.js';
 
 /** Where the weather is centred: round the stage, and the rain and bolts round the player. */
@@ -45,6 +45,13 @@ const stormState = {
   still: false,
   torch: 1,
   time: 0,
+  // The interior he stands in (a section's `interior`, stage.js `interiorAt`), how far into it the light has blended (0 the open storm, 1 the interior), and the share of a flash that gets in.
+  interiorSpec: null,
+  interiorLast: null,
+  interiorK: 0,
+  interiorTime: null,
+  interiorFlash: 1,
+  flashNow: 0,
 };
 
 /** Tell the weather where the player is (and whether he is under a roof). */
@@ -54,6 +61,17 @@ export function stormFollow(x, y, z, indoors = false) {
   stormState.follow[2] = z;
   stormState.indoors = indoors;
 }
+
+/**
+ * Tell the weather the interior the player stands in now (a section's `interior`, or null in the open): the storm's look is blended toward it over its `blend` seconds,
+ * and back as he leaves (stagelooks.js `interiorLevels` says what each number does). Cheap to call every frame.
+ */
+export function stormInterior(spec) {
+  stormState.interiorSpec = spec ?? null;
+}
+
+/** How bright the lightning's flash is now (0..1): the kit's stained glass flashes with it. */
+export const stormFlashLevel = () => stormState.flashNow;
 
 /** Start a run of the storm over: a new seed (the stage's), strikes from the beginning. */
 export function stormReset(seed = 1500) {
@@ -428,6 +446,45 @@ export function buildStormPlace({ buildRain }) {
     stormAimShaft(shaft, look);
   };
 
+  /** Blend the weather toward the interior he stands in, and back out (stagelooks.js `interiorLevels`): the lights, the probe's tint, the fog and the background, the mist and wet in the kit's shaders. */
+  const stormApplyInterior = (view, time) => {
+    const s = stormState;
+    const dt = s.interiorTime === null ? 0 : Math.min(0.1, Math.max(0, time - s.interiorTime));
+    s.interiorTime = time;
+    const spec = s.interiorSpec ?? s.interiorLast;
+    if (!spec) return;
+    if (s.interiorSpec) s.interiorLast = s.interiorSpec;
+    const goal = s.interiorSpec ? 1 : 0;
+    const before = s.interiorK;
+    const step = dt / (spec.blend ?? 1.5);
+    s.interiorK = goal > before ? Math.min(goal, before + step) : Math.max(goal, before - step);
+    if (before === 0 && s.interiorK === 0) return;
+    const look = stageLookOf(s.look);
+    const lv = interiorLevels(look, spec, s.interiorK);
+    const { scene, lights } = view;
+    lights.sun.intensity = lv.sun;
+    lights.hemi.intensity = lv.hemi;
+    lights.hemi.color.setHex(lv.hemiSky);
+    lights.hemi.groundColor.setHex(lv.hemiGround);
+    const probe = stormProbe(scene);
+    if (probe) {
+      const base = probe.userData.kitBase;
+      probe.sh.coefficients.forEach((c, k) => c.copy(base.sh[k]).multiply(new THREE.Vector3(...lv.tint)));
+      probe.intensity = base.intensity * lv.probe;
+    }
+    if (scene.fog) {
+      scene.fog.color.setHex(lv.fogColour);
+      scene.fog.near = lv.fogNear;
+      scene.fog.far = lv.fogFar;
+    }
+    if (scene.background?.isColor) scene.background.setHex(lv.fogColour);
+    ktWeather.uKitFog.value.set(lv.mist, look.fog.mist.base, look.fog.mist.falloff, 0);
+    ktWeather.uKitWet.value = lv.wet;
+    s.torch = lv.torch;
+    s.interiorFlash = lv.flash;
+    if (s.interiorK === 0) s.interiorLast = null;
+  };
+
   place.userData.bind = (view) => {
     stormState.view = view;
     stormState.place = place;
@@ -460,6 +517,8 @@ export function buildStormPlace({ buildRain }) {
     if (!view) return;
     const scene = view.scene;
     if (stormState.dirty || scene.fog !== stormState.fog) applyLook(view);
+    stormApplyInterior(view, time);
+    shaft.visible = Boolean(look.shaft) && !stormState.indoors;
     // Strikes, from the stage's seed.
     if (!stormState.strike && time > stormState.nextStrike) {
       const heading = new THREE.Vector3();
@@ -490,6 +549,7 @@ export function buildStormPlace({ buildRain }) {
     // The flash on the whole scene, for the few tenths of a second it lasts (nothing here runs when there is no strike): the ground, the castle and the men are lit
     // by a hard cold light from the bolt's side (the sun is turned to it), the sky light and the probe rise, and the sky, the fog and the background lift toward a cold white
     // (as much as the look's strikes are hard).
+    stormState.flashNow = flash * (stormState.interiorK > 0 ? 0.35 + 0.65 * (1 - stormState.interiorK) : 1);
     if (flash > 0 || stormState.flashed) {
       FLASH_WHITE ??= new THREE.Color(0xb9c4e4);
       const lights = view.lights;
@@ -498,7 +558,7 @@ export function buildStormPlace({ buildRain }) {
         stormState.base = { hemi: lights.hemi.intensity, sun: lights.sun.intensity, key: lights.key.intensity, probe: stormState.probe?.intensity ?? 0, fog: scene.fog?.color.clone(), background: scene.background, sunColour: lights.sun.color.clone(), sunAt: lights.sun.position.clone() };
       }
       const base = stormState.base;
-      const dim = (stormState.indoors ? 0.3 : 1) * (look.lightning?.strength ?? 1);
+      const dim = (stormState.interiorK > 0 ? stormState.interiorFlash : stormState.indoors ? 0.3 : 1) * (look.lightning?.strength ?? 1);
       lights.hemi.intensity = base.hemi + flash * 2.5 * dim;
       lights.sun.intensity = base.sun + flash * 2.8 * dim;
       lights.key.intensity = base.key + flash * 1.4 * dim;
@@ -542,6 +602,7 @@ export function stormRelease(view) {
   stormState.view = null;
   stormState.base = null;
   stormState.dirty = true;
+  Object.assign(stormState, { interiorSpec: null, interiorLast: null, interiorK: 0, interiorTime: null, interiorFlash: 1, flashNow: 0 });
 }
 
 /** Bring the next strike to now (for the weather's test, and a look at one). */
