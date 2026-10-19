@@ -9,13 +9,14 @@
 //   taken (Set of item ids)  notes  keys  pulled  opened  freed (Sets)   what the run has done to the stage
 //   action { kind, label, seconds, t, ... } | null    what holds the man still now
 //   tonics []   tonic effects at work
-//   checkpoint { id, name, at, facing, section, gear, inventory }    where, in what, with what he wakes
+//   checkpoint { id, name, at, facing, section, gear, inventory, comrades }    where, in what, with what he wakes, and the spawn ids of the comrades alive at the rest
 //   boss { id, phase } | null
 //   ending { phase: 'locked' | 'felled' | 'open' | 'scene' | 'done', held?, watched? } | null    the boss out, the cutscene, the inner door, the scene (ending.js)
 //   ui []        what the screen is to be told, in order: { type: 'toast', text } | { type: 'note', key, id }
 //                | { type: 'death' } | { type: 'respawned' } | { type: 'rested', name } | { type: 'phase2', id }
 //                | { type: 'bossDown' } (the cutscene begins) | { type: 'doorsOpen' } (it is through) | { type: 'ending' }
-//   team { fallen: Set of spawn ids, gateTold }   the comrades who have fallen (they stay fallen), and whether the gate has been spoken of (team.js)
+//   attempts []   the failed attempts, one record per death; attempt { since, from, comrades }   the one in hand (attempts.js)
+//   team { fallen: Set of spawn ids, gateTold }   the comrades said to have fallen (a death brings back those a rest recorded), and whether the gate has been spoken of (team.js)
 //   rebuild Set  fighter ids whose drawing is out of date (their bodies were remade)
 //   spawns { id: { def, section } }   spawnInputs { fighterId: inputs }   what the stage made them from
 //
@@ -35,6 +36,7 @@ import { levelAware } from './adapter.js';
 import { createStageWorld } from './stage.js';
 import { endingBusy, endingRelease, watchEnding } from './ending.js';
 import { watchTeam } from './team.js';
+import { beginAttempt } from './attempts.js';
 
 /** Give a stage world its run. Returns the level. */
 export function startLevel(world, { settle = true } = {}) {
@@ -44,7 +46,7 @@ export function startLevel(world, { settle = true } = {}) {
   const level = {
     inventory: { ...startItems }, startItems,
     taken: new Set(), notes: new Set(), keys: new Set(), pulled: new Set(), opened: new Set(), freed: new Set(),
-    action: null, tonics: [], checkpoint: null, boss: null, dying: false, deaths: 0, rests: 0,
+    action: null, tonics: [], checkpoint: null, boss: null, dying: false, deaths: 0, rests: 0, attempts: [], attempt: null,
     ui: [], rebuild: new Set(), spawns, spawnInputs: {}, team: { fallen: new Set(), gateTold: false }, ending: stage.ending ? { phase: 'locked' } : null,
   };
   world.stage.level = level;
@@ -65,6 +67,7 @@ export function startLevel(world, { settle = true } = {}) {
   }
   const me = world.fighters[0];
   setCheckpoint(world, { id: null, at: playerStands(me), facing: me.yaw });
+  beginAttempt(world);
   return level;
 }
 
@@ -192,7 +195,8 @@ export function restartFromRest(world) {
   return true;
 }
 
-export { respawnPlayer, restAtPoint } from './checkpoints.js';
+export { livingComrades, respawnPlayer, restAtPoint } from './checkpoints.js';
+export { attemptCount, attemptLog, attemptStory, beginAttempt } from './attempts.js';
 export { contextFor, interact, interactions, hostileNear } from './interact.js';
 export { useItem } from './items.js';
 export { endingBusy, endingDone, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, princeOf } from './ending.js';

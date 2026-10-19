@@ -12,7 +12,7 @@
 //             a rest within a few metres of his way.
 //
 // Usage:
-//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 3600] [--allies 3] [--logs] [--allies 3]
+//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 3600] [--allies 2] [--logs]
 //   node tools/dunnottar.js segments [--runs 20] [--segments start_rest1,rest1_rest2,...] [--logs]   rest to rest, from full health
 //   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
 //   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
@@ -73,7 +73,7 @@
 // and 7 of 26 attempts at him in the careful sweep were wins (27%; they wear what they took off the last knight, plate half the time).
 // A person who comes to him healed with brigandine and a poleaxe is where the spec wants the odds, about one in three.
 //
-// ---- Phase D (after the stage grew: run mode, narrow path, crags, props, the vault's branches, a team of three comrades) -------------
+// ---- Phase D (after the stage grew: run mode, narrow path, crags, props, the vault's branches, a team of three comrades; the team is two weak ones now, see Phase E) -------------
 // The bot as C3 left it timed out in every full run (2400 s): it was the bot's, not the stage's. What was wrong, and what the bot does now:
 //   - It walked straight lines between points. A fight or a looting left it on the far side of a wall (the lodge guard dies inside Benholm's
 //     Lodging; a cell, a gate, a gatehouse wall) and every point after it was through that wall: the stuck rule gave the points up one by one,
@@ -96,7 +96,12 @@
 //   reckless                1/16             1/16       12/16                4/16        9.0           tower 95 (the wall knight, the stair knight), quad 17, ascent 12
 // 15 of 33 attempts at Vaelen were wins (45%: the finisher takes a crawling Vaelen; they wear what they took off the last knight, plate half the time).
 // Vaelen alone from the chapel gate (20 runs each): unhealed 1/20, healed (sword and gambeson) 4/20, brigandine 1/20 (7 timeouts), plate 16/20.
-// (`--allies 0` leaves the comrades dead at the start: the stage as it was; it was seen to stall once in eight runs on a frightened levy that will not fight. Use 3.)
+// (`--allies 0` leaves the comrades dead at the start: the stage as it was; it was seen to stall once in eight runs on a frightened levy that will not fight.)
+//
+// ---- Phase E (the team is two: Maren and Old Tobin, a short sword each, no armour, weaker than the operative) --------------------------
+// The table above was struck with three comrades, an archer among them, in gambesons. The stage's own team is now `--allies 2` (the default): a
+// death brings back whichever comrades the last rest recorded alive (levelmode/checkpoints.js), so the bot's deaths no longer thin the team.
+// Not re-run for the table; the numbers above are the three-comrade stage's.
 //
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
@@ -109,7 +114,7 @@ import { FINISHER, finishTarget, helplessOnFloor, startFinisher, updateFinisher 
 import { comradesOf } from '../src/levelmode/team.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { levelAware } from '../src/levelmode/adapter.js';
-import { createLevelWorld, levelThink, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
+import { beginAttempt, createLevelWorld, levelThink, livingComrades, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
 import { interactions } from '../src/levelmode/interact.js';
 import { feetFloor, holdPlayer, useItem } from '../src/levelmode/items.js';
 import { regionContains, setMechanism, stageFloor, updateStage } from '../src/levelmode/stage.js';
@@ -120,11 +125,11 @@ import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js
 
 const STEP = 1 / 60;
 /**
- * How many of the three Forger comrades the stage starts the operative with (`--allies N`; the stage's own is 3). The bot treats them as
+ * How many of the two Forger comrades the stage starts the operative with (`--allies N`; the stage's own is 2). The bot treats them as
  * given: they follow, fight and die by the game's own rules (levelmode/team.js); it does not command them. With fewer, the rest are
  * dead where they stood from the start (what the stage was before it had a team: `--allies 0`).
  */
-let ALLIES = 3;
+let ALLIES = 2;
 /** The sections in the order the route reaches them (the cell is a side room). */
 const ORDER = ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'];
 const PLAYER = new Set([0]);
@@ -252,6 +257,9 @@ class Run {
       knockOut(this.world, fighter, { time: this.world.time, effects: [] }, 'lies dead', 'killed');
       this.world.stage.level.team.fallen.add(fighter.spawn.id);
     });
+    // (They are not on the roster the run wakes with either, nor among the comrades he began the first attempt with.)
+    this.world.stage.level.checkpoint.comrades = livingComrades(this.world);
+    beginAttempt(this.world);
     this.me = this.world.fighters[0];
     this.level = this.world.stage.level;
     this.maxDeaths = maxDeaths;
@@ -1121,7 +1129,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const command = options._[0] ?? 'sweep';
   const jobs = Number(options.jobs ?? Math.max(1, cpus().length - 2));
-  ALLIES = Number(options.allies ?? 3);
+  ALLIES = Number(options.allies ?? 2);
   if (command === 'one') {
     const [, policy, seed] = options._;
     const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });

@@ -1,5 +1,5 @@
 // Stage 1 run by a player who holds the run key: the whole route, cliff path to the chapel, sprinting (Shift+forward) with the stick held toward the
-// next point of the route, through the real controls (control.js directFighter: run mode, the run's steering along walls), with the three comrades
+// next point of the route, through the real controls (control.js directFighter: run mode, the run's steering along walls), with the two comrades
 // awake and following (a comrade must not wall him in at a door or on the path) and the garrison asleep. A snag shows as a leg he does not finish.
 
 import test from 'node:test';
