@@ -635,6 +635,39 @@ function shieldOnLine(world, fighter, guard) {
   return toLocal(fighter, vec.add(mine, vec.scale(vec.normalize(line), (guard[0] + 0.1) * fighter.body.heightM)));
 }
 
+/**
+ * The player running (`fighter.runPose`, 0 to 1): the weapon is carried, not held ready. `target` (where the guard
+ * has it) is eased to the carry: a short weapon hangs point down at his side, a long one rides on the shoulder (WORLD.runMode.carry).
+ */
+function carriedTargets(fighter, weapon, target) {
+  const spec = WORLD.runMode.carry;
+  const H = fighter.body.heightM;
+  const long = weapon.spec.length > spec.longFrom || weapon.spec.hands === 'two';
+  const side = weapon.main === 'l' ? 1 : -1;
+  const [x, y, z] = long ? spec.longHand : spec.hand;
+  const hand = vec.scale([x, y, side * z], H);
+  const dir = vec.normalize(long ? spec.longDir : [spec.dir[0], spec.dir[1], side * spec.dir[2]]);
+  const share = fighter.runPose;
+  return { hand: vec.lerp(target.hand, hand, share), dir: vec.normalize(vec.lerp(target.dir, dir, share)) };
+}
+
+/** The run pose's share, eased towards 1 while the player runs with nothing else in his hands to do, back to 0 after (WORLD.runMode.ease). */
+function easeRunPose(fighter, dt) {
+  if (!fighter.runMode && !fighter.runPose) return 0;
+  const free = fighter.runMode && !fighter.punch && !fighter.defence && !fighter.clinch && !fighter.pin && !fighter.pickup && !fighter.crawling && !fighter.mount && fighter.state === 'up';
+  const rate = Math.min(1, WORLD.runMode.ease * dt);
+  const next = (fighter.runPose ?? 0) + ((free ? 1 : 0) - (fighter.runPose ?? 0)) * rate;
+  fighter.runPose = next < 0.01 ? 0 : next;
+  return fighter.runPose;
+}
+
+/** Two stances blended: `share` of `to`. */
+function blendStance(from, to, share) {
+  const out = { ...from };
+  for (const key of Object.keys(to)) out[key] = (from[key] ?? to[key]) * (1 - share) + to[key] * share;
+  return out;
+}
+
 function weaponIntent(world, fighter, intent) {
   const style = STYLES[fighter.style];
   const H = fighter.body.heightM;
@@ -651,6 +684,8 @@ function weaponIntent(world, fighter, intent) {
     // Knocked out of line, the arm goes with the blow until he has it back.
     if (fighter.shieldOpen > world.time) intent.lHand = toLocal(fighter, point(fighter.x, P.lHand));
     intent.shieldArm = 'l';
+    // Running: the shield hangs at his side.
+    if (fighter.runPose > 0 && !blocking && !punch) intent.lHand = vec.lerp(intent.lHand, vec.scale(WORLD.runMode.carry.shield, H), fighter.runPose);
   }
   // The net held out in the off hand, ready to throw.
   if (fighter.net?.held && style.netGuard && !fighter.shield) intent.lHand = vec.scale(style.netGuard, H);
@@ -679,6 +714,7 @@ function weaponIntent(world, fighter, intent) {
     const held = fighter.aimAt !== undefined && world.fighters[fighter.aimAt] ? raisedAim(fighter, toLocal(fighter, aimPoint(world.fighters[fighter.aimAt], 'body'))) : guardTargets(style, fighter.body);
     target = punch?.spec.path === 'aim' ? aimTargets(world, fighter, punch, held) : held;
   } else target = guardTargets(style, fighter.body);
+  if (fighter.runPose > 0 && !punch && !blocking) target = carriedTargets(fighter, weapon, target);
   const main = weapon.main;
   // A pistol up and aimed is held in both hands: the support hand wraps the
   // gun hand from below and behind, its elbow bent — the Chapman triangle.
@@ -1594,11 +1630,20 @@ function updateIntent(world, fighter, dt) {
   const style = STYLES[fighter.style];
   const idle = idleMotion(fighter, world.time);
   const walking = fighter.walking && !fighter.punch && !fighter.defence && !fighter.clinch;
+  const runPose = easeRunPose(fighter, dt);
   const intent = {
-    stance: walking ? WORLD.walk.stance : style.stance,
+    stance: runPose > 0 ? blendStance(walking ? WORLD.walk.stance : style.stance, WORLD.runMode.stance, runPose) : walking ? WORLD.walk.stance : style.stance,
     twist: walking ? 0 : idle.twist, lean: walking ? 0 : idle.lean, dip: walking ? 0 : idle.dip, shift: walking ? 0 : idle.shift,
     headOffset: vec.scale(idle.headOffset, H), guardOffset: idle.guardOffset, guardTight: fighter.guardHigh > 0,
   };
+  if (runPose > 0) {
+    // Running (the player's run mode): the guard's sway gives way to the run's lean into the stride.
+    const spec = WORLD.runMode;
+    intent.twist *= 1 - runPose;
+    intent.lean = intent.lean * (1 - runPose) + spec.lean * runPose;
+    intent.dip = intent.dip * (1 - runPose) + spec.dip * runPose;
+    intent.shift *= 1 - runPose;
+  }
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
   // On horseback his trunk rides the horse's gait: leaned with its speed, rocked and swayed with its stride (physics/mounted.js).
@@ -1922,7 +1967,7 @@ function runCarry(world, fighter, intent, dt) {
   const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.crawling || fighter.state !== 'up';
   const running = (fighter.running || speed > spec.runningSpeed) && !busy;
   // Walking about, the guard is down whoever is near.
-  const want = fighter.walking && !busy ? 1 : running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
+  const want = (fighter.walking || fighter.runPose > 0.5) && !busy ? 1 : running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
   fighter.carry = (fighter.carry ?? 0) + (want - (fighter.carry ?? 0)) * Math.min(1, spec.ease * dt);
   if (fighter.carry < 0.02) return;
   const H = fighter.body.heightM;
@@ -1936,7 +1981,7 @@ function runCarry(world, fighter, intent, dt) {
     if (held.has(side)) continue;
     // Elbows bent, hands by the hips, swinging opposite to the legs; from
     // wherever the hand was meant to be (the guard, if nothing else).
-    const swinging = [0.04 * H + sign * stride * spec.swing * H, 0.52 * H, sign * 0.19 * H];
+    const swinging = [0.04 * H + sign * stride * (fighter.runPose > 0 ? WORLD.runMode.swing : spec.swing) * H, 0.52 * H, sign * 0.19 * H];
     guard ??= desiredPose(fighter.body, { stance: intent.stance });
     intent[`${side}Hand`] = vec.lerp(intent[`${side}Hand`] ?? guard[P[`${side}Hand`]], swinging, fighter.carry);
   }
@@ -2022,7 +2067,9 @@ function updateFeet(fighter, dt) {
   }
   // Getting up, he stands up off the feet where he put them; he steps once up.
   if (fighter.state === 'rising') return;
-  const spec = WORLD.step;
+  // Running (the player's run mode): quicker, longer steps, the next foot away before the last has landed (WORLD.runMode.step).
+  const run = fighter.runPose > 0.3 ? WORLD.runMode.step : null;
+  const spec = run ? { ...WORLD.step, ...run } : WORLD.step;
   const feet = Object.values(fighter.feet);
   for (const [side, foot] of Object.entries(fighter.feet)) {
     // A kicking, kneeing or checking leg is off the floor; when it comes
@@ -2032,7 +2079,7 @@ function updateFeet(fighter, dt) {
     foot.lifted = lifted;
     if (lifted) foot.step = null;
   }
-  const stepping = feet.some((foot) => foot.step || foot.lifted);
+  const stepping = feet.some((foot) => (foot.step && !(run && foot.step.t >= run.overlap)) || foot.lifted);
   let worst = null;
   let worstDrift = spec.threshold;
   for (const foot of feet) {
@@ -2085,8 +2132,8 @@ function rawFootTarget(fighter, foot) {
   const ease = t * t * (3 - 2 * t);
   const along = vec.lerp(foot.step.from, foot.step.to, ease);
   // On terrain the foot rises to the next tread early (and drops to a lower one late), and clears the edge.
-  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + WORLD.step.lift * Math.sin(Math.PI * t) + stepHeight(foot.step, t), along[2]];
-  return [along[0], fighter.desired[foot.index][1] + WORLD.step.lift * Math.sin(Math.PI * t), along[2]];
+  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + (fighter.runPose > 0.3 ? WORLD.runMode.step.lift : WORLD.step.lift) * Math.sin(Math.PI * t) + stepHeight(foot.step, t), along[2]];
+  return [along[0], fighter.desired[foot.index][1] + (fighter.runPose > 0.3 ? WORLD.runMode.step.lift : WORLD.step.lift) * Math.sin(Math.PI * t), along[2]];
 }
 
 /** The floor height under a foot a share `t` of the way through a step onto terrain, and the clearance it needs over the edge. */
@@ -2301,7 +2348,8 @@ function checkBalance(world, fighter) {
   // The base is the ground between the feet: hips over the front foot of a
   // long lunge are on it; what counts is how far outside it they are.
   const planted = Object.values(fighter.feet).every((foot) => !foot.lifted);
-  const outside = planted ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
+  // (A runner's hips are never over a base: they are carried from one foot to the other.)
+  const outside = planted && !fighter.runMode ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
@@ -2377,7 +2425,8 @@ function moveRoot(world, fighter, dt) {
   // Facing his man, or the place he is going (a weapon on the floor).
   // A place he means to strike (faceAt, for a moment) first; then where he is going; then his man.
   const facing = fighter.faceAt && world.time < fighter.faceAt.until ? fighter.faceAt.at : null;
-  const facePoint = facing ?? fighter.goTo ?? (opponent ? point(opponent.x, P.pelvis) : null);
+  // (The player's `faceFoe`, set by control.js: false, he keeps his own heading while his man is far and he is not locked on.)
+  const facePoint = facing ?? fighter.goTo ?? (opponent && fighter.faceFoe !== false ? point(opponent.x, P.pelvis) : null);
   if (facePoint) {
     const from = point(fighter.x, P.pelvis);
     const to = facePoint;
@@ -2407,7 +2456,7 @@ function moveRoot(world, fighter, dt) {
   // A lunge: the legs drive the body in behind the point while it travels.
   const punch = fighter.punch;
   if (punch?.spec.step && !(punch.load > 0) && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
-  if (fighter.running && !fighter.rush) drive = fighter.move * WORLD.run.speedFactor;
+  if (fighter.running && !fighter.rush) drive = fighter.move * (fighter.runMode ? WORLD.runMode.speedFactor : WORLD.run.speedFactor);
   // On his knees: slow, and no faster for trying.
   if (fighter.crawling) drive = Math.max(-0.3, Math.min(1, fighter.move)) * WORLD.crawl.speed;
   // In the net: short steps, stumbling.

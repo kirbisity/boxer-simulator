@@ -13,7 +13,7 @@
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, contextAction, moveName } from './control.js';
+import { ACTIONS, CONTROL, contextAction, endRun, moveName } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
@@ -70,6 +70,11 @@ export function installFightControls(root, hooks) {
   guard.innerHTML = '<b>🛡</b><span>Guard</span>';
   const action = root.appendChild(uiElement('button', 'fight-button action-button'));
   action.innerHTML = '<b></b><span></span>';
+  // Run lock: a small pill while the run is locked (the stick held at a run for a moment); a tap on it stops the run.
+  const runPill = root.appendChild(uiElement('button', 'run-pill'));
+  runPill.innerHTML = '<span class="run-body"><i class="glyph" aria-hidden="true"></i>Run</span>';
+  runPill.setAttribute('aria-label', 'Running: tap to stop');
+  runPill.hidden = true;
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
   lock.innerHTML = '<b>◎</b><span class="label">Lock</span><span class="who"></span>';
   const status = root.appendChild(uiElement('div', 'player-status'));
@@ -169,7 +174,8 @@ export function installFightControls(root, hooks) {
         orders.stick = null;
         stick.hidden = true;
       } else if (event.type === 'tap') {
-        // The attack controls take it: with Body, a tap on his man strikes there.
+        // A tap lets go of a locked run (and, with Body, a tap on his man strikes there).
+        endRun(orders);
         fightUi.tap(event);
         const target = orders.lock ?? foeFor(world, hooks.player())?.id;
         if (target !== undefined && target !== null) awake.set(target, hooks.now());
@@ -255,7 +261,7 @@ export function installFightControls(root, hooks) {
   surface.addEventListener('lostpointercapture', drop);
   // No callout, selection, context menu or page zoom from the fight.
   for (const kind of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) {
-    for (const target of [surface, guard, action, lock]) target.addEventListener(kind, (event) => event.preventDefault());
+    for (const target of [surface, guard, action, lock, runPill]) target.addEventListener(kind, (event) => event.preventDefault());
   }
 
   // Guard: held, the block; tapped, an evasion.
@@ -279,6 +285,12 @@ export function installFightControls(root, hooks) {
   };
   guard.addEventListener('pointerup', (up) => guardUp(up, false));
   guard.addEventListener('pointercancel', (up) => guardUp(up, true));
+
+  runPill.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    endRun(hooks.orders());
+    navigator.vibrate?.(10);
+  });
 
   action.addEventListener('pointerdown', (press) => {
     press.preventDefault();
@@ -358,8 +370,12 @@ export function installFightControls(root, hooks) {
     fightUi.update();
     commandBar.update();
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
-    // Level mode: a man running does not guard (control.js directFighter); the button is greyed.
-    guard.classList.toggle('blocked', Boolean(world.stage && me.running));
+    // A man running does not guard (control.js): the button is greyed. The run lock shows on the stick's ring and in the pill.
+    guard.classList.toggle('blocked', Boolean(me.runMode));
+    const runLocked = Boolean(orders.runLock);
+    runPill.hidden = !runLocked;
+    stick.classList.toggle('locked', runLocked);
+    stick.style.setProperty('--lock', runLocked ? '1' : (orders.runHeld / CONTROL.run.lockHold).toFixed(2));
     // The special button: one place, its label what it would do now.
     const name = contextAction(world, me);
     if (name !== lastAction) {
@@ -410,6 +426,7 @@ export function installFightControls(root, hooks) {
     guardDown = null;
     lastAction = undefined;
     stick.hidden = true;
+    runPill.hidden = true;
     mark.hidden = true;
     guard.classList.remove('on');
     awake.clear();

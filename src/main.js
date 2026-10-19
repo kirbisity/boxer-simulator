@@ -14,7 +14,7 @@ import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
-import { contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
+import { askRunLock, breakRun, CONTROL, contextAction, directFighter, endRun, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
@@ -405,7 +405,11 @@ function thinkForBout(world, dt) {
   thinkAll(world, dt, still);
   if (!players.size) return;
   // At a bandage, a change of harness, a stoop for a weapon: he stands where he is.
-  if (world.stage?.level && levelBusy(world)) holdPlayer(player());
+  if (world.stage?.level && levelBusy(world)) {
+    endRun(state.orders);
+    player().runMode = false;
+    holdPlayer(player());
+  }
   // Walking about (V), the keys steer him; otherwise he does as the orders say.
   else if (player().walking) walkAbout(player());
   else {
@@ -463,6 +467,7 @@ function walkAbout(fighter) {
   fighter.goTo = [pelvis[0] + (way[0] / size) * 3, 0, pelvis[1] + (way[1] / size) * 3];
   fighter.move = 1;
   fighter.running = state.walkRunning && !fighter.crawling;
+  fighter.runMode = fighter.running;
 }
 
 /** Into walk mode, or back into the fight (the guard up, the footwork the style's). */
@@ -475,6 +480,7 @@ function setWalking(on) {
     fighter.goTo = null;
     fighter.move = 0;
     fighter.running = false;
+    fighter.runMode = false;
     walkHeld.clear();
   }
 }
@@ -699,7 +705,7 @@ function followCamera(fighter, dt) {
     facing: fighter.yaw,
     down: fighter.state !== 'up',
     foe: locked ? point(locked.x, P.pelvis) : null,
-    moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick) && state.orders.lock === null)),
+    moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick || state.orders.runLock) && state.orders.lock === null)),
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
   }, realSeconds(), dt);
@@ -1245,6 +1251,7 @@ const KEYS = {
 const ORDER_KEYS = Object.fromEntries(COMMAND_ORDERS.map((entry) => [entry.key, entry.kind]));
 // The movement keys held in the fight (not walk mode), and when Space went down.
 const fightKeys = new Set();
+let lastForward = { key: null, at: -Infinity };
 let spaceDown = null;
 const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
@@ -1263,6 +1270,8 @@ function moveLabel(name) {
 function command(name) {
   // Any fighting move puts the guard back up.
   if (player()?.walking) setWalking(false);
+  // A blow thrown from a key stops a run, as a tap on the attack does.
+  breakRun(state.orders);
   if (name === 'body') {
     state.aimBody = !state.aimBody;
     document.querySelector('[data-command="body"]')?.classList.toggle('on', state.aimBody);
@@ -1291,8 +1300,19 @@ window.addEventListener('keydown', (press) => {
     }
   }
   if (key === 'shift') state.walkRunning = true;
+  // Shift+R locks the run (or lets it go); so does a second tap on forward within CONTROL.run.doubleTap. It then goes on with the keys let go.
+  if (press.shiftKey && key === 'r') {
+    press.preventDefault();
+    askRunLock(state.orders);
+    return;
+  }
   if (MOVE_KEYS[key]) {
     press.preventDefault();
+    if (MOVE_KEYS[key][0] > 0) {
+      const now = realSeconds();
+      if (lastForward.key === key && now - lastForward.at <= CONTROL.run.doubleTap) askRunLock(state.orders, true);
+      lastForward = { key, at: now };
+    }
     fightKeys.add(key);
   } else if (press.key === ' ') {
     // Held, the guard stays up; tapped, a dodge (as the Guard button).

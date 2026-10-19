@@ -7,8 +7,9 @@
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
-import { dropWeapon, inFight, legBroken, legShare, manNear, opponentFor, perform, point, reachOf, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
+import { dropWeapon, hostile, inFight, legBroken, legShare, manNear, opponentFor, perform, point, reachOf, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
+import { floorAt } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { handling } from './handling.js';
@@ -18,6 +19,22 @@ export const CONTROL = {
   // a walk from `walkFrom` of the footwork's pace up to full pace at
   // `fullFrom`, and a run past `runFrom` (going forward, or unlocked).
   stick: { deadZone: 0.12, walkFrom: 0.3, fullFrom: 0.8, runFrom: 0.88 },
+  // Run mode (the stick past `runFrom`, Shift, or a locked run): no guard, weapon carried, faster (WORLD.runMode).
+  // - doubleTap: a second tap on forward this soon (s) locks the run on the keyboard (Shift+R toggles it).
+  // - lockHold: held this long (s) at a run on the stick, it locks: the finger can lift and he runs on. Long enough that a
+  //   dash is not a lock, short enough to be a gesture.
+  // - steerFrom: a locked run is steered by the stick from this throw (below it a resting finger does not turn him);
+  //   steerRate: how fast (rad/s) his heading follows the stick, smooth rather than snapping (the legs turn at footing.turnRate).
+  // - backFrom, backDot: the stick at `backFrom` or more, its way against his heading (cosine) below `backDot`: pulled back, the lock ends.
+  // - edgeAhead, edgeDrop: a locked run with no finger on the screen must not carry him off a ledge or into the sea: if the floor `edgeAhead` m
+  //   ahead of him is `edgeDrop` m or more below the floor under him (stairs are 0.2 m a step), the lock ends and he stops.
+  // - staminaPerSecond: what running costs (stamina is 0..1; it recovers at WORLD.staminaRecovery × aerobic, so the net is modest:
+  //   an athletic man runs ~20 s from fresh); below `windedBelow` he is winded and runs no more until stamina is back to `recoveredTo`.
+  run: { doubleTap: 0.3, lockHold: 0.4, steerFrom: 0.3, steerRate: 3.5, backFrom: 0.5, backDot: -0.6, edgeAhead: 1.6, edgeDrop: 0.9, staminaPerSecond: 0.12, windedBelow: 0.06, recoveredTo: 0.25 },
+  // Facing. Not locked on and with no foe near, he keeps the heading he has (or the way he goes) and does not turn to a man
+  // far off: `foeWithin` m (a man at the other end of a courtyard is not a man to square up to). A man with a gun or bow
+  // always faces his man (he aims); in a level stage only a man aware of him counts as near.
+  facing: { foeWithin: 4.5 },
   // The special button offers Crawl once he is this hurt (hurtShare, or his legs' damage), with nothing else to offer.
   crawlOfferFrom: 0.35,
   // Locked on, the stick idle: he keeps to the edge of his reach (m of slack
@@ -53,7 +70,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, requests: [] };
+  return { lock: null, stick: null, keyStick: null, guard: false, requests: [], runLock: null, runHeld: 0, runBroken: false, winded: false };
 }
 
 /**
@@ -96,17 +113,128 @@ export function holdDistance(fighter, opponent) {
   return reachOf(fighter) + opponent.body.lengths.headRadius - CONTROL.hold.inside;
 }
 
+/** Whether a man of the other side, awake and (in a level stage) aware of him, is within `range` m of the fighter. */
+function foeNear(world, fighter, range) {
+  const at = point(fighter.x, P.pelvis);
+  const minds = world.stage?.aware?.minds;
+  return world.fighters.some((other) => {
+    if (!hostile(other, fighter) || !inFight(other)) return false;
+    if (minds && !['aggro', 'search'].includes(minds[other.id]?.state)) return false;
+    return Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]) <= range;
+  });
+}
+
+/** Whether he squares up to his man: locked on, armed with a gun or bow, or with a foe near. Otherwise he keeps his own heading. */
+function facesFoe(world, fighter, orders) {
+  if (orders.lock !== null) return true;
+  if (STYLES[fighter.style]?.ranged && fighter.weapon?.held) return true;
+  return foeNear(world, fighter, CONTROL.facing.foeWithin);
+}
+
+/** Where he faces, as a floor way [x, z]. */
+function runHeading(fighter) {
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  return [forward[0], forward[2]];
+}
+
+/** A floor way [x, z] turned towards another by at most `most` radians. */
+function turnWay(from, to, most) {
+  const was = Math.atan2(from[1], from[0]);
+  const turn = Math.atan2(to[1], to[0]) - was;
+  const now = was + Math.max(-most, Math.min(most, Math.atan2(Math.sin(turn), Math.cos(turn))));
+  return [Math.cos(now), Math.sin(now)];
+}
+
+/** Whether the floor ahead along `dir` falls away (a ledge, a stair's head, the sea's edge): CONTROL.run.edgeDrop m or more. */
+function dropsAhead(world, fighter, dir) {
+  const terrain = world.arena?.terrain;
+  if (!terrain) return false;
+  const [x, y, z] = point(fighter.x, P.pelvis);
+  const here = floorAt(terrain, x, z, y);
+  const ahead = floorAt(terrain, x + dir[0] * CONTROL.run.edgeAhead, z + dir[1] * CONTROL.run.edgeAhead, y);
+  return here - ahead >= CONTROL.run.edgeDrop;
+}
+
+/** What stops a run: not on his feet, hurt, reeling, on a horse, held, or at some work with his hands. */
+function cannotRun(fighter) {
+  return fighter.state !== 'up' || fighter.pain || fighter.crawling || fighter.netted || fighter.mount || fighter.clinch || fighter.pin || fighter.pickup
+    || fighter.stagger > 0 || fighter.dazed > 0;
+}
+
+/** Let go of a locked run. */
+export function endRun(orders) {
+  orders.runLock = null;
+  orders.runHeld = 0;
+}
+
+/** An attack or guard made outside the orders (a key): the run, locked or held on the stick, stops until the stick is eased off. */
+export function breakRun(orders) {
+  endRun(orders);
+  orders.runBroken = true;
+}
+
+/** Ask for a locked run to begin, end or (the default) flip: `true`, `false` or 'toggle'. It heads as the stick, else as he faces. */
+export function askRunLock(orders, on = 'toggle') {
+  orders.runLockAsk = on;
+}
+
+/**
+ * The run: whether he runs this step, and the stick that steers it. The stick past the run threshold (or Shift) is a run for as
+ * long as it is held. Held so for CONTROL.run.lockHold on the stick, or asked for (`askRunLock`), it locks: he runs on with no
+ * finger on the screen, steered by the stick whenever it is put down again. A guard, an attack, evasion or action asked for,
+ * the stick pulled back against his heading, a lock on a man, a blow that staggers him or running out of breath end the lock;
+ * an attack or the guard also stops a run held on the stick, until the stick is eased off the threshold.
+ */
+function runStep(world, fighter, orders, stick, dt) {
+  const spec = CONTROL.run;
+  const breaks = orders.guard || orders.requests.length > 0 || (orders.evasions?.length ?? 0) > 0 || (orders.actions?.length ?? 0) > 0;
+  const atRun = Boolean(stick) && stick.amount >= CONTROL.stick.runFrom;
+  orders.runBroken = atRun && (breaks || orders.runBroken);
+  if (fighter.stamina < spec.windedBelow) orders.winded = true;
+  else if (fighter.stamina >= spec.recoveredTo) orders.winded = false;
+  const ask = orders.runLockAsk;
+  orders.runLockAsk = undefined;
+  const cannot = cannotRun(fighter) || orders.winded;
+  if (orders.runLock && (breaks || cannot || orders.lock !== null || ask === false || ask === 'toggle')) endRun(orders);
+  else if (!orders.runLock && (ask === true || ask === 'toggle') && !breaks && !cannot) orders.runLock = { dir: stick ? stick.dir : runHeading(fighter) };
+  if (!orders.runLock) {
+    // On the stick (not the keys), held at a run: it locks.
+    const held = orders.stick && orders.stick.amount >= CONTROL.stick.runFrom && !orders.runBroken && !breaks && !cannot && orders.lock === null;
+    orders.runHeld = held ? orders.runHeld + dt : 0;
+    if (orders.runHeld >= spec.lockHold) {
+      orders.runLock = { dir: orders.stick.dir };
+      orders.runHeld = 0;
+    }
+  }
+  const lock = orders.runLock;
+  if (lock && dropsAhead(world, fighter, lock.dir)) {
+    endRun(orders);
+    return { run: false, stick: null };
+  }
+  if (lock) {
+    if (stick && stick.amount >= spec.backFrom && stick.dir[0] * lock.dir[0] + stick.dir[1] * lock.dir[1] < spec.backDot) {
+      endRun(orders);
+      return { run: false, stick };
+    }
+    // The stick steers a locked run, his heading following it smoothly.
+    if (stick && stick.amount >= spec.steerFrom) lock.dir = turnWay(lock.dir, stick.dir, spec.steerRate * dt);
+    return { run: true, stick: { dir: lock.dir, amount: 1 } };
+  }
+  return { run: atRun && !orders.runBroken && !orders.guard && !orders.winded && !cannotRun(fighter), stick };
+}
+
 /** Footwork from the stick, the keys, or (locked and idle) holding his range. */
 function steer(world, fighter, orders, opponent, dt) {
   const pelvis = point(fighter.x, P.pelvis);
   fighter.strafe = 0;
   fighter.running = false;
+  fighter.runMode = false;
   const locked = orders.lock !== null && opponent?.id === orders.lock;
   const held = orders.stick ?? orders.keyStick;
-  const stick = held && held.amount >= CONTROL.stick.deadZone ? held : null;
+  const { run: running, stick } = runStep(world, fighter, orders, held && held.amount >= CONTROL.stick.deadZone ? held : null, dt);
   const slow = orders.guard ? CONTROL.guardFootwork : 1;
   if (stick) {
-    const { pace, running } = stickPace(stick.amount);
+    const { pace } = stickPace(stick.amount);
     const way = stick.dir;
     if (locked) {
       // Facing his man: the stick's way split into in-and-out and round him.
@@ -123,6 +251,10 @@ function steer(world, fighter, orders, opponent, dt) {
       fighter.move = pace * slow;
       fighter.running = running && !orders.guard;
     }
+    // A run is another gait, not the guard hurrying: the weapon carried, nothing guarded, his heading his own. It costs breath.
+    fighter.runMode = fighter.running && !fighter.mount;
+    if (fighter.runMode) fighter.stamina = Math.max(0, fighter.stamina - CONTROL.run.staminaPerSecond * dt / fighter.body.aerobic);
+    if (fighter.runMode) fighter.faceFoe = locked;
     return;
   }
   fighter.goTo = null;
@@ -721,6 +853,8 @@ export function directFighter(world, fighter, orders, dt) {
   const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
   if (locked && !inFight(locked)) orders.lock = null;
   fighter.focus = orders.lock ?? undefined;
+  fighter.faceFoe = facesFoe(world, fighter, orders);
+  fighter.runMode = false;
   const opponent = opponentFor(world, fighter);
   // A gun is kept up on the man locked on.
   const style = STYLES[fighter.style];
@@ -728,6 +862,7 @@ export function directFighter(world, fighter, orders, dt) {
   if (fighter.state !== 'up' || fighter.pain) {
     fighter.move = 0;
     fighter.strafe = 0;
+    endRun(orders);
     return;
   }
   for (const action of orders.actions ?? []) doAction(world, fighter, action);
@@ -737,11 +872,9 @@ export function directFighter(world, fighter, orders, dt) {
   if (goPin(world, fighter)) return;
   if (fighter.orderPickup !== undefined && fighter.orderPickup !== null && goPickUp(world, fighter)) return;
   if (!goClinch(world, fighter, opponent)) steer(world, fighter, orders, opponent, dt);
-  // Level mode: running (the stick past the run threshold, or Shift) is not fighting. No guard, no block and no
-  // attack while at it: what was asked is let go (not kept for when he stops), and a block he held comes down.
-  if (world.stage && fighter.running) {
-    orders.requests.length = 0;
-    orders.evasions = [];
+  // Running is no fight: while it lasts nothing is guarded, and a block he held when it began comes down. (An attack or the guard
+  // asked for ends the run first: runStep.)
+  if (fighter.runMode) {
     if (BLOCKS.has(fighter.defence?.name)) fighter.defence = null;
     return;
   }

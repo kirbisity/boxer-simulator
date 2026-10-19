@@ -49,7 +49,7 @@ function standAt(world, x, y, z, yaw = 0) {
 
 // ---- Running -----------------------------------------------------------------------------------------------
 
-test('level mode: running blocks the guard and attacks; the same stick inside the threshold does not', () => {
+test('level mode: running does not guard, and an attack asked for breaks the run (it is thrown); the same stick inside the threshold does not run', () => {
   const world = yard();
   const me = world.fighters[0];
   const orders = newOrders();
@@ -63,16 +63,25 @@ test('level mode: running blocks the guard and attacks; the same stick inside th
   running.keyStick = keyStick(new Set(['d']), { ahead: [1, 0], right: [0, 1] }, true);
   run(world, 0.5, running);
   assert.equal(me.running, true);
-  // The block comes down, and what he asked for while running is let go (not saved for later).
+  // The block comes down; the guard asked for slows him to a walk.
   running.guard = true;
   run(world, 0.3, running);
   const stats = me.stats.thrown;
   assert.equal(me.running, false, 'asking for the guard slows him to a walk (control.js)');
   running.guard = false;
+  // Let go of the guard with the stick still at a run: still no run (the guard broke it) until the stick is eased off.
+  run(world, 0.2, running);
+  assert.equal(me.running, false, 'a run broken by the guard stays broken while the stick is held');
+  running.keyStick = keyStick(new Set(['d']), { ahead: [1, 0], right: [0, 1] }, false);
+  run(world, 0.1, running);
+  running.keyStick = keyStick(new Set(['d']), { ahead: [1, 0], right: [0, 1] }, true);
+  run(world, 0.3, running);
+  assert.equal(me.running, true, 'eased off and pushed again: running');
+  // An attack asked for ends the run and is thrown.
   running.requests.push({ at: world.time, line: 'mid', strength: 'quick' });
   run(world, 0.1, running);
-  assert.equal(me.stats.thrown, stats, 'no attack while running');
-  assert.equal(running.requests.length, 0, 'the request was dropped');
+  assert.equal(me.running, false, 'an attack asked for while running breaks the run');
+  assert.ok(me.stats.thrown > stats || me.punch, 'and is thrown');
   // Back inside the threshold: attacks work again.
   const walking = newOrders();
   walking.keyStick = keyStick(new Set(['d']), { ahead: [1, 0], right: [0, 1] }, false);
@@ -81,15 +90,15 @@ test('level mode: running blocks the guard and attacks; the same stick inside th
   assert.ok(me.stats.thrown > stats || me.punch, 'a walking man can strike');
 });
 
-test('Battle Mode is as it was: running does not drop the guard or the attacks of a world without a stage', () => {
+test('Battle Mode: running is the same gait (run mode), and a blow asked for while running is thrown, ending the run', () => {
   const world = createWorld([{ inputs: structuredClone(PRESETS.heavy), corner: 'red' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 5 });
   const me = world.fighters[0];
   const orders = newOrders();
   orders.keyStick = { dir: [0, 1], amount: 1 };
   orders.requests.push({ at: 0, move: 'jab', zone: 'head' });
   advance(world, 0.3, (w, dt) => directFighter(w, me, orders, dt));
-  assert.equal(me.running, true);
   assert.ok(me.stats.thrown > 0, 'in a battle he may strike while running');
+  assert.equal(me.running, false, 'the blow ended the run');
 });
 
 // ---- Bandage and tonic -------------------------------------------------------------------------------------
