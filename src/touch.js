@@ -13,7 +13,7 @@
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, CONTROL, contextAction, endRun, moveName } from './control.js';
+import { ACTIONS, CONTROL, contextAction, endRun, lockCandidate, moveName } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
@@ -106,7 +106,7 @@ export function installFightControls(root, hooks) {
     let best = null;
     let bestDistance = TOUCH.manWithin;
     for (const other of world?.fighters ?? []) {
-      if (!me || other.corner === me.corner || !inFight(other)) continue;
+      if (!me || other === me || !inFight(other)) continue;
       const near = rayToSegment(origin, dir, point(other.x, P.pelvis), point(other.x, P.head));
       if (near.distance < bestDistance) {
         bestDistance = near.distance;
@@ -318,7 +318,9 @@ export function installFightControls(root, hooks) {
       signal('unlock');
       return;
     }
-    const target = foeFor(hooks.world(), hooks.player());
+    // The man he is on; with none, whoever is nearest, enemy or not (a civilian, a prisoner, a team-mate): Lock takes any man.
+    const me = hooks.player();
+    const target = lockCandidate(hooks.world(), me, foeFor(hooks.world(), me));
     if (!target) return;
     orders.lock = target.id;
     awake.set(target.id, hooks.now());

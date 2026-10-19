@@ -14,7 +14,7 @@ import { ratingOf } from './roster.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
-import { askRunLock, breakRun, CONTROL, contextAction, directFighter, endRun, keyStick, MOVE_KEYS, newOrders, playerCrawl } from './control.js';
+import { askRunLock, breakRun, CONTROL, contextAction, directFighter, endRun, keyStick, MOVE_KEYS, newOrders, playerCrawl, swingAt } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
@@ -706,6 +706,8 @@ function followCamera(fighter, dt) {
     facing: fighter.yaw,
     down: fighter.state !== 'up',
     foe: locked ? point(locked.x, P.pelvis) : null,
+    running: Boolean(fighter.runMode),
+    speed: Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]),
     moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick || state.orders.runLock) && state.orders.lock === null)),
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
@@ -1302,7 +1304,7 @@ function command(name) {
   const spec = MOVES[name];
   if (spec?.kind === 'strike') {
     const zone = spec.zones.includes('legs') ? 'legs' : state.aimBody ? 'body' : 'head';
-    throwPunch(state.world, player(), name, zone);
+    swingAt(state.world, player(), state.orders, name, zone);
   } else perform(state.world, player(), name);
 }
 

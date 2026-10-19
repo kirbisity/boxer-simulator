@@ -145,7 +145,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
     bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined,
-    loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
+    loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
@@ -490,6 +490,51 @@ export function styleForWeapon(kind) {
 }
 const STYLE_KEYS_ALL = Object.keys(STYLES);
 const WEAPON_LABEL = (kind) => WEAPONS[kind].label.toLowerCase();
+
+/** A blade in the hands (or the off hand's) leaves them without falling: its weight off the hands it rode on. */
+function unloadBlade(fighter, weapon) {
+  if (!weapon?.held || weapon.spec.mounted) return;
+  const shares = handShares(weapon.spec);
+  addParticleMass(fighter, P[`${weapon.main}Hand`], -weapon.spec.mass * shares.main);
+  if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], -weapon.spec.mass * shares.off);
+}
+
+/** The same blade back in the hands. */
+function reloadBlade(fighter, weapon) {
+  if (!weapon?.held || weapon.spec.mounted) return;
+  const shares = handShares(weapon.spec);
+  addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * shares.main);
+  if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * shares.off);
+}
+
+/**
+ * The finisher's dagger (finisher.js): `kind` goes into his sword hand, and what he held before is put by (kept, not dropped; its
+ * weight comes off his hands) to be taken up again by `restoreAfterFinisher`. Returns what was put by, or null if he could not hold
+ * the blade (nothing is changed then).
+ */
+export function drawForFinisher(world, fighter, kind) {
+  const keep = { weapon: fighter.weapon, offWeapon: fighter.offWeapon, style: fighter.style, mixed: fighter.mixed, sidearmDrawn: fighter.sidearmDrawn };
+  unloadBlade(fighter, fighter.weapon);
+  unloadBlade(fighter, fighter.offWeapon);
+  fighter.weapon = null;
+  fighter.offWeapon = null;
+  armFighter(fighter, styleForWeapon(kind), { random: world.random, shield: false });
+  if (fighter.weapon?.held) return keep;
+  restoreAfterFinisher(fighter, keep);
+  return null;
+}
+
+/** The blade put by for the finisher, back in his hands; the finisher's own (if still in them) away. */
+export function restoreAfterFinisher(fighter, keep) {
+  if (fighter.weapon?.held) unloadBlade(fighter, fighter.weapon);
+  fighter.weapon = keep.weapon;
+  fighter.offWeapon = keep.offWeapon;
+  fighter.style = keep.style;
+  fighter.mixed = keep.mixed;
+  fighter.sidearmDrawn = keep.sidearmDrawn;
+  reloadBlade(fighter, fighter.weapon);
+  reloadBlade(fighter, fighter.offWeapon);
+}
 
 /** Stoop for a weapon on the floor: he crouches and reaches for it. */
 export function startPickup(world, fighter, debris, { swap = false } = {}) {
@@ -1419,7 +1464,8 @@ export function toLocal(fighter, world) {
  */
 export function opponentFor(world, fighter) {
   const focus = fighter.focus === undefined ? null : world.fighters[fighter.focus];
-  if (focus && hostile(focus, fighter) && inFight(focus)) return focus;
+  // (The player locked on a man who is no enemy, a civilian or an ally: `focusAny`, control.js.)
+  if (focus && (hostile(focus, fighter) || fighter.focusAny) && inFight(focus)) return focus;
   return nearestOpponent(world, fighter);
 }
 
@@ -1521,7 +1567,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     edgeTilt: edgeTilt(world, fighter, spec),
     wander,
     // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
-    riposte: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
+    riposte: undefined, finisher: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
     fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
@@ -1574,16 +1620,38 @@ function edgeTilt(world, fighter, spec) {
   return untrained * (least + (most - least) * world.random());
 }
 
-/** The man of the other side nearest a place, within `within` m of it (on the floor), or null. */
+/**
+ * Whoever stands nearest a place the player aims at, within `within` m of it (on the floor), or null: an enemy first
+ * (a man of the other side who is in the fight), then anyone else (a civilian, a prisoner, a team-mate, a man lying
+ * crawling or out), who is a little further for it (`WORLD.aimedAtOthers` m). A player can strike at anything.
+ */
 export function manNear(world, fighter, at, within) {
   let best = null;
-  let bestDistance = within;
+  let bestScore = Infinity;
   for (const other of world.fighters) {
-    if (other.corner === fighter.corner || !inFight(other)) continue;
+    if (other === fighter || other.dormant || other.fled) continue;
     const distance = Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
-    if (distance < bestDistance) {
+    const score = distance + (hostile(other, fighter) && inFight(other) ? 0 : WORLD.aimedAtOthers);
+    if (distance <= within && score < bestScore) {
       best = other;
-      bestDistance = distance;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/** The man nearest this one within `range` m, enemy or not (a civilian, a prisoner, a team-mate), awake or lying; null if none. */
+export function nearestAnyone(world, fighter, range) {
+  let best = null;
+  let bestScore = Infinity;
+  for (const other of world.fighters) {
+    if (other === fighter || other.dormant || other.fled || other.state === 'out') continue;
+    const distance = Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+    // An enemy before a bystander at about the same distance.
+    const score = distance + (hostile(other, fighter) ? 0 : WORLD.aimedAtOthers);
+    if (distance <= range && score < bestScore) {
+      best = other;
+      bestScore = score;
     }
   }
   return best;
@@ -1625,6 +1693,30 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   return true;
 }
 
+/**
+ * The pose of a sprint turn (WORLD.runMode.turn): the heading's rate `fighter.turn` (rad/s, positive turning to his right) smoothed,
+ * and from it the trunk banked into the turn (`roll`), the shoulders led into it and the hips lagging it (`twist`, `hipYaw`).
+ * All of it is the run pose's share; a straight run, and a man not running, have none.
+ */
+function runTurnPose(fighter, intent, dt) {
+  const spec = WORLD.runMode.turn;
+  const share = fighter.runPose;
+  if (fighter.yawWas === undefined || dt <= 0) fighter.turn = 0;
+  else {
+    const rate = Math.atan2(Math.sin(fighter.yaw - fighter.yawWas), Math.cos(fighter.yaw - fighter.yawWas)) / dt;
+    fighter.turn = (fighter.turn ?? 0) + (rate - (fighter.turn ?? 0)) * (1 - Math.exp(-dt / spec.smooth));
+  }
+  fighter.yawWas = fighter.yaw;
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const cap = (value, most) => Math.max(-most, Math.min(most, value));
+  return {
+    // (Local +z is his left: a positive rate turns him to his right, so the roll and the leads are the other way.)
+    roll: (intent.roll ?? 0) - cap(fighter.turn * speed * spec.bank, spec.bankMax) * share,
+    twist: intent.twist + cap(fighter.turn * spec.lead, spec.leadMax) * share,
+    hipYaw: -cap(fighter.turn * spec.hipLag, spec.hipLagMax) * share,
+  };
+}
+
 function updateIntent(world, fighter, dt) {
   const H = fighter.body.heightM;
   const style = STYLES[fighter.style];
@@ -1643,6 +1735,10 @@ function updateIntent(world, fighter, dt) {
     intent.lean = intent.lean * (1 - runPose) + spec.lean * runPose;
     intent.dip = intent.dip * (1 - runPose) + spec.dip * runPose;
     intent.shift *= 1 - runPose;
+    Object.assign(intent, runTurnPose(fighter, intent, dt));
+  } else if (fighter.turn !== undefined) {
+    fighter.turn = 0;
+    fighter.yawWas = undefined;
   }
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
@@ -1791,6 +1887,7 @@ function updateIntent(world, fighter, dt) {
       intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
     }
   }
+  if (fighter.finisher?.kneeling) finisherPose(fighter, intent);
   if (fighter.crawling) crawlPose(fighter, intent, dt);
   if (fighter.pain) painPose(fighter, intent);
   if (fighter.tending) tendingPose(fighter, intent);
@@ -1872,6 +1969,23 @@ function painPose(fighter, intent) {
   intent[`${free}Hand`] = vec.lerp(intent[`${free}Hand`] ?? hurt, hurt, share);
   if (fighter.weapon?.held) intent.bladeDir = [0.4, -1, 0];
   if (fighter.offWeapon?.held) intent.offBladeDir = [0.4, -1, 0];
+}
+
+/**
+ * The finisher's kneel (finisher.js): down on both knees beside the man on the floor, bowed over him, the weight forward over
+ * the dagger hand. Eased in as `kneeling` goes 0 to 1; the thrust itself is an ordinary blade stroke from here.
+ */
+function finisherPose(fighter, intent) {
+  const share = fighter.finisher.kneeling;
+  const H = fighter.body.heightM;
+  const L = fighter.body.lengths;
+  intent.dip += WORLD.pin.dip * share;
+  intent.lean += WORLD.pin.lean * share;
+  intent.guardTight = false;
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    intent[`${side}Knee`] = [0.06 * H, L.ankle + 0.02, sign * 0.1 * H];
+    intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
+  }
 }
 
 function crawlPose(fighter, intent, dt) {
@@ -2095,6 +2209,7 @@ function updateFeet(fighter, dt) {
     // Step to where the stance will be, not where it is: lead the motion.
     const lead = spec.lead * spec.seconds;
     const to = [worst.desired[0] + fighter.rootVelocity[0] * lead, worst.desired[1], worst.desired[2] + fighter.rootVelocity[1] * lead];
+    if (run) turnedStep(fighter, worst, to);
     // (floorFrom, floorTo: the floor under the foot at each end of the step, set on terrain: groundStance.)
     worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined };
   }
@@ -2106,6 +2221,33 @@ function updateFeet(fighter, dt) {
       foot.step = null;
     }
   }
+}
+
+/**
+ * A step in a sprint turn (WORLD.runMode.turn): the landing `to` is moved in place so that the foot lands in the direction of travel and
+ * on its own side of the line, not across it (the stance is turned to the facing, the travel is not), the foot on the inside of the turn
+ * shorter and wider, the one on the outside longer. Nothing at a straight run (no turn, no change).
+ */
+function turnedStep(fighter, foot, to) {
+  const spec = WORLD.runMode.turn;
+  const share = Math.min(1, Math.abs(fighter.turn ?? 0) / spec.full);
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  if (share < 0.05 || speed < 0.5) return;
+  const H = fighter.body.heightM;
+  const ux = fighter.rootVelocity[0] / speed;
+  const uz = fighter.rootVelocity[1] / speed;
+  // (Where he will be when it lands: the stance's own place for the foot, from him, is the same.)
+  const dx = foot.desired[0] - fighter.root[0];
+  const dz = foot.desired[2] - fighter.root[1];
+  const across = -dx * uz + dz * ux;
+  const along = dx * ux + dz * uz;
+  // Left of the line of travel is +, as the foot index says: the left foot is on that side.
+  const side = foot.index === P.lFoot ? 1 : -1;
+  const inner = side * fighter.turn < 0;
+  const wanted = side * Math.max(side * across, spec.gap * H * share) + (inner ? side * spec.wide * H * share : 0);
+  const length = along + (inner ? -spec.inner : spec.outer) * H * share;
+  to[0] += (length - along) * ux - (wanted - across) * uz;
+  to[2] += (length - along) * uz + (wanted - across) * ux;
 }
 
 function footTarget(fighter, foot) {
@@ -2163,7 +2305,7 @@ function groundStance(fighter, dt) {
   const lift = fighter.lift ?? 0;
   const pelvis = P.pelvis * 3;
   const feet = fighter.feet;
-  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin)) {
+  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin && !fighter.finisher?.kneeling)) {
     fighter.air = false;
     if (fighter.state !== 'rising') {
       const under = floorAt(terrain, fighter.x[pelvis], fighter.x[pelvis + 2], fighter.x[pelvis + 1] + spec.stepUp);
@@ -2355,7 +2497,7 @@ export function step(world, dt) {
  */
 function checkBalance(world, fighter) {
   // Kneeling over a man held down is a base of its own, not a fall.
-  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling) return;
+  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling || fighter.finisher?.kneeling) return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   // Worn joints step less sharply (aging.js).
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
@@ -2474,7 +2616,8 @@ function moveRoot(world, fighter, dt) {
   let drive = fighter.move;
   // A lunge: the legs drive the body in behind the point while it travels.
   const punch = fighter.punch;
-  if (punch?.spec.step && !(punch.load > 0) && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
+  // (Not kneeling over a man: the stab is driven down from where he kneels.)
+  if (punch?.spec.step && !(punch.load > 0) && !fighter.finisher?.kneeling && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   if (fighter.running && !fighter.rush) drive = fighter.move * (fighter.runMode ? WORLD.runMode.speedFactor : WORLD.run.speedFactor);
   // On his knees: slow, and no faster for trying.
   if (fighter.crawling) drive = Math.max(-0.3, Math.min(1, fighter.move)) * WORLD.crawl.speed;
@@ -2814,7 +2957,7 @@ function updateTimers(world, fighter, dt) {
   countPin(world, fighter, dt);
   updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
-  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * dt);
+  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;
@@ -2908,7 +3051,7 @@ export function standingTarget(fighter, index) {
   const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
-  if ((fighter.pin || fighter.crawling) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
+  if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
   if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: [0, 0, 0] };
   if (info.knee) {
     const side = info.side;
@@ -5092,7 +5235,8 @@ export function bladeStrike(attacker, weapon, punch, relative, distance) {
   const wspec = weapon.spec;
   const limbs = attacker.body.limbKg;
   const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
-  const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
+  // (A finisher's thrust is driven down with the whole weight of the kneeling man behind the dagger: finisher.js.)
+  const armMass = ((spec.mass.arm ?? 0) * arms + (punch.finisher?.body ?? spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
@@ -5135,7 +5279,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   punch.landed = true;
   // On a curved helmet a blow not square to it skids: less of it goes in, edge and point and weight alike.
   const glance = helmetGlance(defender, capsule, relative, closing);
-  const goingIn = closing * glance.share;
+  // (A finisher's point is driven down with his weight: never slower than `finisher.drive` m/s, however the arm slowed at the floor.)
+  const goingIn = Math.max(closing, punch.finisher?.drive ?? 0) * glance.share;
 
   const body = defender.body;
   const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance);
@@ -5145,6 +5290,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * goingIn * goingIn;
   const mix = harmMix(wspec, spec.mode, along, closest.s);
+  // A dagger driven into a man lying helpless: all point, little blunt (finisher.js).
+  if (punch.finisher) {
+    mix.pierce *= punch.finisher.pierce;
+    mix.blunt *= punch.finisher.blunt;
+  }
   // An edge or point turned off true (punch.edgeTilt) bites as much as it is square: the rest lands as the flat.
   // A trained hand draws the edge through the cut and drives the point straight (WORLD.skill.draw: ± at skill 1 and 0).
   const drawn = 1 + WORLD.skill.draw * 2 * ((attacker.body.skill ?? 0.5) - 0.5);
@@ -5163,7 +5313,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (A full plate harness has no gap for an edge: `cutProof`.)
   // A heavy point that wanders (punch.wander, m) is put into a gap the less often: a gap is a hand's breadth (`size`).
   const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
-  const gapChance = (spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing) * placed;
+  // (A finisher is put where the plates part, the visor, the armpit, the throat: `finisher.gap` of the time, at the least.)
+  const gapChance = Math.max(spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing, punch.finisher?.gap ?? 0) * placed;
   const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
@@ -5178,7 +5329,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // slant it holds at); slanting, it skids off the curve of the plate (a rounded breastplate, its
   // ridge) and goes in nowhere: it is a shove.
   const facing = Math.abs(vec.dot(weapon.dir, normal));
-  const skids = Boolean(protection.deflects) && spec.mode === 'thrust' && mix.pierce > 0 && facing < BLADES.bite;
+  // (A finisher's point is driven square down onto him: it does not skid.)
+  const skids = Boolean(protection.deflects) && spec.mode === 'thrust' && mix.pierce > 0 && facing < BLADES.bite && !punch.finisher;
   if (skids) {
     // (The impulse is already only what the point brings square to the plate.)
     mix.cut = 0;

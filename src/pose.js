@@ -128,7 +128,7 @@ export function lockedHead(body, neck, up, forward, restLean) {
 /**
  * Desired particle positions in the local frame.
  * @param body   built body (lengths)
- * @param intent { stance, twist, lean, dip, shift, headOffset, guardTight,
+ * @param intent { stance, twist, hipYaw (the hips' own yaw, rad, besides the twist's share), lean, dip, shift, headOffset, guardTight,
  *   guardOffset, and per-limb overrides lHand, rHand, lElbow, rElbow,
  *   lFoot, rFoot, lKnee, rKnee (local points), check (lead shin up) }
  */
@@ -150,7 +150,7 @@ export function desiredPose(body, intent = {}) {
   }
   const pelvis = [0, hipHeight, 0];
   out[P.pelvis] = pelvis;
-  const hipAxis = across(stance.blade * POSE.hipBladeShare + twist * 0.3);
+  const hipAxis = across(stance.blade * POSE.hipBladeShare + twist * 0.3 + (intent.hipYaw ?? 0));
   out[P.lHip] = vec.add(pelvis, vec.scale(hipAxis, L.hipSpan / 2));
   out[P.rHip] = vec.add(pelvis, vec.scale(hipAxis, -L.hipSpan / 2));
 
