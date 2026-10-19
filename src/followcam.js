@@ -30,6 +30,12 @@ export const FOLLOW_CAM = {
   // s: the low-pass on the way he faces; rad: a turn smaller than this leaves the view where it is.
   facingSeconds: 0.35,
   deadBand: 0.3,
+  // Running (run mode, free of a lock): the view eases round behind the way he runs, with no dead band. `rate` rad/s of spring
+  // frequency at a standstill, plus `perSpeed` for each m/s he runs (4.2 m/s: 3.7; a 90 degree turn is 90% followed in 0.7 s); a heading that points back at the
+  // camera does not swing it round (it fades out between `towardFrom` and `towardTo` rad off the view's own behind-him line, so a man
+  // running at the camera is not chased round, and a hairpin is not a spin). The player's own look pauses the following for `pause` s
+  // after the last of it (the usual `holdSeconds` is for walking), then it resumes from where he left the view.
+  run: { rate: 1.6, perSpeed: 0.5, towardFrom: 2.1, towardTo: 2.75, pause: 1.5 },
   // Locked on: the view aimed `lockAt` of the way to his man, `lockAngle` rad off the line between them, `lockBack` m further back for every m apart.
   lockAt: 0.45,
   lockAngle: 0.55,
@@ -75,6 +81,22 @@ const lowPass = (value, goal, seconds, dt) => value + (goal - value) * (1 - Math
 /** The way behind a man facing `yaw` (he faces (cos yaw, −sin yaw) on the floor): the camera's orbit yaw. */
 export const behindYaw = (yaw) => Math.atan2(Math.sin(yaw), -Math.cos(yaw));
 
+/** The spring rate (rad/s) at which the view comes round behind a man running `speed` m/s (FOLLOW_CAM.run). */
+export function runFollowRate(speed, spec = FOLLOW_CAM) {
+  return spec.run.rate + spec.run.perSpeed * Math.max(0, speed);
+}
+
+/**
+ * Where the view heads while he runs: from the view's yaw `yaw` towards behind-him (`facing` his yaw), the whole way for a heading
+ * within `towardFrom` of the view's own line, none at all past `towardTo` (he runs at the camera), smoothly between.
+ */
+export function runFollowGoal(yaw, facing, spec = FOLLOW_CAM) {
+  const off = wrap(behindYaw(facing) - yaw);
+  const { towardFrom, towardTo } = spec.run;
+  const share = Math.max(0, Math.min(1, (towardTo - Math.abs(off)) / (towardTo - towardFrom)));
+  return yaw + off * share * share * (3 - 2 * share);
+}
+
 /**
  * A follow camera. `room(x, z)` (optional) says whether the camera may
  * stand there (inside the walls); outside, it comes in along its line.
@@ -86,6 +108,7 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
   function reset() {
     cam.ready = false;
     cam.manualUntil = -Infinity;
+    cam.lastLook = -Infinity;
     cam.zoom = 1;
   }
   reset();
@@ -114,7 +137,8 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
 
   /**
    * One frame. `input`: { me: [x, y, z] (his pelvis), facing (his yaw), down (on the floor or rising),
-   * foe: [x, y, z] (the man locked on's pelvis, or null), moving (walking free), aspect (the screen's width over height) },
+   * foe: [x, y, z] (the man locked on's pelvis, or null), moving (walking free), running (in run mode) and speed (m/s, for the
+   * run's follow), aspect (the screen's width over height) },
    * `now` (s, real time) and `dt` (s). Returns { target, yaw, pitch, distance }.
    */
   function update(input, now, dt) {
@@ -128,10 +152,20 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
       if (!cam.foe) cam.foe = input.foe.slice();
       for (let axis = 0; axis < 3; axis += 1) cam.foe[axis] = lowPass(cam.foe[axis], input.foe[axis], spec.anchorSeconds, dt);
     } else cam.foe = null;
-    const manual = now < cam.manualUntil;
+    // Running free, the player's look holds the view only `run.pause` s; otherwise `holdSeconds` after it.
+    const running = Boolean(input.running) && !locked && !input.down;
+    const manual = now < (running ? Math.min(cam.manualUntil, cam.lastLook + spec.run.pause) : cam.manualUntil);
     // Where the view wants to be: behind him (lazily), or on the line from his man.
     let goalYaw;
-    if (locked) {
+    let followRate = 0;
+    cam.following = running && !manual;
+    if (cam.following) {
+      // Running: round behind the way he runs, the rate rising with his speed; what is left of a lazier goal is kept up with it.
+      goalYaw = runFollowGoal(cam.yaw, input.facing, spec);
+      followRate = runFollowRate(input.speed ?? 0, spec);
+      cam.facing = behindYaw(input.facing);
+      cam.goalYaw = goalYaw;
+    } else if (locked) {
       goalYaw = Math.atan2(cam.anchor[2] - cam.foe[2], cam.anchor[0] - cam.foe[0]) + spec.lockAngle;
       cam.facing = goalYaw;
     } else {
@@ -142,13 +176,13 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
       goalYaw = cam.goalYaw;
     }
     if (manual) goalYaw = cam.manualYaw;
-    else if (!locked && cam.wasManual) {
+    else if (!locked && !running && cam.wasManual) {
       // His look let go: the view comes back from where he left it.
       cam.goalYaw = cam.facing;
       goalYaw = cam.goalYaw;
     }
     cam.wasManual = manual;
-    const rate = locked ? spec.lockTurnRate : input.moving ? spec.walkTurnRate : spec.turnRate;
+    const rate = followRate || (locked ? spec.lockTurnRate : input.moving ? spec.walkTurnRate : spec.turnRate);
     // The yaw spring runs on the unwrapped angle nearest the goal.
     const nearGoal = cam.yaw + wrap(goalYaw - cam.yaw);
     if (!manual) [cam.yaw, cam.yawV] = spring(cam.yaw, cam.yawV, nearGoal, rate, dt);
@@ -208,7 +242,7 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
   /** The player turns the view (rad of yaw and pitch): kept until `holdSeconds` after the last of it. */
   function look(dyaw, dpitch, now, locked = false) {
     if (!cam.ready) return;
-    if (now >= cam.manualUntil) {
+    if (now >= cam.manualUntil || cam.following) {
       cam.manualYaw = cam.yaw;
       cam.manualPitch = cam.pitch;
     }
@@ -219,6 +253,7 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
     cam.yawV = 0;
     cam.pitchV = 0;
     cam.manualUntil = now + (locked ? spec.lockHoldSeconds : spec.holdSeconds);
+    cam.lastLook = now;
   }
 
   /** The player zooms: the distance times 1/ratio (a pinch apart comes in), within its limits. Kept. */

@@ -267,6 +267,46 @@ export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.s
 }
 
 /**
+ * Feelers: how far a man whose centre is at `at` ([x, z]) and whose feet are at `lift` (m, as `fighter.lift`) could walk along each of
+ * `angles` (rad, turned from `heading`, a floor way [x, z]; positive turns from +x toward +z), up to `reach` m, felt every `step` m with
+ * the very test the physics keeps him out of solids with (pushOut: his body radius and height, the faces his foot may step onto).
+ * For each angle: `{ angle, free, normal, edge }`: `free` the distance felt clear (`reach` if all of it was), `normal` the way the
+ * thing in the way pushes ([nx, nz], away from it; null if nothing), `edge` true if the stretch ended instead at a drop of `drop` m or
+ * more (a ledge, the head of a stair, the sea). Used to steer the player's run along walls (runsteer.js); costs a few dozen pushOuts.
+ */
+export function feelers(terrain, at, heading, lift, angles, { reach = 1.4, step = 0.15, drop = WORLD.terrain.stepUp * 2, wallLow = lift + WORLD.terrain.sag } = {}) {
+  const spec = WORLD.terrain;
+  const low = lift + spec.sag;
+  const high = low + spec.bodyHeight;
+  const here = floorAt(terrain, at[0], at[1], lift + spec.stepUp + spec.slopeHeadroom);
+  const turn = Math.atan2(heading[1], heading[0]);
+  const probe = [0, 0];
+  return angles.map((angle) => {
+    const ux = Math.cos(turn + angle);
+    const uz = Math.sin(turn + angle);
+    let free = reach;
+    let normal = null;
+    let edge = false;
+    for (let d = step; d <= reach + 1e-9; d += step) {
+      probe[0] = at[0] + ux * d;
+      probe[1] = at[1] + uz * d;
+      if (pushOut(terrain, probe, spec.bodyRadius, low, high, spec.stepUp, wallLow)) {
+        free = d - step * 0.5;
+        normal = [terrain.normal[0], terrain.normal[1]];
+        break;
+      }
+      const floor = floorAt(terrain, at[0] + ux * d, at[1] + uz * d, lift + spec.stepUp + spec.slopeHeadroom);
+      if (here - floor >= drop) {
+        free = d - step * 0.5;
+        edge = true;
+        break;
+      }
+    }
+    return { angle, free, normal, edge };
+  });
+}
+
+/**
  * Whether a straight line over the floor from `a` to `b` (each [x, z]) is
  * blocked, for a line of sight at `height` m (an eye; `heightB` at b, if it
  * differs). Blocked by a wall whose height range the line crosses, and by a
