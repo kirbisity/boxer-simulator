@@ -608,7 +608,7 @@ function kitMass(batch, mass) {
 /** The winding stair's rope and its posts. */
 function kitSpiral(batch, spiral) {
   const sweep = spiral.turn / spiral.steps;
-  const radius = spiral.outer - 0.3;
+  const radius = spiral.rail ?? spiral.outer - 0.3;
   const points = [];
   for (let k = 0; k < spiral.steps; k += 1) {
     const angle = spiral.start + sweep * (k + 0.5);

@@ -6,12 +6,12 @@
 // Stage data it reads (all optional, see stage.js for the rest):
 //   section.items:   [{ id, kind: 'bandage' | 'tonic' | 'note' | 'key', at: [x, y, z], note?: NOTES key (default: the id), label? }]
 //   section.rest:    { at: [x, y, z], id?, name? }
-//   section.levers:  [{ id, at, target, state, label? }]        pulled from `at`
+//   section.levers:  [{ id, at, target, state, label? }]        pulled from within `leverReach` of `at`
 //   section.gates:   [{ id, at, ..., opensFrom?: region, key?: item id, frees?: [spawn ids], label? }]
-//                    opened by hand from `at`, only from within `opensFrom` (a region, as stage.js's; none: from anywhere
-//                    near) and with the key (an item id the player holds); `frees`: prisoners let out when it opens.
-//                    A gate with none of these is worked by a lever only.
-//   section.ladders: [{ id, at, ..., kickFrom?: region }]        kicked down from `at`, from within `kickFrom`
+//                    opened by hand from anywhere within `mechanismReach` of the gate's leaf (its whole width, not one point), only from
+//                    within `opensFrom` (a region, as stage.js's; none: from anywhere near) and with the key (an item id the player holds);
+//                    `frees`: prisoners let out when it opens. A gate with none of these is worked by a lever only.
+//   section.ladders: [{ id, at, ..., kickFrom?: region }]        kicked down from within `mechanismReach` of the ladder, from within `kickFrom`
 
 import { P } from '../body.js';
 import { LEVEL_CONFIG } from './config.js';
@@ -30,10 +30,30 @@ export function hostileNear(world, range = LEVEL_CONFIG.interact.hostileRange) {
 }
 
 /** A thing in the section lists at a point: its distance from the player if within reach on the floor and in height. */
-function nearAt(me, at) {
-  const { reach, height } = LEVEL_CONFIG.interact;
+function nearAt(me, at, reach = LEVEL_CONFIG.interact.reach) {
+  const { height } = LEVEL_CONFIG.interact;
   const distance = Math.hypot(at[0] - me.x[P.pelvis * 3], at[2] - me.x[P.pelvis * 3 + 2]);
   return distance <= reach && Math.abs(at[1] - feetFloor(me)) <= height ? distance : null;
+}
+
+/**
+ * How far the player is from a gate or ladder: the nearest point of its leaf (the first solid of its closed or raised state: a
+ * wall, a rectangle turned by its yaw) when it has one, else its `at` point; null if it is a storey away. A door is a thing
+ * as wide as its opening, so the button is offered along all of it and a few metres out, not at one spot in front of it.
+ */
+function mechanismDistance(me, mechanism) {
+  const { height } = LEVEL_CONFIG.interact;
+  const x = me.x[P.pelvis * 3];
+  const z = me.x[P.pelvis * 3 + 2];
+  if (Math.abs(mechanism.at[1] - feetFloor(me)) > height) return null;
+  const leaf = (mechanism.states.closed ?? mechanism.states.up ?? [])[0];
+  if (!leaf?.size) return Math.hypot(mechanism.at[0] - x, mechanism.at[2] - z);
+  const yaw = leaf.yaw ?? 0;
+  const dx = x - leaf.at[0];
+  const dz = z - leaf.at[1];
+  const u = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+  const v = dx * Math.sin(yaw) + dz * Math.cos(yaw);
+  return Math.hypot(Math.max(Math.abs(u) - leaf.size[0] / 2, 0), Math.max(Math.abs(v) - leaf.size[1] / 2, 0));
 }
 
 const ITEM_LABEL = { bandage: 'Take bandage', tonic: 'Take tonic', key: 'Take key', note: 'Read note' };
@@ -60,14 +80,14 @@ export function interactions(world) {
     }
     for (const lever of section.levers ?? []) {
       if (stage.mechanisms[lever.target] === lever.state) continue;
-      const distance = nearAt(me, lever.at);
+      const distance = nearAt(me, lever.at, LEVEL_CONFIG.interact.leverReach);
       if (distance !== null) found.push({ id: `lever:${lever.id}`, kind: 'lever', label: lever.label ?? 'Pull lever', icon: 'lever', distance, run: (w) => { level.pulled.add(lever.id); say(w, { type: 'toast', text: 'The lever grinds over' }); return pullLever(w, lever.id); } });
     }
     for (const gate of section.gates ?? []) {
       if (!gate.opensFrom && !gate.key) continue;
       if (stage.mechanisms[gate.id] === 'open') continue;
-      const distance = nearAt(me, gate.at);
-      if (distance === null || (gate.opensFrom && !regionContains(gate.opensFrom, here[0], here[2], me.x[P.pelvis * 3 + 1]))) continue;
+      const distance = mechanismDistance(me, gate);
+      if (distance === null || distance > LEVEL_CONFIG.interact.mechanismReach || (gate.opensFrom && !regionContains(gate.opensFrom, here[0], here[2], me.x[P.pelvis * 3 + 1]))) continue;
       const locked = gate.key && !level.keys.has(gate.key);
       found.push({
         id: `gate:${gate.id}`, kind: 'gate', label: locked ? 'Locked' : gate.label ?? (gate.key ? 'Unlock' : 'Open gate'), icon: locked ? 'lock' : 'gate', distance, disabled: Boolean(locked),
@@ -82,8 +102,8 @@ export function interactions(world) {
     }
     for (const ladder of section.ladders ?? []) {
       if (!ladder.kickFrom || stage.mechanisms[ladder.id] === 'down') continue;
-      const distance = nearAt(me, ladder.at);
-      if (distance === null || !regionContains(ladder.kickFrom, here[0], here[2], me.x[P.pelvis * 3 + 1])) continue;
+      const distance = mechanismDistance(me, ladder);
+      if (distance === null || distance > LEVEL_CONFIG.interact.mechanismReach || !regionContains(ladder.kickFrom, here[0], here[2], me.x[P.pelvis * 3 + 1])) continue;
       found.push({ id: `ladder:${ladder.id}`, kind: 'ladder', label: 'Kick ladder down', icon: 'ladder', distance, run: (w) => { say(w, { type: 'toast', text: 'The ladder crashes down' }); return setMechanism(w, ladder.id, 'down'); } });
     }
     if (section.rest) {

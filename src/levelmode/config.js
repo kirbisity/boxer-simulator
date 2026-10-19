@@ -8,6 +8,11 @@ export const LEVEL_CONFIG = {
     // m on the floor from his hips: arm's length and a step (the brief's number): close enough that the thing
     // is plainly the one he is standing at, far enough that a man does not have to line himself up on it.
     reach: 1.5,
+    // m from the nearest point of a gate's or a ladder's leaf (its whole width, not one spot in front of it): the "Open gate" button
+    // was found only by standing on one spot; now it is offered across the approach (still only from the gate's own side, `opensFrom`).
+    mechanismReach: 3.8,
+    // m from a lever: a pull handle on a wall, found from a few strides' distance.
+    leverReach: 3.0,
     // m of height between his feet's floor and the thing's: one storey is never "near" (a note on the wall
     // walk above, a lever on the stair): a stride and a half.
     height: 1.0,
