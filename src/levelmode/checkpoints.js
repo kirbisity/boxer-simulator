@@ -4,6 +4,10 @@
 // opened gates and kicked ladders (world.stage.mechanisms), freed prisoners, notes read, keys and pickups
 // taken. Men are made new in place (physics reviveFighter: the same object, so ids and the world's
 // references hold); the screen is told which to draw again (level.rebuild).
+// The comrades (team.js): a rest records who is alive (the checkpoint's roster); a death wakes the operative with exactly those
+// beside him, so a comrade who fell since the rest comes back. One who fell before the rest is not on its roster and stays gone: he
+// is lost for good once the next rest is reached while he is dead.
+// Every death is a failed attempt on the prince (attempts.js keeps the record); a death or a respawn begins the next attempt.
 
 import { P } from '../body.js';
 import { reviveFighter } from '../physics.js';
@@ -12,6 +16,8 @@ import { levelOf, say, feetFloor } from './items.js';
 import { regionContains, updateStage } from './stage.js';
 import { levelResetMinds } from './adapter.js';
 import { endingRelease } from './ending.js';
+import { beginAttempt, recordAttempt } from './attempts.js';
+import { comradesOf } from './team.js';
 
 /** The operative's gear as it is now: his inputs (outfit, headgear, style) and the shield on his arm. */
 export function snapshotGear(me) {
@@ -30,11 +36,14 @@ function sectionAt(stage, at) {
   return stage.sections.find((section) => regionContains(section.bounds, at[0], at[2], at[1]))?.id ?? stage.start.section;
 }
 
-/** Make the checkpoint: the place, the gear and the items he will wake with. */
+/** The spawn ids of the comrades who are alive now (down or up, awake or not): the roster a rest records. */
+export const livingComrades = (world) => comradesOf(world).filter((fighter) => fighter.state !== 'out').map((fighter) => fighter.spawn.id);
+
+/** Make the checkpoint: the place, the gear and the items he will wake with, and the comrades alive (whom a death brings back). */
 export function setCheckpoint(world, { id = null, at, facing, name = null }) {
   const level = levelOf(world);
   const me = world.fighters[0];
-  level.checkpoint = { id, name, at: [...at], facing, section: sectionAt(world.stage.def, at), gear: snapshotGear(me), inventory: { ...level.inventory } };
+  level.checkpoint = { id, name, at: [...at], facing, section: sectionAt(world.stage.def, at), gear: snapshotGear(me), inventory: { ...level.inventory }, comrades: livingComrades(world) };
 }
 
 /** The spawn definitions by id, with the section each stands in: { id: { def, section } }. */
@@ -67,8 +76,9 @@ function remake(world, fighter, inputs, options, { force = false } = {}) {
 }
 
 /**
- * The enemies back at their posts, whole and as they were made; the comrades (the team and the freed) beside the player, the
- * living only: one who has fallen stays fallen through every rest and every death (team.js), where he lies.
+ * The enemies back at their posts, whole and as they were made; the comrades (the team and the freed) beside the player: the
+ * living, and the ones on the checkpoint's roster, who come back whole if they have fallen since the rest (a death). One who is not
+ * on the roster and lies fallen stays where he lies (a rest records only the living, so he is lost for good).
  */
 function reviveWorld(world, { followersAt = true } = {}) {
   const level = levelOf(world);
@@ -88,7 +98,7 @@ function reviveWorld(world, { followersAt = true } = {}) {
       remake(world, fighter, inputs, { at: def.post, yaw: def.facing ?? 0, shield: undefined });
       if (def.role === 'boss') level.boss = { id: fighter.id, phase: 1 };
     } else if (fighter.corner === 'red' && followersAt) {
-      if (fighter.state === 'out') continue;
+      if (fighter.state === 'out' && !level.checkpoint.comrades.includes(fighter.spawn.id)) continue;
       remake(world, fighter, inputs, { at: beside(me, follower), yaw: me.yaw, shield: undefined });
       fighter.spawn.section = level.checkpoint.section;
       follower += 1;
@@ -124,12 +134,17 @@ export function restAtPoint(world, point) {
   return true;
 }
 
-/** The operative is out: say so once, and the screen runs its death (which calls `respawnPlayer` while dark). */
+/** The operative is out: put the failed attempt on the record, say so once, and the screen runs its death (which calls `respawnPlayer` while dark). */
 export function noteDeath(world) {
   const level = levelOf(world);
   if (level.dying) return;
   level.dying = true;
   level.deaths += 1;
+  const at = playerStands(world.fighters[0]);
+  // (Lost to the sea or over an edge he is in no section: the one the stage last had awake for him.)
+  const sections = world.stage.def.sections;
+  const section = sections.find((each) => regionContains(each.bounds, at[0], at[2], at[1])) ?? sections.find((each) => each.id === world.stage.active[0]);
+  recordAttempt(world, { section: section?.id ?? null, place: section?.name ?? null });
   say(world, { type: 'death' });
 }
 
@@ -152,6 +167,7 @@ export function respawnPlayer(world) {
   // Where he is decides which sections are awake, before the men are put back.
   updateStage(world, true);
   reviveWorld(world);
+  beginAttempt(world);
   world.events.push({ time: world.time, kind: 'respawned', fighter: 0, effects: ['wakes at the last rest'] });
   say(world, { type: 'respawned' });
   return true;

@@ -40,7 +40,7 @@ import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awar
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
 import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
-import { bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
+import { attemptCount, attemptLog, attemptStory, bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { installLevelHud } from './levelmode/hud.js';
 import { NOTES, STAGE_ONE, closeStory, showDeath, showEnding, showFinale, showNote, showOpening, storyBusy } from './levelmode/story.js';
@@ -2206,10 +2206,13 @@ function beginEnding(world) {
   state.orders = newOrders();
   fightControls.reset();
   endingCam = { k: 0, goal: 0 };
+  // Every death was a failed attempt: the story of the night, told from the record, and how many tries it took.
+  const attempts = { count: attemptCount(world), story: attemptStory(attemptLog(world)) };
   // How far the push-in goes with each line (0: the player; 1: close on the prince, who is what the lines are about: a narrow phone screen frames him first).
   const beats = [0.45, 0.58, 0.68, 0.76, 0.83, 0.88, 0.92, 0.95];
   showEnding({
     civiliansHarmed: world.stage.civiliansHarmed,
+    attempts,
     onLine: (index) => {
       if (run !== stageRun || !endingCam) return;
       // (An upright phone cannot hold the player and the prince in one picture: it goes to the prince at once.)
@@ -2220,7 +2223,7 @@ function beginEnding(world) {
   }, () => {
     if (run !== stageRun) return;
     endingDone(world);
-    showFinale({ onMenu: () => goHome(), onAgain: () => enterStage(key) });
+    showFinale({ onMenu: () => goHome(), onAgain: () => enterStage(key), attempts });
   });
 }
 

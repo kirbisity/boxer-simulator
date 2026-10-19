@@ -78,9 +78,16 @@ const ENDING = {
   end: 'End of Stage 1 · Memories of Dunnottar',
 };
 
-/** The ending's lines in order, for the way the run went. */
-export function endingLines({ civiliansHarmed = false } = {}) {
-  return [...ENDING.cell, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...ENDING.closing, ENDING.end];
+/** The "Attempts: N" line of the ending cards and the finale: how many tries it took (every death was one that failed). */
+export const attemptsLine = (count) => `Attempts: ${count}`;
+
+/**
+ * The ending's lines in order, for the way the run went. With `attempts` ({ count, story }: levelmode/attempts.js) the story of the
+ * night comes after the closing words, then the "Attempts: N" line, then the stage's end.
+ */
+export function endingLines({ civiliansHarmed = false, attempts = null } = {}) {
+  const told = attempts ? [attempts.story, attemptsLine(attempts.count)] : [];
+  return [...ENDING.cell, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...ENDING.closing, ...told, ENDING.end];
 }
 
 /** How long the cards take (s): the fade of each, and how long a card holds before a tap counts. */
@@ -89,6 +96,8 @@ export const STORY_TIMING = {
   noteLock: 0.35,
   deathIn: 1.6, deathHold: 2.4, deathOut: 1.0,
   endingLineFade: 1.4, endingLineHold: 3.2, endingLock: 0.6,
+  // s a long line (the story of the attempts) holds for each word in it, at the least the usual hold: a tap brings the next at once.
+  endingWord: 0.18,
 };
 
 // ---- The cards -----------------------------------------------------------------
@@ -223,10 +232,11 @@ export function showDeath(onDone) {
 
 /**
  * The ending in the cell: lines rise one by one over black (a tap brings the next at once); `onLine(index, text)` says
- * which is up, so the stage can pose the cell behind it; the last tap closes the card and runs onDone.
+ * which is up, so the stage can pose the cell behind it; the last tap closes the card and runs onDone. `attempts`
+ * ({ count, story }) adds the story of the night and the "Attempts: N" line before the end.
  */
-export function showEnding({ civiliansHarmed = false, onLine = null, over = true } = {}, onDone) {
-  const lines = endingLines({ civiliansHarmed });
+export function showEnding({ civiliansHarmed = false, attempts = null, onLine = null, over = true } = {}, onDone) {
+  const lines = endingLines({ civiliansHarmed, attempts });
   const shown = [];
   let at = -1;
   let timer = null;
@@ -237,7 +247,8 @@ export function showEnding({ civiliansHarmed = false, onLine = null, over = true
     clearTimeout(timer);
     if (at >= lines.length - 1) return;
     at += 1;
-    const line = storyEl('p', at === lines.length - 1 ? 'story-line story-end' : 'story-line', lines[at]);
+    const kind = at === lines.length - 1 ? ' story-end' : attempts && lines[at] === attempts.story ? ' story-tale' : attempts && lines[at] === attemptsLine(attempts.count) ? ' story-count' : '';
+    const line = storyEl('p', `story-line${kind}`, lines[at]);
     stack.append(line);
     requestAnimationFrame(() => line.classList.add('shown'));
     shown.push(line);
@@ -245,7 +256,7 @@ export function showEnding({ civiliansHarmed = false, onLine = null, over = true
     shown.slice(0, -1).forEach((old) => old.classList.add('old'));
     shown.slice(0, -2).forEach((gone) => gone.classList.add('gone'));
     onLine?.(at, lines[at]);
-    if (at < lines.length - 1) timer = setTimeout(next, STORY_TIMING.endingLineHold * 1000);
+    if (at < lines.length - 1) timer = setTimeout(next, Math.max(STORY_TIMING.endingLineHold, lines[at].split(' ').length * STORY_TIMING.endingWord) * 1000);
     else card.root.classList.add('last');
   };
   // Over the scene (the default): the cell stays in view above the words, and the world runs behind them.
@@ -264,9 +275,9 @@ export function showEnding({ civiliansHarmed = false, onLine = null, over = true
 
 /**
  * The card after the ending: where the stage stops. "Return to menu" and "Play again" (each runs its callback once, the card
- * taking itself down). Enter works the button that has the focus.
+ * taking itself down). Enter works the button that has the focus. `attempts` ({ count }) puts "Attempts: N" under the title.
  */
-export function showFinale({ onMenu, onAgain }, stage = STAGE_ONE) {
+export function showFinale({ onMenu, onAgain, attempts = null }, stage = STAGE_ONE) {
   let done = false;
   const card = storyCard('story-finale', () => document.activeElement?.closest?.('.story-finale') && document.activeElement.click?.(), { bodyClass: 'card-up' });
   const choose = (callback) => () => {
@@ -285,6 +296,7 @@ export function showFinale({ onMenu, onAgain }, stage = STAGE_ONE) {
     storyEl('p', 'story-chapter', stage.chapter),
     storyEl('h2', 'story-fin-title', `Stage 1 complete`),
     storyEl('p', 'story-fin-sub', stage.title),
+    ...(attempts ? [storyEl('p', 'story-fin-attempts', attemptsLine(attempts.count))] : []),
     storyEl('div', 'story-rule'),
     storyEl('div', 'story-buttons'),
   );

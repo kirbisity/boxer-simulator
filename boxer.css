@@ -758,6 +758,8 @@ body.playing .sandbox-panel { top: calc(48px + env(safe-area-inset-top, 0px)); }
 .story-line.old { color: rgba(180, 188, 208, 0.55); }
 .story-line.gone { display: none; }
 .story-line.story-end { margin-top: 6px; font: 500 clamp(11px, 3vw, 13px) var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
+.story-line.story-tale { font-size: clamp(13px, 3.5vw, 16px); line-height: 1.6; font-style: italic; }
+.story-line.story-count { font: 500 clamp(11px, 3vw, 13px) var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(214, 190, 120, 0.9); }
 .story-ending .story-prompt { opacity: 0.5; }
 /* Over the scene: the cell stays in view, the words sit on a dark foot at the bottom and the world runs behind them. */
 .story-ending.over { background: linear-gradient(180deg, rgba(2, 2, 5, 0.25) 0, rgba(2, 2, 5, 0) 22%, rgba(2, 2, 5, 0) 46%, rgba(2, 2, 5, 0.88) 80%); place-content: end center; gap: 14px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
@@ -770,6 +772,7 @@ body.card-up .hud, body.card-up .fight-ui, body.card-up .controls, body.card-up 
 .story-finale { background: radial-gradient(ellipse at 50% 40%, rgba(24, 28, 44, 0.9), rgba(4, 5, 9, 0.97) 75%); cursor: default; gap: 10px; }
 .story-fin-title { margin: 0; font: 700 clamp(30px, 8vw, 64px)/1.05 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #e8ecf6; text-shadow: 0 0 30px rgba(120, 150, 230, 0.35); }
 .story-fin-sub { margin: 0; font: 400 clamp(13px, 3.4vw, 17px) var(--body); color: rgba(210, 217, 236, 0.8); }
+.story-fin-attempts { margin: 0; font: 500 clamp(11px, 3vw, 13px) var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
 .story-buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 12px; }
 .story-button { min-height: 48px; padding: 0 26px; border-radius: 6px; border: 1px solid rgba(190, 205, 240, 0.4); background: rgba(14, 18, 30, 0.8); color: #dfe5f4; font: 600 14px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; }
 .story-button.story-primary { border-color: var(--gold); color: var(--gold); }
