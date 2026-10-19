@@ -29,6 +29,10 @@ import { ceilingOf, rampOf, slabOf, stairsOf, wallLine, wallOf, windingStairs, w
 /** The levels (y). */
 export const DN_Y = { sea: -9, start: 14, pathA: 10.6, pathB: 7.2, pathC: 3.8, gorge: 0, landing: 4.18, guardroom: 8.18, quad: 12.18, vault: 6.0, ladderRoom: 17.18, walk: 24.93 };
 const Y = DN_Y;
+/** The floors a man stands on (y), for the drawing's wear (levelmode/kitwear.js finds the floor a wall stands on among these). */
+export const DN_LEVELS = [Y.gorge, Y.landing, Y.guardroom, Y.quad, Y.vault, Y.ladderRoom, Y.walk];
+/** How wide the outdoor path is (m): a narrow way between rails, not a road (the fighting room is this less the rails: 2.9). */
+export const DN_PATH = 3.2;
 
 /** Facing: yaw 0 looks along +x, a positive yaw turns toward -z. */
 export const DN_FACE = { E: 0, N: Math.PI / 2, W: Math.PI, S: -Math.PI / 2 };
@@ -93,6 +97,7 @@ function dnRun(sec, a, b, thick, y0, y1, style, openings = [], extra = {}) {
   piece(cursor, length, y0, y1);
   sec.decor.push({ kind: 'run', a, b, thick, y0, y1, style, openings, ...extra });
 }
+
 
 /** A straight flight up in direction `dir` (E W N S) from the foot's middle `foot` = [x, z]. */
 function dnFlight(sec, { foot, dir, steps, tread = 0.34, width, from, rise, style = 'stone', id, bottom }) {
@@ -187,6 +192,29 @@ const dnProp = (sec, what, at, extra = {}) => sec.decor.push({ kind: 'prop', wha
 const dnBounds = (sec, ...regions) => sec.bounds.push(...regions);
 const dnLerp = (x0, x1, y0, y1) => (x) => y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
 
+// ---- Scenery that is solid ----------------------------------------------------------------------
+
+/** The mainland's height (y) at (x, z), away from the paths: the hillside's plane (kit.js draws it from `landform.mainland`). */
+const dnGround = (x, z) => Math.min(16, 12 - 0.27 * (z + 4));
+
+/** Crags and boulders: [x, z, rx, ry, rz] each, standing in the hillside (drawn as lumps of rock with tufts at their feet) and a wall of the same footprint that keeps men out. */
+function dnOutcrop(sec, crags) {
+  const lumps = [];
+  crags.forEach(([x, z, rx, ry, rz], k) => {
+    const base = dnGround(x, z) - 1.4;
+    lumps.push({ at: [x, base, z], r: [rx, ry, rz], seed: 7 + k + Math.floor(Math.abs(x + z)) });
+    sec.terrain.push({ ...wallOf([x, z], [rx * 1.5, rz * 1.5], base - 1, base + ry * 1.3, {}), style: 'hidden', skin: false });
+  });
+  sec.decor.push({ kind: 'outcrop', lumps });
+}
+
+/** A cairn of stacked stones standing on the ground at (x, z): drawn, and a post of a wall under it. */
+function dnCairn(sec, x, z) {
+  const y = Y.start;
+  sec.decor.push({ kind: 'cairn', at: [x, y, z] });
+  sec.terrain.push({ ...wallOf([x, z], [1.4, 1.4], y - 0.5, y + 1.7, {}), style: 'hidden', skin: false });
+}
+
 // ---- 1. The Cliff Path ----------------------------------------------------------------------
 
 // Three fenced legs down the mainland slope (east, west, east), each 4.4 wide, a landing at each turn, then a
@@ -198,44 +226,73 @@ const DN_L3 = dnLerp(-100.5, -62.5, Y.pathB, Y.pathC);
 function buildCliff() {
   const sec = dnSection('cliff', 'The Cliff Path');
   dnBounds(sec, { at: [-88, 14], size: [76, 56] }, { at: [-36, 47], size: [60, 22] });
-  // The mainland, where the way begins: a plateau, then L1.
+  // The mainland, where the way begins: a plateau, then L1. The path is DN_PATH wide, rails 0.2 outside its edges; each turn is a landing a little wider.
+  const h = DN_PATH / 2;
+  const r = h + 0.2;
   dnSlab(sec, -126, -104, -10, 2, Y.start, 'grass', { extra: { land: true } });
-  sec.terrain.push({ ...rampOf([-83, -4], [42, 4.4], Y.start, Y.pathA, { id: 'leg1' }), style: 'path' });
-  dnSlab(sec, -62.5, -53.5, -6.2, 10.2, Y.pathA, 'path', { extra: { land: true } });
-  sec.terrain.push({ ...rampOf([-81.5, 8], [38, 4.4], Y.pathA, Y.pathB, { yaw: Math.PI, id: 'leg2' }), style: 'path' });
-  dnSlab(sec, -108.5, -99.5, 5.8, 22.2, Y.pathB, 'path', { extra: { land: true } });
-  sec.terrain.push({ ...rampOf([-81.5, 20], [38, 4.4], Y.pathB, Y.pathC, { id: 'leg3' }), style: 'path' });
-  dnSlab(sec, -62.5, -53.5, 17.8, 30.8, Y.pathC, 'path', { extra: { land: true } });
+  sec.terrain.push({ ...rampOf([-83, -4], [42, DN_PATH], Y.start, Y.pathA, { id: 'leg1' }), style: 'path' });
+  dnSlab(sec, -62.5, -58.5, -4 - h, 8 + h, Y.pathA, 'path', { extra: { land: true } });
+  sec.terrain.push({ ...rampOf([-81.5, 8], [38, DN_PATH], Y.pathA, Y.pathB, { yaw: Math.PI, id: 'leg2' }), style: 'path' });
+  dnSlab(sec, -105, -99.5, 8 - h, 20 + h, Y.pathB, 'path', { extra: { land: true } });
+  sec.terrain.push({ ...rampOf([-81.5, 20], [38, DN_PATH], Y.pathB, Y.pathC, { id: 'leg3' }), style: 'path' });
+  dnSlab(sec, -62.5, -56.4, 20 - h, 30.8, Y.pathC, 'path', { extra: { land: true } });
   // The stair down to the gorge: 19 treads of 0.2 (3.8 m).
-  const down = dnFlight(sec, { foot: [-58, 38.4], dir: 'N', steps: 19, tread: 0.4, width: 4.4, from: Y.gorge, rise: 0.2, style: 'cobble' });
+  const down = dnFlight(sec, { foot: [-58, 38.4], dir: 'N', steps: 19, tread: 0.4, width: DN_PATH, from: Y.gorge, rise: 0.2, style: 'cobble' });
   // The gorge shelf: black rock, a cliff to the sea on its south and west; a low rock face on the north.
   dnSlab(sec, -64, -6.8, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
-  dnBox(sec, -64, -60.4, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
-  dnBox(sec, -55.6, -6.8, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
+  dnBox(sec, -64, -58 - r, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
+  dnBox(sec, -58 + r, -6.8, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
 
   // Fences: every leg on both sides, the landings round their outer edges; the stair on both sides.
   const rail = (points, opts) => dnFence(sec, points, opts);
+  const c1 = -4;
+  const c2 = 8;
+  const c3 = 20;
   rail([[-126, 2.1, 14], [-126, -10.1, 14]]);
-  rail([[-104, -10.1, 14], [-104, -6.4, 14]]);
-  rail([[-104, 2.1, 14], [-104, -1.6, 14]]);
+  rail([[-104, -10.1, 14], [-104, c1 - r, 14]]);
+  rail([[-104, 2.1, 14], [-104, c1 + r, 14]]);
   rail([[-126, -10.1, 14], [-103.9, -10.1, 14]]);
   rail([[-126, 2.1, 14], [-103.9, 2.1, 14]]);
-  rail([[-104, -6.4, DN_L1(-104)], [-62.5, -6.4, DN_L1(-62.5)], [-53.3, -6.4, Y.pathA], [-53.3, 10.4, Y.pathA], [-62.5, 10.4, Y.pathA]]);
-  rail([[-104, -1.6, DN_L1(-104)], [-62.5, -1.6, DN_L1(-62.5)], [-62.5, 5.6, Y.pathA]]);
-  rail([[-62.5, 5.6, Y.pathA], [-100.5, 5.6, DN_L2(-100.5)]]);
-  rail([[-62.5, 10.4, Y.pathA], [-99.4, 10.4, Y.pathB]]);
-  rail([[-100.5, 5.6, DN_L2(-100.5)], [-108.6, 5.6, Y.pathB], [-108.6, 22.3, Y.pathB], [-100.5, 22.3, Y.pathB]]);
-  rail([[-99.4, 10.4, Y.pathB], [-99.4, 17.7, Y.pathB]]);
-  rail([[-99.4, 17.7, Y.pathB], [-62.5, 17.7, DN_L3(-62.5)], [-53.3, 17.7, Y.pathC], [-53.3, 30.9, Y.pathC]]);
-  rail([[-100.5, 22.3, Y.pathB], [-62.6, 22.3, DN_L3(-62.6)], [-62.6, 30.9, Y.pathC], [-60.5, 30.9, Y.pathC]]);
-  rail([[-55.5, 30.9, Y.pathC], [-53.3, 30.9, Y.pathC]]);
-  rail([[-60.5, 30.9, Y.pathC], [-60.5, 38.4, Y.gorge]]);
-  rail([[-55.5, 30.9, Y.pathC], [-55.5, 38.4, Y.gorge]]);
+  rail([[-104, c1 - r, DN_L1(-104)], [-62.5, c1 - r, DN_L1(-62.5)], [-58.3, c1 - r, Y.pathA], [-58.3, c2 + r, Y.pathA], [-62.5, c2 + r, Y.pathA]]);
+  rail([[-104, c1 + r, DN_L1(-104)], [-62.5, c1 + r, DN_L1(-62.5)], [-62.5, c2 - r, Y.pathA]]);
+  rail([[-62.5, c2 - r, Y.pathA], [-100.5, c2 - r, DN_L2(-100.5)]]);
+  rail([[-62.5, c2 + r, Y.pathA], [-99.4, c2 + r, Y.pathB]]);
+  rail([[-100.5, c2 - r, DN_L2(-100.5)], [-105.2, c2 - r, Y.pathB], [-105.2, c3 + r, Y.pathB], [-100.5, c3 + r, Y.pathB]]);
+  rail([[-99.4, c2 + r, Y.pathB], [-99.4, c3 - r, Y.pathB]]);
+  rail([[-99.4, c3 - r, Y.pathB], [-62.5, c3 - r, DN_L3(-62.5)], [-56.2, c3 - r, Y.pathC], [-56.2, 30.9, Y.pathC]]);
+  rail([[-100.5, c3 + r, Y.pathB], [-62.6, c3 + r, DN_L3(-62.6)], [-62.6, 30.9, Y.pathC], [-58 - r, 30.9, Y.pathC]]);
+  rail([[-58 - r, 30.9, Y.pathC], [-58 - r, 38.4, Y.gorge]]);
+  rail([[-56.2, 30.9, Y.pathC], [-56.2, 38.4, Y.gorge]]);
+
+  // The view is kept from him: rock and boulders flanking the path hide the castle and the island until a bend gives them up (the physics has each of them too).
+  // (Crags: [x, z, rx, ry, rz] at the hillside's height; away from the path, so that the cut banks do not run into them.)
+  // First a screen of rock beyond the first turn: the castle shows in the mist from the start and is lost behind it.
+  dnOutcrop(sec, [[-52, -6, 3.6, 7.4, 3.2], [-48.5, -0.5, 3.0, 5.4, 3.4], [-54.5, -11, 3.0, 5.0, 2.8], [-46.5, -8.5, 2.6, 4.2, 2.5], [-51, 4, 2.4, 3.8, 2.2], [-56, -15, 2.2, 3.0, 2.2]]);
+  // The north side of the first leg: boulders and a low crag, to break the long green slope.
+  dnOutcrop(sec, [[-88, -13.5, 2.3, 2.6, 2.0], [-81, -12, 1.5, 1.7, 1.4], [-73, -15.5, 2.9, 3.4, 2.4], [-96, -12.6, 1.3, 1.2, 1.3]]);
+  // Between the first two legs: a ridge of rock that cuts the view of the slope and the sea.
+  dnOutcrop(sec, [[-92, 1.2, 2.0, 2.4, 1.6], [-84, 2.0, 1.5, 1.8, 1.3], [-75, 1.0, 2.4, 3.0, 1.6]]);
+  // Between the second and the third: the high rock that hides the castle from the third leg until its end.
+  dnOutcrop(sec, [[-90, 14, 3.0, 4.0, 2.4], [-80, 13.6, 2.2, 3.0, 2.2], [-71, 14.2, 3.6, 5.6, 2.4], [-63.5, 14, 1.8, 2.6, 1.8]]);
+  // Beyond the third leg's end: the gateway of rock that opens on the gorge as he turns down the stair.
+  dnOutcrop(sec, [[-52, 21, 3.4, 6.6, 3.2], [-49.5, 27, 3.0, 5.4, 3.0], [-47, 15, 2.6, 4.4, 2.6], [-45.5, 22.5, 2.0, 3.2, 2.0]]);
+  // The outer slope under the third leg: boulders.
+  dnOutcrop(sec, [[-95, 26.5, 1.9, 1.7, 1.6], [-84, 27.5, 2.4, 2.4, 2.0], [-73, 25.5, 1.5, 1.3, 1.5], [-68, 28, 1.2, 1.0, 1.2]]);
+  // A ruined cairn on the plateau, where the first of the garrison made his mark.
+  dnCairn(sec, -119.5, -8);
 
   // Rest 1: the brazier in the gorge, out of the wind under the rock face.
   sec.rest = { id: 'rest1', name: 'The Gorge Brazier', at: [-44, Y.gorge, 41.5] };
   dnProp(sec, 'brazier', [-44, Y.gorge, 40.4], { lit: true, rest: true });
   dnProp(sec, 'brazier', [-14, Y.gorge, 43], { lit: true });
+  // The way round to the postern (the great gate is barred): a brazier at the turning, and a trail of way-marks on the rock along the shelf and round the ledge.
+  dnProp(sec, 'brazier', [-8.2, Y.gorge, 50.6], { lit: true });
+  sec.decor.push({ kind: 'waymarks', points: [[-50, 44.5, Y.gorge], [-38, 44.5, Y.gorge], [-26, 47, Y.gorge], [-16, 51, Y.gorge], [-11.5, 53.8, Y.gorge]], gap: 2.1, first: 1.0 });
+  // The head of the stair down into the gorge: a trail from the landing over the lip.
+  sec.decor.push({ kind: 'waymarks', points: [[-104, -4, DN_L1(-104)], [-97, -4, DN_L1(-97)], [-90, -4, DN_L1(-90)]], gap: 2.4, first: 1.2 });
+  sec.decor.push({ kind: 'waymarks', points: [[-66, -4, DN_L1(-66)], [-60.5, -2.4, Y.pathA], [-60.5, 5.6, Y.pathA], [-64, 8, DN_L2(-64)]], gap: 2.0, first: 0.8 });
+  sec.decor.push({ kind: 'waymarks', points: [[-98, 8, DN_L2(-98)], [-102.5, 10.5, Y.pathB], [-102.5, 17.5, Y.pathB], [-98, 20, DN_L3(-98)]], gap: 2.0, first: 0.8 });
+  sec.decor.push({ kind: 'waymarks', points: [[-66, 20, DN_L3(-66)], [-60.5, 22, Y.pathC], [-58.5, 28, Y.pathC]], gap: 2.0, first: 0.8 });
   // The way on: the corridor to the gatehouse is a portal while he is in it.
   sec.portals.push({ to: 'gate', area: { at: [-17, 47], size: [20, 18] } });
 
@@ -245,13 +302,13 @@ function buildCliff() {
   dnProp(sec, 'weapon', [-98, DN_L1(-98), -3], { what2: 'spear', yaw: 1.1 });
   dnProp(sec, 'weapon', [-91, DN_L1(-91), -4.2], { what2: 'sword', yaw: 2.4 });
   dnProp(sec, 'weapon', [-72, DN_L2(-72), 7.2], { what2: 'halberd', yaw: 0.4 });
-  dnProp(sec, 'weapon', [-85, DN_L3(-85), 21], { what2: 'shield', yaw: 0.7 });
+  dnProp(sec, 'weapon', [-85, DN_L3(-85), 20.4], { what2: 'shield', yaw: 0.7 });
   dnProp(sec, 'weapon', [-30, Y.gorge, 49], { what2: 'sword', yaw: 3.7 });
   dnProp(sec, 'barrel', [-109, 14, -6.5], { yaw: 0.3 });
   dnProp(sec, 'barrel', [-108.2, 14, -8], { yaw: 1.3, tipped: true });
   dnProp(sec, 'cart', [-122, 14, -2], { yaw: -0.5, broken: true });
   dnProp(sec, 'raven', [-120.1, 15.15, -10.1], { yaw: 0.5 });
-  dnProp(sec, 'raven', [-62.6, DN_L2(-62.6) + 1.15, 10.4], { yaw: 2.6 });
+  dnProp(sec, 'raven', [-62.6, DN_L2(-62.6) + 1.15, 9.8], { yaw: 2.6 });
   dnProp(sec, 'raven', [-60.4, 1.2, 36.6], { yaw: 4.2 });
   dnProp(sec, 'raven', [-36, 3.3, 37.6], { yaw: 3 });
   dnProp(sec, 'raven', [-66, Y.gorge, 55.6], { yaw: 1.5 });
@@ -262,12 +319,12 @@ function buildCliff() {
   const post = (x, y, z) => [x, y, z];
   dnSpawn(sec, 'levy1', 'dunnottarSoldier', 'enemy', 1, post(-84, DN_L1(-84), -4.9), DN_FACE.W, { inputs: { name: 'Hob' } });
   dnSpawn(sec, 'levy3', 'dunnottarSoldier', 'enemy', 1, post(-74, DN_L2(-74), 7.1), DN_FACE.E, { inputs: { name: 'Davie' } });
-  dnSpawn(sec, 'levy5', 'dunnottarSoldier', 'enemy', 1, post(-86, DN_L3(-86), 21.2), DN_FACE.W, { inputs: { name: 'Rab' } });
+  dnSpawn(sec, 'levy5', 'dunnottarSoldier', 'enemy', 1, post(-86, DN_L3(-86), 20.5), DN_FACE.W, { inputs: { name: 'Rab' } });
   dnSpawn(sec, 'levy7', 'dunnottarSoldier', 'enemy', 1, post(-24, Y.gorge, 45), DN_FACE.W, { inputs: { name: 'Sandy' }, patrol: [[-24, 45], [-34, 43]] });
 
   // Things to find.
   dnItem(sec, 'bandage1', 'bandage', [-96, DN_L1(-96), -4.4]);
-  dnItem(sec, 'bandage2', 'bandage', [-65, DN_L3(-65), 20.4]);
+  dnItem(sec, 'bandage2', 'bandage', [-65, DN_L3(-65), 20.2]);
   dnItem(sec, 'tonic1', 'tonic', [-50, Y.gorge, 44]);
   return sec;
 }
@@ -298,6 +355,12 @@ function buildGate() {
   dnProp(sec, 'powderkeg', [3.6, Y.gorge, 42.2], { yaw: 0.2 });
   dnProp(sec, 'table', [0.5, Y.gorge, 49.2], { yaw: 0.1 });
   dnProp(sec, 'crate', [-3.8, Y.gorge, 49.6], { yaw: 0.2 });
+  // The postern: a torch each side of it on the sea face, and the marks round the ledge to its door and across the hall to the stair.
+  dnProp(sec, 'torch', [0.1, 2.2, 52.85], { face: 'S' });
+  dnProp(sec, 'torch', [4.3, 2.2, 52.85], { face: 'S' });
+  sec.decor.push({ kind: 'waymarks', points: [[-9.5, 54.2, Y.gorge], [-3, 54.2, Y.gorge], [2.2, 54, Y.gorge]], gap: 1.9, first: 0.4 });
+  sec.decor.push({ kind: 'waymarks', points: [[2.2, 50.8, Y.gorge], [3.2, 48.2, Y.gorge], [5.2, 46.2, Y.gorge]], gap: 1.7, first: 0.3 });
+  sec.decor.push({ kind: 'waymarks', points: [[16.2, 46.2, A], [17.5, 43.4, A], [17.5, 40.6, A]], gap: 1.8, first: 0.3 });
   dnProp(sec, 'torch', [-5.2, 3, 42.4], { face: 'E' });
   dnProp(sec, 'torch', [5, 3, 50.4], { face: 'W' });
   dnProp(sec, 'torch', [-5.2, 3, 50.4], { face: 'E' });
@@ -393,6 +456,8 @@ function buildAscent() {
   dnFlightVault(sec, b, { head: 3.9 });
   // The head of the stair: a short floor under the quadrangle's south wall, the arch above.
   dnSlab(sec, 14.3, 19.7, 6, 8.2, Q, 'cobble', { extra: { room: true } });
+  sec.decor.push({ kind: 'waymarks', points: [[17.7, 39, A], [17.7, 35.2, A]], gap: 1.8, first: 0.3 });
+  sec.decor.push({ kind: 'waymarks', points: [[17.5, 23.6, B], [17.2, 18.4, B]], gap: 1.8, first: 0.3 });
   sec.portals.push({ to: 'gate', area: { at: [17.7, 38], size: [12, 9] } });
   sec.portals.push({ to: 'quad', area: { at: [17, 10], size: [8, 9] } });
 
@@ -453,10 +518,18 @@ function buildQuad() {
   // The shortcut stair's head: low balustrades round the open part of the well.
   dnBox(sec, 21.7, 22, -14, -6.2, Q - 0.5, Q + 1.0, 'ashlar');
   dnBox(sec, 27.4, 27.7, -14, -6.2, Q - 0.5, Q + 1.0, 'ashlar');
-  // The far ends of the open stairwells, where the court's slab runs on over the covered treads: a rim to keep a man out of the trench.
+  // The far ends of the open stairwells, where the court's slab runs on over the covered treads: a railing (a wall to the physics, bars to the eye: the way on, under the slab,
+  // is seen through it) over the slab's own face, a lintel with the stair running dark beneath it.
   for (const [x0, x1, z] of [[3, 8.4, -4 - open], [22, 27.4, -6.86 - open], [34 + 0.34 * DN_COVERED, 34 + 0.34 * DN_COVERED, 0]]) {
-    if (x0 === x1) dnBox(sec, x0 - 0.3, x0, -25.4, -19.6, Q - 0.5, Q + 1.0, 'ashlar');
-    else dnBox(sec, x0, x1, z - 0.3, z, Q - 0.5, Q + 1.0, 'ashlar');
+    if (x0 === x1) {
+      dnBox(sec, x0 - 0.3, x0, -25.4, -19.6, Q - 0.5, Q + 1.0, 'ashlar', { skin: false });
+      sec.decor.push({ kind: 'bars', a: [x0 - 0.15, -25.4], b: [x0 - 0.15, -19.6], y0: Q, y1: Q + 1.0 });
+      sec.decor.push({ kind: 'face', a: [x0, -25.4], b: [x0, -19.6], y0: Q - 1.6, y1: Q, thick: 0.2, style: 'ashlar' });
+    } else {
+      dnBox(sec, x0, x1, z - 0.3, z, Q - 0.5, Q + 1.0, 'ashlar', { skin: false });
+      sec.decor.push({ kind: 'bars', a: [x0, z - 0.15], b: [x1, z - 0.15], y0: Q, y1: Q + 1.0 });
+      sec.decor.push({ kind: 'face', a: [x0, z], b: [x1, z], y0: Q - 1.6, y1: Q, thick: 0.2, style: 'ashlar' });
+    }
   }
   // The old kitchen (a ruined range, roofless): north-west of the court.
   dnRun(sec, [3, -31.6], [12, -31.6], 1.2, Q - 0.5, Q + 4.4, 'ruin', [{ at: 4.5, width: 0.6, sill: Q + 2, top: Q + 3.3, shape: 'lancet', solid: true }]);
@@ -490,7 +563,12 @@ function buildQuad() {
   dnProp(sec, 'raven', [43.2, Q + 6.5, -15.4], { yaw: 3 });
   dnProp(sec, 'raven', [3.4, Q + 3.3, -31.6], { yaw: 1 });
   dnProp(sec, 'raven', [31.5, Q + 1.0, -4.5], { yaw: 4, size: 0.9 });
-  dnProp(sec, 'siegeram', [7, Q, -27], { yaw: 0.4 });
+  dnProp(sec, 'siegeram', [29, Q, -30.4], { yaw: 0.4 });
+  // The stair-house of the west stair (down to the vault): a torch each side of its arch, a brazier by it, and marks from the tunnel's mouth to the door.
+  dnProp(sec, 'torch', [1.9, Q + 2.4, -2.5], { face: 'S' });
+  dnProp(sec, 'torch', [9.5, Q + 2.4, -2.5], { face: 'S' });
+  dnProp(sec, 'brazier', [11.2, Q, -1.2], { lit: true });
+  sec.decor.push({ kind: 'waymarks', points: [[16, 3.6, Q], [11.5, 1.2, Q], [7.4, -0.4, Q], [5.7, -1.6, Q]], gap: 1.8, first: 0.3 });
   dnProp(sec, 'torch', [16.2, Q + 3, 6.2], { face: 'S' });
   dnProp(sec, 'torch', [19.4, Q + 3, 6.2], { face: 'S' });
   // Portals: the tunnel; down into the vault by any of its stairs; up to the walls by the ladder.
@@ -500,7 +578,7 @@ function buildQuad() {
 
   // Men: patrols, a guard at the Lodging; the servants at the well; a priest; ladies of another age, sheltering in the ruin.
   dnSpawn(sec, 'patrol1', 'dunnottarSoldier', 'enemy', 1, [13, Q, -5], DN_FACE.N, { inputs: { name: 'Lachie' }, patrol: [[13, -5], [13, -17], [20, -17], [20, -5]] });
-  dnSpawn(sec, 'lodgeguard', 'dunnottarGuard', 'enemy', 2, [45.5, Q, 0.2], DN_FACE.E, { inputs: { name: 'Sergeant Keith' } });
+  dnSpawn(sec, 'lodgeguard', 'dunnottarGuard', 'enemy', 2, [43.0, Q, 0.8], DN_FACE.W, { inputs: { name: 'Sergeant Keith' } });
   dnSpawn(sec, 'servant1', 'dunnottarServant', 'civilian', 0, [28.4, Q, -3.6], DN_FACE.E, { inputs: { name: 'Meg' } });
   dnSpawn(sec, 'servant2', 'dunnottarServant', 'civilian', 0, [34.6, Q, -0.4], DN_FACE.W, { inputs: { name: 'Isobel' } });
   dnSpawn(sec, 'priest', 'dunnottarPriest', 'civilian', 0, [38, Q, -8], DN_FACE.S, { inputs: { name: 'Father Anselm' } });
@@ -585,6 +663,7 @@ function buildVault() {
   dnProp(sec, 'puddle', [9, V, -22.4], { radius: 1.1 });
   dnProp(sec, 'puddle', [20, V, -23.2], { radius: 1.4 });
 
+  sec.decor.push({ kind: 'waymarks', points: [[9, -22.5, V], [17, -22.5, V], [25, -22.5, V], [32, -22.5, V]], gap: 2.1, first: 0.4 });
   sec.portals.push({ to: 'quad', area: [{ at: [5.7, -9], size: [13, 20], y: [8.4, 12] }, { at: [24.7, -11], size: [11, 18], y: [8.4, 12] }] });
   sec.portals.push({ to: 'tower', area: { at: [41, -22.5], size: [14, 10], y: [8.4, 14.6] } });
 
@@ -605,15 +684,15 @@ function buildVault() {
 
 // The keep (a hall on the court's level, reached from the vault), its round stair tower (85 treads of 0.15 round a newel, 12.75 m),
 // the wall walk along the north cliff, a stair down to the ladder room (and the ladder), Rest 3.
-const DN_TOWER = { at: [61.6, -23.8], radius: 4.0, sides: 12 };
-const DN_SPIRAL = { at: DN_TOWER.at, inner: 0.5, outer: 3.2, start: Math.PI, turn: (85 * Math.PI * 2) / 26, steps: 85, from: Y.quad, rise: 0.15 };
+const DN_TOWER = { at: [62.6, -23.8], radius: 4.9, sides: 12 };
+const DN_SPIRAL = { at: DN_TOWER.at, inner: 0.6, outer: 4.2, start: Math.PI, turn: (85 * Math.PI * 2) / 26, steps: 85, from: Y.quad, rise: 0.15 };
 
 function buildTower() {
   const sec = dnSection('tower', 'The Tower House and the Upper Walls');
   const Q = Y.quad;
   const W = Y.walk;
   const L = Y.ladderRoom;
-  dnBounds(sec, { at: [54, -24], size: [22, 20], y: [Q - 3, 40] }, { at: [52, -35.5], size: [28, 9], y: [W - 4, 45] }, { at: [30, -36], size: [64, 8], y: [L - 4, 45] }, { at: [5, -36], size: [14, 9], y: [L - 4, 45] });
+  dnBounds(sec, { at: [57, -24], size: [28, 20], y: [Q - 3, 40] }, { at: [53, -35.5], size: [30, 9], y: [W - 4, 45] }, { at: [30, -36], size: [64, 8], y: [L - 4, 45] }, { at: [5, -36], size: [14, 9], y: [L - 4, 45] });
   // The hall of the keep (an L-plan house; the hall and the round tower are the part a man can enter).
   dnSlab(sec, 44.5, 58.4, -32.4, -15, Q, 'flags', { extra: { land: true } });
   dnRun(sec, [44.5, -31.6], [58.4, -31.6], 1.6, Q - 1, Q + 5.6, 'ashlar', [{ at: 4, width: 0.6, sill: Q + 3, top: Q + 4.6, shape: 'lancet', solid: true }, { at: 9, width: 0.6, sill: Q + 3, top: Q + 4.6, shape: 'lancet', solid: true }]);
@@ -625,9 +704,9 @@ function buildTower() {
   sec.decor.push({ kind: 'vault', a: [45.6, -23.7, Q + 3.8], b: [56.8, -23.7, Q + 3.8], width: 14.2, crown: 1.3, style: 'timber' });
   sec.decor.push({ kind: 'mass', box: [43.3, 58.4, -32.4, -15], y0: Q + 5.6, y1: W + 6.6, style: 'tower', windows: 3 });
   dnProp(sec, 'hearth', [51, Q, -30.9], { yaw: Math.PI / 2 });
-  dnProp(sec, 'table', [51.4, Q, -23.6], { yaw: 0 });
-  dnProp(sec, 'bench', [51.4, Q, -22.2], { yaw: 0 });
-  dnProp(sec, 'bench', [51.4, Q, -25], { yaw: 0 });
+  dnProp(sec, 'table', [51.4, Q, -27.4], { yaw: 0 });
+  dnProp(sec, 'bench', [51.4, Q, -26.0], { yaw: 0 });
+  dnProp(sec, 'bench', [51.4, Q, -28.8], { yaw: 0 });
   dnProp(sec, 'banner', [47, Q + 2.4, -31], { yaw: Math.PI / 2 });
   dnProp(sec, 'barrel', [55.6, Q, -29.6], { yaw: 0.4 });
   dnProp(sec, 'weaponrack', [55.8, Q, -17.6], { yaw: Math.PI });
@@ -637,7 +716,7 @@ function buildTower() {
   // The round tower (a twelve-sided wall: a door in from the hall on the west, a door out onto the wall walk at the top on the north) and its winding stair.
   const [cx, cz] = DN_TOWER.at;
   const corner = (k) => [cx + DN_TOWER.radius * Math.cos(Math.PI / 12 + (k * Math.PI) / 6), cz + DN_TOWER.radius * Math.sin(Math.PI / 12 + (k * Math.PI) / 6)];
-  dnSlab(sec, cx - 4.7, cx + 4.7, cz - 4.7, cz + 4.7, Q, 'flags', { extra: { land: true } });
+  dnSlab(sec, cx - 5.6, cx + 5.6, cz - 5.6, cz + 5.6, Q, 'flags', { extra: { land: true } });
   for (let k = 0; k < DN_TOWER.sides; k += 1) {
     const a = corner(k);
     const b = corner(k + 1);
@@ -645,26 +724,28 @@ function buildTower() {
     const mx = (a[0] + b[0]) / 2 - cx;
     const mz = (a[1] + b[1]) / 2 - cz;
     const openings = [];
-    if (mx < -3.5 && Math.abs(mz) < 0.5) openings.push({ at: length / 2, width: 1.9, sill: Q, top: Q + 3.6, shape: 'round' });
-    else if (mz < -3.5 && Math.abs(mx) < 0.5) openings.push({ at: length / 2, width: 1.9, sill: W, top: W + 3.4, shape: 'round' });
+    if (mx < -3.5 && Math.abs(mz) < 0.5) openings.push({ at: length / 2, width: 2.4, sill: Q, top: Q + 3.6, shape: 'round' });
+    else if (mz < -3.5 && Math.abs(mx) < 0.5) openings.push({ at: length / 2, width: 2.4, sill: W, top: W + 3.7, shape: 'round' });
     else if (k % 3 === 1) openings.push({ at: length / 2, width: 0.5, sill: Q + 4 + k * 0.9, top: Q + 5.4 + k * 0.9, shape: 'slit', solid: true });
     dnRun(sec, a, b, 1.4, Q - 1, W + 3.4, 'ashlar', openings, { round: true });
   }
   // The doorstep at the top of the stair: a floor under the door's thickness, level with the last tread.
-  dnSlab(sec, cx - 1.1, cx + 1.1, cz - 4.7, cz - DN_SPIRAL.outer + 0.3, W, 'flags');
+  dnSlab(sec, cx - 1.3, cx + 1.3, cz - 5.6, cz - DN_SPIRAL.outer + 0.3, W, 'flags');
   // ...and the quarter of the tower's floor at the top beyond the door, where no tread of this turn is: a landing over the turn below.
-  dnSlab(sec, cx, cx + 3.3, cz - 3.3, cz, W, 'flags', { bottom: W - 0.5 });
-  dnBox(sec, cx + 0.45, cx + 3.3, cz - 0.3, cz, W - 0.4, W + 1.2, 'parapet');
+  dnSlab(sec, cx, cx + 4.1, cz - 4.1, cz, W, 'flags', { bottom: W - 0.5 });
+  dnBox(sec, cx + 0.55, cx + 4.1, cz - 0.3, cz, W - 0.4, W + 1.2, 'parapet');
   const treads = windingStairs({ ...DN_SPIRAL, id: 'spiral' }).map((tread) => ({ ...tread, bottom: tread.top - 0.55, style: 'stone' }));
   sec.terrain.push(...treads);
-  sec.terrain.push({ ...wallOf([cx, cz], [1.3, 1.3], Q - 0.5, W + 3, { id: 'newel' }), style: 'newel' });
+  sec.terrain.push({ ...wallOf([cx, cz], [1.4, 1.4], Q - 0.5, W + 3, { id: 'newel' }), style: 'newel' });
   sec.decor.push({ kind: 'spiral', ...DN_SPIRAL, rope: true });
+  sec.decor.push({ kind: 'waymarks', points: [[49, -23.8, Q], [53, -23.8, Q], [56.4, -23.8, Q]], gap: 1.9, first: 0.4 });
+  sec.decor.push({ kind: 'waymarks', points: [[cx, cz - 6.3, W], [cx, -35.2, W], [cx - 6, -35.2, W], [cx - 14, -35.2, W], [cx - 23, -35.2, W]], gap: 2.2, first: 0.4 });
   // The top landing, the wall walk, and its parapets.
-  dnSlab(sec, 59.8, 63.4, -38, -28.3, W, 'flags', { extra: { walk: true } });
-  dnSlab(sec, 44, 63.4, -38, -32.4, W, 'flags', { extra: { walk: true } });
+  dnSlab(sec, cx - 1.8, cx + 1.8, -38, cz - 5.4, W, 'flags', { extra: { walk: true } });
+  dnSlab(sec, 44, cx + 1.8, -38, -32.4, W, 'flags', { extra: { walk: true } });
   dnSlab(sec, 36, 44, -38, -34, W, 'flags', { bottom: W - 1.5, extra: { walk: true } });
   // The keep's north face, the walk's inner side.
-  dnBox(sec, 44, 59.55, -32.9, -32.4, W - 0.4, W + 6.6, 'tower');
+  dnBox(sec, 44, cx - 2.05, -32.9, -32.4, W - 0.4, W + 6.6, 'tower');
   const stairs = dnFlight(sec, { foot: [36 - 38 * 0.34, -36], dir: 'E', steps: 38, tread: 0.34, width: 4, from: L, rise: (W - L) / 38, style: 'cobble', bottom: L - 1.5 });
   dnSlab(sec, -2, 36 - 38 * 0.34, -38, -34, L, 'flags', { bottom: L - 1.5, extra: { walk: true } });
   // Parapets: the sea side whole (but for two breaches that let a man fall to the sea), the court side with the gaps.
@@ -682,8 +763,8 @@ function buildTower() {
   parapet(0, 23.08, -33.8, L + 1.3, L - 0.4, [[5.6, 8.4], [13.4, 15.2]]);
   parapet(36, 44, -33.8, W + 1.3, W - 0.4, []);
   dnBox(sec, 66, 66.55, -38.5, -28.3, W - 0.4, W + 1.3, 'parapet');
-  dnBox(sec, 59.55, 60, -32.4, -28.3, W - 0.4, W + 1.3, 'parapet');
-  dnBox(sec, 63.4, 63.9, -38.5, -28.3, W - 0.4, W + 1.3, 'parapet');
+  dnBox(sec, cx - 2.05, cx - 1.6, -32.4, cz - 5.4, W - 0.4, W + 1.3, 'parapet');
+  dnBox(sec, cx + 1.8, cx + 2.3, -38.5, cz - 5.4, W - 0.4, W + 1.3, 'parapet');
   // Along the stair down: parapets on both sides, stepped.
   for (let i = 0; i < stairs.steps; i += 3) {
     const last = Math.min(stairs.steps, i + 3) - 1;
@@ -700,6 +781,8 @@ function buildTower() {
   // Rest 3, before the chapel gate.
   sec.rest = { id: 'rest3', name: 'The Wall Brazier', at: [4.6, L, -36] };
   dnProp(sec, 'brazier', [4.8, L, -37.1], { lit: true, rest: true });
+  // The way on from the ladder room to the chapel's gate: marks along the walk.
+  sec.decor.push({ kind: 'waymarks', points: [[26, -36, L], [18, -36, L], [11, -36, L], [7.2, -36, L]], gap: 2.2, first: 0.4 });
   dnProp(sec, 'brazier', [22.5, W - 3, -37.2], { lit: true });
   dnProp(sec, 'weapon', [31, stairs.treadY(26), -36.4], { what2: 'halberd', yaw: 0.2 });
   dnProp(sec, 'weapon', [47, W, -35.2], { what2: 'sword', yaw: 4 });
@@ -801,6 +884,72 @@ const DN_MIND = {
     miner: [12.6, 6, -34], captive: [20.6, 6, -34],
   },
 };
+// Litter and wear lying about (the drawing's, kitprops.js): [what, x, y, z, options]. Heaps, crates and the like have a solid (below); planks, tools, bones, puddles and the rest are walked over.
+const DN_CLUTTER = {
+  cliff: [
+    ['planks', -121, 14, -8, { yaw: 0.4 }], ['sack', -123.4, 14, -5.4, {}], ['rubbleheap', -124, 14, 0.2, { size: 1.0 }], ['tools', -110.2, 14, 0.9, { yaw: 2 }], ['brokencrate', -112.6, 14, -8.6, { yaw: 0.7 }], ['rustiron', -115, 14, -9.2, {}],
+    ['rubbleheap', -40, Y.gorge, 53.6, { size: 1.1 }], ['planks', -30, Y.gorge, 53, { yaw: 1.1 }], ['brokencrate', -24, Y.gorge, 54.2, { yaw: 0.3 }], ['rustiron', -47, Y.gorge, 53, {}], ['tools', -12.4, Y.gorge, 41.5, {}], ['sack', -55, Y.gorge, 52, {}],
+    ['puddle', -35, Y.gorge, 46, { radius: 1.4 }], ['puddle', -18, Y.gorge, 44.4, { radius: 1.0 }], ['weeds', -62, Y.gorge, 40, {}], ['weeds', -9, Y.gorge, 40.5, {}], ['weeds', -50, Y.gorge, 38.9, {}],
+  ],
+  gate: [
+    ['planks', 0.6, Y.gorge, 43.6, { yaw: 0.3 }], ['brokencrate', -2.6, Y.gorge, 41.6, { yaw: 1 }], ['sack', 5.0, Y.gorge, 43.4, {}], ['rustiron', -1.2, Y.gorge, 51.4, {}], ['puddle', 1.5, Y.gorge, 45.2, { radius: 1.2 }],
+    ['weeds', -3, Y.gorge, 55.3, {}], ['weeds', 4.8, Y.gorge, 53.0, {}], ['planks', -5.2, Y.gorge, 54.9, { yaw: 0.2 }],
+    ['brokencrate', 24.2, Y.landing, 50.4, { yaw: 0.3 }], ['rustiron', 26.5, Y.landing, 48.2, {}], ['sack', 29.2, Y.landing, 45.2, {}],
+  ],
+  ascent: [
+    ['brokencrate', 24.4, Y.landing, 36.4, {}], ['sack', 22.4, Y.landing, 39.5, {}], ['rubbleheap', 26, Y.landing, 34.2, { size: 0.8 }],
+    ['planks', 13.4, Y.guardroom, 22.6, { yaw: 0.9 }], ['sack', 19.6, Y.guardroom, 24.9, {}], ['puddle', 16, Y.guardroom, 19.4, { radius: 1.0 }],
+  ],
+  quad: [
+    ['rubbleheap', 2.2, Y.quad, -8, { size: 1.2 }], ['rubbleheap', 41.5, Y.quad, -30, { size: 1.4 }], ['planks', 24, Y.quad, -31.6, { yaw: 0.3 }], ['brokencrate', 28, Y.quad, -18.6, { yaw: 0.5 }], ['sack', 10.5, Y.quad, -12.5, {}],
+    ['puddle', 17.5, Y.quad, -12.5, { radius: 1.5 }], ['puddle', 8.5, Y.quad, -14, { radius: 1.2 }], ['puddle', 32, Y.quad, -20, { radius: 1.6 }], ['weeds', 1.5, Y.quad, -12, {}], ['weeds', 43, Y.quad, 3.5, {}], ['tools', 36, Y.quad, -31, { yaw: 1 }],
+    ['rustiron', 4.5, Y.quad, 1.2, {}],
+  ],
+  vault: [
+    ['planks', 6.4, Y.vault, -18.4, { yaw: 0.2 }], ['rustiron', 20.4, Y.vault, -18.6, {}], ['brokencrate', 26.4, Y.vault, -26.2, {}], ['sack', 30, Y.vault, -27, {}],
+  ],
+  tower: [
+    ['brokencrate', 55.4, Y.quad, -27.4, { yaw: 0.2 }], ['sack', 49.2, Y.quad, -28.2, {}], ['rustiron', 49, Y.quad, -18, {}], ['planks', 54, Y.quad, -18.6, { yaw: 0.6 }],
+    ['rubbleheap', 52, Y.walk, -33.4, { size: 0.7 }],
+  ],
+  chapel: [
+    ['rubbleheap', -3.9, Y.ladderRoom, -32.6, { size: 0.9 }], ['brokencrate', -17.2, Y.ladderRoom, -44.2, {}], ['planks', -12, Y.ladderRoom, -31.4, { yaw: 0.5 }], ['rustiron', -6.6, Y.ladderRoom, -45.4, {}], ['sack', -17, Y.ladderRoom, -31.6, {}],
+  ],
+};
+
+/** What a solid prop is to the physics: [length along its own x, width along its z, height (m)]; a man walks round it. (Small litter, weapons, bones, straw, banners, puddles and torches are not here: they are walked over or hang on a wall.) */
+const DN_PROP_SOLIDS = {
+  barrel: (p) => (p.tipped ? [1.0, 0.85, 0.85] : [0.9, 0.9, 1.0]),
+  powderkeg: () => [0.62, 0.62, 0.6],
+  crate: () => [0.85, 0.85, 0.75],
+  brokencrate: () => [0.9, 0.9, 0.5],
+  table: () => [1.75, 0.9, 0.85],
+  bench: () => [1.5, 0.4, 0.5],
+  stool: () => [0.4, 0.4, 0.45],
+  bed: () => [2.0, 1.0, 0.65],
+  hearth: () => [2.4, 0.9, 2.6],
+  cart: () => [2.5, 1.6, 1.2],
+  trebuchet: (p) => [7 * (p.scale ?? 1), 2.7 * (p.scale ?? 1), 5],
+  ram: () => [5.4, 2.4, 2.4],
+  siegeram: () => [5.4, 2.4, 2.4],
+  weaponrack: () => [2.2, 0.35, 2.4],
+  altar: () => [1.8, 3.2, 1.3],
+  pew: () => [0.55, 2.8, 0.9],
+  gravestone: () => [0.25, 0.8, 1.2],
+  gunrest: () => [0.3, 0.3, 1.1],
+  brazier: (p) => (p.rest ? [1.3, 1.3, 1.1] : [1.05, 1.05, 1.0]),
+  rubble: (p) => [1.8 * (p.size ?? 1), 1.6 * (p.size ?? 1), 0.7],
+  rubbleheap: (p) => [2.0 * (p.size ?? 1), 1.8 * (p.size ?? 1), 0.8],
+};
+
+/** The wall of a prop (a hidden box of its footprint, as tall as it is), or null for one a man walks over. */
+export function dnPropSolid(decor) {
+  const make = DN_PROP_SOLIDS[decor.what];
+  if (!make) return null;
+  const [length, width, height] = make(decor);
+  return { ...wallOf([decor.at[0], decor.at[2]], [length, width], decor.at[1] - 0.1, decor.at[1] + height, { yaw: decor.yaw ?? 0 }), style: 'hidden', skin: false };
+}
+
 // Bodies that lie where they fell from the start (levelmode/level.js `dead`): a story to read, and a weapon or a coat to take.
 const DN_DEAD = {
   cliff: [
@@ -810,6 +959,13 @@ const DN_DEAD = {
   quad: [['fallen3', 'dunnottarGuard', 2, [21.5, Y.quad, -27.2], 1.2, 'A guard, a crossbow bolt in his back']],
   tower: [['fallen4', 'dunnottarGuard', 2, [36.6, Y.walk, -37], 0.1, 'A guard, who held the wall']],
 };
+for (const section of DN_SECTIONS) {
+  for (const [what, x, y, z, extra] of DN_CLUTTER[section.id] ?? []) dnProp(section, what, [x, y, z], extra);
+  for (const decor of section.decor) {
+    const solid = decor.kind === 'prop' ? dnPropSolid(decor) : null;
+    if (solid) section.terrain.push(solid);
+  }
+}
 for (const section of DN_SECTIONS) {
   for (const [id, preset, tier, post, facing, name] of DN_DEAD[section.id] ?? []) section.spawns.push({ id, preset, role: 'enemy', tier, post, facing, dead: true, inputs: { name } });
   section.light = DN_MIND.light[section.id];
@@ -823,6 +979,8 @@ export const DUNNOTTAR = {
   // The render.js place it is set in (a storm, levelmode/storm.js).
   place: 'dunnottar',
   sea: DN_Y.sea,
+  // The floors, for the drawing's wear.
+  levels: DN_LEVELS,
   start: { section: 'cliff', at: [-114, DN_Y.start, -4], facing: DN_FACE.E },
   sections: DN_SECTIONS,
   // After the boss: the inner cell's door opens, and near the prince (m) the scene begins; he shuffles into the corner (the straw's).
@@ -857,7 +1015,7 @@ const dnSpiralWaypoints = (every = 2) => {
  * round or through, with the shortcuts tested apart, `DUNNOTTAR_SHORTCUTS`).
  */
 export const DUNNOTTAR_ROUTE = [
-  { name: 'cliff path', to: 'cliff', points: [[-100, -4], [-80, -4], [-64, -4], [-58, -2], [-58, 8], [-70, 8], [-90, 8], [-100, 8], [-104, 12], [-104, 20], [-90, 20], [-70, 20], [-62, 20], [-58, 24], [-58, 30], [-58, 34], [-58, 38], [-58, 44]] },
+  { name: 'cliff path', to: 'cliff', points: [[-100, -4], [-80, -4], [-64, -4], [-60.5, -2], [-60.5, 8], [-70, 8], [-90, 8], [-100, 8], [-102.5, 12], [-102.5, 20], [-90, 20], [-70, 20], [-62, 20], [-59, 24], [-58, 30], [-58, 34], [-58, 38], [-58, 44]] },
   { name: 'the gorge and the ledge', to: 'gate', points: [[-44, 44], [-30, 44], [-14, 50], [-10, 54], [-3, 54.2], [2.2, 54], [2.2, 50], [2.2, 47]] },
   { name: 'the oillet stair', to: 'ascent', points: [[5, 46.2], [10, 46.2], [13, 46.2], [16.5, 46.2], [17.7, 42], [17.7, 37], [17.7, 30], [17.7, 26]] },
   { name: 'the tunnelled ascent', to: 'ascent', points: [[17, 22], [17, 14], [17, 9], [17, 6], [17, 2]] },
@@ -865,7 +1023,7 @@ export const DUNNOTTAR_ROUTE = [
   { name: 'the long cellar', to: 'vault', points: [[6, -22.5], [14, -22.5], [24, -22.5], [32, -22.5], [36, -22.5], [44, -22.5]] },
   { name: 'the keep to the stair tower', to: 'tower', points: [[48, -22.5], [52, -23.8], [56, -23.8], [59, -23.8]] },
   { name: 'the winding stair', to: 'tower', points: dnSpiralWaypoints(2) },
-  { name: 'the wall walk', to: 'tower', points: [[61.6, -27.4], [61.6, -31], [61.6, -36], [50, -36], [44, -36], [37, -36], [30, -36], [24, -36], [20, -36], [10, -36], [5, -36], [0, -36]], open: ['chapelgate'] },
+  { name: 'the wall walk', to: 'tower', points: [[62.6, -28.4], [62.6, -31], [62.6, -36], [50, -36], [44, -36], [37, -36], [30, -36], [24, -36], [20, -36], [10, -36], [5, -36], [0, -36]], open: ['chapelgate'] },
   { name: 'the chapel', to: 'chapel', points: [[-6, -36], [-11, -38]] },
 ];
 

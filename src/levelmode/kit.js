@@ -15,8 +15,9 @@
 
 import { P } from '../body.js';
 import { ceilingAt, pushOut } from '../physics/terrain.js';
-import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
+import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgRock, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
+import { kwDecorate } from './kitwear.js';
 import { stormFollow, stormTorch } from './storm.js';
 import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
 import { skyDirection } from './stagesky.js';
@@ -500,7 +501,7 @@ function kitParapet(batch, solid) {
 function kitSolids(batch, section, { silhouette = false } = {}) {
   const tops = new Map();
   for (const solid of section.terrain) {
-    if (!silhouette && solid.skin === false) continue;
+    if (!silhouette && solid.skin === false && solid.kind !== 'ceiling') continue;
     if (['iron', 'ladder', 'fence', 'hidden'].includes(solid.style)) continue;
     const [cx, cz] = solid.at;
     const yaw = solid.yaw ?? 0;
@@ -530,11 +531,13 @@ function kitSolids(batch, section, { silhouette = false } = {}) {
         kgBox(batch, material, cx, (solid.bottom + solid.top) / 2, cz, length, solid.top - solid.bottom, width, yaw, { aoFrom: solid.bottom + 0.5, aoSpan: 3 });
       }
     } else if (solid.kind === 'ramp' || solid.kind === 'stairs') {
-      const steps = solid.style === 'path' ? ['path', 'rock'] : solid.style === 'cobble' ? ['cobble', 'rubble'] : ['ashlar', 'ashlar'];
+      // (Stairs are dressed slabs, treads and risers alike, between ashlar flanks: a flight in cobbles reads as a heap of stones, not as steps.)
+      const steps = solid.style === 'path' ? ['path', 'rock'] : solid.style === 'cobble' ? ['flags', 'ashlar'] : ['ashlar', 'ashlar'];
       kgFlight(batch, steps[0], steps[1], solid, { base: Number.isFinite(solid.bottom) ? solid.bottom : null, options: { aoFrom: null } });
     } else if (solid.kind === 'ceiling') {
-      // The roof of a room or passage: its top, in rough stone.
-      kgBox(batch, 'rubble', cx, (solid.bottom + solid.top) / 2 + 0.1, cz, length, solid.top - solid.bottom, width, yaw, { faces: ['top', 'ends', 'sides'], tint: 0.9 });
+      // The roof of a room or passage: its top, in rough stone (drawn in the detail as well, so that a room seen from outside and above is closed; the vault under it is the decor's).
+      // (In the detail only the top: its ends and sides would show as steps of rubble under the vault the decor draws below it.)
+      kgBox(batch, 'rubble', cx, (solid.bottom + solid.top) / 2 + 0.1, cz, length, solid.top - solid.bottom, width, yaw, { faces: silhouette ? ['top', 'ends', 'sides'] : ['top'], tint: 0.9 });
     }
   }
 }
@@ -625,10 +628,72 @@ function kitSpiral(batch, spiral) {
   kgTube(batch, 'iron', inner, 0.02, { segments: inner.length * 2, sides: 4 });
 }
 
+/** A rock outcrop: lumps of black rock (and the tufts of gorse and heather at their feet): `decor.lumps` = [{ at: [x, y, z] (the base), r: [rx, ry, rz], seed }]. */
+function kitOutcrop(batch, outcrop) {
+  const random = ktRandom(Math.floor(Math.abs((outcrop.lumps[0]?.at[0] ?? 1) * 17 + (outcrop.lumps[0]?.at[2] ?? 1) * 29)) + 3);
+  for (const lump of outcrop.lumps) {
+    const [x, y, z] = lump.at;
+    const [rx, ry, rz] = lump.r;
+    kgRock(batch, 'rock', x, y + ry * 0.55, z, rx, ry, rz, { seed: lump.seed ?? 5, detail: rx + ry > 5 ? 4 : 3, aoFrom: y - 0.5, aoSpan: Math.max(2, ry), tint: [0.78 + random() * 0.18, 0.78 + random() * 0.16, 0.8 + random() * 0.16] });
+    // Tufts round its foot.
+    const tufts = Math.min(7, 2 + Math.floor((rx + rz) * 0.8));
+    for (let k = 0; k < tufts; k += 1) {
+      const angle = random() * Math.PI * 2;
+      const reach = 0.85 + random() * 0.5;
+      const heather = random() < 0.4;
+      const tint = heather ? [0.62, 0.42, 0.6] : [0.58 + random() * 0.2, 0.62 + random() * 0.18, 0.28];
+      kgLump(batch, 'grass', x + Math.cos(angle) * rx * reach, y + 0.15, z + Math.sin(angle) * rz * reach, 0.45 + random() * 0.5, 0.3 + random() * 0.25, 0.4 + random() * 0.45, { seed: k + 3, detail: 0, tint, aoFrom: y });
+    }
+  }
+}
+
+/** A cairn: stacked stones, a few of them fallen: `decor.at`. */
+function kitCairn(batch, cairn) {
+  const [x, y, z] = cairn.at;
+  const random = ktRandom(Math.floor(Math.abs(x * 31 + z * 7)) + 9);
+  let h = 0;
+  for (let k = 0; k < 6; k += 1) {
+    const r = 0.62 - k * 0.07;
+    kgRock(batch, 'rock', x + (random() - 0.5) * 0.12, y + h + r * 0.4, z + (random() - 0.5) * 0.12, r * 1.15, r * 0.55, r, { seed: k + 11, detail: 2, aoFrom: y });
+    h += r * 0.7;
+  }
+  for (let k = 0; k < 4; k += 1) {
+    const angle = random() * Math.PI * 2;
+    kgLump(batch, 'rock', x + Math.cos(angle) * 1.1, y + 0.1, z + Math.sin(angle) * 1.1, 0.25 + random() * 0.15, 0.15, 0.22, { seed: k + 21, detail: 0, aoFrom: y });
+  }
+}
+
+/** A slab's edge, or any plain face: `decor.a`, `decor.b` ([x, z]) from y0 to y1, `decor.thick` thick (a lintel over a covered stair, the face of a floor). */
+function kitFace(batch, face) {
+  const dx = face.b[0] - face.a[0];
+  const dz = face.b[1] - face.a[1];
+  const length = Math.hypot(dx, dz);
+  kgBox(batch, KIT_WALL[face.style] ?? 'ashlar', (face.a[0] + face.b[0]) / 2, (face.y0 + face.y1) / 2, (face.a[1] + face.b[1]) / 2, length, face.y1 - face.y0, face.thick ?? 0.3, Math.atan2(-dz, dx), { faces: ['top', 'ends', 'sides'], aoFrom: face.y0, aoSpan: 2 });
+}
+
+/** The marks on the floor along a trail (`decor.points`: [x, z, y] each, `decor.gap` m apart): chevrons pointing the way, for the dynamics to glow. */
+function kitWaymarks(dyn, trail) {
+  const gap = trail.gap ?? 1.7;
+  const pts = trail.points;
+  let carry = trail.first ?? 0.6;
+  for (let i = 0; i + 1 < pts.length; i += 1) {
+    const [x0, z0, y0] = pts[i];
+    const [x1, z1, y1] = pts[i + 1];
+    const length = Math.hypot(x1 - x0, z1 - z0);
+    if (length < 1e-6) continue;
+    let s = carry;
+    for (; s <= length; s += gap) {
+      const t = s / length;
+      dyn.waymarks.push({ at: [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, z0 + (z1 - z0) * t], dir: [(x1 - x0) / length, (z1 - z0) / length], slope: (y1 - y0) / length, size: trail.size ?? 1.0 });
+    }
+    carry = s - length;
+  }
+}
+
 /** The detail of a section: its solids as masonry, its decor, its props. Returns { group, dyn }. */
-function kitSection(section, mats, seed) {
+function kitSection(section, mats, seed, levels = []) {
   const batch = new KitBatch(mats, seed);
-  const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [] };
+  const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [] };
   kitSolids(batch, section);
   const cellar = section.id === 'vault' || section.id === 'cell';
   let fences = 0;
@@ -648,9 +713,14 @@ function kitSection(section, mats, seed) {
       case 'mass': kitMass(batch, decor); break;
       case 'spiral': kitSpiral(batch, decor); break;
       case 'prop': kpBuild(decor, { batch, dyn }); break;
+      case 'outcrop': kitOutcrop(batch, decor); break;
+      case 'cairn': kitCairn(batch, decor); break;
+      case 'face': kitFace(batch, decor); break;
+      case 'waymarks': kitWaymarks(dyn, decor); break;
       default: break;
     }
   }
+  kwDecorate(batch, section, levels);
   const group = new THREE.Group();
   group.name = `detail:${section.id}`;
   batch.build(group, { name: section.id });
@@ -812,6 +882,34 @@ function kitGlowTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
+/** A chevron pointing along +u, a warm chalk-and-ember glow with a small rune dot behind it: the map of the floor's way-marks. */
+function kitWaymarkTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const g = canvas.getContext('2d');
+  const halo = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+  halo.addColorStop(0, 'rgba(255,170,90,0.28)');
+  halo.addColorStop(1, 'rgba(255,170,90,0)');
+  g.fillStyle = halo;
+  g.fillRect(0, 0, 128, 128);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for (const [width, alpha, color] of [[14, 0.25, '255,150,60'], [7, 0.7, '255,196,120'], [2.6, 1, '255,238,200']]) {
+    g.strokeStyle = `rgba(${color},${alpha})`;
+    g.lineWidth = width;
+    g.beginPath();
+    g.moveTo(40, 30);
+    g.lineTo(88, 64);
+    g.lineTo(40, 98);
+    g.stroke();
+  }
+  g.fillStyle = 'rgba(255,220,160,0.8)';
+  g.beginPath();
+  g.arc(24, 64, 3.2, 0, Math.PI * 2);
+  g.fill();
+  return new THREE.CanvasTexture(canvas);
+}
+
 /** A tall soft beam: the map of a light shaft's card (bright at the top, gone at the foot). */
 function kitShaftTexture() {
   const canvas = document.createElement('canvas');
@@ -858,7 +956,7 @@ function kitRaven(mats, size) {
 /** The dynamic parts of a section: flame cards, ravens, drips, puddles, light shafts. Returns an object the kit updates each frame. */
 function kitDynamics(dyn, mats, textures) {
   const group = new THREE.Group();
-  const parts = { flames: null, ravens: [], drips: null, dripState: [], puddles: [], shafts: [] };
+  const parts = { flames: null, ravens: [], drips: null, dripState: [], puddles: [], shafts: [], waymarks: null };
   if (dyn.flames.length) {
     const card = new THREE.PlaneGeometry(0.55, 1, 1, 1);
     card.translate(0, 0.5, 0);
@@ -883,6 +981,28 @@ function kitDynamics(dyn, mats, textures) {
     parts.flames.frustumCulled = false;
     parts.flames.renderOrder = 3;
     group.add(parts.flames);
+  }
+  if (dyn.waymarks.length) {
+    // Chevrons on the floor, one merged mesh: a faint warm glow that breathes (the one material's opacity, in kitAnimate).
+    const position = [];
+    const uv = [];
+    for (const w of dyn.waymarks) {
+      const half = w.size / 2;
+      const f = w.dir;
+      const sx = -f[1];
+      const sz = f[0];
+      const corner = (a, b) => [w.at[0] + f[0] * a * half + sx * b * half, w.at[1] + 0.045 + w.slope * a * half, w.at[2] + f[1] * a * half + sz * b * half];
+      const q = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
+      for (const k of [0, 1, 2, 0, 2, 3]) position.push(...q[k]);
+      uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const material = new THREE.MeshBasicMaterial({ map: textures.waymark, color: 0xffc88a, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    parts.waymarks = new THREE.Mesh(geometry, material);
+    parts.waymarks.renderOrder = 2;
+    group.add(parts.waymarks);
   }
   for (const r of dyn.ravens) {
     const raven = kitRaven(mats, r.size);
@@ -932,6 +1052,8 @@ const KIT_TMP = new THREE.Object3D();
 
 /** Move a section's dynamic parts to time `t` (s): flames flicker, ravens turn their heads, drips fall. */
 function kitAnimate(parts, dyn, t) {
+  // The way-marks breathe, slow and faint (a sign on the floor, not a lamp).
+  if (parts.waymarks) parts.waymarks.material.opacity = 0.42 + 0.2 * Math.sin(t * 1.6);
   if (parts.flames) {
     for (let k = 0; k < dyn.flames.length; k += 1) {
       const f = dyn.flames[k];
@@ -1083,7 +1205,7 @@ export function createCastleView(stage) {
   const mats = ktMaterials();
   const foam = new THREE.MeshBasicMaterial({ map: kitFoamTexture(), transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
   foam.map.repeat.set(1, 1);
-  const textures = { flame: kitFlameTexture(), glow: kitGlowTexture(), shaft: kitShaftTexture() };
+  const textures = { flame: kitFlameTexture(), glow: kitGlowTexture(), shaft: kitShaftTexture(), waymark: kitWaymarkTexture() };
   const group = new THREE.Group();
   group.name = `stage:${stage.id}`;
   const blocks = kitBlocks(stage);
@@ -1098,7 +1220,7 @@ export function createCastleView(stage) {
   let seed = 7;
   for (const section of stage.sections) {
     seed += 13;
-    const detail = kitSection(section, mats, seed);
+    const detail = kitSection(section, mats, seed, stage.levels ?? []);
     const far = kitSilhouette(section, mats, seed + 1);
     const dynamic = kitDynamics(detail.dyn, mats, textures);
     detail.group.add(dynamic.group);

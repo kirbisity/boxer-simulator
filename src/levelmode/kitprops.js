@@ -309,6 +309,75 @@ export function kpBuild(prop, ctx) {
       dyn.lights.push({ at: [sx + dir[0] * 0.6, y + 0.7, sz + dir[1] * 0.6], color: 0xffa05a, power: prop.dim ? 0.3 : 0.8, range: 9 });
       break;
     }
+    // ---- litter and wear (the stage's clutter: walked over, or a heap to walk round) ----
+    case 'planks': {
+      // Rotten planks, a few thrown down across each other, one on its edge against the rest.
+      for (let k = 0; k < 4; k += 1) {
+        const [px, pz] = here((random() - 0.5) * 1.1, (random() - 0.5) * 0.9);
+        kgBox(batch, 'wood', px, y + 0.03 + k * 0.035, pz, 1.1 + random() * 0.9, 0.035, 0.17 + random() * 0.08, yaw + random() * 3, { tint: [0.6 + random() * 0.2, 0.58, 0.52] });
+      }
+      const [qx, qz] = here(0.2, 0.1);
+      kgBox(batch, 'wood', qx, y + 0.22, qz, 0.9, 0.035, 0.2, yaw + 0.5, { tint: 0.65 });
+      break;
+    }
+    case 'brokencrate': {
+      box('wood', 0, 0.12, 0, 0.8, 0.06, 0.8, 0, { tint: 0.7 });
+      box('wood', -0.38, 0.32, 0, 0.05, 0.5, 0.8, 0, { tint: 0.75 });
+      box('wood', 0.2, 0.28, -0.38, 0.55, 0.42, 0.05, 0.12, { tint: 0.7 });
+      box('wood', 0.5, 0.06, 0.5, 0.7, 0.04, 0.12, 0.7, { tint: 0.6 });
+      box('wood', -0.1, 0.08, 0.55, 0.5, 0.04, 0.12, -0.4, { tint: 0.6 });
+      box('iron', -0.38, 0.5, 0, 0.06, 0.05, 0.8, 0, { tint: [1.5, 0.8, 0.5] });
+      break;
+    }
+    case 'sack': {
+      for (let k = 0; k < 2; k += 1) {
+        const [px, pz] = here(k * 0.5 - 0.2, (random() - 0.5) * 0.3);
+        kgLump(batch, 'straw', px, y + 0.18, pz, 0.34, 0.2, 0.26, { seed: k + 40, detail: 1, tint: [0.78, 0.7, 0.55], aoFrom: y });
+      }
+      break;
+    }
+    case 'tools': {
+      // A pick and a shovel dropped: shafts, an iron head, a blade.
+      const lay = (material, lx, lz, w, h, d, turn = 0, up = 0.04, options = {}) => {
+        const [px, pz] = here(lx, lz);
+        kgBox(batch, material, px, y + up, pz, w, h, d, yaw + turn, options);
+      };
+      lay('wood', 0, 0, 1.2, 0.045, 0.045, 0.2);
+      lay('iron', 0.6, 0.12, 0.34, 0.04, 0.05, 0.2, 0.05, { tint: [1.4, 0.9, 0.7] });
+      lay('wood', 0.3, 0.55, 1.3, 0.045, 0.045, -0.5);
+      lay('iron', -0.28, 0.82, 0.26, 0.025, 0.2, -0.5, 0.05, { tint: [1.4, 0.9, 0.7] });
+      break;
+    }
+    case 'rustiron': {
+      // Rusted ironwork on the ground: a bent bar, a ring, a length of chain.
+      const rust = [1.6, 0.85, 0.5];
+      box('iron', 0, 0.04, 0, 1.0, 0.05, 0.06, 0.4, { tint: rust });
+      box('iron', 0.2, 0.05, 0.1, 0.6, 0.05, 0.06, 1.2, { tint: rust });
+      const [rx, rz] = here(-0.5, 0.3);
+      kgCylinder(batch, 'iron', rx, y + 0.02, rz, 0.2, 0.2, 0.05, { sides: 8, tint: rust });
+      kgTube(batch, 'iron', [0, 0.25, 0.5, 0.75, 1].map((t) => { const [px, pz] = here(0.3 + t * 0.9, -0.3 + 0.12 * Math.sin(t * 6)); return [px, y + 0.03, pz]; }), 0.018, { segments: 8, sides: 4, tint: rust });
+      break;
+    }
+    case 'rubbleheap': {
+      // A heap of fallen stone to walk round: a mound of lumps, a few larger blocks on it.
+      const size = prop.size ?? 1;
+      for (let k = 0; k < 9; k += 1) {
+        const ring = k < 5 ? 0.55 : 0.2;
+        const angle = random() * Math.PI * 2;
+        const [px, pz] = here(Math.cos(angle) * ring * size * 1.1, Math.sin(angle) * ring * size * 0.95);
+        const r = (0.3 + random() * 0.32) * size * (k < 5 ? 1 : 0.85);
+        kgLump(batch, k % 3 === 0 ? 'ashlar' : 'ruin', px, y + r * (k < 5 ? 0.45 : 1.05), pz, r * 1.1, r * 0.7, r, { seed: k + 60, detail: 1, aoFrom: y, tint: [0.8 + random() * 0.2, 0.8 + random() * 0.2, 0.82 + random() * 0.18] });
+      }
+      break;
+    }
+    case 'weeds': {
+      // Weeds and grass thrust up between the flags: a few tufts.
+      for (let k = 0; k < 4; k += 1) {
+        const [px, pz] = here((random() - 0.5) * 1.0, (random() - 0.5) * 0.8);
+        kgLump(batch, 'grass', px, y + 0.1, pz, 0.22 + random() * 0.18, 0.2 + random() * 0.15, 0.2 + random() * 0.15, { seed: k + 80, detail: 0, tint: [0.55 + random() * 0.25, 0.65 + random() * 0.2, 0.28], aoFrom: y });
+      }
+      break;
+    }
     default:
       break;
   }

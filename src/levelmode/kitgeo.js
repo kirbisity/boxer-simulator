@@ -403,6 +403,15 @@ export function kgFlight(batch, material, flank, solid, { base = null, options =
   }
   // The shape's x is the flight's u (the way up), its extrusion across it.
   kgExtrude(batch, flank, material, kgShape(points), width, kgPlace(cx, 0, cz, solid.yaw ?? 0), options);
+  // The lip of each tread: a pale worn nosing, so that a flight reads as steps (the dark gap under it) and not as a slope of stone.
+  const yaw = solid.yaw ?? 0;
+  const tread = length / solid.steps;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  for (let step = 0; step < solid.steps; step += 1) {
+    const u = -hu + step * tread + 0.06;
+    kgBox(batch, 'ashlar', cx + u * c, solid.from + (step + 1) * solid.rise + 0.012, cz - u * s, 0.13, 0.03, width - 0.02, yaw, { faces: ['top', 'ends'], tint: 1.45, jitter: 0.1, shift: false });
+  }
 }
 
 /** A tube along points [x, y, z] (rope, rail, chain). */
@@ -445,4 +454,103 @@ export function kgLump(batch, material, x, y, z, rx, ry, rz, { seed = 1, detail 
   matrix.setPosition(x, y, z);
   batch.add(material, geometry, matrix, options);
   geometry.dispose();
+}
+
+/** A smooth 3D value noise (about -1..1) from a hashed lattice, for the shape of a rock. */
+function kgNoise3(x, y, z, seed) {
+  const hash = (i, j, k) => {
+    const v = Math.sin(i * 127.1 + j * 311.7 + k * 74.7 + seed * 19.19) * 43758.5453;
+    return (v - Math.floor(v)) * 2 - 1;
+  };
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fy = y - iy;
+  const fz = z - iz;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const sz = fz * fz * (3 - 2 * fz);
+  const mix = (a, b, t) => a + (b - a) * t;
+  return mix(
+    mix(mix(hash(ix, iy, iz), hash(ix + 1, iy, iz), sx), mix(hash(ix, iy + 1, iz), hash(ix + 1, iy + 1, iz), sx), sy),
+    mix(mix(hash(ix, iy, iz + 1), hash(ix + 1, iy, iz + 1), sx), mix(hash(ix, iy + 1, iz + 1), hash(ix + 1, iy + 1, iz + 1), sx), sy),
+    sz,
+  );
+}
+
+/**
+ * A boulder or a crag: an icosphere pushed about by noise at three scales (big swells, ledges, grain) and flattened toward the foot, smooth-shaded over
+ * its facets (so it reads as stone and not as a gem), its texture laid by the way each face points (plan on the tops, along the sides on the flanks).
+ * Centre (x, y, z), radii (rx, ry, rz): `y` is the centre. `tint`, `aoFrom`, `aoSpan` as every piece's.
+ */
+export function kgRock(batch, material, x, y, z, rx, ry, rz, { seed = 1, detail = 2, ...options } = {}) {
+  const geometry = new THREE.IcosahedronGeometry(1, detail);
+  const position = geometry.attributes.position;
+  const count = position.count;
+  const dir = [];
+  const shaped = [];
+  const radiusAt = (dx, dy, dz) => {
+    // Swells, ledges (a ridge noise, sharp where it folds) and grain; the underside is drawn in.
+    const swell = kgNoise3(dx * 1.3 + 3, dy * 1.3, dz * 1.3, seed) * 0.26;
+    const ridge = (1 - Math.abs(kgNoise3(dx * 2.7, dy * 2.7 + 5, dz * 2.7, seed + 1))) * 0.2 - 0.1;
+    const grain = kgNoise3(dx * 6.3, dy * 6.3, dz * 6.3 + 9, seed + 2) * 0.05;
+    const flat = dy < -0.2 ? 0.85 : 1;
+    return (1 + swell + ridge + grain) * flat;
+  };
+  for (let k = 0; k < count; k += 1) {
+    const dx = position.getX(k);
+    const dy = position.getY(k);
+    const dz = position.getZ(k);
+    const f = radiusAt(dx, dy, dz);
+    dir.push([dx, dy, dz]);
+    shaped.push([dx * f * rx, dy * f * ry, dz * f * rz]);
+  }
+  const normal = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  for (let tri = 0; tri < count; tri += 3) {
+    const a = shaped[tri];
+    const b = shaped[tri + 1];
+    const c = shaped[tri + 2];
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const uz = b[2] - a[2];
+    const vx = c[0] - a[0];
+    const vy = c[1] - a[1];
+    const vz = c[2] - a[2];
+    let fx = uy * vz - uz * vy;
+    let fy = uz * vx - ux * vz;
+    let fz = ux * vy - uy * vx;
+    const length = Math.hypot(fx, fy, fz) || 1;
+    fx /= length;
+    fy /= length;
+    fz /= length;
+    for (let j = 0; j < 3; j += 1) {
+      const d = dir[tri + j];
+      // The smooth normal of an ellipsoid there, half-mixed with the face's.
+      let sx = d[0] / rx;
+      let sy = d[1] / ry;
+      let sz = d[2] / rz;
+      const sl = Math.hypot(sx, sy, sz) || 1;
+      sx = sx / sl + fx * 0.8;
+      sy = sy / sl + fy * 0.8;
+      sz = sz / sl + fz * 0.8;
+      const nl = Math.hypot(sx, sy, sz) || 1;
+      normal[(tri + j) * 3] = sx / nl;
+      normal[(tri + j) * 3 + 1] = sy / nl;
+      normal[(tri + j) * 3 + 2] = sz / nl;
+      const p = shaped[tri + j];
+      const top = Math.abs(fy) > Math.max(Math.abs(fx), Math.abs(fz));
+      uv[(tri + j) * 2] = top ? p[0] : Math.abs(fx) > Math.abs(fz) ? p[2] : p[0];
+      uv[(tri + j) * 2 + 1] = top ? p[2] : p[1];
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(shaped.flat(), 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  const matrix = new THREE.Matrix4().makeTranslation(x, y, z);
+  batch.add(material, out, matrix, options);
+  geometry.dispose();
+  out.dispose();
 }

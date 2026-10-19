@@ -109,7 +109,7 @@ test('dunnottar: a man can walk off the map only where there is a cliff (every s
     const terrain = stageTerrain(DUNNOTTAR, DUNNOTTAR.sections.map((section) => section.id), states);
     const flood = floodFill(terrain, DUNNOTTAR.start.at);
     assert.ok(!flood.truncated);
-    assert.ok(flood.standing > (open ? 20000 : 19000), `${flood.standing} places to stand`);
+    assert.ok(flood.standing > (open ? 18000 : 17000), `${flood.standing} places to stand`);
     const stray = flood.edges.filter((edge) => !CLIFFS.some((allowed) => allowed(edge)));
     assert.deepEqual(stray.map((edge) => `${edge.at.map((v) => v.toFixed(1))} at ${edge.floor.toFixed(2)}`), [], `open ${open}`);
   }

@@ -18,12 +18,15 @@ const STORM = {
   centre: [-30, 0, 0],
   skyRadius: 560,
   seaSize: 1800,
-  // How long one strike lasts (s); the gap between them is the look's.
-  flashSeconds: 0.55,
+  // A strike: the bolt is on for `boltSeconds` (a crack, a dip, a second crack); the light it throws decays by `flashSeconds`. The gap between strikes is the look's.
+  flashSeconds: 0.34,
+  boltSeconds: 0.2,
   // Where the shaft of light (a look's `shaft`) lands: the middle of the castle.
   target: [14, 14, -6],
   rain: { halfX: 15, halfZ: 15, height: 18, count: 2200, speed: 15, length: 0.8, slant: [3.2, 0, -1.4] },
 };
+
+let FLASH_WHITE = null;
 
 const stormState = {
   follow: [-100, 14, 0],
@@ -31,7 +34,7 @@ const stormState = {
   place: null,
   view: null,
   random: ktRandom(1500),
-  nextStrike: 3.5,
+  nextStrike: 9,
   strike: null,
   base: null,
   environments: new Map(),
@@ -55,7 +58,7 @@ export function stormFollow(x, y, z, indoors = false) {
 /** Start a run of the storm over: a new seed (the stage's), strikes from the beginning. */
 export function stormReset(seed = 1500) {
   stormState.random = ktRandom(seed);
-  stormState.nextStrike = stormGap(3.5);
+  stormState.nextStrike = stormGap(9);
   stormState.strike = null;
 }
 
@@ -79,7 +82,7 @@ export function stormSetLook(name, { still } = {}) {
   if (still !== undefined) stormState.still = still;
   if (name !== undefined) stormState.look = STAGE_LOOKS[name] ? name : DEFAULT_STAGE_LOOK;
   stormState.dirty = true;
-  stormState.nextStrike = stormGap(stormState.random() * 4 + 2);
+  stormState.nextStrike = stormGap(stormState.random() * 8 + 5);
   return stormState.look;
 }
 
@@ -151,8 +154,12 @@ export function stormEnvironment(renderer, name = stormState.look) {
 
 // ---- lightning -----------------------------------------------------------------------------------
 
-/** A bolt: a jagged ribbon from the cloud to the sea, facing the player, with a branch or two. Returns a mesh. */
-function stormBolt(random, from, material, facing) {
+/**
+ * A bolt: a thin, jagged line from the cloud to the sea in front of the player, with a few thin branches. Two meshes of flat ribbons that
+ * face along the line of sight: a white core a couple of pixels wide and a faint wide glow round it (widths scale with the distance, so the
+ * line is as fine near as far). Returns the group (`userData.at`: where it lands; `userData.bearing`: which way from the player).
+ */
+function stormBolt(random, from, coreMaterial, glowMaterial, facing) {
   // Over the water in front of him, within a third of a turn either side of where he looks.
   const bearing = facing + (random() - 0.5) * 2.2;
   const distance = 150 + random() * 120;
@@ -160,58 +167,82 @@ function stormBolt(random, from, material, facing) {
   const z = from[2] + Math.sin(bearing) * distance;
   // Across the line of sight: the ribbon's width runs along this.
   const side = [-Math.sin(bearing), Math.cos(bearing)];
-  const points = [];
   const top = 190;
   const bottom = -9;
-  const segments = 16;
+  const segments = 30;
+  const points = [];
   let sway = 0;
   for (let k = 0; k <= segments; k += 1) {
     const y = top + ((bottom - top) * k) / segments;
-    sway += (random() - 0.5) * 22;
+    // Short kinks all the way down, and now and then a hard jink.
+    sway += (random() - 0.5) * (random() < 0.18 ? 26 : 9);
     points.push([sway, y]);
   }
-  const strips = [{ points, width: 1.9 }];
-  for (let b = 0; b < 2; b += 1) {
-    const start = 4 + Math.floor(random() * 7);
+  const strips = [{ points, width: 1 }];
+  const branches = 3 + Math.floor(random() * 2);
+  for (let b = 0; b < branches; b += 1) {
+    const start = 4 + Math.floor(random() * 18);
     const branch = [points[start]];
     let s = points[start][0];
     const direction = random() < 0.5 ? -1 : 1;
-    for (let k = 1; k < 5; k += 1) {
-      s += direction * (4 + random() * 10);
-      branch.push([s, points[start][1] - k * (12 + random() * 8)]);
+    const length = 4 + Math.floor(random() * 5);
+    for (let k = 1; k < length; k += 1) {
+      s += direction * (2 + random() * 8) + (random() - 0.5) * 5;
+      branch.push([s, points[start][1] - k * (5 + random() * 6)]);
     }
-    strips.push({ points: branch, width: 0.9 });
+    strips.push({ points: branch, width: 0.5 });
   }
-  const position = [];
-  for (const strip of strips) {
-    for (let k = 0; k + 1 < strip.points.length; k += 1) {
-      const [s0, y0] = strip.points[k];
-      const [s1, y1] = strip.points[k + 1];
-      const w = strip.width;
-      const p = (s, y, dw) => [x + side[0] * (s + dw), y, z + side[1] * (s + dw)];
-      const a = p(s0, y0, -w);
-      const b = p(s0, y0, w);
-      const c = p(s1, y1, w);
-      const d = p(s1, y1, -w);
-      position.push(...a, ...b, ...c, ...a, ...c, ...d);
+  const build = (half, material, order) => {
+    const position = [];
+    for (const strip of strips) {
+      const w = half * strip.width;
+      for (let k = 0; k + 1 < strip.points.length; k += 1) {
+        const [s0, y0] = strip.points[k];
+        const [s1, y1] = strip.points[k + 1];
+        const p = (s, y, dw) => [x + side[0] * (s + dw), y, z + side[1] * (s + dw)];
+        const a = p(s0, y0, -w);
+        const b = p(s0, y0, w);
+        const c = p(s1, y1, w);
+        const d = p(s1, y1, -w);
+        position.push(...a, ...b, ...c, ...a, ...c, ...d);
+      }
     }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.frustumCulled = false;
-  mesh.renderOrder = 12;
-  mesh.userData.at = [x, z];
-  return mesh;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = order;
+    return mesh;
+  };
+  // (About 1.4 pixels at 643 lines high for the core, 6 for the glow.)
+  const group = new THREE.Group();
+  group.add(build(distance * 0.0065, glowMaterial, 12), build(distance * 0.0014, coreMaterial, 13));
+  group.userData.at = [x, z];
+  group.userData.bearing = bearing;
+  return group;
 }
 
-/** The flash's brightness at `age` s into a strike: a crack, a dip, a second crack, a slow fade. */
+/** Free a bolt's geometry. */
+function stormDisposeBolt(bolt) {
+  for (const mesh of bolt.children) mesh.geometry.dispose();
+}
+
+/** The flash's brightness at `age` s into a strike: a crack, a dip, a second crack, a fast fade. */
 function stormFlash(age) {
   if (age < 0 || age > STORM.flashSeconds) return 0;
-  if (age < 0.07) return 1;
-  if (age < 0.13) return 0.25;
-  if (age < 0.21) return 0.9;
-  return Math.max(0, 0.55 * (1 - (age - 0.21) / (STORM.flashSeconds - 0.21)));
+  if (age < 0.05) return 1;
+  if (age < 0.09) return 0.3;
+  if (age < 0.15) return 0.85;
+  return 0.55 * (1 - (age - 0.15) / (STORM.flashSeconds - 0.15)) ** 1.6;
+}
+
+/** The bolt's own brightness at `age`: on for the two cracks, dim between, gone by `boltSeconds`. */
+function stormBoltLight(age) {
+  if (age < 0 || age > STORM.boltSeconds) return 0;
+  if (age < 0.05) return 1;
+  if (age < 0.09) return 0.35;
+  if (age < 0.15) return 1;
+  return 0.5 * (1 - (age - 0.15) / (STORM.boltSeconds - 0.15));
 }
 
 // ---- the shaft of light ----------------------------------------------------------------------------
@@ -340,8 +371,10 @@ export function buildStormPlace({ buildRain }) {
   place.add(rain);
   const shaft = stormShaft();
   place.add(shaft);
-  const boltMaterial = new THREE.MeshBasicMaterial({ color: 0xdfe8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
-  place.userData.storm = { sea, rain, waves, boltMaterial, shaft };
+  // The bolt: a white-hot core and a faint blue glow, both added to what is behind them.
+  const boltCore = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const boltGlow = new THREE.MeshBasicMaterial({ color: 0x9fb4ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  place.userData.storm = { sea, rain, waves, boltCore, boltGlow, shaft };
 
   /** Put the scene in the look: sky, fog, the lights, the sea, the rain. Run when the look changes, and when the scene's fog is made anew (a look of the game, a place). */
   const applyLook = (view) => {
@@ -420,7 +453,7 @@ export function buildStormPlace({ buildRain }) {
     for (const child of [...place.children]) {
       if (child.userData.at && child !== stormState.strike?.bolt) {
         place.remove(child);
-        child.geometry.dispose();
+        stormDisposeBolt(child);
       }
     }
     const view = stormState.view;
@@ -431,43 +464,59 @@ export function buildStormPlace({ buildRain }) {
     if (!stormState.strike && time > stormState.nextStrike) {
       const heading = new THREE.Vector3();
       view.camera.getWorldDirection(heading);
-      const bolt = stormBolt(stormState.random, stormState.follow, boltMaterial, Math.atan2(heading.z, heading.x));
+      const bolt = stormBolt(stormState.random, stormState.follow, boltCore, boltGlow, Math.atan2(heading.z, heading.x));
       place.add(bolt);
       stormState.strike = { start: time, bolt };
-      const gap = stageLookOf(stormState.look).lightning?.gap ?? [4, 11];
+      const gap = stageLookOf(stormState.look).lightning?.gap ?? [9, 22];
       stormState.nextStrike = stormState.still || !stageLookOf(stormState.look).lightning ? Infinity : time + gap[0] + stormState.random() * (gap[1] - gap[0]);
     }
     const strike = stormState.strike;
     let flash = 0;
     if (strike) {
       if (stormState.hold) strike.start = time - 0.02;
-      flash = stormFlash(time - strike.start);
-      boltMaterial.opacity = Math.min(1, flash * 1.4);
-      if (time - strike.start > STORM.flashSeconds) {
+      const age = time - strike.start;
+      flash = stormFlash(age);
+      const lit = stormBoltLight(age);
+      boltCore.opacity = lit;
+      boltGlow.opacity = lit * 0.2;
+      strike.bolt.visible = lit > 0;
+      if (age > STORM.flashSeconds) {
         place.remove(strike.bolt);
-        strike.bolt.geometry.dispose();
+        stormDisposeBolt(strike.bolt);
         stormState.strike = null;
         flash = 0;
       }
     }
-    // The flash on the whole scene: the sky light, the fog and the background lift toward a cold white (as much as the look's strikes are hard).
-    const lights = view.lights;
-    const hard = look.lightning?.strength ?? 1;
-    if (!stormState.base || (flash === 0 && !stormState.flashing)) {
-      stormState.probe = stormProbe(scene);
-      stormState.base = { hemi: lights.hemi.intensity, sun: lights.sun.intensity, key: lights.key.intensity, probe: stormState.probe?.intensity ?? 0, fog: scene.fog?.color.clone(), background: scene.background?.clone?.() };
-    }
-    stormState.flashing = flash > 0;
-    const base = stormState.base;
-    const dim = (stormState.indoors ? 0.3 : 1) * hard;
+    // The flash on the whole scene, for the few tenths of a second it lasts (nothing here runs when there is no strike): the ground, the castle and the men are lit
+    // by a hard cold light from the bolt's side (the sun is turned to it), the sky light and the probe rise, and the sky, the fog and the background lift toward a cold white
+    // (as much as the look's strikes are hard).
     if (flash > 0 || stormState.flashed) {
-      lights.hemi.intensity = base.hemi + flash * 2.4 * dim;
-      lights.sun.intensity = base.sun + flash * 1.6 * dim;
-      lights.key.intensity = base.key + flash * 1.2 * dim;
+      FLASH_WHITE ??= new THREE.Color(0xb9c4e4);
+      const lights = view.lights;
+      if (!stormState.base) {
+        stormState.probe = stormProbe(scene);
+        stormState.base = { hemi: lights.hemi.intensity, sun: lights.sun.intensity, key: lights.key.intensity, probe: stormState.probe?.intensity ?? 0, fog: scene.fog?.color.clone(), background: scene.background, sunColour: lights.sun.color.clone(), sunAt: lights.sun.position.clone() };
+      }
+      const base = stormState.base;
+      const dim = (stormState.indoors ? 0.3 : 1) * (look.lightning?.strength ?? 1);
+      lights.hemi.intensity = base.hemi + flash * 2.5 * dim;
+      lights.sun.intensity = base.sun + flash * 2.8 * dim;
+      lights.key.intensity = base.key + flash * 1.4 * dim;
       if (stormState.probe) stormState.probe.intensity = base.probe + flash * 2.2 * dim;
-      if (scene.fog && base.fog) scene.fog.color.copy(base.fog).lerp(new THREE.Color(0xb9c4e4), Math.min(1, flash * 0.5 * dim));
-      if (base.background) scene.background = base.background.clone().lerp(new THREE.Color(0xb9c4e4), Math.min(1, flash * 0.5 * dim));
+      if (flash > 0) {
+        const bearing = strike?.bolt.userData.bearing ?? 0;
+        lights.sun.position.set(Math.cos(bearing) * 25, 16, Math.sin(bearing) * 25);
+        lights.sun.color.setHex(0xdfe8ff);
+      } else {
+        lights.sun.position.copy(base.sunAt);
+        lights.sun.color.copy(base.sunColour);
+      }
+      sky.material.color.setScalar(1 + flash * 1.6 * dim);
+      const lift = Math.min(1, flash * 0.55 * dim);
+      if (scene.fog && base.fog) scene.fog.color.copy(base.fog).lerp(FLASH_WHITE, lift);
+      if (base.background?.isColor) scene.background = flash > 0 ? base.background.clone().lerp(FLASH_WHITE, lift) : base.background;
       stormState.flashed = flash > 0;
+      if (!stormState.flashed) stormState.base = null;
     }
   };
   return place;
@@ -497,8 +546,9 @@ export function stormRelease(view) {
 
 /** Bring the next strike to now (for the weather's test, and a look at one). */
 export function stormStrikeNow(hold = false) {
-  stormState.nextStrike = 0;
-  stormState.hold = hold;
+  // (`null` lets go of a held strike without making another.)
+  if (hold !== null) stormState.nextStrike = 0;
+  stormState.hold = Boolean(hold);
 }
 
 /** What the weather is doing, for the tests and the console: the look, whether it is held still, when the next strike is and whether one is on. */
