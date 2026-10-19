@@ -49,7 +49,7 @@ export function buildSeaCave(sec) {
   dnFence(sec, [[-32.55, 56.2, Y.gorge], [-32.55, 59.55, Y.gorge], [-46, 59.55, F], [-52.65, 59.55, F], [-52.65, 56.2, F]]);
   // The rock face under the shelf's plate, with the cave's mouth in it: the sea's face of the cliff, from the waterline up to the plate.
   dnRun(sec, [-56, DN_CAVE.face], [-41, DN_CAVE.face], 1.2, Y.sea - 0.5, F + 3.6, 'rock', [{ at: X + 56, width: DN_CAVE.mouth, sill: F, top: F + 3.2, shape: 'round' }]);
-  // Light and the signs of use: a lantern on a post and a brazier on the landing, kegs, a coil of rope; a trail down the stair; at the head a lit brazier and the note.
+  // Light and the signs of use: a lantern on a post and a brazier on the landing, kegs, a dead man's bones; a trail down the stair; at the head a lit brazier and the note.
   dnProp(sec, 'lantern', [mouth[0] - 0.9, F, 56.6], { yaw: 0 });
   dnProp(sec, 'brazier', [-50.4, F, 58.6], { lit: true });
   dnProp(sec, 'barrel', [-52.0, F, 57.2], { yaw: 0.4 });

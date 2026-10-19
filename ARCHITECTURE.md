@@ -67,7 +67,7 @@ sections, dormant fighters (`fighter.dormant`: not stepped, thought for, collide
 drawn) and gates and ladders that swap solids. Civilians and prisoners are corner
 `grey` (`hostile`). `levelmode/terrainview.js` draws the terrain as grey boxes, or, for a
 stage with a `landform`, hands over to the castle kit. Stage 1 (`levelmode/stages/dunnottar.js`)
-is nine sections of data (the builders every section shares are `stages/dnbuild.js`; the vault and the crypt under it are `stages/dunnottar-vault.js`, the vaulted sanctuary and the cell behind its chancel doors `stages/dunnottar-chapel.js`), with `decor` (wall runs with their openings, vaults, props) that only
+is ten sections of data (the builders every section shares are `stages/dnbuild.js`; the vault and the crypt under it are `stages/dunnottar-vault.js`, the sea cave under the gorge shelf and the old drain that runs from it to the crypt's sea-gate, the way round the plate knight at the front gate, `stages/dunnottar-sewer.js`, the vaulted sanctuary and the cell behind its chancel doors `stages/dunnottar-chapel.js`), with `decor` (wall runs with their openings, vaults, props) that only
 the drawing reads. `levelmode/kit.js` draws it from the same solids and decor: merged batches per
 material and chunk (`kitgeo.js`), painted textures (`kitpaint.js`: Voronoi stones and course-by-course masonry from noise, no two stones alike) and
 the materials made of them (`kittex.js`: a shader patch that reads each texture twice, at two scales blended by a world-space macro map, with moss, damp,
