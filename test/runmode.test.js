@@ -186,6 +186,9 @@ test('run lock: the stick held at a run for a moment locks it; the finger lifts 
 
 test('run lock: steered by the stick smoothly, wherever it is put down', () => {
   const game = yard();
+  // (On the open flat east of the yard's stairs: a man running up a stair is held to the pace of the climb, and +z from the west end is its winding stair.)
+  placeOnFloor(game.me, 0, -4, 0, 0);
+  updateStage(game.world, true);
   game.orders.stick = { dir: [1, 0], amount: 1 };
   game.step(1.2);
   game.orders.stick = null;
