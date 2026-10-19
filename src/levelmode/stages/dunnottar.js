@@ -261,7 +261,7 @@ function buildGate() {
   dnSpawn(sec, 'hallguard', 'dunnottarGuard', 'enemy', 2, [-1.5, Y.gorge, 44.2], DN_FACE.S, { inputs: { name: 'Corporal Rae' } });
   dnSpawn(sec, 'gunner1', 'dunnottarMatchlock', 'enemy', 2, [23.4, A, 43.2], DN_FACE.W, { inputs: { name: 'Gunner Mackie' }, station: 'oillet', hole: 0 });
   // The front way's door: a man-at-arms in full plate on the ledge to the postern, looking back along it (the ledge is 3.4 m wide: there is no way past him). The sea cave is the way round.
-  dnSpawn(sec, 'gateknight', 'dunnottarKnight', 'enemy', 3, [-3, Y.gorge, 54.1], DN_FACE.W, { inputs: { name: 'Sir Alasdair' } });
+  dnSpawn(sec, 'gateknight', 'dunnottarPlateKnight', 'enemy', 3, [-3, Y.gorge, 54.1], DN_FACE.W, { inputs: { name: 'Sir Alasdair' } });
 
   dnItem(sec, 'note-powder', 'note', [3.6, Y.gorge, 42.9], { note: 'powder', lift: 0.9 });
   dnItem(sec, 'bandage3', 'bandage', [-4.4, Y.gorge, 50.6]);

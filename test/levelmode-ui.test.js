@@ -15,7 +15,7 @@ const sentences = (text) => text.split(/[.!?]["']?(?:\s|$)/).filter((part) => pa
 
 test('the cast: every preset builds, in a known style and kit, with a weapon that exists', () => {
   for (const key of [
-    'forger', 'dunnottarSoldier', 'dunnottarGuard', 'dunnottarCrossbow', 'dunnottarMatchlock', 'dunnottarKnight', 'turnkey',
+    'forger', 'dunnottarSoldier', 'dunnottarGuard', 'dunnottarCrossbow', 'dunnottarMatchlock', 'dunnottarKnight', 'dunnottarPlateKnight', 'turnkey',
     'cabyMiner', 'cabySoldier', 'cabyPrince', 'dunnottarServant', 'dunnottarPriest', 'vaelen',
   ]) assert.ok(LEVEL_PRESET_KEYS.includes(key), key);
   for (const key of LEVEL_PRESET_KEYS) {

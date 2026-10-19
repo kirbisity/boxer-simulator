@@ -190,6 +190,13 @@ function routeTrace() {
   return traceCache[ROUTE];
 }
 
+/** The floor (y) each point of the plan is on, by its base index, as the trace walked it: the path finder needs it where floors lie over one another (the vault over the crypt). */
+function planFloors() {
+  const floors = new Map();
+  for (const sample of routeTrace()) floors.set(sample.idx, sample.y);
+  return floors;
+}
+
 /** The nearest trace sample to a point (3 m of height counts as a far step: floors above and below are not near). */
 function nearestSample(samples, x, y, z) {
   let best = null;
@@ -215,11 +222,11 @@ function planFor(policy) {
     for (const item of section.items) {
       if (item.kind === 'note' || !spec.items) continue;
       const { sample, flat, dy } = nearestSample(samples, item.at[0], item.at[1], item.at[2]);
-      if (sample && flat <= spec.items && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [item.at[0], item.at[2]], acts: [{ kind: 'item', id: item.id }], before: sample.idx, item });
+      if (sample && flat <= spec.items && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [item.at[0], item.at[2]], y: item.at[1], acts: [{ kind: 'item', id: item.id }], before: sample.idx, item });
     }
     if (section.rest) {
       const { sample, flat, dy } = nearestSample(samples, section.rest.at[0], section.rest.at[1], section.rest.at[2]);
-      if (sample && flat <= spec.rest && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [section.rest.at[0], section.rest.at[2]], acts: [{ kind: 'rest', id: section.rest.id, name: section.rest.name }], before: sample.idx });
+      if (sample && flat <= spec.rest && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [section.rest.at[0], section.rest.at[2]], y: section.rest.at[1], acts: [{ kind: 'rest', id: section.rest.id, name: section.rest.name }], before: sample.idx });
     }
   }
   stops.sort((a, b) => a.order - b.order);
@@ -232,7 +239,7 @@ function planFor(policy) {
       for (const gate of section.gates) {
         if (gate.key !== stop.item.id) continue;
         const at = [gate.at[0], gate.at[2] + 1.2];
-        withDoors.push({ p: at, acts: [{ kind: 'gate', id: gate.id }], before: stop.before });
+        withDoors.push({ p: at, y: gate.at[1], acts: [{ kind: 'gate', id: gate.id }], before: stop.before });
       }
     }
   }
@@ -244,7 +251,7 @@ function planFor(policy) {
   }
   const out = [];
   plan.forEach((entry, index) => {
-    for (const stop of byBefore.get(index) ?? []) out.push({ p: stop.p, acts: stop.acts, leg: 'detour', stop: true, base: index });
+    for (const stop of byBefore.get(index) ?? []) out.push({ p: stop.p, y: stop.y, acts: stop.acts, leg: 'detour', stop: true, base: index });
     out.push(entry);
   });
   return out;
@@ -839,7 +846,9 @@ class Run {
     const me = this.me;
     const world = this.world;
     if (!this.nav || this.nav.entry !== entry || world.time - this.nav.at > 2) {
-      const path = findPath(world.arena.terrain, { x: hipX(me), z: hipZ(me), y: feetFloor(me) }, entry.p);
+      // (The floor of the goal: a stop's own (an item's, a rest's), else the one the trace found at that point of the route.)
+      const toY = entry.y ?? (entry.base === undefined ? undefined : this.floors?.get(entry.base) ?? (this.floors ??= planFloors()).get(entry.base));
+      const path = findPath(world.arena.terrain, { x: hipX(me), z: hipZ(me), y: feetFloor(me) }, entry.p, { toY });
       this.nav = { entry, path, at: world.time };
       if (!path) this.note(`no way round to ${entry.p[0].toFixed(1)},${entry.p[1].toFixed(1)}`);
       else if (!this.navNoted) {
@@ -1043,7 +1052,7 @@ function bossDuel(variant, seed, log, seconds = 240) {
 function knightDuel(seed, log, seconds = 300, tweak = {}) {
   const spawn = DUNNOTTAR.sections.flatMap((section) => section.spawns).find((entry) => entry.id === 'gateknight');
   const was = { preset: spawn.preset, inputs: structuredClone(spawn.inputs) };
-  const { preset, ...inputs } = tweak;
+  const { preset, full, ...inputs } = tweak;
   if (preset) spawn.preset = preset;
   Object.assign(spawn.inputs, inputs);
   const leg = DUNNOTTAR_ROUTE.find((entry) => entry.name === 'the gorge and the ledge');
@@ -1058,7 +1067,8 @@ function knightDuel(seed, log, seconds = 300, tweak = {}) {
     until: (self) => (self.knight.beaten ? 'beaten' : null),
     setup: (self) => {
       const comrades = comradesOf(self.world).slice(0, ALLIES).map((fighter) => fighter.spawn.id);
-      self.only = ['gateknight', ...comrades];
+      // (`full=1`: the rest of the stage awake too, as in a run: the levy on the shelf, the gatehouse.)
+      self.only = full ? null : ['gateknight', ...comrades];
       const rest = RESTS.rest1;
       restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
       self.level.ui.length = 0;
