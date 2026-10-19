@@ -206,9 +206,10 @@ export function ceilingAt(terrain, x, z, y) {
  * What blocks: a wall whose height range overlaps; a slab, ramp or flight whose
  * top (where the sphere is) is more than `stepUp` above `low`, and whose
  * `bottom` is below `high`. A rise within `stepUp` is not a wall: it is stepped onto
- * (floorAt lifts the part).
+ * (floorAt lifts the part). `wallLow` (default `low`): the height a wall's top is measured from, for a man whose higher foot stands above
+ * his lowest point.
  */
-export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.stepUp) {
+export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.stepUp, wallLow = low) {
   let pushed = false;
   for (let pass = 0; pass < 3; pass += 1) {
     const list = cellOf(terrain, at[0], at[1]);
@@ -216,7 +217,7 @@ export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.s
     for (let index = 0; index < list.length; index += 1) {
       const part = list[index];
       if (part.shape === 'ceiling' || high <= part.bottom) continue;
-      if (part.shape === 'wall' && low >= part.top) continue;
+      if (part.shape === 'wall' && wallLow >= part.top) continue;
       const dx = at[0] - part.cx;
       const dz = at[1] - part.cz;
       const u = dx * part.cos - dz * part.sin;

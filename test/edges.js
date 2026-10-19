@@ -9,7 +9,7 @@ const key = (ix, iz, level) => `${ix},${iz},${Math.round(level * 20)}`;
 
 /**
  * Flood from `start` ([x, y, z], y the floor): returns { standing: count, edges: [{ at: [x, z], floor, toward: [dx, dz] }] },
- * the edges being where a step off lands on no floor (or one more than stepDown below) with nothing in the way.
+ * the edges being where a step off lands on no floor (or one more than reachDown below) with nothing in the way.
  */
 export function floodFill(terrain, start, { limit = 400000, radius = WORLD.terrain.bodyRadius, bounds = null } = {}) {
   const spec = WORLD.terrain;
@@ -34,7 +34,7 @@ export function floodFill(terrain, start, { limit = 400000, radius = WORLD.terra
       // Is a man at the new place pushed out of something (a wall, a face too tall to step on)?
       const moved = pushOut(terrain, at, radius, lowest, lowest + spec.bodyHeight, spec.stepUp);
       if (moved && Math.hypot(at[0] - nx, at[1] - nz) > 0.04) continue;
-      if (!Number.isFinite(next) || floor - next > spec.stepDown + 1e-6) {
+      if (!Number.isFinite(next) || floor - next > spec.reachDown + 1e-6) {
         const cell = `${Math.round(nx)},${Math.round(nz)},${Math.round(floor)}`;
         if (!edges.has(cell)) edges.set(cell, { at: [nx, nz], floor, toward: [dx, dz] });
         continue;

@@ -2174,7 +2174,7 @@ function groundStance(fighter, dt) {
     feet.l.floor = feet.r.floor = fighter.lift ?? 0;
     return;
   }
-  const reach = lift - spec.stepDown;
+  const reach = lift - spec.reachDown;
   const sides = ['l', 'r'];
   const real = [-Infinity, -Infinity];
   let bearing = 0;
@@ -2192,7 +2192,8 @@ function groundStance(fighter, dt) {
       foot.step.to = [aim[0], to[1], aim[1]];
     }
     const at = foot.step ? foot.step.to : foot.planted;
-    real[k] = floorAt(terrain, at[0], at[2], lift + spec.stepUp);
+    // (As far above the stance as the aim above allows: the stance is held `sag` under the lower foot's floor.)
+    real[k] = floorAt(terrain, at[0], at[2], lift + spec.sag + spec.stepUp);
     if (real[k] >= reach) {
       bearing += 1;
       // The stance rises with the foot, not ahead of it: a foot part way through a step has come that far.
@@ -2234,6 +2235,21 @@ function groundStance(fighter, dt) {
   }
 }
 
+/** How long (s) the fighter was in the air (off every floor) in the spell that is on now, or ended no more than `together` ago; 0 if none. */
+function airSpell(world, fighter) {
+  if (fighter.airEnd === undefined || world.time - fighter.airEnd > WORLD.terrain.fall.together) return 0;
+  return fighter.airEnd - fighter.airSince;
+}
+
+/** On terrain, note when each spell in the air begins and ends (a landing is hurt only after a real one: airSpell). */
+function trackAir(fighter, time) {
+  if (fighter.air) {
+    if (!fighter.airWas) fighter.airSince = time;
+    fighter.airEnd = time;
+  }
+  fighter.airWas = fighter.air === true;
+}
+
 // ---- Stepping -------------------------------------------------------------
 
 // The fighters stepping this substep, refilled each substep (not reallocated).
@@ -2254,7 +2270,10 @@ export function step(world, dt) {
     const span = fighter.detail === 'proxy' ? dt * WORLD.tiers.proxyEvery : dt;
     updateIntent(world, fighter, span);
     updateFeet(fighter, span);
-    if (fighter.arena.terrain) groundStance(fighter, span);
+    if (fighter.arena.terrain) {
+      groundStance(fighter, span);
+      trackAir(fighter, world.time);
+    }
   }
   chooseDetail(world);
   const h = dt / WORLD.substeps;
@@ -2475,6 +2494,12 @@ function moveRoot(world, fighter, dt) {
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
   const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
+  // On a stair or a steep slope he goes only as fast as his feet can climb (up or down) it.
+  if (world.arena.terrain) {
+    const slowed = Math.min(climbShare(fighter, wanted), leashShare(fighter));
+    wanted[0] *= slowed;
+    wanted[1] *= slowed;
+  }
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
@@ -2502,6 +2527,78 @@ function moveRoot(world, fighter, dt) {
 }
 
 /**
+ * On terrain, the share of the speed he wants that his feet can follow: his hips outside the base of his feet by more than
+ * WORLD.terrain.leash.from of what throws him (checkBalance's reach) slow him, to a stop at leash.to: the stance must not
+ * outrun the steps, as it does up a flight taken fast in heavy gear, or a man who has not the legs for it goes over.
+ * The player's run mode, which carries the hips over the feet and is not thrown by it, is not held.
+ */
+function leashShare(fighter) {
+  if (fighter.air || fighter.runMode || !fighter.feet || fighter.feet.l.lifted || fighter.feet.r.lifted) return 1;
+  const outside = outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot));
+  const reach = WORLD.balance.reach * (fighter.body.lengths.thigh + fighter.body.lengths.shank) * balanceFooting(fighter);
+  const leash = WORLD.terrain.leash;
+  const used = outside / reach;
+  return used <= leash.from ? 1 : Math.max(0, 1 - (used - leash.from) / (leash.to - leash.from));
+}
+
+/** How well his legs hold him (checkBalance's footing): strong legs, sound joints and legs, gear made for it, no net. */
+function balanceFooting(fighter) {
+  const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
+  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
+  return legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
+}
+
+/** The turns (rad) from his way at which the floor's slope is looked at. */
+const SLOPE_FAN = [0, 0.6, -0.6];
+
+/**
+ * On terrain, the share of the speed he wants that his feet can climb: the floor's slope along his way (over
+ * WORLD.terrain.slopeSpan m each side of him, none if it changes by more than slopeMost there: a ledge; a flight of treads is a slope of rise over tread) times his speed
+ * is the rate he must rise or sink (m/s), and past WORLD.terrain.climb he is held to it. The stance cannot
+ * outrun the steps: a man running a flight at flat-ground speed has his feet left behind.
+ */
+function climbShare(fighter, wanted) {
+  const speed = Math.hypot(wanted[0], wanted[1]);
+  if (speed < 1e-6 || fighter.air) return 1;
+  const terrain = fighter.arena.terrain;
+  const spec = WORLD.terrain;
+  const y = (fighter.lift ?? 0) + spec.stepUp + spec.slopeHeadroom;
+  const here = floorAt(terrain, fighter.root[0], fighter.root[1], y);
+  // (Along his way, and a little to each side of it: a winding stair turns under him.)
+  let steepest = 0;
+  for (const turn of SLOPE_FAN) {
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const ux = (wanted[0] * cos - wanted[1] * sin) / speed;
+    const uz = (wanted[0] * sin + wanted[1] * cos) / speed;
+    const ahead = floorAt(terrain, fighter.root[0] + ux * spec.slopeSpan, fighter.root[1] + uz * spec.slopeSpan, y);
+    const behind = floorAt(terrain, fighter.root[0] - ux * spec.slopeSpan, fighter.root[1] - uz * spec.slopeSpan, y);
+    // (No floor one side, or a face of a ledge's height: not a slope. He walks to the edge, and off it.)
+    if (!(Math.abs(ahead - here) <= spec.slopeMost) || !(Math.abs(here - behind) <= spec.slopeMost)) continue;
+    steepest = Math.max(steepest, Math.abs(ahead - behind) / (2 * spec.slopeSpan));
+  }
+  const rate = steepest * speed;
+  return rate > spec.climb ? spec.climb / rate : 1;
+}
+
+/**
+ * The height of the highest floor a man's feet are planted on or stepping to (never below the stance's own `lift`,
+ * which trails the lower foot): what a wall or a ledge's face is measured from. With one foot on a tread and the
+ * other a tread down, the face of the next is a stride above the higher, and he is not stopped by a low wall
+ * (the sill of a doorway at the head of a flight) that his lead foot is already above.
+ */
+function standingOn(fighter) {
+  let height = fighter.lift ?? 0;
+  if (fighter.air || !fighter.feet) return height;
+  for (const side of ['l', 'r']) {
+    const foot = fighter.feet[side];
+    const floor = foot.step ? foot.step.floorTo : foot.floor;
+    if (floor !== undefined && floor > height) height = floor;
+  }
+  return height;
+}
+
+/**
  * On terrain, the stance's root is kept out of the walls and ledge faces, the speed into them gone:
  * the feet are aimed from the root, and a root inside a wall would set them fighting it.
  */
@@ -2510,7 +2607,7 @@ function keepClearOfSolids(terrain, fighter) {
   const lift = fighter.lift ?? 0;
   const at = [fighter.root[0], fighter.root[1]];
   // A face a foot can be put on (stepUp) is not a wall to him.
-  if (!pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, spec.stepUp)) return;
+  if (!pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, spec.stepUp, standingOn(fighter) + spec.sag)) return;
   fighter.root[0] = at[0];
   fighter.root[1] = at[1];
   const into = fighter.rootVelocity[0] * terrain.normal[0] + fighter.rootVelocity[1] * terrain.normal[1];
@@ -3473,12 +3570,13 @@ function collideTerrain(world, fighter, h, arena) {
     if (fighter.x[base + 1] < floor) {
       // Arriving this substep (it was clear of the floor): how fast it hit. The part's speed as it fell
       // (not only how far it moved: a joint's correction can push a resting knee down a few centimetres at once).
-      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, Math.min((fighter.prev[base + 1] - fighter.x[base + 1]) / h, WORLD.gravity * h - fighter.v[base + 1]));
+          if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, Math.min((fighter.prev[base + 1] - fighter.x[base + 1]) / h, WORLD.gravity * h - fighter.v[base + 1]));
       // Run into a higher tread (a knee against the stair ahead) it is lifted a little each substep, not at once:
-      // a part snapped up by centimetres throws the limb it is joined to. Fallen on the floor, it stops there.
+      // a part snapped up by centimetres throws the limb it is joined to (and the joints pull it back down as a fall
+      // at tens of m/s: a man sliding on down a flight has risers of 0.2 m for that). Fallen on the floor, it stops there.
       const lift = floor - fighter.x[base + 1];
       const landed = fighter.prev[base + 1] >= floor - 1e-4;
-      const reached = landed || lift > spec.ride ? floor : fighter.x[base + 1] + Math.min(lift, spec.rise * h);
+      const reached = landed ? floor : fighter.x[base + 1] + Math.min(lift, spec.rise * h);
       fighter.x[base + 1] = reached;
       fighter.prev[base + 1] = Math.max(fighter.prev[base + 1], reached);
       fighter.x[base] = fighter.prev[base] + (fighter.x[base] - fighter.prev[base]) * friction;
@@ -3652,6 +3750,9 @@ function landOnFeet(world, fighter, index, speed) {
   const spec = WORLD.terrain.fall;
   const through = speed - spec.safe;
   if (through <= 0) return;
+  // A foot that comes down fast onto the next tread of a flight, or the one below a kerb, is a step and not a fall:
+  // it lands hard only after a spell in the air (the drop of `airMin` s of falling).
+  if (airSpell(world, fighter) < spec.airMin) return;
   const side = PARTICLE_INFO[index].side;
   const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
   const gear = fighter.body.gear;
