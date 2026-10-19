@@ -410,3 +410,52 @@ export const stageLookNames = () => Object.keys(STAGE_LOOKS);
 
 /** A look by name (the default for one that is not known). */
 export const stageLookOf = (name) => STAGE_LOOKS[name] ?? STAGE_LOOKS[DEFAULT_STAGE_LOOK];
+
+// ---- Interiors ---------------------------------------------------------------------------------------------------
+// A section's `interior` (stage data: levelmode/stages/dunnottar-chapel.js) is how a room that is not under the sky is lit: the storm's look is the outside, and
+// as the player walks in it is blended toward this over `blend` seconds, as `k` goes 0 to 1. Nothing here touches the DOM.
+//
+//   interior = {
+//     sun       how much of the look's sun is left (0..1; the weather outside is a glimmer in glass: 0.03)
+//     ambient   how much of the look's sky light (hemisphere) is left; `probe` of the probe the realistic look lights with (default: ambient)
+//     tint      [r, g, b] the probe's light is multiplied by (the baked sky is a cold violet-grey; a nave of candles is amber)
+//     hemi      { sky, ground } hex colours of the hemisphere light, for the toon look and the hemisphere
+//     exposure  everything the lights give, times this (default 1)
+//     fog       { colour (hex, also the background), near, far (m), mist (the low mist's density; 0: none) }
+//     wet       how soaked the stone looks (default: the look's); torch: how bright the flames burn (default: the look's)
+//     flash     how much of a lightning strike's flash gets in (0..1; the look's own strength is kept times this)
+//     blend     seconds to blend over (default 1.5)
+//   }
+
+/** A colour in between two hex colours. */
+export function lerpHex(a, b, t) {
+  const channel = (shift) => Math.round(((a >> shift) & 255) * (1 - t) + ((b >> shift) & 255) * t);
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
+
+/**
+ * The numbers the weather sets when a look is `k` (0..1) of the way into an interior (eased): the light's strengths, the probe's tint, the fog and mist, the wetness, the torches
+ * and how much of a lightning flash gets in. At k = 0 these are the look's own, exactly; at k = 1 the interior's.
+ */
+export function interiorLevels(look, spec, k) {
+  const e = k * k * (3 - 2 * k);
+  const mix = (a, b) => a + (b - a) * e;
+  const exposure = mix(1, spec.exposure ?? 1) * look.exposure;
+  const fog = spec.fog ?? { colour: look.fog.colour, near: look.fog.near, far: look.fog.far, mist: look.fog.mist.density };
+  return {
+    sun: look.sun.intensity * exposure * mix(1, spec.sun ?? 0.05),
+    hemi: look.hemi.intensity * exposure * mix(1, spec.ambient ?? 0.4),
+    probe: look.ambient.gain * exposure * mix(1, spec.probe ?? spec.ambient ?? 0.4),
+    tint: look.ambient.tint.map((v, i) => mix(v, spec.tint?.[i] ?? v)),
+    hemiSky: lerpHex(look.hemi.sky, spec.hemi?.sky ?? look.hemi.sky, e),
+    hemiGround: lerpHex(look.hemi.ground, spec.hemi?.ground ?? look.hemi.ground, e),
+    fogColour: lerpHex(look.fog.colour, fog.colour, e),
+    fogNear: mix(look.fog.near, fog.near),
+    fogFar: mix(look.fog.far, fog.far),
+    mist: mix(look.fog.mist.density, fog.mist ?? 0),
+    wet: mix(look.wet, spec.wet ?? look.wet),
+    torch: mix(look.torch, spec.torch ?? look.torch),
+    flash: mix(1, spec.flash ?? 0.15),
+    eased: e,
+  };
+}

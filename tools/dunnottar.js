@@ -776,6 +776,8 @@ export const SEGMENTS = {
   rest1_rest2: { from: 'rest1', to: 'rest2', note: 'gorge, gatehouse, oillet stair, ascent, quad' },
   rest2_rest2b: { from: 'rest2', to: 'rest2b', note: 'the quad, the cellar to the turnkey\'s fire' },
   rest2b_rest3: { from: 'rest2b', to: 'rest3', note: 'keep, stair tower, wall walk' },
+  // The vault alone (a bot that has to cross the quadrangle first is held up by the court's patrol): from the foot of the west stair to the turnkey's fire.
+  vault_rest2b: { from: null, fromAt: [5.7, 6, -17.4], to: 'rest2b', note: 'the long cellar, from the foot of the west stair' },
 };
 
 /** One walk of a segment from full health: { result: through | died | timeout, by, seconds, harm, bandages, tonics }. */
@@ -783,17 +785,17 @@ function segmentRun(name, policy, seed, log) {
   const spec = SEGMENTS[name];
   const full = planFor(policy);
   const samples = routeTrace();
-  const startAt = spec.from ? RESTS[spec.from].at : DUNNOTTAR.start.at;
+  const startAt = spec.fromAt ?? (spec.from ? RESTS[spec.from].at : DUNNOTTAR.start.at);
   const endAt = RESTS[spec.to].at;
-  const from = spec.from ? nearestSample(samples, startAt[0], startAt[1], startAt[2]).sample.idx : 0;
+  const from = spec.from || spec.fromAt ? nearestSample(samples, startAt[0], startAt[1], startAt[2]).sample.idx : 0;
   const to = nearestSample(samples, endAt[0], endAt[1], endAt[2]).sample.idx;
   // (From the turnkey's fire he does not go back for the cell: that is a walk through the cellar, and the cellar's men are another stretch's.)
   const plan = full.filter((entry) => entry.base >= from && entry.base <= to && !(spec.from === 'rest2b' && entry.stop && entry.acts.some((act) => act.kind === 'gate')));
   const run = new Run({
     policy, seed, plan, log, maxDeaths: 1, endAt,
     setup: (self) => {
-      if (spec.from) {
-        restAtPoint(self.world, { id: spec.from, at: startAt, name: RESTS[spec.from].name });
+      if (spec.from || spec.fromAt) {
+        restAtPoint(self.world, { id: spec.from ?? 'segment-start', at: startAt, name: spec.from ? RESTS[spec.from].name : 'The segment\'s start' });
         self.level.ui.length = 0;
       }
     },
