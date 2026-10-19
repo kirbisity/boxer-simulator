@@ -241,6 +241,8 @@ function buildShaft(sec) {
 
 export function buildCrypt() {
   const sec = dnSection('crypt', 'The Crypt');
+  // Under the cellar's floor: drawn in detail only while he is in it or on the shaft stair (active), never merely seen through a portal's mouth from the room above (where it is hidden under the floor).
+  sec.activeOnly = true;
   // (The well shaft's own height range is the vault's: the crypt holds the stair's foot and what it leads to.)
   dnBounds(sec, { at: [16.4, -29.2], size: [35.2, 22], y: [-1, 5.4] }, { at: [1.7, -32.3], size: [3.6, 10], y: [-1, 9] }, { at: [28.6, -32.4], size: [11.4, 11.4], y: [-1, 3.2] });
   const top = C + 4.2;

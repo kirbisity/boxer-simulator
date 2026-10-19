@@ -1318,7 +1318,7 @@ export function createCastleView(stage) {
       const entry = parts[section.id];
       const inView = sees(boxes[section.id]);
       const shown = near.has(section.id);
-      const detailed = shown && inView && (active.has(section.id) || seenThrough(section.id));
+      const detailed = shown && inView && (active.has(section.id) || (!section.activeOnly && seenThrough(section.id)));
       entry.detail.group.visible = detailed;
       entry.far.group.visible = !detailed && inView;
       if (!shown) continue;

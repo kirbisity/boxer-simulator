@@ -41,6 +41,7 @@
 //     // thing under two names (an open gate stops blocking; a kicked ladder becomes a ramp).
 //     gates:   [ { id: 'gate1', at: [x, y, z], state: 'closed', states: { closed: [solids], open: [solids] } } ],
 //     ladders: [ { id: 'ladder1', at: [x, y, z], state: 'up', states: { up: [solids], down: [solids] } } ],
+//     // `activeOnly: true`: the drawing shows this section in detail only while it is active, not when it is merely seen through a portal.
 //     // A place to rest (not used here).
 //     rest: { at: [x, y, z] },
 //   }
