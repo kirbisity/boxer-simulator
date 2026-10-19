@@ -413,7 +413,7 @@ export const WORLD = {
   //     `together` s: two feet landing within it are one landing. Speeds: a drop of 1 m lands at
   //     4.4 m/s, 3 m at 7.7, 6 m at 10.8, 10 m at 14.0. Calibrated in test/terrain.test.js.
   terrain: {
-    cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, ride: 0.15,
+    cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, ride: 0.25, climb: 1, slopeSpan: 0.5, slopeMost: 0.6, slopeHeadroom: 0.5,
     fall: { safe: 5, legs: 1.6, bodyFrom: 4.5, body: 1, stumble: 6.5, ankleFrom: 6.8, ankleTo: 11, compress: 12, compressFrom: 8, together: 0.3 },
   },
   // Running (away from a gun, or after one): footwork speed times this.

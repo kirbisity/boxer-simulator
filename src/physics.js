@@ -2426,6 +2426,12 @@ function moveRoot(world, fighter, dt) {
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
   const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
+  // On a stair or a steep slope he goes only as fast as his feet can climb (up or down) it.
+  if (world.arena.terrain) {
+    const slowed = climbShare(fighter, wanted);
+    wanted[0] *= slowed;
+    wanted[1] *= slowed;
+  }
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
@@ -2450,6 +2456,29 @@ function moveRoot(world, fighter, dt) {
   // ... but a shove can: out across the strip to the edge and over it.
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
   if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter);
+}
+
+/**
+ * On terrain, the share of the speed he wants that his feet can climb: the floor's slope along his way (over
+ * WORLD.terrain.slopeSpan m each side of him, none if it changes by more than slopeMost there: a ledge; a flight of treads is a slope of rise over tread) times his speed
+ * is the rate he must rise or sink (m/s), and past WORLD.terrain.climb he is held to it. The stance cannot
+ * outrun the steps: a man running a flight at flat-ground speed has his feet left behind.
+ */
+function climbShare(fighter, wanted) {
+  const speed = Math.hypot(wanted[0], wanted[1]);
+  if (speed < 1e-6 || fighter.air) return 1;
+  const terrain = fighter.arena.terrain;
+  const spec = WORLD.terrain;
+  const ux = wanted[0] / speed;
+  const uz = wanted[1] / speed;
+  const y = (fighter.lift ?? 0) + spec.stepUp + spec.slopeHeadroom;
+  const here = floorAt(terrain, fighter.root[0], fighter.root[1], y);
+  const ahead = floorAt(terrain, fighter.root[0] + ux * spec.slopeSpan, fighter.root[1] + uz * spec.slopeSpan, y);
+  const behind = floorAt(terrain, fighter.root[0] - ux * spec.slopeSpan, fighter.root[1] - uz * spec.slopeSpan, y);
+  // (No floor one side, or a face of a ledge's height: not a slope. He walks to the edge, and off it.)
+  if (!(Math.abs(ahead - here) <= spec.slopeMost) || !(Math.abs(here - behind) <= spec.slopeMost)) return 1;
+  const rate = (Math.abs(ahead - behind) / (2 * spec.slopeSpan)) * speed;
+  return rate > spec.climb ? spec.climb / rate : 1;
 }
 
 /**
