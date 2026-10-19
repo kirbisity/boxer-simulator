@@ -38,6 +38,7 @@ import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.j
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
+import { travelPlaces } from './levelmode/travel.js';
 import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
@@ -1213,6 +1214,24 @@ for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) {
   });
 }
 
+// Fast travel (the ghost walk): jump to any part of the stage; the Go to menu is filled from the stage's own data when it opens.
+const ghostGo = $('#ghost-go');
+let ghostPlaces = [];
+function fillGhostGo() {
+  ghostPlaces = state.world?.stage ? travelPlaces(state.world.stage.def) : [];
+  ghostGo.replaceChildren(new Option('Go to…', ''), ...ghostPlaces.map((place, index) => new Option(place.label, String(index))));
+}
+ghostGo.addEventListener('change', () => {
+  const place = ghostPlaces[Number(ghostGo.value)];
+  ghostGo.value = '';
+  ghostGo.blur();
+  const world = state.world;
+  if (!place || !world?.stage?.ghost) return;
+  const me = world.fighters[0];
+  placeOnFloor(me, place.at[0], place.at[2], place.at[1], place.yaw);
+  followCam.reset();
+});
+
 /** The ghost bar shows the pace now and who he is. */
 function syncGhostBar() {
   for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) button.classList.toggle('on', Number(button.dataset.speed) === state.speed);
@@ -2058,6 +2077,7 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   // Exploring: every gate and door stands open and every ladder is down, so the whole castle can be walked.
   if (ghost) for (const mechanism of mechanismsOf(stage)) setMechanism(state.world, mechanism.id, 'open' in mechanism.states ? 'open' : 'down' in mechanism.states ? 'down' : Object.keys(mechanism.states).at(-1));
   document.body.classList.toggle('ghost-walk', ghost);
+  if (ghost) fillGhostGo();
   clearGore(scene);
   // (A stage may be set in a place of its own: the storm of Dunnottar, levelmode/storm.js.)
   const place = stage.place ?? 'stage';
