@@ -58,6 +58,16 @@ export const LEVEL_PRESETS = {
     outfit: { kind: 'knight', design: 2 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'grey' },
   },
+  // Sir Alasdair, who holds the ledge at the front gate: the same full blackened plate, sword and heater as the man-at-arms, but a stiffer, less practised
+  // fighter (skill 0.25 for 0.5; the sword does nothing to plate either way: what wins is a thrust that finds a gap, and the comrades drawing his blows).
+  // Tuned with tools/dunnottar.js `knights` (120 duels from the gorge brazier, the stage awake, two comrades, the operative's sword and gambeson): at skill 0.5 the
+  // operative wins 18 in 120, at 0.35 27, at 0.25 32, at 0.2 43. In a whole run the bot (careful, a death a try) wins about one try in five.
+  // No damage multiplier anywhere: armour, weapon and skill, as elsewhere.
+  dunnottarPlateKnight: {
+    name: 'Dunnottar plate knight', style: 'templar', sex: 'male', heightCm: 182, frame: 'large', age: 33, exercise: 0.5, calories: 4047, skill: 0.25,
+    outfit: { kind: 'knight', design: 2 }, accessories: ['plume'],
+    look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'grey' },
+  },
   // The jailer of Whigs' Vault: heavy, a club, a ring of keys.
   turnkey: {
     name: 'The Turnkey', style: 'baton', sex: 'male', heightCm: 181, frame: 'large', age: 45, exercise: 0.35, calories: 3941, skill: 0.4,

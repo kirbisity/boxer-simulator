@@ -20,16 +20,20 @@ export function standable(terrain, x, z, y, radius) {
 }
 
 /**
- * A path over the terrain from `from` ({ x, z, y }) to near `to` ([x, z]): [[x, z], ...] from the first step to the last (the goal point
- * itself when it can be stood on, else the nearest cell to it), or `null` if there is none within `reach` m of either.
+ * A path over the terrain from `from` ({ x, z, y }) to near `to` ([x, z]): [[x, z, floor], ...] from the first step to the last (the goal point
+ * itself when it can be stood on, else the nearest cell to it), or `null` if there is none within `reach` m of either. `options.toY`: the
+ * floor the goal is on, where floors lie over one another (the vault over the crypt: a point of the cellar is a point of the crypt too): the
+ * goal is only reached on that floor (within two metres), and a cell is a different cell on each floor (a stair's foot is not its head).
  */
 export function findPath(terrain, from, to, options = {}) {
   // (With a margin first; then as close as the body itself: he may stand against a table.)
   return search(terrain, from, to, { ...options, radius: SPEC.bodyRadius + 0.15 }) ?? search(terrain, from, to, { ...options, radius: SPEC.bodyRadius + 0.02 });
 }
 
-function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 40000 }) {
-  const key = (ix, iz) => ix * 100003 + iz;
+function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 40000, toY }) {
+  // (A cell on each floor, with the floors told apart by the metre and a half when the goal says which it is on.)
+  const layer = (y) => (toY === undefined ? 0 : Math.round(y / 1.5));
+  const key = (ix, iz, y) => (ix * 100003 + iz) * 64 + layer(y) + 32;
   const cx = (ix) => ix * cell;
   const ix0 = Math.round(from.x / cell);
   const iz0 = Math.round(from.z / cell);
@@ -67,7 +71,7 @@ function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 
     return top;
   };
   const start = { ix: ix0, iz: iz0, y: from.y, g: 0, f: near(ix0, iz0), parent: null, closed: false };
-  nodes.set(key(ix0, iz0), start);
+  nodes.set(key(ix0, iz0, from.y), start);
   push(start);
   let best = start;
   let count = 0;
@@ -77,14 +81,15 @@ function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 
     node.closed = true;
     count += 1;
     const d = near(node.ix, node.iz);
-    if (d < near(best.ix, best.iz)) best = node;
-    if (d <= cell * 1.1) {
+    const here = toY === undefined || Math.abs(node.y - toY) < 2;
+    if (here && d < near(best.ix, best.iz)) best = node;
+    if (here && d <= cell * 1.1) {
       best = node;
       break;
     }
     const ok = new Map();
     const free = (ix, iz) => {
-      const k = key(ix, iz);
+      const k = ix * 100003 + iz;
       if (ok.has(k)) return ok.get(k);
       const x = cx(ix);
       const z = cx(iz);
@@ -98,7 +103,7 @@ function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 
       const floor = free(ix, iz);
       if (floor === null) continue;
       if (dx && dz && (free(node.ix + dx, node.iz) === null || free(node.ix, node.iz + dz) === null)) continue;
-      const k = key(ix, iz);
+      const k = key(ix, iz, floor);
       const g = node.g + (dx && dz ? 1.414 : 1) * cell;
       const old = nodes.get(k);
       if (old && old.g <= g) continue;
@@ -110,7 +115,7 @@ function search(terrain, from, to, { cell = 0.5, radius, reach = 16, maxNodes = 
   // (Near enough, or the nearest it came: a goal on a wall's far side with no way round is no path.)
   if (near(best.ix, best.iz) > 3) return null;
   const path = [];
-  for (let node = best; node; node = node.parent) path.push([cx(node.ix), cx(node.iz)]);
+  for (let node = best; node; node = node.parent) path.push([cx(node.ix), cx(node.iz), node.y]);
   path.reverse();
   path.shift();
   return path;

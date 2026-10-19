@@ -282,11 +282,14 @@ export function updateRise(fighter, dt) {
   if (rise.best === undefined || hips > rise.best + spec.gain) Object.assign(rise, { best: Math.max(hips, rise.best ?? hips), gainedAt: rise.t });
   if (rise.t < seconds) return null;
   const wanted = rise.stage === 'stand' ? toWorld(fighter, fighter.desired[P.pelvis])[1] : rise.to?.[P.pelvis]?.[1] ?? 0;
-  const there = pelvisHeight(fighter) >= wanted * (rise.stage === 'stand' ? spec.stood : spec.reached) || rise.stage === 'gather' || rise.stage === 'roll' || rise.stage === 'step';
+  // (On a floor below y 0 (a cave at the sea's edge) the shares are of the height above that floor: a share of a negative height is a higher one, which no man could reach.
+  // Floors at or above 0, and the arena's, are as they were.)
+  const base = Math.min(0, fighter.lift ?? 0);
+  const there = pelvisHeight(fighter) - base >= (wanted - base) * (rise.stage === 'stand' ? spec.stood : spec.reached) || rise.stage === 'gather' || rise.stage === 'roll' || rise.stage === 'step';
   // Short of it, he strains `patience` s past his stage's time and past the
   // last time he gained height (a heavy man coming up slowly is coming up),
   // `strainMost` s at most; on his feet if not quite straight, `patience` s.
-  const nearlyUp = rise.stage === 'stand' && hips >= wanted * spec.reached;
+  const nearlyUp = rise.stage === 'stand' && hips - base >= (wanted - base) * spec.reached;
   const strained = nearlyUp ? seconds + spec.patience : Math.min(seconds + spec.strainMost, Math.max(seconds, rise.gainedAt) + spec.patience);
   if (!there && rise.t < strained) return null;
   // Long at it and up on his feet, if not quite straight, he is up.

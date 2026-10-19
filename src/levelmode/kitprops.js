@@ -310,6 +310,18 @@ export function kpBuild(prop, ctx) {
       dyn.lights.push({ at: [sx + dir[0] * 0.6, y + 0.7, sz + dir[1] * 0.6], color: 0xffa05a, power: prop.dim ? 0.3 : 0.8, range: 9 });
       break;
     }
+    case 'lantern': {
+      // An iron lantern hung on an arm from a post: a small cage of iron and horn, lit. `at` is the foot of the post.
+      const [x, z] = here(0, 0);
+      const [lx, lz] = here(0.32, 0);
+      kgCylinder(batch, 'iron', x, y, z, 0.035, 0.05, 1.9, { sides: 6 });
+      kgBox(batch, 'iron', (x + lx) / 2, y + 1.88, (z + lz) / 2, 0.36, 0.035, 0.035, yaw);
+      kgBox(batch, 'iron', lx, y + 1.62, lz, 0.2, 0.3, 0.2, yaw, { faces: ['top', 'ends', 'sides'] });
+      kgBox(batch, 'iron', lx, y + 1.8, lz, 0.26, 0.04, 0.26, yaw);
+      dyn.flames.push({ at: [lx, y + 1.6, lz], size: 0.16 });
+      dyn.lights.push({ at: [lx, y + 1.7, lz], color: 0xffb060, power: 0.9, range: 10 });
+      break;
+    }
     // ---- litter and wear (the stage's clutter: walked over, or a heap to walk round) ----
     case 'planks': {
       // Rotten planks, a few thrown down across each other, one on its edge against the rest.
