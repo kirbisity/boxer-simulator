@@ -12,9 +12,10 @@
 //             a rest within a few metres of his way.
 //
 // Usage:
-//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 3600] [--allies 3] [--logs] [--allies 3]
+//   node tools/dunnottar.js [sweep] [--policy careful,reckless] [--runs 10] [--seed0 1] [--jobs 8] [--deaths 10] [--seconds 3600] [--allies 3] [--route front,sewer] [--logs] [--allies 3]
 //   node tools/dunnottar.js segments [--runs 20] [--segments start_rest1,rest1_rest2,...] [--logs]   rest to rest, from full health
 //   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
+//   node tools/dunnottar.js knights [--runs 20] [--tweak skill=0.3,exercise=0.2]               Sir Alasdair (the plate knight at the front gate) alone, from rest 1
 //   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
 // A sweep of 16 + 16 runs takes about ten minutes on ten cores (a run is a few thousand simulated seconds at about 6x real time);
 // each run is its own process, `--jobs` of them at a time. `segments` is the quick way to tune: one stretch, many seeds.
@@ -116,7 +117,7 @@ import { regionContains, setMechanism, stageFloor, updateStage } from '../src/le
 import { rayBlocked } from '../src/physics/terrain.js';
 import { findPath } from './botnav.js';
 import { OUTFITS } from '../src/outfits.js';
-import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 
 const STEP = 1 / 60;
 /**
@@ -125,8 +126,15 @@ const STEP = 1 / 60;
  * dead where they stood from the start (what the stage was before it had a team: `--allies 0`).
  */
 let ALLIES = 3;
-/** The sections in the order the route reaches them (the cell is a side room). */
-const ORDER = ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'];
+/**
+ * Which way he goes: `front` (DUNNOTTAR_ROUTE: the gorge, the ledge past Sir Alasdair, the gatehouse, the ascent, the quadrangle) or `sewer`
+ * (DUNNOTTAR_SEWER_ROUTE: the sea cave under the shelf, the old drain, the sea-gate and the stair behind the heavy door up into the vault).
+ * `--route front,sewer` sweeps both. A run reads it when it is made.
+ */
+let ROUTE = 'front';
+const routeLegs = () => (ROUTE === 'sewer' ? DUNNOTTAR_SEWER_ROUTE : DUNNOTTAR_ROUTE);
+/** The sections in the order each route reaches them (the cell is a side room). */
+const ORDERS = { front: ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'], sewer: ['cliff', 'sewer', 'crypt', 'vault', 'tower', 'chapel'] };
 const PLAYER = new Set([0]);
 const hipX = (fighter) => fighter.x[P.pelvis * 3];
 const hipZ = (fighter) => fighter.x[P.pelvis * 3 + 2];
@@ -140,6 +148,12 @@ const POLICY = {
   trace: { engage: 0, release: 0, heal: false, loot: false, items: 0, rest: 0, run: false, retreatAt: 99 },
 };
 
+/** Whether a lever's mechanism is already in the state the lever sets (it was pulled in an earlier life of the run). */
+function leverSet(world, id) {
+  const lever = DUNNOTTAR.sections.flatMap((section) => section.levers).find((entry) => entry.id === id);
+  return Boolean(lever) && world.stage.mechanisms[lever.target] === lever.state;
+}
+
 /** How much a harness protects: the mean of its blunt, cut and pierce proofing. */
 function protection(inputs) {
   const spec = OUTFITS[inputs.outfit?.kind]?.protection;
@@ -151,23 +165,24 @@ function protection(inputs) {
 /** The route as one list of points: [{ p: [x, z], acts: [] }], the chapel gate to be opened at the end of the wall walk. */
 function basePlan() {
   const plan = [];
-  for (const leg of DUNNOTTAR_ROUTE) {
+  for (const leg of routeLegs()) {
     for (const p of leg.points) plan.push({ p, acts: [], leg: leg.name, base: plan.length });
-    // (The gates a leg lists are the ones its end comes to: the chapel gate at the end of the wall walk.)
-    if (leg.open?.length) plan.at(-1).acts.push(...leg.open.map((id) => ({ kind: 'gate', id })));
+    // (The gates a leg lists are the ones its end comes to: the chapel gate at the end of the wall walk. A leg that ends at a lever pulls it: the sea-gate's.)
+    if (leg.lever) plan.at(-1).acts.push({ kind: 'lever', id: leg.lever });
+    else if (leg.open?.length) plan.at(-1).acts.push(...leg.open.map((id) => ({ kind: 'gate', id })));
   }
   return plan;
 }
 
-let traceCache = null;
+const traceCache = {};
 /** Where a man walking the route goes, nobody about: samples { x, y, z, idx } each half second. */
 function routeTrace() {
-  if (!traceCache) {
+  if (!traceCache[ROUTE]) {
     const run = new Run({ policy: 'trace', seed: 1 });
     run.play({ seconds: 900 });
-    traceCache = run.samples;
+    traceCache[ROUTE] = run.samples;
   }
-  return traceCache;
+  return traceCache[ROUTE];
 }
 
 /** The nearest trace sample to a point (3 m of height counts as a far step: floors above and below are not near). */
@@ -239,9 +254,11 @@ class Run {
    * @param maxDeaths the deaths after which the run is a fail
    * @param plan the points to walk (default: the policy's plan)
    * @param setup a function given the world before the first step (the boss duel's)
+   * @param until a function of the run that gives the result when it is over (the knight duel's), else null
    */
-  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false, endAt = null, only = null, allies = ALLIES }) {
+  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false, endAt = null, only = null, until = null, allies = ALLIES }) {
     this.endAt = endAt;
+    this.until = until;
     this.only = only;
     this.policy = policy;
     this.spec = POLICY[policy];
@@ -261,7 +278,10 @@ class Run {
     this.sampleAt = 0;
     this.deaths = [];
     this.stats = { bandages: 0, tonics: 0, swaps: 0, hammers: 0, rests: 0, kills: 0, stuck: 0, retreats: 0, finishers: 0, lunges: 0, crawls: 0 };
+    this.order = ORDERS[ROUTE];
     this.furthest = 0;
+    this.knight = { attempts: 0, beaten: false };
+    this.knightAware = false;
     this.vaelen = { reached: false, attempts: 0, beaten: false, atArrival: [] };
     this.cursor = 0;
     this.lastHit = null;
@@ -363,8 +383,23 @@ class Run {
       if (event.attacker === 0 && ['knockout', 'killed'].includes(event.kind) && event.fighter !== 0) this.stats.kills += 1;
     }
     if (this.endAt && !this.result && this.me.state === 'up' && Math.hypot(hipX(this.me) - this.endAt[0], hipZ(this.me) - this.endAt[2]) < 1.2 && Math.abs(feetFloor(this.me) - this.endAt[1]) < 1.2) this.result = 'through';
-    const here = ORDER.indexOf(this.sectionName());
+    if (this.until && !this.result) this.result = this.until(this);
+    const here = this.order.indexOf(this.sectionName());
     if (here > this.furthest) this.furthest = here;
+    // Sir Alasdair, the knight in plate at the front gate: how often he turns on him, and whether he falls.
+    const knight = world.fighters.find((fighter) => fighter.spawn?.id === 'gateknight');
+    if (knight) {
+      const aware = !knight.dormant && knight.state !== 'out' && levelAware(world, knight);
+      if (aware && !this.knightAware) {
+        this.knight.attempts += 1;
+        this.note('Sir Alasdair sees him');
+      }
+      this.knightAware = aware;
+      if (knight.state === 'out' && !this.knight.beaten) {
+        this.knight.beaten = true;
+        this.note('Sir Alasdair is down');
+      }
+    }
     const boss = this.level.boss ? world.fighters[this.level.boss.id] : null;
     if (boss) {
       const aware = !boss.dormant && boss.state !== 'out' && levelAware(world, boss);
@@ -879,12 +914,13 @@ class Run {
     me.move = 0;
     if (act.kind === 'item') done ||= level.taken.has(act.id);
     if (act.kind === 'gate') done ||= world.stage.mechanisms[act.id] === 'open';
+    if (act.kind === 'lever') done ||= level.pulled.has(act.id) || leverSet(world, act.id);
     if (act.kind === 'rest') {
       const need = bodyHarm(me) > 0.03 || level.inventory.bandage < level.startItems.bandage || level.inventory.tonic < level.startItems.tonic || !this.restsMade.has(act.id);
       done ||= !need || level.checkpoint.id === act.id;
     }
     if (!done) {
-      const choice = interactions(world).find((entry2) => (act.kind === 'item' && entry2.id === `item:${act.id}`) || (act.kind === 'gate' && entry2.id === `gate:${act.id}`) || (act.kind === 'rest' && entry2.kind === 'rest'));
+      const choice = interactions(world).find((entry2) => (act.kind === 'item' && entry2.id === `item:${act.id}`) || (act.kind === 'gate' && entry2.id === `gate:${act.id}`) || (act.kind === 'lever' && entry2.id === `lever:${act.id}`) || (act.kind === 'rest' && entry2.kind === 'rest'));
       if (choice && !choice.disabled && this.aware().every((enemy) => enemy.d > 6)) {
         if (choice.run(world) !== false) {
           if (act.kind === 'rest') {
@@ -926,7 +962,9 @@ class Run {
     return {
       policy: this.policy,
       result: this.result,
-      furthest: ORDER[this.furthest],
+      route: ROUTE,
+      furthest: this.order[this.furthest],
+      knight: this.knight,
       deaths: this.deaths,
       seconds: Number(this.world.time.toFixed(0)),
       stats: this.stats,
@@ -986,6 +1024,45 @@ function bossDuel(variant, seed, log, seconds = 240) {
   return { variant, seed, result: boss.state === 'out' ? 'beaten' : run.deaths.length ? 'died' : 'timeout', seconds: run.report().seconds, by: run.deaths[0]?.by ?? '', bossHurt: Number(hurtShare(boss).toFixed(2)), log: run.log };
 }
 
+
+// ---- The knight alone ---------------------------------------------------------------------------------------
+
+/**
+ * Sir Alasdair, the knight in plate on the ledge at the front gate, alone (nobody else awake but the comrades): the operative from the gorge brazier (rest 1,
+ * whole, the pouch as the stage gives it) walks to the ledge and fights what turns on him. One death ends it. `tweak` is laid over the knight's fighter inputs
+ * (skill, exercise, calories... or `preset`) before the world is made, to tune him: node tools/dunnottar.js knight --runs 20 --tweak skill=0.3,exercise=0.2.
+ */
+function knightDuel(seed, log, seconds = 300, tweak = {}) {
+  const spawn = DUNNOTTAR.sections.flatMap((section) => section.spawns).find((entry) => entry.id === 'gateknight');
+  const was = { preset: spawn.preset, inputs: structuredClone(spawn.inputs) };
+  const { preset, ...inputs } = tweak;
+  if (preset) spawn.preset = preset;
+  Object.assign(spawn.inputs, inputs);
+  const leg = DUNNOTTAR_ROUTE.find((entry) => entry.name === 'the gorge and the ledge');
+  const plan = leg.points.slice(0, 4).map((p) => ({ p, acts: [], leg: leg.name }));
+  plan.forEach((entry, index) => { entry.base = index; });
+  const run = new Run({
+    policy: 'careful',
+    seed,
+    plan,
+    log,
+    maxDeaths: 1,
+    until: (self) => (self.knight.beaten ? 'beaten' : null),
+    setup: (self) => {
+      const comrades = comradesOf(self.world).slice(0, ALLIES).map((fighter) => fighter.spawn.id);
+      self.only = ['gateknight', ...comrades];
+      const rest = RESTS.rest1;
+      restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
+      self.level.ui.length = 0;
+      self.me.mayTarget = (other) => self.wanted(other);
+    },
+  });
+  run.play({ seconds });
+  Object.assign(spawn, was);
+  spawn.inputs = was.inputs;
+  const knight = run.world.fighters.find((fighter) => fighter.spawn?.id === 'gateknight');
+  return { seed, result: run.knight.beaten ? 'beaten' : run.deaths.length ? 'died' : 'timeout', seconds: run.report().seconds, harm: Number(bodyHarm(run.me).toFixed(2)), knightHurt: Number(hurtShare(knight).toFixed(2)), by: run.deaths[0]?.by ?? '', log: run.log };
+}
 
 // ---- Segments: from one rest to the next -------------------------------------------------------------------
 
@@ -1050,6 +1127,15 @@ function parseArgs(argv) {
   return options;
 }
 
+/** `skill=0.3,exercise=0.2,preset=dunnottarPlateKnight` as an object (numbers where they are numbers). */
+function parseTweak(text) {
+  if (!text) return {};
+  return Object.fromEntries(String(text).split(',').map((pair) => {
+    const [key, value] = pair.split('=');
+    return [key, Number.isFinite(Number(value)) ? Number(value) : value];
+  }));
+}
+
 /** Run `jobs` child processes at a time over the argument lists; each prints one JSON line. */
 function farm(lists, jobs) {
   const script = fileURLToPath(import.meta.url);
@@ -1096,7 +1182,7 @@ function printSweep(runs) {
   }
 }
 
-function printSummary(runs) {
+function printSummary(runs, route = ROUTE) {
   for (const policy of [...new Set(runs.map((run) => run.policy))]) {
     const mine = runs.filter((run) => run.policy === policy);
     const share = (test) => `${mine.filter(test).length}/${mine.length}`;
@@ -1111,7 +1197,11 @@ function printSummary(runs) {
     const attempts = mine.reduce((total, run) => total + (run.vaelen.attempts ?? 0), 0);
     const wins = mine.filter((run) => run.vaelen.beaten).length;
     const sorted = (object) => Object.entries(object).sort((a, b) => b[1] - a[1]).map(([key, count]) => `${key} ${count}`).join(', ');
-    console.log(`\n${policy}: reached Vaelen ${share((run) => run.vaelen.reached)}, beat him ${share((run) => run.vaelen.beaten)} (${wins}/${attempts} attempts), failed ${share((run) => run.result === 'fail')}, mean deaths ${(sum / mine.length).toFixed(1)}, median time ${[...mine.map((run) => run.seconds)].sort((a, b) => a - b)[Math.floor(mine.length / 2)]} s`);
+    const met = mine.filter((run) => run.knight?.attempts > 0).length;
+    const knightWins = mine.filter((run) => run.knight?.beaten).length;
+    const knightTries = mine.reduce((total, run) => total + (run.knight?.attempts ?? 0), 0);
+    console.log(`\n[${route}] ${policy}: reached Vaelen ${share((run) => run.vaelen.reached)}, beat him ${share((run) => run.vaelen.beaten)} (${wins}/${attempts} attempts), failed ${share((run) => run.result === 'fail')}, mean deaths ${(sum / mine.length).toFixed(1)}, median time ${[...mine.map((run) => run.seconds)].sort((a, b) => a - b)[Math.floor(mine.length / 2)]} s`);
+    if (route === 'front') console.log(`  Sir Alasdair (plate knight at the gate): met in ${met}/${mine.length} runs, beaten in ${knightWins}/${met} of them (${knightWins}/${knightTries} times he turned on him)`);
     console.log(`  deaths by section: ${sorted(bySection) || 'none'}`);
     console.log(`  deaths by: ${sorted(byKiller) || 'none'}`);
   }
@@ -1122,6 +1212,8 @@ async function main() {
   const command = options._[0] ?? 'sweep';
   const jobs = Number(options.jobs ?? Math.max(1, cpus().length - 2));
   ALLIES = Number(options.allies ?? 3);
+  const routes = String(options.route ?? 'front').split(',');
+  ROUTE = routes[0];
   if (command === 'one') {
     const [, policy, seed] = options._;
     const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });
@@ -1132,6 +1224,20 @@ async function main() {
   if (command === 'seg') {
     const [, name, policy, seed] = options._;
     console.log(JSON.stringify(segment(name, policy, Number(seed), Boolean(options.log))));
+    return;
+  }
+  if (command === 'knight') {
+    console.log(JSON.stringify(knightDuel(Number(options._[1]), Boolean(options.log), 300, parseTweak(options.tweak))));
+    return;
+  }
+  if (command === 'knights') {
+    const runs0 = Number(options.runs ?? 20);
+    const lists = Array.from({ length: runs0 }, (_, index) => ['knight', String(Number(options.seed0 ?? 1) + index), '--allies', String(ALLIES), ...(options.tweak ? ['--tweak', String(options.tweak)] : [])]);
+    const results = await farm(lists, jobs);
+    const by = {};
+    for (const result of results) if (result.by) by[result.by] = (by[result.by] ?? 0) + 1;
+    const mean = (key) => (results.reduce((sum, result) => sum + (result[key] ?? 0), 0) / Math.max(1, results.length)).toFixed(2);
+    console.log(`Sir Alasdair alone (allies ${ALLIES}${options.tweak ? `, ${options.tweak}` : ''}): beaten ${results.filter((result) => result.result === 'beaten').length}/${results.length}  died ${results.filter((result) => result.result === 'died').length}  timed out ${results.filter((result) => result.result === 'timeout').length}  mean knight hurt ${mean('knightHurt')}  median ${[...results.map((result) => result.seconds)].sort((a, b) => a - b)[Math.floor(results.length / 2)]} s`);
     return;
   }
   if (command === 'boss') {
@@ -1172,17 +1278,24 @@ async function main() {
     return;
   }
   const policies = String(options.policy ?? 'careful,reckless').split(',');
-  const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--allies', String(ALLIES), '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 3600), ...(options.logs ? ['--log'] : [])]));
-  const results = await farm(lists, jobs);
-  printSweep(results);
-  // (`--logs`: the tail of the log of each run that did not beat him, to see where it was at the end.)
-  if (options.logs) for (const run of results.filter((entry) => !entry.vaelen?.beaten)) console.log(`--- ${run.policy} seed ${run.seed} ${run.result} at ${run.seconds} s\n${(run.log ?? []).slice(-12).join('\n')}`);
-  printSummary(results);
+  // (`--route front,sewer`: each way in turn, the same seeds.)
+  for (const route of routes) {
+    ROUTE = route;
+    const lists = policies.flatMap((policy) => Array.from({ length: runs }, (_, index) => ['one', policy, String(seed0 + index), '--allies', String(ALLIES), '--route', route, '--deaths', String(options.deaths ?? 10), '--seconds', String(options.seconds ?? 3600), ...(options.logs ? ['--log'] : [])]));
+    const results = await farm(lists, jobs);
+    console.log(`\n==== route: ${route} ====`);
+    printSweep(results);
+    // (`--logs`: the tail of the log of each run that did not beat him, to see where it was at the end.)
+    if (options.logs) for (const run of results.filter((entry) => !entry.vaelen?.beaten)) console.log(`--- ${run.policy} seed ${run.seed} ${run.result} at ${run.seconds} s\n${(run.log ?? []).slice(-12).join('\n')}`);
+    printSummary(results, route);
+  }
 }
 
 /** (For scripts that build runs themselves.) */
 const setAllies = (count) => { ALLIES = count; };
 
-export { setAllies, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, POLICY, VARIANTS };
+const setRoute = (name) => { ROUTE = name; };
+
+export { setAllies, setRoute, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, knightDuel, POLICY, VARIANTS };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
