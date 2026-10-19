@@ -1,12 +1,14 @@
-// Level mode, the team: the comrades who fight beside the operative (the three Forgers the stage starts him with, and any
-// prisoner he frees: role 'ally', corner 'red'). They follow him and fight what he fights (awareness.js followers); this
+// Level mode, the team: the comrades who fight beside the operative (the two weak Forgers the stage starts him with, Maren and Old
+// Tobin, and any prisoner he frees: role 'ally', corner 'red'). They follow him and fight what he fights (awareness.js followers); this
 // module is what the player is told about them, with no drawing:
 //   teamStatus(world)   [{ id, spawn, name, alive, state, fraction, distance, near }] in fighter order, the fallen too
-//   watchTeam(world)    each step: a comrade who falls is said so once ('Brann has fallen'), and the first time any holds at the
-//                       chapel gate the player is told they do ('Your comrades hold the gate')
+//   watchTeam(world)    each step: a comrade who falls is said so once ('Maren has fallen'; said again if he falls again after
+//                       being brought back), and the first time any holds at the chapel gate the player is told they do
+//                       ('Your comrades hold the gate')
 // Friendly fire is real (the player can strike anyone): a comrade he hits keeps his loyalty, flinches as any man does, and says so once in a while.
-// The rule the rest of the run keeps (checkpoints.js reviveWorld): a comrade who has fallen stays fallen, through every rest and
-// every death of the operative; the living are gathered beside him each time. Nothing here revives anyone.
+// The rule the rest of the run keeps (checkpoints.js reviveWorld): a rest records which comrades are alive; a death of the operative
+// wakes him with exactly those beside him, so one who fell since the rest comes back. One who fell before the rest stays where he
+// fell: a comrade dead when the next rest is reached is lost for good. Nothing here revives anyone; it only keeps the telling in step.
 
 import { P } from '../body.js';
 import { hurtShare } from '../ai.js';
@@ -66,7 +68,9 @@ export function watchTeam(world) {
     }
   }
   for (const fighter of comradesOf(world)) {
-    if (fighter.state === 'out' && !team.fallen.has(fighter.spawn.id)) {
+    // (Brought back by a death of the operative: he may fall, and be said to, again.)
+    if (fighter.state !== 'out') team.fallen.delete(fighter.spawn.id);
+    else if (!team.fallen.has(fighter.spawn.id)) {
       team.fallen.add(fighter.spawn.id);
       say(world, { type: 'toast', text: TEAM.fallenText(fighter.body.inputs.name) });
     }
