@@ -24,19 +24,24 @@
 
 import { sculptTraits } from './sculpt.js';
 
+// Where the landmarks are (u up the trunk: 0 the hip joint, 1 the base of the neck), measured on an emaciated reference figure
+// (fractions of standing height: the jugular notch and collarbones 0.81, the xiphoid 0.69, the lowest rib margin 0.64, the waist
+// 0.60, the iliac crest 0.58, the crotch 0.49) and carried to this rig's trunk (hip joint at 0.53 of the height, neck at 0.80).
+export const LANDMARKS = { clavicle: 0.98, notch: 1.0, xiphoid: 0.59, archSide: 0.41, waist: 0.26, navel: 0.26, crest: 0.185, asis: 0.075, pecEdge: 0.665, nipple: 0.7, scapulaTop: 0.93, scapulaLow: 0.62, ribTop: 0.95 };
+
 export const RULES = {
   // Ribs: spacing (u), how much lower a rib's front end is than its back (u), and how many show.
   ribSpacing: 0.041,
   ribDroop: 0.12,
   // The costal arch: its height at the breastbone (the xiphoid) and at the side.
-  archFront: 0.505,
-  archSide: 0.33,
+  archFront: 0.59,
+  archSide: 0.41,
   // The rectus: its column's inner and outer edge (angle from the front) and its rows (u, lowest first).
   absInner: 0.04,
   absOuter: 0.4,
-  absRows: [[0.125, 0.27], [0.28, 0.362], [0.372, 0.448], [0.458, 0.53]],
+  absRows: [[0.0, 0.25], [0.265, 0.37], [0.38, 0.48], [0.49, 0.585]],
   // The pectoral's lower edge (u at the breastbone) and how much it rises towards the armpit.
-  pecEdge: 0.6,
+  pecEdge: 0.665,
   pecRise: 0.05,
   // Most a rule stands out or in (m).
   most: 0.016,
@@ -130,7 +135,8 @@ export function rulesTraits(body) {
     veryHeavy: rSmooth(0.07, 0.12, fat),
     defined,
     abs: rClamp(rSmooth(0.05, 0.45, dev) * defined + 0.35 * lean ** 2 * (1 - bony) * defined) * (female ? 0.6 : 1),
-    ribs: lean ** 1.6 * (0.08 + 0.92 * bony) * (female ? 0.85 : 1),
+    // Ribs show through a starved or thin trunk, not a lean trained one (its lats and serratus cover them).
+    ribs: lean ** 1.6 * rSmooth(0.22, 0.85, bony) * (female ? 0.85 : 1),
     veins: (female ? 0.4 : 1) * rClamp(traits.arm.lean ** 1.5 * (0.25 + 0.75 * rSmooth(0.1, 0.7, dev))),
     stretch: rSmooth(0.05, 0.11, fat) + 0.5 * rSmooth(0.7, 1.05, dev) * (female ? 0 : 1),
     cellulite: rSmooth(female ? 0.03 : 0.05, female ? 0.08 : 0.1, traits.thigh.fat),
@@ -167,7 +173,7 @@ export function trunkRule(R, u, angle) {
   if (R.abs > 0.01) {
     const outer = RULES.absOuter - 0.03 * (1 - dev);
     // The muscle's belly: the whole column a little raised, soft at its edges.
-    h += 0.002 * R.abs * rBand(fa, 0.02, outer - 0.02, 0.05) * rBand(u, 0.12, 0.53, 0.04);
+    h += 0.002 * R.abs * rBand(fa, 0.02, outer - 0.02, 0.05) * rBand(u, 0.0, 0.59, 0.04);
     const across = rClamp((fa - 0.008) / (outer - 0.008));
     if (across > 0 && across < 1) {
       // Each block a cushion: round across and along, so the grooves between them (the linea alba, the tendinous bands) are soft valleys.
@@ -182,7 +188,7 @@ export function trunkRule(R, u, angle) {
       h += 0.0042 * R.abs * domeAcross * along;
     }
     // The linea semilunaris: the column's outer edge, a shallow groove, and the obliques' swell beyond it.
-    h -= 0.0018 * R.abs * rHump(fa, RULES.absOuter + 0.04, 0.035) * rBand(u, 0.12, 0.5, 0.05);
+    h -= 0.0018 * R.abs * rHump(fa, RULES.absOuter + 0.04, 0.035) * rBand(u, 0.0, 0.58, 0.05);
   }
   // Obliques over the hip, and the groove of the inguinal line (the V) from the hip's front spine to the pubis.
   if (lean > 0.05) {
@@ -200,14 +206,15 @@ export function trunkRule(R, u, angle) {
     const arch = fa < 1.9 ? archAt(fa) : RULES.archSide - 0.12 * rSmooth(1.9, 2.6, fa);
     const front = Math.cos(angle) > -0.2;
     const window = rSmooth(arch - 0.005, arch + 0.035, u)
-      * (1 - rSmooth(front ? 0.7 : 0.66, front ? 0.77 : 0.72, u))
+      * (1 - rSmooth(front ? 0.9 : 0.86, front ? 0.97 : 0.93, u))
       * rSmooth(0.14, 0.3, fa)
-      // The erectors either side of the spine cover the ribs there.
+      // The erectors either side of the spine cover the ribs there, and a trained man's lats the rest of the back.
       * rSmooth(0.22, 0.42, back)
+      * (1 - 0.85 * rClamp(dev) * rSmooth(1.4, 2.0, fa))
       // The scapula lies over the upper ribs at the back, the pectoral over them in front (unless there is no pectoral to speak of).
-      * (1 - 0.8 * rHump(back, 0.7, 0.45) * rHump(u, 0.68, 0.09))
-      * (1 - (0.4 + 0.6 * dev) * (female ? 0.9 : 0.6) * rHump(u, 0.67, 0.07) * rHump(fa, 0.6, 0.45));
-    h += 0.0048 * R.ribs * window * profile;
+      * (1 - 0.8 * rHump(back, 0.7, 0.45) * rHump(u, 0.78, 0.12))
+      * (1 - (0.4 + 0.6 * dev) * (female ? 0.9 : 0.6) * rHump(u, 0.77, 0.09) * rHump(fa, 0.6, 0.45));
+    h += 0.004 * R.ribs * window * profile;
   }
   // The costal arch: a ridge where the cage ends, the soft belly a little sunk below it.
   if (lean > 0.1) {
@@ -217,16 +224,16 @@ export function trunkRule(R, u, angle) {
     h -= 0.0025 * bony * (1 - rSmooth(arch - 0.05, arch - 0.005, u)) * rSmooth(0.14, 0.22, u) * near;
   }
   // The breastbone: a faint flat ridge in the bony, the pit at its foot (the xiphoid) and the notch at its head.
-  h += 0.0015 * bony * rHump(fa, 0, 0.07) * rBand(u, 0.52, 0.86, 0.03);
+  h += 0.0015 * bony * rHump(fa, 0, 0.07) * rBand(u, 0.6, 0.97, 0.03);
   h -= 0.0025 * lean * rHump(fa, 0, 0.09) * rHump(u, RULES.archFront + 0.02, 0.02);
-  h -= (0.002 + 0.006 * bony) * lean * rHump(fa, 0, 0.12) * rHump(u, 0.94, 0.025);
+  h -= (0.002 + 0.006 * bony) * lean * rHump(fa, 0, 0.12) * rHump(u, 1.0, 0.025);
 
   // ---- Collarbones: the shaft climbing to the shoulder, hollows above and below it.
   {
     const shows = lean ** 1.2 * (0.35 + 0.65 * bony) * (1 - 0.6 * heavy);
     if (shows > 0.02 && Math.cos(angle) > -0.15) {
       const along = rClamp((fa - 0.14) / 1.3);
-      const centre = 0.875 + 0.06 * along;
+      const centre = 0.975 + 0.025 * along;
       const span = rSmooth(0.08, 0.2, fa) * (1 - rSmooth(1.35, 1.6, fa));
       h += (0.002 + 0.0045 * shows) * span * rHump(u, centre, 0.016);
       h -= (0.001 + 0.004 * bony) * shows * span * rHump(u, centre + 0.042, 0.02);
@@ -239,26 +246,26 @@ export function trunkRule(R, u, angle) {
     const amount = dev * (0.35 + 0.65 * defined) * (1 - 0.5 * heavy);
     const edge = RULES.pecEdge + RULES.pecRise * rSmooth(0.15, 1.15, fa);
     const across = rSmooth(0.05, 0.12, fa) * (1 - rSmooth(1.05, 1.3, fa));
-    h += 0.0045 * amount * across * rSmooth(edge - 0.01, edge + 0.035, u) * (1 - rSmooth(0.8, 0.88, u));
+    h += 0.0045 * amount * across * rSmooth(edge - 0.01, edge + 0.035, u) * (1 - rSmooth(0.9, 0.97, u));
     h -= 0.0035 * amount * across * rHump(u, edge - 0.012, 0.012);
     crease += 0.5 * amount * across * rHump(u, edge - 0.012, 0.01) * defined;
-    h -= 0.0025 * amount * rHump(fa, 0, 0.045) * rBand(u, 0.55, 0.82, 0.03);
+    h -= 0.0025 * amount * rHump(fa, 0, 0.045) * rBand(u, 0.62, 0.95, 0.03);
   }
   // Serratus: fingers along the side of a lean, trained cage, slanting down to the front.
   if (dev > 0.1 && lean > 0.2) {
     const amount = dev * lean * defined;
-    for (const centre of [0.46, 0.505, 0.55]) {
+    for (const centre of [0.54, 0.585, 0.63]) {
       h += 0.0028 * amount * rHump(u - centre + 0.06 * (fa - 1.1), 0, 0.011) * rHump(fa, 1.12, 0.16);
     }
   }
   // A woman's bust: the fold under it.
   if (female) {
-    const below = rHump(fa, 0.55, 0.4) * rHump(u, 0.565 - 0.03 * rClamp(R.fat / 0.06), 0.022);
+    const below = rHump(fa, 0.55, 0.4) * rHump(u, 0.63 - 0.03 * rClamp(R.fat / 0.06), 0.022);
     crease += (0.35 + 0.5 * rSmooth(0.01, 0.05, R.fat)) * below;
     h -= 0.002 * below;
   } else if (heavy > 0.2) {
     // A heavy man's chest: the fold under it.
-    const below = rHump(fa, 0.6, 0.45) * rHump(u, 0.585, 0.024) * heavy;
+    const below = rHump(fa, 0.6, 0.45) * rHump(u, 0.64, 0.024) * heavy;
     crease += 0.4 * below;
     h -= 0.003 * below;
   }
@@ -273,17 +280,17 @@ export function trunkRule(R, u, angle) {
     h += 0.0032 * bony * lean * along * knob * rHump(back, 0, 0.05);
     // The scapula: its medial edge and lower point a ridge with a shadow inside it, its spine a ridge to the shoulder; winged when starved.
     // (In a plane of the angle from the spine and three times u, so a triangle there is the blade's shape on the back.)
-    const plate = triangleDistance(back, u * 3, [0.36, 0.8 * 3], [0.5, 0.55 * 3], [1.1, 0.79 * 3]);
-    const spine = rSegmentDistance(back, u * 3, 0.38, 0.77 * 3, 1.05, 0.84 * 3);
-    const blade = (0.001 + 0.0045 * bony + 0.0015 * dev) * lean;
+    const plate = triangleDistance(back, u * 3, [0.36, 0.93 * 3], [0.5, 0.62 * 3], [1.1, 0.9 * 3]);
+    const spine = rSegmentDistance(back, u * 3, 0.38, 0.89 * 3, 1.05, 0.96 * 3);
+    const blade = (0.001 + 0.007 * bony + 0.0015 * dev) * lean;
     h += blade * rSmooth(0.12, -0.12, plate);
     // The shadow along its medial edge and under its lower point (a starved man's wing), soft.
     h -= (0.25 + 0.5 * bony) * blade * rHump(plate, 0.13, 0.09) * rSmooth(0.9, 0.45, back);
     h += 0.6 * blade * Math.exp(-((spine / 0.06) ** 2));
     // Trained: the lats' edge, the trapezius's lower edge: broad, faint.
-    const latEdge = rSegmentDistance(fa, u * 3, 1.7, 0.3 * 3, 2.55, 0.6 * 3);
+    const latEdge = rSegmentDistance(fa, u * 3, 1.7, 0.35 * 3, 2.55, 0.62 * 3);
     h -= 0.0014 * dev * defined * Math.exp(-((latEdge / 0.12) ** 2));
-    const trapEdge = rSegmentDistance(back, u * 3, 0.0, 0.5 * 3, 0.55, 0.78 * 3);
+    const trapEdge = rSegmentDistance(back, u * 3, 0.0, 0.45 * 3, 0.45, 0.88 * 3);
     h -= 0.0012 * dev * defined * Math.exp(-((trapEdge / 0.11) ** 2));
     // The dimples over the sacrum.
     h -= 0.0025 * lean * rHump(back, 0.33, 0.07) * rHump(u, 0.07, 0.025);
@@ -299,7 +306,7 @@ export function trunkRule(R, u, angle) {
 
   // ---- Fat: the navel, the fold under the belly, the flank's fold, stretch marks.
   {
-    const navel = rHump(fa, 0, 0.055) * rHump(u, 0.245, 0.013 + 0.008 * heavy);
+    const navel = rHump(fa, 0, 0.055) * rHump(u, 0.26, 0.013 + 0.008 * heavy);
     h -= (0.0025 + 0.006 * heavy) * navel;
     crease += (0.4 + 0.5 * heavy) * navel;
     if (heavy > 0.05) {
@@ -313,12 +320,12 @@ export function trunkRule(R, u, angle) {
     if (R.stretch > 0.02) {
       // Marks across the belly's sides and the flanks (a bodybuilder's run from the chest to the shoulder).
       const lines = Math.max(0, Math.sin((u * 40 + 0.6 * Math.sin(fa * 7)) * Math.PI * 2) - 0.7) / 0.3;
-      const where = rHump(fa, 1.05, 0.35) * rBand(u, 0.1, 0.4, 0.06) * rSmooth(0.05, 0.11, R.fat) + (female ? 0 : rSmooth(0.7, 1.05, dev) * rHump(fa, 1.15, 0.2) * rHump(u, 0.74, 0.04));
+      const where = rHump(fa, 1.05, 0.35) * rBand(u, 0.1, 0.4, 0.06) * rSmooth(0.05, 0.11, R.fat) + (female ? 0 : rSmooth(0.7, 1.05, dev) * rHump(fa, 1.15, 0.2) * rHump(u, 0.8, 0.04));
       stretch += rClamp(R.stretch) * lines * where;
     }
   }
   // The armpit's hollow at the top of the side.
-  crease += 0.6 * rHump(fa, 1.62, 0.22) * rHump(u, 0.78, 0.04);
+  crease += 0.6 * rHump(fa, 1.62, 0.22) * rHump(u, 0.86, 0.04);
   return { h: rClamp(h, -RULES.most, RULES.most), crease: rClamp(crease), vein: 0, stretch: rClamp(stretch), flush: 0 };
 }
 
@@ -337,13 +344,13 @@ export function trunkSilhouette(R, u, angle) {
     out -= 0.026 * bony * below * rSmooth(0.1, 0.2, u) * (1 - rSmooth(0.9, 1.55, fa)) * (1 - heavy);
     out += 0.005 * bony * rHump(u, arch + 0.01, 0.025) * (1 - rSmooth(0.2, 1.6, fa));
     // The cage itself: the starved chest is a barrel of bone, the waist pinched under it.
-    out -= 0.01 * bony * rHump(u, 0.24, 0.07) * rSmooth(0.9, 1.5, fa) * (1 - rSmooth(2.2, 2.8, fa));
+    out -= 0.01 * bony * rHump(u, 0.27, 0.07) * rSmooth(0.9, 1.5, fa) * (1 - rSmooth(2.2, 2.8, fa));
   }
   if (lean > 0.1) {
     // Collarbones and the shoulder blades, which stand out of a thin back.
     const along = rClamp((fa - 0.14) / 1.3);
-    out += 0.004 * lean * (0.3 + 0.7 * bony) * rSmooth(0.1, 0.25, fa) * (1 - rSmooth(1.35, 1.6, fa)) * rHump(u, 0.875 + 0.06 * along, 0.02) * (Math.cos(angle) > -0.15 ? 1 : 0);
-    out += (0.002 + 0.008 * bony) * lean * rHump(back, 0.62, 0.3) * rHump(u, 0.68, 0.09);
+    out += 0.004 * lean * (0.3 + 0.7 * bony) * rSmooth(0.1, 0.25, fa) * (1 - rSmooth(1.35, 1.6, fa)) * rHump(u, 0.975 + 0.025 * along, 0.02) * (Math.cos(angle) > -0.15 ? 1 : 0);
+    out += (0.002 + 0.008 * bony) * lean * rHump(back, 0.62, 0.3) * rHump(u, 0.78, 0.1);
   }
   return out;
 }
@@ -452,7 +459,7 @@ export function limbRule(R, kind, side, t, angle) {
     // The knee: the kneecap's outline, its tendon, the pads either side; the fold behind it.
     const cap = Math.hypot((t - 0.985) / 0.045, signed / 0.42);
     h += (0.0015 + 0.003 * bony) * rSmooth(1.25, 0.7, cap);
-    h -= (0.001 + 0.0015 * bony) * rHump(cap, 1.15, 0.18);
+    h -= (0.0004 + 0.0012 * bony) * rHump(cap, 1.25, 0.32);
     crease += 0.55 * rHump(t, 1.0, 0.025) * rHump(Math.PI - fa, 0, 0.6);
     flush += 0.35 * rSmooth(1.4, 0.5, cap);
     // The buttock's fold behind, at the top of the thigh; the groin inside.

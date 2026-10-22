@@ -12,7 +12,7 @@ import { BONE, bindPoints, boneFrames } from './rig.js';
 import { glovedFists, outfitOf } from './outfits.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile as stepProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
-import { rulesProfile, rulesShape, rulesTraits } from './skinrules.js';
+import { rulesProfile, rulesShape, rulesTraits, trunkSilhouette } from './skinrules.js';
 
 // Tops: where the hem and neckline sit along the trunk (0 hips, 1 neck),
 // how far the cloth stands off the skin, how long the sleeves run (a share of
@@ -127,6 +127,11 @@ export const LOFT = {
   relaxAmount: 0.3,
   // The rules' styles: how much fuller a limb is drawn per metre of fat on it (0.03 m of fat: 15%).
   limbFatDrawn: 5,
+  // The medium ring density (a skin wrapped onto a field): sides round a limb and the trunk, rings per baseline ring, the trunk's ring step (u).
+  medium: { limbSides: 16, trunkSides: 36, limbDensity: 1.3, trunkStep: 0.022 },
+  // Wrapping onto a field: Newton steps, the most a step and a whole wrap may move a point (m), the gradient's step (m), how far a
+  // point buried in another part is set back behind the surface (m), and where the wrap fades in and out (the trunk's hips, the neck's top).
+  wrap: { steps: 4, step: 0.03, most: 0.06, epsilon: 0.003, buried: 0.0025, hips: [0.3, 0.45], legs: false, neckTop: [0.3, 0.5], clothReach: 0.045 },
 };
 
 /**
@@ -156,6 +161,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       mesh.colors.push(paint(ring, angle, ringIndex, step));
       mesh.bones.push(bones(ring, Math.cos(angle)));
       mesh.ringT.push(ring.t);
+      mesh.ringA.push(angle);
       if (uv) {
         mesh.uvs.set(mesh.positions.length / 3 - 1, uv(ring, step / sides));
         if (step === sides) mesh.welds.push([mesh.positions.length / 3 - 1, mesh.positions.length / 3 - 1 - sides]);
@@ -176,6 +182,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
     mesh.colors.push(paint(rings[row], 0, row, 0));
     mesh.bones.push(bones(rings[row], 0));
     mesh.ringT.push(rings[row].t);
+    mesh.ringA.push(0);
     if (uv) mesh.uvs.set(center, uv(rings[row], 0));
     for (let step = 0; step < sides; step += 1) {
       const a = start + row * stride + step;
@@ -207,6 +214,151 @@ function along(a, b, forward, count, from, to, depthAt, widthAt, offsetAt = () =
   return rings;
 }
 
+/** The gradient of a field at a point, unit (a tetrahedron of four reads). */
+function fieldGradient(field, x, y, z, e) {
+  const a = field(x + e, y - e, z - e);
+  const b = field(x - e, y - e, z + e);
+  const c = field(x - e, y + e, z - e);
+  const d = field(x + e, y + e, z + e);
+  const g = [a - b - c + d, -a - b + c + d, -a + b - c + d];
+  const length = Math.hypot(...g) || 1;
+  return [g[0] / length, g[1] / length, g[2] / length];
+}
+
+/**
+ * Wrap a loft's skin onto a field's surface (the refined flesh field: the limbs grow out of the trunk, the elbow and knee are one
+ * surface): each skin point walked along the field's gradient onto its zero (Newton steps), so the loft keeps its topology, its
+ * texture coordinates and its skin weights but takes the field's shape. A point of one part buried in another (an arm's root inside
+ * the trunk, the trunk under the deltoid) lands on the same surface as the other's: it is set back a little behind it, so the part
+ * whose surface it is wins. Cloth is moved with the skin, keeping its standoff. `outline(vertex)`: metres out along the normal added
+ * on the trunk afterwards (the outline's features the field lacks). Returns the normals: the field's own on the skin.
+ */
+function wrapOnField(positions, normals, mesh, regions, field, recompute, outline) {
+  const spec = LOFT.wrap;
+  const count = positions.length / 3;
+  const copies = new Set(mesh.welds.map(([copy]) => copy));
+  const partOf = new Array(count).fill(null);
+  for (const [name, [from, to]] of Object.entries(mesh.parts)) for (let vertex = from; vertex < to; vertex += 1) partOf[vertex] = name;
+  const cell = 0.05;
+  const key = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+  const grid = new Map();
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (regions[vertex] !== 'skin') continue;
+    const slot = key(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]);
+    if (!grid.has(slot)) grid.set(slot, []);
+    grid.get(slot).push(vertex);
+  }
+  /** The nearest skin point to (x, y, z) not of part `not` (or any), and the distance to its tangent plane. */
+  const nearest = (x, y, z, not = undefined) => {
+    let best = cell * cell;
+    let found = -1;
+    const [cx, cy, cz] = [Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell)];
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dz = -1; dz <= 1; dz += 1) {
+          for (const other of grid.get(`${cx + dx},${cy + dy},${cz + dz}`) ?? []) {
+            if (not !== undefined && partOf[other] === not) continue;
+            const distance = (positions[other * 3] - x) ** 2 + (positions[other * 3 + 1] - y) ** 2 + (positions[other * 3 + 2] - z) ** 2;
+            if (distance < best) {
+              best = distance;
+              found = other;
+            }
+          }
+        }
+      }
+    }
+    if (found < 0) return null;
+    const plane = (x - positions[found * 3]) * normals[found * 3] + (y - positions[found * 3 + 1]) * normals[found * 3 + 1] + (z - positions[found * 3 + 2]) * normals[found * 3 + 2];
+    return { vertex: found, plane };
+  };
+  // Before anything moves: which skin points are buried in another part, and how far each piece of cloth stands off the skin.
+  const buried = new Uint8Array(count);
+  // (Cloth follows the skin point nearest it: moved as that point is, so it keeps its standoff and its hems stay on the skin.)
+  const follows = new Int32Array(count).fill(-1);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    const [x, y, z] = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
+    if (regions[vertex] === 'skin') {
+      const other = partOf[vertex] ? nearest(x, y, z, partOf[vertex]) : null;
+      if (other && other.plane < -0.003) buried[vertex] = 1;
+      // A forearm or a shin starts inside the part above it: where they overlap, the part above is the skin (one surface, no ring).
+      if (/Fore$|Shin$/.test(partOf[vertex] ?? '') && mesh.ringT[vertex] < -0.005) buried[vertex] = 1;
+    } else {
+      const skin = nearest(x, y, z);
+      if (skin && skin.plane > -0.01 && skin.plane < spec.clothReach) follows[vertex] = skin.vertex;
+    }
+  }
+  // How much of the wrap a point takes: fading in above the trunk's hips, fading out up the neck (the field's neck ends in the head).
+  const share = (vertex) => {
+    const t = mesh.ringT[vertex];
+    const part = partOf[vertex];
+    // The trunk below the waist (the hips under the shorts, a hanging belly) keeps the loft's: the field has no apron, and its hips met the shorts badly.
+    if (part === 'trunk') return Math.min(1, Math.max(0, (t - spec.hips[0]) / (spec.hips[1] - spec.hips[0])));
+    if (part === 'neck') return 1 - Math.min(1, Math.max(0, (t - spec.neckTop[0]) / (spec.neckTop[1] - spec.neckTop[0])));
+    // The legs keep the loft's (under the shorts the field's hips and the cloth fought; the knee is blended by the fillet instead).
+    if (/Thigh$|Shin$/.test(part ?? '')) return spec.legs ? 1 : 0;
+    return 1;
+  };
+  const moved = new Float32Array(positions.length);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (copies.has(vertex) || regions[vertex] !== 'skin') continue;
+    const weight = share(vertex);
+    if (weight <= 0) continue;
+    const target = 0;
+    let [x, y, z] = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
+    const [x0, y0, z0] = [x, y, z];
+    let g = null;
+    for (let step = 0; step < spec.steps; step += 1) {
+      const f = field(x, y, z) - target;
+      g = fieldGradient(field, x, y, z, spec.epsilon);
+      const move = Math.max(-spec.step, Math.min(spec.step, f));
+      x -= g[0] * move;
+      y -= g[1] * move;
+      z -= g[2] * move;
+    }
+    if (buried[vertex]) {
+      x -= g[0] * spec.buried;
+      y -= g[1] * spec.buried;
+      z -= g[2] * spec.buried;
+    }
+    // Never further than `most` from where the loft put it (a point the field cannot place stays near its ring).
+    let dx = x - x0;
+    let dy = y - y0;
+    let dz = z - z0;
+    const length = Math.hypot(dx, dy, dz);
+    const scale = (length > spec.most ? spec.most / length : 1) * weight;
+    dx *= scale;
+    dy *= scale;
+    dz *= scale;
+    moved.set([dx, dy, dz], vertex * 3);
+  }
+  // A weld's copy moves as its original; cloth as the skin under it.
+  for (const [copy, original] of mesh.welds) moved.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  for (let vertex = 0; vertex < count; vertex += 1) if (follows[vertex] >= 0) moved.copyWithin(vertex * 3, follows[vertex] * 3, follows[vertex] * 3 + 3);
+  for (let index = 0; index < positions.length; index += 1) positions[index] += moved[index];
+  // The trunk's outline features, along the field's normal.
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (regions[vertex] !== 'skin' || partOf[vertex] !== 'trunk' || copies.has(vertex)) continue;
+    const out = outline(vertex) * share(vertex);
+    if (!out) continue;
+    const g = fieldGradient(field, positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], 0.006);
+    for (let axis = 0; axis < 3; axis += 1) positions[vertex * 3 + axis] += g[axis] * out;
+  }
+  for (const [copy, original] of mesh.welds) positions.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  const result = recompute();
+  // The skin's normals are the field's (smoothed: read over a centimetre), so the shading runs on across the joins.
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (regions[vertex] !== 'skin') continue;
+    const weight = share(vertex);
+    if (weight <= 0) continue;
+    const g = fieldGradient(field, positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], 0.008);
+    const n = [0, 1, 2].map((axis) => result[vertex * 3 + axis] * (1 - weight) + g[axis] * weight);
+    const length = Math.hypot(...n) || 1;
+    for (let axis = 0; axis < 3; axis += 1) result[vertex * 3 + axis] = n[axis] / length;
+  }
+  for (const [copy, original] of mesh.welds) result.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  return result;
+}
+
 // The joins blended (`fillet` styles): which parts meet which, and the radius (m) of the blend.
 export const FILLET = {
   pairs: [['trunk', 'lUpper', 0.045], ['trunk', 'rUpper', 0.045], ['trunk', 'lThigh', 0.04], ['trunk', 'rThigh', 0.04], ['trunk', 'neck', 0.035], ['lUpper', 'lFore', 0.02], ['rUpper', 'rFore', 0.02], ['lThigh', 'lShin', 0.02], ['rThigh', 'rShin', 0.02]],
@@ -221,12 +373,12 @@ export const FILLET = {
  * its normal turned towards the other part's, so the shading runs across the join instead of breaking at a crease. The distance to
  * the other part is to the plane of its nearest point. Returns the new normals (positions are changed in place).
  */
-function filletParts(positions, normals, parts, regions, welds, recompute, bare) {
+function filletParts(positions, normals, parts, regions, welds, recompute, bare, pairs = FILLET.pairs) {
   const push = new Float32Array(positions.length / 3);
   const blendTo = new Map();
   const point = (index) => [positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]];
   const copies = new Set(welds.map(([copy]) => copy));
-  for (const [nameA, nameB, k] of FILLET.pairs) {
+  for (const [nameA, nameB, k] of pairs) {
     if (!parts[nameA] || !parts[nameB]) continue;
     for (const [from, to] of [[nameA, nameB], [nameB, nameA]]) {
       const [toStart, toEnd] = parts[to];
@@ -1110,7 +1262,7 @@ function facet(positions, indices, colors, bones, weightPositions) {
  * abs, pecs, belly, joint knobs...) on more, finer rings; clothes follow the
  * broad forms (`bend`) and armour is built as before. Never in a crowd.
  */
-export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt = false, rules = null, fillet = false } = {}) {
+export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt = false, rules = null, fillet = false, wrap = null } = {}) {
   // Bent by anatomy (`sculpted`): `sculpt: true` with all its fine detail on fine rings (`detailed`); `sculpt: 'mass'` only the broad forms, on the usual
   // rings (the detail style adds the rest as shading); `sculpt: 'rules'` the broad forms, the outline's own features and a share of the fine anatomy of
   // skinrules.js (`rules`: { share, fine }: how much of the fine height goes in the mesh, and whether on fine rings), the rest left to the textures.
@@ -1119,6 +1271,10 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt
   const detailed = sculpted && sculpt === true;
   const ruled = sculpted && sculpt === 'rules';
   const fine = sculpted && (sculpt === true || (ruled && Boolean(rules?.fine)));
+  // `rules.density: 'medium'`: between the plain rings and the fine ones (a skin wrapped onto a field: `wrap`, see wrapOnField).
+  const medium = ruled && !fine && rules?.density === 'medium';
+  // `wrap`: the skin moved onto the surface of a signed-distance field (the refined flesh field: V5's joins on a loft's topology).
+  const wrapping = ruled && Boolean(wrap) && !lowDetail && !faceted;
   // The textured styles' skin lofts carry texture coordinates (skindetail.js): they unwrap each part as a cylinder.
   const textured = sculpted && (sculpt === 'mass' || ruled);
   const skinUv = (tile) => (textured ? { uv: detailUv(tile) } : {});
@@ -1136,9 +1292,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt
   const rows = faceted ? 0.5 : lowDetail ? LOFT.rowDensity * 0.6 : LOFT.rowDensity;
   const count = (n) => Math.max(2, Math.round(n * rows));
   // The skin's own rings, finer when sculpted (clothes and armour keep the usual count).
-  const skinCount = (n) => (fine ? Math.max(2, Math.round(n * SCULPT.limbDensity)) : count(n));
-  const skinSides = fine ? SCULPT.limbSides : sides;
-  const trunkSides = fine ? SCULPT.trunkSides : sides;
+  const skinCount = (n) => (fine ? Math.max(2, Math.round(n * SCULPT.limbDensity)) : medium ? Math.max(2, Math.round(n * LOFT.medium.limbDensity)) : count(n));
+  const skinSides = fine ? SCULPT.limbSides : medium ? LOFT.medium.limbSides : sides;
+  const trunkSides = fine ? SCULPT.trunkSides : medium ? LOFT.medium.trunkSides : sides;
   // Which of a part's shapes the skin takes: all of it, or the broad forms alone.
   const skinBend = (shapes) => (detailed ? shapes.skin : armoured ? null : shapes.mass);
   // The rules' bend: the broad form, the outline's features and the mesh's share of the fine height, not under cloth, nothing under armour.
@@ -1148,7 +1304,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
-  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [], uvs: new Map(), welds: [], parts: {}, ringT: [], covers: {} };
+  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [], uvs: new Map(), welds: [], parts: {}, ringT: [], ringA: [], covers: {} };
   const build = seg.trunk.tissue.muscle / (seg.trunk.tissue.muscle + seg.trunk.tissue.fat);
   // The trunk is a lean shape (from the radius without fat) under a layer
   // of fat, laid on where fat goes: thickest at the waist and belly, then
@@ -1237,6 +1393,10 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt
   if (fine) {
     trunkCount = [];
     for (let t = Math.min(-0.12, hem); t < 1.12; t += t > SCULPT.denseTrunk[0] && t < SCULPT.denseTrunk[1] ? SCULPT.denseStep : SCULPT.sparseStep) trunkCount.push(t);
+    trunkCount.push(1.12);
+  } else if (medium) {
+    trunkCount = [];
+    for (let t = Math.min(-0.12, hem); t < 1.12; t += LOFT.medium.trunkStep) trunkCount.push(t);
     trunkCount.push(1.12);
   }
   loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, trunkCount), trunkSides, { bones: abdomen, ...(sculpted ? { bend: ruledBend(trunkShape, 'trunk', null, coveredTrunk) } : {}), ...skinUv('trunk'), part: 'trunk' });
@@ -1667,7 +1827,20 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false, sculpt
     return result;
   };
   let normals = smoothNormals();
-  if (fillet && sculpted && !armoured) {
+  if (wrapping && !armoured) {
+    // The legs' joins (trunk to thigh, the knee) by the fillet; the upper body by the field.
+    const bare = new Float32Array(positionArray.length / 3).fill(1);
+    for (const [name, [from, to]] of Object.entries(mesh.parts)) {
+      const covers = (mesh.covers[name] ?? []).map(([low, high]) => [name === 'trunk' ? -5 : low - 0.04, high + 0.04]);
+      for (let vertex = from; vertex < to; vertex += 1) bare[vertex] = sculptCoverShare(covers, mesh.ringT[vertex], 0.05);
+    }
+    normals = filletParts(positionArray, normals, mesh.parts, colors, mesh.welds, smoothNormals, bare, FILLET.pairs.filter(([a, b]) => /Thigh|Shin/.test(a + b)));
+    normals = wrapOnField(positionArray, normals, mesh, colors, wrap, smoothNormals, (vertex) => {
+      // The outline's own features (the starved belly sunk under the ribs, the collarbones, the blades) on the trunk, not under cloth.
+      const t = mesh.ringT[vertex];
+      return trunkSilhouette(rulesOf, t, mesh.ringA[vertex]) * sculptCoverShare(coveredTrunk, t, 0.05);
+    });
+  } else if (fillet && sculpted && !armoured) {
     // Under cloth the skin is not blended: pushed out, it would come through the shorts or a sleeve.
     const bare = new Float32Array(positionArray.length / 3).fill(1);
     for (const [name, [from, to]] of Object.entries(mesh.parts)) {

@@ -13,7 +13,7 @@ import { progression } from './bodysheet-cast.js';
 const subjects = [['male', 'starved'], ['male', 'athletic'], ['male', 'obese'], ['female', 'average']].map(([sex, key]) => ({ label: `${sex} ${key}`, body: buildBody(progression(sex).find((row) => row.key === key).inputs) }));
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const bytesOf = (mesh) => [mesh.positions, mesh.normals, mesh.indices, mesh.skinIndex, mesh.skinWeight, mesh.uvs].reduce((sum, array) => sum + (array?.byteLength ?? 0), 0);
-const wanted = process.argv[2]?.split(',') ?? ['lofted', 'sculpt', 'detail', 'flesh', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
+const wanted = process.argv[2]?.split(',') ?? ['lofted', 'sculpt', 'detail', 'flesh', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'];
 
 const rows = [['crowd (lowDetail loft)', (body) => buildLoftBody(body, { lowDetail: true }), null], ...BODY_STYLE_KEYS.filter((style) => wanted.includes(style)).map((style) => [style, (body) => buildSkinMesh(body, style), style])];
 console.log(`${'style'.padEnd(24)}${subjects.map((subject) => subject.label.padStart(46)).join('')}`);
@@ -22,7 +22,7 @@ for (const [name, build, style] of rows) {
     build(body);
     const times = [];
     let mesh = null;
-    const runs = ['flesh', 'v5', 'v6'].includes(name) ? 3 : 5;
+    const runs = ['flesh', 'v5', 'v6', 'v7'].includes(name) ? 3 : 5;
     for (let run = 0; run < runs; run += 1) {
       const start = performance.now();
       mesh = build(body);

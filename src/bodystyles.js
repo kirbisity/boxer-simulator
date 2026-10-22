@@ -22,6 +22,8 @@
 //   v4  sculpted and mapped: fine rings carrying the outline and most of the rules' height, the maps the rest
 //   v5  flesh-lite: the refined field meshed coarsely, painted per vertex (no maps): smooth joins by construction
 //   v6  flesh hero: the refined field at full resolution, painted per vertex
+//   v7  V5's shape on a loft: a medium-density loft (V2's texture coordinates, skin weights and maps) wrapped onto the refined
+//       field's large forms (loftbody.js wrapOnField), so the arms grow out of the trunk as in V5 at a fifth of its triangles
 // Every round-two style also morphs the face with the body (the `face` flag; the head is built in face.js).
 
 import { buildBodyMesh } from './bodymesh.js';
@@ -49,6 +51,7 @@ export const STYLE_SPECS = {
   v4: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0.6, upgrade: true }, label: 'V4 sculpted + mapped' },
   v5: { face: true, label: 'V5 flesh-lite, painted' },
   v6: { face: true, label: 'V6 flesh hero, painted' },
+  v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
 
@@ -57,6 +60,8 @@ export const styleSpec = (style) => STYLE_SPECS[style] ?? STYLE_SPECS.lofted;
 
 /** The refined flesh field (B's anatomy with round two's corrections) for a body: a signed distance of a bind-pose point. */
 export const refinedField = (body) => fleshField(fleshAnatomy(body, { refined: true }));
+/** The same field's large forms only (no ribs, spine knobs or ab blocks: the maps draw those): what V7's low-polygon skin is wrapped onto. */
+export const coarseField = (body) => fleshField(fleshAnatomy(body, { refined: true, coarse: true }));
 
 /** The skin mesh of a body in a style (an unknown key is the fine field, as before). */
 export function buildSkinMesh(body, style) {
@@ -71,6 +76,7 @@ export function buildSkinMesh(body, style) {
     case 'v4': return buildLoftBody(body, { sculpt: 'rules', rules: { share: STYLE_SPECS.v4.tex.share, fine: true }, fillet: true });
     case 'v5': return buildFleshBody(body, { cell: 0.012, paint: true, refined: true });
     case 'v6': return buildFleshBody(body, { paint: true, refined: true });
+    case 'v7': return buildLoftBody(body, { sculpt: 'rules', rules: { share: 0, density: 'medium' }, wrap: coarseField(body) });
     default: return buildBodyMesh(body, 'skin');
   }
 }

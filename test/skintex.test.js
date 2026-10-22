@@ -5,7 +5,9 @@ import { BODY_STYLE_KEYS, buildSkinMesh, skinTexturesNow, styleSpec, STYLE_SPECS
 import { buildLoftBody, FILLET } from '../src/loftbody.js';
 import { buildFleshBody } from '../src/fleshbody.js';
 import { clearSkinTextureCache, compositionKey, skinTextureCache, SKINTEX } from '../src/skintex.js';
-import { rulesProfile, rulesTraits, trunkRule, limbRule } from '../src/skinrules.js';
+import { LANDMARKS, rulesProfile, rulesTraits, trunkRule, limbRule } from '../src/skinrules.js';
+import { bindPoints } from '../src/rig.js';
+import { P } from '../src/body.js';
 import { FACE_MORPH, faceMarks, faceMorphWeights, morphHeadPoint } from '../src/facemorph.js';
 import { DETAIL } from '../src/skindetail.js';
 import { progression } from '../tools/bodysheet-cast.js';
@@ -13,7 +15,7 @@ import { progression } from '../tools/bodysheet-cast.js';
 // Round two's body styles (bodystyles.js v1..v6): textures, the rules, blended joins and the face that follows the body.
 const CAST = [...progression('male'), ...progression('female')].map((row) => ({ ...row, body: buildBody(row.inputs) }));
 const one = (sex, key) => CAST.find((row) => row.inputs.sex === sex && row.key === key).body;
-const ROUND_TWO = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
+const ROUND_TWO = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'];
 
 function finite(name, array) {
   for (let index = 0; index < array.length; index += 1) if (!Number.isFinite(array[index])) assert.fail(`${name}: not a number at ${index}`);
@@ -205,4 +207,47 @@ test('the face morph: weights in 0..1 that follow the body, every point moved a 
   // An average face is barely touched.
   const average = weights['male average'];
   assert.ok(Math.hypot(...morphHeadPoint(0.6, -0.45, 0.55, average).map((value, axis) => value - [0.6, -0.45, 0.55][axis])) < 0.03);
+});
+
+test('V7: the loft wrapped onto the flesh field: 8-12k triangles, finite, texture coordinates in the atlas, its maps V2\'s', () => {
+  for (const [sex, key] of [['male', 'starved'], ['male', 'bodybuilder'], ['male', 'veryObese'], ['female', 'obese']]) {
+    const body = one(sex, key);
+    const mesh = buildSkinMesh(body, 'v7');
+    const triangles = mesh.indices.length / 3;
+    assert.ok(triangles >= 8000 && triangles <= 12000, `${sex} ${key}: ${triangles} triangles`);
+    finite(`${sex} ${key} v7 positions`, mesh.positions);
+    finite(`${sex} ${key} v7 normals`, mesh.normals);
+    for (const value of mesh.uvs) assert.ok(value >= 0 && value <= 1);
+    for (let vertex = 0; vertex < mesh.normals.length / 3; vertex += 1) {
+      const length = Math.hypot(mesh.normals[vertex * 3], mesh.normals[vertex * 3 + 1], mesh.normals[vertex * 3 + 2]);
+      assert.ok(Math.abs(length - 1) < 1e-3, 'unit normals');
+    }
+  }
+  assert.deepEqual(STYLE_SPECS.v7.tex, STYLE_SPECS.v2.tex, 'the same maps as V2');
+  // The wrap moves the skin only so far from the loft it started as, and not at all in plate.
+  const knight = buildBody(PRESETS.knight);
+  assert.equal(buildSkinMesh(knight, 'v7').indices.length > 0, true);
+});
+
+test('the landmarks sit where the reference has them: rib margin, xiphoid and collarbones as fractions of standing height', () => {
+  const body = one('male', 'starved');
+  const points = bindPoints(body);
+  const pelvis = points[P.pelvis][1];
+  const neck = points[P.neck][1];
+  const height = (u) => (pelvis + u * (neck - pelvis)) / body.heightM;
+  assert.ok(Math.abs(height(LANDMARKS.archSide) - 0.64) < 0.015, `rib margin at ${height(LANDMARKS.archSide)}`);
+  assert.ok(Math.abs(height(LANDMARKS.xiphoid) - 0.69) < 0.015, `xiphoid at ${height(LANDMARKS.xiphoid)}`);
+  // The rig's neck joint is at 0.80 of the height (the reference's notch 0.81): the collarbones go as high as the trunk reaches.
+  assert.ok(Math.abs(height(LANDMARKS.clavicle) - 0.81) < 0.02, `collarbones at ${height(LANDMARKS.clavicle)}`);
+  assert.ok(Math.abs(height(LANDMARKS.navel) - 0.6) < 0.015, `navel at ${height(LANDMARKS.navel)}`);
+  // The rib bands of a starved trunk lie between the rib margin and the collarbones, none over the soft belly below the arch.
+  const R = rulesTraits(body);
+  // Ribbing: how much the height swings over a rib's span (two ribs' worth of u) at the side of the cage.
+  const relief = (centre) => {
+    const heights = [];
+    for (let u = centre - 0.045; u <= centre + 0.045; u += 0.005) heights.push(trunkRule(R, u, 1.0).h);
+    return Math.max(...heights) - Math.min(...heights);
+  };
+  assert.ok(relief(0.8) > 0.002, 'ribs high on the cage');
+  assert.ok(relief(0.3) < relief(0.8) / 2, 'the belly under the arch is not ribbed');
 });

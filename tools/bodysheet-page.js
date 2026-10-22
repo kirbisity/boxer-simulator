@@ -41,6 +41,9 @@ const CROP = query.get('crop');
 const MAT = query.get('mat') ?? 'standard';
 const TONE = query.get('tone') ?? 'clay';
 const POSE = query.get('pose') ?? 'rest';
+// `ruler`: the landmark heights measured on the emaciated reference (fractions of standing height), drawn over every cell.
+const RULER = query.get('ruler') !== null;
+const RULER_MARKS = [[1, 'crown'], [0.81, 'clavicles / notch'], [0.69, 'xiphoid'], [0.64, 'rib margin'], [0.6, 'waist'], [0.58, 'iliac crest'], [0.49, 'crotch']];
 // The flesh style's grid (m), to compare resolutions.
 if (query.get('cell')) FLESH.cell = Number(query.get('cell'));
 
@@ -364,7 +367,23 @@ async function main() {
     stats.push({ key: column.key, bmi, bodyFat: body.inputs.bodyFat, muscleKg: body.muscleKg, triangles: subject.triangles, vertices: subject.built.positions.length / 3, meshMs: subject.ms, texMs: subject.texMs, coldMs: subject.coldMs, textures: subject.textures, soft: subject.softMs });
     ROWS.forEach((view, rowIndex) => {
       const canvas = shoot(subject, view);
-      ctx.drawImage(canvas, index * width, (SHEET.header + SHEET.labels) * SCALE + rowIndex * height);
+      const top = (SHEET.header + SHEET.labels) * SCALE + rowIndex * height;
+      ctx.drawImage(canvas, index * width, top);
+      // `ruler`: lines at the reference's landmark heights (fractions of standing height), where the camera sees them on this body.
+      if (RULER) {
+        for (const [fraction, name] of RULER_MARKS) {
+          const point = new THREE.Vector3(0, fraction * body.heightM, 0).project(camera);
+          const y = top + ((1 - point.y) / 2) * height;
+          if (point.y < -1 || point.y > 1) continue;
+          ctx.strokeStyle = 'rgba(255, 210, 60, 0.85)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(index * width, y);
+          ctx.lineTo(index * width + width, y);
+          ctx.stroke();
+          text(`${fraction.toFixed(2)} ${name}`, index * width + 4, y - 2, 9, '#ffd23c', 'left');
+        }
+      }
     });
   });
   document.body.appendChild(sheet);

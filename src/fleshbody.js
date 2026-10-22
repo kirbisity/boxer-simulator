@@ -18,7 +18,7 @@
 // not drawn by this style (the sheets' fit check says what that needs).
 // No Three.js: plain arrays, buildable in Node.
 
-import { rulesProfile } from './skinrules.js';
+import { LANDMARKS, rulesProfile } from './skinrules.js';
 import { P } from './body.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
@@ -47,6 +47,8 @@ export const FLESH = {
   garments: { band: [0.17, 0.25], top: [0.56, 0.86], reach: 1.04 },
   // Rib cage: how many ribs are drawn, the spacing (of the trunk's length), the tube's radius (m, at 1.8 m), how far they droop to the front (m).
   ribs: { count: 7, top: 0.6, spacing: 0.042, radius: 0.0105, droop: 0.045 },
+  // Refined, the cage where it is (skinrules.js LANDMARKS): the first rib under the collarbone, ten down to the lowest margin at the side.
+  refinedRibs: { count: 10, top: 0.93, spacing: 0.047, radius: 0.0095, droop: 0.075 },
   // Where along the thigh the trunks end (the loft's own reach for trunks).
   trunksReach: 0.42,
   // Per-vertex painting (the flesh-lite style): how far out (m) the field is probed for a cavity, and how dark a full one is.
@@ -144,7 +146,8 @@ const fleshBall = (center, radius) => solidEllipsoid(center, [radius, radius, ra
  * The lean body: its volumes and the fat that goes over it.
  * @returns { shapes, thickness(x, y, z), traits }
  */
-export function fleshAnatomy(body, { refined = false } = {}) {
+export function fleshAnatomy(body, { refined = false, coarse = false } = {}) {
+  // `coarse`: the large forms only (no ribs, spine knobs or ab blocks): what a low-polygon skin is drawn onto, the maps carrying the rest.
   // `refined`: round two's corrections (a pectoral fanned to the shoulder, a smooth trapezius and deltoid, bone buried by fat, a hanging apron).
   const [shoulderFrom, shoulderTo] = refined ? FLESH.refinedShoulder : [FLESH.shoulderFrom, FLESH.shoulderTo];
   const points = bindPoints(body);
@@ -219,27 +222,28 @@ export function fleshAnatomy(body, { refined = false } = {}) {
   const bare = lean ** 1.2;
   // And bone is buried by the fat as well: a plate or a crest on a heavy trunk is not seen.
   const boneBare = refined ? lean ** 1.1 : 1;
-  const ribRadius = FLESH.ribs.radius * sc;
 
   // ---- Ribs, breastbone side to spine: tubes round the cage, each a little lower at the front.
-  for (let rib = 0; rib < FLESH.ribs.count; rib += 1) {
-    const u = FLESH.ribs.top - rib * FLESH.ribs.spacing;
+  const ribs = refined ? FLESH.refinedRibs : FLESH.ribs;
+  for (let rib = 0; rib < (coarse ? 0 : ribs.count); rib += 1) {
+    const u = ribs.top - rib * ribs.spacing;
     // Under muscle or fat the ribs sink in as well as thin: a trained trunk's are all but gone.
     const inset = 0.985 - (refined ? 0.06 : 0.035) * (1 - bony);
-    shapes.push(ribTube([pelvis[0] + shift(u), 0, pelvis[2]], [depth(u) * inset, width(u) * inset], pelvis[1] + u * trunkLength, FLESH.ribs.droop * sc, ribRadius * (0.45 + 0.55 * bony)));
+    shapes.push(ribTube([pelvis[0] + shift(u), 0, pelvis[2]], [depth(u) * inset, width(u) * inset], pelvis[1] + u * trunkLength, ribs.droop * sc, ribs.radius * sc * (0.45 + 0.55 * bony)));
   }
 
   // ---- Collarbones: from the notch at the top of the breastbone out and a little up to the point of the shoulder.
   for (const side of [1, -1]) {
-    const notch = surface(0.88, side * 0.12, 0.975);
-    const tip = surface(0.925, side * 1.42, 0.985);
+    const notch = refined ? surface(LANDMARKS.notch - 0.015, side * 0.12, 0.975) : surface(0.88, side * 0.12, 0.975);
+    // Refined, the collarbone runs out to the point of the shoulder (over the joint), nearly level.
+    const tip = refined ? vec.add(at(side > 0 ? 'lShoulder' : 'rShoulder'), [0.012, 0.03, 0]) : surface(0.925, side * 1.42, 0.985);
     // Refined, the collarbone sinks under fat (its inner end stood up as a knob on a heavy chest), and starts off the notch.
     const clavicle = refined ? 0.3 + 0.7 * boneBare : 1;
     shapes.push(fleshTube(refined ? lerp(notch, tip, 0.06) : notch, tip, 0.0072 * sc * (0.7 + 0.5 * boneProud) * clavicle, 0.0082 * sc * (0.7 + 0.5 * boneProud) * clavicle));
     // The sternum's top, and the pit between the collarbones is left to the lean core.
     // Shoulder blades: flat plates on the back, their spine a ridge.
-    shapes.push(lens(0.69, side * (Math.PI - 0.62), (0.004 + 0.009 * Math.max(bony, dev * 0.7)) * boneBare, 0.065 * sc, 0.045 * sc, FLESH.softBlend));
-    shapes.push({ ...fleshTube(surface(0.8, side * (Math.PI - 0.22), 0.985), surface(0.79, side * (Math.PI - 1.15), 0.985), (0.0035 + 0.004 * boneProud) * (refined ? 0.3 + 0.7 * boneBare : 1), (0.004 + 0.0045 * boneProud) * (refined ? 0.3 + 0.7 * boneBare : 1)), skip: refined && boneBare < 0.2 });
+    shapes.push(lens(refined ? 0.78 : 0.69, side * (Math.PI - 0.62), (0.004 + 0.009 * Math.max(bony, dev * 0.7)) * boneBare, 0.065 * sc, 0.045 * sc, FLESH.softBlend));
+    shapes.push({ ...fleshTube(surface(refined ? 0.9 : 0.8, side * (Math.PI - 0.22), 0.985), surface(refined ? 0.94 : 0.79, side * (Math.PI - 1.15), 0.985), (0.0035 + 0.004 * boneProud) * (refined ? 0.3 + 0.7 * boneBare : 1), (0.004 + 0.0045 * boneProud) * (refined ? 0.3 + 0.7 * boneBare : 1)), skip: (refined && boneBare < 0.2) || coarse });
     // Hip bones: the front spine, the crest running back, the back spine.
     const front = surface(0.085, side * 1.02, 0.97);
     const crest = surface(0.17, side * 1.85, 0.97);
@@ -250,7 +254,7 @@ export function fleshAnatomy(body, { refined = false } = {}) {
     // The pectoral: a shelf with a sharp lower edge (a man's); a woman's bust is the fat's.
     if (!female && dev > 0.08 && bare > 0.12) {
       // A broad fan from the breastbone to the shoulder: long outwards and a little up, a flat edge below, no cleft where the two meet.
-      if (refined) shapes.push(lens(0.67, side * 0.66, (0.004 + 0.016 * dev) * bare, 0.05 * sc, 0.095 * sc, FLESH.refinedPecBlend, 0.3));
+      if (refined) shapes.push(lens(0.75, side * 0.66, (0.004 + 0.016 * dev) * bare, 0.05 * sc, 0.095 * sc, FLESH.refinedPecBlend, 0.3));
       else shapes.push(lens(0.665, side * 0.55, (0.005 + 0.022 * dev) * bare, 0.058 * sc, 0.085 * sc, FLESH.softBlend));
     }
     // Lats flare the back; the trapezius slopes from the neck to the shoulder.
@@ -267,21 +271,21 @@ export function fleshAnatomy(body, { refined = false } = {}) {
   const absShow = fleshSmooth(0.12, 0.5, dev) * fleshSmooth(SCULPT.definedFrom, SCULPT.definedTo, traits.trunk.fat);
   if (absShow > 0.05) {
     for (const side of [1, -1]) {
-      for (let row = 0; row < 4; row += 1) {
-        const u = 0.46 - row * 0.07;
+      for (let row = 0; row < (coarse ? 0 : refined ? 3 : 4); row += 1) {
+        const u = refined ? 0.535 - row * 0.105 : 0.46 - row * 0.07;
         shapes.push(lens(u, side * 0.27, 0.003 + 0.011 * absShow, 0.0185 * sc, 0.031 * sc));
       }
     }
   }
   // ---- Spine: the knobs of the vertebrae (bony), the erector muscles either side of them (trained).
   const knobs = Math.floor(0.82 / SCULPT_SPINE_KNOB);
-  if (bony > 0.15) {
+  if (bony > 0.15 && !coarse) {
     for (let knob = 0; knob < knobs; knob += 1) {
       const u = 0.12 + knob * SCULPT_SPINE_KNOB;
       shapes.push(fleshBall(surface(u, Math.PI, 0.99), 0.0058 * sc * bony + 0.001));
     }
   }
-  if (dev > 0.12 && bare > 0.12) {
+  if (dev > 0.12 && bare > 0.12 && !coarse) {
     for (const side of [1, -1]) shapes.push(lens(0.45, side * (Math.PI - 0.18), (0.003 + 0.008 * dev) * bare, 0.17 * sc, 0.026, FLESH.softBlend));
   }
   // Glutes (existing proportions): round, heavier with training.
@@ -325,7 +329,7 @@ export function fleshAnatomy(body, { refined = false } = {}) {
     shapes.push(cone(lerp(elbow, hand, 0.35), wrist, foreR * 1.03, foreR * 0.62));
     shapes.push(cone(vec.add(lerp(elbow, hand, 0.12), [0.004, 0, sign * foreR * 0.35]), vec.add(lerp(elbow, hand, 0.4), [0.004, 0, sign * foreR * 0.25]), foreR * (0.5 + 0.2 * dev), foreR * 0.4));
     // The wrist's two knobs.
-    for (const across of [1, -1]) shapes.push(fleshBall(vec.add(wrist, [0, 0.004, across * foreR * 0.55]), 0.0045 + 0.0035 * armBony));
+    if (!coarse) for (const across of [1, -1]) shapes.push(fleshBall(vec.add(wrist, [0, 0.004, across * foreR * 0.55]), 0.0045 + 0.0035 * armBony));
   }
 
   // ---- Legs.

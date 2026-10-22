@@ -2517,6 +2517,7 @@ const SHEETS = {
       ['v4', 'V4 · Sculpted + mapped', 'fine loft + maps · ~14k'],
       ['v5', 'V5 · Flesh-lite', 'coarse flesh field, painted per vertex · ~35k'],
       ['v6', 'V6 · Flesh hero', 'flesh field, painted per vertex · ~65k'],
+      ['v7', 'V7 · Flesh-wrapped loft', 'loft wrapped on the flesh field + V2 maps · ~9k'],
     ],
     rows: [PRESETS.heavy, PRESETS.contender],
     // Inside the ropes (the ring edge is 3 m out), so none cross the view.
