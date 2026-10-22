@@ -190,11 +190,11 @@ export const SCENARIOS = {
   legion: {
     title: 'Rome against Han',
     place: 'A what-if · the 1st century',
-    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: fifty legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into fifty crossbows; the front ranks meet, the rest hold their places.',
+    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: forty-two legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into forty-two crossbows; the front ranks meet, the rest hold their places. Eight auxiliary horse in mail ride on one flank and eight Han horsemen on the other, and charge it when the lines close.',
     scene: 'plain',
     arena: LEGION.arena,
     camera: { yaw: -0.5, pitch: 0.45, distance: 20, maxDistance: 26 },
-    roster: 'Fifty a side: legionaries and Han crossbowmen, with a wing of horse each',
+    roster: 'Fifty a side: forty-two legionaries and eight auxiliary horse · forty-two Han crossbowmen and eight horsemen',
     formation: { red: { ...LEGION.ranks, front: LEGION.romanFront }, blue: { ...LEGION.ranks, front: LEGION.hanFront } },
     cast: (random) => legionSides(random),
     // Eight horse of an auxiliary ala to the legion's side, eight Han horsemen to theirs, in place of the rear rank of the foot.
@@ -212,13 +212,13 @@ export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
     place: 'The market square, Maidstone, Kent · June 1381',
-    blurb: 'The town has risen. Two lords in plate and three of their foot soldiers ride in to put it down — and meet twenty peasants with spears in the market square.',
+    blurb: 'The town has risen. Two lords in plate ride in on their destriers, with three of their foot soldiers behind them, to put it down — and meet twenty peasants with spears in the market square.',
     scene: 'town',
     weather: { fog: WEATHER_MIST.rebellion, sky: 0.55, pale: 0.55, sun: 0.9 },
     arena: { halfX: 9, halfZ: 7 },
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
-    roster: 'Two knights and three foot soldiers · twenty rebels with spears',
+    roster: 'Two mounted knights and three foot soldiers · twenty rebels with spears',
     // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
     formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
@@ -237,12 +237,12 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: 'The battle that ends the Sengoku. Thirty of the East in red against thirty of the West in black and blue: bows and teppō in front, spears, blades and polearms behind.',
+    blurb: 'The battle that ends the Sengoku. Thirty-six of the East in red against thirty-six of the West in black and blue: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.',
     scene: 'sengoku',
     weather: { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
-    roster: 'Thirty a side: samurai and ashigaru',
+    roster: 'Thirty-six a side: samurai and ashigaru, six of the samurai on horse',
     // Ten abreast: the bows and teppō in the front rows, the blades and polearms behind them.
     formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 } },
     cast: (random) => {
@@ -281,11 +281,11 @@ export const SCENARIOS = {
   otumba: {
     title: 'Otumba',
     place: 'Otumba, Valley of Mexico · 7 July 1520',
-    blurb: 'Days after the Noche Triste, the Spaniards and their Tlaxcalan allies are caught on the open plain by the Mexica host: steel breastplates, espadas and arquebuses against obsidian blades and quilted cotton.',
+    blurb: 'Days after the Noche Triste, the Spaniards and their Tlaxcalan allies are caught on the open plain by the Mexica host: steel breastplates, espadas and arquebuses, and the few horse Cortés had left, against obsidian blades and quilted cotton.',
     scene: 'plain',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
-    roster: 'Fourteen conquistadors, seven of them on horse, and twenty-five Tlaxcalans · forty Mexica',
+    roster: 'Fourteen conquistadors on foot and seven on horse, and twenty-five Tlaxcalans · forty Mexica',
     formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 10, loose: 0.3 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.5 } },
     cast: (random) => ({
       red: shootersBehind([...company(OTUMBA.spanish, (type) => europeanSoldier(random, type)), ...company(OTUMBA.tlaxcalan, (style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }))]),
