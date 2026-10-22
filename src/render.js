@@ -10,6 +10,8 @@ import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
+import { BODY_STYLE_KEYS, buildSkinMesh } from './bodystyles.js';
+import { detailMaterial } from './skindetail.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
@@ -1408,32 +1410,28 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(built.skinIndex, 4));
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(built.skinWeight, 4));
+    // The detail style's coordinates: the bump map's, and the same again for the occlusion map.
+    if (built.uvs) {
+      geometry.setAttribute('uv', new THREE.BufferAttribute(built.uvs, 2));
+      geometry.setAttribute('uv2', new THREE.BufferAttribute(built.uvs, 2));
+    }
   }
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   const inverses = built.bindFrames.map((frame) => new THREE.Matrix4().fromArray(frameMatrix(frame)).invert());
-  const mesh = new THREE.SkinnedMesh(geometry, material ?? surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }));
+  const skin = material ?? surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 });
+  // The detail style's fine anatomy: the skin's bump and occlusion maps (skindetail.js).
+  const mesh = new THREE.SkinnedMesh(geometry, built.detail && !material ? detailMaterial(skin, built.detail) : skin);
   mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
   mesh.castShadow = true;
   mesh.frustumCulled = false;
   return mesh;
 }
 
-/**
- * Ways to build the skin. 'smoothed' is the anatomy field on a coarse grid,
- * relaxed; 'lofted' is clean low-poly rings; 'faceted' is the same with few
- * sides and flat shading; 'dense' is the fine field, as first built.
- */
-export const BODY_STYLES = ['lofted', 'smoothed', 'faceted', 'dense'];
+/** Ways to build the skin: see bodystyles.js. */
+export const BODY_STYLES = BODY_STYLE_KEYS;
 export let BODY_STYLE = 'lofted';
 export function setBodyStyle(style) {
   BODY_STYLE = style;
-}
-
-function buildSkin(body, style) {
-  if (style === 'lofted') return buildLoftBody(body);
-  if (style === 'faceted') return buildLoftBody(body, { faceted: true });
-  if (style === 'smoothed') return buildBodyMesh(body, 'skin', 0.024, 4);
-  return buildBodyMesh(body, 'skin');
 }
 
 /**
@@ -1478,7 +1476,7 @@ function detailedView(view, fighter, simple) {
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkin(body, look.bodyStyle ?? BODY_STYLE);
+  const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkinMesh(body, look.bodyStyle ?? BODY_STYLE);
   const baseColors = paintBody(built, body, look, corner);
   // Steel is drawn apart, as metal; everything else is the toon body.
   const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];

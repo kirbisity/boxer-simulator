@@ -2507,6 +2507,9 @@ const SHEETS = {
       ['lofted', '1 · Lofted', 'low-poly rings, lightly smoothed · ~5.9k triangles'],
       ['smoothed', '2 · Smoothed', 'anatomy field, coarse and relaxed · ~8k'],
       ['faceted', '3 · Faceted', 'flat-shaded low poly · ~0.8k'],
+      ['sculpt', '4 · Sculpt', 'loft bent by anatomy: ribs, abs, folds · ~14k'],
+      ['detail', '5 · Detail', 'loft + bump and occlusion map · ~6k + a map'],
+      ['flesh', '6 · Flesh', 'anatomy field, hero close-ups · ~60k, ~1.5 s to build'],
     ],
     rows: [PRESETS.heavy, PRESETS.contender],
     // Inside the ropes (the ring edge is 3 m out), so none cross the view.
