@@ -10,8 +10,10 @@ import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
-import { BODY_STYLE_KEYS, buildSkinMesh } from './bodystyles.js';
+import { BODY_STYLE_KEYS, buildSkinMesh, skinTexturesNow, styleSpec } from './bodystyles.js';
+import { applySkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
+import { SKIN_TONES } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
@@ -45,7 +47,7 @@ const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
 // Skin tones, lightest to deepest. Light tan is a warm, yellow-leaning
 // light skin: a shade under light, nowhere near medium.
 // porcelain: a pale, cold-toned complexion (powdered, gothic).
-export const SKIN_TONES = { porcelain: 0xd9c4c2, light: 0xe8b796, lightTan: 0xcc9a66, medium: 0xc58c64, tan: 0xa8704a, deep: 0x7a4a2e };
+export { SKIN_TONES } from './skintones.js';
 /** A look's skin colour: its own (`skinColor`: a gorilla's black skin, a robot's dark joints) or its tone's. */
 const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getHex() : SKIN_TONES[look.skinTone ?? 'medium']);
 
@@ -1352,6 +1354,8 @@ function paintBody(mesh, body, look, corner) {
         color = tattooColor([positions[vertex * 3], positions[vertex * 3 + 1] - bindPoints[P.pelvis][1], positions[vertex * 3 + 2]], segment, skin) ?? skin;
       }
       colors.set([color.r, color.g, color.b], vertex * 3);
+      // A style that paints its skin per vertex (flesh-lite, flesh hero) darkens and tints each skin vertex.
+      if (region === 'skin' && mesh.tint) for (let axis = 0; axis < 3; axis += 1) colors[vertex * 3 + axis] *= mesh.tint[vertex * 3 + axis];
     });
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
     // Armour of leather or horn (`armor.matte`) is drawn as the body is, not as metal; its gilt still shines.
@@ -1420,7 +1424,9 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
   const inverses = built.bindFrames.map((frame) => new THREE.Matrix4().fromArray(frameMatrix(frame)).invert());
   const skin = material ?? surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 });
   // The detail style's fine anatomy: the skin's bump and occlusion maps (skindetail.js).
-  const mesh = new THREE.SkinnedMesh(geometry, built.detail && !material ? detailMaterial(skin, built.detail) : skin);
+  // A textured style's maps (skintex.js), as far as the look's material takes them (`built.skinMaps`: { textures, upgrade }).
+  const dressedSkin = material ? skin : built.skinMaps ? applySkinTextures(skin, built.skinMaps.textures, { upgrade: built.skinMaps.upgrade }) : built.detail ? detailMaterial(skin, built.detail) : skin;
+  const mesh = new THREE.SkinnedMesh(geometry, dressedSkin);
   mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
   mesh.castShadow = true;
   mesh.frustumCulled = false;
@@ -1476,7 +1482,11 @@ function detailedView(view, fighter, simple) {
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkinMesh(body, look.bodyStyle ?? BODY_STYLE);
+  const bodyStyle = simple ? 'lofted' : look.bodyStyle ?? BODY_STYLE;
+  const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkinMesh(body, bodyStyle);
+  // The skin's maps, made when the fighter is built (cached per composition bucket, so a second fighter like him costs nothing).
+  const maps = simple ? null : skinTexturesNow(body, bodyStyle, built);
+  if (maps) built.skinMaps = { textures: maps, upgrade: Boolean(styleSpec(bodyStyle).tex.upgrade) };
   const baseColors = paintBody(built, body, look, corner);
   // Steel is drawn apart, as metal; everything else is the toon body.
   const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];
@@ -1511,7 +1521,9 @@ function detailedView(view, fighter, simple) {
   // A design may set the hair (a sumo's topknot).
   // A face may be its own colour (Guan Yu's, the red of a ripe jujube).
   const faceColor = look.faceColor ? new THREE.Color(look.faceColor).getHex() : skinColor;
-  const headView = buildHead(body, dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look, faceColor, corner);
+  // A round-two body style's face follows the body (facemorph.js).
+  const faceLook = { ...(dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look), faceMorph: Boolean(styleSpec(bodyStyle).face) };
+  const headView = buildHead(body, faceLook, faceColor, corner);
   headView.group.matrixAutoUpdate = false;
   layers.skin.add(headView.group);
   if (!rigid) shells.push({ key: 'head', shell: headView.shell });

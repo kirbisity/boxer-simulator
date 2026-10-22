@@ -81,6 +81,11 @@ export function sculptProfile(stops) {
   };
 }
 
+/** How much of a place along a part is not under cloth: 1 bare, 0 covered, fading over `fade` at each edge (`covers`: [from, to, fade?]). */
+export function sculptCoverShare(covers, u, fade = 0.05) {
+  return covers.reduce((share, [from, to, own]) => share * (1 - sculptSmooth(from - (own ?? fade), from, u) * (1 - sculptSmooth(to, to + (own ?? fade), u))), 1);
+}
+
 /**
  * What the body is made of, as shares between 0 and 1: how bony, how lean
  * (muscle shows through), how developed, and fat by region.
@@ -351,7 +356,7 @@ export function trunkShapes(body, traits, covers = [], armoured = false) {
     return sculptClamp(out, SCULPT.leastOut, SCULPT.mostOut);
   };
   // Cloth over a stretch of the trunk (`covers`: [from, to, fade]): its fine anatomy is not drawn there.
-  const uncovered = (u) => covers.reduce((share, [from, to, fade]) => share * (1 - sculptSmooth(from - fade, from, u) * (1 - sculptSmooth(to, to + fade, u))), 1);
+  const uncovered = (u) => sculptCoverShare(covers, u, 0.05);
   // Under armour (built on the ring ellipses) the skin keeps the ellipse: a pectoral or a belly would stand through the plate.
   const bare = armoured ? 0 : 1;
   return { skin: wrap((u, angle) => bare * massOffset(u, angle) + detailOffset(u, angle) * uncovered(u) * bare), mass: wrap(massOffset), detail: detailOffset };
@@ -517,7 +522,7 @@ export function limbShapes(traits, part, side, covers = [], armoured = false) {
 
   const make = (offsetOf) => (ring, angle) => sculptClamp(1 + offsetOf(ring.t, angle) / radius(ring, angle), SCULPT.leastOut, SCULPT.mostOut);
   // Cloth over a stretch of the limb (`covers`: [from, to]): the bone and tendon knobs under it are not drawn.
-  const uncovered = (t) => covers.reduce((share, [from, to]) => share * (1 - sculptSmooth(from - 0.05, from, t) * (1 - sculptSmooth(to, to + 0.05, t))), 1);
+  const uncovered = (t) => sculptCoverShare(covers, t, 0.05);
   const bare = armoured ? 0 : 1;
   return { skin: make((t, angle) => bare * (mass(t, angle) + detail(t, angle) * uncovered(t))), mass: make(mass), detail };
 }

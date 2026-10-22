@@ -34,7 +34,7 @@ export const DETAIL = {
 
 const [DETAIL_WIDTH, DETAIL_HEIGHT] = DETAIL.atlas;
 // Tile rectangles in the atlas: the trunk takes the left of it, the neck below that, the eight limb parts the right.
-const DETAIL_TILES = {
+export const DETAIL_TILES = {
   trunk: { x: 0, y: 0, w: 512, h: 384, span: 'trunk' },
   neck: { x: 0, y: 384, w: 192, h: 128, span: 'neck' },
 };

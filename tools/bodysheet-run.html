@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Runs several body sheets one after another (each in a frame, each posting its own PNG):
+       http://127.0.0.1:8951/tools/bodysheet-run.html#<sheet query>|<sheet query>|...
+     each <sheet query> being what tools/bodysheet.html takes after its "?". The title reads "running i/n" and then "all done". -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Body sheets</title>
+<style>body { margin: 0; background: #333; color: #ddd; font: 12px sans-serif; } iframe { width: 400px; height: 300px; border: 0; } pre { margin: 8px; }</style>
+</head>
+<body>
+<pre id="log"></pre>
+<script>
+const queries = decodeURIComponent(location.hash.slice(1)).split('|').filter(Boolean);
+const log = document.getElementById('log');
+window.__runs = [];
+(async () => {
+  for (const [index, query] of queries.entries()) {
+    document.title = `running ${index + 1}/${queries.length}`;
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    frame.src = `bodysheet.html?${query}`;
+    // The sheet posts a message when it is done (or fails): no polling, so a throttled background tab does not slow it.
+    const message = await new Promise((resolve) => {
+      const heard = (event) => {
+        if (event.source !== frame.contentWindow || !event.data?.sheet) return;
+        window.removeEventListener('message', heard);
+        resolve(event.data);
+      };
+      window.addEventListener('message', heard);
+    });
+    const done = message.sheet === 'done';
+    const report = message.report;
+    window.__runs.push({ query, done, report });
+    log.textContent += `${done ? 'ok' : 'FAILED'} ${query}\n`;
+    frame.remove();
+  }
+  document.title = 'all done';
+})();
+</script>
+</body>
+</html>

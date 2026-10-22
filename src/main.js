@@ -2510,6 +2510,13 @@ const SHEETS = {
       ['sculpt', '4 · Sculpt', 'loft bent by anatomy: ribs, abs, folds · ~14k'],
       ['detail', '5 · Detail', 'loft + bump and occlusion map · ~6k + a map'],
       ['flesh', '6 · Flesh', 'anatomy field, hero close-ups · ~60k, ~1.5 s to build'],
+      // Round two (bodystyles.js): skin textures, blended joins, a face that follows the body.
+      ['v1', 'V1 · Painted loft', 'loft + albedo and occlusion maps · ~6k'],
+      ['v2', 'V2 · Mapped loft', 'loft + albedo, normal, occlusion, roughness · ~6k'],
+      ['v3', 'V3 · B baked on A', 'loft + the flesh field baked into its maps · ~6k'],
+      ['v4', 'V4 · Sculpted + mapped', 'fine loft + maps · ~14k'],
+      ['v5', 'V5 · Flesh-lite', 'coarse flesh field, painted per vertex · ~35k'],
+      ['v6', 'V6 · Flesh hero', 'flesh field, painted per vertex · ~65k'],
     ],
     rows: [PRESETS.heavy, PRESETS.contender],
     // Inside the ropes (the ring edge is 3 m out), so none cross the view.

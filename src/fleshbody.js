@@ -18,11 +18,12 @@
 // not drawn by this style (the sheets' fit check says what that needs).
 // No Three.js: plain arrays, buildable in Node.
 
+import { rulesProfile } from './skinrules.js';
 import { P } from './body.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { cone, ellipsoid, relax, skinWeights, smoothMin, surfaceNets } from './bodymesh.js';
-import { outfitOf } from './outfits.js';
+import { glovedFists, outfitOf } from './outfits.js';
 import { buildLoftBody } from './loftbody.js';
 import { SCULPT, sculptProfile, sculptTraits, trunkFat, trunkProfiles } from './sculpt.js';
 
@@ -48,9 +49,15 @@ export const FLESH = {
   ribs: { count: 7, top: 0.6, spacing: 0.042, radius: 0.0105, droop: 0.045 },
   // Where along the thigh the trunks end (the loft's own reach for trunks).
   trunksReach: 0.42,
+  // Per-vertex painting (the flesh-lite style): how far out (m) the field is probed for a cavity, and how dark a full one is.
+  paint: { probe: 0.014, dark: 0.3 },
   // Where (u up the trunk) the core narrows from the rib cage to the neck.
   shoulderFrom: 0.8,
   shoulderTo: 1.0,
+  // The refined anatomy (round two's styles): the core closes on the neck later, so the trapezius and deltoids make the shoulder line.
+  refinedShoulder: [0.93, 1.05],
+  // ...and the pectoral blended into the chest over a wider band (a narrow one left a rim round a plate).
+  refinedPecBlend: 0.085,
   // Muscle's proud is scaled by how bare the skin is over it, and a bone's by the same and by how bony the body (see sculpt.js).
 };
 
@@ -137,7 +144,9 @@ const fleshBall = (center, radius) => solidEllipsoid(center, [radius, radius, ra
  * The lean body: its volumes and the fat that goes over it.
  * @returns { shapes, thickness(x, y, z), traits }
  */
-export function fleshAnatomy(body) {
+export function fleshAnatomy(body, { refined = false } = {}) {
+  // `refined`: round two's corrections (a pectoral fanned to the shoulder, a smooth trapezius and deltoid, bone buried by fat, a hanging apron).
+  const [shoulderFrom, shoulderTo] = refined ? FLESH.refinedShoulder : [FLESH.shoulderFrom, FLESH.shoulderTo];
   const points = bindPoints(body);
   const at = (name) => points[P[name]];
   const seg = body.segments;
@@ -161,10 +170,11 @@ export function fleshAnatomy(body) {
   const R = seg.trunk.muscleRadius;
   const neckR = L.headRadius * (0.44 + 0.12 * body.neckIndex);
   const hipHalf = L.hipSpan / 2 + seg.lThigh.muscleRadius * 0.85;
-  const profiles = trunkProfiles(body, traits, { L, R, neckR, hipHalf, sculptProfile });
+  // Refined, the profiles are smooth curves through their stops (no shelf where an eased one sits flat at a stop).
+  const profiles = trunkProfiles(body, traits, { L, R, neckR, hipHalf, sculptProfile: refined ? rulesProfile : sculptProfile });
   const fat = trunkFat(traits);
   // Above the ribs the core closes in on the neck, so the trapezius (a volume of its own, below) makes the slope to the shoulders, not a shelf.
-  const closing = (profile, neckSize) => (u) => profile(u) + (neckSize - profile(u)) * fleshSmooth(FLESH.shoulderFrom, FLESH.shoulderTo, u);
+  const closing = (profile, neckSize) => (u) => profile(u) + (neckSize - profile(u)) * fleshSmooth(shoulderFrom, shoulderTo, u);
   // The lats widen the back above the waist (a V), with training and without fat over them.
   const wide = (u) => 1 + 0.1 * dev * lean ** 1.2 * Math.exp(-(((u - 0.55) / 0.14) ** 2));
   // The skin's own envelope (lean body and the layer of fat over it, as the loft's rings are drawn): the bones and muscles stand proud of it
@@ -172,7 +182,7 @@ export function fleshAnatomy(body) {
   const trunkLayer = Math.max(0, seg.trunk.skinRadius - seg.trunk.muscleRadius);
   const leanWide = (u) => closing(profiles.leanWidth, neckR * 1.2)(u) * wide(u);
   const leanDeep = closing(profiles.leanDepth, neckR * 1.15);
-  const closeness = (u) => 1 - fleshSmooth(FLESH.shoulderFrom, FLESH.shoulderTo, u);
+  const closeness = (u) => 1 - fleshSmooth(shoulderFrom, shoulderTo, u);
   const width = (u) => leanWide(u) + trunkLayer * profiles.fatWidth(u) * closeness(u);
   const depth = (u) => leanDeep(u) + trunkLayer * profiles.fatDepth(u) * closeness(u);
   const shift = (u) => profiles.leanOffset(u) + trunkLayer * profiles.fatOffset(u) * closeness(u);
@@ -182,13 +192,18 @@ export function fleshAnatomy(body) {
    * A flat muscle or bone plate lying on the trunk: an ellipsoid whose outer face stands `proud` m above the surface at (u, lateral),
    * `tall` and `wide` (m) half-extents along and across the surface.
    */
-  const lens = (u, lateral, proud, tall, wide, blend = FLESH.blend) => {
+  const lens = (u, lateral, proud, tall, wide, blend = FLESH.blend, tilt = 0) => {
     const normal = Math.min(Math.max(proud * 1.25 + 0.002, FLESH.thinnest), tall, wide);
     const onSurface = surface(u, lateral, 1);
     const out = [Math.cos(lateral), 0, Math.sin(lateral)];
     const across = [-Math.sin(lateral), 0, Math.cos(lateral)];
     const centre = vec.sub(onSurface, vec.scale(out, normal - proud));
-    return { ...solidEllipsoid(centre, [normal, tall, wide], [out, [0, 1, 0], across]), blend };
+    // `tilt`: the plate's long axis turned up (rad) from running outwards along the surface, as a pectoral's fibres run to the shoulder.
+    const outwards = vec.scale(across, Math.sign(Math.sin(lateral)) || 1);
+    const long = vec.add(vec.scale(outwards, Math.cos(tilt)), [0, Math.sin(tilt), 0]);
+    const short = vec.add(vec.scale(outwards, -Math.sin(tilt)), [0, Math.cos(tilt), 0]);
+    // Refined, a plate that would barely stand proud is left out: buried under fat its rim still printed (a box on a heavy back).
+    return { ...solidEllipsoid(centre, [normal, tall, wide], [out, tilt ? short : [0, 1, 0], tilt ? long : across]), blend, skip: refined && proud < 0.0015 };
   };
 
   /** A point on the lean trunk's surface at u, signed angle `lateral` from the front (+ to the left), a share `inset` of the way out. */
@@ -202,13 +217,15 @@ export function fleshAnatomy(body) {
   const boneProud = 0.35 + 0.65 * bony;
   // Muscle shows only where the fat is thin: a heavy man's pectorals are under his chest.
   const bare = lean ** 1.2;
+  // And bone is buried by the fat as well: a plate or a crest on a heavy trunk is not seen.
+  const boneBare = refined ? lean ** 1.1 : 1;
   const ribRadius = FLESH.ribs.radius * sc;
 
   // ---- Ribs, breastbone side to spine: tubes round the cage, each a little lower at the front.
   for (let rib = 0; rib < FLESH.ribs.count; rib += 1) {
     const u = FLESH.ribs.top - rib * FLESH.ribs.spacing;
     // Under muscle or fat the ribs sink in as well as thin: a trained trunk's are all but gone.
-    const inset = 0.985 - 0.035 * (1 - bony);
+    const inset = 0.985 - (refined ? 0.06 : 0.035) * (1 - bony);
     shapes.push(ribTube([pelvis[0] + shift(u), 0, pelvis[2]], [depth(u) * inset, width(u) * inset], pelvis[1] + u * trunkLength, FLESH.ribs.droop * sc, ribRadius * (0.45 + 0.55 * bony)));
   }
 
@@ -216,26 +233,31 @@ export function fleshAnatomy(body) {
   for (const side of [1, -1]) {
     const notch = surface(0.88, side * 0.12, 0.975);
     const tip = surface(0.925, side * 1.42, 0.985);
-    shapes.push(fleshTube(notch, tip, 0.0072 * sc * (0.7 + 0.5 * boneProud), 0.0082 * sc * (0.7 + 0.5 * boneProud)));
+    // Refined, the collarbone sinks under fat (its inner end stood up as a knob on a heavy chest), and starts off the notch.
+    const clavicle = refined ? 0.3 + 0.7 * boneBare : 1;
+    shapes.push(fleshTube(refined ? lerp(notch, tip, 0.06) : notch, tip, 0.0072 * sc * (0.7 + 0.5 * boneProud) * clavicle, 0.0082 * sc * (0.7 + 0.5 * boneProud) * clavicle));
     // The sternum's top, and the pit between the collarbones is left to the lean core.
     // Shoulder blades: flat plates on the back, their spine a ridge.
-    shapes.push(lens(0.69, side * (Math.PI - 0.62), 0.004 + 0.009 * Math.max(bony, dev * 0.7), 0.065 * sc, 0.045 * sc, FLESH.softBlend));
-    shapes.push(fleshTube(surface(0.8, side * (Math.PI - 0.22), 0.985), surface(0.79, side * (Math.PI - 1.15), 0.985), 0.0035 + 0.004 * boneProud, 0.004 + 0.0045 * boneProud));
+    shapes.push(lens(0.69, side * (Math.PI - 0.62), (0.004 + 0.009 * Math.max(bony, dev * 0.7)) * boneBare, 0.065 * sc, 0.045 * sc, FLESH.softBlend));
+    shapes.push({ ...fleshTube(surface(0.8, side * (Math.PI - 0.22), 0.985), surface(0.79, side * (Math.PI - 1.15), 0.985), (0.0035 + 0.004 * boneProud) * (refined ? 0.3 + 0.7 * boneBare : 1), (0.004 + 0.0045 * boneProud) * (refined ? 0.3 + 0.7 * boneBare : 1)), skip: refined && boneBare < 0.2 });
     // Hip bones: the front spine, the crest running back, the back spine.
     const front = surface(0.085, side * 1.02, 0.97);
     const crest = surface(0.17, side * 1.85, 0.97);
     const back = surface(0.1, side * 2.75, 0.97);
-    shapes.push(fleshBall(front, 0.0105 * sc * boneProud + 0.004));
-    shapes.push(fleshTube(front, crest, 0.0085 * sc * boneProud + 0.003));
-    shapes.push(fleshTube(crest, back, 0.0085 * sc * boneProud + 0.003));
+    shapes.push(fleshBall(front, (0.0105 * sc * boneProud + 0.004) * (0.3 + 0.7 * boneBare)));
+    shapes.push(fleshTube(front, crest, (0.0085 * sc * boneProud + 0.003) * (0.3 + 0.7 * boneBare)));
+    shapes.push(fleshTube(crest, back, (0.0085 * sc * boneProud + 0.003) * (0.3 + 0.7 * boneBare)));
     // The pectoral: a shelf with a sharp lower edge (a man's); a woman's bust is the fat's.
     if (!female && dev > 0.08 && bare > 0.12) {
-      shapes.push(lens(0.665, side * 0.55, (0.005 + 0.022 * dev) * bare, 0.058 * sc, 0.085 * sc, FLESH.softBlend));
+      // A broad fan from the breastbone to the shoulder: long outwards and a little up, a flat edge below, no cleft where the two meet.
+      if (refined) shapes.push(lens(0.67, side * 0.66, (0.004 + 0.016 * dev) * bare, 0.05 * sc, 0.095 * sc, FLESH.refinedPecBlend, 0.3));
+      else shapes.push(lens(0.665, side * 0.55, (0.005 + 0.022 * dev) * bare, 0.058 * sc, 0.085 * sc, FLESH.softBlend));
     }
     // Lats flare the back; the trapezius slopes from the neck to the shoulder.
     // The shoulder girdle: the trapezius from the neck out to the point of the shoulder, thin in the starved, thick in the trained.
     const shoulderPoint = at(side > 0 ? 'lShoulder' : 'rShoulder');
-    shapes.push(fleshTube(vec.add(lerp(neck, shoulderPoint, 0.1), [-0.015, 0.0, 0]), vec.add(lerp(neck, shoulderPoint, 0.9), [-0.01, 0.004, 0]), 0.014 + 0.032 * dev + 0.012 * body.neckIndex, 0.02 + 0.012 * dev));
+    if (refined) shapes.push({ ...fleshTube(vec.add(lerp(neck, shoulderPoint, 0.06), [-0.012, -0.012, 0]), vec.add(lerp(neck, shoulderPoint, 0.93), [-0.006, -0.012, 0]), 0.026 + 0.026 * dev + 0.012 * body.neckIndex, 0.03 + 0.014 * dev), blend: FLESH.softBlend });
+    else shapes.push(fleshTube(vec.add(lerp(neck, shoulderPoint, 0.1), [-0.015, 0.0, 0]), vec.add(lerp(neck, shoulderPoint, 0.9), [-0.01, 0.004, 0]), 0.014 + 0.032 * dev + 0.012 * body.neckIndex, 0.02 + 0.012 * dev));
     // The neck's two cords, from behind the ear to the notch.
     const cords = lean * (0.25 + 0.5 * bony + 0.5 * Math.min(1, body.neckIndex));
     shapes.push(fleshTube([neck[0] + 0.03, neck[1] - 0.02, neck[2] + side * 0.014], [neck[0] - 0.012, neck[1] + 0.1 * (L.neckToHead / 0.207), neck[2] + side * 0.036], 0.0045 + 0.0075 * cords, 0.0045 + 0.0075 * cords));
@@ -284,7 +306,10 @@ export function fleshAnatomy(body) {
     const forward = [1, 0, 0];
     shapes.push(cone(shoulder, elbow, upperR * 0.95, upperR * 0.72));
     // Deltoid over the joint, cap and three heads.
-    shapes.push(solidEllipsoid(vec.add(shoulder, [0, -0.004, sign * 0.012]), [upperR * (1.05 + 0.25 * dev), upperR * (1.35 + 0.3 * dev), upperR * (1.0 + 0.2 * dev)]));
+    const armAxis = vec.normalize(vec.sub(elbow, shoulder));
+    const armSide = vec.normalize(vec.cross(armAxis, [1, 0, 0]));
+    if (refined) shapes.push({ ...solidEllipsoid(vec.add(shoulder, vec.scale(armAxis, upperR * 0.55)), [upperR * (1.05 + 0.25 * dev), upperR * (1.5 + 0.35 * dev), upperR * (1.0 + 0.2 * dev)], [[1, 0, 0], armAxis, armSide]), blend: FLESH.softBlend });
+    else shapes.push(solidEllipsoid(vec.add(shoulder, [0, -0.004, sign * 0.012]), [upperR * (1.05 + 0.25 * dev), upperR * (1.35 + 0.3 * dev), upperR * (1.0 + 0.2 * dev)]));
     // Biceps in front, triceps behind, the groove between them on the inside.
     const belly = upperR * (0.5 + 0.35 * dev * armLean);
     shapes.push(cone(vec.add(lerp(shoulder, elbow, 0.32), vec.scale(forward, upperR * 0.3)), vec.add(lerp(shoulder, elbow, 0.76), vec.scale(forward, upperR * 0.28)), belly, belly * 0.7));
@@ -294,7 +319,8 @@ export function fleshAnatomy(body) {
     shapes.push(fleshBall(vec.add(elbow, [-upperR * 0.5, 0.004, 0]), 0.008 + 0.006 * armBony));
     for (const across of [1, -1]) shapes.push(fleshBall(vec.add(elbow, [0, 0.01, across * upperR * 0.6]), 0.0065 + 0.005 * armBony));
     // The forearm: thick below the elbow, narrow at the wrist, a bulge of muscle on the outside (brachioradialis).
-    const wrist = lerp(elbow, hand, 0.72);
+    // Refined and bare-handed, the forearm runs on to the fist (as the loft's does); in gloves it stops inside the cuff.
+    const wrist = lerp(elbow, hand, refined && !glovedFists(body.inputs) ? 0.95 : 0.72);
     shapes.push(cone(lerp(elbow, hand, 0.02), lerp(elbow, hand, 0.35), foreR * 1.12, foreR * 1.03));
     shapes.push(cone(lerp(elbow, hand, 0.35), wrist, foreR * 1.03, foreR * 0.62));
     shapes.push(cone(vec.add(lerp(elbow, hand, 0.12), [0.004, 0, sign * foreR * 0.35]), vec.add(lerp(elbow, hand, 0.4), [0.004, 0, sign * foreR * 0.25]), foreR * (0.5 + 0.2 * dev), foreR * 0.4));
@@ -384,12 +410,34 @@ export function fleshAnatomy(body) {
   };
   // The skin is never farther than this from the lean surface: the trunk's fat is the most, at its thickest ring, with deposits and creases on it.
   const band = FLESH.band;
+  if (refined) for (let index = shapes.length - 1; index >= 0; index -= 1) if (shapes[index].skip) shapes.splice(index, 1);
   return { shapes, thickness, band, traits, bones, points, layerOf, trunkWidth: width };
 }
 
 const SCULPT_SPINE_KNOB = 0.036;
 
 // ---- The field, the surface -------------------------------------------------
+
+/**
+ * The signed distance to the skin (negative inside it) as a function of a bind-pose point: the lean field with the fat pushed
+ * out of it, as `sampleSkin` meshes it, but read anywhere on its own, to project another surface onto it or to bake its height
+ * into textures. Exact only near the surface; shapes too far to matter at the surface are skipped.
+ */
+export function fleshField(anatomy) {
+  const { shapes, thickness, band } = anatomy;
+  const reach = band + FLESH.blend + 0.01;
+  return (x, y, z) => {
+    let lean = 1;
+    for (const shape of shapes) {
+      const box = shape.box;
+      if (x < box[0] - reach || x > box[3] + reach || y < box[1] - reach || y > box[4] + reach || z < box[2] - reach || z > box[5] + reach) continue;
+      lean = smoothMin(lean, shape.distance(x, y, z), shape.blend ?? FLESH.blend);
+    }
+    if (lean > band || lean < -band) return lean;
+    return lean - thickness(x, y, z) * (1 - fleshSmooth(band * 0.6, band, Math.abs(lean)));
+  };
+}
+
 
 /** Grid and field of the lean union, then the skin: the lean field pushed out by the fat near its surface. */
 export function sampleSkin({ shapes, thickness, band }, cell) {
@@ -442,8 +490,8 @@ export function sampleSkin({ shapes, thickness, band }, cell) {
  * The skin as a mesh in the bind pose: { positions, normals, indices, regions, rigid, skinIndex, skinWeight, bindFrames, bindPoints }.
  * `regions` names each vertex (skin, or kit, band, top for the trunks and top drawn over it).
  */
-export function buildFleshBody(body, { cell = FLESH.cell } = {}) {
-  const anatomy = fleshAnatomy(body);
+export function buildFleshBody(body, { cell = FLESH.cell, paint = false, refined = false } = {}) {
+  const anatomy = fleshAnatomy(body, { refined });
   let surface = surfaceNets(sampleSkin(anatomy, cell));
   surface = relax(surface, FLESH.relaxPasses, FLESH.relaxAmount);
   const frames = boneFrames(anatomy.points, body);
@@ -451,7 +499,38 @@ export function buildFleshBody(body, { cell = FLESH.cell } = {}) {
   const vertexCount = surface.positions.length / 3;
   const regions = new Array(vertexCount).fill('skin');
   const mesh = { positions: surface.positions, normals: surface.normals, indices: surface.indices, regions, rigid: new Array(vertexCount).fill(false), ...weights, bindFrames: frames, bindPoints: anatomy.points };
-  return dressSkin(mesh, body, anatomy);
+  const dressed = dressSkin(mesh, body, anatomy);
+  // `paint`: the skin coloured per vertex instead of by maps (the flesh-lite style): `tint`, a multiplier on the tone for each vertex.
+  if (!paint) return dressed;
+  const field = fleshField(anatomy);
+  return { ...dressed, field, tint: paintFleshVertices(dressed, field, anatomy.traits) };
+}
+
+/**
+ * Per-vertex skin colour from the field: how shut in each skin vertex is (the skin's own field read a little way out along its normal:
+ * less than that far out means a cavity), as the albedo map shades its cavities, with the ruddy of the heavy and the pale of the starved.
+ * @returns the multipliers, three a vertex (1 for what is not skin)
+ */
+export function paintFleshVertices(mesh, field, traits) {
+  const count = mesh.positions.length / 3;
+  const tint = new Float32Array(count * 3).fill(1);
+  const ruddy = fleshSmooth(0.03, 0.095, traits.trunk.fat) * (traits.female ? 0.85 : 1);
+  const pale = traits.trunk.bony;
+  const probe = FLESH.paint.probe;
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (mesh.regions[vertex] !== 'skin') continue;
+    const x = mesh.positions[vertex * 3];
+    const y = mesh.positions[vertex * 3 + 1];
+    const z = mesh.positions[vertex * 3 + 2];
+    const out = field(x + mesh.normals[vertex * 3] * probe, y + mesh.normals[vertex * 3 + 1] * probe, z + mesh.normals[vertex * 3 + 2] * probe);
+    // On a flat face the field a probe out is the probe; in a hollow it is less.
+    const hollow = fleshClamp((probe - out) / probe);
+    const dark = hollow ** 0.9 * FLESH.paint.dark;
+    tint[vertex * 3] = (1 - dark * (0.45 + 0.4 * pale)) * (1 + 0.045 * ruddy - 0.03 * pale);
+    tint[vertex * 3 + 1] = (1 - dark * (0.95 - 0.1 * pale)) * (1 - 0.035 * ruddy - 0.006 * pale);
+    tint[vertex * 3 + 2] = (1 - dark * (1 - 0.2 * pale)) * (1 - 0.05 * ruddy + 0.032 * pale);
+  }
+  return tint;
 }
 
 // ---- Clothes as offset skin ------------------------------------------------
