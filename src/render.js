@@ -104,7 +104,13 @@ export function createScene(canvas) {
  * scene is built the first time it is needed; lighting goes with it.
  */
 export function setPlace(view, place, arena, weather = null) {
-  if (place === view.place && weather === (view.weather ?? null)) return;
+  // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
+  // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
+  const home = PLACE_ARENAS[place];
+  const floor = home && arena && arena.halfX >= home.halfX * WIDE_FLOOR ? arena : null;
+  const swapped = swapFloor(view, place, floor);
+  view.floor = floor;
+  if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
   const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
@@ -130,6 +136,26 @@ export function setPlace(view, place, arena, weather = null) {
   applyWeather(view);
 }
 
+// A floor this many times the place's own width gets a copy of the place built for it.
+const WIDE_FLOOR = 1.5;
+
+/**
+ * Show `place` on `floor` (null: its own): the copy built for that floor takes the place's
+ * slot, the one it replaces parked under `place@floor` (hidden, with the other places) for
+ * the next visit. Returns whether the slot changed.
+ */
+function swapFloor(view, place, floor) {
+  view.floors ??= {};
+  const wanted = floor ? `${floor.halfX}x${floor.halfZ}` : 'home';
+  const shown = view.floors[place] ?? 'home';
+  if (wanted === shown) return false;
+  if (view.places[place]) view.places[`${place}@${shown}`] = view.places[place];
+  view.places[place] = view.places[`${place}@${wanted}`] ?? null;
+  delete view.places[`${place}@${wanted}`];
+  view.floors[place] = wanted;
+  return true;
+}
+
 /**
  * Throw away every place built so far, so the next setPlace builds it anew.
  * The places are painted with Math.random; the looks harness rebuilds them
@@ -146,6 +172,7 @@ export function forgetPlaces(view) {
     view.places[key] = null;
   }
   view.place = null;
+  view.floors = {};
 }
 
 /** The place already shown, lit and drawn again: after the look changed. */
@@ -637,6 +664,9 @@ function buildStageSky() {
 
 function buildPlain(arena = PLACE_ARENAS.plain) {
   const place = new THREE.Group();
+  // On a floor wider than its own (a battle map's) the ground, hills and plants stand that much further out.
+  const outX = Math.max(0, arena.halfX - PLACE_ARENAS.plain.halfX);
+  const outZ = Math.max(0, arena.halfZ - PLACE_ARENAS.plain.halfZ);
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   place.add(daySky());
   const field = paintedTexture(1024, 1024, (g, w, h) => {
@@ -648,7 +678,7 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
       g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
     }
   }, [5, 5]);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(130, 130), lit(0xffffff, { map: field }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(130 + 2 * outX, 130 + 2 * outZ), lit(0xffffff, { map: field }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   ground.userData.scenery = 'ground';
@@ -665,7 +695,7 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
   for (let index = 0; index < 10; index += 1) {
     const angle = (index / 10) * Math.PI * 2;
     const hill = new THREE.Mesh(new THREE.ConeGeometry(9 + Math.random() * 6, 4 + Math.random() * 4, 8), lit(0x5f6448));
-    hill.position.set(Math.cos(angle) * 52, 1.5, Math.sin(angle) * 50);
+    hill.position.set(Math.cos(angle) * (52 + outX), 1.5, Math.sin(angle) * (50 + outZ));
     hill.userData.scenery = 'hills';
     place.add(hill);
   }
@@ -682,7 +712,7 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
       blade.rotation.set(Math.sin(turn) * 0.6, 0, -Math.cos(turn) * 0.6);
       plant.add(blade);
     }
-    plant.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.8);
+    plant.position.set(Math.cos(angle) * (reach + outX), 0, Math.sin(angle) * (reach * 0.8 + outZ));
     plant.scale.setScalar(0.8 + Math.random() * 0.8);
     plant.userData.scenery = 'plants';
     place.add(plant);
@@ -803,6 +833,9 @@ function buildCoast({ fort }) {
 
 function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   const place = new THREE.Group();
+  // On a floor wider than its own (a battle map's) the ground, mountains and pines stand that much further out.
+  const outX = Math.max(0, arena.halfX - PLACE_ARENAS.sengoku.halfX);
+  const outZ = Math.max(0, arena.halfZ - PLACE_ARENAS.sengoku.halfZ);
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   const shaded = (mesh) => {
     mesh.castShadow = true;
@@ -826,7 +859,7 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
       g.fill();
     }
   }, [5, 5]);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 110), lit(0xffffff, { map: field }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(110 + 2 * outX, 110 + 2 * outZ), lit(0xffffff, { map: field }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   ground.userData.scenery = 'ground';
@@ -835,7 +868,7 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   for (let index = 0; index < 12; index += 1) {
     const angle = (index / 12) * Math.PI * 2 + 0.2;
     const mountain = new THREE.Mesh(new THREE.ConeGeometry(10 + Math.random() * 6, 9 + Math.random() * 7, 7), lit(0x6a7a88));
-    mountain.position.set(Math.cos(angle) * 46, 3, Math.sin(angle) * 44);
+    mountain.position.set(Math.cos(angle) * (46 + outX), 3, Math.sin(angle) * (44 + outZ));
     mountain.userData.scenery = 'mountains';
     place.add(mountain);
   }
@@ -854,7 +887,7 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
       crown.position.y = 3 + tier * 1.05;
       tree.add(crown);
     }
-    tree.position.set(Math.cos(angle) * reach, 0, Math.sin(angle) * reach * 0.8);
+    tree.position.set(Math.cos(angle) * (reach + outX), 0, Math.sin(angle) * (reach * 0.8 + outZ));
     tree.scale.setScalar(0.8 + Math.random() * 0.6);
     tree.userData.scenery = 'trees';
     place.add(tree);
@@ -889,11 +922,14 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   // The curtains, the banners on their poles, and a bamboo palisade along both flanks, gapped (src/props/rural.js).
   place.add(ruralSengokuCamps({
     sides: [[-1, '#b3161b'], [1, '#1f3f8a']],
-    curtainX: 14.5,
+    // (Beyond the floor's ends and flanks, whatever its size: 14.5 and 9.5 m on the place's own.)
+    curtainX: arena.halfX + 3.5,
     curtainArt: crestCurtain,
     bannerArt,
-    banners: (side) => Array.from({ length: 7 }, (_, index) => [side * (12.4 + (index % 2) * 0.8), -9 + index * 3]),
-    palisadeZ: [-9.5, 9.5],
+    banners: (side) => Array.from({ length: 7 }, (_, index) => [side * (arena.halfX + 1.4 + (index % 2) * 0.8), (index - 3) * (arena.halfZ + 2) / 3]),
+    palisadeZ: [-(arena.halfZ + 2.5), arena.halfZ + 2.5],
+    curtainLength: 2 * arena.halfZ,
+    palisadeSpan: arena.halfX,
   }));
   // Autumn grass in tufts and field stones beyond the trampled ground.
   place.add(...fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] }));

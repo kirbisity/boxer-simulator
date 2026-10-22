@@ -968,6 +968,23 @@ export const OUTFITS = {
       { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'hanHelm', color: '#5d6066', lace: '#3a2a20' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
     ],
   },
+  // A Han horseman: the same iron lamellar coat and helmet as the crossbowmen
+  // (Han cavalry wore the infantry's lamellar), but not in their ranks: the
+  // Ferghana-bred horse of the frontier armies (HORSES.warhorse).
+  hanCavalry: {
+    // Rides (the Han army's horse: the "heavenly horses" bought from Ferghana, Wu Di's reign).
+    horse: 'warhorse',
+    skill: 0.3,
+    faction: 'chinese',
+    label: 'Han cavalry — iron lamellar', movement: 'good', fists: 'bare',
+    sidearm: 'jian',
+    extraMass: 0.18,
+    protection: { blunt: 0.4, cut: 0.82, pierce: 0.62, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.5 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    courage: 0.3,
+    designs: [
+      { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'hanHelm', color: '#5d6066', lace: '#3a2a20' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
+    ],
+  },
   // The wuxia swordsman's dress: a light robe crossed over the breast and
   // open below the waist for the legs, a sash, cloth shoes; no armour.
   wuxia: {
@@ -1012,6 +1029,26 @@ export const OUTFITS = {
     courage: 0.55,
     designs: [
       { label: 'Mail, phalerae, transverse crest', top: { kind: 'tunic', color: '#7a1a1e' }, bottom: { kind: 'loincloth', color: '#7a1a1e' }, armor: { kind: 'centurion', color: '#a7adb6', mail: '#8d9097', gold: '#c9a24a', lace: '#3a2416' }, head: { kind: 'galea', color: '#b8bec6', gold: '#c9a24a', crest: 'transverse', plume: '#b3161b' }, feet: { kind: 'sandal', color: '#3a2416' } },
+    ],
+  },
+  // A trooper of an auxiliary cavalry wing (ala) of the early Empire: a mail
+  // shirt (lorica hamata) to mid-thigh over a tunic, the Gallic trousers
+  // (bracae) of the horse, a cavalry galea, and the spatha at his hip; the
+  // alae were raised from Gauls, Thracians, Batavians and Spaniards, who
+  // brought their own horses (HORSES.warhorse: the light Iberian and Gallic
+  // riding horse).
+  romanAuxiliary: {
+    // Rides (auxiliary cavalry).
+    horse: 'warhorse',
+    faction: 'romans',
+    label: 'Auxiliary cavalry — mail and spatha', movement: 'good', fists: 'bare',
+    sidearm: 'dagger',
+    extraMass: 0.26,
+    protection: { blunt: 0.35, cut: 0.9, pierce: 0.5, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.1, pierce: 0.03 } } },
+    courage: 0.45,
+    designs: [
+      { label: 'Mail, red tunic, bracae', top: { kind: 'tunic', color: '#7a2a22' }, bottom: { kind: 'pants', color: '#5a4c36' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'galea', color: '#b8bec6', gold: '#9a7a3a' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+      { label: 'Mail, blue tunic, bracae', top: { kind: 'tunic', color: '#2f4468' }, bottom: { kind: 'pants', color: '#4a4030' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'galea', color: '#b8bec6', gold: '#9a7a3a' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
     ],
   },
   // ---- The steppe, 14th–17th centuries: Mongol, Oirat and Timurid warriors,

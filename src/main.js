@@ -27,7 +27,7 @@ import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
 import { checkButtons } from './uicheck.js';
-import { crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
+import { battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
@@ -276,7 +276,7 @@ function newBout() {
   leaveStage();
   state.seed += 1;
   // A scenario is the same world on its own floor, with its own people.
-  const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
+  const scenario = state.scenario ? battleOf(state.scenario) : null;
   // Each side: its lead (the one the builder edits) and, in a team fight,
   // the level's crew or, in the ring, fighters from the presets.
   // Who rides is each fighter's own (`inputs.mounted`, set in the builder; those whose kit rides: horses.js canRide).
@@ -762,7 +762,7 @@ function watchCamera(world, middle, dt) {
     orbit.distance = Math.max(min, Math.min(max, orbit.distance));
   } else if (world.fighters.length > 2 || world.horses?.length) {
     // A crowd needs a wider shot: back off with the spread of the fighters.
-    const furthest = state.scenario ? SCENARIOS[state.scenario].camera?.maxDistance ?? Infinity : Infinity;
+    const furthest = state.scenario ? battleOf(state.scenario).camera?.maxDistance ?? Infinity : Infinity;
     orbit.distance += (Math.min(furthest, frameDistance(spread)) - orbit.distance) * 0.03;
     watchCam.reframing = false;
   } else stepReframe(watchCam, orbit, spread, dt);
@@ -1106,7 +1106,7 @@ for (const corner of ['red', 'blue']) {
     const roster = state.rosters[corner];
     for (let index = 1; index < roster.length; index += 1) roster[index] = randomCharacter();
     state.rosters[corner] = roster.slice(0, Math.max(1, state.teamSizes[corner]));
-    ensureRoster(corner, state.scenario ? SCENARIOS[state.scenario] : null);
+    ensureRoster(corner, state.scenario ? battleOf(state.scenario) : null);
     refreshBuilder();
     newBout();
   });
@@ -1125,7 +1125,7 @@ function refreshMountButton() {
   button.dataset.all = String(riders.length > 0 && riding === riders.length);
   button.textContent = riders.length > 0 && riding === riders.length ? '🐎 Dismount all' : '🐎 Mount all';
   button.title = riders.length
-    ? `${riding} of the ${riders.length} who can ride are mounted. Each fighter's own Mounted choice is in Build fighters. A mounted fight is on the open field.`
+    ? `${riding} of the ${riders.length} who can ride are mounted. Each fighter's own Mounted choice is in Build fighters. A mounted fight in a small scene moves to the open field (the battle maps keep their own ground, with their cavalry already mounted).`
     : 'Nobody here rides (knights, samurai, steppe, sultanates, Ming cavalry...)';
 }
 $('#mounted').addEventListener('click', () => {
@@ -1744,7 +1744,7 @@ function fillCornerForm(corner) {
 function chooseLevel(key) {
   if (!state.scenario) state.sandboxRosters = state.rosters;
   if (key) {
-    const scenario = SCENARIOS[key];
+    const scenario = battleOf(key);
     // A level with a whole cast is made fresh each visit, at its own sizes.
     if (scenario.cast) state.levelRosters[key] = scenario.cast(Math.random);
     state.levelRosters[key] ??= Object.fromEntries(scenarioFighters(scenario).map(({ inputs, corner }) => [corner, [inputs]]));
@@ -1760,7 +1760,7 @@ function chooseLevel(key) {
 
 /** Rosters filled to size, the fighter being edited kept in range, both forms redrawn. */
 function refreshBuilder() {
-  const scenario = state.scenario ? SCENARIOS[state.scenario] : null;
+  const scenario = state.scenario ? battleOf(state.scenario) : null;
   for (const corner of ['red', 'blue']) {
     ensureRoster(corner, scenario);
     state.editing[corner] = Math.min(state.editing[corner], state.teamSizes[corner] - 1);

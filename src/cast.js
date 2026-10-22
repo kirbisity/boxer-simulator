@@ -358,6 +358,60 @@ function builtLike(inputs, build, random) {
   return atWeight({ ...inputs, heightCm, exercise }, weightKg);
 }
 
+// ---- Horsemen: the wings of the battle maps (scenarios.js `wings`) ----
+
+/**
+ * A mounted samurai of one side at Sekigahara (a samurai in ō-yoroi or tōsei
+ * gusoku on his Japanese horse: the ashigaru went on foot), with the yari, the
+ * katana or the yumi, in the side's colours.
+ */
+export function samuraiHorseman(random = Math.random, side, style = 'yari') {
+  return { ...sengokuWarrior(random, side, style, 'samurai'), mounted: true };
+}
+
+/**
+ * A horseman of the Ming army (Li Rusong's Liaodong horse): northern heavy cavalry
+ * in iron lamellar to the knees on a steppe horse, with the dao, a spear or a
+ * three-eyed gun (sanyanchong), built like the army's elite.
+ */
+export function mingHorseman(random = Math.random, style = 'dao') {
+  const kind = 'mingIronLamellar';
+  const base = varyCharacter(PRESETS.guandao, random, { sex: 'male' });
+  const name = `${pickOne(['Li', 'Zhang', 'Wang', 'Zhu', 'Ma', 'Sun', 'Qian', 'Xu', 'Tang', 'Gao', 'Shen', 'Yu'], random)} ${pickOne(['Biao', 'Yong', 'Zhen', 'Hu', 'Fei', 'Cheng', 'Guo', 'Kai', 'Lei', 'Meng', 'Tai', 'Wei'], random)}`;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [], mounted: true };
+  return builtLike(soldier, PERIOD_BUILD.ming.elite, random);
+}
+
+/**
+ * A Spanish horseman of Cortés's cavalry in 1520 (a jinete or a caballero in
+ * breastplate and morion on an Andalusian horse): with the lance, as the horse
+ * charged at Otumba, or the espada.
+ */
+export function conquistadorHorseman(random = Math.random, style = 'lance') {
+  return { ...europeanSoldier(random, 'hidalgo'), style, mounted: true };
+}
+
+/**
+ * A trooper of a Roman auxiliary cavalry wing (ala), the early Empire's: a Gaul,
+ * Thracian or Batavian, in mail on a riding horse of his own, with the spatha (a
+ * long sword) or the cavalry spear (hasta).
+ */
+export function romanHorseman(random = Math.random, style = 'longsword') {
+  const base = drilledSoldier(PRESETS.legionary, random);
+  const name = `${pickOne(['Gaius', 'Lucius', 'Quintus', 'Marcus', 'Titus', 'Aulus'], random)} ${pickOne(['Julius Vindex', 'Flavius Sabinus', 'Ulpius Atto', 'Claudius Bato', 'Valerius Dacus', 'Aelius Verax'], random)}`;
+  return normaliseInputs({ ...base, name, style, outfit: { kind: 'romanAuxiliary', design: randomDesign('romanAuxiliary', random) }, accessories: [], mounted: true });
+}
+
+/**
+ * A Han horseman of the frontier army: iron lamellar, on a Ferghana-bred horse,
+ * with the dao, the long spear or (the horse archer) the composite bow.
+ */
+export function hanHorseman(random = Math.random, style = 'dao') {
+  const base = drilledSoldier(PRESETS.hanCrossbow, random);
+  const name = `${pickOne(['Li', 'Zhao', 'Han', 'Gongsun', 'Lu', 'Cheng', 'Su', 'Wei'], random)} ${pickOne(['Guang', 'Qing', 'Chong', 'Ping', 'Gan', 'Jian', 'Bo', 'Xiang'], random)}`;
+  return normaliseInputs({ ...base, name, style, outfit: { kind: 'hanCavalry', design: 0 }, accessories: [], mounted: true });
+}
+
 /** A noble knight in full plate, named for his rank and house, with a long sword or a war hammer. */
 export function nobleKnight(random = Math.random, style = 'longsword') {
   const base = varyCharacter(style === 'warhammer' ? PRESETS.warhammer : PRESETS.knight, random, { sex: 'male' });
@@ -365,6 +419,11 @@ export function nobleKnight(random = Math.random, style = 'longsword') {
   const house = pickOne(['de Beauchamp', 'de Courtenay', 'de Mowbray', 'Montagu', 'de Vere', 'Fitzalan', 'Percy', 'Neville', 'de Clifford', 'Holland'], random);
   const first = pickOne(['Thomas', 'John', 'William', 'Hugh', 'Robert', 'Richard', 'Ralph', 'Guy', 'Henry', 'Walter'], random);
   return normaliseInputs({ ...base, sex: 'male', name: `${title} ${first} ${house}`, style, outfit: { kind: 'knight', design: randomDesign('knight', random) }, accessories: ['plume'] });
+}
+
+/** A noble knight arriving mounted: on his destrier, in plate barding. */
+export function mountedKnight(random = Math.random, style = 'longsword') {
+  return { ...nobleKnight(random, style), mounted: true };
 }
 
 /** A foot soldier in whatever armour he has, with a spear, a bow, a long sword or a war hammer. */
