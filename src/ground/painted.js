@@ -1136,9 +1136,11 @@ function paintedGroundMaterial(view, spec, layers, layout, box, original) {
 /** What the last builds cost: place → { ms, bytes }. */
 export const PAINTED_GROUND_COST = {};
 
-function paintedGroundBuild({ place, view, arena, grounds, rng }) {
-  const spec = PAINTED_GROUND_PLACES[place];
-  if (!spec || !grounds.length) return null;
+function paintedGroundBuild({ place, view, scale, keepOut, grounds, rng }) {
+  const own = PAINTED_GROUND_PLACES[place];
+  if (!own || !grounds.length) return null;
+  // On a wider floor (a battle map's) the detail stays to the floor's edge (keepOut) and the layout, drawn for the place's own size, is stretched with the floor.
+  const spec = scale > 1 ? { ...own, keepOut: keepOut ?? own.keepOut, layout: (x, z, f, random) => own.layout(x / scale, z / scale, f, random) } : own;
   const started = performance.now();
   const fresh = [spec.a, spec.b].filter((name) => !paintedGroundLayerCache.has(name));
   const layers = { a: paintedGroundLayer(spec.a), b: paintedGroundLayer(spec.b) };
@@ -1173,7 +1175,6 @@ function paintedGroundBuild({ place, view, arena, grounds, rng }) {
       child.visible = false;
     }
   }
-  void arena;
   PAINTED_GROUND_COST[place] = { ms: Math.round(performance.now() - started), bytes: Math.round(bytes), layoutMs: Math.round(layoutMs), layers: fresh.map((name) => `${name} ${paintedGroundLayerCache.get(name).ms}ms`) };
   group.userData.paintedCost = PAINTED_GROUND_COST[place];
   // Its standing water, for the blood: the wettest spots of the layout.

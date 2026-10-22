@@ -18,7 +18,7 @@ import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, sta
 import { flyNets } from './physics/net.js';
 import { beginRise, restedToRise, riseTarget, supportLimit, updateRise } from './physics/rising.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
-import { formUp } from './formation.js';
+import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
@@ -139,7 +139,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // What the fight adds later, named here (unset) so that every fighter has the
     // one shape: fighters that gain fields in their own order each get their own,
     // and the engine reading them all (a hundred men, a hundred shapes) slows to a crawl.
-    shield: undefined, weapon: undefined, offWeapon: undefined, arena: undefined, slot: undefined, formation: undefined, inFront: undefined,
+    shield: undefined, weapon: undefined, offWeapon: undefined, arena: undefined, slot: undefined, formation: undefined, inFront: undefined, wing: undefined,
     shieldPose: undefined, shieldOpen: undefined, strafe: undefined, running: undefined, aimAt: undefined, focus: undefined, goTo: undefined,
     nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
     weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined,
@@ -1311,10 +1311,14 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // stands up to this far off his place, a crowd rather than a rank).
   // `shootersFront` (m): the bows and guns form the front rows, the rest
   // behind them this far back (a gap to shoot over and fall back through).
+  let wingOrder = null;
   for (const corner of ['red', 'blue']) {
-    const team = fighters.filter((fighter) => fighter.corner === corner);
+    const everyone = fighters.filter((fighter) => fighter.corner === corner);
     const order = formation[corner];
-    if (team.length < 2 && !order) continue;
+    if (everyone.length < 2 && !order) continue;
+    // `wings`: the riders stand on the flanks of the line, held, not in its rows (formation.js placeWings).
+    const riders = order?.wings ? everyone.filter((fighter) => riding(fighter.body.inputs)) : [];
+    const team = riders.length ? everyone.filter((fighter) => !riders.includes(fighter)) : everyone;
     // With riders in the fight, every team lines up at the charging distance: the foot in rows, the riders on their flanks.
     if (mounted && !order) {
       lineUpMounted(team, corner === 'red' ? -1 : 1, apart, arena, (fighter) => riding(fighter.body.inputs));
@@ -1344,6 +1348,11 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
       placeRows(shooters, 0);
       placeRows(rest, shooters.length ? Math.ceil(shooters.length / perRow) * rowSpacing + order.shootersFront : 0);
     } else placeRows(team, 0);
+    if (riders.length) {
+      const widest = Math.min(perRow, team.length);
+      placeWings(riders, sign, order, { front, width: (widest - 1) * spacing }, arena, (fighter, x, z) => placeFighter(fighter, x, z));
+      wingOrder ??= order.wings;
+    }
   }
   for (const fighter of fighters) fighter.arena = arena;
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
@@ -1355,6 +1364,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const horses = [];
   if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
   const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
+  // Wings of horse held on the flanks (formation.js moveWings): released when the foot lines close.
+  if (wingOrder) world.wings = { release: wingOrder.release ?? WINGS.release, by: wingOrder.by ?? WINGS.by, review: 0 };
   // Drilled men form up on their side's leader (formation.js).
   if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
   return world;
@@ -2858,7 +2869,8 @@ function chooseDetail(world) {
       // In an exchange now: striking, struck at, just hit, holding or held, getting up.
       const exchanging = world.keepFull?.has(fighter.id) || fighter.punch || fighter.rush || fighter.clinch || fighter.pin || fighter.pickup
         || targeted.has(fighter.id) || lastHit > world.time - WORLD.tiers.hitMemory || fighter.state === 'rising';
-      if (exchanging) fighter.detail = 'full';
+      // (A rider is always in full: he is carried by his horse, which is not a pose.)
+      if (exchanging || fighter.mount) fighter.detail = 'full';
       // A man standing in the ranks behind the front (formation.js) is only a pose, enemy near or not.
       else if (fighter.slot && !fighter.inFront && fighter.state === 'up' && world.formations?.[fighter.formation]) fighter.detail = 'proxy';
       else if (tier === 3 || fighter.state !== 'up') fighter.detail = 'coarse';

@@ -52,11 +52,50 @@ export const PLACE_SCENERY = {
   // Sekigahara: a valley ringed by forested mountains, pines about the field.
   sengoku: {
     keepOut: [13, 9], groundColour: 0x7d8a4a,
+    // Each side's camp curtain stands this far (m) beyond the floor's end (render.js buildSengoku); trees keep off them.
+    camps: 3.5,
     hills: { from: 30, to: 60, height: [3, 8], colour: 0x5f7040, character: 'forested' },
     mountains: [{ ring: true, from: 42, to: 70, height: [9, 18], colour: 0x6a7a88, forested: true }],
     trees: { kind: 'pine', count: 30, from: 19, to: 34, colour: 0x2a4430, bark: 0x4a3626 },
   },
 };
+
+/**
+ * A place's scenery for the floor the fight has (`view.floor`, set by render.js
+ * setPlace). On its own floor, the place's spec as it stands. On a wider one (a
+ * battle map's, with room for a cavalry charge) the same land pushed back: the
+ * ground nothing may stand on is the floor and `margin` m round it, and everything
+ * beyond it (hills, mountains, trees) is `k` times as far, as high and as many, so
+ * the backdrop looks as it did from the old edge and nothing stands in the fight.
+ */
+/** How many times as wide a floor is as the place's flat ground (1 on the place's own floor). */
+export function floorScale(place, floor) {
+  const spec = PLACE_SCENERY[place];
+  if (!spec || !floor) return 1;
+  return Math.max(1, (floor.halfX + 2) / spec.keepOut[0], (floor.halfZ + 2) / spec.keepOut[1]);
+}
+
+export function sceneryFor(place, floor) {
+  const spec = PLACE_SCENERY[place];
+  if (!spec || !floor) return spec;
+  const margin = 2;
+  const keepOut = [Math.max(spec.keepOut[0], floor.halfX + margin), Math.max(spec.keepOut[1], floor.halfZ + margin)];
+  const k = floorScale(place, floor);
+  if (k === 1) return spec;
+  const pushed = (range) => ({ ...range, from: range.from * k, to: range.to * k });
+  return {
+    ...spec,
+    keepOut,
+    scale: k,
+    avoid: spec.camps ? [-1, 1].map((side) => [side * (floor.halfX + spec.camps), 0, 9]) : undefined,
+    hills: { ...pushed(spec.hills), height: spec.hills.height.map((height) => height * k) },
+    mountains: spec.mountains.map((mountain) => (mountain.ring
+      ? { ...pushed(mountain), height: mountain.height.map((height) => height * k) }
+      : { ...mountain, distance: mountain.distance * k, height: mountain.height * k, radius: mountain.radius * k })),
+    // (As many trees again for the wider ring they stand in, but no more than three times: they are instanced cards beyond 30 m.)
+    trees: { ...pushed(spec.trees), count: Math.round(spec.trees.count * Math.min(3, k * k)) },
+  };
+}
 
 const CURRENT = { id: 'current', label: 'Current (as built)', replaces: [] };
 // The default: the photograph over generated foothills in the realistic looks; the classic cartoon look keeps its painted hills.
@@ -99,7 +138,7 @@ function partsOf(variant) {
  */
 export function applyScenery(view, place) {
   const group = view.places?.[place];
-  const spec = PLACE_SCENERY[place];
+  const spec = sceneryFor(place, view.floor);
   if (!group) return;
   const chosen = sceneryInForce === 'default' ? sceneryForLook() : sceneryInForce;
   const parts = spec ? partsOf(sceneryById(chosen)) : [CURRENT];
@@ -187,7 +226,7 @@ function applyGround(view, place, group) {
   if (styles.some((style) => style.hidesGround)) for (const ground of grounds) ground.visible = false;
   for (const style of styles) {
     if (!style.build) continue;
-    const context = { place, view, kind: info.kind, about: info.about, arena: PLACE_ARENAS[place], grounds };
+    const context = { place, view, kind: info.kind, about: info.about, arena: view.floor ?? PLACE_ARENAS[place], scale: floorScale(place, view.floor), keepOut: PLACE_SCENERY[place] ? sceneryFor(place, view.floor).keepOut : null, grounds };
     let built = group.children.find((child) => child.userData.groundStyle === style.id);
     if (!built) {
       built = style.build({ ...context, rng: sceneryRandom(place, `ground:${style.id}`) });

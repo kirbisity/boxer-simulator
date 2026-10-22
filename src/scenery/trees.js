@@ -237,12 +237,12 @@ function treesPineGeometry(rng, needle, bark, sun) {
 
 /** Is (x, z) a place a tree may stand in this place? */
 function treesFree(place, spec, x, z, margin = 2.5) {
-  const half = TREES_GROUND_HALF[place] ?? 40;
+  const half = (TREES_GROUND_HALF[place] ?? 40) * (spec.scale ?? 1);
   if (Math.abs(x) > half || Math.abs(z) > half) return false;
   const [kx, kz] = spec.keepOut ?? [0, 0];
   if (Math.abs(x) < kx + margin && Math.abs(z) < kz + margin) return false;
   for (const clear of spec.keepClear ?? []) if (Math.hypot(x - clear.at[0], z - clear.at[1]) < clear.radius + 2) return false;
-  for (const [ax, az, r] of TREES_AVOID[place] ?? []) if (Math.hypot(x - ax, z - az) < r) return false;
+  for (const [ax, az, r] of spec.avoid ?? TREES_AVOID[place] ?? []) if (Math.hypot(x - ax, z - az) < r) return false;
   return true;
 }
 

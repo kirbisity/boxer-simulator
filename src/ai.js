@@ -2,7 +2,7 @@
 // starting, its own stamina) and issues the same commands a player would,
 // choosing from its style's moves those that reach from where it stands.
 
-import { aheadOfSlot, DRILL, fromSlot, moveFormations, walkToSlot } from './formation.js';
+import { aheadOfSlot, DRILL, fromSlot, moveFormations, moveWings, walkToSlot, WINGS } from './formation.js';
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
@@ -11,7 +11,7 @@ import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
 import { handling } from './handling.js';
-import { ride, standToRider } from './riding.js';
+import { holdWing, ride, standToRider } from './riding.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -267,6 +267,7 @@ export function thinkAll(world, dt, playerIds = new Set()) {
   keepLeaders(world);
   keepSides(world);
   moveFormations(world, dt);
+  moveWings(world, dt);
   // The player's orders to his side (command.js).
   keepOrders(world);
   // In a big fight, a fighter with nothing happening near him thinks ten
@@ -612,7 +613,9 @@ function chooseFocus(world, fighter) {
     if (mate !== fighter && mate.corner === fighter.corner && mate.state === 'up' && mate.focus !== undefined) crowds.set(mate.focus, (crowds.get(mate.focus) ?? 0) + 1);
   }
   // Nearest, least crowded, and (in a group fight) nearer my side's leader.
-  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * (crowds.get(other.id) ?? 0) + AI.cohesion.focus * fromMyLeader(world, fighter, other);
+  // A wing of horse rides at the enemy's shooters first (they cannot stand to a charge).
+  const shooters = fighter.wing && !fighter.wing.held ? WINGS.shooters : 0;
+  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * (crowds.get(other.id) ?? 0) + AI.cohesion.focus * fromMyLeader(world, fighter, other) - (shooters && !other.mount && STYLES[other.style]?.ranged ? shooters : 0);
   // The nearest, least crowded: each scored once (the first of equals kept, as before).
   let next = standing[0];
   let best = score(next);
@@ -1500,7 +1503,9 @@ export function think(world, fighter, dt) {
   }
   // On horseback: the charge (riding.js).
   if (fighter.mount) {
-    ride(world, fighter, opponent, STYLES[fighter.style] ?? STYLES.mix, dt, { gunfight });
+    // A wing of horse stands on the flank until it is released (formation.js moveWings).
+    if (fighter.wing?.held) holdWing(fighter, world.time);
+    else ride(world, fighter, opponent, STYLES[fighter.style] ?? STYLES.mix, dt, { gunfight });
     return;
   }
   switchMix(world, fighter, dt);
