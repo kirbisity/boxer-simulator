@@ -3,7 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildBody, PRESETS } from '../src/body.js';
 import { buildSkinMesh, buildSkinMeshSteps, DEFAULT_BODY_STYLE, makeSkinTextures, skinTextureKey } from '../src/bodystyles.js';
 import { buildLoftBody, coveredRegions, LOFT, runSteps } from '../src/loftbody.js';
@@ -202,4 +205,15 @@ test('the skin worker\'s answer is the mesh built here; a body made otherwise th
 
 test('the margin kept round each piece is a few centimetres', () => {
   assert.ok(LOFT.cover.margin >= 0.03 && LOFT.cover.margin <= 0.08);
+});
+
+test('the one-file bundle carries the skin worker\'s code, and refuses an aliased import', () => {
+  const out = join(mkdtempSync(join(tmpdir(), 'v7-bundle-')), 'gladiator.html');
+  execFileSync('node', ['tools/bundle.js', out], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
+  const page = readFileSync(out, 'utf8');
+  const worker = page.match(/<script type="text\/plain" id="skin-worker-source">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(worker, 'the worker source is in the page');
+  for (const name of ['skinworker', 'bodystyles', 'loftbody', 'fleshbody', 'skintex', 'body']) assert.ok(worker.includes(`// ---- src/${name}.js ----`), `${name} in the worker`);
+  assert.ok(!worker.includes('// ---- src/render.js ----'), 'no page code in the worker');
+  assert.match(readFileSync(new URL('../tools/bundle.js', import.meta.url), 'utf8'), /an aliased import/);
 });

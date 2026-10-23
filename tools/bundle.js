@@ -21,6 +21,8 @@ function strip(name) {
 const code = MODULES.map((name) => {
   const source = readFileSync(`src/${name}.js`, 'utf8');
   const stripped = strip(name);
+  // An aliased import (`a as b`) is stripped with the rest, and `b` then names nothing: refuse it.
+  if (/^import \{[^}]*\bas\b/m.test(source)) throw new Error(`src/${name}.js: an aliased import, which the bundle cannot keep`);
   if (/^(import|export) /m.test(stripped)) throw new Error(`src/${name}.js: an import or export survived the bundling`);
   // Every local module imported must be on the list, or the page dies at load.
   for (const [, path] of source.matchAll(/from '(\.{1,2}\/[\w/-]+)\.js'/g)) {

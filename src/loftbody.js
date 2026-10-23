@@ -11,8 +11,12 @@ import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { glovedFists, outfitOf } from './outfits.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
-import { SCULPT, limbShapes, sculptProfile as stepProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
+import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { rulesProfile, rulesShape, rulesTraits, trunkSilhouette } from './skinrules.js';
+
+// The loft's own profiles (eased stop to stop), by a name of their own: the builder's `sculptProfile` is this or the rules' smooth one.
+// (Not an aliased import: the one-file bundle strips imports, so an alias would name nothing.)
+const stepProfile = sculptProfile;
 
 // Tops: where the hem and neckline sit along the trunk (0 hips, 1 neck),
 // how far the cloth stands off the skin, how long the sleeves run (a share of
