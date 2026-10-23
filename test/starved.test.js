@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { buildBody, PRESETS } from '../src/body.js';
 import { deriveStats } from '../src/physiology.js';
 import { buildSkinMesh } from '../src/bodystyles.js';
-import { buildLoftBody, coveredRegions } from '../src/loftbody.js';
+import { buildLoftBody, coveredRegions, TOPS } from '../src/loftbody.js';
 import { OUTFITS, ragTear, ragTorn } from '../src/outfits.js';
 import { randomCharacter, starvedRebel } from '../src/cast.js';
 import { thinkAll } from '../src/ai.js';
@@ -38,12 +38,28 @@ test('his body: BMI 14–15.5 at 160–175 cm, a few percent fat, wasted, frail-
   assert.ok(Object.values(body.segments).every((segment) => Number.isFinite(segment.mass) && segment.mass > 0));
 });
 
-test('the rags build with no NaN in every style, torn open over the ribs: nothing counts the cage covered', () => {
+test('the rags build with no NaN in every style: a few hundred triangles of plain wrapped cloth, torn open over the ribs', () => {
   const body = buildBody(PRESETS.starved);
-  for (const mesh of [buildLoftBody(body), buildLoftBody(body, { lowDetail: true }), buildSkinMesh(body, 'v7')]) {
+  const cloth = (mesh, role = null) => {
+    let count = 0;
+    for (let corner = 0; corner < mesh.indices.length; corner += 3) {
+      const regions = [0, 1, 2].map((offset) => mesh.regions[mesh.indices[corner + offset]]);
+      if (role ? regions.every((region) => region === role) : regions.some((region) => region !== 'skin')) count += 1;
+    }
+    return count;
+  };
+  const [plain, crowd, v7] = [buildLoftBody(body), buildLoftBody(body, { lowDetail: true }), buildSkinMesh(body, 'v7')];
+  for (const mesh of [plain, crowd, v7]) {
     assert.ok(finite(mesh));
-    assert.ok(mesh.regions.includes('fray') && mesh.regions.includes('top') && mesh.regions.includes('rope'));
+    assert.ok(mesh.regions.includes('top') && mesh.regions.includes('rope') && mesh.regions.includes('kit'));
+    assert.ok(cloth(mesh) < 800, `${cloth(mesh)} triangles of cloth`);
   }
+  assert.ok(plain.indices.length / 3 < 7000, `the plain body in his rags: ${plain.indices.length / 3} triangles`);
+  assert.ok(v7.indices.length / 3 < 10000, `V7 in his rags: ${v7.indices.length / 3} triangles`);
+  // The shirt is a wrap with whole quads cut out of it: well under what the uncut wrap would be (TOPS.rags.torn).
+  const torn = TOPS.rags.torn;
+  const uncut = 2 * (torn.rings * torn.sides + 2 * torn.sleeveRings * torn.sleeveSides);
+  assert.ok(cloth(plain, 'top') < 0.8 * uncut, `${cloth(plain, 'top')} shirt triangles of ${uncut} uncut`);
   // The front and the sides over the cage are gone; the shoulders and the back mostly kept.
   const tear = ragTear(PRESETS.starved.outfit);
   for (const [u, angle] of [[0.5, 0], [0.65, 0.3], [0.55, -0.3], [0.55, 1.85], [0.55, -1.85]]) assert.ok(ragTorn(tear, u, angle), `torn at ${u}, ${angle}`);

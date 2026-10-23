@@ -157,6 +157,15 @@ function ribProfile(x) {
 }
 
 /**
+ * How much lower (u) a rib runs at this angle than at the spine: down and out from the spine to the side, on down to the front,
+ * and its cartilage rising again to the breastbone.
+ */
+export function ribDroop(angle) {
+  const fa = Math.abs(fromFront(angle));
+  return 0.15 * rSmooth(Math.PI - 0.1, Math.PI / 2, fa) + 0.045 * rSmooth(Math.PI / 2, 0.7, fa) - 0.06 * rSmooth(0.75, 0.2, fa);
+}
+
+/**
  * The trunk's fine height (m) and marks at (u, angle): see the header.
  * @returns { h, crease, vein, stretch, flush }
  */
@@ -199,9 +208,7 @@ export function trunkRule(R, u, angle) {
 
   // ---- Ribs: bands between the arch and the armpit, sloping down to the front; none over the breastbone.
   if (R.ribs > 0.02) {
-    // A rib runs down and out from the spine to the side, on down to the front, and its cartilage rises again to the breastbone.
-    const droop = 0.15 * rSmooth(Math.PI - 0.1, Math.PI / 2, fa) + 0.045 * rSmooth(Math.PI / 2, 0.7, fa) - 0.06 * rSmooth(0.75, 0.2, fa);
-    const w = (u + droop) / RULES.ribSpacing;
+    const w = (u + ribDroop(angle)) / RULES.ribSpacing;
     const profile = ribProfile(w - Math.floor(w));
     const arch = fa < 1.9 ? archAt(fa) : RULES.archSide - 0.12 * rSmooth(1.9, 2.6, fa);
     const front = Math.cos(angle) > -0.2;
