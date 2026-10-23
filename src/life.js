@@ -8,6 +8,8 @@
 // visibly and a seed replays exactly.
 
 import { STYLES } from './moves.js';
+import { WORLD } from './physics/config.js';
+import { overdraftDepth } from './physics/overdraft.js';
 
 export const LIFE = {
   // Boxers bounce at about 1.5–2.2 Hz; untrained people barely bounce.
@@ -49,14 +51,16 @@ export function idleMotion(fighter, time) {
   const life = fighter.life;
   const style = STYLES[fighter.style]?.idle ?? STYLES.boxing.idle;
   const training = fighter.body.inputs.training;
-  const freshness = 0.35 + 0.65 * fighter.stamina;
+  const freshness = Math.max(0.05, 0.35 + 0.65 * fighter.stamina);
   const loose = fighter.stun > 0 ? LIFE.stunnedSway : 1;
   const sway = LIFE.sway * loose * style.sway;
   const busy = fighter.punch ? 0.3 : 1;
   const bounce = LIFE.bounceDepth * style.bounce * (0.15 + 0.85 * training) * freshness * busy * (0.5 - 0.5 * Math.cos(time * Math.PI * 2 * life.bounceHz));
   const rock = LIFE.rockDepth * style.rock * busy * Math.sin(time * Math.PI * 2 * LIFE.rockHz + life.phases[11]);
-  // Breathing deepens and quickens as stamina runs down.
-  const breath = LIFE.breathLean * (1.4 - 0.6 * fighter.stamina) * Math.sin(time * Math.PI * 2 * LIFE.breathHz * (1.6 - 0.6 * fighter.stamina));
+  // Breathing deepens and quickens as stamina runs down, and on in the player's overdraft (a gasp: WORLD.overdraft.breath).
+  const debt = overdraftDepth(fighter.stamina);
+  const gasp = WORLD.overdraft.breath;
+  const breath = LIFE.breathLean * (1.4 - 0.6 * fighter.stamina) * (1 + gasp.deepen * debt) * Math.sin(time * Math.PI * 2 * LIFE.breathHz * (1.6 - 0.6 * fighter.stamina) * (1 + gasp.quicken * debt));
   // A feint: a quick half-extension of the lead hand, every few seconds.
   const feintPhase = ((time + life.feintOffset) % LIFE.feintEvery) / 0.18;
   const feint = !fighter.punch && feintPhase < 1 ? Math.sin(Math.PI * feintPhase) * LIFE.feintReach * training : 0;

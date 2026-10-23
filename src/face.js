@@ -12,6 +12,8 @@
 /* global THREE */
 import { P } from './body.js';
 import { concussionCapacity } from './physics.js';
+import { WORLD } from './physics/config.js';
+import { overdraftDepth } from './physics/overdraft.js';
 import { Dangle } from './dangle.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
@@ -471,7 +473,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     const out = fighter.state === 'down' || fighter.state === 'out';
     const stunned = fighter.stun > 0 ? 1 : 0;
     const punching = fighter.punch ? 1 : 0;
-    const panting = Math.max(0, 0.45 - fighter.stamina) * 2 * (0.6 + 0.4 * Math.sin(time * Math.PI * 1.7));
+    // (Panting and the flush read the stamina below empty too: the player's overdraft pants faster, to the full.)
+    const panting = Math.max(0, 0.45 - fighter.stamina) * 2 * (0.6 + 0.4 * Math.sin(time * Math.PI * 1.7 * (1 + WORLD.overdraft.breath.quicken * overdraftDepth(fighter.stamina))));
 
     let lid = 0.1 * punching + 0.75 * wince + 0.45 * stunned;
     if (face.blinking > 0 || out) lid = 1;

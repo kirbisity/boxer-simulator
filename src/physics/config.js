@@ -296,6 +296,38 @@ export const WORLD = {
     hurtSeconds: 8, hurtPerKnockdown: 4, hurtStrength: 0.65,
     staminaPerTrunkDamage: 0.6, armForcePerDamage: 0.4,
   },
+  // The player's stamina overdraft (physics/overdraft.js; only the man flagged `fighter.player`: every other fighter stops at
+  // empty, as before). Past empty he goes on, weaker and slumping, down to `floor`, where he faints. `depth` below is how far
+  // down he is, 0 at empty to 1 at the floor.
+  // - floor: the deepest stamina (it is 0..1 above empty); a blow or a swing that would take him past it makes him faint.
+  // - forceAtFloor: the muscles' share at the floor. Above empty it is 0.55 + 0.45 × stamina (0.55 at empty); below, it falls on in a
+  //   straight line to this, so a swing at the floor is a quarter of a fresh man's (no separate damage multiplier: the arms are weaker).
+  // - recoveryShare: the share of the usual recovery (`staminaRecovery`) while below empty: a man in debt gets his wind back slowly
+  //   (~35 s from the floor, ~12 s from the waking point, at 0.07 × aerobic 0.9), the usual from empty on.
+  // - faintSeconds: the least time he lies when he faints (the rise itself takes longer: physics/rising.js); wakeStamina: what he has
+  //   when he starts to get up (the screen still dim, the arms at ~0.4 of a fresh man's); graceSeconds: from waking, a cost cannot
+  //   send him down again (it holds him at the floor), so a faint cannot loop; clearSeconds: the black of the faint clears over this
+  //   long once he is getting up.
+  // - defenceCost: what a dodge or a block (a defence other than the plain guard held up) takes, in stamina before his fitness.
+  // - posture, at full depth (each scaled by depth, smoothly): `stance` is blended towards (blendStance) from the style's guard: the
+  //   forward lean (rad), a deeper crouch and `guardHeight` (hands this many heights lower); then `hunch` more trunk
+  //   lean (rad), `headDrop` (shares of height) the head sinks, `headForward`, `dip` the hips sink (share of height), `handDrop` the
+  //   hands and weapon sag (share of height, for hands set by a weapon or shield).
+  // - stagger: from `from` of depth, a sway of the body (`shift`, `head`: shares of height; `roll`: trunk rad) at two incommensurate
+  //   rates (`hz`), growing to full over the rest of the depth.
+  // - breath: the breathing at full depth is `deepen` times deeper and `quicken` times faster again than the stamina formula gives
+  //   (life.js), and the face (face.js) pants and flushes to the full.
+  // - screen: the fade is a function of depth alone (overdraftScreen): `curve` the power the depth is raised to (above 1: slow to
+  //   start, steep near the floor), `pulseHz` and `pulse` a heartbeat in it (share of its strength) that grows with depth.
+  overdraft: {
+    floor: -1, forceAtFloor: 0.25, recoveryShare: 0.25,
+    faintSeconds: 3.5, wakeStamina: -0.45, graceSeconds: 10, clearSeconds: 5,
+    defenceCost: 0.012,
+    posture: { stance: { lean: 0.3, crouch: 0.07, guardHeight: -0.17 }, hunch: 0.2, headDrop: 0.045, headForward: 0.02, dip: 0.02, handDrop: 0.14 },
+    stagger: { from: 0.7, shift: 0.02, head: 0.03, roll: 0.08, hz: [0.55, 0.83] },
+    breath: { deepen: 1.2, quicken: 0.8 },
+    screen: { curve: 1.15, pulseHz: 1.1, pulse: 0.12 },
+  },
   // Armour (blunt protection from `armouredFrom`) spreads a heavy blow: a
   // man in it reels instead of dropping. A blow of `startAt` or more of what
   // would put him down (head speed change over the chin, or the knock over

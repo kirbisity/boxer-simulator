@@ -18,6 +18,7 @@ import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, sta
 import { flyNets } from './physics/net.js';
 import { beginRise, restedToRise, riseTarget, supportLimit, updateRise } from './physics/rising.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
+import { overdraftDepth, drawStamina, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
@@ -160,6 +161,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
     // Level mode (levelmode/level.js): hands at a wound while a bandage goes on ({ t, seconds }).
     tending: undefined,
+    // The player's stamina overdraft (physics/overdraft.js): player (the man played), faintDue (a cost would pass the floor), fainted (down in a faint), blackout (the screen's black, 0..1), faintGrace (s after waking).
+    player: undefined, faintDue: undefined, fainted: undefined, blackout: undefined, faintGrace: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
@@ -1249,7 +1252,7 @@ export function reclothe(world, fighter, inputs) {
  * What he had dropped lies no more; his headgear is on his head. The caller redraws him.
  */
 export function reviveFighter(world, fighter, inputs, { at, yaw = fighter.yaw, shield } = {}) {
-  const { id, corner, arena, spawn, dormant, walking } = fighter;
+  const { id, corner, arena, spawn, dormant, walking, player } = fighter;
   const fresh = createFighter(inputs, { id, corner, x: at[0], facing: yaw, random: world.random });
   if (shield !== undefined && fresh.shield && fresh.shield.kind !== shield) {
     addParticleMass(fresh, P.lHand, -fresh.shield.spec.mass * 0.6);
@@ -1263,7 +1266,7 @@ export function reviveFighter(world, fighter, inputs, { at, yaw = fighter.yaw, s
     addParticleMass(fresh, P.lElbow, spec.mass * 0.4);
   }
   for (const key of Object.keys(fighter)) if (!(key in fresh)) delete fighter[key];
-  Object.assign(fighter, fresh, { arena, spawn, dormant, walking });
+  Object.assign(fighter, fresh, { arena, spawn, dormant, walking, player });
   placeOnFloor(fighter, at[0], at[2], at[1], yaw);
   for (const piece of world.debris) if (piece.owner === id && !piece.taken) piece.taken = true;
   refreshProps(world, fighter);
@@ -1584,7 +1587,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.pain || fighter.stamina < drain || (spec.bash && !fighter.shield)) return false;
+  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
@@ -1623,7 +1626,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     fighter.stats.dual = (fighter.stats.dual ?? 0) + 1;
   }
   if (blade && blade === fighter.offWeapon) fighter.stats.offStrikes = (fighter.stats.offStrikes ?? 0) + 1;
-  fighter.stamina = Math.max(0, fighter.stamina - drain);
+  drawStamina(fighter, drain);
   fighter.stats.thrown += 1;
   if (heavy) world.events.push({ time: world.time, kind: 'heavy', attacker: fighter.id, punch: type, effects: [] });
   return true;
@@ -1705,6 +1708,8 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   // His shield knocked out of line: it cannot be brought to meet this one.
   if (name === 'shieldBlock' && fighter.shieldOpen > world.time) return false;
   if (DEFENCES[name]) {
+    // The player's dodge or block takes breath (the plain guard held up does not); he may go into the overdraft for it.
+    if (fighter.player && name !== 'guard') drawStamina(fighter, WORLD.overdraft.defenceCost / fighter.body.aerobic);
     // `from`: who the strike comes from, for a block that goes to meet it.
     fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from };
     if (name === 'guard') fighter.guardHigh = DEFENCES.guard.seconds;
@@ -1717,7 +1722,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if (name === 'pin') return startPin(world, fighter);
   const spec = MOVES[name];
   const target = opponentFor(world, fighter);
-  if (!spec || !target || fighter.punch || fighter.rush || fighter.stamina < spec.cost / fighter.body.aerobic) return false;
+  if (!spec || !target || fighter.punch || fighter.rush || (fighter.stamina < spec.cost / fighter.body.aerobic && !fighter.player)) return false;
   if (spec.kind === 'rush') {
     fighter.rush = { t: 0, duration: spec.duration, hit: false };
   } else if (spec.kind === 'clinch') {
@@ -1729,7 +1734,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
     fighter.clinch = { target: target.id, t: 0, duration: spec.duration * (0.5 + share), hands: spec.hands ?? ['l', 'r'] };
     world.events.push({ time: world.time, kind: 'clinch', attacker: fighter.id, defender: target.id, effects: [] });
   } else return false;
-  fighter.stamina = Math.max(0, fighter.stamina - spec.cost / fighter.body.aerobic);
+  drawStamina(fighter, spec.cost / fighter.body.aerobic);
   return true;
 }
 
@@ -1956,8 +1961,40 @@ function updateIntent(world, fighter, dt) {
     intent.headOffset = vec.add(intent.headOffset, [-0.02 * H, -slip.down * H, (fighter.slipSide ?? 1) * slip.across * H]);
     intent.lean -= 0.05;
   }
+  if (fighter.player && fighter.stamina < 0) slumpPose(world, fighter, intent, runPose);
   fighter.intent = intent;
   fighter.desired = desiredPose(fighter.body, intent);
+}
+
+/**
+ * The player in the overdraft (WORLD.overdraft): the deeper he is, the more the guard and the walk give way to a slump: the stance
+ * blended towards a leaning, crouched one with the hands low, the trunk hunched and the head sunk forward, the hands and weapon
+ * sagging; near the floor (`stagger.from` of the depth on) he sways on his legs. A run (he cannot run in debt) keeps its own pose.
+ */
+function slumpPose(world, fighter, intent, runPose) {
+  if (fighter.state !== 'up' || fighter.mount || fighter.crawling || fighter.pin || fighter.finisher) return;
+  const depth = overdraftDepth(fighter.stamina) * (1 - runPose);
+  if (depth <= 0) return;
+  const spec = WORLD.overdraft;
+  const post = spec.posture;
+  const H = fighter.body.heightM;
+  intent.stance = blendStance({ lean: POSE.forwardLean, crouch: POSE.crouch, guardHeight: 0, ...intent.stance }, post.stance, depth);
+  intent.lean += post.hunch * depth;
+  intent.dip += post.dip * depth;
+  intent.headOffset = vec.add(intent.headOffset, [post.headForward * H * depth, -post.headDrop * H * depth, 0]);
+  // Hands set by a weapon or a shield sag too, unless a blow or a hold has them.
+  if (!fighter.punch && !fighter.clinch && !fighter.pickup && !fighter.pain && !fighter.tending && !fighter.netted) {
+    for (const side of ['l', 'r']) if (intent[`${side}Hand`]) intent[`${side}Hand`] = vec.add(intent[`${side}Hand`], [0, -post.handDrop * H * depth, 0]);
+  }
+  const stagger = Math.max(0, (depth - spec.stagger.from) / (1 - spec.stagger.from));
+  if (stagger > 0) {
+    const time = world.time * Math.PI * 2;
+    const slow = Math.sin(time * spec.stagger.hz[0] + fighter.id * 1.3);
+    const quick = Math.sin(time * spec.stagger.hz[1] + fighter.id * 2.6);
+    intent.shift += spec.stagger.shift * stagger * slow;
+    intent.headOffset = vec.add(intent.headOffset, [0, 0, spec.stagger.head * H * stagger * quick]);
+    intent.roll = (intent.roll ?? 0) + spec.stagger.roll * stagger * quick;
+  }
 }
 
 /**
@@ -2616,6 +2653,37 @@ export function fall(world, fighter, reason, onOneFoot = false) {
   world.events.push({ time: world.time, kind: 'fell', fighter: fighter.id, onOneFoot, effects: [reason] });
 }
 
+/**
+ * The player's overdraft, each step (physics/overdraft.js): a cost that would pass the floor has made him faint (`faintDue`); the
+ * grace after waking runs down; the screen's black is held while he lies in the faint and clears once he is getting up.
+ */
+function overdraftStep(world, fighter, dt) {
+  const spec = WORLD.overdraft;
+  fighter.faintGrace = Math.max(0, (fighter.faintGrace ?? 0) - dt);
+  if (fighter.faintDue) {
+    fighter.faintDue = false;
+    // (Not on a horse: the saddle holds him; not already down or getting up.)
+    if (fighter.state === 'up' && !fighter.mount) faintAway(world, fighter);
+  }
+  if (fighter.fainted && fighter.state === 'down') fighter.blackout = 1;
+  else if (fighter.blackout > 0) fighter.blackout = Math.max(0, fighter.blackout - dt / spec.clearSeconds);
+}
+
+/** Out of breath at the floor: down like any fall, not counted as a knockdown and no knockout, for `faintSeconds` at least. */
+function faintAway(world, fighter) {
+  fall(world, fighter, 'fainted');
+  fighter.downTimer = WORLD.overdraft.faintSeconds;
+  fighter.fainted = true;
+  fighter.blackout = 1;
+}
+
+/** He starts to get up from a faint: breath enough to stand in a daze (the screen still dim), and no second faint for a while. */
+function wakeFromFaint(fighter) {
+  fighter.fainted = false;
+  fighter.stamina = WORLD.overdraft.wakeStamina;
+  fighter.faintGrace = WORLD.overdraft.graceSeconds;
+}
+
 /** How far a point is outside the base between two feet (m, on the floor): from the nearest point on the line joining them. */
 function outsideBase(at, first, second) {
   const across = [second[0] - first[0], second[2] - first[2]];
@@ -3024,7 +3092,8 @@ function updateTimers(world, fighter, dt) {
   countPin(world, fighter, dt);
   updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
-  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * dt);
+  if (fighter.player) overdraftStep(world, fighter, dt);
+  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * recoveryShare(fighter.stamina) * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;
@@ -3040,6 +3109,7 @@ function updateTimers(world, fighter, dt) {
         world.events.push({ time: world.time, kind: 'stopped', fighter: fighter.id });
       } else {
         fighter.state = 'rising';
+        if (fighter.fainted) wakeFromFaint(fighter);
         // Crawling, his hands are on the floor: nothing drawn.
         if (fighter.pendingArm && !fighter.crawling) {
           armFighter(fighter, fighter.pendingArm, { random: world.random });
@@ -3154,7 +3224,7 @@ const want = [0, 0, 0];
 const accelerations = new Float64Array(PARTICLES.length * 3);
 
 function integrate(fighter, h, time) {
-  const fatigue = 0.55 + 0.45 * fighter.stamina;
+  const fatigue = fatigueScale(fighter.stamina);
   const alive = fighter.state === 'up' || fighter.state === 'rising';
   const rising = fighter.state === 'rising';
   const damping = Math.exp(-h * (fighter.air ? WORLD.terrain.airDamping : alive ? WORLD.damping.up : WORLD.damping.down));
@@ -5126,7 +5196,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
       event.effects.push('facial fracture');
     }
   } else if (capsule.key === 'trunk') {
-    defender.stamina = Math.max(0, defender.stamina - ((impulse / (body.massKg * 0.6)) / body.aerobic) * harm);
+    drawStamina(defender, ((impulse / (body.massKg * 0.6)) / body.aerobic) * harm);
     event.effects.push(push ? 'pushed back' : 'body: wind taken');
     if (peakForce * harm > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
       defender.injuries.push({ kind: 'rib', time: world.time });
