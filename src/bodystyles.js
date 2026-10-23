@@ -4,7 +4,7 @@
 // every module this imports is plain numbers too, so every style can be built
 // and checked in Node.
 //
-// 'lofted' is the default and the baseline. 'smoothed' and 'dense' are the
+// 'v7' is the default (DEFAULT_BODY_STYLE); 'lofted' the old default and the baseline. 'smoothed' and 'dense' are the
 // anatomy field (bodymesh.js), 'faceted' the loft in flat low poly.
 //
 // Round one of the body-drawing prototypes (docs: tools/bodysheet.html):
@@ -27,7 +27,8 @@
 // Every round-two style also morphs the face with the body (the `face` flag; the head is built in face.js).
 
 import { buildBodyMesh } from './bodymesh.js';
-import { buildLoftBody } from './loftbody.js';
+import { buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
+import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
 import { buildDetailMap } from './skindetail.js';
 import { cachedSkinTextures, compositionKey, runSkinTextures, runSkinTexturesAsync, SKINTEX, skinTextureSteps, storeSkinTextures } from './skintex.js';
@@ -54,8 +55,10 @@ export const STYLE_SPECS = {
   v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
+/** The style fighters are drawn in unless a look says otherwise: V7. ('lofted', the plain loft, is the old default and the placeholder while V7 is built.) */
+export const DEFAULT_BODY_STYLE = 'v7';
 
-/** What a style does beyond the mesh (see STYLE_SPECS); an unknown style is the default's. */
+/** What a style does beyond the mesh (see STYLE_SPECS); an unknown style does nothing more (the plain loft's). */
 export const styleSpec = (style) => STYLE_SPECS[style] ?? STYLE_SPECS.lofted;
 
 /** The refined flesh field (B's anatomy with round two's corrections) for a body: a signed distance of a bind-pose point. */
@@ -63,8 +66,40 @@ export const refinedField = (body) => fleshField(fleshAnatomy(body, { refined: t
 /** The same field's large forms only (no ribs, spine knobs or ab blocks: the maps draw those): what V7's low-polygon skin is wrapped onto. */
 export const coarseField = (body) => fleshField(fleshAnatomy(body, { refined: true, coarse: true }));
 
+// Built skins kept for the next fighter with the same body (a restart, a mirror bout, the same man of a cast): by style and inputs
+// (a body is made from its inputs alone), the most recently used last. A fighter takes his own copy of the positions (his dents move them).
+const MESHES = new Map();
+export const SKIN_MESH_CACHE = { limit: 24, map: MESHES };
+const meshKey = (body, style) => `${style}|${JSON.stringify(body.inputs)}`;
+/** A body's built skin in a style, if one is kept (shared: copy the positions before moving them). */
+export function cachedSkinMesh(body, style) {
+  const key = meshKey(body, style);
+  const found = MESHES.get(key);
+  if (!found) return null;
+  MESHES.delete(key);
+  MESHES.set(key, found);
+  return found;
+}
+export function storeSkinMesh(body, style, built) {
+  MESHES.set(meshKey(body, style), built);
+  while (MESHES.size > SKIN_MESH_CACHE.limit) MESHES.delete(MESHES.keys().next().value);
+}
+
 /** The skin mesh of a body in a style (an unknown key is the fine field, as before). */
 export function buildSkinMesh(body, style) {
+  return runSteps(buildSkinMeshSteps(body, style));
+}
+
+/**
+ * The same as slices of work (a generator: each `yield` a place to hand the thread back, the mesh its return value): V7 yields
+ * through its loft and its wrap; every other style is built in one go. Under armour V7 leaves out the skin the armour covers
+ * (loftbody.js `hideCovered`) and is not wrapped (the field is not even made).
+ */
+export function* buildSkinMeshSteps(body, style) {
+  if (style === 'v7') {
+    const armoured = Boolean(outfitOf(body.inputs).look.armor);
+    return yield* buildLoftBodySteps(body, { sculpt: 'rules', rules: { share: 0, density: 'medium' }, hideCovered: true, ...(armoured ? {} : { wrap: coarseField(body) }) });
+  }
   switch (style) {
     case 'lofted': return buildLoftBody(body);
     case 'sculpt': return buildLoftBody(body, { sculpt: true });
@@ -76,7 +111,6 @@ export function buildSkinMesh(body, style) {
     case 'v4': return buildLoftBody(body, { sculpt: 'rules', rules: { share: STYLE_SPECS.v4.tex.share, fine: true }, fillet: true });
     case 'v5': return buildFleshBody(body, { cell: 0.012, paint: true, refined: true });
     case 'v6': return buildFleshBody(body, { paint: true, refined: true });
-    case 'v7': return buildLoftBody(body, { sculpt: 'rules', rules: { share: 0, density: 'medium' }, wrap: coarseField(body) });
     default: return buildBodyMesh(body, 'skin');
   }
 }
@@ -84,7 +118,32 @@ export function buildSkinMesh(body, style) {
 /** The slices of work that make a style's maps for a built body (see skintex.js). */
 function stepsFor(body, style, built) {
   const spec = styleSpec(style).tex;
-  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share });
+  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built) });
+}
+
+/** A built body's maps made now, not looked up or kept (the skin worker's: it hands them over). */
+export function makeSkinTextures(body, style, built) {
+  if (!styleSpec(style).tex || !built.uvs) return null;
+  return runSteps(stepsFor(body, style, built));
+}
+
+/** What a built body leaves out under armour (its maps leave it blank too), or null. */
+const coverOf = (built) => (built.hiddenTriangles ? built.covered : null);
+
+/** The cache key of a built body's maps. */
+export const skinTextureKey = (body, style, built) => compositionKey(body, style, coverOf(built));
+
+/** A built body's maps if its bucket's are made (or it has none to make: true), without making them. */
+export function readySkinTextures(body, style, built) {
+  if (!styleSpec(style).tex || !built.uvs) return true;
+  return cachedSkinTextures(skinTextureKey(body, style, built));
+}
+
+/** The slices of work that make a built body's maps and store them (a generator; its value the maps). */
+export function* skinTexturesSteps(body, style, built) {
+  const textures = yield* stepsFor(body, style, built);
+  storeSkinTextures(skinTextureKey(body, style, built), textures);
+  return textures;
 }
 
 /**
@@ -94,7 +153,7 @@ function stepsFor(body, style, built) {
  */
 export async function skinTextures(body, style, built, { sliceMs = SKINTEX.sliceMs } = {}) {
   if (!styleSpec(style).tex || !built.uvs) return null;
-  const key = compositionKey(body, style);
+  const key = skinTextureKey(body, style, built);
   const cached = cachedSkinTextures(key);
   if (cached) return { textures: cached, ms: 0, report: { key, cached: true, bytes: cached.bytes } };
   const start = performance.now();
@@ -106,7 +165,7 @@ export async function skinTextures(body, style, built, { sliceMs = SKINTEX.slice
 /** The same, all at once (a fighter built at load, a tool, a test): the maps, or null. */
 export function skinTexturesNow(body, style, built) {
   if (!styleSpec(style).tex || !built.uvs) return null;
-  const key = compositionKey(body, style);
+  const key = skinTextureKey(body, style, built);
   const cached = cachedSkinTextures(key);
   if (cached) return cached;
   const textures = runSkinTextures(stepsFor(body, style, built));

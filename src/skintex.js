@@ -57,6 +57,11 @@ export const SKINTEX = {
   // Time (ms) a slice may take before it hands the thread back, and the most buckets kept.
   sliceMs: 6,
   cacheLimit: 16,
+  // How much work goes between hand-backs in the slices: texel rows (rows of rules, the dearest, apart), and triangles rasterised.
+  sliceRows: 32,
+  sliceRuleRows: 12,
+  sliceFaces: 1500,
+  sliceTexels: 65536,
 };
 
 const [ATLAS_WIDTH, ATLAS_HEIGHT] = DETAIL.atlas;
@@ -75,10 +80,12 @@ const texSmooth = (low, high, x) => {
 // ---- Composition buckets, and the cache -----------------------------------------
 
 /** Which bodies share a set of maps: the same style, sex and frame, close in fat, muscle, neck, height and training. */
-export function compositionKey(body, style = '') {
+export function compositionKey(body, style = '', covered = null) {
   const traits = sculptTraits(body);
   const step = (value, size) => Math.round(value / size);
-  return [style, body.inputs.sex, body.inputs.frame, `f${step(traits.trunk.fat, 0.006)}`, `l${step(traits.arm.fat, 0.006)}`, `d${step(traits.developed, 0.15)}`, `n${step(body.neckIndex, 0.35)}`, `h${step(body.inputs.heightCm, 6)}`, `x${step(body.inputs.exercise, 0.25)}`, `a${step(body.inputs.age ?? 30, 15)}`].join('|');
+  // Maps made for a body under armour leave its covered stretches blank: kept apart from the bare body's, by what is covered.
+  const cover = covered ? Object.entries(covered).map(([part, stretches]) => `${part}${stretches.map(([from, to]) => `${from.toFixed(2)}:${to.toFixed(2)}`).join(';')}`).join(',') : '';
+  return [style, cover, body.inputs.sex, body.inputs.frame, `f${step(traits.trunk.fat, 0.006)}`, `l${step(traits.arm.fat, 0.006)}`, `d${step(traits.developed, 0.15)}`, `n${step(body.neckIndex, 0.35)}`, `h${step(body.inputs.heightCm, 6)}`, `x${step(body.inputs.exercise, 0.25)}`, `a${step(body.inputs.age ?? 30, 15)}`].join('|');
 }
 
 const CACHE = new Map();
@@ -111,6 +118,11 @@ export function storeSkinTextures(key, textures) {
  * texels take their nearest neighbour's.
  */
 export function rasterizeSkin(mesh) {
+  return runSkinTextures(rasterizeSkinSteps(mesh));
+}
+
+/** The same as slices of work (a generator; its value the raster). */
+function* rasterizeSkinSteps(mesh) {
   const { positions, normals, indices, uvs, regions } = mesh;
   const pos = new Float32Array(ATLAS_WIDTH * ATLAS_HEIGHT * 3);
   const nor = new Float32Array(ATLAS_WIDTH * ATLAS_HEIGHT * 3);
@@ -118,6 +130,7 @@ export function rasterizeSkin(mesh) {
   const flat = [0, 0, 0];
   const curved = [0, 0, 0];
   for (let face = 0; face < indices.length; face += 3) {
+    if (face % SKINTEX.sliceFaces === 0) yield 'raster';
     const a = indices[face];
     const b = indices[face + 1];
     const c = indices[face + 2];
@@ -165,6 +178,7 @@ export function rasterizeSkin(mesh) {
   for (let pass = 0; pass < GUTTER + 1; pass += 1) {
     const before = covered.slice();
     for (let y = 0; y < ATLAS_HEIGHT; y += 1) {
+      if (y % SKINTEX.sliceRows === 0) yield 'raster: gutters';
       for (let x = 0; x < ATLAS_WIDTH; x += 1) {
         const at = y * ATLAS_WIDTH + x;
         if (before[at]) continue;
@@ -186,6 +200,7 @@ export function rasterizeSkin(mesh) {
     }
   }
   for (let at = 0; at < covered.length; at += 1) {
+    if (at % SKINTEX.sliceTexels === 0) yield 'raster: normals';
     if (!covered[at]) continue;
     const length = Math.hypot(nor[at * 3], nor[at * 3 + 1], nor[at * 3 + 2]) || 1;
     for (let axis = 0; axis < 3; axis += 1) nor[at * 3 + axis] /= length;
@@ -206,30 +221,49 @@ function tileTexel(tile, column, row, dc, dr) {
  * The surface frame at each texel: unit T (round the part, the way the texture's u grows) and B (along it, v), both in the loft's
  * tangent plane, and the metres one texel spans each way.
  */
-function texelFrames(raster) {
+function* texelFrames(raster) {
   const { pos, nor } = raster;
   const frame = new Float32Array(ATLAS_WIDTH * ATLAS_HEIGHT * 8);
   for (const tile of TILES) {
     for (let row = 0; row < tile.h; row += 1) {
+      if (row % SKINTEX.sliceRows === 0) yield `frames ${tile.name}`;
+      const rows = (Math.min(tile.tall - 1, row - GUTTER + 1) - Math.max(0, row - GUTTER - 1)) || 1;
       for (let column = 0; column < tile.w; column += 1) {
         const at = (tile.y + row) * ATLAS_WIDTH + tile.x + column;
         const left = tileTexel(tile, column, row, -1, 0);
         const right = tileTexel(tile, column, row, 1, 0);
         const down = tileTexel(tile, column, row, 0, -1);
         const up = tileTexel(tile, column, row, 0, 1);
-        const rows = (Math.min(tile.tall - 1, row - GUTTER + 1) - Math.max(0, row - GUTTER - 1)) || 1;
-        const n = [nor[at * 3], nor[at * 3 + 1], nor[at * 3 + 2]];
-        const T = [0, 1, 2].map((axis) => (pos[right * 3 + axis] - pos[left * 3 + axis]) / 2);
-        const B = [0, 1, 2].map((axis) => (pos[up * 3 + axis] - pos[down * 3 + axis]) / rows);
-        const tLength = Math.hypot(...T) || 1e-4;
-        const bLength = Math.hypot(...B) || 1e-4;
-        const tn = T[0] * n[0] + T[1] * n[1] + T[2] * n[2];
-        const t = T.map((value, axis) => value - n[axis] * tn);
-        const tl = Math.hypot(...t) || 1;
-        const bn = B[0] * n[0] + B[1] * n[1] + B[2] * n[2];
-        const b = B.map((value, axis) => value - n[axis] * bn);
-        const bl = Math.hypot(...b) || 1;
-        frame.set([t[0] / tl, t[1] / tl, t[2] / tl, b[0] / bl, b[1] / bl, b[2] / bl, tLength, bLength], at * 8);
+        const n0 = nor[at * 3];
+        const n1 = nor[at * 3 + 1];
+        const n2 = nor[at * 3 + 2];
+        const T0 = (pos[right * 3] - pos[left * 3]) / 2;
+        const T1 = (pos[right * 3 + 1] - pos[left * 3 + 1]) / 2;
+        const T2 = (pos[right * 3 + 2] - pos[left * 3 + 2]) / 2;
+        const B0 = (pos[up * 3] - pos[down * 3]) / rows;
+        const B1 = (pos[up * 3 + 1] - pos[down * 3 + 1]) / rows;
+        const B2 = (pos[up * 3 + 2] - pos[down * 3 + 2]) / rows;
+        const tLength = Math.hypot(T0, T1, T2) || 1e-4;
+        const bLength = Math.hypot(B0, B1, B2) || 1e-4;
+        const tn = T0 * n0 + T1 * n1 + T2 * n2;
+        const t0 = T0 - n0 * tn;
+        const t1 = T1 - n1 * tn;
+        const t2 = T2 - n2 * tn;
+        const tl = Math.hypot(t0, t1, t2) || 1;
+        const bn = B0 * n0 + B1 * n1 + B2 * n2;
+        const b0 = B0 - n0 * bn;
+        const b1 = B1 - n1 * bn;
+        const b2 = B2 - n2 * bn;
+        const bl = Math.hypot(b0, b1, b2) || 1;
+        const base = at * 8;
+        frame[base] = t0 / tl;
+        frame[base + 1] = t1 / tl;
+        frame[base + 2] = t2 / tl;
+        frame[base + 3] = b0 / bl;
+        frame[base + 4] = b1 / bl;
+        frame[base + 5] = b2 / bl;
+        frame[base + 6] = tLength;
+        frame[base + 7] = bLength;
       }
     }
   }
@@ -240,10 +274,16 @@ function texelFrames(raster) {
 
 /** A box blur of one channel of the atlas, tile by tile: round each part (the angle wraps) and clamped along it. */
 export function blurAtlas(source, radius) {
+  return runSkinTextures(blurAtlasSteps(source, radius));
+}
+
+/** The same as slices of work (a generator: a tile at a time; its value the blurred channel). */
+function* blurAtlasSteps(source, radius) {
   const across = new Float32Array(source.length);
   const out = new Float32Array(source.length);
   const window = 2 * radius + 1;
   for (const tile of TILES) {
+    yield `blur ${tile.name}`;
     const period = tile.inner - 1;
     for (let row = 0; row < tile.h; row += 1) {
       const base = (tile.y + row) * ATLAS_WIDTH + tile.x + GUTTER;
@@ -303,12 +343,20 @@ export function texNoise(x, y, seed) {
  * `mesh`: the built loft (with `uvs`); `source`: 'rules' or 'field' (then `field`: the flesh style's signed distance);
  * `layers`: which maps; `share`: how much of the rules' fine height the mesh already has (the maps carry the rest).
  */
-export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, layers = ['albedo', 'normal', 'ao', 'rough'], share = 0, seed = 7 } = {}) {
+export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, layers = ['albedo', 'normal', 'ao', 'rough'], share = 0, seed = 7, covered = null } = {}) {
   const R = rulesTraits(body);
+  // Under armour (`covered`: the stretches of each part left out of the mesh, loftbody.js coveredRegions) those rows of a tile are never
+  // seen: no rules, normals or paint are worked out for them (flat, neutral).
+  const hiddenRow = (tile, row) => {
+    const stretches = covered?.[tile.name];
+    if (!stretches) return false;
+    const t = tile.from + (tile.to - tile.from) * texClamp((row - GUTTER) / (tile.tall - 1));
+    return stretches.some(([from, to]) => t > from && t < to);
+  };
   const size = ATLAS_WIDTH * ATLAS_HEIGHT;
-  const raster = rasterizeSkin(mesh);
+  const raster = yield* rasterizeSkinSteps(mesh);
   yield 'raster';
-  const frames = texelFrames(raster);
+  const frames = yield* texelFrames(raster);
   yield 'frames';
   // The rules at every texel: the fine height still to draw, and the marks.
   const height = new Float32Array(size);
@@ -319,6 +367,8 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
   for (const tile of TILES) {
     const rule = ruleForTile(R, tile);
     for (let row = 0; row < tile.h; row += 1) {
+      if (row % SKINTEX.sliceRuleRows === 0) yield `rules ${tile.name}`;
+      if (hiddenRow(tile, row)) continue;
       const t = tile.from + (tile.to - tile.from) * texClamp((row - GUTTER) / (tile.tall - 1));
       for (let column = 0; column < tile.w; column += 1) {
         const angle = ((column - GUTTER) / (tile.inner - 1)) * Math.PI * 2;
@@ -342,10 +392,15 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
   if (source === 'field') {
     yield* bakeField(raster, field, frames, normal, occlusion, cavity);
   } else {
-    const blurred = blurAtlas(height, SKINTEX.cavityBlur);
+    const blurred = yield* blurAtlasSteps(height, SKINTEX.cavityBlur);
     yield 'blurred';
     for (const tile of TILES) {
       for (let row = 0; row < tile.h; row += 1) {
+        if (row % SKINTEX.sliceRows === 0) yield `normals ${tile.name}`;
+        if (hiddenRow(tile, row)) {
+          for (let column = 0; column < tile.w; column += 1) normal[((tile.y + row) * ATLAS_WIDTH + tile.x + column) * 3 + 2] = 1;
+          continue;
+        }
         for (let column = 0; column < tile.w; column += 1) {
           const at = (tile.y + row) * ATLAS_WIDTH + tile.x + column;
           const slopeT = (height[tileTexel(tile, column, row, 1, 0)] - height[tileTexel(tile, column, row, -1, 0)]) / (2 * frames[at * 8 + 6]);
@@ -363,19 +418,24 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
     }
   }
   const out = { width: ATLAS_WIDTH, height: ATLAS_HEIGHT, neutral: SKINTEX.neutral };
-  if (layers.includes('normal')) out.normal = encodeNormals(normal, frames);
+  if (layers.includes('normal')) out.normal = yield* encodeNormals(normal, frames);
   yield 'normal';
   if (layers.includes('ao')) {
     const ao = new Uint8Array(size).fill(255);
-    for (let at = 0; at < size; at += 1) ao[at] = Math.round(255 * texClamp(occlusion[at] * (1 - 0.45 * crease[at])));
+    for (let at = 0; at < size; at += 1) {
+      if (at % SKINTEX.sliceTexels === 0) yield 'ao';
+      ao[at] = Math.round(255 * texClamp(occlusion[at] * (1 - 0.45 * crease[at])));
+    }
     out.ao = ao;
   }
+  yield 'ao';
   if (layers.includes('rough')) {
     const rough = new Uint8Array(size);
     // Sweat: the more trained, the wetter on the high places; the starved are dry; the creases never shine.
     const sweat = texClamp(0.2 + 0.8 * R.exercise);
     const dry = R.rawBony;
     for (let at = 0; at < size; at += 1) {
+      if (at % SKINTEX.sliceTexels === 0) yield 'roughness';
       const high = texClamp(1 - cavity[at] * 2);
       rough[at] = Math.round(255 * texClamp(0.64 - 0.26 * sweat * high + 0.18 * dry + 0.15 * crease[at], 0.25, 0.95));
     }
@@ -385,11 +445,9 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
   if (layers.includes('albedo')) {
     const albedo = new Uint8Array(size * 4);
     const flat = Math.round(SKINTEX.neutral * 255);
-    for (let at = 0; at < size; at += 1) albedo.set([flat, flat, flat, 255], at * 4);
-    for (const tile of TILES) {
-      paintTile(albedo, tile, { R, cavity, crease, vein, stretch, flush, seed });
-      yield `albedo ${tile.name}`;
-    }
+    // Every texel [flat, flat, flat, 255] (as one little-endian word).
+    new Uint32Array(albedo.buffer).fill(((255 << 24) | (flat << 16) | (flat << 8) | flat) >>> 0);
+    for (const tile of TILES) yield* paintTile(albedo, tile, { R, cavity, crease, vein, stretch, flush, seed }, (row) => hiddenRow(tile, row));
     out.albedo = albedo;
   }
   out.bytes = (out.albedo?.length ?? 0) + (out.normal?.length ?? 0) + (out.ao?.length ?? 0) + (out.rough?.length ?? 0);
@@ -499,10 +557,11 @@ function* bakeField(raster, field, frames, normal, occlusion, cavity) {
  * how fast u and v run over the surface (the larger to 1), so a tile whose texels are longer one way would flatten that way's
  * slopes: each is stretched back by that ratio before it is stored.
  */
-function encodeNormals(normal, frames) {
+function* encodeNormals(normal, frames) {
   const size = ATLAS_WIDTH * ATLAS_HEIGHT;
   const out = new Uint8Array(size * 4);
   for (let at = 0; at < size; at += 1) {
+    if (at % (ATLAS_WIDTH * SKINTEX.sliceRows * 2) === 0) yield 'normal';
     const tLength = frames[at * 8 + 6] || 1;
     const bLength = frames[at * 8 + 7] || 1;
     // |grad u| ~ 1 / (metres per texel round * width), |grad v| ~ 1 / (metres per texel along * height).
@@ -525,13 +584,15 @@ function encodeNormals(normal, frames) {
 }
 
 /** Paint one tile's albedo: every texel, gutter included. */
-function paintTile(albedo, tile, { R, cavity, crease, vein, stretch, flush, seed }) {
+function* paintTile(albedo, tile, { R, cavity, crease, vein, stretch, flush, seed }, hidden = () => false) {
   const neutral = SKINTEX.neutral;
   // The body's state is one colour all over (by part it left a seam where an arm met the trunk).
   const ruddy = texSmooth(0.025, 0.09, R.traits.trunk.fat) * (R.female ? 0.8 : 1);
   const pale = R.rawBony;
   const exercise = R.exercise;
   for (let row = 0; row < tile.h; row += 1) {
+    if (row % SKINTEX.sliceRows === 0) yield `albedo ${tile.name}`;
+    if (hidden(row)) continue;
     for (let column = 0; column < tile.w; column += 1) {
       const at = (tile.y + row) * ATLAS_WIDTH + tile.x + column;
       // The noise runs on the texel grid of the tile, wrapping round it.

@@ -15,6 +15,7 @@ export const MESH = {
   blend: 0.035, // m: how far apart two shapes start to merge
   weightPower: 6, // sharper means stiffer joints, softer means rubberier
   maxInfluences: 4,
+  weightSlice: 1500, // points weighed between hand-backs (skinWeightsSteps)
 };
 
 // ---- Primitives -------------------------------------------------------------
@@ -267,11 +268,21 @@ const SIDE = BONES.map((name) => (/^l[A-Z]/.test(name) ? 1 : /^r[A-Z]/.test(name
 
 /** Up to four bone influences per vertex, by inverse distance to each bone's segment. */
 export function skinWeights(positions, frames, allowedBones = []) {
+  const steps = skinWeightsSteps(positions, frames, allowedBones);
+  for (;;) {
+    const next = steps.next();
+    if (next.done) return next.value;
+  }
+}
+
+/** The same as slices of work (a generator: some hundreds of points at a time; its value the weights). */
+export function* skinWeightsSteps(positions, frames, allowedBones = []) {
   const count = positions.length / 3;
   const skinIndex = new Uint16Array(count * 4);
   const skinWeight = new Float32Array(count * 4);
   const scores = new Float64Array(BONES.length);
   for (let vertex = 0; vertex < count; vertex += 1) {
+    if (vertex % MESH.weightSlice === 0) yield 'skin weights';
     const p = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
     const side = p[2] > 0.02 ? 1 : p[2] < -0.02 ? -1 : 0;
     const allowed = allowedBones[vertex];

@@ -30,6 +30,10 @@ import { SCULPT, sculptProfile, sculptTraits, trunkFat, trunkProfiles } from './
 export const FLESH = {
   // Grid spacing (m) of the field: ribs 4 cm apart and 1 cm thick want under a centimetre (8.5 mm keeps them; 7.5 is cleaner and a third as dear again).
   cell: 0.0085,
+  // The cell (m) of the grid that tells the field which shapes may reach a point (fleshShapeGrid).
+  gridCell: 0.06,
+  // The span of u the coarse field's trunk profiles are tabulated over, and how many steps (fleshTable).
+  table: [-0.25, 1.25, 4096],
   // How far apart two lean shapes start to merge (m): small, so landmarks stay crisp.
   blend: 0.01,
   // The same for muscles that grow out of the body without an edge (pectorals, the back's).
@@ -186,9 +190,12 @@ export function fleshAnatomy(body, { refined = false, coarse = false } = {}) {
   const leanWide = (u) => closing(profiles.leanWidth, neckR * 1.2)(u) * wide(u);
   const leanDeep = closing(profiles.leanDepth, neckR * 1.15);
   const closeness = (u) => 1 - fleshSmooth(shoulderFrom, shoulderTo, u);
-  const width = (u) => leanWide(u) + trunkLayer * profiles.fatWidth(u) * closeness(u);
-  const depth = (u) => leanDeep(u) + trunkLayer * profiles.fatDepth(u) * closeness(u);
-  const shift = (u) => profiles.leanOffset(u) + trunkLayer * profiles.fatOffset(u) * closeness(u);
+  // The coarse field (V7's: read some fifty thousand times a body) reads the trunk's profiles from tables: a smooth curve sampled finely
+  // and read between samples differs from itself by well under a micrometre, at a fifth of the cost.
+  const table = coarse ? fleshTable : (profile) => profile;
+  const width = table((u) => leanWide(u) + trunkLayer * profiles.fatWidth(u) * closeness(u));
+  const depth = table((u) => leanDeep(u) + trunkLayer * profiles.fatDepth(u) * closeness(u));
+  const shift = table((u) => profiles.leanOffset(u) + trunkLayer * profiles.fatOffset(u) * closeness(u));
   shapes.push(sweptEllipse(pelvis, trunkLength, -0.1, 1.06, { width, depth, shift }));
 
   /**
@@ -430,9 +437,10 @@ const SCULPT_SPINE_KNOB = 0.036;
 export function fleshField(anatomy) {
   const { shapes, thickness, band } = anatomy;
   const reach = band + FLESH.blend + 0.01;
+  const near = fleshShapeGrid(shapes, reach);
   return (x, y, z) => {
     let lean = 1;
-    for (const shape of shapes) {
+    for (const shape of near(x, y, z)) {
       const box = shape.box;
       if (x < box[0] - reach || x > box[3] + reach || y < box[1] - reach || y > box[4] + reach || z < box[2] - reach || z > box[5] + reach) continue;
       lean = smoothMin(lean, shape.distance(x, y, z), shape.blend ?? FLESH.blend);
@@ -442,6 +450,53 @@ export function fleshField(anatomy) {
   };
 }
 
+
+/** A function of u sampled over [from, to] (`count` steps) and read linearly between samples; outside the span, the function itself. */
+function fleshTable(profile, from = FLESH.table[0], to = FLESH.table[1], count = FLESH.table[2]) {
+  const values = new Float64Array(count + 1);
+  const step = (to - from) / count;
+  for (let index = 0; index <= count; index += 1) values[index] = profile(from + index * step);
+  return (u) => {
+    if (!(u >= from && u <= to)) return profile(u);
+    const at = (u - from) / step;
+    const index = Math.min(count - 1, Math.floor(at));
+    const share = at - index;
+    return values[index] + (values[index + 1] - values[index]) * share;
+  };
+}
+
+/**
+ * The shapes that may reach a point, by a coarse grid over their boxes (each grown by `reach`): a cell lists, in their order, the
+ * shapes whose grown box meets it, so the field reads a handful of shapes instead of all of them and gets the same number (a shape
+ * left out would have failed its own box test; the order of the smooth union is kept). Outside the grid no shape reaches.
+ */
+function fleshShapeGrid(shapes, reach, cell = FLESH.gridCell) {
+  const none = [];
+  if (!shapes.length) return () => none;
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (const { box } of shapes) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      low[axis] = Math.min(low[axis], box[axis] - reach);
+      high[axis] = Math.max(high[axis], box[axis + 3] + reach);
+    }
+  }
+  const size = low.map((value, axis) => Math.max(1, Math.ceil((high[axis] - value) / cell)));
+  const cells = Array.from({ length: size[0] * size[1] * size[2] }, () => []);
+  const slack = 1e-6;
+  for (const shape of shapes) {
+    const from = [0, 1, 2].map((axis) => Math.max(0, Math.floor((shape.box[axis] - reach - slack - low[axis]) / cell)));
+    const to = [0, 1, 2].map((axis) => Math.min(size[axis] - 1, Math.floor((shape.box[axis + 3] + reach + slack - low[axis]) / cell)));
+    for (let k = from[2]; k <= to[2]; k += 1) for (let j = from[1]; j <= to[1]; j += 1) for (let i = from[0]; i <= to[0]; i += 1) cells[i + size[0] * (j + size[1] * k)].push(shape);
+  }
+  return (x, y, z) => {
+    const i = Math.floor((x - low[0]) / cell);
+    const j = Math.floor((y - low[1]) / cell);
+    const k = Math.floor((z - low[2]) / cell);
+    if (i < 0 || j < 0 || k < 0 || i >= size[0] || j >= size[1] || k >= size[2]) return none;
+    return cells[i + size[0] * (j + size[1] * k)];
+  };
+}
 
 /** Grid and field of the lean union, then the skin: the lean field pushed out by the fat near its surface. */
 export function sampleSkin({ shapes, thickness, band }, cell) {
