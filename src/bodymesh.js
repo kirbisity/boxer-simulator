@@ -15,12 +15,13 @@ export const MESH = {
   blend: 0.035, // m: how far apart two shapes start to merge
   weightPower: 6, // sharper means stiffer joints, softer means rubberier
   maxInfluences: 4,
+  weightSlice: 1500, // points weighed between hand-backs (skinWeightsSteps)
 };
 
 // ---- Primitives -------------------------------------------------------------
 
 /** A tapered capsule: radius r1 at a, r2 at b. */
-function cone(a, b, r1, r2) {
+export function cone(a, b, r1, r2) {
   const ab = vec.sub(b, a);
   const lengthSquared = vec.dot(ab, ab);
   const pad = Math.max(r1, r2);
@@ -41,7 +42,7 @@ function cone(a, b, r1, r2) {
 }
 
 /** An ellipsoid with semi-axes `radii` along the axes of `frame` (default: world). */
-function ellipsoid(center, radii, axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+export function ellipsoid(center, radii, axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
   const pad = Math.max(...radii);
   return {
     box: [center[0] - pad, center[1] - pad, center[2] - pad, center[0] + pad, center[1] + pad, center[2] + pad],
@@ -148,7 +149,7 @@ export function anatomy(body, layer = 'skin') {
 
 // ---- Field and surface -------------------------------------------------------
 
-function smoothMin(a, b, k) {
+export function smoothMin(a, b, k) {
   const h = Math.max(k - Math.abs(a - b), 0) / k;
   return Math.min(a, b) - (h * h * k) / 4;
 }
@@ -267,11 +268,21 @@ const SIDE = BONES.map((name) => (/^l[A-Z]/.test(name) ? 1 : /^r[A-Z]/.test(name
 
 /** Up to four bone influences per vertex, by inverse distance to each bone's segment. */
 export function skinWeights(positions, frames, allowedBones = []) {
+  const steps = skinWeightsSteps(positions, frames, allowedBones);
+  for (;;) {
+    const next = steps.next();
+    if (next.done) return next.value;
+  }
+}
+
+/** The same as slices of work (a generator: some hundreds of points at a time; its value the weights). */
+export function* skinWeightsSteps(positions, frames, allowedBones = []) {
   const count = positions.length / 3;
   const skinIndex = new Uint16Array(count * 4);
   const skinWeight = new Float32Array(count * 4);
   const scores = new Float64Array(BONES.length);
   for (let vertex = 0; vertex < count; vertex += 1) {
+    if (vertex % MESH.weightSlice === 0) yield 'skin weights';
     const p = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
     const side = p[2] > 0.02 ? 1 : p[2] < -0.02 ? -1 : 0;
     const allowed = allowedBones[vertex];
@@ -297,8 +308,10 @@ export function skinWeights(positions, frames, allowedBones = []) {
  * Laplacian relaxation: move each vertex part of the way to the average of
  * its neighbours. Irons out the small bumps where blended shapes meet and
  * the stair-step a coarse grid leaves, at some cost in volume.
+ * `welds`: pairs [copy, original] of vertices that are one point drawn twice
+ * (a texture's seam): they move together.
  */
-export function relax(surface, iterations, amount = 0.5) {
+export function relax(surface, iterations, amount = 0.5, welds = []) {
   const { positions, indices } = surface;
   const count = positions.length / 3;
   const neighbours = Array.from({ length: count }, () => new Set());
@@ -307,6 +320,10 @@ export function relax(surface, iterations, amount = 0.5) {
     neighbours[a].add(b).add(c);
     neighbours[b].add(a).add(c);
     neighbours[c].add(a).add(b);
+  }
+  for (const [copy, original] of welds) {
+    for (const other of neighbours[copy]) neighbours[original].add(other);
+    neighbours[original].delete(copy);
   }
   let current = Float32Array.from(positions);
   for (let pass = 0; pass < iterations; pass += 1) {
@@ -320,6 +337,7 @@ export function relax(surface, iterations, amount = 0.5) {
         next[vertex * 3 + axis] = current[vertex * 3 + axis] + (mean - current[vertex * 3 + axis]) * amount;
       }
     }
+    for (const [copy, original] of welds) next.copyWithin(copy * 3, original * 3, original * 3 + 3);
     current = next;
   }
   return { ...surface, positions: current };

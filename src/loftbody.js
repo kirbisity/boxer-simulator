@@ -1,15 +1,22 @@
 // A low-polygon body, built the way game characters are: each part is a
-// loft of elliptical rings along its bones, with a designed profile (the
+// loft of elliptical rings along its bones, with a designed sculptProfile (the
 // deltoid cap, the biceps, the narrow elbow, the calf), and the parts
 // overlap where they meet rather than being fused. ~3k triangles for the
 // whole body, and no lumps: every ring is a clean ellipse. 'faceted' drops to
 // seven sides and flat normals, for a low-poly art look.
 
 import { P } from './body.js';
-import { relax, skinWeights } from './bodymesh.js';
+import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { glovedFists, outfitOf } from './outfits.js';
+import { detailUv, FLAT_UV } from './skindetail.js';
+import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
+import { rulesProfile, rulesShape, rulesTraits, trunkSilhouette } from './skinrules.js';
+
+// The loft's own profiles (eased stop to stop), by a name of their own: the builder's `sculptProfile` is this or the rules' smooth one.
+// (Not an aliased import: the one-file bundle strips imports, so an alias would name nothing.)
+const stepProfile = sculptProfile;
 
 // Tops: where the hem and neckline sit along the trunk (0 hips, 1 neck),
 // how far the cloth stands off the skin, how long the sleeves run (a share of
@@ -122,37 +129,38 @@ export const LOFT = {
   // A light relaxation rounds the ring edges without losing the shapes.
   relaxPasses: 2,
   relaxAmount: 0.3,
+  // The rules' styles: how much fuller a limb is drawn per metre of fat on it (0.03 m of fat: 15%).
+  limbFatDrawn: 5,
+  // The medium ring density (a skin wrapped onto a field): sides round a limb and the trunk, rings per baseline ring, the trunk's ring step (u).
+  medium: { limbSides: 16, trunkSides: 36, limbDensity: 1.3, trunkStep: 0.022 },
+  // Wrapping onto a field: Newton steps, the most a step and a whole wrap may move a point (m), the gradient's step (m), how far a
+  // point buried in another part is set back behind the surface (m), and where the wrap fades in and out (the trunk's hips, the neck's top).
+  wrap: { steps: 4, step: 0.03, most: 0.06, epsilon: 0.003, buried: 0.0025, hips: [0.3, 0.45], legs: false, neckTop: [0.3, 0.5], clothReach: 0.045 },
+  // The skin under armour (`hideCovered`, see coverage): a stretch of a skin part inside a closed piece worn over it is left out of the mesh, all
+  // but `margin` (m) inside each end of the piece (an open end, a joint the next piece meets, a gap that opens in a swing keep their skin).
+  cover: { margin: 0.05 },
+  // A slice of the wrap's per-point work between hand-backs (buildLoftBodySteps), points.
+  slice: 400,
 };
-
-const smooth = (t) => t * t * (3 - 2 * t);
-
-/** Piecewise-smooth interpolation through [u, value] stops. */
-function profile(stops) {
-  return (u) => {
-    if (u <= stops[0][0]) return stops[0][1];
-    for (let index = 1; index < stops.length; index += 1) {
-      const [u0, v0] = stops[index - 1];
-      const [u1, v1] = stops[index];
-      if (u <= u1) return v0 + (v1 - v0) * smooth((u - u0) / (u1 - u0));
-    }
-    return stops.at(-1)[1];
-  };
-}
 
 /**
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
-function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null } = {}) {
+function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null } = {}) {
   const start = mesh.positions.length / 3;
+  // A part with texture coordinates (`uv`: ring, share of the way round -> [u, v]) has its first column of vertices twice, so the
+  // texture does not run backwards across the last quad: the pairs are welded again for relaxing and for the normals.
+  const stride = uv ? sides + 1 : sides;
   // A colour may be a pattern: a function of the ring (and its index), and
   // of the angle round it (0 at the front, as the depth axis points).
   const paint = typeof color === 'function' ? color : () => color;
   for (const [ringIndex, ring] of rings.entries()) {
-    for (let step = 0; step < sides; step += 1) {
+    for (let step = 0; step < stride; step += 1) {
       const angle = (step / sides) * Math.PI * 2;
       // `shape`: the surface stood further out (or in) by angle and ring: a breastplate's ridge, its flared hem.
-      const out = inflate * (shape ? shape(ring, angle) : 1);
+      // `bend`: the body's own anatomy (the sculpt style's bumps), which the cloth over it follows too.
+      const out = inflate * (shape ? shape(ring, angle) : 1) * (bend ? bend(ring, angle) : 1);
       const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * out), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * out)));
       mesh.positions.push(...p);
       // Weighted where the body's own surface is beneath it: cloth standing
@@ -161,13 +169,19 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       mesh.weightPositions.push(...vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width))));
       mesh.colors.push(paint(ring, angle, ringIndex, step));
       mesh.bones.push(bones(ring, Math.cos(angle)));
+      mesh.ringT.push(ring.t);
+      mesh.ringA.push(angle);
+      if (uv) {
+        mesh.uvs.set(mesh.positions.length / 3 - 1, uv(ring, step / sides));
+        if (step === sides) mesh.welds.push([mesh.positions.length / 3 - 1, mesh.positions.length / 3 - 1 - sides]);
+      }
     }
   }
   for (let row = 0; row < rings.length - 1; row += 1) {
     for (let step = 0; step < sides; step += 1) {
-      const a = start + row * sides + step;
-      const b = start + row * sides + ((step + 1) % sides);
-      mesh.indices.push(a, b, a + sides, b, b + sides, a + sides);
+      const a = start + row * stride + step;
+      const b = uv ? a + 1 : start + row * sides + ((step + 1) % sides);
+      mesh.indices.push(a, b, a + stride, b, b + stride, a + stride);
     }
   }
   const cap = (row, flip) => {
@@ -176,30 +190,275 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
     mesh.weightPositions.push(...rings[row].center);
     mesh.colors.push(paint(rings[row], 0, row, 0));
     mesh.bones.push(bones(rings[row], 0));
+    mesh.ringT.push(rings[row].t);
+    mesh.ringA.push(0);
+    if (uv) mesh.uvs.set(center, uv(rings[row], 0));
     for (let step = 0; step < sides; step += 1) {
-      const a = start + row * sides + step;
-      const b = start + row * sides + ((step + 1) % sides);
+      const a = start + row * stride + step;
+      const b = uv ? a + 1 : start + row * sides + ((step + 1) % sides);
       if (flip) mesh.indices.push(center, b, a);
       else mesh.indices.push(center, a, b);
     }
   };
   if (capStart) cap(0, false);
   if (capEnd) cap(rings.length - 1, true);
+  // A closed piece worn over a skin part (its rings tagged with the part: trunkRings, upperArmRings...) covers that stretch of it,
+  // unless any of it is drawn as skin (sheer lace, an open shirt).
+  if (rings.part && !part && mesh.cover && !mesh.colors.slice(start).includes('skin')) {
+    const ts = rings.map((ring) => ring.t);
+    (mesh.cover[rings.part] ??= []).push([Math.min(...ts), Math.max(...ts)]);
+  }
+  // `part`: the skin part this loft is (trunk, neck, lUpper...), for blending the joins between parts (`filletParts`).
+  if (part) mesh.parts[part] = [start, mesh.positions.length / 3];
 }
 
 /** Rings along a straight run from a to b, oriented by a frame's forward axis. */
 function along(a, b, forward, count, from, to, depthAt, widthAt, offsetAt = () => 0) {
+  // `count` may be the list of t (the sculpt style spaces rings by where landmarks repeat).
   const axis = vec.normalize(vec.sub(b, a));
   const depthAxis = vec.normalize(vec.sub(forward, vec.scale(axis, vec.dot(forward, axis))));
   const widthAxis = vec.cross(axis, depthAxis);
   const length = vec.length(vec.sub(b, a));
   const rings = [];
-  for (let index = 0; index <= count; index += 1) {
-    const t = from + ((to - from) * index) / count;
+  const stops = Array.isArray(count) ? count : null;
+  for (let index = 0; index <= (stops ? stops.length - 1 : count); index += 1) {
+    const t = stops ? stops[index] : from + ((to - from) * index) / count;
     const center = vec.add(vec.add(a, vec.scale(axis, t * length)), vec.scale(depthAxis, offsetAt(t)));
     rings.push({ t, center, depthAxis, widthAxis, depth: depthAt(t), width: widthAt(t) });
   }
   return rings;
+}
+
+/** The gradient of a field at a point, unit (a tetrahedron of four reads). */
+function fieldGradient(field, x, y, z, e) {
+  const a = field(x + e, y - e, z - e);
+  const b = field(x - e, y - e, z + e);
+  const c = field(x - e, y + e, z - e);
+  const d = field(x + e, y + e, z + e);
+  const g = [a - b - c + d, -a - b + c + d, -a + b - c + d];
+  const length = Math.hypot(...g) || 1;
+  return [g[0] / length, g[1] / length, g[2] / length];
+}
+
+/**
+ * Wrap a loft's skin onto a field's surface (the refined flesh field: the limbs grow out of the trunk, the elbow and knee are one
+ * surface): each skin point walked along the field's gradient onto its zero (Newton steps), so the loft keeps its topology, its
+ * texture coordinates and its skin weights but takes the field's shape. A point of one part buried in another (an arm's root inside
+ * the trunk, the trunk under the deltoid) lands on the same surface as the other's: it is set back a little behind it, so the part
+ * whose surface it is wins. Cloth is moved with the skin, keeping its standoff. `outline(vertex)`: metres out along the normal added
+ * on the trunk afterwards (the outline's features the field lacks). Returns the normals: the field's own on the skin.
+ */
+function* wrapOnField(positions, normals, mesh, regions, field, recompute, outline) {
+  const spec = LOFT.wrap;
+  const count = positions.length / 3;
+  const copies = new Set(mesh.welds.map(([copy]) => copy));
+  const partOf = new Array(count).fill(null);
+  for (const [name, [from, to]] of Object.entries(mesh.parts)) for (let vertex = from; vertex < to; vertex += 1) partOf[vertex] = name;
+  const cell = 0.05;
+  const key = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+  const grid = new Map();
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (regions[vertex] !== 'skin') continue;
+    const slot = key(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]);
+    if (!grid.has(slot)) grid.set(slot, []);
+    grid.get(slot).push(vertex);
+  }
+  /** The nearest skin point to (x, y, z) not of part `not` (or any), and the distance to its tangent plane. */
+  const nearest = (x, y, z, not = undefined) => {
+    let best = cell * cell;
+    let found = -1;
+    const [cx, cy, cz] = [Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell)];
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dz = -1; dz <= 1; dz += 1) {
+          for (const other of grid.get(`${cx + dx},${cy + dy},${cz + dz}`) ?? []) {
+            if (not !== undefined && partOf[other] === not) continue;
+            const distance = (positions[other * 3] - x) ** 2 + (positions[other * 3 + 1] - y) ** 2 + (positions[other * 3 + 2] - z) ** 2;
+            if (distance < best) {
+              best = distance;
+              found = other;
+            }
+          }
+        }
+      }
+    }
+    if (found < 0) return null;
+    const plane = (x - positions[found * 3]) * normals[found * 3] + (y - positions[found * 3 + 1]) * normals[found * 3 + 1] + (z - positions[found * 3 + 2]) * normals[found * 3 + 2];
+    return { vertex: found, plane };
+  };
+  // Before anything moves: which skin points are buried in another part, and how far each piece of cloth stands off the skin.
+  const buried = new Uint8Array(count);
+  // (Cloth follows the skin point nearest it: moved as that point is, so it keeps its standoff and its hems stay on the skin.)
+  const follows = new Int32Array(count).fill(-1);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (vertex % LOFT.slice === 0) yield 'wrap: buried';
+    const [x, y, z] = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
+    if (regions[vertex] === 'skin') {
+      const other = partOf[vertex] ? nearest(x, y, z, partOf[vertex]) : null;
+      if (other && other.plane < -0.003) buried[vertex] = 1;
+      // A forearm or a shin starts inside the part above it: where they overlap, the part above is the skin (one surface, no ring).
+      if (/Fore$|Shin$/.test(partOf[vertex] ?? '') && mesh.ringT[vertex] < -0.005) buried[vertex] = 1;
+    } else {
+      const skin = nearest(x, y, z);
+      if (skin && skin.plane > -0.01 && skin.plane < spec.clothReach) follows[vertex] = skin.vertex;
+    }
+  }
+  // How much of the wrap a point takes: fading in above the trunk's hips, fading out up the neck (the field's neck ends in the head).
+  const share = (vertex) => {
+    const t = mesh.ringT[vertex];
+    const part = partOf[vertex];
+    // The trunk below the waist (the hips under the shorts, a hanging belly) keeps the loft's: the field has no apron, and its hips met the shorts badly.
+    if (part === 'trunk') return Math.min(1, Math.max(0, (t - spec.hips[0]) / (spec.hips[1] - spec.hips[0])));
+    if (part === 'neck') return 1 - Math.min(1, Math.max(0, (t - spec.neckTop[0]) / (spec.neckTop[1] - spec.neckTop[0])));
+    // The legs keep the loft's (under the shorts the field's hips and the cloth fought; the knee is blended by the fillet instead).
+    if (/Thigh$|Shin$/.test(part ?? '')) return spec.legs ? 1 : 0;
+    return 1;
+  };
+  const moved = new Float32Array(positions.length);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (vertex % (LOFT.slice / 2) === 0) yield 'wrap: onto the field';
+    if (copies.has(vertex) || regions[vertex] !== 'skin') continue;
+    const weight = share(vertex);
+    if (weight <= 0) continue;
+    const target = 0;
+    let [x, y, z] = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
+    const [x0, y0, z0] = [x, y, z];
+    let g = null;
+    for (let step = 0; step < spec.steps; step += 1) {
+      const f = field(x, y, z) - target;
+      g = fieldGradient(field, x, y, z, spec.epsilon);
+      const move = Math.max(-spec.step, Math.min(spec.step, f));
+      x -= g[0] * move;
+      y -= g[1] * move;
+      z -= g[2] * move;
+    }
+    if (buried[vertex]) {
+      x -= g[0] * spec.buried;
+      y -= g[1] * spec.buried;
+      z -= g[2] * spec.buried;
+    }
+    // Never further than `most` from where the loft put it (a point the field cannot place stays near its ring).
+    let dx = x - x0;
+    let dy = y - y0;
+    let dz = z - z0;
+    const length = Math.hypot(dx, dy, dz);
+    const scale = (length > spec.most ? spec.most / length : 1) * weight;
+    dx *= scale;
+    dy *= scale;
+    dz *= scale;
+    moved.set([dx, dy, dz], vertex * 3);
+  }
+  // A weld's copy moves as its original; cloth as the skin under it.
+  for (const [copy, original] of mesh.welds) moved.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  for (let vertex = 0; vertex < count; vertex += 1) if (follows[vertex] >= 0) moved.copyWithin(vertex * 3, follows[vertex] * 3, follows[vertex] * 3 + 3);
+  for (let index = 0; index < positions.length; index += 1) positions[index] += moved[index];
+  // The trunk's outline features, along the field's normal.
+  yield 'wrap: moved';
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (regions[vertex] !== 'skin' || partOf[vertex] !== 'trunk' || copies.has(vertex)) continue;
+    const out = outline(vertex) * share(vertex);
+    if (!out) continue;
+    const g = fieldGradient(field, positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], 0.006);
+    for (let axis = 0; axis < 3; axis += 1) positions[vertex * 3 + axis] += g[axis] * out;
+  }
+  for (const [copy, original] of mesh.welds) positions.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  const result = recompute();
+  yield 'wrap: normals';
+  // The skin's normals are the field's (smoothed: read over a centimetre), so the shading runs on across the joins.
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (vertex % LOFT.slice === 0) yield 'wrap: field normals';
+    if (regions[vertex] !== 'skin') continue;
+    const weight = share(vertex);
+    if (weight <= 0) continue;
+    const g = fieldGradient(field, positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], 0.008);
+    const n = [0, 1, 2].map((axis) => result[vertex * 3 + axis] * (1 - weight) + g[axis] * weight);
+    const length = Math.hypot(...n) || 1;
+    for (let axis = 0; axis < 3; axis += 1) result[vertex * 3 + axis] = n[axis] / length;
+  }
+  for (const [copy, original] of mesh.welds) result.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  return result;
+}
+
+// The joins blended (`fillet` styles): which parts meet which, and the radius (m) of the blend.
+export const FILLET = {
+  pairs: [['trunk', 'lUpper', 0.045], ['trunk', 'rUpper', 0.045], ['trunk', 'lThigh', 0.04], ['trunk', 'rThigh', 0.04], ['trunk', 'neck', 0.035], ['lUpper', 'lFore', 0.02], ['rUpper', 'rFore', 0.02], ['lThigh', 'lShin', 0.02], ['rThigh', 'rShin', 0.02]],
+  // How far inside the other part a point may be and still count as on the join (m), and how much of the other's normal the seam takes.
+  inside: 0.012,
+  normalShare: 0.5,
+};
+
+/**
+ * Blend the joins between skin parts that are separate lofts (an arm stuck into the trunk): each skin point near the other part is
+ * pushed out by the polynomial smooth union of the two surfaces (the gap a blend of radius k fills: (k - d)^2 / 4k at distance d), and
+ * its normal turned towards the other part's, so the shading runs across the join instead of breaking at a crease. The distance to
+ * the other part is to the plane of its nearest point. Returns the new normals (positions are changed in place).
+ */
+function* filletParts(positions, normals, parts, regions, welds, recompute, bare, pairs = FILLET.pairs) {
+  const push = new Float32Array(positions.length / 3);
+  const blendTo = new Map();
+  const point = (index) => [positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]];
+  const copies = new Set(welds.map(([copy]) => copy));
+  for (const [nameA, nameB, k] of pairs) {
+    if (!parts[nameA] || !parts[nameB]) continue;
+    for (const [from, to] of [[nameA, nameB], [nameB, nameA]]) {
+      yield 'fillet';
+      const [toStart, toEnd] = parts[to];
+      const cell = k * 1.5;
+      const grid = new Map();
+      const key = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`;
+      for (let index = toStart; index < toEnd; index += 1) {
+        if (regions[index] !== 'skin') continue;
+        const [x, y, z] = point(index);
+        const slot = key(x, y, z);
+        if (!grid.has(slot)) grid.set(slot, []);
+        grid.get(slot).push(index);
+      }
+      const [fromStart, fromEnd] = parts[from];
+      for (let index = fromStart; index < fromEnd; index += 1) {
+        if (regions[index] !== 'skin' || copies.has(index) || bare[index] <= 0) continue;
+        const [x, y, z] = point(index);
+        let nearest = -1;
+        let best = cell * cell;
+        const [cx, cy, cz] = [Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell)];
+        for (let dx = -1; dx <= 1; dx += 1) {
+          for (let dy = -1; dy <= 1; dy += 1) {
+            for (let dz = -1; dz <= 1; dz += 1) {
+              for (const other of grid.get(`${cx + dx},${cy + dy},${cz + dz}`) ?? []) {
+                const distance = (positions[other * 3] - x) ** 2 + (positions[other * 3 + 1] - y) ** 2 + (positions[other * 3 + 2] - z) ** 2;
+                if (distance < best) {
+                  best = distance;
+                  nearest = other;
+                }
+              }
+            }
+          }
+        }
+        if (nearest < 0) continue;
+        const d = (x - positions[nearest * 3]) * normals[nearest * 3] + (y - positions[nearest * 3 + 1]) * normals[nearest * 3 + 1] + (z - positions[nearest * 3 + 2]) * normals[nearest * 3 + 2];
+        if (d < -FILLET.inside) continue;
+        const gap = Math.max(0, k - Math.max(0, d));
+        push[index] = Math.max(push[index], ((gap * gap) / (4 * k)) * bare[index]);
+        const weight = (gap / k) ** 2 * FILLET.normalShare * bare[index];
+        if (weight > (blendTo.get(index)?.[1] ?? 0)) blendTo.set(index, [nearest, weight]);
+      }
+    }
+  }
+  for (let index = 0; index < push.length; index += 1) {
+    if (!push[index]) continue;
+    for (let axis = 0; axis < 3; axis += 1) positions[index * 3 + axis] += normals[index * 3 + axis] * push[index];
+  }
+  for (const [copy, original] of welds) positions.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  yield 'fillet: pushed';
+  const result = recompute();
+  // The normals across the join: each side's turned towards the other's (both read after the push).
+  const before = Float32Array.from(result);
+  for (const [index, [other, weight]] of blendTo) {
+    const n = [0, 1, 2].map((axis) => before[index * 3 + axis] * (1 - weight) + before[other * 3 + axis] * weight);
+    const length = Math.hypot(...n) || 1;
+    for (let axis = 0; axis < 3; axis += 1) result[index * 3 + axis] = n[axis] / length;
+  }
+  for (const [copy, original] of welds) result.copyWithin(copy * 3, original * 3, original * 3 + 3);
+  return result;
 }
 
 function computeNormals(positions, indices) {
@@ -1020,17 +1279,82 @@ function facet(positions, indices, colors, bones, weightPositions) {
   return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones, weightPositions: flatWeights };
 }
 
-export function buildLoftBody(body, { faceted = false, lowDetail = false } = {}) {
+/**
+ * `sculpt`: the skin's rings bent by anatomy (sculpt.js: collarbones, ribs,
+ * abs, pecs, belly, joint knobs...) on more, finer rings; clothes follow the
+ * broad forms (`bend`) and armour is built as before. Never in a crowd.
+ */
+/** Drive a builder's slices (a generator) to its end now: its result. */
+export function runSteps(steps) {
+  for (;;) {
+    const next = steps.next();
+    if (next.done) return next.value;
+  }
+}
+
+/** A body's loft, built now (see buildLoftBodySteps). */
+export function buildLoftBody(body, options = {}) {
+  return runSteps(buildLoftBodySteps(body, options));
+}
+
+/**
+ * The stretches of each skin part a body's armour covers (see LOFT.cover): { trunk: [[from, to]...], lUpper: [...], ... } in t along
+ * the part, the margin at each end already taken off, or null when he wears no armour. What `hideCovered` leaves out of the skin.
+ */
+export function coveredRegions(body) {
+  return buildLoftBody(body, { coverOnly: true }).covered ?? null;
+}
+
+/**
+ * The loft, as slices of work (a generator: each `yield` is a place to hand the thread back, the return value the mesh), so a
+ * dear style (V7's wrap onto the flesh field) can be built a few milliseconds a frame. `hideCovered`: under armour, the skin a
+ * closed piece covers is left out of the mesh (coveredRegions); `coverOnly`: stop once that is known (no mesh worth having).
+ */
+export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, sculpt = false, rules = null, fillet = false, wrap = null, hideCovered = false, coverOnly = false } = {}) {
+  // Bent by anatomy (`sculpted`): `sculpt: true` with all its fine detail on fine rings (`detailed`); `sculpt: 'mass'` only the broad forms, on the usual
+  // rings (the detail style adds the rest as shading); `sculpt: 'rules'` the broad forms, the outline's own features and a share of the fine anatomy of
+  // skinrules.js (`rules`: { share, fine }: how much of the fine height goes in the mesh, and whether on fine rings), the rest left to the textures.
+  // `fillet`: the joins of the arms, legs and neck to the trunk blended (filletParts), so a limb grows out of the body instead of being stuck on.
+  const sculpted = Boolean(sculpt) && !faceted && !lowDetail;
+  const detailed = sculpted && sculpt === true;
+  const ruled = sculpted && sculpt === 'rules';
+  const fine = sculpted && (sculpt === true || (ruled && Boolean(rules?.fine)));
+  // `rules.density: 'medium'`: between the plain rings and the fine ones (a skin wrapped onto a field: `wrap`, see wrapOnField).
+  const medium = ruled && !fine && rules?.density === 'medium';
+  // `wrap`: the skin moved onto the surface of a signed-distance field (the refined flesh field: V5's joins on a loft's topology).
+  const wrapping = ruled && Boolean(wrap) && !lowDetail && !faceted;
+  // The textured styles' skin lofts carry texture coordinates (skindetail.js): they unwrap each part as a cylinder.
+  const textured = sculpted && (sculpt === 'mass' || ruled);
+  const skinUv = (tile) => (textured ? { uv: detailUv(tile) } : {});
+  const traits = sculpted ? sculptTraits(body) : null;
+  const rulesOf = ruled ? rulesTraits(body) : null;
+  const rulesShare = ruled ? rules?.share ?? 0 : 0;
+  // The profiles along each part: eased stop to stop (flat at every stop, which prints a band round the part at each), or for the
+  // rules' styles a smooth curve through the stops (no shelf at the shoulder, no ring round the arm).
+  const sculptProfile = ruled ? rulesProfile : stepProfile;
+  // The rules' styles draw a fat limb a little fuller than the physics' radius (a heavy man's arms and thighs read as tubes at it):
+  // drawn only, the body's own radii are untouched. Not under armour, which is built on the same rings.
+  const limbFatter = (key) => (ruled && !outfitOf(body.inputs).look.armor ? 1 + LOFT.limbFatDrawn * Math.max(0, body.segments[key].skinRadius - body.segments[key].muscleRadius) : 1);
   // Low detail (a crowd): fewer sides and rows, still smooth.
   const sides = faceted ? LOFT.facetedSides : lowDetail ? Math.round(LOFT.sides * 0.6) : LOFT.sides;
   const rows = faceted ? 0.5 : lowDetail ? LOFT.rowDensity * 0.6 : LOFT.rowDensity;
   const count = (n) => Math.max(2, Math.round(n * rows));
+  // The skin's own rings, finer when sculpted (clothes and armour keep the usual count).
+  const skinCount = (n) => (fine ? Math.max(2, Math.round(n * SCULPT.limbDensity)) : medium ? Math.max(2, Math.round(n * LOFT.medium.limbDensity)) : count(n));
+  const skinSides = fine ? SCULPT.limbSides : medium ? LOFT.medium.limbSides : sides;
+  const trunkSides = fine ? SCULPT.trunkSides : medium ? LOFT.medium.trunkSides : sides;
+  // Which of a part's shapes the skin takes: all of it, or the broad forms alone.
+  const skinBend = (shapes) => (detailed ? shapes.skin : armoured ? null : shapes.mass);
+  // The rules' bend: the broad form, the outline's features and the mesh's share of the fine height, not under cloth, nothing under armour.
+  const ruledBend = (shapes, part, side, covers) => (armoured || !ruled ? skinBend(shapes) : rulesShape(rulesOf, part, side, rulesShare, shapes.mass, (t) => sculptCoverShare(covers, t, 0.05)));
   const points = bindPoints(body);
   const frames = boneFrames(points, body);
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
-  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [] };
+  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [], uvs: new Map(), welds: [], parts: {}, ringT: [], ringA: [], covers: {}, cover: lowDetail ? null : {} };
+  // Rings along a skin part, tagged with it: a closed piece lofted over them covers that stretch of the part (loft).
+  const tagged = (name, rings) => Object.assign(rings, { part: name });
   const build = seg.trunk.tissue.muscle / (seg.trunk.tissue.muscle + seg.trunk.tissue.fat);
   // The trunk is a lean shape (from the radius without fat) under a layer
   // of fat, laid on where fat goes: thickest at the waist and belly, then
@@ -1047,18 +1371,20 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   // Wasting (0 at a normal build, 1 at the BMI floor): the abdomen sinks
   // behind the ribs, the waist pinches and the chest shrinks onto its cage.
   const wasting = Math.min(1, Math.max(0, (LOFT.wastingFrom - R) / LOFT.wastingSpan));
-  const leanWidth = profile([[-0.12, hipHalf * 0.8], [0.02, hipHalf], [0.3, (L.hipSpan * 0.42 + R * 0.25) * (1 - 0.3 * wasting)], [0.62, (L.shoulderSpan * 0.42 + 0.02) * (1 - 0.14 * wasting)], [0.84, L.shoulderSpan * 0.48 * (1 - 0.06 * wasting)], [0.94, L.shoulderSpan * 0.4], [1.04, neckR * (1.7 + 0.5 * body.neckIndex)], [1.12, neckR * 1.15]]);
-  const fatWidth = profile([[-0.12, 0.9 * hipFat], [0.05, 1.25 * hipFat], [0.3, 1.55], [0.6, 1.05], [0.86, 0.55], [1.04, 0.45], [1.12, 0.25]]);
-  const leanDepth = profile([[-0.12, R * 0.5], [0.02, R * 0.62], [0.3, R * 0.55 * (1 - 0.3 * wasting)], [0.62, R * 0.62 * (1 + 0.15 * build) * (1 - 0.1 * wasting)], [0.88, R * 0.52], [1.04, neckR * 1.3], [1.12, neckR * 1.05]]);
-  const fatDepth = profile([[-0.12, 0.8], [0.1, 1.05], [0.3, 1.45], [0.62, 0.95], [0.88, 0.5], [1.04, 0.6], [1.12, 0.35]]);
+  // The sculpt style draws the trunk's profiles from its landmarks (sculpt.js trunkProfiles).
+  const sculptProfiles = sculpted ? trunkProfiles(body, traits, { L, R, neckR, hipHalf, sculptProfile }) : null;
+  const leanWidth = sculptProfiles?.leanWidth ?? sculptProfile([[-0.12, hipHalf * 0.8], [0.02, hipHalf], [0.3, (L.hipSpan * 0.42 + R * 0.25) * (1 - 0.3 * wasting)], [0.62, (L.shoulderSpan * 0.42 + 0.02) * (1 - 0.14 * wasting)], [0.84, L.shoulderSpan * 0.48 * (1 - 0.06 * wasting)], [0.94, L.shoulderSpan * 0.4], [1.04, neckR * (1.7 + 0.5 * body.neckIndex)], [1.12, neckR * 1.15]]);
+  const fatWidth = sculptProfiles?.fatWidth ?? sculptProfile([[-0.12, 0.9 * hipFat], [0.05, 1.25 * hipFat], [0.3, 1.55], [0.6, 1.05], [0.86, 0.55], [1.04, 0.45], [1.12, 0.25]]);
+  const leanDepth = sculptProfiles?.leanDepth ?? sculptProfile([[-0.12, R * 0.5], [0.02, R * 0.62], [0.3, R * 0.55 * (1 - 0.3 * wasting)], [0.62, R * 0.62 * (1 + 0.15 * build) * (1 - 0.1 * wasting)], [0.88, R * 0.52], [1.04, neckR * 1.3], [1.12, neckR * 1.05]]);
+  const fatDepth = sculptProfiles?.fatDepth ?? sculptProfile([[-0.12, 0.8], [0.1, 1.05], [0.3, 1.45], [0.62, 0.95], [0.88, 0.5], [1.04, 0.6], [1.12, 0.35]]);
   // The belly carries forward of the spine as fat thickens.
-  const leanOffset = profile([[0, -0.012], [0.3, 0], [0.65, 0.012], [1, -0.01]]);
-  const fatOffset = profile([[0, 0.1], [0.25, 0.55], [0.45, 0.35], [0.65, 0.1], [1, 0]]);
+  const leanOffset = sculptProfiles?.leanOffset ?? sculptProfile([[0, -0.012], [0.3, 0], [0.65, 0.012], [1, -0.01]]);
+  const fatOffset = sculptProfiles?.fatOffset ?? sculptProfile([[0, 0.1], [0.25, 0.55], [0.45, 0.35], [0.65, 0.1], [1, 0]]);
   // Past a thick enough layer the abdomen bulges forward, then hangs: the
   // trunk carries on below the waistband as an apron in front of the thighs,
   // narrowing and thinning to its hem.
   const belly = Math.max(0, fatLayer - LOFT.bellyFrom);
-  const bulge = profile([[-0.12, 0.7], [0.15, 1], [0.4, 0.4], [0.6, 0]]);
+  const bulge = sculptProfile([[-0.12, 0.7], [0.15, 1], [0.4, 0.4], [0.6, 0]]);
   const hem = -0.12 - (belly * LOFT.bellyDrop) / vec.length(vec.sub(at('neck'), at('pelvis')));
   // A corset cinches the waist: the trunk drawn in round the natural waist.
   const corseted = Boolean(ARMOR_KINDS[outfitOf(body.inputs).look.armor?.kind]?.cinch);
@@ -1068,10 +1394,13 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   const bodyLean = (u) => leanOffset(u) + fatLayer * fatOffset(u) + belly * LOFT.bellyScale * 0.8 * bulge(u);
   // 0 at the hem, 1 at the waistband.
   const apron = (u) => Math.sqrt(Math.max(0, (u - hem) / (-0.12 - hem)));
-  const width = (u) => (u >= -0.12 ? bodyWidth(u) : bodyWidth(-0.12) * (0.55 + 0.45 * apron(u)));
-  const depth = (u) => (u >= -0.12 ? bodyDepth(u) : bodyDepth(-0.12) * (0.3 + 0.7 * apron(u)));
+  // (Sculpted, the apron's hem is rounded off: it closes in on itself rather than ending flat.)
+  const hemWidth = sculpted ? 0.3 : 0.55;
+  const hemDepth = sculpted ? 0.08 : 0.3;
+  const width = (u) => (u >= -0.12 ? bodyWidth(u) : bodyWidth(-0.12) * (hemWidth + (1 - hemWidth) * apron(u)));
+  const depth = (u) => (u >= -0.12 ? bodyDepth(u) : bodyDepth(-0.12) * (hemDepth + (1 - hemDepth) * apron(u)));
   const lean = (u) => (u >= -0.12 ? bodyLean(u) : bodyLean(-0.12) + bodyDepth(-0.12) * 0.7 * (1 - apron(u)));
-  const trunkRings = (from, to, rings) => along(at('pelvis'), at('neck'), forward, rings, from, to, depth, width, lean);
+  const trunkRings = (from, to, rings) => tagged('trunk', along(at('pelvis'), at('neck'), forward, rings, from, to, depth, width, lean));
   // Skin weights go by distance; a wide belly lies nearer the hanging
   // forearms than the spine, so the abdomen is bound to the torso alone,
   // and the apron to the pelvis and spine, not the legs it hangs over.
@@ -1100,7 +1429,30 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   };
   // Roped borders on the breastplate: a twisted band at its neck and its hem.
   const roped = (ring, step) => breastplate && (Math.abs(ring.t - breastplate[1] + LOFT.ridged.rope) < LOFT.ridged.rope || Math.abs(ring.t - breastplate[0] - LOFT.ridged.rope) < LOFT.ridged.rope) ? (step % 2 ? 'steel2' : 'steel') : null;
-  loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, count(18) + Math.round((-0.12 - Math.min(-0.12, hem)) * 10)), sides, { bones: abdomen });
+  // Clothes hide the anatomy beneath them: no fine detail on the skin where trunks or a top cover it.
+  const coveredTrunk = [];
+  const dressed = outfitOf(body.inputs).look;
+  // In armour (a plate, a coat of lames, a quilted jack) the sculpted skin keeps the loft's plain rings: the armour is built on those and has no room for a muscle's bulge.
+  const armoured = Boolean(dressed.armor);
+  if (sculpted && dressed.bottom && !dressed.bottom.skirt && dressed.bottom.kind !== 'gown') coveredTrunk.push([-0.2, 0.26, 0.05]);
+  if (sculpted && dressed.top && (!dressed.top.female || female)) coveredTrunk.push([TOPS[dressed.top.kind].hem, TOPS[dressed.top.kind].neck, 0.03]);
+  const trunkShape = sculpted ? trunkShapes(body, traits, coveredTrunk, armoured) : null;
+  if (sculpted) yield 'trunk shapes';
+  const apronRings = Math.round((-0.12 - Math.min(-0.12, hem)) * 10);
+  // Rings sparse over the hips and shoulders, dense where the landmarks repeat (ribs, abs, spine knobs).
+  let trunkCount = count(18) + apronRings;
+  if (fine) {
+    trunkCount = [];
+    for (let t = Math.min(-0.12, hem); t < 1.12; t += t > SCULPT.denseTrunk[0] && t < SCULPT.denseTrunk[1] ? SCULPT.denseStep : SCULPT.sparseStep) trunkCount.push(t);
+    trunkCount.push(1.12);
+  } else if (medium) {
+    trunkCount = [];
+    for (let t = Math.min(-0.12, hem); t < 1.12; t += LOFT.medium.trunkStep) trunkCount.push(t);
+    trunkCount.push(1.12);
+  }
+  yield 'trunk shaped';
+  loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, trunkCount), trunkSides, { bones: abdomen, ...(sculpted ? { bend: ruledBend(trunkShape, 'trunk', null, coveredTrunk) } : {}), ...skinUv('trunk'), part: 'trunk' });
+  mesh.covers.trunk = coveredTrunk;
   // Kit is geometry, not paint: shorts, waistband and (for women) a sports
   // top are lofts a little proud of the skin, so their edges are crisp.
   // Shorts sit on the hips under the belly, which hangs over them.
@@ -1171,12 +1523,14 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     }
   };
   // Below the waist: shorts on the hips, a belt, a sumo's mawashi.
-  const shortsOn = (role, inflate) => loft(mesh, shortsRings(-0.12, 0.2, count(5)), sides, { color: role, inflate, capStart: false, capEnd: false, bones: abdomen });
+  // (Cloth under armour is not bent either: it would stand through the plate.)
+  const bendTrunk = sculpted && !armoured ? { bend: trunkShape.mass } : {};
+  const shortsOn = (role, inflate) => loft(mesh, shortsRings(-0.12, 0.2, count(5)), trunkSides, { color: role, inflate, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
   if (bottom) {
     switch (bottom.kind) {
       case 'trunks': case 'longShorts':
         shortsOn('kit', 1.05);
-        loft(mesh, shortsRings(0.17, 0.25, 1), sides, { color: bottom.trim ? 'trim2' : 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen });
+        loft(mesh, shortsRings(0.17, 0.25, 1), trunkSides, { color: bottom.trim ? 'trim2' : 'band', inflate: 1.08, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
         break;
       case 'mawashi':
         if (bottom.under) shortsOn('under', 1.04);
@@ -1189,7 +1543,7 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
         break;
       case 'slacks': case 'pants': case 'jeans': case 'cargo':
         shortsOn('kit', 1.06);
-        loft(mesh, shortsRings(0.12, 0.17, 1), sides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen });
+        loft(mesh, shortsRings(0.12, 0.17, 1), trunkSides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
         break;
       default:
         shortsOn('kit', bottom.kind === 'tights' ? 1.03 : 1.06);
@@ -1247,14 +1601,14 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   // The balteus: a gladiator's broad bronze belt.
   if (hoplomachus) loft(mesh, shortsRings(0.04, 0.24, count(3)), sides, { color: (ring, angle, index) => (index === 1 ? 'gold' : 'steel'), inflate: 1.14, capStart: false, capEnd: false, bones: abdomen });
   // The top, over any layer beneath it; then body armour over both.
-  if (topShape?.inner) loft(mesh, trunkRings(-0.02, 0.99, count(12)), sides, { color: 'shirt', inflate: TOPS[topShape.inner].loose, capStart: false, capEnd: false, bones: abdomen });
+  if (topShape?.inner) loft(mesh, trunkRings(-0.02, 0.99, count(12)), trunkSides, { color: 'shirt', inflate: TOPS[topShape.inner].loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
   if (topShape?.skirt) {
     loft(mesh, skirtRings(skirtTo(topShape.skirt), count(5), 0.45), sides, { color: 'top', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
     loft(mesh, shortsRings(0.1, 0.16, 1), sides, { color: 'belt', inflate: 1.16, capStart: false, capEnd: false, bones: abdomen });
   }
   if (topShape) {
-    loft(mesh, trunkRings(topShape.hem, topShape.neck, count(Math.max(4, Math.round(14 * (topShape.neck - topShape.hem))))), sides, { color: topPattern, inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen });
-    if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), sides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen });
+    loft(mesh, trunkRings(topShape.hem, topShape.neck, count(Math.max(4, Math.round(14 * (topShape.neck - topShape.hem))))), trunkSides, { color: topPattern, inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
+    if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), trunkSides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
   }
   if (armor) {
     const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.1, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
@@ -1336,40 +1690,50 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
   // Cloth over a ridged plate lies over the ridge.
   for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen, plate ? ridgedPlate : null);
   for (const [hem, flare, inflate, paint] of armorPieces(over, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
-  loft(mesh, along(at('neck'), at('head'), forward, count(3), -0.05, 0.6, () => neckR, () => neckR * 1.05), sides, { capEnd: false });
+  // The neck thickens a little with fat (the roll under the jaw and at the nape is in the shape).
+  const neckGirth = sculpted ? 1 + 3.4 * Math.max(0, traits.trunk.fat - 0.03) : 1;
+  loft(mesh, along(at('neck'), at('head'), forward, ruled ? skinCount(5) : skinCount(3), ruled ? -0.2 : -0.05, 0.6, () => neckR * neckGirth, () => neckR * 1.05 * neckGirth), ruled ? 28 : fine ? SCULPT.limbSides + 4 : sides, { capEnd: false, ...(sculpted ? { bend: ruled && !armoured ? rulesShape(rulesOf, 'neck', null, rulesShare, neckShape(traits, false)) : neckShape(traits, detailed) } : {}), ...skinUv('neck'), part: 'neck' });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
   // Plate's gorget flares down over the tops of the breast and back plates, closing the gap between them and the helmet.
   const collarFrom = plate ? -0.45 : lamellar || kit?.collar ? -0.15 : -0.6;
   const flare = (t) => 1 + (lamellar || kit?.collar ? 0 : (plate ? 0.7 : 0.9) * Math.max(0, -t) / 0.6);
-  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') loft(mesh, along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)), sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false });
+  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') loft(mesh, tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t))), sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false });
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
+    yield `${side} limbs`;
     const shoulder = at(`${side}Shoulder`);
     const elbow = at(`${side}Elbow`);
     const hand = at(`${side}Hand`);
-    const upperR = seg[`${side}UpperArm`].skinRadius;
-    const foreR = seg[`${side}Forearm`].skinRadius;
+    const upperR = seg[`${side}UpperArm`].skinRadius * limbFatter(`${side}UpperArm`);
+    const foreR = seg[`${side}Forearm`].skinRadius * limbFatter(`${side}Forearm`);
     const armBuild = seg[`${side}UpperArm`].tissue.muscle / (seg[`${side}UpperArm`].tissue.muscle + seg[`${side}UpperArm`].tissue.fat);
     const armForward = frames[BONE[`${side}UpperArm`]].x;
     // Deltoid cap, biceps and triceps (deeper than wide), the narrow elbow.
     // It starts well inside the trunk so its end never shows at the shoulder.
     // Its root closes to a point inside the shoulder, so no end face shows.
-    const upperDepth = profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]);
-    const upperWidth = profile([[-0.3, upperR * 0.08], [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]]);
-    loft(mesh, along(shoulder, elbow, armForward, count(10), -0.3, 1.0, upperDepth, upperWidth), sides, { capStart: false });
+    // (Sculpted, the root is a round dome inside the shoulder, not a point sticking out above it.)
+    const root = sculpted ? [[-0.22, upperR * 0.3], [-0.14, upperR * 0.95]] : [[-0.3, upperR * 0.08]];
+    const upperDepth = sculptProfile([...root, [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]);
+    const upperWidth = sculptProfile([...root.map(([at, radius]) => [at, radius * 1.02]), [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]]);
+    const sleeveCover = topShape?.sleeve ? [[-0.4, Math.min(1.1, topShape.sleeve)]] : [];
+    const foreCover = topShape?.sleeve > 1 ? [[-0.1, topShape.sleeve - 1]] : [];
+    const limbs = sculpted ? { upper: limbShapes(traits, 'arm', side, sleeveCover, armoured), fore: limbShapes(traits, 'fore', side, foreCover, armoured) } : null;
+    loft(mesh, along(shoulder, elbow, armForward, skinCount(10), sculpted ? -0.22 : -0.3, 1.0, upperDepth, upperWidth), skinSides, { capStart: sculpted, ...(limbs ? { bend: ruledBend(limbs.upper, 'upper', side, sleeveCover) } : {}), ...skinUv(`${side}Upper`), part: `${side}Upper` });
+    mesh.covers[`${side}Upper`] = sleeveCover;
     // Forearm: full below the elbow, tapering to the wrist inside the glove
     // (or, bare, on to the wrist above the fist).
     // Bare, the forearm runs right into the back of the fist.
     const wrist = glovedFists(body.inputs) ? 0.74 : 0.98;
-    const forearmRings = (from, to, rings) => along(elbow, hand, armForward, rings, from, to,
-      profile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.98, foreR * 0.6]]),
-      profile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.98, foreR * 0.7]]));
-    loft(mesh, forearmRings(-0.04, wrist, count(8)), sides);
+    const forearmRings = (from, to, rings) => tagged(`${side}Fore`, along(elbow, hand, armForward, rings, from, to,
+      sculptProfile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.98, foreR * 0.6]]),
+      sculptProfile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.98, foreR * 0.7]])));
+    loft(mesh, forearmRings(-0.04, wrist, skinCount(8)), skinSides, { ...(limbs ? { bend: ruledBend(limbs.fore, 'fore', side, foreCover) } : {}), ...skinUv(`${side}Fore`), part: `${side}Fore` });
+    mesh.covers[`${side}Fore`] = foreCover;
     // Sleeves follow the arm's own shape, deltoid and all, a little off it,
     // from as deep in the shoulder as the arm's skin starts.
-    const upperArmRings = (from, to, rings) => along(shoulder, elbow, armForward, rings, from, to, (t) => Math.max(upperDepth(t), upperR * 0.9), (t) => Math.max(upperWidth(t), upperR * 0.9));
+    const upperArmRings = (from, to, rings) => tagged(`${side}Upper`, along(shoulder, elbow, armForward, rings, from, to, (t) => Math.max(upperDepth(t), upperR * 0.9), (t) => Math.max(upperWidth(t), upperR * 0.9)));
     const sleeveOf = (shape, role) => {
       if (!shape?.sleeve) return;
       const outer = side === 'l' ? 1 : -1;
@@ -1377,9 +1741,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       if (role === 'top' && top?.stripe) pattern = (ring, angle) => (Math.sin(angle) * outer > 0.85 ? 'stripe' : 'top');
       if (role === 'top' && top?.kind === 'flannel') pattern = (ring, angle, index, step) => (((index >> 1) + (step >> 1)) % 2 ? 'pattern' : 'top');
       if (role === 'top' && top?.kind === 'aloha') pattern = (ring, angle, index, step) => ((index * 3 + step * 5) % 7 === 0 ? 'pattern' : 'top');
-      loft(mesh, upperArmRings(-0.3, shape.sleeve > 1 ? 1.05 : shape.sleeve, count(6)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false });
+      loft(mesh, upperArmRings(-0.3, shape.sleeve > 1 ? 1.05 : shape.sleeve, count(6)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false, ...(limbs && !armoured ? { bend: limbs.upper.mass } : {}) });
       if (shape.sleeve > 1) {
-        loft(mesh, forearmRings(-0.06, shape.sleeve - 1, count(5)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false });
+        loft(mesh, forearmRings(-0.06, shape.sleeve - 1, count(5)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false, ...(limbs && !armoured ? { bend: limbs.fore.mass } : {}) });
         if (shape.ribbed || top?.kind === 'suit') loft(mesh, forearmRings(shape.sleeve - 1.07, shape.sleeve - 1, 1), sides, { color: top?.kind === 'suit' ? 'shirt' : 'trim', inflate: shape.sleeveLoose + 0.04, capStart: false, capEnd: false });
       }
     };
@@ -1410,19 +1774,22 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       armorPiece(forearmRings(0.12, wrist - 0.06, count(4)), plate ? 1.32 : 1.42);
     }
 
+    yield `${side} arm`;
     const hip = at(`${side}Hip`);
     const knee = at(`${side}Knee`);
     const foot = at(`${side}Foot`);
-    const thighR = seg[`${side}Thigh`].skinRadius;
-    const shankR = seg[`${side}Shank`].skinRadius;
+    const thighR = seg[`${side}Thigh`].skinRadius * limbFatter(`${side}Thigh`);
+    const shankR = seg[`${side}Shank`].skinRadius * limbFatter(`${side}Shank`);
     const legForward = frames[BONE[`${side}Thigh`]].x;
-    const thighRings = (from, to, rings) => along(hip, knee, legForward, rings, from, to,
-      profile([[-0.14, thighR * 1.0], [0.1, thighR * 1.18], [0.5, thighR * 1.0], [0.92, thighR * 0.66], [1, shankR * 0.92]]),
-      profile([[-0.14, thighR * 1.0], [0.1, thighR * 1.1], [0.5, thighR * 0.95], [1, shankR * 0.9]]),
-      profile([[0, 0], [0.5, thighR * 0.08], [1, 0]]));
-    loft(mesh, thighRings(-0.14, 1.0, count(10)), sides);
+    const thighRings = (from, to, rings) => tagged(`${side}Thigh`, along(hip, knee, legForward, rings, from, to,
+      sculptProfile([[-0.14, thighR * 1.0], [0.1, thighR * 1.18], [0.5, thighR * 1.0], [0.92, thighR * 0.66], [1, shankR * 0.92]]),
+      sculptProfile([[-0.14, thighR * 1.0], [0.1, thighR * 1.1], [0.5, thighR * 0.95], [1, shankR * 0.9]]),
+      sculptProfile([[0, 0], [0.5, thighR * 0.08], [1, 0]])));
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
     const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
+    const legs = sculpted ? { thigh: limbShapes(traits, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : [], armoured), shank: limbShapes(traits, 'shank', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : [], armoured) } : null;
+    loft(mesh, thighRings(-0.14, 1.0, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.thigh, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : []) } : {}), ...skinUv(`${side}Thigh`), part: `${side}Thigh` });
+    mesh.covers[`${side}Thigh`] = legReach[0] > 0 ? [[-0.3, legReach[0]]] : [];
     const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
     const legPattern = (ring, angle) => {
@@ -1430,8 +1797,9 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
       if (bottom?.kind === 'cargo' && ring.t > 0.35 && ring.t < 0.62 && Math.sin(angle) * outer > 0.55) return 'trim2';
       return 'kit';
     };
-    if (bottom?.under) loft(mesh, thighRings(-0.05, 0.4, count(3)), sides, { color: 'under', inflate: 1.05, capStart: false, capEnd: false });
-    if (legReach[0] > 0 && !skirted) loft(mesh, thighRings(-0.05, legReach[0], count(Math.max(3, Math.round(9 * legReach[0])))), sides, { color: legPattern, inflate: legLoose, capStart: false, capEnd: false });
+    const bendThigh = legs && !armoured ? { bend: legs.thigh.mass } : {};
+    if (bottom?.under) loft(mesh, thighRings(-0.05, 0.4, count(3)), sides, { color: 'under', inflate: 1.05, capStart: false, capEnd: false, ...bendThigh });
+    if (legReach[0] > 0 && !skirted) loft(mesh, thighRings(-0.05, legReach[0], count(Math.max(3, Math.round(9 * legReach[0])))), sides, { color: legPattern, inflate: legLoose, capStart: false, capEnd: false, ...bendThigh });
     // Hakama (the hitatare's trousers): full, bloused out at the knee where they are tied over the shin guards.
     if (bottom?.kind === 'hakama' && !skirted) loft(mesh, thighRings(0.72, 1.06, count(3)), sides, { color: 'kit', inflate: 1.48, capStart: false, capEnd: false });
     // Bloomers end in a lace frill round the thigh.
@@ -1455,11 +1823,12 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     }
     // Shin and calf: the calf sits high and behind.
     // The shin starts inside the thigh, so the knee bends without a seam.
-    const shinRings = (from, to, rings) => along(knee, foot, frames[BONE[`${side}Shin`]].x, rings, from, to,
-      profile([[-0.12, shankR * 0.6], [0, shankR * 0.92], [0.28, shankR * 1.1], [0.7, shankR * 0.7], [0.97, shankR * 0.5]]),
-      profile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
-      profile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]]));
-    loft(mesh, shinRings(-0.12, 0.97, count(10)), sides);
+    const shinRings = (from, to, rings) => tagged(`${side}Shin`, along(knee, foot, frames[BONE[`${side}Shin`]].x, rings, from, to,
+      sculptProfile([[-0.12, shankR * 0.6], [0, shankR * 0.92], [0.28, shankR * 1.1], [0.7, shankR * 0.7], [0.97, shankR * 0.5]]),
+      sculptProfile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
+      sculptProfile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]])));
+    loft(mesh, shinRings(-0.12, 0.97, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.shank, 'shin', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : []) } : {}), ...skinUv(`${side}Shin`), part: `${side}Shin` });
+    mesh.covers[`${side}Shin`] = legReach[1] > 0 ? [[-0.3, legReach[1]]] : [];
     // A plate greave covers the shin: the hose under it is not drawn (it stands wider than the greave at the ankle and showed through).
     if (legReach[1] > 0 && !skirted && !plate) {
       // Trousers fall straight to the shoe; joggers and track pants gather.
@@ -1488,22 +1857,129 @@ export function buildLoftBody(body, { faceted = false, lowDetail = false } = {})
     if (feet.socks) loft(mesh, shinRings(0.66, 0.75, 1), sides, { color: 'sock', inflate: 1.28, capStart: false, capEnd: false });
   }
 
+  // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
+  const covered = armor && mesh.cover ? coverTable(mesh.cover, { trunk: [at('pelvis'), at('neck')], neck: [at('neck'), at('head')], ...Object.fromEntries(['l', 'r'].flatMap((side) => [[`${side}Upper`, [at(`${side}Shoulder`), at(`${side}Elbow`)]], [`${side}Fore`, [at(`${side}Elbow`), at(`${side}Hand`)]], [`${side}Thigh`, [at(`${side}Hip`), at(`${side}Knee`)]], [`${side}Shin`, [at(`${side}Knee`), at(`${side}Foot`)]]])) }) : null;
+  if (coverOnly) return { covered };
+  yield 'lofted';
   let { positions, indices, colors, bones, weightPositions } = mesh;
   if (faceted) ({ positions, indices, colors, bones, weightPositions } = facet(positions, indices, colors, bones, weightPositions));
   let positionArray = Float32Array.from(positions);
-  const indexArray = Uint32Array.from(indices);
+  let indexArray = Uint32Array.from(indices);
   if (!faceted) {
     // Smooth the skin only: cloth tubes are all open edges, and relaxing an
     // open edge pulls it in — hems would sink into the body beneath them.
     const loose = Float32Array.from(positionArray);
-    positionArray = relax({ positions: positionArray, indices: indexArray }, LOFT.relaxPasses, LOFT.relaxAmount).positions;
+    positionArray = relax({ positions: positionArray, indices: indexArray }, fine ? SCULPT.relaxPasses : LOFT.relaxPasses, fine ? SCULPT.relaxAmount : LOFT.relaxAmount, mesh.welds).positions;
+    yield 'relaxed';
     colors.forEach((region, vertex) => {
       if (region !== 'skin') positionArray.set(loose.subarray(vertex * 3, vertex * 3 + 3), vertex * 3);
     });
   }
-  const normals = computeNormals(positionArray, indexArray);
+  // A textured part's seam is one line of points drawn twice: the same normal on both.
+  const smoothNormals = () => {
+    const result = computeNormals(positionArray, indexArray);
+    for (const [copy, original] of mesh.welds) {
+      const sum = [0, 1, 2].map((axis) => result[copy * 3 + axis] + result[original * 3 + axis]);
+      const length = Math.hypot(...sum) || 1;
+      for (let axis = 0; axis < 3; axis += 1) result[copy * 3 + axis] = result[original * 3 + axis] = sum[axis] / length;
+    }
+    return result;
+  };
+  let normals = smoothNormals();
+  yield 'normals';
+  if (wrapping && !armoured) {
+    // The legs' joins (trunk to thigh, the knee) by the fillet; the upper body by the field.
+    const bare = new Float32Array(positionArray.length / 3).fill(1);
+    for (const [name, [from, to]] of Object.entries(mesh.parts)) {
+      const covers = (mesh.covers[name] ?? []).map(([low, high]) => [name === 'trunk' ? -5 : low - 0.04, high + 0.04]);
+      for (let vertex = from; vertex < to; vertex += 1) bare[vertex] = sculptCoverShare(covers, mesh.ringT[vertex], 0.05);
+    }
+    normals = yield* filletParts(positionArray, normals, mesh.parts, colors, mesh.welds, smoothNormals, bare, FILLET.pairs.filter(([a, b]) => /Thigh|Shin/.test(a + b)));
+    yield 'filleted';
+    normals = yield* wrapOnField(positionArray, normals, mesh, colors, wrap, smoothNormals, (vertex) => {
+      // The outline's own features (the starved belly sunk under the ribs, the collarbones, the blades) on the trunk, not under cloth.
+      const t = mesh.ringT[vertex];
+      return trunkSilhouette(rulesOf, t, mesh.ringA[vertex]) * sculptCoverShare(coveredTrunk, t, 0.05);
+    });
+  } else if (fillet && sculpted && !armoured) {
+    // Under cloth the skin is not blended: pushed out, it would come through the shorts or a sleeve.
+    const bare = new Float32Array(positionArray.length / 3).fill(1);
+    for (const [name, [from, to]] of Object.entries(mesh.parts)) {
+      // On the trunk, everything below the top of the shorts as well (a hanging belly lies over them).
+      const covers = (mesh.covers[name] ?? []).map(([low, high]) => [name === 'trunk' ? -5 : low - 0.04, high + 0.04]);
+      for (let vertex = from; vertex < to; vertex += 1) bare[vertex] = sculptCoverShare(covers, mesh.ringT[vertex], 0.05);
+    }
+    normals = yield* filletParts(positionArray, normals, mesh.parts, colors, mesh.welds, smoothNormals, bare);
+  }
+  // Texture coordinates: the parts that have them, and everything else on a flat patch of the map.
+  let uvs = null;
+  if (textured) {
+    uvs = new Float32Array((positionArray.length / 3) * 2);
+    for (let vertex = 0; vertex < positionArray.length / 3; vertex += 1) uvs.set(mesh.uvs.get(vertex) ?? FLAT_UV, vertex * 2);
+  }
+  // Under armour (`hideCovered`): the skin the pieces cover is left out (every triangle of it), and the points no triangle uses.
+  let hidden = 0;
+  if (hideCovered && covered) {
+    const inside = new Uint8Array(positionArray.length / 3);
+    for (const [name, [from, to]] of Object.entries(mesh.parts)) {
+      for (const [low, high] of covered[name] ?? []) for (let vertex = from; vertex < to; vertex += 1) if (mesh.ringT[vertex] > low && mesh.ringT[vertex] < high) inside[vertex] = 1;
+    }
+    const kept = [];
+    for (let corner = 0; corner < indexArray.length; corner += 3) {
+      const [a, b, c] = [indexArray[corner], indexArray[corner + 1], indexArray[corner + 2]];
+      if (inside[a] && inside[b] && inside[c]) hidden += 1;
+      else kept.push(a, b, c);
+    }
+    if (hidden) {
+      const used = new Int32Array(inside.length).fill(-1);
+      let next = 0;
+      for (const vertex of kept) if (used[vertex] < 0) used[vertex] = next++;
+      const order = new Int32Array(next);
+      used.forEach((to, from) => {
+        if (to >= 0) order[to] = from;
+      });
+      const pick = (array, width) => {
+        const out = new array.constructor(next * width);
+        for (let to = 0; to < next; to += 1) for (let axis = 0; axis < width; axis += 1) out[to * width + axis] = array[order[to] * width + axis];
+        return out;
+      };
+      positionArray = pick(positionArray, 3);
+      normals = pick(normals, 3);
+      if (uvs) uvs = pick(uvs, 2);
+      weightPositions = Array.from(order, (from) => [weightPositions[from * 3], weightPositions[from * 3 + 1], weightPositions[from * 3 + 2]]).flat();
+      colors = Array.from(order, (from) => colors[from]);
+      bones = Array.from(order, (from) => bones[from]);
+      indexArray = Uint32Array.from(kept, (vertex) => used[vertex]);
+    }
+  }
   // `rigid`: vertices carried by the chest bone alone (a breastplate and what is under it): no flesh to dent.
   const rigid = bones.map((list) => list === chestOnly);
+  yield 'skin weights';
+  const weights = yield* skinWeightsSteps(Float32Array.from(weightPositions), frames, bones);
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
-  return { positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...skinWeights(Float32Array.from(weightPositions), frames, bones), bindFrames: frames, bindPoints: points };
+  return {
+    positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames: frames, bindPoints: points,
+    ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}),
+  };
+}
+
+/**
+ * The covered stretches of each part ({ part: [[from, to]...] }, t along it) from the pieces lofted over it: overlapping pieces joined,
+ * then LOFT.cover.margin (m, as t by the part's length from `ends`) taken off each end; a stretch shorter than two margins covers nothing.
+ */
+function coverTable(cover, ends) {
+  const table = {};
+  for (const [name, pieces] of Object.entries(cover)) {
+    const [a, b] = ends[name];
+    const margin = LOFT.cover.margin / vec.length(vec.sub(b, a));
+    const joined = [];
+    for (const [from, to] of [...pieces].sort((p, q) => p[0] - q[0])) {
+      const last = joined.at(-1);
+      if (last && from <= last[1]) last[1] = Math.max(last[1], to);
+      else joined.push([from, to]);
+    }
+    const stretches = joined.map(([from, to]) => [from + margin, to - margin]).filter(([from, to]) => to > from);
+    if (stretches.length) table[name] = stretches;
+  }
+  return table;
 }

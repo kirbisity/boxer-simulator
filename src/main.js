@@ -33,7 +33,7 @@ import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
-import { buildFighterView, clearCrowdTemplates, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
@@ -521,11 +521,15 @@ function frame(now) {
   last = now;
   try {
     resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)), { tiered: Boolean(state.world?.stage) });
+    // A V7 skin's maps by the stage's tier (render.js setSkinQuality): on 'low', no normal or roughness map.
+    setSkinQuality(state.views, state.world?.stage ? resolution.tier ?? 'high' : 'high');
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
     if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow());
     draw(dt);
+    // A fighter drawn in the plain loft while his V7 skin is built: a few ms of it a frame (render.js pumpSkinBuilds).
+    pumpSkinBuilds(scene);
   } catch (error) {
     // Reported once per kind of error, not sixty times a second.
     const key = String(error?.stack ?? error);
@@ -2348,8 +2352,8 @@ const introKept = [];
 const introPoint = new THREE.Vector3();
 
 const introStage = {
-  /** Clear whatever was on (the fight behind the menu) for the empty arena. */
-  begin() {
+  /** Clear whatever was on (the fight behind the menu) for the empty arena; the legends' skins begun ahead, in the skin workers. */
+  begin(plan = null) {
     if (state.mode === 'play') $('#modes button[data-value="watch"]').click();
     state.sideAsked = false;
     $('#side-pick').hidden = true;
@@ -2370,6 +2374,7 @@ const introStage = {
     resetDrama(state.drama);
     $('#banner').hidden = true;
     $('#log').replaceChildren();
+    if (plan?.legends?.length) prefetchSkins(createWorld(plan.legends.map((legend) => ({ inputs: normaliseInputs(structuredClone(legend.inputs)), corner: 'red' })), { seed: 3, arena: INTRO_ARENA }).fighters.map((fighter) => fighter.body));
   },
   /** These legends ({ inputs, x, z, yaw }) in their places, in guard, breathing; the last lot kept, still and hidden. */
   place(legends) {
@@ -2385,11 +2390,17 @@ const introStage = {
     advance(state.world, 0.6, null, STEP);
     state.before = null;
     state.eventCursor = state.world.events.length;
-    state.views = state.world.fighters.map((fighter) => {
-      const view = buildFighterView(scene, fighter);
-      setLayer(view, state.layer);
-      return view;
-    });
+    // Built behind the faction's card (the intro's one still moment): in their own skins at once, most of them made ahead (begin).
+    SKIN_BUILD.now = true;
+    try {
+      state.views = state.world.fighters.map((fighter) => {
+        const view = buildFighterView(scene, fighter);
+        setLayer(view, state.layer);
+        return view;
+      });
+    } finally {
+      SKIN_BUILD.now = false;
+    }
     state.paused = false;
   },
   /** Everyone at once, still. */
@@ -2507,6 +2518,17 @@ const SHEETS = {
       ['lofted', '1 · Lofted', 'low-poly rings, lightly smoothed · ~5.9k triangles'],
       ['smoothed', '2 · Smoothed', 'anatomy field, coarse and relaxed · ~8k'],
       ['faceted', '3 · Faceted', 'flat-shaded low poly · ~0.8k'],
+      ['sculpt', '4 · Sculpt', 'loft bent by anatomy: ribs, abs, folds · ~14k'],
+      ['detail', '5 · Detail', 'loft + bump and occlusion map · ~6k + a map'],
+      ['flesh', '6 · Flesh', 'anatomy field, hero close-ups · ~60k, ~1.5 s to build'],
+      // Round two (bodystyles.js): skin textures, blended joins, a face that follows the body.
+      ['v1', 'V1 · Painted loft', 'loft + albedo and occlusion maps · ~6k'],
+      ['v2', 'V2 · Mapped loft', 'loft + albedo, normal, occlusion, roughness · ~6k'],
+      ['v3', 'V3 · B baked on A', 'loft + the flesh field baked into its maps · ~6k'],
+      ['v4', 'V4 · Sculpted + mapped', 'fine loft + maps · ~14k'],
+      ['v5', 'V5 · Flesh-lite', 'coarse flesh field, painted per vertex · ~35k'],
+      ['v6', 'V6 · Flesh hero', 'flesh field, painted per vertex · ~65k'],
+      ['v7', 'V7 · Flesh-wrapped loft', 'loft wrapped on the flesh field + V2 maps · ~9k'],
     ],
     rows: [PRESETS.heavy, PRESETS.contender],
     // Inside the ropes (the ring edge is 3 m out), so none cross the view.
@@ -2572,7 +2594,13 @@ function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
     fighter.yaw = -0.5 + turn;
   });
   advance(state.world, 0.6, null, STEP);
-  rebuildViews();
+  // A sheet is a still to compare: every body in its own style at once, not the plain loft first.
+  SKIN_BUILD.now = true;
+  try {
+    rebuildViews();
+  } finally {
+    SKIN_BUILD.now = false;
+  }
   // A close-up frames one option from any side: { column, yaw, pitch, distance }.
   const { distance, pitch, yaw, height } = { ...sheet.camera, ...closeUp };
   Object.assign(scene.orbit, { distance, pitch, yaw });
@@ -2672,6 +2700,16 @@ const boxer = window.boxer = {
     return sceneryLodOn();
   },
   sceneryLodStats: () => sceneryLodStats(scene),
+  // Fighters waiting for their V7 skin ({ waiting, bodies }); `finishSkins()` builds and swaps them all now (tests, shots).
+  skins: () => skinBuildStats(),
+  finishSkins: () => pumpSkinBuilds(scene, Infinity),
+  // How skins are built (render.js SKIN_BUILD: workers, slice ms, reach), to tune or compare.
+  skinBuild: SKIN_BUILD,
+  // The body style fighters are drawn in from the next build on (bodystyles.js: 'v7' the default, 'lofted' the old one); no argument: the one in force.
+  bodyStyle: (style) => {
+    if (BODY_STYLES.includes(style)) setBodyStyle(style);
+    return BODY_STYLE;
+  },
   // Adaptive resolution (adaptres.js): on or off (off: the full pixel ratio, kept), and what it is doing now; no argument: just that.
   adaptiveResolution: (on) => {
     if (on !== undefined) resolution.set(on, scene);
@@ -2785,6 +2823,7 @@ const boxer = window.boxer = {
       buildQueuedViews();
       if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow());
       draw(dt);
+      pumpSkinBuilds(scene);
     }
   },
   // Profiling: a level entered as its menu button does, watched (or played as `side`), its armies built.

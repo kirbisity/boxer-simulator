@@ -16,6 +16,7 @@ import { Dangle } from './dangle.js';
 import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 import { assignColour } from './looks/kit.js';
+import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
@@ -84,39 +85,74 @@ const easeInOut = (t) => t * t * (3 - 2 * t);
 
 function headDeform(position, shape) {
   for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index);
-    const y = position.getY(index);
-    const z = position.getZ(index);
-    let X;
-    let Y;
-    let Z;
-    if (y < 0) {
-      // Lower face: rebuild each ring from its direction, at a drawn width.
-      const t = Math.min(1, -y);
-      const ring = Math.sqrt(Math.max(1e-6, 1 - y * y));
-      const ux = x / ring;
-      const uz = z / ring;
-      const width = t < shape.jawAt
-        ? 1 + (shape.jawWidth - 1) * (t / shape.jawAt) + shape.cheek * Math.sin((Math.PI * t) / shape.jawAt)
-        : shape.jawWidth + (shape.chinWidth - shape.jawWidth) * ((t - shape.jawAt) / (1 - shape.jawAt));
-      const front = 1 + (shape.chinForward - 1) * easeInOut(t);
-      const back = 1 - 0.62 * easeInOut(t);
-      X = ux * (ux > 0 ? front : back) * Math.min(1, ring * 3 + 0.25);
-      Z = uz * width * Math.min(1, ring * 3 + 0.25);
-      Y = -t * shape.chinLength;
-    } else {
-      X = x;
-      Y = y * shape.crown;
-      Z = z;
-    }
-    // The flat face plane: the front is pressed back where the features sit,
-    // fading in and out over the brow and the chin so no crease forms.
-    if (X > shape.faceFront) {
-      const band = easeInOut(Math.max(0, Math.min(1, (0.6 - Y) / 0.25))) * easeInOut(Math.max(0, Math.min(1, (Y + 0.95) / 0.3)));
-      X -= (X - shape.faceFront) * 0.7 * band;
-    }
-    position.setXYZ(index, X * SKULL[0], Y * SKULL[1], Z * SKULL[2]);
+    const [X, Y, Z] = deformPoint(position.getX(index), position.getY(index), position.getZ(index), shape);
+    position.setXYZ(index, X, Y, Z);
   }
+}
+
+/** One point of the unit sphere on the drawn head (and, with `shape.morph`, the face following the body: facemorph.js), unscaled by the radius. */
+function deformPoint(x, y, z, shape) {
+  let X;
+  let Y;
+  let Z;
+  if (y < 0) {
+    // Lower face: rebuild each ring from its direction, at a drawn width.
+    const t = Math.min(1, -y);
+    const ring = Math.sqrt(Math.max(1e-6, 1 - y * y));
+    const ux = x / ring;
+    const uz = z / ring;
+    const width = t < shape.jawAt
+      ? 1 + (shape.jawWidth - 1) * (t / shape.jawAt) + shape.cheek * Math.sin((Math.PI * t) / shape.jawAt)
+      : shape.jawWidth + (shape.chinWidth - shape.jawWidth) * ((t - shape.jawAt) / (1 - shape.jawAt));
+    const front = 1 + (shape.chinForward - 1) * easeInOut(t);
+    const back = 1 - 0.62 * easeInOut(t);
+    X = ux * (ux > 0 ? front : back) * Math.min(1, ring * 3 + 0.25);
+    Z = uz * width * Math.min(1, ring * 3 + 0.25);
+    Y = -t * shape.chinLength;
+  } else {
+    X = x;
+    Y = y * shape.crown;
+    Z = z;
+  }
+  // The flat face plane: the front is pressed back where the features sit,
+  // fading in and out over the brow and the chin so no crease forms.
+  if (X > shape.faceFront) {
+    const band = easeInOut(Math.max(0, Math.min(1, (0.6 - Y) / 0.25))) * easeInOut(Math.max(0, Math.min(1, (Y + 0.95) / 0.3)));
+    X -= (X - shape.faceFront) * 0.7 * band;
+  }
+  if (shape.morph) [X, Y, Z] = morphHeadPoint(X, Y, Z, shape.morph);
+  return [X * SKULL[0], Y * SKULL[1], Z * SKULL[2]];
+}
+
+const FACE_MAPS = new Map();
+/**
+ * The face's colour map for a morph (facemorph.js faceMarks), on the sphere's own texture coordinates (u round from the back,
+ * v up): made once for each set of weights alike.
+ */
+function faceMap(shape) {
+  const key = `${faceMorphKey(shape.morph)}|${shape.jawWidth}|${shape.chinLength}`;
+  if (FACE_MAPS.has(key)) return FACE_MAPS.get(key);
+  const [width, height] = FACE_MORPH.map;
+  const data = new Uint8Array(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const theta = (1 - (row + 0.5) / height) * Math.PI;
+    for (let column = 0; column < width; column += 1) {
+      const phi = ((column + 0.5) / width) * Math.PI * 2;
+      // three's SphereGeometry: x = -cos(phi) sin(theta), y = cos(theta), z = sin(phi) sin(theta).
+      const [X, Y, Z] = deformPoint(-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta), shape);
+      const paint = faceMarks(X / SKULL[0], Y / SKULL[1], Z / SKULL[2], shape.morph);
+      for (let axis = 0; axis < 3; axis += 1) data[(row * width + column) * 4 + axis] = Math.round(Math.min(1, Math.max(0, paint[axis] * FACE_MORPH.neutral)) * 255);
+      data[(row * width + column) * 4 + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  FACE_MAPS.set(key, texture);
+  return texture;
 }
 
 function headGeometry(radius, shape, segments = 36) {
@@ -282,14 +318,22 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const r = body.lengths.headRadius;
   const female = body.inputs.sex === 'female';
   // Chosen from the design sheet: shonen for women, seinen for men.
-  const shape = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
+  const drawn = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
+  // `faceMorph`: the face follows the body (facemorph.js): the skull, hair and beard bent alike, and a map of its shading.
+  const morph = look.faceMorph ? faceMorphWeights(body) : null;
+  const shape = morph ? { ...drawn, morph } : drawn;
   const group = new THREE.Group();
   const skinMaterial = surface(skinHex, { steps: STYLE.faceSteps });
+  if (morph) {
+    skinMaterial.map = faceMap(shape);
+    skinMaterial.color.multiplyScalar(1 / FACE_MORPH.neutral);
+    skinMaterial.needsUpdate = true;
+  }
   const baseSkin = skinMaterial.color.clone();
   const hairMaterial = surface(look.hairColor);
   const ink = 0x24181a;
 
-  const skull = new SoftShell(headGeometry(r, shape), skinMaterial, body.segments.head.fleshFirmness);
+  const skull = new SoftShell(headGeometry(r, shape, morph ? 48 : 36), skinMaterial, body.segments.head.fleshFirmness);
   group.add(skull.mesh);
   skull.mesh.add(outlineFor(skull.mesh, 0.0035));
   for (const side of [1, -1]) {
@@ -314,6 +358,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     // Mirror one eye so the outer flick points outward on both.
     const mirror = new THREE.Group();
     mirror.scale.x = side > 0 ? -1 : 1;
+    // Fat cheeks narrow the eyes (a fixed squash on the group the blink does not drive).
+    if (morph) mirror.scale.y = 1 - 0.22 * morph.full;
     holder.add(mirror);
     const makeup = look.makeup ?? {};
     // Smoky shadow: a dark, soft wash round and above the eye, under the drawn eye.
@@ -378,6 +424,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   lineShape.quadraticCurveTo(0, -0.026 * r, -0.12 * r, 0);
   const lipColor = look.makeup?.lips ?? null;
   const mouthLine = flat(lineShape, lipColor ?? 0x6a2c2c, 0.001);
+  // A starved mouth is a thin, taut line.
+  if (morph) mouthLine.scale.set(1 - 0.12 * morph.gaunt + 0.08 * morph.full, 1 - 0.35 * morph.gaunt, 1);
   // Painted lips: a full, crisp mouth in the lipstick's colour while it is closed.
   if (lipColor) {
     const lips = new THREE.Shape();
