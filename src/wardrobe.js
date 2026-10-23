@@ -3,7 +3,7 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
-import { heelLift, OUTFITS, outfitOf, resolveColor } from './outfits.js';
+import { heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
@@ -62,6 +62,9 @@ export function roleColors(dress, skin) {
     tie: base(top?.tie, 0x8a1f2a),
     pattern: top?.pattern || top?.check ? base(top.pattern ?? top.check) : darker(topColor, 0.55),
     belt: new THREE.Color(bottom?.kind === 'slacks' ? 0x151515 : 0x2a1d14),
+    // A rope for a belt (rags); a torn edge, frayed, grubby and in shadow.
+    rope: new THREE.Color(0x8a7650),
+    fray: darker(topColor, 0.78).lerp(new THREE.Color(0x5a4a36), 0.2),
     under: base(bottom?.under, 0x1c1c22),
     mawashi: kitColor,
     armor: armorColor,
@@ -224,6 +227,8 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     // Split-toed socks on straw sandals; a gladiator's leather sandal.
     tabi: { width: 0.046, height: 0.045, sole: 0xc8b27a },
     sandal: { width: 0.036, height: 0.044, sole: 0x5a3a22, skin: true },
+    // A bare foot bound in strips of rag (a starving rebel's).
+    footRags: { width: 0.043, height: 0.034, skin: true },
     sabaton: { width: 0.058, height: 0.05 },
     bare: { width: 0.042, height: 0.032 },
   }[kind] ?? { width: 0.05, height: 0.045, sole: 0x17171c };
@@ -245,6 +250,17 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
       strap.rotation.z = Math.PI / 2;
       strap.position.set(-0.01, length * along, 0);
       shoe.add(strap);
+    }
+  }
+  if (kind === 'footRags') {
+    // Strips of rag wound round the foot and up over the ankle, a little askew, the toes bare.
+    const rag = surface(upperColor, { roughness: 0.95 });
+    for (const [along, tilt, thick] of [[-0.06, 0.25, 1.15], [0.04, -0.2, 1.1], [0.14, 0.3, 1.06], [0.27, -0.15, 1.03], [0.4, 0.2, 1]]) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(spec.height * thick, 0.0075, 5, 14), rag);
+      band.scale.set(spec.width / spec.height, 1, 1);
+      band.rotation.x = Math.PI / 2 + tilt;
+      band.position.set(-0.012, length * along, 0);
+      shoe.add(band);
     }
   }
   if (kind === 'jinBoot' || kind === 'ridingBoot') {
@@ -2400,6 +2416,26 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
         }
       }
       dangles.push(...drape);
+    } else if (extra.kind === 'tatters') {
+      // Strips of a shirt torn to rags (outfits.js RAGS), hanging from its ragged hem at the edges of the torn front and
+      // behind, each on the hips and swinging as he moves; their tips torn to a point.
+      const cloth = surface(new THREE.Color(dress.top?.color ?? '#b9ad8e').multiplyScalar(0.9).getHex(), { roughness: 0.95 });
+      cloth.side = THREE.DoubleSide;
+      const width = (body.lengths.hipSpan / 2 + body.segments.lThigh.muscleRadius * 0.85) * 0.92;
+      const depth = body.segments.trunk.muscleRadius * 0.62;
+      for (const strip of ragStrips(ragTear(body.inputs.outfit))) {
+        const length = (RAGS.strips.shortest + (RAGS.strips.longest - RAGS.strips.shortest) * strip.length) * scale;
+        const out = [Math.cos(strip.angle), 0, -Math.sin(strip.angle)];
+        const pivot = [out[0] * depth * 1.1, strip.u * body.lengths.trunk, out[2] * width * 1.1];
+        const tatter = new Dangle(hips, pivot, [out[0] * 0.15, -1, out[2] * 0.15], length, { sag: 0.6, damping: 0.4, collides: ['trunk', 'leg'] });
+        const across = (0.03 + 0.02 * strip.length) * scale;
+        const shape = new THREE.Shape([new THREE.Vector2(-across / 2, 0), new THREE.Vector2(across / 2, 0), new THREE.Vector2(across * 0.3, -length * 0.8), new THREE.Vector2(across * 0.05, -length), new THREE.Vector2(-across * 0.35, -length * 0.85)]);
+        const piece = new THREE.Mesh(new THREE.ShapeGeometry(shape), cloth);
+        // Its face turned out from the body.
+        piece.rotation.y = strip.angle + Math.PI / 2;
+        tatter.group.add(piece);
+        dangles.push(tatter);
+      }
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;

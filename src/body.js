@@ -544,6 +544,15 @@ export const PRESETS = {
     outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'hazel' },
   },
+  // A starving rebel with a hay fork, in rags torn open over his ribs (outfits.js `rags`). BMI 15 (43 kg at 170 cm, 4.7%
+  // fat: the calories that settle there, physiology.js caloriesForWeight): his limbs wasted, his bones thin (T-score −2.2),
+  // a third of his strength gone with the fat (aging.js starvation), little wind; next to no drill (`skill`, a levy's). Nothing
+  // here makes him weak but his body. Not dealt at random (`undealt`): the casts and battles stay as they were.
+  starved: {
+    name: 'Starved Rebel', style: 'pitchfork', sex: 'male', heightCm: 170, frame: 'medium', age: 26, exercise: 0.2, calories: 1669, skill: 0.12, undealt: true,
+    outfit: { kind: 'rags', design: 0, tear: { seed: 3, amount: 0.85, sleeve: 'l' } }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#4a3a2a', facialHair: 'beard', eyeColor: 'grey' },
+  },
   // An ashigaru spearman with his yari: Hob Miller's build, a foot soldier's drill.
   yari: {
     name: 'Gonbei', style: 'yari', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
