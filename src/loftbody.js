@@ -9,10 +9,10 @@ import { P } from './body.js';
 import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
-import { glovedFists, outfitOf } from './outfits.js';
+import { glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
-import { rulesProfile, rulesShape, rulesTraits, trunkSilhouette } from './skinrules.js';
+import { rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
 
 // The loft's own profiles (eased stop to stop), by a name of their own: the builder's `sculptProfile` is this or the rules' smooth one.
 // (Not an aliased import: the one-file bundle strips imports, so an alias would name nothing.)
@@ -41,6 +41,9 @@ export const TOPS = {
   kosode: { hem: -0.1, neck: 0.97, loose: 1.12, sleeve: 1.2, sleeveLoose: 1.42 },
   // A medieval tunic: to the waist as a shirt, then a skirt to mid-thigh (`skirt`, thigh shares), belted.
   tunic: { hem: -0.1, neck: 0.97, loose: 1.12, sleeve: 1.7, sleeveLoose: 1.26, skirt: 0.5 },
+  // A shirt worn to rags (outfits.js RAGS: where it is torn away, each man's own): lofted to below its lowest jag and down the arm
+  // past the longest sleeve, then cut; finer than other cloth (`torn`: rings `step` apart in u, `sides` round) so its edges jag.
+  rags: { hem: 0.03, neck: 0.96, loose: 1.1, sleeve: 0.9, sleeveLoose: 1.3, torn: { step: 0.018, sides: 44, sleeveSides: 24 } },
 };
 
 export const LOFT = {
@@ -139,6 +142,12 @@ export const LOFT = {
   // The skin under armour (`hideCovered`, see coverage): a stretch of a skin part inside a closed piece worn over it is left out of the mesh, all
   // but `margin` (m) inside each end of the piece (an open end, a joint the next piece meets, a gap that opens in a swing keep their skin).
   cover: { margin: 0.05 },
+  // The plain loft's painted ribs (a starved man drawn before his V7 skin is built): from a rules' `ribs` share of `from`, the trunk
+  // on rings `step` apart over `span` (u), each skin point's colour times 1 + `shade` × the rules' height (m) + `hollow` × the
+  // outline's (the sunk belly), held between `dark` and `light`. Set by eye against the V7 skin of the same man.
+  ribBand: { from: 0.25, span: [0.3, 1.02], step: 0.012, shade: 85, hollow: 12, dark: 0.6, light: 1.12 },
+  // A torn edge (rags): its points shaken up to `shift` of a step off the grid, and drawn in to `curl` of the cloth's standoff.
+  fray: { shift: 0.45, curl: 0.97 },
   // A slice of the wrap's per-point work between hand-backs (buildLoftBodySteps), points.
   slice: 400,
 };
@@ -147,20 +156,29 @@ export const LOFT = {
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
-function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null } = {}) {
+function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null, holes = null } = {}) {
   const start = mesh.positions.length / 3;
   // A part with texture coordinates (`uv`: ring, share of the way round -> [u, v]) has its first column of vertices twice, so the
   // texture does not run backwards across the last quad: the pairs are welded again for relaxing and for the normals.
   const stride = uv ? sides + 1 : sides;
+  // `holes`: cloth torn away (t, angle -> true where it is gone, asked at each quad's middle): those quads are left out, and
+  // the points round a hole are its frayed edge ('fray').
+  const gone = holes ? tornQuads(rings, sides, holes) : null;
   // A colour may be a pattern: a function of the ring (and its index), and
   // of the angle round it (0 at the front, as the depth axis points).
-  const paint = typeof color === 'function' ? color : () => color;
-  for (const [ringIndex, ring] of rings.entries()) {
+  const pattern = typeof color === 'function' ? color : () => color;
+  const paint = gone ? (ring, angle, ringIndex, step) => (frayed(gone, rings.length, sides, ringIndex, step % sides) ? 'fray' : pattern(ring, angle, ringIndex, step)) : pattern;
+  for (const [ringIndex, atRing] of rings.entries()) {
     for (let step = 0; step < stride; step += 1) {
-      const angle = (step / sides) * Math.PI * 2;
+      // A torn edge's points are shaken off the grid (up to LOFT.fray.shift of a step round and along, a little in towards the
+      // skin), so the edge runs ragged rather than in steps.
+      const edge = gone && frayed(gone, rings.length, sides, ringIndex, step % sides);
+      const shake = edge ? frayShake(ringIndex, step % sides) : null;
+      const ring = shake ? ringToward(atRing, rings[ringIndex + (shake[1] > 0 ? 1 : -1)], Math.abs(shake[1])) : atRing;
+      const angle = ((step + (shake ? shake[0] : 0)) / sides) * Math.PI * 2;
       // `shape`: the surface stood further out (or in) by angle and ring: a breastplate's ridge, its flared hem.
       // `bend`: the body's own anatomy (the sculpt style's bumps), which the cloth over it follows too.
-      const out = inflate * (shape ? shape(ring, angle) : 1) * (bend ? bend(ring, angle) : 1);
+      const out = inflate * (shape ? shape(ring, angle) : 1) * (bend ? bend(ring, angle) : 1) * (edge ? LOFT.fray.curl : 1);
       const p = vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth * out), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width * out)));
       mesh.positions.push(...p);
       // Weighted where the body's own surface is beneath it: cloth standing
@@ -179,6 +197,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   }
   for (let row = 0; row < rings.length - 1; row += 1) {
     for (let step = 0; step < sides; step += 1) {
+      if (gone?.[row * sides + step]) continue;
       const a = start + row * stride + step;
       const b = uv ? a + 1 : start + row * sides + ((step + 1) % sides);
       mesh.indices.push(a, b, a + stride, b, b + stride, a + stride);
@@ -203,13 +222,53 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   if (capStart) cap(0, false);
   if (capEnd) cap(rings.length - 1, true);
   // A closed piece worn over a skin part (its rings tagged with the part: trunkRings, upperArmRings...) covers that stretch of it,
-  // unless any of it is drawn as skin (sheer lace, an open shirt).
-  if (rings.part && !part && mesh.cover && !mesh.colors.slice(start).includes('skin')) {
+  // unless any of it is drawn as skin (sheer lace, an open shirt) or torn away (rags).
+  if (rings.part && !part && mesh.cover && !gone?.includes(1) && !mesh.colors.slice(start).includes('skin')) {
     const ts = rings.map((ring) => ring.t);
     (mesh.cover[rings.part] ??= []).push([Math.min(...ts), Math.max(...ts)]);
   }
   // `part`: the skin part this loft is (trunk, neck, lUpper...), for blending the joins between parts (`filletParts`).
   if (part) mesh.parts[part] = [start, mesh.positions.length / 3];
+}
+
+/** Which quads of a loft are torn away (`holes`, see loft): 1 for gone, row by row, `sides` to a row. */
+function tornQuads(rings, sides, holes) {
+  const gone = new Uint8Array(Math.max(0, rings.length - 1) * sides);
+  for (let row = 0; row < rings.length - 1; row += 1) {
+    const t = (rings[row].t + rings[row + 1].t) / 2;
+    for (let step = 0; step < sides; step += 1) gone[row * sides + step] = holes(t, ((step + 0.5) / sides) * Math.PI * 2) ? 1 : 0;
+  }
+  return gone;
+}
+
+/** How far a torn edge's point is shaken off its place: [steps round, share of the way to the next ring (negative: the last)]. */
+function frayShake(row, step) {
+  const hash = (salt) => {
+    const x = Math.sin(row * 127.1 + step * 311.7 + salt * 74.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  return [(hash(1) - 0.5) * 2 * LOFT.fray.shift, (hash(2) - 0.5) * 2 * LOFT.fray.shift];
+}
+
+/** A ring part of the way (`share`) towards another (or itself, at a loft's end). */
+function ringToward(ring, other, share) {
+  if (!other) return ring;
+  const mix = (a, b) => a + (b - a) * share;
+  return { ...ring, t: mix(ring.t, other.t), center: ring.center.map((value, axis) => mix(value, other.center[axis])), depth: mix(ring.depth, other.depth), width: mix(ring.width, other.width) };
+}
+
+/** Whether a loft's point (ring `row`, `step` round) is on a torn edge: some of the quads round it gone, not all. */
+function frayed(gone, rings, sides, row, step) {
+  let missing = 0;
+  let quads = 0;
+  for (const r of [row - 1, row]) {
+    if (r < 0 || r >= rings - 1) continue;
+    for (const s of [step - 1, step]) {
+      quads += 1;
+      missing += gone[r * sides + ((s + sides) % sides)];
+    }
+  }
+  return missing > 0 && missing < quads;
 }
 
 /** Rings along a straight run from a to b, oriented by a frame's forward axis. */
@@ -1435,10 +1494,15 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // In armour (a plate, a coat of lames, a quilted jack) the sculpted skin keeps the loft's plain rings: the armour is built on those and has no room for a muscle's bulge.
   const armoured = Boolean(dressed.armor);
   if (sculpted && dressed.bottom && !dressed.bottom.skirt && dressed.bottom.kind !== 'gown') coveredTrunk.push([-0.2, 0.26, 0.05]);
-  if (sculpted && dressed.top && (!dressed.top.female || female)) coveredTrunk.push([TOPS[dressed.top.kind].hem, TOPS[dressed.top.kind].neck, 0.03]);
+  // (A shirt torn to rags hides nothing: the cage shows through where it is gone, and it is gone over most of the front and sides.)
+  if (sculpted && dressed.top && (!dressed.top.female || female) && !TOPS[dressed.top.kind].torn) coveredTrunk.push([TOPS[dressed.top.kind].hem, TOPS[dressed.top.kind].neck, 0.03]);
   const trunkShape = sculpted ? trunkShapes(body, traits, coveredTrunk, armoured) : null;
   if (sculpted) yield 'trunk shapes';
   const apronRings = Math.round((-0.12 - Math.min(-0.12, hem)) * 10);
+  // The plain loft of a starved man (the placeholder while his V7 skin is built, LOFT.ribBand): his ribs, sunk belly and collarbones
+  // painted on the skin from the same rules the maps draw, so he reads as starved at once. Not in a crowd, faceted, or under armour.
+  const starvedRules = !sculpted && !lowDetail && !faceted && !armoured ? rulesTraits(body) : null;
+  const ribBand = Boolean(starvedRules && starvedRules.ribs > LOFT.ribBand.from);
   // Rings sparse over the hips and shoulders, dense where the landmarks repeat (ribs, abs, spine knobs).
   let trunkCount = count(18) + apronRings;
   if (fine) {
@@ -1448,6 +1512,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   } else if (medium) {
     trunkCount = [];
     for (let t = Math.min(-0.12, hem); t < 1.12; t += LOFT.medium.trunkStep) trunkCount.push(t);
+    trunkCount.push(1.12);
+  } else if (ribBand) {
+    // Fine over the cage, where the ribs are painted (LOFT.ribBand).
+    const band = LOFT.ribBand;
+    trunkCount = [];
+    for (let t = Math.min(-0.12, hem); t < 1.12; t += t > band.span[0] && t < band.span[1] ? band.step : 0.05) trunkCount.push(t);
     trunkCount.push(1.12);
   }
   yield 'trunk shaped';
@@ -1545,6 +1615,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
         shortsOn('kit', 1.06);
         loft(mesh, shortsRings(0.12, 0.17, 1), trunkSides, { color: 'belt', inflate: 1.075, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
         break;
+      case 'ragTrousers':
+        // Held up with a length of rope.
+        shortsOn('kit', 1.06);
+        loft(mesh, shortsRings(0.13, 0.16, 1), trunkSides, { color: 'rope', inflate: 1.085, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
+        break;
       default:
         shortsOn('kit', bottom.kind === 'tights' ? 1.03 : 1.06);
     }
@@ -1606,7 +1681,13 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     loft(mesh, skirtRings(skirtTo(topShape.skirt), count(5), 0.45), sides, { color: 'top', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
     loft(mesh, shortsRings(0.1, 0.16, 1), sides, { color: 'belt', inflate: 1.16, capStart: false, capEnd: false, bones: abdomen });
   }
-  if (topShape) {
+  // Rags: this man's tear (outfits.js RAGS), on fine rings so the torn edges jag (coarser in a crowd).
+  const tear = topShape?.torn ? ragTear(body.inputs.outfit) : null;
+  const tornFine = (from, to, step) => Array.from({ length: Math.ceil((to - from) / step) + 1 }, (_, index) => Math.min(to, from + index * step));
+  if (topShape?.torn) {
+    const torn = topShape.torn;
+    loft(mesh, trunkRings(topShape.hem, topShape.neck, tornFine(topShape.hem, topShape.neck, lowDetail ? torn.step * 2 : torn.step)), lowDetail ? Math.round(torn.sides / 2) : torn.sides, { color: 'top', inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk, holes: (u, angle) => ragTorn(tear, u, angle) });
+  } else if (topShape) {
     loft(mesh, trunkRings(topShape.hem, topShape.neck, count(Math.max(4, Math.round(14 * (topShape.neck - topShape.hem))))), trunkSides, { color: topPattern, inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
     if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), trunkSides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
   }
@@ -1717,7 +1798,9 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const root = sculpted ? [[-0.22, upperR * 0.3], [-0.14, upperR * 0.95]] : [[-0.3, upperR * 0.08]];
     const upperDepth = sculptProfile([...root, [-0.06, upperR * 1.22], [0.15, upperR * 1.2], [0.5, upperR * (1 + 0.15 * armBuild)], [0.9, upperR * 0.74], [1, upperR * 0.7]]);
     const upperWidth = sculptProfile([...root.map(([at, radius]) => [at, radius * 1.02]), [-0.06, upperR * 1.25], [0.15, upperR * 1.15], [0.5, upperR * 0.92], [1, upperR * 0.72]]);
-    const sleeveCover = topShape?.sleeve ? [[-0.4, Math.min(1.1, topShape.sleeve)]] : [];
+    // (A torn sleeve covers the arm only as far as it reaches on this side.)
+    const sleeveReach = tear ? (tear.sleeve === side || tear.sleeve === 'both' ? RAGS.sleeve.stub : RAGS.sleeve.end) : topShape?.sleeve;
+    const sleeveCover = sleeveReach ? [[-0.4, Math.min(1.1, sleeveReach)]] : [];
     const foreCover = topShape?.sleeve > 1 ? [[-0.1, topShape.sleeve - 1]] : [];
     const limbs = sculpted ? { upper: limbShapes(traits, 'arm', side, sleeveCover, armoured), fore: limbShapes(traits, 'fore', side, foreCover, armoured) } : null;
     loft(mesh, along(shoulder, elbow, armForward, skinCount(10), sculpted ? -0.22 : -0.3, 1.0, upperDepth, upperWidth), skinSides, { capStart: sculpted, ...(limbs ? { bend: ruledBend(limbs.upper, 'upper', side, sleeveCover) } : {}), ...skinUv(`${side}Upper`), part: `${side}Upper` });
@@ -1741,6 +1824,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       if (role === 'top' && top?.stripe) pattern = (ring, angle) => (Math.sin(angle) * outer > 0.85 ? 'stripe' : 'top');
       if (role === 'top' && top?.kind === 'flannel') pattern = (ring, angle, index, step) => (((index >> 1) + (step >> 1)) % 2 ? 'pattern' : 'top');
       if (role === 'top' && top?.kind === 'aloha') pattern = (ring, angle, index, step) => ((index * 3 + step * 5) % 7 === 0 ? 'pattern' : 'top');
+      // A torn sleeve: lofted fine down the arm and cut ragged where this side's ends (one torn off at the shoulder).
+      if (shape.torn) {
+        loft(mesh, upperArmRings(-0.3, shape.sleeve, tornFine(-0.3, shape.sleeve, lowDetail ? 0.08 : 0.04)), lowDetail ? sides : shape.torn.sleeveSides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false, ...(limbs && !armoured ? { bend: limbs.upper.mass } : {}), holes: (t, angle) => ragSleeveTorn(tear, side, t, angle) });
+        return;
+      }
       loft(mesh, upperArmRings(-0.3, shape.sleeve > 1 ? 1.05 : shape.sleeve, count(6)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false, ...(limbs && !armoured ? { bend: limbs.upper.mass } : {}) });
       if (shape.sleeve > 1) {
         loft(mesh, forearmRings(-0.06, shape.sleeve - 1, count(5)), sides, { color: pattern, inflate: shape.sleeveLoose, capStart: false, capEnd: false, ...(limbs && !armoured ? { bend: limbs.fore.mass } : {}) });
@@ -1786,11 +1874,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       sculptProfile([[-0.14, thighR * 1.0], [0.1, thighR * 1.1], [0.5, thighR * 0.95], [1, shankR * 0.9]]),
       sculptProfile([[0, 0], [0.5, thighR * 0.08], [1, 0]])));
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
-    const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9] }[bottom?.kind] ?? [0, 0];
+    const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9], ragTrousers: [1.04, RAGS.trousers.hem + RAGS.trousers.jag * 1.7] }[bottom?.kind] ?? [0, 0];
     const legs = sculpted ? { thigh: limbShapes(traits, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : [], armoured), shank: limbShapes(traits, 'shank', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : [], armoured) } : null;
     loft(mesh, thighRings(-0.14, 1.0, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.thigh, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : []) } : {}), ...skinUv(`${side}Thigh`), part: `${side}Thigh` });
     mesh.covers[`${side}Thigh`] = legReach[0] > 0 ? [[-0.3, legReach[0]]] : [];
-    const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1 }[bottom?.kind] ?? 1.12;
+    const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1, ragTrousers: 1.16 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
     const legPattern = (ring, angle) => {
       if (bottom?.stripe && Math.abs(Math.sin(angle)) > 0.9) return 'trim2';
@@ -1833,7 +1921,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     if (legReach[1] > 0 && !skirted && !plate) {
       // Trousers fall straight to the shoe; joggers and track pants gather.
       const gathered = bottom.kind === 'joggers' || bottom.kind === 'trackPants';
-      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : 1.22, capStart: false, capEnd: false });
+      // Breeches cut off ragged below the knee (outfits.js RAGS), on fine rings so the hem jags.
+      const ragged = bottom.kind === 'ragTrousers' ? { holes: (t, angle) => ragHemTorn(ragTear(body.inputs.outfit), side, t, angle) } : {};
+      const shinCount = ragged.holes && !lowDetail ? Array.from({ length: Math.round((legReach[1] + 0.14) / 0.02) + 1 }, (_, index) => -0.14 + index * 0.02) : count(8);
+      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, shinCount, -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), ragged.holes && !lowDetail ? 28 : sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : 1.22, capStart: false, capEnd: false, ...ragged });
       if (gathered) loft(mesh, shinRings(legReach[1] - 0.08, legReach[1], 1), sides, { color: 'trim2', inflate: 1.15, capStart: false, capEnd: false });
     }
     if (lamellar) {
@@ -1952,6 +2043,19 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       indexArray = Uint32Array.from(kept, (vertex) => used[vertex]);
     }
   }
+  // The painted ribs (LOFT.ribBand): each trunk skin point darkened in the rules' grooves and hollows, lit on their ridges.
+  let tint = null;
+  if (ribBand) {
+    const band = LOFT.ribBand;
+    tint = new Float32Array(positionArray.length).fill(1);
+    const [from, to] = mesh.parts.trunk;
+    for (let vertex = from; vertex < to; vertex += 1) {
+      const t = mesh.ringT[vertex];
+      const angle = mesh.ringA[vertex];
+      const shade = band.shade * trunkRule(starvedRules, t, angle).h + band.hollow * trunkSilhouette(starvedRules, t, angle);
+      tint.fill(Math.min(band.light, Math.max(band.dark, 1 + shade)), vertex * 3, vertex * 3 + 3);
+    }
+  }
   // `rigid`: vertices carried by the chest bone alone (a breastplate and what is under it): no flesh to dent.
   const rigid = bones.map((list) => list === chestOnly);
   yield 'skin weights';
@@ -1959,7 +2063,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return {
     positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames: frames, bindPoints: points,
-    ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}),
+    ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}), ...(tint ? { tint } : {}),
   };
 }
 

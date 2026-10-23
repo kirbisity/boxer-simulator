@@ -94,6 +94,16 @@ export const LEVEL_PRESETS = {
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#8a6a3a', facialHair: 'none', eyeColor: 'blue' },
   },
 
+  // A starving rebel with his hay fork, for the levels to come (no stage places him yet): body.js's Starved Rebel (BMI 15, a
+  // levy's drill, his rags torn open over the ribs). Tier 1, the levy's; he needs no rule of his own to run: a man that weak
+  // is outmatched by nearly anyone (ai.js confidence), and fear and his wounds break him (ai.js `panic`) as they do a levy.
+  // A stage that wants a crowd of them deals each from cast.js `starvedRebel` and sets it as the spawn's `inputs`.
+  starvedRebel: {
+    name: 'Starved rebel', style: 'pitchfork', sex: 'male', heightCm: 170, frame: 'medium', age: 26, exercise: 0.2, calories: 1669, skill: 0.12,
+    outfit: { kind: 'rags', design: 0, tear: { seed: 3, amount: 0.85, sleeve: 'l' } }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#4a3a2a', facialHair: 'beard', eyeColor: 'grey' },
+  },
+
   // ---- The team: two Forger comrades who start beside the operative -------------------------------------------------
   // Resistance fighters of the same cell, weaker than the operative in every way that counts: a short sword each, plain clothes
   // and no armour at all (not the Forgers' quilted gambeson either: outfits.js `forger` turns a good part of an edge, so it is

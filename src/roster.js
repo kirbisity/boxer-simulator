@@ -100,6 +100,7 @@ export const WARRIORS = [
   warrior('legionary', 'Gaius Valerius Crispus', PRESETS.legionary),
   warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
   warrior('peasant', 'Hob Miller', PRESETS.spear),
+  warrior('starved', 'Starved Rebel', PRESETS.starved),
   warrior('pistol', 'Sgt. Dana Cole', PRESETS.handgun),
   warrior('ladyAshford', 'Lady Ashford', PRESETS.revolver),
   warrior('lordAshford', 'Lord Ashford', PRESETS.rapier),

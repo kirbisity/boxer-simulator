@@ -1503,6 +1503,20 @@ export const OUTFITS = {
       { label: 'Tunic and hose', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#6a4a30', skirt: true }, feet: { kind: 'bare' } },
     ],
   },
+  // A starving rebel's rags: a linen shirt worn to tatters, torn open over the ribs at the front and under the arms, one
+  // sleeve gone (how, each man's own: `outfit.tear`, see RAGS), strips of it hanging; breeches cut off below the knee and
+  // held up with a rope; bare feet or feet wrapped in rags. No traits: cloth turns nothing.
+  rags: {
+    faction: 'knights',
+    label: 'Rags', movement: 'good', fists: 'bare',
+    headgear: ['headWrap'],
+    // Washed out and dirty: undyed and faded linen over earth-brown or grey breeches.
+    palette: [['undyed', 'brown'], ['linen', 'brown'], ['sand', 'brown'], ['undyed', 'slate'], ['linen', 'olive']],
+    designs: [
+      { label: 'Torn shirt, bare feet', top: { kind: 'rags', color: '#b9ad8e' }, bottom: { kind: 'ragTrousers', color: '#5a4a36' }, feet: { kind: 'bare' }, extras: [{ kind: 'tatters' }] },
+      { label: 'Torn shirt, wrapped feet', top: { kind: 'rags', color: '#b9ad8e' }, bottom: { kind: 'ragTrousers', color: '#5a4a36' }, feet: { kind: 'footRags', color: '#8a7f66' }, extras: [{ kind: 'tatters' }] },
+    ],
+  },
   // Beasts and machines. A silverback: nothing worn; his black fur is his
   // skin's colour, the grey saddle over his back and hips, the ape's head.
   // A gorilla's hide is thick, but it turns nothing an armour would.
@@ -1824,4 +1838,112 @@ export function glovedFists(inputs) {
 export function resolveColor(value, cornerHex) {
   if (value === 'corner') return cornerHex;
   return value;
+}
+
+// ---- Rags: where a torn shirt is gone (the `rags` kit) ------------------------------------------------
+
+/**
+ * Where the rags are torn away, in the loft's own coordinates (loftbody.js): u up the trunk (0 the hips, 1 the base of the
+ * neck), t along a limb (0 its root, 1 its far joint), the angle round it 0 at the front. Each man's tear is his own
+ * (`outfit.tear`): `seed` (where the edges jag and the rips wander), `amount` (0..1, how much of the front is gone) and `sleeve`
+ * (the side whose sleeve is torn off: 'l', 'r', 'both' or 'none'). The ribs show where the shirt is gone: the skin there is
+ * drawn bare (nothing counts it covered), the V7 skin's ribs and all.
+ */
+export const RAGS = {
+  // The hem (u) and how far it jags up and down.
+  hem: 0.12, hemJag: 0.05,
+  // The front torn away over the belly and the cage, from the hem up to `top` (u; lower towards its sides by `topFall`):
+  // `width` rad either side of a middle that wanders `wander` rad, `widen` more per unit of u below the top, times the man's
+  // `amount`; its edges jagged by `jag` rad.
+  front: { top: 0.83, topFall: 0.12, width: 0.78, widen: 0.5, wander: 0.16, jag: 0.2 },
+  // Under each arm a hole over the side of the cage: centred `at` rad off the front, `half` rad and `span` (u) across, jagged by `jag` of its size.
+  side: { at: 1.85, half: 0.4, span: [0.4, 0.68], jag: 0.3 },
+  // Holes worn through the back: how many at most, and their size (rad, u).
+  back: { count: 2, half: 0.26, tall: 0.08 },
+  // Sleeves: the one torn off leaves a stub to `stub` of the upper arm; the other ends ragged at `end` (± `jag`).
+  sleeve: { stub: 0.12, end: 0.7, jag: 0.12 },
+  // The breeches cut off down the shin (a share of it), ± `jag`.
+  trousers: { hem: 0.4, jag: 0.08 },
+  // Strips of the shirt left hanging from the torn edges: length (m, for a 1.8 m man) at most and at least.
+  strips: { longest: 0.24, shortest: 0.1 },
+  // A man's tear when none is given.
+  plain: { seed: 1, amount: 0.8, sleeve: 'l' },
+};
+
+/** A seeded share 0..1 of a number (the same seed, salt and index give the same share). */
+const ragHash = (seed, salt, index = 0) => {
+  const x = Math.sin(seed * 12.9898 + salt * 78.233 + index * 37.719) * 43758.5453;
+  return x - Math.floor(x);
+};
+/** A ragged wave round a circle (periodic in 2π), about −1..1: sines of whole frequencies `from`..`to` in seeded phases. */
+function ragWave(x, seed, salt, from = 2, to = 7) {
+  let sum = 0;
+  let norm = 0;
+  for (let k = from; k <= to; k += 1) {
+    sum += Math.sin(k * x + ragHash(seed, salt, k) * Math.PI * 2) / k;
+    norm += 1 / k;
+  }
+  return (sum / norm) * 1.6;
+}
+
+/** A man's tear, completed. */
+export const ragTear = (outfit) => ({ ...RAGS.plain, ...outfit?.tear });
+
+/** Whether the shirt is torn away at (u, angle) on the trunk. */
+export function ragTorn(tear, u, angle) {
+  const { seed, amount } = tear;
+  const a = Math.atan2(Math.sin(angle), Math.cos(angle));
+  if (u < RAGS.hem + RAGS.hemJag * ragWave(angle * 3, seed, 1, 2, 9)) return true;
+  // The front: open from the hem up over the belly and the cage, its top rounded.
+  const f = RAGS.front;
+  const middle = f.wander * ragWave(u * 5, seed, 2, 1, 4);
+  const half = amount * (f.width + f.widen * Math.max(0, f.top - u)) + f.jag * ragWave(u * 16, seed, 3, 2, 8);
+  const off = Math.abs(a - middle);
+  if (off < half && u < f.top - f.topFall * (off / Math.max(0.1, half)) ** 2 + 0.03 * ragWave(a * 4, seed, 4)) return true;
+  // Under the arms.
+  const s = RAGS.side;
+  for (const sign of [1, -1]) {
+    const across = (a * sign - s.at) / (s.half * (0.6 + 0.4 * amount));
+    const up = (u - (s.span[0] + s.span[1]) / 2) / ((s.span[1] - s.span[0]) / 2);
+    if (across * across + up * up < 1 + s.jag * ragWave(Math.atan2(up, across), seed, sign > 0 ? 5 : 6, 2, 7)) return true;
+  }
+  // Worn through at the back: the more torn the man's shirt, the more holes.
+  const b = RAGS.back;
+  for (let hole = 0; hole < Math.round(b.count * amount); hole += 1) {
+    const at = Math.PI + (ragHash(seed, 9, hole) - 0.5) * 1.6;
+    const high = 0.3 + ragHash(seed, 10, hole) * 0.45;
+    const across = Math.atan2(Math.sin(angle - at), Math.cos(angle - at)) / b.half;
+    const up = (u - high) / b.tall;
+    if (across * across + up * up < 1 + 0.4 * ragWave(Math.atan2(up, across), seed, 11 + hole, 2, 6)) return true;
+  }
+  return false;
+}
+
+/** Whether a sleeve (side 'l' or 'r') is torn away at (t, angle) down the upper arm. */
+export function ragSleeveTorn(tear, side, t, angle) {
+  const gone = tear.sleeve === side || tear.sleeve === 'both';
+  const end = gone ? RAGS.sleeve.stub : RAGS.sleeve.end;
+  return t > end + RAGS.sleeve.jag * ragWave(angle, tear.seed, side === 'l' ? 7 : 8, 2, 8);
+}
+
+/** Whether the breeches are torn away at (t, angle) down the shin. */
+export function ragHemTorn(tear, side, t, angle) {
+  return t > RAGS.trousers.hem + RAGS.trousers.jag * ragWave(angle, tear.seed, side === 'l' ? 12 : 13, 2, 8);
+}
+
+/**
+ * The strips of the shirt left hanging, each { u, angle, length (share of `strips.longest`) }: from the hem at the torn
+ * front's edges, and behind; how many by how torn the shirt is.
+ */
+export function ragStrips(tear) {
+  const { seed, amount } = tear;
+  const f = RAGS.front;
+  const half = amount * (f.width + f.widen * (f.top - RAGS.hem));
+  const strips = [
+    { u: RAGS.hem + 0.02, angle: half + 0.05, length: 0.55 + 0.45 * ragHash(seed, 20) },
+    { u: RAGS.hem + 0.02, angle: -half - 0.05, length: 0.45 + 0.5 * ragHash(seed, 21) },
+    { u: RAGS.hem + 0.01, angle: Math.PI + (ragHash(seed, 22) - 0.5) * 1.2, length: 0.4 + 0.5 * ragHash(seed, 23) },
+  ];
+  if (amount > 0.6) strips.push({ u: RAGS.hem + 0.01, angle: (ragHash(seed, 24) < 0.5 ? 1 : -1) * (2.3 + ragHash(seed, 25) * 0.5), length: 0.4 + 0.4 * ragHash(seed, 26) });
+  return strips;
 }

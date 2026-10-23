@@ -103,9 +103,12 @@ export function redress(inputs, random = Math.random, { anyKind = false } = {}) 
   return { ...inputs, outfit: { ...inputs.outfit, kind, design: randomDesign(kind, random) }, accessories: kind === current ? inputs.accessories : (accessories.length ? accessories : defaultHeadgear(kind)) };
 }
 
+// The characters dealt at random: all but those kept for their own places (`undealt`: the starved rebel).
+const DEALT = Object.values(PRESETS).filter((preset) => !preset.undealt);
+
 /** Anyone at all: one of the characters, made a little different. */
 export function randomCharacter(random = Math.random) {
-  return varyCharacter(pickOne(Object.values(PRESETS), random), random);
+  return varyCharacter(pickOne(DEALT, random), random);
 }
 
 /** A fighter's own weight (kg), without his kit. */
@@ -161,6 +164,64 @@ export function rebel(random = Math.random) {
     accessories: random() < 0.6 ? ['headWrap'] : [],
     simple: true,
   });
+}
+
+// The starved rebels: a peasant's name and byname; their builds (BMI, and how hard they still work: `exercise`), the share of
+// them with rag-wrapped feet (design 1) or a head wrap, and which sleeve is gone ('both' and 'none' the rarer).
+const STARVED = {
+  first: ['Wat', 'Hob', 'Jack', 'Tom', 'Will', 'Hal', 'Ned', 'Dick', 'Piers', 'Roger', 'Simkin', 'Gib', 'Jankin', 'Hodge', 'Col', 'Adam'],
+  by: ['Thatcher', 'Reaper', 'Ploughman', 'Shepherd', 'Hayward', 'Gleaner', 'Carter', 'Thresher', 'Ditcher', 'Lean', 'Crust', 'Hollow'],
+  bmi: [14, 15.5],
+  exercise: [0.1, 0.3],
+  height: [160, 175],
+  age: [18, 60],
+  skill: [0.05, 0.2],
+  wrappedFeet: 0.4,
+  headWrap: 0.25,
+  sleeve: ['l', 'r', 'l', 'r', 'both', 'none'],
+  tear: [0.6, 1],
+  skinTone: ['light', 'light', 'lightTan', 'medium'],
+  hairColor: ['#120d0a', '#2a1a10', '#4a3a2a', '#6b4a2a', '#8a6a3a'],
+  greyHair: ['#8d8d8d', '#a8a49c'],
+  hair: ['midLong', 'midLong', 'long', 'cleanShort'],
+  facialHair: ['beard', 'beard', 'stubble', 'longBeard', 'mustache'],
+};
+
+/**
+ * A starving rebel (built on the Starved Rebel, PRESETS.starved): anyone from a lad of eighteen to a greybeard of sixty,
+ * 160–175 cm, starved to a BMI of 14–15.5 (fed the calories that settle there), with next to no drill; in his own rags: the
+ * shirt's faded colour, how much of it is torn away and which sleeve is gone, bare or rag-wrapped feet; long unkempt hair
+ * (grey with the years, or gone), a beard or a few days' growth.
+ */
+export function starvedRebel(random = Math.random) {
+  const base = normaliseInputs(structuredClone(PRESETS.starved));
+  const span = ([low, high]) => low + random() * (high - low);
+  const age = Math.round(span(STARVED.age));
+  const heightCm = Math.round(span(STARVED.height));
+  const bmi = span(STARVED.bmi);
+  const grey = random() < (age - 40) / 25;
+  const man = normaliseInputs({
+    ...base,
+    name: `${pickOne(STARVED.first, random)} ${pickOne(STARVED.by, random)}`,
+    age, heightCm,
+    exercise: Math.round(span(STARVED.exercise) * 100) / 100,
+    skill: Math.round(span(STARVED.skill) * 100) / 100,
+    outfit: {
+      kind: 'rags', design: random() < STARVED.wrappedFeet ? 1 : 0, colors: randomColors('rags', random),
+      tear: { seed: Math.floor(random() * 1000), amount: Math.round(span(STARVED.tear) * 100) / 100, sleeve: pickOne(STARVED.sleeve, random) },
+    },
+    accessories: random() < STARVED.headWrap ? ['headWrap'] : [],
+    look: {
+      ...base.look,
+      skinTone: pickOne(STARVED.skinTone, random),
+      hairColor: pickOne(grey ? STARVED.greyHair : STARVED.hairColor, random),
+      hairStyle: age > 40 && random() < 0.25 ? 'bald' : pickOne(STARVED.hair, random),
+      facialHair: pickOne(STARVED.facialHair, random),
+      eyeColor: pickOne(CAST.looks.eyeColor, random),
+    },
+  });
+  man.calories = Math.round(caloriesForWeight(man, bmi * (heightCm / 100) ** 2, (FRAMES[man.frame] ?? FRAMES.medium).lean));
+  return man;
 }
 
 /** A SWAT officer: armed with a pistol or a baton, in the full kit. */
