@@ -1857,9 +1857,9 @@ export const RAGS = {
   // `amount`; its edges jagged by `jag` rad.
   front: { top: 0.83, topFall: 0.12, width: 0.78, widen: 0.5, wander: 0.16, jag: 0.2 },
   // Under each arm a hole over the side of the cage: centred `at` rad off the front, `half` rad and `span` (u) across, jagged by `jag` of its size.
-  side: { at: 1.85, half: 0.4, span: [0.4, 0.68], jag: 0.3 },
-  // Holes worn through the back: how many at most, and their size (rad, u).
-  back: { count: 2, half: 0.26, tall: 0.08 },
+  side: { at: 1.9, half: 0.55, span: [0.38, 0.7], jag: 0.15 },
+  // A hole worn through the back (at most `count`), its size (rad, u).
+  back: { count: 1, half: 0.3, tall: 0.1 },
   // Sleeves: the one torn off leaves a stub to `stub` of the upper arm; the other ends ragged at `end` (± `jag`).
   sleeve: { stub: 0.12, end: 0.7, jag: 0.12 },
   // The breeches cut off down the shin (a share of it), ± `jag`.

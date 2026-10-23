@@ -62,9 +62,8 @@ export function roleColors(dress, skin) {
     tie: base(top?.tie, 0x8a1f2a),
     pattern: top?.pattern || top?.check ? base(top.pattern ?? top.check) : darker(topColor, 0.55),
     belt: new THREE.Color(bottom?.kind === 'slacks' ? 0x151515 : 0x2a1d14),
-    // A rope for a belt (rags); a torn edge, frayed, grubby and in shadow.
+    // A rope for a belt (rags).
     rope: new THREE.Color(0x8a7650),
-    fray: darker(topColor, 0.78).lerp(new THREE.Color(0x5a4a36), 0.2),
     under: base(bottom?.under, 0x1c1c22),
     mawashi: kitColor,
     armor: armorColor,
@@ -253,12 +252,12 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     }
   }
   if (kind === 'footRags') {
-    // Strips of rag wound round the foot and up over the ankle, a little askew, the toes bare.
+    // A strip of rag wound round the middle of the foot and one round the ankle: two open, eight-sided bands, the toes bare.
     const rag = surface(upperColor, { roughness: 0.95 });
-    for (const [along, tilt, thick] of [[-0.06, 0.25, 1.15], [0.04, -0.2, 1.1], [0.14, 0.3, 1.06], [0.27, -0.15, 1.03], [0.4, 0.2, 1]]) {
-      const band = new THREE.Mesh(new THREE.TorusGeometry(spec.height * thick, 0.0075, 5, 14), rag);
+    rag.side = THREE.DoubleSide;
+    for (const [along, wide] of [[0.3, 0.32], [-0.02, 0.18]]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(spec.height * 1.08, spec.height * 1.12, length * wide, 8, 1, true), rag);
       band.scale.set(spec.width / spec.height, 1, 1);
-      band.rotation.x = Math.PI / 2 + tilt;
       band.position.set(-0.012, length * along, 0);
       shoe.add(band);
     }
