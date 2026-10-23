@@ -45,15 +45,35 @@ function yard(body = 'forger', at = [0, 0], yaw = 0) {
   return { world, me, orders, step };
 }
 
+/**
+ * An open flat field (the stage machinery, nothing else in it) with the player in the middle: room to run circles at whatever
+ * pace his body runs (physics/gait.js: a fit man sprints at 7-8 m/s, and the yard's open flat is too small a circle for it).
+ */
+function openField(body = 'forger') {
+  const world = createStageWorld(field(), levelPreset(body), { seed: 3 });
+  const me = world.fighters[0];
+  const orders = newOrders();
+  const step = (seconds, each = null) => {
+    for (let frame = 0; frame < Math.round(seconds * 60); frame += 1) {
+      advance(world, 1 / 60, (current, dt) => {
+        stageThink(current, dt);
+        directFighter(current, me, orders, dt);
+      });
+      each?.();
+    }
+  };
+  return { world, me, orders, step };
+}
+
 // ---- 1. Stamina -------------------------------------------------------------------------------------------------
 
 test('stamina: running costs at least five times less than it did, and a run across a courtyard never winds him', () => {
   assert.ok(CONTROL.run.staminaPerSecond <= 0.12 / 5, `the gross cost ${CONTROL.run.staminaPerSecond} a second (it was 0.12)`);
   for (const body of ['forger', 'dunnottarKnight']) {
-    const game = yard(body, [0, 2]);
+    const game = openField(body);
     let winded = false;
     let heading = 0;
-    // Round a circle of 5 m radius on the open flat, 20 s.
+    // Round and round on the open flat (a circle of 5-9 m radius at his pace), 20 s.
     game.step(20, () => {
       heading += (0.85 / 60);
       game.orders.keyStick = { dir: [Math.cos(heading), Math.sin(heading)], amount: 1 };
@@ -66,7 +86,7 @@ test('stamina: running costs at least five times less than it did, and a run acr
 });
 
 test('stamina: a drain that matters over minutes: a man in plate who sprints for two minutes is winded, and recovers in seconds', () => {
-  const game = yard('dunnottarKnight', [0, 2]);
+  const game = openField('dunnottarKnight');
   let heading = 0;
   let windedAt = null;
   game.step(150, () => {

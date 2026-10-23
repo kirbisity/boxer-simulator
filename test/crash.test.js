@@ -75,14 +75,17 @@ test('a crash to the head shakes the brain and a crash to the chest breaks ribs:
   assert.ok(!head.victim.injuries.some((injury) => injury.kind === 'rib'));
 });
 
-test('a man running into a man standing is a crash too: both are hurt, the standing man the more, and the charge that drives him over hurts more than a run into him', () => {
+test('a man running into a man standing is a crash too: both are hurt, the standing man the more, and the faster into him the harder', () => {
   const run = crashOnce('heavy', 'amateur', 'run', 700);
   assert.ok(run.onTarget && run.onCharger, 'both took it');
   assert.ok(run.onTarget.energy > 0 && run.onTarget.force > 0);
   assert.ok(run.targetTrauma > run.chargerTrauma, `${run.targetTrauma.toFixed(2)} v ${run.chargerTrauma.toFixed(2)}`);
+  // (The bout's rush starts a step or two from his man; the run has seven metres to gather its pace (physics/gait.js): whichever
+  // closes the faster lands the harder.)
   const rush = crashOnce('heavy', 'amateur', 'rush', 700);
-  const walk = run;
-  assert.ok(rush.onTarget.impulse > walk.onTarget.impulse, 'the faster the harder: a charge lands at more than a run');
+  const [faster, slower] = rush.onTarget.speed > run.onTarget.speed ? [rush, run] : [run, rush];
+  assert.ok(faster.onTarget.speed > slower.onTarget.speed + 0.5, `${run.onTarget.speed.toFixed(1)} m/s run, ${rush.onTarget.speed.toFixed(1)} m/s rush`);
+  assert.ok(faster.onTarget.impulse > slower.onTarget.impulse, 'the faster the harder');
 });
 
 test('a horse into a man is the same crash: his trunk takes the horse\'s speed over his own mass, ribs break, a plate harness takes its share', () => {

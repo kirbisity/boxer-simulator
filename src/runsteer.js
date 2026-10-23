@@ -1,7 +1,8 @@
 // The player's run, steered along walls: when he runs (run mode) in a world with terrain, a few feelers
 // (physics/terrain.js feelers) read the way ahead, and the heading he is given is bent along the wall that
 // stands in his way at a glancing angle, round the corner of a wall's end, and with the curve of a winding
-// stair's outer wall, so that a run beside geometry glides rather than hits and sticks. It is the player's
+// stair's outer wall, so that a run beside geometry glides rather than hits and sticks; and round a man standing in
+// his way (a comrade, a sleeper: at a sprint, 6-8 m/s, a man run into is a crash that hurts). It is the player's
 // intent only (control.js steer): the physics, and every man the AI plays, are untouched. No DOM, no THREE.
 
 import { WORLD } from './physics/config.js';
@@ -38,6 +39,16 @@ export const RUN_STEER = {
   stairRise: 0.09,
   stairFull: 0.7,
   stairFrom: 1.15,
+  // A man on his feet (not the runner) ahead within the feelers' distance (`lookAhead` s of his speed, at least `wallWithin`) and
+  // within `manClear` m of the line he runs bends the heading away from him (to the side he already stands off it), by up to
+  // `manGain` rad, more the nearer the line and the nearer the man.
+  // One within `manBlock` m of the line he cannot be passed at a sprint: the run is held to `passSpeed` m/s, or what would reach him in
+  // `passSeconds` (state.speedCap), so that he goes by with a brush, not a crash.
+  manClear: 0.8,
+  manGain: 0.9,
+  manBlock: 0.55,
+  passSpeed: 3.5,
+  passSeconds: 0.6,
   // The bend may not exceed this (rad), and follows what is wanted at `rate` per second (so it eases in and out, and does not flicker).
   maxBend: 1.35,
   rate: 14,
@@ -87,6 +98,30 @@ export function wantedBend(felt, way, spec = RUN_STEER, within = spec.wallWithin
   return { bend: Math.max(-spec.maxBend, Math.min(spec.maxBend, bend)), engaged, glide, front: centre.free };
 }
 
+/**
+ * The bend (rad) that takes a heading `way` round the men on their feet in it, within `within` m ahead of `from` ([x, z]):
+ * away from each (to the side of the line he already stands off it), more the nearer the line and the nearer he is; and how far
+ * ahead the nearest man right on the line is (`blocked`, m; Infinity if none). { bend, blocked }.
+ */
+export function menBend(world, fighter, from, way, within, spec = RUN_STEER) {
+  let bend = 0;
+  let blocked = Infinity;
+  for (const other of world.fighters ?? []) {
+    if (other === fighter || other.dormant || other.mount || (other.state !== 'up' && other.state !== 'rising')) continue;
+    const dx = other.root[0] - from[0];
+    const dz = other.root[1] - from[1];
+    const along = dx * way[0] + dz * way[1];
+    if (along <= 0 || along > within) continue;
+    const across = -dx * way[1] + dz * way[0];
+    if (Math.abs(across) >= spec.manClear) continue;
+    if (Math.abs(across) < spec.manBlock) blocked = Math.min(blocked, along);
+    // (Positive bend turns from +x toward +z, to the left of the way; a man to the left is passed on the right.)
+    const side = across >= 0 ? -1 : 1;
+    bend += side * spec.manGain * (1 - Math.abs(across) / spec.manClear) * (1 - along / (within + 0.5));
+  }
+  return { bend, blocked };
+}
+
 /** The uphill way of the floor under him, a unit [x, z], and how steep (rise per m); null on the flat, or where a ledge's face is. */
 export function stairLine(terrain, fighter, spec = RUN_STEER) {
   const world = WORLD.terrain;
@@ -114,7 +149,8 @@ export function stairBend(line, way, spec = RUN_STEER) {
 
 /**
  * Steer a run: `way` is the floor way [x, z] (unit) the player's stick asks for; the heading he is to be given is
- * returned, bent along a wall in the way. `state` ({ bend }) is kept between steps (`orders.runSteer`): `bend` the smoothed bend.
+ * returned, bent along a wall in the way. `state` ({ bend }) is kept between steps (`orders.runSteer`): `bend` the smoothed bend;
+ * `speedCap` (m/s, or null) the most his run may go now, with a man in his way (control.js holds the pace to it).
  * `drops(dir)` says whether a heading would take him off an edge (control.js dropsAhead): such a bend is not made. A world with no
  * terrain, or a man in the air, is not steered.
  */
@@ -122,6 +158,7 @@ export function runSteer(world, fighter, state, way, dt, { drops = () => false, 
   const terrain = world.arena?.terrain;
   if (!terrain || fighter.air || !fighter.root) {
     state.bend = 0;
+    state.speedCap = null;
     return way;
   }
   // On a stair, first along its line; then the walls are felt from there.
@@ -132,7 +169,10 @@ export function runSteer(world, fighter, state, way, dt, { drops = () => false, 
   const within = Math.max(spec.wallWithin, speed * spec.lookAhead);
   const felt = feelers(terrain, fighter.root, ahead, fighter.lift ?? 0, fan, { reach: Math.max(spec.reach, within + 0.3) });
   const { bend: wallBend } = wantedBend(felt, ahead, spec, within);
-  const wanted = Math.max(-spec.maxBend, Math.min(spec.maxBend, along + wallBend));
+  const men = menBend(world, fighter, fighter.root, ahead, within, spec);
+  // A man right in his way: no faster than he can go by him with a brush.
+  state.speedCap = Number.isFinite(men.blocked) ? Math.max(spec.passSpeed, men.blocked / spec.passSeconds) : null;
+  const wanted = Math.max(-spec.maxBend, Math.min(spec.maxBend, along + wallBend + men.bend));
   state.bend += (wanted - state.bend) * (1 - Math.exp(-spec.rate * dt));
   const bent = rotateWay(way, state.bend);
   if (Math.abs(state.bend) < 1e-3) {

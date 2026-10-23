@@ -376,11 +376,41 @@ export const WORLD = {
   // floor. Standing up off the knee his hands press on it until the hips
   // are `braceFrom` of the way up, and come off by `braceTo` (or, past the
   // stand's time, once the hips have stalled `braceStall` s).
+  //
+  // Strength against weight, stage by stage (rising.js riseForces, riseMargins, stagePace): an arm pushes with `pushShare` of
+  // its forearm and upper arm's muscle force, a leg with its hip extensors (half the pelvis's), quadriceps (the knee's) and
+  // calf (half the foot's), a knee on the floor with `kneeShare` of its leg; each as sound and fresh as it is (physics.js
+  // limbShares: nothing through a broken limb, the legs tiring `legFatigue` as much as the arms). Each lifting stage asks
+  // a share of his weight with all he wears (`asks`): on his hands, both arms with `legsInPush` of the legs (drawing the
+  // knees in); the foot through, the arms and `rearShare` of the lead leg; the kneel and the stand, the lead leg and
+  // `rearShare` of the rear (on its knee, then pushing off its toes). A foot bears him while its ankle is within `toes` m
+  // of where it stands (the heel lifts as the leg drives, the toes still down). Where the stand's margin is under `braceBelow` he presses his hands
+  // on his knee (`braceShare` of both arms helps the kneel and the stand), slower by `braceSlow`; else the hands come off
+  // the floor and he stands with the trunk at `kneelLeanFree`. A stage's time is its own (`seconds`, a fit man's) at a
+  // margin of `pace.easy` and over, 1 + k (easy - m) / (m - low) times it nearer, `slowest` at most, over his gear's
+  // footwork share (OUTFITS movement: a man in plate folds and unfolds more slowly). Straining tires
+  // him: stamina `effort` a second over the square root of his aerobic fitness and the margin squared. He comes up on the stronger leg.
+  // The roll (`roll`): lying further than `choiceFrom` rad from face down he may roll either way; each way costs its
+  // turn (in half turns), `badArm` for rolling onto an arm as weak as broken, `weapon` onto the hand with the weapon, less
+  // `limbs` for each share of his height his limbs lie to that side (their weight takes him over). With one arm to push
+  // on, its hand goes `oneArmIn` of the way in under his chest.
+  // Beaten (not held), he rests before the next try (`rest`): `seconds` × (1 + `perTry` per failed try) over his aerobic
+  // fitness, `most` s at most; after `crawlAfter` tries he gives it up: crawling if he got onto his hands and knees
+  // (and from his knees he tries again every `most` s, once the stand's margin is `retryMargin`), else lying, out of the
+  // fight until he gets up. Up, he is unsteady for a moment (`wobble`, rising.js standWobble): a sway of the trunk (rad)
+  // and hips at `hz`, `size` × (least + the sum of strain (the stand's margin under `easyMargin`), tired, dazed, fat
+  // (body fat over 18%, × 3) and old (stiff joints) at their weights), for `seconds` × the same.
   rise: {
     restSpeed: 0.3, restSeconds: 0.3, waitMost: 1.5, strengthFrom: 0.4,
-    seconds: { gather: 0.3, roll: 0.5, push: 0.5, step: 0.35, kneel: 0.4, stand: 0.55 },
-    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, gain: 0.01, strainMost: 6, easyMargin: 1.7, slowest: 2.5,
-    kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03, pushShare: 0.6, brace: 0.06, braceFrom: 0.6, braceTo: 0.9, braceStall: 0.3,
+    seconds: { gather: 0.25, roll: 0.45, push: 0.35, step: 0.3, kneel: 0.3, stand: 0.45 },
+    rollFrom: 0.6, reached: 0.75, stood: 0.97, patience: 1.2, gain: 0.01, strainMost: 6, slowest: 7,
+    asks: { push: 0.35, step: 0.5, kneel: 0.6, stand: 0.75 }, legsInPush: 0.15, rearShare: 0.6, kneeShare: 0.6, legFatigue: 0.5,
+    braceBelow: 1.3, braceShare: 0.5, braceSlow: 1.4, kneelLeanFree: 0.2,
+    pace: { easy: 1.5, low: 0.6, k: 1.5 }, effort: 0.025,
+    roll: { choiceFrom: 2.2, badArm: 0.6, weapon: 0.3, limbs: 4 }, oneArmIn: 0.35,
+    rest: { seconds: 1.2, perTry: 0.6, most: 6, crawlAfter: 3 }, retryMargin: 1.05,
+    wobble: { seconds: 0.9, size: 0.05, least: 0.3, hz: [1.1, 1.7], easyMargin: 1.5, strain: 1, tired: 0.6, dazed: 1.2, fat: 0.6, old: 0.8 },
+    kneesBack: 0.1, kneelLean: 0.35, legReach: 0.95, contact: 0.03, toes: 0.06, pushShare: 0.6, brace: 0.06, braceFrom: 0.6, braceTo: 0.9, braceStall: 0.3,
     // A man little hurt (bodyHarm 0) rises sooner and stronger: the count's
     // wait is `freshDown` of a spent man's, he starts the rise with
     // `freshStrength` more of his strength, and each stage takes `freshPace`
@@ -396,7 +426,7 @@ export const WORLD = {
   // legs hold the whole body behind the trunk. legDamageCost: balance lost
   // to a fully damaged pair of legs.
   balance: { speed: 2.1, reach: 0.8, fallSeconds: 1.4, absorbPerSecond: 5, massShare: 0.7, strikeMassShare: 1, legDamageCost: 0.3 },
-  // Charging: top speed as a multiple of footwork speed.
+  // Charging (the rush of a bout, a step or two from his man: not a run, WORLD.gait): top speed as a multiple of footwork speed.
   rush: { speedFactor: 2.6 },
   // Bodies meeting (a man's trunk or head against another's, a horse's barrel,
   // neck or head against a man or another horse): two effective masses at a
@@ -485,18 +515,20 @@ export const WORLD = {
   //   hangs at `shield`, an empty hand at `free`. These are the middle of the swing: with the elbows ~90 degrees (80-108 as it goes).
   // - recovery: the share of the usual stamina recovery (WORLD.staminaRecovery) he gets while running, so that the cost of running
   //   (CONTROL.run.staminaPerSecond) is a drain over minutes rather than being cancelled by his recovery.
-  // - turn: the pose in a sprint turn (`fighter.turn` is the heading's rate in rad/s, smoothed over `smooth` s; all of it scales with the run
+  // - turn: the pose in a sprint turn (`fighter.turn` is the heading's rate in rad/s (of his path, the way his speed points, faster
+  //   than `pathFrom` m/s: it lags his facing; of his facing slower), smoothed over `smooth` s; all of it scales with the run
   //   pose, and a straight run has none). `bank`: the trunk rolls into the turn by this many rad for each rad/s × m/s of it, up to `bankMax`
   //   (a sprinter at 4.4 m/s turning at 2 rad/s banks ~0.3 rad); `lead`: the shoulders lead the turn by this many rad per rad/s (up to
   //   `leadMax`) while the hips lag it by `hipLag` per rad/s (up to `hipLagMax`), so the trunk winds into the turn and the hips follow the
-  //   feet; `full`: the rate (rad/s) at which the footwork below is at its full. The feet: each lands at least `gap` (share of height)
+  //   feet; `full`: the rate (rad/s) at which the footwork below is at its full. The feet: each lands at least `gap` (share of height, times the square root of the turn's share)
   //   to its own side of the line of travel (a turn must not cross them); the foot on the inside lands `inner` shorter and `wide`
   //   wider, the outside one `outer` longer (shares of height), in step with the turn's share. (`gap`, `inner` and `wide` were 0.035, 0.07 and
-  //   0.03: with the long stride of the flat the inside foot crossed the other in a sharp turn, and wants more room.)
+  //   0.03: with the long stride of the flat the inside foot crossed the other in a sharp turn, and wants more room. `gap` was then 0.07,
+  //   0.08 since the run follows the body: a fit man sprints at 8 m/s and leans further.)
   runMode: {
     speedFactor: 4,
     recovery: 0.25,
-    turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.07, inner: 0.09, wide: 0.08, outer: 0.03 },
+    turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.08, inner: 0.09, wide: 0.08, outer: 0.03, pathFrom: 1.5 },
     stance: { blade: 0, crouch: 0, width: 0.55, lean: 0.03, guardHeight: 0, stagger: 0 },
     lean: 0.25, dip: 0.02, bob: 0.045, ease: 6,
     arms: { span: 0.5, free: 0.17, shield: 0.09, weapon: 0.09, lift: 0.02, tilt: 0.25 },
@@ -504,6 +536,37 @@ export const WORLD = {
     settle: 0.95,
     stairs: { slope: 0.15, step: { seconds: 0.15, overlap: 0.55, lead: 1.4, threshold: 0.2, lift: 0.12 } },
     carry: { longFrom: 1.15, hand: [0.08, 0.46, 0.14], dir: [-0.3, -1, 0.05], longHand: [0.1, 0.62, 0.17], longDir: [0.45, 1, 0.1], shield: [0.07, 0.46, 0.15], free: [0.1, 0.46, 0.12], reach: -0.2 },
+  },
+  // Running, for every fighter that runs (physics/gait.js; the pose, carry, turn and stairs are WORLD.runMode's, the look of
+  // the player's sprint, now everyone's run). Speeds in m/s, accelerations as shares of g, lengths as shares of leg length.
+  // - forceRef, speedRef: the power of a fit young man (one leg's push over his weight, its muscle's top shortening speed
+  //   at the foot, m/s): power 1. top: his sprint at power 1 (8.5 m/s: an athletic man; an average one ~6.5, an obese
+  //   one ~4, a man in field plate ~4 flat out, his run ~2.5-3). runShare: a run that is not a sprint (an AI man's),
+  //   base + aerobic × his aerobic fitness, between least and most of his top (a jog of ~3.4 m/s for an average man).
+  //   legFloor: a run on legs worn to nothing (limbShares 0) still goes at this share.
+  // - accel, brake: the stance gathers speed at accel × g × power × his kit's share (less as he nears his top speed, to
+  //   `least` of it: ~0.75 s to 63% of it, ~1.7 s to 90%) and brakes at brake × g × the same. runFrom: faster than this
+  //   (m/s) the feet take a run's strides, not the guard's quick steps. arrive: a man running to a place goes no faster
+  //   than he can stop there braking at this share of his brake (he slows as he comes, rather than circling it).
+  // - The stride (real runners: ~2.8 steps a second at a 3 m/s jog, ~3.6 at 6.5, ~4.1 at 8.5; contact ~0.28 s at a jog,
+  //   ~0.1 s at a sprint): rate + ratePerSpeed × speed steps a second; a foot on the floor while the hips pass over
+  //   contact × leg length (no longer than mostContact of a step), longer for a man short of power (his power, no less
+  //   than leastPower, to the powerContact); the swing is the rest of two steps. The foot lands land + landPerSpeed ×
+  //   speed (× leg length) ahead of the stance and rises lift + liftPerSpeed × speed, less by tiredLift when spent.
+  //   slowest: the stride is never laid out for less than this speed. threshold: as WORLD.step's. heelUp: the swing's
+  //   height follows sin(pi t^heelUp) of its share t: the foot leaves the floor rising (the heel kicked up towards the
+  //   seat), highest a third of the way through, not trailing low behind him.
+  // - The lean (rad): lean + leanPerSpeed × speed, accelLean of his acceleration's angle to gravity (smoothed over
+  //   accelSmooth s: forward gathering speed, back braking), tiredLean more when spent; within leanMost.
+  // - limp: a leg weaker than the other by a share shortens its time bearing him by seconds × that share, and the step
+  //   by length × it.
+  gait: {
+    forceRef: 0.96, speedRef: 33, top: 8.5, runShare: { base: 0.35, aerobic: 0.3, least: 0.4, most: 0.68 }, legFloor: 0.25,
+    accel: 1.15, brake: 0.75, least: 0.12, runFrom: 2.2, arrive: 0.6,
+    rate: 2.2, ratePerSpeed: 0.22, contact: 0.95, mostContact: 0.9, leastPower: 0.35, powerContact: 0.5, slowest: 2.5,
+    land: 0.35, landPerSpeed: 0.02, lift: 0.14, liftPerSpeed: 0.05, tiredLift: 0.35, threshold: 0.2, heelUp: 0.6,
+    lean: 0.06, leanPerSpeed: 0.02, accelLean: 0.6, accelSmooth: 0.15, tiredLean: 0.15, leanMost: [-0.3, 0.75],
+    limp: { seconds: 0.5, length: 0.4 },
   },
   // Walking about (the player's walk mode): upright and square, feet under
   // the hips, no guard; the arms swing with the stride, more the faster he goes.
