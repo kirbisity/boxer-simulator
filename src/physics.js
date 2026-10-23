@@ -173,6 +173,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).
     // gaitCarry: running, or carried on from a run until braked to his footwork's pace.
     runMode: undefined, runPose: undefined, runSlope: undefined, turn: undefined, yawWas: undefined, gaitBody: undefined, gaitAlong: undefined, gaitAccel: undefined, gaitCarry: undefined,
+    // limbCache: limbShares worked out this step.
+    limbCache: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
@@ -2564,9 +2566,12 @@ function trackAir(fighter, time) {
 
 // The fighters stepping this substep, refilled each substep (not reallocated).
 const moving = [];
+// Counts outer steps (any world's): what a fighter's per-step caches are stamped with (limbShares).
+let stepStamp = 0;
 
 /** Advance the world by `dt` seconds (one outer step, several substeps). */
 export function step(world, dt) {
+  stepStamp += 1;
   measureNearestFoes(world);
   world.steps = (world.steps ?? 0) + 1;
   for (const fighter of world.fighters) {
@@ -3493,11 +3498,18 @@ function handHealth(fighter, side) {
  * the damage it has taken, and tired by `WORLD.rise.legFatigue` of what tires the arms (the legs hold out better).
  */
 export function limbShares(fighter) {
+  // (Asked several times a step by the run and the rise: worked out once a step, and again if his stamina, legs or limp limbs change.)
+  const cache = fighter.limbCache;
+  if (cache && cache.stamp === stepStamp && cache.stamina === fighter.stamina && cache.left === fighter.legDamage.l && cache.right === fighter.legDamage.r && cache.limp === fighter.limp.size) return cache.shares;
   const fatigue = fatigueScale(fighter.stamina);
   const legFatigue = 1 - WORLD.rise.legFatigue * (1 - fatigue);
-  const arm = (side) => (fighter.limp.has(P[`${side}Hand`]) ? 0 : fatigue * handHealth(fighter, side));
-  const leg = (side) => (fighter.limp.has(P[`${side}Foot`]) ? 0 : legFatigue * (1 - 0.6 * Math.min(1, fighter.legDamage[side] / legCapacity())));
-  return { arm: { l: arm('l'), r: arm('r') }, leg: { l: leg('l'), r: leg('r') } };
+  const capacity = legCapacity();
+  const shares = {
+    arm: { l: fighter.limp.has(P.lHand) ? 0 : fatigue * handHealth(fighter, 'l'), r: fighter.limp.has(P.rHand) ? 0 : fatigue * handHealth(fighter, 'r') },
+    leg: { l: fighter.limp.has(P.lFoot) ? 0 : legFatigue * (1 - 0.6 * Math.min(1, fighter.legDamage.l / capacity)), r: fighter.limp.has(P.rFoot) ? 0 : legFatigue * (1 - 0.6 * Math.min(1, fighter.legDamage.r / capacity)) },
+  };
+  fighter.limbCache = { stamp: stepStamp, stamina: fighter.stamina, left: fighter.legDamage.l, right: fighter.legDamage.r, limp: fighter.limp.size, shares };
+  return shares;
 }
 
 function solveConstraints(fighter, h, reposition = false) {
