@@ -1674,16 +1674,16 @@ function detailedView(view, fighter, simple) {
     collar.add(banner);
   }
 
-  // Bone layer: the anatomical skeleton, moved rigidly with the rig.
-  const skeleton = simple ? BONES.map(() => new THREE.Group()) : buildSkeleton(body, built.bindFrames);
-  for (const piece of skeleton) layers.bone.add(piece);
+  // Bone layer: the anatomical skeleton, moved rigidly with the rig. The skin view draws none (the body carries its own bony
+  // landmarks), so the pieces are built when the bone or muscle view is first shown (ensureSkeleton): until then, empty groups.
+  const skeleton = BONES.map(() => new THREE.Group());
 
   const physicsLayer = buildPhysicsLayer(fighter, layers);
   if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
   const fighterView = {
-    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
-    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh, steelOutline: skin.steelOutline,
+    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells,
+    baseColors, vertexSegment, damageVersion: -1, headProps, dangles, steelMesh, steelOutline: skin.steelOutline,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
   };
   if (later) queueSkin(fighterView, wanted);
@@ -2084,7 +2084,6 @@ function bakeCrowdTemplate(view, fighter) {
     frames,
     headRadius: fighter.body.lengths.headRadius,
     lacquer: full.lacquer,
-    shod: full.shod,
     vertices: own + added,
   };
   template.far = farTemplate(template);
@@ -2228,8 +2227,8 @@ function crowdView(view, fighter, template) {
   for (const holder of [group, ...Object.values(layers)]) holder.matrixAutoUpdate = false;
   view.scene.add(group);
   return {
-    fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], shod: template.shod, near, far,
-    baseColors: template.colors, vertexSegment: template.vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles: [], steelMesh,
+    fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], near, far,
+    baseColors: template.colors, vertexSegment: template.vertexSegment, damageVersion: -1, headProps, dangles: [], steelMesh,
     head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner,
   };
 }
@@ -2405,23 +2404,35 @@ function ensureCrowdLayers(fighterView) {
   Object.assign(fighterView, buildPhysicsLayer(fighterView.fighter, fighterView.layers));
 }
 
+/**
+ * The anatomical skeleton, built the first time the bone or muscle view shows it (the skin view draws none): its pieces fill the
+ * empty group of each rig bone, posed where the rig is now, a severed part's bones left hidden and a broken joint's red.
+ */
+function ensureSkeleton(fighterView) {
+  if (fighterView.skeletonBuilt || fighterView.baked) return;
+  fighterView.skeletonBuilt = true;
+  buildSkeleton(fighterView.fighter.body, fighterView.built.bindFrames, fighterView.skeleton);
+  fighterView.skeleton.forEach((piece, index) => {
+    piece.matrix.fromArray(frameMatrix(fighterView.frames[index]));
+    piece.matrixWorldNeedsUpdate = true;
+    fighterView.layers.bone.add(piece);
+  });
+  for (const bone of fighterView.severedBones ?? []) fighterView.skeleton[bone].visible = false;
+  reddenBrokenBones(fighterView);
+}
+
 /** Which layers show: skin; muscle (with bone); bone over a ghost; physics over a ghost. */
 export function setLayer(fighterView, layer) {
   fighterView.layer = layer;
   if (fighterView.baked && layer !== 'skin') ensureCrowdLayers(fighterView);
   if (layer === 'muscle') ensureMuscle(fighterView);
+  if (layer === 'muscle' || layer === 'bone') ensureSkeleton(fighterView);
   const { layers, skinMesh, skinOutline, head, attachments } = fighterView;
   const ghost = layer === 'physics' ? 0.25 : layer === 'bone' ? 0.12 : 1;
   layers.skin.visible = layer !== 'muscle';
   layers.muscle.visible = layer === 'muscle';
-  // In the skin view the skeleton stays, painted as skin: hidden inside a
-  // normal body, it shows through where a wasted one is thinner than its bones.
-  // A machine has no skin over its skeleton: drawn in shells, the bones stay hidden.
-  layers.bone.visible = layer !== 'physics' && !(fighterView.machine && layer === 'skin');
+  layers.bone.visible = layer === 'muscle' || layer === 'bone';
   layers.physics.visible = layer === 'physics';
-  paintSkeleton(fighterView, layer === 'skin');
-  // A shod foot's bones stay hidden in the skin view: a heeled boot lifts off them.
-  for (const side of ['l', 'r']) fighterView.skeleton[BONE[`${side}Foot`]].visible = layer !== 'skin' || !fighterView.shod;
   // Ghosting: the body goes see-through and drops its ink; the head and kit hide.
   for (const mesh of [skinMesh, fighterView.steelMesh].filter(Boolean)) {
     mesh.material.transparent = ghost < 1;
@@ -2477,8 +2488,8 @@ export function updateFighterView(fighterView, dt, time) {
   frames.forEach((frame, index) => {
     const matrix = frameMatrix(frame);
     fighterView.bones[index].matrixWorld.fromArray(matrix);
-    // A crowd man's bone pieces are in the scene only once his bone layer is built.
-    if (fighterView.baked && !fighterView.particles) return;
+    // The bone pieces are in the scene only once the bone layer is built (a crowd man's with his other layers).
+    if (fighterView.baked ? !fighterView.particles : !fighterView.skeletonBuilt) return;
     fighterView.skeleton[index].matrix.fromArray(matrix);
     fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
   });
@@ -2679,69 +2690,18 @@ function paintDamage(fighterView) {
     });
     colors.needsUpdate = true;
   }
-  for (const joint of fighter.broken) {
+  if (fighterView.skeletonBuilt) reddenBrokenBones(fighterView);
+}
+
+/** A broken joint's bones are red in the skeleton (once it is built: ensureSkeleton). */
+function reddenBrokenBones(fighterView) {
+  for (const joint of fighterView.fighter.broken) {
     for (const bone of JOINT_BONES[joint]) {
       fighterView.skeleton[BONE[bone]].traverse((object) => {
         if (object.isMesh && !object.userData.outline) object.material = fighterView.brokenBone ?? (fighterView.brokenBone = surface(0xe01b1b));
       });
     }
   }
-}
-
-const SKIN_BONE_INSET = 0.87;
-
-/**
- * The bones clothes cover, so none shows through them in the skin view: in
- * the ring, the pelvis under the shorts (and the chest under a sports top);
- * in street clothes, the trunk under a top, the legs under trousers, the
- * arms under long sleeves.
- */
-function coveredBones(body) {
-  // Bones under anything worn do not show through it in the skin view; on a
-  // wasted body in shorts the knees below still should, so bare-legged
-  // fighters keep their thighs visible when BMI is low.
-  const dress = dressFor(body.inputs, 0);
-  // A hoplomachus fights bare-chested: his armour is an arm and two greaves.
-  const covering = dress.armor && !['hoplomachus', 'murmillo', 'secutor', 'retiarius', 'thraex'].includes(dress.armor.kind) ? dress.armor : null;
-  const names = [];
-  if (dress.bottom) names.push('pelvis');
-  if (dress.top || covering) names.push('pelvis', 'spine', 'chest', 'lClavicle', 'rClavicle');
-  if (TOPS[dress.top?.kind]?.sleeve > 0 || covering) names.push('lUpperArm', 'rUpperArm');
-  if (TOPS[dress.top?.kind]?.sleeve > 1 || covering) names.push('lForearm', 'rForearm');
-  const longLegs = ['tights', 'trackPants', 'pants', 'slacks', 'jeans', 'cargo', 'joggers'].includes(dress.bottom?.kind) || covering;
-  if (longLegs || body.composition.bmi >= 16) names.push('lThigh', 'rThigh');
-  if (longLegs) names.push('lShin', 'rShin');
-  return new Set(names.map((name) => BONE[name]));
-}
-
-/** Bones wear skin in the skin view and their own colour elsewhere; broken ones stay red. */
-function paintSkeleton(fighterView, asSkin) {
-  const broken = new Set([...fighterView.fighter.broken].flatMap((joint) => JOINT_BONES[joint].map((bone) => BONE[bone])));
-  const covered = coveredBones(fighterView.fighter.body);
-  fighterView.skeleton.forEach((piece, index) => {
-    // Under clothes, no bone shows in the skin view, however thin the man.
-    piece.visible = !(asSkin && covered.has(index));
-    // Drawn as skin, the bones sit a little in from where the anatomy layer
-    // draws them, towards each bone's axis: under the flesh of a normal body,
-    // through it only where the flesh has wasted away.
-    for (const part of piece.children) {
-      part.userData.bind ??= { x: part.position.x, z: part.position.z, scale: part.scale.clone() };
-      const inset = asSkin ? SKIN_BONE_INSET : 1;
-      part.position.x = part.userData.bind.x * inset;
-      part.position.z = part.userData.bind.z * inset;
-      part.scale.set(part.userData.bind.scale.x * inset, part.userData.bind.scale.y, part.userData.bind.scale.z * inset);
-    }
-    piece.traverse((object) => {
-      if (!object.isMesh) return;
-      if (object.userData.outline) {
-        object.visible = !asSkin;
-        return;
-      }
-      object.userData.boneMaterial ??= object.material;
-      if (broken.has(index)) object.material = fighterView.brokenBone ?? (fighterView.brokenBone = surface(0xe01b1b));
-      else object.material = asSkin ? fighterView.skinBone : object.userData.boneMaterial;
-    });
-  });
 }
 
 /**

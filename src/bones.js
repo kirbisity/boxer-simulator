@@ -2,6 +2,10 @@
 // in that bone's own frame (x forward, y along the bone, z = x × y), sized
 // from the body's bone mass and lengths. Each group is moved rigidly with
 // its bone, so the skeleton is posed by the same rig that skins the body.
+// Only the bone and muscle views show it, and render.js builds it the first
+// time one of them is shown (ensureSkeleton): the skin view draws none, for
+// the body itself carries its bony landmarks (V7: ribs, spine, collarbones,
+// hip crests, drawn from its own muscle and fat).
 
 /* global THREE */
 import { vec } from './pose.js';
@@ -54,14 +58,14 @@ function vertebrae(group, count, from, to, size, material) {
 
 /**
  * Build the skeleton: one Group per rig bone, filled with that bone's anatomy.
+ * `groups`: the groups to fill, one per bone (a fighter's own, made empty with him); new ones if none.
  * @returns {THREE.Group[]} indexed like BONES
  */
-export function buildSkeleton(body, bindFrames) {
+export function buildSkeleton(body, bindFrames, groups = BONES.map(() => new THREE.Group())) {
   const material = surface(BONE_COLOR, { roughness: 0.75 });
   const length = (bone) => vec.length(vec.sub(bindFrames[bone].end, bindFrames[bone].origin));
   const scale = Math.max(0.8, Math.min(1.3, body.boneDensity)) * (body.heightM / 1.8);
   const L = body.lengths;
-  const groups = BONES.map(() => new THREE.Group());
 
   // Pelvis: iliac wings, sacrum, the pubic arch, hip sockets.
   const pelvis = groups[BONE.pelvis];
