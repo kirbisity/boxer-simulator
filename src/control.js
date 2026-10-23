@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
-import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
+import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
@@ -785,6 +785,8 @@ export function playerCrawl(world, fighter, on) {
     return startCrawl(world, fighter, 'goes down on his knees');
   }
   if (!fighter.crawling || legBroken(fighter)) return false;
+  // On his knees because he could not stand (physics/rising.js): he tries, from his knees, if his legs will bear him now.
+  if (fighter.crawlWeak) return retryFromKnees(world, fighter);
   fighter.crawling = false;
   fighter.crawlChosen = false;
   world.events.push({ time: world.time, kind: 'stand', fighter: fighter.id, effects: ['back on his feet'] });

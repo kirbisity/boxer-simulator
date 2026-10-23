@@ -141,3 +141,30 @@ test('running: a tired man and a hurt leg run slower; the same run twice is the 
   assert.equal(limping.fell, false, 'he hobbles, he does not fall');
   assert.deepEqual(runTrial(GAIT_BUILDS.average, { seconds: 6 }), fresh, 'deterministic');
 });
+
+test('getting up from a crawl he was put on his knees by: he tries from his knees when his legs will bear him (the player asking, or by himself later)', async () => {
+  const { playerCrawl } = await import('../src/control.js');
+  const { startCrawl } = await import('../src/physics.js');
+  const world = createWorld([GAIT_BUILDS.average, PRESETS.light], { seed: 4 });
+  const man = world.fighters[0];
+  placeFighter(world.fighters[1], 6);
+  advance(world, 0.5);
+  startCrawl(world, man, 'cannot get up: crawls');
+  man.crawlWeak = true;
+  advance(world, 1);
+  // Legs worn to nothing and spent: not yet.
+  man.legDamage.l = man.legDamage.r = 1e6;
+  man.stamina = 0;
+  assert.equal(playerCrawl(world, man, false), false, 'his legs will not bear him');
+  assert.equal(man.crawling, true);
+  // Sound again: he comes up off his knees, a foot through and up, and stands.
+  man.legDamage.l = man.legDamage.r = 0;
+  man.stamina = 1;
+  assert.equal(playerCrawl(world, man, false), true);
+  assert.equal(man.state, 'rising');
+  assert.equal(man.rise.stage, 'step');
+  for (let second = 0; second < 8 && man.state !== 'up'; second += 0.5) advance(world, 0.5);
+  assert.equal(man.state, 'up');
+  assert.equal(man.crawling, false);
+  assert.ok(man.x.every(Number.isFinite));
+});

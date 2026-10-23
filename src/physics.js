@@ -3327,19 +3327,22 @@ function failedRise(world, fighter, pushed) {
 /**
  * Crawling because he could not stand: if his legs (as strong as he is now) could stand him, with his hands on his knee if
  * need be, he tries, from his knees: a foot brought through, then up. If not, he crawls on and tries again later.
+ * Returns whether he tries (the player asking to stand from such a crawl: control.js playerCrawl).
  */
-function retryFromKnees(world, fighter) {
+export function retryFromKnees(world, fighter) {
   fighter.crawlRetryAt = world.time + WORLD.rise.rest.most;
-  if (legBroken(fighter) || fighter.netted || fighter.mount) return;
+  if (legBroken(fighter) || fighter.netted || fighter.mount || fighter.state !== 'up' || !fighter.crawling) return false;
   const recovering = fighter.hurt > 0 && fighter.hurtFor ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
-  if (riseMargins(fighter, recovering).stand < WORLD.rise.retryMargin) return;
+  if (riseMargins(fighter, recovering).stand < WORLD.rise.retryMargin) return false;
   fighter.crawling = false;
   fighter.crawlWeak = false;
+  fighter.crawlChosen = false;
   fighter.state = 'rising';
   fighter.move = 0;
   fighter.strafe = 0;
   beginRise(fighter, { fromKnees: true });
   fighter.triedRise = true;
+  return true;
 }
 
 /** Share of a muscle's force available `elapsed` seconds after its part was hit. */
