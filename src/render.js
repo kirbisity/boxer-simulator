@@ -10,8 +10,9 @@ import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
-import { BODY_STYLE_KEYS, buildSkinMesh, skinTexturesNow, styleSpec } from './bodystyles.js';
-import { applySkinTextures } from './skintex.js';
+import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
+import { bodyCheck } from './skinworker.js';
+import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
 import { SKIN_TONES } from './skintones.js';
 import { buildSkeleton } from './bones.js';
@@ -394,6 +395,19 @@ function shaderWarmers() {
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
   const severed = new THREE.Mesh(geometry, surface(0xffffff, { vertexColors: true, roughness: 0.55 }));
+  // A V7 skin (skinned, with its four maps; a Lambert look's made a standard one) and its ink: swapped in a few seconds into a fight
+  // (pumpSkinBuilds), so its program is compiled before, not on that frame.
+  const skinnedGeometry = geometry.clone();
+  skinnedGeometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(12), 4));
+  skinnedGeometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4));
+  skinnedGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(6), 2));
+  skinnedGeometry.setAttribute('uv2', new THREE.Float32BufferAttribute(new Float32Array(6), 2));
+  const warmMaps = { width: 1, height: 1, neutral: 0.88, albedo: new Uint8Array([224, 224, 224, 255]), normal: new Uint8Array([128, 128, 255, 255]), ao: new Uint8Array([255]), rough: new Uint8Array([160]) };
+  const skinV7 = new THREE.SkinnedMesh(skinnedGeometry, applySkinTextures(surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }), warmMaps, { upgrade: true }));
+  skinV7.bind(new THREE.Skeleton(BONES.map(() => new THREE.Bone())), new THREE.Matrix4());
+  // ...and on the low tier, without its normal and roughness maps (skinForTier).
+  const skinV7Low = new THREE.SkinnedMesh(skinnedGeometry, applySkinTextures(surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 }), { ...warmMaps, normal: null, rough: null }, { upgrade: true }));
+  skinV7Low.bind(skinV7.skeleton, new THREE.Matrix4());
   // Blood: instanced drops and sparks, and the stains on the floor; an arrow's double-sided vanes.
   const drops = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ color: 0x8a0d12 }), 1);
   const stains = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ color: 0x5a0a0d, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -2 }), 1);
@@ -402,7 +416,7 @@ function shaderWarmers() {
   // A retiarius's net: cord drawn as lines.
   const cord = new THREE.LineSegments(geometry, netCord());
   for (const instanced of [drops, stains]) instanced.setMatrixAt(0, new THREE.Matrix4());
-  group.add(severed, outlineFor(severed), drops, stains, vane, tracer, cord);
+  group.add(severed, outlineFor(severed), skinV7, outlineFor(skinV7), skinV7Low, drops, stains, vane, tracer, cord);
   group.traverse((object) => {
     object.frustumCulled = false;
     object.userData.shared = true;
@@ -1462,6 +1476,10 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
   // The detail style's fine anatomy: the skin's bump and occlusion maps (skindetail.js).
   // A textured style's maps (skintex.js), as far as the look's material takes them (`built.skinMaps`: { textures, upgrade }).
   const dressedSkin = material ? skin : built.skinMaps ? applySkinTextures(skin, built.skinMaps.textures, { upgrade: built.skinMaps.upgrade }) : built.detail ? detailMaterial(skin, built.detail) : skin;
+  if (!material && built.skinMaps) {
+    dressedSkin.userData.fullMaps = { normalMap: dressedSkin.normalMap, roughnessMap: dressedSkin.roughnessMap, roughness: dressedSkin.roughness };
+    skinForTier(dressedSkin);
+  }
   const mesh = new THREE.SkinnedMesh(geometry, dressedSkin);
   mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
   mesh.castShadow = true;
@@ -1469,9 +1487,9 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
   return mesh;
 }
 
-/** Ways to build the skin: see bodystyles.js. */
+/** Ways to build the skin: see bodystyles.js. V7 (a loft wrapped onto the flesh field, with maps) is the default; 'lofted' the old one. */
 export const BODY_STYLES = BODY_STYLE_KEYS;
-export let BODY_STYLE = 'lofted';
+export let BODY_STYLE = DEFAULT_BODY_STYLE;
 export function setBodyStyle(style) {
   BODY_STYLE = style;
 }
@@ -1518,49 +1536,41 @@ function detailedView(view, fighter, simple) {
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  const bodyStyle = simple ? 'lofted' : look.bodyStyle ?? BODY_STYLE;
-  const built = simple ? buildLoftBody(body, { lowDetail: true }) : buildSkinMesh(body, bodyStyle);
-  // The skin's maps, made when the fighter is built (cached per composition bucket, so a second fighter like him costs nothing).
-  const maps = simple ? null : skinTexturesNow(body, bodyStyle, built);
-  if (maps) built.skinMaps = { textures: maps, upgrade: Boolean(styleSpec(bodyStyle).tex.upgrade) };
-  const baseColors = paintBody(built, body, look, corner);
-  // Steel is drawn apart, as metal; everything else is the toon body.
-  const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];
+  // The style wanted (V7 by default). A dear one not built yet for a body like his is built in slices over the next frames
+  // (pumpSkinBuilds) while he is drawn in the plain loft; then his skin is swapped for it (swapSkin).
+  const wanted = simple ? 'lofted' : look.bodyStyle ?? BODY_STYLE;
+  const ready = simple ? null : readySkin(body, wanted);
+  const later = !simple && !ready && SKIN_BUILD.slicedStyles.includes(wanted) && !SKIN_BUILD.now;
+  const bodyStyle = later ? 'lofted' : wanted;
+  const built = simple ? buildLoftBody(body, { lowDetail: true }) : ready ?? skinNow(body, bodyStyle);
   const dressLook = dressFor(body.inputs, corner);
   // A machine (`armor.robot`) is drawn in rigid shells over its bones, not a skin: the body mesh is left empty.
   const machine = Boolean(dressLook.armor?.robot);
   // A rigid build (`build.rigid`) has no flesh to jiggle under a blow.
   const rigid = Boolean(body.inputs.build?.rigid);
-  const triangles = machine ? 0 : built.indices.length / 3;
-  const bodyIndices = [];
-  const steelIndices = [];
-  for (let triangle = 0; triangle < triangles; triangle += 1) {
-    const target = steelTriangle(triangle) ? steelIndices : bodyIndices;
-    target.push(built.indices[triangle * 3], built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
-  }
-  const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
   // Lacquered lamellar is glossy paint over steel: its colour shows, not only reflections.
   const lacquer = dressLook.armor?.kind === 'lamellar' || dressLook.armor?.kind === 'okegawa' ? { metalness: 0.45, roughness: 0.3 } : {};
-  const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
-  let steelMesh = null;
-  if (steelIndices.length) {
-    steelMesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(steelIndices), material: steel, share: skinMesh.geometry });
-    layers.skin.add(steelMesh, outlineFor(steelMesh));
-  }
-  // Which body segment each skin vertex belongs to, by its strongest bone.
-  const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
-  const skinOutline = outlineFor(skinMesh);
+  const skin = skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, soft: !simple && !rigid });
+  const { skinMesh, skinOutline, steelMesh, baseColors, vertexSegment } = skin;
+  if (steelMesh) layers.skin.add(steelMesh, skin.steelOutline);
   layers.skin.add(skinMesh, skinOutline);
-  const shells = simple || rigid ? [] : [{ key: 'body', shell: new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) }];
+  const shells = simple || rigid ? [] : [{ key: 'body', shell: skin.shell }];
 
   const dress = leaderDress(dressFor(body.inputs, corner), fighter);
   // A design may set the hair (a sumo's topknot).
   // A face may be its own colour (Guan Yu's, the red of a ripe jujube).
   const faceColor = look.faceColor ? new THREE.Color(look.faceColor).getHex() : skinColor;
   // A round-two body style's face follows the body (facemorph.js).
-  const faceLook = { ...(dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look), faceMorph: Boolean(styleSpec(bodyStyle).face) };
+  // (Under a closed helm the face is never seen: not morphed, not drawn.)
+  const faceHidden = !simple && CLOSED_HELMS.includes(dress.head?.kind);
+  const faceLook = { ...(dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look), faceMorph: Boolean(styleSpec(wanted).face) && !faceHidden };
   const headView = buildHead(body, faceLook, faceColor, corner);
   headView.group.matrixAutoUpdate = false;
+  if (faceHidden) {
+    headView.group.traverse((object) => {
+      if (object.isMesh) object.visible = false;
+    });
+  }
   layers.skin.add(headView.group);
   if (!rigid) shells.push({ key: 'head', shell: headView.shell });
 
@@ -1671,11 +1681,318 @@ function detailedView(view, fighter, simple) {
   const physicsLayer = buildPhysicsLayer(fighter, layers);
   if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
-  return {
+  const fighterView = {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, attachments, shells, shod: dress.feet.kind !== 'bare',
-    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh,
-    ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine,
+    baseColors, vertexSegment, damageVersion: -1, skinBone: surface(skinColor, { roughness: 0.6 }), headProps, dangles, steelMesh, steelOutline: skin.steelOutline,
+    ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
   };
+  if (later) queueSkin(fighterView, wanted);
+  return fighterView;
+}
+
+// ---- The skin, built in slices -------------------------------------------------------------------
+
+/**
+ * How a dear body style is brought in (the default V7: a loft wrapped onto the flesh field, ~0.15-0.3 s, and its maps, ~0.5-1 s a
+ * composition bucket): a fighter whose skin is not ready is drawn at once in the plain loft and queued; each frame `pumpSkinBuilds`
+ * works a few milliseconds (`sliceMs`) on the nearest queued body, and when his mesh and maps are done his skin is swapped for it in
+ * one frame. A body built once is kept (bodystyles.js cachedSkinMesh): the same man again (a restart, a mirror bout, another of a
+ * cast) is ready at once. `farDistance`: built on this thread (no worker), a man farther than this from the camera waits until he comes
+ * nearer (no frame time for the unseen); the workers take every body, the nearest first.
+ * `now`: build at once instead (tools, design sheets, tests). `workers`: how many skin workers (skinworker.js) build them where they can be
+ * had, so the page's thread only swaps the finished skin in (0: none, all on this thread).
+ */
+export const SKIN_BUILD = { slicedStyles: ['v7'], sliceMs: 5, farDistance: 30, now: false, workers: 2 };
+/**
+ * A textured skin by the picture's quality tier (levelmode/quality.js: a stage's, 'high' anywhere else): on `low` it keeps its colour
+ * and occlusion maps and drops the normal and roughness maps (a cheaper pixel, the anatomy still painted); both programs are compiled
+ * beforehand (shaderWarmers), so a change of tier is not a stall.
+ */
+const skinQuality = { tier: 'high' };
+export function setSkinQuality(fighterViews, tier) {
+  if (skinQuality.tier === tier) return;
+  skinQuality.tier = tier;
+  for (const fighterView of fighterViews) if (fighterView.skinMesh) skinForTier(fighterView.skinMesh.material);
+}
+function skinForTier(material) {
+  const full = material.userData.fullMaps;
+  if (!full) return;
+  const low = skinQuality.tier === 'low';
+  const normalMap = low ? null : full.normalMap;
+  const roughnessMap = low ? null : full.roughnessMap;
+  if (material.normalMap === normalMap && material.roughnessMap === roughnessMap) return;
+  Object.assign(material, { normalMap, roughnessMap, roughness: low && full.roughnessMap ? SKIN_LOW_ROUGHNESS : full.roughness, needsUpdate: true });
+}
+const SKIN_LOW_ROUGHNESS = 0.62;
+// The helmets that close over the whole face (wardrobe.js): the head under them is not drawn.
+const CLOSED_HELMS = ['greatHelm', 'stechhelm', 'bascinet'];
+
+/** A body's skin in a style if it is built and its maps are made: a fighter's own copy (his dents move its points), else null. */
+function readySkin(body, style) {
+  const cached = cachedSkinMesh(body, style);
+  if (!cached || !readySkinTextures(body, style, cached)) return null;
+  return { ...cached, positions: cached.positions.slice() };
+}
+
+/** A body's skin in a style, built now (and its maps), kept for the next like him. */
+function skinNow(body, style) {
+  const built = buildSkinMesh(body, style);
+  storeSkinMesh(body, style, built);
+  skinTexturesNow(body, style, built);
+  return { ...built, positions: built.positions.slice() };
+}
+
+/**
+ * A built skin made into meshes over the rig's bones: the body (toon, or the style's maps), the steel apart, their ink, the colours
+ * painted, which segment each vertex is, and the soft shell that dents it.
+ */
+function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, soft = true }) {
+  const { body } = fighter;
+  const look = lookOf(body.inputs);
+  const corner = CORNER_COLORS[fighter.corner];
+  // The skin's maps (cached per composition bucket, so a second fighter like him costs nothing).
+  const spec = styleSpec(bodyStyle).tex;
+  const maps = spec && built.uvs ? skinTexturesNow(body, bodyStyle, built) : null;
+  if (maps) built.skinMaps = { textures: maps, upgrade: Boolean(spec.upgrade) };
+  const baseColors = paintBody(built, body, look, corner);
+  // Steel is drawn apart, as metal; everything else is the toon body.
+  const steelTriangle = (triangle) => built.steelMask?.[built.indices[triangle * 3]] && built.steelMask[built.indices[triangle * 3 + 1]] && built.steelMask[built.indices[triangle * 3 + 2]];
+  const triangles = machine ? 0 : built.indices.length / 3;
+  const bodyIndices = [];
+  const steelIndices = [];
+  for (let triangle = 0; triangle < triangles; triangle += 1) {
+    const target = steelTriangle(triangle) ? steelIndices : bodyIndices;
+    target.push(built.indices[triangle * 3], built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
+  }
+  const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
+  const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
+  let steelMesh = null;
+  let steelOutline = null;
+  if (steelIndices.length) {
+    steelMesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(steelIndices), material: steel, share: skinMesh.geometry });
+    steelOutline = outlineFor(steelMesh);
+  }
+  // Which body segment each skin vertex belongs to, by its strongest bone.
+  const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
+  const skinOutline = outlineFor(skinMesh);
+  const shell = soft ? new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) : null;
+  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, vertexSegment, shell };
+}
+
+// Bodies being built, by the body's key: { body, style, steps, built, phase, views: the fighter views waiting for it }.
+const skinBuilds = new Map();
+const skinBuildKey = (body, style) => `${style}|${JSON.stringify(body.inputs)}`;
+
+function queueSkin(fighterView, style) {
+  const job = skinJob(fighterView.fighter.body, style);
+  job.views.add(fighterView);
+  fighterView.skinPending = style;
+}
+function skinJob(body, style) {
+  const key = skinBuildKey(body, style);
+  let job = skinBuilds.get(key);
+  if (!job) {
+    job = { body, style, steps: null, built: null, phase: 'mesh', views: new Set(), keep: false };
+    skinBuilds.set(key, job);
+  }
+  return job;
+}
+
+/**
+ * Bodies that will be drawn soon (the intro's legends, before their chapter comes): their skins built ahead, in the workers, so
+ * they are ready when their men are. Nothing is swapped; the body and its maps are kept (cachedSkinMesh) for when they are built.
+ */
+export function prefetchSkins(bodies, style = BODY_STYLE) {
+  if (!SKIN_BUILD.slicedStyles.includes(style)) return 0;
+  let queued = 0;
+  for (const body of bodies) {
+    if (cachedSkinMesh(body, style)) continue;
+    skinJob(body, style).keep = true;
+    queued += 1;
+  }
+  return queued;
+}
+
+/** How many fighters wait for their skin, and how many bodies are queued. */
+export function skinBuildStats() {
+  let waiting = 0;
+  for (const job of skinBuilds.values()) for (const fighterView of job.views) if (!fighterView.disposed && fighterView.skinPending === job.style) waiting += 1;
+  return { waiting, bodies: skinBuilds.size, jobs: [...skinBuilds.values()].map((job) => `${job.style} ${job.phase} ${job.views.size}`), ...skinTimes };
+}
+// What the slices have cost (ms): the longest frame's share, and the longest swap; how many swaps.
+const skinTimes = { longestPump: 0, longestSwap: 0, swaps: 0, longestStep: 0, longestStepIs: '' };
+/** One slice of a builder (a generator's next step), timed. */
+function stepOf(steps) {
+  const started = performance.now();
+  const next = steps.next();
+  const took = performance.now() - started;
+  if (took > skinTimes.longestStep) Object.assign(skinTimes, { longestStep: took, longestStepIs: String(next.done ? 'the last' : next.value) });
+  return next;
+}
+
+/**
+ * Work on the queued skins for about `budgetMs` (Infinity: all of them, now): the body of the waiting man nearest the camera first;
+ * a body whose men are all farther than SKIN_BUILD.farDistance waits (unless all are wanted now). Done, each waiting man's skin is
+ * swapped. Returns how many were swapped.
+ */
+export function pumpSkinBuilds(view, budgetMs = SKIN_BUILD.sliceMs) {
+  const started = performance.now();
+  const all = budgetMs === Infinity;
+  let swapped = 0;
+  const camera = view.camera.position;
+  // The bodies waiting, the nearest man's first (a body no one waits for any more is dropped).
+  const order = [];
+  for (const [key, job] of skinBuilds) {
+    for (const fighterView of job.views) if (fighterView.disposed || fighterView.skinPending !== job.style) job.views.delete(fighterView);
+    if (!job.views.size && !job.keep) {
+      skinBuilds.delete(key);
+      continue;
+    }
+    // (A body built ahead, no one waiting for it yet: after everyone who is.)
+    let nearest = job.views.size ? Infinity : SKIN_BUILD.farDistance * 2;
+    for (const fighterView of job.views) {
+      const x = fighterView.fighter.x;
+      nearest = Math.min(nearest, Math.hypot(x[P.pelvis * 3] - camera.x, x[P.pelvis * 3 + 1] - camera.y, x[P.pelvis * 3 + 2] - camera.z));
+    }
+    order.push({ key, job, nearest });
+  }
+  order.sort((a, b) => a.nearest - b.nearest);
+  const swap = (key, job) => {
+    skinBuilds.delete(key);
+    for (const fighterView of job.views) {
+      const swapStarted = performance.now();
+      if (!swapSkin(view, fighterView, job.style, job.built)) continue;
+      swapped += 1;
+      skinTimes.swaps += 1;
+      skinTimes.longestSwap = Math.max(skinTimes.longestSwap, performance.now() - swapStarted);
+    }
+  };
+  // Ready (built here or by the worker, or by another man's job): swapped, one body a frame (a swap is some milliseconds of its own).
+  for (const { key, job } of order) {
+    if (job.phase === 'mesh' || job.phase === 'worker') {
+      const cached = cachedSkinMesh(job.body, job.style);
+      if (cached) Object.assign(job, { built: cached, phase: 'maps', steps: null });
+    }
+    if (job.phase === 'maps' && readySkinTextures(job.body, job.style, job.built)) job.phase = 'done';
+    if (job.phase === 'done' && (all || !swapped)) swap(key, job);
+  }
+  // The worker takes the rest, nearest first, as many as asked of it (it builds them one after another).
+  const workers = all ? null : skinWorkers();
+  if (workers) {
+    for (const { job, nearest } of order) {
+      if (job.phase !== 'mesh' || job.noWorker) continue;
+      // To the worker with the least asked of it.
+      const worker = workers.reduce((least, next) => (next.load < least.load ? next : least));
+      worker.load += 1;
+      job.id = (skinWorkerState.next += 1);
+      job.phase = 'worker';
+      skinWorkerState.asked.set(job.id, { job, worker });
+      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()] });
+    }
+  }
+  // What no worker takes (none could be made, or the body was refused), or everything now (`all`): built here, a slice at a time.
+  for (const { key, job, nearest } of order) {
+    if (!skinBuilds.has(key) || job.phase === 'done' || (job.phase === 'worker' && !all)) continue;
+    if (nearest > SKIN_BUILD.farDistance && !all) continue;
+    if (performance.now() - started >= budgetMs) break;
+    if (job.phase === 'worker') Object.assign(job, { phase: 'mesh', noWorker: true });
+    while (job.phase !== 'done' && performance.now() - started < budgetMs) {
+      if (job.phase === 'mesh') {
+        job.steps ??= buildSkinMeshSteps(job.body, job.style);
+        const next = stepOf(job.steps);
+        if (!next.done) continue;
+        Object.assign(job, { built: next.value, steps: null, phase: 'maps' });
+        storeSkinMesh(job.body, job.style, job.built);
+      } else if (readySkinTextures(job.body, job.style, job.built)) job.phase = 'done';
+      else {
+        job.steps ??= skinTexturesSteps(job.body, job.style, job.built);
+        if (stepOf(job.steps).done) Object.assign(job, { steps: null, phase: 'done' });
+      }
+    }
+    if (job.phase === 'done' && (all || !swapped)) swap(key, job);
+  }
+  if (!all && skinBuilds.size + swapped) skinTimes.longestPump = Math.max(skinTimes.longestPump, performance.now() - started);
+  return swapped;
+}
+
+/**
+ * The skin workers (skinworker.js, SKIN_BUILD.workers of them), made the first time they are wanted: from the page's own copy of
+ * the code when the game is one bundled file (a script element `skin-worker-source`, tools/bundle.js), else from the module beside
+ * this one. Null where none can be had (SKIN_BUILD.workers 0, or one failed to start): the skins are then built on this thread, a
+ * few milliseconds a frame.
+ */
+const skinWorkerState = { workers: undefined, next: 0, asked: new Map(), failed: false };
+function skinWorkers() {
+  if (!SKIN_BUILD.workers || skinWorkerState.failed || typeof Worker === 'undefined' || typeof document === 'undefined') return null;
+  if (skinWorkerState.workers !== undefined) return skinWorkerState.workers;
+  // It cannot be made, or dies: what any was asked is built here instead.
+  const fail = () => {
+    skinWorkerState.failed = true;
+    for (const worker of skinWorkerState.workers ?? []) worker.thread.terminate();
+    skinWorkerState.workers = null;
+    for (const { job } of skinWorkerState.asked.values()) Object.assign(job, { phase: 'mesh', noWorker: true });
+    skinWorkerState.asked.clear();
+  };
+  const workers = [];
+  try {
+    const source = document.getElementById('skin-worker-source')?.textContent;
+    const main = document.querySelector('script[type="module"][src]')?.src ?? document.baseURI;
+    const url = source ? URL.createObjectURL(new Blob([source], { type: 'text/javascript' })) : new URL('skinworker.js', new URL('.', main));
+    const count = Math.max(1, Math.min(SKIN_BUILD.workers, (navigator.hardwareConcurrency ?? 2) - 1));
+    for (let index = 0; index < count; index += 1) workers.push({ thread: source ? new Worker(url) : new Worker(url, { type: 'module' }), load: 0 });
+  } catch {
+    skinWorkerState.workers = workers;
+    fail();
+    return null;
+  }
+  for (const worker of workers) {
+    worker.thread.onerror = fail;
+    worker.thread.onmessage = ({ data }) => {
+      const asked = skinWorkerState.asked.get(data.id);
+      skinWorkerState.asked.delete(data.id);
+      worker.load = Math.max(0, worker.load - 1);
+      const job = asked?.job;
+      if (!job || job.phase !== 'worker') return;
+      if (!data.built) {
+        // Refused (his body came out otherwise there) or failed: built here.
+        Object.assign(job, { phase: 'mesh', noWorker: true });
+        return;
+      }
+      storeSkinMesh(job.body, job.style, data.built);
+      if (data.maps) storeSkinTextures(skinTextureKey(job.body, job.style, data.built), data.maps);
+      Object.assign(job, { built: data.built, phase: 'maps' });
+      skinTimes.workerMs = Math.max(skinTimes.workerMs ?? 0, data.ms);
+    };
+  }
+  skinWorkerState.workers = workers;
+  return workers;
+}
+
+/**
+ * Swap a fighter's skin for the style now ready, in one frame: his bones, head, kit and soft flesh stay; only the body mesh, its
+ * steel, ink and colours are new. Not once a part is cut off (the cut lifted triangles out of the skin drawn): he stays as he is.
+ */
+function swapSkin(view, fighterView, style, made = null) {
+  if (fighterView.skinPending !== style) return false;
+  fighterView.skinPending = null;
+  if (fighterView.disposed || fighterView.severedBones?.size || fighterView.headDetached) return false;
+  const built = readySkin(fighterView.fighter.body, style) ?? (made ? { ...made, positions: made.positions.slice() } : null);
+  if (!built) return false;
+  const old = [fighterView.skinMesh, fighterView.skinOutline, fighterView.steelMesh, fighterView.steelOutline].filter(Boolean);
+  const skin = skinParts(view, fighterView.fighter, built, style, fighterView.bones, { machine: fighterView.machine, lacquer: fighterView.lacquer, soft: !fighterView.rigid });
+  const { layers } = fighterView;
+  for (const mesh of old) layers.skin.remove(mesh);
+  const holder = new THREE.Group();
+  holder.add(...old);
+  disposeObject(holder);
+  if (skin.steelMesh) layers.skin.add(skin.steelMesh, skin.steelOutline);
+  layers.skin.add(skin.skinMesh, skin.skinOutline);
+  Object.assign(fighterView, { built, skinMesh: skin.skinMesh, skinOutline: skin.skinOutline, steelMesh: skin.steelMesh, steelOutline: skin.steelOutline, baseColors: skin.baseColors, vertexSegment: skin.vertexSegment, bodyStyle: style, damageVersion: -1 });
+  const entry = fighterView.shells.find((shell) => shell.key === 'body');
+  if (entry && skin.shell) entry.shell = skin.shell;
+  // As he was drawn: ghosted or not, his ink, his shadow.
+  setLayer(fighterView, fighterView.layer);
+  return true;
 }
 
 /** The physics layer: particles, constraints, motor targets, collision capsules. */
@@ -1949,6 +2266,7 @@ function ensureMuscle(fighterView) {
 }
 
 export function disposeFighterView(view, fighterView) {
+  fighterView.disposed = true;
   view.scene.remove(fighterView.group);
   for (const prop of fighterView.headProps ?? []) {
     if (prop.loose.parent) view.scene.remove(prop.loose);

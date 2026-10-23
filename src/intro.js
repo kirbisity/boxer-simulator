@@ -160,7 +160,7 @@ export function stepIntro(seconds, dt = 1 / 30) {
 }
 
 /**
- * Play the intro. `stage`: main.js's hooks (begin, place, lineup, camera,
+ * Play the intro. `stage`: main.js's hooks (begin, with the plan, so the legends can be made ready ahead; place, lineup, camera,
  * fit, end); `onDone` runs once it ends or is skipped (the home menu).
  */
 export function playIntro(stage, onDone) {
@@ -184,7 +184,7 @@ export function playIntro(stage, onDone) {
   root.append(title, head, captions, card, progress, skip, black);
   document.body.append(root);
   document.body.dataset.intro = 'on';
-  stage.begin();
+  stage.begin(plan);
 
   let clock = 0;
   let last = performance.now();
