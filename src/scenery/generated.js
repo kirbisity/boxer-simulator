@@ -149,7 +149,8 @@ const generatedLands = new Map();
 
 /** The land of a place: a height at any (x, z) and the noise behind it; the same every time. */
 function generatedLand(place, spec, profile = 'land') {
-  const key = `${place}:${profile}`;
+  // (The flat ground is the spec's keepOut: a wider floor has its own land.)
+  const key = `${place}:${profile}:${spec.keepOut.join('x')}`;
   if (generatedLands.has(key)) return generatedLands.get(key);
   const land = profile === 'foothills' ? GENERATED_FOOTHILLS[place] : GENERATED_PLACES[place];
   const random = generatedRandom(`land:${place}`);

@@ -9,6 +9,11 @@
 // A fallen man's place is taken by the man behind him in his file, and a
 // shooter who has loosed changes places with a loaded man behind him.
 // Nothing here knows a unit: it is all slots, files and the kit's `drill`.
+//
+// Wings: a side's horsemen (a level's `formation.wings`) are not in the ranks.
+// They stand on the flanks of the foot line, held, and are released to charge
+// when the two foot lines have closed (or the enemy's horse comes at them, or
+// their patience runs out): placeWings puts them there, moveWings lets them go.
 
 import { P } from './body.js';
 
@@ -47,6 +52,23 @@ export const DRILL = {
   swapEvery: 1.5,
 };
 
+/**
+ * Where a side's horse waits and when it goes. A wing stands `out` m beyond the
+ * end of the foot line (so the charge never crosses its own ranks), on one flank
+ * (`side`: +1 or -1 across the field; the two sides take opposite flanks, so the
+ * wings ride past each other rather than into each other), `back` m behind the
+ * front rank, `abreast` horses to a rank across, `spacing` m apart (a horse's
+ * width and a gap: the lane-keeping needs room to steer), the ranks `rankBack` m
+ * behind each other. It is released when the foot lines are within
+ * `release` m of each other (the flank is then the enemy's soft side, and a
+ * gallop from standing needs ~15 m to get up to speed), or an enemy horseman
+ * comes within `alarm` m of one of the wing, or `by` s have passed (a foot
+ * battle that does not close must not leave the horse standing). A rider of
+ * a wing rides at the enemy's shooters before others (`shooters`, m taken off
+ * their distance when he picks his man).
+ */
+export const WINGS = { out: 2.5, back: 10, abreast: 3, spacing: 3.2, rankBack: 4, release: 9, alarm: 16, by: 25, shooters: 8, reviewEvery: 0.25 };
+
 const at = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
 /** Still in his place in the ranks: on his feet or down for a moment, not out, crawling or broken. */
@@ -62,7 +84,7 @@ const fighting = (fighter) => fighter.state === 'up' && !fighter.crawling;
 export function formUp(world, leaderOf = () => null) {
   world.formations = {};
   for (const corner of ['red', 'blue']) {
-    const members = world.fighters.filter((fighter) => fighter.corner === corner && fighter.body.gear.drill);
+    const members = world.fighters.filter((fighter) => fighter.corner === corner && fighter.body.gear.drill && !fighter.mount);
     if (members.length < DRILL.minMembers) continue;
     const enemies = world.fighters.filter((fighter) => fighter.corner !== corner);
     if (!enemies.length) continue;
@@ -108,10 +130,10 @@ export function moveFormations(world, dt) {
     if (!standing.length) continue;
     let front = -Infinity;
     for (const fighter of standing) front = Math.max(front, fighter.slot.ahead);
-    // Their nearest man, along our way forward from the anchor.
+    // Their nearest man on foot, along our way forward from the anchor (their horse is not the line we are closing on).
     let theirs = Infinity;
     for (const other of world.fighters) {
-      if (other.corner === corner || !fighting(other)) continue;
+      if (other.corner === corner || other.mount || !fighting(other)) continue;
       const position = at(other);
       theirs = Math.min(theirs, dot([position[0] - formation.anchor[0], position[1] - formation.anchor[1]], formation.forward));
     }
@@ -235,4 +257,62 @@ export function fromSlot(fighter, formation, other) {
   const slot = slotAt(formation, fighter.slot);
   const position = at(other);
   return Math.hypot(position[0] - slot[0], position[1] - slot[1]);
+}
+
+/**
+ * Put a side's horsemen on the wings of its foot line (`order.wings` of a level's
+ * formation, over WINGS): alternately left and right, the inner places first, in
+ * ranks of `abreast`, and mark each as held (`wing`, see moveWings). `foot` is the
+ * line they flank: { front, width } (m from the middle to its first rank, and across
+ * its widest row); `sign` is -1 for red, 1 for blue. `place(fighter, x, z)` puts a man.
+ */
+export function placeWings(riders, sign, order, foot, arena, place) {
+  const wings = { ...WINGS, ...order.wings };
+  const edge = foot.width / 2 + wings.out;
+  const room = arena.halfZ - 1.2;
+  // One wing on the flank `side` names (+1 or -1 across the field), or half and half.
+  const both = wings.side === undefined;
+  riders.forEach((fighter, index) => {
+    const side = both ? (index % 2 === 0 ? 1 : -1) : wings.side;
+    const nth = both ? Math.floor(index / 2) : index;
+    const across = Math.min(room, edge + (nth % wings.abreast) * wings.spacing) * side;
+    const back = foot.front + wings.back + Math.floor(nth / wings.abreast) * wings.rankBack;
+    place(fighter, sign * Math.min(arena.halfX - 1, back), across);
+    fighter.wing = { held: true, side };
+  });
+}
+
+/**
+ * Release the wings that are due: the held riders go when the foot lines have
+ * closed or time is up, and any one of them at once if an enemy horseman is near
+ * him or he is struck. Checked every WINGS.reviewEvery s.
+ */
+export function moveWings(world, dt) {
+  const wings = world.wings;
+  if (!wings) return;
+  wings.review -= dt;
+  if (wings.review > 0) return;
+  wings.review = WINGS.reviewEvery;
+  const held = world.fighters.filter((fighter) => fighter.wing?.held && fighter.mount && fighter.state === 'up');
+  if (!held.length) {
+    world.wings = null;
+    return;
+  }
+  // The foot lines' fronts, along x (red stands at -x): how far apart their first men are.
+  let red = -Infinity;
+  let blue = Infinity;
+  for (const fighter of world.fighters) {
+    if (fighter.mount || !fighting(fighter)) continue;
+    const x = at(fighter)[0];
+    if (fighter.corner === 'red') red = Math.max(red, x);
+    else if (fighter.corner === 'blue') blue = Math.min(blue, x);
+  }
+  const closed = blue - red <= wings.release;
+  const late = world.time >= wings.by;
+  for (const fighter of held) {
+    const horse = fighter.mount;
+    const near = world.fighters.some((other) => other.mount && other.corner !== fighter.corner && other.state === 'up' && Math.hypot(other.mount.at[0] - horse.at[0], other.mount.at[1] - horse.at[1]) < WINGS.alarm);
+    const struck = fighter.hitAt.some((time) => time > world.time - 1);
+    if (closed || late || near || struck) fighter.wing.held = false;
+  }
 }

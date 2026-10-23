@@ -426,6 +426,15 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   return true;
 }
 
+/** A wing of horse held on the flank: the horse stands where it is, facing as it was set (formation.js releases it). */
+export function holdWing(fighter, now) {
+  const horse = fighter.mount;
+  horse.goalAt = now;
+  horse.goal = { heading: horse.yaw, speed: 0 };
+  fighter.goTo = null;
+  fighter.move = 0;
+}
+
 /**
  * A man on foot against a rider: a long weapon is braced and thrust at the
  * horse's chest as it comes (it comes first: reach decides); anyone else

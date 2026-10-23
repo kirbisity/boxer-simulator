@@ -7,11 +7,17 @@ import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
-import { drilledSoldier, europeanSoldier, footSoldier, hospitaller, mexicaWarrior, mingSoldier, nobleKnight, ottomanSoldier, rebel, roninWarrior, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+import { conquistadorHorseman, drilledSoldier, europeanSoldier, footSoldier, hanHorseman, hospitaller, mexicaWarrior, mingHorseman, mingSoldier, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 // Rome against Han: fifty a side, ten to a rank; a centurion to every
 // eighty legionaries (a century), Li Ling among his crossbowmen.
-export const LEGION = { perSide: 50, arena: { halfX: 26, halfZ: 12 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 10 }, romanFront: 14, hanFront: 3, century: 80 };
+export const LEGION = { perSide: 50, arena: { halfX: 26, halfZ: 12 }, wingsArena: { halfX: 42, halfZ: 17 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 10 }, romanFront: 14, hanFront: 3, century: 80 };
+
+// The horse of Rome against Han: an ala of auxiliaries (spatha and spear) for the legion, and for
+// the Han a troop of frontier cavalry: sabre and spear, and two horse archers (Li Ling's men met the
+// Xiongnu's). They take the place of a rear rank of foot, so a side stays fifty.
+const LEGION_HORSE = { roman: { longsword: 4, spear: 4 }, han: { dao: 3, spear: 3, steppeBow: 2 } };
+const total = (styles) => Object.values(styles).reduce((sum, count) => sum + count, 0);
 
 /** The two armies of Rome against Han, `count` a side. */
 export function legionSides(random, count = LEGION.perSide) {
@@ -52,6 +58,12 @@ const SEKIGAHARA_SIDE = {
   ashigaru: { spear: 9, bow: 4, matchlock: 3, katana: 4, naginata: 1 },
 };
 
+// Each army's colours: the East (Tokugawa) in red, the West (Ishida's, Toyotomi's) in black and blue.
+const SEKIGAHARA_EAST = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
+const SEKIGAHARA_WEST = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
+// A side's mounted samurai: spears (the yari from the saddle), a sword and the bow.
+const SEKIGAHARA_HORSE = { spear: 3, katana: 1, bow: 2 };
+
 function sekigaharaSide(random, side) {
   const warriors = [];
   for (const [rank, styles] of Object.entries(SEKIGAHARA_SIDE)) {
@@ -64,16 +76,19 @@ function sekigaharaSide(random, side) {
 }
 
 // Pyongyang, 1593: the Ming army storms the city held by Konishi
-// Yukinaga. Twenty a side; the Ming regulars only — brigandine and elite —
-// led by an elite with the guandao; gun and bow men behind on both sides.
+// Yukinaga. Twenty-four Ming foot and twenty-six Japanese; the Ming regulars
+// only — brigandine and elite — led by an elite with the guandao; gun and bow
+// men behind on both sides. Li Rusong's Liaodong horse ride with them (below).
 const PYONGYANG_MING = {
   elite: { guandao: 2, matchlock: 1, threeEyed: 2 },
-  brigandine: { swordShield: 6, spear: 5, matchlock: 4 },
+  brigandine: { swordShield: 8, spear: 6, matchlock: 5 },
 };
 const PYONGYANG_JAPANESE = {
-  samurai: { katana: 3, naginata: 1, spear: 1 },
-  ashigaru: { spear: 7, matchlock: 5, bow: 3 },
+  samurai: { katana: 4, naginata: 1, spear: 2 },
+  ashigaru: { spear: 8, matchlock: 7, bow: 4 },
 };
+// The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
+const PYONGYANG_HORSE = { dao: 3, spear: 3, threeEyed: 2 };
 
 /** Blades and polearms first (the front ranks), bows and guns last. */
 // Where the bows and guns open a battle: in the front rows, shooting, the
@@ -89,8 +104,7 @@ function pyongyangSides(random) {
   const ming = [];
   for (const [rank, styles] of Object.entries(PYONGYANG_MING)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) ming.push(mingSoldier(random, style, rank));
   const japanese = [];
-  const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
-  for (const [rank, styles] of Object.entries(PYONGYANG_JAPANESE)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) japanese.push(sengokuWarrior(random, west, style, rank));
+  for (const [rank, styles] of Object.entries(PYONGYANG_JAPANESE)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) japanese.push(sengokuWarrior(random, SEKIGAHARA_WEST, style, rank));
   const red = shootersBehind(ming);
   const blue = shootersBehind(japanese);
   // Led by the two commanders: Li Rusong for the Ming, Konishi Yukinaga in the city.
@@ -111,6 +125,8 @@ function company(styles, make) {
 // Mexica host on the plain. Steel against obsidian and cotton.
 const OTUMBA = {
   spanish: { hidalgo: 4, rodelero: 7, arquebusier: 3 },
+  // The jinetes of Cortés's horse: lances first, as at Otumba, where he rode the Mexica commander down.
+  horse: { lance: 5, espada: 2 },
   tlaxcalan: { macuahuitl: 15, tepoztopilli: 10 },
   mexica: { warrior: { macuahuitl: 18, tepoztopilli: 10, bow: 4 }, elite: { macuahuitl: 5, tepoztopilli: 3 } },
 };
@@ -142,6 +158,29 @@ const RHODES = {
   ottomans: { heavy: { maceShield: 2, saberShield: 1 }, janissary: { yatagan: 4, matchlock: 3 }, azap: { spear: 4, steppeBow: 3 } },
 };
 
+/**
+ * Wings of horse. A battle map that history had cavalry in (`wings` on its
+ * scenario) is played on a wider floor with a wing of horsemen to a side, in
+ * the kit of the time, on the flanks of the foot line: they wait there
+ * (formation.js) and charge the enemy's flank and shooters when the foot lines
+ * close. A scenario's own `arena`, `formation` and `cast` are the line of
+ * battle on foot (the sandbox's fixtures, and the fingerprint's: tools/fingerprint.js);
+ * `battleOf` joins the wings to them:
+ * - `arena`: the wider floor (the charge needs a run up, and room to wheel),
+ * - `camera`: its framing,
+ * - `formation`: per side, over the foot's, with `wings` (the placing and release
+ *   of formation.js WINGS) to name the riders' place,
+ * - `cast(random, sides)`: the sides as the foot cast made them, with the horse added
+ *   (or the foot thinned where horse takes their place).
+ */
+export function battleOf(key) {
+  const scenario = SCENARIOS[key];
+  const wings = scenario.wings;
+  if (!wings) return scenario;
+  const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, { ...scenario.formation?.[corner], ...wings.formation?.[corner] }]));
+  return { ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation, cast: (random) => wings.cast(random, scenario.cast(random)) };
+}
+
 export const SCENARIOS = {
   // A what-if, not a battle that was: a legion of the early Empire against
   // a Han army of crossbowmen, as Li Ling's five thousand (99 BC) stood
@@ -151,25 +190,35 @@ export const SCENARIOS = {
   legion: {
     title: 'Rome against Han',
     place: 'A what-if · the 1st century',
-    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: fifty legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into fifty crossbows; the front ranks meet, the rest hold their places.',
+    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: forty-two legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into forty-two crossbows; the front ranks meet, the rest hold their places. Eight auxiliary horse in mail ride on one flank and eight Han horsemen on the other, and charge it when the lines close.',
     scene: 'plain',
     arena: LEGION.arena,
     camera: { yaw: -0.5, pitch: 0.45, distance: 20, maxDistance: 26 },
-    roster: 'Fifty a side: legionaries and Han crossbowmen',
+    roster: 'Fifty a side: forty-two legionaries and eight auxiliary horse · forty-two Han crossbowmen and eight horsemen',
     formation: { red: { ...LEGION.ranks, front: LEGION.romanFront }, blue: { ...LEGION.ranks, front: LEGION.hanFront } },
     cast: (random) => legionSides(random),
+    // Eight horse of an auxiliary ala to the legion's side, eight Han horsemen to theirs, in place of the rear rank of the foot.
+    wings: {
+      arena: LEGION.wingsArena,
+      camera: { yaw: -0.5, pitch: 0.45, distance: 31, maxDistance: 40 },
+      formation: { red: { wings: { side: 1 } }, blue: { wings: { side: -1 } } },
+      cast: (random, sides) => ({
+        red: [...sides.red.slice(0, LEGION.perSide - total(LEGION_HORSE.roman)), ...company(LEGION_HORSE.roman, (style) => romanHorseman(random, style))],
+        blue: [...sides.blue.slice(0, LEGION.perSide - total(LEGION_HORSE.han)), ...company(LEGION_HORSE.han, (style) => hanHorseman(random, style))],
+      }),
+    },
     fighters: [],
   },
   rebellion: {
     title: 'Peasant Rebellion',
     place: 'The market square, Maidstone, Kent · June 1381',
-    blurb: 'The town has risen. Two lords in plate and three of their foot soldiers ride in to put it down — and meet twenty peasants with spears in the market square.',
+    blurb: 'The town has risen. Two lords in plate ride in on their destriers, with three of their foot soldiers behind them, to put it down — and meet twenty peasants with spears in the market square.',
     scene: 'town',
     weather: { fog: WEATHER_MIST.rebellion, sky: 0.55, pale: 0.55, sun: 0.9 },
     arena: { halfX: 9, halfZ: 7 },
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
-    roster: 'Two knights and three foot soldiers · twenty rebels with spears',
+    roster: 'Two mounted knights and three foot soldiers · twenty rebels with spears',
     // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
     formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
@@ -177,51 +226,78 @@ export const SCENARIOS = {
       red: [nobleKnight(random, 'longsword'), footSoldier(random, 'spear'), nobleKnight(random, 'warhammer'), footSoldier(random, 'bow'), footSoldier(random, 'longsword')],
       blue: Array.from({ length: 20 }, () => rebel(random)),
     }),
+    // The lords ride in on their destriers, the foot behind them (the square is only so wide between the house fronts).
+    wings: {
+      arena: { halfX: 11, halfZ: 8.5 },
+      formation: { red: { front: 7.5, spacing: 1.2, wings: { out: 2, back: 1, spacing: 3, release: 14, by: 6 } } },
+      cast: (random, sides) => ({ red: sides.red.map((inputs) => (inputs.outfit.kind === 'knight' ? { ...inputs, mounted: true } : inputs)), blue: sides.blue }),
+    },
     fighters: [],
   },
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: 'The battle that ends the Sengoku. Thirty of the East in red against thirty of the West in black and blue: bows and teppō in front, spears, blades and polearms behind.',
+    blurb: 'The battle that ends the Sengoku. Thirty-six of the East in red against thirty-six of the West in black and blue: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.',
     scene: 'sengoku',
     weather: { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
-    roster: 'Thirty a side: samurai and ashigaru',
+    roster: 'Thirty-six a side: samurai and ashigaru, six of the samurai on horse',
     // Ten abreast: the bows and teppō in the front rows, the blades and polearms behind them.
     formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 } },
     cast: (random) => {
-      const east = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
-      const west = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
-      return { red: sekigaharaSide(random, east), blue: sekigaharaSide(random, west) };
+      return { red: sekigaharaSide(random, SEKIGAHARA_EAST), blue: sekigaharaSide(random, SEKIGAHARA_WEST) };
+    },
+    // Each army's mounted samurai on its flanks: six a side, in the armies' colours.
+    wings: {
+      arena: { halfX: 30, halfZ: 16 },
+      camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 },
+      formation: { red: { wings: { side: 1 } }, blue: { wings: { side: -1 } } },
+      cast: (random, sides) => ({
+        red: [...sides.red, ...company(SEKIGAHARA_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_EAST, style))],
+        blue: [...sides.blue, ...company(SEKIGAHARA_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_WEST, style))],
+      }),
     },
     fighters: [],
   },
   pyongyang: {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
-    blurb: 'The Ming army retakes the city from the Japanese. Twenty Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — against twenty Japanese samurai and ashigaru.',
+    blurb: 'The Ming army retakes the city from the Japanese. Twenty-four Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and eight of Li Rusong\'s horsemen in iron lamellar on the flank, against twenty-six Japanese samurai and ashigaru.',
     scene: 'sengoku',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
-    roster: 'Twenty a side: Ming and Japanese',
+    roster: 'Thirty-two Ming (eight on horse) · twenty-six Japanese',
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
+    wings: {
+      arena: { halfX: 28, halfZ: 15 },
+      camera: { yaw: -0.5, pitch: 0.42, distance: 26, maxDistance: 33 },
+      formation: { red: { wings: { side: 1 } } },
+      cast: (random, sides) => ({ red: [...sides.red, ...company(PYONGYANG_HORSE, (style) => mingHorseman(random, style))], blue: sides.blue }),
+    },
     fighters: [],
   },
   otumba: {
     title: 'Otumba',
     place: 'Otumba, Valley of Mexico · 7 July 1520',
-    blurb: 'Days after the Noche Triste, the Spaniards and their Tlaxcalan allies are caught on the open plain by the Mexica host: steel breastplates, espadas and arquebuses against obsidian blades and quilted cotton.',
+    blurb: 'Days after the Noche Triste, the Spaniards and their Tlaxcalan allies are caught on the open plain by the Mexica host: steel breastplates, espadas and arquebuses, and the few horse Cortés had left, against obsidian blades and quilted cotton.',
     scene: 'plain',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
-    roster: 'Fourteen conquistadors and twenty-five Tlaxcalans · forty Mexica',
+    roster: 'Fourteen conquistadors on foot and seven on horse, and twenty-five Tlaxcalans · forty Mexica',
     formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 10, loose: 0.3 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.5 } },
     cast: (random) => ({
       red: shootersBehind([...company(OTUMBA.spanish, (type) => europeanSoldier(random, type)), ...company(OTUMBA.tlaxcalan, (style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }))]),
       blue: shootersBehind([...company(OTUMBA.mexica.elite, (style) => mexicaWarrior(random, style, 'elite')), ...company(OTUMBA.mexica.warrior, (style) => mexicaWarrior(random, style, 'warrior'))]),
     }),
+    // Cortés's few horse (about twenty survived the Noche Triste) ride on the Spanish flanks: no Tlaxcalan or Mexica horse (the Americas had none).
+    wings: {
+      arena: { halfX: 30, halfZ: 16 },
+      camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 },
+      formation: { red: { wings: { side: 1 } } },
+      cast: (random, sides) => ({ red: [...sides.red, ...company(OTUMBA.horse, (style) => conquistadorHorseman(random, style))], blue: sides.blue }),
+    },
     fighters: [],
   },
   zeelandia: {
@@ -371,7 +447,7 @@ export function crewFighter(lead, entry) {
 
 /** A world for a scenario: its fighters on its floor. */
 export function scenarioWorld(key, seed = 1) {
-  const scenario = SCENARIOS[key];
+  const scenario = battleOf(key);
   // A battle's armies are drawn from its cast, at the same seed.
   const fighters = scenario.cast ? Object.entries(scenario.cast(seededRandom(seed))).flatMap(([corner, side]) => side.map((inputs) => ({ inputs, corner }))) : scenarioFighters(scenario);
   return createWorld(fighters, { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation });

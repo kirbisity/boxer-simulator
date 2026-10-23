@@ -1480,14 +1480,15 @@ function ruralNobori({ poleHeight = 5.2, width = 0.75, length = 3, top = 4.85, s
  * both flanks; `curtainArt(colour)` and `bannerArt(colour)` paint the
  * crests as before. Returns a group.
  */
-export function ruralSengokuCamps({ sides, curtainX, curtainArt, bannerArt, palisadeZ, banners }) {
+export function ruralSengokuCamps({ sides, curtainX, curtainArt, bannerArt, palisadeZ, banners, curtainLength = 14, palisadeSpan = 11 }) {
   const group = new THREE.Group();
   const random = ruralRandom(77);
   const bamboo = [];
   for (const [side, colour] of sides) {
     // The curtain, turned as the plane it replaces (its length along z).
-    const poles = [-7, -3.5, 0, 3.5, 7];
-    const curtain = ruralCurtain(curtainArt(colour), { length: 14, height: 1.8, centreY: 1.3, poles });
+    const gaps = Math.max(2, Math.round(curtainLength / 3.5));
+    const poles = Array.from({ length: gaps + 1 }, (_, index) => -curtainLength / 2 + (curtainLength * index) / gaps);
+    const curtain = ruralCurtain(curtainArt(colour), { length: curtainLength, height: 1.8, centreY: 1.3, poles });
     curtain.position.set(side * curtainX, 0, 0);
     curtain.rotation.y = Math.PI / 2;
     group.add(curtain);
@@ -1519,7 +1520,7 @@ export function ruralSengokuCamps({ sides, curtainX, curtainArt, bannerArt, pali
     flags.receiveShadow = true;
     group.add(flags);
   }
-  for (const z of palisadeZ) ruralPalisade(bamboo, { z, from: -11, to: 11, gap: 1.6, random });
+  for (const z of palisadeZ) ruralPalisade(bamboo, { z, from: -palisadeSpan, to: palisadeSpan, gap: 1.6, random });
   // Bamboo seen from the fight: its painted grain is enough, no relief.
   group.add(ruralMesh(bamboo, new THREE.MeshLambertMaterial({ map: ruralBamboo().map, vertexColors: true }), 1));
   return group;
