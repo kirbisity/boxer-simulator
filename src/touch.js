@@ -18,6 +18,7 @@ import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
 import { fightUiCommandBar } from './fightui/command.js';
+import { paintStamina } from './overdraftview.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -379,7 +380,7 @@ export function installFightControls(root, hooks) {
     status.querySelector('.name').textContent = firstNameOf(me);
     status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
-    status.querySelector('.stamina i').style.width = `${Math.round(me.stamina * 100)}%`;
+    paintStamina(status.querySelector('.stamina'), me.stamina);
     // His man: the one locked, or the one he is on; a marker over his head.
     const target = locked ?? foeFor(world, me);
     for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) awake.set(event.defender, now);

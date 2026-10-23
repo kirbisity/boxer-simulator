@@ -155,7 +155,8 @@ export function fightUiReady(fighter, move) {
   const blade = spec.path === 'blade' && fighter.weapon?.held ? fighter.weapon : null;
   const lift = blade ? Math.max(1, blade.spec.mass / WORLD.weapons.heavyFrom) / (handling(fighter.body, blade.spec).speed ?? 1) : 1;
   const drain = ((spec.cost ?? 0) * lift) / (fighter.body.aerobic || 1);
-  if (fighter.stamina < drain) return { ok: false, why: 'tired', cooling: 0 };
+  // (The player is never too tired: he goes on into the overdraft, weaker, physics/overdraft.js.)
+  if (fighter.stamina < drain && !fighter.player) return { ok: false, why: 'tired', cooling: 0 };
   const busy = fighter.punch ?? fighter.rush ?? null;
   if (busy || fighter.pain || fighter.pickup) {
     const duration = busy?.spec?.duration ?? 1;

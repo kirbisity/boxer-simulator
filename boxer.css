@@ -45,6 +45,16 @@ body[data-place="dunnottar"] .arena::after { content: ""; position: absolute; in
 .bar { height: 6px; border-radius: 3px; background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 1px 3px rgba(0, 0, 0, 0.6); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; transition: width 0.15s linear; }
 .bar.stamina i { background: var(--green); }
+/* The stamina overdraft (physics/overdraft.js): the bar goes dark red and a red segment grows from the left for how deep he is. */
+.bar.stamina { position: relative; }
+.bar.stamina.overdrawn { background: rgba(70, 6, 14, 0.85); box-shadow: inset 0 0 0 1px rgba(255, 70, 80, 0.85), 0 0 7px rgba(255, 40, 60, 0.55); }
+.bar.stamina i.debt { position: absolute; left: 0; top: 0; background: linear-gradient(90deg, #ff4a52, #b3121e); }
+/* The fade over the picture, driven by --od (0 clear to 1 black; overdraftview.js): a vignette closing in from the edges, the whole picture
+   darkening a little and, through the grey layer in saturation mode, losing its colour. Under the controls, never taking a pointer. */
+.fade { position: absolute; inset: 0; z-index: 0; pointer-events: none; --od: 0; }
+.fade::before, .fade::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.fade::before { background: radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0, 0, 0, 0) calc(60% - 56% * var(--od)), rgba(0, 0, 0, calc(0.55 + 0.45 * var(--od))) calc(100% - 28% * var(--od))), linear-gradient(rgba(0, 0, 0, calc(0.5 * var(--od))), rgba(0, 0, 0, calc(0.5 * var(--od)))); }
+.fade::after { background: #808080; mix-blend-mode: saturation; opacity: calc(0.9 * var(--od)); }
 .bar.brain i { background: linear-gradient(90deg, #ff9b3d, #ff3d5e); }
 .bar.blood i { background: linear-gradient(90deg, #a5121b, #5e070c); }
 .meta { font: 11px var(--mono); color: var(--muted); }

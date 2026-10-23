@@ -37,6 +37,7 @@ import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetc
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
+import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
 import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
@@ -131,6 +132,9 @@ const seeThrough = createSeeThrough();
 // The marks of the player's blows in the fight (fightui/marker.js): where each goes, its way, how it went.
 const fightMarks = createFightUiMarks(scene);
 let fightMarksClock = 0;
+
+// The player's stamina overdraft fade over the picture (overdraftview.js).
+const fade = installFade($('#fade'));
 
 // The fight's controls (touch.js): drawn over the fight in play mode only.
 const fightControls = installFightControls($('#fight-ui'), {
@@ -388,6 +392,8 @@ function thinkForBout(world, dt) {
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
   // The one you play is simulated in full however big the fight.
   world.keepFull = new Set(players);
+  // The man played has the stamina overdraft (physics/overdraft.js); an AI fighter never does.
+  for (const fighter of world.fighters) if (Boolean(fighter.player) !== players.has(fighter.id)) fighter.player = players.has(fighter.id);
   // Standing still: no thinking at all; he stays where he is, guard down, and takes what comes.
   const still = new Set(players);
   // Crawling (the sandbox's look at it): that side down on its knees, still in the fight; the player's man as he chooses.
@@ -912,6 +918,7 @@ function drawWorld(dt, drawIt = true) {
   renderHud();
   fightControls.update();
   levelHud.update();
+  fade.update(state.mode === 'play' && state.world ? player() : null, dt);
   cutsceneDirector.frame(state.paused ? 0 : dt);
   tutorial.update();
 }
@@ -955,7 +962,7 @@ function renderHud() {
     // The sandbox shows each lead's fighting rating (roster.js: ∝ inferred K/D; Maximus is 100).
     const rating = state.game === 'sandbox' ? ratingOf(fighter.body.inputs) : null;
     card.querySelector('.name').textContent = rating ? `${fighter.body.inputs.name} · ⚔ ${rating}` : fighter.body.inputs.name;
-    card.querySelector('.stamina i').style.width = `${Math.round(fighter.stamina * 100)}%`;
+    paintStamina(card.querySelector('.stamina'), fighter.stamina);
     const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;
     // Blood lost, against what puts him down: shown once he is bleeding.

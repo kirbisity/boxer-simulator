@@ -884,6 +884,8 @@ function goPickUp(world, fighter) {
  */
 export function directFighter(world, fighter, orders, dt) {
   if (!fighter || fighter.state === 'out') return;
+  // The man whose mind this is is the player: he has the stamina overdraft (physics/overdraft.js), nobody else does.
+  fighter.player = true;
   // Down on his knees over a man, a dagger going in: that holds him until it is done or he is struck (finisher.js).
   if (fighter.finisher && updateFinisher(world, fighter, dt)) {
     orders.requests.length = 0;
