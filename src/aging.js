@@ -87,3 +87,23 @@ export function ageing(inputs, { bodyFat = 0.15, starving = 0 } = {}) {
     stoop,
   };
 }
+
+/**
+ * Greying: the share of hairs gone grey by age ('50-50-50': about half of people are half grey at fifty), and the colour white-grey
+ * the greyed share is mixed toward. The first grey hairs come in the mid-thirties, nearly everyone is white by the eighties.
+ */
+export const GREYING = { from: 34, fullBy: 80, shape: 0.66, white: [214, 212, 206] };
+
+/** The share of a head's hair that has gone grey at `age` (0 young .. 1 white), 0.5 at fifty. */
+export function greyShare(age) {
+  const progress = (Math.min(age, GREYING.fullBy) - GREYING.from) / (GREYING.fullBy - GREYING.from);
+  return progress <= 0 ? 0 : Math.min(1, progress ** GREYING.shape);
+}
+
+/** A '#rrggbb' hair colour as it reads at `age`: the natural colour mixed toward white-grey by the grey share. */
+export function greyedHair(natural, age) {
+  const share = greyShare(age);
+  if (share === 0 || !/^#[0-9a-f]{6}$/i.test(natural)) return natural;
+  const channels = [1, 3, 5].map((start, index) => Math.round(parseInt(natural.slice(start, start + 2), 16) * (1 - share) + GREYING.white[index] * share));
+  return `#${channels.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+}

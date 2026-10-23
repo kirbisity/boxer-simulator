@@ -1,6 +1,7 @@
 // Page wiring: builder, HUD, controls, and the loop that steps the world and
 // draws it. The simulation runs at a fixed step whatever the frame rate.
 
+import { greyedHair } from './aging.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
@@ -1501,6 +1502,14 @@ $('#frame-all').addEventListener('click', () => frameAll(watchCam));
 
 // ---- Builder ----------------------------------------------------------------
 
+/** His hair as his age shows it: the natural colour (kept, so younger again brings it back) greyed for his years. */
+function regreyHair(inputs) {
+  const look = { ...DEFAULT_LOOK, ...inputs.look };
+  look.hairNatural ??= look.hairColor;
+  look.hairColor = greyedHair(look.hairNatural, inputs.age);
+  inputs.look = look;
+}
+
 const FIELDS = [
   { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female'] },
   { key: 'heightCm', label: 'Height', type: 'range', min: 150, max: 210, step: 1, unit: 'cm' },
@@ -1609,6 +1618,7 @@ function buildCornerForm(corner) {
     row.append(input, value);
     input.addEventListener('input', () => {
       current(corner)[field.key] = field.type === 'range' ? Number(input.value) : input.value;
+      if (field.key === 'age') regreyHair(current(corner));
       fillCornerForm(corner);
     });
     return row;
@@ -1624,6 +1634,11 @@ function buildCornerForm(corner) {
     select.addEventListener('change', () => {
       if (field.onInputs) current(corner)[field.key] = select.value;
       else current(corner).look = { ...DEFAULT_LOOK, ...current(corner).look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
+      // The colour picked is his natural colour; the hair shown is that, greyed for his age.
+      if (field.key === 'hairColor') {
+        current(corner).look.hairNatural = current(corner).look.hairColor;
+        regreyHair(current(corner));
+      }
     });
     row.append(select);
     return row;
@@ -1729,7 +1744,7 @@ function fillCornerForm(corner) {
   }
   const look = { ...DEFAULT_LOOK, ...inputs.look };
   for (const field of LOOK_FIELDS) {
-    const value = field.onInputs ? inputs[field.key] ?? 'boxing' : look[field.key];
+    const value = field.onInputs ? inputs[field.key] ?? 'boxing' : field.key === 'hairColor' ? look.hairNatural ?? look.hairColor : look[field.key];
     form.querySelector(`[data-look="${field.key}"]`).value = field.fromValue ? field.fromValue(value) : value;
   }
   const body = buildBody(inputs);
