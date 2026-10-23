@@ -36,7 +36,8 @@
 
 import { P, PARTICLES, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { advance, boutWinner, createWorld, deliverImpulse, placeFighter, point, WORLD } from '../src/physics.js';
+import { advance, boutWinner, breakJoint, createWorld, deliverImpulse, placeFighter, point, WORLD } from '../src/physics.js';
+import { GAIT_BUILDS } from './gait.js';
 import { fighterFor } from './weapons.js';
 import { jointViolations } from './anatomy.js';
 import { liftMargin } from '../src/physics/rising.js';
@@ -220,8 +221,27 @@ export const ALONE = {
   'old man (Stechzeug)': { ...PRESETS.passive, name: 'Old man', age: 72, exercise: 0.05, calories: 2200, outfit: { kind: 'tournament', design: 5 } },
 };
 
-/** One man knocked over with nobody near, and how he gets up. */
-export function riseAlone(inputs, seed, seconds = 30) {
+/** Lying face up (the chest's normal up) at the moment he starts to rise? */
+function faceUp(fighter) {
+  const pelvis = point(fighter.x, P.pelvis);
+  const axis = vecNorm(sub(point(fighter.x, P.neck), pelvis));
+  const left = sub(point(fighter.x, P.lHip), point(fighter.x, P.rHip));
+  const front = [axis[1] * left[2] - axis[2] * left[1], axis[2] * left[0] - axis[0] * left[2], axis[0] * left[1] - axis[1] * left[0]];
+  return front[1] > 0;
+}
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const vecNorm = (a) => {
+  const length = Math.hypot(...a) || 1;
+  return a.map((value) => value / length);
+};
+
+/**
+ * One man knocked over with nobody near, and how he gets up. `setup(world, fighter)` is called once he is down (an
+ * injury, his stamina spent). Per run: whether he stood, the time from starting to rise to standing, the attempts,
+ * where failed ones sank back, the floor's budget by stage, the seconds spent in each stage (summed over attempts),
+ * whether he lay face up when he started, whether a hand pressed on a knee, and whether he ended up crawling.
+ */
+export function riseAlone(inputs, seed, seconds = 30, { setup } = {}) {
   const world = createWorld([inputs, PRESETS.light], { seed: 700 + seed });
   const fighter = world.fighters[0];
   placeFighter(world.fighters[1], 4);
@@ -229,36 +249,49 @@ export function riseAlone(inputs, seed, seconds = 30) {
   const angle = seed * 2.4;
   const shove = fighter.body.masses.reduce((sum, mass) => sum + mass, 0) * 3.5;
   deliverImpulse({ fighter, shares: [[P.neck, 1], [P.lShoulder, 0.5], [P.rShoulder, 0.5], [P.pelvis, 0.3]], direction: [Math.cos(angle), 0.1, Math.sin(angle)], impulse: shove });
-  const out = { fell: false, stood: false, time: null, tries: 0, stalls: {}, budget: {} };
+  const out = { fell: false, stood: false, time: null, tries: 0, stalls: {}, budget: {}, stages: {}, faceUp: null, braced: false, crawling: false };
   let started = null;
   let stage = null;
+  let hurt = false;
   for (let elapsed = 0; elapsed < seconds; elapsed += 1 / 60) {
     advance(world, 1 / 60);
     if (fighter.state === 'down') out.fell = true;
+    if (out.fell && !hurt && setup) {
+      setup(world, fighter);
+      hurt = true;
+    }
     if (fighter.state === 'rising' && fighter.rise) {
-      if (stage === null) out.tries += 1;
+      if (stage === null) {
+        out.tries += 1;
+        out.faceUp ??= faceUp(fighter);
+      }
       started ??= elapsed;
       stage = fighter.rise.stage;
+      out.stages[stage] = (out.stages[stage] ?? 0) + 1 / 60;
+      if (fighter.rise.braced) out.braced = true;
       const budget = fighter.riseBudget;
       if (budget) (out.budget[stage] ??= []).push(budget.support / budget.weight);
     } else if (stage !== null) {
-      if (fighter.state === 'up') {
+      if (fighter.state === 'up' && !fighter.crawling) {
         out.stood = true;
         out.time = elapsed - started;
         break;
       }
+      if (fighter.crawling) out.crawling = true;
       out.stalls[stage] = (out.stalls[stage] ?? 0) + 1;
       stage = null;
     }
   }
+  if (fighter.crawling) out.crawling = true;
   return out;
 }
 
 export function riseAloneTable(characters = ALONE, seeds = 8, seconds = 30) {
   const STAGES = ['push', 'step', 'kneel', 'stand'];
   const rows = [];
-  for (const [label, inputs] of Object.entries(characters)) {
-    const runs = Array.from({ length: seeds }, (_, seed) => riseAlone(inputs, seed, seconds)).filter((run) => run.fell);
+  for (const [label, entry] of Object.entries(characters)) {
+    const { inputs, setup } = entry.inputs ? entry : { inputs: entry };
+    const runs = Array.from({ length: seeds }, (_, seed) => riseAlone(inputs, seed, seconds, { setup })).filter((run) => run.fell);
     const stood = runs.filter((run) => run.stood);
     const stalls = {};
     const budget = {};
@@ -273,6 +306,11 @@ export function riseAloneTable(characters = ALONE, seeds = 8, seconds = 30) {
       up: stood.length / Math.max(1, runs.length),
       time: stood.length ? mean(stood.map((run) => run.time)) : null,
       tries: mean(runs.map((run) => run.tries)),
+      up_face: mean(stood.filter((run) => run.faceUp).map((run) => run.time)),
+      down_face: mean(stood.filter((run) => !run.faceUp).map((run) => run.time)),
+      braced: runs.filter((run) => run.braced).length / Math.max(1, runs.length),
+      crawling: runs.filter((run) => run.crawling).length / Math.max(1, runs.length),
+      stages: Object.fromEntries(Object.keys(Object.assign({}, ...runs.map((run) => run.stages))).map((name) => [name, mean(runs.map((run) => run.stages[name] ?? 0))])),
       stalls,
       budget: Object.fromEntries(STAGES.filter((stage) => budget[stage]).map((stage) => [stage, mean(budget[stage])])),
     });
@@ -280,7 +318,35 @@ export function riseAloneTable(characters = ALONE, seeds = 8, seconds = 30) {
   return rows;
 }
 
-if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === 'alone') {
+// By build (tools/gait.js's bodies) and by injury: who gets up how fast from lying, and how.
+const hurtLeg = (world, fighter) => {
+  fighter.legDamage.r = 1e6;
+};
+export const RISE_BUILDS = {
+  ...Object.fromEntries(Object.entries(GAIT_BUILDS).filter(([label]) => label !== 'gambeson')),
+  // Starved further (BMI 13.5): frail.
+  frail: { ...GAIT_BUILDS.starved, calories: 1500 },
+  maximilian: PRESETS.maximilian,
+  'average, broken arm': { inputs: GAIT_BUILDS.average, setup: (world, fighter) => breakJoint(world, fighter, 'rElbow') },
+  'average, hurt leg': { inputs: GAIT_BUILDS.average, setup: hurtLeg },
+  'average, broken knee': { inputs: GAIT_BUILDS.average, setup: (world, fighter) => breakJoint(world, fighter, 'rKnee') },
+  'average, spent': { inputs: GAIT_BUILDS.average, setup: (world, fighter) => { fighter.stamina = 0; } },
+};
+
+export function printRiseTable(rows) {
+  const fixed = (value, digits = 1) => (value === null || Number.isNaN(value) || value === undefined ? '-' : value.toFixed(digits));
+  for (const row of rows) {
+    const stalls = Object.entries(row.stalls).map(([stage, count]) => `${stage} ${count}`).join(', ') || '-';
+    const stages = Object.entries(row.stages).map(([stage, value]) => `${stage} ${value.toFixed(2)}`).join(' ');
+    console.log(`${row.label.padEnd(22)} up ${(100 * row.up).toFixed(0).padStart(3)}% of ${row.falls}  time ${fixed(row.time).padStart(4)} s (face up ${fixed(row.up_face).padStart(4)}, down ${fixed(row.down_face).padStart(4)})  tries ${row.tries.toFixed(1)}  knee-hand ${(100 * row.braced).toFixed(0)}%  crawl ${(100 * row.crawling).toFixed(0)}%  stalls ${stalls}  | ${stages}`);
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === 'builds') {
+  const seeds = Number(process.argv[3] ?? 6);
+  const seconds = Number(process.argv[4] ?? 30);
+  printRiseTable(riseAloneTable(RISE_BUILDS, seeds, seconds));
+} else if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === 'alone') {
   const { buildBody } = await import('../src/body.js');
   const seeds = Number(process.argv[3] ?? 8);
   const seconds = Number(process.argv[4] ?? 30);

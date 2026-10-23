@@ -16,7 +16,8 @@ import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from '.
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
-import { beginRise, restedToRise, riseTarget, supportLimit, updateRise } from './physics/rising.js';
+import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
+import { limpOf, runChange, runLean, runSpeed, strideOf } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { formUp, placeWings, WINGS } from './formation.js';
@@ -163,6 +164,15 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     tending: undefined,
     // The player's stamina overdraft (physics/overdraft.js): player (the man played), faintDue (a cost would pass the floor), fainted (down in a faint), blackout (the screen's black, 0..1), faintGrace (s after waking).
     player: undefined, faintDue: undefined, fainted: undefined, blackout: undefined, faintGrace: undefined,
+    // Getting up (physics/rising.js): riseTries (failed tries since he was last up), floored (given up trying for now: out of the
+    // fight until he rises), crawlWeak (crawling because he could not stand; he tries again at crawlRetryAt), wobble (unsteady
+    // for a moment once up: { t, seconds, size }).
+    riseTries: undefined, floored: undefined, crawlWeak: undefined, crawlRetryAt: undefined, wobble: undefined,
+    // Running (physics/gait.js; everyone's run): runPose (the run's look, 0..1), runSlope (the slope under his run),
+    // turn and yawWas (the heading's rate in a run), gaitBody (his body's gait, cached), gaitAlong and gaitAccel (his
+    // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).
+    // gaitCarry: running, or carried on from a run until braked to his footwork's pace.
+    runMode: undefined, runPose: undefined, runSlope: undefined, turn: undefined, yawWas: undefined, gaitBody: undefined, gaitAlong: undefined, gaitAccel: undefined, gaitCarry: undefined,
   };
   for (let index = 0; index < count; index += 1) setPoint(fighter.x, index, toWorld(fighter, rest[index]));
   fighter.prev.set(fighter.x);
@@ -726,10 +736,15 @@ function runHand(fighter, kind, side) {
   return [(x + forward * arms[kind]) * H, (y + Math.max(0, forward) * arms.lift) * H, (side === 'l' ? z : -z) * H];
 }
 
-/** The run pose's share, eased towards 1 while the player runs with nothing else in his hands to do, back to 0 after (WORLD.runMode.ease). */
+/**
+ * The run pose's share, eased towards 1 while he runs with nothing else in his hands to do, back to 0 after
+ * (WORLD.runMode.ease): the player in his run mode; any other man running (at more than a crawl of a pace) with no
+ * enemy within his guard's distance (WORLD.runCarry.guardFrom: near one, he runs with his guard up).
+ */
 function easeRunPose(fighter, dt) {
-  if (!fighter.runMode && !fighter.runPose) return 0;
-  const free = fighter.runMode && !fighter.punch && !fighter.defence && !fighter.clinch && !fighter.pin && !fighter.pickup && !fighter.crawling && !fighter.mount && fighter.state === 'up';
+  const running = fighter.runMode || (fighter.running && !fighter.rush && fighter.move > 0.3 && (fighter.nearestFoe ?? Infinity) > WORLD.runCarry.guardFrom);
+  if (!running && !fighter.runPose) return 0;
+  const free = running && !fighter.punch && !fighter.defence && !fighter.clinch && !fighter.pin && !fighter.pickup && !fighter.crawling && !fighter.mount && fighter.state === 'up';
   const rate = Math.min(1, WORLD.runMode.ease * dt);
   const next = (fighter.runPose ?? 0) + ((free ? 1 : 0) - (fighter.runPose ?? 0)) * rate;
   fighter.runPose = next < 0.01 ? 0 : next;
@@ -1746,13 +1761,15 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
 function runTurnPose(fighter, intent, dt) {
   const spec = WORLD.runMode.turn;
   const share = fighter.runPose;
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  // The turn of his path once he is going (the way his speed points: it lags his facing, which turns first), else of his facing.
+  const heading = speed > spec.pathFrom ? Math.atan2(-fighter.rootVelocity[1], fighter.rootVelocity[0]) : fighter.yaw;
   if (fighter.yawWas === undefined || dt <= 0) fighter.turn = 0;
   else {
-    const rate = Math.atan2(Math.sin(fighter.yaw - fighter.yawWas), Math.cos(fighter.yaw - fighter.yawWas)) / dt;
+    const rate = Math.atan2(Math.sin(heading - fighter.yawWas), Math.cos(heading - fighter.yawWas)) / dt;
     fighter.turn = (fighter.turn ?? 0) + (rate - (fighter.turn ?? 0)) * (1 - Math.exp(-dt / spec.smooth));
   }
-  fighter.yawWas = fighter.yaw;
-  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  fighter.yawWas = heading;
   const cap = (value, most) => Math.max(-most, Math.min(most, value));
   return {
     // (Local +z is his left: a positive rate turns him to his right, so the roll and the leads are the other way.)
@@ -1774,10 +1791,11 @@ function updateIntent(world, fighter, dt) {
     headOffset: vec.scale(idle.headOffset, H), guardOffset: idle.guardOffset, guardTight: fighter.guardHigh > 0,
   };
   if (runPose > 0) {
-    // Running (the player's run mode): the guard's sway gives way to the run's lean into the stride.
+    // Running: the guard's sway gives way to the run's lean into the stride (physics/gait.js: more the faster, forward
+    // gathering speed, back braking, hunched when spent).
     const spec = WORLD.runMode;
     intent.twist *= 1 - runPose;
-    intent.lean = intent.lean * (1 - runPose) + spec.lean * runPose;
+    intent.lean = intent.lean * (1 - runPose) + runLean(fighter, dt) * runPose;
     intent.dip = intent.dip * (1 - runPose) + spec.dip * runPose;
     intent.shift *= 1 - runPose;
     // The body rises as the feet part (the flight) and sinks as they pass.
@@ -1786,6 +1804,8 @@ function updateIntent(world, fighter, dt) {
   } else if (fighter.turn !== undefined) {
     fighter.turn = 0;
     fighter.yawWas = undefined;
+    fighter.gaitAlong = undefined;
+    fighter.gaitAccel = 0;
   }
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
@@ -1794,6 +1814,22 @@ function updateIntent(world, fighter, dt) {
     const sit = ridingLean(fighter, dt);
     intent.lean += sit.lean;
     intent.roll = sit.roll;
+  }
+  // Just up off the floor: unsteady for a moment, the trunk and hips swaying as his legs find their balance (physics/rising.js standWobble).
+  if (fighter.wobble) {
+    const wobble = fighter.wobble;
+    wobble.t += dt;
+    if (wobble.t >= wobble.seconds || fighter.state !== 'up' || fighter.crawling) fighter.wobble = null;
+    else {
+      const [first, second] = WORLD.rise.wobble.hz;
+      const fade = (1 - wobble.t / wobble.seconds) ** 2;
+      const size = wobble.size * fade;
+      const phase = fighter.id * 1.3;
+      intent.lean += size * Math.sin(wobble.t * Math.PI * 2 * first + phase);
+      intent.roll = (intent.roll ?? 0) + size * 0.7 * Math.sin(wobble.t * Math.PI * 2 * second + phase * 2);
+      intent.shift += size * 0.4 * Math.sin(wobble.t * Math.PI * 2 * second + phase + 1);
+      intent.dip += size * 0.15;
+    }
   }
   // Dazed: the head lolls and he sways, unsteady, his guard pulled in.
   const dazed = dazedShare(fighter);
@@ -2131,7 +2167,7 @@ export function startCrawl(world, fighter, reason) {
 /** Still in the fight: not out, and not crawling away. */
 export function inFight(fighter) {
   // A player walking about on his knees (walk mode), or crawling by choice, has not left it; a man who fled the field has.
-  return fighter.state !== 'out' && !fighter.fled && !fighter.dormant && !(fighter.crawling && !fighter.walking && !fighter.crawlChosen);
+  return fighter.state !== 'out' && !fighter.fled && !fighter.dormant && !fighter.floored && !(fighter.crawling && !fighter.walking && !fighter.crawlChosen);
 }
 
 /**
@@ -2260,10 +2296,11 @@ function updateFeet(fighter, dt) {
   }
   // Getting up, he stands up off the feet where he put them; he steps once up.
   if (fighter.state === 'rising') return;
-  // Running (the player's run mode): quicker, longer steps, the next foot away before the last has landed (WORLD.runMode.step).
-  // On a stair (or a steep slope) the stride is the short quick step of the stair, a foot to a tread, not the leaping stride of the flat.
+  // Running (anyone at a run's pace, or in the run's pose): longer steps, the next foot away before the last has landed, laid out for
+  // his speed and body (physics/gait.js strideOf). On a stair (or a steep slope) the stride is the short quick step of the stair, a foot
+  // to a tread, not the leaping stride of the flat.
   const stair = fighter.runSlope > WORLD.runMode.stairs.slope;
-  const run = fighter.runPose > 0.3 ? (stair ? WORLD.runMode.stairs.step : WORLD.runMode.step) : null;
+  const run = striding(fighter) ? (stair ? WORLD.runMode.stairs.step : strideOf(fighter, Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]))) : null;
   const spec = run ? { ...WORLD.step, ...run } : WORLD.step;
   const feet = Object.values(fighter.feet);
   for (const [side, foot] of Object.entries(fighter.feet)) {
@@ -2287,17 +2324,19 @@ function updateFeet(fighter, dt) {
     }
   }
   if (worst && !stepping) {
-    // Step to where the stance will be, not where it is: lead the motion.
-    const to = landingOf(fighter, worst, spec, run ? 1 : null, 0);
+    // Step to where the stance will be, not where it is: lead the motion. (On a hurt leg he hobbles: limpOf.)
+    const own = run && !stair ? limped(fighter, worst, spec) : spec;
+    const to = landingOf(fighter, worst, own, run ? 1 : null, 0);
     // (floorFrom, floorTo: the floor under the foot at each end of the step, set on terrain: groundStance.)
     // (A run's long stride is aimed again as it goes, while the foot is in the air: `retarget`.)
-    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined, seconds: spec.seconds, lift: run ? spec.lift : undefined, retarget: Boolean(run) && !stair };
+    // (A run's foot comes up behind him at once, the heel towards the seat, and is highest a third of the way through its swing: `early`.)
+    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined, seconds: own.seconds, lift: run ? spec.lift : undefined, retarget: Boolean(run) && !stair, early: Boolean(run) && !stair };
   }
   for (const foot of feet) {
     if (!foot.step) continue;
     foot.step.t += dt / foot.step.seconds;
     if (foot.step.retarget) {
-      if (foot.step.t < WORLD.runMode.settle) foot.step.to = landingOf(fighter, foot, spec, 1, foot.step.t);
+      if (foot.step.t < WORLD.runMode.settle && run) foot.step.to = landingOf(fighter, foot, { ...limped(fighter, foot, spec), seconds: foot.step.seconds }, 1, foot.step.t);
       else foot.step.retarget = false;
     }
     if (foot.step.t >= 1) {
@@ -2305,6 +2344,20 @@ function updateFeet(fighter, dt) {
       foot.step = null;
     }
   }
+}
+
+/** Is he striding (a run's footwork): in the run's pose, or running (or carried on from a run) faster than a run's pace (WORLD.gait.runFrom)? */
+function striding(fighter) {
+  if (fighter.crawling || fighter.pin || fighter.finisher?.kneeling || fighter.rush) return false;
+  return fighter.runPose > 0.3 || (fighter.gaitCarry && Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) > WORLD.gait.runFrom);
+}
+
+/** A run's step for this foot on a hurt leg (physics/gait.js limpOf): the swing off the bad leg quicker, the step shorter. */
+function limped(fighter, foot, spec) {
+  if (fighter.legDamage.l + fighter.legDamage.r <= 0 && fighter.stamina > 0) return spec;
+  const limp = limpOf(fighter, foot.index === P.lFoot ? 'l' : 'r');
+  if (limp.seconds >= 1 && limp.length >= 1) return spec;
+  return { ...spec, seconds: spec.seconds * limp.seconds, lead: 1 + (spec.lead - 1) * limp.length };
 }
 
 /**
@@ -2345,7 +2398,7 @@ function turnedStep(fighter, foot, to) {
   // Left of the line of travel is +, as the foot index says: the left foot is on that side.
   const side = foot.index === P.lFoot ? 1 : -1;
   const inner = side * fighter.turn < 0;
-  const wanted = side * Math.max(side * across, spec.gap * H * share) + (inner ? side * spec.wide * H * share : 0);
+  const wanted = side * Math.max(side * across, spec.gap * H * Math.sqrt(share)) + (inner ? side * spec.wide * H * share : 0);
   const length = along + (inner ? -spec.inner : spec.outer) * H * share;
   to[0] += (length - along) * ux - (wanted - across) * uz;
   to[2] += (length - along) * uz + (wanted - across) * ux;
@@ -2375,8 +2428,22 @@ function rawFootTarget(fighter, foot) {
   const ease = t * t * (3 - 2 * t);
   const along = vec.lerp(foot.step.from, foot.step.to, ease);
   // On terrain the foot rises to the next tread early (and drops to a lower one late), and clears the edge.
-  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * Math.sin(Math.PI * t) + stepHeight(foot.step, t), along[2]];
-  return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * Math.sin(Math.PI * t), along[2]];
+  const arc = Math.sin(Math.PI * (foot.step.early ? t ** WORLD.gait.heelUp : t));
+  if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * arc + stepHeight(foot.step, t), along[2]];
+  return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * arc, along[2]];
+}
+
+/**
+ * How fast a run's swinging foot is meant to go (the swing's own rate along its path, horizontally): its muscles drive it with
+ * its target, not against it (at a sprint the foot comes through at twice the body's speed). Nothing for any other step: a
+ * guard's quick step is placed, a planted foot stands.
+ */
+function swingVelocity(foot) {
+  const step = foot.step;
+  if (!step?.early || foot.lifted) return [0, 0, 0];
+  const t = step.t;
+  const rate = (6 * t * (1 - t)) / step.seconds;
+  return [(step.to[0] - step.from[0]) * rate, 0, (step.to[2] - step.from[2]) * rate];
 }
 
 /** The floor height under a foot a share `t` of the way through a step onto terrain, and the clearance it needs over the edge. */
@@ -2611,7 +2678,7 @@ function checkBalance(world, fighter) {
   // long lunge are on it; what counts is how far outside it they are.
   const planted = Object.values(fighter.feet).every((foot) => !foot.lifted);
   // (A runner's hips are never over a base: they are carried from one foot to the other.)
-  const outside = planted && !fighter.runMode ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
+  const outside = planted && !striding(fighter) ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
@@ -2750,13 +2817,20 @@ function moveRoot(world, fighter, dt) {
   const punch = fighter.punch;
   // (Not kneeling over a man: the stab is driven down from where he kneels.)
   if (punch?.spec.step && !(punch.load > 0) && !fighter.finisher?.kneeling && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
-  if (fighter.running && !fighter.rush) drive = fighter.move * (fighter.runMode ? WORLD.runMode.speedFactor : WORLD.run.speedFactor);
+  // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.
+  let runPace = null;
+  if (fighter.running && !fighter.rush && !fighter.crawling) {
+    runPace = Math.max(0, fighter.move) * runSpeed(fighter, Boolean(fighter.runMode));
+    // Running to a place (an AI man's goTo; the player's is only a way, a little ahead of him): no faster than he can stop there.
+    if (fighter.goTo && !fighter.runMode) runPace = Math.min(runPace, arrivalSpeed(fighter, Math.hypot(fighter.goTo[0] - fighter.root[0], fighter.goTo[2] - fighter.root[1])));
+  }
   // On his knees: slow, and no faster for trying.
   if (fighter.crawling) drive = Math.max(-0.3, Math.min(1, fighter.move)) * WORLD.crawl.speed;
   // In the net: short steps, stumbling.
   if (fighter.netted) drive *= NET.step;
+  if (fighter.netted && runPace !== null) runPace *= NET.step;
   if (fighter.rush) {
-    // A charge: flat out at the opponent, at what the legs can reach.
+    // A charge (the bull rush of a bout, from a step or two away): at what the legs can reach in it.
     fighter.rush.t += dt;
     drive = WORLD.rush.speedFactor;
     if (fighter.rush.t >= fighter.rush.duration) fighter.rush = null;
@@ -2768,7 +2842,10 @@ function moveRoot(world, fighter, dt) {
   if (fighter.defence?.name === 'sidestep' && !fighter.rush && !fighter.crawling) side = fighter.defence.side * DEFENCES.sidestep.step * (fighter.netted ? NET.step : 1);
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
-  const wanted = [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot];
+  const footwork = WORLD.footSpeed * legs * gear.foot;
+  const wanted = runPace === null
+    ? [(forward[0] * drive + left[0] * side) * footwork, (forward[2] * drive + left[2] * side) * footwork]
+    : [forward[0] * runPace + left[0] * side * footwork, forward[2] * runPace + left[2] * side * footwork];
   // On a stair or a steep slope he goes only as fast as his feet can climb (up or down) it.
   if (world.arena.terrain) {
     const slowed = Math.min(climbShare(fighter, wanted), leashShare(fighter));
@@ -2777,11 +2854,20 @@ function moveRoot(world, fighter, dt) {
   }
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
-  const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
-  // (Off the ground, the legs push on nothing.)
-  const scale = fighter.air ? 0 : size > limit ? limit / size : 1;
-  fighter.rootVelocity[0] += change[0] * scale;
-  fighter.rootVelocity[1] += change[1] * scale;
+  const speedNow = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  // (A run let go carries on at a run's pace until he has braked to his footwork's; a surge or a lunge of the guard's footwork is not a run.)
+  fighter.gaitCarry = runPace !== null || (fighter.gaitCarry && speedNow > footwork * 1.05);
+  if (fighter.gaitCarry && !fighter.rush && !fighter.crawling && !fighter.air) {
+    // Running, or carried on from a run: he gathers speed and brakes as his body can (gait.js runChange), and turns no
+    // sharper than his brake allows across his way.
+    runTowards(fighter, wanted, speedNow, dt);
+  } else {
+    const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
+    // (Off the ground, the legs push on nothing.)
+    const scale = fighter.air ? 0 : size > limit ? limit / size : 1;
+    fighter.rootVelocity[0] += change[0] * scale;
+    fighter.rootVelocity[1] += change[1] * scale;
+  }
   const { halfX, halfZ, drop } = world.arena;
   const margin = WORLD.footing.edgeMargin;
   const walkedFrom = fighter.root[1];
@@ -2801,14 +2887,49 @@ function moveRoot(world, fighter, dt) {
   if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter);
 }
 
+/** The speed (m/s) from which a runner stops in `distance` m, at his brake (physics/gait.js: `arrive` of it, and never under a walk). */
+function arrivalSpeed(fighter, distance) {
+  return Math.max(WORLD.footSpeed, Math.sqrt(2 * WORLD.gait.arrive * runChange(fighter, 1, 0, 1) * Math.max(0, distance)));
+}
+
+/**
+ * The stance's velocity changed towards `wanted` as a runner's can: along his way, gathering speed at his start and
+ * braking at his brake (physics/gait.js runChange); across it (a turn), at his brake.
+ */
+function runTowards(fighter, wanted, speed, dt) {
+  const velocity = fighter.rootVelocity;
+  const wantedSpeed = Math.hypot(wanted[0], wanted[1]);
+  if (speed < 0.1) {
+    const change = [wanted[0] - velocity[0], wanted[1] - velocity[1]];
+    const size = Math.hypot(change[0], change[1]);
+    const limit = runChange(fighter, speed, wantedSpeed, dt);
+    const scale = size > limit ? limit / size : 1;
+    velocity[0] += change[0] * scale;
+    velocity[1] += change[1] * scale;
+    return;
+  }
+  const ux = velocity[0] / speed;
+  const uz = velocity[1] / speed;
+  const change = [wanted[0] - velocity[0], wanted[1] - velocity[1]];
+  const along = change[0] * ux + change[1] * uz;
+  const across = [change[0] - along * ux, change[1] - along * uz];
+  const alongMost = runChange(fighter, speed, speed + along, dt);
+  const acrossMost = runChange(fighter, speed, 0, dt);
+  const alongDone = Math.max(-alongMost, Math.min(alongMost, along));
+  const acrossSize = Math.hypot(across[0], across[1]);
+  const acrossScale = acrossSize > acrossMost ? acrossMost / acrossSize : 1;
+  velocity[0] += alongDone * ux + across[0] * acrossScale;
+  velocity[1] += alongDone * uz + across[1] * acrossScale;
+}
+
 /**
  * On terrain, the share of the speed he wants that his feet can follow: his hips outside the base of his feet by more than
  * WORLD.terrain.leash.from of what throws him (checkBalance's reach) slow him, to a stop at leash.to: the stance must not
  * outrun the steps, as it does up a flight taken fast in heavy gear, or a man who has not the legs for it goes over.
- * The player's run mode, which carries the hips over the feet and is not thrown by it, is not held.
+ * A run in the run's pose, which carries the hips over the feet and is not thrown by it, is not held.
  */
 function leashShare(fighter) {
-  if (fighter.air || fighter.runMode || !fighter.feet || fighter.feet.l.lifted || fighter.feet.r.lifted) return 1;
+  if (fighter.air || fighter.runPose > 0.5 || !fighter.feet || fighter.feet.l.lifted || fighter.feet.r.lifted) return 1;
   const outside = outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot));
   const reach = WORLD.balance.reach * (fighter.body.lengths.thigh + fighter.body.lengths.shank) * balanceFooting(fighter);
   const leash = WORLD.terrain.leash;
@@ -2853,7 +2974,7 @@ function climbShare(fighter, wanted) {
     steepest = Math.max(steepest, Math.abs(ahead - behind) / (2 * spec.slopeSpan));
   }
   // (The run's step reads the slope: a stair is stepped, a flat is leapt along: updateFeet.)
-  if (fighter.runMode) fighter.runSlope = steepest;
+  fighter.runSlope = steepest;
   const rate = steepest * speed;
   return rate > spec.climb ? spec.climb / rate : 1;
 }
@@ -2985,7 +3106,7 @@ function poseProxy(fighter, dt) {
 }
 
 /**
- * Each running fighter's distance to the nearest enemy not out
+ * Each running fighter's distance to the nearest enemy not out (nor dormant: his section asleep)
  * (`nearestFoe`, m), as far as WORLD.runCarry.relaxFrom; beyond it, or not
  * running, Infinity (all a running man's arms need to know). A grid, not every pair: a big battle has
  * thousands of pairs.
@@ -2997,7 +3118,7 @@ function measureNearestFoes(world) {
     for (const fighter of fighters) {
       let nearest = Infinity;
       for (const other of fighters) {
-        if (other.corner === fighter.corner || other.state === 'out') continue;
+        if (!hostile(other, fighter) || other.state === 'out' || other.dormant) continue;
         nearest = Math.min(nearest, Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
       }
       fighter.nearestFoe = nearest;
@@ -3014,7 +3135,7 @@ function measureNearestFoes(world) {
     }
     for (const other of grid.near(index)) {
       const foe = fighters[other];
-      if (foe.corner === fighter.corner || foe.state === 'out') continue;
+      if (!hostile(foe, fighter) || foe.state === 'out' || foe.dormant) continue;
       nearest = Math.min(nearest, Math.hypot(foe.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], foe.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
     }
     fighter.nearestFoe = nearest;
@@ -3143,21 +3264,29 @@ function updateTimers(world, fighter, dt) {
     }
     // Held down, if the hold kept his trunk low he did not get up; nor did
     // he if his limbs could not lift him. He sinks back and tries again in a moment.
-    if (result === 'beaten' || (result === 'stood' && pinnedBy(world, fighter).length && neckLow(fighter))) {
+    const held = (result === 'beaten' || result === 'stood') && pinnedBy(world, fighter).length > 0;
+    if (result === 'beaten' || (result === 'stood' && held && neckLow(fighter))) {
+      const pushed = fighter.rise?.pushed;
       fighter.state = 'down';
       fighter.motorScale = 0;
-      fighter.downTimer = WORLD.pin.retry;
       fighter.restFor = 0;
       fighter.rise = null;
       fighter.triedRise = true;
+      // Held, he struggles again at once; beaten by his own weight, he lies and gets his breath first, longer each time.
+      fighter.downTimer = WORLD.pin.retry;
+      if (!held) failedRise(world, fighter, pushed);
     } else if (result === 'stood') {
-      // On his feet: any hold on him is broken, and he starts square.
+      // On his feet: any hold on him is broken, and he starts square, unsteady for a moment.
+      fighter.wobble = fighter.crawling ? null : standWobble(fighter);
       fighter.state = 'up';
       fighter.rise = null;
       fighter.knock = [0, 0, 0];
+      if (!fighter.crawling) Object.assign(fighter, { riseTries: 0, floored: false, crawlWeak: false });
       for (const holder of world.fighters) if (holder.pin?.target === fighter.id) holder.pin = null;
     }
   } else if (fighter.state === 'up') {
+    // Crawling because he could not stand: when his strength is back enough, he tries again from his knees.
+    if (fighter.crawlWeak && fighter.crawling && world.time >= fighter.crawlRetryAt) retryFromKnees(world, fighter);
     // Hurt after a knockdown: the legs and arms come back over seconds.
     const recovering = fighter.hurt > 0 ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
     // Blood loss: weaker the more is gone.
@@ -3166,6 +3295,46 @@ function updateTimers(world, fighter, dt) {
     const battered = 1 - (1 - WORLD.injury.shockStrength) * Math.min(1, (fighter.trauma?.trunk ?? 0) / WORLD.injury.trunkFatal) ** 2;
     fighter.motorScale = (fighter.stun > 0 ? 0.55 : 1) * recovering * shock * battered * staggerShare(fighter, WORLD.stagger.strength) * (1 - WORLD.daze.strength * dazedShare(fighter));
   }
+}
+
+/**
+ * He could not get up (not held: his own weight beat him). He lies and gets his breath back first, the longer the more
+ * tries he has made and the less his wind (WORLD.rise.rest). After `crawlAfter` tries he gives it up for now: if he got
+ * as far as his hands and knees (`pushed`), he crawls (out of the fight on his knees, trying to stand again now and then);
+ * if not, he lies (`floored`: out of the fight until he rises), trying again after the longest rest.
+ */
+function failedRise(world, fighter, pushed) {
+  const spec = WORLD.rise.rest;
+  fighter.riseTries = (fighter.riseTries ?? 0) + 1;
+  const tries = fighter.riseTries;
+  fighter.downTimer = Math.min(spec.most, spec.seconds * (1 + spec.perTry * (tries - 1)) / Math.max(0.3, fighter.body.aerobic));
+  if (tries < spec.crawlAfter) return;
+  if (pushed && !fighter.broken.has('neck')) {
+    fighter.crawlWeak = true;
+    fighter.crawlRetryAt = world.time + spec.most;
+    startCrawl(world, fighter, 'cannot get up: crawls');
+  } else if (!fighter.floored) {
+    fighter.floored = true;
+    world.events.push({ time: world.time, kind: 'floored', fighter: fighter.id, effects: ['cannot get up'] });
+  }
+}
+
+/**
+ * Crawling because he could not stand: if his legs (as strong as he is now) could stand him, with his hands on his knee if
+ * need be, he tries, from his knees: a foot brought through, then up. If not, he crawls on and tries again later.
+ */
+function retryFromKnees(world, fighter) {
+  fighter.crawlRetryAt = world.time + WORLD.rise.rest.most;
+  if (legBroken(fighter) || fighter.netted || fighter.mount) return;
+  const recovering = fighter.hurt > 0 && fighter.hurtFor ? 1 - (1 - WORLD.hurt.hurtStrength) * (fighter.hurt / fighter.hurtFor) : 1;
+  if (riseMargins(fighter, recovering).stand < WORLD.rise.retryMargin) return;
+  fighter.crawling = false;
+  fighter.crawlWeak = false;
+  fighter.state = 'rising';
+  fighter.move = 0;
+  fighter.strafe = 0;
+  beginRise(fighter, { fromKnees: true });
+  fighter.triedRise = true;
 }
 
 /** Share of a muscle's force available `elapsed` seconds after its part was hit. */
@@ -3189,7 +3358,7 @@ export function standingTarget(fighter, index) {
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
   if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
-  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: [0, 0, 0] };
+  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: swingVelocity(fighter.feet[info.side]) };
   if (info.knee) {
     const side = info.side;
     if (fighter.feet[side].lifted) return { target: toWorld(fighter, desired), velocity: point(fighter.v, info.hip) };
@@ -3316,6 +3485,19 @@ function handHealth(fighter, side) {
   const beaten = Math.max(fighter.damage[ARM_PARTS[side][0]] ?? 0, fighter.damage[ARM_PARTS[side][1]] ?? 0);
   const broken = fighter.injuries.some((injury) => injury.kind === 'hand' && injury.side === side) ? 0.6 : 1;
   return broken * (1 - WORLD.hurt.armForcePerDamage * beaten);
+}
+
+/**
+ * How much of each limb's own strength he has now (0..1), as integrate drives it: nothing through a limb hanging limp
+ * (a broken elbow, knee or hip); an arm as sound as its hand and as fresh as his stamina (fatigueScale), a leg less
+ * the damage it has taken, and tired by `WORLD.rise.legFatigue` of what tires the arms (the legs hold out better).
+ */
+export function limbShares(fighter) {
+  const fatigue = fatigueScale(fighter.stamina);
+  const legFatigue = 1 - WORLD.rise.legFatigue * (1 - fatigue);
+  const arm = (side) => (fighter.limp.has(P[`${side}Hand`]) ? 0 : fatigue * handHealth(fighter, side));
+  const leg = (side) => (fighter.limp.has(P[`${side}Foot`]) ? 0 : legFatigue * (1 - 0.6 * Math.min(1, fighter.legDamage[side] / legCapacity())));
+  return { arm: { l: arm('l'), r: arm('r') }, leg: { l: leg('l'), r: leg('r') } };
 }
 
 function solveConstraints(fighter, h, reposition = false) {

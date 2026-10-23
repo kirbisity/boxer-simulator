@@ -166,6 +166,9 @@ test('the men wake when he enters the portal, fight on, and sleep again as he go
   const moved = guards.map((guard, index) => Math.hypot(...hipsAt(guard).map((value, axis) => value - start[index][axis])));
   assert.ok(moved.some((distance) => distance > 1), `moved: ${moved.map((distance) => distance.toFixed(2))}`);
   // Out of the hall's reach again: the hall sleeps at once, those who stayed in it where they stood; those who came after him are of the yard now, and awake.
+  // (Nobody thinks while he walks back: the guards are stopped where they are, not left running on at where he was, which at a run's
+  // pace (physics/gait.js) bowls him over.)
+  for (const guard of guards) Object.assign(guard, { move: 0, running: false, goTo: null });
   walk(world, me, [[18, 0], [10, 0]], { seconds: 100, within: 0.5 });
   assert.deepEqual(world.stage.active, ['yard']);
   const hallMen = world.fighters.filter((fighter) => fighter.spawn?.section === 'hall');

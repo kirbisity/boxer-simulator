@@ -244,7 +244,8 @@ for (const [name, route, label] of [['ronin', FLIGHT, 'the straight flights, up 
     const { result, errors, within, p5, p95, lowestHips } = climb(world, fighter, route);
     assert.equal(result.reached, route.length, `stuck at ${result.stuckAt}`);
     assert.equal(fighter.state, 'up');
-    assert.deepEqual(world.events.filter((event) => ['broken', 'killed', 'fell', 'impact'].includes(event.kind)).map((event) => event.kind), [], 'no falls on the way');
+    // (His own: a gardener who flees at a run and drops to cower may break a hand, which is not the walker's.)
+    assert.deepEqual(world.events.filter((event) => event.fighter === fighter.id && ['broken', 'killed', 'fell', 'impact'].includes(event.kind)).map((event) => event.kind), [], 'no falls on the way');
     assert.ok(errors.length > 100, 'many feet measured');
     // Planted feet sit on the tread (the ankle's own height above it), within 3 cm for the most part; the odd one trailing a step is further.
     assert.ok(within >= (name === 'ronin' ? 0.9 : 0.7), `${(within * 100).toFixed(0)}% of planted feet within 3 cm`);

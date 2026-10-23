@@ -7,7 +7,7 @@ import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { CONTROL, directFighter, keyStick, newOrders } from '../src/control.js';
 import { advance, createWorld, placeFighter, placeOnFloor } from '../src/physics.js';
-import { WORLD } from '../src/physics/config.js';
+import { runSpeed } from '../src/physics/gait.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { TESTYARD } from '../src/levelmode/stages/testyard.js';
 import { stageThink, updateStage } from '../src/levelmode/stage.js';
@@ -45,9 +45,9 @@ function yard(preset = 'forger') {
   return { world, orders, me, step };
 }
 
-/** Metres a second over `seconds` after a short start. */
-function speedOver(game, seconds = 1.5) {
-  game.step(0.8);
+/** Metres a second over `seconds` after a start of `start` s. */
+function speedOver(game, seconds = 1.5, start = 0.8) {
+  game.step(start);
   const from = hips(game.me);
   game.step(seconds);
   const to = hips(game.me);
@@ -105,7 +105,7 @@ test('facing: in a level, only a man aware of him counts as near', () => {
   assert.ok(turnBetween(game.me.yaw, toward) < 0.35, 'an aware man 3 m off is');
 });
 
-test('run mode: a real gait, quicker than the guard by the configured factor, for the forger and a man in plate', () => {
+test('run mode: a real gait, as fast as his body runs (physics/gait.js), for the forger and a man in plate', () => {
   const rows = [];
   for (const key of ['forger', 'dunnottarKnight']) {
     const walking = yard(key);
@@ -113,15 +113,18 @@ test('run mode: a real gait, quicker than the guard by the configured factor, fo
     const combat = speedOver(walking);
     const running = yard(key);
     running.orders.keyStick = keyStick(new Set(['w']), AHEAD, true);
-    const sprint = speedOver(running);
+    // (Up to speed first: a sprint takes a second or two to gather.)
+    const sprint = speedOver(running, 1.5, 2.5);
     rows.push({ key, combat, sprint });
     assert.equal(running.me.runMode, true);
     assert.equal(running.me.state, 'up', `${key} stays on his feet at a run`);
-    // The ratio is the config's: the legs and the gear scale both alike.
-    assert.ok(Math.abs(sprint / combat / WORLD.runMode.speedFactor - 1) < 0.2, `${key}: ${sprint.toFixed(2)} m/s run against ${combat.toFixed(2)} m/s in the guard stance`);
-    assert.ok(sprint > combat * WORLD.run.speedFactor * 1.3, `${key}: noticeably quicker than the AI's run`);
+    // Flat out: his body's sprint, well beyond the guard's footwork and an AI man's run.
+    const top = runSpeed(running.me, true);
+    assert.ok(Math.abs(sprint / top - 1) < 0.12, `${key}: ${sprint.toFixed(2)} m/s against his body's ${top.toFixed(2)}`);
+    assert.ok(sprint > combat * 3, `${key}: ${sprint.toFixed(2)} m/s run against ${combat.toFixed(2)} m/s in the guard stance`);
+    assert.ok(sprint > runSpeed(running.me, false) * 1.3, `${key}: noticeably quicker than the AI's run`);
   }
-  assert.ok(rows[0].sprint > 3.5 && rows[0].sprint < 7, `the forger sprints at a man's pace (${rows[0].sprint.toFixed(2)} m/s)`);
+  assert.ok(rows[0].sprint > 5 && rows[0].sprint < 8.5, `the forger sprints at a man's pace (${rows[0].sprint.toFixed(2)} m/s)`);
   assert.ok(rows[1].sprint < rows[0].sprint * 0.75, 'a man in plate is slower than one in a gambeson');
 });
 
@@ -180,7 +183,8 @@ test('drag only: the stick held at a run keeps him running, and letting go stops
   const from = hips(game.me);
   game.step(1.5);
   const to = hips(game.me);
-  assert.ok(to[0] - from[0] < 0.6, `and he comes to rest (${(to[0] - from[0]).toFixed(2)} m in 1.5 s)`);
+  // (He brakes as his legs can (physics/gait.js): a few strides from a sprint, not dead in his tracks.)
+  assert.ok(to[0] - from[0] < 3, `and he comes to rest (${(to[0] - from[0]).toFixed(2)} m in 1.5 s)`);
   assert.ok(Math.hypot(...game.me.rootVelocity) < 0.3, 'standing');
 });
 
