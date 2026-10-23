@@ -2849,7 +2849,7 @@ function moveRoot(world, fighter, dt) {
   const gear = fighter.body.gear;
   const footwork = WORLD.footSpeed * legs * gear.foot;
   const wanted = runPace === null
-    ? [(forward[0] * drive + left[0] * side) * footwork, (forward[2] * drive + left[2] * side) * footwork]
+    ? [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot]
     : [forward[0] * runPace + left[0] * side * footwork, forward[2] * runPace + left[2] * side * footwork];
   // On a stair or a steep slope he goes only as fast as his feet can climb (up or down) it.
   if (world.arena.terrain) {
