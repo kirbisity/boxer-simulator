@@ -14,6 +14,7 @@ import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
+import { runSpeed } from './physics/gait.js';
 import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
 
 export const CONTROL = {
@@ -209,9 +210,14 @@ function steer(world, fighter, orders, opponent, dt) {
       orders.runSteer ??= { bend: 0 };
       if (running && !orders.guard && !fighter.mount && world.arena?.terrain) {
         go = runSteer(world, fighter, orders.runSteer, way, dt, { drops: (dir) => dropsAhead(world, fighter, dir) });
-      } else orders.runSteer.bend = 0;
+      } else {
+        orders.runSteer.bend = 0;
+        orders.runSteer.speedCap = null;
+      }
       fighter.goTo = [pelvis[0] + go[0] * 3, 0, pelvis[2] + go[1] * 3];
       fighter.move = pace * slow;
+      // A man in his way: the run held to a pace he can brush past him at (runsteer.js).
+      if (orders.runSteer.speedCap) fighter.move = Math.min(fighter.move, orders.runSteer.speedCap / runSpeed(fighter, true));
       fighter.running = running && !orders.guard;
     }
     // A run is another gait, not the guard hurrying: the weapon carried, nothing guarded, his heading his own. It costs breath.
