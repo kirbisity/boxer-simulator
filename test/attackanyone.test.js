@@ -124,8 +124,15 @@ test('the AI never strikes a civilian or a friend: blue leaves grey alone, whate
   const world = createWorld([{ inputs: structuredClone(PRESETS.knight), corner: 'red' }, { inputs: structuredClone(PRESETS.amateur), corner: 'grey' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 4 });
   const [, civilian, foe] = world.fighters;
   placeFighter(civilian, world.fighters[0].root[0] + 0.9, world.fighters[0].root[1]);
-  advance(world, 5, (w, dt) => thinkAll(w, dt, new Set([0])));
-  assert.equal(world.events.filter((event) => event.kind === 'landed' && event.attacker === foe.id && event.defender === civilian.id).length, 0, 'blue never struck him');
+  const fought = new Set();
+  advance(world, 5, (w, dt) => {
+    thinkAll(w, dt, new Set([0]));
+    fought.add(opponentFor(w, foe)?.id);
+  });
+  assert.ok(!fought.has(civilian.id), 'blue never goes for him');
+  // (Blue runs in past him at red: a blow can find him only once the run-in has shoved him into its way, never before.)
+  const shoved = world.events.find((event) => event.kind === 'bump' && [event.attacker, event.defender].includes(civilian.id))?.time ?? Infinity;
+  assert.equal(world.events.filter((event) => event.kind === 'landed' && event.attacker === foe.id && event.defender === civilian.id && event.time < shoved).length, 0, 'blue never struck him');
   assert.equal(opponentFor(world, foe)?.corner, 'red', 'blue picks red');
 });
 

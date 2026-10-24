@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
-import { advance, createWorld, crashBetween, crashHarm, crashHardness, crashMass, crashOf, fighterParty, perform, placeFighter, point, WORLD } from '../src/physics.js';
+import { advance, createWorld, crashBetween, crashBraced, crashHarm, crashHardness, crashMass, crashOf, fall, fighterParty, perform, placeFighter, point, wholeVelocity, WORLD } from '../src/physics.js';
 import { vec } from '../src/pose.js';
 import { crashOnce } from '../tools/crash.js';
 
@@ -162,4 +162,134 @@ test('two horses head-on take the crash\'s energy through their barding, the lig
   assert.ok(steppe > 1.5 * destrier, `${steppe.toFixed(0)} J v ${destrier.toFixed(0)} J`);
   const [first, second] = meet('knight', 0.65);
   assert.ok(first < 0.3 * destrier && second < 0.3 * destrier, `brushing ${first.toFixed(0)} J and ${second.toFixed(0)} J`);
+});
+
+/** A man running flat out through a file of men standing 1.3 m apart (his run held on a point past them), for six seconds. */
+function runThrough(runnerKey, targetKey, count, seed, { player = false, stamina = 1 } = {}) {
+  const world = createWorld([PRESETS[runnerKey], ...Array.from({ length: count }, () => ({ ...PRESETS[targetKey], style: 'unskilled' }))], { seed, arena: { halfX: 40, halfZ: 20 } });
+  const [runner, ...men] = world.fighters;
+  placeFighter(runner, -10, 0);
+  men.forEach((man, index) => placeFighter(man, index * 1.3, 0));
+  advance(world, 0.6);
+  // (The player's overdraft is the one that faints: with it on and his breath low, any wind the bumps took would put him down.)
+  runner.player = player;
+  runner.stamina = stamina;
+  const speeds = [];
+  for (let frame = 0; frame < 360; frame += 1) {
+    runner.move = 1;
+    runner.running = true;
+    runner.goTo = [40, 0, 0];
+    for (const man of men) man.move = 0;
+    advance(world, 1 / 60);
+    speeds.push(wholeVelocity(runner)[0]);
+  }
+  return { world, runner, men, speeds };
+}
+
+test('a heavy man running into a file of men runs on through them, on his feet and awake: he goes in braced, and the bumps do not wind him', () => {
+  for (const seed of [100, 101]) {
+    const { world, runner, men, speeds } = runThrough('heavy', 'unskilled', 4, seed, { player: true, stamina: 0.3 });
+    const onHim = world.events.filter((event) => event.kind === 'crash' && event.defender === runner.id);
+    assert.ok(onHim.length >= 3, `he met them (${onHim.length} crashes)`);
+    assert.ok(onHim.filter((event) => event.target === 'trunk').every((event) => event.effects.includes('braced for it')), 'he took each body braced');
+    assert.equal(runner.state, 'up');
+    assert.ok(!runner.fainted && !world.events.some((event) => ['fell', 'knockdown', 'knockout'].includes(event.kind) && (event.fighter === runner.id || event.defender === runner.id)), 'never down');
+    assert.ok(runner.stamina >= 0.3, `his breath ${runner.stamina.toFixed(2)}`);
+    // Through the file and still running.
+    assert.ok(point(runner.x, P.pelvis)[0] > men.length * 1.3 + 2, `at ${point(runner.x, P.pelvis)[0].toFixed(1)} m`);
+    assert.ok(speeds.at(-1) > 0.6 * Math.max(...speeds), `${speeds.at(-1).toFixed(1)} of ${Math.max(...speeds).toFixed(1)} m/s`);
+    // Several crashes in a row add up on him, but as bruises.
+    assert.ok(runner.trauma.trunk > 0 && runner.trauma.trunk < 1, `trunk ${runner.trauma.trunk.toFixed(2)}`);
+  }
+});
+
+test('the men he runs into are driven back and the lighter go over, each from the shove of a crash on him, none in a faint', () => {
+  let over = 0;
+  let total = 0;
+  for (const seed of [100, 101]) {
+    const { world, men } = runThrough('heavy', 'light', 4, seed);
+    for (const man of men) {
+      total += 1;
+      const hit = world.events.find((event) => event.kind === 'crash' && event.defender === man.id);
+      const fell = world.events.find((event) => ['fell', 'knockdown', 'knockout'].includes(event.kind) && (event.fighter === man.id || event.defender === man.id));
+      assert.ok(!man.fainted, 'no faint');
+      if (!fell) continue;
+      over += 1;
+      assert.ok(hit && hit.time <= fell.time, `man ${man.id} went down only after a crash on him`);
+    }
+    // The first man is met at speed (his shoulders lower than the runner's chest: the line of the crash slopes down through him).
+    const first = world.events.find((event) => event.kind === 'bump' && (event.attacker === 0 || event.defender === 0));
+    assert.ok(first && first.speed > 2, `closing ${first?.speed.toFixed(1)} m/s`);
+  }
+  assert.ok(over >= total / 2, `${over} of ${total} went over`);
+});
+
+test('in a run-in the heavier man, going in braced, loses less speed than the man standing gains, and keeps going his way', () => {
+  const world = createWorld([PRESETS.heavy, { ...PRESETS.amateur, style: 'unskilled' }], { seed: 700, arena: { halfX: 40, halfZ: 20 } });
+  const [runner, man] = world.fighters;
+  placeFighter(runner, -7, 0);
+  placeFighter(man, 0, 0);
+  advance(world, 0.6);
+  let before = null;
+  let at = null;
+  for (let frame = 0; frame < 240 && at === null; frame += 1) {
+    runner.move = 1;
+    runner.running = true;
+    runner.goTo = [30, 0, 0];
+    man.move = 0;
+    const was = [wholeVelocity(runner)[0], wholeVelocity(man)[0]];
+    advance(world, 1 / 60);
+    if (world.events.some((event) => event.kind === 'bump')) {
+      before = was;
+      at = world.time;
+    }
+  }
+  assert.ok(at !== null, 'they met');
+  for (let frame = 0; frame < 3; frame += 1) {
+    runner.move = 1;
+    man.move = 0;
+    advance(world, 1 / 60);
+  }
+  const lost = before[0] - wholeVelocity(runner)[0];
+  const gained = wholeVelocity(man)[0] - before[1];
+  assert.ok(gained > 1.5 && lost < 0.8 * gained, `runner lost ${lost.toFixed(2)} m/s, the man gained ${gained.toFixed(2)}`);
+  assert.ok(wholeVelocity(runner)[0] > 0.4 * before[0], 'he keeps on his way');
+  const fell = world.events.find((event) => event.kind === 'fell' && event.fighter === man.id);
+  assert.ok(fell && fell.effects.includes('knocked off balance'), 'the man standing went over');
+});
+
+test('a crash taken braced costs no wind, and one taken standing does: a player low on breath faints only from the second', () => {
+  const take = (braced) => {
+    const world = pair('heavy', 'amateur');
+    const [victim, other] = world.fighters;
+    victim.player = true;
+    victim.stamina = WORLD.overdraft.floor + 0.05;
+    crashHarm(world, victim, 'trunk', { impulse: 150, mass: 60, closing: 5, energy: 300, point: [0, 1, 0], normal: [1, 0, 0], source: other, braced });
+    return victim;
+  };
+  const braced = take(true);
+  assert.ok(!braced.faintDue && Math.abs(braced.stamina - (WORLD.overdraft.floor + 0.05)) < 1e-9 && braced.trauma.trunk > 0, 'bruised, not winded');
+  assert.ok(take(false).faintDue, 'winded past the floor');
+  // Braced is going into it, the other ahead: not standing, not backing into him.
+  const [a, b] = pair('heavy', 'amateur').fighters;
+  placeFighter(a, -0.5, 0);
+  placeFighter(b, 0.5, 0);
+  a.yaw = 0;
+  a.v.fill(0);
+  assert.equal(crashBraced(a, 'trunk', [-1, 0, 0], 4, b), false, 'standing');
+  for (let index = 0; index < a.v.length; index += 3) a.v[index] = 4;
+  assert.equal(crashBraced(a, 'trunk', [-1, 0, 0], 4, b), true, 'running into him');
+  a.yaw = Math.PI;
+  assert.equal(crashBraced(a, 'trunk', [-1, 0, 0], 4, b), false, 'backing into him');
+});
+
+test('a man on his way down has only his own weight behind him in a crash; lying on the floor, the ground', () => {
+  const world = pair('amateur', 'amateur');
+  const [man] = world.fighters;
+  advance(world, 0.3);
+  fall(world, man, 'test');
+  assert.equal(fighterParty(man, 'head').supported, false, 'still falling');
+  advance(world, 3);
+  assert.notEqual(man.state, 'up');
+  assert.equal(fighterParty(man, 'trunk').supported, true, 'lying');
 });
