@@ -346,7 +346,7 @@ function bossBuild() {
   document.body.append(bossRoot);
 }
 
-/** The stage boss's bar, bottom centre: name and title over a track that drains red, with the pale lag of the last blow behind it. */
+/** The boss's bar (the stage boss's, and a miniboss's: Noname), top centre: name and title over a track that drains red, with the pale lag of the last blow behind it. */
 export const bossBar = {
   /** Show it, full. `title` is the epithet under the name ("Chief Jailer of the Queen"). */
   show(name, title = '') {

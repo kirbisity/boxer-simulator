@@ -809,8 +809,9 @@ body.card-up .hud, body.card-up .fight-ui, body.card-up .controls, body.card-up 
 .story-button.story-primary { border-color: var(--gold); color: var(--gold); }
 .story-button:hover, .story-button:focus-visible { background: rgba(40, 48, 74, 0.9); outline: none; }
 
-/* The boss's bar: bottom centre, above the footer, under the fight's buttons (they draw over it) and deaf to taps. */
-.boss-bar { position: fixed; z-index: 0; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 8px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100vw - 32px)); display: grid; gap: 4px; pointer-events: none; opacity: 0; transition: opacity 0.6s; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95); }
+/* The boss's bar (Lord Vaelen's, and Noname's in the drain): top centre, under the clock, over the fight and deaf to taps. On a wide screen it is 560 px, kept clear of the
+   items at the top left and the team at the top right (150 px each, plus their gutters); on a phone it takes the width under those two rows. The toast steps down under it. */
+.boss-bar { position: fixed; z-index: 0; left: 50%; translate: -50% 0; top: calc(50px + env(safe-area-inset-top, 0px)); width: min(560px, calc(100vw - 360px)); display: grid; gap: 4px; pointer-events: none; opacity: 0; transition: opacity 0.6s; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95); }
 .boss-bar.shown { opacity: 1; }
 .boss-words { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .boss-name { font: 700 clamp(16px, 4.2vw, 22px)/1 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: #eceff7; white-space: nowrap; }
@@ -819,11 +820,13 @@ body.card-up .hud, body.card-up .fight-ui, body.card-up .controls, body.card-up 
 .boss-fill, .boss-lag { position: absolute; inset: 0; transform-origin: left; display: block; }
 .boss-fill { background: linear-gradient(180deg, #c8282a, #7a0f12); transition: transform 0.12s linear; }
 .boss-lag { background: #d9c27a; transition: transform 0.7s ease-out 0.45s; }
-@media (max-width: 560px) {
-  /* A phone: left of the fight's buttons (they stand in the right 100px), over the player's own card (bottom left), thin. */
-  .boss-bar { left: calc(12px + env(safe-area-inset-left, 0px)); translate: none; width: calc(100vw - 124px - env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 56px + env(safe-area-inset-bottom, 0px)); }
+body:has(.boss-bar.shown) .lv-toast { top: calc(104px + env(safe-area-inset-top, 0px)); }
+@media (max-width: 760px) {
+  /* A phone: the full width under the items (top left) and the team (top right), thin. */
+  .boss-bar { left: calc(12px + env(safe-area-inset-left, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); translate: none; width: auto; top: calc(96px + env(safe-area-inset-top, 0px)); }
   .boss-track { height: 9px; }
   .boss-title { display: none; }
+  body:has(.boss-bar.shown) .lv-toast { top: calc(136px + env(safe-area-inset-top, 0px)); }
 }
 
 /* Ghost walk (the sandbox's stage debug): a quiet tag by the clock, so it is never mistaken for the real stage. */

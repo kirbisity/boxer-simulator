@@ -65,6 +65,9 @@ export const LEVEL_CONFIG = {
     // The bar shows when he is awake and aware of the player, within this many m (the stand-in for the awareness
     // AI's own word, levelmode/adapter.js), and goes when he is out.
     barRange: 30,
+    // s a miniboss's bar (Noname's) holds, empty and struck through, after he is out, before it goes: the length of the `boss-felled` fade in boxer.css (the
+    // main boss's holds for the cutscene instead). The same bar serves both: any spawn with `miniboss` gets it while he is awake and aware of the player.
+    felledSeconds: 3.4,
     // Phase 2: at this share of his health gone (hurtShare, what the health bar shows) the helm comes off
     // (bareHead) and he moves faster: footwork and acceleration go from the harness's 0.66 / 0.55 to the
     // 0.82 / 0.78 of light plate (the helm was the harness's clumsiest part), and he works harder (the AI's
