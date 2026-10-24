@@ -286,6 +286,16 @@ export function kpBuild(prop, ctx) {
       kgCylinder(batch, 'wood', x, y, z, 0.2, 0.16, 0.3, { sides: 8 });
       break;
     }
+    case 'privy': {
+      // A garderobe's seat (the stone block under it is the stage's solid; `at` is on its top, over the hole): the round hole black over the chute, a
+      // worn wooden board round it, its lid left leaning on the wall.
+      const [x, z] = here(0, 0);
+      const wide = prop.width ?? 2;
+      box('wood', 0, 0.012, 0, (prop.depth ?? 1) * 0.8, 0.024, Math.min(1.2, wide * 0.6));
+      kgCylinder(batch, 'black', x, y + 0.026, z, 0.19, 0.19, 0.01, { sides: 14 });
+      box('wood', -(prop.depth ?? 1) * 0.42, 0.32, wide * 0.32, 0.04, 0.6, 0.5, 0.18);
+      break;
+    }
     case 'chalice': {
       for (let k = 0; k < 6; k += 1) {
         const [px, pz] = here((random() - 0.5) * 0.5, (random() - 0.5) * 0.4);

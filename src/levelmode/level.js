@@ -11,10 +11,12 @@
 //   tonics []   tonic effects at work
 //   checkpoint { id, name, at, facing, section, gear, inventory, comrades }    where, in what, with what he wakes, and the spawn ids of the comrades alive at the rest
 //   boss { id, phase } | null
-//   ending { phase: 'locked' | 'felled' | 'open' | 'scene' | 'done', held?, watched? } | null    the boss out, the cutscene, the inner door, the scene (ending.js)
+//   ending { phase: 'locked' | 'felled' | 'open' | 'horde' | 'fall' | 'landing' | 'reveal' | 'epilogue' | 'done', since, held?, watched?, ... } | null
+//                the boss out, the cutscene, the back room's door, the horde, the chute, the cesspool, the reveal, the new Noname, the cards (ending.js)
 //   ui []        what the screen is to be told, in order: { type: 'toast', text } | { type: 'note', key, id }
 //                | { type: 'death' } | { type: 'respawned' } | { type: 'rested', name } | { type: 'phase2', id }
-//                | { type: 'bossDown' } (the cutscene begins) | { type: 'doorsOpen' } (it is through) | { type: 'ending' }
+//                | { type: 'bossDown' } (the cutscene begins) | { type: 'doorsOpen' } (it is through) | { type: 'horde' } | { type: 'fall' }
+//                | { type: 'landed' } | { type: 'reveal' } | { type: 'epilogue' } | { type: 'ending', outcome } (the plot twist's beats, ending.js)
 //   attempts []   the failed attempts, one record per death; attempt { since, from, comrades }   the one in hand (attempts.js)
 //   team { fallen: Set of spawn ids, gateTold }   the comrades said to have fallen (a death brings back those a rest recorded), and whether the gate has been spoken of (team.js)
 //   rebuild Set  fighter ids whose drawing is out of date (their bodies were remade)
@@ -34,7 +36,7 @@ import { levelOf, updateAction, updateTonics } from './items.js';
 import { noteDeath, playerStands, respawnPlayer, setCheckpoint, spawnDefinitions } from './checkpoints.js';
 import { levelAware } from './adapter.js';
 import { createStageWorld } from './stage.js';
-import { endingBusy, endingRelease, watchEnding } from './ending.js';
+import { endingBusy, endingFinal, endingRelease, endingRespawn, finishEpilogue, watchEnding } from './ending.js';
 import { watchTeam } from './team.js';
 import { beginAttempt } from './attempts.js';
 import { outfitOf } from '../outfits.js';
@@ -117,7 +119,9 @@ export function levelThink(world, dt) {
   giveTemper(world);
   wadeGear(world);
   if (me.state === 'out') {
-    noteDeath(world);
+    // (Past the reveal there is no waking at a rest: a death in the epilogue ends the game, with the cards.)
+    if (endingFinal(world)) finishEpilogue(world, 'fell');
+    else noteDeath(world);
     return;
   }
   if (level.dying) return;
@@ -275,9 +279,11 @@ export function drainRebuilds(world) {
 export function restartFromRest(world) {
   const level = levelOf(world);
   if (!level.rests) return false;
-  if (level.ending?.phase === 'scene') level.ending.phase = 'open';
-  // A cutscene half-played: it is over, and the door is open.
+  // Past the reveal there is no going back.
+  if (level.ending && ['reveal', 'epilogue', 'done'].includes(level.ending.phase)) return false;
+  // A cutscene half-played: it is over, and the door is open; the horde or the cesspool: the back room as he first found it.
   endingRelease(world);
+  endingRespawn(world);
   level.ui.length = 0;
   respawnPlayer(world);
   level.ui.length = 0;
@@ -288,4 +294,4 @@ export { livingComrades, respawnPlayer, restAtPoint } from './checkpoints.js';
 export { attemptCount, attemptLog, attemptStory, beginAttempt } from './attempts.js';
 export { contextFor, interact, interactions, hostileNear } from './interact.js';
 export { useItem } from './items.js';
-export { endingBusy, endingDone, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, princeOf } from './ending.js';
+export { dropDown, endingBusy, endingDone, endingFinal, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, killNoname, nonameOf } from './ending.js';

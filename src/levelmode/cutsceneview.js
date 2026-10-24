@@ -9,7 +9,7 @@
 
 import { P } from '../body.js';
 import { CUTSCENE, createCutscene, cutsceneHolds, cutsceneLook, cutscenePhase, cutsceneSpeed, skipCutscene, stepCutscene } from './cutscene.js';
-import { endingHold, endingRelease, endingWatched } from './ending.js';
+import { TWIST, endingHold, endingOf, endingRelease, endingWatched, nonameOf } from './ending.js';
 import { bossStatus } from './level.js';
 
 /** How the camera frames the boss (it is a camera, not a timing, so it lives here): a low angle, a little way off, looking up at a giant. */
@@ -181,4 +181,148 @@ export function createCutsceneDirector(hooks) {
     get active() { return Boolean(run); },
     get state() { return run?.state ?? null; },
   };
+}
+
+// ---- The plot twist on the screen -----------------------------------------------------------------------------------------
+
+/** How the twist is framed (cameras and fades, not the story's timings: those are ending.js TWIST's, on the world's clock). */
+export const TWIST_CAMERA = {
+  // The chute: the camera tips down to look into the hole as the dark comes (rad of pitch; s for the dark to close, and to lift once he is in the sludge).
+  fall: { pitch: 1.05, dark: 0.35, lift: 0.9 },
+  // The cut into the reveal (s): the dark closes this fast, holds until the scene is set (TWIST.reveal.cut), and lifts over `lift`.
+  cut: { dark: 0.3, lift: 0.7 },
+  // The reveal: a low, close shot of the two of them from the side (m over the middle of them it looks at; pitch, rad; distance, m), the letterbox
+  // bars in and out (s), and the turns off the line across them that it tries, the first that has room.
+  reveal: { lift: 0.25, pitch: 0.32, distance: 2.7, bars: 0.6, turns: [1.35, -1.35, 0.9, -0.9, 1.75, -1.75] },
+  // A spoken line stays up this long (s of the world's clock).
+  line: 4.2,
+};
+
+const twSmooth = (u) => {
+  const v = Math.min(1, Math.max(0, u));
+  return v * v * (3 - 2 * v);
+};
+
+/** What the twist puts over the screen now: { black, bars } (0..1), from the ending's phase and how long it has been in it. Pure. */
+export function twistLook(world) {
+  const ending = endingOf(world);
+  if (!ending) return { black: 0, bars: 0 };
+  const t = world.time - (ending.since ?? 0);
+  if (ending.phase === 'fall') return { black: twSmooth(t / TWIST_CAMERA.fall.dark), bars: 0 };
+  if (ending.phase === 'landing') return { black: 1 - twSmooth((world.time - ending.landedAt) / TWIST_CAMERA.fall.lift), bars: 0 };
+  if (ending.phase === 'reveal') {
+    const { cut, rise } = TWIST.reveal;
+    const { bars } = TWIST_CAMERA.reveal;
+    const black = t < cut ? twSmooth(t / TWIST_CAMERA.cut.dark) : 1 - twSmooth((t - cut) / TWIST_CAMERA.cut.lift);
+    return { black, bars: twSmooth(t / bars) * (1 - twSmooth((t - (rise - bars)) / bars)) };
+  }
+  return { black: 0, bars: 0 };
+}
+
+/**
+ * The twist's director (ending.js): the dark of the chute and of the cut into the reveal, the reveal's letterbox and its camera, and the spoken lines
+ * (`{ type: 'line' }`) in the lower bar. It reads the ending's phase and the world's clock each frame, so a pause holds it and a restart ends it.
+ * `hooks`: orbit() (the follow camera's), roomTest(x, z, y). Returns { frame(world), steer(world), say(world, text), cancel(), active }.
+ */
+export function createTwistDirector(hooks) {
+  let layer = null;
+  let nodes = null;
+  let line = null;
+  let pick = null;
+  let busy = false;
+
+  function build() {
+    if (layer) return;
+    layer = cutsceneElement('div', 'cs-layer tw-layer');
+    layer.setAttribute('aria-hidden', 'true');
+    layer.innerHTML = '<div class="tw-black"></div><div class="cs-bar cs-top"></div><div class="cs-bar cs-bottom"></div><p class="tw-line"></p>';
+    nodes = { black: layer.querySelector('.tw-black'), top: layer.querySelector('.cs-top'), bottom: layer.querySelector('.cs-bottom'), line: layer.querySelector('.tw-line') };
+    document.body.append(layer);
+  }
+
+  function teardown() {
+    layer?.remove();
+    layer = nodes = null;
+    document.body.classList.remove('cutscene');
+  }
+
+  function frame(world) {
+    const look = world?.stage?.level ? twistLook(world) : { black: 0, bars: 0 };
+    const lineUp = Boolean(line) && world === line.world && world.time < line.until;
+    busy = look.black > 0 || look.bars > 0;
+    if (!busy && !lineUp) {
+      if (layer) teardown();
+      return;
+    }
+    build();
+    nodes.black.style.opacity = String(look.black);
+    nodes.top.style.transform = `scaleY(${look.bars})`;
+    nodes.bottom.style.transform = `scaleY(${look.bars})`;
+    if (lineUp && nodes.line.textContent !== line.text) nodes.line.textContent = line.text;
+    nodes.line.classList.toggle('shown', lineUp);
+    document.body.classList.toggle('cutscene', look.bars > 0.05);
+  }
+
+  /** The chute: the camera looks down into the hole. The reveal: a low, close shot of the two of them, from the side that has room. */
+  function steer(world) {
+    const ending = endingOf(world);
+    const def = world?.stage?.def.ending;
+    if (!ending || !def) return;
+    const orbit = hooks.orbit();
+    const t = world.time - (ending.since ?? 0);
+    if (ending.phase === 'fall') {
+      const u = Math.min(1, t / TWIST_CAMERA.fall.dark);
+      const [x, y, z] = def.hole.at;
+      orbit.target.set(orbit.target.x + (x - orbit.target.x) * u, orbit.target.y + (y + 0.4 - orbit.target.y) * u, orbit.target.z + (z - orbit.target.z) * u);
+      orbit.pitch += (TWIST_CAMERA.fall.pitch - orbit.pitch) * u;
+      return;
+    }
+    if (ending.phase !== 'reveal' || !ending.posed) {
+      pick = null;
+      return;
+    }
+    const swing = twistLook(world).bars;
+    const me = world.fighters[0];
+    const caby = nonameOf(world);
+    if (!caby || swing <= 0) return;
+    const spec = TWIST_CAMERA.reveal;
+    const head = [me.x[P.head * 3], me.x[P.head * 3 + 1], me.x[P.head * 3 + 2]];
+    const neck = [caby.x[P.neck * 3], caby.x[P.neck * 3 + 1], caby.x[P.neck * 3 + 2]];
+    const focus = [(head[0] + neck[0]) / 2, (head[1] + neck[1]) / 2 + spec.lift, (head[2] + neck[2]) / 2];
+    if (!pick) {
+      // Across the line between the two of them, to whichever side the walls leave room for (the first turn that gives most of the distance).
+      const across = Math.atan2(neck[2] - head[2], neck[0] - head[0]);
+      const reach = (yaw) => {
+        for (let along = 0.6; along <= spec.distance; along += 0.2) {
+          const flat = Math.cos(spec.pitch) * along;
+          if (!hooks.roomTest(focus[0] + Math.cos(yaw) * flat, focus[2] + Math.sin(yaw) * flat, focus[1] + Math.sin(spec.pitch) * along)) return Math.max(0.8, along - 0.2);
+        }
+        return spec.distance;
+      };
+      for (const turn of spec.turns) {
+        const yaw = across + turn;
+        const distance = reach(yaw);
+        if (!pick || distance > pick.distance) pick = { yaw, distance };
+        if (distance >= spec.distance * 0.9) break;
+      }
+    }
+    orbit.target.set(orbit.target.x + (focus[0] - orbit.target.x) * swing, orbit.target.y + (focus[1] - orbit.target.y) * swing, orbit.target.z + (focus[2] - orbit.target.z) * swing);
+    orbit.pitch += (spec.pitch - orbit.pitch) * swing;
+    orbit.yaw = turnToward(orbit.yaw, pick.yaw) * swing + orbit.yaw * (1 - swing);
+    orbit.distance += (pick.distance - orbit.distance) * swing;
+  }
+
+  /** A spoken line (the ending's `{ type: 'line' }`): up in the lower bar for a few seconds. */
+  function sayLine(world, text) {
+    line = { world, text, until: world.time + TWIST_CAMERA.line };
+  }
+
+  function cancel() {
+    line = null;
+    pick = null;
+    busy = false;
+    teardown();
+  }
+
+  return { frame, steer, say: sayLine, cancel, get active() { return busy; } };
 }

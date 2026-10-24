@@ -305,8 +305,9 @@ function swCesspool(sec, alcove) {
   dnProp(sec, 'outfall', [cx - 3.6, D + 2.6, cz - P.hall], { face: 'S', to: surface, length: 2.4 });
   dnProp(sec, 'outfall', [cx + 3.4, D + 2.2, cz + P.hall], { face: 'N', to: surface, length: 2.4, size: 1.2 });
   dnProp(sec, 'outfall', [cx + 4.2, D + 3.0, cz - P.hall], { face: 'S', to: surface, length: 2.4, size: 0.8 });
-  // The garderobe's grating high in the vault, under the inner cell (a cold grey light from it, and what comes down it).
-  dnProp(sec, 'grating', [cx - 4, D + 4.75, cz + 1.9], { size: [1.2, 1.2] });
+  // The garderobe's grating high in the vault, under the privy's hole in the room above (a cold grey light from it, and what comes down it: the chute's
+  // mouth, where the plot twist drops the player in, dunnottar-chapel.js DN_ENDING.landing).
+  dnProp(sec, 'grating', [cx - 5.1, D + 4.75, cz + 1.9], { size: [1.2, 1.2] });
   // Filth on the rim: rubbish heaps and slime, a rotted beam, rats, rags; the dead.
   const rim = (angle, out = 0) => [cx + Math.cos(angle) * (P.radius + 0.9 + out), cz + Math.sin(angle) * (P.radius + 0.9 + out)];
   for (const [angle, what, extra] of [

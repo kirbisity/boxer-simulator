@@ -76,6 +76,11 @@ test('cesspool: its constants lie in the sewer, on the floor the physics has (th
   const cell = sectionById(DUNNOTTAR, 'cell');
   const [c] = cell.bounds;
   assert.ok(Math.abs(c.at[0] - x) < P0.radius && Math.abs(c.at[1] - z) < P0.radius, 'the inner cell stands over the pit');
+  // The privy's hole in it is over the pit too, and the grating in the vault is under the hole (the chute between them: levelmode/ending.js).
+  const [hx, , hz] = DUNNOTTAR.ending.hole.at;
+  assert.ok(Math.hypot(hx - x, hz - z) < P0.radius - 0.8, 'the chute falls into the sludge, not onto the rim');
+  const grating = sectionById(DUNNOTTAR, 'sewer').decor.find((decor) => decor.what === 'grating' && Math.hypot(decor.at[0] - x, decor.at[2] - z) < P0.hall);
+  assert.ok(grating && Math.hypot(grating.at[0] - hx, grating.at[2] - hz) < 0.2, 'the grating is under the hole');
   // Its water is the sludge, over the whole pit.
   const pool = stageWaters(DUNNOTTAR).find((water) => water.id === 'cesspool');
   assert.equal(pool.murk, 'sludge');

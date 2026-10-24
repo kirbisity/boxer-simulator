@@ -1,5 +1,7 @@
-// Level mode, the flow around the stage (Phase C1): the banner that never comes, the ending (boss out, the inner door, the
-// prince's scene), the freed who stay out of the boss fight, the markers, the man the marker is over, restart from a rest.
+// Level mode, the flow around the stage (Phase C1): the banner that never comes, the ending's start (boss out, the doors behind the altar,
+// the guide, the back room found empty and the horde let go: the rest of the plot twist is test/dunnottartwist.test.js), the freed who stay
+// out of the boss fight, the markers, the man the marker is over, restart from a rest.
+// (The prince's scene that was here, his cowering into the cell's corner, is gone with him: the back room is a privy with nobody in it.)
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,18 +13,18 @@ import { levelPreset } from '../src/levelmode/presets.js';
 import { DUNNOTTAR } from '../src/levelmode/stages/dunnottar.js';
 import { TESTYARD } from '../src/levelmode/stages/testyard.js';
 import { checkStage, setMechanism, updateStage } from '../src/levelmode/stage.js';
-import { bannerWinner, createLevelWorld, drainUi, endingBusy, endingDone, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, levelBusy, levelOpponent, levelThink, princeOf, restartFromRest, restAtPoint } from '../src/levelmode/level.js';
-import { ENDING_WAIT } from '../src/levelmode/ending.js';
-import { cowerFor, freePrisoner, mindState } from '../src/levelmode/awareness.js';
+import { bannerWinner, createLevelWorld, drainUi, endingBusy, endingHold, endingOf, endingRelease, endingWatched, guideOf, killBoss, levelBusy, levelOpponent, levelThink, restartFromRest, restAtPoint } from '../src/levelmode/level.js';
+import { ENDING_WAIT, TWIST } from '../src/levelmode/ending.js';
+import { freePrisoner, mindState } from '../src/levelmode/awareness.js';
 import { markerCandidates } from '../src/levelmode/markers.js';
 import { holdPlayer } from '../src/levelmode/items.js';
 import { hipsAt, walk } from './walker.js';
 
 const L = DUNNOTTAR.sections.find((section) => section.id === 'chapel').spawns[0].post[1];
-// The prince is in the cell directly behind the chancel doors: near him (inside the doors), and far from him (in the nave).
-const PRINCE = DUNNOTTAR.sections.find((section) => section.id === 'cell').spawns.find((spawn) => spawn.id === 'prince').post;
-const NEAR = [PRINCE[0] + 2.8, L, PRINCE[2]];
-const FAR = [-20, L, PRINCE[2]];
+// The back room directly behind the chancel doors: inside it (a stride past the doors), and far from it (in the nave).
+const HOLE = DUNNOTTAR.ending.hole.at;
+const INSIDE = [-36.4, L, HOLE[2]];
+const FAR = [-20, L, HOLE[2]];
 const man = (world, id) => world.fighters.find((fighter) => fighter.spawn?.id === id);
 const hips = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
 
@@ -35,10 +37,10 @@ function thinking(world, dt) {
 }
 const run = (world, seconds) => advance(world, seconds, thinking);
 
-/** A Dunnottar of only the chapel's people: the boss, the prince, the two prisoners (no garrison to join a fight). */
+/** A Dunnottar of only the chapel's people: the boss, the two prisoners, Noname and the ending's held crowds (no garrison to join a fight). */
 function bare() {
   const stage = structuredClone(DUNNOTTAR);
-  for (const section of stage.sections) section.spawns = section.spawns.filter((spawn) => ['vaelen', 'prince', 'miner', 'captive'].includes(spawn.id));
+  for (const section of stage.sections) section.spawns = section.spawns.filter((spawn) => spawn.hold || ['vaelen', 'miner', 'captive', 'noname'].includes(spawn.id));
   return stage;
 }
 const standAt = (world, x, y, z, yaw) => {
@@ -47,11 +49,6 @@ const standAt = (world, x, y, z, yaw) => {
   run(world, 0.1);
 };
 
-/** Walk up to the cell's doors first (the cell wakes as he comes: its prince has had his look round before the scene is begun, as in play, not in the same step as the cell wakes). */
-const enterCell = (world) => {
-  standAt(world, -31.5, L, PRINCE[2], Math.PI);
-  run(world, 0.8);
-};
 
 // ---- No banner in a stage -----------------------------------------------------------------------------------
 
@@ -68,11 +65,14 @@ test('level flow: no bout banner in a stage, however many enemies are out or how
 
 // ---- The ending ----------------------------------------------------------------------------------------------
 
-test('level flow: Dunnottar names its ending (the door and the prince are in it), and checkStage knows when they are not', () => {
+test('level flow: Dunnottar names its ending (the door, Noname, the held crowds are in it), and checkStage knows when they are not', () => {
   assert.deepEqual(checkStage(DUNNOTTAR), []);
   const broken = structuredClone(DUNNOTTAR);
   broken.ending.door = 'nodoor';
-  assert.ok(checkStage(broken).some((problem) => problem.includes('nodoor')));
+  broken.ending.noname = 'nobody';
+  broken.ending.horde = 'nocrowd';
+  const problems = checkStage(broken);
+  for (const word of ['nodoor', 'nobody', 'nocrowd']) assert.ok(problems.some((problem) => problem.includes(word)), word);
 });
 
 /** The boss struck down, and the world's own wait for the cutscene (no screen: the tests') run out: the door is open. */
@@ -101,7 +101,7 @@ test('level flow: the boss out begins the cutscene and then opens the inner door
   const messages = drainUi(world);
   assert.ok(messages.some((message) => message.type === 'doorsOpen'));
   assert.ok(messages.some((message) => message.type === 'toast'));
-  assert.ok(!messages.some((message) => message.type === 'ending'), 'not yet: the player is not at the prince');
+  assert.ok(!messages.some((message) => message.type === 'horde'), 'not yet: the player is not in the back room');
   assert.equal(killBoss(world), false, 'he is already down');
 });
 
@@ -123,80 +123,71 @@ test('level flow: a screen that plays the cutscene holds the player and opens th
   assert.equal(world.stage.mechanisms.innerdoor, 'open');
   assert.equal(levelBusy(world), false, 'the player is free again');
   assert.equal(endingRelease(world), false, 'the door opens once');
-  // The guide runs from the door to the prince, read from the stage's own data.
+  // The guide runs from the door to the privy's hole, read from the stage's own data, the glow over the door.
   const guide = guideOf(world);
-  const prince = hips(princeOf(world));
   assert.ok(guide);
   // (The door is where the stage's own `innerdoor` gate stands, wherever the chapel is put.)
   const gate = DUNNOTTAR.sections.flatMap((section) => section.gates).find((each) => each.id === 'innerdoor');
   const leaf = gate.states.closed.find((solid) => solid.at).at;
-  assert.ok(Math.abs(guide.door[0] - leaf[0]) < 0.5 && Math.abs(guide.door[2] - leaf[1]) < 0.5, `the door is ${guide.door}`);
-  assert.ok(Math.hypot(guide.prince[0] - prince[0], guide.prince[2] - prince[1]) < 0.01);
+  assert.ok(Math.abs(guide.from[0] - leaf[0]) < 0.5 && Math.abs(guide.from[2] - leaf[1]) < 0.5, `the door is ${guide.from}`);
+  assert.deepEqual(guide.beacon, guide.from);
+  assert.deepEqual(guide.to, HOLE);
 });
 
-test('level flow: the player near the prince begins the scene: held, the prince cowers and shuffles into the corner, the cards are asked for', () => {
+test('level flow: walking into the back room shows the words and lets the horde go into the chapel; the guide goes over the hole', () => {
   const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
   standAt(world, -4, L, -37, Math.PI);
   fell(world);
   drainUi(world);
-  // Far from the prince (in the chapel, the door open): nothing yet.
+  const horde = world.fighters.filter((fighter) => fighter.spawn?.id.startsWith('horde'));
+  assert.equal(horde.length, 36);
+  assert.ok(horde.every((fighter) => fighter.dormant && fighter.spawn.held === 'horde'), 'held out of the world while the chapel is awake');
+  // Far from the room (in the chapel, the door open): nothing yet.
   standAt(world, ...FAR, Math.PI);
   run(world, 0.5);
   assert.equal(endingOf(world).phase, 'open');
-  // Near: the scene.
-  enterCell(world);
-  standAt(world, ...NEAR, Math.PI);
+  // In it: the words, and the crowd.
+  standAt(world, ...INSIDE, Math.PI);
   run(world, 0.3);
-  assert.equal(endingOf(world).phase, 'scene');
-  assert.ok(endingBusy(world) && levelBusy(world), 'the player is held where he stands');
-  assert.ok(drainUi(world).some((message) => message.type === 'ending'));
-  const prince = princeOf(world);
-  const player = world.fighters[0];
-  const from = hips(prince);
-  const apart = Math.hypot(...hips(player).map((value, index) => value - from[index]));
-  const at = hips(player);
-  run(world, 9);
-  assert.equal(mindState(world, prince.id), 'cower');
-  assert.ok(prince.crawling, 'on his knees');
-  const corner = DUNNOTTAR.ending.corner;
-  const now = hips(prince);
-  assert.ok(Math.hypot(now[0] - corner[0], now[1] - corner[1]) < Math.hypot(from[0] - corner[0], from[1] - corner[1]) - 1, 'he has gone toward the corner');
-  assert.ok(Math.hypot(now[0] - at[0], now[1] - at[1]) > apart, 'away from the player');
-  // The player did not walk: he was held.
-  assert.ok(Math.hypot(hips(player)[0] - at[0], hips(player)[1] - at[1]) < 0.5);
-  assert.equal(world.stage.civiliansHarmed, false);
-  endingDone(world);
-  assert.equal(endingOf(world).phase, 'done');
-  run(world, 0.2);
-  assert.ok(!drainUi(world).some((message) => message.type === 'ending'), 'the scene is not begun twice');
+  assert.equal(endingOf(world).phase, 'horde');
+  assert.equal(levelBusy(world), false, 'he is free to run for it');
+  const messages = drainUi(world);
+  assert.ok(messages.some((message) => message.type === 'line' && message.text === TWIST.words.empty), 'Prince Caby is not here');
+  assert.ok(messages.some((message) => message.type === 'horde'));
+  assert.deepEqual(guideOf(world).beacon, HOLE, 'the glow over the hole now');
+  // A row at a time: none in the first moment, all of them within a few seconds, every one sent at him.
+  assert.ok(horde.every((fighter) => fighter.dormant), 'not at once');
+  const counts = [];
+  for (let second = 0; second < 6; second += 1) {
+    run(world, 1);
+    counts.push(horde.filter((fighter) => !fighter.dormant).length);
+  }
+  assert.ok(counts[0] > 0 && counts[0] < 36 && counts.at(-1) === 36, `released in bursts: ${counts}`);
+  assert.ok(counts.every((count, at) => at === 0 || count >= counts[at - 1]));
+  assert.ok(horde.every((fighter) => ['charge', 'aggro'].includes(mindState(world, fighter.id))), 'every one hunts him');
+  assert.ok(horde.every((fighter) => fighter.spawn.section === 'chapel' || fighter.spawn.section === 'cell'));
+  run(world, 0.3);
+  assert.equal(endingOf(world).phase, 'horde', 'the room is not begun twice');
 });
 
-test('level flow: a scripted cower is not calmed, and a man who is not there cannot be told to', () => {
-  const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
-  enterCell(world);
-  standAt(world, ...NEAR, Math.PI);
-  assert.equal(cowerFor(world, 'nobody', { corner: [0, 0] }), false);
-  assert.ok(cowerFor(world, 'prince', { corner: DUNNOTTAR.ending.corner, near: 5 }));
-  run(world, 20);
-  assert.equal(mindState(world, princeOf(world).id), 'cower', 'the calm of a quiet fight never comes to him');
-});
-
-test('level flow: restart from a rest is for a run that reached one; a scene half played goes back to the door open', () => {
+test('level flow: restart from a rest is for a run that reached one; a horde half played goes back to the door open and the crowd held', () => {
   const world = createLevelWorld(bare(), levelPreset('forger'), { seed: 5 });
   assert.equal(restartFromRest(world), false, 'no rest reached: the stage is begun over by the screen');
   standAt(world, -4, L, -37, Math.PI);
   restAtPoint(world, { id: 'test', at: [4.6, L, -36], name: 'Test' });
   fell(world);
   run(world, 0.2);
-  enterCell(world);
-  standAt(world, ...NEAR, Math.PI);
-  run(world, 0.3);
-  assert.equal(endingOf(world).phase, 'scene');
+  standAt(world, ...INSIDE, Math.PI);
+  run(world, 3);
+  assert.equal(endingOf(world).phase, 'horde');
   assert.ok(restartFromRest(world));
   assert.equal(endingOf(world).phase, 'open');
   assert.equal(world.stage.mechanisms.innerdoor, 'open', 'what he opened stays open');
   assert.equal(levelBusy(world), false);
   assert.ok(hips(world.fighters[0])[0] > 0, 'he wakes at the rest');
+  const horde = world.fighters.filter((fighter) => fighter.spawn?.id.startsWith('horde'));
+  assert.ok(horde.every((fighter) => fighter.spawn.held === 'horde' && fighter.dormant), 'the crowd is held again');
+  assert.equal(man(world, 'vaelen').state, 'out', 'the boss stays dead');
 });
 
 // ---- The freed and the boss -------------------------------------------------------------------------------------

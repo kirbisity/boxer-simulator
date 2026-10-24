@@ -23,7 +23,10 @@ test('dunnottar: registered, sound, ten sections with the cast the spec calls fo
   assert.deepEqual(checkStage(DUNNOTTAR), []);
   assert.deepEqual(DUNNOTTAR.sections.map((section) => section.id), ['cliff', 'gate', 'ascent', 'quad', 'vault', 'crypt', 'sewer', 'tower', 'chapel', 'cell']);
   const spawns = DUNNOTTAR.sections.flatMap((section) => section.spawns);
-  const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead);
+  // (The ending's crowds are held out of the world until it lets them go, levelmode/ending.js: not the garrison he meets on the way.)
+  const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead && !spawn.hold);
+  assert.equal(spawns.filter((spawn) => spawn.hold === 'horde').length, 36, 'the horde in the chapel');
+  assert.equal(spawns.filter((spawn) => spawn.hold === 'epilogue').length, 12, 'the epilogue\'s men in the drain');
   assert.ok(enemies.length >= 12 && enemies.length <= 32, `${enemies.length} enemies`);
   // The main line's cast stood at 14 (the bot's careful policy reaches Vaelen 12 in 16 against it), 15 with the knight at the postern; the vault's optional branches add at
   // most six, and the old drain (the way round the knight) four: a sergeant and three levies.

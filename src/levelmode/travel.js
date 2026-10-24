@@ -1,6 +1,7 @@
 // Fast travel for the sandbox's ghost walk: where a designer can jump to on a stage, worked out from the stage's own data, so it
 // follows the stage when its rooms move. A place is { id, label, at: [x, y, z], yaw }: the start, each section (at its rest point,
-// else its first man or item), each rest point, the boss, and the end of the road (the ending's prince, if the stage has one).
+// else its first man or item), each rest point, the boss, and the ending's places if the stage has them: the back room's privy (its hole, where the drop is
+// offered) and the cesspool under it, where the chute lets him out (levelmode/ending.js).
 
 /** The places of a stage, in the order of its sections. */
 export function travelPlaces(stage) {
@@ -23,12 +24,15 @@ export function travelPlaces(stage) {
     const boss = section.spawns.find((spawn) => spawn.role === 'boss');
     if (boss) add(`boss:${boss.id}`, `${boss.inputs?.name ?? boss.id} (boss)`, boss.post, boss.facing ?? 0);
   }
-  const prince = stage.ending?.prince;
-  if (prince) {
-    for (const section of stage.sections) {
-      const spawn = section.spawns.find((entry) => entry.id === prince);
-      if (spawn) add(`prince:${prince}`, `${spawn.inputs?.name ?? 'The prince'} (the end)`, spawn.post, spawn.facing ?? 0);
-    }
+  const ending = stage.ending;
+  if (ending?.hole) {
+    // A stride in front of the seat, facing it.
+    const [x, y, z] = ending.hole.at;
+    add('ending:toilet', 'The privy (the ending)', [x + 1.2, y, z], Math.PI);
+  }
+  if (ending?.landing) {
+    const [x, y, z] = ending.landing.at;
+    add('ending:landing', 'The cesspool landing (the ending)', [x + 0.6, y, z], ending.landing.yaw ?? 0);
   }
   return places;
 }

@@ -278,7 +278,14 @@ export function kfDropped() {
     const live = new Set();
     for (const thing of dropped ?? []) {
       live.add(thing.id);
-      if (made.has(thing.id)) continue;
+      const kept = made.get(thing.id);
+      if (kept) {
+        // (It may be moved: laid by his head for the reveal, lifted in the player's hands, levelmode/ending.js; carried, it is upright.)
+        kept.position.set(...thing.at);
+        kept.rotation.y = thing.yaw ?? 0;
+        kept.children[0].rotation.z = thing.carried ? 0 : Math.PI / 2 - 0.25;
+        continue;
+      }
       const holder = new THREE.Group();
       const helm = new THREE.Group();
       const metal = new THREE.MeshStandardMaterial({ color: thing.head?.color ?? '#b98a3e', roughness: 0.38, metalness: 0.75 });

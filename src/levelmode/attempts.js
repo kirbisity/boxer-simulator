@@ -1,5 +1,6 @@
-// Level mode, the attempts: every death is a failed attempt on the prince, and the run's last attempt is the one that frees him. The
-// run keeps a record of each failure (so the ending can tell the story of the night) and the one attempt now under way.
+// Level mode, the attempts: every death is a failed attempt on the keep, and the run's last attempt is the one that reaches the back room behind
+// the chapel, finds it empty and goes down the chute (levelmode/ending.js: the operative stays below with Caby, the new Noname). The run keeps a
+// record of each failure (so the ending can tell the story of the night) and the one attempt now under way.
 //
 //   beginAttempt(world)        the operative wakes (the start, or a respawn after a death): where he began and who is beside him
 //   recordAttempt(world, at)   he is out: the attempt goes on the record (checkpoints.js noteDeath), with the place ({ section, place })
@@ -177,36 +178,43 @@ function taleBetween(middle, seed) {
   ]);
 }
 
-/** The attempt that counted: who stood with the operative, and who walked out with him. */
-function taleSuccess(final, seed, failures) {
+/**
+ * The attempt that was the last: who stood with the operative and who was left waiting for him, the empty room behind the jailer, and the end of it:
+ * he stays below the keep with Caby, the new Noname, waiting for whoever comes next.
+ */
+function taleLast(final, seed, failures) {
   const ordinal = taleOrdinal(final.number);
   const company = taleCompany(final.comrades, seed, 900);
   const lost = final.comrades.filter((name) => !final.survivors.includes(name));
-  let leaving;
-  if (!final.comrades.length) leaving = talePick(seed, 901, ['You walked out of it alone.', 'No one else was left to walk out with you.']);
-  else if (!lost.length) leaving = talePick(seed, 901, [`${taleCapital(taleList(final.comrades))} walked out with you.`, `The ${taleCount(final.comrades.length + 1)} of you walked out of it alive.`]);
-  else if (lost.length === final.comrades.length) leaving = talePick(seed, 901, [`${taleCapital(taleList(lost))} did not walk out with you.`, 'You walked out of it alone, and you remembered every name.']);
-  else leaving = `${taleCapital(taleList(final.survivors))} walked out with you; ${taleList(lost)} did not.`;
-  const open = failures
+  let left;
+  if (!final.comrades.length) left = talePick(seed, 901, ['No one was left to wait for you.', 'There was no one left to come back for.']);
+  else if (!lost.length) left = talePick(seed, 901, [`${taleCapital(taleList(final.comrades))} waited at the chapel gate for a man who did not come back.`, `${taleCapital(taleList(final.comrades))} waited at the chapel gate. You never came back for them.`]);
+  else if (lost.length === final.comrades.length) left = talePick(seed, 901, [`${taleCapital(taleList(lost))} did not live to see the chapel.`, 'You went on alone, and you remembered every name.']);
+  else left = `${taleCapital(taleList(final.survivors))} waited at the chapel gate; ${taleList(lost)} did not live to.`;
+  const reached = failures
     ? talePick(seed, 902, [
-      `The ${ordinal} attempt was the one that counted: ${company}, you came through the dark to the prince, and the cell stood open at last.`,
-      `Then came the ${ordinal} attempt. ${taleCapital(company)}, you did not fall this time, and the cell stood open at last.`,
-      `On the ${ordinal} attempt, ${company}, you reached the prince, and the cell stood open at last.`,
+      `The ${ordinal} attempt was the last: ${company}, you came through the dark and past the jailer, and the room behind him was empty.`,
+      `Then came the ${ordinal} attempt. ${taleCapital(company)}, you did not fall this time, and behind the jailer you found an empty room.`,
+      `On the ${ordinal} attempt, ${company}, you got past the jailer at last, and the room behind him held no one.`,
     ])
     : talePick(seed, 902, [
-      `It took one night and one attempt: ${company}, you went up the cliff, through the garrison and past the jailer, and the cell stood open at last.`,
-      `There was no second try. ${taleCapital(company)}, you went in and did not fall, and the cell stood open at last.`,
-      `The first attempt was the only one it needed: ${company}, you came up through the storm, and the cell stood open at last.`,
+      `It took one night and one attempt: ${company}, you went up the cliff, through the garrison and past the jailer, and the room behind him was empty.`,
+      `There was no second try. ${taleCapital(company)}, you went in, did not fall, and found the room behind the jailer empty.`,
+      `The first attempt was the only one there was: ${company}, you came up through the storm and past the jailer to an empty room.`,
     ]);
   const took = taleHash(`${seed}:took`) % 2 === 0 ? ` It had taken ${taleDuration(final.seconds)}.` : '';
-  return `${open} ${leaving}${failures ? '' : took}`;
+  const end = talePick(seed, 903, [
+    'You did not climb out again. You stayed in the dark below the keep with Caby, and the new Noname waits there for whoever comes next.',
+    'You never came back up. Below the keep, beside Caby, the new Noname waits in the dark for whoever comes next.',
+  ]);
+  return `${reached} ${left}${failures ? '' : took} ${end}`;
 }
 
 /**
  * The story the ending tells, from `attemptLog(world)`: one paragraph, in the second person. Each earlier attempt is told in turn (where it
- * began, who stood with you, where and by whom it ended, who fell before you), and the paragraph ends on the attempt that counted. With
- * no deaths it is the clean night alone. The same log always gives the same words. (Past TALE_MOST failures the first two and the last two
- * are told in full, and a line sums up the rest.)
+ * began, who stood with you, where and by whom it ended, who fell before you), and the paragraph ends on the last: the empty room, and the
+ * operative who stayed below with Caby as the new Noname. With no deaths it is the one night alone. The same log always gives the same words.
+ * (Past TALE_MOST failures the first two and the last two are told in full, and a line sums up the rest.)
  */
 export function attemptStory(log) {
   const seed = taleHash(JSON.stringify(log));
@@ -214,5 +222,5 @@ export function attemptStory(log) {
   const told = failed.length > TALE_MOST
     ? [...failed.slice(0, 2).map((record) => taleFailure(record, log, seed)), taleBetween(failed.slice(2, -2), seed), ...failed.slice(-2).map((record) => taleFailure(record, log, seed))]
     : failed.map((record) => taleFailure(record, log, seed));
-  return [...told, taleSuccess(log.final, seed, failed.length)].join(' ');
+  return [...told, taleLast(log.final, seed, failed.length)].join(' ');
 }

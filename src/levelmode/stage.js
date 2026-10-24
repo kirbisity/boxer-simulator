@@ -31,6 +31,7 @@
 //       tier: 1,                          // strength of the garrison, for the AI to read (not used here)
 //       post: [x, y, z], facing: yaw,     // where he stands, on the floor at height y
 //       patrol: [[x, z], ...],            // optional: the path he walks when unaware (not used here)
+//       hold: 'horde',                    // optional: held out of the world (dormant whatever is active) until released by name (releaseHeld)
 //     } ],
 //     // Things to find (not used here): { id, kind: 'bandage', at: [x, y, z] }.
 //     items: [ ],
@@ -60,6 +61,8 @@
 //    set or a mechanism changes. Fighters of inactive sections are dormant (fighter.dormant):
 //    kept as they are, not stepped, thought for, collided or drawn; they wake when theirs activates.
 //    A man who has walked into another section belongs to it from then on (fighter.spawn.section).
+//    A man held (`spawn.hold`: a crowd kept for a scene, levelmode/ending.js) sleeps whatever is active until he is let go (releaseHeld), and
+//    is held again when he is made new at his post (a rest, a death: levelmode/checkpoints.js).
 //  - setMechanism(world, id, state), pullLever(world, id): gates and ladders.
 //
 // Neutral men: civilians and prisoners are in corner 'grey'. Nobody targets them
@@ -164,7 +167,9 @@ export function checkStage(stage) {
   }
   if (stage.ending) {
     if (!mechanisms.has(stage.ending.door)) problems.push(`the ending opens ${stage.ending.door}, which is not there`);
-    if (!spawns.has(stage.ending.prince)) problems.push(`the ending is with ${stage.ending.prince}, who is not there`);
+    if (stage.ending.noname && !spawns.has(stage.ending.noname)) problems.push(`the ending is with ${stage.ending.noname}, who is not there`);
+    const holds = new Set(stage.sections.flatMap((section) => (section.spawns ?? []).map((spawn) => spawn.hold).filter(Boolean)));
+    for (const name of [stage.ending.horde, stage.ending.epilogue?.hold].filter(Boolean)) if (!holds.has(name)) problems.push(`the ending lets go the ${name}, which nobody is held for`);
   }
   return problems;
 }
@@ -228,7 +233,7 @@ export function createStageWorld(stage, playerInputs, { seed = 1, awareness = tr
   for (const section of stage.sections) {
     for (const spawn of section.spawns ?? []) {
       entries.push({ inputs: spawnInputs(spawn), corner: ROLE_CORNER[spawn.role] });
-      posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id } });
+      posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id, held: spawn.hold ?? null } });
     }
   }
   // An open arena: the box is a far limit, the terrain the floor.
@@ -309,7 +314,7 @@ function apply(world, ids) {
   world.arena.terrain = stageTerrain(run.def, ids, run.mechanisms);
   let awake = 0;
   for (const fighter of world.fighters) {
-    if (fighter.spawn && !ids.includes(fighter.spawn.section)) {
+    if (fighter.spawn && (fighter.spawn.held || !ids.includes(fighter.spawn.section))) {
       if (!fighter.dormant) fighter.dormant = true;
       continue;
     }
@@ -335,6 +340,25 @@ function apply(world, ids) {
     }
   }
 }
+
+/**
+ * Let a held man go (`spawn.hold`): put him at `at` ([x, y, z], facing `yaw`) in section `section` (default his own), awake at once if it is
+ * active. False if he is not held.
+ */
+export function releaseHeld(world, fighter, { at = null, yaw = fighter.yaw, section = fighter.spawn?.section } = {}) {
+  if (!fighter.spawn?.held) return false;
+  fighter.spawn.held = null;
+  fighter.spawn.section = section;
+  if (at) placeOnFloor(fighter, at[0], at[2], at[1], yaw);
+  if (world.stage.active.includes(section)) {
+    if (fighter.dormant) wake(fighter);
+    world.awake = (world.awake ?? 0) + 1;
+  }
+  return true;
+}
+
+/** The men held under a name (`spawn.hold`), in the stage's order: the crowd a scene lets go. */
+export const heldMen = (world, name) => world.fighters.filter((fighter) => fighter.spawn?.held === name);
 
 /** A dormant man wakes as he was left: still, his feet where they are. */
 function wake(fighter) {

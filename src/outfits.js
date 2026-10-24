@@ -1690,8 +1690,19 @@ export function outfitOf(inputs) {
   const kind = OUTFITS[inputs.outfit?.kind] ? inputs.outfit.kind : 'boxing';
   const design = Math.max(0, Math.min(OUTFITS[kind].designs.length - 1, inputs.outfit?.design ?? 0));
   // Level mode (a boss's second phase): `outfit.bareHead`, the helm taken off; the rest of the kit as it was.
-  const look = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : OUTFITS[kind].designs[design];
+  // (And `outfit.helm` { kind, design }: another kit's helm put on over this one, a dead man's taken up: levelmode/ending.js.)
+  const helm = wornHelm(inputs);
+  const look = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : helm ? { ...OUTFITS[kind].designs[design], head: helm.head } : OUTFITS[kind].designs[design];
   return { kind, design, spec: OUTFITS[kind], look };
+}
+
+/** The helm of another kit worn over this one (`outfit.helm`: { kind, design }), as { head (its look), spec (its kit) }, or null. */
+function wornHelm(inputs) {
+  const from = inputs.outfit?.helm;
+  const spec = from && OUTFITS[from.kind];
+  if (!spec) return null;
+  const head = spec.designs[Math.max(0, Math.min(spec.designs.length - 1, from.design ?? 0))].head;
+  return head ? { head, spec } : null;
 }
 
 /**
@@ -1777,6 +1788,13 @@ function bareHeaded(protection) {
   return { ...protection, bullet: { ...protection.bullet, head: 0 }, regions: { ...protection.regions, head: { blunt: 0, cut: 0, pierce: 0, deflects: false } } };
 }
 
+/** A kit's protection with another kit's helm over the head (`outfit.helm`): the head as that kit guards it; the rest as it was. */
+function helmedBy(protection, helm) {
+  const head = helm?.spec.protection?.regions?.head;
+  if (!head) return protection;
+  return { ...protection, regions: { ...protection.regions, head } };
+}
+
 export function gearTraits(inputs) {
   const { spec, look } = outfitOf(inputs);
   const female = inputs.sex === 'female';
@@ -1791,7 +1809,7 @@ export function gearTraits(inputs) {
     kick: bySex.kick ?? spec.kick ?? 1,
     // The kit's weight as a share of the body's; a man's own (`outfit.extraMass`) before the kit's (a giant in a harness that weighs what a harness weighs).
     extraMass: inputs.outfit?.extraMass ?? spec.extraMass ?? 0,
-    protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : { ...NO_PROTECTION, ...spec.protection },
+    protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)),
     deflects: Boolean(spec.deflects),
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
     headLocked: Boolean(spec.headLocked) && !inputs.outfit?.bareHead,
@@ -1810,7 +1828,7 @@ export function gearTraits(inputs) {
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
     headBulk: spec.headBulk ?? 1,
     // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve; or the kit's own (`helmet`: a machine's head shell).
-    helmet: inputs.outfit?.bareHead ? NO_HELMET : spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET,
+    helmet: inputs.outfit?.bareHead ? NO_HELMET : (wornHelm(inputs) ? null : spec.helmet) ?? HELMETS[look.head?.kind] ?? NO_HELMET,
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.

@@ -1,5 +1,5 @@
 // Level Mode's story and its cards: the opening title card, the parchment notes, YOU DIED, the boss's
-// health bar and the ending in the cell. Plain DOM over the game (styled under "Level Mode" in boxer.css);
+// health bar and the ending (the plot twist's: the empty room, the chute, Noname). Plain DOM over the game (styled under "Level Mode" in boxer.css);
 // nothing here knows the stage or the world. The stage calls these, and asks `storyBusy()` whether a
 // card is up (to hold the world still behind it).
 //
@@ -65,19 +65,20 @@ export const NOTES = {
 };
 export const NOTE_KEYS = Object.keys(NOTES);
 
-// What the cell says. `endingLines` is the whole sequence in order; the middle line differs when civilians were harmed.
+// What the ending says (the plot twist, levelmode/ending.js). `endingLines` is the whole sequence in order: one line differs with when Noname was
+// met (killed on the way in by the old drain, or only at the end), one with whether civilians were harmed.
 const ENDING = {
-  cell: [
-    'The inner cell stands open. No guard inside, no chain on the door.',
-    'The Prince of Caby sits where the torchlight does not reach. He does not look up.',
-    'In both hands he holds the shards of a chalice, a fake, pressed so hard to his chest that they have drawn blood. He does not seem to feel it.',
-    'You hold out the scroll, signed in blood by his miners and his peasants. He flinches from it, and from you. "She said the world had forgotten me," he whispers. "She said someone would come, and that it would be a lie."',
+  twist: [
+    'The room behind the jailer was a privy. There had never been a prince in it.',
+    'The Queen\'s order said it plainly: the boy was not to die, and he was not to leave. She had found a way to keep both.',
   ],
-  spared: 'You spared those who only served. In the dark, for a breath, his eyes find yours.',
-  harmed: 'The servants who fell on your way were no one\'s soldiers. He saw them from the stair. "Then you are hers too," he whispers, and turns his face to the wall.',
+  before: 'Down in the dark under the keep, the thing in the cesspool had worn his face behind its helmet. You had cut it down on your way in, and never looked.',
+  after: 'The thing in the cesspool came at you out of the sludge, and did not stop until you had killed it. When its helmet came off, it had his face.',
+  helmet: 'You held him a long time. Then you took up the helmet from beside him, and put it on.',
+  spared: 'You had spared those who only served. Down here, no one will ever know it.',
+  harmed: 'The servants who fell on your way were no one\'s soldiers. Down here, they are one more thing to carry in the dark.',
   closing: [
-    'He will not leave. The door is open, and the prison is already inside him.',
-    'Beyond the walls, the storm begins to break.',
+    'Above, the storm breaks over Dunnottar. Below, the sludge closes over the way you came.',
   ],
   end: 'End of Stage 1 · Memories of Dunnottar',
 };
@@ -86,12 +87,13 @@ const ENDING = {
 export const attemptsLine = (count) => `Attempts: ${count}`;
 
 /**
- * The ending's lines in order, for the way the run went. With `attempts` ({ count, story }: levelmode/attempts.js) the story of the
- * night comes after the closing words, then the "Attempts: N" line, then the stage's end.
+ * The ending's lines in order, for the way the run went: `slainBefore` (Noname was killed on the way in, by the old drain; else only at the end).
+ * With `attempts` ({ count, story }: levelmode/attempts.js) the story of the night comes after the closing words, then the "Attempts: N" line,
+ * then the stage's end.
  */
-export function endingLines({ civiliansHarmed = false, attempts = null } = {}) {
+export function endingLines({ civiliansHarmed = false, attempts = null, slainBefore = false } = {}) {
   const told = attempts ? [attempts.story, attemptsLine(attempts.count)] : [];
-  return [...ENDING.cell, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...ENDING.closing, ...told, ENDING.end];
+  return [...ENDING.twist, slainBefore ? ENDING.before : ENDING.after, ENDING.helmet, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...ENDING.closing, ...told, ENDING.end];
 }
 
 /** How long the cards take (s): the fade of each, and how long a card holds before a tap counts. */
@@ -235,12 +237,12 @@ export function showDeath(onDone) {
 }
 
 /**
- * The ending in the cell: lines rise one by one over black (a tap brings the next at once); `onLine(index, text)` says
- * which is up, so the stage can pose the cell behind it; the last tap closes the card and runs onDone. `attempts`
- * ({ count, story }) adds the story of the night and the "Attempts: N" line before the end.
+ * The ending: lines rise one by one over black (a tap brings the next at once); `onLine(index, text)` says which is up, so the stage
+ * can frame the cesspool behind it; the last tap closes the card and runs onDone. `attempts` ({ count, story }) adds the story of the
+ * night and the "Attempts: N" line before the end; `slainBefore` is endingLines'.
  */
-export function showEnding({ civiliansHarmed = false, attempts = null, onLine = null, over = true } = {}, onDone) {
-  const lines = endingLines({ civiliansHarmed, attempts });
+export function showEnding({ civiliansHarmed = false, attempts = null, slainBefore = false, onLine = null, over = true } = {}, onDone) {
+  const lines = endingLines({ civiliansHarmed, attempts, slainBefore });
   const shown = [];
   let at = -1;
   let timer = null;
@@ -263,7 +265,7 @@ export function showEnding({ civiliansHarmed = false, attempts = null, onLine = 
     if (at < lines.length - 1) timer = setTimeout(next, Math.max(STORY_TIMING.endingLineHold, lines[at].split(' ').length * STORY_TIMING.endingWord) * 1000);
     else card.root.classList.add('last');
   };
-  // Over the scene (the default): the cell stays in view above the words, and the world runs behind them.
+  // Over the scene (the default): the cesspool stays in view above the words, and the world runs behind them.
   const card = storyCard(over ? 'story-ending over' : 'story-ending', () => {
     if (!ready || finished) return;
     if (at < lines.length - 1) { next(); return; }
