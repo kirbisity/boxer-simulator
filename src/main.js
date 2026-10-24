@@ -44,6 +44,8 @@ import { travelPlaces } from './levelmode/travel.js';
 import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { attemptCount, attemptLog, attemptStory, bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
+import { snapshotGear } from './levelmode/checkpoints.js';
+import { applySandbox, heroClean, heroLoad, heroSave, sandboxBadge, sandboxPlaces, travelTo } from './levelmode/sandbox.js';
 import { installLevelHud } from './levelmode/hud.js';
 import { NOTES, STAGE_ONE, closeStory, showDeath, showEnding, showFinale, showNote, showOpening, storyBusy } from './levelmode/story.js';
 import { createLevelMarkers } from './levelmode/markers.js';
@@ -59,12 +61,22 @@ import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, u
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
+/** The browser's local storage, or null where it is denied (a sandboxed page may not even look). */
+function browserStorage() {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
 
 const state = {
   // Each side's fighters, in order (the first leads); the builder edits one
   // of each side at a time, the one `editing` points to.
   rosters: { red: [normaliseInputs(structuredClone(PRESETS.heavy))], blue: [normaliseInputs(structuredClone(PRESETS.light))] },
   editing: { red: 0, blue: 0 },
+  // The character the sandbox's level is played as (levelmode/sandbox.js: kept in this browser, the Forger until another is built).
+  levelPlayer: heroLoad(browserStorage()),
   world: null,
   views: [],
   layer: 'skin',
@@ -238,8 +250,12 @@ function placeLockRing() {
 }
 
 /** The fighter of a side the builder is editing, and replacing it. */
-const current = (corner) => state.rosters[corner][state.editing[corner]];
-const setCurrent = (corner, inputs) => { state.rosters[corner][state.editing[corner]] = inputs; };
+// ('hero' is not a corner: the character the sandbox's level is played as, kept in state.levelPlayer.)
+const current = (corner) => (corner === 'hero' ? state.levelPlayer : state.rosters[corner][state.editing[corner]]);
+const setCurrent = (corner, inputs) => {
+  if (corner === 'hero') state.levelPlayer = inputs;
+  else state.rosters[corner][state.editing[corner]] = inputs;
+};
 
 /**
  * Fill a side's roster up to its size: the level's crew or, in the ring,
@@ -1190,12 +1206,89 @@ $('#modes').addEventListener('click', () => setSandboxPanel(false));
 $('#open-builder').addEventListener('click', () => setSandboxPanel(false));
 // The sandbox's ghost walk: the Dunnottar stage, unseen by its garrison, to walk and look it over. He goes in as the
 // sandbox's red lead; the ghost bar under the clock changes the pace (as the sandbox's speeds) and who he is, in place.
-$('#ghost-walk').addEventListener('click', () => {
+// The two ways in with his own character (levelmode/sandbox.js): the ghost walk, or the real run.
+function enterSandboxLevel(mode) {
   setSandboxPanel(false);
-  enterStage('dunnottar', { ghost: true, player: state.rosters.red[0] });
+  enterStage('dunnottar', { sandbox: mode, player: state.levelPlayer });
   boxer.finishBuilding();
   syncGhostBar();
+}
+$('#ghost-walk').addEventListener('click', () => enterSandboxLevel('ghost'));
+$('#real-walk').addEventListener('click', () => enterSandboxLevel('real'));
+
+// An in-page question (no alert/confirm: a sandboxed page may not have them): `yes` runs when it is said yes to.
+function askConfirm(text, yesLabel, yes) {
+  const card = $('#confirm-card');
+  $('#confirm-text').textContent = text;
+  $('#confirm-yes').textContent = yesLabel;
+  card.hidden = false;
+  const close = () => { card.hidden = true; $('#confirm-yes').onclick = $('#confirm-no').onclick = null; };
+  $('#confirm-yes').onclick = () => { close(); yes(); };
+  $('#confirm-no').onclick = close;
+  $('#confirm-yes').focus({ preventScroll: true });
+}
+
+// His character, built with the same form as a corner's (the fighter code's copy and load too), kept in this browser.
+let heroTurn = -0.45;
+let heroTimer = null;
+const builderOpen = () => !$('#hero-builder').hidden;
+function heroPreviewSoon() {
+  if (!builderOpen()) return;
+  clearTimeout(heroTimer);
+  heroTimer = setTimeout(() => {
+    if (!builderOpen()) return;
+    try {
+      $('#hero-picture').src = drawPortrait(heroClean(state.levelPlayer), heroTurn);
+    } catch {
+      // No picture; the form still works.
+    }
+  }, 150);
+}
+let heroBefore = null;
+function openHeroBuilder() {
+  setSandboxPanel(false);
+  heroBefore = JSON.stringify(state.levelPlayer);
+  state.levelPlayer = heroClean(state.levelPlayer);
+  $('#hero-builder').hidden = false;
+  state.paused = true;
+  const inLevel = state.game === 'level' && state.world?.stage?.sandbox;
+  $('#hero-apply').textContent = !inLevel ? 'Save' : state.world.stage.sandbox === 'ghost' ? 'Apply here' : 'Apply and restart the level';
+  $('#hero-note').textContent = '';
+  fillCornerForm('hero');
+}
+function closeHeroBuilder() {
+  $('#hero-builder').hidden = true;
+  state.paused = false;
+  $('#pause').textContent = 'Pause';
+}
+$('#level-character').addEventListener('click', openHeroBuilder);
+$('#ghost-character').addEventListener('click', openHeroBuilder);
+$('#hero-cancel').addEventListener('click', () => {
+  state.levelPlayer = JSON.parse(heroBefore);
+  closeHeroBuilder();
 });
+$('#hero-left').addEventListener('click', () => { heroTurn -= 0.8; heroPreviewSoon(); });
+$('#hero-right').addEventListener('click', () => { heroTurn += 0.8; heroPreviewSoon(); });
+$('#hero-apply').addEventListener('click', () => {
+  state.levelPlayer = heroClean(state.levelPlayer);
+  const kept = heroSave(browserStorage(), state.levelPlayer);
+  const world = state.world;
+  closeHeroBuilder();
+  if (state.game !== 'level' || !world?.stage?.sandbox) {
+    if (!kept) levelHud.toast('Not kept: this browser would not store it');
+    return;
+  }
+  if (world.stage.sandbox === 'ghost') ghostPlayAs(null, state.levelPlayer);
+  else enterSandboxLevel('real');
+});
+// Switching mode starts the level over from the start.
+for (const button of document.querySelectorAll('#ghost-mode [data-mode]')) {
+  button.addEventListener('click', () => {
+    const mode = button.dataset.mode;
+    if (state.world?.stage?.sandbox === mode) return;
+    askConfirm(mode === 'real' ? 'Play for real? The level starts again from the beginning, and the garrison will fight you.' : 'Switch to the ghost walk? The level starts again from the beginning.', 'Start over', () => enterSandboxLevel(mode));
+  });
+}
 // The stage's look (levelmode/stagelooks.js): a name in the ghost bar's Look select, `boxer.stageLook(name)`, or ?stagelook=; kept for next time.
 const stageLookKey = 'boxer.stageLook';
 const stageLookSelect = $('#ghost-look');
@@ -1262,7 +1355,7 @@ for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) {
 const ghostGo = $('#ghost-go');
 let ghostPlaces = [];
 function fillGhostGo() {
-  ghostPlaces = state.world?.stage ? travelPlaces(state.world.stage.def) : [];
+  ghostPlaces = state.world?.stage ? sandboxPlaces(travelPlaces(state.world.stage.def), state.world.stage.sandbox) : [];
   ghostGo.replaceChildren(new Option('Go to…', ''), ...ghostPlaces.map((place, index) => new Option(place.label, String(index))));
 }
 ghostGo.addEventListener('change', () => {
@@ -1270,33 +1363,37 @@ ghostGo.addEventListener('change', () => {
   ghostGo.value = '';
   ghostGo.blur();
   const world = state.world;
-  if (!place || !world?.stage?.ghost) return;
-  const me = world.fighters[0];
-  placeOnFloor(me, place.at[0], place.at[2], place.at[1], place.yaw);
+  if (!place || !world?.stage?.sandbox) return;
+  if (!travelTo(world, place)) return;
+  if (world.stage.cheated) levelHud.toast('Fast travel: the run is marked as a sandbox cheat');
   followCam.reset();
 });
 
 /** The ghost bar shows the pace now and who he is. */
 function syncGhostBar() {
   for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) button.classList.toggle('on', Number(button.dataset.speed) === state.speed);
+  for (const button of document.querySelectorAll('#ghost-mode [data-mode]')) button.classList.toggle('on', button.dataset.mode === state.world?.stage?.sandbox);
   const name = state.world?.fighters[0]?.body.inputs.name;
   const match = [...ghostAs.options].find((option) => option.text === name);
   if (match) ghostAs.value = match.value;
 }
 
 /** In the ghost walk, he becomes someone else where he stands (made new, whole: a look at the stage as that man). */
-function ghostPlayAs(choice) {
+function ghostPlayAs(choice, own = null) {
   const world = state.world;
-  if (!world?.stage?.ghost) return;
-  const [kind, key] = choice.split(':');
-  const inputs = kind === 'level' ? levelPreset(key) : normaliseInputs(structuredClone(PRESETS[key]));
+  if (world?.stage?.sandbox !== 'ghost') return;
+  const [kind, key] = (choice ?? '').split(':');
+  const inputs = own ? heroClean(own) : kind === 'level' ? levelPreset(key) : normaliseInputs(structuredClone(PRESETS[key]));
   const me = world.fighters[0];
   reviveFighter(world, me, inputs, { at: [me.x[P.pelvis * 3], feetFloor(me), me.x[P.pelvis * 3 + 2]], yaw: me.yaw });
   rebuildFighterView(0);
   state.stageOptions = { ...state.stageOptions, player: inputs };
+  // (A death wakes him in this body, not the one he began with.)
+  world.stage.level.checkpoint.gear = snapshotGear(me);
   state.orders = newOrders();
   fightControls.reset();
   ghostAs.blur();
+  syncGhostBar();
 }
 $('#open-menu').addEventListener('click', () => setSandboxPanel(false));
 
@@ -1570,6 +1667,7 @@ const OUTFIT_FIELDS = [
 
 /** Which of a side's fighters the form is showing: one entry per fighter on the side. */
 function fillMemberPicker(corner) {
+  if (corner === 'hero') return;
   const picker = $(`#build-${corner} .member`);
   const size = state.teamSizes[corner];
   picker.closest('label').hidden = size < 2;
@@ -1591,12 +1689,20 @@ function buildCornerForm(corner) {
     group.append(...Object.entries(PRESETS).filter(([, preset]) => factionOf(preset) === faction).map(([key, preset]) => new Option(preset.name, key)));
     return group;
   }).filter((group) => group.children.length));
-  presetSelect.value = Object.keys(PRESETS).find((key) => PRESETS[key].name === current(corner).name) ?? 'heavy';
+  // (The level character also has the Dunnottar cast, the Forger first.)
+  if (corner === 'hero') {
+    const group = Object.assign(document.createElement('optgroup'), { label: '🏰 Dunnottar' });
+    group.append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => new Option(preset.name, `level:${key}`)));
+    presetSelect.prepend(group);
+  }
+  const presetOf = (inputs) => Object.keys(PRESETS).find((key) => PRESETS[key].name === inputs.name) ?? (Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name) ? `level:${Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name)}` : null);
+  presetSelect.value = presetOf(current(corner)) ?? 'heavy';
   presetSelect.addEventListener('change', () => {
-    const chosen = normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
-    shuffleColors(chosen);
+    const level = presetSelect.value.startsWith('level:');
+    const chosen = level ? levelPreset(presetSelect.value.slice(6)) : normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
+    if (!level) shuffleColors(chosen);
     // The slot keeps its choice to ride (if the new man's kit rides).
-    if (current(corner).mounted) chosen.mounted = true;
+    if (corner !== 'hero' && current(corner).mounted) chosen.mounted = true;
     setCurrent(corner, chosen);
     fillCornerForm(corner);
   });
@@ -1697,12 +1803,18 @@ function buildCornerForm(corner) {
   fillCornerForm(corner);
 }
 
+/** A select showing a value; one the list does not offer (the Forger's own style and kit) is added to it. */
+function showValue(select, value, names) {
+  if (![...select.options].some((option) => option.value === value)) select.append(new Option(`${names?.[value] ?? OUTFITS[value]?.label ?? STYLES[value]?.label ?? value}`, value));
+  select.value = value;
+}
+
 function fillCornerForm(corner) {
   const form = $(`#build-${corner}`);
   const inputs = current(corner);
   fillMemberPicker(corner);
   // A level's fighters are tuned, not swapped for a preset.
-  form.querySelector('.preset').closest('label').hidden = Boolean(state.scenario);
+  form.querySelector('.preset').closest('label').hidden = corner !== 'hero' && Boolean(state.scenario);
   const outfit = form.querySelector('.outfit');
   // The design names follow the outfit chosen.
   const kind = outfitOf(inputs).kind;
@@ -1715,12 +1827,12 @@ function fillCornerForm(corner) {
   const headOptions = headgearOptions(kind);
   if (!headOptions.includes((inputs.accessories ?? [])[0] ?? 'none')) inputs.accessories = [];
   outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
-  for (const field of OUTFIT_FIELDS) outfit.querySelector(`[data-outfit="${field.key}"]`).value = field.get(inputs);
+  for (const field of OUTFIT_FIELDS) showValue(outfit.querySelector(`[data-outfit="${field.key}"]`), field.get(inputs), field.names);
   form.querySelector('.name-input').value = inputs.name;
   // Mounted is each fighter's own, and only if his kit rides (levels have no horses).
   const rides = canRide(inputs);
   const mount = form.querySelector('.mount-check');
-  form.querySelector('.mount-row').hidden = Boolean(state.scenario);
+  form.querySelector('.mount-row').hidden = corner === 'hero' || Boolean(state.scenario);
   mount.disabled = !rides;
   mount.checked = rides && Boolean(inputs.mounted);
   const horse = mountOf(inputs);
@@ -1740,7 +1852,7 @@ function fillCornerForm(corner) {
   const look = { ...DEFAULT_LOOK, ...inputs.look };
   for (const field of LOOK_FIELDS) {
     const value = field.onInputs ? inputs[field.key] ?? 'boxing' : field.key === 'hairColor' ? look.hairNatural ?? look.hairColor : look[field.key];
-    form.querySelector(`[data-look="${field.key}"]`).value = field.fromValue ? field.fromValue(value) : value;
+    showValue(form.querySelector(`[data-look="${field.key}"]`), field.fromValue ? field.fromValue(value) : value, field.names);
   }
   const body = buildBody(inputs);
   const stats = deriveStats(body);
@@ -1753,6 +1865,7 @@ function fillCornerForm(corner) {
     ['Reach', `${Math.round(body.reach * 100)} cm`], ['Punch', `${Math.round(body.motorForce[7])} N`], ['Chin', `${body.chin.toFixed(2)} m/s`],
   ];
   form.querySelector('.derived').innerHTML = rows.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('');
+  if (corner === 'hero') heroPreviewSoon();
 }
 
 // ---- Levels -------------------------------------------------------------------
@@ -1872,7 +1985,7 @@ let goHome = () => {};
 
 /** Show which part of the game is on: the footer keeps only what it uses. */
 function setGame(game, next = null) {
-  document.body.classList.remove('ghost-walk');
+  document.body.classList.remove('ghost-walk', 'sandbox-level', 'sandbox-real');
   if (state.game === 'sandbox' && game !== 'sandbox') state.sandbox = { rosters: state.rosters, teamSizes: { ...state.teamSizes }, place: state.place };
   if (game !== 'tutorial') {
     // Out of the yard, however he left it (finished, skipped, the menu): a next visit opens on the home screen.
@@ -2115,23 +2228,25 @@ function leaveStage() {
  * the sandbox's ghost walk, unseen by the garrison. `opening`: the title card over the storm first (the menu's way in; the
  * world holds still behind it, and play begins when it is tapped away); a replay from the finale skips the lore.
  */
-function enterStage(key, { opening = false, ghost = false, player = null } = {}) {
+function enterStage(key, { opening = false, sandbox = null, ghost: asGhost = false, player = null } = {}) {
+  if (asGhost && !sandbox) sandbox = 'ghost';
   const stage = STAGES[key];
   if (!stage) throw new Error(`no stage called ${key}`);
   leaveStage();
   const run = (stageRun += 1);
-  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key, { ghost, player }) });
-  state.stageOptions = { ghost, player };
+  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key, { sandbox, player }) });
+  state.stageOptions = { sandbox, player };
   state.scenario = null;
   state.seed += 1;
   // The operative (a fixed preset), in his combat stance: the stick within the run threshold fights, past it runs (control.js).
-  state.world = createLevelWorld(stage, player ? normaliseInputs(structuredClone(player)) : levelPreset('forger'), { seed: state.seed });
-  // Ghost walk (the sandbox's debug for designing the stage): the garrison never notices him (levelmode/awareness.js).
-  state.world.stage.ghost = ghost;
-  // Exploring: every gate and door stands open and every ladder is down, so the whole castle can be walked.
-  if (ghost) for (const mechanism of mechanismsOf(stage)) setMechanism(state.world, mechanism.id, 'open' in mechanism.states ? 'open' : 'down' in mechanism.states ? 'down' : Object.keys(mechanism.states).at(-1));
+  state.world = createLevelWorld(stage, player ? heroClean(player) : levelPreset('forger'), { seed: state.seed });
+  // The sandbox (levelmode/sandbox.js): 'ghost' walk (the garrison never notices him, every door open: levelmode/awareness.js) or the 'real' run with his own character.
+  if (sandbox) applySandbox(state.world, sandbox);
+  const ghost = sandbox === 'ghost';
+  document.body.classList.toggle('sandbox-level', Boolean(sandbox));
   document.body.classList.toggle('ghost-walk', ghost);
-  if (ghost) fillGhostGo();
+  document.body.classList.toggle('sandbox-real', sandbox === 'real');
+  if (sandbox) fillGhostGo();
   clearGore(scene);
   // (A stage may be set in a place of its own: the storm of Dunnottar, levelmode/storm.js.)
   const place = stage.place ?? 'stage';
@@ -2215,11 +2330,15 @@ function beginEnding(world) {
   endingCam = { k: 0, goal: 0 };
   // Every death was a failed attempt: the story of the night, told from the record, and how many tries it took.
   const attempts = { count: attemptCount(world), story: attemptStory(attemptLog(world)) };
+  // A sandbox run says so on its cards; "Play again" is the same sandbox run, as the same man.
+  const badge = sandboxBadge(world);
+  const again = world.stage.sandbox ? { sandbox: world.stage.sandbox, player: state.stageOptions.player } : undefined;
   // How far the push-in goes with each line (0: as the camera was; 1: close on him).
   const beats = [0.3, 0.42, 0.52, 0.6, 0.68, 0.74, 0.8, 0.85];
   showEnding({
     civiliansHarmed: world.stage.civiliansHarmed,
     attempts,
+    sandbox: badge,
     // (Noname was dead before the drop: he had been killed on the way in, by the old drain.)
     slainBefore: endingOf(world)?.nonameAlive === false,
     outcome: endingOf(world)?.outcome ?? null,
@@ -2232,7 +2351,7 @@ function beginEnding(world) {
   }, () => {
     if (run !== stageRun) return;
     endingDone(world);
-    showFinale({ onMenu: () => goHome(), onAgain: () => enterStage(key), attempts });
+    showFinale({ onMenu: () => goHome(), onAgain: () => enterStage(key, again), attempts, sandbox: badge });
   });
 }
 
@@ -2296,7 +2415,7 @@ function portrait(key, inputs) {
   return made;
 }
 
-function drawPortrait(inputs) {
+function drawPortrait(inputs, yaw = -0.45) {
   if (!portraitView) {
     const canvas = document.createElement('canvas');
     canvas.width = 300;
@@ -2313,7 +2432,7 @@ function drawPortrait(inputs) {
   const world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed: 3 });
   const fighter = world.fighters[0];
   placeFighter(fighter, 0, 0);
-  fighter.yaw = -0.45;
+  fighter.yaw = yaw;
   advance(world, 0.7, null, STEP);
   // Drawn plainly in the look's renderer settings and colours: its steel map must be in place before the fighter is built.
   flattenView(portraitView);
@@ -2489,6 +2608,7 @@ window.addEventListener('resize', fit);
 new ResizeObserver(fit).observe($('.controls'));
 buildCornerForm('red');
 buildCornerForm('blue');
+buildCornerForm('hero');
 tutorial = installTutorial($('#fight-ui'), {
   now: realSeconds,
   stage: yardStage,

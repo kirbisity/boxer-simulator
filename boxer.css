@@ -829,9 +829,13 @@ body.card-up .hud, body.card-up .fight-ui, body.card-up .controls, body.card-up 
 /* Ghost walk (the sandbox's stage debug): a quiet tag by the clock, so it is never mistaken for the real stage. */
 body.ghost-walk #clock::after { content: ' · 👻 Ghost'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
 
+body.sandbox-real #clock::after { content: ' · ⚔ Sandbox'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
+body.sandbox-real #ghost-as-label { display: none; }
+.ghost-bar .seg { border-radius: 999px; }
+
 /* The ghost walk's bar: under the clock, small; only while ghost walking. */
 .ghost-bar { display: none; }
-body.ghost-walk .ghost-bar { display: flex; position: fixed; z-index: 7; left: 50%; top: calc(62px + env(safe-area-inset-top, 0px)); translate: -50% 0; gap: 4px; align-items: center; padding: 4px 6px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font: 600 12px var(--body); color: var(--muted); }
+body.sandbox-level .ghost-bar { display: flex; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 16px); position: fixed; z-index: 7; left: 50%; top: calc(62px + env(safe-area-inset-top, 0px)); translate: -50% 0; gap: 4px; align-items: center; padding: 4px 6px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); font: 600 12px var(--body); color: var(--muted); }
 .ghost-bar button { padding: 4px 9px; border-radius: 999px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .ghost-bar button.on { background: var(--gold); color: #111; }
 .ghost-bar label { display: flex; gap: 5px; align-items: center; padding-left: 6px; }
@@ -863,3 +867,21 @@ body.ghost-walk .ghost-bar { display: flex; position: fixed; z-index: 7; left: 5
 .tw-line.shown { opacity: 1; }
 .fight-ui, .controls { transition: opacity 0.4s; }
 body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.cutscene .controls { opacity: 0; pointer-events: none; }
+
+/* The sandbox level's character: the builder form beside his picture, and the in-page confirmation. */
+.hero-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
+.hero-preview { display: grid; gap: 6px; justify-items: center; position: sticky; top: 0; }
+.hero-preview img { width: 100%; max-width: 300px; height: auto; border-radius: 10px; border: 1px solid var(--line); background: #1a1f2c; }
+.hero-turn { display: flex; gap: 8px; }
+.hero-turn button { padding: 2px 16px; font-size: 20px; }
+.hero-note { margin: 0; color: var(--muted); font-size: 12px; min-height: 1em; }
+#hero-builder { z-index: 10; }
+.confirm-card { position: fixed; z-index: 30; left: 50%; top: 40%; translate: -50% -50%; width: min(360px, calc(100vw - 32px)); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); display: grid; gap: 12px; }
+.confirm-card p { margin: 0; }
+.confirm-card div { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 700px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .hero-preview { position: static; }
+  .hero-preview img { max-width: 180px; }
+}
+.story-fin-sandbox { color: var(--muted); }

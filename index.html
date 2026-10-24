@@ -53,9 +53,11 @@
   <div class="wizard" id="wizard" hidden></div>
 
   <!-- The ghost walk's own bar (the sandbox's stage debug): the pace, and who he walks as. -->
-  <div class="ghost-bar" id="ghost-bar" role="group" aria-label="Ghost walk">
+  <div class="ghost-bar" id="ghost-bar" role="group" aria-label="Sandbox level">
+    <span class="seg" id="ghost-mode" aria-label="Mode"><button type="button" data-mode="ghost" title="Unseen by the garrison, every door open">👻 Ghost</button><button type="button" data-mode="real" title="The real run: the garrison fights you, doors by the real rules">⚔ Real</button></span>
+    <button type="button" id="ghost-character" title="Build the character you play the level as">🧍 Character</button>
     <button type="button" data-speed="0.25">¼×</button><button type="button" data-speed="1">1×</button><button type="button" data-speed="4">4×</button>
-    <label><span>As</span><select id="ghost-as"></select></label>
+    <label id="ghost-as-label"><span>As</span><select id="ghost-as"></select></label>
     <label><span>Look</span><select id="ghost-look"></select></label>
     <label><span>Quality</span><select id="ghost-quality" title="auto: the frame rate picks the pixels and detail; high: everything; low: the cheapest picture"></select></label>
     <label><span>Go to</span><select id="ghost-go"><option value="">Go to…</option></select></label>
@@ -108,7 +110,9 @@
         <button data-value="play">Play red</button>
         <button data-value="play" data-side="blue">Play blue</button>
       </div>
+      <button type="button" id="level-character" class="sandbox-only" title="Build the character you play the Dunnottar level as (saved in this browser)">🧍 My level character…</button>
       <button type="button" id="ghost-walk" class="sandbox-only" title="Walk the Dunnottar stage unseen: the garrison never notices you (for looking the castle over)">👻 Ghost walk · Dunnottar</button>
+      <button type="button" id="real-walk" class="sandbox-only" title="Play the real Dunnottar level with your own character: the garrison fights you, doors by the real rules, the whole story to the end">⚔ Play for real with my character</button>
       <button id="open-builder" class="primary sandbox-only">Build fighters</button>
     </div>
     <!-- How the player attacks in a fight (fightui/toggle.js): tapping his man, or a button for each kind of blow; the key shows the colours. -->
@@ -153,6 +157,31 @@
 <button id="close-builder" class="primary">Fight</button></div>
     </div>
   </div>
+
+  <!-- The character the sandbox's level is played as (the same builder form as a corner's), with a picture of him. -->
+  <div class="builder" id="hero-builder" hidden>
+    <div class="sheet">
+      <h1>Your character in the level</h1>
+      <p class="lede">Built like any fighter; kept in this browser. He is the one who walks (ghost) or fights (real) through Dunnottar. There are no horses in a level.</p>
+      <div class="hero-grid">
+        <div class="hero-preview"><img id="hero-picture" alt="Your character" width="300" height="380"><div class="hero-turn"><button type="button" id="hero-left" aria-label="Turn left">‹</button><button type="button" id="hero-right" aria-label="Turn right">›</button></div></div>
+        <form class="corner hero" id="build-hero" onsubmit="return false">
+          <h2>Your character</h2>
+          <label class="field wide member-row" hidden><span>Fighter</span><select class="member"></select></label>
+          <label class="field wide"><span>Preset</span><select class="preset"></select></label>
+          <label class="field wide"><span>Name</span><input class="name-input" maxlength="32"></label>
+          <label class="field wide mount-row" hidden><span>Mounted</span><span class="mount-line"><input type="checkbox" class="mount-check"><em class="mount-note"></em></span></label>
+          <div class="fields"></div>
+          <div class="looks"></div>
+          <div class="derived"></div>
+          <div class="share"><input class="code" placeholder="Fighter code"><button type="button" class="copy">Copy code</button><button type="button" class="load">Load</button></div>
+        </form>
+      </div>
+      <p class="hero-note" id="hero-note"></p>
+      <div class="builder-actions"><button type="button" id="hero-cancel">Cancel</button><button type="button" id="hero-apply" class="primary">Apply</button></div>
+    </div>
+  </div>
+  <div class="confirm-card" id="confirm-card" hidden role="alertdialog"><p id="confirm-text"></p><div><button type="button" id="confirm-no">Cancel</button><button type="button" id="confirm-yes" class="primary">Yes</button></div></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script type="module" src="src/main.js"></script>

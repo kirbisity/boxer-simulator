@@ -99,10 +99,10 @@ export const attemptsLine = (count) => `Attempts: ${count}`;
  * With `attempts` ({ count, story }: levelmode/attempts.js) the story of the night comes after the closing words, then the "Attempts: N" line,
  * then the stage's end.
  */
-export function endingLines({ civiliansHarmed = false, attempts = null, slainBefore = false, outcome = null } = {}) {
+export function endingLines({ civiliansHarmed = false, attempts = null, slainBefore = false, outcome = null, sandbox = null } = {}) {
   const told = attempts ? [attempts.story, attemptsLine(attempts.count)] : [];
   const epilogue = outcome === 'fell' ? [ENDING.fell] : outcome ? [ENDING.stands] : [];
-  return [...ENDING.twist, slainBefore ? ENDING.before : ENDING.after, ENDING.helmet, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...epilogue, ...ENDING.closing, ...told, ENDING.end];
+  return [...ENDING.twist, slainBefore ? ENDING.before : ENDING.after, ENDING.helmet, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...epilogue, ...ENDING.closing, ...told, ...(sandbox ? [sandbox] : []), ENDING.end];
 }
 
 /** How long the cards take (s): the fade of each, and how long a card holds before a tap counts. */
@@ -250,8 +250,8 @@ export function showDeath(onDone) {
  * can frame the cesspool behind it; the last tap closes the card and runs onDone. `attempts` ({ count, story }) adds the story of the
  * night and the "Attempts: N" line before the end; `slainBefore` is endingLines'.
  */
-export function showEnding({ civiliansHarmed = false, attempts = null, slainBefore = false, outcome = null, onLine = null, over = true } = {}, onDone) {
-  const lines = endingLines({ civiliansHarmed, attempts, slainBefore, outcome });
+export function showEnding({ civiliansHarmed = false, attempts = null, slainBefore = false, outcome = null, sandbox = null, onLine = null, over = true } = {}, onDone) {
+  const lines = endingLines({ civiliansHarmed, attempts, slainBefore, outcome, sandbox });
   const shown = [];
   let at = -1;
   let timer = null;
@@ -292,7 +292,7 @@ export function showEnding({ civiliansHarmed = false, attempts = null, slainBefo
  * The card after the ending: where the stage stops. "Return to menu" and "Play again" (each runs its callback once, the card
  * taking itself down). Enter works the button that has the focus. `attempts` ({ count }) puts "Attempts: N" under the title.
  */
-export function showFinale({ onMenu, onAgain, attempts = null }, stage = STAGE_ONE) {
+export function showFinale({ onMenu, onAgain, attempts = null, sandbox = null }, stage = STAGE_ONE) {
   let done = false;
   const card = storyCard('story-finale', () => document.activeElement?.closest?.('.story-finale') && document.activeElement.click?.(), { bodyClass: 'card-up' });
   const choose = (callback) => () => {
@@ -312,6 +312,7 @@ export function showFinale({ onMenu, onAgain, attempts = null }, stage = STAGE_O
     storyEl('h2', 'story-fin-title', `Stage 1 complete`),
     storyEl('p', 'story-fin-sub', stage.title),
     ...(attempts ? [storyEl('p', 'story-fin-attempts', attemptsLine(attempts.count))] : []),
+    ...(sandbox ? [storyEl('p', 'story-fin-attempts story-fin-sandbox', sandbox)] : []),
     storyEl('div', 'story-rule'),
     storyEl('div', 'story-buttons'),
   );
