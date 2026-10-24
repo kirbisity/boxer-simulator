@@ -1858,7 +1858,8 @@ function updateIntent(world, fighter, dt) {
     // The stroke at the pace his arms give the weapon; a bow drawn as fast as he can pull it (handling.js).
     const held = punch.spec.path === 'blade' ? (blade?.held ? blade : null) : fighter.weapon?.held ? fighter.weapon : null;
     const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
-    punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace;
+    // (Waist-deep in sludge: slower, a little. Levelmode/level.js wadeGear; nothing in a battle.)
+    punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace * (fighter.wading?.act ?? 1);
     punch.age += dt;
     // From the saddle the lancer keeps his point on the man all the way in (the horse carries it on its own line, not the lance's).
     if (punch.spec.couched && punch.driven && fighter.mount && punch.target !== null && !punch.at) punch.aim = toLocal(fighter, vec.add(aimPoint(world.fighters[punch.target], punch.zone), punch.miss ?? [0, 0, 0]));
@@ -2276,7 +2277,7 @@ function weaveHead(world, fighter, intent, dt) {
 function applyDefence(fighter, intent, dt) {
   const defence = fighter.defence;
   if (!defence) return;
-  defence.t += dt;
+  defence.t += dt * (fighter.wading?.act ?? 1);
   const H = fighter.body.heightM;
   const u = Math.min(1, defence.t / defence.seconds);
   const arc = Math.sin(Math.PI * u);
@@ -2827,7 +2828,7 @@ function moveRoot(world, fighter, dt) {
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     // A man who cannot turn his head turns his whole body to follow, slowly.
-    let change = turn * Math.min(1, dt * WORLD.footing.turnRate * (fighter.body.gear.headLocked ? WORLD.headLock.turn : 1));
+    let change = turn * Math.min(1, dt * WORLD.footing.turnRate * (fighter.body.gear.headLocked ? WORLD.headLock.turn : 1) * (fighter.wading?.act ?? 1));
     if (fighter.crawling) {
       // On his knees he turns only as fast as his steps carry him round.
       const spec = WORLD.crawl;

@@ -73,10 +73,18 @@ export const LEVEL_CONFIG = {
   },
 
   // ---- Wading ----------------------------------------------------------------------------------------
-  // Standing water and sludge (levelmode/water.js) deeper than `from` m over a man's feet hold his legs: his footwork and acceleration (gear.foot, gear.accel)
-  // are times these while he is in it, so he cannot step back as quickly as on the stone (the cesspool's thigh-deep sludge). A man whose inputs say `wader`
-  // (none now: a wader Noname did worse in the bot's fights) is not held. The crypt's and the cistern's water (0.28 m) and the cesspool's island hold no one.
-  wade: { from: 0.35, foot: 0.62, accel: 0.55 },
+  // Standing water and sludge (levelmode/water.js wadeDrag, applied each step by level.js wadeGear) hold a man's legs by how deep it is over his feet, in proportion to
+  // his height (the same water is deeper on a short man). `table` is [depth over the feet (m) of a man `height` m tall, the share of his footwork left] for the
+  // reference man; between the rows the share is interpolated, above the last it stays, and under the first it is 1 (ankle-deep water holds no one): shin 0.9,
+  // knee 0.75, thigh 0.55, waist 0.4 (a man wading at the waist goes at about half a walk), chest 0.3 (past that he is swimming, not walking).
+  //   sole:   the ankle joint (what the body's foot particle is) stands this share of his height above the sole, which the depth is measured from.
+  //   accel:  his acceleration share is the footwork share to this power (the legs take longer to get going than to carry on).
+  //   thick:  a volume's `viscosity` v (1 water, 1.6 the cistern's sewage, 2 the cesspool's sludge) takes a further v^-exp of it, brought on as the water comes up from
+  //           `from` to `full` m (reference man) over his feet (a man standing in sludge to the ankle is not stuck; to the knee he is): the cesspool's 0.49 m is x0.6 on top of the knee.
+  //   act:    his punches, dodges and turning go at the thick share to this power (a man stuck in sludge is slower everywhere, but only slightly); rising is slowed by his
+  //           footwork share itself (physics/rising.js already divides its stages by gear.foot).
+  //   tire:   the stamina he loses a second for each 1 of footwork share lost, while he moves (a little).
+  wade: { height: 1.75, sole: 0.073, table: [[0.15, 1], [0.3, 0.9], [0.5, 0.75], [0.8, 0.55], [1.0, 0.4], [1.3, 0.3]], accel: 1.2, thick: { exp: 0.75, from: 0.15, full: 0.35 }, act: 0.35, tire: { cost: 0.03, speed: 0.4 } },
 
   // ---- Stand-ins until the awareness AI lands (levelmode/adapter.js) ---------------------------------------
   // An awake enemy counts as aware of the player within this many m.

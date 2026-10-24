@@ -41,7 +41,7 @@ import { watchTeam } from './team.js';
 import { beginAttempt } from './attempts.js';
 import { outfitOf } from '../outfits.js';
 import { floorAt } from '../physics/terrain.js';
-import { stageWaters, waterAt } from './water.js';
+import { stageWaters, wadeDrag, waterAt } from './water.js';
 
 /** Give a stage world its run. Returns the level. */
 export function startLevel(world, { settle = true } = {}) {
@@ -117,7 +117,7 @@ export function levelThink(world, dt) {
   watchTeam(world);
   dropHelmets(world);
   giveTemper(world);
-  wadeGear(world);
+  wadeGear(world, dt);
   if (me.state === 'out') {
     // (Past the reveal there is no waking at a rest: a death in the epilogue ends the game, with the cards.)
     if (endingFinal(world)) finishEpilogue(world, 'fell');
@@ -134,13 +134,15 @@ export function levelThink(world, dt) {
 // ---- Wading ---------------------------------------------------------------------------------------------------
 
 /**
- * A man in water deeper than LEVEL_CONFIG.wade.from over his feet is held by it: his footwork and acceleration are scaled down while he is in it and given back as
- * he comes out (`fighter.wading` keeps what they were, for the gear they were taken from: a rest or a death makes his gear new). One with `wader` in his inputs
- * walks in it as on the stone.
+ * A man in water over his ankles is held by it, by how deep it is over his feet and how tall he is (water.js wadeDrag, LEVEL_CONFIG.wade), every step: his footwork and
+ * acceleration (gear.foot, gear.accel, the run's and the rise's too: physics/gait.js, rising.js) are scaled down while he is in it and given back as he comes out, and
+ * thick water (the cesspool's sludge) slows his punches, dodges and turning besides (`fighter.wading.act`, read by physics.js) and tires him a little as he moves
+ * (`dt`). `fighter.wading` = { gear, base: the gear's footwork and acceleration before the water, set: what was last put on it (a gear changed by another hand while
+ * he wades, the boss's second phase, is taken as the new base), drag: wadeDrag's last answer, act }, for the gear they were taken from: a rest or a death makes his gear
+ * new. One with `wader` in his inputs walks in it as on the stone. A battle has no stage and no waters: nothing here runs there.
  */
-export function wadeGear(world) {
+export function wadeGear(world, dt = 0) {
   const level = levelOf(world);
-  const spec = LEVEL_CONFIG.wade;
   level.waters ??= stageWaters(world.stage.def);
   if (!level.waters.length) return;
   for (const fighter of world.fighters) {
@@ -149,14 +151,27 @@ export function wadeGear(world) {
     const x = fighter.x;
     const feet = Math.min(x[P.lFoot * 3 + 1], x[P.rFoot * 3 + 1]);
     const water = fighter.dormant || fighter.body.inputs.wader ? null : waterAt(level.waters, x[P.pelvis * 3], feet, x[P.pelvis * 3 + 2]);
-    const held = Boolean(water) && water.at[1] - feet > spec.from;
-    if (held && !fighter.wading) {
-      fighter.wading = { gear, foot: gear.foot, accel: gear.accel };
-      gear.foot = (gear.foot ?? 1) * spec.foot;
-      gear.accel = (gear.accel ?? 1) * spec.accel;
-    } else if (!held && fighter.wading) {
-      gear.foot = fighter.wading.foot;
-      gear.accel = fighter.wading.accel;
+    const depth = water ? water.at[1] - feet + LEVEL_CONFIG.wade.sole * fighter.body.heightM : 0;
+    const drag = depth > 0 ? wadeDrag(water, depth, fighter.body.heightM) : null;
+    const held = drag && drag.foot < 1 ? drag : null;
+    let wading = fighter.wading;
+    if (held) {
+      if (!wading) wading = fighter.wading = { gear, base: { foot: gear.foot, accel: gear.accel }, set: null, drag: held, act: 1 };
+      else if (gear.foot !== wading.set.foot || gear.accel !== wading.set.accel) wading.base = { foot: gear.foot, accel: gear.accel };
+      gear.foot = (wading.base.foot ?? 1) * held.foot;
+      gear.accel = (wading.base.accel ?? 1) * held.accel;
+      wading.set = { foot: gear.foot, accel: gear.accel };
+      wading.drag = held;
+      wading.act = held.act;
+      if (dt > 0 && fighter.state !== 'out') {
+        const moving = Math.min(1, Math.hypot(fighter.rootVelocity?.[0] ?? 0, fighter.rootVelocity?.[1] ?? 0) / LEVEL_CONFIG.wade.tire.speed);
+        fighter.stamina = Math.max(0, fighter.stamina - LEVEL_CONFIG.wade.tire.cost * (1 - held.foot) * moving * dt);
+      }
+    } else if (wading) {
+      if (gear.foot === wading.set.foot && gear.accel === wading.set.accel) {
+        gear.foot = wading.base.foot;
+        gear.accel = wading.base.accel;
+      }
       fighter.wading = null;
     }
   }

@@ -50,8 +50,9 @@ export function gaitBody(body) {
 /** His body's gait (cached on the fighter for his body). */
 export function gaitOf(fighter) {
   let cache = fighter.gaitBody;
-  if (!cache || cache.body !== fighter.body) {
-    cache = { body: fighter.body, ...gaitBody(fighter.body) };
+  // (Worked out again when his kit's footwork or acceleration has changed: a man wading is held by the water, levelmode/level.js wadeGear.)
+  if (!cache || cache.body !== fighter.body || cache.footKey !== fighter.body.gear?.foot || cache.accelKey !== fighter.body.gear?.accel) {
+    cache = { body: fighter.body, footKey: fighter.body.gear?.foot, accelKey: fighter.body.gear?.accel, ...gaitBody(fighter.body) };
     fighter.gaitBody = cache;
   }
   return cache;
