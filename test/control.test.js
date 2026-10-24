@@ -51,10 +51,12 @@ test('gestures: a tap, a double tap near it, and a press held still (acting the 
 
 test('the stick: a dead centre, a walk, full pace, then a run', () => {
   assert.equal(stickPace(0.05).pace, 0);
-  const walk = stickPace(0.3);
+  const walk = stickPace(0.25);
   assert.ok(walk.pace > 0.3 && walk.pace < 0.7 && !walk.running);
-  assert.equal(stickPace(0.82).pace, 1);
-  assert.equal(stickPace(1).running, true);
+  assert.equal(stickPace(CONTROL.stick.fullFrom).pace, 1);
+  assert.equal(stickPace(CONTROL.stick.runFrom).running, true);
+  assert.equal(stickPace(CONTROL.stick.runFrom).run, 0, 'a jog at the threshold');
+  assert.equal(stickPace(1).run, 1, 'his sprint at full throw');
 });
 
 test('locked on and left alone, he holds his own range: a boxer close, a spearman out at his point, a gunman back', () => {
@@ -72,7 +74,8 @@ test('locked on and left alone, he holds his own range: a boxer close, a spearma
 test('the stick moves him the way it points, faster the further it goes; unlocked he turns that way', () => {
   const { orders, me, step } = played(PRESETS.heavy, PRESETS.light, { distance: 6, still: true });
   const start = point(me.x, P.pelvis);
-  orders.stick = { dir: [0, 1], amount: 0.5 };
+  // (A slow walk: the walk's range is now the stick's first 0.55, and 0.5 nearly its full pace.)
+  orders.stick = { dir: [0, 1], amount: 0.3 };
   step(1.5);
   const walked = point(me.x, P.pelvis)[2] - start[2];
   orders.stick = { dir: [0, 1], amount: 1 };

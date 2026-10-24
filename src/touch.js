@@ -13,7 +13,7 @@
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, contextAction, crawlReady, lockCandidate, moveName, toggleCrawl } from './control.js';
+import { ACTIONS, CONTROL, contextAction, crawlReady, lockCandidate, moveName, toggleCrawl } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
 import { inFight, jumpNow, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
@@ -221,7 +221,7 @@ export function installFightControls(root, hooks) {
     const reach = Math.min(radius, length);
     stick.style.transform = `translate(${event.origin[0]}px, ${event.origin[1]}px)`;
     stick.firstChild.style.transform = `translate(${(event.dx / length) * reach}px, ${(event.dy / length) * reach}px)`;
-    stick.classList.toggle('running', event.amount >= 0.88);
+    stick.classList.toggle('running', event.amount >= CONTROL.stick.runFrom);
   }
 
   // The surface's own touches: captured, so a finger that strays over a button or off the edge keeps its gesture.

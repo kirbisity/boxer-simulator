@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
-import { directFighter, keyStick, newOrders } from '../src/control.js';
+import { CONTROL, directFighter, keyStick, newOrders } from '../src/control.js';
 import { advance, collapseAt, createWorld, placeOnFloor } from '../src/physics.js';
 import { fire } from '../src/physics/ranged.js';
 import { WORLD } from '../src/physics/config.js';
@@ -726,10 +726,10 @@ test('a bare head takes a blow as a bare head does: the helm\'s protection is go
   assert.equal(b.protection.cut, a.protection.cut, 'the harness below it is as it was');
 });
 
-test('the fight stick\'s run threshold is where the config says: a stick at 0.88 is a run, 0.87 a walk', () => {
+test('the fight stick\'s run threshold is where the config says: a stick at CONTROL.stick.runFrom is a run, just short of it a walk', () => {
   const world = yard();
   const me = world.fighters[0];
-  for (const [amount, running] of [[0.87, false], [0.88, true], [1, true]]) {
+  for (const [amount, running] of [[CONTROL.stick.runFrom - 0.01, false], [CONTROL.stick.runFrom, true], [1, true]]) {
     const orders = newOrders();
     orders.stick = { dir: [1, 0], amount };
     run(world, 0.3, orders);

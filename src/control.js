@@ -14,22 +14,24 @@ import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
-import { runSpeed } from './physics/gait.js';
+import { jogSpeed, runSpeed } from './physics/gait.js';
 import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
 
 export const CONTROL = {
-  // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`;
-  // a walk from `walkFrom` of the footwork's pace up to full pace at
-  // `fullFrom`, and a run past `runFrom`.
-  stick: { deadZone: 0.12, walkFrom: 0.3, fullFrom: 0.8, runFrom: 0.88 },
+  // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`; a walk from `walkFrom` of the footwork's pace up
+  // to full pace at `fullFrom` (the keys' walk); past `runFrom` a run (the run mode), from a jog at the stick's threshold
+  // (his walk-to-run speed, physics/gait.js jogSpeed) to his sprint at full throw, in proportion to the throw between.
+  // (The run was 0.88 to 1, at his sprint whatever the throw, and the walk full from 0.8.)
+  stick: { deadZone: 0.12, walkFrom: 0.3, fullFrom: 0.55, runFrom: 0.6 },
   // Run mode (the stick past `runFrom`, or Shift): no guard, weapon carried, faster (WORLD.runMode). A run lasts as long as the stick is
   // held out there (or Shift is): let go and he stops. There is no run lock.
-  // - staminaPerSecond: what running costs (stamina is 0..1; divided by his aerobic; it recovers at WORLD.staminaRecovery × aerobic, and
+  // - staminaPerSecond: what running flat out costs (stamina is 0..1; divided by his aerobic; it recovers at WORLD.staminaRecovery × aerobic, and
   //   at WORLD.runMode.recovery of that while he runs). Was 0.12 (an athletic man winded in ~20 s: a run across one section tired him);
   //   now 0.02: a fit man (the forger, aerobic 0.9) loses ~0.006 a second net, so ~2.5 minutes of sprinting from fresh before he is
   //   winded, a man in plate (aerobic 0.73) a little over a minute. A dash across a courtyard or a tower stair costs a few percent.
   //   Below `windedBelow` he is winded and runs no more until stamina is back to `recoveredTo` (a few seconds' rest: the latch is
-  //   lower and shorter than it was, 0.06 / 0.25, as the drain is so much gentler).
+  //   lower and shorter than it was, 0.06 / 0.25, as the drain is so much gentler). A slower run costs less: in proportion
+  //   to his speed over his sprint (a runner's energy per metre is about the same at any pace: per second, it goes with the speed).
   // - Auto-steer along walls, corners and winding stairs (runsteer.js RUN_STEER; the player's intent only, in worlds with terrain, and
   //   not locked on a man): the heading the stick gives is bent along a wall in his way at a glancing angle.
   run: {
@@ -51,7 +53,9 @@ export const CONTROL = {
   // On horseback (rideStick): the horse is slowed into a turn more than `slowFrom` rad off its line, to the speed it turns sharpest
   // at by a right angle; `snap` (off): locked on, a way within `snapAngle` rad of his man is taken straight at him.
   // `reins` false: the old way (the stick split round his facing as on foot: a pull back while locked on reins the horse back), to compare.
-  ride: { reins: true, slowFrom: 0.35, snap: false, snapAngle: 0.25 },
+  // `canterFrom`, `gallopFrom`: the stick's throw for the horse's full canter and its gallop (the horse keeps the stick's old
+  // ranges: its gaits are its own, not the man's run).
+  ride: { reins: true, slowFrom: 0.35, snap: false, snapAngle: 0.25, canterFrom: 0.8, gallopFrom: 0.88 },
   // An attack asked for while busy waits this long (s) for the hands to come back.
   bufferSeconds: 0.35,
   // He turns to face the place he strikes at for this long (s).
@@ -115,12 +119,27 @@ export const MOVE_KEYS = { w: [1, 0], arrowup: [1, 0], s: [-1, 0], arrowdown: [-
 
 // ---- Movement ---------------------------------------------------------------
 
-/** The stick's throw (0..1) as footwork: a pace (0..1) and whether to run. */
+/**
+ * The stick's throw (0..1) as footwork: a pace (0..1, the walk's) and whether to run; running, `run` is how far into the
+ * run's range it is (0 at the threshold, a jog, to 1 at full throw, his sprint).
+ */
 export function stickPace(amount) {
   const spec = CONTROL.stick;
-  if (amount < spec.deadZone) return { pace: 0, running: false };
+  if (amount < spec.deadZone) return { pace: 0, running: false, run: 0 };
   const share = Math.min(1, (amount - spec.deadZone) / (spec.fullFrom - spec.deadZone));
-  return { pace: spec.walkFrom + (1 - spec.walkFrom) * share, running: amount >= spec.runFrom };
+  const running = amount >= spec.runFrom;
+  return { pace: spec.walkFrom + (1 - spec.walkFrom) * share, running, run: running ? Math.min(1, (amount - spec.runFrom) / (1 - spec.runFrom)) : 0 };
+}
+
+/**
+ * His run at a stick's run share (0..1) as a share of his sprint (fighter.move while running): from a jog (his walk-to-run
+ * speed, physics/gait.js jogSpeed) at the run's threshold to his sprint at full throw.
+ */
+export function runShare(fighter, share) {
+  const top = runSpeed(fighter, true);
+  if (top <= 0) return 0;
+  const jog = Math.min(top, jogSpeed(fighter));
+  return (jog + (top - jog) * Math.max(0, Math.min(1, share))) / top;
 }
 
 /** Where he wants to stand from his man: the edge of his reach, or with a gun room to raise it. */
@@ -206,7 +225,9 @@ function steer(world, fighter, orders, opponent, dt) {
     return;
   }
   if (stick) {
-    const { pace } = stickPace(stick.amount);
+    const { pace, run } = stickPace(stick.amount);
+    // Running, the throw is his speed: a jog at the threshold to his sprint at full throw (runShare).
+    const runMove = running ? runShare(fighter, run) : 0;
     const way = stick.dir;
     if (locked) {
       // Facing his man: the stick's way split into in-and-out and round him.
@@ -217,6 +238,7 @@ function steer(world, fighter, orders, opponent, dt) {
       fighter.move = ahead * pace * slow;
       fighter.strafe = (way[0] * left[0] + way[1] * left[2]) * pace * slow;
       fighter.running = running && ahead > 0.7 && !orders.guard;
+      if (fighter.running) fighter.move = ahead * runMove;
     } else {
       // Free: he turns and goes that way (a run bent along any wall in his way: runsteer.js).
       let go = way;
@@ -228,14 +250,15 @@ function steer(world, fighter, orders, opponent, dt) {
         orders.runSteer.speedCap = null;
       }
       fighter.goTo = [pelvis[0] + go[0] * 3, 0, pelvis[2] + go[1] * 3];
-      fighter.move = pace * slow;
+      fighter.move = running && !orders.guard ? runMove : pace * slow;
       // A man in his way: the run held to a pace he can brush past him at (runsteer.js).
       if (orders.runSteer.speedCap) fighter.move = Math.min(fighter.move, orders.runSteer.speedCap / runSpeed(fighter, true));
       fighter.running = running && !orders.guard;
     }
     // A run is another gait, not the guard hurrying: the weapon carried, nothing guarded, his heading his own. It costs breath.
     fighter.runMode = fighter.running && !fighter.mount;
-    if (fighter.runMode) fighter.stamina = Math.max(0, fighter.stamina - CONTROL.run.staminaPerSecond * dt / fighter.body.aerobic);
+    // (A slower run costs less: in proportion to his speed over his sprint.)
+    if (fighter.runMode) fighter.stamina = Math.max(0, fighter.stamina - CONTROL.run.staminaPerSecond * Math.max(0, Math.min(1, fighter.move)) * dt / fighter.body.aerobic);
     if (fighter.runMode) fighter.faceFoe = locked;
     return;
   }
@@ -262,8 +285,9 @@ function steer(world, fighter, orders, opponent, dt) {
 function rideStick(world, fighter, orders, stick, opponent) {
   const horse = fighter.mount;
   const spec = CONTROL.ride;
-  const { pace } = stickPace(stick.amount);
-  const gallop = stick.amount >= CONTROL.stick.runFrom && !orders.guard;
+  const { deadZone, walkFrom } = CONTROL.stick;
+  const pace = walkFrom + (1 - walkFrom) * Math.min(1, Math.max(0, (stick.amount - deadZone) / (spec.canterFrom - deadZone)));
+  const gallop = stick.amount >= spec.gallopFrom && !orders.guard;
   let heading = Math.atan2(-stick.dir[1], stick.dir[0]);
   const locked = orders.lock !== null && opponent?.id === orders.lock;
   if (spec.snap && locked) {
