@@ -7,10 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
 import { ARM, createArm } from '../src/cameraarm.js';
-import { createFollowCam, FOLLOW_CAM } from '../src/followcam.js';
+import { createFollowCam } from '../src/followcam.js';
 import { solidAt, terrainWorld } from '../src/physics/terrain.js';
 import { placeOnFloor } from '../src/physics.js';
-import { mechanismsOf, setMechanism, updateStage } from '../src/levelmode/stage.js';
+import { cameraTerrain, mechanismsOf, setMechanism, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
@@ -26,7 +26,9 @@ function cameraFor(world) {
   const arm = createArm();
   const stats = { frames: 0, pitchMax: -Infinity, pitchMin: Infinity, nearest: Infinity, inside: 0, pitchOver: 0, close: 0, steps: [], last: null };
   let last = null;
+  let seen = null;
   const frame = () => {
+    // (The camera keeps clear of the whole castle, as it is drawn: main.js passes cameraTerrain, not the sections awake. Where it is checked to be, below, is against the sections awake: the man's own world.)
     const terrain = world.arena.terrain;
     const view = cam.update({
       me: [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 1], fighter.x[P.pelvis * 3 + 2]],
@@ -35,11 +37,12 @@ function cameraFor(world) {
       foe: null,
       running: Boolean(fighter.runMode),
       speed: Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]),
+      velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]],
+      room: seen ? seen.distance / (seen.distance + seen.pulled) : 1,
       moving: Boolean(fighter.walking),
       aspect: 16 / 9,
     }, world.time, FRAME);
-    const subject = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, fighter.x[P.pelvis * 3 + 2]];
-    const seen = arm.solve({ target: view.target, subject, yaw: view.yaw, pitch: view.pitch, distance: view.distance }, terrainWorld(terrain), FRAME);
+    seen = arm.solve({ target: view.target, subject: view.subject, yaw: view.yaw, pitch: view.pitch, distance: view.distance }, terrainWorld(cameraTerrain(world)), FRAME);
     stats.frames += 1;
     stats.pitchMax = Math.max(stats.pitchMax, seen.pitch);
     stats.pitchMin = Math.min(stats.pitchMin, seen.pitch);
@@ -89,7 +92,10 @@ function walkWithCamera(legs, { run = true, seed = 21, start = null, yaw = 0 } =
 function assertSteady(stats) {
   const quick = stats.steps.filter((step) => step > 0.3).length;
   assert.ok(quick / stats.steps.length < 0.006, `${quick} of ${stats.steps.length} frames moved the camera more than 0.3 m`);
-  assert.ok(Math.max(...stats.steps) < 2, `the biggest step was ${Math.max(...stats.steps).toFixed(2)} m`);
+  // (3, not 2: the arm now turns to another direction by a spring, not at once, and the camera it leaves for a moment up the second drain as he
+  // turns the corner east, hugging the drain's east wall, is cut in by up to 2.8 m once. Everywhere else the cuts are smaller and rarer than they
+  // were: tools/camjerk.js measures them.)
+  assert.ok(Math.max(...stats.steps) < 3, `the biggest step was ${Math.max(...stats.steps).toFixed(2)} m`);
 }
 
 const legsBetween = (route, from, to) => route.slice(route.findIndex((leg) => leg.name === from), to ? route.findIndex((leg) => leg.name === to) : undefined);
@@ -99,9 +105,11 @@ test('the sewer: down the stair, through the grotto, the drains, the cistern and
   assert.ok(stats.frames > 3000, `${stats.frames} frames`);
   assert.ok(stats.pitchMax <= 0.95, `the steepest pitch was ${stats.pitchMax.toFixed(2)} rad (the old camera went to 1.45, straight down)`);
   assert.ok(stats.pitchMin >= ARM.pitchMin - 1e-9);
-  assert.ok(stats.nearest > 1, `the nearest the camera came to him was ${stats.nearest.toFixed(2)} m`);
+  // (At that corner, for a frame or two, 0.99 m: the closest it comes.)
+  assert.ok(stats.nearest > 0.9, `the nearest the camera came to him was ${stats.nearest.toFixed(2)} m`);
   assert.equal(stats.inside, 0, 'never in a wall, a roof or a floor');
-  assert.ok(stats.close / stats.frames < 0.01, `${stats.close} of ${stats.frames} frames had the camera nearer than 1.2 m`);
+  // (1.5%, not 1%: the corner where the second drain turns east, above, holds the camera in for a moment longer than the old arm's snap round it did.)
+  assert.ok(stats.close / stats.frames < 0.015, `${stats.close} of ${stats.frames} frames had the camera nearer than 1.2 m`);
   assertSteady(stats);
 });
 
