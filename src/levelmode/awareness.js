@@ -55,6 +55,9 @@ export const AWARE = {
   // appearing out of the air at that instant (he was running a moment ago), short enough that standing there is soon seen.
   sprintUnseen: true,
   sprintGrace: 0.6,
+  // The player crawling (his own crawl: control.js toggleCrawl) is low and slow: a man not yet aware of him makes him out only within
+  // `crawlSight` of his usual range (and his head is low: a parapet or a cart hides him the sooner, as the sight line says).
+  crawlSight: 0.5,
   // An aggro man who has not seen a foe for this long (s) searches; within `meleeSense` m he sees (hears) one regardless.
   loseSeconds: 8,
   meleeSense: 2.5,
@@ -295,8 +298,12 @@ export function sprintUnseen(world, aware = world.stage?.aware) {
 function spot(world, aware, fighter, mind) {
   const range = rangeOf(aware, world, fighter);
   const cone = coneOf(aware, fighter, mind);
-  const player = sprintUnseen(world, aware) ? world.fighters[0] : null;
-  for (const target of targetsOf(world, aware)) if (target !== fighter && target !== player && sees(world, fighter, target, range, cone)) return target;
+  const me = world.fighters[0];
+  const player = sprintUnseen(world, aware) ? me : null;
+  for (const target of targetsOf(world, aware)) {
+    if (target === fighter || target === player) continue;
+    if (sees(world, fighter, target, target === me && me.crawling ? range * aware.config.crawlSight : range, cone)) return target;
+  }
   return null;
 }
 

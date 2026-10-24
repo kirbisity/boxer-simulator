@@ -71,3 +71,9 @@ export const FIGHT_UI_OUTCOME_GLYPHS = {
   miss: '<svg class="fu-icon" viewBox="-12 -12 24 24" aria-hidden="true"><circle r="8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="4 3.4"/></svg>',
 };
 FIGHT_UI_OUTCOME_GLYPHS.parried = FIGHT_UI_OUTCOME_GLYPHS.blocked;
+
+/** The Jump and Crawl buttons' icons (touch.js): a man springing up off a floor line; a man low on his hands and knees. */
+export const FIGHT_UI_CONTROL_ICONS = {
+  jump: '<svg class="fu-icon" viewBox="-24 -24 48 48" aria-hidden="true"><circle cx="0" cy="-14" r="4.2" fill="currentColor"/><path d="M0 -8v10M0 -5l-7 -5M0 -5l7 -5M0 2l-6 7M0 2l6 7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M-15 19h30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M-15 10l4 -5l4 5M7 10l4 -5l4 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/></svg>',
+  crawl: '<svg class="fu-icon" viewBox="-24 -24 48 48" aria-hidden="true"><circle cx="13" cy="-3" r="4.2" fill="currentColor"/><path d="M8 1L-9 3M8 1l3 12M-9 3l-3 10M-9 3l-9 7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M-20 17h40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+};

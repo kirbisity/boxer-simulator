@@ -118,7 +118,8 @@ export function canFinish(fighter) {
 /** Whether a man is helpless on the floor: down or on his knees and crawling, not yet out, not getting up. */
 export function helplessOnFloor(man) {
   if (man.state === 'out' || man.dormant || man.fled || man.mount || man.netted) return false;
-  return man.state === 'down' || Boolean(man.crawling && man.state === 'up');
+  // (On his knees by his own choice, the player's crawl, he is not helpless: he can strike and stand.)
+  return man.state === 'down' || Boolean(man.crawling && !man.crawlChosen && man.state === 'up');
 }
 
 /** Whether a man on the floor is within reach of this one: the hips apart on the floor, and on the same level. */

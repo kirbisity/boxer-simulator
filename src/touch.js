@@ -5,7 +5,7 @@
 // the floor), the attack controls the player chose (fightui/: a tap on
 // his man himself where to hit, or a button for each kind of blow, with the
 // name of each attack he makes and how it went), a big Guard button, a Lock
-// button above it, one special button in a fixed place, and the fight-mode
+// button above it, Jump above Lock and Crawl below Guard, one special button in a fixed place, and the fight-mode
 // HUD (the player's status low down, his man's over his head); in a battle,
 // a small column of orders to his men at the top left (fightui/command.js).
 // Only this surface takes the browser's gestures from it: menus and text
@@ -13,10 +13,11 @@
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, contextAction, lockCandidate, moveName } from './control.js';
+import { ACTIONS, contextAction, crawlReady, lockCandidate, moveName, toggleCrawl } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
-import { inFight, opponentFor, point, reachOf } from './physics.js';
+import { inFight, jumpNow, opponentFor, point, reachOf } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
+import { FIGHT_UI_CONTROL_ICONS } from './fightui/icons.js';
 import { fightUiCommandBar } from './fightui/command.js';
 import { paintStamina } from './overdraftview.js';
 
@@ -73,6 +74,13 @@ export function installFightControls(root, hooks) {
   action.innerHTML = '<b></b><span></span>';
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
   lock.innerHTML = '<b>◎</b><span class="label">Lock</span><span class="who"></span>';
+  // Jump (above Lock) and Crawl (below Guard): round, in the right-hand stack.
+  const jump = root.appendChild(uiElement('button', 'fight-button jump-button'));
+  jump.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.jump}</b><span>Jump</span><kbd>Space</kbd>`;
+  jump.setAttribute('aria-label', 'Jump');
+  const crawl = root.appendChild(uiElement('button', 'fight-button crawl-button'));
+  crawl.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.crawl}</b><span class="label">Crawl</span><kbd>C</kbd>`;
+  crawl.setAttribute('aria-label', 'Crawl');
   const status = root.appendChild(uiElement('div', 'player-status'));
   status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div>';
   const marker = root.appendChild(uiElement('div', 'target-marker'));
@@ -256,7 +264,7 @@ export function installFightControls(root, hooks) {
   surface.addEventListener('lostpointercapture', drop);
   // No callout, selection, context menu or page zoom from the fight.
   for (const kind of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) {
-    for (const target of [surface, guard, action, lock]) target.addEventListener(kind, (event) => event.preventDefault());
+    for (const target of [surface, guard, action, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
   }
 
   // Guard: held, the block; tapped, an evasion.
@@ -295,6 +303,38 @@ export function installFightControls(root, hooks) {
     toggleLock();
     navigator.vibrate?.(15);
   });
+
+  // Jump: a press is a jump (as Space), if his body can (physics/jump.js; the button dims when not).
+  jump.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    if (!active) return;
+    askJump();
+    navigator.vibrate?.(12);
+  });
+  // Crawl: down on his knees, or up again (as C); not while locked on.
+  crawl.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    if (!active) return;
+    pressCrawl();
+    navigator.vibrate?.(12);
+  });
+
+  /** A jump asked for (the button or Space): carried out with the orders (control.js directFighter). */
+  function askJump() {
+    hooks.orders().jump = true;
+    signal('jump');
+  }
+
+  /** Down to crawl, or up (the button or C): control.js toggleCrawl, which refuses while locked on. */
+  function pressCrawl() {
+    const me = hooks.player();
+    const world = hooks.world();
+    if (!me || !world) return false;
+    const was = Boolean(me.crawling);
+    const done = toggleCrawl(world, me, hooks.orders());
+    if (done) signal(was ? 'stand' : 'crawl');
+    return done;
+  }
 
   // The man he is on: the nearest foe, or whoever the page says (a stage run: only one near or aware of him).
   const foeFor = (world, me) => (hooks.opponent ? hooks.opponent(world, me) : opponentFor(world, me));
@@ -376,6 +416,14 @@ export function installFightControls(root, hooks) {
     lock.classList.toggle('on', Boolean(locked));
     lock.querySelector('.label').textContent = locked ? 'Unlock' : 'Lock';
     lock.querySelector('.who').textContent = locked ? firstNameOf(locked) : '';
+    // Crawl lit while he crawls, dimmed while it cannot be pressed (locked on, down, mounted); its word is what a press does.
+    crawl.classList.toggle('on', Boolean(me.crawling));
+    crawl.classList.toggle('blocked', !crawlReady(world, me, orders));
+    crawl.querySelector('.label').textContent = me.crawling ? 'Stand' : 'Crawl';
+    // Jump dimmed while he cannot (in the air, crawling, down, hurt, too weak, getting his legs back after a landing).
+    const canJump = !jumpNow(world, me).blocked;
+    jump.classList.toggle('blocked', !canJump);
+    jump.classList.toggle('on', Boolean(me.jump));
     // The player's own status, compact, low down.
     status.querySelector('.name').textContent = firstNameOf(me);
     status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
@@ -415,6 +463,8 @@ export function installFightControls(root, hooks) {
     stick.hidden = true;
     mark.hidden = true;
     guard.classList.remove('on');
+    jump.classList.remove('on', 'blocked');
+    crawl.classList.remove('on', 'blocked');
     awake.clear();
     incoming = null;
     rightButtons.clear();
@@ -422,7 +472,7 @@ export function installFightControls(root, hooks) {
     commandBar.reset();
   }
 
-  return { update, setActive, reset, toggleLock, setDevice, get device() { return device; }, fightUi: fightUi.choose };
+  return { update, setActive, reset, toggleLock, jump: askJump, toggleCrawl: pressCrawl, setDevice, get device() { return device; }, fightUi: fightUi.choose };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */

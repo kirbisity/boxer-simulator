@@ -6,7 +6,7 @@ import { aheadOfSlot, DRILL, fromSlot, moveFormations, moveWings, walkToSlot, WI
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bladeFor, bodyHarm, chinNow, couchedGap, dazedShare, dropWeapon, fightTier, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bladeFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
@@ -595,13 +595,13 @@ function chooseFocus(world, fighter) {
   }
   fighter.aiEventCursor = events.length;
   const current = fighter.focus === undefined ? null : world.fighters[fighter.focus];
-  // A man crawling away is left to go.
-  if (hitBy !== null && hitBy !== fighter.focus && world.fighters[hitBy].state === 'up' && !world.fighters[hitBy].crawling) {
+  // A man crawling away is left to go (not one crawling by his own choice: the player's crawl is still the fight).
+  if (hitBy !== null && hitBy !== fighter.focus && world.fighters[hitBy].state === 'up' && !crawlingAway(world.fighters[hitBy])) {
     fighter.focus = hitBy;
     return world.fighters[hitBy];
   }
-  if (current && current.state === 'up' && !current.crawling && !closerAtHand(world, fighter, current)) return current;
-  const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !other.crawling);
+  if (current && current.state === 'up' && !crawlingAway(current) && !closerAtHand(world, fighter, current)) return current;
+  const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !crawlingAway(other));
   if (!standing.length) {
     fighter.focus = undefined;
     return fighter.mayTarget ? null : nearestOpponent(world, fighter);
@@ -645,7 +645,7 @@ function closerAtHand(world, fighter, current) {
   const away = (other) => Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
   const mine = away(current);
   for (const other of world.fighters) {
-    if (other === current || !foeOf(fighter, other) || other.state !== 'up' || other.crawling) continue;
+    if (other === current || !foeOf(fighter, other) || other.state !== 'up' || crawlingAway(other)) continue;
     const distance = away(other);
     if (distance < mine - spec.margin && distance < mine * spec.ratio) return true;
   }

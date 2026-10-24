@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
-import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startPickup, throwPunch, WORLD } from './physics.js';
+import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
@@ -41,9 +41,17 @@ export const CONTROL = {
   facing: { foeWithin: 4.5 },
   // The special button offers Crawl once he is this hurt (hurtShare, or his legs' damage), with nothing else to offer.
   crawlOfferFrom: 0.35,
+  // Crawling by choice onto a slope steeper than `crawlSteep` (rise over run, looked at `crawlLook` m along his way: a flight of
+  // stairs is ~0.6, a ladder laid down steeper, the castle's ramps under 0.3), he gets up to climb it.
+  crawlSteep: 0.4,
+  crawlLook: 0.5,
   // Locked on, the stick idle: he keeps to the edge of his reach (m of slack
   // either way), or, with a gun or bow, `gunRoom` m beyond where he must drop it.
   hold: { slack: 0.15, inside: 0.08, gunRoom: 1.5 },
+  // On horseback (rideStick): the horse is slowed into a turn more than `slowFrom` rad off its line, to the speed it turns sharpest
+  // at by a right angle; `snap` (off): locked on, a way within `snapAngle` rad of his man is taken straight at him.
+  // `reins` false: the old way (the stick split round his facing as on foot: a pull back while locked on reins the horse back), to compare.
+  ride: { reins: true, slowFrom: 0.35, snap: false, snapAngle: 0.25 },
   // An attack asked for while busy waits this long (s) for the hands to come back.
   bufferSeconds: 0.35,
   // He turns to face the place he strikes at for this long (s).
@@ -80,7 +88,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 } };
+  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 } };
 }
 
 /**
@@ -192,6 +200,11 @@ function steer(world, fighter, orders, opponent, dt) {
   const stick = held && held.amount >= CONTROL.stick.deadZone ? held : null;
   const running = runStep(fighter, orders, stick);
   const slow = orders.guard ? CONTROL.guardFootwork : 1;
+  // On horseback the stick is the reins, locked on or not: the horse goes the way it points (rideStick).
+  if (stick && fighter.mount && CONTROL.ride.reins) {
+    rideStick(world, fighter, orders, stick, opponent);
+    return;
+  }
   if (stick) {
     const { pace } = stickPace(stick.amount);
     const way = stick.dir;
@@ -237,6 +250,39 @@ function steer(world, fighter, orders, opponent, dt) {
   const off = distance - hold;
   if (Math.abs(off) <= CONTROL.hold.slack) fighter.move *= Math.exp(-dt * 6);
   else fighter.move = Math.max(-1, Math.min(1, off * 2)) * slow;
+}
+
+/**
+ * The player's horse under the stick: its heading is the stick's way on the floor, at the canter (the gallop past the run
+ * threshold or with Shift), whether or not he is locked on a man (the lock aims his weapon, his shoulders and the camera, not
+ * the horse). The horse turns at its own rate (physics/mounted.js: `spin`, and `lateral` / speed), and is slowed into a turn
+ * the harder it is: to the speed it turns sharpest at (lateral / spin) by a right angle off its line (CONTROL.ride.slowFrom on).
+ * Snap (CONTROL.ride.snap, off): locked, a way within `snapAngle` of his man goes straight at him.
+ */
+function rideStick(world, fighter, orders, stick, opponent) {
+  const horse = fighter.mount;
+  const spec = CONTROL.ride;
+  const { pace } = stickPace(stick.amount);
+  const gallop = stick.amount >= CONTROL.stick.runFrom && !orders.guard;
+  let heading = Math.atan2(-stick.dir[1], stick.dir[0]);
+  const locked = orders.lock !== null && opponent?.id === orders.lock;
+  if (spec.snap && locked) {
+    const at = point(opponent.x, P.pelvis);
+    const toward = Math.atan2(-(at[2] - horse.at[1]), at[0] - horse.at[0]);
+    if (Math.abs(Math.atan2(Math.sin(toward - heading), Math.cos(toward - heading))) < spec.snapAngle) heading = toward;
+  }
+  let speed = pace * (gallop ? horse.paces.gallop : horse.paces.canter);
+  const off = Math.abs(Math.atan2(Math.sin(heading - horse.yaw), Math.cos(heading - horse.yaw)));
+  const hard = Math.max(0, Math.min(1, (off - spec.slowFrom) / (Math.PI / 2 - spec.slowFrom)));
+  const turning = Math.max(horse.paces.walk, horse.spec.lateral / horse.spec.spin);
+  if (speed > turning) speed += (turning - speed) * hard;
+  horse.goal = { heading, speed };
+  horse.goalAt = world.time;
+  fighter.goTo = null;
+  fighter.move = 0;
+  fighter.strafe = 0;
+  fighter.running = gallop;
+  fighter.runMode = false;
 }
 
 // ---- The attack pad ----------------------------------------------------------
@@ -778,19 +824,57 @@ export function contextAction(world, fighter) {
  * the special button offers it once he is hurt. False if it cannot be done.
  */
 export function playerCrawl(world, fighter, on) {
-  if (!fighter || fighter.state !== 'up' || fighter.netted || fighter.mount) return false;
+  if (!fighter || fighter.state !== 'up' || fighter.netted || fighter.mount || fighter.jump) return false;
   if (on) {
     if (fighter.crawling) return false;
     fighter.crawlChosen = true;
-    return startCrawl(world, fighter, 'goes down on his knees');
+    // (His own choice: what is in his hands he keeps.)
+    return startCrawl(world, fighter, 'goes down on his knees', { keep: true });
   }
   if (!fighter.crawling || legBroken(fighter)) return false;
-  // On his knees because he could not stand (physics/rising.js): he tries, from his knees, if his legs will bear him now.
-  if (fighter.crawlWeak) return retryFromKnees(world, fighter);
-  fighter.crawling = false;
-  fighter.crawlChosen = false;
-  world.events.push({ time: world.time, kind: 'stand', fighter: fighter.id, effects: ['back on his feet'] });
+  // Up from his knees in stages, as his legs can lift him (physics/rising.js: a foot brought through, then up; slower the weaker
+  // he is for his weight). Legs that will not bear him now leave him on his knees.
+  if (!retryFromKnees(world, fighter)) return false;
+  world.events.push({ time: world.time, kind: 'stand', fighter: fighter.id, effects: ['gets up off his knees'] });
   return true;
+}
+
+/**
+ * The Crawl button (and C): down on his knees, or up again. Down only when he is not locked on a man (the lock is a fight; a
+ * crawl is a way of going about). Returns whether anything happened.
+ */
+export function toggleCrawl(world, fighter, orders) {
+  if (!fighter) return false;
+  if (fighter.crawling) return playerCrawl(world, fighter, false);
+  if (orders?.lock !== null && orders?.lock !== undefined) return false;
+  return playerCrawl(world, fighter, true);
+}
+
+/** Whether the Crawl button can be pressed now (lit while he crawls; dimmed while locked on, or when he cannot get down or up). */
+export function crawlReady(world, fighter, orders) {
+  if (!fighter || fighter.state !== 'up' || fighter.netted || fighter.mount || fighter.jump) return false;
+  if (fighter.crawling) return !legBroken(fighter);
+  return orders?.lock === null || orders?.lock === undefined;
+}
+
+/**
+ * Whether the floor under him or just ahead along his way climbs steeply (a flight of stairs, a ladder laid down, a steep ramp):
+ * past CONTROL.crawlSteep of rise over run, over CONTROL.crawlLook m.
+ */
+function steepUnder(world, fighter) {
+  const terrain = world.arena?.terrain;
+  if (!terrain) return false;
+  const [x, y, z] = point(fighter.x, P.pelvis);
+  const here = floorAt(terrain, x, z, y);
+  if (here === -Infinity) return false;
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const way = speed > 0.05 ? [fighter.rootVelocity[0] / speed, fighter.rootVelocity[1] / speed] : [Math.cos(fighter.yaw), -Math.sin(fighter.yaw)];
+  const look = CONTROL.crawlLook;
+  for (const reach of [look * 0.5, look]) {
+    const ahead = floorAt(terrain, x + way[0] * reach, z + way[1] * reach, y + WORLD.terrain.stepUp);
+    if (ahead > -Infinity && Math.abs(ahead - here) / reach > CONTROL.crawlSteep) return true;
+  }
+  return false;
 }
 
 /** Do a special action now (when it still applies). */
@@ -903,6 +987,15 @@ export function directFighter(world, fighter, orders, dt) {
   // The man locked on is the man he fights; a lock on a man out of the fight lets go.
   const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
   if (locked && !inFight(locked)) orders.lock = null;
+  // Locked on while crawling by his own choice: he gets up to fight (the staged rise).
+  if (orders.lock !== null && fighter.crawling && fighter.crawlChosen) playerCrawl(world, fighter, false);
+  // On his knees on a stair, a steep ramp or a ladder: he gets up to climb it (a man does not crawl up a ladder).
+  if (fighter.crawling && fighter.crawlChosen && steepUnder(world, fighter)) playerCrawl(world, fighter, false);
+  // Jump asked (the Jump button, Space): he jumps if his body can (physics/jump.js).
+  if (orders.jump) {
+    orders.jump = false;
+    startJump(world, fighter);
+  }
   fighter.focus = orders.lock ?? undefined;
   // Locked on a man who is no enemy (a civilian, a team-mate): he is still the man he fights, for his blows and his facing.
   fighter.focusAny = Boolean(locked) && orders.lock !== null && !hostile(locked, fighter);
