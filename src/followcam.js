@@ -53,8 +53,6 @@ export const FOLLOW_CAM = {
   // The pitch he may drag to (rad).
   pitchMin: -0.05,
   pitchMax: 1.2,
-  // Nearer than this (m) the view does not come in for a wall; it eases back out at `distanceRate`.
-  nearest: 1.4,
   // A narrow screen (a phone held upright) shows little across: the view stands back until this
   // much (m) either side of what it looks at is in the picture, and the shoulder offset is at most
   // this share of it, so that he stays in frame. The camera's vertical field of view (degrees).
@@ -98,11 +96,9 @@ export function runFollowGoal(yaw, facing, spec = FOLLOW_CAM) {
 }
 
 /**
- * A follow camera. `room(x, z)` (optional) says whether the camera may
- * stand there (inside the walls); outside, it comes in along its line.
- * Returns { update, look, zoom, reset, state }.
+ * A follow camera. Returns { update, look, zoom, reset, state }.
  */
-export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
+export function createFollowCam(spec = FOLLOW_CAM) {
   const cam = { ready: false };
 
   function reset() {
@@ -204,39 +200,9 @@ export function createFollowCam(spec = FOLLOW_CAM, { room = null } = {}) {
       : [cam.anchor[0] + right[0] * shoulder, height, cam.anchor[2] + right[1] * shoulder];
     if (!cam.target) cam.target = goalTarget.slice();
     for (let axis = 0; axis < 3; axis += 1) [cam.target[axis], cam.targetV[axis]] = spring(cam.target[axis], cam.targetV[axis], goalTarget[axis], spec.targetRate, dt);
-    // The distance eases to it; then no further back than the walls allow.
+    // The distance eases to it. (What stands in its way is not the follow camera's to know: cameraarm.js pulls the camera in.)
     [cam.distance, cam.distanceV] = spring(cam.distance, cam.distanceV, wanted, spec.distanceRate, dt);
-    const allowed = roomFor(cam.target, cam.yaw, cam.pitch, cam.distance);
-    if (allowed < cam.distance) {
-      cam.distance = allowed;
-      cam.distanceV = Math.min(0, cam.distanceV);
-    }
     return { target: cam.target.slice(), yaw: cam.yaw, pitch: cam.pitch, distance: cam.distance };
-  }
-
-  /**
-   * The furthest the camera may stand back along its line (no nearer than `nearest`). A room that is a wall of a place
-   * (colosseum, subway) is tested at the end of the line and bisected; a room with `march` (the walls and roofs of a
-   * level-mode stage: `room(x, z, y)`) is walked along from the target in steps, so that a thin wall is not leapt over.
-   */
-  function roomFor(target, yaw, pitch, distance) {
-    if (!room) return distance;
-    const at = (d) => [target[0] + Math.cos(pitch) * Math.cos(yaw) * d, target[2] + Math.cos(pitch) * Math.sin(yaw) * d, target[1] + Math.sin(pitch) * d];
-    if (room.march) {
-      for (let d = spec.nearest; d <= distance + 1e-6; d += 0.3) {
-        if (!room(...at(d))) return Math.max(spec.nearest, d - 0.3 - 0.2);
-      }
-      return room(...at(distance)) ? distance : Math.max(spec.nearest, distance - 0.5);
-    }
-    if (room(...at(distance))) return distance;
-    let inside = spec.nearest;
-    let outside = distance;
-    for (let pass = 0; pass < 12; pass += 1) {
-      const middle = (inside + outside) / 2;
-      if (room(...at(middle))) inside = middle;
-      else outside = middle;
-    }
-    return Math.max(spec.nearest, inside);
   }
 
   /** The player turns the view (rad of yaw and pitch): kept until `holdSeconds` after the last of it. */

@@ -44,10 +44,6 @@
   const game = () => frame.contentWindow;
 
   /** Pixels of the drawn frame (RGBA, rows bottom first), read at once after the draw. */
-  function noCutaway(g) {
-    const at = g.boxer.scene.camera.position;
-    FB.kt?.ktSightline({ x: at.x, y: at.y, z: at.z }, [at.x, at.y - 100, at.z], false);
-  }
   function grab(g) {
     const canvas = g.boxer.scene.renderer.domElement;
     const gl = g.boxer.scene.renderer.getContext();
@@ -65,7 +61,6 @@
   /** The frame drawn again with the camera as it is (nothing else touched), then read. */
   function redraw(g) {
     const s = g.boxer.scene;
-    noCutaway(g);
     s.renderer.render(s.scene, s.camera);
     return grab(g);
   }

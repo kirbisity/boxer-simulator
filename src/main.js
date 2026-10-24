@@ -21,8 +21,8 @@ import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js
 import { createFightUiMarks } from './fightui/marker.js';
 import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
-import { cameraRoom, createFollowCam } from './followcam.js';
-import { createSeeThrough } from './seethrough.js';
+import { cameraRoom, createFollowCam, FOLLOW_CAM } from './followcam.js';
+import { createCameraRig } from './camerarig.js';
 import { adaptiveSize, createAdaptiveResolution } from './adaptres.js';
 import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
@@ -55,7 +55,6 @@ import { pinnedRung, QUALITY_MODES, readQuality, writeQuality } from './levelmod
 import { stormEnvironment, stormLook, stormOnSkyArrived, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
-import { ktSightline } from './levelmode/kittex.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -118,17 +117,17 @@ if (activeLook().id !== DEFAULT_LOOK_ID) reapplyPlace(scene);
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
 let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
 
-// The third-person camera of play mode (followcam.js), kept out of the place's walls.
+// The third-person camera of play mode (followcam.js). Where the camera stands wanted, the rig below keeps it clear of the scenery.
+// `cameraWalls`: where it may stand in a place that keeps it inside (the Colosseum's oval, the subway's wall) or in a stage (the cutscene's and the ending's use).
 let cameraWalls = null;
-// (A stage's walls and roofs are walked along from the target, so that a thin wall is not leapt over: `march`, set by enterStage.)
 const cameraRoomTest = (x, z, y) => !cameraWalls || cameraWalls(x, z, y);
-const followCam = createFollowCam(undefined, { room: cameraRoomTest });
+const followCam = createFollowCam();
 
 // The camera when watching (watchcam.js): framing everyone, or taken over by the viewer's zoom and tap.
 let watchCam = createWatchCam();
 
-// Scenery between the camera and the men it watches is drawn see-through (seethrough.js).
-const seeThrough = createSeeThrough();
+// Scenery between the camera and the men it watches is never drawn see-through: the camera is moved clear of it instead (camerarig.js).
+const cameraRig = createCameraRig();
 
 // The marks of the player's blows in the fight (fightui/marker.js): where each goes, its way, how it went.
 const fightMarks = createFightUiMarks(scene);
@@ -304,7 +303,6 @@ function newBout() {
   fightMarks.reset();
   fightMarks.warm();
   cameraWalls = cameraRoom(place, arena);
-  cameraRoomTest.march = false;
   followCam.reset();
   // A level frames its own place; anything else starts from the usual ringside view.
   Object.assign(scene.orbit, scenario?.camera ?? { yaw: -0.5, pitch: 0.2, distance: 5.2 });
@@ -796,35 +794,6 @@ function showCameraBar(watching) {
   $('#frame-all').hidden = !free;
 }
 
-// The points on a man the camera must see past the scenery to.
-const WATCHED = [P.head, P.neck, P.pelvis, P.lFoot, P.rFoot];
-// In a crowd, the men nearest what the camera looks at (at most this many).
-const WATCHED_IN_CROWD = 3;
-
-/**
- * What the camera is there to see: the man played and the man he is locked
- * on; one man against another, both; in a crowd, the point the camera looks
- * at and the men nearest it.
- */
-function watchedPoints(world, followed) {
-  const standing = world.fighters.filter((fighter) => !(fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds));
-  let men;
-  const points = [];
-  if (followed) men = [followed, lockedTarget()].filter(Boolean);
-  else if (standing.length <= 2) men = standing;
-  else {
-    const at = scene.orbit.target;
-    points.push([at.x, at.y, at.z]);
-    const off = (fighter) => Math.hypot(fighter.x[P.pelvis * 3] - at.x, fighter.x[P.pelvis * 3 + 2] - at.z);
-    men = standing.slice().sort((a, b) => off(a) - off(b)).slice(0, WATCHED_IN_CROWD);
-  }
-  // The man the viewer follows is the one he is looking at.
-  const looked = !followed && watchCam.mode === 'free' && watchCam.focus !== null ? world.fighters[watchCam.focus] : null;
-  if (looked && !men.includes(looked)) men = [looked, ...men];
-  for (const fighter of men) for (const particle of WATCHED) points.push(point(fighter.x, particle));
-  return points;
-}
-
 function draw(dt, { render: drawIt = true } = {}) {
   const restore = blendWorld(state.world, state.before, state.paused ? 1 : state.accumulator / STEP);
   try {
@@ -856,15 +825,14 @@ function drawWorld(dt, drawIt = true) {
   if (followed) followCamera(followed, dt);
   else if (!sheet) watchCamera(world, pelvisMid, dt);
   // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
-  // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall).
-  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet });
-  // In a stage the walls and roofs between the camera and the man played let him through (a dithered fade: levelmode/kittex.js).
-  if (world.stage && followed) ktSightline(scene.camera.position, [followed.x[P.neck * 3], followed.x[P.neck * 3 + 1], followed.x[P.neck * 3 + 2]], true);
+  // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall). (A stage's floors are its terrain's, which the arm below knows.)
+  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet && !world.stage });
+  // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js). The viewer's own turn of the view only shortens.
+  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, subject: followed ? [followed.x[P.pelvis * 3], followed.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, followed.x[P.pelvis * 3 + 2]] : null, free: !followed || followCam.state.wasManual, dt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);
   showCameraBar(!followed && !sheet);
-  seeThrough.update(scene, document.body.classList.contains('sheet') ? [] : watchedPoints(world, followed), dt);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
@@ -1085,8 +1053,8 @@ function switchLook(id, { remember = false } = {}) {
     lookSelect.value = look.id;
     if (remember) rememberLook(look.id);
     reapplyPlace(scene);
-    // The scenery's meshes may have been swapped (scenerylod.js): see-through finds its pieces anew.
-    seeThrough.forget();
+    // The scenery's meshes may have been swapped (scenerylod.js): the camera's rig takes its occluders anew.
+    cameraRig.forget();
     // Templates keep the materials of the look they were built in.
     clearCrowdTemplates(scene);
     rebuildViews({ progressive: true });
@@ -2111,7 +2079,6 @@ function leaveStage() {
   if (stageView) disposeStageView(stageView);
   stageView = null;
   awarenessOverlay?.show(false);
-  cameraRoomTest.march = false;
 }
 
 /**
@@ -2163,7 +2130,6 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   fightMarks.warm();
   // The follow camera is held off the stage's walls and roofs (levelmode/kit.js).
   cameraWalls = stageCameraRoom(() => state.world.arena.terrain);
-  cameraRoomTest.march = true;
   followCam.reset();
   Object.assign(scene.orbit, { yaw: Math.PI + 0.3, pitch: 0.25, distance: 5.2 });
   watchCam = createWatchCam();
@@ -2717,7 +2683,7 @@ const boxer = window.boxer = {
   sceneryLod: (on) => {
     if (on !== undefined) {
       setSceneryLod(scene, on);
-      seeThrough.forget();
+      cameraRig.forget();
     }
     return sceneryLodOn();
   },
@@ -2753,8 +2719,22 @@ const boxer = window.boxer = {
   // Move the intro on (its own clock, s) without frames; the shot it is on, null once over.
   introStep: stepIntro,
   designSheet,
-  // What the scenery see-through has faded now ([{ name, opacity, box }]); refresh() tests again at the next frame.
-  seeThrough,
+  // The camera's rig (camerarig.js): `update`'s last answer, its cost in ms a frame and how much of the place is taken as occluders (`stats(scene)`).
+  cameraRig: {
+    stats: () => cameraRig.stats(scene),
+    arm: cameraRig.arm,
+    // Profiling: the arm's cost (ms a frame) over `frames` solves of the camera as it stands, the camera put where it is wanted each time (a view blocked, it is every frame's work).
+    bench: (frames = 300) => {
+      const world = state.world;
+      const options = { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, free: state.mode !== 'play', dt: 1 / 60 };
+      const started = performance.now();
+      for (let index = 0; index < frames; index += 1) {
+        placeCamera(scene, null);
+        cameraRig.update(scene, options);
+      }
+      return (performance.now() - started) / frames;
+    },
+  },
   // The watching camera's state ({ mode: 'auto' | 'free', focus }) and its two verbs, as a tap and 'Frame all' do them.
   watchCam: () => watchCam,
   // The man under a point on the screen (what a tap picks), or null.
