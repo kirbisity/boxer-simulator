@@ -140,6 +140,18 @@
 // The whole sewer route (careful, two comrades, seeds 1-6, 3600 s): every run got through the sewer (deaths there 7: Noname 3, bled after him 4); 2 of 6
 // reached and beat Vaelen, 4 timed out in the vault (not looked into: the vault is as it was).
 //
+// ---- Phase H (the plot twist after Vaelen: the empty privy, the horde, the chute, Noname, the reveal, the epilogue) ----------------------
+// A whole run goes on past Vaelen (levelmode/ending.js): to the privy's hole past the horde (never fought), down, Noname if he stands, the reveal, the
+// epilogue's waves fought from the island; `escaped` is the end reached (its outcome: `cleared`, `held` 120 s, `fell` in it). `twist` runs it alone from
+// rest 3, Vaelen dead (10 seeds each; the new Noname walks the sludge as stone, `wader`, and has the cesspool's footing):
+//   Noname alive  escaped 10/10 (fell 8, held 2)  deaths before the reveal 6 (Noname 5, bled 1)  epilogue men down 16 of 120
+//   Noname dead   escaped 10/10 (held 2, fell 8)  deaths 0                                        epilogue men down 10 of 120
+// Nobody died to the horde: the drop is reached before the first man is in the room. The epilogue (3, 4, 5 men in 120 s) kills the bot 4 times in 5:
+// it is a last stand, and its death ends the game with the cards as its surviving does.
+// The whole sweep (careful, seeds 1-6, 3600 s), every run that beat Vaelen escaped:
+//   front  beat Vaelen 4/6, escaped 4/6 (fell 2, held 2; Noname alive at all 4 landings), deaths after Vaelen 1 (Noname), 1 fail, 1 timeout
+//   sewer  beat Vaelen 3/6, escaped 3/6 (fell 3; Noname dead at all 3), deaths after Vaelen 0, 3 timeouts in the vault (as in phase G)
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
