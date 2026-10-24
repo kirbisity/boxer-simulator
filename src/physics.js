@@ -161,8 +161,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
     // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).
     dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
-    // A jump (physics/jump.js: startJump): jump (the one under way: { phase, t, ... }), jumpReadyAt (when he can jump again), jumpBody (his body's jump, cached).
-    jump: undefined, jumpReadyAt: undefined, jumpBody: undefined,
+    // A jump (physics/jump.js: startJump): jump (the one under way: { phase, t, ... }), jumpReadyAt (when he can jump again), jumpBody (his body's jump, cached),
+    // jumpLandedAt (when he last came down from one: WORLD.jump.land.grace), landBruise ({ l, r }: the landing's bruise of his legDamage, healing).
+    jump: undefined, jumpReadyAt: undefined, jumpBody: undefined, jumpLandedAt: undefined, landBruise: undefined,
     // Level mode (levelmode/level.js): hands at a wound while a bandage goes on ({ t, seconds }).
     tending: undefined,
     // The player's stamina overdraft (physics/overdraft.js): player (the man played), faintDue (a cost would pass the floor), fainted (down in a faint), blackout (the screen's black, 0..1), faintGrace (s after waking).
@@ -2649,6 +2650,19 @@ function floorBelow(fighter, x, y, z) {
   return floorUnder(fighter.arena, z);
 }
 
+/** A landing's bruise heals at WORLD.jump.land.heal (leg damage per s); a broken leg's does not matter. */
+function healLandBruise(fighter, dt) {
+  const bruise = fighter.landBruise;
+  let left = 0;
+  for (const side of ['l', 'r']) {
+    const heal = Math.min(bruise[side], WORLD.jump.land.heal * dt);
+    bruise[side] -= heal;
+    fighter.legDamage[side] = Math.max(0, fighter.legDamage[side] - heal);
+    left += bruise[side];
+  }
+  if (left <= 0) fighter.landBruise = undefined;
+}
+
 /** A jump's end: the stance his again (the floor's on terrain, the flat floor's lift otherwise), the flight over. */
 function endJump(fighter) {
   const jump = fighter.jump;
@@ -2739,7 +2753,8 @@ function jumpStance(world, fighter, dt) {
         const bottom = fighter.x[at + 1] - fighter.radius[foot.index];
         const under = floorBelow(fighter, fighter.x[at], bottom, fighter.x[at + 2]);
         floor = Math.max(floor, under);
-        if (bottom - under < WORLD.terrain.touching + 0.02) touched = true;
+        // (A step ahead at the speed he falls: met the step before, not a step into the floor at full speed.)
+        if (bottom - under < WORLD.terrain.touching + 0.02 + Math.max(0, -fighter.v[at + 1]) * dt) touched = true;
       }
       // (Or the hips are down to standing height over that floor: the legs, reaching down, are on it.)
       if (y - floor <= fighter.desired[P.pelvis][1] - WORLD.terrain.sag || jump.t > 3) touched = true;
@@ -2795,9 +2810,10 @@ function launch(world, fighter) {
 }
 
 /**
- * Down on his feet at `speed` m/s onto the floor at `floor`: his legs take it (jump.js jumpLanding). A soft landing is a dip of the
- * knees; a hard one buckles them (stamina), past `stumble` he is unsteady, past `fall` he goes over, past `hurtFrom` his legs are
- * hurt. A drop from a height lands as a fall too on terrain (landOnFeet, the foot's own impact). He can jump again after `recover`.
+ * Down on his feet at `speed` m/s onto the floor at `floor`: his legs take it (jump.js jumpLanding), and only they (the fall's
+ * landOnFeet and the legs' joint strain stand aside: WORLD.jump.land.grace). A soft landing is a dip of the knees; a hard one buckles
+ * them (stamina), past `stumble` he is unsteady and his legs bruised (healing), past `fall` he goes over, past his bones' threshold
+ * a knee may break. He can jump again after `recover`.
  */
 function landJump(world, fighter, speed, floor) {
   const jump = fighter.jump;
@@ -2833,14 +2849,31 @@ function landJump(world, fighter, speed, floor) {
   // it is off the edge (the stance stands on the lower foot: a foot left over the drop would take him back down it).
   if (terrain) settleOnLedge(fighter, terrain, floor);
   fighter.jumpReadyAt = world.time + landing.seconds + landing.recover;
+  fighter.jumpLandedAt = world.time;
+  // His legs take the fall: the body's way down is stopped by them (the dip is the stance's), not by the floor meeting each
+  // part at full speed in one substep (a spike the joints and the floor's own fall rules would read as a far worse landing).
+  for (let index = 1; index < fighter.v.length; index += 3) fighter.v[index] = Math.max(0, fighter.v[index]);
   if (landing.stamina > 0) drawStamina(fighter, landing.stamina);
   const effects = [landing.fall ? 'lands hard and goes over' : landing.stumble ? 'stumbles as he lands' : landing.buckle ? 'knees buckle' : 'lands lightly'];
-  if (landing.legDamage > 0) {
-    const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
-    fighter.legDamage.l += landing.legDamage / bone;
-    fighter.legDamage.r += landing.legDamage / bone;
-    effects.push('legs hurt by the landing');
+  if (landing.bruise > 0) {
+    // A bruise, healing (updateTimers): his legs a little weaker for some seconds.
+    const bruise = (fighter.landBruise ??= { l: 0, r: 0 });
+    for (const side of ['l', 'r']) {
+      fighter.legDamage[side] += landing.bruise;
+      bruise[side] += landing.bruise;
+    }
+    effects.push('legs jarred by the landing');
   }
+  if (landing.fracture > 0 && world.random() < landing.fracture) {
+    const side = world.random() < 0.5 ? 'l' : 'r';
+    fighter.legDamage[side] += landing.legDamage - landing.bruise;
+    effects.push('a leg broken by the landing');
+    world.events.push({ time: world.time, kind: 'land', fighter: fighter.id, speed, ratio: landing.ratio, height: jump.apex - jump.from, effects });
+    breakJoint(world, fighter, `${side}Knee`);
+    endJump(fighter);
+    return;
+  }
+  if (landing.trunk > 0) addDamage(fighter, 'trunk', landing.trunk, false);
   world.events.push({ time: world.time, kind: 'land', fighter: fighter.id, speed, ratio: landing.ratio, height: jump.apex - jump.from, effects });
   if (landing.fall) {
     endJump(fighter);
@@ -3505,6 +3538,7 @@ export function spatialGrid(points, cell) {
 }
 
 function updateTimers(world, fighter, dt) {
+  if (fighter.landBruise) healLandBruise(fighter, dt);
   if (fighter.weapon?.held) fighter.weapon.strain = Math.max(0, fighter.weapon.strain - BLADES.gripLeak * dt);
   if (fighter.offWeapon?.held) fighter.offWeapon.strain = Math.max(0, fighter.offWeapon.strain - BLADES.gripLeak * dt);
   if (fighter.shield?.strain) fighter.shield.strain = Math.max(0, fighter.shield.strain - WORLD.shield.strainLeak * dt);
@@ -4284,6 +4318,12 @@ function breakAngleFor(joint) {
  */
 function strain(world, fighter, joint, overAngle) {
   if (fighter.state === 'rising') return false;
+  // Just down from a jump, the legs folding under him (or gone over, until he is up): the landing has said what it did to
+  // his bones (jump.js jumpLanding), and a ragdoll's legs folded under it on the floor are no second verdict.
+  if (fighter.jumpLandedAt !== undefined && LEG_JOINTS.has(joint)) {
+    const since = world.time - fighter.jumpLandedAt;
+    if (since < WORLD.jump.land.grace || (fighter.state === 'down' && since < WORLD.jump.land.downGrace)) return false;
+  }
   const h = fighter.limitStep;
   const strains = fighter.strain ?? (fighter.strain = {});
   const past = Math.max(0, overAngle - breakAngleFor(joint));
@@ -4292,6 +4332,8 @@ function strain(world, fighter, joint, overAngle) {
   breakJoint(world, fighter, joint);
   return true;
 }
+
+const LEG_JOINTS = new Set(['lKnee', 'rKnee', 'lHip', 'rHip']);
 
 // What hangs off each joint: the particles whose muscles die with it.
 const LIMP_BELOW = {
@@ -4560,6 +4602,10 @@ function groundImpact(world, fighter, index, speed) {
  */
 function landOnFeet(world, fighter, index, speed) {
   const spec = WORLD.terrain.fall;
+  // A jump's landing is his legs' (landJump: jump.js jumpLanding), not a fall's as well.
+  if (fighter.jump || (fighter.jumpLandedAt !== undefined && world.time - fighter.jumpLandedAt < WORLD.jump.land.grace)) return;
+  // The man played lands as fast as his body comes down, not as a foot swung down onto the floor goes (or a joint's push on it).
+  if (fighter.player) speed = Math.min(speed, Math.max(0, -fighter.v[P.pelvis * 3 + 1]) + spec.footOver);
   const through = speed - spec.safe;
   if (through <= 0) return;
   // A foot that comes down fast onto the next tread of a flight, or the one below a kerb, is a step and not a fall:
