@@ -267,18 +267,21 @@ test('in a run-in the heavier man, going in braced, loses less speed than the ma
   assert.ok(mean < 0.8, `the runner loses ${mean.toFixed(2)} of what the man gains, on the whole (their masses alone: 0.81)`);
 });
 
-test('a crash taken braced costs no wind, and one taken standing does: a player low on breath faints only from the second', () => {
-  const take = (braced) => {
+test('a crash taken braced costs no wind, and one taken standing costs a little: never more than a shove\'s cap, and never faints a player', () => {
+  const take = (braced, start) => {
     const world = pair('heavy', 'amateur');
     const [victim, other] = world.fighters;
     victim.player = true;
-    victim.stamina = WORLD.overdraft.floor + 0.05;
+    victim.stamina = start;
     crashHarm(world, victim, 'trunk', { impulse: 150, mass: 60, closing: 5, energy: 300, point: [0, 1, 0], normal: [1, 0, 0], source: other, braced });
     return victim;
   };
-  const braced = take(true);
-  assert.ok(!braced.faintDue && Math.abs(braced.stamina - (WORLD.overdraft.floor + 0.05)) < 1e-9 && braced.trauma.trunk > 0, 'bruised, not winded');
-  assert.ok(take(false).faintDue, 'winded past the floor');
+  const braced = take(true, 0.9);
+  assert.ok(!braced.faintDue && Math.abs(braced.stamina - 0.9) < 1e-9 && braced.trauma.trunk > 0, 'bruised, not winded');
+  const standing = take(false, 0.9);
+  assert.ok(standing.stamina < 0.9 && standing.stamina >= 0.9 - WORLD.wind.pushCap - 1e-9, `winded a little (${standing.stamina})`);
+  const tired = take(false, WORLD.overdraft.floor + 0.05);
+  assert.ok(!tired.faintDue && Math.abs(tired.stamina - (WORLD.overdraft.floor + 0.05)) < 1e-9, 'a man already spent is not sent down by a shove');
   // Braced is going into it, the other ahead: not standing, not backing into him.
   const [a, b] = pair('heavy', 'amateur').fighters;
   placeFighter(a, -0.5, 0);

@@ -38,6 +38,19 @@ export function drawStamina(fighter, amount) {
   } else fighter.stamina = next;
 }
 
+/**
+ * The wind a blow to the body takes, `demand` being the old cost (speed change over mass, over fitness). A blow (a shove, `push`,
+ * takes less) loses at most WORLD.wind's cap of the bar, and hits alone never bring him below its floor: a man is winded for a
+ * moment by being hit, he is not tired out by it. Never faints the player (that is for work: drawStamina).
+ */
+export function takeWind(fighter, demand, push) {
+  const wind = WORLD.wind;
+  const cap = push ? wind.pushCap : wind.blowCap;
+  const share = push ? wind.pushShare : 1;
+  const loss = cap * (1 - Math.exp(-(demand * share) / cap));
+  fighter.stamina = Math.min(fighter.stamina, Math.max(wind.floor, fighter.stamina - loss));
+}
+
 /** The share of the usual recovery he gets now: a quarter below empty, all of it from empty up. */
 export function recoveryShare(stamina) {
   return stamina < 0 ? WORLD.overdraft.recoveryShare : 1;

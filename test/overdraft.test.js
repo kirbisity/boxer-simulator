@@ -9,7 +9,7 @@ import { MOVES } from '../src/moves.js';
 import { CONTROL, directFighter, keyStick, newOrders } from '../src/control.js';
 import { advance, createWorld, perform, placeFighter, reviveFighter, throwPunch } from '../src/physics.js';
 import { WORLD } from '../src/physics/config.js';
-import { drawStamina, fadeOf, fatigueScale, overdraftDepth, overdraftScreen, recoveryShare, staminaBar } from '../src/physics/overdraft.js';
+import { drawStamina, fadeOf, fatigueScale, overdraftDepth, overdraftScreen, recoveryShare, staminaBar, takeWind } from '../src/physics/overdraft.js';
 import { fightUiReady } from '../src/fightui/logic.js';
 import { pulsedFade } from '../src/overdraftview.js';
 
@@ -121,7 +121,7 @@ test('he cannot pass the floor: a draw that would holds him there, and he faints
   assert.ok(me.stamina >= SPEC.floor);
 });
 
-test('blows taken draw from the player\'s breath into the overdraft as well', () => {
+test('blows taken wind the player but do not draw his breath past the wind floor, nor into the overdraft', () => {
   const { world, me, him } = played();
   placeFighter(me, -0.5);
   placeFighter(him, 0.5);
@@ -132,8 +132,29 @@ test('blows taken draw from the player\'s breath into the overdraft as well', ()
   throwPunch(world, him, 'oshi', 'body');
   advance(world, 1);
   if (!world.events.some((event) => event.defender === me.id && event.target === 'trunk' && event.kind === 'landed')) assert.fail('the push did not land');
-  assert.ok(me.stamina < 0, `breath taken from him past empty (${me.stamina})`);
-  assert.ok(me.stamina >= SPEC.floor);
+  assert.ok(me.stamina >= 0 && !me.faintDue, `hits alone do not overdraw him (${me.stamina})`);
+});
+
+test('wind: a blow takes a bounded share of the bar, a shove less, and hits alone never take a man below the wind floor', () => {
+  const wind = WORLD.wind;
+  const hit = (start, demand, push) => {
+    const { me } = played();
+    me.stamina = start;
+    takeWind(me, demand, push);
+    return me.stamina;
+  };
+  assert.ok(Math.abs(hit(1, 0.02, false) - 0.98) < 0.002, 'a light blow costs about what it demands');
+  assert.ok(hit(1, 5, false) >= 1 - wind.blowCap - 1e-9, 'a huge blow takes at most the cap');
+  assert.ok(hit(1, 5, true) >= 1 - wind.pushCap - 1e-9 && hit(1, 5, true) > hit(1, 5, false), 'a huge shove takes less');
+  let stamina = 1;
+  for (let blow = 0; blow < 40; blow += 1) {
+    const { me } = played();
+    me.stamina = stamina;
+    takeWind(me, 5, false);
+    stamina = me.stamina;
+  }
+  assert.ok(Math.abs(stamina - wind.floor) < 1e-9, `forty blows leave him at the floor, not empty (${stamina})`);
+  assert.equal(hit(0.1, 5, false), 0.1, 'already below the floor from work: a blow takes no more');
 });
 
 test('recovery below zero is a quarter of the usual; from zero on it is the usual', () => {

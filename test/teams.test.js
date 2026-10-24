@@ -69,10 +69,10 @@ test('fear and confidence: the stronger man presses and covers up less, the weak
 });
 
 test('uneven sides, up to eight a side: everyone fits the floor, team-mates rarely hit each other, nothing breaks', () => {
-  // A rate needs a sample: five short crowd fights of each shape, pooled.
+  // A rate needs a sample: ten short crowd fights of each shape, pooled (five swung from 3.5% to 5.6% on one change of breath).
   for (const [red, blue] of [[1, 5], [8, 3]]) {
     const total = { broken: 0, friendly: 0, landed: 0, pops: 0, fighterMinutes: 0 };
-    for (const seed of [2, 3, 4, 5, 6]) {
+    for (const seed of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
       const tally = crowdBout(red, blue, { seconds: 30, seed });
       for (const key of Object.keys(total)) total[key] += tally[key];
     }

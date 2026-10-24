@@ -296,6 +296,12 @@ export const WORLD = {
     hurtSeconds: 8, hurtPerKnockdown: 4, hurtStrength: 0.65,
     staminaPerTrunkDamage: 0.6, armForcePerDamage: 0.4,
   },
+  // The wind a blow takes (physics/overdraft.js takeWind): a hit to the body knocks the breath out for a moment; it is not the long
+  // drain of work, so it cannot empty a man. The speed change over his mass (the old cost) is the demand; the loss is that
+  // demand soft-capped at `blowCap` of the bar for a blow and `pushCap` for a shove or a bump (a body met on the shoulder or arms
+  // takes `pushShare` of the demand: it is a push, not a punch to the belly). Hits alone never take him below `floor` of the bar;
+  // only running, swinging and rising go on from there.
+  wind: { blowCap: 0.3, pushCap: 0.12, pushShare: 0.4, floor: 0.25 },
   // The player's stamina overdraft (physics/overdraft.js; only the man flagged `fighter.player`: every other fighter stops at
   // empty, as before). Past empty he goes on, weaker and slumping, down to `floor`, where he faints. `depth` below is how far
   // down he is, 0 at empty to 1 at the floor.

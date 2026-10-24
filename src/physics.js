@@ -19,7 +19,7 @@ import { flyNets } from './physics/net.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { limpOf, pushOff, runChange, runLean, runSpeed, strideOf } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
-import { overdraftDepth, drawStamina, fatigueScale, recoveryShare } from './physics/overdraft.js';
+import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
@@ -5972,7 +5972,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     }
   } else if (capsule.key === 'trunk') {
     // The wind is knocked out of a belly caught slack; a man who went into the crash ready met it on his shoulder, braced (crashBraced).
-    if (!braced) drawStamina(defender, ((impulse / (body.massKg * 0.6)) / body.aerobic) * harm);
+    if (!braced) takeWind(defender, ((impulse / (body.massKg * 0.6)) / body.aerobic) * harm, push);
     event.effects.push(braced ? 'braced for it' : push ? 'pushed back' : 'body: wind taken');
     if (peakForce * harm > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
       defender.injuries.push({ kind: 'rib', time: world.time });
