@@ -41,6 +41,10 @@ export const POSE = {
   // inside, the ribs pushed it out and the muscles pulled it back, substep
   // after substep: the rear hand and the whole weapon shook.
   weaponClear: { clear: 0.03, below: 0.1 },
+  // Which way a knee bends: forward, and this much out over the toes (a fighter's guard). A run asks its own (intent.kneeOut).
+  kneeOut: 0.35,
+  // Which way a runner's elbow points (intent.runArms): back and down, a little out from his side.
+  runElbow: [-1, -0.5, 0.15],
 };
 
 export const vec = {
@@ -144,8 +148,13 @@ export function desiredPose(body, intent = {}) {
   const hipHeight = L.ankle + L.shank + L.thigh - stance.crouch * H - (intent.dip ?? 0) * H;
   // (`stagger` scales how far one foot stands ahead of the other: 1 a fighter's guard, 0 side by side, as a runner's feet pass.)
   const stagger = stance.stagger ?? 1;
-  out[P.lFoot] = intent.lFoot ?? [POSE.leadFoot[0] * H * stance.width * stagger, L.ankle, POSE.leadFoot[1] * H * stance.width];
-  out[P.rFoot] = intent.rFoot ?? [POSE.rearFoot[0] * H * stance.width * stagger, L.ankle, POSE.rearFoot[1] * H * stance.width];
+  // (`even` evens the feet's distances from the middle: 1 the same either side, as a runner's; 0 a guard's, the lead foot nearer.)
+  const even = stance.even ?? 0;
+  const middle = (POSE.leadFoot[1] - POSE.rearFoot[1]) / 2;
+  const leadSide = POSE.leadFoot[1] + (middle - POSE.leadFoot[1]) * even;
+  const rearSide = POSE.rearFoot[1] + (-middle - POSE.rearFoot[1]) * even;
+  out[P.lFoot] = intent.lFoot ?? [POSE.leadFoot[0] * H * stance.width * stagger, L.ankle, leadSide * H * stance.width];
+  out[P.rFoot] = intent.rFoot ?? [POSE.rearFoot[0] * H * stance.width * stagger, L.ankle, rearSide * H * stance.width];
   if (intent.check && !intent.lFoot) {
     // Checking a kick: the lead knee comes up and out, the shin a shield.
     out[P.lFoot] = [POSE.leadFoot[0] * H * stance.width + 0.04 * H, hipHeight * 0.42, POSE.leadFoot[1] * H + 0.03 * H];
@@ -185,7 +194,8 @@ export function desiredPose(body, intent = {}) {
   for (const side of ['l', 'r']) {
     const hip = out[P[`${side}Hip`]];
     const foot = out[P[`${side}Foot`]];
-    const outward = side === 'l' ? 0.35 : -0.35;
+    // (A runner's knee goes straight fore and aft: `kneeOut`, the run's, in place of the guard's turned-out knee.)
+    const outward = (side === 'l' ? 1 : -1) * (intent.kneeOut ?? POSE.kneeOut);
     // A raised or kicking leg folds with its knee where the move puts it.
     const kneeOverride = intent[`${side}Knee`];
     out[P[`${side}Knee`]] = kneeOverride ?? swivelIntoRange(hipAxes, 'leg', side, hip, twoBoneIK(hip, foot, L.thigh, L.shank, [1, intent.check && side === 'l' ? 0.6 : 0, outward]), foot, { margin });
@@ -218,7 +228,10 @@ export function desiredPose(body, intent = {}) {
     }
     const target = clampReach(shoulder, wanted, (L.upperArm + L.forearmToFist) * 0.995);
     out[P[`${side}Hand`]] = target;
-    const pole = weaponArm ? weaponPole(shoulder, target, side) : [-0.4, -1, side === 'l' ? 0.5 : -0.5];
+    // (Running, `runArms` of the way to a runner's elbow: back and down, close to his side, not out like a guard's.)
+    const free = [-0.4, -1, side === 'l' ? 0.5 : -0.5];
+    const own = weaponArm ? weaponPole(shoulder, target, side) : free;
+    const pole = intent.runArms ? vec.lerp(own, [POSE.runElbow[0], POSE.runElbow[1], side === 'l' ? POSE.runElbow[2] : -POSE.runElbow[2]], intent.runArms) : own;
     // A weapon's hand also turns its forearm so the wrist can point the blade.
     const elbow = twoBoneIK(shoulder, target, L.upperArm, L.forearmToFist, pole);
     // Not mid-stroke: a swing's own path through the arm is what drives the blade.

@@ -17,7 +17,7 @@ import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN,
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
-import { limpOf, runChange, runLean, runSpeed, strideOf } from './physics/gait.js';
+import { limpOf, pushOff, runChange, runLean, runSpeed, strideOf } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
@@ -700,46 +700,103 @@ function shieldOnLine(world, fighter, guard) {
 }
 
 /**
- * The player running (`fighter.runPose`, 0 to 1): the weapon is carried, not held ready. `target` (where the guard
- * has it) is eased to the carry: a short weapon hangs point down at his side, a long one rides on the shoulder (WORLD.runMode.carry).
+ * How a weapon is carried in a run (WORLD.runMode.carry): 'waist' (a short one, in one hand at the side of the waist),
+ * 'pole' (a spear or polearm, at the ready, forward and up) or 'shoulder' (a long gun, a flag, a long bow, a heavy two-hander).
  */
-function carriedTargets(fighter, weapon, target) {
-  const spec = WORLD.runMode.carry;
-  const long = weapon.spec.length > spec.longFrom || weapon.spec.hands === 'two';
-  const side = weapon.main === 'l' ? 1 : -1;
-  const gait = runGait(fighter);
-  // (A long weapon rides steady on the shoulder; a short one hangs in a relaxed hand that swings, the blade a little with it.)
-  const hand = long ? vec.scale([spec.longHand[0], spec.longHand[1], side * spec.longHand[2]], fighter.body.heightM) : runHand(fighter, 'weapon', weapon.main);
-  const swing = long ? 0 : side * gait.swing * WORLD.runMode.arms.tilt;
-  const dir = vec.normalize(long ? spec.longDir : [spec.dir[0] - swing, spec.dir[1], side * spec.dir[2]]);
-  const share = fighter.runPose;
-  return { hand: vec.lerp(target.hand, hand, share), dir: vec.normalize(vec.lerp(target.dir, dir, share)) };
+export function carryKind(spec) {
+  const carry = WORLD.runMode.carry;
+  const overall = spec.length + (spec.handle ?? 0);
+  if (spec.flag || spec.longGun) return 'shoulder';
+  if (spec.bow) return overall > carry.bowFrom ? 'shoulder' : 'waist';
+  if ((spec.leadAhead || overall > carry.poleFrom) && !spec.ranged) return 'pole';
+  if (spec.hands === 'one') return 'waist';
+  return overall <= carry.small.length && spec.mass <= carry.small.mass ? 'waist' : 'shoulder';
 }
 
 /**
- * The stride of a run, read from where his feet are (WORLD.runMode.arms.span): `swing` from -1 to 1, positive with the right foot ahead
- * of the left (so the left arm forward: the arms go against the legs), and `spread` (0..1) how far apart the feet are fore and aft:
- * widest as one lands and the other leaves, together as they pass.
+ * Running (`fighter.runPose`, 0 to 1): the weapon is carried, not held ready. `target` (where the guard has it) is eased to the
+ * carry (carryKind): a short weapon at the side of his waist, the blade down along the thigh; a spear at the ready, forward and
+ * up; a long gun or a flag up on the shoulder.
+ */
+function carriedTargets(fighter, weapon, target) {
+  const spec = WORLD.runMode.carry;
+  const kind = carryKind(weapon.spec);
+  const side = weapon.main === 'l' ? 1 : -1;
+  const H = fighter.body.heightM;
+  let hand;
+  let dir;
+  if (kind === 'waist') {
+    // (In a hand that swings a little with the stride, the blade a little with it.)
+    hand = runHand(fighter, 'weapon', weapon.main);
+    const swing = side * runGait(fighter).swing * WORLD.runMode.arms.tilt * spec.waist.swing;
+    dir = [spec.dir[0] - swing, spec.dir[1], side * spec.dir[2]];
+  } else if (kind === 'pole') {
+    // (From his shoulder, in his trunk's frame: as he leans into the run, the spear goes with him.)
+    const { shoulder, spine, front } = runTrunk(fighter, weapon.main);
+    const [forward, down, inward] = spec.pole.hand;
+    hand = vec.add(vec.add(shoulder, vec.scale(front, forward * H)), vec.add(vec.scale(spine, -down * H), [0, 0, -side * inward * H]));
+    dir = [spec.pole.dir[0], spec.pole.dir[1], side * spec.pole.dir[2]];
+  } else {
+    hand = [spec.longHand[0] * H, spec.longHand[1] * H, side * spec.longHand[2] * H];
+    dir = spec.longDir;
+  }
+  const share = fighter.runPose;
+  return { hand: vec.lerp(target.hand, hand, share), dir: vec.normalize(vec.lerp(target.dir, vec.normalize(dir), share)) };
+}
+
+/**
+ * The stride of a run, read from his legs: `swing` from -1 to 1, positive with the right knee ahead of the left (so the left arm
+ * forward: the arms go against the legs), full with the knees `WORLD.runMode.arms.span` of a thigh apart fore and aft; and
+ * `spread` (0..1) how far apart the feet are fore and aft (full at half his height): widest as one lands and the other
+ * leaves, together as they pass.
  */
 function runGait(fighter) {
   const forward = yawRotate([1, 0, 0], fighter.yaw);
   const x = fighter.x;
   const ahead = (index) => (x[index * 3] - x[P.pelvis * 3]) * forward[0] + (x[index * 3 + 2] - x[P.pelvis * 3 + 2]) * forward[2];
-  const swing = Math.max(-1, Math.min(1, (ahead(P.rFoot) - ahead(P.lFoot)) / (WORLD.runMode.arms.span * fighter.body.heightM)));
-  return { swing, spread: Math.abs(swing) };
+  const swing = Math.max(-1, Math.min(1, (ahead(P.rKnee) - ahead(P.lKnee)) / (WORLD.runMode.arms.span * fighter.body.lengths.thigh)));
+  const spread = Math.min(1, Math.abs(ahead(P.rFoot) - ahead(P.lFoot)) / (0.5 * fighter.body.heightM));
+  return { swing, spread };
 }
 
 /**
- * A hand carried in the run (kind 'free', 'shield' or 'weapon'; WORLD.runMode.carry and .arms): its place at his side, swung fore and
- * aft against the legs and lifted as it comes forward. A local point, in metres.
+ * The trunk as the pose has it (local): the shoulder on `side`, and the trunk's own axes: up its spine, forward square to it.
+ */
+function runTrunk(fighter, side) {
+  const desired = fighter.desired;
+  const shoulder = desired?.[P[`${side}Shoulder`]] ?? [0, fighter.body.heightM * 0.8, (side === 'l' ? 1 : -1) * fighter.body.lengths.shoulderSpan / 2];
+  const spine = desired ? vec.normalize(vec.sub(desired[P.neck], desired[P.pelvis])) : [0, 1, 0];
+  const front = vec.normalize(vec.sub([1, 0, 0], vec.scale(spine, spine[0])));
+  return { shoulder, spine, front };
+}
+
+/**
+ * A hand carried in the run (kind 'free', 'shield' or 'weapon'; WORLD.runMode.arms and .carry): where a runner's arm puts it,
+ * from his shoulder: the upper arm swung fore and aft against the legs (more the faster he goes), out from his side a little,
+ * the elbow bent about a right angle (more as it comes forward). A weapon hand (a short weapon at his waist) and a shield arm
+ * swing less, as their own numbers say. A local point, in metres.
  */
 function runHand(fighter, kind, side) {
-  const spec = WORLD.runMode.carry;
   const arms = WORLD.runMode.arms;
-  const H = fighter.body.heightM;
-  const [x, y, z] = kind === 'weapon' ? spec.hand : kind === 'shield' ? spec.shield : spec.free;
-  const forward = (side === 'l' ? 1 : -1) * runGait(fighter).swing;
-  return [(x + forward * arms[kind]) * H, (y + Math.max(0, forward) * arms.lift) * H, (side === 'l' ? z : -z) * H];
+  const carry = WORLD.runMode.carry;
+  const L = fighter.body.lengths;
+  const sign = side === 'l' ? 1 : -1;
+  const { shoulder, spine, front } = runTrunk(fighter, side);
+  const out = [0, 0, sign];
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const amplitude = Math.min(arms.most, arms.swing + arms.swingPerSpeed * speed);
+  const own = kind === 'weapon' ? carry.waist : kind === 'shield' ? carry.shield : null;
+  const forward = sign * runGait(fighter).swing * (own ? own.swing : 1);
+  const flex = (own ? own.flex : arms.centre) + amplitude * forward;
+  const elbow = own ? own.elbow : arms.elbow + arms.elbowSwing * forward;
+  const abduct = own ? own.abduct : arms.abduct;
+  const along = (angle) => vec.add(vec.scale(spine, -Math.cos(angle)), vec.scale(front, Math.sin(angle)));
+  const upper = vec.normalize(vec.add(along(flex), vec.scale(out, Math.sin(abduct))));
+  const elbowAt = vec.add(shoulder, vec.scale(upper, L.upperArm));
+  const hand = vec.add(elbowAt, vec.scale(along(flex + elbow), L.forearmToFist));
+  // (Across towards the middle as it comes up in front.)
+  if (!own) hand[2] -= sign * arms.inward * fighter.body.heightM * Math.max(0, forward);
+  return hand;
 }
 
 /**
@@ -825,7 +882,9 @@ function weaponIntent(world, fighter, intent) {
   if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };
   intent[`${main}Hand`] = target.hand;
   intent.bladeDir = target.dir;
-  const oneHanded = weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && (fighter.net?.held || (punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil)));
+  // (Carried at his waist in a run, a short two-hander is in the one hand: the other runs free.)
+  const atWaist = fighter.runPose > 0.5 && !punch && !blocking && carryKind(weapon.spec) === 'waist';
+  const oneHanded = atWaist || weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && (fighter.net?.held || (punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil)));
   intent.twoHanded = !oneHanded;
   if (!oneHanded) intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, offHandAlong(weapon.spec)));
   // A lunge: the free arm flung back behind him as a counterweight, out and back with the stroke.
@@ -1809,6 +1868,9 @@ function updateIntent(world, fighter, dt) {
     intent.lean = intent.lean * (1 - runPose) + runLean(fighter, dt) * runPose;
     intent.dip = intent.dip * (1 - runPose) + spec.dip * runPose;
     intent.shift *= 1 - runPose;
+    // Knees straight fore and aft, elbows back by his sides (WORLD.runMode.kneeOut, POSE.runElbow).
+    intent.kneeOut = POSE.kneeOut + (spec.kneeOut - POSE.kneeOut) * runPose;
+    intent.runArms = runPose;
     // The body rises as the feet part (the flight) and sinks as they pass.
     intent.dip += spec.bob * (1 - runGait(fighter).spread) * runPose;
     Object.assign(intent, runTurnPose(fighter, intent, dt));
@@ -2371,14 +2433,18 @@ function updateFeet(fighter, dt) {
       worstDrift = drift;
     }
   }
-  if (worst && !stepping) {
+  // Running, a foot left as far behind his hips as his leg reaches (gait.js pushOff) goes now, the other in the air or not:
+  // it is off the toe, not dragged on behind him (the flight is longer by the moment).
+  const overReach = worst && run && !stair && !worst.lifted && runBehind(fighter, worst) > pushOff(fighter);
+  if (worst && (!stepping || overReach)) {
     // Step to where the stance will be, not where it is: lead the motion. (On a hurt leg he hobbles: limpOf.)
     const own = run && !stair ? limped(fighter, worst, spec) : spec;
     const to = landingOf(fighter, worst, own, run ? 1 : null, 0);
     // (floorFrom, floorTo: the floor under the foot at each end of the step, set on terrain: groundStance.)
     // (A run's long stride is aimed again as it goes, while the foot is in the air: `retarget`.)
     // (A run's foot comes up behind him at once, the heel towards the seat, and is highest a third of the way through its swing: `early`.)
-    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined, seconds: own.seconds, lift: run ? spec.lift : undefined, retarget: Boolean(run) && !stair, early: Boolean(run) && !stair };
+    // (A run's swing is laid out about the stance, from where the foot leaves it: `rel`, the take-off from the stance's root; runSwing.)
+    worst.step = { from: [...worst.planted], to, t: 0, floorFrom: undefined, floorTo: undefined, seconds: own.seconds, lift: run ? spec.lift : undefined, retarget: Boolean(run) && !stair, early: Boolean(run) && !stair, rel: run && !stair ? [worst.planted[0] - fighter.root[0], worst.planted[2] - fighter.root[1]] : undefined };
   }
   for (const foot of feet) {
     if (!foot.step) continue;
@@ -2392,6 +2458,12 @@ function updateFeet(fighter, dt) {
       foot.step = null;
     }
   }
+}
+
+/** How far (m) a foot's planted place is behind where his stance has that foot, along his facing. */
+function runBehind(fighter, foot) {
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  return (foot.desired[0] - foot.planted[0]) * forward[0] + (foot.desired[2] - foot.planted[2]) * forward[2];
 }
 
 /** Is he striding (a run's footwork): in the run's pose, or running (or carried on from a run) faster than a run's pace (WORLD.gait.runFrom)? */
@@ -2471,10 +2543,18 @@ function onTheFloor(fighter, target) {
 
 function rawFootTarget(fighter, foot) {
   if (foot.lifted) return toWorld(fighter, fighter.desired[foot.index]);
-  if (!foot.step) return [foot.planted[0], foot.floor === undefined ? fighter.desired[foot.index][1] : fighter.desired[foot.index][1] + foot.floor, foot.planted[2]];
+  if (!foot.step) {
+    const base = foot.floor === undefined ? fighter.desired[foot.index][1] : fighter.desired[foot.index][1] + foot.floor;
+    return [foot.planted[0], base + heelRise(fighter, foot, base), foot.planted[2]];
+  }
   const t = foot.step.t;
   const ease = t * t * (3 - 2 * t);
   const along = vec.lerp(foot.step.from, foot.step.to, ease);
+  if (foot.step.rel) {
+    const swing = runSwing(fighter, foot.step);
+    along[0] = swing.at[0];
+    along[2] = swing.at[1];
+  }
   // On terrain the foot rises to the next tread early (and drops to a lower one late), and clears the edge.
   const arc = Math.sin(Math.PI * (foot.step.early ? t ** WORLD.gait.heelUp : t));
   if (foot.step.floorFrom !== undefined) return [along[0], fighter.desired[foot.index][1] + (foot.step.lift ?? WORLD.step.lift) * arc + stepHeight(foot.step, t), along[2]];
@@ -2482,16 +2562,79 @@ function rawFootTarget(fighter, foot) {
 }
 
 /**
+ * Running, how far a planted foot's ankle rises off the floor as his hips go on past it (WORLD.runMode.heel): up on the ball of
+ * the foot, the heel lifting, so that the leg pushing off behind him is no longer than it is (`reach` of its length, the knee
+ * still a little bent). Held flat to the floor, a foot left 0.5 m behind his hips could be reached only by his hips coming down
+ * to it: the stride's push-off dragged him into a crouch. No higher than `most` of his height (the heel up, the toes down).
+ */
+function heelRise(fighter, foot, base) {
+  if (!(fighter.runPose > 0) || fighter.state !== 'up') return 0;
+  const spec = WORLD.runMode.heel;
+  const side = foot.index === P.lFoot ? 'l' : 'r';
+  // (Where the pose has his hip, not where it has sagged to: the foot rises for the hips the pose wants.)
+  const hip = toWorld(fighter, fighter.desired[P[`${side}Hip`]]);
+  const behind = (hip[0] - foot.planted[0]) * Math.cos(fighter.yaw) - (hip[2] - foot.planted[2]) * Math.sin(fighter.yaw);
+  if (behind <= 0) return 0;
+  const reach = spec.reach * (fighter.body.lengths.thigh + fighter.body.lengths.shank);
+  const flat = Math.hypot(hip[0] - foot.planted[0], hip[2] - foot.planted[2]);
+  const ankle = hip[1] - Math.sqrt(Math.max(0, reach * reach - flat * flat));
+  return Math.min(spec.most * fighter.body.heightM, Math.max(0, ankle - base)) * fighter.runPose;
+}
+
+/**
  * How fast a run's swinging foot is meant to go (the swing's own rate along its path, horizontally): its muscles drive it with
  * its target, not against it (at a sprint the foot comes through at twice the body's speed). Nothing for any other step: a
  * guard's quick step is placed, a planted foot stands.
  */
-function swingVelocity(foot) {
+function swingVelocity(fighter, foot) {
   const step = foot.step;
   if (!step?.early || foot.lifted) return [0, 0, 0];
+  if (step.rel) {
+    // (Up and down too, as the arc rises and falls: held to no speed upwards, the foot lagged its arc and came down late.)
+    const { velocity } = runSwing(fighter, step);
+    const t = Math.min(1, Math.max(1e-3, step.t));
+    const h = WORLD.gait.heelUp;
+    const rise = step.lift ? (step.lift * Math.cos(Math.PI * t ** h) * Math.PI * h * t ** (h - 1)) / step.seconds : 0;
+    return [velocity[0], rise, velocity[1]];
+  }
   const t = step.t;
   const rate = (6 * t * (1 - t)) / step.seconds;
   return [(step.to[0] - step.from[0]) * rate, 0, (step.to[2] - step.from[2]) * rate];
+}
+
+/**
+ * Where a run's swinging foot is on the floor's plane now, and how fast it goes ([x, z] each): on a cubic (Hermite) path in the
+ * frame that goes with his stance, from the take-off (`step.rel`, from the stance's root) to the landing (`step.to`, from
+ * where the stance will be when it lands), leaving with a little more travel back (WORLD.runMode.swing.back: off the toe
+ * the foot goes on back a moment as it rises, the heel to the seat) and landing swept back under him (`pull`). It does not
+ * trail far behind him and then reach far ahead, as a straight line from floor to floor did: the leg folds under him.
+ */
+function runSwing(fighter, step) {
+  const spec = WORLD.runMode.swing;
+  const t = Math.min(1, step.t);
+  const T = step.seconds;
+  const [vx, vz] = fighter.rootVelocity;
+  const root = [fighter.root[0], fighter.root[1]];
+  // From the stance where it will be as the foot lands.
+  const left = (1 - t) * T;
+  const end = [step.to[0] - (root[0] + vx * left), step.to[2] - (root[1] + vz * left)];
+  const start = step.rel;
+  // Tangents (per unit of the swing's share): back along his way.
+  const back = [-vx * T * spec.back, -vz * T * spec.back];
+  const pull = [-vx * T * spec.pull, -vz * T * spec.pull];
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const h00 = 2 * t3 - 3 * t2 + 1;
+  const h10 = t3 - 2 * t2 + t;
+  const h01 = -2 * t3 + 3 * t2;
+  const h11 = t3 - t2;
+  const d00 = 6 * t2 - 6 * t;
+  const d10 = 3 * t2 - 4 * t + 1;
+  const d01 = -6 * t2 + 6 * t;
+  const d11 = 3 * t2 - 2 * t;
+  const at = [0, 1].map((k) => root[k] + h00 * start[k] + h10 * back[k] + h01 * end[k] + h11 * pull[k]);
+  const velocity = [vx, vz].map((v, k) => v + (d00 * start[k] + d10 * back[k] + d01 * end[k] + d11 * pull[k]) / T);
+  return { at, velocity };
 }
 
 /** The floor height under a foot a share `t` of the way through a step onto terrain, and the clearance it needs over the edge. */
@@ -3728,13 +3871,14 @@ export function standingTarget(fighter, index) {
   // Kneeling to hold a man down, the legs go where the kneel puts them.
   if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
   // (In a jump's flight the feet go with the hips, under them.)
-  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: fighter.jump?.phase === 'air' ? point(fighter.v, P.pelvis) : swingVelocity(fighter.feet[info.side]) };
+  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: fighter.jump?.phase === 'air' ? point(fighter.v, P.pelvis) : swingVelocity(fighter, fighter.feet[info.side]) };
   if (info.knee) {
     const side = info.side;
     if (fighter.feet[side].lifted) return { target: toWorld(fighter, desired), velocity: point(fighter.v, info.hip) };
     const hip = point(fighter.x, info.hip);
     const foot = footTarget(fighter, fighter.feet[side]);
-    const pole = yawRotate([1, 0, side === 'l' ? 0.35 : -0.35], fighter.yaw);
+    const out = fighter.runPose > 0 ? POSE.kneeOut + (WORLD.runMode.kneeOut - POSE.kneeOut) * fighter.runPose : POSE.kneeOut;
+    const pole = yawRotate([1, 0, side === 'l' ? out : -out], fighter.yaw);
     const L = fighter.body.lengths;
     const knee = twoBoneIK(hip, foot, L.thigh, L.shank, pole);
     // Where the hips have turned the knee further than they can, it comes round.
@@ -3992,11 +4136,15 @@ function solveJointLimits(world, fighter, h) {
   const hingeDefined = vec.length(forwardRaw) > 0.3 * vec.length(across);
   const forward = vec.normalize(forwardRaw);
   const L = fighter.body.lengths;
+  // Running, a knee bends forward along his way: a runner's thigh is turned in its hip to the way he runs, whatever turn his
+  // swinging legs give his pelvis (the knee's hinge goes with the thigh, not the pelvis). Held to the pelvis's front, a pelvis
+  // swung 30-50 degrees by the stride pushed every straightened knee out sideways: the knees flew wide.
+  const kneeForward = fighter.runPose > 0 ? vec.normalize(vec.lerp(forward, runForward(fighter, trunkUp), fighter.runPose)) : forward;
 
   for (const side of ['l', 'r']) {
     const sign = side === 'l' ? 1 : -1;
     // Knees bend only forward.
-    if (hingeDefined) hinge(world, fighter, `${side}Knee`, P[`${side}Hip`], P[`${side}Knee`], P[`${side}Foot`], forward, L.shank);
+    if (hingeDefined) hinge(world, fighter, `${side}Knee`, P[`${side}Hip`], P[`${side}Knee`], P[`${side}Foot`], kneeForward, L.shank);
     // Elbows bend only towards their natural side: down, back and out from
     // the shoulder–hand line, as the guard holds them.
     // An arm on a weapon bends down and out, never back: it is held forward.
@@ -4134,6 +4282,12 @@ function keepOutOfTrunk(fighter) {
     if (distance >= radius || distance < 1e-6) continue;
     correctJoint(fighter, index, [P.pelvis, P.neck], vec.scale(radial, (radius - distance) / distance));
   }
+}
+
+/** His way (the facing), square to his trunk: the front of a runner's knees. */
+function runForward(fighter, trunkUp) {
+  const ahead = yawRotate([1, 0, 0], fighter.yaw);
+  return vec.normalize(vec.sub(ahead, vec.scale(trunkUp, vec.dot(ahead, trunkUp))));
 }
 
 /**

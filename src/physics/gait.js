@@ -72,6 +72,16 @@ export function runSpeed(fighter, sprint) {
 }
 
 /**
+ * The speed (m/s) a man goes from a walk into a run (the player's slowest run: control.js runShare): where his legs'
+ * swing, a pendulum, can no longer keep the walk's vaulting step under him, at a Froude number (v² / g × leg length) of
+ * `walkRun` (about 0.5 for people: ~2 m/s for a man's legs), and no faster than his own run.
+ */
+export function jogSpeed(fighter) {
+  const gait = gaitOf(fighter);
+  return Math.min(Math.sqrt(WORLD.gait.walkRun * WORLD.gravity * gait.legLength), runSpeed(fighter, false));
+}
+
+/**
  * The most the stance's speed may change this step (m/s), running: gathering speed (towards `wanted` m/s from `speed`)
  * at his start, less as he nears his top; braking at his brake.
  */
@@ -93,18 +103,34 @@ export function strideOf(fighter, speed) {
   const L = gait.legLength;
   const v = Math.max(spec.slowest, speed);
   const period = 1 / (spec.rate + spec.ratePerSpeed * v);
-  // On the floor as long as the hips take to pass over it; a man short of power longer (less flight, a stompier run).
-  const contact = Math.min(period * spec.mostContact, (spec.contact * L) / v / Math.min(1, Math.max(spec.leastPower, gait.power)) ** spec.powerContact);
-  const seconds = Math.max(period * 1.02, 2 * period - contact);
   const ahead = (spec.land + spec.landPerSpeed * v) * L;
+  // On the floor as long as the hips take to pass over it; a man short of power longer (less flight, a stompier run). No
+  // longer than his leg can reach: from the landing, ahead of his hips, to as far behind them as the leg reaches up on the
+  // ball of the foot (pushOff). Past that the foot left behind could be reached only by his hips coming down and round to it.
+  const contact = Math.min(period * spec.mostContact, (spec.contact * L) / v / Math.min(1, Math.max(spec.leastPower, gait.power)) ** spec.powerContact, (ahead + pushOff(fighter)) / v);
+  const seconds = Math.max(period * 1.02, 2 * period - contact);
   const tired = 1 - Math.max(0, Math.min(1, fighter.stamina));
   return {
     seconds,
     overlap: period / seconds,
     lead: 1 + ahead / (seconds * v),
     threshold: spec.threshold,
-    lift: (spec.lift + spec.liftPerSpeed * v) * L * (1 - spec.tiredLift * tired) * Math.min(1, Math.sqrt(Math.max(spec.leastPower, gait.power))),
+    lift: Math.min(spec.liftMost, spec.lift + spec.liftPerSpeed * v) * L * (1 - spec.tiredLift * tired) * Math.min(1, Math.sqrt(Math.max(spec.leastPower, gait.power))),
   };
+}
+
+/**
+ * How far behind his hips (m) a runner's foot can still be on the floor: his leg (WORLD.runMode.heel.reach of its length,
+ * the knee not locked) from the hips' height in the run (the run's dip, and half its bob, below his standing hips) down to
+ * the ankle up on the ball of the foot (heel.most of his height).
+ */
+export function pushOff(fighter) {
+  const run = WORLD.runMode;
+  const L = gaitOf(fighter).legLength;
+  const H = fighter.body.heightM;
+  const reach = run.heel.reach * L;
+  const drop = L - (run.dip + run.bob / 2) * H - run.heel.most * H;
+  return Math.sqrt(Math.max(0, reach * reach - drop * drop));
 }
 
 /**

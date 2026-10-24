@@ -555,13 +555,43 @@ export const WORLD = {
   //   through the swing (`retarget`, until `settle` of the swing has gone: nearly to the end, as a foot is placed as it comes down), so that it lands on the line he is now running, round a bend too.
   // - stairs: on a stair or a slope steeper than `slope` (rise per m) the stride is the old short quick step (`step`'s old values): a foot to
   //   a tread, as a man runs a flight, with no leaping stride to land past its edge or off the tread below.
-  // - arms: the carried hands swing against the legs, read from the feet (`span`: the feet this share of height apart fore and aft is the
-  //   full swing). `free` (an empty hand), `shield` and `weapon`: how far each swings fore and aft (shares of height; the weapon hand
-  //   less, the sword hangs from a loose hand); `lift`: it rises this much as it comes forward; `tilt`: the blade swings this much with it.
-  // - carry: the weapon at his side. A short weapon (up to `longFrom` m) hangs point down and a little back from a hand at the hip
-  //   (`hand`, share of height; z mirrored for the left hand) that may go back past the shoulder (`reach`, share of height, where a held
-  //   weapon's hand is kept before it); a long one is carried on the shoulder, held up and forward (`longHand`, `longDir`); a shield arm
-  //   hangs at `shield`, an empty hand at `free`. These are the middle of the swing: with the elbows ~90 degrees (80-108 as it goes).
+  // - stance (its feet): `even` 1 sets the feet side by side, the same distance either side of his line (the guard's lead foot is nearer
+  //   the middle than the rear one); at `width` 0.4 each foot is 0.0675 × 0.4 of his height off the middle (~4.7 cm at 1.75 m):
+  //   a step width of ~9 cm, as a runner's feet land nearly under his line (real: 5-10 cm at a jog, less sprinting). It was
+  //   width 0.55 with the guard's uneven feet (5 and 8 cm out, 13 cm apart).
+  // - kneeOut: which way a knee bends in the run: forward, and this much out to his side (the guard's is 0.35: a fighter's
+  //   knees turned out over his toes). At 0.35 a run's deeply folded swing leg threw the knee 20-40 cm out from the hips (the
+  //   thigh 50-60 degrees out from the body: a bow-legged, splayed run); a runner's knee travels nearly straight fore and aft.
+  // - swing: the path of a run's swinging foot, laid out about his hips (physics.js runSwing), not straight from where it left
+  //   the floor to where it lands: a cubic (Hermite) curve from the take-off to the landing in the frame moving with him,
+  //   leaving with `back` (a share of the ground he covers in the swing) of travel backwards (the foot goes on back a moment
+  //   as it comes off the toe and rises) and landing with `pull` of it (swept back under him as it lands rather than slapped
+  //   down ahead: a runner's active landing). Laid straight from floor to floor (as it was) the foot hung 0.7 m behind his hips
+  //   through the first third of the swing and reached 0.7 m ahead of them through the last: the legs split fore and aft, a lunge.
+  // - heel: a planted foot behind his hips comes up on its ball as he goes on past it (physics.js heelRise): the ankle rises
+  //   so that the leg is no longer than `reach` of its length (the knee still bent ~20 degrees as the toes leave the floor),
+  //   up to `most` of his height (~14 cm: heel up, toes down). Held flat, the push-off foot 0.5 m behind him could only be
+  //   reached by the hips coming down to it: they ran 10-13 cm below where the pose had them, a crouching, lunging run.
+  // - arms: the arms of a run as a runner holds them (runHand): the upper arm swung fore and aft from the shoulder about `centre`
+  //   rad (a little behind the trunk's line), by `swing` + `swingPerSpeed` × speed rad either way, at most `most` (~25 degrees at
+  //   a jog, ~45 sprinting: the arms swing against the legs, and more as the legs swing more, keeping the turn of the body about
+  //   its spine in balance), the elbow bent `elbow` rad (90 degrees), `elbowSwing` more as the hand comes forward and less as it
+  //   goes back (80-100 degrees), the upper arm `abduct` rad out from the side, the hand `inward` (share of height) towards the
+  //   middle at the front of its swing. Its phase is the legs': the knees apart fore and aft by `span` of the thigh's length is
+  //   the full swing. (They were hand places at hip height, 0.12 of height out from the middle, swung by the feet, with a guard
+  //   arm's elbow pole: the elbows 25-40 cm out from the middle, bent 50-95 degrees, the arms half straight and winged.)
+  //   `tilt`: a short blade carried in a swinging hand turns this much with it.
+  // - carry: what a hand carries in the run (physics.js carryKind). 'waist' (a one-handed weapon, or a two-handed one no longer
+  //   than `small.length` m overall and no heavier than `small.mass` kg: a sword, a katana, a club, a pistol): held at the side
+  //   of the waist, the upper arm `waist.flex` rad back and `waist.abduct` out, the elbow `waist.elbow` rad bent, swung
+  //   `waist.swing` of a free arm's swing, the blade down and back along the thigh (`dir`); a two-handed one in the one hand,
+  //   the other arm running free. 'pole' (a spear, a polearm, a staff: `leadAhead`, or longer than `poleFrom` m overall): at the
+  //   ready, as a man runs with a spear: the middle of the grip `pole.hand` from his shoulder (shares of height: forward, down
+  //   and in, in his trunk's frame, so it leans with him: before his waist, at his side),
+  //   the shaft along `pole.dir` (forward and ~27 degrees up, a little across him, the butt trailing low behind), riding with
+  //   the trunk. 'shoulder' (a long gun, a flag, a bow longer than `bowFrom` m, a heavy two-hander): up on the shoulder
+  //   (`longHand`, `longDir`). `shield`: the shield arm, as `waist` (bent ~85 degrees, the board at his side). `reach`: how far
+  //   back past the shoulder a held weapon's hand may go.
   // - recovery: the share of the usual stamina recovery (WORLD.staminaRecovery) he gets while running, so that the cost of running
   //   (CONTROL.run.staminaPerSecond) is a drain over minutes rather than being cancelled by his recovery.
   // - turn: the pose in a sprint turn (`fighter.turn` is the heading's rate in rad/s (of his path, the way his speed points, faster
@@ -578,13 +608,23 @@ export const WORLD = {
     speedFactor: 4,
     recovery: 0.25,
     turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.08, inner: 0.09, wide: 0.08, outer: 0.03, pathFrom: 1.5 },
-    stance: { blade: 0, crouch: 0, width: 0.55, lean: 0.03, guardHeight: 0, stagger: 0 },
+    stance: { blade: 0, crouch: 0, width: 0.4, lean: 0.03, guardHeight: 0, stagger: 0, even: 1 },
     lean: 0.25, dip: 0.02, bob: 0.045, ease: 6,
-    arms: { span: 0.5, free: 0.17, shield: 0.09, weapon: 0.09, lift: 0.02, tilt: 0.25 },
+    kneeOut: 0.06,
+    swing: { back: 0.05, pull: 0.1 },
+    heel: { reach: 0.98, most: 0.08 },
+    arms: { span: 1.3, centre: -0.25, swing: 0.15, swingPerSpeed: 0.06, most: 0.8, elbow: 1.57, elbowSwing: 0.35, abduct: 0.12, inward: 0.025, tilt: 0.25 },
     step: { seconds: 0.42, overlap: 0.74, lead: 1.3, threshold: 0.2, lift: 0.4 },
     settle: 0.95,
     stairs: { slope: 0.15, step: { seconds: 0.15, overlap: 0.55, lead: 1.4, threshold: 0.2, lift: 0.12 } },
-    carry: { longFrom: 1.15, hand: [0.08, 0.46, 0.14], dir: [-0.3, -1, 0.05], longHand: [0.1, 0.62, 0.17], longDir: [0.45, 1, 0.1], shield: [0.07, 0.46, 0.15], free: [0.1, 0.46, 0.12], reach: -0.2 },
+    carry: {
+      small: { length: 1.25, mass: 1.6 }, poleFrom: 1.6, bowFrom: 1.25,
+      waist: { flex: -0.12, abduct: 0.2, elbow: 0.5, swing: 0.25 }, dir: [-0.35, -1, 0.06],
+      pole: { hand: [0.17, 0.15, -0.03], dir: [0.8, 0.56, -0.2] },
+      longHand: [0.1, 0.62, 0.17], longDir: [0.45, 1, 0.1],
+      shield: { flex: 0.05, abduct: 0.28, elbow: 1.45, swing: 0.3 },
+      reach: -0.2,
+    },
   },
   // Running, for every fighter that runs (physics/gait.js; the pose, carry, turn and stairs are WORLD.runMode's, the look of
   // the player's sprint, now everyone's run). Speeds in m/s, accelerations as shares of g, lengths as shares of leg length.
@@ -600,8 +640,12 @@ export const WORLD = {
   // - The stride (real runners: ~2.8 steps a second at a 3 m/s jog, ~3.6 at 6.5, ~4.1 at 8.5; contact ~0.28 s at a jog,
   //   ~0.1 s at a sprint): rate + ratePerSpeed × speed steps a second; a foot on the floor while the hips pass over
   //   contact × leg length (no longer than mostContact of a step), longer for a man short of power (his power, no less
-  //   than leastPower, to the powerContact); the swing is the rest of two steps. The foot lands land + landPerSpeed ×
-  //   speed (× leg length) ahead of the stance and rises lift + liftPerSpeed × speed, less by tiredLift when spent.
+  //   than leastPower, to the powerContact), and no longer than the leg reaches (gait.js pushOff: the foot then leaves
+  //   behind him, off the toe); the swing is the rest of two steps. The foot lands land + landPerSpeed × speed (× leg
+  //   length) ahead of the stance (~0.26 m at a jog, ~0.3 sprinting: a runner lands nearly under his hips; it was 0.35 +
+  //   0.02, ~0.45 m, a reach with a straight leg) and rises lift + liftPerSpeed × speed, at most liftMost (~0.31 of the
+  //   leg at a jog, 0.42 flat out; it was 0.14 + 0.05 with no cap: 0.57 of the leg sprinting, a heel to the seat his hips
+  //   sank 13 cm to follow), less by tiredLift when spent.
   //   slowest: the stride is never laid out for less than this speed. threshold: as WORLD.step's. heelUp: the swing's
   //   height follows sin(pi t^heelUp) of its share t: the foot leaves the floor rising (the heel kicked up towards the
   //   seat), highest a third of the way through, not trailing low behind him.
@@ -609,13 +653,16 @@ export const WORLD = {
   //   accelSmooth s: forward gathering speed, back braking), tiredLean more when spent; within leanMost.
   // - limp: a leg weaker than the other by a share shortens its time bearing him by seconds × that share, and the step
   //   by length × it.
+  // - walkRun: the Froude number (speed² over g × leg length) at which a man goes from a walk into a run (people: ~0.5;
+  //   ~2 m/s for a man's legs): the slowest run (gait.js jogSpeed), the player's at the stick's run threshold.
   gait: {
     forceRef: 0.96, speedRef: 33, top: 8.5, runShare: { base: 0.35, aerobic: 0.3, least: 0.4, most: 0.68 }, legFloor: 0.25,
     accel: 1.15, brake: 0.75, least: 0.12, runFrom: 2.2, arrive: 0.6,
     rate: 2.2, ratePerSpeed: 0.22, contact: 0.95, mostContact: 0.9, leastPower: 0.35, powerContact: 0.5, slowest: 2.5,
-    land: 0.35, landPerSpeed: 0.02, lift: 0.14, liftPerSpeed: 0.05, tiredLift: 0.35, threshold: 0.2, heelUp: 0.6,
+    land: 0.25, landPerSpeed: 0.012, lift: 0.14, liftPerSpeed: 0.035, liftMost: 0.42, tiredLift: 0.35, threshold: 0.2, heelUp: 0.6,
     lean: 0.06, leanPerSpeed: 0.02, accelLean: 0.6, accelSmooth: 0.15, tiredLean: 0.15, leanMost: [-0.3, 0.75],
     limp: { seconds: 0.5, length: 0.4 },
+    walkRun: 0.5,
   },
   // Walking about (the player's walk mode): upright and square, feet under
   // the hips, no guard; the arms swing with the stride, more the faster he goes.
