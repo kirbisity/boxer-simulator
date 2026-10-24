@@ -1973,6 +1973,7 @@ function updateIntent(world, fighter, dt) {
     }
   }
   if (fighter.finisher?.kneeling) finisherPose(fighter, intent);
+  if (fighter.kneel) kneelPose(fighter, intent);
   if (fighter.crawling) crawlPose(fighter, intent, dt);
   if (fighter.pain) painPose(fighter, intent);
   if (fighter.tending) tendingPose(fighter, intent);
@@ -2105,6 +2106,33 @@ function finisherPose(fighter, intent) {
   }
 }
 
+/**
+ * A scene's kneel (level mode, levelmode/ending.js: `fighter.kneel` { share, lean?, hands? }): down on both knees as the finisher kneels, `share`
+ * (0 to 1) of the way, bowed `lean` more; the hands where the scene puts them (`hands`: [left, right] world points: round a dead man's chest and
+ * neck, a helm lifted to the head), the blade let hang. Nothing else sets it.
+ */
+function kneelPose(fighter, intent) {
+  const kneel = fighter.kneel;
+  const share = kneel.share ?? 1;
+  const H = fighter.body.heightM;
+  const L = fighter.body.lengths;
+  intent.dip += WORLD.pin.dip * share;
+  intent.lean += (WORLD.pin.lean + (kneel.lean ?? 0)) * share;
+  intent.guardTight = false;
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    intent[`${side}Knee`] = [0.06 * H, L.ankle + 0.02, sign * 0.1 * H];
+    intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
+  }
+  if (!kneel.hands) return;
+  intent.lHand = toLocal(fighter, kneel.hands[0]);
+  intent.rHand = toLocal(fighter, kneel.hands[1]);
+  intent.twist = 0;
+  intent.twoHanded = false;
+  // (The blade let hang back and out to his right, away from what the hands hold.)
+  intent.bladeDir = [-0.5, -1, -0.6];
+  intent.offBladeDir = null;
+}
+
 function crawlPose(fighter, intent, dt) {
   const spec = WORLD.crawl;
   const H = fighter.body.heightM;
@@ -2195,7 +2223,7 @@ function runCarry(world, fighter, intent, dt) {
   const spec = WORLD.runCarry;
   const speed = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
   const nearest = fighter.nearestFoe ?? Infinity;
-  const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.crawling || fighter.state !== 'up';
+  const busy = fighter.punch || fighter.clinch || fighter.pin || fighter.pickup || fighter.defence || fighter.crawling || fighter.kneel || fighter.state !== 'up';
   const running = (fighter.running || speed > spec.runningSpeed) && !busy;
   // Walking about, the guard is down whoever is near.
   const want = (fighter.walking || fighter.runPose > 0.5) && !busy ? 1 : running && nearest > spec.guardFrom ? Math.min(1, (nearest - spec.guardFrom) / (spec.relaxFrom - spec.guardFrom)) : 0;
@@ -2350,7 +2378,7 @@ function updateFeet(fighter, dt) {
 
 /** Is he striding (a run's footwork): in the run's pose, or running (or carried on from a run) faster than a run's pace (WORLD.gait.runFrom)? */
 function striding(fighter) {
-  if (fighter.crawling || fighter.pin || fighter.finisher?.kneeling || fighter.rush) return false;
+  if (fighter.crawling || fighter.pin || fighter.finisher?.kneeling || fighter.kneel || fighter.rush) return false;
   return fighter.runPose > 0.3 || (fighter.gaitCarry && Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) > WORLD.gait.runFrom);
 }
 
@@ -2475,7 +2503,7 @@ function groundStance(fighter, dt) {
   const lift = fighter.lift ?? 0;
   const pelvis = P.pelvis * 3;
   const feet = fighter.feet;
-  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin && !fighter.finisher?.kneeling)) {
+  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin && !fighter.finisher?.kneeling && !fighter.kneel)) {
     fighter.air = false;
     if (fighter.state !== 'rising') {
       const under = floorAt(terrain, fighter.x[pelvis], fighter.x[pelvis + 2], fighter.x[pelvis + 1] + spec.stepUp);
@@ -2670,7 +2698,7 @@ export function step(world, dt) {
  */
 function checkBalance(world, fighter) {
   // Kneeling over a man held down is a base of its own, not a fall.
-  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling || fighter.finisher?.kneeling) return;
+  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   // Worn joints step less sharply (aging.js).
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
@@ -3365,7 +3393,7 @@ export function standingTarget(fighter, index) {
   const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
-  if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
+  if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
   if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: swingVelocity(fighter.feet[info.side]) };
   if (info.knee) {
     const side = info.side;

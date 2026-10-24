@@ -2,6 +2,9 @@
 // hard it is ("How it will be judged: Difficulty" in the spec). The player follows DUNNOTTAR_ROUTE; when enemies
 // have noticed him he fights with the existing fight AI (ai.js `think`, limited by `mayTarget` to the men who are
 // aware of him), then goes back to the route. Deaths wake at the last rest, as in the game; ten deaths is a fail.
+// A whole run (`one`, the sweep's) plays the plot twist after Vaelen (levelmode/ending.js): into the back room, straight for the privy's hole
+// past the horde (no fighting it), down the chute, Noname fought if he is alive, the reveal, the epilogue's waves fought from the island; its
+// win is `escaped` (the ending reached, with its outcome), and `--no-twist` stops at Vaelen as before (`beaten`).
 //
 //   careful   fights what has noticed him, one at a time where it can (backs off along the way he came when two or
 //             more come), bandages when he bleeds and nobody aware is within 6 m, drinks the tonic when badly hurt,
@@ -17,7 +20,8 @@
 //   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
 //   node tools/dunnottar.js knights [--runs 20] [--tweak skill=0.3,exercise=0.2]               Sir Alasdair (the plate knight at the front gate) alone, from rest 1
 //   node tools/dunnottar.js noname [--runs 20] [--tweak skill=0.6]                              Noname (the cesspool's miniboss) from the smugglers' brazier
-//   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
+//   node tools/dunnottar.js twist [--runs 10] [--noname alive,dead]                      the plot twist alone, from rest 3 with Vaelen dead
+//   node tools/dunnottar.js one <policy> <seed> [--log] [--no-twist]                      one run, JSON (the sweep's worker)
 // A sweep of 16 + 16 runs takes about ten minutes on ten cores (a run is a few thousand simulated seconds at about 6x real time);
 // each run is its own process, `--jobs` of them at a time. `segments` is the quick way to tune: one stretch, many seeds.
 //
@@ -151,6 +155,18 @@
 //   sewer                                                   4/8                   1/8      3/8         5.4           sewer 20 (Noname 12, bled 8), vault 15: no front man
 // So the front is beaten about once in sixteen whole runs (1 of the 16 above), the way round about half the time.
 //
+// ---- Phase I (the plot twist after Vaelen: the empty privy, the horde, the chute, Noname, the reveal, the epilogue) ----------------------
+// A whole run goes on past Vaelen (levelmode/ending.js): to the privy's hole past the horde (never fought), down, Noname if he stands, the reveal, the
+// epilogue's waves fought from the island; `escaped` is the end reached (its outcome: `cleared`, `held` 120 s, `fell` in it). `twist` runs it alone from
+// rest 3, Vaelen dead (10 seeds each; the new Noname walks the sludge as stone, `wader`, and has the cesspool's footing):
+//   Noname alive  escaped 10/10 (fell 8, held 2)  deaths before the reveal 6 (Noname 5, bled 1)  epilogue men down 16 of 120
+//   Noname dead   escaped 10/10 (held 2, fell 8)  deaths 0                                        epilogue men down 10 of 120
+// Nobody died to the horde: the drop is reached before the first man is in the room. The epilogue (3, 4, 5 men in 120 s) kills the bot 4 times in 5:
+// it is a last stand, and its death ends the game with the cards as its surviving does.
+// The whole sweep (careful, seeds 1-6, 3600 s), every run that beat Vaelen escaped:
+//   front  beat Vaelen 4/6, escaped 4/6 (fell 2, held 2; Noname alive at all 4 landings), deaths after Vaelen 1 (Noname), 1 fail, 1 timeout
+//   sewer  beat Vaelen 3/6, escaped 3/6 (fell 3; Noname dead at all 3), deaths after Vaelen 0, 3 timeouts in the vault (as in phase G)
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -162,7 +178,7 @@ import { FINISHER, finishTarget, helplessOnFloor, startFinisher, updateFinisher 
 import { comradesOf } from '../src/levelmode/team.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { levelAware } from '../src/levelmode/adapter.js';
-import { beginAttempt, createLevelWorld, levelThink, livingComrades, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
+import { beginAttempt, createLevelWorld, endingFinal, endingOf, levelThink, livingComrades, nonameOf, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
 import { interactions } from '../src/levelmode/interact.js';
 import { feetFloor, holdPlayer, useItem } from '../src/levelmode/items.js';
 import { regionContains, setMechanism, stageFloor, stageTerrain, updateStage } from '../src/levelmode/stage.js';
@@ -315,8 +331,10 @@ class Run {
    * @param setup a function given the world before the first step (the boss duel's)
    * @param until a function of the run that gives the result when it is over (the knight duel's), else null
    */
-  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false, endAt = null, only = null, until = null, allies = ALLIES }) {
+  constructor({ policy, seed, maxDeaths = 10, plan = null, setup = null, log = false, endAt = null, only = null, until = null, allies = ALLIES, twist = false }) {
     this.endAt = endAt;
+    // (After Vaelen, the plot twist: the back room, the horde, the chute, Noname, the reveal, the epilogue: `escaped` at its end.)
+    this.twist = twist ? { room: false, dropped: false, nonameAlive: null, revealed: false, outcome: null, deathsAfterBoss: 0, waveKills: 0, epilogueHarm: null } : null;
     this.until = until;
     this.only = only;
     this.policy = policy;
@@ -477,16 +495,50 @@ class Run {
       this.bossAware = aware;
       if (boss.state === 'out' && !this.vaelen.beaten) {
         this.vaelen.beaten = true;
-        this.result = 'beaten';
+        if (!this.twist) this.result = 'beaten';
         this.note('Vaelen is down');
       }
     }
+    if (this.twist) this.watchTwist();
   }
 
-  /** The man is out: note where and by whom, wake at the last rest, or give up. */
+  /** The plot twist as it goes: the room, the drop, Noname as he is found, the reveal, the end of the epilogue (the run's result: `escaped`). */
+  watchTwist() {
+    const ending = endingOf(this.world);
+    const twist = this.twist;
+    if (!ending) return;
+    const phase = ending.phase;
+    if (phase === 'horde' && !twist.room) {
+      twist.room = true;
+      this.note('the back room is empty: the horde comes');
+    }
+    if (phase === 'fall' && !twist.dropped) {
+      twist.dropped = true;
+      this.note('drops down the garderobe');
+    }
+    if (phase === 'landing' && twist.nonameAlive === null) {
+      twist.nonameAlive = ending.nonameAlive;
+      this.note(`lands in the cesspool (harm ${bodyHarm(this.me).toFixed(2)}), Noname ${ending.nonameAlive ? 'alive' : 'dead'}`);
+    }
+    if (phase === 'reveal' && !twist.revealed) {
+      twist.revealed = true;
+      this.note('the reveal');
+    }
+    if (phase === 'done' && !this.result) {
+      twist.outcome = ending.outcome;
+      twist.epilogueHarm = Number(bodyHarm(this.me).toFixed(2));
+      twist.waveKills = (ending.waveMen ?? []).filter((id) => this.world.fighters[id].state === 'out').length;
+      this.result = 'escaped';
+      this.note(`the epilogue ends: ${ending.outcome}`);
+    }
+  }
+
+  /** The man is out: note where and by whom, wake at the last rest, or give up. (Past the reveal the game ends with the cards: watchTwist.) */
   die() {
     const world = this.world;
     const level = this.level;
+    if (this.result || endingFinal(world)) return;
+    if (this.twist && this.vaelen.beaten) this.twist.deathsAfterBoss += 1;
     const hit = this.lastHit && world.time - this.lastHit.time < 30 ? this.lastHit : null;
     const killer = hit ? world.fighters[hit.attacker]?.spawn?.id ?? hit.kind : 'bled';
     const section = this.sectionName();
@@ -540,13 +592,15 @@ class Run {
     const me = this.me;
     const world = this.world;
     if (me.finisher && updateFinisher(world, me, dt)) return true;
-    const boss = this.level.boss ? world.fighters[this.level.boss.id] : null;
+    // (In the plot twist's cesspool, Noname on the floor the same: the reveal waits for his death.)
+    const twistFoe = this.twist && endingOf(world)?.phase === 'landing' ? nonameOf(world) : null;
+    const boss = twistFoe ?? (this.level.boss ? world.fighters[this.level.boss.id] : null);
     if (!boss || boss.dormant || !helplessOnFloor(boss) || me.state !== 'up') return false;
     const d = apart(me, boss);
     if (d > 30) return false;
     if (d <= FINISHER.reach && finishTarget(world, me)?.id === boss.id && startFinisher(world, me, boss)) {
       this.stats.finishers += 1;
-      this.note('puts the dagger to Vaelen on the floor');
+      this.note(`puts the dagger to ${boss.body.inputs.name} on the floor`);
       return true;
     }
     me.walking = true;
@@ -621,6 +675,9 @@ class Run {
       return;
     }
     if (this.policy === 'trace') return this.route(dt);
+    // The plot twist: the horde is not fought (he runs for the hole), the chute and the reveal hold him.
+    const phase = this.twist && this.vaelen.beaten ? endingOf(world)?.phase : null;
+    if (['horde', 'fall', 'reveal', 'done'].includes(phase)) return this.twistWalk(phase);
     if (this.finishBoss(dt)) return;
     // (On his knees from a broken arm, or the fight AI's panic, he stands: only a broken leg keeps a man down.)
     if (me.crawling && !legBroken(me)) playerCrawl(world, me, false);
@@ -851,6 +908,7 @@ class Run {
     const entry = this.plan[this.idx];
     if (!entry) {
       if (this.policy === 'trace') this.result = 'traced';
+      else if (this.twist && this.vaelen.beaten) this.twistWalk(endingOf(world)?.phase);
       else this.finish();
       return;
     }
@@ -1072,6 +1130,51 @@ class Run {
     return true;
   }
 
+  /**
+   * The plot twist, past Vaelen: to the back room and its privy's hole (round the altar by the path finder), at a run once the horde comes, and down it;
+   * in the cesspool, at Noname if he stands (the fight is the fight AI's, as every fight), then by the island for the epilogue's waves. Held through the
+   * chute and the reveal, and once it is over.
+   */
+  twistWalk(phase) {
+    const me = this.me;
+    const world = this.world;
+    const def = DUNNOTTAR.ending;
+    me.walking = true;
+    me.strafe = 0;
+    if (['fall', 'reveal', 'done'].includes(phase)) {
+      holdPlayer(me);
+      return;
+    }
+    if (phase === 'open' || phase === 'horde') {
+      const drop = interactions(world).find((entry) => entry.id === 'ending:drop');
+      if (drop) {
+        drop.run(world);
+        return;
+      }
+      me.focus = undefined;
+      me.mayTarget = () => false;
+      const goal = { p: [def.hole.at[0] + 0.9, def.hole.at[2]], y: def.hole.at[1], acts: [] };
+      this.twistGoal ??= goal;
+      if (this.lineClear(goal.p[0], goal.p[1], 0.3)) me.goTo = [goal.p[0], 0, goal.p[1]];
+      else {
+        const way = this.wayRound(this.twistGoal);
+        if (way) this.follow(way);
+        else me.goTo = [goal.p[0], 0, goal.p[1]];
+      }
+      me.move = 1;
+      me.running = phase === 'horde' || this.spec.run;
+      return;
+    }
+    me.mayTarget = this.targetable;
+    this.twistGoal = null;
+    const noname = nonameOf(world);
+    const [kx, , kz] = def.caby.kneel;
+    const at = phase === 'landing' && noname && noname.state !== 'out' ? [hipX(noname), hipZ(noname)] : [kx - 1, kz];
+    me.goTo = [at[0], 0, at[1]];
+    me.move = Math.hypot(at[0] - hipX(me), at[1] - hipZ(me)) > 0.8 ? 1 : 0;
+    me.running = false;
+  }
+
   /** The plan is walked: the boss is the last thing. If he has not seen him, go to him. */
   finish() {
     const me = this.me;
@@ -1099,6 +1202,7 @@ class Run {
       seconds: Number(this.world.time.toFixed(0)),
       stats: this.stats,
       vaelen: this.vaelen,
+      twist: this.twist,
       freed: [...level.freed],
       armour: Number(protection(this.me.body.inputs).toFixed(2)),
       log: this.log,
@@ -1129,6 +1233,41 @@ const VARIANTS = {
     reclothe(run.world, run.me, { ...run.me.body.inputs, outfit: structuredClone(knight.outfit), accessories: [] });
   },
 };
+
+/**
+ * The plot twist alone (levelmode/ending.js), from the wall brazier (rest 3) with Vaelen dead and the doors behind the altar open: the chapel leg, the back
+ * room, the run for the hole past the horde, the drop, Noname (`noname`: 'alive', the sewer skipped; 'dead', killed by hand first), the reveal, the
+ * epilogue's waves. Deaths before the reveal wake at the rest as in the game (up to `deaths`). { seed, noname, result: escaped | fail | timeout, ... }.
+ */
+function twistRun(seed, { noname = 'alive', log = false, seconds = 900, deaths = 5 } = {}) {
+  const chapel = DUNNOTTAR_ROUTE.find((leg) => leg.to === 'chapel');
+  const plan = [...DUNNOTTAR_ROUTE.find((leg) => leg.name === 'the wall walk').points.slice(-3), ...chapel.points].map((p) => ({ p, acts: [], leg: chapel.name }));
+  const run = new Run({
+    policy: 'careful',
+    seed,
+    plan,
+    log,
+    maxDeaths: deaths,
+    twist: true,
+    setup: (self) => {
+      const rest = DUNNOTTAR.sections.find((section) => section.rest?.id === 'rest3').rest;
+      setMechanism(self.world, 'chapelgate', 'open');
+      restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
+      const boss = self.world.fighters[self.level.boss.id];
+      knockOut(self.world, boss, { time: self.world.time, effects: [] }, 'is struck down', 'killed');
+      self.vaelen.beaten = true;
+      if (noname === 'dead') {
+        const man = nonameOf(self.world);
+        knockOut(self.world, man, { time: self.world.time, effects: [] }, 'is struck down', 'killed');
+      }
+      self.level.ui.length = 0;
+    },
+  });
+  // (The world runs on the boss's fall first: no screen plays the cutscene, the doors open by themselves.)
+  run.play({ seconds });
+  const report = run.report();
+  return { seed, noname, result: report.result, seconds: report.seconds, deaths: report.deaths, twist: report.twist, harm: Number(bodyHarm(run.me).toFixed(2)), log: run.log };
+}
 
 function bossDuel(variant, seed, log, seconds = 240) {
   const chapel = DUNNOTTAR_ROUTE.find((leg) => leg.to === 'chapel');
@@ -1353,7 +1492,7 @@ const pad = (value, width) => String(value).padEnd(width);
 function printSweep(runs) {
   console.log(`${pad('policy', 9)}${pad('seed', 5)}${pad('result', 9)}${pad('furthest', 9)}${pad('deaths', 7)}${pad('time', 6)}${pad('band', 5)}${pad('tonic', 6)}${pad('swap', 5)}${pad('rest', 5)}${pad('vael', 10)}  died (section:by)`);
   for (const run of runs) {
-    const vaelen = run.vaelen.beaten ? 'beaten' : run.vaelen.reached ? `seen x${run.vaelen.attempts}` : '-';
+    const vaelen = run.twist?.outcome ? `${run.twist.nonameAlive ? 'N+' : 'N-'}${run.twist.outcome}` : run.vaelen.beaten ? 'beaten' : run.vaelen.reached ? `seen x${run.vaelen.attempts}` : '-';
     console.log(`${pad(run.policy, 9)}${pad(run.seed, 5)}${pad(run.result, 9)}${pad(run.furthest ?? '-', 9)}${pad(run.deaths.length, 7)}${pad(run.seconds ?? '', 6)}${pad(run.stats.bandages ?? '', 5)}${pad(run.stats.tonics ?? '', 6)}${pad(run.stats.swaps ?? '', 5)}${pad(run.stats.rests ?? '', 5)}${pad(vaelen, 10)}  ${run.deaths.map((death) => `${death.section}:${death.by}`).join(' ')}`);
   }
 }
@@ -1380,6 +1519,13 @@ function printSummary(runs, route = ROUTE) {
     if (route === 'front') console.log(`  Sir Alasdair (plate knight at the gate): met in ${met}/${mine.length} runs, beaten in ${knightWins}/${met} of them (${knightWins}/${knightTries} times he turned on him)`);
     console.log(`  deaths by section: ${sorted(bySection) || 'none'}`);
     console.log(`  deaths by: ${sorted(byKiller) || 'none'}`);
+    const twisted = mine.filter((run) => run.twist);
+    if (twisted.length) {
+      const outcomes = {};
+      for (const run of twisted) if (run.twist.outcome) outcomes[run.twist.outcome] = (outcomes[run.twist.outcome] ?? 0) + 1;
+      const after = twisted.reduce((total, run) => total + run.twist.deathsAfterBoss, 0);
+      console.log(`  the twist: into the room ${share((run) => run.twist?.room)}, down the chute ${share((run) => run.twist?.dropped)} (Noname alive at the landing ${twisted.filter((run) => run.twist.nonameAlive).length}), the reveal ${share((run) => run.twist?.revealed)}, escaped ${share((run) => run.result === 'escaped')} (${sorted(outcomes) || '-'}), deaths after Vaelen ${after}, epilogue men down ${twisted.reduce((total, run) => total + run.twist.waveKills, 0)}`);
+    }
   }
 }
 
@@ -1392,7 +1538,7 @@ async function main() {
   ROUTE = routes[0];
   if (command === 'one') {
     const [, policy, seed] = options._;
-    const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log) });
+    const run = new Run({ policy, seed: Number(seed), maxDeaths: Number(options.deaths ?? 10), log: Boolean(options.log), twist: !options['no-twist'] });
     const report = run.play({ seconds: Number(options.seconds ?? 3600) });
     console.log(JSON.stringify({ ...report, seed: Number(seed) }));
     return;
@@ -1427,6 +1573,26 @@ async function main() {
     const mean = (key) => (results.reduce((sum, result) => sum + (result[key] ?? 0), 0) / Math.max(1, results.length)).toFixed(2);
     if (options.logs) for (const result of results.filter((entry) => entry.result !== 'beaten')) console.log(`--- seed ${result.seed} ${result.result} ${result.by}\n${(result.log ?? []).slice(-20).join('\n')}`);
     console.log(`Noname (allies ${ALLIES}${options.tweak ? `, ${options.tweak}` : ''}): beaten ${results.filter((result) => result.result === 'beaten').length}/${results.length}  died ${results.filter((result) => result.result === 'died').length}  timed out ${results.filter((result) => result.result === 'timeout').length}  mean Noname hurt ${mean('nonameHurt')}  mean comrades left ${mean('comrades')}  median ${[...results.map((result) => result.seconds)].sort((a, b) => a - b)[Math.floor(results.length / 2)]} s`);
+    return;
+  }
+  if (command === 'twistone') {
+    console.log(JSON.stringify(twistRun(Number(options._[1]), { noname: String(options.noname ?? 'alive'), log: Boolean(options.log), seconds: Number(options.seconds ?? 900) })));
+    return;
+  }
+  if (command === 'twist') {
+    const runs0 = Number(options.runs ?? 10);
+    const variants = String(options.noname ?? 'alive,dead').split(',');
+    const lists = variants.flatMap((variant) => Array.from({ length: runs0 }, (_, index) => ['twistone', String(Number(options.seed0 ?? 1) + index), '--noname', variant, '--allies', String(ALLIES), ...(options.logs ? ['--log'] : [])]));
+    const results = await farm(lists, jobs);
+    for (const variant of variants) {
+      const mine = results.filter((result) => result.noname === variant);
+      const outcomes = {};
+      for (const result of mine) if (result.twist?.outcome) outcomes[result.twist.outcome] = (outcomes[result.twist.outcome] ?? 0) + 1;
+      const by = {};
+      for (const result of mine) for (const death of result.deaths ?? []) by[`${death.section}:${death.by}`] = (by[`${death.section}:${death.by}`] ?? 0) + 1;
+      if (options.logs) for (const result of mine.filter((entry) => entry.result !== 'escaped')) console.log(`--- ${variant} seed ${result.seed} ${result.result}\n${(result.log ?? []).slice(-16).join('\n')}`);
+      console.log(`twist, Noname ${pad(variant, 6)} escaped ${mine.filter((result) => result.result === 'escaped').length}/${mine.length} (${Object.entries(outcomes).map(([key, count]) => `${key} ${count}`).join(', ') || '-'})  into the room ${mine.filter((result) => result.twist?.room).length}  dropped ${mine.filter((result) => result.twist?.dropped).length}  revealed ${mine.filter((result) => result.twist?.revealed).length}  deaths ${mine.reduce((total, result) => total + (result.deaths?.length ?? 0), 0)} (${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([key, count]) => `${key} ${count}`).join(', ') || '-'})  epilogue men down ${mine.reduce((total, result) => total + (result.twist?.waveKills ?? 0), 0)}  median ${[...mine.map((result) => result.seconds)].sort((a, b) => a - b)[Math.floor(mine.length / 2)]} s`);
+    }
     return;
   }
   if (command === 'boss') {
@@ -1485,6 +1651,6 @@ const setAllies = (count) => { ALLIES = count; };
 
 const setRoute = (name) => { ROUTE = name; };
 
-export { setAllies, setRoute, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, knightDuel, nonameDuel, POLICY, VARIANTS };
+export { setAllies, setRoute, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, knightDuel, nonameDuel, twistRun, POLICY, VARIANTS };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

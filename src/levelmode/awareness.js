@@ -78,6 +78,10 @@ export const AWARE = {
   seeRadius: 10,
   // How far they run at most (m) and for how long (s) before they crouch where they are; the pause before they get up (s with no fight within calmRadius m).
   fleeMax: 14,
+  // A man a scene sends at the player (`rouse`, the hunt) runs at him while he is farther than `chargeTo` m (the fight AI closes at a guarded
+  // walk, under a metre a second: a crowd 25 m off would take half a minute to come), then fights; the run is `chargeSpeed` of a full walk.
+  chargeTo: 6,
+  chargeSpeed: 1.8,
   fleeSeconds: 8,
   calmRadius: 15,
   calmSeconds: 12,
@@ -204,7 +208,7 @@ export function awarenessReport(world) {
 /** The state of one man, by fighter id. */
 export const mindState = (world, id) => world.stage?.aware?.minds[id]?.state;
 
-const LETTER = { idle: 'I', patrol: 'P', aggro: 'A', search: 'S', return: 'R', flee: 'F', cower: 'C', follow: 'f', stayed: 's', down: 'x' };
+const LETTER = { idle: 'I', patrol: 'P', aggro: 'A', charge: 'H', search: 'S', return: 'R', flee: 'F', cower: 'C', follow: 'f', stayed: 's', down: 'x' };
 /** The letter for a state, for an overlay. */
 export const stateLetter = (state) => LETTER[state] ?? '?';
 
@@ -322,6 +326,25 @@ function raiseAlarm(world, aware, mind) {
     alarm(world, aware, other, friend, 'shout', null);
     other.lastSeen = mind.lastSeen;
   }
+}
+
+/**
+ * A scene sends a man at the player (levelmode/ending.js: the horde in the chapel, the epilogue's men in the drain, Noname as the player drops in): aggro
+ * now, and he hunts (`mind.hunt`: he always knows where the player is, in the ghost walk too, and never gives the chase up). `post`: his post from now on
+ * (a man let out of a holding place has none of his own). `way`: points [x, z] he may run by when the straight line to the player is walled (round an
+ * altar, through a door), as he may by the player's own route. False for a man who is not a guard or is out.
+ */
+export function rouse(world, id, { post = null, way = null } = {}) {
+  const aware = world.stage?.aware;
+  const mind = aware?.minds[id];
+  const fighter = world.fighters[id];
+  if (!mind || mind.kind !== 'guard' || fighter.state === 'out') return false;
+  mind.hunt = true;
+  mind.way = way;
+  mind.slept = false;
+  if (post) mind.post = [...post];
+  if (mind.state !== 'aggro') alarm(world, aware, mind, fighter, 'roused');
+  return true;
 }
 
 /** The shout: unaware men within reach with a clear line to the shouter turn aggro. */
@@ -562,11 +585,15 @@ function doReturn(world, aware, mind, fighter) {
 function lookGuard(world, aware, mind, fighter) {
   const config = aware.config;
   // Ghost walk (a designer's debug, the sandbox): the garrison neither sees nor hears him; a hunt already on is given up.
-  if (world.stage.ghost) {
+  if (world.stage.ghost && !mind.hunt) {
     if (mind.state === 'aggro' || mind.state === 'search') setState(world, aware, mind, fighter, 'return', 'ghost');
     if (mind.state === 'idle') doIdle(world, aware, mind, fighter);
     else if (mind.state === 'patrol') doPatrol(world, aware, mind, fighter);
     else if (mind.state === 'return') doReturn(world, aware, mind, fighter);
+    return;
+  }
+  if (mind.hunt) {
+    lookHunt(world, aware, mind, fighter);
     return;
   }
   if (mind.state === 'aggro') {
@@ -593,6 +620,44 @@ function lookGuard(world, aware, mind, fighter) {
   else if (mind.state === 'search') doSearch(world, aware, mind, fighter);
 }
 
+/** A man sent at the player (`rouse`): at a run while he is far (`charge`, driven), the fight AI's once he is near (aggro, and knowing where the player is). */
+function lookHunt(world, aware, mind, fighter) {
+  const me = world.fighters[0];
+  const far = flatApart(fighter, me) > aware.config.chargeTo && Math.abs(floorOf(me) - floorOf(fighter)) < 3;
+  if (far && !me.dormant) {
+    if (mind.state !== 'charge') setState(world, aware, mind, fighter, 'charge', 'sent');
+    const [x, z] = huntAim(world, aware, mind, fighter, me);
+    head(fighter, x, z, aware.config.chargeSpeed, true);
+    return;
+  }
+  if (mind.state !== 'aggro') setState(world, aware, mind, fighter, 'aggro', 'near');
+  lookAggro(world, aware, mind, fighter);
+}
+
+/**
+ * Where a man running at the player aims: the player if the straight line is open; else, of his `way` points and the player's own route, the one nearest
+ * the player that he can run to straight (the nearest first, so a look costs a ray or a few); else the player all the same.
+ */
+function huntAim(world, aware, mind, fighter, me) {
+  const terrain = world.arena.terrain;
+  const fx = hipX(fighter);
+  const fz = hipZ(fighter);
+  const floor = floorOf(fighter);
+  const mx = hipX(me);
+  const mz = hipZ(me);
+  if (walkable(terrain, fx, fz, floor, mx, mz, floorOf(me))) return [mx, mz];
+  const candidates = [];
+  for (const [x, z] of mind.way ?? []) candidates.push([x, z, floor]);
+  const trail = aware.trail;
+  for (let k = trail.length - 1, n = 0; k >= 0 && n < 12; k -= 3, n += 1) candidates.push([trail[k].x, trail[k].z, trail[k].y]);
+  candidates.sort((a, b) => Math.hypot(a[0] - mx, a[1] - mz) - Math.hypot(b[0] - mx, b[1] - mz));
+  for (const [x, z, y] of candidates) {
+    if (Math.hypot(x - fx, z - fz) < 0.8) continue;
+    if (walkable(terrain, fx, fz, floor, x, z, y)) return [x, z];
+  }
+  return [mx, mz];
+}
+
 /** The foes an aggro man may know of: the player and the allies, awake and on their feet or down. */
 function foesOf(world) {
   return world.fighters.filter((other) => other.corner === 'red' && !other.dormant && other.state !== 'out');
@@ -606,6 +671,13 @@ function lookAggro(world, aware, mind, fighter) {
   if (!last || Math.hypot(last[0] - hipX(fighter), last[1] - hipZ(fighter)) > 1.4) {
     mind.trail.push([hipX(fighter), hipZ(fighter), floorOf(fighter)]);
     if (mind.trail.length > 90) mind.trail = mind.trail.filter((_, index) => index % 2 === 0 || index === mind.trail.length - 1);
+  }
+  // Sent at him by a scene: he knows where the man is.
+  if (mind.hunt) {
+    const me = world.fighters[0];
+    mind.seenAt = world.time;
+    mind.lastSeen = { x: hipX(me), z: hipZ(me), y: floorOf(me) };
+    return;
   }
   const range = rangeOf(aware, world, fighter);
   let nearest = null;
@@ -699,7 +771,6 @@ function flight(world, fighter, threat, { refuge = null, rear = null } = {}) {
 }
 
 function lookNeutral(world, aware, mind, fighter) {
-  if (mind.scripted) return doScripted(world, aware, mind, fighter);
   const config = aware.config;
   // What frightens him: a fight near, an aggro enemy in sight, a blow on himself.
   let threat = null;
@@ -733,31 +804,6 @@ function lookNeutral(world, aware, mind, fighter) {
     case 'return': return doReturn(world, aware, mind, fighter);
     default: return undefined;
   }
-}
-
-/**
- * A civilian cowering for good, as a scene wants him (the prince in the cell): on his knees, he shuffles away from the
- * player toward `corner` ([x, z]) while the player is within `near` m, and otherwise stays down where he is. Nothing calms him.
- * Returns false if there is no such man.
- */
-export function cowerFor(world, id, { corner, near = 3.5 }) {
-  const aware = world.stage?.aware;
-  const fighter = world.fighters.find((each) => each.spawn?.id === id);
-  const mind = fighter && aware?.minds[fighter.id];
-  if (!mind || fighter.state === 'out') return false;
-  mind.scripted = { corner, near };
-  setState(world, aware, mind, fighter, 'cower', 'the scene');
-  fighter.crawling || startCrawl(world, fighter, 'cowers');
-  return true;
-}
-
-function doScripted(world, aware, mind, fighter) {
-  const { corner, near } = mind.scripted;
-  if (!fighter.crawling) startCrawl(world, fighter, 'cowers');
-  const player = world.fighters[0];
-  const toCorner = Math.hypot(corner[0] - hipX(fighter), corner[1] - hipZ(fighter));
-  if (flatApart(player, fighter) < near && toCorner > 0.5) head(fighter, corner[0], corner[1], 1);
-  else stand(fighter, yawToward(hipX(fighter) - hipX(player), hipZ(fighter) - hipZ(player)));
 }
 
 function doFlee(world, aware, mind, fighter, threat) {

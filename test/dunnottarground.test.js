@@ -28,7 +28,8 @@ function groundUnder(x, z, y, reach = 0) {
 }
 
 // Props that hang on a wall, perch on something or hang from a roof: not stood on the ground.
-const HUNG = new Set(['torch', 'raven', 'drip', 'grating', 'chains', 'keys', 'lever', 'chandelier', 'banner', 'votive', 'shaft', 'lightshaft']);
+const HUNG = new Set(['torch', 'raven', 'drip', 'grating', 'chains', 'keys', 'lever', 'chandelier', 'banner', 'votive', 'shaft', 'lightshaft', 'privy', 'flies']);
+// (The privy is placed at its seat's height on its own stone block, and the flies hover over it.)
 
 test('scenery: every prop on the ground stands on it (a floor or the hillside), within a few centimetres', () => {
   const floating = [];

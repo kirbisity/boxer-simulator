@@ -1,7 +1,7 @@
 // Level mode, the context button: what the player can do where he stands. `interactions(world)` lists what
 // is within reach, nearest first (items, lying weapons and shields, a dead man's outfit, levers, gates,
-// ladders, rest points, notes, cell doors); `contextFor` is the one the button offers: the nearest, and only
-// if no awake enemy aware of him is within the hostile range. `interact` does it.
+// ladders, rest points, notes, cell doors, the ending's drop down the privy); `contextFor` is the one the button offers: the nearest, and only
+// if no awake enemy aware of him is within the hostile range (but for an `urgent` one, the ending's drop with the horde at his back). `interact` does it.
 //
 // Stage data it reads (all optional, see stage.js for the rest):
 //   section.items:   [{ id, kind: 'bandage' | 'tonic' | 'note' | 'key', at: [x, y, z], note?: NOTES key (default: the id), label? }]
@@ -20,6 +20,7 @@ import { bodiesWithin, looseWithin, takeLoose, takeOutfit } from './loot.js';
 import { restAtPoint, playerStands } from './checkpoints.js';
 import { levelAware, levelFreePrisoner } from './adapter.js';
 import { pullLever, regionContains, setMechanism } from './stage.js';
+import { endingInteractions } from './ending.js';
 
 /** An awake enemy aware of the player, within `range` m (the context button hides while one is). */
 export function hostileNear(world, range = LEVEL_CONFIG.interact.hostileRange) {
@@ -119,6 +120,7 @@ export function interactions(world) {
   for (const { dead, distance } of bodiesWithin(world, me, reach, bodyHeight)) {
     found.push({ id: `outfit:${dead.id}`, kind: 'outfit', label: 'Take outfit', icon: 'outfit', distance, run: (w) => takeOutfit(w, dead) });
   }
+  found.push(...endingInteractions(world));
   return found.sort((a, b) => a.distance - b.distance);
 }
 
@@ -126,6 +128,8 @@ export function interactions(world) {
 export function contextFor(world) {
   if (!world.stage?.level) return null;
   const list = interactions(world);
+  const urgent = list.find((entry) => entry.urgent);
+  if (urgent) return urgent;
   if (!list.length || hostileNear(world)) return null;
   return list[0];
 }

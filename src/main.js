@@ -42,13 +42,13 @@ import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
 import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
-import { attemptCount, attemptLog, attemptStory, bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, endingDone, interact, interactions, killBoss, levelBusy, levelOpponent, levelThink, princeOf, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
+import { attemptCount, attemptLog, attemptStory, bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { installLevelHud } from './levelmode/hud.js';
 import { NOTES, STAGE_ONE, closeStory, showDeath, showEnding, showFinale, showNote, showOpening, storyBusy } from './levelmode/story.js';
 import { createLevelMarkers } from './levelmode/markers.js';
-import { createGuide, createShards } from './levelmode/endingview.js';
-import { createCutsceneDirector } from './levelmode/cutsceneview.js';
+import { createGuide } from './levelmode/endingview.js';
+import { createCutsceneDirector, createTwistDirector } from './levelmode/cutsceneview.js';
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
 import { pinnedRung, QUALITY_MODES, readQuality, writeQuality } from './levelmode/quality.js';
@@ -174,6 +174,8 @@ const cutsceneDirector = createCutsceneDirector({
   strike: () => stormStrikeNow(false),
   flash: (strength) => { state.drama.flash = { start: realSeconds(), strength }; },
 });
+// The plot twist's (levelmode/cutsceneview.js): the dark of the chute, the reveal's camera and bars, the spoken lines.
+const twistDirector = createTwistDirector({ orbit: () => scene.orbit, roomTest: (x, z, y) => cameraRoomTest(x, z, y) });
 /** Simulated seconds per real second now: a big moment's slow motion, or the cutscene's (the slower of the two; never a stop). */
 const paceNow = () => Math.min(timeScale(state.drama, realSeconds()), cutsceneDirector.speed());
 const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds, camera: () => scene.camera });
@@ -626,6 +628,9 @@ function drainLevel() {
     });
     else if (message.type === 'phase2') levelHud.toast('The helm comes off');
     else if (message.type === 'bossDown') cutsceneDirector.start(world);
+    else if (message.type === 'line') twistDirector.say(world, message.text);
+    // (Out of the chute 19 m down: the camera does not swoop after him, it is there.)
+    else if (message.type === 'landed') followCam.reset();
     else if (message.type === 'ending') beginEnding(world);
     else if (message.type === 'rested') {
       // From now on the footer's Restart goes back to this rest, not the start.
@@ -742,6 +747,7 @@ function followCamera(fighter, dt) {
   orbit.target.set(...view.target);
   if (endingCam) endingCamera(dt);
   cutsceneDirector.steer(dt);
+  if (state.world.stage?.level) twistDirector.steer(state.world);
 }
 
 /** The men as the watching camera sees them: where each stands, how high his neck is, and whether he is left lying. */
@@ -829,7 +835,7 @@ function drawWorld(dt, drawIt = true) {
   placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet && !world.stage });
   // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js), from the man played (a cutscene's or the ending's camera is looking at someone else: from what it looks at).
   // The viewer's own turn of the view only shortens.
-  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, subject: followed && !endingCam && !cutsceneDirector.active ? [followed.x[P.pelvis * 3], followed.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, followed.x[P.pelvis * 3 + 2]] : null, free: !followed || followCam.state.wasManual, dt });
+  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, subject: followed && !endingCam && !cutsceneDirector.active && !twistDirector.active ? [followed.x[P.pelvis * 3], followed.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, followed.x[P.pelvis * 3 + 2]] : null, free: !followed || followCam.state.wasManual, dt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);
@@ -890,6 +896,7 @@ function drawWorld(dt, drawIt = true) {
   levelHud.update();
   fade.update(state.mode === 'play' && state.world ? player() : null, dt);
   cutsceneDirector.frame(state.paused ? 0 : dt);
+  twistDirector.frame(state.world);
   tutorial.update();
 }
 
@@ -2052,10 +2059,9 @@ function enterTutorial() {
 // person, with the sections around him awake. `boxer.levelMode(key)` opens one (STAGES).
 
 let stageView = null;
-// What goes with the stage's drawing: the markers on things to use, the prince's shards; the ending's camera (a push-in on the prince); and
+// What goes with the stage's drawing: the markers on things to use, the ending's guide; the ending's camera (a push-in on the new Noname); and
 // which run is on (a card that comes back after the stage was left, or begun again, is ignored).
 let stageMarkers = null;
-let stageShards = null;
 let stageGuide = null;
 let endingCam = null;
 let stageRun = 0;
@@ -2072,11 +2078,11 @@ function leaveStage() {
   closeStory();
   levelHud.reset();
   stageMarkers?.dispose();
-  stageShards?.dispose();
   stageGuide?.dispose();
-  stageMarkers = stageShards = stageGuide = null;
+  stageMarkers = stageGuide = null;
   endingCam = null;
   cutsceneDirector.cancel();
+  twistDirector.cancel();
   if (stageView) disposeStageView(stageView);
   stageView = null;
   awarenessOverlay?.show(false);
@@ -2115,12 +2121,10 @@ function enterStage(key, { opening = false, ghost = false, player = null } = {})
   placeStageSea(scene.places[place], stage);
   // Things drawn with the stage and kept up with its own update each frame.
   stageMarkers = createLevelMarkers(stageView.group);
-  stageShards = stage.ending ? createShards(stageView.group) : null;
-  // (And the way to the prince, once the boss's cutscene has opened the inner door.)
+  // (And the way to the privy in the back room, once the boss's cutscene has opened its doors.)
   stageGuide = stage.ending ? createGuide(stageView.group) : null;
   stageView.extras = (world) => {
     stageMarkers?.update(world);
-    stageShards?.update(world);
     stageGuide?.update(world);
   };
   if (place === 'dunnottar') {
@@ -2165,6 +2169,7 @@ function restartStage() {
   closeStory();
   endingCam = null;
   cutsceneDirector.cancel();
+  twistDirector.cancel();
   for (const id of drainRebuilds(world)) rebuildFighterView(id);
   state.orders = newOrders();
   fightControls.reset();
@@ -2177,8 +2182,8 @@ function restartStage() {
 const stageStory = () => STAGE_ONE;
 
 /**
- * The ending (levelmode/ending.js has staged the cell): the player held, the cards over the scene, the camera pushing in on
- * the prince with each line, then the finale card: return to the menu, or play again from the start.
+ * The ending (levelmode/ending.js: the epilogue is over): the player held, the cards over the cesspool, the camera pushing in on the new Noname with
+ * each line, then the finale card: return to the menu, or play again from the start.
  */
 function beginEnding(world) {
   const run = stageRun;
@@ -2188,16 +2193,18 @@ function beginEnding(world) {
   endingCam = { k: 0, goal: 0 };
   // Every death was a failed attempt: the story of the night, told from the record, and how many tries it took.
   const attempts = { count: attemptCount(world), story: attemptStory(attemptLog(world)) };
-  // How far the push-in goes with each line (0: the player; 1: close on the prince, who is what the lines are about: a narrow phone screen frames him first).
-  const beats = [0.45, 0.58, 0.68, 0.76, 0.83, 0.88, 0.92, 0.95];
+  // How far the push-in goes with each line (0: as the camera was; 1: close on him).
+  const beats = [0.3, 0.42, 0.52, 0.6, 0.68, 0.74, 0.8, 0.85];
   showEnding({
     civiliansHarmed: world.stage.civiliansHarmed,
     attempts,
+    // (Noname was dead before the drop: he had been killed on the way in, by the old drain.)
+    slainBefore: endingOf(world)?.nonameAlive === false,
+    outcome: endingOf(world)?.outcome ?? null,
     onLine: (index) => {
       if (run !== stageRun || !endingCam) return;
-      // (An upright phone cannot hold the player and the prince in one picture: it goes to the prince at once.)
-      endingCam.goal = Math.max(beats[Math.min(index, beats.length - 1)], scene.camera.aspect < 1 ? 0.85 : 0);
-      // The storm begins to break: a last strike on the closing line.
+      endingCam.goal = beats[Math.min(index, beats.length - 1)];
+      // The storm breaks above: a last strike on the closing line.
       if (index === beats.length - 2) stormStrikeNow(false);
     },
   }, () => {
@@ -2207,20 +2214,19 @@ function beginEnding(world) {
   });
 }
 
-/** The follow camera, pushed in toward the prince as the ending's lines come (a slow ease). */
+/** The follow camera, pushed in toward the new Noname's helmet as the ending's lines come (a slow ease), from the side the walls leave room for. */
 function endingCamera(dt) {
-  const prince = princeOf(state.world);
-  if (!endingCam || !prince) return;
+  const me = state.world.fighters[0];
+  if (!endingCam || !me) return;
   const orbit = scene.orbit;
   endingCam.k += (endingCam.goal - endingCam.k) * (1 - Math.exp(-dt / 2.4));
   const k = endingCam.k;
-  const head = [prince.x[P.head * 3], prince.x[P.head * 3 + 1] - 0.1, prince.x[P.head * 3 + 2]];
+  const head = [me.x[P.head * 3], me.x[P.head * 3 + 1], me.x[P.head * 3 + 2]];
   orbit.target.set(orbit.target.x + (head[0] - orbit.target.x) * k, orbit.target.y + (head[1] - orbit.target.y) * k, orbit.target.z + (head[2] - orbit.target.z) * k);
   const wanted = Math.max(1.6, orbit.distance * (1 - 0.45 * k));
-  orbit.pitch += (0.1 - orbit.pitch) * Math.min(1, k * 1.5);
-  // Swung round to the side, so the player does not stand between the lens and the prince: to whichever side the cell's walls
-  // leave room for (the first that gives most of the distance, else the one that gives the most).
-  const swing = Math.min(1, k * 4);
+  orbit.pitch += (0.12 - orbit.pitch) * Math.min(1, k * 1.5);
+  // Swung round toward his front, as far as the walls leave room for (the first turn that gives most of the distance, else the one that gives the most).
+  const swing = Math.min(1, k * 2);
   const reach = (yaw) => {
     for (let along = 1; along <= wanted; along += 0.25) {
       const flat = Math.cos(orbit.pitch) * along;
@@ -2230,7 +2236,7 @@ function endingCamera(dt) {
   };
   let best = null;
   for (const turn of [0.95, -0.95, 0.5, -0.5, 0]) {
-    const yaw = orbit.yaw + turn * swing;
+    const yaw = orbit.yaw + turn * swing * 0.25;
     const distance = reach(yaw);
     if (!best || distance > best.distance) best = { yaw, distance };
     if (distance >= wanted * 0.85) break;
@@ -2768,8 +2774,12 @@ const boxer = window.boxer = {
       act: () => interact(world), use: (kind) => useItem(world, kind), rest: () => restAtPoint(world, world.stage.def.sections.find((section) => section.rest).rest),
       // Stand the player at a place of the stage ([x, y, z]), facing yaw.
       put: (at, yaw = 0) => { placeOnFloor(world.fighters[0], at[0], at[2], at[1], yaw); return true; },
-      // The boss struck down by hand (the ending follows: his door opens, the cell scene when the player is near the prince).
+      // The boss struck down by hand (the ending follows: his door opens; the back room, the horde, the chute: levelmode/ending.js); Noname too (the sewer gone
+      // through first); the drop down the privy now (as its button does, while the horde comes); the ending's state.
       killBoss: () => killBoss(world),
+      killNoname: () => killNoname(world),
+      drop: () => dropDown(world),
+      ending: () => endingOf(world),
       // The boss's cutscene as it stands (null when none plays), and a skip.
       cutscene: () => cutsceneDirector.state,
       skipCutscene: () => cutsceneDirector.skip(),

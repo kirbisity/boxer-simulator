@@ -7,7 +7,9 @@
 // The comrades (team.js): a rest records who is alive (the checkpoint's roster); a death wakes the operative with exactly those
 // beside him, so a comrade who fell since the rest comes back. One who fell before the rest is not on its roster and stays gone: he
 // is lost for good once the next rest is reached while he is dead.
-// Every death is a failed attempt on the prince (attempts.js keeps the record); a death or a respawn begins the next attempt.
+// Every death is a failed attempt (attempts.js keeps the record); a death or a respawn begins the next attempt.
+// The ending's crowds (stage.js `hold`: the horde in the chapel, the epilogue's men) are held again as they are made new at their posts: a death
+// in the horde or in the cesspool wakes him with the chapel empty again and the back room's door still open (ending.js endingRespawn).
 
 import { P } from '../body.js';
 import { reviveFighter } from '../physics.js';
@@ -15,7 +17,7 @@ import { LEVEL_CONFIG } from './config.js';
 import { levelOf, say, feetFloor } from './items.js';
 import { regionContains, updateStage } from './stage.js';
 import { levelResetMinds } from './adapter.js';
-import { endingRelease } from './ending.js';
+import { endingRelease, endingRespawn } from './ending.js';
 import { beginAttempt, recordAttempt } from './attempts.js';
 import { comradesOf } from './team.js';
 
@@ -95,6 +97,7 @@ function reviveWorld(world, { followersAt = true } = {}) {
       // A boss who has fallen stays down: the stage is done. So does a miniboss (the cesspool's Noname): his helmet lies where it fell.
       if ((def.role === 'boss' || def.miniboss) && fighter.state === 'out') continue;
       fighter.spawn.section = fighter.spawn.home;
+      fighter.spawn.held = def.hold ?? null;
       remake(world, fighter, inputs, { at: def.post, yaw: def.facing ?? 0, shield: undefined });
       if (def.role === 'boss') level.boss = { id: fighter.id, phase: 1 };
     } else if (fighter.corner === 'red' && followersAt) {
@@ -162,8 +165,9 @@ export function respawnPlayer(world) {
   remake(world, me, point.gear.inputs, { at: point.at, yaw: point.facing, shield: point.gear.shield }, { force: true });
   me.orderPickup = null;
   level.dying = false;
-  // (He died while the boss's cutscene played, or after it: the boss is down, the door is open.)
+  // (He died while the boss's cutscene played, or after it: the boss is down, the door is open; or in the horde or the cesspool: the back room as he first found it.)
   endingRelease(world);
+  endingRespawn(world);
   // Where he is decides which sections are awake, before the men are put back.
   updateStage(world, true);
   reviveWorld(world);

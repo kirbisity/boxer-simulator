@@ -95,8 +95,17 @@ test('the story: the lore is about 150 words and names who it should; nine notes
   const harmed = endingLines({ civiliansHarmed: true });
   assert.equal(spared.length, harmed.length);
   assert.equal(spared.filter((line, at) => line !== harmed[at]).length, 1, 'one line differs');
-  assert.ok(spared.join(' ').includes('shards'));
-  assert.match(spared.join(' '), /will not leave/);
+  // The plot twist's ending: the empty privy, Noname's face, the helmet; no prince rescued, no cell standing open.
+  const before = endingLines({ slainBefore: true });
+  assert.equal(before.length, spared.length);
+  assert.equal(before.filter((line, at) => line !== spared[at]).length, 1, 'when he was killed is one line');
+  assert.match(spared.join(' '), /privy/);
+  assert.match(spared.join(' '), /helmet/);
+  assert.match(before.join(' '), /on your way in/);
+  // The epilogue's end is one line more: fallen, or standing.
+  assert.equal(endingLines({ outcome: 'fell' }).length, spared.length + 1);
+  assert.notEqual(endingLines({ outcome: 'fell' }).join(), endingLines({ outcome: 'cleared' }).join());
+  for (const lines of [spared, harmed, before]) assert.ok(!/cell stood open|shards|walked out|rescue/i.test(lines.join(' ')), lines.join(' '));
   assert.ok(STORY_TIMING.deathIn > 0);
 });
 

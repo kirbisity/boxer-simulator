@@ -75,7 +75,7 @@ test('sanctuary: the nave is open for the fight: nothing solid in the middle 9 m
   }
 });
 
-test('sanctuary: the cell lies directly behind the heavy arched doors at the chancel end, and the ending reads them', () => {
+test('sanctuary: the back room (the garderobe) lies directly behind the heavy arched doors at the chancel end, and the ending reads them', () => {
   assert.deepEqual(checkStage(DUNNOTTAR), []);
   const door = DN_CHAPEL.door;
   const mechanism = chapel.gates.find((gate) => gate.id === 'innerdoor');
@@ -87,18 +87,21 @@ test('sanctuary: the cell lies directly behind the heavy arched doors at the cha
   assert.ok(Math.abs(door.z - DN_CHAPEL.axis) < 0.1, 'in the middle of it, on the nave\'s axis');
   const leaf = mechanism.states.closed[0];
   assert.ok(Math.abs(leaf.at[0] - door.x) < 0.01 && Math.abs(leaf.at[1] - door.z) < 0.01);
-  // The ending's data: the door, the prince, and the place he cowers, all inside the cell behind it.
+  // The ending's data: the door; the room behind it, empty (no prince: the plot twist); the privy's hole in it, a short way in from the doors.
   const ending = DUNNOTTAR.ending;
   assert.equal(ending.door, 'innerdoor');
-  const prince = cell.spawns.find((spawn) => spawn.id === ending.prince);
-  assert.ok(prince, 'the prince is in the cell');
-  assert.ok(prince.post[0] < door.x - 4 && Math.abs(prince.post[2] - door.z) < 3, 'directly behind the doors');
-  assert.ok(regionContains(cell.bounds, ending.corner[0], ending.corner[1], L + 1), 'his corner is in the cell');
-  assert.ok(ending.corner[0] < door.x && ending.trigger >= 3);
+  assert.equal(ending.prince, undefined);
+  assert.ok(!cell.spawns.some((spawn) => !spawn.hold), 'nobody in the room but the held');
+  assert.ok(cell.decor.some((decor) => decor.what === 'privy'), 'a privy');
+  for (const what of ['bucket', 'rags', 'straw']) assert.ok(cell.decor.some((decor) => decor.what === what), what);
+  const [hx, hy, hz] = ending.hole.at;
+  assert.ok(regionContains(cell.bounds, hx, hz, hy + 1) && regionContains(ending.toilet, hx, hz, hy + 1), 'the hole is in the room');
+  assert.ok(hx < door.x - 4 && door.x - hx < 8 && Math.abs(hz - door.z) < 1, 'straight in from the doors, a few strides');
+  assert.ok(regionContains(ending.toilet, door.x - 1.2, door.z, L + 1) && !regionContains(ending.toilet, door.x + 1, door.z, L + 1), 'the room begins past the doors');
   // The cell starts at the doors' wall and goes on west of it.
   const bounds = cell.bounds[0];
   assert.ok(bounds.at[0] + bounds.size[0] / 2 >= door.x - 1 && bounds.at[0] < door.x);
-  // Shut, the doors hold; open, a man walks through to the prince (the door's own shortcut test walks it).
+  // Shut, the doors hold; open, a man walks through to the privy (the door's own shortcut test walks it).
   const shut = stageTerrain(DUNNOTTAR, allIds, states(false));
   const open = stageTerrain(DUNNOTTAR, allIds, states(true));
   const probe = (terrain) => { const at = [door.x, door.z]; const moved = pushOut(terrain, at, 0.35, L, L + 1.7, 0.35); return moved && Math.hypot(at[0] - door.x, at[1] - door.z) > 0.05; };

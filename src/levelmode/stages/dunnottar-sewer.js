@@ -314,8 +314,9 @@ function swCesspool(sec, alcove) {
   dnProp(sec, 'outfall', [cx - 3.6, D + 2.6, cz - P.hall], { face: 'S', to: surface, length: 2.4 });
   dnProp(sec, 'outfall', [cx + 3.4, D + 2.2, cz + P.hall], { face: 'N', to: surface, length: 2.4, size: 1.2 });
   dnProp(sec, 'outfall', [cx + 4.2, D + 3.0, cz - P.hall], { face: 'S', to: surface, length: 2.4, size: 0.8 });
-  // The garderobe's grating high in the vault, under the inner cell (a cold grey light from it, and what comes down it).
-  dnProp(sec, 'grating', [cx - 4, D + 4.75, cz + 1.9], { size: [1.2, 1.2] });
+  // The garderobe's grating high in the vault, under the privy's hole in the room above (a cold grey light from it, and what comes down it: the chute's
+  // mouth, where the plot twist drops the player in, dunnottar-chapel.js DN_ENDING.landing).
+  dnProp(sec, 'grating', [cx - 5.1, D + 4.75, cz + 1.9], { size: [1.2, 1.2] });
   // Filth on the rim: rubbish heaps and slime, a rotted beam, rats, rags; the dead.
   const rim = (angle, out = 0) => [cx + Math.cos(angle) * (P.radius + 0.9 + out), cz + Math.sin(angle) * (P.radius + 0.9 + out)];
   for (const [angle, what, extra] of [
@@ -331,6 +332,8 @@ function swCesspool(sec, alcove) {
   // The light: one lantern on the rim by the way in, the fungus's sick green glow on the walls and the rim; cobwebs in the corners of the vault.
   const [lx, lz] = rim(Math.PI * 0.82, 0.55);
   dnProp(sec, 'lantern', [lx, D, lz], { yaw: 0.6 });
+  // (And a guttering lantern at a corner of the island, his: the one light by the face at the end, levelmode/ending.js's reveal.)
+  dnProp(sec, 'lantern', [P.island.at[0] + P.island.size / 2 - 0.2, P.island.top, P.island.at[1] - P.island.size / 2 + 0.2], { yaw: 2.2 });
   for (const [angle, size, light] of [[1.95, 1.2, true], [4.75, 1.0, true], [0.3, 0.8, false], [3.55, 0.9, false]]) {
     const [x, z] = rim(angle, 0.75);
     dnProp(sec, 'fungus', [x, D + 0.02, z], { size, light });

@@ -1,5 +1,6 @@
-// Level mode, the attempts: every death is a failed attempt on the prince (the recorder keeps who killed him, where, who stood with him,
-// how long), and the ending tells the night as a short story, templated from that record (the generator: the same log, the same words).
+// Level mode, the attempts: every death is a failed attempt (the recorder keeps who killed him, where, who stood with him, how long), and
+// the ending tells the night as a short story, templated from that record (the generator: the same log, the same words). The story ends
+// on the plot twist's end (levelmode/ending.js): the empty room behind the jailer, and the operative who stayed below as the new Noname.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -145,18 +146,27 @@ test('story: the same log always tells the same story; a different log, a differ
   assert.notEqual(attemptStory(log), attemptStory(other));
 });
 
-test('story: no deaths is a single clean-night paragraph that names no failure', () => {
+test('story: no deaths is a single one-night paragraph that names no failure, and ends below the keep with Caby', () => {
   const story = attemptStory(logOf([]));
   assert.ok(!story.includes('\n'), 'one paragraph');
   assert.match(story, /Maren and Old Tobin/);
-  assert.match(story, /cell stood open/);
+  assert.match(story, /empty|held no one/);
+  assert.match(story, /Caby/);
+  assert.match(story, /new Noname waits/);
+  assert.match(story, /whoever comes next/);
+  assert.ok(!/prince|cell stood open|walked out/.test(story), story);
   assert.ok(!/second attempt|third|fell to|cut you down/.test(story), story);
-  // The company at the end: none left, or alone from the start.
-  assert.match(attemptStory(logOf([], { comrades: [], survivors: [] })), /alone|on your own|No one else/);
-  assert.match(attemptStory(logOf([], { survivors: ['Maren'] })), /Maren walked out with you; Old Tobin did not|Old Tobin did not/);
+  // The company at the end: none left, or alone from the start; those who lived wait at the chapel gate.
+  assert.match(attemptStory(logOf([], { comrades: [], survivors: [] })), /alone|on your own|No one was left|no one left/);
+  assert.match(attemptStory(logOf([], { survivors: ['Maren'] })), /Maren waited at the chapel gate; Old Tobin did not live to/);
+  assert.match(attemptStory(logOf([], { survivors: ['Maren', 'Old Tobin'] })), /Maren and Old Tobin waited at the chapel gate/);
+  // Fallen in the epilogue: he lies by Caby, he does not wait.
+  const fell = attemptStory(logOf([], { outcome: 'fell' }));
+  assert.match(fell, /fell beside Caby/);
+  assert.ok(!/waits/.test(fell), fell);
 });
 
-test('story: one death names where it began, who stood with you, who killed you and where, and ends on the success', () => {
+test('story: one death names where it began, who stood with you, who killed you and where, and ends on the last attempt', () => {
   const log = logOf([{ killer: 'Sergeant Hay', place: 'The Quadrangle', comrades: ['Maren'], fallen: ['Maren'], seconds: 400 }], { comrades: ['Maren', 'Old Tobin'], from: 'The Well' });
   const story = attemptStory(log);
   assert.match(story, /first (attempt|try)|On the first attempt/);
@@ -166,12 +176,14 @@ test('story: one death names where it began, who stood with you, who killed you 
   assert.match(story, /with Maren (beside you|at your side|at your back)/);
   assert.match(story, /Maren (fell before you|went down first|did not outlast you)/);
   assert.match(story, /second/);
-  assert.ok(story.lastIndexOf('second') > story.indexOf('Sergeant Hay'), 'the success comes after the failure');
-  assert.match(story, /cell stood open at last/);
+  assert.ok(story.lastIndexOf('second') > story.indexOf('Sergeant Hay'), 'the last attempt comes after the failure');
+  assert.match(story, /Caby/);
+  assert.ok(story.indexOf('Caby') > story.lastIndexOf('second'), 'and the paragraph ends on the cesspool');
+  assert.ok(!/prince|cell stood open/.test(story), story);
   assert.ok(!/Old Tobin/.test(story.slice(0, story.indexOf('second'))), 'he was not with her on the first');
 });
 
-test('story: many deaths are each named, in order, and the paragraph ends on the success', () => {
+test('story: many deaths are each named, in order, and the paragraph ends on the last attempt below the keep', () => {
   const killers = ['Hob', 'Davie', 'Rab', 'Sandy', 'Corporal Rae'];
   const places = ['The Cliff Path', 'The Gatehouse and the Oillets', 'The Tunnelled Ascent', 'The Quadrangle', 'The Tower House and the Upper Walls'];
   const log = logOf(killers.map((killer, at) => ({ killer, place: places[at], comrades: at < 3 ? ['Maren', 'Old Tobin'] : ['Old Tobin'], fallen: at === 2 ? ['Old Tobin'] : [] })), { comrades: ['Old Tobin'], survivors: ['Old Tobin'] });
@@ -184,8 +196,10 @@ test('story: many deaths are each named, in order, and the paragraph ends on the
   }
   for (const place of places) assert.ok(story.includes(place.replace(/^The /, 'the ')) || story.includes(place), place);
   for (const ordinal of ['first', 'second', 'third', 'fourth', 'fifth', 'sixth']) assert.ok(story.includes(ordinal), ordinal);
-  assert.ok(story.lastIndexOf('sixth') > last, 'the sixth is the one that counts');
-  assert.match(story, /Old Tobin walked out with you|Old Tobin/);
+  assert.ok(story.lastIndexOf('sixth') > last, 'the sixth is the last');
+  assert.match(story, /Old Tobin waited at the chapel gate/);
+  assert.match(story, /new Noname waits/);
+  assert.ok(!/prince|cell stood open/.test(story), story);
   assert.ok(story.trim().endsWith('.'));
   assert.ok(!story.includes('\n'));
 });
