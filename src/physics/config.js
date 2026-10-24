@@ -484,6 +484,39 @@ export const WORLD = {
     cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, reachDown: 0.6, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, climb: 1, slopeSpan: 0.5, slopeMost: 0.6, slopeHeadroom: 0.5, leash: { from: 0.6, to: 0.9 },
     fall: { safe: 5, legs: 1.6, bodyFrom: 4.5, body: 1, stumble: 6.5, airMin: 0.2, ankleFrom: 6.8, ankleTo: 11, compress: 12, compressFrom: 8, together: 0.3 },
   },
+  // A jump (physics/jump.js; asked by the player's Jump: control.js), and the landing after it. The takeoff is worked out from his
+  // body; the flight is the particles' own (the stance follows them); the landing is taken by his legs.
+  // - force: both legs push `force` × one leg's force over his weight with all he wears (gait.js's leg: hip/2 + knee + ankle/2), as
+  //   sound and fresh as his legs are (limbShares) and as strong as he is now (motorScale): a fit man's ~2.5 body weights (a
+  //   countermovement jump's peak ground force is 2-3), a man in plate ~1.6, an obese or iron-clad man under 1.4.
+  // - push: the hips rise over `push` × his leg length while the feet push (a countermovement's 0.3-0.45 m); `crouch.depth` of
+  //   that is the dip before it, taken in `crouch.seconds`; moving, both are cut by his speed over `fast` m/s (to
+  //   `running` of them at most: a running takeoff has little dip), and running off the edge as he gathers, he goes then.
+  // - speed: his legs cannot extend faster than they shorten (body.topSpeed at the foot: fast fibres, age, joints, armour): the
+  //   takeoff speed is the force's speed and `speed` × that, combined as 1/v² = 1/vF² + 1/vS² (the slower one rules).
+  //   Calibrated: Leo (24, 75 kg, lean) 0.50 m, the knight in plate 0.20 m, the sumo 0.17 m (tools/jump.js; test/jump.test.js).
+  // - least: a jump under this (m) is no jump (his legs cannot get him off the floor). forward: moving, `forward` × the takeoff
+  //   speed is added along his way (a jump leans into the step). tuck: in the air the feet come up this share of his leg length.
+  //   clear: in the flight a foot comes up onto a ledge only from this far (m) under its top (on foot, a stride's stepUp): so the
+  //   highest ledge he can hop onto is his jump + the tuck + this (+ the stance's sag): ~0.85 m for Leo, ~0.6 for the knight.
+  //   settle: landed near a ledge's edge, his stance is brought on over it by up to this (m) so neither foot is over the drop.
+  //   slideBack: come to rest across a ledge on his hips, the feet under its edge, he slides back off it at this (m/s) and is down.
+  // - cost: stamina for the work done (his whole mass × g × the rise of his hips: `workRef` J an 80 kg man's 0.5 m jump), over his
+  //   wind (aerobic). wade: in water that holds his legs (level.js wadeGear: `fighter.wading`), the takeoff speed's share.
+  // - land: the legs take the landing over `absorb` × leg length of knee bend (less in stiff armour: × plate + (1 - plate) ×
+  //   gear.foot), pushing back up to `eccentric` × the force they push with (muscle yields at more than it lifts); the knees carry
+  //   the whole mass, so the load on them is also × (mass / massRef)^massExp. The force asked over the force given is the landing's
+  //   ratio: under `buckle` a soft landing; past it the knees buckle (a deeper dip, `cost` of stamina per unit over); past
+  //   `stumble` he stumbles (unsteady for a moment); past `fall` he goes over; past `hurtFrom` each leg takes `legs` × (ratio -
+  //   hurtFrom) × the speed (to terrain.fall.safe: past it the fall's own leg damage takes over) as leg damage (WORLD.legCapacity). A drop from a height lands as a fall too (terrain.fall: ankles, spine) on top of this.
+  //   The dip goes down `dipMost` of the bend at most and comes back up in `seconds` + `perRatio` × the ratio.
+  // - recover: after landing, he can jump again in `base` + `perRatio` × the landing's ratio s, over his legs' share.
+  jump: {
+    force: 1.38, push: 0.42, speed: 0.2, crouch: { seconds: 0.28, depth: 0.5, fast: 5, running: 0.3 }, least: 0.06, forward: 0.35, tuck: 0.2, clear: 0.15, slideBack: 1.2, settle: 0.7,
+    cost: 0.035, workRef: 700, wade: 0.55,
+    land: { absorb: 0.3, plate: 0.55, eccentric: 1.5, massRef: 80, massExp: 0.5, buckle: 1, stumble: 1.35, fall: 2, hurtFrom: 1.6, legs: 0.5, cost: 0.02, dipMost: 0.55, seconds: 0.22, perRatio: 0.2 },
+    recover: { base: 0.2, perRatio: 0.3 },
+  },
   // Running (away from a gun, or after one): footwork speed times this.
   run: { speedFactor: 2.3 },
   // The player's run mode (control.js: the stick past its run threshold, or Shift; set as `fighter.runMode`, which
@@ -729,7 +762,10 @@ export const WORLD = {
   // (`leanThigh` m): thick thighs meet and push the knees apart, so a thin man
   // crawls knees nearly together and a heavy one well apart; each foot `footOut` of his height further out, the
   // hands out from the shoulders by `armApart` of the arm's thickness.
-  crawl: { speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6, thighApart: 2, leanThigh: 0.06, footOut: 0.008, armApart: 0.8 },
+  // strike: a blow of the hand from his knees (only the player's chosen crawl: control.js toggleCrawl) has this share of the mass
+  // behind it, aimed low (in a stage he is seen the later for it: levelmode/awareness.js crawlSight). Crawling costs no stamina
+  // (he gets his breath back as he would standing).
+  crawl: { strike: 0.35, speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6, thighApart: 2, leanThigh: 0.06, footOut: 0.008, armApart: 0.8 },
   pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 4, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
   // On horseback (physics/mounted.js; the breeds and barding in horses.js).
   // The rider sits his saddle: hips, knees and feet go where the saddle and

@@ -20,6 +20,7 @@ import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportL
 import { limpOf, runChange, runLean, runSpeed, strideOf } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, fatigueScale, recoveryShare } from './physics/overdraft.js';
+import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
@@ -160,6 +161,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
     // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).
     dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
+    // A jump (physics/jump.js: startJump): jump (the one under way: { phase, t, ... }), jumpReadyAt (when he can jump again), jumpBody (his body's jump, cached).
+    jump: undefined, jumpReadyAt: undefined, jumpBody: undefined,
     // Level mode (levelmode/level.js): hands at a wound while a bandage goes on ({ t, seconds }).
     tending: undefined,
     // The player's stamina overdraft (physics/overdraft.js): player (the man played), faintDue (a cost would pass the floor), fainted (down in a faint), blackout (the screen's black, 0..1), faintGrace (s after waking).
@@ -1604,8 +1607,10 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || fighter.crawling || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
-  const aimZone = spec.zones.includes(zone) ? zone : spec.zones[0];
+  // On his knees by his own choice (the player's crawl), a blow of the hand is still his: low and weak (WORLD.crawl.strike).
+  const fromKnees = fighter.crawling && fighter.crawlChosen && fighter.player && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
+  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
+  const aimZone = fromKnees ? 'legs' : spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
   // (Couched, the body carries it: only `couched.wander` of that, the point bobbing with his stride.)
@@ -1629,9 +1634,12 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
     riposte: undefined, finisher: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
     fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined,
+    // From his knees (the player's crawl: WORLD.crawl.strike): the blow's mass behind it is this share.
+    weak: undefined,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
+  if (fromKnees) fighter.punch.weak = WORLD.crawl.strike;
   // Two blades at once (`with`: the other hand's move, `withDelay` s behind):
   // its own stroke, aimed at its own zone, the same scatter off the mark.
   const second = spec.with ? MOVES[spec.with] : null;
@@ -2148,8 +2156,10 @@ function crawlPose(fighter, intent, dt) {
   intent.lean += spec.lean;
   intent.twist = 0;
   intent.twoHanded = false;
-  intent.bladeDir = null;
-  intent.offBladeDir = null;
+  // A blow from his knees (the player's crawl): the striking hand and its blade go where the blow puts them.
+  const striking = fighter.punch?.weak !== undefined ? PARTICLES[fighter.punch.limb][0] : null;
+  if (striking !== 'r') intent.bladeDir = null;
+  if (striking !== 'l') intent.offBladeDir = null;
   intent.guardTight = false;
   const { knee, foot, hand } = crawlStance(fighter.body);
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
@@ -2157,7 +2167,7 @@ function crawlPose(fighter, intent, dt) {
     const step = sign * swing * (1 + sign * turning * spec.turnStride);
     intent[`${side}Knee`] = [0.02 * H + step, L.ankle + 0.02 + (sign > 0 ? lift : 0), sign * knee];
     intent[`${side}Foot`] = [0.02 * H + step - L.shank * 0.95, L.ankle, sign * foot];
-    intent[`${side}Hand`] = [0.3 * H - step, 0.05 * H + (sign < 0 ? lift : 0), sign * hand];
+    if (side !== striking) intent[`${side}Hand`] = [0.3 * H - step, 0.05 * H + (sign < 0 ? lift : 0), sign * hand];
   }
 }
 
@@ -2179,7 +2189,7 @@ export function crawlStance(body) {
  * Down on his knees to crawl away: what is in his hands is let go (they are
  * on the floor now), and he is out of the fight. `reason` for the log.
  */
-export function startCrawl(world, fighter, reason) {
+export function startCrawl(world, fighter, reason, { keep = false } = {}) {
   if (fighter.crawling || fighter.state === 'out') return false;
   fighter.crawling = true;
   fighter.punch = null;
@@ -2189,9 +2199,15 @@ export function startCrawl(world, fighter, reason) {
   fighter.pickup = null;
   fighter.defence = null;
   fighter.running = false;
-  if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
+  // (Down by his own choice, the player keeps hold of his weapon: `keep`.)
+  if (fighter.weapon?.held && !keep) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   world.events.push({ time: world.time, kind: 'crawl', fighter: fighter.id, effects: [reason] });
   return true;
+}
+
+/** Crawling away (out of the fight on his knees), not crawling by his own choice (the player's crawl, which is still fighting). */
+export function crawlingAway(fighter) {
+  return Boolean(fighter.crawling && !fighter.crawlChosen);
 }
 
 /** Still in the fight: not out, and not crawling away. */
@@ -2590,6 +2606,283 @@ function trackAir(fighter, time) {
   fighter.airWas = fighter.air === true;
 }
 
+// ---- Jumping (physics/jump.js: the body's numbers; WORLD.jump) ------------------------------
+
+/** The jump he could make now: jump.js's takeoff with his legs as sound and fresh as they are, and why he cannot (null if he can). */
+export function jumpNow(world, fighter) {
+  const model = jumpOf(fighter, { legs: limbShares(fighter).leg, strength: fighter.motorScale ?? 1 });
+  let blocked = jumpBlocked(fighter, world.time);
+  if (!blocked && legBroken(fighter)) blocked = 'hurt';
+  if (!blocked && !model.can) blocked = 'weak';
+  // (Anyone but the man played stops at empty: he cannot pay for it. The player can, into his overdraft.)
+  if (!blocked && !fighter.player && fighter.stamina < model.cost) blocked = 'spent';
+  return { ...model, blocked };
+}
+
+/**
+ * Jump: he gathers (the hips dip `crouch.depth` of the push), then goes up at the speed his body gives (jumpNow), carrying the
+ * way he was going (and `forward` of the takeoff along it); the flight is the body's own; he lands on his legs (landJump). It
+ * costs stamina by the work. False if he cannot jump now.
+ */
+export function startJump(world, fighter) {
+  const model = jumpNow(world, fighter);
+  if (model.blocked) return false;
+  const running = Math.max(WORLD.jump.crouch.running, 1 - Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) / WORLD.jump.crouch.fast);
+  drawStamina(fighter, model.cost);
+  fighter.defence = null;
+  fighter.rush = null;
+  fighter.jump = {
+    // (Gathered quicker and shallower on the run: a running takeoff has little dip.)
+    phase: 'crouch', t: 0, model, base: fighter.lift, standing: fighter.lift ?? 0, depth: WORLD.jump.crouch.depth * model.push * running,
+    crouch: WORLD.jump.crouch.seconds * running,
+    from: fighter.x[P.pelvis * 3 + 1], apex: -Infinity, takeoff: 0, ground: 0, landing: null, bumped: false,
+  };
+  world.events.push({ time: world.time, kind: 'jump', fighter: fighter.id, height: model.height, effects: ['jumps'] });
+  return true;
+}
+
+/** The floor under a foot (or any part) at (x, z), a stride above y: the terrain's, or the flat floor's. */
+function floorBelow(fighter, x, y, z) {
+  const terrain = fighter.arena.terrain;
+  if (terrain) return floorAt(terrain, x, z, y + WORLD.terrain.stepUp);
+  return floorUnder(fighter.arena, z);
+}
+
+/** A jump's end: the stance his again (the floor's on terrain, the flat floor's lift otherwise), the flight over. */
+function endJump(fighter) {
+  const jump = fighter.jump;
+  if (!jump) return;
+  fighter.jump = null;
+  fighter.air = false;
+  if (fighter.arena.terrain) return;
+  fighter.lift = jump.base;
+  for (const foot of Object.values(fighter.feet)) foot.floor = undefined;
+}
+
+/** Each step of a jump: the crouch, the flight (the stance following the hips, the feet tucked, a ceiling stopping him) and the landing's dip. */
+function jumpStance(world, fighter, dt) {
+  const jump = fighter.jump;
+  // Knocked down, mounted or on his knees in the meantime: the jump is over (a man falling is the floor's).
+  if (fighter.state !== 'up' || fighter.mount || fighter.crawling) {
+    endJump(fighter);
+    return;
+  }
+  const spec = WORLD.jump;
+  const pelvis = P.pelvis * 3;
+  jump.t += dt;
+  if (jump.phase === 'crouch') {
+    const share = Math.min(1, jump.t / jump.crouch);
+    fighter.lift = jump.standing - jump.depth * share * share * (3 - 2 * share);
+    // (Run off the edge while gathering: he goes from the last foot down, not on over the drop.)
+    if (share >= 1 || overTheDrop(fighter, jump.standing)) launch(world, fighter);
+    return;
+  }
+  const feet = fighter.feet;
+  if (jump.phase === 'air') {
+    fighter.air = true;
+    const y = fighter.x[pelvis + 1];
+    const vy = fighter.v[pelvis + 1];
+    jump.apex = Math.max(jump.apex, y);
+    // The knees come up as he rises and go down again to meet the floor. The stance is where his feet are: over the hips'
+    // standing height by the tuck (its floor is what a ledge's face is measured from: keepClearOfSolids), under the hips as they fly.
+    const tuck = spec.tuck * jumpLegLength(fighter) * Math.max(0, Math.min(1, 1 + vy / (0.35 * Math.max(0.5, jump.model.v))));
+    fighter.lift = y - fighter.desired[P.pelvis][1] + tuck;
+    const turned = yawRotate(fighter.desired[P.pelvis], fighter.yaw);
+    fighter.root[0] = fighter.x[pelvis] - turned[0];
+    fighter.root[1] = fighter.x[pelvis + 2] - turned[2];
+    fighter.rootVelocity[0] = fighter.v[pelvis];
+    fighter.rootVelocity[1] = fighter.v[pelvis + 2];
+    for (const foot of Object.values(feet)) {
+      if (foot.step) foot.planted = foot.step.to;
+      foot.step = null;
+      if (!foot.lifted) {
+        const under = toWorld(fighter, fighter.desired[foot.index]);
+        foot.planted = [under[0], fighter.desired[foot.index][1], under[2]];
+      }
+      foot.floor = fighter.lift;
+    }
+    // Come to rest across a ledge on his hips or his belly, his feet hanging under its edge: the jump fell short. He slides
+    // back off it and goes down (a ledge is got onto on the feet, not scrambled up).
+    if (jump.t > 0.15 && Math.abs(vy) < 0.05) {
+      const hips = floorBelow(fighter, fighter.x[pelvis], y - fighter.radius[P.pelvis], fighter.x[pelvis + 2]);
+      if (y - fighter.radius[P.pelvis] - hips < 0.03) {
+        endJump(fighter);
+        fighter.knock = [0, 0, 0];
+        const back = yawRotate([-WORLD.jump.slideBack, 0, 0], fighter.yaw);
+        for (let index = 0; index < fighter.v.length; index += 3) {
+          fighter.v[index] += back[0];
+          fighter.v[index + 2] += back[2];
+        }
+        fall(world, fighter, 'falls short of the ledge');
+        return;
+      }
+    }
+    // Headroom: rising into a ceiling, his head stops there and so does he.
+    const terrain = fighter.arena.terrain;
+    if (terrain?.ceilings && vy > 0) {
+      const head = P.head * 3;
+      const radius = fighter.radius[P.head];
+      const ceiling = ceilingAt(terrain, fighter.x[head], fighter.x[head + 2], fighter.x[head + 1] - radius);
+      if (fighter.x[head + 1] + radius >= ceiling - 0.03) {
+        for (let index = 1; index < fighter.v.length; index += 3) fighter.v[index] = Math.min(0, fighter.v[index]);
+        if (!jump.bumped) world.events.push({ time: world.time, kind: 'impact', fighter: fighter.id, target: 'head', speed: vy, effects: ['head against the ceiling'] });
+        jump.bumped = true;
+      }
+    }
+    // Coming down (or come to rest on a ledge): the first foot on a floor is the landing. (A flight cannot last: 3 s is down.)
+    if ((vy < 0.2 && jump.t > 0.1) || jump.t > 3) {
+      let floor = -Infinity;
+      let touched = false;
+      for (const foot of Object.values(feet)) {
+        const at = foot.index * 3;
+        const bottom = fighter.x[at + 1] - fighter.radius[foot.index];
+        const under = floorBelow(fighter, fighter.x[at], bottom, fighter.x[at + 2]);
+        floor = Math.max(floor, under);
+        if (bottom - under < WORLD.terrain.touching + 0.02) touched = true;
+      }
+      // (Or the hips are down to standing height over that floor: the legs, reaching down, are on it.)
+      if (y - floor <= fighter.desired[P.pelvis][1] - WORLD.terrain.sag || jump.t > 3) touched = true;
+      if (touched) landJump(world, fighter, -vy, floor);
+    }
+    return;
+  }
+  // The landing: the knees give and come back.
+  const landing = jump.landing;
+  const share = Math.min(1, jump.t / landing.seconds);
+  const dip = landing.dip * (share < 0.3 ? Math.sin((share / 0.3) * Math.PI * 0.5) : 0.5 + 0.5 * Math.cos(((share - 0.3) / 0.7) * Math.PI));
+  fighter.lift = jump.ground - dip;
+  if (share >= 1) {
+    fighter.lift = fighter.arena.terrain ? jump.ground : jump.base;
+    endJump(fighter);
+  }
+}
+
+const jumpLegLength = (fighter) => fighter.body.lengths.thigh + fighter.body.lengths.shank;
+
+/** Whether both feet are over a floor well under the one he gathered on (he has run off its edge). */
+function overTheDrop(fighter, standing) {
+  for (const foot of Object.values(fighter.feet)) {
+    const at = foot.index * 3;
+    if (floorBelow(fighter, fighter.x[at], fighter.x[at + 1] - fighter.radius[foot.index], fighter.x[at + 2]) > standing - WORLD.terrain.reachDown) return false;
+  }
+  return true;
+}
+
+/** Off the floor: every part given the takeoff speed (enough, from the crouch, to lift the hips `height` over where he stood). */
+function launch(world, fighter) {
+  const jump = fighter.jump;
+  const spec = WORLD.jump;
+  const pelvis = P.pelvis * 3;
+  const standingY = jump.standing + fighter.desired[P.pelvis][1];
+  const below = Math.max(0, standingY - fighter.x[pelvis + 1]);
+  const up = Math.sqrt(jump.model.v * jump.model.v + 2 * WORLD.gravity * below);
+  // Moving, the jump goes along his way.
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const along = speed > 0.3 ? [fighter.rootVelocity[0] / speed, fighter.rootVelocity[1] / speed] : [0, 0];
+  const push = spec.forward * jump.model.v;
+  fighter.rootVelocity[0] += along[0] * push;
+  fighter.rootVelocity[1] += along[1] * push;
+  for (let index = 0; index < fighter.v.length; index += 3) {
+    fighter.v[index] += along[0] * push;
+    fighter.v[index + 1] = up;
+    fighter.v[index + 2] += along[1] * push;
+  }
+  jump.phase = 'air';
+  jump.t = 0;
+  jump.takeoff = world.time;
+  fighter.air = true;
+}
+
+/**
+ * Down on his feet at `speed` m/s onto the floor at `floor`: his legs take it (jump.js jumpLanding). A soft landing is a dip of the
+ * knees; a hard one buckles them (stamina), past `stumble` he is unsteady, past `fall` he goes over, past `hurtFrom` his legs are
+ * hurt. A drop from a height lands as a fall too on terrain (landOnFeet, the foot's own impact). He can jump again after `recover`.
+ */
+function landJump(world, fighter, speed, floor) {
+  const jump = fighter.jump;
+  const landing = jumpLanding(fighter, speed, { legs: limbShares(fighter).leg, strength: fighter.motorScale ?? 1 });
+  jump.phase = 'land';
+  jump.t = 0;
+  jump.landing = landing;
+  fighter.air = false;
+  const terrain = fighter.arena.terrain;
+  jump.ground = terrain ? floor - WORLD.terrain.sag : 0;
+  const hips = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  for (const foot of Object.values(fighter.feet)) {
+    if (foot.lifted) continue;
+    const at = foot.index * 3;
+    foot.planted = [fighter.x[at], fighter.desired[foot.index][1], fighter.x[at + 2]];
+    foot.floor = terrain ? floorBelow(fighter, fighter.x[at], fighter.x[at + 1] - fighter.radius[foot.index], fighter.x[at + 2]) : undefined;
+    // Come down with one foot on a ledge and the other over the floor below: that foot is brought in onto the ledge (toward
+    // his hips), not left to drag the stance down off it.
+    if (terrain && foot.floor < floor - 0.04) {
+      const toward = [hips[0] - fighter.x[at], hips[1] - fighter.x[at + 2]];
+      const reach = Math.hypot(toward[0], toward[1]) || 1;
+      for (let along = 0.05; along <= 0.6; along += 0.05) {
+        const place = [fighter.x[at] + (toward[0] / reach) * along, fighter.x[at + 2] + (toward[1] / reach) * along];
+        if (Math.abs(floorAt(terrain, place[0], place[1], floor + WORLD.terrain.stepUp) - floor) > 0.04) continue;
+        awayFromEdges(terrain, place, floor + WORLD.terrain.stepUp, 0.08);
+        foot.planted = [place[0], fighter.desired[foot.index][1], place[1]];
+        foot.floor = floor;
+        break;
+      }
+    }
+  }
+  // Come down on a ledge near its edge: the stance is brought on over it (along his way), so that neither foot's place under
+  // it is off the edge (the stance stands on the lower foot: a foot left over the drop would take him back down it).
+  if (terrain) settleOnLedge(fighter, terrain, floor);
+  fighter.jumpReadyAt = world.time + landing.seconds + landing.recover;
+  if (landing.stamina > 0) drawStamina(fighter, landing.stamina);
+  const effects = [landing.fall ? 'lands hard and goes over' : landing.stumble ? 'stumbles as he lands' : landing.buckle ? 'knees buckle' : 'lands lightly'];
+  if (landing.legDamage > 0) {
+    const bone = Math.max(0.4, fighter.body.boneDensity ?? 1);
+    fighter.legDamage.l += landing.legDamage / bone;
+    fighter.legDamage.r += landing.legDamage / bone;
+    effects.push('legs hurt by the landing');
+  }
+  world.events.push({ time: world.time, kind: 'land', fighter: fighter.id, speed, ratio: landing.ratio, height: jump.apex - jump.from, effects });
+  if (landing.fall) {
+    endJump(fighter);
+    fighter.knock = [0, 0, 0];
+    fall(world, fighter, 'lands hard');
+    return;
+  }
+  if (landing.stumble) fighter.wobble = standWobble(fighter);
+}
+
+/**
+ * After a landing on terrain at `floor`: if the stance's root or either foot's place in his stance (the pose's, from the root)
+ * is over a lower floor, the root is moved on along his way (his speed's, else his facing) by as little as puts all of them
+ * on the landing floor, at most WORLD.jump.settle m; the feet are planted there.
+ */
+function settleOnLedge(fighter, terrain, floor) {
+  const stepUp = WORLD.terrain.stepUp;
+  const onIt = (x, z) => Math.abs(floorAt(terrain, x, z, floor + stepUp) - floor) <= 0.04;
+  const places = (dx, dz) => [[fighter.root[0] + dx, fighter.root[1] + dz], ...['l', 'r'].map((side) => {
+    const at = toWorld(fighter, fighter.desired[fighter.feet[side].index]);
+    return [at[0] + dx, at[2] + dz];
+  })];
+  if (places(0, 0).every(([x, z]) => onIt(x, z))) return;
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const way = speed > 0.2 ? [fighter.rootVelocity[0] / speed, fighter.rootVelocity[1] / speed] : [Math.cos(fighter.yaw), -Math.sin(fighter.yaw)];
+  for (let along = 0.05; along <= WORLD.jump.settle + 1e-9; along += 0.05) {
+    const dx = way[0] * along;
+    const dz = way[1] * along;
+    if (!places(dx, dz).every(([x, z]) => onIt(x, z))) continue;
+    fighter.root[0] += dx;
+    fighter.root[1] += dz;
+    for (const side of ['l', 'r']) {
+      const foot = fighter.feet[side];
+      if (foot.lifted) continue;
+      const at = toWorld(fighter, fighter.desired[foot.index]);
+      foot.step = null;
+      foot.planted = [at[0], fighter.desired[foot.index][1], at[2]];
+      foot.floor = floor;
+    }
+    return;
+  }
+}
+
 // ---- Stepping -------------------------------------------------------------
 
 // The fighters stepping this substep, refilled each substep (not reallocated).
@@ -2613,8 +2906,10 @@ export function step(world, dt) {
     const span = fighter.detail === 'proxy' ? dt * WORLD.tiers.proxyEvery : dt;
     updateIntent(world, fighter, span);
     updateFeet(fighter, span);
+    // A jump under way holds the stance itself (crouch, flight, landing); otherwise, on terrain, the floor does.
+    if (fighter.jump) jumpStance(world, fighter, span);
     if (fighter.arena.terrain) {
-      groundStance(fighter, span);
+      if (!fighter.jump) groundStance(fighter, span);
       trackAir(fighter, world.time);
     }
   }
@@ -2699,6 +2994,8 @@ export function step(world, dt) {
 function checkBalance(world, fighter) {
   // Kneeling over a man held down is a base of its own, not a fall.
   if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) return;
+  // Gathering for a jump or in the air, his feet are no base (the landing is his legs': landJump).
+  if (fighter.jump && fighter.jump.phase !== 'land') return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   // Worn joints step less sharply (aging.js).
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
@@ -3037,8 +3334,9 @@ function keepClearOfSolids(terrain, fighter) {
   const spec = WORLD.terrain;
   const lift = fighter.lift ?? 0;
   const at = [fighter.root[0], fighter.root[1]];
-  // A face a foot can be put on (stepUp) is not a wall to him.
-  if (!pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, spec.stepUp, standingOn(fighter) + spec.sag)) return;
+  // A face a foot can be put on (stepUp) is not a wall to him; in a jump's flight, only one his feet are nearly over (WORLD.jump.clear).
+  const stepUp = fighter.jump?.phase === 'air' ? WORLD.jump.clear : spec.stepUp;
+  if (!pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, stepUp, standingOn(fighter) + spec.sag)) return;
   fighter.root[0] = at[0];
   fighter.root[1] = at[1];
   const into = fighter.rootVelocity[0] * terrain.normal[0] + fighter.rootVelocity[1] * terrain.normal[1];
@@ -3394,7 +3692,8 @@ export function standingTarget(fighter, index) {
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
   if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
-  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: swingVelocity(fighter.feet[info.side]) };
+  // (In a jump's flight the feet go with the hips, under them.)
+  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: fighter.jump?.phase === 'air' ? point(fighter.v, P.pelvis) : swingVelocity(fighter.feet[info.side]) };
   if (info.knee) {
     const side = info.side;
     if (fighter.feet[side].lifted) return { target: toWorld(fighter, desired), velocity: point(fighter.v, info.hip) };
@@ -3437,6 +3736,7 @@ function integrate(fighter, h, time) {
   const hands = { l: fatigue * handHealth(fighter, 'l'), r: fatigue * handHealth(fighter, 'r') };
   // The muscles hold each part up against gravity, except in the air (terrain): a man off a ledge falls.
   const holding = fighter.air ? 0 : WORLD.gravity;
+  const ballistic = fighter.jump?.phase === 'air';
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const info = PARTICLE_INFO[index];
     const base = index * 3;
@@ -3453,6 +3753,8 @@ function integrate(fighter, h, time) {
         // the part up against gravity — all within the muscle's force.
         want[axis] = omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? holding : 0);
       }
+      // In a jump's flight the hips go as they were thrown: the stance follows them (jumpStance), the muscles only keep the pose.
+      if (ballistic && info.anchor === null) want[1] = 0;
       const size = vec.length(want);
       let cap = motorForceNow(fighter, index, info) * scale * fighter.invMass[index];
       const top = fighter.body.topSpeed[index];
@@ -4050,12 +4352,16 @@ function collideTerrain(world, fighter, h, arena) {
   const spec = WORLD.terrain;
   const friction = Math.exp(-WORLD.groundFriction * h);
   const at = [0, 0];
+  // In a jump's flight a part comes up onto a ledge only if it is nearly over it (WORLD.jump.clear), not a stride under it.
+  const flying = fighter.jump?.phase === 'air';
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const base = index * 3;
     const radius = fighter.radius[index];
+    // (Only a foot: a knee or a hand is not put up on a ledge, it is stopped by its face.)
+    const stepUp = flying ? (PARTICLE_INFO[index].foot ? WORLD.jump.clear : 0.02) : spec.stepUp;
     at[0] = fighter.x[base];
     at[1] = fighter.x[base + 2];
-    if (pushOut(terrain, at, radius, fighter.x[base + 1] - radius, fighter.x[base + 1] + radius, spec.stepUp)) {
+    if (pushOut(terrain, at, radius, fighter.x[base + 1] - radius, fighter.x[base + 1] + radius, stepUp)) {
       const nx = terrain.normal[0];
       const nz = terrain.normal[1];
       // Its motion this substep, without the part going into the wall.
@@ -4071,7 +4377,7 @@ function collideTerrain(world, fighter, h, arena) {
       fighter.prev[base] = at[0] - vx;
       fighter.prev[base + 2] = at[1] - vz;
     }
-    const floor = radius + floorAt(terrain, fighter.x[base], fighter.x[base + 2], fighter.x[base + 1] - radius + spec.stepUp);
+    const floor = radius + floorAt(terrain, fighter.x[base], fighter.x[base + 2], fighter.x[base + 1] - radius + stepUp);
     if (fighter.x[base + 1] < floor) {
       // Arriving this substep (it was clear of the floor): how fast it hit. The part's speed as it fell
       // (not only how far it moved: a joint's correction can push a resting knee down a few centimetres at once).
@@ -5310,7 +5616,7 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   const kicking = /Foot|Knee/.test(spec.limb);
   // A bash carries the shield's own weight in front of the arm and body.
   const shieldMass = striker.bash && attacker.shield ? attacker.shield.spec.mass : 0;
-  const strikeMass = (((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1) + shieldMass) * staggerShare(attacker, WORLD.stagger.harm);
+  const strikeMass = (((spec.mass.arm ?? 0) * limbs[`${side}Arm`] + (spec.mass.leg ?? 0) * limbs[`${side}Leg`] + (spec.mass.body ?? 0) * attacker.body.massKg) * technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * (kicking ? attacker.body.gear.kick : 1) + shieldMass) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
   const struckMass = struckMassOf(defender, capsule);
   // A collision of two effective masses; flesh and padding make it largely
   // inelastic, so the impulse is the reduced mass times the closing speed.
@@ -5598,7 +5904,7 @@ export function bladeStrike(attacker, weapon, punch, relative, distance) {
   const limbs = attacker.body.limbKg;
   const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
   // (A finisher's thrust is driven down with the whole weight of the kneeling man behind the dagger: finisher.js.)
-  const armMass = ((spec.mass.arm ?? 0) * arms + (punch.finisher?.body ?? spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
+  const armMass = ((spec.mass.arm ?? 0) * arms + (punch.finisher?.body ?? spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
@@ -5860,7 +6166,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
     const weapon = striker.weapon;
     const distance = weapon.spec.strikeFrom + hit.along * (weapon.spec.length - weapon.spec.strikeFrom);
     const arms = attacker.body.limbKg[`${weapon.main}Arm`] + (weapon.twoHanded ? attacker.body.limbKg[`${weapon.off}Arm`] : 0);
-    const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm);
+    const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
     const moving = vec.sub(strikeVelocity, point(defender.v, P.lHand));
     const speed = vec.length(moving);
     const along = speed > 1e-6 ? Math.abs(vec.dot(moving, weapon.dir)) / speed : 0;
