@@ -440,7 +440,17 @@ export const WORLD = {
   //   speed towards it, against the closing speed), the whole of it
   //   (`balance.massShare` of the body, a laden horse's, a man and his horse's
   //   through the seat); a body lying on the ground has the ground behind
-  //   every part.
+  //   every part (a part within `lying` m of resting on the floor: a man
+  //   still on his way down has only his own weight behind him).
+  // - Momentum: two trunks that meet hand over the exchange between the
+  //   bodies' whole masses (WORLD.transferRestitution), a charge's or a plain
+  //   run-in's alike: the lighter is driven back (and over, past what his legs
+  //   take: balance.speed), the heavier slows by his share; what only checks a
+  //   man's own run is braking, not a knock to his balance.
+  // - Braced: a man going into the crash himself (his part carries half the
+  //   closing speed or more) with the other in front of him meets it on his
+  //   shoulder, ready: it bruises him as it would, but does not take his wind
+  //   (the man he runs into, caught standing, does lose it).
   // - Harm: the energy of the closing speed beyond `tolerance` m/s (a shove
   //   is taken unharmed) is ½ reduced mass x closing² and the impulse over the
   //   reduced masses; each is hurt as a blow hurts, by the speed change that
@@ -459,7 +469,7 @@ export const WORLD = {
   //   ~7 kJ, the range of the 'commonly lethal' chest impacts of a vehicle on
   //   a pedestrian (~5 kJ); a horse at the gallop into a man standing gives
   //   his chest ~10 m/s and ~7 kN: ribs broken, in plate a third of the harm.
-  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05 },
+  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05, lying: 0.1 },
   // Static scenery in the physics (physics/terrain.js), only in an arena that
   // carries `terrain`; none of this is read otherwise.
   //   cell, margin: the lookup grid's cell (m), and how far past a solid's edge it is
