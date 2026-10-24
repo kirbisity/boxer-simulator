@@ -151,6 +151,9 @@ export function createArm(spec = ARM) {
     if (!arm.ready) {
       Object.assign(arm, { ready: true, deficit: mustDeficit, deficitV: 0, yaw: goal.dy, pitch: goal.dp, yawV: 0, pitchV: 0, slack: 0, key: goal.key, kept: 0, blocked: 0 });
     } else {
+      // (Never more short than there is arm to shorten: a wanted distance that falls (the look point arriving from far off, a zoom in) leaves no
+      // deficit of metres behind it to be let out for seconds with the camera on top of him.)
+      arm.deficit = Math.min(arm.deficit, Math.max(0, wanted - spec.nearest));
       arm.kept = goal.key === arm.key ? arm.kept + dt : 0;
       arm.key = goal.key;
       // In at once (a spring, not a step); out only after the way has been clear (for the bigger ball) for `quiet` s, and slowly.

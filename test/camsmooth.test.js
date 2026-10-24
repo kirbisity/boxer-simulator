@@ -166,3 +166,14 @@ test('arm: a reset (a cut) starts it at once where it should be, not from where 
   const seen = arm.solve(wanted({ target: [40, 1.45, 40] }), near, 1 / 60);
   assert.ok(Math.abs(seen.distance - 4.2) < 1e-6, `out at once in the open (${seen.distance.toFixed(2)})`);
 });
+
+test('arm: a wanted distance that falls (the look point arriving from far off) leaves no deficit behind: the camera is out again at once', () => {
+  const arm = createArm();
+  const world = place(wallOf([0, 3], [60, 0.6], 0, 8));
+  // 60 m wanted through a wall 3 m behind him: the arm is cut to the wall.
+  for (let frame = 0; frame < 30; frame += 1) arm.solve(wanted({ distance: 60 }), world, 1 / 60);
+  // The wall gone and the wanted distance back to 4.2: out within two seconds (its usual slow way out), not after tens of metres of deficit are let out at 3 m/s.
+  let seen;
+  for (let frame = 0; frame < 120; frame += 1) seen = arm.solve(wanted(), place(), 1 / 60);
+  assert.ok(seen.distance > 3.9, `out to ${seen.distance.toFixed(2)} m`);
+});
