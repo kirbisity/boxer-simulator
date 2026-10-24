@@ -9,7 +9,7 @@ import { advance, placeOnFloor } from '../src/physics.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { activeSections, mechanismsOf, stageTerrain, updateStage } from '../src/levelmode/stage.js';
-import { DN_BARBICAN, DN_BRIDGE, DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DN_BARBICAN, DN_BRIDGE, DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 import { DN_CAVE_STAIR } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floorAt, rayBlocked } from '../src/physics/terrain.js';
 import { walk } from './walker.js';
@@ -129,4 +129,32 @@ test('approach: one of the front\'s men who sees him raises them all, the archer
   const minds = w.stage.aware.minds;
   const state = (fighter) => minds[fighter.id]?.state;
   assert.ok(front.every((fighter) => state(fighter) === 'aggro'), front.map((fighter) => `${fighter.spawn.id}: ${state(fighter)}`).join(', '));
+});
+
+test('approach: the front watches the bridge, not the way round: no man of it sees the shelf\'s path to the sea cave\'s stair, all of it sees the bridge', () => {
+  const front = spawns.filter((entry) => entry.alarm === 'front' && entry.id !== 'gateknight');
+  /** Whether a post sees (x, z) at a man's height: within its range, in its cone (120 degrees about its facing), no wall between. */
+  const watches = (post, x, z) => {
+    const dx = x - post.post[0];
+    const dz = z - post.post[2];
+    const apart = Math.hypot(dx, dz);
+    if (apart > post.vision) return false;
+    if ((Math.cos(post.facing) * dx - Math.sin(post.facing) * dz) / apart < Math.cos(Math.PI / 3)) return false;
+    return !rayBlocked(terrain, [post.post[0], post.post[2]], [x, z], post.post[1] + 1.6, 1.6);
+  };
+  const legs = DUNNOTTAR_SEWER_ROUTE.filter((leg) => ['the shelf to the sea cave stair', 'down the stair to the landing'].includes(leg.name));
+  assert.equal(legs.length, 2);
+  const seen = [];
+  for (const leg of legs) {
+    for (let i = 0; i + 1 < leg.points.length; i += 1) {
+      const [x0, z0] = leg.points[i];
+      const [x1, z1] = leg.points[i + 1];
+      for (let t = 0; t <= 1; t += 0.1) {
+        const [x, z] = [x0 + (x1 - x0) * t, z0 + (z1 - z0) * t];
+        for (const post of front) if (watches(post, x, z)) seen.push(`${post.id} sees ${x.toFixed(1)},${z.toFixed(1)}`);
+      }
+    }
+  }
+  assert.deepEqual(seen, []);
+  for (let x = DN_RAVINE.x0 + 1; x < DN_RAVINE.x1; x += 2) assert.ok(front.some((post) => watches(post, x, 46.2)), `the bridge at ${x} is watched`);
 });

@@ -1,7 +1,7 @@
 // Stage 1, "Memories of Dunnottar": a storm-swept sea-cliff fortress, as stage data (levelmode/stage.js
 // describes the format; physics/terrain.js the solids). Modelled on the real castle: a flat-topped
 // black-rock headland with sheer cliffs to a stormy sea, joined to the mainland by a low neck; a fenced
-// switchback path down the mainland slope into the gorge and up to the gate in the cliff; the gatehouse
+// switchback path down the mainland slope into the gorge, a ravine of the sea crossed by a drawbridge to the gate; the gatehouse
 // with its oillets (gun loops) over a steep stair; barrel-vaulted cellars; a winding tower stair; ruined
 // ranges round a grassy quadrangle; a roofless chapel. Doorways, passages and vaults are 1.5-2x real size
 // (camera room).
@@ -9,7 +9,8 @@
 // The world, one continuous map (x east, z south, y up; every number is a metre):
 //
 //   cliff   The Cliff Path     mainland x -126..-50, z -10..58 : start (-114, 14, -4) down three fenced legs and a
-//                              stair to the gorge shelf (y 0, x -64..-7), Rest 1 at its brazier; at the shelf's foot the sea cave's stair
+//                              stair to the gorge shelf (y 0, x -64..-26), Rest 1 at its brazier; the ravine (x -26..-12) and its drawbridge to
+//                              the barbican (archers) and the forecourt (x -12..-6.8) before the great gate; at the bridge's head the sea cave's lit stair
 //   gate    Gatehouse & Oillets x -8..31, z 38..58           : the great gate (closed: Shortcut 1) and the ledge round to a
 //                              postern, where Sir Alasdair (a man-at-arms in full plate) holds the way; the guard hall, a steep stair up to the oillet wall, and the gallery behind it
 //   ascent  Tunnelled Ascent    x 9..29, z 5..42             : vestibule, two stair flights and a guard room up to the quad (y 12.18)
@@ -146,14 +147,15 @@ function buildDrawbridge(sec) {
   dnProp(sec, 'raven', [B.x0 + 0.3, B.top + 0.9, B.z0 + 0.3], { yaw: 2.2 });
 
   // The guard. The front stays a way in, but a hard one: on the barbican, archers (they see the bridge and its head, not the sea cave's stair);
-  // at the bridge's end two guards; at the ledge's corner a levy; on the ledge Sir Alasdair (the gate section's). They are one alarm (`alarm`):
+  // at the bridge's end two levies under the arch (a guard there made it a wall: the bot got through it 0 times in 16); at the ledge's corner a levy; on the ledge Sir Alasdair (the gate section's). They are one alarm (`alarm`):
   // one who sees him raises them all.
-  const front = { alarm: 'front' };
-  const archer = { ...front, perch: true, vision: 18 };
+  // (Each watches the bridge, not the shelf beside it: a man going down the sea cave's stair is not seen from the barbican or the arch.)
+  const front = { alarm: 'front', vision: 14 };
+  const archer = { ...front, perch: true, vision: 15 };
   dnSpawn(sec, 'archer1', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, B.z0 + 1.6], DN_FACE.W, { ...archer, inputs: { name: 'Archer Gow' } });
   dnSpawn(sec, 'archer2', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, mid], DN_FACE.W, { ...archer, inputs: { name: 'Archer Strachan' } });
   dnSpawn(sec, 'archer3', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, B.z1 - 1.6], DN_FACE.W, { ...archer, inputs: { name: 'Archer Duthie' } });
-  dnSpawn(sec, 'bridgeguard1', 'dunnottarGuard', 'enemy', 2, [-9.4, G, DN_BRIDGE.z0 + 0.5], DN_FACE.W, { ...front, inputs: { name: 'Sergeant Ure' } });
+  dnSpawn(sec, 'bridgeguard1', 'dunnottarSoldier', 'enemy', 1, [-9.4, G, DN_BRIDGE.z0 + 0.5], DN_FACE.W, { ...front, inputs: { name: 'Ure' } });
   dnSpawn(sec, 'bridgeguard2', 'dunnottarSoldier', 'enemy', 1, [-9.4, G, DN_BRIDGE.z1 - 0.5], DN_FACE.W, { ...front, inputs: { name: 'Jock' } });
   dnSpawn(sec, 'bridgelevy', 'dunnottarSoldier', 'enemy', 1, [-8.2, G, 54.6], DN_FACE.W, { ...front, inputs: { name: 'Wattie' } });
 }

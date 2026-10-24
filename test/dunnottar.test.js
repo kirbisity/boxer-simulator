@@ -25,7 +25,7 @@ test('dunnottar: registered, sound, ten sections with the cast the spec calls fo
   const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead);
   assert.ok(enemies.length >= 12 && enemies.length <= 32, `${enemies.length} enemies`);
   // The main line's cast stood at 14 (the bot's careful policy reaches Vaelen 12 in 16 against it), 15 with the knight at the postern, 21 with the drawbridge's guard
-  // (three archers on the barbican, two guards and a levy at the bridge's end: the front is meant to be very hard); the vault's optional branches add at most six, and the
+  // (three archers on the barbican, three levies at the bridge's end and its forecourt: the front is meant to be very hard); the vault's optional branches add at most six, and the
   // old drain (the way round the gate) four: a sergeant and three levies.
   assert.ok(enemies.length >= 28 && enemies.length <= 32, `${enemies.length} enemies: 21 on the main line, 3 to 6 in the optional branches, 4 in the drain`);
   // The front's men are one alarm, and the archers keep their posts on the barbican (there is no way up to them).

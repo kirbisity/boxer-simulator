@@ -121,6 +121,17 @@
 // the physics: a man knocked down on a floor below y 0 never stood again (physics/rising.js asked for a share of a negative height), so in the sea cave and the
 // drain, the bot lay where he fell.
 //
+// ---- Phase G (round 3: the ravine and the drawbridge; the front held by archers; the sea cave's stair beside the bridge's head) --------------
+// The front is meant to be very hard, the way round plain. The barbican's archers (`perch`: the bot leaves them be, as a person would: there is no
+// way up) and the bridge's men are one alarm, and they watch the bridge only (`vision` 14-15 m), not the shelf's path to the sea cave's stair.
+// Careful, `--allies 2`, seeds 1-8, 10 deaths a fail, 3600 s:
+//                                                           reached/beat Vaelen   failed   timed out   mean deaths   where they died
+//   front, 3 archers, a guard and two levies, the knight    0/8                   8/8      0/8         10.0          cliff 80 (the guard 39, archers 35)
+//   front, 3 archers, three levies, the knight (as built)   1/8                   7/8      0/8         9.6           cliff 76 (archers 48, levies 22, knight 6)
+//   front, 2 archers, three levies, the knight              0/8                   8/8      0/8         10.0          cliff 79
+//   sewer (3 archers, a guard, two levies)                  5/8                   0/8      3/8         2.0           vault 6, sewer 5, chapel 5: no front man
+// (A first try had the bridge's men see the shelf: the sewer route then died at the bridge's guard 24 times and reached Vaelen 2/8.)
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
