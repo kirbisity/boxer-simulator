@@ -57,6 +57,8 @@ function mechanismDistance(me, mechanism) {
   return Math.hypot(Math.max(Math.abs(u) - leaf.size[0] / 2, 0), Math.max(Math.abs(v) - leaf.size[1] / 2, 0));
 }
 
+// What a man on his knees can do: take up what lies on the floor.
+const FROM_THE_FLOOR = new Set(['item', 'weapon', 'shield']);
 const ITEM_LABEL = { bandage: 'Take bandage', tonic: 'Take tonic', key: 'Take key', note: 'Read note' };
 const ITEM_ICON = { bandage: 'bandage', tonic: 'tonic', key: 'key', note: 'note' };
 
@@ -121,7 +123,10 @@ export function interactions(world) {
     found.push({ id: `outfit:${dead.id}`, kind: 'outfit', label: 'Take outfit', icon: 'outfit', distance, run: (w) => takeOutfit(w, dead) });
   }
   found.push(...endingInteractions(world));
-  return found.sort((a, b) => a.distance - b.distance);
+  // On his knees (the crawl), only what lies on the floor is his to take: a lever, a gate, a ladder, a rest or a dead man's
+  // harness wants him on his feet (the Crawl button stands him).
+  const kept = me.crawling ? found.filter((entry) => FROM_THE_FLOOR.has(entry.kind) || entry.urgent) : found;
+  return kept.sort((a, b) => a.distance - b.distance);
 }
 
 /** The one thing the button offers now, or null (nothing near, or an enemy too near to stop for it). */

@@ -64,7 +64,7 @@ body:not(.playing) .fu-pick { display: none; }
 
 /* ---- Buttons: one for each kind of blow round the Guard, ringed in its colour ---- */
 .fu-buttons { --fu-s: 1; position: absolute; inset: 0; pointer-events: none; }
-.fu-btn { --fu-col: #ffffff; position: absolute; right: calc(var(--fu-x) * var(--fu-s) + env(safe-area-inset-right, 0px) - 34px); bottom: calc(var(--controls-height, 56px) + var(--fu-y) * var(--fu-s) - 34px); width: 68px; height: 68px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; pointer-events: auto; touch-action: none; border: 3px solid var(--fu-col); background: radial-gradient(circle, rgba(10, 12, 18, 0.5) 55%, color-mix(in srgb, var(--fu-col) 22%, rgba(10, 12, 18, 0.6))); color: var(--fg); box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.45); }
+.fu-btn { --fu-col: #ffffff; position: absolute; right: calc(var(--fu-x) * var(--fu-s) + env(safe-area-inset-right, 0px) - 34px); bottom: calc(var(--controls-height, 56px) + var(--fu-raise, 0px) + var(--fu-y) * var(--fu-s) - 34px); width: 68px; height: 68px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; pointer-events: auto; touch-action: none; border: 3px solid var(--fu-col); background: radial-gradient(circle, rgba(10, 12, 18, 0.5) 55%, color-mix(in srgb, var(--fu-col) 22%, rgba(10, 12, 18, 0.6))); color: var(--fg); box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.45); }
 .fu-btn:active { background: color-mix(in srgb, var(--fu-col) 40%, rgba(10, 12, 18, 0.6)); }
 .fu-btn-icon { width: 34px; height: 34px; color: var(--fu-col); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
 .fu-btn-name { max-width: 60px; max-height: 2.1em; overflow: hidden; text-align: center; font: 700 9px/1.05 var(--mono); letter-spacing: 0.02em; text-transform: uppercase; color: #eef0f5; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
@@ -75,15 +75,32 @@ body:not(.playing) .fu-pick { display: none; }
 .fight-ui[data-device="mouse"] .fu-btn kbd { display: block; }
 .fu-btn.fu-flash[data-fu-flash="asked"] { animation: fu-press 0.45s ease-out; }
 @keyframes fu-press { 0% { scale: 0.9; box-shadow: 0 0 0 0 var(--fu-lit), inset 0 0 0 40px color-mix(in srgb, var(--fu-lit) 70%, transparent); } 35% { scale: 1.12; } 100% { scale: 1; box-shadow: 0 0 0 20px transparent, inset 0 0 0 40px transparent; } }
-.fight-ui[data-fightui="buttons"] .guard-button { width: 104px; height: 104px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 12px); }
-.fight-ui[data-fightui="buttons"] .lock-button { width: 66px; height: 66px; right: calc(19px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 268px); }
+/* The cluster stands `--fu-raise` up off the footer to leave Crawl its place under the Guard; Jump is over Lock. */
+.fight-ui[data-fightui="buttons"] { --fu-raise: 50px; }
+.fight-ui[data-fightui="buttons"] .guard-button { width: 104px; height: 104px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 12px); }
+.fight-ui[data-fightui="buttons"] .crawl-button { width: 54px; height: 54px; right: calc(39px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 4px); }
+.fight-ui[data-fightui="buttons"] .lock-button { width: 66px; height: 66px; right: calc(19px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 268px); }
 .fight-ui[data-fightui="buttons"] .lock-button b { font-size: 24px; }
-.fight-ui[data-fightui="buttons"] .action-button { width: 70px; height: 70px; right: calc(105px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 250px); }
+.fight-ui[data-fightui="buttons"] .jump-button { width: 58px; height: 58px; right: calc(23px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 342px); }
+.fight-ui[data-fightui="buttons"] .action-button { width: 70px; height: 70px; right: calc(105px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 250px); }
 @media (max-width: 520px) {
   .fu-buttons { --fu-s: 0.88; }
+  .fight-ui[data-fightui="buttons"] { --fu-raise: 46px; }
   .fight-ui[data-fightui="buttons"] .guard-button { width: 92px; height: 92px; }
-  .fight-ui[data-fightui="buttons"] .lock-button { bottom: calc(var(--controls-height, 56px) + 240px); }
-  .fight-ui[data-fightui="buttons"] .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 226px); }
+  .fight-ui[data-fightui="buttons"] .crawl-button { width: 48px; height: 48px; right: calc(36px + env(safe-area-inset-right, 0px)); }
+  .fight-ui[data-fightui="buttons"] .lock-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 240px); }
+  .fight-ui[data-fightui="buttons"] .jump-button { width: 52px; height: 52px; right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 312px); }
+  .fight-ui[data-fightui="buttons"] .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 226px); }
+}
+@media (max-height: 480px) {
+  /* A phone on its side: no room under the cluster, so Crawl sits at the bottom to the left of it (past the lowest coloured
+     buttons); Lock, Jump and the special action in a row over the cluster. */
+  .fight-ui[data-fightui="buttons"] { --fu-raise: 0px; }
+  .fight-ui[data-fightui="buttons"] .guard-button { width: 84px; height: 84px; }
+  .fight-ui[data-fightui="buttons"] .crawl-button { width: 48px; height: 48px; right: calc(324px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 20px); }
+  .fight-ui[data-fightui="buttons"] .lock-button { width: 56px; height: 56px; right: calc(84px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 230px); }
+  .fight-ui[data-fightui="buttons"] .jump-button { width: 50px; height: 50px; right: calc(148px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 236px); }
+  .fight-ui[data-fightui="buttons"] .action-button { width: 58px; height: 58px; right: calc(206px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 228px); }
 }
 
 /* ---- Body: tap his man himself; a faint ring on his chest is the only sign, lit in the colour of the move chosen, then how it went ---- */
@@ -156,6 +173,8 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 
 /* ---- Level Mode: the team ---- the comrades: names and health, top right (clear of the thumbs and of the pill), and a soft green pip with a name over each one's head. */
 .lv-team { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: min(150px, 30vw); display: grid; gap: 5px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+/* A phone on its side: the right edge is the controls' column to its top, so the team goes under the items, top left. */
+@media (max-height: 480px) { .lv-team { right: auto; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(68px + env(safe-area-inset-top, 0px)); } }
 .lv-mate { display: grid; grid-template-columns: 10px 1fr; grid-template-rows: auto 3px; column-gap: 7px; row-gap: 2px; align-items: center; padding: 5px 9px 6px 8px; border-radius: 8px; background: rgba(10, 12, 18, 0.5); border: 1px solid rgba(127, 224, 192, 0.28); }
 .lv-mate b { font: 600 12px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: #7fe0c0; box-shadow: 0 0 8px rgba(127, 224, 192, 0.8); }

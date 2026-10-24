@@ -6,7 +6,7 @@ import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './b
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
 import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
-import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, throwPunch, WORLD } from './physics.js';
+import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, startJump, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
@@ -429,7 +429,14 @@ function thinkForBout(world, dt) {
     holdPlayer(player());
   }
   // Walking about (V), the keys steer him; otherwise he does as the orders say.
-  else if (player().walking) walkAbout(player());
+  else if (player().walking) {
+    walkAbout(player());
+    // (Walking about, a jump asked for is still his: the orders are not carried out in walk mode.)
+    if (state.orders.jump) {
+      state.orders.jump = false;
+      startJump(world, player());
+    }
+  }
   else {
     // The movement keys: a stick, the way the camera looks.
     state.orders.keyStick = keyStick(fightKeys, floorAxes(), state.walkRunning);
@@ -494,20 +501,12 @@ function setWalking(on) {
   if (!fighter) return;
   fighter.walking = on;
   if (!on) {
-    fighter.crawling = false;
     fighter.goTo = null;
     fighter.move = 0;
     fighter.running = false;
     fighter.runMode = false;
     walkHeld.clear();
   }
-}
-
-/** Walking about on his knees, or back on his feet (the sandbox's look at the crawl). */
-function setCrawling(on) {
-  const fighter = player();
-  if (!fighter?.walking) return;
-  fighter.crawling = on;
 }
 
 let last = performance.now();
@@ -733,7 +732,8 @@ function followCamera(fighter, dt) {
   const orbit = scene.orbit;
   const locked = lockedTarget();
   const view = followCam.update({
-    me: point(fighter.x, P.pelvis),
+    // (In a jump's gather and flight the view keeps the height he jumped from: the hop is seen, not followed.)
+    me: fighter.jump && fighter.jump.phase !== 'land' ? [fighter.x[P.pelvis * 3], fighter.jump.from, fighter.x[P.pelvis * 3 + 2]] : point(fighter.x, P.pelvis),
     facing: fighter.yaw,
     down: fighter.state !== 'up',
     foe: locked ? point(locked.x, P.pelvis) : null,
@@ -1290,16 +1290,17 @@ const player = () => state.world.fighters.find((fighter) => fighter.corner === s
 // Keys: punches on the right hand's home row, kicks and knees above and
 // below, defences on the left hand.
 // The movement keys (w a s d, the arrows) move him the way the camera looks;
-// F does the special action; Tab locks on; Space held guards, tapped dodges.
+// F does the special action; Tab locks on; T held guards, tapped dodges; Space jumps; C crawls (or stands).
 const KEYS = {
   j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
   c: 'clinch', r: 'rush', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', y: 'rHook', g: 'collarTie',
 };
 // Orders to his side, in a battle (command.js): 7 To me, 8 Charge, 9 Hold, 0 Free (1–6 are the attack buttons).
 const ORDER_KEYS = Object.fromEntries(COMMAND_ORDERS.map((entry) => [entry.key, entry.kind]));
-// The movement keys held in the fight (not walk mode), and when Space went down.
+// The movement keys held in the fight (not walk mode), and when the guard key (T) went down.
 const fightKeys = new Set();
-let spaceDown = null;
+let guardKeyDown = null;
+const GUARD_KEY = 't';
 const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
   elbow: 'Elbow', upElbow: 'Up elbow', clinch: 'Clinch', rush: 'Charge', guard: 'Guard', slip: 'Slip', roll: 'Roll', parry: 'Parry',
@@ -1337,8 +1338,14 @@ window.addEventListener('keydown', (press) => {
   const key = press.key.toLowerCase();
   fightControls.setDevice('mouse');
   if (key === 'v') return setWalking(!player().walking);
+  // C: down on his knees to crawl, or up again (not while locked on: control.js toggleCrawl). Space: a jump.
+  if (key === 'c') return void fightControls.toggleCrawl();
+  if (press.key === ' ') {
+    press.preventDefault();
+    fightControls.jump();
+    return;
+  }
   if (player().walking) {
-    if (key === 'c') return setCrawling(!player().crawling);
     if (key === 'shift') state.walkRunning = true;
     if (WALK_KEYS[key]) {
       press.preventDefault();
@@ -1350,17 +1357,14 @@ window.addEventListener('keydown', (press) => {
   if (MOVE_KEYS[key]) {
     press.preventDefault();
     fightKeys.add(key);
-  } else if (press.key === ' ') {
+  } else if (key === GUARD_KEY) {
     // Held, the guard stays up; tapped, a dodge (as the Guard button).
     press.preventDefault();
     state.orders.guard = true;
-    spaceDown = realSeconds();
+    guardKeyDown = realSeconds();
   } else if (press.key === 'Tab') {
     press.preventDefault();
     fightControls.toggleLock();
-  } else if (key === 'c') {
-    // Down on his knees to crawl, or up again.
-    playerCrawl(state.world, player(), !player().crawling);
   } else if (key === 'f') {
     // The special action, whatever it is now (the button's label).
     const action = contextAction(state.world, player());
@@ -1384,20 +1388,20 @@ window.addEventListener('blur', () => {
   if (state.mode === 'play' && player()) player().move = 0;
   state.orders.keyStick = null;
   state.orders.guard = false;
-  spaceDown = null;
+  guardKeyDown = null;
 });
 window.addEventListener('keyup', (press) => {
   const key = press.key.toLowerCase();
   walkHeld.delete(key);
   fightKeys.delete(key);
   if (key === 'shift') state.walkRunning = false;
-  if (press.key === ' ') {
+  if (key === GUARD_KEY) {
     state.orders.guard = false;
-    if (spaceDown !== null && realSeconds() - spaceDown < TOUCH.guardTap) {
+    if (guardKeyDown !== null && realSeconds() - guardKeyDown < TOUCH.guardTap) {
       (state.orders.evasions ??= []).push(1);
       tutorial.signal('evade');
     }
-    spaceDown = null;
+    guardKeyDown = null;
   }
 });
 
@@ -2036,13 +2040,16 @@ function observeYard() {
   const walked = yard.lastAt && trainee.state === 'up' ? Math.min(0.2, Math.hypot(at[0] - yard.lastAt[0], at[2] - yard.lastAt[2])) : 0;
   yard.lastAt = at;
   let blocked = 0;
+  let landed = 0;
   for (; yard.eventCursor < world.events.length; yard.eventCursor += 1) {
     const event = world.events[yard.eventCursor];
+    // A jump of his own, come down on his feet.
+    if (event.kind === 'land' && event.fighter === trainee.id) landed += 1;
     // Met on his guard, his shield, or his blade (a limb on it, or blade on blade).
     if ((event.kind === 'blocked' && event.defender === trainee.id) || (event.kind === 'bladeBlock' && event.attacker === trainee.id) || (event.kind === 'clash' && event.fighter === trainee.id && event.other === undefined)) blocked += 1;
   }
   const apart = partner ? Math.hypot(partner.x[P.pelvis * 3] - at[0], partner.x[P.pelvis * 3 + 2] - at[2]) : Infinity;
-  return { walked: walked > 0.004 ? walked : 0, near: apart < TUTORIAL.nearFrom, locked: state.orders.lock !== null, guarding: state.orders.guard, blocked, armed: Boolean(trainee.weapon?.held) };
+  return { walked: walked > 0.004 ? walked : 0, near: apart < TUTORIAL.nearFrom, locked: state.orders.lock !== null, guarding: state.orders.guard, blocked, armed: Boolean(trainee.weapon?.held), landed, crawling: Boolean(trainee.crawling), standing: trainee.state === 'up' && !trainee.crawling };
 }
 
 /** Into the training yard: the player plays the trainee at once (no side to choose), the card on its first step. */

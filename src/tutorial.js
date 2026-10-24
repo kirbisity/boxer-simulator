@@ -109,7 +109,7 @@ export const TUTORIAL_STEPS = [
   {
     key: 'guard', title: 'Guard',
     touch: 'Edric swings at you now. <b>Hold Guard 🛡</b> to block with your sword. A quick tap of it dodges instead.',
-    mouse: 'Edric swings at you now. <b>Hold Space</b> to block with your sword. A quick tap of it dodges instead.',
+    mouse: 'Edric swings at you now. <b>Hold T</b> to block with your sword. A quick tap of it dodges instead.',
     done: (progress) => progress.blocked >= 1 || progress.guarded >= TUTORIAL.guardFor,
     stage: 'swing',
   },
@@ -126,16 +126,29 @@ export const TUTORIAL_STEPS = [
     mouse: 'Press <b>Tab</b> again to let go of Edric. The camera follows behind you again.',
     done: (progress) => !progress.locked,
   },
+  {
+    key: 'jump', title: 'Jump',
+    touch: 'Tap <b>Jump</b> (right edge, over Lock). How high you go is your body: legs, weight, armour, how tired. Jumps get you onto low ledges and over gaps.',
+    mouse: 'Press <b>Space</b> to jump. How high you go is your body: legs, weight, armour, how tired. Jumps get you onto low ledges and over gaps.',
+    done: (progress) => progress.landed >= 1,
+  },
+  {
+    key: 'crawl', title: 'Crawl',
+    touch: 'Tap <b>Crawl</b> (bottom of the right edge) to go down on your hands and knees: low, slow, hard to spot. Tap it again (<b>Stand</b>) to get up. Not while locked on.',
+    mouse: 'Press <b>C</b> to go down on your hands and knees: low, slow, hard to spot. Press it again to get up. Not while locked on.',
+    done: (progress) => progress.crawled && progress.stood,
+  },
 ];
 
 /** A step's progress, from nothing. */
-const freshProgress = () => ({ look: 0, walked: 0, near: false, locked: false, kinds: new Set(), combos: 0, holds: 0, blocked: 0, guarded: 0, armed: false });
+const freshProgress = () => ({ look: 0, walked: 0, near: false, locked: false, kinds: new Set(), combos: 0, holds: 0, blocked: 0, guarded: 0, armed: false, landed: 0, crawled: false, stood: false });
 
 /**
  * One run through the steps. `signal(kind, detail)` takes what the controls
  * report ('look' rad, 'move', 'strike' move, 'combo', 'hold', 'action',
  * 'lock', 'unlock', 'evade'); `observe(state, dt)` the yard each frame
- * ({ walked m this frame, near, locked, guarding, blocked (blows met this frame), armed }).
+ * ({ walked m this frame, near, locked, guarding, blocked (blows met this frame), armed, landed (jumps landed this frame),
+ * crawling, standing }).
  * Returns { step, index, finished, done, signal, observe, skip, progress }.
  */
 export function createTutorialRun(steps = TUTORIAL_STEPS) {
@@ -170,6 +183,10 @@ export function createTutorialRun(steps = TUTORIAL_STEPS) {
       progress.locked = Boolean(state.locked);
       progress.armed = Boolean(state.armed);
       progress.blocked += state.blocked ?? 0;
+      progress.landed += state.landed ?? 0;
+      // Down on his knees, then up on his feet again.
+      if (state.crawling) progress.crawled = true;
+      if (progress.crawled && state.standing) progress.stood = true;
       if (state.guarding) progress.guarded += dt;
       check();
     },
