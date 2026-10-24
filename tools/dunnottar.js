@@ -137,6 +137,11 @@
 //   the low island in the middle of the pit (he waits on it, a hand under the sludge)          beaten 45/80
 //   + calories 4500 (80 kg: the preset)                                                        beaten 32/80 (40 %), median 18 s, 1.1 of 2 comrades left
 // The sludge holds the legs of every man in it (level.js wadeGear, his too): a wader Noname did worse (the operative fought from the ramp's foot).
+// Graded wading (level.js wadeGear, water.js wadeDrag, LEVEL_CONFIG.wade: the depth of water over each man's feet against his height, ankle none to chest 0.3 of a
+// walk, the sump's viscosity 2 a further x0.6; also his punches, dodges and turns a little, his rise, his run and a little of his wind): the same men in the sump
+// go at 0.45 of a walk (0.62 before), the cistern's sewage at 0.73, the crypt's water at 0.91. Noname, 20 duels: beaten 11/20 before, 10/20 after (median 17 s, 16 s);
+// the sewer route, careful, two comrades, seeds 1-4, 3600 s: before 2 of 4 beat Vaelen (Noname killed the operative 4 times in 4 runs), after 3 of 4 (one failed in the
+// vault, ten deaths to the jailer and the questioner, not in water; Noname killed none, 2 deaths of the sewer by bleeding).
 // The whole sewer route (careful, two comrades, seeds 1-6, 3600 s): every run got through the sewer (deaths there 7: Noname 3, bled after him 4); 2 of 6
 // reached and beat Vaelen, 4 timed out in the vault (not looked into: the vault is as it was).
 //

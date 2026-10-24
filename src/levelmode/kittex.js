@@ -12,7 +12,7 @@
 import { KIT_FLOOR_OFFSET } from '../depthrange.js';
 import { KT_SHADOW_FUNCTION, KT_SHADOW_PARS, ktShadow, ktShadowInit } from './kitshadow.js';
 import { kwTexture } from './kitwear.js';
-import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
+import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktGritData, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
 
 export { ktRandom } from './kitpaint.js';
 
@@ -91,6 +91,22 @@ function ktMacroTexture() {
   return ktMacro;
 }
 
+/** The grit map (one per page, made on the first stone material): the coarseness of the stone, in world space (kitpaint.js ktGritData). */
+let ktGrit = null;
+function ktGritTexture() {
+  if (!ktGrit) {
+    ktGrit = new THREE.DataTexture(ktGritData(256), 256, 256, THREE.RGBAFormat);
+    ktGrit.wrapS = THREE.RepeatWrapping;
+    ktGrit.wrapT = THREE.RepeatWrapping;
+    ktGrit.magFilter = THREE.LinearFilter;
+    ktGrit.minFilter = THREE.LinearMipmapLinearFilter;
+    ktGrit.generateMipmaps = true;
+    ktGrit.anisotropy = 4;
+    ktGrit.needsUpdate = true;
+  }
+  return ktGrit;
+}
+
 /**
  * What the weather does to every surface of the stage, and what the fog does with height: shared by all its materials, set by the stage's look
  * (stagelooks.js). `uKitWet` (0..1): how soaked the stone is. `uKitFog`: (density per metre at the base, the height (m) it is at full density below,
@@ -103,16 +119,17 @@ export const ktWeather = { uKitWet: { value: 0.3 }, uKitPools: { value: 0 }, uKi
  * How much of the shader's finer work a pixel gets, by distance and by the quality tier (quality.js; kit.js `setQuality` sets it): shared by all the stage's materials, so
  * a change of tier is a change of two uniforms, not a new program. `uKitLod` (metres): x the reach of the environment's reflection, y the reach of the second read of the
  * stone's map (the one that hides the tiling), z the reach of standing water, w the reach of the soft edge of the baked shadow. Each term fades to nothing over its last
- * quarter, so there is no line where it stops. `uKitFlags`: x 1 if the macro map is read at all, y the baked shadow's taps (1: one, 2 or more: the five and the soft edge).
+ * quarter, so there is no line where it stops. `uKitFlags`: x 1 if the macro map is read at all, y the baked shadow's taps (1: one, 2 or more: the five and the soft edge),
+ * z the reach of the stone's relief (m: the chisel marks and pits that catch the light, from the grit map; 0 for none), the stone's grime being read where the macro map is.
  */
 export const ktLod = { uKitLod: { value: null }, uKitFlags: { value: null } };
 
 /** The reaches of a tier of the picture (quality.js gives the numbers). */
-export function ktSetLod({ env, tile, pool, penumbra, macro = 1, taps = 2 }) {
+export function ktSetLod({ env, tile, pool, penumbra, macro = 1, taps = 2, relief = 0 }) {
   ktLodInit();
   const reach = (metres) => Math.max(0.01, metres);
   ktLod.uKitLod.value.set(reach(env), reach(tile), reach(pool), reach(penumbra));
-  ktLod.uKitFlags.value.set(macro, taps, 0, 0);
+  ktLod.uKitFlags.value.set(macro, taps, relief, 0);
 }
 
 function ktLodInit() {
@@ -123,7 +140,7 @@ function ktLodInit() {
 // ---- the detail ----------------------------------------------------------------------------------------------
 
 /** The map chunk: the texture read once or twice, the macro map over it, moss, damp, standing water (`pools`: how much this surface holds, 0..1) and streaks. `two`: 0 once, 1 again at another scale (hard patches), 2 again turned (soft). */
-const ktMapChunk = (two, pools = 0) => `
+const ktMapChunk = (two, pools = 0, stone = false) => `
 #ifdef USE_MAP
   vec3 kitN = normalize(vKitNrm);
   vec3 kitAbs = abs(kitN);
@@ -174,7 +191,73 @@ const ktMapChunk = (two, pools = 0) => `
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.12, 0.17, 0.07) * (0.7 + 2.2 * kitLum) * (1.0 + 0.5 * kitM.r), clamp(kitMoss, 0.0, 0.85));
   // Rain streaks down the vertical faces.
   diffuseColor.rgb *= 1.0 - uKitDetail.w * kitM.a * (1.0 - kitUp) * (0.3 + 0.7 * kitWet);
+  ${stone ? KT_STONE : ''}
 #endif
+`;
+
+/**
+ * Stone that is coarse and dirty, not smooth and clean (what the grit map is for: kitpaint.js ktGritData, read in world space at three scales). Colour: a dirtier,
+ * duller tint, dark in the joints and pits, the grain, soot and rain-dirt in broad blotches smeared down a wall, damp and green at the foot of it, white salt where it
+ * weeps. Relief: the height of the stone (its texture's light and dark: the joints lie back; the grit map's grain, chisel marks, pits and chips) gives its normal a
+ * slope, near enough to see (`uKitFlags.z` m: kitDH, taken to the normal in KT_STONE_NORMAL). Gloss: dry stone has none (the sky's reflection is cut to a tenth in
+ * KT_ENV_REACH); wet stone gets a little, in the damp patches only and never where the grime lies, so it never goes smooth (kitShine, capped by the roughness line in ktPatch).
+ * \`uKitStone\`: x the depth of the joints (m per unit of the texture's light), y the grit's grain (m), z its chips (m), w how dirty (1).
+ */
+const KT_STONE = `
+  kitStoneOn = 1.0;
+  bool kitWall = kitAbs.y < 0.7;
+  vec2 kitS2 = kitWall ? vec2(0.23, 0.075) : vec2(0.23);
+  vec2 kitG1 = kitP * 0.85;
+  vec2 kitG2 = kitP * kitS2 + vec2(0.31, 0.77);
+  vec2 kitG3 = kitP * 0.21 + vec2(0.62, 0.13);
+  // (The lowest tier reads no macro map and no grit: its stone is the texture's own dirt.)
+  vec4 kitGa = uKitFlags.x > 0.5 ? textureGrad(uKitGrit, kitG1, kitPx * 0.85, kitPy * 0.85) : vec4(0.5, 0.5, 0.5, 0.4);
+  vec4 kitGb = uKitFlags.x > 0.5 ? textureGrad(uKitGrit, kitG2, kitPx * kitS2, kitPy * kitS2) : vec4(0.5, 0.5, 0.0, 0.4);
+  float kitLumX = dFdx(kitLum);
+  float kitLumY = dFdy(kitLum);
+  kitRelief = uKitFlags.z > 0.0 ? 1.0 - smoothstep(0.5 * uKitFlags.z, uKitFlags.z, kitDist) : 0.0;
+  if (kitRelief > 0.0) {
+    vec4 kitGax = textureGrad(uKitGrit, kitG1 + kitPx * 0.85, kitPx * 0.85, kitPy * 0.85);
+    vec4 kitGay = textureGrad(uKitGrit, kitG1 + kitPy * 0.85, kitPx * 0.85, kitPy * 0.85);
+    vec4 kitGc = textureGrad(uKitGrit, kitG3, kitPx * 0.21, kitPy * 0.21);
+    vec4 kitGcx = textureGrad(uKitGrit, kitG3 + kitPx * 0.21, kitPx * 0.21, kitPy * 0.21);
+    vec4 kitGcy = textureGrad(uKitGrit, kitG3 + kitPy * 0.21, kitPx * 0.21, kitPy * 0.21);
+    // (A floor's grain is for the chips only: the fine layer on a floor lit along its length glitters.)
+    float kitGrain = kitWall ? 1.0 : 0.2;
+    kitDH = kitRelief * vec2(
+      uKitStone.x * kitLumX + uKitStone.y * kitGrain * (kitGax.r - kitGa.r) + uKitStone.z * (kitGcx.g - kitGc.g),
+      uKitStone.x * kitLumY + uKitStone.y * kitGrain * (kitGay.r - kitGa.r) + uKitStone.z * (kitGcy.g - kitGc.g));
+  }
+  vec3 kitSt = diffuseColor.rgb;
+  float kitSL = dot(kitSt, vec3(0.3, 0.55, 0.15));
+  kitSt = mix(vec3(kitSL), kitSt, 0.78) * vec3(0.98, 0.96, 0.92);
+  kitSt *= mix(0.8, 1.08, smoothstep(0.08, 0.36, kitLum));
+  kitSt *= 0.86 + 0.28 * kitGa.r;
+  float kitGrime = smoothstep(0.38, 0.78, kitGb.a) * uKitStone.w;
+  kitSt *= 1.0 - 0.4 * kitGrime;
+  kitSt *= 1.0 - 0.3 * smoothstep(0.1, 0.55, kitShade) * uKitStone.w;
+  float kitGreen = smoothstep(0.1, 0.6, kitShade) * smoothstep(0.45, 0.7, kitGb.a * 0.6 + kitM.b * 0.5) * uKitStone.w;
+  kitSt = mix(kitSt, vec3(0.1, 0.15, 0.07) * (0.7 + 2.0 * kitLum), 0.45 * kitGreen * (1.0 - kitUp));
+  float kitSalt = smoothstep(0.35, 0.8, kitGb.b) * (0.35 + 0.65 * kitWet) * (1.0 - 0.7 * kitUp) * uKitStone.w;
+  kitSt = mix(kitSt, vec3(0.62, 0.61, 0.56) * (0.55 + 0.9 * kitLum), 0.4 * kitSalt);
+  diffuseColor.rgb = kitSt;
+  kitShine = clamp(kitWet * (0.3 + 0.9 * smoothstep(0.3, 0.7, kitM.b)) * (1.0 - 0.8 * kitGrime), 0.0, 1.0);
+`;
+
+/** The stone's relief taken to its normal (Mikkelsen's: three's own bump map does it so), with the slope of its height over the screen: kitDH (m of height a pixel). */
+const KT_STONE_FUNCTION = `
+vec3 kitBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy, float faceDirection) {
+  vec3 vSigmaX = dFdx(surfPos);
+  vec3 vSigmaY = dFdy(surfPos);
+  // (No slope steeper than about 30 degrees over a pixel: what is finer than the screen would only glitter.)
+  float pixel = 0.6 * max(length(vSigmaX), length(vSigmaY));
+  dHdxy = clamp(dHdxy, vec2(-pixel), vec2(pixel));
+  vec3 R1 = cross(vSigmaY, surfNorm);
+  vec3 R2 = cross(surfNorm, vSigmaX);
+  float fDet = dot(vSigmaX, R1) * faceDirection;
+  vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2);
+  return normalize(abs(fDet) * surfNorm - vGrad);
+}
 `;
 
 /**
@@ -206,6 +289,8 @@ const KT_ENV_REACH = `
     radiance = mix(kitRadiance0, radiance, kitEnvFade);
     iblIrradiance = mix(kitIbl0, iblIrradiance, kitEnvFade);
   }
+  // (Dry stone does not mirror the sky: what its reflection shows is cut to a tenth, and comes back as it is wet, kitShine; stone only, kitStoneOn.)
+  radiance *= mix(1.0, 0.1 + 0.9 * kitShine, kitStoneOn);
 #else
   #include <lights_fragment_maps>
 #endif`;
@@ -244,6 +329,7 @@ function ktSunShaded() {
 export function ktPatch(material, { detail = null, fog = true, shadow = false } = {}) {
   const two = detail ? detail.two ?? 0 : 0;
   const mean = material.map?.kitMean ?? [0.5, 0.5, 0.5];
+  const stone = detail?.stone ?? null;
   ktWeather.uKitFog.value ??= new THREE.Vector4(0, 0, 0.05, 0);
   if (shadow) ktShadowInit();
   ktLodInit();
@@ -262,12 +348,19 @@ export function ktPatch(material, { detail = null, fog = true, shadow = false } 
       shader.uniforms.uKitWet = ktWeather.uKitWet;
       shader.uniforms.uKitPools = ktWeather.uKitPools;
       shader.uniforms.uKitPoolSky = ktWeather.uKitPoolSky;
+      if (stone) {
+        shader.uniforms.uKitGrit = { value: ktGritTexture() };
+        shader.uniforms.uKitStone = { value: new THREE.Vector4(...stone) };
+        uniforms += `uniform sampler2D uKitGrit;\nuniform vec4 uKitStone;\n${KT_STONE_FUNCTION}`;
+      }
       uniforms += 'uniform sampler2D uKitMacro;\nuniform vec4 uKitDetail;\nuniform vec3 uKitMean;\nuniform float uKitWet;\nuniform float uKitPools;\nuniform float uKitPoolSky;\n';
       fragment = fragment
-        .replace('#include <map_fragment>', ktMapChunk(two, detail.pools ?? 0))
-        .replace('void main() {', 'void main() {\n  float kitWet = 0.0;\n  float kitPool = 0.0;')
+        .replace('#include <map_fragment>', ktMapChunk(two, detail.pools ?? 0, Boolean(stone)))
+        .replace('void main() {', 'void main() {\n  float kitWet = 0.0;\n  float kitPool = 0.0;\n  float kitShine = 0.0;\n  float kitStoneOn = 0.0;\n  float kitRelief = 0.0;\n  vec2 kitDH = vec2(0.0);')
         .replace('#include <lights_fragment_maps>', `${KT_ENV_REACH}${KT_POOL_SKY}`)
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor *= 1.0 - 0.5 * kitWet;\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);');
+        // (Wet stone is glossier, but only a little and only in the damp patches: the roughness comes down a third of the way to 0.6 at most; the rest of the surfaces, by their wet, to half.)
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n  ${stone ? 'roughnessFactor = mix(roughnessFactor, 0.6, 0.35 * kitShine);' : 'roughnessFactor *= 1.0 - 0.5 * kitWet;'}\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);`);
+      if (stone) fragment = fragment.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  #ifdef USE_MAP\n  normal = kitBump(-vViewPosition, normal, kitDH, gl_FrontFacing ? 1.0 : -1.0);\n  #endif');
     }
     if (shadow) {
       Object.assign(shader.uniforms, ktShadow);
@@ -281,8 +374,18 @@ export function ktPatch(material, { detail = null, fog = true, shadow = false } 
     }
     shader.fragmentShader = `${uniforms}${fragment}`;
   };
-  material.customProgramCacheKey = () => `kit-${detail ? `d${two}p${detail.pools ?? 0}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
+  material.customProgramCacheKey = () => `kit-${detail ? `d${two}p${detail.pools ?? 0}${stone ? 'S' : ''}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
 }
+
+/**
+ * How coarse each kind of stone is (kittex.js KT_STONE's `uKitStone`: the depth of the joints in m per unit of the texture's light, the grit's grain (m), its chips (m),
+ * how dirty). Dressed ashlar has fine joints and a little chisel; rough walling, rubble and rock more of everything; a floor is walked smooth, a little.
+ */
+const STONE_COARSE = {
+  dressed: [0.05, 0.014, 0.022, 1],
+  rough: [0.08, 0.022, 0.034, 1.1],
+  floor: [0.04, 0.008, 0.016, 0.9],
+};
 
 /**
  * The materials of the castle, by name, each tiling over `tile` metres (the geometry's UVs are in metres).
@@ -298,12 +401,12 @@ export function ktMaterials() {
   const m = {};
   // (Courses stay level, so a masonry texture is read again at another scale, not turned: `two` 1; the ground and the rock may turn: `two` 2.)
   const detail = {
-    ashlar: { macro: 0.7, hue: 1, moss: 0.5, streak: 0.5, two: 1, pools: 0.5 },
-    ruin: { macro: 0.8, hue: 1, moss: 1.0, streak: 0.55, two: 1, pools: 0.35 },
-    rubble: { macro: 0.75, hue: 1, moss: 0.9, streak: 0.5, two: 2, pools: 0.35 },
-    rock: { macro: 0.7, hue: 0.6, moss: 0.5, streak: 0.5, two: 2, pools: 0.5 },
-    cobble: { macro: 0.7, hue: 0.6, moss: 0.4, streak: 0, two: 2, pools: 1 },
-    flags: { macro: 0.7, hue: 0.6, moss: 0.6, streak: 0, two: 2, pools: 1 },
+    ashlar: { macro: 0.7, hue: 1, moss: 0.5, streak: 0.8, two: 1, pools: 0.5, stone: STONE_COARSE.dressed },
+    ruin: { macro: 0.8, hue: 1, moss: 1.0, streak: 0.8, two: 1, pools: 0.35, stone: STONE_COARSE.rough },
+    rubble: { macro: 0.75, hue: 1, moss: 0.9, streak: 0.8, two: 2, pools: 0.35, stone: STONE_COARSE.rough },
+    rock: { macro: 0.7, hue: 0.6, moss: 0.5, streak: 0.7, two: 2, pools: 0.5, stone: STONE_COARSE.rough },
+    cobble: { macro: 0.7, hue: 0.6, moss: 0.4, streak: 0, two: 2, pools: 1, stone: STONE_COARSE.floor },
+    flags: { macro: 0.7, hue: 0.6, moss: 0.6, streak: 0, two: 2, pools: 1, stone: STONE_COARSE.floor },
     grass: { macro: 0.9, hue: 1.6, moss: 0, streak: 0, two: 2, pools: 0.1 },
     path: { macro: 0.8, hue: 1, moss: 0.2, streak: 0, two: 2, pools: 0.85 },
     boards: { macro: 0.6, hue: 0.4, moss: 0.2, streak: 0.3, two: 0, pools: 0.3 },
@@ -311,12 +414,12 @@ export function ktMaterials() {
     iron: { macro: 0.5, hue: 0, moss: 0, streak: 0.4, two: 0, pools: 0 },
   };
   // (Masonry is drawn on both faces: a wall seen from inside its own thickness, or a vault from above, has a face to show and is not a hole into the void.)
-  m.ashlar = make(ktTexture(512, 11, ktAshlar), 4, { roughness: 0.66, side: THREE.DoubleSide });
-  m.ruin = make(ktTexture(512, 12, ktRuinWall), 4, { roughness: 0.74, side: THREE.DoubleSide });
-  m.rubble = make(ktTexture(512, 13, ktRubble), 4, { roughness: 0.76, side: THREE.DoubleSide });
-  m.rock = make(ktTexture(512, 14, ktRock), 6, { roughness: 0.6, side: THREE.DoubleSide });
-  m.cobble = make(ktTexture(512, 15, ktCobbles), 3, { roughness: 0.5 }, KIT_FLOOR_OFFSET.cobble);
-  m.flags = make(ktTexture(512, 16, ktFlags), 4, { roughness: 0.52 }, KIT_FLOOR_OFFSET.flags);
+  m.ashlar = make(ktTexture(512, 11, ktAshlar), 4, { roughness: 0.95, side: THREE.DoubleSide });
+  m.ruin = make(ktTexture(512, 12, ktRuinWall), 4, { roughness: 0.96, side: THREE.DoubleSide });
+  m.rubble = make(ktTexture(512, 13, ktRubble), 4, { roughness: 0.96, side: THREE.DoubleSide });
+  m.rock = make(ktTexture(512, 14, ktRock), 6, { roughness: 0.94, side: THREE.DoubleSide });
+  m.cobble = make(ktTexture(512, 15, ktCobbles), 3, { roughness: 0.93 }, KIT_FLOOR_OFFSET.cobble);
+  m.flags = make(ktTexture(512, 16, ktFlags), 4, { roughness: 0.93 }, KIT_FLOOR_OFFSET.flags);
   m.grass = make(ktTexture(512, 17, ktGrass), 6, { roughness: 0.95 }, KIT_FLOOR_OFFSET.grass);
   m.path = make(ktTexture(512, 18, ktPath), 4, { roughness: 0.84 }, KIT_FLOOR_OFFSET.path);
   m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 }, KIT_FLOOR_OFFSET.boards);

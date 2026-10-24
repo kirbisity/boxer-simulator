@@ -16,7 +16,7 @@ import { createLevelWorld, levelThink, restAtPoint, wadeGear } from '../src/leve
 import { LEVEL_CONFIG } from '../src/levelmode/config.js';
 import { QUALITY_TIERS } from '../src/levelmode/quality.js';
 import { approachLevels, interiorLevels, levelsSettled, STAGE_LOOKS } from '../src/levelmode/stagelooks.js';
-import { addRipple, ageRipples, newRipples, rippleRing, stageWaters, WATER, waterAt, waterContains, waterSources } from '../src/levelmode/water.js';
+import { addRipple, ageRipples, newRipples, rippleRing, stageWaters, WATER, wadeDrag, waterAt, waterContains, waterSources } from '../src/levelmode/water.js';
 import { DUNNOTTAR } from '../src/levelmode/stages/dunnottar.js';
 import { DN_CESSPOOL, DN_CESSPOOL_REGION, DN_NONAME_SPAWN } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { DN_DARK_FLOOR, DN_DARK_MOST, DN_INTERIOR } from '../src/levelmode/stages/dunnottar-light.js';
@@ -194,25 +194,29 @@ test('water: a man wading rings the water at his moving feet and leaves a wake; 
   assert.ok(splash.splashes[0].count >= WATER.bigDrops);
 });
 
-test('water: thigh-deep sludge holds a man\'s legs while he is in it and lets them go after; the crypt\'s knee-deep water and the island do not', () => {
+test('water: the cesspool\'s sludge holds a man\'s legs by its depth over his feet while he is in it and lets them go after; the island and the rim do not', () => {
   const w = inCesspool();
   const me = w.fighters[0];
   const foot = me.body.gear.foot;
   const accel = me.body.gear.accel;
   placeOnFloor(me, P0.at[0] - 2, P0.at[2] + 2, P0.floor, 0);
   wadeGear(w);
-  assert.ok(Math.abs(me.body.gear.foot - foot * LEVEL_CONFIG.wade.foot) < 1e-9, 'held');
-  assert.ok(Math.abs(me.body.gear.accel - accel * LEVEL_CONFIG.wade.accel) < 1e-9);
+  // (The sludge is 0.49 m deep over the bed, the cesspool's viscosity 2: the knee's 0.75 and a further 2^-0.75, the share the table and the thickness give him.)
+  const drag = wadeDrag(stageWaters(DUNNOTTAR).find((water) => water.id === 'cesspool'), P0.depth, me.body.heightM);
+  assert.ok(drag.foot < 0.5 && drag.foot > 0.35, `a man in the pit goes at ${drag.foot.toFixed(2)} of a walk (it was 0.62 before the graded hold)`);
+  assert.ok(Math.abs(me.body.gear.foot - foot * drag.foot) < 1e-3, 'held');
+  assert.ok(Math.abs(me.body.gear.accel - accel * drag.accel) < 1e-3);
   wadeGear(w);
-  assert.ok(Math.abs(me.body.gear.foot - foot * LEVEL_CONFIG.wade.foot) < 1e-9, 'not held twice over');
+  assert.ok(Math.abs(me.body.gear.foot - foot * drag.foot) < 1e-3, 'not held twice over');
   placeOnFloor(me, P0.at[0] - P0.hall + 0.4, P0.at[2], P0.rim, 0);
   wadeGear(w);
   assert.equal(me.body.gear.foot, foot, 'let go on the rim');
   assert.equal(me.body.gear.accel, accel);
-  // The crypt's flood is 0.28 m: under the hold.
+  assert.ok(!me.wading);
+  // The crypt's flood is 0.28 m, plain water: a shin, 0.9 and not more.
   const crypt = stageWaters(DUNNOTTAR).filter((water) => water.id.startsWith('crypt'));
-  for (const water of crypt) assert.ok(water.at[1] - water.bed < LEVEL_CONFIG.wade.from);
-  // Noname on his island, a hand under the sludge: not held.
+  for (const water of crypt) assert.ok(wadeDrag(water, water.at[1] - water.bed, 1.75).foot > 0.9);
+  // Noname on his island, a hand under the sludge: not held (the island is 0.07 m under the surface: ankle-deep, nothing).
   assert.ok(!noname(w).wading, 'the island holds no one');
 });
 

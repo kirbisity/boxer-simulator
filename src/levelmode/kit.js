@@ -1308,7 +1308,7 @@ export function createCastleView(stage) {
     ktWeather.uKitPoolSky.value = state.shelter;
     // The shader's finer terms thin out with distance, and under a roof the sky's wash on the stone is for the nearest walls only (kittex.js ktLod).
     const q = state.q;
-    ktSetLod({ env: q.env * (0.12 + 0.88 * state.shelter), tile: q.tile, pool: q.pool, penumbra: q.penumbra, macro: q.macro, taps: q.taps });
+    ktSetLod({ env: q.env * (0.12 + 0.88 * state.shelter), tile: q.tile, pool: q.pool, penumbra: q.penumbra, macro: q.macro, taps: q.taps, relief: q.relief });
     // What the camera can see (when it is given): a section outside its frustum is not drawn or animated at all; one reached from the sections the man is in
     // by openings that are in view and clear is drawn in detail (else its silhouette, which is what is behind a wall); the frustum culling of the meshes does the rest.
     camera.set = false;

@@ -184,7 +184,7 @@ export function buildSewer() {
   });
   for (const px2 of [-52.4, -44.6]) for (const pz2 of [7.4, 12, 16.6, 20.6]) dnProp(sec, 'pillar', [px2, bed, pz2], { height: 4.2 });
   // The sewage: a sludge just under the causeway's top, scum and rubbish floating on it, an outfall pouring into it from the west wall (levelmode/kitwater.js, kitfilth.js).
-  sec.decor.push({ kind: 'water', id: 'cistern', shape: 'rect', at: [-48.5, F - 0.12, 13], size: [13, 18], bed, murk: 'sludge' });
+  sec.decor.push({ kind: 'water', id: 'cistern', shape: 'rect', at: [-48.5, F - 0.12, 13], size: [13, 18], bed, murk: 'sludge', viscosity: 1.6 });
   for (const [x, z, yaw] of [[-52.6, 9.8, 0.4], [-44.4, 14.2, 1.7], [-53, 18.4, 2.6], [-45.2, 5.8, 0.9]]) dnProp(sec, 'scum', [x, F - 0.12, z], { yaw, size: 1.1 });
   dnProp(sec, 'outfall', [-55, F + 1.9, 11.4], { face: 'E', to: F - 0.12 });
   dnProp(sec, 'outfall', [-42, F + 2.1, 18.2], { face: 'W', to: F - 0.12, size: 0.8 });
@@ -308,7 +308,7 @@ function swCesspool(sec, alcove) {
 
   // The sludge: the castle's sewage, thick, scum on it (levelmode/kitwater.js), over the whole pit (the octagon's corners under the rim).
   const reach = (P.radius / Math.cos(Math.PI / 8)) * 2 + 0.2;
-  sec.decor.push({ kind: 'water', id: 'cesspool', shape: 'ellipse', at: [cx, surface, cz], size: [reach, reach], bed: P.floor, murk: 'sludge' });
+  sec.decor.push({ kind: 'water', id: 'cesspool', shape: 'ellipse', at: [cx, surface, cz], size: [reach, reach], bed: P.floor, murk: 'sludge', viscosity: 2 });
   for (const [x, z, yaw, size] of [[-3.4, 2.6, 0.3, 1.3], [3.6, -2.8, 1.9, 1.1], [-1.4, -4.8, 2.6, 0.9], [4.4, 3.4, 0.8, 1.2], [-4.8, -1.6, 1.2, 0.8]]) dnProp(sec, 'scum', [cx + x, surface, cz + z], { yaw, size });
   // Sewage pouring in from the castle above: three outfalls from the walls north and south, out over the pit's edge.
   dnProp(sec, 'outfall', [cx - 3.6, D + 2.6, cz - P.hall], { face: 'S', to: surface, length: 2.4 });

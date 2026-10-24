@@ -5,7 +5,12 @@
 // murk: 'clear' | 'sludge' }`. The water has no say in the physics: a man stands on the bed under it, as he always did; it is a surface drawn, which
 // rings round each foot that moves in it (`ripples`), trails a wake behind a man wading, and throws up a splash when one runs through it or drops into it.
 //
+// A body of water may carry `viscosity` (1 water, thicker the more it holds a man: `WATER.viscosity` by murk when it has none) for what it does to the legs of
+// the men in it (`wadeDrag`).
+//
 // A ripple is { x, z, born (s), amp (0..1+), water (id) }: a ring that spreads at `speed` m/s and dies over `life` s (the shader draws it: kitwater.js).
+
+import { LEVEL_CONFIG } from './config.js';
 
 /** How ripples and splashes are made. */
 export const WATER = {
@@ -29,6 +34,8 @@ export const WATER = {
   bigDrops: 26,
   // How far above the surface (m) a foot still counts as in it (a foot lifted out and set back makes the ring as it goes in).
   above: 0.06,
+  // How thick a body of water is for a man in it when it has no `viscosity` of its own, by murk: clear water 1, the castle's sewage 1.6.
+  viscosity: { clear: 1, sludge: 1.6 },
 };
 
 /** The bodies of water of a stage: every section's `water` decor, with its section's id. */
@@ -138,4 +145,36 @@ export function waterSources(waters, men, memory, time, config = WATER) {
     }
   }
   return { ripples, splashes };
+}
+
+/** How thick a body of water is for the legs in it: its own `viscosity`, else its murk's (1 for plain water). */
+export const waterViscosity = (water) => water.viscosity ?? WATER.viscosity[water.murk] ?? 1;
+
+/**
+ * What water `depth` m over a man's feet does to him, as a man `heightM` tall (a short man's legs are as deep in it as the reference man's would be in more):
+ * { depth (the reference man's), foot (the share of his footwork left), accel (of his acceleration), act (of his punches, dodges and turning), viscosity }.
+ * Footwork falls with the depth (LEVEL_CONFIG.wade.table); the water's viscosity takes a further share once it is over the ankle, and the thicker it is the more.
+ * Nothing at all (every share 1) under the table's first row.
+ */
+export function wadeDrag(water, depth, heightM, spec = LEVEL_CONFIG.wade) {
+  const viscosity = waterViscosity(water);
+  const reference = depth * (spec.height / (heightM || spec.height));
+  const table = spec.table;
+  let share = 1;
+  if (reference > table[0][0]) {
+    share = table[table.length - 1][1];
+    for (let k = 1; k < table.length; k += 1) {
+      if (reference <= table[k][0]) {
+        const [d0, s0] = table[k - 1];
+        const [d1, s1] = table[k];
+        share = s0 + ((s1 - s0) * (reference - d0)) / (d1 - d0);
+        break;
+      }
+    }
+  }
+  const thick = spec.thick;
+  const engaged = Math.max(0, Math.min(1, (reference - thick.from) / (thick.full - thick.from)));
+  const stuck = viscosity > 1 ? viscosity ** (-thick.exp * engaged) : 1;
+  const foot = share * stuck;
+  return { depth: reference, foot, accel: foot ** spec.accel, act: stuck ** spec.act, viscosity };
 }

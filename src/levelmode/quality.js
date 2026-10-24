@@ -13,6 +13,8 @@ export const QUALITY_TIERS = {
   high: {
     // Shader reaches (kittex.js ktLod), metres. The environment's reflection is the dearest term: the nearer walls only.
     env: 80, tile: 120, pool: 120, penumbra: 80, macro: 1, taps: 2,
+    // The stone's relief (kittex.js: the chisel marks, pits and chips that catch the light): the farthest it is shaded (m), fading from half of it; 0: none.
+    relief: 26,
     // Decals (kitwear.js: wear, dirt), drips, ravens, light shafts: the farthest each is drawn (m; 0: not at all).
     decals: 60, drips: 22, ravens: 40, shafts: 70,
     // The share of the rain drawn (storm.js).
@@ -24,6 +26,7 @@ export const QUALITY_TIERS = {
   },
   medium: {
     env: 0, tile: 10, pool: 18, penumbra: 18, macro: 1, taps: 2,
+    relief: 12,
     decals: 24, drips: 0, ravens: 20, shafts: 40,
     rain: 0.55,
     lamps: 4,
@@ -31,6 +34,7 @@ export const QUALITY_TIERS = {
   },
   low: {
     env: 0, tile: 0, pool: 0, penumbra: 0, macro: 0, taps: 1,
+    relief: 0,
     decals: 0, drips: 0, ravens: 0, shafts: 0,
     rain: 0.25,
     lamps: 3,
