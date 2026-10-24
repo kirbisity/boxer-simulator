@@ -160,6 +160,10 @@ test('story: no deaths is a single one-night paragraph that names no failure, an
   assert.match(attemptStory(logOf([], { comrades: [], survivors: [] })), /alone|on your own|No one was left|no one left/);
   assert.match(attemptStory(logOf([], { survivors: ['Maren'] })), /Maren waited at the chapel gate; Old Tobin did not live to/);
   assert.match(attemptStory(logOf([], { survivors: ['Maren', 'Old Tobin'] })), /Maren and Old Tobin waited at the chapel gate/);
+  // Fallen in the epilogue: he lies by Caby, he does not wait.
+  const fell = attemptStory(logOf([], { outcome: 'fell' }));
+  assert.match(fell, /fell beside Caby/);
+  assert.ok(!/waits/.test(fell), fell);
 });
 
 test('story: one death names where it began, who stood with you, who killed you and where, and ends on the last attempt', () => {

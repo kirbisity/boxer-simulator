@@ -449,8 +449,12 @@ function stepReveal(world, ending, t) {
     kneel.lean = 0;
   } else {
     if (helmet) putOnHelmet(world, helmet);
-    kneel.hands = null;
-    kneel.lean = 0.15;
+    // The helm on, the hands back on him: he stays.
+    if (noname) {
+      const [chest] = pinPoints(noname);
+      kneel.hands = [[chest[0], chest[1], chest[2] - 0.12], [chest[0], chest[1], chest[2] + 0.12]];
+    } else kneel.hands = null;
+    kneel.lean = 0.3;
   }
   if (t >= beats.line && !ending.said) {
     ending.said = true;
@@ -468,7 +472,10 @@ function putOnHelmet(world, helmet) {
   const noname = nonameOf(world);
   const from = outfitOf(noname?.body.inputs ?? { outfit: { kind: 'scissor', design: 4 } });
   const inputs = me.body.inputs;
-  reclothe(world, me, { ...inputs, name: noname?.body.inputs.name ?? 'Noname', outfit: { ...inputs.outfit, helm: { kind: from.kind, design: from.design } }, accessories: [] });
+  // (And the thing in the cesspool's footing and its want of fear: planted in the sludge, he does not run; and the sludge is his: he walks in it as on stone
+  // (level.js wadeGear), where the men who come down after him wade. His body, his kit and his weapon are his own.)
+  const own = noname?.body.inputs.outfit ?? {};
+  reclothe(world, me, { ...inputs, name: noname?.body.inputs.name ?? 'Noname', outfit: { ...inputs.outfit, helm: { kind: from.kind, design: from.design }, balance: own.balance, courage: own.courage }, accessories: [], wader: true });
   level.rebuild.add(me.id);
   level.dropped = level.dropped.filter((thing) => thing !== helmet);
   world.events.push({ time: world.time, kind: 'helmetOn', fighter: 0, effects: ['puts on the helmet'] });

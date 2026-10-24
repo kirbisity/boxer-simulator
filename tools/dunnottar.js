@@ -563,13 +563,15 @@ class Run {
     const me = this.me;
     const world = this.world;
     if (me.finisher && updateFinisher(world, me, dt)) return true;
-    const boss = this.level.boss ? world.fighters[this.level.boss.id] : null;
+    // (In the plot twist's cesspool, Noname on the floor the same: the reveal waits for his death.)
+    const twistFoe = this.twist && endingOf(world)?.phase === 'landing' ? nonameOf(world) : null;
+    const boss = twistFoe ?? (this.level.boss ? world.fighters[this.level.boss.id] : null);
     if (!boss || boss.dormant || !helplessOnFloor(boss) || me.state !== 'up') return false;
     const d = apart(me, boss);
     if (d > 30) return false;
     if (d <= FINISHER.reach && finishTarget(world, me)?.id === boss.id && startFinisher(world, me, boss)) {
       this.stats.finishers += 1;
-      this.note('puts the dagger to Vaelen on the floor');
+      this.note(`puts the dagger to ${boss.body.inputs.name} on the floor`);
       return true;
     }
     me.walking = true;

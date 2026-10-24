@@ -102,6 +102,9 @@ test('the story: the lore is about 150 words and names who it should; nine notes
   assert.match(spared.join(' '), /privy/);
   assert.match(spared.join(' '), /helmet/);
   assert.match(before.join(' '), /on your way in/);
+  // The epilogue's end is one line more: fallen, or standing.
+  assert.equal(endingLines({ outcome: 'fell' }).length, spared.length + 1);
+  assert.notEqual(endingLines({ outcome: 'fell' }).join(), endingLines({ outcome: 'cleared' }).join());
   for (const lines of [spared, harmed, before]) assert.ok(!/cell stood open|shards|walked out|rescue/i.test(lines.join(' ')), lines.join(' '));
   assert.ok(STORY_TIMING.deathIn > 0);
 });

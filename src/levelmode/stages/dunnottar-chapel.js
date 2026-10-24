@@ -211,7 +211,8 @@ const DN_DRAIN_WEST = [-46.6, DN_CAVE.drain, -37.9];
  * The plot twist's numbers (levelmode/ending.js reads them as `stage.ending`): the door that opens when the boss is down; the garderobe (`toilet`, a
  * region: walking into it shows the words and lets the horde go); the privy's hole (`hole`: the drop is offered within `reach` m of it); where the chute
  * lets him out (`landing`: under the cesspool's grating, `at` on the bed, `drop` m over it, facing `yaw`); where Caby's body is laid for the reveal (`caby`:
- * on the island, `at` his hips, `yaw` the way his head lies; `kneel`: where the player kneels beside him); Noname's spawn; the held crowds' names; the
+ * on the island, `at` his hips, `yaw` the way his head lies; `kneel`: where the player kneels beside him); Noname's spawn; the held crowds' names; `way` (the
+ * points the horde runs by when the altar or a door's jamb is between a man and the player: levelmode/awareness.js rouse); the
  * epilogue's waves (`at`: s after it begins; `from`: where they come in; `men`: their presets) and how long it lasts at most (`seconds`).
  */
 export const DN_ENDING = {
@@ -219,7 +220,7 @@ export const DN_ENDING = {
   toilet: { at: [(DN_GARDEROBE.x0 + DN_GARDEROBE.x1) / 2, (DN_GARDEROBE.z0 + DN_GARDEROBE.z1) / 2], size: [DN_GARDEROBE.x1 - DN_GARDEROBE.x0, DN_GARDEROBE.z1 - DN_GARDEROBE.z0], y: [L - 1, L + 4] },
   hole: { at: [DN_GARDEROBE.x0 + DN_GARDEROBE.seat[0] / 2, L, -36], reach: 1.7 },
   landing: { at: [DN_GARDEROBE.x0 + DN_GARDEROBE.seat[0] / 2, DN_CESSPOOL.floor, -36], drop: 1.25, yaw: DN_FACE.E },
-  caby: { at: [DN_CESSPOOL.island.at[0] + 0.25, DN_CESSPOOL.island.top, DN_CESSPOOL.island.at[1]], yaw: DN_FACE.N, kneel: [DN_CESSPOOL.island.at[0] - 0.75, DN_CESSPOOL.island.top, DN_CESSPOOL.island.at[1] - 0.35] },
+  caby: { at: [DN_CESSPOOL.island.at[0] + 0.25, DN_CESSPOOL.island.top, DN_CESSPOOL.island.at[1]], yaw: DN_FACE.N, kneel: [DN_CESSPOOL.island.at[0] - 0.4, DN_CESSPOOL.island.top, DN_CESSPOOL.island.at[1] - 0.45] },
   noname: 'noname',
   horde: 'horde',
   // The way the horde runs when the altar or the door's jambs are between a man and the player: round the altar either side, in at the doors.

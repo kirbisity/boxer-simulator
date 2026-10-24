@@ -6,6 +6,8 @@
 //
 // The page makes one with its hooks and calls, each frame: `frame(dt)` (real seconds), `steer(dt)` after the follow camera is set,
 // `jolt(camera)` after the camera is placed, and asks `speed()` for the world's pace. A tap, Enter, Space or Esc skips (after a second).
+// Below it, the plot twist's director (createTwistDirector): the dark of the chute and of the cut into the reveal, the reveal's bars and close
+// shot of the player kneeling by Caby, and the spoken lines; it plays on the world's clock (ending.js TWIST), so it has nothing to skip.
 
 import { P } from '../body.js';
 import { CUTSCENE, createCutscene, cutsceneHolds, cutsceneLook, cutscenePhase, cutsceneSpeed, skipCutscene, stepCutscene } from './cutscene.js';
@@ -193,7 +195,7 @@ export const TWIST_CAMERA = {
   cut: { dark: 0.3, lift: 0.7 },
   // The reveal: a low, close shot of the two of them from the side (m over the middle of them it looks at; pitch, rad; distance, m), the letterbox
   // bars in and out (s), and the turns off the line across them that it tries, the first that has room.
-  reveal: { lift: 0.25, pitch: 0.32, distance: 2.7, bars: 0.6, turns: [1.35, -1.35, 0.9, -0.9, 1.75, -1.75] },
+  reveal: { lift: 0.05, pitch: 0.5, distance: 2.5, bars: 0.6, turns: [1.35, -1.35, 0.9, -0.9, 1.75, -1.75] },
   // A spoken line stays up this long (s of the world's clock).
   line: 4.2,
 };
@@ -248,7 +250,8 @@ export function createTwistDirector(hooks) {
 
   function frame(world) {
     const look = world?.stage?.level ? twistLook(world) : { black: 0, bars: 0 };
-    const lineUp = Boolean(line) && world === line.world && world.time < line.until;
+    // (A line is the moment's: gone with it, down the chute or up off his knees.)
+    const lineUp = Boolean(line) && world === line.world && world.time < line.until && endingOf(world)?.phase === line.phase;
     busy = look.black > 0 || look.bars > 0;
     if (!busy && !lineUp) {
       if (layer) teardown();
@@ -287,7 +290,7 @@ export function createTwistDirector(hooks) {
     if (!caby || swing <= 0) return;
     const spec = TWIST_CAMERA.reveal;
     const head = [me.x[P.head * 3], me.x[P.head * 3 + 1], me.x[P.head * 3 + 2]];
-    const neck = [caby.x[P.neck * 3], caby.x[P.neck * 3 + 1], caby.x[P.neck * 3 + 2]];
+    const neck = [caby.x[P.head * 3], caby.x[P.head * 3 + 1], caby.x[P.head * 3 + 2]];
     const focus = [(head[0] + neck[0]) / 2, (head[1] + neck[1]) / 2 + spec.lift, (head[2] + neck[2]) / 2];
     if (!pick) {
       // Across the line between the two of them, to whichever side the walls leave room for (the first turn that gives most of the distance).
@@ -314,7 +317,7 @@ export function createTwistDirector(hooks) {
 
   /** A spoken line (the ending's `{ type: 'line' }`): up in the lower bar for a few seconds. */
   function sayLine(world, text) {
-    line = { world, text, until: world.time + TWIST_CAMERA.line };
+    line = { world, text, until: world.time + TWIST_CAMERA.line, phase: endingOf(world)?.phase };
   }
 
   function cancel() {

@@ -80,6 +80,9 @@ const ENDING = {
   closing: [
     'Above, the storm breaks over Dunnottar. Below, the sludge closes over the way you came.',
   ],
+  // (The epilogue's end: fallen to the Queen's men there, or still standing.)
+  fell: 'They came down the drain after you. The helmet did not save you; it was never meant to.',
+  stands: 'They came down the drain after you, and did not come back up. Something in a smooth helmet waits in the sludge.',
   end: 'End of Stage 1 · Memories of Dunnottar',
 };
 
@@ -87,13 +90,15 @@ const ENDING = {
 export const attemptsLine = (count) => `Attempts: ${count}`;
 
 /**
- * The ending's lines in order, for the way the run went: `slainBefore` (Noname was killed on the way in, by the old drain; else only at the end).
+ * The ending's lines in order, for the way the run went: `slainBefore` (Noname was killed on the way in, by the old drain; else only at the end);
+ * `outcome` (how the epilogue ended, ending.js: 'fell' he died in it, else he stands; none: no line for it).
  * With `attempts` ({ count, story }: levelmode/attempts.js) the story of the night comes after the closing words, then the "Attempts: N" line,
  * then the stage's end.
  */
-export function endingLines({ civiliansHarmed = false, attempts = null, slainBefore = false } = {}) {
+export function endingLines({ civiliansHarmed = false, attempts = null, slainBefore = false, outcome = null } = {}) {
   const told = attempts ? [attempts.story, attemptsLine(attempts.count)] : [];
-  return [...ENDING.twist, slainBefore ? ENDING.before : ENDING.after, ENDING.helmet, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...ENDING.closing, ...told, ENDING.end];
+  const epilogue = outcome === 'fell' ? [ENDING.fell] : outcome ? [ENDING.stands] : [];
+  return [...ENDING.twist, slainBefore ? ENDING.before : ENDING.after, ENDING.helmet, civiliansHarmed ? ENDING.harmed : ENDING.spared, ...epilogue, ...ENDING.closing, ...told, ENDING.end];
 }
 
 /** How long the cards take (s): the fade of each, and how long a card holds before a tap counts. */
@@ -241,8 +246,8 @@ export function showDeath(onDone) {
  * can frame the cesspool behind it; the last tap closes the card and runs onDone. `attempts` ({ count, story }) adds the story of the
  * night and the "Attempts: N" line before the end; `slainBefore` is endingLines'.
  */
-export function showEnding({ civiliansHarmed = false, attempts = null, slainBefore = false, onLine = null, over = true } = {}, onDone) {
-  const lines = endingLines({ civiliansHarmed, attempts, slainBefore });
+export function showEnding({ civiliansHarmed = false, attempts = null, slainBefore = false, outcome = null, onLine = null, over = true } = {}, onDone) {
+  const lines = endingLines({ civiliansHarmed, attempts, slainBefore, outcome });
   const shown = [];
   let at = -1;
   let timer = null;

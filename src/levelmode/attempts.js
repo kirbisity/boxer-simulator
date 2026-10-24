@@ -80,6 +80,8 @@ export function attemptLog(world) {
     final: {
       number: level.attempts.length + 1, from: open.from, rest: level.checkpoint?.name ?? null, comrades: [...open.comrades],
       survivors: namesAlive(world), seconds: Math.max(0, Math.round(world.time - open.since)), time: Math.round(world.time),
+      // How the epilogue ended (ending.js: 'cleared', 'held', 'fell'), when it has.
+      outcome: level.ending?.outcome ?? null,
     },
   };
 }
@@ -203,10 +205,16 @@ function taleLast(final, seed, failures) {
       `The first attempt was the only one there was: ${company}, you came up through the storm and past the jailer to an empty room.`,
     ]);
   const took = taleHash(`${seed}:took`) % 2 === 0 ? ` It had taken ${taleDuration(final.seconds)}.` : '';
-  const end = talePick(seed, 903, [
-    'You did not climb out again. You stayed in the dark below the keep with Caby, and the new Noname waits there for whoever comes next.',
-    'You never came back up. Below the keep, beside Caby, the new Noname waits in the dark for whoever comes next.',
-  ]);
+  // (Fallen in the epilogue, he lies by Caby; else he waits there, the new Noname.)
+  const end = final.outcome === 'fell'
+    ? talePick(seed, 903, [
+      'You did not climb out again. The Queen\'s men came down after you, and you fell beside Caby in the dark below the keep, the new Noname, and the last.',
+      'You never came back up. Below the keep the new Noname held the dark as long as he could, and fell beside Caby.',
+    ])
+    : talePick(seed, 903, [
+      'You did not climb out again. You stayed in the dark below the keep with Caby, and the new Noname waits there for whoever comes next.',
+      'You never came back up. Below the keep, beside Caby, the new Noname waits in the dark for whoever comes next.',
+    ]);
   return `${reached} ${left}${failures ? '' : took} ${end}`;
 }
 

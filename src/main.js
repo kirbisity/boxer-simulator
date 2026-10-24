@@ -2200,6 +2200,7 @@ function beginEnding(world) {
     attempts,
     // (Noname was dead before the drop: he had been killed on the way in, by the old drain.)
     slainBefore: endingOf(world)?.nonameAlive === false,
+    outcome: endingOf(world)?.outcome ?? null,
     onLine: (index) => {
       if (run !== stageRun || !endingCam) return;
       endingCam.goal = beats[Math.min(index, beats.length - 1)];

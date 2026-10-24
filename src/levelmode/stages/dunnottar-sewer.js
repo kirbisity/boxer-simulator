@@ -323,6 +323,8 @@ function swCesspool(sec, alcove) {
   // The light: one lantern on the rim by the way in, the fungus's sick green glow on the walls and the rim; cobwebs in the corners of the vault.
   const [lx, lz] = rim(Math.PI * 0.82, 0.55);
   dnProp(sec, 'lantern', [lx, D, lz], { yaw: 0.6 });
+  // (And a guttering lantern at a corner of the island, his: the one light by the face at the end, levelmode/ending.js's reveal.)
+  dnProp(sec, 'lantern', [P.island.at[0] + P.island.size / 2 - 0.2, P.island.top, P.island.at[1] - P.island.size / 2 + 0.2], { yaw: 2.2 });
   for (const [angle, size, light] of [[1.95, 1.2, true], [4.75, 1.0, true], [0.3, 0.8, false], [3.55, 0.9, false]]) {
     const [x, z] = rim(angle, 0.75);
     dnProp(sec, 'fungus', [x, D + 0.02, z], { size, light });

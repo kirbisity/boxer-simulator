@@ -2128,7 +2128,8 @@ function kneelPose(fighter, intent) {
   intent.rHand = toLocal(fighter, kneel.hands[1]);
   intent.twist = 0;
   intent.twoHanded = false;
-  intent.bladeDir = [0.3, -1, 0];
+  // (The blade let hang back and out to his right, away from what the hands hold.)
+  intent.bladeDir = [-0.5, -1, -0.6];
   intent.offBladeDir = null;
 }
 
