@@ -3391,7 +3391,7 @@ function moveRoot(world, fighter, dt) {
   fighter.root[0] = Math.max(-(halfX - margin), Math.min(halfX - margin, fighter.root[0]));
   // ... but a shove can: out across the strip to the edge and over it.
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
-  if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter);
+  if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter, operativeOf(world, fighter));
 }
 
 /** The speed (m/s) from which a runner stops in `distance` m, at his brake (physics/gait.js: `arrive` of it, and never under a walk). */
@@ -3503,17 +3503,22 @@ function standingOn(fighter) {
   return height;
 }
 
+/** Whether this is the man played: marked by the screen (`player`), or in a stage the operative, its first fighter (a world with no screen to mark him). */
+const operativeOf = (world, fighter) => Boolean(fighter.player) || (Boolean(world.stage) && fighter === world.fighters[0]);
+
 /**
  * On terrain, the stance's root is kept out of the walls and ledge faces, the speed into them gone:
  * the feet are aimed from the root, and a root inside a wall would set them fighting it.
  */
-function keepClearOfSolids(terrain, fighter) {
+function keepClearOfSolids(terrain, fighter, played = false) {
   const spec = WORLD.terrain;
+  // (The man played stands off the stone by more than the others: WORLD.terrain.playerClearance.)
+  const radius = spec.bodyRadius + (played ? spec.playerClearance : 0);
   const lift = fighter.lift ?? 0;
   const at = [fighter.root[0], fighter.root[1]];
   // A face a foot can be put on (stepUp) is not a wall to him; in a jump's flight, only one his feet are nearly over (WORLD.jump.clear).
   const stepUp = fighter.jump?.phase === 'air' ? WORLD.jump.clear : spec.stepUp;
-  if (!pushOut(terrain, at, spec.bodyRadius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, stepUp, standingOn(fighter) + spec.sag)) return;
+  if (!pushOut(terrain, at, radius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, stepUp, standingOn(fighter) + spec.sag)) return;
   fighter.root[0] = at[0];
   fighter.root[1] = at[1];
   const into = fighter.rootVelocity[0] * terrain.normal[0] + fighter.rootVelocity[1] * terrain.normal[1];
