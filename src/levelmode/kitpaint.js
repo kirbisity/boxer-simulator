@@ -179,9 +179,10 @@ function ktMasonry(g, size, random, { base, rows, lengths, variance, mortar, mos
             if (dr < w) light -= (1 - dr / w) * bevel * 0.8;
             // The face: soft blotches of its own and fine grain, and the odd pit.
             const blotch = 0.8 + 0.4 * ktAt(coarse, size, wx, py, offset, offset * 3);
-            const grain = 0.88 + 0.24 * ktAt(fine, size, wx, py, offset * 5, offset);
-            const pit = ktAt(fine, size, wx, py, offset * 7, offset * 2) > 0.8 ? 0.62 : 1;
-            const edge = 0.82 + 0.18 * ktSmoothstep(0, 9, e);
+            const grain = 0.8 + 0.4 * ktAt(fine, size, wx, py, offset * 5, offset);
+            const pit = ktAt(fine, size, wx, py, offset * 7, offset * 2) > 0.76 ? 0.56 : 1;
+            // (The edges of a stone crumble: dark at the joint, coming up to the face over a dozen pixels.)
+            const edge = 0.58 + 0.42 * ktSmoothstep(0, 12, e);
             const k = index * 4;
             const f = tone * light * blotch * grain * pit * edge;
             d[k] = colour[0] * f;
@@ -223,12 +224,47 @@ function ktMasonry(g, size, random, { base, rows, lengths, variance, mortar, mos
     const r = 6 + random() * 18;
     ktStain(g, size, mx, my, r, `${54 + random() * 20},${72 + random() * 26},${34 + random() * 14}`, 0.35 + random() * 0.45);
   }
-  // Rain streaks: dark runs below the joints, a little longer than a stone.
-  for (let k = 0; k < 40; k += 1) {
+  // Chipped corners: a dark notch where a corner has broken away, and the paler stone it laid bare beside it.
+  for (const stone of stones) {
+    if (random() > 0.4) continue;
+    const right = random() < 0.5;
+    const cx = right ? stone.x + stone.w - 2 : stone.x + 2;
+    const cy = random() < 0.6 ? stone.y + stone.h - 2 : stone.y + 2;
+    const r = 3 + random() * 7;
+    g.fillStyle = 'rgba(18,16,14,0.6)';
+    g.beginPath();
+    g.moveTo(cx, cy);
+    g.lineTo(cx + (right ? -r : r), cy);
+    g.lineTo(cx, cy + (cy > stone.y + stone.h / 2 ? -r : r));
+    g.fill();
+    g.fillStyle = 'rgba(165,152,132,0.28)';
+    g.fillRect(cx + (right ? -r - 3 : r), cy - 1, 3, 2);
+  }
+  ktGrime(g, size, random, 1);
+}
+
+/**
+ * Dirt over a finished texture: rain streaks running down below the joints (long, uneven, some doubled), soot-dark blotches broad and soft, and a few
+ * pale runs of salt. `strength` 1 for a wall, less for a floor (that is walked on).
+ */
+function ktGrime(g, size, random, strength = 1) {
+  for (let k = 0; k < 90 * strength; k += 1) {
     const px = random() * size;
     const py = random() * size;
-    g.fillStyle = `rgba(10,12,14,${0.05 + random() * 0.1})`;
-    g.fillRect(px, py, 1 + random() * 3, 12 + random() * 70);
+    const width = 1 + random() * 3.5;
+    const length = 20 + random() * 120;
+    const gradient = g.createLinearGradient(0, py, 0, py + length);
+    gradient.addColorStop(0, `rgba(10,10,12,${(0.08 + random() * 0.14) * strength})`);
+    gradient.addColorStop(1, 'rgba(10,10,12,0)');
+    g.fillStyle = gradient;
+    g.fillRect(px, py, width, length);
+  }
+  for (let k = 0; k < 28 * strength; k += 1) ktStain(g, size, random() * size, random() * size, 22 + random() * 50, '16,14,12', (0.07 + random() * 0.12) * strength);
+  for (let k = 0; k < 14 * strength; k += 1) {
+    const px = random() * size;
+    const py = random() * size;
+    g.fillStyle = `rgba(196,192,176,${0.07 + random() * 0.1})`;
+    g.fillRect(px, py, 1 + random() * 2, 10 + random() * 40);
   }
 }
 
@@ -316,7 +352,9 @@ function ktVoronoi(g, size, random, { cellsX, cellsY, jitter = 0.45, weight = 0.
       const shade = 1 + dome * lit * (0.25 + 0.75 * (1 - bowl)) - edgeDark * (1 - ktSmoothstep(gap, gap + soft * 2.2, edge)) - 0.15 * (1 - bowl);
       const blotch = 0.78 + 0.44 * ktAt(coarse, size, x, y, site.offset, site.offset * 3);
       const grainValue = 1 + (ktAt(fine, size, x, y, site.offset * 5, site.offset) - 0.5) * grain * 3;
-      const f = site.tone * shade * blotch * grainValue;
+      // (A pitted, uneven face: small holes where the fine noise peaks.)
+      const pitted = ktAt(fine, size, x, y, site.offset * 7, site.offset * 2) > 0.74 ? 0.55 : 1;
+      const f = site.tone * shade * blotch * grainValue * pitted;
       data[k] = base[0] * (1 + site.hue) * f;
       data[k + 1] = base[1] * (1 + site.hue * 0.3) * f;
       data[k + 2] = base[2] * (1 - site.hue) * f;
@@ -331,10 +369,7 @@ export function ktRubble(g, size, random) {
   ktVoronoi(g, size, random, { cellsX: 11, cellsY: 17, jitter: 0.5, weight: 0.45, base: [112, 108, 98], variance: 0.62, warm: 0.14, mortar: [32, 32, 29], gap: 2, soft: 3, dome: 0.55, seed: 3 });
   for (let k = 0; k < 90; k += 1) ktStain(g, size, random() * size, random() * size, 8 + random() * 26, `${58 + random() * 20},${78 + random() * 24},${38 + random() * 12}`, 0.25 + random() * 0.4);
   for (let k = 0; k < 120; k += 1) ktStain(g, size, random() * size, random() * size, 2 + random() * 8, random() < 0.5 ? '170,160,92' : '150,150,130', 0.2 + random() * 0.3);
-  for (let k = 0; k < 30; k += 1) {
-    g.fillStyle = `rgba(10,12,14,${0.05 + random() * 0.1})`;
-    g.fillRect(random() * size, random() * size, 1 + random() * 3, 14 + random() * 80);
-  }
+  ktGrime(g, size, random, 1);
 }
 
 /** Cobbled setts: close-packed, irregular, rounded, dark and wet between; a few paler, a few sunk. */
@@ -342,6 +377,7 @@ export function ktCobbles(g, size, random) {
   ktVoronoi(g, size, random, { cellsX: 13, cellsY: 13, jitter: 0.42, weight: 0.2, base: [112, 106, 98], variance: 0.7, warm: 0.1, mortar: [24, 23, 22], gap: 2.2, soft: 4, dome: 0.7, seed: 4, edgeDark: 0.4 });
   for (let k = 0; k < 40; k += 1) ktStain(g, size, random() * size, random() * size, 10 + random() * 30, `${50 + random() * 14},${64 + random() * 20},${38 + random() * 10}`, 0.2 + random() * 0.3);
   for (let k = 0; k < 60; k += 1) ktStain(g, size, random() * size, random() * size, 14 + random() * 40, '12,12,14', 0.12 + random() * 0.18);
+  ktGrime(g, size, random, 0.5);
 }
 
 /** Flagstones: big slabs, close joints, cracked, grout wet and dark, moss in the joints. */
@@ -363,6 +399,7 @@ export function ktFlags(g, size, random) {
   }
   for (let k = 0; k < 50; k += 1) ktStain(g, size, random() * size, random() * size, 8 + random() * 24, '58,76,44', 0.2 + random() * 0.3);
   for (let k = 0; k < 40; k += 1) ktStain(g, size, random() * size, random() * size, 20 + random() * 50, '14,14,18', 0.1 + random() * 0.16);
+  ktGrime(g, size, random, 0.5);
 }
 
 /** Black sea-rock: dark blocks, wide and flat, split by cracks, with faint bedding and ledges that hold a little lichen and grass. */
@@ -393,6 +430,7 @@ export function ktRock(g, size, random) {
     g.stroke();
   }
   for (let k = 0; k < 60; k += 1) ktStain(g, size, random() * size, random() * size, 5 + random() * 16, random() < 0.5 ? '96,106,70' : '150,150,120', 0.15 + random() * 0.3);
+  ktGrime(g, size, random, 0.7);
 }
 
 /** Wind-flattened grass: patches of long and short, dry yellow-green and dark, bare earth and the odd stone; blades fine. */
@@ -519,6 +557,61 @@ export function ktMacroData(size = 256) {
       data[k + 1] = ktClamp(((g[i] - 0.5) * 2.2 + 0.5) * 255, 0, 255);
       data[k + 2] = ktClamp(((b[i] - 0.5) * 2.4 + 0.5) * 255, 0, 255);
       data[k + 3] = streak * 255;
+    }
+  }
+  return data;
+}
+
+// ---- the grit map -------------------------------------------------------------------------------------
+
+/**
+ * The map the stone's shader reads, in world space (kittex.js): the coarseness the textures' own pixels (128 to the metre) cannot give, 256 by 256, tiling.
+ * r: fine relief for a tile of about a metre: grain, pitting and the short slanting strokes of a chisel (0.5 level; lower is a hollow). g: chips and swells for
+ * a tile of about five metres: crumbled edges, a face worn hollow or left proud. b: efflorescence, the white salt a damp wall weeps, in patches. a: grime, broad
+ * blotches of soot and rain-dirt that the shader smears down the wall.
+ */
+export function ktGritData(size = 256) {
+  const data = new Uint8Array(size * size * 4);
+  const random = ktRandom(977);
+  const grain = ktField(size, 961, [[64, 1], [128, 0.8], [256, 0.6]]);
+  const pits = ktField(size, 963, [[48, 1], [96, 0.8], [192, 0.5]]);
+  const swell = ktField(size, 967, [[8, 1], [16, 0.8], [32, 0.6], [64, 0.35]]);
+  const chips = ktField(size, 969, [[12, 1], [24, 0.8], [48, 0.4]]);
+  const salt = ktField(size, 971, [[6, 1], [12, 0.7], [24, 0.5], [48, 0.3]]);
+  const dirt = ktField(size, 973, [[3, 1], [6, 0.8], [12, 0.6], [24, 0.4]]);
+  // The relief of the fine layer: grain, with holes where the pit field peaks, and chisel strokes cut into it.
+  const relief = new Float32Array(size * size);
+  for (let k = 0; k < relief.length; k += 1) {
+    const hole = ktSmoothstep(0.62, 0.78, pits[k]);
+    relief[k] = 0.5 + (grain[k] - 0.5) * 0.9 - hole * 0.42;
+  }
+  for (let stroke = 0; stroke < 900; stroke += 1) {
+    let x = random() * size;
+    let y = random() * size;
+    const angle = (random() < 0.7 ? 0.55 : 0.0) + (random() - 0.5) * 0.5;
+    const length = 8 + random() * 16;
+    const depth = 0.1 + random() * 0.22;
+    for (let step = 0; step < length; step += 1) {
+      const taper = Math.sin((Math.PI * step) / length);
+      for (let across = -1; across <= 1; across += 1) {
+        const px = (Math.floor(x - Math.sin(angle) * across) + size) & (size - 1);
+        const py = (Math.floor(y + Math.cos(angle) * across) + size) & (size - 1);
+        relief[py * size + px] -= depth * taper * (across === 0 ? 1 : 0.45);
+      }
+      x += Math.cos(angle);
+      y += Math.sin(angle);
+    }
+  }
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const i = y * size + x;
+      const k = i * 4;
+      data[k] = ktClamp(relief[i] * 255, 0, 255);
+      // Chips: plateaus and steps where the swell field crosses its thresholds, over a gentle swell.
+      const step = ktSmoothstep(0.56, 0.62, chips[i]) * 0.35 - ktSmoothstep(0.38, 0.32, chips[i]) * 0.3;
+      data[k + 1] = ktClamp((0.5 + (swell[i] - 0.5) * 0.8 + step) * 255, 0, 255);
+      data[k + 2] = ktClamp(ktSmoothstep(0.55, 0.8, salt[i]) * (0.55 + 0.9 * grain[i]) * 255, 0, 255);
+      data[k + 3] = ktClamp(((dirt[i] - 0.5) * 2.2 + 0.5) * 255, 0, 255);
     }
   }
   return data;
