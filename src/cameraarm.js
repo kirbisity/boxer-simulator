@@ -1,6 +1,6 @@
 // The camera's spring arm. Whatever camera the game wants (the follow camera behind the man played, the watching camera over
-// the fight, a cutscene's) is a point on an arm from what it looks at; the scenery between the two is never made see-through.
-// Instead the arm is kept clear: a ball (the camera and its near plane) is swept from the look point out to the wanted
+// the fight, a cutscene's) is a point on an arm from what it is there to see; the scenery between the two is never made see-through.
+// Instead the arm is kept clear: a ball (the camera and its near plane) is swept from the man (his chest) out to the wanted
 // position, and where it touches a wall, a roof, a floor, a house, the camera stands short of it, with a margin.
 //
 // Where the arm comes up short it is not simply shortened: in a low tunnel that would leave the camera on top of him. Under `comfort` the
@@ -16,18 +16,18 @@
 //
 // The solver knows no THREE and no scene. A `world` says what is in the way: `reach(from, dir, length, radius)` is how far a ball of
 // that radius, set going from `from` along the unit `dir`, gets before it touches anything (up to `length`); `pivot(point, radius)`
-// (optional) moves the look point out of anything it is inside (a man against a wall, his shoulder in it). Positions are [x, y, z];
+// (optional) moves the start of the arm out of anything it is inside (a man against a wall). Positions are [x, y, z];
 // angles radians: the camera stands at target + (cos pitch cos yaw, sin pitch, cos pitch sin yaw) * distance (render.js placeCamera). The arm runs from a
 // `subject` (the man: his chest, not the smoothed point the camera looks at, which lags behind him and may be round a corner from him) to that wanted place.
 
 export const ARM = {
-  // m: the ball swept from the look point to the camera. The hard one (the last check) is the camera's own: near plane 0.2 m, and its corners (with a wide
+  // m: the ball swept from the man to the camera. The hard one (the last check) is the camera's own: near plane 0.2 m, and its corners (with a wide
   // screen) 0.27 m out. The soft one (what the arm settles on) is a little bigger, so that the hard check is seldom what stops it; the held one is the
   // dead band's far side.
   hardRadius: 0.3,
   radius: 0.42,
   held: 0.58,
-  // m: the nearest it comes to the look point as things are (the hard check may take it nearer: a man with his back to a gate), and the nearest of all (the look point is itself kept 0.3 m off the walls).
+  // m: the nearest it comes to the look point as things are (the hard check may take it nearer: a man with his back to a gate), and the nearest of all (the start of the arm is itself kept 0.3 m off the walls).
   nearest: 0.45,
   closest: 0.12,
   // m: an arm this long is as good as any longer, and one shorter than `tooClose` has the camera on top of him (m of score lost per m short, `closeCost`).
@@ -39,16 +39,17 @@ export const ARM = {
   pitchSteps: [0, 0.25, 0.5, -0.15, -0.3, -0.5],
   yawCost: 1.6,
   pitchUpCost: 2.5,
-  pitchDownCost: 2.5,
+  pitchDownCost: 1.4,
   // m of score the direction kept from the frame before has over another.
   sticky: 0.6,
-  // The pitch the camera is kept between (rad): never under the look point by much, and never top-down.
-  pitchMin: -0.05,
+  // The pitch the camera is kept between (rad): never top-down, and under him by no more than a stair needs (the camera behind a man going up a flight stands lower
+  // than he does: the flight falls away behind him at 0.46 rad, and a ceiling over it follows the slope).
+  pitchMin: -0.3,
   pitchMax: 1.0,
   // 1/s: how fast the arm goes in and comes out (a first-order approach), s: how long the way is clear before it begins to come out.
   pullIn: 14,
-  letOut: 1.8,
-  quiet: 0.4,
+  letOut: 2.5,
+  quiet: 0.35,
 };
 
 const between = (value, low, high) => Math.max(low, Math.min(high, value));

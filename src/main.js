@@ -827,8 +827,9 @@ function drawWorld(dt, drawIt = true) {
   // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
   // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall). (A stage's floors are its terrain's, which the arm below knows.)
   placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet && !world.stage });
-  // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js). The viewer's own turn of the view only shortens.
-  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, subject: followed ? [followed.x[P.pelvis * 3], followed.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, followed.x[P.pelvis * 3 + 2]] : null, free: !followed || followCam.state.wasManual, dt });
+  // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js), from the man played (a cutscene's or the ending's camera is looking at someone else: from what it looks at).
+  // The viewer's own turn of the view only shortens.
+  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, subject: followed && !endingCam && !cutsceneDirector.active ? [followed.x[P.pelvis * 3], followed.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, followed.x[P.pelvis * 3 + 2]] : null, free: !followed || followCam.state.wasManual, dt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);

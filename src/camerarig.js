@@ -15,7 +15,7 @@ import { terrainWorld } from './physics/terrain.js';
 import { voxelsOfPlace } from './occluders.js';
 
 /** ms of a frame given to taking a place's scenery into voxels, until it is taken. */
-const TAKE_MS = 5;
+const TAKE_MS = 3;
 /** m: a look point further than this from where it was a frame before has been put somewhere (no man moves 2 m in a frame). */
 const CUT = 2;
 
