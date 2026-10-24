@@ -16,6 +16,7 @@
 //   node tools/dunnottar.js segments [--runs 20] [--segments start_rest1,rest1_rest2,...] [--logs]   rest to rest, from full health
 //   node tools/dunnottar.js vaelen [--runs 10] [--variant unhealed,healed,brigandine,plate]   the boss alone, from the chapel gate
 //   node tools/dunnottar.js knights [--runs 20] [--tweak skill=0.3,exercise=0.2]               Sir Alasdair (the plate knight at the front gate) alone, from rest 1
+//   node tools/dunnottar.js noname [--runs 20] [--tweak skill=0.6]                              Noname (the cesspool's miniboss) from the smugglers' brazier
 //   node tools/dunnottar.js one <policy> <seed> [--log]                                   one run, JSON (the sweep's worker)
 // A sweep of 16 + 16 runs takes about ten minutes on ten cores (a run is a few thousand simulated seconds at about 6x real time);
 // each run is its own process, `--jobs` of them at a time. `segments` is the quick way to tune: one stretch, many seeds.
@@ -120,6 +121,16 @@
 // foot); it closes in on a man who pokes from the end of his reach and goes round a wall to one across it; it pulls the sea-gate lever. And the stage taught
 // the physics: a man knocked down on a floor below y 0 never stood again (physics/rising.js asked for a share of a negative height), so in the sea cave and the
 // drain, the bot lay where he fell.
+//
+// ---- Phase G (round 3: the sewer emptied of soldiers, one miniboss in its cesspool) ----------------------------------------------------
+// The levies Wat, Peem and Jock and Sergeant Mungo are gone; the old drain holds Noname alone (presets.js `noname`: Astacius's kit, a long sword), in the
+// sludge of the cesspool under the inner cell, the smugglers' brazier just before him. `noname` runs the fight from that rest (the careful operative, two
+// comrades, one death a try; `--tweak` over his inputs, `work`, `burst`, `move`, `mobility` his temperament, `extraMass`, `balance` his outfit's hooks):
+//   as first built (calories 2850: 49 kg of body under the kit, strikeForce 79 N at the hand)   beaten 15/20    the long sword struck from his hand in every fight
+//   calories 4220 (74 kg)                                                                      beaten 20/30
+//   + outfit.balance 2.5, skill 0.85, temperament work 1.4 burst 1.3                           beaten 50/80    (skill 0.7 to 1: no measurable change)
+//   + calories 4400 (78 kg: the preset)                                                       beaten 33/80 (41 %), median 16 s, 1.3 of 2 comrades left
+// The sludge holds the legs of every man in it (level.js wadeGear, his too): a wader Noname did worse (the operative fought from the ramp's foot).
 //
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
@@ -1163,6 +1174,51 @@ function knightDuel(seed, log, seconds = 300, tweak = {}) {
   return { seed, result: run.knight.beaten ? 'beaten' : run.deaths.length ? 'died' : 'timeout', seconds: run.report().seconds, harm: Number(bodyHarm(run.me).toFixed(2)), knightHurt: Number(hurtShare(knight).toFixed(2)), by: run.deaths[0]?.by ?? '', log: run.log };
 }
 
+// ---- Noname in the cesspool ------------------------------------------------------------------------------------
+
+/**
+ * Noname, the cesspool's miniboss (stages/dunnottar-sewer.js), from the smugglers' brazier (the drain's rest: whole, the pouch as the stage gives it, his
+ * comrades beside him): the operative walks the long drain into the cesspool and fights him (the bot careful: it backs off, bandages, drinks). One death ends it.
+ * `tweak` is laid over Noname's inputs before the world is made: node tools/dunnottar.js noname --runs 20 --tweak skill=0.6.
+ */
+function nonameDuel(seed, log, seconds = 300, tweak = {}) {
+  ROUTE = 'sewer';
+  const spawn = DUNNOTTAR.sections.flatMap((section) => section.spawns).find((entry) => entry.id === 'noname');
+  const was = { preset: spawn.preset, inputs: structuredClone(spawn.inputs) };
+  // (work, move, burst, mobility: his temperament, levelmode/level.js giveTemper.)
+  const { preset, work, move, burst, mobility, extraMass, balance, ...inputs } = tweak;
+  if (preset) spawn.preset = preset;
+  // (extraMass, balance: his kit's weight as a share of his body, how hard he is to knock down: a man's own `outfit` hooks, outfits.js gearTraits.)
+  if (extraMass !== undefined || balance !== undefined) inputs.outfit = { ...levelPreset(spawn.preset).outfit, ...(extraMass !== undefined ? { extraMass } : {}), ...(balance !== undefined ? { balance } : {}) };
+  const temper = Object.fromEntries(Object.entries({ work, move, burst, mobility }).filter(([, value]) => value !== undefined));
+  if (Object.keys(temper).length) inputs.temperament = { ...levelPreset(spawn.preset).temperament, ...temper };
+  Object.assign(spawn.inputs, inputs);
+  const leg = DUNNOTTAR_SEWER_ROUTE.find((entry) => entry.name === 'the long drain');
+  const plan = leg.points.slice(0, 5).map((p, index) => ({ p, acts: [], leg: leg.name, base: index }));
+  const noname = (self) => self.world.fighters.find((fighter) => fighter.spawn?.id === 'noname');
+  const run = new Run({
+    policy: 'careful',
+    seed,
+    plan,
+    log,
+    maxDeaths: 1,
+    until: (self) => (noname(self)?.state === 'out' ? 'beaten' : null),
+    setup: (self) => {
+      const comrades = comradesOf(self.world).slice(0, ALLIES).map((fighter) => fighter.spawn.id);
+      self.only = ['noname', ...comrades];
+      const rest = RESTS.restdrain;
+      restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
+      self.level.ui.length = 0;
+      self.me.mayTarget = (other) => self.wanted(other);
+    },
+  });
+  run.play({ seconds });
+  Object.assign(spawn, was);
+  spawn.inputs = was.inputs;
+  const man = noname(run);
+  return { seed, result: man.state === 'out' ? 'beaten' : run.deaths.length ? 'died' : 'timeout', seconds: run.report().seconds, harm: Number(bodyHarm(run.me).toFixed(2)), nonameHurt: Number(hurtShare(man).toFixed(2)), comrades: livingComrades(run.world).length, by: run.deaths[0]?.by ?? '', log: run.log };
+}
+
 // ---- Segments: from one rest to the next -------------------------------------------------------------------
 
 /** The rests, by id: { at, name }. */
@@ -1339,6 +1395,19 @@ async function main() {
     console.log(`Sir Alasdair alone (allies ${ALLIES}${options.tweak ? `, ${options.tweak}` : ''}): beaten ${results.filter((result) => result.result === 'beaten').length}/${results.length}  died ${results.filter((result) => result.result === 'died').length}  timed out ${results.filter((result) => result.result === 'timeout').length}  mean knight hurt ${mean('knightHurt')}  median ${[...results.map((result) => result.seconds)].sort((a, b) => a - b)[Math.floor(results.length / 2)]} s`);
     return;
   }
+  if (command === 'nonameone') {
+    console.log(JSON.stringify(nonameDuel(Number(options._[1]), Boolean(options.log), Number(options.seconds ?? 300), parseTweak(options.tweak))));
+    return;
+  }
+  if (command === 'noname') {
+    const runs0 = Number(options.runs ?? 20);
+    const lists = Array.from({ length: runs0 }, (_, index) => ['nonameone', String(Number(options.seed0 ?? 1) + index), '--allies', String(ALLIES), ...(options.tweak ? ['--tweak', String(options.tweak)] : []), ...(options.logs ? ['--log'] : [])]);
+    const results = await farm(lists, jobs);
+    const mean = (key) => (results.reduce((sum, result) => sum + (result[key] ?? 0), 0) / Math.max(1, results.length)).toFixed(2);
+    if (options.logs) for (const result of results.filter((entry) => entry.result !== 'beaten')) console.log(`--- seed ${result.seed} ${result.result} ${result.by}\n${(result.log ?? []).slice(-20).join('\n')}`);
+    console.log(`Noname (allies ${ALLIES}${options.tweak ? `, ${options.tweak}` : ''}): beaten ${results.filter((result) => result.result === 'beaten').length}/${results.length}  died ${results.filter((result) => result.result === 'died').length}  timed out ${results.filter((result) => result.result === 'timeout').length}  mean Noname hurt ${mean('nonameHurt')}  mean comrades left ${mean('comrades')}  median ${[...results.map((result) => result.seconds)].sort((a, b) => a - b)[Math.floor(results.length / 2)]} s`);
+    return;
+  }
   if (command === 'boss') {
     const [, variant, seed] = options._;
     console.log(JSON.stringify(bossDuel(variant, Number(seed), Boolean(options.log))));
@@ -1395,6 +1464,6 @@ const setAllies = (count) => { ALLIES = count; };
 
 const setRoute = (name) => { ROUTE = name; };
 
-export { setAllies, setRoute, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, knightDuel, POLICY, VARIANTS };
+export { setAllies, setRoute, Run, segmentRun, basePlan, planFor, routeTrace, bossDuel, knightDuel, nonameDuel, POLICY, VARIANTS };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

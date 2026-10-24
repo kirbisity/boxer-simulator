@@ -1799,8 +1799,8 @@ export function gearTraits(inputs) {
     skillFactor: spec.skillFactor ?? 1,
     // Poise beyond the armour's weight and shell (physics poiseOf): one rigid shell bolted together.
     poise: spec.poise ?? 0,
-    // Courage from good armour: less fear, readier to close (0 to 1).
-    courage: spec.courage ?? 0,
+    // Courage from good armour: less fear, readier to close (0 to 1); a man's own (`outfit.courage`: one who never breaks) before the kit's.
+    courage: inputs.outfit?.courage ?? spec.courage ?? 0,
     // Trained to fight in ranks (formation.js): { advance, charge, testudo } — the line moves up to the enemy (closed under its shields if `testudo`; the last `charge` m at a run), or holds.
     drill: spec.drill ?? null,
     // A full plate harness: no gap for an edge (a point may still find one).

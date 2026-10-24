@@ -92,8 +92,8 @@ function reviveWorld(world, { followersAt = true } = {}) {
     const { def } = found;
     if (def.dead) continue;
     if (fighter.corner === 'blue') {
-      // A boss who has fallen stays down: the stage is done.
-      if (def.role === 'boss' && fighter.state === 'out') continue;
+      // A boss who has fallen stays down: the stage is done. So does a miniboss (the cesspool's Noname): his helmet lies where it fell.
+      if ((def.role === 'boss' || def.miniboss) && fighter.state === 'out') continue;
       fighter.spawn.section = fighter.spawn.home;
       remake(world, fighter, inputs, { at: def.post, yaw: def.facing ?? 0, shield: undefined });
       if (def.role === 'boss') level.boss = { id: fighter.id, phase: 1 };

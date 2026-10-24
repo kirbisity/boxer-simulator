@@ -6,6 +6,7 @@
 import { kgBox, kgCylinder, kgLump, kgTube } from './kitgeo.js';
 import { ktRandom } from './kittex.js';
 import { kcProp } from './kitchapel.js';
+import { kfProp } from './kitfilth.js';
 
 /** Where a prop's local (lx, lz) is in the world, for a prop at [x, z] turned `yaw`. */
 function kpAt(at, yaw) {
@@ -213,6 +214,12 @@ export function kpBuild(prop, ctx) {
       dyn.shafts.push({ at: [x, y, z], size: [w, d], yaw });
       break;
     }
+    case 'lightshaft': {
+      // A pale shaft of the storm's light from a slit or a window down to the floor (no grating: the opening is the wall's): `height` m from the opening down.
+      const [x, z] = here(0, 0);
+      dyn.shafts.push({ at: [x, y, z], size: prop.size ?? [0.6, 1.2], yaw, height: prop.height ?? 3 });
+      break;
+    }
     case 'drip':
       dyn.drips.push({ at: [...here(0, 0).slice(0, 1), y, here(0, 0)[1]], fall: 4.1 });
       break;
@@ -307,7 +314,7 @@ export function kpBuild(prop, ctx) {
       kgBox(batch, 'iron', sx + dir[0] * 0.12, y + at[1] * 0, sz + dir[1] * 0.12, Math.abs(dir[0]) * 0.28 + 0.05, 0.05, Math.abs(dir[1]) * 0.28 + 0.05, 0);
       kgCylinder(batch, 'wood', sx + dir[0] * 0.28, y - 0.05, sz + dir[1] * 0.28, 0.035, 0.03, 0.55, { sides: 5 });
       dyn.flames.push({ at: [sx + dir[0] * 0.28, y + 0.55, sz + dir[1] * 0.28], size: prop.dim ? 0.12 : KP_FLAME.torch });
-      dyn.lights.push({ at: [sx + dir[0] * 0.6, y + 0.7, sz + dir[1] * 0.6], color: 0xffa05a, power: prop.dim ? 0.3 : 0.8, range: 9 });
+      dyn.lights.push({ at: [sx + dir[0] * 0.6, y + 0.7, sz + dir[1] * 0.6], color: 0xffa05a, power: prop.dim ? 0.5 : 0.8, range: prop.dim ? 8 : 9 });
       break;
     }
     case 'lantern': {
@@ -392,7 +399,8 @@ export function kpBuild(prop, ctx) {
       break;
     }
     default:
-      kcProp(prop, ctx);
+      // (The drain's filth, kitfilth.js; else the chapel's furniture.)
+      if (!kfProp(prop, ctx)) kcProp(prop, ctx);
       break;
   }
 }

@@ -33,7 +33,8 @@
 import { ceilingOf, rampOf, stairsOf, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
 import { buildChapel, buildCell, DN_ENDING } from './dunnottar-chapel.js';
 import { buildCrypt, buildVault, DN_COVERED, DN_SHAFT_SPIRAL, DN_VAULT_STEPS } from './dunnottar-vault.js';
-import { buildSeaCave, buildSewer, DN_CAVE } from './dunnottar-sewer.js';
+import { buildSeaCave, buildSewer, DN_CAVE, DN_CESSPOOL_REGION } from './dunnottar-sewer.js';
+import { dnInteriorRooms, dnLightDecor } from './dunnottar-light.js';
 import { DN_FACE, DN_LEVELS, DN_PATH, DN_Y, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnLerp, dnProp, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
 export { DN_FACE, DN_LEVELS, DN_PATH, DN_Y } from './dnbuild.js';
@@ -670,6 +671,8 @@ const DN_DEAD = {
   vault: [['fallen5', 'dunnottarGuard', 2, [6.6, Y.vault, -33.8], 2.6, 'A guard, killed at the rack: a poor man, the questioner\'s own sergeant']],
   crypt: [['fallen6', 'dunnottarKnight', 3, [4.4, Y.crypt, -37.4], 0.5, 'A man-at-arms, his harness on, sat down by the sea-gate and did not rise']],
 };
+// The lit things the dark rooms want beyond their builders' (dunnottar-light.js).
+dnLightDecor(DN_SECTIONS);
 for (const section of DN_SECTIONS) {
   for (const [what, x, y, z, extra] of DN_CLUTTER[section.id] ?? []) dnProp(section, what, [x, y, z], extra);
   for (const decor of section.decor) {
@@ -708,6 +711,10 @@ export const DUNNOTTAR = {
   levels: DN_LEVELS,
   start: { section: 'cliff', at: [-114, DN_Y.start, -4], facing: DN_FACE.E },
   sections: DN_SECTIONS,
+  // The light under the roofs (stage.js interiorAt, levelmode/storm.js): the rooms and sections that are dark, lit by their flames (dunnottar-light.js).
+  interiors: dnInteriorRooms(DN_SECTIONS),
+  // Named places for what wants them (the plot twist's drop, a cutscene): the cesspool's arena under the inner cell (dunnottar-sewer.js).
+  regions: { cesspool: DN_CESSPOOL_REGION },
   // After the boss: the inner cell's door opens, and near the prince (m) the scene begins; he shuffles into the corner (the straw's).
   ending: DN_ENDING,
   // The prisoners who follow him stop at the chapel gate.
