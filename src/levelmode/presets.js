@@ -45,6 +45,13 @@ export const LEVEL_PRESETS = {
     outfit: { kind: 'footman', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'mustache', eyeColor: 'brown' },
   },
+  // The archer on the walls (a long bow): he looses from a post he does not leave (the barbican's platform over the drawbridge), at a
+  // man on the bridge and its head; the operative has no way up to him. Drilled no better than the crossbowman.
+  dunnottarArcher: {
+    name: 'Dunnottar archer', style: 'bow', sex: 'male', heightCm: 172, frame: 'medium', age: 26, exercise: 0.3, calories: 2770, skill: 0.2,
+    outfit: { kind: 'footman', design: 2 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#5a3a20', facialHair: 'stubble', eyeColor: 'blue' },
+  },
   // His powder is damp: the stage makes him misfire (matchlock misfire and hang-fire chances are level config).
   dunnottarMatchlock: {
     name: 'Dunnottar matchlock', style: 'matchlock', sex: 'male', heightCm: 174, frame: 'medium', age: 34, exercise: 0.3, calories: 2836, skill: 0.2,

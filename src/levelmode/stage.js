@@ -225,7 +225,7 @@ export function createStageWorld(stage, playerInputs, { seed = 1, awareness = tr
   for (const section of stage.sections) {
     for (const spawn of section.spawns ?? []) {
       entries.push({ inputs: spawnInputs(spawn), corner: ROLE_CORNER[spawn.role] });
-      posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id } });
+      posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id, ...(spawn.perch ? { perch: true } : {}) } });
     }
   }
   // An open arena: the box is a far limit, the terrain the floor.

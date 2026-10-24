@@ -30,10 +30,11 @@
 // A section's `decor` is for the drawing only (levelmode/kit.js): wall runs with openings, vaults, props. The solids
 // that make the physics carry a `style` (how they are drawn) and, when a run draws them instead, `skin: false`.
 
-import { ceilingOf, rampOf, stairsOf, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
+import { ceilingOf, rampOf, stairsOf, wallLine, wallOf, windingStairs, windingTread } from '../../physics/terrain.js';
 import { buildChapel, buildCell, DN_ENDING } from './dunnottar-chapel.js';
 import { buildCrypt, buildVault, DN_COVERED, DN_SHAFT_SPIRAL, DN_VAULT_STEPS } from './dunnottar-vault.js';
-import { buildSeaCave, buildSewer, DN_CAVE } from './dunnottar-sewer.js';
+import { buildSeaCave, buildSewer, DN_CAVE, DN_CAVE_STAIR } from './dunnottar-sewer.js';
+import { mainlandHeight } from '../landform.js';
 import { DN_FACE, DN_LEVELS, DN_PATH, DN_Y, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnLerp, dnProp, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
 export { DN_FACE, DN_LEVELS, DN_PATH, DN_Y } from './dnbuild.js';
@@ -43,13 +44,19 @@ export { DN_FACE, DN_LEVELS, DN_PATH, DN_Y } from './dnbuild.js';
 /** The mainland's height (y) at (x, z), away from the paths: the hillside's plane (kit.js draws it from `landform.mainland`). */
 const dnGround = (x, z) => Math.min(16, 12 - 0.27 * (z + 4));
 
+/** Every crag's lump and its wall, to be set on the drawn hillside when the stage is whole (dnSettle). */
+const DN_LUMPS = [];
+
 /** Crags and boulders: [x, z, rx, ry, rz] each, standing in the hillside (drawn as lumps of rock with tufts at their feet) and a wall of the same footprint that keeps men out. */
 function dnOutcrop(sec, crags) {
   const lumps = [];
   crags.forEach(([x, z, rx, ry, rz], k) => {
     const base = dnGround(x, z) - 1.4;
-    lumps.push({ at: [x, base, z], r: [rx, ry, rz], seed: 7 + k + Math.floor(Math.abs(x + z)) });
-    sec.terrain.push({ ...wallOf([x, z], [rx * 1.5, rz * 1.5], base - 1, base + ry * 1.3, {}), style: 'hidden', skin: false });
+    const lump = { at: [x, base, z], r: [rx, ry, rz], seed: 7 + k + Math.floor(Math.abs(x + z)) };
+    const wall = { ...wallOf([x, z], [rx * 1.5, rz * 1.5], base - 1, base + ry * 1.3, {}), style: 'hidden', skin: false };
+    lumps.push(lump);
+    sec.terrain.push(wall);
+    DN_LUMPS.push([lump, wall]);
   });
   sec.decor.push({ kind: 'outcrop', lumps });
 }
@@ -72,10 +79,89 @@ const DN_L1 = dnLerp(-104, -62, Y.start, Y.pathA);
 const DN_L2 = dnLerp(-62.5, -100.5, Y.pathA, Y.pathB);
 const DN_L3 = dnLerp(-100.5, -62.5, Y.pathB, Y.pathC);
 
+// ---- The ravine and the drawbridge ----------------------------------------------------------------
+//
+// Between the gorge shelf (the mainland's last ledge) and the castle rock, the sea runs in through a ravine 14 m wide, sheer on both
+// sides, open to the south. The drawbridge is let down across it from the barbican: two squat towers joined by an arch over the
+// bridge's end, their tops a fighting platform with archers on it, and the forecourt behind, before the great gate (barred) and the
+// ledge round to the postern. Seen from the bridge's head, the gate with its guard is ahead, and the sea cave's lit stair is to the
+// right, 4 m off the way: the choice is in view.
+//
+//                 z 36.6 ── rock face ─────────────────────────────────────────┐
+//   gorge shelf   │                          │   ravine (sea, y -9)  │ barbican │ gate hall
+//   (y 0)         │                          │                       │ tower N  │ (great gate, x -6)
+//   Rest 1 (-44)  │                          ├═══ drawbridge (y 0) ══╡  arch    │ forecourt x -12..-6.8
+//                 │                          │   z 44.2..48.2        │ tower S  │
+//                 │                          │                       │          ├── ledge to the postern (x -6.8..6.2, z 52.4..55.8)
+//   z 56 ─────────┴─ sea-cave stair head ────┘ (x -29.6..-26.2, z 56..59.5)      │
+//                 x -41                   x -26                  x -12.6   x -9   x -6.8
+
+/** The ravine (x0..x1) and the drawbridge over it: its deck (z0..z1, its top at y), and the barbican's platform (y) and its extent. */
+export const DN_RAVINE = { x0: -26, x1: -12 };
+export const DN_BRIDGE = { x0: DN_RAVINE.x0 - 0.4, x1: DN_RAVINE.x1 + 0.4, z0: 44.2, z1: 48.2, y: Y.gorge };
+export const DN_BARBICAN = { x0: -14, x1: -11, z0: 39.4, z1: 53, top: 7.2, arch: 4.6 };
+
+function buildDrawbridge(sec) {
+  const G = Y.gorge;
+  const B = DN_BARBICAN;
+  const mid = (DN_BRIDGE.z0 + DN_BRIDGE.z1) / 2;
+  // The castle side of the ravine: the forecourt, rock, before the gate hall's west wall.
+  dnSlab(sec, DN_RAVINE.x1, -6.8, 38, 56, G, 'rock', { extra: { land: true } });
+  dnBox(sec, DN_RAVINE.x1, -6.8, 36.6, 38.4, G - 0.5, 3.2, 'rock');
+  // The ravine's head: the rock face closes it on the north, down to the sea.
+  dnBox(sec, DN_RAVINE.x0, DN_RAVINE.x1, 36.6, 38.4, Y.sea - 1, 3.2, 'rock');
+  // The deck: timber, let down across the ravine, its ends on the rock either side (a span: the cliffs under it are drawn whole).
+  dnSlab(sec, DN_BRIDGE.x0, DN_BRIDGE.x1, DN_BRIDGE.z0, DN_BRIDGE.z1, DN_BRIDGE.y, 'boards', { bottom: DN_BRIDGE.y - 0.5, extra: { span: true } });
+  dnFence(sec, [[DN_RAVINE.x0, DN_BRIDGE.z0 + 0.05, G], [DN_BRIDGE.x1, DN_BRIDGE.z0 + 0.05, G]], { style: 'fence', height: 1.1 });
+  dnFence(sec, [[DN_RAVINE.x0, DN_BRIDGE.z1 - 0.05, G], [DN_BRIDGE.x1, DN_BRIDGE.z1 - 0.05, G]], { style: 'fence', height: 1.1 });
+  dnProp(sec, 'drawbridge', [(DN_RAVINE.x0 + B.x0) / 2, G, mid], { yaw: 0, length: B.x0 - DN_RAVINE.x0, width: DN_BRIDGE.z1 - DN_BRIDGE.z0, chainTo: [(B.x0 - DN_RAVINE.x0) / 2 - 0.1, B.arch + 1.6] });
+  // The barbican: two towers rising from the sea joined by an arch over the bridge's end (a wall run with the arch in it), and on top a
+  // platform with crenellated parapets all round: the archers' (there is no way up for him: they are for arrows from afar).
+  dnRun(sec, [(B.x0 + B.x1) / 2, B.z0], [(B.x0 + B.x1) / 2, B.z1], B.x1 - B.x0, Y.sea - 1, B.top - 0.05, 'ashlar', [{ at: mid - B.z0, width: DN_BRIDGE.z1 - DN_BRIDGE.z0, sill: G, top: B.arch, shape: 'round' }], { face: 'barbican' });
+  dnSlab(sec, B.x0, B.x1, B.z0, B.z1, B.top, 'flags', { bottom: B.top - 0.3 });
+  const t = 0.45;
+  const parapet = (a, b) => sec.terrain.push({ ...wallLine(a, b, t, B.top - 0.3, B.top + 0.9), style: 'parapet' });
+  // (The west parapet, over the bridge, has an embrasure at each archer's post: a gap down to a low sill, through which he looses down the bridge.)
+  const loops = [B.z0 + 1.6, mid, B.z1 - 1.6];
+  let from = B.z0 + t / 2;
+  for (const z of loops) {
+    parapet([B.x0 + t / 2, from], [B.x0 + t / 2, z - 0.6]);
+    sec.terrain.push({ ...wallLine([B.x0 + t / 2, z - 0.6], [B.x0 + t / 2, z + 0.6], t, B.top - 0.3, B.top + 0.35), style: 'ashlar' });
+    from = z + 0.6;
+  }
+  parapet([B.x0 + t / 2, from], [B.x0 + t / 2, B.z1 - t / 2]);
+  parapet([B.x1 - t / 2, B.z0 + t / 2], [B.x1 - t / 2, B.z1 - t / 2]);
+  parapet([B.x0 + t * 1.5, B.z0 + t / 2], [B.x1 - t * 1.5, B.z0 + t / 2]);
+  parapet([B.x0 + t * 1.5, B.z1 - t / 2], [B.x1 - t * 1.5, B.z1 - t / 2]);
+  // The forecourt's lip over the ravine, north and south of the towers: a low wall.
+  dnBox(sec, DN_RAVINE.x1, DN_RAVINE.x1 + 0.45, 38.4, B.z0, G - 0.4, G + 1.1, 'parapet');
+  dnBox(sec, DN_RAVINE.x1, DN_RAVINE.x1 + 0.45, B.z1, 56, G - 0.4, G + 1.1, 'parapet');
+  // The gate is a killing ground and says so: a lit brazier at the bridge's foot, the bodies of the last who tried, a sign with a skull.
+  dnProp(sec, 'brazier', [-8.0, G, 39.4], { lit: true });
+  dnProp(sec, 'torch', [B.x0 - 0.05, G + 3.2, DN_BRIDGE.z0 - 0.9], { face: 'W' });
+  dnProp(sec, 'torch', [B.x0 - 0.05, G + 3.2, DN_BRIDGE.z1 + 0.9], { face: 'W' });
+  dnProp(sec, 'sign', [-27.4, G, DN_BRIDGE.z0 - 0.6], { yaw: 0, warn: true });
+  dnProp(sec, 'bones', [-17.5, G, mid + 0.8], { yaw: 1.3 });
+  dnProp(sec, 'weapon', [-21, G, mid - 1.1], { what2: 'spear', yaw: 0.2 });
+  dnProp(sec, 'raven', [B.x0 + 0.3, B.top + 0.9, B.z0 + 0.3], { yaw: 2.2 });
+
+  // The guard. The front stays a way in, but a hard one: on the barbican, archers (they see the bridge and its head, not the sea cave's stair);
+  // at the bridge's end two guards; at the ledge's corner a levy; on the ledge Sir Alasdair (the gate section's). They are one alarm (`alarm`):
+  // one who sees him raises them all.
+  const front = { alarm: 'front' };
+  const archer = { ...front, perch: true, vision: 18 };
+  dnSpawn(sec, 'archer1', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, B.z0 + 1.6], DN_FACE.W, { ...archer, inputs: { name: 'Archer Gow' } });
+  dnSpawn(sec, 'archer2', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, mid], DN_FACE.W, { ...archer, inputs: { name: 'Archer Strachan' } });
+  dnSpawn(sec, 'archer3', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, B.z1 - 1.6], DN_FACE.W, { ...archer, inputs: { name: 'Archer Duthie' } });
+  dnSpawn(sec, 'bridgeguard1', 'dunnottarGuard', 'enemy', 2, [-9.4, G, DN_BRIDGE.z0 + 0.5], DN_FACE.W, { ...front, inputs: { name: 'Sergeant Ure' } });
+  dnSpawn(sec, 'bridgeguard2', 'dunnottarSoldier', 'enemy', 1, [-9.4, G, DN_BRIDGE.z1 - 0.5], DN_FACE.W, { ...front, inputs: { name: 'Jock' } });
+  dnSpawn(sec, 'bridgelevy', 'dunnottarSoldier', 'enemy', 1, [-8.2, G, 54.6], DN_FACE.W, { ...front, inputs: { name: 'Wattie' } });
+}
+
 function buildCliff() {
   const sec = dnSection('cliff', 'The Cliff Path');
   // (The mainland and the gorge are above y -1: the sea cave and the old drain run under them, in the `sewer` section; the cave's stair and landing are the third region.)
-  dnBounds(sec, { at: [-88, 14], size: [76, 56], y: [-1, 60] }, { at: [-36, 47], size: [60, 22], y: [-1, 60] }, { at: [-43, 58.5], size: [26, 5], y: [-6.5, 0.6] });
+  dnBounds(sec, { at: [-88, 14], size: [76, 56], y: [-1, 60] }, { at: [-36, 47], size: [60, 22], y: [-1, 60] }, { at: [-39.4, 58.5], size: [27, 5], y: [-6.5, 0.6] });
   // The mainland, where the way begins: a plateau, then L1. The path is DN_PATH wide, rails 0.2 outside its edges; each turn is a landing a little wider.
   const h = DN_PATH / 2;
   const r = h + 0.2;
@@ -88,13 +174,15 @@ function buildCliff() {
   dnSlab(sec, -62.5, -56.4, 20 - h, 30.8, Y.pathC, 'path', { extra: { land: true } });
   // The stair down to the gorge: 19 treads of 0.2 (3.8 m).
   const down = dnFlight(sec, { foot: [-58, 38.4], dir: 'N', steps: 19, tread: 0.4, width: DN_PATH, from: Y.gorge, rise: 0.2, style: 'cobble' });
-  // The gorge shelf: black rock, a cliff to the sea on its south and west; a low rock face on the north.
+  // The gorge shelf: black rock, a cliff to the sea on its south and west; a low rock face on the north. It ends at the ravine, the sea's
+  // cut between the mainland and the castle rock, crossed by the drawbridge (below).
   // (The shelf is whole but for a plate over the sea cave, 15 m wide and 1.5 thick, with the cave under it: `faceless`, as the cave's mouth is in its face.)
   dnSlab(sec, -64, -56, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
   dnSlab(sec, -56, -41, 38, 56, Y.gorge, 'rock', { bottom: Y.gorge - 1.5, extra: { land: true, faceless: true } });
-  dnSlab(sec, -41, -6.8, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
+  dnSlab(sec, -41, DN_RAVINE.x0, 38, 56, Y.gorge, 'rock', { extra: { land: true } });
   dnBox(sec, -64, -58 - r, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
-  dnBox(sec, -58 + r, -6.8, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
+  dnBox(sec, -58 + r, DN_RAVINE.x0, 36.6, 38.4, Y.gorge - 0.5, 3.2, 'rock');
+  buildDrawbridge(sec);
 
   // Fences: every leg on both sides, the landings round their outer edges; the stair on both sides.
   const rail = (points, opts) => dnFence(sec, points, opts);
@@ -137,23 +225,23 @@ function buildCliff() {
   // Rest 1: the brazier in the gorge, out of the wind under the rock face.
   sec.rest = { id: 'rest1', name: 'The Gorge Brazier', at: [-44, Y.gorge, 41.5] };
   dnProp(sec, 'brazier', [-44, Y.gorge, 40.4], { lit: true, rest: true });
-  dnProp(sec, 'brazier', [-14, Y.gorge, 43], { lit: true });
-  // The way round to the postern (the great gate is barred): a brazier at the turning, and a trail of way-marks on the rock along the shelf and round the ledge.
-  dnProp(sec, 'brazier', [-8.2, Y.gorge, 50.6], { lit: true });
-  sec.decor.push({ kind: 'waymarks', points: [[-50, 44.5, Y.gorge], [-38, 44.5, Y.gorge], [-26, 47, Y.gorge], [-16, 51, Y.gorge], [-11.5, 53.8, Y.gorge]], gap: 2.1, first: 1.0 });
+  // The worn way: from the foot of the stair past the brazier, the trail of way-marks goes to the sea cave's stair head (buildSeaCave), not to the
+  // bridge. The front way (the drawbridge, the gatehouse and its archers, the knight on the ledge) has no marks: what marks it is a warning.
+  sec.decor.push({ kind: 'waymarks', points: [[-58, 40.2, Y.gorge], [-54, 42.6, Y.gorge], [-48, 44.8, Y.gorge]], gap: 2.0, first: 0.6 });
   // The head of the stair down into the gorge: a trail from the landing over the lip.
   sec.decor.push({ kind: 'waymarks', points: [[-104, -4, DN_L1(-104)], [-97, -4, DN_L1(-97)], [-90, -4, DN_L1(-90)]], gap: 2.4, first: 1.2 });
   sec.decor.push({ kind: 'waymarks', points: [[-66, -4, DN_L1(-66)], [-60.5, -2.4, Y.pathA], [-60.5, 5.6, Y.pathA], [-64, 8, DN_L2(-64)]], gap: 2.0, first: 0.8 });
   sec.decor.push({ kind: 'waymarks', points: [[-98, 8, DN_L2(-98)], [-102.5, 10.5, Y.pathB], [-102.5, 17.5, Y.pathB], [-98, 20, DN_L3(-98)]], gap: 2.0, first: 0.8 });
   sec.decor.push({ kind: 'waymarks', points: [[-66, 20, DN_L3(-66)], [-60.5, 22, Y.pathC], [-58.5, 28, Y.pathC]], gap: 2.0, first: 0.8 });
-  // The way on: the corridor to the gatehouse is a portal while he is in it.
-  sec.portals.push({ to: 'gate', area: { at: [-17, 47], size: [20, 18] } });
+  // The way on: from the bridge's head to the gatehouse, a portal while he is in it (its men on the walls wake as he sets foot on the bridge).
+  sec.portals.push({ to: 'gate', area: { at: [-16.75, 45], size: [21.5, 14] } });
   // The sea cave (the old drain): its mouth at the foot of the shelf's cliff, and the way down to it.
   sec.portals.push({ to: 'sewer', area: { at: [DN_CAVE.x, 58], size: [15, 7], y: [-6.5, 0.5] } });
   buildSeaCave(sec);
 
   // Story props: a rotting trebuchet and a ram on the mainland, dropped weapons, ravens, wreckage.
-  dnProp(sec, 'trebuchet', [-117, 14, 14], { yaw: 0.3, scale: 1.2 });
+  // (On the hillside below the plateau, at the hill's own height: it was put at the plateau's and stood in the air.)
+  dnProp(sec, 'trebuchet', [-117, dnGround(-117, 14), 14], { yaw: 0, scale: 1.2 });
   dnProp(sec, 'ram', [-95, DN_L1(-95) , -8.4], { yaw: 0.1 });
   dnProp(sec, 'weapon', [-98, DN_L1(-98), -3], { what2: 'spear', yaw: 1.1 });
   dnProp(sec, 'weapon', [-91, DN_L1(-91), -4.2], { what2: 'sword', yaw: 2.4 });
@@ -168,7 +256,7 @@ function buildCliff() {
   dnProp(sec, 'raven', [-60.4, 1.2, 36.6], { yaw: 4.2 });
   dnProp(sec, 'raven', [-36, 3.3, 37.6], { yaw: 3 });
   dnProp(sec, 'raven', [-66, Y.gorge, 55.6], { yaw: 1.5 });
-  dnProp(sec, 'bones', [-22, Y.gorge, 52], { yaw: 0.6 });
+  dnProp(sec, 'bones', [-31, Y.gorge, 50.4], { yaw: 0.6 });
   dnProp(sec, 'banner', [-110, 14, -9.8], { yaw: 0, torn: true });
 
   // Men: a levy on each leg, one more on his round in the gorge.
@@ -176,12 +264,14 @@ function buildCliff() {
   dnSpawn(sec, 'levy1', 'dunnottarSoldier', 'enemy', 1, post(-84, DN_L1(-84), -4.9), DN_FACE.W, { inputs: { name: 'Hob' } });
   dnSpawn(sec, 'levy3', 'dunnottarSoldier', 'enemy', 1, post(-74, DN_L2(-74), 7.1), DN_FACE.E, { inputs: { name: 'Davie' } });
   dnSpawn(sec, 'levy5', 'dunnottarSoldier', 'enemy', 1, post(-86, DN_L3(-86), 20.5), DN_FACE.W, { inputs: { name: 'Rab' } });
-  dnSpawn(sec, 'levy7', 'dunnottarSoldier', 'enemy', 1, post(-24, Y.gorge, 45), DN_FACE.W, { inputs: { name: 'Sandy' }, patrol: [[-24, 45], [-34, 43]] });
+  dnSpawn(sec, 'levy7', 'dunnottarSoldier', 'enemy', 1, post(-30, Y.gorge, 44), DN_FACE.W, { inputs: { name: 'Sandy' }, patrol: [[-30, 44], [-38, 42.6]] });
 
   // Things to find.
   dnItem(sec, 'bandage1', 'bandage', [-96, DN_L1(-96), -4.4]);
   dnItem(sec, 'bandage2', 'bandage', [-65, DN_L3(-65), 20.2]);
   dnItem(sec, 'tonic1', 'tonic', [-50, Y.gorge, 44]);
+  // On the levy dead at the bridge's head: the warning, and the way round.
+  dnItem(sec, 'note-bridge', 'note', [-27.4, Y.gorge, 50.6], { note: 'bridge' });
   return sec;
 }
 
@@ -214,7 +304,6 @@ function buildGate() {
   // The postern: a torch each side of it on the sea face, and the marks round the ledge to its door and across the hall to the stair.
   dnProp(sec, 'torch', [0.1, 2.2, 52.85], { face: 'S' });
   dnProp(sec, 'torch', [4.3, 2.2, 52.85], { face: 'S' });
-  sec.decor.push({ kind: 'waymarks', points: [[-9.5, 54.2, Y.gorge], [-3, 54.2, Y.gorge], [2.2, 54, Y.gorge]], gap: 1.9, first: 0.4 });
   sec.decor.push({ kind: 'waymarks', points: [[2.2, 50.8, Y.gorge], [3.2, 48.2, Y.gorge], [5.2, 46.2, Y.gorge]], gap: 1.7, first: 0.3 });
   sec.decor.push({ kind: 'waymarks', points: [[16.2, 46.2, A], [17.5, 43.4, A], [17.5, 40.6, A]], gap: 1.8, first: 0.3 });
   dnProp(sec, 'torch', [-5.2, 3, 42.4], { face: 'E' });
@@ -228,7 +317,7 @@ function buildGate() {
   sec.terrain.push({ ...wallOf([13.9, 42.3], [0.8, 2.2], A - 1, A + 8, {}), style: 'ashlar', skin: false });
   // The landing before the oillet wall.
   dnSlab(sec, 14.28, 22.1, 39.6, 52.8, A, 'flags', { extra: { room: true } });
-  dnRun(sec, [14.28, 40.4], [30.6, 40.4], 1.6, A - 1, A + 5.2, 'ashlar', [{ at: 3.2, width: 5.4, sill: A, top: A + 3.9, shape: 'round' }, { at: 10.3, width: 3.2, sill: A, top: A + 3.6, shape: 'round' }], { face: 'vestibule' });
+  dnRun(sec, [14.28, 40.4], [30.6, 40.4], 1.6, A - 1, A + 5.2, 'ashlar', [{ at: 3.2, width: 5.4, sill: A, top: A + 3.9, shape: 'round' }, { at: 9.8, width: 3.2, sill: A, top: A + 3.6, shape: 'round' }], { face: 'vestibule' });
   dnRun(sec, [14.28, 52], [30.6, 52], 1.6, A - 1, A + 5.2, 'ashlar');
   dnCeiling(sec, 14.3, 20.5, 41.2, 51.2, A + 4.4, A + 5.2);
   sec.decor.push({ kind: 'vault', a: [14.3, 46.2, A + 4.4], b: [20.5, 46.2, A + 4.4], width: 10, crown: 2.2, style: 'vault' });
@@ -261,7 +350,7 @@ function buildGate() {
   dnSpawn(sec, 'hallguard', 'dunnottarGuard', 'enemy', 2, [-1.5, Y.gorge, 44.2], DN_FACE.S, { inputs: { name: 'Corporal Rae' } });
   dnSpawn(sec, 'gunner1', 'dunnottarMatchlock', 'enemy', 2, [23.4, A, 43.2], DN_FACE.W, { inputs: { name: 'Gunner Mackie' }, station: 'oillet', hole: 0 });
   // The front way's door: a man-at-arms in full plate on the ledge to the postern, looking back along it (the ledge is 3.4 m wide: there is no way past him). The sea cave is the way round.
-  dnSpawn(sec, 'gateknight', 'dunnottarPlateKnight', 'enemy', 3, [-3, Y.gorge, 54.1], DN_FACE.W, { inputs: { name: 'Sir Alasdair' } });
+  dnSpawn(sec, 'gateknight', 'dunnottarPlateKnight', 'enemy', 3, [-3, Y.gorge, 54.1], DN_FACE.W, { alarm: 'front', inputs: { name: 'Sir Alasdair' } });
 
   dnItem(sec, 'note-powder', 'note', [3.6, Y.gorge, 42.9], { note: 'powder', lift: 0.9 });
   dnItem(sec, 'bandage3', 'bandage', [-4.4, Y.gorge, 50.6]);
@@ -421,8 +510,9 @@ function buildQuad() {
   dnProp(sec, 'torch', [9.5, Q + 2.4, -2.5], { face: 'S' });
   dnProp(sec, 'brazier', [11.2, Q, -1.2], { lit: true });
   sec.decor.push({ kind: 'waymarks', points: [[16, 3.6, Q], [11.5, 1.2, Q], [7.4, -0.4, Q], [5.7, -1.6, Q]], gap: 1.8, first: 0.3 });
-  dnProp(sec, 'torch', [16.2, Q + 3, 6.2], { face: 'S' });
-  dnProp(sec, 'torch', [19.4, Q + 3, 6.2], { face: 'S' });
+  // (Either side of the tunnel's arch on the court's face of the wall: they hung in the arch itself, in the air.)
+  dnProp(sec, 'torch', [13.4, Q + 3, 5.95], { face: 'N' });
+  dnProp(sec, 'torch', [20.6, Q + 3, 5.95], { face: 'N' });
   // Portals: the tunnel; down into the vault by any of its stairs; up to the walls by the ladder.
   sec.portals.push({ to: 'ascent', area: { at: [17, 0.5], size: [12, 14] } });
   sec.portals.push({ to: 'vault', area: [{ at: [5.7, -9], size: [13, 22] }, { at: [24.7, -11], size: [11, 18] }, { at: [40, -21], size: [12, 12] }] });
@@ -546,8 +636,9 @@ function buildTower() {
   dnProp(sec, 'brazier', [4.8, L, -38.3], { lit: true, rest: true });
   // The way on from the ladder room to the chapel's gate: marks along the walk.
   sec.decor.push({ kind: 'waymarks', points: [[26, -36, L], [18, -36, L], [11, -36, L], [7.2, -36, L]], gap: 2.2, first: 0.4 });
-  dnProp(sec, 'brazier', [22.5, W - 3, -37.2], { lit: true });
-  dnProp(sec, 'weapon', [31, stairs.treadY(26), -36.4], { what2: 'halberd', yaw: 0.2 });
+  // (At the stair's foot, on the walk: it was 4.75 m up in the air.)
+  dnProp(sec, 'brazier', [22.0, L, -37.2], { lit: true });
+  dnProp(sec, 'weapon', [31, stairs.treadY(Math.floor((31 - stairs.foot[0]) / stairs.tread)), -36.4], { what2: 'halberd', yaw: 0.2 });
   dnProp(sec, 'weapon', [47, W, -35.2], { what2: 'sword', yaw: 4 });
   dnProp(sec, 'bones', [38, W, -37.2], { yaw: 0.8 });
   dnProp(sec, 'raven', [58.5, W + 1.3, DN_WALK_N - 0.2], { yaw: 2 });
@@ -592,8 +683,8 @@ const DN_MIND = {
 const DN_CLUTTER = {
   cliff: [
     ['planks', -121, 14, -8, { yaw: 0.4 }], ['sack', -123.4, 14, -5.4, {}], ['rubbleheap', -124, 14, 0.2, { size: 1.0 }], ['tools', -110.2, 14, 0.9, { yaw: 2 }], ['brokencrate', -112.6, 14, -8.6, { yaw: 0.7 }], ['rustiron', -115, 14, -9.2, {}],
-    ['rubbleheap', -40, Y.gorge, 53.6, { size: 1.1 }], ['planks', -30, Y.gorge, 53, { yaw: 1.1 }], ['brokencrate', -24, Y.gorge, 54.2, { yaw: 0.3 }], ['rustiron', -47, Y.gorge, 53, {}], ['tools', -12.4, Y.gorge, 41.5, {}], ['sack', -55, Y.gorge, 52, {}],
-    ['puddle', -35, Y.gorge, 46, { radius: 1.4 }], ['puddle', -18, Y.gorge, 44.4, { radius: 1.0 }], ['weeds', -62, Y.gorge, 40, {}], ['weeds', -9, Y.gorge, 40.5, {}], ['weeds', -50, Y.gorge, 38.9, {}],
+    ['rubbleheap', -40, Y.gorge, 53.6, { size: 1.1 }], ['planks', -30, Y.gorge, 53, { yaw: 1.1 }], ['brokencrate', -36.5, Y.gorge, 39.6, { yaw: 0.3 }], ['rustiron', -47, Y.gorge, 53, {}], ['tools', -7.6, Y.gorge, 41.6, {}], ['sack', -55, Y.gorge, 52, {}],
+    ['puddle', -35, Y.gorge, 46, { radius: 1.4 }], ['puddle', -30, Y.gorge, 40.8, { radius: 1.0 }], ['weeds', -62, Y.gorge, 40, {}], ['weeds', -7.4, Y.gorge, 43.0, {}], ['weeds', -50, Y.gorge, 38.9, {}],
   ],
   gate: [
     ['planks', 0.6, Y.gorge, 43.6, { yaw: 0.3 }], ['brokencrate', -2.6, Y.gorge, 41.6, { yaw: 1 }], ['sack', 5.0, Y.gorge, 43.4, {}], ['rustiron', -1.2, Y.gorge, 51.4, {}], ['puddle', 1.5, Y.gorge, 45.2, { radius: 1.2 }],
@@ -663,7 +754,7 @@ export function dnPropSolid(decor) {
 const DN_DEAD = {
   cliff: [
     ['fallen1', 'dunnottarSoldier', 1, [-93, DN_L1(-93), -2.9], 2.1, 'A levy, dead a day'],
-    ['fallen2', 'dunnottarSoldier', 1, [-20.5, Y.gorge, 52.6], 0.4, 'A levy, face down at the cliff edge'],
+    ['fallen2', 'dunnottarSoldier', 1, [-28.2, Y.gorge, 49.6], 0.4, 'A levy, an arrow through his neck, dead where the bridge begins'],
   ],
   quad: [['fallen3', 'dunnottarGuard', 2, [21.5, Y.quad, -27.2], 1.2, 'A guard, a crossbow bolt in his back']],
   tower: [['fallen4', 'dunnottarGuard', 2, [36.6, Y.walk, -37], 0.1, 'A guard, who held the wall']],
@@ -720,11 +811,29 @@ export const DUNNOTTAR = {
     // Where the headland's rock is kept clear of a door at its foot: the great gate and the postern.
     clear: [[-12, -4.6, 43.6, 48.8, DN_Y.gorge - 0.35], [0.4, 4, 50.6, 53.6, DN_Y.gorge - 0.35], [-2, 11, -50, -39.2, DN_Y.crypt + 0.8]],
     // Where the hillside is cut away, for the sea cave's stair and landing under the shelf's edge: [x0, x1, z0, z1, top].
-    carve: [[-57, -31.5, 55.4, 64, DN_Y.sea - 1]],
+    // ...and the ravine between the shelf and the castle rock, down to the sea's bed.
+    carve: [[-57, DN_CAVE_STAIR.head + 3.6, 55.4, 64, DN_Y.sea - 1], [DN_RAVINE.x0, DN_RAVINE.x1, 38.4, 84, DN_Y.sea - 6]],
+    // Where the hillside is not drawn at all: over the grotto, under the shelf's plate (the plate, the face and the grotto's roof close it). Its slope
+    // down to the carve stood in the cave's mouth, behind the arch, and the mouth looked walled up from the quay.
+    holes: [[-56, -41, 44, 56]],
     mainland: { polygon: [[-136, -50], [-12, -50], [-12, 58], [-136, 58]], plane: [12, 0, -0.27, -4], cap: 16 },
   },
   weather: { kind: 'storm', seed: 1500 },
 };
+
+// The crags stand in the hillside as the kit draws it (landform.js mainlandHeight: the plane, drawn to the paths and the plateau), not in the bare
+// plane: their feet sunk a little, by their size (a small boulder was sunk out of sight), the tufts at the ground (`ground`), the wall with them.
+{
+  const land = mainlandHeight(DUNNOTTAR);
+  for (const [lump, wall] of DN_LUMPS) {
+    const ground = land(lump.at[0], lump.at[2]);
+    const base = ground - Math.min(1.4, 0.3 * lump.r[1] + 0.2);
+    lump.at[1] = base;
+    lump.ground = ground;
+    wall.bottom = base - 1;
+    wall.top = base + lump.r[1] * 1.3;
+  }
+}
 
 // ---- The route ------------------------------------------------------------------------------------------
 
@@ -743,7 +852,7 @@ const dnSpiralWaypoints = (every = 2) => {
  */
 export const DUNNOTTAR_ROUTE = [
   { name: 'cliff path', to: 'cliff', points: [[-100, -4], [-80, -4], [-64, -4], [-60.5, -2], [-60.5, 8], [-70, 8], [-90, 8], [-100, 8], [-102.5, 12], [-102.5, 20], [-90, 20], [-70, 20], [-62, 20], [-59, 24], [-58, 30], [-58, 34], [-58, 38], [-58, 44]] },
-  { name: 'the gorge and the ledge', to: 'gate', points: [[-44, 44], [-30, 44], [-14, 50], [-10, 54], [-3, 54.2], [2.2, 54], [2.2, 50], [2.2, 47]] },
+  { name: 'the drawbridge and the ledge', to: 'gate', points: [[-44, 44], [-34, 45], [-28, 46.2], [-22, 46.2], [-16, 46.2], [-10.4, 46.2], [-7.7, 46.2], [-7.8, 50.4], [-8.2, 54], [-3, 54.2], [2.2, 54], [2.2, 50], [2.2, 47]] },
   { name: 'the oillet stair', to: 'ascent', points: [[5, 46.2], [10, 46.2], [13, 46.2], [16.5, 46.2], [17.7, 42], [17.7, 37], [17.7, 30], [17.7, 26]] },
   { name: 'the tunnelled ascent', to: 'ascent', points: [[17, 22], [17, 14], [17, 9], [17, 6], [17, 2]] },
   { name: 'the quadrangle to the vault', to: 'vault', points: [[12, -1], [5.7, -2.4], [5.7, -6], [5.7, -12], [5.7, -17], [5.7, -20]] },
@@ -763,8 +872,8 @@ export const DUNNOTTAR_ROUTE = [
  */
 export const DUNNOTTAR_SEWER_ROUTE = [
   DUNNOTTAR_ROUTE[0],
-  { name: 'the shelf to the sea cave stair', to: 'cliff', points: [[-50, 46], [-43, 50], [-36.7, 52.6], [-36.7, 56.6]] },
-  { name: 'down the stair to the landing', to: 'cliff', points: [[-40, 57.6], [-44, 57.6], [-47.8, 57.6], [-48.5, 56.6]] },
+  { name: 'the shelf to the sea cave stair', to: 'cliff', points: [[-50, 46], [-42, 49], [-34, 52], [DN_CAVE_STAIR.head + 1.6, 54.6], [DN_CAVE_STAIR.head + 1.7, 56.6], [DN_CAVE_STAIR.head + 1.4, 57.6]] },
+  { name: 'down the stair to the landing', to: 'cliff', points: [[DN_CAVE_STAIR.head - 2, 57.6], [DN_CAVE_STAIR.foot + 2, 57.6], [DN_CAVE_STAIR.foot - 2, 57.6], [-44, 57.6], [-47.8, 57.6], [-48.5, 56.6]] },
   { name: 'the grotto and the first drain', to: 'sewer', points: [[-48.5, 53], [-48.5, 48], [-48.5, 44], [-48.5, 38], [-48.5, 30], [-48.5, 24]] },
   { name: 'the cistern causeway', to: 'sewer', points: [[-48.5, 20], [-48.5, 14], [-48.5, 8], [-48.5, 2]] },
   { name: 'the second drain and its stair', to: 'sewer', points: [[-48.5, -4], [-48.5, -8], [-48.5, -12], [-48.5, -16], [-48.5, -24], [-48.5, -32], [-48.5, -36.4]] },

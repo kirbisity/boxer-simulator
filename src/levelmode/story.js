@@ -24,7 +24,7 @@ export const STAGE_LIST = [
   { key: null, number: 2, ready: false, glyph: '🔒', kicker: 'Locked', title: 'Stage 2 · Coming soon', blurb: 'Not yet unlocked.' },
 ];
 
-// Nine found papers: five along the main route, in the order it meets them, one at the head of the sea-cave stair (the way round the guarded gate), and three in the vault's optional branches (the stage places them): what each is, and what it says.
+// Ten found papers: five along the main route, in the order it meets them, one on a dead levy at the drawbridge's head and one at the head of the sea-cave stair (the way round the guarded gate), and three in the vault's optional branches (the stage places them): what each is, and what it says.
 export const NOTES = {
   powder: {
     title: 'Scratched on a powder keg',
@@ -41,6 +41,10 @@ export const NOTES = {
   soldier: {
     title: 'Cut into the parapet',
     body: 'The wind took the others over the wall and the sea kept them. Tell my mother the Queen never once climbed up to see who guarded her. If you read this, keep to the stones. The wet takes your feet, and the drop takes the rest.',
+  },
+  bridge: {
+    title: 'Clutched in a dead levy\'s hand',
+    body: 'Do not cross. They have bows on the barbican now and they see the whole bridge; Tam got as far as the middle. Sir Alasdair stands the ledge behind the gate in his black plate. If you must get in, go down the stair by the lantern to the sea cave: the old drain runs under the gate, and nobody watches it.',
   },
   drain: {
     title: 'Chalked on a post at the stair head',

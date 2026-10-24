@@ -354,6 +354,8 @@ class Run {
   /** Whether he fights this man: awake, aware of him, and not one he has given up on (across a fence, say). */
   wanted(other) {
     if (other.corner !== 'blue' || other.dormant || other.state === 'out' || other.crawling || !levelAware(this.world, other)) return false;
+    // (An archer on a post he cannot reach, the barbican's platform: he goes on under the arrows, as a person would, and fights who he can reach.)
+    if (other.spawn?.perch) return false;
     const until = this.ignore.get(other.id);
     const struck = this.lastHit?.attacker === other.id && this.world.time - this.lastHit.time < 4;
     return !(until > this.world.time && !struck);
@@ -1136,8 +1138,8 @@ function knightDuel(seed, log, seconds = 300, tweak = {}) {
   const { preset, full, ...inputs } = tweak;
   if (preset) spawn.preset = preset;
   Object.assign(spawn.inputs, inputs);
-  const leg = DUNNOTTAR_ROUTE.find((entry) => entry.name === 'the gorge and the ledge');
-  const plan = leg.points.slice(0, 4).map((p) => ({ p, acts: [], leg: leg.name }));
+  const leg = DUNNOTTAR_ROUTE.find((entry) => entry.name === 'the drawbridge and the ledge');
+  const plan = leg.points.slice(0, leg.points.findIndex(([x, z]) => x > -8 && z > 53) + 1).map((p) => ({ p, acts: [], leg: leg.name }));
   plan.forEach((entry, index) => { entry.base = index; });
   const run = new Run({
     policy: 'careful',

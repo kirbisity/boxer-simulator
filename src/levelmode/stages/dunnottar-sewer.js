@@ -20,6 +20,8 @@ import { DN_FACE, Y, dnBounds, dnBox, dnFence, dnFlight, dnFlightVault, dnFlight
 
 /** The levels (y) of the old drain and the line it runs on (x): the cave, the cistern and the first drains at `floor`; the long drain at `drain`; the crypt's at Y.crypt. */
 export const DN_CAVE = { floor: -5, drain: -1.6, x: -48.5, mouth: 3.4, face: 55.4 };
+/** The stair down the cliff's face to the sea cave: x of its foot at the quay and of its head on the shelf, beside the drawbridge's head. */
+export const DN_CAVE_STAIR = { foot: -39.6, head: -29.6 };
 
 /** The drain's clear width (m) and the head room under its roof. */
 const SW_WIDE = 3.4;
@@ -37,30 +39,37 @@ export const DN_SEAGATE_DOOR = { z: -37.9, width: 2.8 };
 export function buildSeaCave(sec) {
   const F = DN_CAVE.floor;
   const X = DN_CAVE.x;
+  const S = DN_CAVE_STAIR;
   const mouth = [X - DN_CAVE.mouth / 2, X + DN_CAVE.mouth / 2];
-  // The stair: 25 treads of 0.2 along the cliff, from the landing in the west up to the shelf's level at its east end, 3.2 wide, hung on the face.
-  const stair = dnFlight(sec, { foot: [-46, 57.6], dir: 'E', steps: 25, tread: 0.4, width: 3.2, from: F, rise: 0.2, style: 'rock' });
+  // The stair: 25 treads of 0.2 along the cliff, from the quay at the waterline in the west up to the shelf's level at its east end (by the
+  // ravine and the drawbridge's head: the way round starts beside the way through), 3.2 wide, hung on the face.
+  const stair = dnFlight(sec, { foot: [S.foot, 57.6], dir: 'E', steps: 25, tread: 0.4, width: 3.2, from: F, rise: 0.2, style: 'rock' });
   // (A stepped mass of rock under it, down to the sea, a hand's breadth below the treads: the stair is cut into the cliff's foot, not hung from it.)
-  for (let x = -46; x < -36; x += 2) dnBox(sec, x, x + 2, 56, 59.2, Y.sea - 1, stair.treadY(Math.round((x + 46) / 0.4)) - 0.25, 'rock');
-  dnSlab(sec, -52.6, -46, 56, 59.5, F, 'flags');
+  for (let x = S.foot; x < S.head - 1e-6; x += 2) dnBox(sec, x, x + 2, 56, 59.2, Y.sea - 1, stair.treadY(Math.round((x - S.foot) / 0.4)) - 0.25, 'rock');
+  // The quay at the waterline, from the cave's mouth along the cliff's foot to the stair's foot, the new part on its own rock.
+  dnSlab(sec, -52.6, S.foot, 56, 59.5, F, 'flags');
+  dnBox(sec, -46, S.foot, 56, 59.5, Y.sea - 1, F - 0.25, 'rock');
   // (And a landing at its head, a jetty of the shelf's rock 3.4 m long on the sea's side of the shelf's edge, with its mass under it.)
-  dnSlab(sec, -36, -32.6, 56, 59.5, Y.gorge, 'rock');
-  dnBox(sec, -36, -32.6, 56, 59.5, Y.sea - 1, Y.gorge - 0.25, 'rock');
-  dnFence(sec, [[-32.55, 56.2, Y.gorge], [-32.55, 59.55, Y.gorge], [-46, 59.55, F], [-52.65, 59.55, F], [-52.65, 56.2, F]]);
+  dnSlab(sec, S.head, S.head + 3.4, 56, 59.5, Y.gorge, 'rock');
+  dnBox(sec, S.head, S.head + 3.4, 56, 59.5, Y.sea - 1, Y.gorge - 0.25, 'rock');
+  dnFence(sec, [[S.head + 3.45, 56.2, Y.gorge], [S.head + 3.45, 59.55, Y.gorge], [S.head, 59.55, Y.gorge], [S.foot, 59.55, F], [-52.65, 59.55, F], [-52.65, 56.2, F]]);
   // The rock face under the shelf's plate, with the cave's mouth in it: the sea's face of the cliff, from the waterline up to the plate.
   dnRun(sec, [-56, DN_CAVE.face], [-41, DN_CAVE.face], 1.2, Y.sea - 0.5, F + 3.6, 'rock', [{ at: X + 56, width: DN_CAVE.mouth, sill: F, top: F + 3.2, shape: 'round' }]);
-  // Light and the signs of use: a lantern on a post and a brazier on the landing, kegs, a dead man's bones; a trail down the stair; at the head a lit brazier and the note.
+  // Light and the signs of use: a lantern on a post and a brazier on the quay, kegs, a dead man's bones; a trail down the stair; at the head a lit
+  // brazier, a lantern, a sign pointing down and the note: lit and marked, so that from the drawbridge's head it is the plain way to go.
   dnProp(sec, 'lantern', [mouth[0] - 0.9, F, 56.6], { yaw: 0 });
   dnProp(sec, 'brazier', [-50.4, F, 58.6], { lit: true });
   dnProp(sec, 'barrel', [-52.0, F, 57.2], { yaw: 0.4 });
   dnProp(sec, 'barrel', [-51.8, F, 59.0], { yaw: 1.1, tipped: true });
   dnProp(sec, 'bones', [-46.8, F, 58.8], { yaw: 0.5 });
-  dnProp(sec, 'brazier', [-40.8, Y.gorge, 53.0], { lit: true });
-  dnProp(sec, 'barrel', [-38.9, Y.gorge, 54.6], { yaw: 0.2 });
-  dnProp(sec, 'lantern', [-34.6, Y.gorge, 55.2], { yaw: Math.PI });
-  sec.decor.push({ kind: 'waymarks', points: [[-44, 46.6, Y.gorge], [-42.4, 49.6, Y.gorge], [-38.4, 52.4, Y.gorge], [-36.8, 55.4, Y.gorge]], gap: 2.0, first: 1.2 });
-  sec.decor.push({ kind: 'waymarks', points: [[-37.6, 57.6, -0.4], [-43, 57.6, F + 2.0], [-48.2, 57.6, F]], gap: 2.0, first: 0.6 });
-  dnItem(sec, 'note-drain', 'note', [-38.9, Y.gorge, 54.6], { note: 'drain', lift: 0.95 });
+  dnProp(sec, 'lantern', [-43.2, F, 59.0], { yaw: Math.PI / 2 });
+  dnProp(sec, 'brazier', [S.head - 1.4, Y.gorge, 53.6], { lit: true });
+  dnProp(sec, 'barrel', [S.head + 2.6, Y.gorge, 54.4], { yaw: 0.2 });
+  dnProp(sec, 'lantern', [S.head + 3.0, Y.gorge, 58.9], { yaw: Math.PI });
+  dnProp(sec, 'sign', [S.head + 2.9, Y.gorge, 55.4], { yaw: Math.PI });
+  sec.decor.push({ kind: 'waymarks', points: [[-46, 45.6, Y.gorge], [-40, 48.6, Y.gorge], [-34, 51.6, Y.gorge], [S.head + 1.2, 54.6, Y.gorge], [S.head + 1.7, 56.6, Y.gorge]], gap: 1.8, first: 0.8, size: 1.25 });
+  sec.decor.push({ kind: 'waymarks', points: [[S.head + 1.7, 57.8, Y.gorge], [S.head - 0.4, 57.6, -0.4], [S.foot + 0.4, 57.6, F + 0.2], [-48.2, 57.6, F]], gap: 2.0, first: 0.6 });
+  dnItem(sec, 'note-drain', 'note', [S.head + 2.6, Y.gorge, 54.4], { note: 'drain', lift: 0.95 });
 }
 
 // ---- The old drain --------------------------------------------------------------------------------------------

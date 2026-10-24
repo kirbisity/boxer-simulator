@@ -20,6 +20,7 @@ import { P } from '../body.js';
 import { ceilingAt, pushOut, rayBlocked } from '../physics/terrain.js';
 import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, kgLump, kgOpening, kgRock, kgPlace, kgShape, kgTube, kgVault } from './kitgeo.js';
 import { kpBuild } from './kitprops.js';
+import { islandHeights, landHole, landNoise, mainlandHeight, stageBlocks } from './landform.js';
 import { kwDecorate } from './kitwear.js';
 import { stormFlashLevel, stormFogFar, stormFollow, stormInterior, stormRain, stormTorch } from './storm.js';
 import { interiorAt } from './stage.js';
@@ -149,36 +150,15 @@ function kitCurtain(batch, material, rect, top, sea, spans, seed, stopTop = null
 /** Whether a point (x, z) is covered by anything of the rects in `blocks` that reaches up to `top` (so a cliff edge there is not exposed). */
 function kitCovered(blocks, x, z, top, skip) {
   for (const b of blocks) {
-    if (b === skip) continue;
+    // (A bridge's deck spans a gap: the cliffs under its ends are still drawn.)
+    if (b === skip || b.solid.span) continue;
     if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) continue;
     if (b.wall ? b.y0 <= top + 0.1 && b.y1 >= top - 1.0 : b.top >= top - 0.6) return true;
   }
   return false;
 }
 
-/** The axis-aligned footprints of a stage's solids, with their heights. */
-function kitBlocks(stage) {
-  const blocks = [];
-  for (const section of stage.sections) {
-    const mechanical = [...(section.gates ?? []), ...(section.ladders ?? [])];
-    const solids = [...(section.terrain ?? []), ...mechanical.flatMap((m) => m.states[m.state] ?? [])];
-    for (const s of solids) {
-      if (s.kind === 'ceiling') continue;
-      const yaw = s.yaw ?? 0;
-      const hu = s.size[0] / 2;
-      const hv = s.size[1] / 2;
-      const ex = Math.abs(Math.cos(yaw)) * hu + Math.abs(Math.sin(yaw)) * hv;
-      const ez = Math.abs(Math.sin(yaw)) * hu + Math.abs(Math.cos(yaw)) * hv;
-      const wall = s.kind === 'wall';
-      blocks.push({
-        solid: s, section: section.id, wall, x0: s.at[0] - ex, x1: s.at[0] + ex, z0: s.at[1] - ez, z1: s.at[1] + ez,
-        top: s.kind === 'slab' ? s.top : s.kind === 'ramp' ? Math.max(s.from, s.to) : s.kind === 'stairs' ? s.from + s.steps * s.rise : s.top,
-        y0: s.bottom ?? -Infinity, y1: s.top ?? 0,
-      });
-    }
-  }
-  return blocks;
-}
+const kitBlocks = stageBlocks;
 
 /** The exposed stretches of each side of a block, as { n: [[from, to]...], ... } along the side. */
 function kitExposed(blocks, block, top) {
@@ -207,41 +187,8 @@ function kitExposed(blocks, block, top) {
 
 // ---- the mainland ----------------------------------------------------------------------------------
 
-/** Distance from (x, z) to a block's footprint (0 inside). */
-const kitDistance = (b, x, z) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1));
-
-/** Whether a point is inside a polygon. */
-function kitInside(polygon, x, z) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const [xi, zi] = polygon[i];
-    const [xj, zj] = polygon[j];
-    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
-/** The distance from a point to the polygon's edge. */
-function kitEdgeDistance(polygon, x, z) {
-  let best = Infinity;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const [ax, az] = polygon[j];
-    const [bx, bz] = polygon[i];
-    const dx = bx - ax;
-    const dz = bz - az;
-    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
-    best = Math.min(best, Math.hypot(x - (ax + dx * t), z - (az + dz * t)));
-  }
-  return best;
-}
-
-const kitSmooth = (a, b, x) => {
-  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
-
 /** A heightfield (`heights[row][column]`, rows along z from z0, columns along x from x0, `cell` m apart) as triangles: grass where it is gentle and high, rock where it is steep or low. */
-function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
+function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62, holes = []) {
   const rows = heights.length - 1;
   const columns = heights[0].length - 1;
   const tris = { grass: { p: [], n: [], u: [], c: [] }, rock: { p: [], n: [], u: [], c: [] } };
@@ -308,6 +255,7 @@ function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
       const p01 = vertex(r + 1, k);
       const p11 = vertex(r + 1, k + 1);
       if (p00[1] <= sea - 5 && p10[1] <= sea - 5 && p01[1] <= sea - 5 && p11[1] <= sea - 5) continue;
+      if (landHole(holes, x0 + (k + 0.5) * cell, z0 + (r + 0.5) * cell)) continue;
       emit(p00, p01, p11);
       emit(p00, p11, p10);
     }
@@ -316,82 +264,17 @@ function kitGridMesh(batch, x0, z0, cell, heights, sea, steep = 0.62) {
 }
 
 /** A cheap smooth noise of (x, z), about -1 to 1. */
-function kitNoise(x, z) {
-  const hash = (i, j) => {
-    const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
-    return (v - Math.floor(v)) * 2 - 1;
-  };
-  const ix = Math.floor(x);
-  const iz = Math.floor(z);
-  const fx = x - ix;
-  const fz = z - iz;
-  const sx = fx * fx * (3 - 2 * fx);
-  const sz = fz * fz * (3 - 2 * fz);
-  const a = hash(ix, iz) * (1 - sx) + hash(ix + 1, iz) * sx;
-  const b = hash(ix, iz + 1) * (1 - sx) + hash(ix + 1, iz + 1) * sx;
-  return a * (1 - sz) + b * sz;
-}
+const kitNoise = landNoise;
 
 /**
  * The rock of the headland: a heightfield that stands a little under every floor and roof of the castle and falls away from
  * their edges in cliffs, ragged and steep, down to the sea; grass on its flat top where it shows. Returns the waterline cells for the surf.
  */
 function kitIsland(batch, stage, blocks, sea) {
-  const sources = [];
-  // Open floors (the shelf, the ledge, the court) hold the rock under them: it never rises above one.
-  const caps = blocks.filter((b) => b.solid.kind === 'slab' && (b.solid.land || b.solid.walk)).map((b) => ({ x0: b.x0 - 0.2, x1: b.x1 + 0.2, z0: b.z0 - 0.2, z1: b.z1 + 0.2, top: b.top - 0.35 }));
-  // Doorways at the foot of the rock, where the cliff must not stand in front of them: [x0, x1, z0, z1, top].
-  for (const [x0, x1, z0, z1, top] of stage.landform.clear ?? []) caps.push({ x0, x1, z0, z1, top });
-  // The rock stands a little under every floor, and under every flight along its slope: never in a room, never in a doorway.
-  for (const b of blocks) {
-    if (b.wall || !(b.solid.at[0] >= -7 || b.solid.at[1] < -34)) continue;
-    if (['ladder', 'hidden'].includes(b.solid.style)) continue;
-    sources.push({ x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, top: b.top - 0.35, solid: b.solid });
-  }
-  /** The height of a source at the nearest point of its footprint: level for a floor, along the slope for a flight. */
-  const topAt = (src, x, z) => {
-    const s = src.solid;
-    if (s.kind !== 'stairs' && s.kind !== 'ramp') return src.top;
-    const px = Math.max(src.x0, Math.min(src.x1, x));
-    const pz = Math.max(src.z0, Math.min(src.z1, z));
-    const yaw = s.yaw ?? 0;
-    const u = Math.max(0, Math.min(1, (((px - s.at[0]) * Math.cos(yaw) - (pz - s.at[1]) * Math.sin(yaw)) / s.size[0]) + 0.5));
-    const from = s.from;
-    const to = s.kind === 'ramp' ? s.to : s.from + s.steps * s.rise;
-    return from + (to - from) * u - 0.35;
-  };
-  const cell = 2;
-  const x0 = -22;
-  const z0 = -72;
-  const columns = 54;
-  const rows = 72;
-  const fall = 3.1;
-  const heights = [];
+  const { x0, z0, cell, heights } = islandHeights(stage, blocks, sea);
+  const rows = heights.length - 1;
+  const columns = heights[0].length - 1;
   const waterline = [];
-  for (let r = 0; r <= rows; r += 1) {
-    const row = [];
-    for (let k = 0; k <= columns; k += 1) {
-      // The vertices are knocked about so the cliffs do not run on the grid.
-      const x = x0 + k * cell + kitNoise(k * 0.9 + 3, r * 0.9) * 0.55;
-      const z = z0 + r * cell + kitNoise(k * 0.9, r * 0.9 + 7) * 0.55;
-      let best = -Infinity;
-      let reach = 0;
-      for (const src of sources) {
-        const d = Math.hypot(Math.max(src.x0 - x, 0, x - src.x1), Math.max(src.z0 - z, 0, z - src.z1));
-        const h = topAt(src, x, z) - fall * d;
-        if (h > best) {
-          best = h;
-          reach = d;
-        }
-      }
-      // Ledges and gullies in the face, more the further out; the foot of it breaks into stacks.
-      const rough = (kitNoise(x * 0.35, z * 0.35) * 1.6 + kitNoise(x * 0.9 + 9, z * 0.9) * 0.6) * Math.min(reach, 5) * 0.55;
-      let h = best + rough;
-      for (const cap of caps) if (x > cap.x0 && x < cap.x1 && z > cap.z0 && z < cap.z1) h = Math.min(h, cap.top);
-      row.push(Math.max(h, sea - 6));
-    }
-    heights.push(row);
-  }
   kitGridMesh(batch, x0, z0, cell, heights, sea);
   for (let r = 0; r < rows; r += 1) {
     for (let k = 0; k < columns; k += 1) {
@@ -408,47 +291,12 @@ function kitIsland(batch, stage, blocks, sea) {
  * height at its footprint, blending out to the hill over a few metres). Grass where it is gentle, rock where it is not.
  */
 function kitMainland(batch, stage, blocks, terrain, sea) {
-  const form = stage.landform;
-  const { mainland, cell, extent } = form;
+  const { cell, extent } = stage.landform;
   const [x0, x1, z0, z1] = extent;
-  const [a, bx, c, d] = mainland.plane;
-  const sources = blocks.filter((b) => !b.wall && b.solid.style && ['path', 'cobble'].includes(b.solid.style) || (b.solid.style === 'rock' && b.solid.land && b.top < 2));
   const random = ktRandom(77);
   const columns = Math.ceil((x1 - x0) / cell);
   const rows = Math.ceil((z1 - z0) / cell);
-  const height = (x, z) => {
-    let h = Math.min(mainland.cap, a + bx * x + c * (z - d));
-    if (!kitInside(mainland.polygon, x, z)) h -= 3.2 * kitEdgeDistance(mainland.polygon, x, z);
-    let near = null;
-    let nearD = Infinity;
-    for (const b of sources) {
-      const dist = kitDistance(b, x, z);
-      if (dist < nearD) {
-        nearD = dist;
-        near = b;
-      }
-    }
-    if (near && nearD < 7) {
-      const px = Math.max(near.x0, Math.min(near.x1, x));
-      const pz = Math.max(near.z0, Math.min(near.z1, z));
-      let py = -Infinity;
-      for (const s of near.solid.kind === 'slab' ? [near.solid] : []) py = s.top;
-      if (py === -Infinity) {
-        const u = near.solid.kind === 'stairs' || near.solid.kind === 'ramp' ? (() => {
-          const yaw = near.solid.yaw ?? 0;
-          const lx = (px - near.solid.at[0]) * Math.cos(yaw) - (pz - near.solid.at[1]) * Math.sin(yaw);
-          return (lx + near.solid.size[0] / 2) / near.solid.size[0];
-        })() : 0;
-        const s = near.solid;
-        py = s.kind === 'ramp' ? s.from + (s.to - s.from) * u : s.from + s.steps * s.rise * u;
-      }
-      const w = kitSmooth(1.4, 7, nearD);
-      h = py - 0.05 + (h - (py - 0.05)) * w;
-    }
-    // Boxes where the hillside is cut away to a height (the sea cave's stair and landing under the shelf's edge): [x0, x1, z0, z1, top].
-    for (const [cx0, cx1, cz0, cz1, top] of form.carve ?? []) if (x >= cx0 && x <= cx1 && z >= cz0 && z <= cz1) h = Math.min(h, top);
-    return Math.max(h, sea - 6);
-  };
+  const height = mainlandHeight(stage, blocks);
   const heights = [];
   for (let r = 0; r <= rows; r += 1) {
     const row = [];
@@ -460,7 +308,7 @@ function kitMainland(batch, stage, blocks, terrain, sea) {
     heights.push(row);
   }
   // (The cut banks beside the paths are grass: only a real cliff is rock.)
-  kitGridMesh(batch, x0, z0, cell, heights, sea, 0.42);
+  kitGridMesh(batch, x0, z0, cell, heights, sea, 0.42, stage.landform.holes ?? []);
   void terrain;
 }
 
@@ -653,7 +501,7 @@ function kitOutcrop(batch, outcrop) {
       const reach = 0.85 + random() * 0.5;
       const heather = random() < 0.4;
       const tint = heather ? [0.62, 0.42, 0.6] : [0.58 + random() * 0.2, 0.62 + random() * 0.18, 0.28];
-      kgLump(batch, 'grass', x + Math.cos(angle) * rx * reach, y + 0.15, z + Math.sin(angle) * rz * reach, 0.45 + random() * 0.5, 0.3 + random() * 0.25, 0.4 + random() * 0.45, { seed: k + 3, detail: 0, tint, aoFrom: y });
+      kgLump(batch, 'grass', x + Math.cos(angle) * rx * reach, (lump.ground ?? y) + 0.15, z + Math.sin(angle) * rz * reach, 0.45 + random() * 0.5, 0.3 + random() * 0.25, 0.4 + random() * 0.45, { seed: k + 3, detail: 0, tint, aoFrom: lump.ground ?? y });
     }
   }
 }

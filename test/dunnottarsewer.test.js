@@ -13,8 +13,8 @@ import { activeSections, mechanismsOf, sectionById, setMechanism, stageTerrain, 
 import { levelPreset } from '../src/levelmode/presets.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { travelPlaces } from '../src/levelmode/travel.js';
-import { DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
-import { DN_CAVE } from '../src/levelmode/stages/dunnottar-sewer.js';
+import { DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DN_CAVE, DN_CAVE_STAIR } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floodFill } from './edges.js';
 import { walk } from './walker.js';
 
@@ -66,14 +66,15 @@ test('sewer: the sea cave is under the gorge shelf, its mouth in the cliff face 
   assert.equal(floorAt(shelfOnly, DN_CAVE.x, 50, DN_CAVE.floor + 1), -Infinity, 'cut away under the plate: the cave is not the shelf');
   // The shelf elsewhere is whole (a column to the sea).
   assert.equal(floorAt(shelfOnly, -60, 50, DN_CAVE.floor + 0.5), -Infinity);
-  const plates = cliff.terrain.filter((solid) => solid.kind === 'slab' && solid.top === DN_Y.gorge && solid.bottom !== undefined);
+  const plates = cliff.terrain.filter((solid) => solid.kind === 'slab' && solid.top === DN_Y.gorge && solid.bottom !== undefined && !solid.span);
   assert.equal(plates.length, 1);
   // Who is active where: the cave's south end holds both sections (the plate and the face are the cliff's), its depths only the sewer, the shelf only the cliff.
   assert.deepEqual(activeSections(DUNNOTTAR, [DN_CAVE.x, DN_CAVE.floor + 0.95, 57.6]), ['cliff', 'sewer']);
   assert.deepEqual(activeSections(DUNNOTTAR, [DN_CAVE.x, DN_CAVE.floor + 0.95, 55.2]), ['cliff', 'sewer']);
   assert.deepEqual(activeSections(DUNNOTTAR, [DN_CAVE.x, DN_CAVE.floor + 0.95, 50]), ['sewer']);
   assert.deepEqual(activeSections(DUNNOTTAR, [DN_CAVE.x, 1, 50]), ['cliff']);
-  assert.ok(activeSections(DUNNOTTAR, [-36.7, 0.95, 56.5]).includes('cliff'), 'at the stair head');
+  assert.ok(activeSections(DUNNOTTAR, [DN_CAVE_STAIR.head + 1.7, 0.95, 56.5]).includes('cliff'), 'at the stair head');
+  assert.ok(!activeSections(DUNNOTTAR, [DN_CAVE_STAIR.head + 1.7, 0.95, 56.5]).includes('gate'), 'the stair head does not wake the gatehouse');
 });
 
 test('sewer: the drain is walkable from the cave to the sea-gate, without a drop in it, and its floors are each in the sewer or the crypt', () => {
@@ -82,8 +83,8 @@ test('sewer: the drain is walkable from the cave to the sea-gate, without a drop
   // (From the landing, over the cave's side of the stage: x -57..-0.5, so that the shelf's east end and the sea-gate chamber's far side are left alone.)
   const flood = floodFill(terrain, [DN_CAVE.x, DN_CAVE.floor, 57.6], { limit: 200000, bounds: [-57, -0.5, -45, 62] });
   assert.ok(!flood.truncated);
-  // Every edge is on the cliff: the landing's and the stair's open side, the shelf's south edge.
-  const stray = flood.edges.filter((edge) => !(edge.at[1] >= 55 && edge.floor < 0.5));
+  // Every edge is on the cliff: the landing's and the stair's open side, the shelf's south edge, the ravine's west bank beside the drawbridge.
+  const stray = flood.edges.filter((edge) => !(edge.at[1] >= 55 && edge.floor < 0.5) && !(Math.abs(edge.floor) < 0.5 && edge.at[0] >= DN_RAVINE.x0 - 1 && edge.at[0] <= DN_RAVINE.x0 + 0.5));
   assert.deepEqual(stray.map((edge) => `${edge.at.map((v) => v.toFixed(1))} at ${edge.floor.toFixed(2)}`), []);
   assert.ok(flood.standing > 1500, `${flood.standing} places to stand`);
   // The walker's way through the sewer: each point of it stands in the sewer (or the crypt) and on a floor.
