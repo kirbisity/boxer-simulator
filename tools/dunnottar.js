@@ -144,8 +144,12 @@
 //   front, 3 archers, a guard and two levies, the knight    0/8                   8/8      0/8         10.0          cliff 80 (the guard 39, archers 35)
 //   front, 3 archers, three levies, the knight (as built)   1/8                   7/8      0/8         9.6           cliff 76 (archers 48, levies 22, knight 6)
 //   front, 2 archers, three levies, the knight              0/8                   8/8      0/8         10.0          cliff 79
-//   sewer (3 archers, a guard, two levies)                  5/8                   0/8      3/8         2.0           vault 6, sewer 5, chapel 5: no front man
+//   sewer (3 archers, a guard, two levies; the old drain)   5/8                   0/8      3/8         2.0           vault 6, sewer 5, chapel 5: no front man
 // (A first try had the bridge's men see the shelf: the sewer route then died at the bridge's guard 24 times and reached Vaelen 2/8.)
+// Again on main's sewer (Noname in the cesspool, the lighting), the stage as built:
+//   front                                                   0/8                   8/8      0/8         10.0          cliff 79 (archers 51, levies 20, knight 9)
+//   sewer                                                   4/8                   1/8      3/8         5.4           sewer 20 (Noname 12, bled 8), vault 15: no front man
+// So the front is beaten about once in sixteen whole runs (1 of the 16 above), the way round about half the time.
 //
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
