@@ -9,6 +9,7 @@ import { activeSections, checkStage, createStageWorld, mechanismsOf, pullLever, 
 import { levelPreset } from '../src/levelmode/presets.js';
 import { STAGES } from '../src/levelmode/stages.js';
 import { DN_Y, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS } from '../src/levelmode/stages/dunnottar.js';
+import { DN_CESSPOOL } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floodFill } from './edges.js';
 import { hipsAt, walk } from './walker.js';
 
@@ -105,6 +106,8 @@ const CLIFFS = [
   (e) => e.at[1] <= -38 && e.floor > 17,
   (e) => e.at[0] >= 5 && e.at[0] <= 9 && e.at[1] > -34 && e.at[1] < -33 && e.floor > 17,
   (e) => e.at[0] >= 12.5 && e.at[0] <= 16.5 && e.at[1] > -34 && e.at[1] < -26 && e.floor > 12 && e.floor < 18,
+  // The cesspool's pit (dunnottar-sewer.js): the side of a ramp is a step down into the sludge (0.75 m); the ramps are the way out of it.
+  (e) => Math.hypot(e.at[0] - DN_CESSPOOL.at[0], e.at[1] - DN_CESSPOOL.at[2]) < DN_CESSPOOL.radius + 0.6 && Math.abs(e.floor - DN_CESSPOOL.rim) < 0.3,
 ];
 
 test('dunnottar: a man can walk off the map only where there is a cliff (every state of the doors)', () => {

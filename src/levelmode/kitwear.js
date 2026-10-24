@@ -358,6 +358,20 @@ export function kwDecorate(batch, section, levels) {
         else if (pick < 0.84) put(KW.moss, s, y - 0.3, 1.0 + random() * 0.8, 1.0 + random() * 0.6);
         else put(KW.droppings, s, Math.min(top - 1.5, y + 0.6), 0.7 + random() * 0.5, 1.2 + random() * 0.8);
       }
+      // The old drain's filth (`section.filth`, 0..1): green-black streaks down from the vault, mould and moss low, a salt crust, a slime line where the sewage stood.
+      if (section.filth) {
+        for (let s = 0.3 + random(); s < length - 0.6; s += 0.9 + random() * 1.3 / section.filth) {
+          if (inOpening(s, 0.2)) continue;
+          const pick = random();
+          if (pick < 0.42) put(KW.algae, s, Math.max(floor + 0.4, top - 2.8 - random() * 0.6), 0.8 + random() * 0.8, 2.4 + random() * 0.8, 0.7 + random() * 0.3);
+          else if (pick < 0.64) put(KW.moss, s, floor + 0.15 + random() * 1.2, 0.9 + random() * 0.9, 0.9 + random() * 0.6, 0.8);
+          else if (pick < 0.8) put(KW.salt, s, floor + 0.2, 0.8 + random() * 0.6, 1.2 + random() * 0.9, 1);
+          else put(KW.water, s, Math.max(floor + 0.4, top - 3), 0.8, 2.6, 0.8);
+        }
+        for (const [s0, s1] of stretches) {
+          for (let s = s0; s < s1 - 0.3; s += 2.8) put(KW.damp, s, floor + 0.35, Math.min(2.8, s1 - s), 0.55, 0.7);
+        }
+      }
       // Weeds at the foot, in the joints.
       for (let n = 0; n < Math.round(length / 2.8); n += 1) {
         const s = random() * (length - 0.6);

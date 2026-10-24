@@ -17,18 +17,29 @@ export const QUALITY_TIERS = {
     decals: 60, drips: 22, ravens: 40, shafts: 70,
     // The share of the rain drawn (storm.js).
     rain: 1,
+    // How many real lights the torches, braziers and lanterns nearest him are given (kit.js; each is paid for by every lit pixel): the dark rooms are lit by these.
+    lamps: 6,
+    // The standing water (kitwater.js): its reflection of the room (0: none), how many rings it shows at once, the share of the splash drops thrown.
+    waterReflect: 1, ripples: 24, waterDrops: 1,
   },
   medium: {
     env: 0, tile: 10, pool: 18, penumbra: 18, macro: 1, taps: 2,
     decals: 24, drips: 0, ravens: 20, shafts: 40,
     rain: 0.55,
+    lamps: 4,
+    waterReflect: 1, ripples: 16, waterDrops: 0.6,
   },
   low: {
     env: 0, tile: 0, pool: 0, penumbra: 0, macro: 0, taps: 1,
     decals: 0, drips: 0, ravens: 0, shafts: 0,
     rain: 0.25,
+    lamps: 3,
+    waterReflect: 0, ripples: 8, waterDrops: 0.3,
   },
 };
+
+/** The most real lights any tier gives the torches (kit.js builds this many). */
+export const QUALITY_LAMPS_MOST = Math.max(...Object.values(QUALITY_TIERS).map((tier) => tier.lamps));
 
 /** The tiers' names, best first. */
 export const TIER_NAMES = ['high', 'medium', 'low'];

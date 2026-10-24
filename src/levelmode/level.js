@@ -37,6 +37,9 @@ import { createStageWorld } from './stage.js';
 import { endingBusy, endingRelease, watchEnding } from './ending.js';
 import { watchTeam } from './team.js';
 import { beginAttempt } from './attempts.js';
+import { outfitOf } from '../outfits.js';
+import { floorAt } from '../physics/terrain.js';
+import { stageWaters, waterAt } from './water.js';
 
 /** Give a stage world its run. Returns the level. */
 export function startLevel(world, { settle = true } = {}) {
@@ -110,6 +113,9 @@ export function levelThink(world, dt) {
   const level = levelOf(world);
   const me = world.fighters[0];
   watchTeam(world);
+  dropHelmets(world);
+  giveTemper(world);
+  wadeGear(world);
   if (me.state === 'out') {
     noteDeath(world);
     return;
@@ -119,6 +125,89 @@ export function levelThink(world, dt) {
   updateTonics(world, dt);
   if (level.boss) watchBoss(world, level.boss);
   watchEnding(world);
+}
+
+// ---- Wading ---------------------------------------------------------------------------------------------------
+
+/**
+ * A man in water deeper than LEVEL_CONFIG.wade.from over his feet is held by it: his footwork and acceleration are scaled down while he is in it and given back as
+ * he comes out (`fighter.wading` keeps what they were, for the gear they were taken from: a rest or a death makes his gear new). One with `wader` in his inputs
+ * walks in it as on the stone.
+ */
+export function wadeGear(world) {
+  const level = levelOf(world);
+  const spec = LEVEL_CONFIG.wade;
+  level.waters ??= stageWaters(world.stage.def);
+  if (!level.waters.length) return;
+  for (const fighter of world.fighters) {
+    const gear = fighter.body.gear;
+    if (fighter.wading && fighter.wading.gear !== gear) fighter.wading = null;
+    const x = fighter.x;
+    const feet = Math.min(x[P.lFoot * 3 + 1], x[P.rFoot * 3 + 1]);
+    const water = fighter.dormant || fighter.body.inputs.wader ? null : waterAt(level.waters, x[P.pelvis * 3], feet, x[P.pelvis * 3 + 2]);
+    const held = Boolean(water) && water.at[1] - feet > spec.from;
+    if (held && !fighter.wading) {
+      fighter.wading = { gear, foot: gear.foot, accel: gear.accel };
+      gear.foot = (gear.foot ?? 1) * spec.foot;
+      gear.accel = (gear.accel ?? 1) * spec.accel;
+    } else if (!held && fighter.wading) {
+      gear.foot = fighter.wading.foot;
+      gear.accel = fighter.wading.accel;
+      fighter.wading = null;
+    }
+  }
+}
+
+// ---- A man's own temper -----------------------------------------------------------------------------------------------
+
+/**
+ * A man whose inputs carry a `temperament` ({ work, move, burst, mobility }: ai.js cadenceOf, each round 1) fights with it and not with one drawn at random (the
+ * fight AI draws one the first time it needs it, and again after a rest makes him new): the cesspool's Noname works long and in bursts. Set before the AI thinks.
+ */
+function giveTemper(world) {
+  for (const fighter of world.fighters) {
+    const own = fighter.body.inputs.temperament;
+    if (own && !fighter.temperament) fighter.temperament = { work: 1, move: 1, burst: 1, mobility: 1, ...own };
+  }
+}
+
+// ---- A helmet off a dead man's head ---------------------------------------------------------------------------------
+
+/**
+ * A man whose inputs say `helmetOffOnDeath` (the cesspool's Noname) loses his helmet as he dies: he is made bare-headed (his face shows) and the helmet lies by
+ * his head, on the floor or on the sludge over it (`level.dropped`: { id, kind: 'helmet', owner (spawn id), head (the outfit's headgear), at, yaw }, drawn by
+ * kitfilth.js). The screen is told ({ type: 'helmetOff', id }) and the history has it. Once only for each man.
+ */
+export function dropHelmets(world) {
+  const level = levelOf(world);
+  if (!level) return;
+  for (const fighter of world.fighters) {
+    const inputs = fighter.body.inputs;
+    if (fighter.state !== 'out' || !inputs.helmetOffOnDeath || inputs.outfit?.bareHead) continue;
+    const head = outfitOf(inputs).look.head;
+    if (!head) continue;
+    const x = fighter.x;
+    const hx = x[P.head * 3];
+    const hy = x[P.head * 3 + 1];
+    const hz = x[P.head * 3 + 2];
+    // Beside the head, on the side away from the hips: where it rolled.
+    const ax = hx - x[P.pelvis * 3];
+    const az = hz - x[P.pelvis * 3 + 2];
+    const away = Math.hypot(ax, az) || 1;
+    const at = [hx + (ax / away) * 0.3 - (az / away) * 0.3, hy, hz + (az / away) * 0.3 + (ax / away) * 0.3];
+    const floor = world.arena.terrain ? floorAt(world.arena.terrain, at[0], at[2], hy + 0.5) : -Infinity;
+    at[1] = Number.isFinite(floor) ? floor : hy - 0.1;
+    // (In the cesspool it does not sink out of sight: it lies half in the sludge.)
+    level.waters ??= stageWaters(world.stage.def);
+    const water = waterAt(level.waters, at[0], at[1], at[2]);
+    if (water) at[1] = Math.max(at[1], water.at[1] - 0.06);
+    reclothe(world, fighter, { ...inputs, outfit: { ...inputs.outfit, bareHead: true } });
+    level.rebuild.add(fighter.id);
+    level.dropped ??= [];
+    level.dropped.push({ id: `helmet:${fighter.spawn?.id ?? fighter.id}`, kind: 'helmet', owner: fighter.spawn?.id ?? null, head: { ...head }, at, yaw: Math.atan2(-az, ax) });
+    world.events.push({ time: world.time, kind: 'helmetOff', fighter: fighter.id, effects: ['the helmet comes off'] });
+    level.ui.push({ type: 'helmetOff', id: fighter.id });
+  }
 }
 
 // ---- The boss -----------------------------------------------------------------------------------------------

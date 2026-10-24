@@ -10,7 +10,7 @@
 // stay put round the stage.
 
 import { ktPatch, ktRandom, ktWeather } from './kittex.js';
-import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, interiorLevels, stageLookOf } from './stagelooks.js';
+import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, approachLevels, interiorLevels, levelsSettled, stageLookOf } from './stagelooks.js';
 import { hexToRgb, skyDirection, stageShaftCanvas, stagePoolCanvas, stageSkyCanvas, stageSkyCapCanvas, stormSkyImage } from './stagesky.js';
 
 /** Where the weather is centred: round the stage, and the rain and bolts round the player. */
@@ -56,6 +56,9 @@ const stormState = {
   interiorK: 0,
   interiorTime: null,
   interiorFlash: 1,
+  // The light as it is set now (stagelooks.js `interiorLevels`), eased toward the light of where he stands; null when it is the look's own. And how far the torches carry.
+  levels: null,
+  torchReach: 1,
   flashNow: 0,
 };
 
@@ -106,6 +109,9 @@ export const stormLook = () => stormState.look;
 
 /** How bright the torches burn in this look (kit.js multiplies its lights by it). */
 export const stormTorch = () => stormState.torch;
+
+/** How far the torches' light carries now, times their own range (an interior's `reach`, stagelooks.js). */
+export const stormTorchReach = () => stormState.torchReach;
 
 /**
  * Put the stage in another look (a key of STAGE_LOOKS; an unknown name is the default's); the weather follows at the next frame. `still`: no strikes
@@ -554,43 +560,57 @@ export function buildStormPlace({ buildRain }) {
     stormAimShaft(shaft, look);
   };
 
-  /** Blend the weather toward the interior he stands in, and back out (stagelooks.js `interiorLevels`): the lights, the probe's tint, the fog and the background, the mist and wet in the kit's shaders. */
+  /**
+   * Blend the weather toward the interior he stands in, and back out (stagelooks.js `interiorLevels`): the lights, the probe's tint, the fog and the background, the mist and
+   * wet in the kit's shaders. The light set is eased toward the light of the place (`approachLevels`, a share of the way each frame, about `blend` s to arrive), so that a
+   * step from the storm into a doorway, or from one dark room into a darker one, never changes the light at once.
+   */
   const stormApplyInterior = (view, time) => {
     const s = stormState;
     const dt = s.interiorTime === null ? 0 : Math.min(0.1, Math.max(0, time - s.interiorTime));
     s.interiorTime = time;
     const spec = s.interiorSpec ?? s.interiorLast;
-    if (!spec) return;
+    if (!spec && !s.levels) return;
     if (s.interiorSpec) s.interiorLast = s.interiorSpec;
     const goal = s.interiorSpec ? 1 : 0;
     const before = s.interiorK;
-    const step = dt / (spec.blend ?? 1.5);
+    const blend = spec?.blend ?? 1.5;
+    const step = dt / blend;
     s.interiorK = goal > before ? Math.min(goal, before + step) : Math.max(goal, before - step);
-    if (before === 0 && s.interiorK === 0) return;
     const look = stageLookOf(s.look);
-    const lv = interiorLevels(look, spec, s.interiorK);
+    const outside = interiorLevels(look, {}, 0);
+    const target = s.interiorSpec ? interiorLevels(look, s.interiorSpec, 1) : outside;
+    // (A dt of 0, the first frame, sets nothing new; 3 / blend: most of the way in `blend` s, eased out.)
+    const lv = approachLevels(s.levels ?? outside, target, dt <= 0 ? 0 : 1 - Math.exp((-3 * dt) / blend));
+    const home = !s.interiorSpec && levelsSettled(lv, outside, 2e-3);
+    const set = home ? outside : lv;
     const { scene, lights } = view;
-    lights.sun.intensity = lv.sun;
-    lights.hemi.intensity = lv.hemi;
-    lights.hemi.color.setHex(lv.hemiSky);
-    lights.hemi.groundColor.setHex(lv.hemiGround);
+    lights.sun.intensity = set.sun;
+    lights.hemi.intensity = set.hemi;
+    lights.hemi.color.setHex(set.hemiSky);
+    lights.hemi.groundColor.setHex(set.hemiGround);
     const probe = stormProbe(scene);
     if (probe) {
       const base = probe.userData.kitBase;
-      probe.sh.coefficients.forEach((c, k) => c.copy(base.sh[k]).multiply(new THREE.Vector3(...lv.tint)));
-      probe.intensity = base.intensity * lv.probe;
+      probe.sh.coefficients.forEach((c, k) => c.copy(base.sh[k]).multiply(new THREE.Vector3(...set.tint)));
+      probe.intensity = base.intensity * set.probe;
     }
     if (scene.fog) {
-      scene.fog.color.setHex(lv.fogColour);
-      scene.fog.near = lv.fogNear;
-      scene.fog.far = lv.fogFar;
+      scene.fog.color.setHex(set.fogColour);
+      scene.fog.near = set.fogNear;
+      scene.fog.far = set.fogFar;
     }
-    if (scene.background?.isColor) scene.background.setHex(lv.fogColour);
-    ktWeather.uKitFog.value.set(lv.mist, look.fog.mist.base, look.fog.mist.falloff, 0);
-    ktWeather.uKitWet.value = lv.wet;
-    s.torch = lv.torch;
-    s.interiorFlash = lv.flash;
-    if (s.interiorK === 0) s.interiorLast = null;
+    if (scene.background?.isColor) scene.background.setHex(set.fogColour);
+    ktWeather.uKitFog.value.set(set.mist, look.fog.mist.base, look.fog.mist.falloff, 0);
+    ktWeather.uKitWet.value = set.wet;
+    s.torch = set.torch;
+    s.torchReach = set.reach;
+    s.interiorFlash = set.flash;
+    s.levels = home ? null : lv;
+    if (home) {
+      s.interiorK = 0;
+      s.interiorLast = null;
+    }
   };
 
   place.userData.bind = (view) => {
@@ -712,7 +732,7 @@ export function stormRelease(view) {
   stormState.view = null;
   stormState.base = null;
   stormState.dirty = true;
-  Object.assign(stormState, { interiorSpec: null, interiorLast: null, interiorK: 0, interiorTime: null, interiorFlash: 1, flashNow: 0 });
+  Object.assign(stormState, { interiorSpec: null, interiorLast: null, interiorK: 0, interiorTime: null, interiorFlash: 1, levels: null, torchReach: 1, flashNow: 0 });
 }
 
 /** Bring the next strike to now (for the weather's test, and a look at one). */
