@@ -32,6 +32,14 @@ const V = Y.vault;
 const C = Y.crypt;
 /** How thick the vault's floor is where a room lies under it (the crypt's roof). */
 const FLOOR = 0.8;
+/**
+ * The head room of the vault's rooms (m over the floor): as high as the court's slab over them allows (its underside at V + 4.58, the slab 1.6 thick
+ * under the court's 12.18), a roof 0.4 thick. It was 3.3 in the cellar and the dungeon, 3.4-3.6 in the torture chamber and the stores: the camera came in
+ * to under 2 m along the cellar. The barrel vaults drawn are lifted with it, the torches stay at the walls' height. (The crypt under them cannot be
+ * raised: the vault's own floor is its roof.)
+ */
+const HEAD = 4.15;
+const LIFT = HEAD - 3.3;
 
 /** The well shaft: a twelve-sided room at the north-east of the cellar, a winding stair down one turn to the crypt, the landing over its first quarter. */
 export const DN_SHAFT = { at: [28.6, -32.4], radius: 5.4, sides: 12 };
@@ -60,8 +68,8 @@ export function buildVault() {
     { at: 30.2, width: 3.0, sill: V, top: V + 3.4, shape: 'round' },
   ]);
   dnRun(sec, [33.4, -27.6], [33.4, -17.4], 1.2, V - 1, wallTop, 'rubble', [{ at: 5.1, width: 5.8, sill: V, top: V + 3.8, shape: 'round' }]);
-  dnCeiling(sec, 0, 32.8, -26, -19, V + 3.3, V + 4.8);
-  sec.decor.push({ kind: 'vault', a: [0, -22.5, V + 3.0], b: [32.8, -22.5, V + 3.0], width: 7, crown: 1.4, ribs: 4.1, style: 'vault' });
+  dnCeiling(sec, 0, 32.8, -26, -19, V + HEAD, V + 4.8);
+  sec.decor.push({ kind: 'vault', a: [0, -22.5, V + 3.0 + LIFT], b: [32.8, -22.5, V + 3.0 + LIFT], width: 7, crown: 1.4, ribs: 4.1, style: 'vault' });
   // The west stair down from the court: 31 treads, the first 11 under the court's own slab.
   const west = dnFlight(sec, { foot: [5.7, -14.6], dir: 'S', steps: DN_VAULT_STEPS, tread: 0.34, width: 5.4, from: V, rise, style: 'cobble' });
   dnFlightWalls(sec, west, { thick: 1.6, head: 4.4, every: 3 });
@@ -84,8 +92,8 @@ export function buildVault() {
   dnRun(sec, [10.8, -35.2], [10.8, -26.8], 1.6, V - 1, wallTop, 'rubble');
   dnRun(sec, [22.6, -35.2], [22.6, -26.8], 1.6, V - 1, wallTop, 'rubble');
   dnRun(sec, [10, -35.2], [23.4, -35.2], 1.6, V - 1, wallTop, 'rubble', [{ at: 6.7, width: 1.2, sill: V + 2.2, top: V + 3.4, shape: 'slit', solid: true }]);
-  dnCeiling(sec, 11.6, 21.8, -34.4, -26.8, V + 3.3, V + 4.8);
-  sec.decor.push({ kind: 'vault', a: [11.6, -30.6, V + 3.0], b: [21.8, -30.6, V + 3.0], width: 7.6, crown: 1.4, style: 'vault' });
+  dnCeiling(sec, 11.6, 21.8, -34.4, -26.8, V + HEAD, V + 4.8);
+  sec.decor.push({ kind: 'vault', a: [11.6, -30.6, V + 3.0 + LIFT], b: [21.8, -30.6, V + 3.0 + LIFT], width: 7.6, crown: 1.4, style: 'vault' });
   dnGate(sec, 'celldoor', [16.7, V, -25.4], [{ ...wallOf([16.7, -26.8], [3.4, 0.3], V, V + 3.4, { id: 'celldoor' }), style: 'iron', skin: false }], { kind: 'bars', width: 3.4, height: 3.4 }, { key: 'cellkey', frees: ['miner', 'captive'], opensFrom: { at: [16.7, -22.5], size: [10, 8.6], y: [V - 1, V + 4] }, label: 'Unlock the cell door', lockedText: 'Locked. The turnkey keeps the key at his desk.' });
   sec.decor.push({ kind: 'bars', a: [11.6, -31.8], b: [14.8, -31.8], y0: V, y1: V + 3.2 });
   sec.decor.push({ kind: 'bars', a: [18.6, -31.8], b: [21.8, -31.8], y0: V, y1: V + 3.2 });
@@ -110,11 +118,11 @@ export function buildVault() {
   dnProp(sec, 'torch', [6.1, V + 2.4, -26], { face: 'S' });
   dnProp(sec, 'torch', [25, V + 2.4, -26], { face: 'S' });
   dnProp(sec, 'torch', [16.6, V + 2.4, -27.2], { face: 'N' });
-  dnProp(sec, 'grating', [11, V + 4.5, -22.5], { size: [1.6, 1.6] });
-  dnProp(sec, 'grating', [27.4, V + 4.5, -22.5], { size: [1.6, 1.6] });
-  dnProp(sec, 'drip', [7.4, V + 4.1, -24], {});
-  dnProp(sec, 'drip', [18.6, V + 4.1, -21], {});
-  dnProp(sec, 'drip', [29.4, V + 4.1, -23.4], {});
+  dnProp(sec, 'grating', [11, V + 4.5 + LIFT, -22.5], { size: [1.6, 1.6] });
+  dnProp(sec, 'grating', [27.4, V + 4.5 + LIFT, -22.5], { size: [1.6, 1.6] });
+  dnProp(sec, 'drip', [7.4, V + 4.1 + LIFT, -24], {});
+  dnProp(sec, 'drip', [18.6, V + 4.1 + LIFT, -21], {});
+  dnProp(sec, 'drip', [29.4, V + 4.1 + LIFT, -23.4], {});
   dnProp(sec, 'puddle', [9, V, -22.4], { radius: 1.1 });
   dnProp(sec, 'puddle', [20, V, -23.2], { radius: 1.4 });
 
@@ -151,8 +159,8 @@ function buildTortureChamber(sec) {
   dnSlab(sec, 0, 4.0, -29.5, -27.6, V, 'flags', { bottom: V - FLOOR, extra: { room: true } });
   dnRun(sec, [-0.8, -36.4], [-0.8, -27.6], 1.6, V - 1, wallTop, 'rubble');
   dnRun(sec, [-1.6, -35.8], [11.0, -35.8], 1.2, V - 1, wallTop, 'rubble');
-  dnCeiling(sec, 0.2, 9.8, -35, -27.8, V + 3.6, V + 4.4);
-  sec.decor.push({ kind: 'vault', a: [0, -31.4, V + 3.1], b: [10, -31.4, V + 3.1], width: 7.6, crown: 1.3, ribs: 4.1, style: 'vault' });
+  dnCeiling(sec, 0.2, 9.8, -35, -27.8, V + HEAD, V + 4.55);
+  sec.decor.push({ kind: 'vault', a: [0, -31.4, V + 3.1 + (HEAD - 3.6)], b: [10, -31.4, V + 3.1 + (HEAD - 3.6)], width: 7.6, crown: 1.3, ribs: 4.1, style: 'vault' });
   const steps = 23;
   const tread = 0.33;
   dnFlight(sec, { foot: [1.7, -37.0], dir: 'S', steps, tread, width: 3.4, from: C, rise: (V - C) / steps, style: 'cobble' });
@@ -172,7 +180,7 @@ function buildTortureChamber(sec) {
   dnProp(sec, 'puddle', [6.6, V, -31], { radius: 0.9 });
   dnProp(sec, 'torch', [5.0, V + 2.4, -35.1], { face: 'S' });
   dnProp(sec, 'torch', [9.9, V + 2.4, -29.4], { face: 'W', dim: true });
-  dnProp(sec, 'drip', [8, V + 3.4, -30], {});
+  dnProp(sec, 'drip', [8, V + 3.4 + (HEAD - 3.6), -30], {});
   dnSpawn(sec, 'questioner', 'dunnottarGuard', 'enemy', 2, [8.4, V, -30.6], DN_FACE.N, { inputs: { name: 'The Questioner' } });
   dnItem(sec, 'bandage10', 'bandage', [7.6, V, -34.4]);
 }
@@ -180,10 +188,10 @@ function buildTortureChamber(sec) {
 /** The stores, south of the cellar: a short passage, a hall of barrels and crates, and at its end a tunnel that fell in. */
 function buildStores(sec) {
   // The passage: from the cellar's south wall (its door at x 15.2) to the hall's north door.
-  dnRoom(sec, { x0: 13.6, x1: 16.8, z0: -17.4, z1: -14.4, floor: V, head: 3.4, walls: ['w', 'e'], slab: { bottom: V - FLOOR }, vault: { crown: 1.0, ribs: 3 } });
+  dnRoom(sec, { x0: 13.6, x1: 16.8, z0: -17.4, z1: -14.4, floor: V, head: HEAD, over: 0.4, walls: ['w', 'e'], slab: { bottom: V - FLOOR }, vault: { crown: 1.0, ribs: 3 } });
   // The hall.
   dnRoom(sec, {
-    x0: 11, x1: 19.4, z0: -13.4, z1: -6.2, floor: V, head: 3.6, walls: ['n', 's', 'e', 'w'], slab: { bottom: V - FLOOR },
+    x0: 11, x1: 19.4, z0: -13.4, z1: -6.2, floor: V, head: HEAD, over: 0.4, walls: ['n', 's', 'e', 'w'], slab: { bottom: V - FLOOR },
     doors: { n: [{ at: 15.2, width: 3.2, top: V + 3.4 }], s: [{ at: 15.2, width: 3.2, top: V + 3.2, solid: true }] },
   });
   dnProp(sec, 'barrel', [11.9, V, -12.5], { yaw: 0.3 });
@@ -203,7 +211,7 @@ function buildStores(sec) {
   dnProp(sec, 'rubbleheap', [16.0, V, -6.9], { size: 1.0 });
   dnProp(sec, 'torch', [12.0, V + 2.4, -6.3], { face: 'S' });
   dnProp(sec, 'torch', [16.9, V + 2.4, -13.3], { face: 'S', dim: true });
-  dnProp(sec, 'drip', [13.4, V + 3.5, -10], {});
+  dnProp(sec, 'drip', [13.4, V + 3.5 + (HEAD - 3.6), -10], {});
   dnProp(sec, 'puddle', [15.4, V, -11], { radius: 1.2 });
   dnSpawn(sec, 'storeman', 'dunnottarSoldier', 'enemy', 1, [14.2, V, -12], DN_FACE.E, { inputs: { name: 'Quartermaster Dow' }, patrol: [[14.2, -12], [17, -12], [17, -10.5], [14.2, -10.5]] });
   dnItem(sec, 'tonic6', 'tonic', [18.3, V, -7.9]);
