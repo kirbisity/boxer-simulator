@@ -120,24 +120,7 @@ function ktLodInit() {
   ktLod.uKitFlags.value ??= new THREE.Vector4(1, 2, 0, 0);
 }
 
-// ---- the cut-away and the detail -----------------------------------------------------------------------
-
-/** Shared uniforms of the screen-door fade: the camera, what it looks at, how wide the clear tube is, and whether it is on. */
-const ktFade = { uKitCam: { value: null }, uKitSubject: { value: null }, uKitRadius: { value: 1.0 }, uKitOn: { value: 0 } };
-
-const KT_CUTAWAY = `
-  if (uKitOn > 0.5) {
-    vec3 kitLine = uKitSubject - uKitCam;
-    float kitLength = max(length(kitLine), 0.001);
-    float kitAlong = dot(vKitPos - uKitCam, kitLine) / (kitLength * kitLength);
-    float kitRoom = clamp((1.0 - kitAlong) * kitLength - 0.5, 0.0, 1.0);
-    float kitAcross = distance(vKitPos, uKitCam + kitLine * clamp(kitAlong, 0.0, 1.0));
-    // (Only what is at the height of the line or above it: the floor under it is not in the way.)
-    float kitAbove = vKitPos.y - (uKitCam.y + kitLine.y * clamp(kitAlong, 0.0, 1.0));
-    float kitFade = (1.0 - smoothstep(uKitRadius * 0.45, uKitRadius, kitAcross)) * kitRoom * step(0.0, kitAlong) * step(-0.4, kitAbove);
-    float kitNoise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-    if (kitFade > kitNoise * 0.95 + 0.02) discard;
-  }`;
+// ---- the detail ----------------------------------------------------------------------------------------------
 
 /** The map chunk: the texture read once or twice, the macro map over it, moss, damp, standing water (`pools`: how much this surface holds, 0..1) and streaks. `two`: 0 once, 1 again at another scale (hard patches), 2 again turned (soft). */
 const ktMapChunk = (two, pools = 0) => `
@@ -255,10 +238,10 @@ function ktSunShaded() {
 }
 
 /**
- * Give a material the castle's shader: the cut-away (`cutaway`), the detail over its map (`detail`: { macro, hue, moss, streak, two }), the height fog
+ * Give a material the castle's shader: the detail over its map (`detail`: { macro, hue, moss, streak, two }), the height fog
  * (any material that has fog on) and the baked shadow of the castle on the sun's light (`shadow`: kitshadow.js). Patched once, before its first draw.
  */
-export function ktPatch(material, { cutaway = false, detail = null, fog = true, shadow = false } = {}) {
+export function ktPatch(material, { detail = null, fog = true, shadow = false } = {}) {
   const two = detail ? detail.two ?? 0 : 0;
   const mean = material.map?.kitMean ?? [0.5, 0.5, 0.5];
   ktWeather.uKitFog.value ??= new THREE.Vector4(0, 0, 0.05, 0);
@@ -272,11 +255,6 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true, 
     Object.assign(shader.uniforms, ktLod);
     let uniforms = 'varying vec3 vKitPos;\nvarying vec3 vKitNrm;\nuniform vec4 uKitLod;\nuniform vec4 uKitFlags;\n';
     let fragment = shader.fragmentShader;
-    if (cutaway) {
-      Object.assign(shader.uniforms, ktFade);
-      uniforms += 'uniform vec3 uKitCam;\nuniform vec3 uKitSubject;\nuniform float uKitRadius;\nuniform float uKitOn;\n';
-      fragment = fragment.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${KT_CUTAWAY}`);
-    }
     if (detail) {
       shader.uniforms.uKitMacro = { value: ktMacroTexture() };
       shader.uniforms.uKitDetail = { value: new THREE.Vector4(detail.macro ?? 0.6, detail.hue ?? 1, detail.moss ?? 0, detail.streak ?? 0) };
@@ -303,16 +281,7 @@ export function ktPatch(material, { cutaway = false, detail = null, fog = true, 
     }
     shader.fragmentShader = `${uniforms}${fragment}`;
   };
-  material.customProgramCacheKey = () => `kit-${cutaway ? 'c' : ''}${detail ? `d${two}p${detail.pools ?? 0}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
-}
-
-/** Tell the castle's materials where the camera and the man are: the tube between them is let through. */
-export function ktSightline(camera, subject, on = true) {
-  ktFade.uKitCam.value ??= new THREE.Vector3();
-  ktFade.uKitSubject.value ??= new THREE.Vector3();
-  ktFade.uKitCam.value.set(camera.x, camera.y, camera.z);
-  ktFade.uKitSubject.value.set(subject[0], subject[1], subject[2]);
-  ktFade.uKitOn.value = on ? 1 : 0;
+  material.customProgramCacheKey = () => `kit-${detail ? `d${two}p${detail.pools ?? 0}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
 }
 
 /**
@@ -327,8 +296,6 @@ export function ktMaterials() {
     return new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.78, metalness: 0, ...offset, ...options });
   };
   const m = {};
-  ktFade.uKitCam.value ??= new THREE.Vector3(0, 100, 0);
-  ktFade.uKitSubject.value ??= new THREE.Vector3(0, -100, 0);
   // (Courses stay level, so a masonry texture is read again at another scale, not turned: `two` 1; the ground and the rock may turn: `two` 2.)
   const detail = {
     ashlar: { macro: 0.7, hue: 1, moss: 0.5, streak: 0.5, two: 1, pools: 0.5 },
@@ -355,16 +322,16 @@ export function ktMaterials() {
   m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 }, KIT_FLOOR_OFFSET.boards);
   m.wood = make(ktTexture(128, 20, (g, s, r) => ktBoards(g, s, r, [70, 52, 36])), 2, { roughness: 0.85 });
   m.iron = make(ktTexture(128, 21, ktIron), 1.5, { roughness: 0.45, metalness: 0.55 });
-  for (const name of Object.keys(detail)) ktPatch(m[name], { cutaway: true, detail: detail[name], shadow: true });
+  for (const name of Object.keys(detail)) ktPatch(m[name], { detail: detail[name], shadow: true });
   const flat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, vertexColors: true, roughness: 0.9, ...options });
   m.bone = flat(0xb9b29a, { roughness: 0.8 });
   m.cloth = flat(0x6a3a32, { roughness: 0.95, side: THREE.DoubleSide });
   m.straw = flat(0x8a7a4a, { roughness: 1 });
   m.black = flat(0x101114, { roughness: 0.9 });
-  for (const name of ['bone', 'cloth', 'straw', 'black']) ktPatch(m[name], { cutaway: true, shadow: true });
+  for (const name of ['bone', 'cloth', 'straw', 'black']) ktPatch(m[name], { shadow: true });
   // The wear and dirt: decals over the stone (kitwear.js), alpha-blended, a hair off the face, with the castle's fog and cut-away.
   m.wear = new THREE.MeshStandardMaterial({ map: kwTexture(), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  ktPatch(m.wear, { cutaway: true });
+  ktPatch(m.wear);
   m.silhouette = flat(0x23252b, { roughness: 1 });
   ktPatch(m.silhouette, { shadow: true });
   m.flame = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });

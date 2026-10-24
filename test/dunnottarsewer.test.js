@@ -14,7 +14,7 @@ import { levelPreset } from '../src/levelmode/presets.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { travelPlaces } from '../src/levelmode/travel.js';
 import { DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
-import { DN_CAVE, DN_CAVE_STAIR } from '../src/levelmode/stages/dunnottar-sewer.js';
+import { DN_CAVE, DN_CAVE_STAIR, DN_CESSPOOL } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floodFill } from './edges.js';
 import { walk } from './walker.js';
 
@@ -23,14 +23,14 @@ const cliff = sectionById(DUNNOTTAR, 'cliff');
 const pelvisY = (fighter) => fighter.x[P.pelvis * 3 + 1];
 const quiet = (current) => current.fighters.slice(1).forEach((fighter) => { fighter.dormant = true; });
 
-test('sewer: a section of its own, dark, with one rest half way, a sergeant and a few levies and things to take', () => {
+// (Round 3: the levies Wat, Peem and Jock and Sergeant Mungo are gone, the user's call: no soldier goes down into the sewage. The one man there is Noname,
+// the cesspool's miniboss: test/dunnottarcesspool.test.js.)
+test('sewer: a section of its own, dark, with one rest half way, no soldier in it but the one thing in the cesspool, and things to take', () => {
   assert.ok(sewer);
   assert.ok(sewer.activeOnly, 'drawn only while he is in it');
   assert.equal(sewer.rest.id, 'restdrain', 'one smugglers\' brazier on the way');
   assert.ok(sewer.light <= 0.25, 'dark');
-  const men = sewer.spawns.filter((spawn) => spawn.role === 'enemy');
-  assert.equal(men.filter((spawn) => spawn.preset === 'dunnottarGuard').length, 1, 'one sewer guard');
-  assert.ok(men.filter((spawn) => spawn.preset === 'dunnottarSoldier').length >= 2, 'a few levies');
+  assert.deepEqual(sewer.spawns.map((spawn) => spawn.id), ['noname'], 'nobody but Noname');
   assert.ok(sewer.items.some((item) => item.kind === 'bandage') && sewer.items.some((item) => item.kind === 'tonic'));
   // The fast-travel list has it (the sandbox's Go to menu is made from the stage's own data).
   assert.ok(travelPlaces(DUNNOTTAR).some((place) => place.id === 'section:sewer' && place.label === 'The Old Drain'));
@@ -83,8 +83,11 @@ test('sewer: the drain is walkable from the cave to the sea-gate, without a drop
   // (From the landing, over the cave's side of the stage: x -57..-0.5, so that the shelf's east end and the sea-gate chamber's far side are left alone.)
   const flood = floodFill(terrain, [DN_CAVE.x, DN_CAVE.floor, 57.6], { limit: 200000, bounds: [-57, -0.5, -45, 62] });
   assert.ok(!flood.truncated);
-  // Every edge is on the cliff: the landing's and the stair's open side, the shelf's south edge, the ravine's west bank beside the drawbridge.
-  const stray = flood.edges.filter((edge) => !(edge.at[1] >= 55 && edge.floor < 0.5) && !(Math.abs(edge.floor) < 0.5 && edge.at[0] >= DN_RAVINE.x0 - 1 && edge.at[0] <= DN_RAVINE.x0 + 0.5));
+  // Every edge is on the cliff: the landing's and the stair's open side, the shelf's south edge, the ravine's west bank beside the drawbridge; and the sides of
+  // the cesspool's ramps (a step down into its pit).
+  const inPit = (edge) => Math.hypot(edge.at[0] - DN_CESSPOOL.at[0], edge.at[1] - DN_CESSPOOL.at[2]) < DN_CESSPOOL.radius + 0.6 && Math.abs(edge.floor - DN_CESSPOOL.rim) < 0.3;
+  const onRavine = (edge) => Math.abs(edge.floor) < 0.5 && edge.at[0] >= DN_RAVINE.x0 - 1 && edge.at[0] <= DN_RAVINE.x0 + 0.5;
+  const stray = flood.edges.filter((edge) => !(edge.at[1] >= 55 && edge.floor < 0.5) && !inPit(edge) && !onRavine(edge));
   assert.deepEqual(stray.map((edge) => `${edge.at.map((v) => v.toFixed(1))} at ${edge.floor.toFixed(2)}`), []);
   assert.ok(flood.standing > 1500, `${flood.standing} places to stand`);
   // The walker's way through the sewer: each point of it stands in the sewer (or the crypt) and on a floor.

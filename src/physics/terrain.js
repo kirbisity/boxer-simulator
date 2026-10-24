@@ -47,6 +47,9 @@ import { WORLD } from './config.js';
 
 const SHAPES = new Set(['slab', 'ramp', 'stairs', 'wall', 'ceiling']);
 
+/** m: a wall no taller than this is low: no higher than a man's waist, the camera looks over it. */
+const LOW_WALL = 1.3;
+
 /** The key of a grid cell. */
 const cellKey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
@@ -59,7 +62,7 @@ function compile(source) {
   const yaw = source.yaw ?? 0;
   const part = {
     id: source.id ?? null, shape, cx: at[0], cz: at[1], hu: size[0] / 2, hv: size[1] / 2, cos: Math.cos(yaw), sin: Math.sin(yaw),
-    bottom: source.bottom ?? -Infinity, top: 0, lo: 0, hi: 0, steps: 1, rise: 0, ex: 0, ez: 0, stamp: 0,
+    bottom: source.bottom ?? -Infinity, top: 0, lo: 0, hi: 0, steps: 1, rise: 0, ex: 0, ez: 0, stamp: 0, low: false, rail: false,
   };
   const need = (...names) => {
     for (const name of names) if (!Number.isFinite(source[name])) throw new Error(`terrain: ${shape} ${source.id ?? ''} needs a number for "${name}"`);
@@ -82,6 +85,9 @@ function compile(source) {
   } else if (shape === 'wall') {
     need('bottom', 'top');
     part.top = source.top;
+    // A fence (posts and rails: a body cannot pass it, the eye sees through it) is nothing to the camera; a low wall (a parapet's) is gone over with a hand's breadth, not the ball's whole radius (partReach).
+    part.rail = source.style === 'fence';
+    part.low = source.top - source.bottom <= LOW_WALL;
   } else {
     need('bottom');
     part.top = source.top ?? source.bottom + 0.5;
@@ -367,6 +373,130 @@ function segmentHits(part, a, b, heightA, heightB) {
   const topOut = topAt(part, u0 + (u1 - u0) * leave);
   return lineLow < Math.max(topIn, topOut);
 }
+
+// ---- A ball swept through the solids: the camera's spring arm (cameraarm.js) ---------------------------------------
+
+/** How far (m) a point is from a part's box along the axis it is furthest out on (a ramp's or a flight's top: where it is under the point): 0 inside it. */
+function distanceToPart(part, x, y, z) {
+  const dx = x - part.cx;
+  const dz = z - part.cz;
+  const u = dx * part.cos - dz * part.sin;
+  const v = dx * part.sin + dz * part.cos;
+  const gapU = Math.max(0, Math.abs(u) - part.hu);
+  const gapV = Math.max(0, Math.abs(v) - part.hv);
+  const top = part.shape === 'stairs' || part.shape === 'ramp' ? topAt(part, u) : part.top;
+  const gapY = y > top ? y - top : y < part.bottom ? part.bottom - y : 0;
+  return Math.max(gapU, gapV, gapY);
+}
+
+/**
+ * How far along `dir` (a unit [x, y, z]) from `from` a ball of `radius` m travels before it touches a part, at most `length` (`length`
+ * if it never does). A part the ball already touches at the start blocks only as far as the gap there allows (its radius shrinks to the
+ * gap), so a start beside a wall is not stopped by the wall, and one inside a part does not see it.
+ */
+function partReach(part, from, dir, length, radius) {
+  const gap = distanceToPart(part, from[0], from[1], from[2]);
+  if (gap <= 1e-6) return length;
+  // (The box grown by r must not hold the start: r is at most the gap on the axis the start is furthest out on.)
+  const r = Math.min(radius, gap - 1e-4);
+  const dx = from[0] - part.cx;
+  const dz = from[2] - part.cz;
+  const u0 = dx * part.cos - dz * part.sin;
+  const v0 = dx * part.sin + dz * part.cos;
+  const du = dir[0] * part.cos - dir[2] * part.sin;
+  const dv = dir[0] * part.sin + dir[2] * part.cos;
+  const low = part.bottom - r;
+  // (Over a low wall the ball's centre needs only a hand's breadth: it looks over a rail, not through it.)
+  const high = part.top + (part.low ? Math.min(r, 0.12) : r);
+  // The ray against the box grown by r: the slab method on u, v and height.
+  let enter = 0;
+  let leave = length;
+  for (const [start, along, lo, hi] of [[u0, du, -part.hu - r, part.hu + r], [v0, dv, -part.hv - r, part.hv + r], [from[1], dir[1], low, high]]) {
+    if (Math.abs(along) < 1e-9) {
+      if (start < lo || start > hi) return length;
+      continue;
+    }
+    let near = (lo - start) / along;
+    let far = (hi - start) / along;
+    if (near > far) [near, far] = [far, near];
+    enter = Math.max(enter, near);
+    leave = Math.min(leave, far);
+    if (enter > leave) return length;
+  }
+  if (part.shape !== 'stairs' && part.shape !== 'ramp') return enter;
+  // A ramp or a flight: its top is not the box's top; walk the stretch inside the box in short steps.
+  for (let s = enter; s <= leave + 1e-9; s += 0.1) {
+    const u = u0 + du * s;
+    const clamped = u > part.hu ? part.hu : u < -part.hu ? -part.hu : u;
+    const y = from[1] + dir[1] * s;
+    if (y - r < topAt(part, clamped) && y + r > part.bottom) return Math.max(0, s - 0.1);
+  }
+  return length;
+}
+
+/**
+ * How far a ball of `radius` m, set going from `from` ([x, y, z]) along `dir` (a unit [x, y, z]), travels through the open before it
+ * touches a wall, a ceiling or a floor of the terrain: `length` if the way is clear. A cheap broad phase (the grid's cells along the
+ * line, a few solids each), so that it can be asked many times a frame: the camera's spring arm (cameraarm.js) is its user.
+ */
+export function sweepReach(terrain, from, dir, length, radius = 0.3) {
+  // A fifth of a cell between samples: with the grid's margin round each solid, that finds every solid within `radius` (up to 0.55 m) of the line.
+  const step = terrain.cell * 0.2;
+  const count = Math.max(1, Math.ceil(length / step));
+  const stamp = (terrain.stamp += 1);
+  let reach = length;
+  for (let sample = 0; sample <= count; sample += 1) {
+    const along = (sample / count) * length;
+    // (Past the nearest hit nothing can be nearer.)
+    if (along - radius > reach) break;
+    const list = cellOf(terrain, from[0] + dir[0] * along, from[2] + dir[2] * along);
+    for (let index = 0; index < list.length; index += 1) {
+      const part = list[index];
+      if (part.stamp === stamp) continue;
+      part.stamp = stamp;
+      if (part.rail) continue;
+      const hit = partReach(part, from, dir, reach, radius);
+      if (hit < reach) reach = hit;
+    }
+  }
+  return reach;
+}
+
+/**
+ * The solid (a wall, a ceiling, a floor block, a flight) a point is inside, or within `grow` m of the inside of; null in the open. A
+ * fence is none (it is the camera's to pass). For asking where a camera stands, in tests and tools.
+ */
+export function solidAt(terrain, x, y, z, grow = 0) {
+  const list = cellOf(terrain, x, z);
+  for (let index = 0; index < list.length; index += 1) {
+    const part = list[index];
+    if (part.rail) continue;
+    const dx = x - part.cx;
+    const dz = z - part.cz;
+    const u = dx * part.cos - dz * part.sin;
+    const v = dx * part.sin + dz * part.cos;
+    if (Math.abs(u) > part.hu + grow || Math.abs(v) > part.hv + grow) continue;
+    const top = part.shape === 'stairs' || part.shape === 'ramp' ? topAt(part, u) : part.top;
+    if (y < top + grow && y > part.bottom - grow) return part;
+  }
+  return null;
+}
+
+/**
+ * `point` ([x, y, z]) moved sideways out of any wall or step it is inside or within `radius` of (a copy): where the camera's arm starts
+ * from, so that a man against a wall, whose look point over his shoulder is in it, still has a way out.
+ */
+export function clearOfSolids(terrain, point, radius = 0.3) {
+  const at = [point[0], point[2]];
+  pushOut(terrain, at, radius, point[1] - 0.3, point[1] + 0.3, 0.2);
+  return [at[0], point[1], at[1]];
+}
+
+/** The terrain as the camera's arm (cameraarm.js) sees the world: the ball swept through its solids, and the look point moved out of the ones it stands in. */
+export const terrainWorld = (terrain) => ({
+  reach: (from, dir, length, radius) => sweepReach(terrain, from, dir, length, radius),
+  pivot: (point, radius) => clearOfSolids(terrain, point, radius),
+});
 
 // ---- Builders: the same data a stage file writes by hand ---------------------------
 

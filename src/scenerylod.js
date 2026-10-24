@@ -17,7 +17,6 @@
 // place back exactly as built (a before-and-after in the same page).
 
 /* global THREE */
-import { mayBlock, SEE_THROUGH } from './seethrough.js';
 
 export const SCENERY_LOD = {
   // m: the cell a wide instanced scatter (trees all round the place, litter over the field) is cut into. A 60 m view holds a handful of these; the rest are culled or thinned.
@@ -36,10 +35,13 @@ export const SCENERY_LOD = {
   thinFrom: 20,
   thinTo: 50,
   thinFloor: 0.5,
-  // m: a group of meshes is merged only when it is no wider than a see-through piece (seethrough.js pieceMax), so it fades as one thing as before.
-  mergeWidth: SEE_THROUGH.pieceMax,
-  // m: loose meshes (not in a group) are merged only within one cell this wide, and only the thin or low ones that see-through never fades.
+  // m: a group of meshes is merged only when it is no wider than one piece of scenery (a house, a tree, a gate): not a street, a ring of stands.
+  mergeWidth: 14,
+  // m: loose meshes (not in a group) are merged only within one cell this wide, and only the thin or low ones (a rope, a post, a kerb: `thin`), which are no wall.
   looseCell: 10,
+  // m: a mesh is a wall, a trunk or a roof (what a loose mesh is never merged as) if its top is above `floorTop`, it is no wider than `skyWide` (a wider one is ground or sky),
+  // and at least two of its sides are `thick` m or more.
+  thin: { floorTop: 0.25, skyWide: 80, thick: 0.3 },
   // A merged mesh may not grow past this many vertices (a 16-bit index would do, but a big one gains little).
   mergeMaxVertices: 60000,
   // s apart: the two times the place's own clock (rain, a ship at anchor) is read to find out which meshes it moves; those are left alone.
@@ -360,7 +362,7 @@ function mergeStatic(place, state) {
   };
   sort(place);
   for (const unit of units) mergeIn(unit, collect(unit, state), state, true);
-  // Loose meshes: in cells, and only those see-through would never fade.
+  // Loose meshes: in cells, and only the thin and low ones.
   const quiet = loose.filter((mesh) => mergeable(mesh, state) && !blocks(mesh));
   const points = quiet.map((mesh) => {
     const centre = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
@@ -384,10 +386,13 @@ function hasMoving(object, moving) {
   return any;
 }
 
-/** Whether see-through could ever fade this mesh (a thick, tall-enough scenery piece). */
+/** Whether this mesh is a wall, a trunk or a roof (a thick, tall-enough scenery piece), not a rope or a post or the floor. */
 function blocks(mesh) {
   const box = new THREE.Box3().setFromObject(mesh);
-  return mayBlock(box.min.toArray(), box.max.toArray());
+  const { floorTop, skyWide, thick } = SCENERY_LOD.thin;
+  const size = box.max.clone().sub(box.min);
+  if (box.max.y < floorTop || size.x > skyWide || size.z > skyWide) return false;
+  return [size.x, size.y, size.z].filter((side) => side >= thick).length >= 2;
 }
 
 /** Whether a mesh can be merged with others: a plain, solid, static mesh of one material that nothing else reads. */
@@ -500,7 +505,7 @@ function mergeBatch(unit, batch, inverse, state, sealed) {
   mesh.castShadow = first.castShadow;
   mesh.receiveShadow = first.receiveShadow;
   mesh.renderOrder = first.renderOrder;
-  // Loose, thin things see-through never faded stay unfaded merged; the parts of a piece fade with it as before.
+  // Loose, thin things are no wall: marked so (`userData.seeThrough === false`, the places' own mark: occluders.js leaves them out of the camera's way).
   if (!sealed) mesh.userData.seeThrough = false;
   const removed = batch.map((original) => ({ original, parent: original.parent }));
   for (const { original, parent } of removed) parent.remove(original);

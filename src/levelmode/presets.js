@@ -139,6 +139,24 @@ export const LEVEL_PRESETS = {
     look: { skinTone: 'light', hairStyle: 'bald', hairColor: '#8d8d8d', facialHair: 'none', eyeColor: 'grey' },
   },
 
+  // ---- The thing in the cesspool -----------------------------------------------------------------
+  // Noname, the one man in the old drain: he waits in the sludge of the cesspool under the inner cell (dunnottar-sewer.js `noname`). Astacius's kit (body.js
+  // PRESETS.scissor: the scale shirt, the smooth egg of a helmet, the steel tube on the left forearm, the greaves) but a long sword in both hands (the
+  // longsword style, moves.js: no shield; the tube is armour). A young man, thin in the face and hard in the body: 24, 178 cm, 80 kg of a fit gladiator
+  // (exercise 0.8; calories for that weight: the kit is another 38 % on top), well taught (skill 0.85). He knows no fear (`outfit.courage` 1: he never
+  // breaks and runs, ai.js fearTarget) and fights to the death, planted in the sludge (`outfit.balance` 2.5: hard to knock off his feet, as Vaelen's
+  // own hook) and working long, in bursts (`temperament`, level.js giveTemper). When he dies his helmet comes off and lies by the body
+  // (`helmetOffOnDeath`, level.js dropHelmets), and the face under it is the prince's: pale, long dark hair, no beard.
+  // Tuned with tools/dunnottar.js `noname` (the careful operative and his two comrades from the smugglers' brazier, one death a try): the operative wins
+  // 32 tries in 80 (40 %). As first built (49 kg of body, his calories a starving man's: the long sword was struck from his weak hands in every fight, the
+  // grip is the hand's strength) he lost 3 in 4; skill moved nothing measurable (0.7 to 1), his body and his footing did. Nothing is multiplied.
+  noname: {
+    name: 'Noname', style: 'longsword', sex: 'male', heightCm: 178, frame: 'medium', age: 24, exercise: 0.8, calories: 4500, skill: 0.85,
+    outfit: { kind: 'scissor', design: 4, courage: 1, balance: 2.5 }, accessories: [], helmetOffOnDeath: true,
+    temperament: { work: 1.4, burst: 1.3 },
+    look: { skinTone: 'porcelain', hairStyle: 'long', hairColor: '#16110d', facialHair: 'none', eyeColor: 'grey' },
+  },
+
   // ---- The boss -------------------------------------------------------------------------------
   // Lord Vaelen, the Queen's chief jailer: 210 cm, a body of 150 kg (a big man gone soft in the Queen's service:
   // little drilled, `exercise` 0.2, so his strength is a giant's, not a strongman's) in a jousting harness (the

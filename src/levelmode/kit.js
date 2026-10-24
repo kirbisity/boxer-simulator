@@ -22,16 +22,21 @@ import { KitBatch, kgAddGrid, kgBox, kgCylinder, kgExtrude, kgFlight, kgFloor, k
 import { kpBuild } from './kitprops.js';
 import { islandHeights, landHole, landNoise, mainlandHeight, stageBlocks } from './landform.js';
 import { kwDecorate } from './kitwear.js';
-import { stormFlashLevel, stormFogFar, stormFollow, stormInterior, stormRain, stormTorch } from './storm.js';
+import { stormFlashLevel, stormFogFar, stormFollow, stormInterior, stormRain, stormTorch, stormTorchReach } from './storm.js';
 import { interiorAt } from './stage.js';
 import { kcDecor, kcDoubleDoor, kcExtras, kcFar, kcMaterials } from './kitchapel.js';
 import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
 import { FaceRegistry } from '../depthrange.js';
 import { lampShare, newLamps, pickLit, stepLamps, torchFlicker } from './torchpool.js';
+import { kwtCreate } from './kitwater.js';
+import { kfDropped, kfDynamics } from './kitfilth.js';
 import { skyDirection } from './stagesky.js';
 import { ktDispose, ktMaterials, ktRandom, ktSetLod, ktWeather } from './kittex.js';
-import { TIER_NAMES, tierOf } from './quality.js';
+import { QUALITY_LAMPS_MOST, TIER_NAMES, tierOf } from './quality.js';
 import { chooseSections, fogReach, holdSections, holdMan, manDrawn, manSeen, nearestBoxDistance, pastReachHeld, sectionGraph, seeThroughIds, VISIBILITY } from './visibility.js';
+
+/** The real lights the torches are lent (quality.js: the best tier's count; a tier lights fewer). */
+const KIT_LAMPS = QUALITY_LAMPS_MOST;
 
 const KIT_SLAB_TOP = { grass: 'grass', path: 'path', rock: 'rock', flags: 'flags', cobble: 'cobble', boards: 'boards', stone: 'ashlar' };
 const KIT_WALL = { ashlar: 'ashlar', rubble: 'rubble', ruin: 'ruin', rock: 'rock', tower: 'ashlar', parapet: 'ashlar' };
@@ -552,7 +557,7 @@ function kitWaymarks(dyn, trail) {
 /** The detail of a section: its solids as masonry, its decor, its props. Returns { group, dyn }. */
 function kitSection(section, mats, seed, levels = [], faces = null) {
   const batch = new KitBatch(mats, seed, faces);
-  const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [] };
+  const dyn = { flames: [], lights: [], ravens: [], drips: [], puddles: [], shafts: [], waymarks: [], waters: [], filth: [] };
   kitSolids(batch, section);
   const cellar = ['vault', 'cell', 'crypt', 'sewer'].includes(section.id);
   let fences = 0;
@@ -576,6 +581,8 @@ function kitSection(section, mats, seed, levels = [], faces = null) {
       case 'cairn': kitCairn(batch, decor); break;
       case 'face': kitFace(batch, decor); break;
       case 'waymarks': kitWaymarks(dyn, decor); break;
+      // (Standing water is drawn by kitwater.js: a surface that ripples where men wade.)
+      case 'water': dyn.waters.push(decor); break;
       default: kcDecor(batch, dyn, decor); break;
     }
   }
@@ -893,7 +900,7 @@ function kitDynamics(dyn, mats, textures) {
   }
   for (const s of dyn.shafts) {
     const material = new THREE.MeshBasicMaterial({ map: textures.shaft, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, opacity: 0.6, fog: false });
-    const height = 4.4;
+    const height = s.height ?? 4.4;
     for (const turn of [0, Math.PI / 2]) {
       const card = new THREE.Mesh(new THREE.PlaneGeometry(s.size[0] * 1.1, height), material);
       card.position.set(s.at[0], s.at[1] - height / 2 - 0.05, s.at[2]);
@@ -1154,6 +1161,12 @@ export function createCastleView(stage) {
   const markers = [];
   const lights = [];
   const stats = { land: 0, sections: {} };
+  // The standing water (kitwater.js): its meshes go in the sections' detail, its drops in the stage's group.
+  const water = kwtCreate(stage);
+  group.add(water.group);
+  // What the dead leave lying (a helmet off a head: kitfilth.js), from the run's `level.dropped`.
+  const dropped = kfDropped();
+  group.add(dropped.group);
   let seed = 7;
   for (const section of stage.sections) {
     seed += 13;
@@ -1166,6 +1179,10 @@ export function createCastleView(stage) {
     const dynamic = kitDynamics(detail.dyn, mats, textures);
     dynamic.group.name = `dyn:${section.id}`;
     detail.group.add(dynamic.group);
+    water.addSection(section.id, detail.dyn.waters, detail.group);
+    // The filth's moving parts (kitfilth.js): the fungus's glow, flies, sewage pouring.
+    const filth = kfDynamics(detail.dyn.filth, textures, water);
+    if (filth) detail.group.add(filth.group);
     const ext = kcExtras(section, mats, textures);
     if (ext) detail.group.add(ext.group);
     const holder = new THREE.Group();
@@ -1188,7 +1205,7 @@ export function createCastleView(stage) {
     }
     for (const l of detail.dyn.lights) lights.push({ ...l, section: section.id });
     sections[section.id] = holder;
-    parts[section.id] = { detail, far, dynamic, moving, marks, ext, chunks, decals, silhouette };
+    parts[section.id] = { detail, far, dynamic, moving, marks, ext, filth, chunks, decals, silhouette };
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
     group.add(holder);
   }
@@ -1209,8 +1226,9 @@ export function createCastleView(stage) {
   // A few real lights, moved to the nearest of the flames and torches. Every lit surface of the picture pays for each light in the scene, lit or
   // not (a third of the graphics card's time out in the rain, where no torch is near), so the four are in the scene only while a torch lights
   // something (all together: two shaders to keep, with the lights and without, `view.warm` builds them both before they are wanted).
+  // (As many as the best tier lights, `KIT_LAMPS`; a tier lights its own `lamps` of them, quality.js, the rest stay out of the scene.)
   const pool = [];
-  for (let k = 0; k < 4; k += 1) {
+  for (let k = 0; k < KIT_LAMPS; k += 1) {
     const light = new THREE.PointLight(0xffa050, 0, 12, 2);
     light.name = `kit-light-${k}`;
     light.userData.torch = true;
@@ -1224,7 +1242,7 @@ export function createCastleView(stage) {
     tier: 'high', q: tierOf('high'), held: {}, states: new Map(), hidden: new Set(), menHeld: {}, menSeen: new Map(), open: new Map(), stamp: null,
     sight: seeThroughIds(stage), eye: [0, 0, 0], fogFar: Infinity, paint: { sections: 0, far: 0, chunks: 0, decals: 0 },
   };
-  const view = { stage, group, sections, mechanisms: [], mats, stats, safe: null };
+  const view = { stage, group, sections, mechanisms: [], mats, stats, safe: null, water };
 
   /** Put the picture in a quality tier (quality.js: 'high', 'medium', 'low'): the reaches of the small things and of the shader's finer terms, the rain. */
   view.setQuality = (name) => {
@@ -1346,6 +1364,7 @@ export function createCastleView(stage) {
       const away = nearestBoxDistance(graph.bounds[section.id], ex, ey, ez);
       kitAnimate(entry.dynamic.parts, entry.detail.dyn, state.time, q, away, state.eye);
       entry.ext?.update(state.time, extra);
+      entry.filth?.update(state.time);
       const taken = run.level?.taken;
       for (const mark of entry.marks) {
         const gone = taken?.has(mark.item.id);
@@ -1361,7 +1380,12 @@ export function createCastleView(stage) {
     // The men: one behind a wall from the eye (and from the man played), and not near, is not drawn (visibility.js manDrawn).
     state.hidden.clear();
     if (camera.set && terrain) kitMen(state, world, terrain, view.safe, dt);
-    // The lights: the four nearest of the lit things in the sections shown, a few times a second.
+    // The water: rings round the men wading in it, splashes, the reflections (kitwater.js).
+    water.update(world, state.time, dt, states, q);
+    dropped.update(run.level?.dropped);
+    // The lights: the nearest of the lit things in the sections shown (as many as the tier lights), a few times a second.
+    const lamps = Math.min(pool.length, q.lamps ?? pool.length);
+    const reachNow = stormTorchReach();
     state.lightClock -= dt;
     if (state.lightClock <= 0) {
       state.lightClock = 0.2;
@@ -1370,23 +1394,25 @@ export function createCastleView(stage) {
         // (The torches of a section that is not painted are out: they light nothing that is seen.)
         if (!near.has(l.section) || states.get(l.section) !== 'detail') continue;
         const d = Math.hypot(l.at[0] - px, l.at[2] - pz);
-        if (d < l.range * 2.2) candidates.push({ l, d });
+        if (d < l.range * reachNow * 2.2) candidates.push({ l, d });
       }
-      state.lit = pickLit(candidates, state.lit, pool.length);
+      state.lit = pickLit(candidates, state.lit, lamps);
     }
-    // (A light stays with its torch, and fades in and out: torchpool.js.)
-    stepLamps(state.lamps, state.lit, dt);
+    // (A light stays with its torch, and fades in and out: torchpool.js. The lamps past the tier's count only fade out.)
+    stepLamps(state.lamps.slice(0, lamps), state.lit, dt);
+    stepLamps(state.lamps.slice(lamps), [], dt);
+    const anyLit = state.lit.length > 0 || state.lamps.some((other) => other.l);
     pool.forEach((light, k) => {
       const lamp = state.lamps[k];
-      light.visible = state.lit.length > 0 || state.lamps.some((other) => other.l);
+      light.visible = k < lamps && anyLit;
       const l = lamp.l;
-      if (!l) {
+      if (!l || k >= lamps) {
         light.intensity = 0;
         return;
       }
       light.position.set(l.at[0], l.at[1], l.at[2]);
       light.color.setHex(l.color);
-      light.distance = l.range;
+      light.distance = l.range * reachNow;
       light.intensity = l.power * torchFlicker(state.time, k) * lampShare(lamp) * 2.2 * stormTorch();
     });
     foam.map.offset.set(state.time * 0.02, state.time * 0.05);
@@ -1412,8 +1438,9 @@ export function createCastleView(stage) {
       object.visible = true;
     }
     for (const [holder] of holders) holder.visible = true;
+    const lit = Math.min(pool.length, state.q.lamps ?? pool.length);
     for (const on of [true, false]) {
-      for (const light of pool) light.visible = on;
+      pool.forEach((light, k) => { light.visible = on && k < lit; });
       draw();
     }
     for (const [object, culled, visible] of kept) Object.assign(object, { frustumCulled: culled, visible });
@@ -1478,6 +1505,7 @@ export function createCastleView(stage) {
 
   view.dispose = () => {
     ktShadowRelease();
+    water.dispose();
     group.traverse((object) => {
       object.geometry?.dispose();
     });

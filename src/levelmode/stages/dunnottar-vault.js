@@ -297,8 +297,9 @@ export function buildCrypt() {
   dnProp(sec, 'drip', [20, C + 3.5, -24.4], {});
   dnProp(sec, 'drip', [27.6, C + 3.5, -23.6], {});
   dnProp(sec, 'drip', [8.2, C + 3.5, -24.4], {});
-  // Water (knee-deep in the bed beside the causeway): discs just under the causeway's top, hidden where the floor is higher.
-  for (const [x, z] of [[5.6, -24.6], [8.2, -24.4], [10.2, -24.6], [6.2, -27.4], [6.2, -29.8], [6.2, -32.2], [6.2, -34.6]]) dnProp(sec, 'puddle', [x, C - 0.14, z], { radius: 2.2 });
+  // Water (knee-deep in the bed beside the causeway): black and still, a surface just under the causeway's top that rings where a man wades (levelmode/kitwater.js).
+  sec.decor.push({ kind: 'water', id: 'cryptflood', shape: 'rect', at: [7.5, C - 0.12, -24.5], size: [5.8, 3.4], bed: C - 0.4, murk: 'clear' });
+  sec.decor.push({ kind: 'water', id: 'cryptway', shape: 'rect', at: [6.2, C - 0.12, -30.8], size: [3.2, 9.2], bed: C - 0.4, murk: 'clear' });
   // The ossuary: heaps of skulls, four pillars of bone-stacked stone, one brazier, a sarcophagus broken open.
   for (const [x, z] of [[13.6, -29.4], [19.6, -29.4], [13.6, -33.4], [19.6, -33.4]]) dnProp(sec, 'pillar', [x, C, z], { height: 3.7 });
   dnProp(sec, 'skullpile', [11.9, C, -28.2], { size: 1.0 });

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { attackLayout, attackWhere, keyStick, MOVE_NAMES, moveName, strikeOutcome } from '../src/control.js';
 import { createRecognizer, GESTURE, screenZone } from '../src/gesture.js';
+import { createArm, roomWorld } from '../src/cameraarm.js';
 import { behindYaw, cameraRoom, createFollowCam, FOLLOW_CAM, spring } from '../src/followcam.js';
 import { createTutorialRun, TUTORIAL, TUTORIAL_STEPS } from '../src/tutorial.js';
 import { STYLES } from '../src/moves.js';
@@ -210,18 +211,22 @@ test('entering play lands the view on him at once: behind him at the follow dist
   }
 });
 
-test('the camera stays inside the walls: it comes in along its line', () => {
+test('the camera stays inside the walls: the arm comes in along its line (followcam.js asks for the room, cameraarm.js keeps to it)', () => {
   const room = cameraRoom('colosseum', { halfX: 6.5, halfZ: 4.4 });
   assert.ok(room(0, 0) && !room(10.5, 0));
   assert.equal(cameraRoom('ring', { halfX: 3, halfZ: 3 }), null);
-  const cam = createFollowCam(FOLLOW_CAM, { room });
+  const cam = createFollowCam(FOLLOW_CAM);
+  const arm = createArm();
+  const world = roomWorld(room);
   let view = null;
+  let seen = null;
   // Standing near the wall, facing away from it (+x is the wall behind: he faces −x, yaw π).
-  for (let time = 0; time < 3; time += 1 / 60) view = frame(cam, { me: [8, 0.9, 0], facing: Math.PI }, time);
-  const x = view.target[0] + Math.cos(view.pitch) * Math.cos(view.yaw) * view.distance;
-  const z = view.target[2] + Math.cos(view.pitch) * Math.sin(view.yaw) * view.distance;
-  assert.ok(room(x, z), `the camera at (${x.toFixed(2)}, ${z.toFixed(2)}) is inside`);
-  assert.ok(view.distance < FOLLOW_CAM.distance, 'nearer than usual');
+  for (let time = 0; time < 3; time += 1 / 60) {
+    view = frame(cam, { me: [8, 0.9, 0], facing: Math.PI }, time);
+    seen = arm.solve({ target: view.target, yaw: view.yaw, pitch: view.pitch, distance: view.distance }, world, 1 / 60);
+    assert.ok(room(seen.position[0], seen.position[2]), `the camera at (${seen.position[0].toFixed(2)}, ${seen.position[2].toFixed(2)}) is inside, at every frame`);
+  }
+  assert.ok(seen.distance < FOLLOW_CAM.distance, 'nearer than usual');
 });
 
 // ---- The tutorial -----------------------------------------------------------------

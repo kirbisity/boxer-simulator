@@ -423,6 +423,7 @@ export const stageLookOf = (name) => STAGE_LOOKS[name] ?? STAGE_LOOKS[DEFAULT_ST
 //     exposure  everything the lights give, times this (default 1)
 //     fog       { colour (hex, also the background), near, far (m), mist (the low mist's density; 0: none) }
 //     wet       how soaked the stone looks (default: the look's); torch: how bright the flames burn (default: the look's)
+//     reach     how far the torches' light carries, times their own range (default 1): a dark room's flames light a wider pool
 //     flash     how much of a lightning strike's flash gets in (0..1; the look's own strength is kept times this)
 //     blend     seconds to blend over (default 1.5)
 //   }
@@ -455,7 +456,50 @@ export function interiorLevels(look, spec, k) {
     mist: mix(look.fog.mist.density, fog.mist ?? 0),
     wet: mix(look.wet, spec.wet ?? look.wet),
     torch: mix(look.torch, spec.torch ?? look.torch),
+    reach: mix(1, spec.reach ?? 1),
     flash: mix(1, spec.flash ?? 0.15),
     eased: e,
   };
+}
+
+/** The colour fields of `interiorLevels`, blended as colours (the rest are numbers, `tint` a triple). */
+const LEVEL_COLOURS = ['hemiSky', 'hemiGround', 'fogColour'];
+
+/**
+ * The light now, moved a share `a` (0..1) of the way from `current` toward `target` (both `interiorLevels` results): the weather eases toward the light of where he
+ * stands, from the open into a doorway and from one room into the next (the vault's torchlit dark into the crypt's blacker one), never in a step.
+ */
+export function approachLevels(current, target, a) {
+  const t = Math.max(0, Math.min(1, a));
+  const out = {};
+  for (const [key, value] of Object.entries(target)) {
+    const from = current?.[key] ?? value;
+    if (LEVEL_COLOURS.includes(key)) out[key] = approachHex(from, value, t);
+    else if (Array.isArray(value)) out[key] = value.map((v, i) => from[i] + (v - from[i]) * t);
+    else out[key] = from + (value - from) * t;
+  }
+  return out;
+}
+
+/** A colour moved a share `t` of the way to another, each channel at least one step while it is not there (a small share would round back to where it was). */
+function approachHex(a, b, t) {
+  const channel = (shift) => {
+    const from = (a >> shift) & 255;
+    const to = (b >> shift) & 255;
+    if (from === to || t <= 0) return from;
+    const moved = Math.round(from + (to - from) * t);
+    return moved === from ? from + Math.sign(to - from) : moved;
+  };
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
+
+/** Whether two `interiorLevels` results are the same light, near enough not to be worth setting again. */
+export function levelsSettled(a, b, tolerance = 1e-3) {
+  if (!a || !b) return false;
+  return Object.entries(b).every(([key, value]) => {
+    // (A colour eased a share of the way at a time stops a step short, rounded: within two of 255 in each channel is there.)
+    if (LEVEL_COLOURS.includes(key)) return [16, 8, 0].every((shift) => Math.abs(((a[key] >> shift) & 255) - ((value >> shift) & 255)) <= 2);
+    if (Array.isArray(value)) return value.every((v, i) => Math.abs(a[key][i] - v) < tolerance);
+    return Math.abs(a[key] - value) < tolerance * Math.max(1, Math.abs(value));
+  });
 }
