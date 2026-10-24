@@ -1362,12 +1362,13 @@ export function groundHeightAt(view) {
 }
 
 /**
- * The camera on its orbit round the target, the target eased towards `focus` (`ease` of the way each frame, at `height` m).
- * With `ground`, the orbit is first kept above the ground (watchcam.js orbitAboveGround): never under the floor.
+ * The camera on its orbit round the target, the target eased towards `focus` (`ease` of the way each 60th of a second, at `height` m; `dt`
+ * the frame's s, so that it is the same at any frame rate). With `ground`, the orbit is first kept above the ground (watchcam.js
+ * orbitAboveGround): never under the floor.
  */
-export function placeCamera(view, focus, { ease = 0.06, height = 1.1, ground = false } = {}) {
+export function placeCamera(view, focus, { ease = 0.06, height = 1.1, ground = false, dt = 1 / 60 } = {}) {
   const orbit = view.orbit;
-  if (focus) orbit.target.lerp(new THREE.Vector3(focus[0], height, focus[2]), ease);
+  if (focus) orbit.target.lerp(new THREE.Vector3(focus[0], height, focus[2]), 1 - (1 - ease) ** (dt * 60));
   if (ground) orbitAboveGround(orbit, groundHeightAt(view));
   const { yaw, pitch, distance, target } = orbit;
   view.camera.position.set(

@@ -161,9 +161,10 @@ export function buildCell() {
   const t = 1.4;
   dnBounds(sec, { at: [(room.x0 - t + room.x1 + 1.4) / 2, -36], size: [room.x1 + 1.4 - (room.x0 - t), room.z1 - room.z0 + 2 * t], y: [L - 3, 40] });
   sec.interior = DN_CELL_INTERIOR;
-  // Directly behind the chancel's double doors: a small stone room of 6.4 m by 6.8, a low vault, a slit of cold light over the privy in the west wall.
+  // Directly behind the chancel's double doors: a small stone room of 6.4 m by 6.8, a vault 5 m up (it was 3.6: a camera behind a man in it came in on top of
+  // him; nothing is over it but the roofs), a slit of cold light over the privy in the west wall.
   dnRoom(sec, {
-    x0: room.x0, x1: room.x1, z0: room.z0, z1: room.z1, floor: L, head: 3.6, thick: t, style: 'rubble', walls: ['n', 's', 'w'], foot: L - 2, slab: { bottom: L - 2, extra: { room: true } },
+    x0: room.x0, x1: room.x1, z0: room.z0, z1: room.z1, floor: L, head: 5, thick: t, style: 'rubble', walls: ['n', 's', 'w'], foot: L - 2, slab: { bottom: L - 2, extra: { room: true } },
     doors: { w: [{ at: -36, width: 0.6, sill: L + 2.6, top: L + 3.9, shape: 'slit', solid: true }] }, vault: { crown: 1.2, ribs: 4.2 },
   });
   // The privy: a stone seat built out from the west wall under the slit, a round hole in it over the chute (levelmode/kitprops.js `privy` draws the hole and the lid).

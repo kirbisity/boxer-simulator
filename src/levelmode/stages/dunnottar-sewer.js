@@ -29,7 +29,8 @@ import { rampOf, slabOf } from '../../physics/terrain.js';
 import { DN_FACE, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnItem, dnProp, dnRoom, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
 /** The levels (y) of the old drain and the line it runs on (x): the cave, the cistern and the first drains at `floor`; the long drain at `drain`; the crypt's at Y.crypt. */
-export const DN_CAVE = { floor: -5, drain: -1.6, x: -48.5, mouth: 3.4, face: 55.4 };
+// (`mouth`: its width, 5.4 m; it was the drain's 3.4, and the camera behind a man walking in, a little to one side of him, was cut in on him by its jamb.)
+export const DN_CAVE = { floor: -5, drain: -1.6, x: -48.5, mouth: 5.4, face: 55.4 };
 /** The stair down the cliff's face to the sea cave: x of its foot at the quay and of its head on the shelf, beside the drawbridge's head. */
 export const DN_CAVE_STAIR = { foot: -39.6, head: -29.6 };
 
@@ -45,9 +46,14 @@ export const DN_CESSPOOL_REGION = { at: [DN_CESSPOOL.at[0], DN_CESSPOOL.at[2]], 
 /** The one man in the drain: his spawn id. */
 export const DN_NONAME_SPAWN = 'noname';
 
-/** The drain's clear width (m) and the head room under its roof. */
+/**
+ * The drain's clear width (m) and the head room under its roof: `SW_HEAD` under the shelf (the grotto, the first drain: the shelf's rock is over them),
+ * `SW_TALL` from the second drain on, under the hill, where there is rock enough over it (and the stairs' vaults with it): a camera behind and above a man
+ * in a passage 3.4 m wide stands under a 4.4 m roof; under 3.2 m it came in to a metre.
+ */
 const SW_WIDE = 3.4;
 const SW_HEAD = 3.2;
+const SW_TALL = 4.4;
 /** Where the sea-gate chamber's low door stands (z) and how wide it is: the crypt builds it (buildCrypt), the drain's last stretch runs to it. */
 export const DN_SEAGATE_DOOR = { z: -37.9, width: 2.8 };
 
@@ -76,7 +82,7 @@ export function buildSeaCave(sec) {
   dnBox(sec, S.head, S.head + 3.4, 56, 59.5, Y.sea - 1, Y.gorge - 0.25, 'rock');
   dnFence(sec, [[S.head + 3.45, 56.2, Y.gorge], [S.head + 3.45, 59.55, Y.gorge], [S.head, 59.55, Y.gorge], [S.foot, 59.55, F], [-52.65, 59.55, F], [-52.65, 56.2, F]]);
   // The rock face under the shelf's plate, with the cave's mouth in it: the sea's face of the cliff, from the waterline up to the plate.
-  dnRun(sec, [-56, DN_CAVE.face], [-41, DN_CAVE.face], 1.2, Y.sea - 0.5, F + 3.6, 'rock', [{ at: X + 56, width: DN_CAVE.mouth, sill: F, top: F + 3.2, shape: 'round' }]);
+  dnRun(sec, [-56, DN_CAVE.face], [-41, DN_CAVE.face], 1.2, Y.sea - 0.5, F + 3.6, 'rock', [{ at: X + 56, width: DN_CAVE.mouth, sill: F, top: F + 3.4, shape: 'round' }]);
   // Light and the signs of use: a lantern on a post and a brazier on the quay, kegs, a dead man's bones; a trail down the stair; at the head a lit
   // brazier, a lantern, a sign pointing down and the note: lit and marked, so that from the drawbridge's head it is the plain way to go.
   dnProp(sec, 'lantern', [mouth[0] - 0.9, F, 56.6], { yaw: 0 });
@@ -117,15 +123,15 @@ export function buildSewer() {
   const east = X + SW_WIDE / 2;
   // (Heights: below the shelf and the hillside, whose sections are the cliff path's, up to a man's hips on the stairs and the last stretch.)
   const low = [-6.5, -1.5];
-  const mid = [-6.5, 0.2];
-  const high = [-6.5, 3];
+  const mid = [-6.5, DN_CAVE.drain + SW_TALL + 1];
+  const high = [-6.5, Y.crypt + SW_TALL + 1];
   const hallOut = P.hall + 1;
   const alcove = { x0: px - 1.8, x1: px + 1.8, z0: pz - hallOut - 3.8, z1: pz - hallOut };
   dnBounds(sec,
     { at: [X, 49.7], size: [15, 12.6], y: low },
     { at: [X, 33], size: [5.4, 23], y: low },
     { at: [X, 13], size: [15, 19], y: low },
-    { at: [X, -2], size: [5.4, 14], y: low },
+    { at: [X, -2], size: [5.4, 14], y: [-6.5, F + SW_TALL + 1] },
     { at: [X, -11.2], size: [5.4, 8.4], y: mid },
     { at: [X, -25.6], size: [5.4, 22.4], y: mid },
     { at: [-25.9, -37.9], size: [53.2, 5.4], y: high },
@@ -201,28 +207,28 @@ export function buildSewer() {
   for (const [x, z] of [[-50, 10.6], [-46, 18.4], [-52.4, 5.4]]) dnProp(sec, 'drip', [x, F + 3.6, z], {});
 
   // The second drain, the first stair (17 treads of 0.2, to y -1.6) and the long drain after it.
-  swDrain(sec, { x0: west, x1: east, z0: -7, z1: 3, floor: F, walls: ['w', 'e'] });
+  swDrain(sec, { x0: west, x1: east, z0: -7, z1: 3, floor: F, walls: ['w', 'e'], head: SW_TALL });
   const first = dnFlight(sec, { foot: [X, -7], dir: 'N', steps: 17, tread: 0.4, width: SW_WIDE, from: F, rise: 0.2, style: 'stone' });
-  dnFlightWalls(sec, first, { thick: 1, head: 3.0, style: 'rubble' });
-  dnFlightVault(sec, first, { head: 3.0 });
-  swDrain(sec, { x0: west, x1: east, z0: -35.2, z1: -14.8, floor: D, walls: ['w', 'e'] });
+  dnFlightWalls(sec, first, { thick: 1, head: SW_TALL, style: 'rubble' });
+  dnFlightVault(sec, first, { head: SW_TALL });
+  swDrain(sec, { x0: west, x1: east, z0: -35.2, z1: -14.8, floor: D, walls: ['w', 'e'], head: SW_TALL });
   dnProp(sec, 'puddle', [X, F + 0.02, -1], { radius: 1.1 });
   dnProp(sec, 'torch', [west + 0.1, F + 2.3, -3], { face: 'E' });
-  dnProp(sec, 'drip', [X, F + 3.0, 1.2], {});
+  dnProp(sec, 'drip', [X, F + SW_TALL - 0.2, 1.2], {});
   dnProp(sec, 'slime', [X + 0.3, F + 0.01, 1.6], { yaw: 0.7 });
   dnProp(sec, 'rat', [east - 0.4, F, -4.6], { yaw: 1.9 });
   for (const z of [-20, -26, -31]) dnProp(sec, 'puddle', [X, D + 0.02, z], { radius: 1.0 });
-  dnProp(sec, 'drip', [X, D + 3.0, -24], {});
+  dnProp(sec, 'drip', [X, D + SW_TALL - 0.2, -24], {});
   dnProp(sec, 'rubbleheap', [east - 0.5, D, -28.6], { size: 0.6 });
   dnProp(sec, 'torch', [east - 0.1, D + 2.3, -22], { face: 'W' });
   dnProp(sec, 'slime', [X - 0.3, D + 0.01, -17.6], { yaw: 2.2, size: 1.2 });
   dnProp(sec, 'rags', [west + 0.6, D, -25.4], { yaw: 0.2 });
-  dnProp(sec, 'cobweb', [east - 0.1, D + 3.0, -15.4], { yaw: Math.PI, span: 0.8 });
+  dnProp(sec, 'cobweb', [east - 0.1, D + SW_TALL - 0.2, -15.4], { yaw: Math.PI, span: 0.8 });
   dnProp(sec, 'fungus', [west + 0.15, D + 0.4, -31.6], { size: 0.9 });
 
   // The pocket where the drain turns east: the smugglers' brazier, the way's one rest (dry, a fire), before the cesspool.
   swDrain(sec, {
-    x0: west - 2.6, x1: px - hallOut, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's', 'w'], doors: { s: [{ at: X, width: SW_WIDE, top: D + 3 }] },
+    x0: west - 2.6, x1: px - hallOut, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's', 'w'], head: SW_TALL, doors: { s: [{ at: X, width: SW_WIDE, top: D + SW_TALL - 0.2 }] },
   });
   sec.rest = { id: 'restdrain', name: "The Smugglers' Brazier", at: [-49.2, D, -37.9] };
   dnProp(sec, 'brazier', [-51.4, D, -37.9], { lit: true, rest: true });
@@ -233,14 +239,14 @@ export function buildSewer() {
   swCesspool(sec, alcove);
 
   // East from the cesspool along the foot of the rock under the chapel: 13 m, a door to the sea-gate at its end. The stair up (15 treads of 0.2, y -1.6 to the crypt's 1.4) and the last 6 m.
-  swDrain(sec, { x0: px + hallOut, x1: -13, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's'] });
+  swDrain(sec, { x0: px + hallOut, x1: -13, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's'], head: SW_TALL });
   const second = dnFlight(sec, { foot: [-13, -37.9], dir: 'E', steps: 15, tread: 0.4, width: SW_WIDE, from: D, rise: 0.2, style: 'stone' });
-  dnFlightWalls(sec, second, { thick: 1, head: 3.0, style: 'rubble' });
-  dnFlightVault(sec, second, { head: 3.0 });
+  dnFlightWalls(sec, second, { thick: 1, head: SW_TALL, style: 'rubble' });
+  dnFlightVault(sec, second, { head: SW_TALL });
   swDrain(sec, { x0: -6, x1: 0, z0: -39.6, z1: -36.2, floor: C, walls: ['n', 's'] });
   dnProp(sec, 'puddle', [-21, D + 0.02, -37.9], { radius: 1.0 });
   dnProp(sec, 'torch', [-19, D + 2.3, -39.5], { face: 'S' });
-  dnProp(sec, 'drip', [-23, D + 3.0, -37.9], {});
+  dnProp(sec, 'drip', [-23, D + SW_TALL - 0.2, -37.9], {});
   dnProp(sec, 'slime', [-17.2, D + 0.01, -37.6], { yaw: 0.3 });
   dnProp(sec, 'rat', [-24.6, D, -36.8], { yaw: 0.9 });
   dnProp(sec, 'torch', [-3, C + 2.3, -36.3], { face: 'N', dim: true });

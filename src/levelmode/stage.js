@@ -218,6 +218,18 @@ export function stageTerrain(stage, ids, states) {
   return createTerrain(activeSolids(stage, ids, states), { sea: stage.sea ?? -Infinity });
 }
 
+/**
+ * The terrain the camera's arm keeps clear of (camerarig.js): every section's, as the castle is drawn, not only the sections awake, so that
+ * a section waking as he walks is no jump of the camera (a wall of it that was not there a frame before); the gates and ladders as they
+ * stand. Made again when one of them changes.
+ */
+export function cameraTerrain(world) {
+  const run = world.stage;
+  const key = Object.values(run.mechanisms).join();
+  if (run.cameraTerrain?.key !== key || run.cameraTerrain.def !== run.def) run.cameraTerrain = { key, def: run.def, terrain: stageTerrain(run.def, run.def.sections.map((section) => section.id), run.mechanisms) };
+  return run.cameraTerrain.terrain;
+}
+
 // ---- The world ----------------------------------------------------------------------
 
 /**

@@ -21,7 +21,7 @@ import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js
 import { createFightUiMarks } from './fightui/marker.js';
 import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
-import { cameraRoom, createFollowCam, FOLLOW_CAM } from './followcam.js';
+import { cameraRoom, createFollowCam } from './followcam.js';
 import { createCameraRig } from './camerarig.js';
 import { adaptiveSize, createAdaptiveResolution } from './adaptres.js';
 import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
@@ -41,7 +41,7 @@ import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awar
 import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
-import { mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { attemptCount, attemptLog, attemptStory, bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { installLevelHud } from './levelmode/hud.js';
@@ -724,14 +724,23 @@ function blendWorld(world, before, share) {
 // The player's drag of the view (touch.js: the top half, or the right
 // button) is kept a while, then eased back.
 
+/** The follow camera's last answer (followcam.js update). */
+let followView = null;
+/** The share of the arm's length the walls left it last frame (camerarig.js): the follow camera comes in behind him when it is hemmed in. */
+function armRoom() {
+  const last = cameraRig.stats().last;
+  return last ? last.distance / Math.max(1e-6, last.distance + last.pulled) : 1;
+}
+
 /** The man the player has locked on, in play mode. */
 const lockedTarget = () => (state.mode === 'play' && state.orders.lock !== null ? state.world.fighters[state.orders.lock] ?? null : null);
 
 /** The follow camera, this frame: behind the man played, or on him and the man he is locked on. */
 function followCamera(fighter, dt) {
   const orbit = scene.orbit;
+  // (Kept for the arm: the man's chest it is kept clear from, and how he moves.)
   const locked = lockedTarget();
-  const view = followCam.update({
+  const view = (followView = followCam.update({
     // (In a jump's gather and flight the view keeps the height he jumped from: the hop is seen, not followed.)
     me: fighter.jump && fighter.jump.phase !== 'land' ? [fighter.x[P.pelvis * 3], fighter.jump.from, fighter.x[P.pelvis * 3 + 2]] : point(fighter.x, P.pelvis),
     facing: fighter.yaw,
@@ -739,10 +748,12 @@ function followCamera(fighter, dt) {
     foe: locked ? point(locked.x, P.pelvis) : null,
     running: Boolean(fighter.runMode),
     speed: Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]),
+    velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]],
+    room: armRoom(),
     moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick) && state.orders.lock === null)),
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
-  }, realSeconds(), dt);
+  }, realSeconds(), dt));
   Object.assign(orbit, { yaw: view.yaw, pitch: view.pitch, distance: view.distance });
   orbit.target.set(...view.target);
   if (endingCam) endingCamera(dt);
@@ -778,7 +789,7 @@ function watchCamera(world, middle, dt) {
   } else if (world.fighters.length > 2 || world.horses?.length) {
     // A crowd needs a wider shot: back off with the spread of the fighters.
     const furthest = state.scenario ? battleOf(state.scenario).camera?.maxDistance ?? Infinity : Infinity;
-    orbit.distance += (Math.min(furthest, frameDistance(spread)) - orbit.distance) * 0.03;
+    orbit.distance += (Math.min(furthest, frameDistance(spread)) - orbit.distance) * (1 - 0.97 ** (dt * 60));
     watchCam.reframing = false;
   } else stepReframe(watchCam, orbit, spread, dt);
 }
@@ -828,14 +839,18 @@ function drawWorld(dt, drawIt = true) {
   const sheet = document.body.classList.contains('sheet') || state.game === 'intro';
   // Playing: the camera follows his man from behind (third person).
   const followed = state.mode === 'play' && !sheet ? player() : null;
-  if (followed) followCamera(followed, dt);
-  else if (!sheet) watchCamera(world, pelvisMid, dt);
+  // Paused, the camera holds where it is (the player's own turn of the view still turns it).
+  const cameraDt = state.paused ? 0 : dt;
+  if (followed) followCamera(followed, cameraDt);
+  else if (!sheet) watchCamera(world, pelvisMid, cameraDt);
   // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
   // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall). (A stage's floors are its terrain's, which the arm below knows.)
-  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet && !world.stage });
+  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet && !world.stage, dt: cameraDt });
   // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js), from the man played (a cutscene's or the ending's camera is looking at someone else: from what it looks at).
   // The viewer's own turn of the view only shortens.
-  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? world.arena.terrain : null, room: world.stage ? null : cameraWalls, subject: followed && !endingCam && !cutsceneDirector.active && !twistDirector.active ? [followed.x[P.pelvis * 3], followed.x[P.pelvis * 3 + 1] + FOLLOW_CAM.aboveHips, followed.x[P.pelvis * 3 + 2]] : null, free: !followed || followCam.state.wasManual, dt });
+  // (In a stage, the whole castle's walls, not only the sections awake: a section waking is no jump of the camera. Paused, the camera holds still.)
+  const own = followed && !endingCam && !cutsceneDirector.active && !twistDirector.active;
+  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? cameraTerrain(world) : null, room: world.stage ? null : cameraWalls, subject: own ? followView.subject : null, free: !followed || followCam.state.wasManual, dt: cameraDt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);

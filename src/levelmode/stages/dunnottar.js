@@ -278,6 +278,9 @@ function buildCliff() {
   return sec;
 }
 
+/** m: the head room of the tunnelled flights of the gatehouse and the ascent (over the treads, the roof following the slope): room for the camera behind a man on them. */
+const DN_FLIGHT_HEAD = 5;
+
 // ---- 2. The Gatehouse and the Oillets -----------------------------------------------------------
 
 function buildGate() {
@@ -314,9 +317,10 @@ function buildGate() {
   dnProp(sec, 'torch', [-5.2, 3, 50.4], { face: 'E' });
 
   // The steep stair up: 22 treads of 0.19, under an arched tunnel.
+  // (Its roof 5 m over the treads, walls to match: a third-person camera behind and above a man on it stands under it. It was 3.9: the camera came in to 1.5 m.)
   const stair = dnFlight(sec, { foot: [6.8, 46.2], dir: 'E', steps: 22, tread: 0.34, width: 5.4, from: Y.gorge, rise: A / 22, style: 'cobble' });
-  dnFlightWalls(sec, stair, { thick: 2.3, head: 4.6 });
-  dnFlightVault(sec, stair, { head: 3.9 });
+  dnFlightWalls(sec, stair, { thick: 2.3, head: DN_FLIGHT_HEAD + 0.8 });
+  dnFlightVault(sec, stair, { head: DN_FLIGHT_HEAD });
   sec.terrain.push({ ...wallOf([13.9, 42.3], [0.8, 2.2], A - 1, A + 8, {}), style: 'ashlar', skin: false });
   // The landing before the oillet wall.
   dnSlab(sec, 14.28, 22.1, 39.6, 52.8, A, 'flags', { extra: { room: true } });
@@ -362,6 +366,7 @@ function buildGate() {
 
 // ---- 3. The Tunnelled Ascent --------------------------------------------------------------------
 
+
 // From the gatehouse landing: a vestibule, a first flight (4 m) up to a guard room, a second (4 m) up to the quadrangle's
 // south wall. The corridor is the hand-over: the quadrangle's men wake at its head, out of sight.
 function buildAscent() {
@@ -379,8 +384,8 @@ function buildAscent() {
   // Flight A north: 20 treads of 0.2.
   const a = dnFlight(sec, { foot: [17.7, 33.4], dir: 'N', steps: 20, tread: 0.4, width: 5.4, from: A, rise: (B - A) / 20, style: 'cobble' });
   // The long side wall west of flight A is the vestibule's; the east one runs on.
-  dnFlightWalls(sec, a, { thick: 2.3, head: 4.6 });
-  dnFlightVault(sec, a, { head: 3.9 });
+  dnFlightWalls(sec, a, { thick: 2.3, head: DN_FLIGHT_HEAD + 0.8 });
+  dnFlightVault(sec, a, { head: DN_FLIGHT_HEAD });
   dnBox(sec, 20.4, 25.8, 31.8, 33.4, A - 1, A + 6, 'ashlar');
   // The guard room.
   dnSlab(sec, 9.4, 26.1, 14.8, 25.4, B, 'flags', { extra: { room: true } });
@@ -402,8 +407,8 @@ function buildAscent() {
   dnProp(sec, 'torch', [24.6, B + 2.7, 16.4], { face: 'W' });
   // Flight B north: 20 treads of 0.2 to the quadrangle.
   const b = dnFlight(sec, { foot: [17, 16.0], dir: 'N', steps: 20, tread: 0.4, width: 5.4, from: B, rise: (Q - B) / 20, style: 'cobble' });
-  dnFlightWalls(sec, b, { thick: 2.3, head: 4.6 });
-  dnFlightVault(sec, b, { head: 3.9 });
+  dnFlightWalls(sec, b, { thick: 2.3, head: DN_FLIGHT_HEAD + 0.8 });
+  dnFlightVault(sec, b, { head: DN_FLIGHT_HEAD });
   // The head of the stair: a short floor under the quadrangle's south wall, the arch above.
   dnSlab(sec, 14.3, 19.7, 6, 8.2, Q, 'cobble', { extra: { room: true } });
   sec.decor.push({ kind: 'waymarks', points: [[17.7, 39, A], [17.7, 35.2, A]], gap: 1.8, first: 0.3 });

@@ -492,10 +492,14 @@ export function clearOfSolids(terrain, point, radius = 0.3) {
   return [at[0], point[1], at[1]];
 }
 
-/** The terrain as the camera's arm (cameraarm.js) sees the world: the ball swept through its solids, and the look point moved out of the ones it stands in. */
+/**
+ * The terrain as the camera's arm (cameraarm.js) sees the world: the ball swept through its solids, the look point moved out of the ones it
+ * stands in, and whether a ball at a point is clear of them all.
+ */
 export const terrainWorld = (terrain) => ({
   reach: (from, dir, length, radius) => sweepReach(terrain, from, dir, length, radius),
   pivot: (point, radius) => clearOfSolids(terrain, point, radius),
+  free: (point, radius) => !solidAt(terrain, point[0], point[1], point[2], radius),
 });
 
 // ---- Builders: the same data a stage file writes by hand ---------------------------

@@ -19,6 +19,17 @@ export const FOLLOW_CAM = {
   anchorSeconds: 0.18,
   // Down (or getting up): the anchor is smoothed this much more, and the heading held.
   downSeconds: 0.45,
+  // The lag of the anchor and of the look point's spring (a man running 7 m/s was 1.4 m ahead of what the view looked at, and the camera
+  // 5.6 m behind him) is made up, `leadShare` of it, by his velocity on the floor: smoothed over `velocitySeconds` (the sway of his steps is
+  // not in it), at most `leadMost` m. Not while he is down (a body thrown about has no way it goes). A man who stops is not overshot by more
+  // than a hand's breadth: the velocity eases out with him.
+  leadShare: 0.75,
+  velocitySeconds: 0.2,
+  leadMost: 1.5,
+  // The arm's subject (cameraarm.js: what it is kept clear from) is his chest, where he is, but its height smoothed over `subjectSeconds`
+  // (the bob of a run's stride), never more than `subjectMost` m off.
+  subjectSeconds: 0.15,
+  subjectMost: 0.25,
   // rad/s: how fast (natural frequency of the springs) the look point, the distance and the pitch follow.
   targetRate: 7,
   distanceRate: 3,
@@ -27,6 +38,8 @@ export const FOLLOW_CAM = {
   turnRate: 2.4,
   walkTurnRate: 0.9,
   lockTurnRate: 3,
+  // rad/s: the fastest the view comes round by itself (the player's own drag of it is his).
+  turnMost: 2.2,
   // s: the low-pass on the way he faces; rad: a turn smaller than this leaves the view where it is.
   facingSeconds: 0.35,
   deadBand: 0.3,
@@ -58,6 +71,12 @@ export const FOLLOW_CAM = {
   // this share of it, so that he stays in frame. The camera's vertical field of view (degrees).
   minHalfWidth: 1.1,
   shoulderShare: 0.3,
+  // Hemmed in (the arm, cameraarm.js, left less than `roomFrom` of its length the frame before; none of the shoulder offset under `roomTo`), the view
+  // comes in behind him instead of over his shoulder, and the lazy follow's dead band closes: in a drain 3.2 m wide a camera over his shoulder,
+  // or left 15 degrees off his way, touches the wall; behind him it does not. Smoothed over `roomSeconds`.
+  roomFrom: 0.95,
+  roomTo: 0.6,
+  roomSeconds: 0.5,
   // Locked on: both men in the picture, with this much (m) to spare beyond each.
   lockMargin: 0.5,
   fov: 40,
@@ -71,6 +90,13 @@ export function spring(value, velocity, goal, rate, dt) {
   const off = value - goal;
   const push = (velocity + rate * off) * dt;
   return [goal + (off + push) * decay, (velocity - rate * push) * decay];
+}
+
+/** `value` kept under `most` in size, eased into from 0.6 of it (below that it is untouched). */
+function softCap(value, most) {
+  const knee = most * 0.6;
+  const size = Math.abs(value);
+  return size <= knee ? value : Math.sign(value) * (knee + (most - knee) * Math.tanh((size - knee) / (most - knee)));
 }
 
 /** A first-order low-pass of `value` towards `goal` over `seconds`. */
@@ -117,6 +143,11 @@ export function createFollowCam(spec = FOLLOW_CAM) {
   function place(input) {
     const anchor = input.me.slice();
     cam.anchor = anchor;
+    cam.last = anchor.slice();
+    cam.velocity = [0, 0, 0];
+    cam.lead = 0;
+    cam.subjectY = anchor[1];
+    cam.room = 1;
     cam.foe = input.foe ? input.foe.slice() : null;
     cam.facing = input.foe ? Math.atan2(anchor[2] - input.foe[2], anchor[0] - input.foe[0]) + spec.lockAngle : behindYaw(input.facing);
     cam.goalYaw = cam.facing;
@@ -134,15 +165,39 @@ export function createFollowCam(spec = FOLLOW_CAM) {
   /**
    * One frame. `input`: { me: [x, y, z] (his pelvis), facing (his yaw), down (on the floor or rising),
    * foe: [x, y, z] (the man locked on's pelvis, or null), moving (walking free), running (in run mode) and speed (m/s, for the
-   * run's follow), aspect (the screen's width over height) },
-   * `now` (s, real time) and `dt` (s). Returns { target, yaw, pitch, distance }.
+   * run's follow), velocity ([x, y, z] m/s, his walk's: optional, else it is read from the pelvis), room (the share of the arm the walls left
+   * the frame before: 1 in the open), aspect (the screen's width over height) },
+   * `now` (s, real time) and `dt` (s). Returns { target, yaw, pitch, distance, subject }: the orbit, and for the arm (cameraarm.js)
+   * the point it is kept clear from (his chest).
    */
   function update(input, now, dt) {
     if (!cam.ready) place(input);
     dt = Math.max(0, Math.min(0.1, dt));
-    // The anchor: his pelvis, smoothed; more so while he is down.
+    // His velocity on the floor, smoothed; the share of it that leads the anchor and the look point (none while he is down).
+    const { me } = input;
+    // (His walk's own velocity, `input.velocity`, if it is given: the pelvis's surges with each stride and sways side to side, the walk does not.)
+    if (dt > 0) {
+      for (const axis of [0, 2]) {
+        const raw = input.velocity ? input.velocity[axis] : (me[axis] - cam.last[axis]) / dt;
+        cam.velocity[axis] = lowPass(cam.velocity[axis], Math.max(-12, Math.min(12, raw)), spec.velocitySeconds, dt);
+      }
+      cam.last = me.slice();
+    }
+    cam.lead = lowPass(cam.lead, input.down ? 0 : spec.leadShare, spec.velocitySeconds, dt);
+    const speed = Math.hypot(cam.velocity[0], cam.velocity[2]);
+    const leadOf = (seconds) => {
+      const scale = cam.lead * Math.min(seconds, spec.leadMost / Math.max(speed, 1e-6));
+      return [cam.velocity[0] * scale, 0, cam.velocity[2] * scale];
+    };
+    // The anchor: his pelvis, smoothed (more so while he is down), its lag made up by the lead.
     const smooth = input.down ? spec.downSeconds : spec.anchorSeconds;
-    for (let axis = 0; axis < 3; axis += 1) cam.anchor[axis] = lowPass(cam.anchor[axis], input.me[axis], smooth, dt);
+    const ahead = leadOf(smooth);
+    for (let axis = 0; axis < 3; axis += 1) cam.anchor[axis] = lowPass(cam.anchor[axis], me[axis] + ahead[axis], smooth, dt);
+    // The arm's subject: his chest where he is, its height without the bob.
+    cam.subjectY = lowPass(cam.subjectY, me[1], spec.subjectSeconds, dt);
+    cam.subjectY = Math.max(me[1] - spec.subjectMost, Math.min(me[1] + spec.subjectMost, cam.subjectY));
+    // How hemmed in the arm was (1: not at all): the shoulder offset and the dead band of the lazy follow go with it.
+    cam.room = lowPass(cam.room, Math.max(0, Math.min(1, ((input.room ?? 1) - spec.roomTo) / (spec.roomFrom - spec.roomTo))), spec.roomSeconds, dt);
     const locked = Boolean(input.foe);
     if (locked) {
       if (!cam.foe) cam.foe = input.foe.slice();
@@ -168,7 +223,8 @@ export function createFollowCam(spec = FOLLOW_CAM) {
       if (!input.down) cam.facing += wrap(behindYaw(input.facing) - cam.facing) * (1 - Math.exp(-dt / spec.facingSeconds));
       // Within the dead band of where the view is going, a turn leaves it be; past it, the goal is dragged along.
       const off = wrap(cam.facing - cam.goalYaw);
-      if (Math.abs(off) > spec.deadBand) cam.goalYaw = wrap(cam.goalYaw + off - Math.sign(off) * spec.deadBand);
+      const band = spec.deadBand * cam.room;
+      if (Math.abs(off) > band) cam.goalYaw = wrap(cam.goalYaw + off - Math.sign(off) * band);
       goalYaw = cam.goalYaw;
     }
     if (manual) goalYaw = cam.manualYaw;
@@ -181,7 +237,12 @@ export function createFollowCam(spec = FOLLOW_CAM) {
     const rate = followRate || (locked ? spec.lockTurnRate : input.moving ? spec.walkTurnRate : spec.turnRate);
     // The yaw spring runs on the unwrapped angle nearest the goal.
     const nearGoal = cam.yaw + wrap(goalYaw - cam.yaw);
-    if (!manual) [cam.yaw, cam.yawV] = spring(cam.yaw, cam.yawV, nearGoal, rate, dt);
+    if (!manual) {
+      // (No faster than `turnMost` rad/s, eased into: a hairpin at a sprint swings the view round, it does not whip it.)
+      const [yaw, yawV] = spring(cam.yaw, cam.yawV, nearGoal, rate, dt);
+      if (dt > 0) cam.yaw += softCap((yaw - cam.yaw) / dt, spec.turnMost) * dt;
+      cam.yawV = softCap(yawV, spec.turnMost);
+    }
     const goalPitch = manual ? cam.manualPitch : spec.pitch;
     if (!manual) [cam.pitch, cam.pitchV] = spring(cam.pitch, cam.pitchV, goalPitch, spec.pitchRate, dt);
     // What it looks at: over his shoulder (to the view's right), or between the two men.
@@ -193,16 +254,25 @@ export function createFollowCam(spec = FOLLOW_CAM) {
     const halfWidth = locked ? spec.lockMargin + apart * 0.5 : spec.minHalfWidth;
     const wanted = Math.max(spec.distance + apart * spec.lockBack, halfWidth / across) * cam.zoom;
     if (cam.distance === null) cam.distance = wanted;
-    const shoulder = Math.min(spec.shoulder, cam.distance * across * spec.shoulderShare);
+    const shoulder = Math.min(spec.shoulder, cam.distance * across * spec.shoulderShare) * cam.room;
     const height = cam.anchor[1] + spec.aboveHips;
     const goalTarget = locked
       ? [cam.anchor[0] + ((cam.foe[0] - cam.anchor[0]) / Math.max(gap, 1e-6)) * apart * spec.lockAt, height, cam.anchor[2] + ((cam.foe[2] - cam.anchor[2]) / Math.max(gap, 1e-6)) * apart * spec.lockAt]
       : [cam.anchor[0] + right[0] * shoulder, height, cam.anchor[2] + right[1] * shoulder];
+    // (The look point's spring lags a moving goal by 2 / rate s of its motion: so much of it is led.)
+    const led = leadOf(2 / spec.targetRate);
+    for (let axis = 0; axis < 3; axis += 1) goalTarget[axis] += led[axis];
     if (!cam.target) cam.target = goalTarget.slice();
     for (let axis = 0; axis < 3; axis += 1) [cam.target[axis], cam.targetV[axis]] = spring(cam.target[axis], cam.targetV[axis], goalTarget[axis], spec.targetRate, dt);
     // The distance eases to it. (What stands in its way is not the follow camera's to know: cameraarm.js pulls the camera in.)
     [cam.distance, cam.distanceV] = spring(cam.distance, cam.distanceV, wanted, spec.distanceRate, dt);
-    return { target: cam.target.slice(), yaw: cam.yaw, pitch: cam.pitch, distance: cam.distance };
+    return {
+      target: cam.target.slice(),
+      yaw: cam.yaw,
+      pitch: cam.pitch,
+      distance: cam.distance,
+      subject: [me[0], cam.subjectY + spec.aboveHips, me[2]],
+    };
   }
 
   /** The player turns the view (rad of yaw and pitch): kept until `holdSeconds` after the last of it. */
