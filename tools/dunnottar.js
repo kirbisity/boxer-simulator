@@ -133,6 +133,8 @@
 //   the low island in the middle of the pit (he waits on it, a hand under the sludge)          beaten 45/80
 //   + calories 4500 (80 kg: the preset)                                                        beaten 32/80 (40 %), median 18 s, 1.1 of 2 comrades left
 // The sludge holds the legs of every man in it (level.js wadeGear, his too): a wader Noname did worse (the operative fought from the ramp's foot).
+// The whole sewer route (careful, two comrades, seeds 1-6, 3600 s): every run got through the sewer (deaths there 7: Noname 3, bled after him 4); 2 of 6
+// reached and beat Vaelen, 4 timed out in the vault (not looked into: the vault is as it was).
 //
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
