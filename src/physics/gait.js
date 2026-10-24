@@ -19,6 +19,10 @@
 //   at the middle of the swing, less as he tires.
 // - The lean: `lean` rad forward at a run, `leanPerSpeed` more per m/s, and `accelLean` of the angle his acceleration
 //   makes with gravity (forward speeding up, back braking: `accelSmooth` s), `tiredLean` more when spent (hunched).
+// - The corner: a turn at a run is a sideways force v × (turn rate) that the stance foot gives through the floor, and the
+//   body leans in by atan(that over g) to carry it through its centre of mass. The most he can give is the least of what
+//   the floor grips (`corner.grip`) and what his leg holds (`corner.legs` × power, less as it is hurt or tired); past it
+//   his heading and his path turn no faster, wider the faster he goes (cornering, turnRateMost, bankOf, cornerShare).
 // - A hurt leg: the step off it is quicker and the stride shorter (`limp`): he hobbles.
 
 import { P } from '../body.js';
@@ -149,6 +153,50 @@ export function runLean(fighter, dt) {
   const tired = 1 - Math.max(0, Math.min(1, fighter.stamina));
   const lean = spec.lean + spec.leanPerSpeed * speed + spec.accelLean * Math.atan2(fighter.gaitAccel, WORLD.gravity) + spec.tiredLean * tired;
   return Math.max(spec.leanMost[0], Math.min(spec.leanMost[1], lean));
+}
+
+/**
+ * What he can give a turn at a run (WORLD.gait.corner): `tan`, the most sideways push over his weight, which is the tangent
+ * of the lean he can hold (the floor's grip, or his leg's strength: the less, less as the leg is hurt or tired), and `accel`,
+ * that push as a sideways acceleration (m/s²).
+ */
+export function cornering(fighter) {
+  const spec = WORLD.gait.corner;
+  const legs = WORLD.gait.legFloor + (1 - WORLD.gait.legFloor) * runLegs(fighter);
+  const floor = spec.grip * Math.min(1, fighter.body.gear?.balance ?? 1);
+  const tan = Math.max(0, Math.min(floor, spec.legs * gaitOf(fighter).power * legs));
+  return { tan, accel: tan * WORLD.gravity };
+}
+
+/** The fastest his heading may turn (rad/s) at `speed` m/s: the sideways acceleration he can give, over his speed (never slower than 1 m/s: a start is not a corner). */
+export function turnRateMost(fighter, speed) {
+  return cornering(fighter).accel / Math.max(1, speed);
+}
+
+/**
+ * The lean (rad, positive to his left, the pose's `bank`) that carries a turn: the floor must push him in by v × turn
+ * (`turn` rad/s, positive turning to his right) so the push through his centre of mass leans him by atan(v × turn / g), toward the
+ * inside of the curve, no further than he can hold.
+ */
+export function bankOf(fighter, speed, turn) {
+  const wanted = (speed * Math.abs(turn)) / WORLD.gravity;
+  return -Math.sign(turn) * Math.atan(Math.min(wanted, cornering(fighter).tan));
+}
+
+/**
+ * The pace (m/s) at which a runner who has `angle` rad still to turn can take it in `corner.room` m of his way: the arc of a turn is its
+ * radius (v² over the sideways acceleration he can give) × the angle, so v = √(accel × room / angle). A small angle is no limit at all
+ * (his pace as it is); a right angle at a sprint's grip is ~4 m/s, a U-turn ~3.
+ */
+export function cornerPace(fighter, angle) {
+  if (angle < 1e-3) return Infinity;
+  return Math.sqrt((cornering(fighter).accel * WORLD.gait.corner.room) / angle);
+}
+
+/** The share (0..1) of the grip a sideways acceleration `lateral` (m/s²) has used: the forward push has the rest, as the root of what is left of a circle (gathering speed in a hard turn). */
+export function cornerShare(fighter, lateral) {
+  const used = Math.min(1, Math.abs(lateral) / Math.max(1e-6, cornering(fighter).accel));
+  return Math.sqrt(1 - used * used);
 }
 
 /**

@@ -605,7 +605,7 @@ export function updateHorseView(view, world = null) {
   const horse = view.horse;
   const drawn = view.drawn;
   const rig = view.model.rig;
-  Object.assign(drawn, { at: horse.at, yaw: horse.yaw, speed: horse.speed, stride: horse.stride, state: horse.state, roll: horse.roll, fall: horse.fall, withers: horse.withers });
+  Object.assign(drawn, { at: horse.at, yaw: horse.yaw, speed: horse.speed, stride: horse.stride, state: horse.state, roll: horse.roll, fall: horse.fall, withers: horse.withers, bank: horse.bank });
   poseHorse(drawn);
   const W = horse.withers;
   const time = world?.time ?? performance.now() / 1000;
@@ -625,6 +625,9 @@ export function updateHorseView(view, world = null) {
   // The body pitches (nose up and down) and rocks about its barrel with the stride, as the physics has it (physics/mounted.js horseMotion), and the fall's roll.
   view.body.rotation.z = drawn.pitch ?? 0;
   view.body.rotation.x = (horse.roll ?? 0) + (drawn.rock ?? 0);
+  // Leaning into a turn: the whole horse about its hooves (the group stands on the ground; yaw, then the roll about its own forward line).
+  view.group.rotation.order = 'YXZ';
+  view.group.rotation.x = horse.bank ?? 0;
   view.body.position.y = 0.76 * W - fall * (0.76 * W - 0.21 * W);
   const pitchAmp = speed < 2.4 ? 0.07 : speed < 4.6 ? 0.025 : 0.06;
   view.neck.rotation.z = -0.22 * pace - pitchAmp * nod * 0.6 + idle - fall * 0.5 + (horse.dead ? -0.1 * fall : 0);

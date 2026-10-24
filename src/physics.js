@@ -10,14 +10,14 @@ import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
 import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
-import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, vec, yawCos, yawRotate, yawSin } from './pose.js';
+import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
-import { limpOf, pushOff, runChange, runLean, runSpeed, strideOf } from './physics/gait.js';
+import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
@@ -764,8 +764,10 @@ function runGait(fighter) {
  */
 function runTrunk(fighter, side) {
   const desired = fighter.desired;
-  const shoulder = desired?.[P[`${side}Shoulder`]] ?? [0, fighter.body.heightM * 0.8, (side === 'l' ? 1 : -1) * fighter.body.lengths.shoulderSpan / 2];
-  const spine = desired ? vec.normalize(vec.sub(desired[P.neck], desired[P.pelvis])) : [0, 1, 0];
+  // (Before the lean into a turn: the arms are laid out in his upright frame and leaned with the rest, once, by the pose.)
+  const level = desired ? unleaned(fighter.body, fighter.intent?.bank, desired) : null;
+  const shoulder = desired ? level(desired[P[`${side}Shoulder`]]) : [0, fighter.body.heightM * 0.8, (side === 'l' ? 1 : -1) * fighter.body.lengths.shoulderSpan / 2];
+  const spine = desired ? vec.normalize(vec.sub(level(desired[P.neck]), level(desired[P.pelvis]))) : [0, 1, 0];
   const front = vec.normalize(vec.sub([1, 0, 0], vec.scale(spine, spine[0])));
   return { shoulder, spine, front };
 }
@@ -1824,15 +1826,12 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
 }
 
 /**
- * The pose of a sprint turn (WORLD.runMode.turn): the heading's rate `fighter.turn` (rad/s, positive turning to his right) smoothed,
- * and from it the trunk banked into the turn (`roll`), the shoulders led into it and the hips lagging it (`twist`, `hipYaw`).
- * All of it is the run pose's share; a straight run, and a man not running, have none.
+ * The turn of a run (WORLD.runMode.turn): `fighter.turn`, the heading's rate (rad/s, positive turning to his right), smoothed over what a
+ * runner takes to feel it; of his path, once he is going (the way his speed points: it lags his facing), else of his facing.
  */
-function runTurnPose(fighter, intent, dt) {
+function turnOf(fighter, dt) {
   const spec = WORLD.runMode.turn;
-  const share = fighter.runPose;
   const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
-  // The turn of his path once he is going (the way his speed points: it lags his facing, which turns first), else of his facing.
   const heading = speed > spec.pathFrom ? Math.atan2(-fighter.rootVelocity[1], fighter.rootVelocity[0]) : fighter.yaw;
   if (fighter.yawWas === undefined || dt <= 0) fighter.turn = 0;
   else {
@@ -1840,10 +1839,33 @@ function runTurnPose(fighter, intent, dt) {
     fighter.turn = (fighter.turn ?? 0) + (rate - (fighter.turn ?? 0)) * (1 - Math.exp(-dt / spec.smooth));
   }
   fighter.yawWas = heading;
+  return fighter.turn;
+}
+
+/**
+ * The lean into a turn, `fighter.bank` (rad, positive to his left; pose.js bank): what the turn asks of the floor (gait.js bankOf:
+ * atan(v × turn / g), no more than he can hold) reached by his own lag (`lag` s) as he leans in after the turn begins, and
+ * lost the same way when it ends; none at a walk or standing still. A man not in a run's footwork has none to reach.
+ */
+function leanIntoTurn(fighter, dt, cornering) {
+  const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  const wanted = cornering ? bankOf(fighter, speed, fighter.turn ?? 0) : 0;
+  const bank = fighter.bank ?? 0;
+  const next = bank + (wanted - bank) * (1 - Math.exp(-dt / WORLD.runMode.turn.lag));
+  fighter.bank = Math.abs(next) < 1e-4 && !wanted ? 0 : next;
+  return fighter.bank;
+}
+
+/**
+ * The pose of a turn in the run pose (WORLD.runMode.turn): the shoulders led into the turn and the hips lagging it (`twist`, `hipYaw`),
+ * from `fighter.turn`, the run pose's share. A straight run, and a man not running, have none.
+ */
+function runTurnPose(fighter, intent) {
+  const spec = WORLD.runMode.turn;
+  const share = fighter.runPose;
   const cap = (value, most) => Math.max(-most, Math.min(most, value));
   return {
-    // (Local +z is his left: a positive rate turns him to his right, so the roll and the leads are the other way.)
-    roll: (intent.roll ?? 0) - cap(fighter.turn * speed * spec.bank, spec.bankMax) * share,
+    // (A positive rate turns him to his right, local +z is his left: the leads are the other way.)
     twist: intent.twist + cap(fighter.turn * spec.lead, spec.leadMax) * share,
     hipYaw: -cap(fighter.turn * spec.hipLag, spec.hipLagMax) * share,
   };
@@ -1873,12 +1895,20 @@ function updateIntent(world, fighter, dt) {
     intent.runArms = runPose;
     // The body rises as the feet part (the flight) and sinks as they pass.
     intent.dip += spec.bob * (1 - runGait(fighter).spread) * runPose;
-    Object.assign(intent, runTurnPose(fighter, intent, dt));
-  } else if (fighter.turn !== undefined) {
-    fighter.turn = 0;
-    fighter.yawWas = undefined;
+  } else if (fighter.gaitAccel !== undefined) {
     fighter.gaitAlong = undefined;
     fighter.gaitAccel = 0;
+  }
+  // The turn of a run, and the lean into it (a man striding on a guard's pose leans too: the lean is the floor's, not the pose's).
+  const cornering = !fighter.mount && (runPose > 0 || striding(fighter));
+  if (cornering) turnOf(fighter, dt);
+  else if (fighter.turn !== undefined) {
+    fighter.turn = 0;
+    fighter.yawWas = undefined;
+  }
+  if (cornering || fighter.bank) {
+    intent.bank = leanIntoTurn(fighter, dt, cornering);
+    if (runPose > 0) Object.assign(intent, runTurnPose(fighter, intent));
   }
   // An old back stoops (aging.js).
   intent.lean += fighter.body.stoop ?? 0;
@@ -2498,15 +2528,18 @@ function landingOf(fighter, foot, spec, run, done) {
 }
 
 /**
- * A step in a sprint turn (WORLD.runMode.turn): the landing `to` is moved in place so that the foot lands in the direction of travel and
- * on its own side of the line, not across it (the stance is turned to the facing, the travel is not), the foot on the inside of the turn
- * shorter and wider, the one on the outside longer. Nothing at a straight run (no turn, no change).
+ * A step in a turn at a run (WORLD.runMode.turn): the landing `to` is moved in place so that the foot lands in the direction of travel
+ * (the stance is turned to the facing, the travel lags it) and on its own side of the other foot, not across it (`gap`). The feet are out to
+ * the outside of his centre of mass already, as far as the lean puts them (pose.js); and each foot goes round the curve on its own radius:
+ * its step is as much longer or shorter than the centre's as its radius is (the outer foot goes the longer way round the same angle), the
+ * radius being the one the turn is on (the speed over the rate of turning) and the foot's distance in or out of it. Nothing at a straight
+ * run (no turn, no change).
  */
 function turnedStep(fighter, foot, to) {
   const spec = WORLD.runMode.turn;
-  const share = Math.min(1, Math.abs(fighter.turn ?? 0) / spec.full);
   const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
-  if (share < 0.05 || speed < 0.5) return;
+  const turn = fighter.turn ?? 0;
+  if (Math.abs(turn) < spec.full || speed < 0.5) return;
   const H = fighter.body.heightM;
   const ux = fighter.rootVelocity[0] / speed;
   const uz = fighter.rootVelocity[1] / speed;
@@ -2515,11 +2548,21 @@ function turnedStep(fighter, foot, to) {
   const dz = foot.desired[2] - fighter.root[1];
   const across = -dx * uz + dz * ux;
   const along = dx * ux + dz * uz;
-  // Left of the line of travel is +, as the foot index says: the left foot is on that side.
+  // Left of the line of travel is +, as the foot index says: the left foot is on that side. The middle of his two feet, across (the lean
+  // has put it out to the outside of his centre of mass): a foot lands to its own side of that, at least `gap` from it.
   const side = foot.index === P.lFoot ? 1 : -1;
-  const inner = side * fighter.turn < 0;
-  const wanted = side * Math.max(side * across, spec.gap * H * Math.sqrt(share)) + (inner ? side * spec.wide * H * share : 0);
-  const length = along + (inner ? -spec.inner : spec.outer) * H * share;
+  const middle = (fighter.desired[P.lFoot][2] + fighter.desired[P.rFoot][2]) / 2;
+  let wanted = middle + side * Math.max(side * (across - middle), spec.gap * H);
+  // ...and to its own side of where the other foot is (planted, or coming down), where he will have gone to when this one lands.
+  const other = fighter.feet[side === 1 ? 'r' : 'l'];
+  const there = other.step ? other.step.to : other.planted;
+  const gone = [to[0] - foot.desired[0], to[2] - foot.desired[2]];
+  const otherAcross = -(there[0] - fighter.root[0] - gone[0]) * uz + (there[2] - fighter.root[1] - gone[1]) * ux;
+  if (side * (wanted - otherAcross) < spec.gap * H) wanted = otherAcross + side * spec.gap * H;
+  // The centre of the curve is to his right in a right turn (turn > 0), his left in a left one: `out`, how far outside the centre's radius
+  // (speed over rate) the foot is. Its step round the same angle is that much longer than the centre's.
+  const out = Math.sign(turn) * across;
+  const length = along * (1 + (Math.abs(turn) * out) / speed);
   to[0] += (length - along) * ux - (wanted - across) * uz;
   to[2] += (length - along) * uz + (wanted - across) * ux;
 }
@@ -3294,12 +3337,15 @@ function moveRoot(world, fighter, dt) {
   const facing = fighter.faceAt && world.time < fighter.faceAt.until ? fighter.faceAt.at : null;
   // (The player's `faceFoe`, set by control.js: false, he keeps his own heading while his man is far and he is not locked on.)
   const facePoint = facing ?? fighter.goTo ?? (opponent && fighter.faceFoe !== false ? point(opponent.x, P.pelvis) : null);
+  // (How far round he has yet to turn to face it, rad: a runner slows for a turn he has begun, below.)
+  let toTurn = 0;
   if (facePoint) {
     const from = point(fighter.x, P.pelvis);
     const to = facePoint;
     const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    toTurn = Math.abs(turn);
     // A man who cannot turn his head turns his whole body to follow, slowly.
     let change = turn * Math.min(1, dt * WORLD.footing.turnRate * (fighter.body.gear.headLocked ? WORLD.headLock.turn : 1) * (fighter.wading?.act ?? 1));
     if (fighter.crawling) {
@@ -3312,6 +3358,12 @@ function moveRoot(world, fighter, dt) {
     }
     // A blow aimed by the line he runs (a couched lance: `holdHeading`) is not turned once it is going: the point would sweep sideways.
     if (fighter.punch?.spec.holdHeading && fighter.punch.t >= fighter.punch.spec.windup) change = 0;
+    // Running, his heading turns no faster than the floor can carry his path round (gait.js turnRateMost: v × rate = what the foot
+    // gives sideways): faster than that and he would face one way while the run went on another, dragged round sideways.
+    if (fighter.running && !fighter.rush && !fighter.crawling && !fighter.air || fighter.gaitCarry) {
+      const most = turnRateMost(fighter, Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1])) * dt;
+      change = Math.max(-most, Math.min(most, change));
+    }
     fighter.yaw += change;
   }
   // Footwork has inertia: the stance accelerates and brakes at what the legs
@@ -3328,6 +3380,8 @@ function moveRoot(world, fighter, dt) {
   let runPace = null;
   if (fighter.running && !fighter.rush && !fighter.crawling) {
     runPace = Math.max(0, fighter.move) * runSpeed(fighter, Boolean(fighter.runMode));
+    // A turn still to make slows him to the pace at which his grip carries him round it in `room` m (gait.js cornerPace).
+    runPace = Math.min(runPace, cornerPace(fighter, toTurn));
     // Running to a place (an AI man's goTo; the player's is only a way, a little ahead of him): no faster than he can stop there.
     if (fighter.goTo && !fighter.runMode) runPace = Math.min(runPace, arrivalSpeed(fighter, Math.hypot(fighter.goTo[0] - fighter.root[0], fighter.goTo[2] - fighter.root[1])));
   }
@@ -3401,7 +3455,7 @@ function arrivalSpeed(fighter, distance) {
 
 /**
  * The stance's velocity changed towards `wanted` as a runner's can: along his way, gathering speed at his start and
- * braking at his brake (physics/gait.js runChange); across it (a turn), at his brake.
+ * braking at his brake (physics/gait.js runChange); across it (a turn), at what his grip and leg give a corner (gait.js cornering).
  */
 function runTowards(fighter, wanted, speed, dt) {
   const velocity = fighter.rootVelocity;
@@ -3420,11 +3474,14 @@ function runTowards(fighter, wanted, speed, dt) {
   const change = [wanted[0] - velocity[0], wanted[1] - velocity[1]];
   const along = change[0] * ux + change[1] * uz;
   const across = [change[0] - along * ux, change[1] - along * uz];
-  const alongMost = runChange(fighter, speed, speed + along, dt);
-  const acrossMost = runChange(fighter, speed, 0, dt);
-  const alongDone = Math.max(-alongMost, Math.min(alongMost, along));
+  // Across his way (a turn) the floor gives what the foot and the leg hold (gait.js cornering); along it he gathers speed at his start
+  // and brakes at his brake, a gathering the less the more of the grip the turn he is on has used.
+  const acrossMost = cornering(fighter).accel * dt;
   const acrossSize = Math.hypot(across[0], across[1]);
   const acrossScale = acrossSize > acrossMost ? acrossMost / acrossSize : 1;
+  // (The turn it is on, not this step's correction: a runner's velocity is nudged a little every step, and that is not a corner.)
+  const alongMost = runChange(fighter, speed, speed + along, dt) * (along > 0 ? cornerShare(fighter, speed * (fighter.turn ?? 0)) : 1);
+  const alongDone = Math.max(-alongMost, Math.min(alongMost, along));
   velocity[0] += alongDone * ux + across[0] * acrossScale;
   velocity[1] += alongDone * uz + across[1] * acrossScale;
 }

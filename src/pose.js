@@ -133,9 +133,51 @@ export function lockedHead(body, neck, up, forward, restLean) {
  * Desired particle positions in the local frame.
  * @param body   built body (lengths)
  * @param intent { stance, twist, hipYaw (the hips' own yaw, rad, besides the twist's share), lean, dip, shift, headOffset, guardTight,
+ *   bank (a run's lean into a turn, rad, positive to his left: see below),
  *   guardOffset, and per-limb overrides lHand, rHand, lElbow, rElbow,
  *   lFoot, rFoot, lKnee, rKnee (local points), check (lead shin up) }
  */
+/**
+ * A run's turn leans him as a whole into it (`intent.bank`, rad, positive to his left): everything above the feet is rolled that far
+ * about the floor under him, so the hips move in towards the curve's centre and the feet are left out on the outside of them, the
+ * stance leg slanting from the foot in to the hip as the force through it does. The pose then puts the middle of his hips back on his
+ * own line (his root, the centre of mass's floor point): the feet go out instead. The head takes some of the lean back (WORLD.runMode.turn
+ * `head`: the neck bends out of it, the righting reflex keeping the eyes near the horizon). A hand or a blade given in his frame goes
+ * with him. `roll(point, share)` and `turn(direction, share)`: a point or a direction leaned by `share` of the lean (1 the body's).
+ */
+function leaning(body, bank, hipHeight) {
+  const floor = body.lengths.ankle;
+  const inward = (hipHeight - floor) * Math.sin(bank);
+  const turn = (v, share = 1) => {
+    const sin = Math.sin(bank * share);
+    const cos = Math.cos(bank * share);
+    return [v[0], v[1] * cos - v[2] * sin, v[1] * sin + v[2] * cos];
+  };
+  const roll = (p) => {
+    const rolled = turn([p[0], p[1] - floor, p[2]]);
+    return [rolled[0], rolled[1] + floor, rolled[2] - inward];
+  };
+  return { roll, turn, inward };
+}
+
+/**
+ * A pose's points as they were before it leaned (`bank`, rad: the pose's `intent.bank`), a function of a point of `desired`: the lean
+ * undone (for what is built in the body's own frame, like a runner's arms, which then goes through the lean once, with the rest).
+ */
+export function unleaned(body, bank, desired) {
+  if (!bank) return (p) => p;
+  const floor = body.lengths.ankle;
+  const hipHeight = floor + (desired[P.pelvis][1] - floor) / Math.cos(bank);
+  const inward = (hipHeight - floor) * Math.sin(bank);
+  const sin = Math.sin(-bank);
+  const cos = Math.cos(bank);
+  return (p) => {
+    const y = p[1] - floor;
+    const z = p[2] + inward;
+    return [p[0], y * cos - z * sin + floor, y * sin + z * cos];
+  };
+}
+
 export function desiredPose(body, intent = {}) {
   const H = body.heightM;
   const L = body.lengths;
@@ -146,6 +188,14 @@ export function desiredPose(body, intent = {}) {
   const across = (angle) => yawRotate([0, 0, 1], angle);
 
   const hipHeight = L.ankle + L.shank + L.thigh - stance.crouch * H - (intent.dip ?? 0) * H;
+  // (Leaning into a turn: `leaned`, the roll about the floor; the hands and blades in his frame go with it.)
+  const leaned = intent.bank ? leaning(body, intent.bank, hipHeight) : null;
+  if (leaned) {
+    const carried = { ...intent };
+    for (const key of ['lHand', 'rHand', 'lElbow', 'rElbow']) if (intent[key]) carried[key] = leaned.roll(intent[key]);
+    for (const key of ['bladeDir', 'offBladeDir']) if (intent[key]) carried[key] = leaned.turn(intent[key]);
+    intent = carried;
+  }
   // (`stagger` scales how far one foot stands ahead of the other: 1 a fighter's guard, 0 side by side, as a runner's feet pass.)
   const stagger = stance.stagger ?? 1;
   // (`even` evens the feet's distances from the middle: 1 the same either side, as a runner's; 0 a guard's, the lead foot nearer.)
@@ -159,6 +209,8 @@ export function desiredPose(body, intent = {}) {
     // Checking a kick: the lead knee comes up and out, the shin a shield.
     out[P.lFoot] = [POSE.leadFoot[0] * H * stance.width + 0.04 * H, hipHeight * 0.42, POSE.leadFoot[1] * H + 0.03 * H];
   }
+  // (Leaning, the feet stay on the floor and go out as far as the hips went in.)
+  if (leaned) for (const foot of [P.lFoot, P.rFoot]) out[foot] = [out[foot][0], out[foot][1], out[foot][2] - leaned.inward];
   const pelvis = [0, hipHeight, 0];
   out[P.pelvis] = pelvis;
   const hipAxis = across(stance.blade * POSE.hipBladeShare + twist * 0.3 + (intent.hipYaw ?? 0));
@@ -176,6 +228,14 @@ export function desiredPose(body, intent = {}) {
   out[P.head] = vec.add(neck, [0.012 * H + headOffset[0], L.neckToHead + headOffset[1], headOffset[2]]);
   // A locked head (OUTFITS headLocked) goes where the trunk takes it: no slip, roll or bob of its own.
   if (body.gear?.headLocked) out[P.head] = lockedHead(body, neck, [Math.sin(lean), Math.cos(lean), 0], [Math.cos(lean), -Math.sin(lean), 0], stance.lean);
+
+  if (leaned) {
+    const neckAt = out[P.neck];
+    const headFrom = vec.sub(out[P.head], neckAt);
+    for (const index of [P.pelvis, P.lHip, P.rHip, P.neck, P.lShoulder, P.rShoulder]) out[index] = leaned.roll(out[index]);
+    // The head: carried with the trunk if it is bolted to it, else leaning by what the neck lets the lean take back.
+    out[P.head] = body.gear?.headLocked ? leaned.roll(vec.add(neckAt, headFrom)) : vec.add(out[P.neck], leaned.turn(headFrom, 1 - WORLD.runMode.turn.head));
+  }
 
   // Weight shifts onto the front foot to extend a punch: everything above
   // the feet moves forward; the knees go half as far.

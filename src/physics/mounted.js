@@ -131,6 +131,12 @@ export function horsePoint(horse, local) {
     const dy = y - 0.76 * horse.withers;
     [x, y] = [x * cos - dy * sin, 0.76 * horse.withers + x * sin + dy * cos];
   }
+  if (horse.bank) {
+    // Leaning into a turn: all of it, hooves on the ground, about its forward line there (positive to its left).
+    const cos = Math.cos(horse.bank);
+    const sin = Math.sin(horse.bank);
+    [y, z] = [y * cos - z * sin, y * sin + z * cos];
+  }
   const f = forwardOf(horse.yaw);
   const l = leftOf(horse.yaw);
   return [horse.at[0] + f[0] * x + l[0] * z, y + (horse.bob ?? 0), horse.at[1] + f[2] * x + l[2] * z];
@@ -240,6 +246,7 @@ export function stepHorse(world, horse, h) {
   if (horse.state === 'falling' || horse.state === 'down') {
     horse.speed *= Math.exp(-h * 2.5);
     horse.yawRate = 0;
+    horse.bank = 0;
     if (horse.state === 'falling') {
       horse.fall = Math.min(1, horse.fall + h / 0.9);
       horse.roll = horse.side * (Math.PI / 2) * horse.fall * horse.fall;
@@ -265,6 +272,9 @@ export function stepHorse(world, horse, h) {
     const rate = turnRateAt(horse, horse.speed);
     horse.yawRate = Math.max(-rate, Math.min(rate, turn * 4));
     horse.yaw += horse.yawRate * h;
+    // It leans into the turn, as a runner does (gait.js bankOf): the push through its legs is v × yaw rate, positive to the right.
+    const leanWanted = -Math.sign(horse.yawRate) * Math.atan(Math.abs(horse.speed * horse.yawRate) / WORLD.gravity);
+    horse.bank = (horse.bank ?? 0) + (leanWanted - (horse.bank ?? 0)) * Math.min(1, h / WORLD.mount.motion.bankLag);
   }
   const f = forwardOf(horse.yaw);
   horse.at[0] += (f[0] * horse.speed + horse.shove[0]) * h;
@@ -372,7 +382,8 @@ export function ridingLean(fighter, dt) {
     carry.leanV += (omega * omega * (target - carry.lean) - 2 * spec.damping * omega * carry.leanV) * (dt / steps);
     carry.lean += carry.leanV * (dt / steps);
   }
-  return { lean: carry.lean, roll: -0.6 * (horse.rock ?? 0) };
+  // (His trunk goes in with the horse's lean into a turn: his seat is on the leaned horse and he sits to its line.)
+  return { lean: carry.lean, roll: -0.6 * (horse.rock ?? 0) + (horse.bank ?? 0) };
 }
 
 /**

@@ -600,20 +600,23 @@ export const WORLD = {
   //   back past the shoulder a held weapon's hand may go.
   // - recovery: the share of the usual stamina recovery (WORLD.staminaRecovery) he gets while running, so that the cost of running
   //   (CONTROL.run.staminaPerSecond) is a drain over minutes rather than being cancelled by his recovery.
-  // - turn: the pose in a sprint turn (`fighter.turn` is the heading's rate in rad/s (of his path, the way his speed points, faster
-  //   than `pathFrom` m/s: it lags his facing; of his facing slower), smoothed over `smooth` s; all of it scales with the run
-  //   pose, and a straight run has none). `bank`: the trunk rolls into the turn by this many rad for each rad/s × m/s of it, up to `bankMax`
-  //   (a sprinter at 4.4 m/s turning at 2 rad/s banks ~0.3 rad); `lead`: the shoulders lead the turn by this many rad per rad/s (up to
-  //   `leadMax`) while the hips lag it by `hipLag` per rad/s (up to `hipLagMax`), so the trunk winds into the turn and the hips follow the
-  //   feet; `full`: the rate (rad/s) at which the footwork below is at its full. The feet: each lands at least `gap` (share of height, times the square root of the turn's share)
-  //   to its own side of the line of travel (a turn must not cross them); the foot on the inside lands `inner` shorter and `wide`
-  //   wider, the outside one `outer` longer (shares of height), in step with the turn's share. (`gap`, `inner` and `wide` were 0.035, 0.07 and
-  //   0.03: with the long stride of the flat the inside foot crossed the other in a sharp turn, and wants more room. `gap` was then 0.07,
-  //   0.08 since the run follows the body: a fit man sprints at 8 m/s and leans further.)
+  // - turn: the pose of a turn at a run (`fighter.turn` is the heading's rate in rad/s (of his path, the way his speed points, faster
+  //   than `pathFrom` m/s: it lags his facing; of his facing slower), smoothed over `smooth` s, the time a runner takes to feel his
+  //   own turn and lean into it; a straight run has none). The lean itself is physics, not a number here: the floor must push him
+  //   in towards the curve's centre by v × turn m/s², so the push (through his centre of mass, or he would spin) leans him in by
+  //   atan(v × turn / g), his whole body about the feet, and the feet are put out to the outside of it (pose.js `bank`; gait.js
+  //   cornering, banking; WORLD.gait.corner for the most he can hold). He leans by his own lag, `lag` s. `lead`: the shoulders
+  //   lead the turn by this many rad per rad/s (up to `leadMax`) while the hips lag it by `hipLag` per rad/s (up to `hipLagMax`),
+  //   so the trunk winds into the turn and the hips follow the feet; `head`: the share of the lean the head takes back to level
+  //   (the righting reflex: the eyes stay near the horizon, so the neck bends back out of the lean by this much of it).
+  //   `full`, `gap`: the feet. Each lands on its side of the other with a gap of at least `gap` (a share of height) between them
+  //   (a turn must not cross them); the step it takes round the curve is longer on the outer foot's arc and shorter on the
+  //   inner, in proportion to its distance from the centre (see turnedStep). `full` is the rate (rad/s) from which the
+  //   step is bent at all. (`gap` was 0.035 and 0.07 before 0.08: with the long stride of the flat the inside foot crossed the other in a sharp turn.)
   runMode: {
     speedFactor: 4,
     recovery: 0.25,
-    turn: { smooth: 0.1, bank: 0.04, bankMax: 0.32, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 1.5, gap: 0.08, inner: 0.09, wide: 0.08, outer: 0.03, pathFrom: 1.5 },
+    turn: { smooth: 0.1, lag: 0.12, head: 0.6, lead: 0.1, leadMax: 0.25, hipLag: 0.07, hipLagMax: 0.18, full: 0.15, gap: 0.08, pathFrom: 1.5 },
     stance: { blade: 0, crouch: 0, width: 0.4, lean: 0.03, guardHeight: 0, stagger: 0, even: 1 },
     lean: 0.25, dip: 0.02, bob: 0.045, ease: 6,
     kneeOut: 0.06,
@@ -657,6 +660,20 @@ export const WORLD = {
   //   seat), highest a third of the way through, not trailing low behind him.
   // - The lean (rad): lean + leanPerSpeed × speed, accelLean of his acceleration's angle to gravity (smoothed over
   //   accelSmooth s: forward gathering speed, back braking), tiredLean more when spent; within leanMost.
+  // - corner: a turn at a run is a sideways force on the runner (v × his rate of turning, m/s²), which the stance foot gives him
+  //   through the floor, leaning him in by atan(that over g) (so the force goes through his centre of mass). What he can give
+  //   is the least of two things. The floor: `grip`, the friction coefficient of a shoe on dry ground (~1: leaning 45 degrees
+  //   at the very most; his kit's balance below 1, heels, cuts it); and his leg: `legs` times his power, the sideways push of
+  //   a fit man's stance leg over his weight (ankle, hip abductors and the quadriceps working at a slant: 0.7, a lean of 35
+  //   degrees, the hard cut of a footballer; a sprint round a track bend asks 0.2). Less as his legs are hurt or tired
+  //   (limbShares). Beyond it he cannot turn tighter: his heading turns no faster than that force carries his path (v ×
+  //   turn = tan × g), so a sprint swings wide (a radius of v² / (tan × g): ~7 m at 7 m/s) and a jog turns sharper (~1.3 m at 3 m/s),
+  //   and no man is asked to lean past what holds him. A runner does not run at a turn he cannot make: he slows for the angle he
+  //   has still to turn (the stick's way, or his place's, from his heading) to the pace at which his grip takes him round it in
+  //   `room` m of his way (gait.js cornerPace: his next stride or two; ~3 m/s for a right angle, 4 for a half of one, 6 for 20 degrees
+  //   and no limit for a gentle bend), so a corridor's corner is taken at a trot, not at his sprint into the wall (4 m left the
+  //   walk of Dunnottar's stair at the heavy door swinging into its wall). The forward push shares that grip: gathering speed is cut by the
+  //   share of it the turn has used (gait.js cornerShare), so a man at the limit of a turn can only hold his speed.
   // - limp: a leg weaker than the other by a share shortens its time bearing him by seconds × that share, and the step
   //   by length × it.
   // - walkRun: the Froude number (speed² over g × leg length) at which a man goes from a walk into a run (people: ~0.5;
@@ -668,6 +685,7 @@ export const WORLD = {
     land: 0.25, landPerSpeed: 0.012, lift: 0.14, liftPerSpeed: 0.035, liftMost: 0.42, tiredLift: 0.35, threshold: 0.2, heelUp: 0.6,
     lean: 0.06, leanPerSpeed: 0.02, accelLean: 0.6, accelSmooth: 0.15, tiredLean: 0.15, leanMost: [-0.3, 0.75],
     limp: { seconds: 0.5, length: 0.4 },
+    corner: { grip: 1, legs: 0.7, room: 2 },
     walkRun: 0.5,
   },
   // Walking about (the player's walk mode): upright and square, feet under
@@ -946,7 +964,10 @@ export const WORLD = {
   //   absorbing it: `seatSpring` (natural frequency `hz`, damping ratio `damping`) on
   //   the height the trunk is carried at; `lean`: forward lean (rad) of the trunk by
   //   gait, followed by a spring (`hz`, `damping`) which takes `follow` of the horse's
-  //   pitch and leans back by `surge` rad per m/s² of the horse's acceleration.
+  //   pitch and leans back by `surge` rad per m/s² of the horse's acceleration. `bankLag`: a horse
+  //   in a turn leans into it as a man does (atan of its sideways acceleration, speed × yaw rate,
+  //   over g: its `lateral` is what its legs hold, ~0.6 g), the whole horse about its hooves, the
+  //   rider's trunk with it; it takes this many seconds to get there.
   mount: {
     startApart: 12,
     line: { spacing: 3, rankBack: 5, margin: 1.5 },
@@ -964,7 +985,7 @@ export const WORLD = {
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
     motion: {
-      blend: 0.5,
+      blend: 0.5, bankLag: 0.25,
       stand: { bob: [0, 2, 0], pitch: [0, 0], rock: [0, 1, 0] },
       walk: { bob: [0.005, 2, 0.12], pitch: [0.025, 0.9], rock: [0.025, 1, 0.25] },
       trot: { bob: [0.024, 2, 0.475], pitch: [0.012, 0.1], rock: [0.012, 2, 0.2] },

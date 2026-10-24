@@ -425,7 +425,7 @@ test('winding stair: without the steering the same push is held at the wall (the
 /** The player running +x then turning to `degrees` (positive: towards +z); returns what the pose did. */
 function sprintTurn(degrees, { off = false } = {}) {
   const saved = { ...WORLD.runMode.turn };
-  if (off) Object.assign(WORLD.runMode.turn, { bank: 0, lead: 0, hipLag: 0, gap: 0, inner: 0, wide: 0, outer: 0 });
+  if (off) Object.assign(WORLD.runMode.turn, { lead: 0, hipLag: 0, gap: 0 });
   try {
     const game = yard('forger', [-10, 0]);
     const out = { crossed: 0, closest: Infinity, rollAtTurn: 0 };
@@ -438,12 +438,15 @@ function sprintTurn(degrees, { off = false } = {}) {
       const speed = Math.hypot(velocity[0], velocity[1]);
       if (speed < 1) continue;
       const left = [-velocity[1] / speed, velocity[0] / speed];
-      const lateral = (index) => (game.me.x[index * 3] - game.me.x[P.pelvis * 3]) * left[0] + (game.me.x[index * 3 + 2] - game.me.x[P.pelvis * 3 + 2]) * left[1];
-      // (Only with both feet on the floor: a foot swinging through the air passes the other, and is free to; it is where they stand that must not cross.)
-      // (Where they stand as a foot comes down: a foot swinging through the air passes the other, and is free to.)
+      // (Where each foot stands, or is coming down to: a foot swinging through the air passes the other, and is free to; it is where they land that must not cross.)
+      const lateral = (side) => {
+        const foot = game.me.feet[side];
+        const at = foot.step ? foot.step.to : foot.planted;
+        return (at[0] - game.me.x[P.pelvis * 3]) * left[0] + (at[2] - game.me.x[P.pelvis * 3 + 2]) * left[1];
+      };
       const down = ['l', 'r'].some((side) => landing[side] && !game.me.feet[side].step);
       landing = { l: Boolean(game.me.feet.l.step), r: Boolean(game.me.feet.r.step) };
-      const gap = down ? lateral(P.lFoot) - lateral(P.rFoot) : Infinity;
+      const gap = down ? lateral('l') - lateral('r') : Infinity;
       if (gap < 0) out.crossed += 1;
       out.closest = Math.min(out.closest, gap);
       {
@@ -465,9 +468,8 @@ test('sprint turn: the trunk banks into the turn, either way, and not in a strai
   // (Local +z is his left: a turn towards +z from +x is a turn to his left, the lean towards +z.)
   assert.ok(left.rollAtTurn > 0.12, `leaning left into a left turn (${left.rollAtTurn.toFixed(2)} rad)`);
   assert.ok(right.rollAtTurn < -0.12, `and right into a right one (${right.rollAtTurn.toFixed(2)} rad)`);
-  const old = sprintTurn(90, { off: true });
-  assert.ok(left.rollAtTurn > old.rollAtTurn + 0.06, `more than the old pose did (${old.rollAtTurn.toFixed(2)} rad)`);
-  assert.ok(Math.abs(left.rollAtTurn) <= 0.5, 'but not toppling');
+  // (A runner at a sprint leans in by atan(v × turn / g), no more than he can hold: gait.js bankOf; test/runcorner.test.js.)
+  assert.ok(Math.abs(left.rollAtTurn) <= 0.7 && Math.abs(right.rollAtTurn) <= 0.7, 'but not toppling: no more than 40 degrees');
   const straight = yard('forger', [-10, 0]);
   straight.orders.keyStick = { dir: [1, 0], amount: 1 };
   straight.step(2);
