@@ -15,7 +15,7 @@
 //     the long drain       x -52.8..-45.6, z -39.6..-36.2     (the pocket where it turns east: the smugglers' brazier, the way's one rest)
 //     the cesspool         centre (-36, -37.9), DN_CESSPOOL   (an eight-sided sump hall 17.2 m across under the inner cell: a pit of sludge 13.6 m across,
 //                                                             thigh-deep, a rim walk round it, ramps down into it on the drain's line and north and south,
-//                                                             outfalls pouring into it, a dead-end alcove north; Noname in the middle of the pit)
+//                                                             outfalls pouring into it, a dead-end alcove north; Noname on the low island in the middle)
 //     the long drain, east x -26.4..-13, z -39.6..-36.2      and a stair of 15 treads up to y 1.4
 //     the low door         x -7..0                            (into the crypt's sea-gate chamber at x 0)
 //
@@ -33,10 +33,11 @@ export const DN_CAVE = { floor: -5, drain: -1.6, x: -48.5, mouth: 3.4, face: 55.
 
 /**
  * The cesspool: `at` its centre [x, y, z] (y: the sludge's surface), `radius` the pit's (the apothem of its eight sides: the arena), `hall` the hall's inside
- * (the rim walk runs from `radius` to `hall`), `floor` the bed under the sludge (y), `rim` the walk's level (y, the long drain's floor), `depth` the sludge over the bed.
- * Directly under the inner cell (x -44.4..-35.2, z -41.2..-30.8): a man dropped down its garderobe lands in the pit.
+ * (the rim walk runs from `radius` to `hall`), `floor` the bed under the sludge (y), `rim` the walk's level (y, the long drain's floor), `depth` the sludge over the
+ * bed, `island` the low stone platform in the middle where Noname waits ({ at: [x, z], size, top }: its top a hand under the sludge, so a man lying dead on it
+ * has his face out of it). Directly under the inner cell (x -44.4..-35.2, z -41.2..-30.8): a man dropped down its garderobe lands in the pit.
  */
-export const DN_CESSPOOL = { at: [-36, -1.78, -37.9], radius: 6.8, hall: 8.6, floor: -2.35, rim: -1.6, depth: 0.57 };
+export const DN_CESSPOOL = { at: [-36, -1.86, -37.9], radius: 6.8, hall: 8.6, floor: -2.35, rim: -1.6, depth: 0.49, island: { at: [-35.2, -37.9], size: 3.2, top: -1.93 } };
 /** The cesspool's arena as a stage region (x, z box, y range): `stage.regions.cesspool`. */
 export const DN_CESSPOOL_REGION = { at: [DN_CESSPOOL.at[0], DN_CESSPOOL.at[2]], size: [DN_CESSPOOL.radius * 2, DN_CESSPOOL.radius * 2], y: [DN_CESSPOOL.floor - 0.5, DN_CESSPOOL.rim + 4] };
 /** The one man in the drain: his spawn id. */
@@ -238,7 +239,7 @@ export function buildSewer() {
   sec.decor.push({ kind: 'waymarks', points: [[px + P.radius + 0.4, -37.9, D], [-14, -37.9, D], [-4, -37.9, C]], gap: 2.6, first: 0.6 });
 
   // The one man down here: Noname, waiting in the middle of the sludge (presets.js `noname`; a guard's mind: he waits, he sees, he fights to the death).
-  dnSpawn(sec, DN_NONAME_SPAWN, 'noname', 'enemy', 3, [px + 1.2, P.floor, pz], DN_FACE.W, { inputs: { name: 'Noname' }, miniboss: { title: 'The Cesspool' } });
+  dnSpawn(sec, DN_NONAME_SPAWN, 'noname', 'enemy', 3, [P.island.at[0], P.island.top, P.island.at[1]], DN_FACE.W, { inputs: { name: 'Noname' }, miniboss: { title: 'The Cesspool' } });
 
   dnItem(sec, 'bandage12', 'bandage', [-53.4, F, 52.6]);
   dnItem(sec, 'tonic9', 'tonic', [-54.0, bed, 5.4]);
@@ -281,6 +282,9 @@ function swCesspool(sec, alcove) {
     if (k === 6) doors.push({ at: span / 2, width: alcove.x1 - alcove.x0, sill: D, top: D + 3, shape: 'round' });
     dnRun(sec, from, to, t, P.floor - 1, top, 'rubble', doors);
   }
+  // The island in the middle, a hand under the sludge: where he waits (a step up from the bed).
+  const isle = P.island;
+  dnSlab(sec, isle.at[0] - isle.size / 2, isle.at[0] + isle.size / 2, isle.at[1] - isle.size / 2, isle.at[1] + isle.size / 2, isle.top, 'flags', { bottom: P.floor - 0.5 });
   // Ramps down into the sludge: on the drain's line (west and east) and north and south.
   for (const [dx, dz, yaw] of [[-1, 0, Math.PI], [1, 0, 0], [0, -1, Math.PI / 2], [0, 1, -Math.PI / 2]]) {
     const r = P.radius - 1.2;

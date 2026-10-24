@@ -75,8 +75,8 @@ export const LEVEL_CONFIG = {
   // ---- Wading ----------------------------------------------------------------------------------------
   // Standing water and sludge (levelmode/water.js) deeper than `from` m over a man's feet hold his legs: his footwork and acceleration (gear.foot, gear.accel)
   // are times these while he is in it, so he cannot step back as quickly as on the stone (the cesspool's thigh-deep sludge). A man whose inputs say `wader`
-  // (the cesspool's Noname, who lives in it) is not held. The crypt's and the cistern's knee-deep water (0.28 m) hold no one.
-  wade: { from: 0.4, foot: 0.62, accel: 0.55 },
+  // (none now: a wader Noname did worse in the bot's fights) is not held. The crypt's and the cistern's water (0.28 m) and the cesspool's island hold no one.
+  wade: { from: 0.35, foot: 0.62, accel: 0.55 },
 
   // ---- Stand-ins until the awareness AI lands (levelmode/adapter.js) ---------------------------------------
   // An awake enemy counts as aware of the player within this many m.

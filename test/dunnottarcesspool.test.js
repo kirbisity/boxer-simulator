@@ -46,9 +46,11 @@ test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 in the middl
   assert.equal(spawn.inputs.name, 'Noname');
   assert.ok(spawn.miniboss, 'a miniboss (he stays dead after a rest)');
   for (const gone of ['drain1', 'drain2', 'drainward', 'drain3']) assert.ok(!DUNNOTTAR.sections.some((section) => section.spawns.some((entry) => entry.id === gone)), `${gone} is gone`);
-  // He stands in the pit, on its bed, under the sludge's surface.
+  // He stands in the middle of the pit, on the low island a hand under the sludge (a man who dies on it has his face out of the sludge).
   assert.ok(Math.hypot(spawn.post[0] - P0.at[0], spawn.post[2] - P0.at[2]) < P0.radius - 2.5);
-  assert.equal(spawn.post[1], P0.floor);
+  assert.deepEqual(spawn.post, [P0.island.at[0], P0.island.top, P0.island.at[1]]);
+  assert.ok(P0.island.top < P0.at[1] && P0.island.top + 0.2 > P0.at[1], 'the island just under the surface');
+  assert.ok(P0.island.top - P0.floor <= 0.45, 'a step up from the bed');
 });
 
 // ---- the cesspool's constants -----------------------------------------------------------------------------------
@@ -62,7 +64,8 @@ test('cesspool: its constants lie in the sewer, on the floor the physics has (th
   assert.ok(P0.radius * 2 >= 12 && P0.radius * 2 <= 16, 'an arena 12-16 m across');
   const w = inCesspool();
   const terrain = w.arena.terrain;
-  assert.equal(floorAt(terrain, x, z, P0.rim + 1), P0.floor, 'the bed at the centre');
+  assert.equal(floorAt(terrain, x - 3.5, z + 2, P0.rim + 1), P0.floor, 'the bed in the pit');
+  assert.equal(floorAt(terrain, P0.island.at[0], P0.island.at[1], P0.rim + 1), P0.island.top, 'the island');
   for (const angle of [0.4, 1.2, 2.0, 2.8, 3.6, 4.4, 5.2, 6.0]) {
     const r = (P0.radius + P0.hall) / 2;
     assert.ok(Math.abs(floorAt(terrain, x + Math.cos(angle) * r, z + Math.sin(angle) * r, P0.rim + 1) - P0.rim) < 0.02, `the rim at ${angle}`);
@@ -186,7 +189,7 @@ test('water: a man wading rings the water at his moving feet and leaves a wake; 
   assert.ok(splash.splashes[0].count >= WATER.bigDrops);
 });
 
-test('water: thigh-deep sludge holds a man\'s legs while he is in it and lets them go after; the crypt\'s knee-deep water and a wader are not held', () => {
+test('water: thigh-deep sludge holds a man\'s legs while he is in it and lets them go after; the crypt\'s knee-deep water and the island do not', () => {
   const w = inCesspool();
   const me = w.fighters[0];
   const foot = me.body.gear.foot;
@@ -204,8 +207,8 @@ test('water: thigh-deep sludge holds a man\'s legs while he is in it and lets th
   // The crypt's flood is 0.28 m: under the hold.
   const crypt = stageWaters(DUNNOTTAR).filter((water) => water.id.startsWith('crypt'));
   for (const water of crypt) assert.ok(water.at[1] - water.bed < LEVEL_CONFIG.wade.from);
-  // Noname stands in the sludge: held, unless his preset makes him a wader.
-  assert.equal(Boolean(noname(w).wading), !noname(w).body.inputs.wader, 'Noname as his preset says');
+  // Noname on his island, a hand under the sludge: not held.
+  assert.ok(!noname(w).wading, 'the island holds no one');
 });
 
 // ---- the light ---------------------------------------------------------------------------------------------------

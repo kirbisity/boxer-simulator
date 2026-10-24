@@ -122,7 +122,7 @@ export function kwtCreate(stage) {
   const group = new THREE.Group();
   group.name = 'water-drops';
   // The drops: one instanced mesh, lit like the stone (they catch the torches).
-  const dropMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.045, 6, 4), new THREE.MeshLambertMaterial({ color: 0x8c9488 }), KWT_DROPS);
+  const dropMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.028, 6, 4), new THREE.MeshLambertMaterial({ color: 0x8c9488 }), KWT_DROPS);
   dropMesh.frustumCulled = false;
   dropMesh.count = 0;
   group.add(dropMesh);

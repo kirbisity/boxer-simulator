@@ -129,7 +129,9 @@
 //   as first built (calories 2850: 49 kg of body under the kit, strikeForce 79 N at the hand)   beaten 15/20    the long sword struck from his hand in every fight
 //   calories 4220 (74 kg)                                                                      beaten 20/30
 //   + outfit.balance 2.5, skill 0.85, temperament work 1.4 burst 1.3                           beaten 50/80    (skill 0.7 to 1: no measurable change)
-//   + calories 4400 (78 kg: the preset)                                                       beaten 33/80 (41 %), median 16 s, 1.3 of 2 comrades left
+//   + calories 4400 (78 kg)                                                                    beaten 33/80
+//   the low island in the middle of the pit (he waits on it, a hand under the sludge)          beaten 45/80
+//   + calories 4500 (80 kg: the preset)                                                        beaten 32/80 (40 %), median 18 s, 1.1 of 2 comrades left
 // The sludge holds the legs of every man in it (level.js wadeGear, his too): a wader Noname did worse (the operative fought from the ramp's foot).
 //
 import { spawn } from 'node:child_process';
