@@ -171,6 +171,9 @@ export function createAwareness(world, config = {}) {
       facing: post.facing ?? 0,
       patrol: post.patrol?.length ? post.patrol : null,
       refuge: post.refuge ?? null,
+      // The post's alarm (raiseAlarm), and how far he looks from it (m) if not as far as his section lets him (an archer watching a bridge, not the cliff beside it).
+      alarm: post.alarm ?? null,
+      vision: post.vision ?? null,
       leg: 0,
       step: 1,
       pauseUntil: 0,
@@ -234,6 +237,8 @@ function setState(world, aware, mind, fighter, state, why = '') {
 
 /** How far this man sees (m): his section's `vision`, or the radius dimmed by its light. */
 function rangeOf(aware, world, fighter) {
+  const own = aware.minds[fighter.id]?.vision;
+  if (own) return own;
   const section = fighter.spawn ? sectionById(world.stage.def, fighter.spawn.section) : null;
   if (section?.vision !== undefined) return section.vision;
   const light = section?.light ?? 1;
@@ -302,6 +307,21 @@ function alarm(world, aware, mind, fighter, why, target = null) {
   mind.lastSeen = { x: hipX(at), z: hipZ(at), y: floorOf(at) };
   mind.trail = [[hipX(fighter), hipZ(fighter), floorOf(fighter)]];
   if (why !== 'shout') shout(world, aware, mind, fighter);
+  if (mind.alarm) raiseAlarm(world, aware, mind);
+}
+
+/**
+ * A post's alarm (`spawn.alarm`, a name shared by the men of one post: the drawbridge's archers, its guards and the knight on the ledge): one of them
+ * aggro makes every awake man of it aggro, wherever he stands (a horn, a shout from the walls), and they know where he was seen.
+ */
+function raiseAlarm(world, aware, mind) {
+  for (const other of aware.minds) {
+    if (!other || other === mind || other.alarm !== mind.alarm || other.state === 'aggro' || other.state === 'down') continue;
+    const friend = world.fighters[other.id];
+    if (friend.dormant || !upright(friend)) continue;
+    alarm(world, aware, other, friend, 'shout', null);
+    other.lastSeen = mind.lastSeen;
+  }
 }
 
 /** The shout: unaware men within reach with a clear line to the shouter turn aggro. */

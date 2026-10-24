@@ -329,6 +329,52 @@ export function kpBuild(prop, ctx) {
       dyn.lights.push({ at: [lx, y + 1.7, lz], color: 0xffb060, power: 0.9, range: 10 });
       break;
     }
+    case 'drawbridge': {
+      // The timber of a drawbridge let down (the deck's boards are its floor's): `at` is the middle of the deck's top, `length` along the
+      // prop's x (the hinge at +x, the castle's end), `width` across; under it three stringers and the cross beams, a kerb each side, the
+      // iron-shod outer end, the hinge, and the two chains from the outer end up to `chainTo` ([local x, y above the deck]) on the gatehouse.
+      const length = prop.length ?? 12;
+      const width = prop.width ?? 4;
+      const half = length / 2;
+      for (const lz of [-width / 2 + 0.35, 0, width / 2 - 0.35]) box('wood', 0, -0.32, lz, length, 0.34, 0.3, 0, { tint: 0.8 });
+      for (let lx = -half + 0.6; lx < half; lx += 1.6) box('wood', lx, -0.1, 0, 0.22, 0.16, width - 0.1, 0, { tint: 0.85 });
+      for (const side of [-1, 1]) box('wood', 0, 0.1, side * (width / 2 - 0.12), length, 0.2, 0.24, 0, { tint: 0.9 });
+      box('iron', -half + 0.12, -0.05, 0, 0.24, 0.32, width, 0, { tint: 0.8 });
+      // (The hinge pin: a bar across the deck's end, as a row of short drums, so it lies across whatever way the bridge is turned.)
+      for (let lz = -width / 2; lz <= width / 2 + 1e-6; lz += 0.5) {
+        const [hx, hz] = here(half - 0.15, lz);
+        kgCylinder(batch, 'iron', hx, y - 0.4, hz, 0.13, 0.13, 0.3, { sides: 8 });
+      }
+      const [toX, toY] = prop.chainTo ?? [half + 0.4, 6];
+      for (const side of [-1, 1]) {
+        const lz = side * (width / 2 - 0.15);
+        const points = [];
+        for (let k = 0; k <= 8; k += 1) {
+          const t = k / 8;
+          const lx = -half + 0.3 + (toX + half - 0.3) * t;
+          const [x, z] = here(lx, lz);
+          points.push([x, y + 0.2 + (toY - 0.2) * t - 0.9 * Math.sin(Math.PI * t), z]);
+        }
+        kgTube(batch, 'iron', points, 0.05, { segments: 24, sides: 5, tint: 0.7 });
+        const [rx, rz] = here(-half + 0.3, lz);
+        kgCylinder(batch, 'iron', rx, y + 0.05, rz, 0.09, 0.09, 0.22, { sides: 6 });
+      }
+      break;
+    }
+    case 'sign': {
+      // A board on a post, an arrow painted on it pointing along the prop's +x (`yaw`), and a skull daubed under it for a way not to go (`warn`).
+      box('wood', 0, 1.1, 0, 0.12, 2.2, 0.12);
+      box('wood', 0.35, 1.85, 0.08, 1.2, 0.5, 0.05, 0, { tint: 0.9 });
+      const paint = prop.warn ? [1.25, 0.45, 0.4] : [1.4, 1.35, 1.2];
+      box('cloth', 0.25, 1.85, 0.115, 0.7, 0.09, 0.012, 0, { tint: paint });
+      for (const [lx, h] of [[0.58, 0.3], [0.65, 0.2], [0.72, 0.1]]) box('cloth', lx, 1.85, 0.115, 0.07, h, 0.012, 0, { tint: paint });
+      if (prop.warn) {
+        box('cloth', 0.35, 1.5, 0.115, 0.3, 0.26, 0.012, 0, { tint: [1.4, 1.35, 1.2] });
+        box('wood', 0.29, 1.53, 0.123, 0.06, 0.06, 0.006, 0, { tint: 0.3 });
+        box('wood', 0.41, 1.53, 0.123, 0.06, 0.06, 0.006, 0, { tint: 0.3 });
+      }
+      break;
+    }
     // ---- litter and wear (the stage's clutter: walked over, or a heap to walk round) ----
     case 'planks': {
       // Rotten planks, a few thrown down across each other, one on its edge against the rest.

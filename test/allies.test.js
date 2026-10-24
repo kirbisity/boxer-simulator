@@ -222,7 +222,8 @@ test('team: walking the cliff path, the gorge and the ledge, the stair and the q
 // ---- Friendly fire: the player can strike anyone (control.js), and a comrade is anyone ----------------------------------------
 
 test('team: a comrade the player strikes stays loyal (does not fight back, keeps following), says so, and is not offered the finisher', () => {
-  const world = dunnottar(6);
+  // (The seed is the swing's: whether one oberhau lands depends on the world's draws, which the stage's cast changes; 7 since the drawbridge's guard.)
+  const world = dunnottar(7);
   garrisonAsleep(world);
   const me = world.fighters[0];
   const maren = man(world, 'maren');

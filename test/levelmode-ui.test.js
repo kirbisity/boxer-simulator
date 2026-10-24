@@ -82,7 +82,7 @@ test('the story: the lore is about 150 words and names who it should; nine notes
   for (const name of ['Queen Alta of Albion', 'Caby', 'Prince of Caby', 'Forgers', 'Eileen of Okimo', 'scroll signed in blood', 'Lord Vaelen', 'chief jailer']) assert.ok(lore.includes(name), name);
   assert.equal(STAGE_ONE.chapter, 'Chapter 4 · The Murmurs of the Shattered Chalice');
   assert.equal(STAGE_ONE.title, 'Memories of Dunnottar');
-  assert.equal(NOTE_KEYS.length, 9);
+  assert.equal(NOTE_KEYS.length, 10);
   for (const key of NOTE_KEYS) {
     assert.ok(NOTES[key].title.length > 4, key);
     assert.ok(sentences(NOTES[key].body) >= 2 && sentences(NOTES[key].body) <= 4, `${key}: ${sentences(NOTES[key].body)} sentences`);

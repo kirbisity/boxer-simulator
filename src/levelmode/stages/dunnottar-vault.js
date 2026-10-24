@@ -218,9 +218,17 @@ function buildShaft(sec) {
   const top = V + 4.4;
   // The crypt's floor under it, and the walls round: every side but the south one, which is the cellar's own north wall above and the gallery's below.
   dnSlab(sec, cx - 6, cx + 6, cz - 6, cz + 6, C, 'flags', { extra: { room: true } });
+  // (The sides either side of the door stop short of it, by the wall's half thickness and a little: at full length their inner corners stood in the
+  // cellar's doorway, a jamb of rubble half across it.)
+  const toward = (p, q, by) => {
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    return [p[0] + ((q[0] - p[0]) * by) / length, p[1] + ((q[1] - p[1]) * by) / length];
+  };
   for (let k = 0; k < DN_SHAFT.sides; k += 1) {
     if (k === 2) continue;
-    dnRun(sec, corner(k), corner(k + 1), 1.4, C - 1, top, 'rubble', [], { round: true });
+    const a = k === 3 ? toward(corner(3), corner(4), 0.9) : corner(k);
+    const b = k === 1 ? toward(corner(2), corner(1), 0.9) : corner(k + 1);
+    dnRun(sec, a, b, 1.4, C - 1, top, 'rubble', [], { round: true });
   }
   dnCeiling(sec, cx - 4.6, cx + 4.6, cz - 4.6, cz + 4.6, V + 4.2, V + 4.6);
   const treads = windingStairs({ ...DN_SHAFT_SPIRAL, id: 'oubliette' }).map((t) => ({ ...t, bottom: t.top - 0.55, style: 'stone' }));

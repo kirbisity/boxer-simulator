@@ -8,7 +8,7 @@ import { placeOnFloor } from '../src/physics.js';
 import { activeSections, checkStage, createStageWorld, mechanismsOf, pullLever, regionContains, setMechanism, stageTerrain, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { STAGES } from '../src/levelmode/stages.js';
-import { DN_Y, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS } from '../src/levelmode/stages/dunnottar.js';
+import { DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS } from '../src/levelmode/stages/dunnottar.js';
 import { DN_CESSPOOL } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floodFill } from './edges.js';
 import { hipsAt, walk } from './walker.js';
@@ -25,15 +25,20 @@ test('dunnottar: registered, sound, ten sections with the cast the spec calls fo
   const spawns = DUNNOTTAR.sections.flatMap((section) => section.spawns);
   const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead);
   assert.ok(enemies.length >= 12 && enemies.length <= 32, `${enemies.length} enemies`);
-  // The main line's cast stood at 14 (the bot's careful policy reaches Vaelen 12 in 16 against it), 15 with the knight at the postern; the vault's optional branches add at
-  // most six, and the old drain (the way round the knight) four: a sergeant and three levies.
-  assert.ok(enemies.length >= 22 && enemies.length <= 26, `${enemies.length} enemies: 15 on the main line, 3 to 6 in the optional branches, 4 in the drain`);
+  // The main line's cast stood at 14 (the bot's careful policy reaches Vaelen 12 in 16 against it), 15 with the knight at the postern, 21 with the drawbridge's guard
+  // (three archers on the barbican, three levies at the bridge's end and its forecourt: the front is meant to be very hard); the vault's optional branches add at most six, and the
+  // old drain (the way round the gate) four: a sergeant and three levies.
+  assert.ok(enemies.length >= 28 && enemies.length <= 32, `${enemies.length} enemies: 21 on the main line, 3 to 6 in the optional branches, 4 in the drain`);
+  // The front's men are one alarm, and the archers keep their posts on the barbican (there is no way up to them).
+  const front = enemies.filter((spawn) => spawn.alarm === 'front');
+  assert.deepEqual(front.map((spawn) => spawn.id).sort(), ['archer1', 'archer2', 'archer3', 'bridgeguard1', 'bridgeguard2', 'bridgelevy', 'gateknight'].sort());
+  assert.ok(front.filter((spawn) => spawn.preset === 'dunnottarArcher').every((spawn) => spawn.perch && spawn.post[1] > 6));
   assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 2);
   assert.ok(spawns.some((spawn) => spawn.role === 'boss' && spawn.preset === 'vaelen'));
   assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest2b', 'restdrain', 'rest3']);
   assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'ladder1'].sort());
   const notes = DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'note').map((item) => item.note).sort();
-  assert.deepEqual(notes, ['cellar', 'drain', 'ledger', 'order', 'powder', 'seagate', 'servant', 'soldier', 'warden']);
+  assert.deepEqual(notes, ['bridge', 'cellar', 'drain', 'ledger', 'order', 'powder', 'seagate', 'servant', 'soldier', 'warden']);
   assert.ok(DUNNOTTAR.sections.some((section) => section.items.some((item) => item.kind === 'key')));
 });
 
@@ -99,10 +104,11 @@ test('dunnottar: the sections that hold the player at each rest and shortcut are
   }
 });
 
-// The places a man can step off into nothing: the cliffs (the gorge's south and west edges, the sea breaches in the wall walk
-// parapet), the court-side gap in the lower walk parapet, and the sides of the ladder. Nowhere else.
+// The places a man can step off into nothing: the cliffs (the gorge's south and west edges, the ravine's west bank beside the drawbridge, the sea
+// breaches in the wall walk parapet), the court-side gap in the lower walk parapet, and the sides of the ladder. Nowhere else.
 const CLIFFS = [
   (e) => e.floor < 0.5 && (e.at[1] >= 55 || e.at[0] <= -63),
+  (e) => Math.abs(e.floor) < 0.5 && e.at[0] >= DN_RAVINE.x0 - 1 && e.at[0] <= DN_RAVINE.x0 + 0.5 && e.at[1] > 38 && e.at[1] < 56,
   (e) => e.at[1] <= -38 && e.floor > 17,
   (e) => e.at[0] >= 5 && e.at[0] <= 9 && e.at[1] > -34 && e.at[1] < -33 && e.floor > 17,
   (e) => e.at[0] >= 12.5 && e.at[0] <= 16.5 && e.at[1] > -34 && e.at[1] < -26 && e.floor > 12 && e.floor < 18,

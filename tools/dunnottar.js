@@ -136,6 +136,21 @@
 // The whole sewer route (careful, two comrades, seeds 1-6, 3600 s): every run got through the sewer (deaths there 7: Noname 3, bled after him 4); 2 of 6
 // reached and beat Vaelen, 4 timed out in the vault (not looked into: the vault is as it was).
 //
+// ---- Phase H (round 3: the ravine and the drawbridge; the front held by archers; the sea cave's stair beside the bridge's head) --------------
+// The front is meant to be very hard, the way round plain. The barbican's archers (`perch`: the bot leaves them be, as a person would: there is no
+// way up) and the bridge's men are one alarm, and they watch the bridge only (`vision` 14-15 m), not the shelf's path to the sea cave's stair.
+// Careful, `--allies 2`, seeds 1-8, 10 deaths a fail, 3600 s:
+//                                                           reached/beat Vaelen   failed   timed out   mean deaths   where they died
+//   front, 3 archers, a guard and two levies, the knight    0/8                   8/8      0/8         10.0          cliff 80 (the guard 39, archers 35)
+//   front, 3 archers, three levies, the knight (as built)   1/8                   7/8      0/8         9.6           cliff 76 (archers 48, levies 22, knight 6)
+//   front, 2 archers, three levies, the knight              0/8                   8/8      0/8         10.0          cliff 79
+//   sewer (3 archers, a guard, two levies; the old drain)   5/8                   0/8      3/8         2.0           vault 6, sewer 5, chapel 5: no front man
+// (A first try had the bridge's men see the shelf: the sewer route then died at the bridge's guard 24 times and reached Vaelen 2/8.)
+// Again on main's sewer (Noname in the cesspool, the lighting), the stage as built:
+//   front                                                   0/8                   8/8      0/8         10.0          cliff 79 (archers 51, levies 20, knight 9)
+//   sewer                                                   4/8                   1/8      3/8         5.4           sewer 20 (Noname 12, bled 8), vault 15: no front man
+// So the front is beaten about once in sixteen whole runs (1 of the 16 above), the way round about half the time.
+//
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -369,6 +384,8 @@ class Run {
   /** Whether he fights this man: awake, aware of him, and not one he has given up on (across a fence, say). */
   wanted(other) {
     if (other.corner !== 'blue' || other.dormant || other.state === 'out' || other.crawling || !levelAware(this.world, other)) return false;
+    // (An archer on a post he cannot reach, the barbican's platform: he goes on under the arrows, as a person would, and fights who he can reach.)
+    if (other.spawn?.perch) return false;
     const until = this.ignore.get(other.id);
     const struck = this.lastHit?.attacker === other.id && this.world.time - this.lastHit.time < 4;
     return !(until > this.world.time && !struck);
@@ -1151,8 +1168,8 @@ function knightDuel(seed, log, seconds = 300, tweak = {}) {
   const { preset, full, ...inputs } = tweak;
   if (preset) spawn.preset = preset;
   Object.assign(spawn.inputs, inputs);
-  const leg = DUNNOTTAR_ROUTE.find((entry) => entry.name === 'the gorge and the ledge');
-  const plan = leg.points.slice(0, 4).map((p) => ({ p, acts: [], leg: leg.name }));
+  const leg = DUNNOTTAR_ROUTE.find((entry) => entry.name === 'the drawbridge and the ledge');
+  const plan = leg.points.slice(0, leg.points.findIndex(([x, z]) => x > -8 && z > 53) + 1).map((p) => ({ p, acts: [], leg: leg.name }));
   plan.forEach((entry, index) => { entry.base = index; });
   const run = new Run({
     policy: 'careful',
