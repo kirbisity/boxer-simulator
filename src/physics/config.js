@@ -482,7 +482,7 @@ export const WORLD = {
   //     4.4 m/s, 3 m at 7.7, 6 m at 10.8, 10 m at 14.0. Calibrated in test/terrain.test.js.
   terrain: {
     cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, reachDown: 0.6, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, climb: 1, slopeSpan: 0.5, slopeMost: 0.6, slopeHeadroom: 0.5, leash: { from: 0.6, to: 0.9 },
-    fall: { safe: 5, legs: 1.6, bodyFrom: 4.5, body: 1, stumble: 6.5, airMin: 0.2, ankleFrom: 6.8, ankleTo: 11, compress: 12, compressFrom: 8, together: 0.3 },
+    fall: { safe: 5, legs: 1.6, bodyFrom: 4.5, body: 1, stumble: 6.5, airMin: 0.2, ankleFrom: 6.8, ankleTo: 11, compress: 12, compressFrom: 8, together: 0.3, footOver: 1 },
   },
   // A jump (physics/jump.js; asked by the player's Jump: control.js), and the landing after it. The takeoff is worked out from his
   // body; the flight is the particles' own (the stance follows them); the landing is taken by his legs.
@@ -503,18 +503,24 @@ export const WORLD = {
   //   slideBack: come to rest across a ledge on his hips, the feet under its edge, he slides back off it at this (m/s) and is down.
   // - cost: stamina for the work done (his whole mass × g × the rise of his hips: `workRef` J an 80 kg man's 0.5 m jump), over his
   //   wind (aerobic). wade: in water that holds his legs (level.js wadeGear: `fighter.wading`), the takeoff speed's share.
-  // - land: the legs take the landing over `absorb` × leg length of knee bend (less in stiff armour: × plate + (1 - plate) ×
-  //   gear.foot), pushing back up to `eccentric` × the force they push with (muscle yields at more than it lifts); the knees carry
-  //   the whole mass, so the load on them is also × (mass / massRef)^massExp. The force asked over the force given is the landing's
-  //   ratio: under `buckle` a soft landing; past it the knees buckle (a deeper dip, `cost` of stamina per unit over); past
-  //   `stumble` he stumbles (unsteady for a moment); past `fall` he goes over; past `hurtFrom` each leg takes `legs` × (ratio -
-  //   hurtFrom) × the speed (to terrain.fall.safe: past it the fall's own leg damage takes over) as leg damage (WORLD.legCapacity). A drop from a height lands as a fall too (terrain.fall: ankles, spine) on top of this.
+  // - land: a landing he means: the legs take it over `absorb` × leg length of knee bend and `soft` more of the hips and ankles
+  //   folding into a crouch (a drop jump's ~0.5 m; less in stiff armour: × plate + (1 - plate) × gear.foot), pushing back up to
+  //   `eccentric` × the force they push with (muscle yields at more than it lifts); the knees carry the whole mass, so the load on
+  //   them is also × (mass / massRef)^massExp. The force asked over the force given is the landing's ratio: under `buckle` a soft
+  //   landing; past it the knees buckle (a deeper dip, `cost` of stamina per unit over); past `stumble` he stumbles (unsteady for a
+  //   moment) and past `bruiseFrom` his legs are jarred: each takes `bruise` × the ratio beyond as leg damage (at most `bruiseMost`,
+  //   healing at `heal` per s: landBruise); past `fall` he goes over and his trunk takes `trunk` × the ratio past `trunkFrom` (m/s).
+  //   His bones: past `fracture` × his bone density (T-score) a knee may break, more likely by `fractureSpan` of that more (sure
+  //   there), with `broken` of leg damage. His legs' own stop takes his way down (no floor spike); the fall's rules (terrain.fall)
+  //   and the joints' strain on his legs stand aside for `grace` s after it (`downGrace` while he is down from it).
+  //   So a fit man: soft to 1 m, buckling at 1.5, stumbling at 2-2.5, over at 3 unbroken, a leg broken from 4-6 m; heavy, fat,
+  //   old and plate a band worse; the Starved Rebel (T -2.2) breaks from 2.5-3 m (tools/jump.js; test/jump.test.js).
   //   The dip goes down `dipMost` of the bend at most and comes back up in `seconds` + `perRatio` × the ratio.
   // - recover: after landing, he can jump again in `base` + `perRatio` × the landing's ratio s, over his legs' share.
   jump: {
     force: 1.38, push: 0.42, speed: 0.2, crouch: { seconds: 0.28, depth: 0.5, fast: 5, running: 0.3 }, least: 0.06, forward: 0.35, tuck: 0.2, clear: 0.15, slideBack: 1.2, settle: 0.7,
     cost: 0.035, workRef: 700, wade: 0.55,
-    land: { absorb: 0.3, plate: 0.55, eccentric: 1.5, massRef: 80, massExp: 0.5, buckle: 1, stumble: 1.35, fall: 2, hurtFrom: 1.6, legs: 0.5, cost: 0.02, dipMost: 0.55, seconds: 0.22, perRatio: 0.2 },
+    land: { absorb: 0.3, soft: 0.3, plate: 0.55, eccentric: 1.5, massRef: 80, massExp: 0.5, buckle: 0.9, stumble: 1.1, fall: 1.75, bruiseFrom: 1.1, bruise: 0.8, bruiseMost: 2.5, heal: 0.2, broken: 4, fracture: 2.35, fractureSpan: 0.4, trunk: 1.5, trunkFrom: 1.75, grace: 0.6, downGrace: 5, cost: 0.02, dipMost: 0.55, seconds: 0.22, perRatio: 0.2 },
     recover: { base: 0.2, perRatio: 0.3 },
   },
   // Running (away from a gun, or after one): footwork speed times this.

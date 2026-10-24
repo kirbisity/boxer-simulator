@@ -80,12 +80,19 @@ export function jumpLanding(fighter, speed, { legs = { l: 1, r: 1 }, strength = 
   const spec = WORLD.jump.land;
   const body = jumpBodyOf(fighter);
   const share = Math.max(0.05, (legs.l + legs.r) / 2) * Math.max(0.05, Math.min(1, strength)) * body.joints;
-  const bend = spec.absorb * body.legLength * (spec.plate + (1 - spec.plate) * Math.min(1, body.foot));
+  // A landing he means: the knees bend (`absorb`) and the hips and ankles fold with them into a crouch (`soft`).
+  const bend = (spec.absorb + spec.soft) * body.legLength * (spec.plate + (1 - spec.plate) * Math.min(1, body.foot));
   const v = Math.max(0, speed);
   const asked = (v * v) / (2 * G * bend) + 1;
   const given = 2 * WORLD.jump.force * spec.eccentric * body.legForce * share;
   const ratio = (asked / given) * (body.massKg / spec.massRef) ** spec.massExp;
   const over = Math.max(0, ratio - spec.buckle);
+  // The bones: past `fracture` × his bone density (T-score) a leg may break, surely by `fractureSpan` more of it; under it,
+  // a bruise that heals (each leg `bruise` × the ratio past `bruiseFrom`, at most `bruiseMost`).
+  const bone = Math.max(0.35, fighter.body.boneDensity ?? 1);
+  const fractureFrom = spec.fracture * bone;
+  const fracture = Math.max(0, Math.min(1, (ratio - fractureFrom) / (spec.fractureSpan * fractureFrom)));
+  const bruise = ratio > spec.bruiseFrom ? Math.min(spec.bruiseMost, spec.bruise * (ratio - spec.bruiseFrom)) : 0;
   return {
     speed: v,
     force: asked,
@@ -96,8 +103,12 @@ export function jumpLanding(fighter, speed, { legs = { l: 1, r: 1 }, strength = 
     buckle: ratio > spec.buckle,
     stumble: ratio > spec.stumble,
     fall: ratio > spec.fall,
-    // (Past a drop's safe speed the fall's own rules hurt him too, on terrain: physics.js landOnFeet; this is the legs' share below it.)
-    legDamage: ratio > spec.hurtFrom ? spec.legs * (ratio - spec.hurtFrom) * Math.min(v, WORLD.terrain.fall.safe) : 0,
+    legDamage: bruise + (fracture > 0 ? spec.broken * fracture : 0),
+    bruise,
+    fracture,
+    fractureFrom,
+    // Gone over, what the legs did not take reaches the trunk as he goes down (m/s past `trunkFrom` of the ratio).
+    trunk: ratio > spec.fall ? spec.trunk * Math.max(0, ratio - spec.trunkFrom) : 0,
     stamina: spec.cost * Math.min(over, 3),
     recover: (WORLD.jump.recover.base + WORLD.jump.recover.perRatio * Math.min(ratio, 3)) / Math.max(0.3, share),
   };

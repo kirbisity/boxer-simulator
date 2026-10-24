@@ -9,7 +9,7 @@ import { WORLD } from '../src/physics/config.js';
 import { jumpBlocked, jumpLanding, jumpOf, wadeFactor } from '../src/physics/jump.js';
 import { ceilingOf, createTerrain, floorAt, slabOf } from '../src/physics/terrain.js';
 import { directFighter, newOrders, playerCrawl } from '../src/control.js';
-import { jumper, measureJump } from '../tools/jump.js';
+import { dropOff, jumper, measureJump } from '../tools/jump.js';
 
 const build = (preset, change = {}) => {
   const raw = { ...structuredClone(PRESETS[preset]), ...change };
@@ -81,20 +81,75 @@ test('the landing: the force asked grows with the speed; soft, then buckling, st
     const level = landing.fall ? 3 : landing.stumble ? 2 : landing.buckle ? 1 : 0;
     assert.ok(level >= seen, `${speed} m/s`);
     seen = level;
-    assert.ok(landing.legDamage === 0 || landing.ratio > WORLD.jump.land.hurtFrom);
+    // A bruise only past a stumble; a fracture only past his bones' threshold, more likely the harder.
+    assert.ok(landing.bruise === 0 || landing.ratio > WORLD.jump.land.bruiseFrom);
+    assert.ok(landing.fracture === 0 || landing.ratio > landing.fractureFrom);
   }
-  // From his own jump a fit man lands lightly; from a metre his knees give; a man in plate falls from a metre and a half.
+  // (The landing he means: the knees, hips and ankles fold into a crouch: `absorb` + `soft`, ~0.5 m for a fit man. It was
+  // the knees alone and he stumbled from a metre and fell from a metre and a half; drop jumps of a metre are a training drill.)
+  // From his own jump and from a 1 m drop a fit man lands lightly; at 2 m (6.3 m/s) his knees give; a man in plate falls there.
+  const drop = (metres) => Math.sqrt(2 * 9.81 * metres);
   assert.equal(jumpLanding(leo, jumpOf(leo).v).buckle, false);
-  assert.equal(jumpLanding(leo, Math.sqrt(2 * 9.81)).buckle, true);
-  assert.equal(jumpLanding(leo, Math.sqrt(2 * 9.81)).fall, false);
-  assert.equal(jumpLanding(knight, Math.sqrt(2 * 9.81 * 1.5)).fall, true);
-  // The heavier lands the harder on the same legs-for-his-weight: the sumo's own jump buckles his knees.
+  assert.equal(jumpLanding(leo, drop(1)).buckle, false);
+  assert.equal(jumpLanding(leo, drop(2)).buckle, true);
+  assert.equal(jumpLanding(leo, drop(2)).fall, false);
+  assert.equal(jumpLanding(knight, drop(2)).fall, true);
+  // The heavier lands the harder on the same legs-for-his-weight.
   const sumo = build('sumo');
   assert.ok(jumpLanding(sumo, jumpOf(sumo).v).ratio > jumpLanding(leo, jumpOf(leo).v).ratio);
-  assert.equal(jumpLanding(sumo, jumpOf(sumo).v).buckle, true);
-  // The landing's numbers for Leo's own jump: ~3 body weights, ~2.2 kN.
+  // The landing's numbers for Leo's own jump, over the soft landing's bend: ~2 body weights, ~1.5 kN.
   const own = jumpLanding(leo, jumpOf(leo).v);
-  assert.ok(own.force > 2.5 && own.force < 3.6 && own.kN > 1.8 && own.kN < 2.7, `${own.force.toFixed(2)} BW, ${own.kN.toFixed(2)} kN`);
+  assert.ok(own.force > 1.6 && own.force < 2.6 && own.kN > 1.2 && own.kN < 1.9, `${own.force.toFixed(2)} BW, ${own.kN.toFixed(2)} kN`);
+});
+
+// The drops, by build: (ledge height m + his own jump's rise) -> the landing speed. What no landing may do below, and may above.
+const LANDING_BUILDS = [
+  // name, build, no fracture up to (m), fracture possible from (m)
+  ['light athletic', ['light'], 3.5, 6],
+  ['average', ['street'], 3, 6],
+  ['heavy', ['heavy'], 3, 6],
+  ['obese', ['street', { bodyFat: 0.35 }], 2, 4],
+  ['old', ['light', { age: 75 }], 2.5, 4],
+  ['plate knight', ['knight'], 2, 4],
+  ['starved rebel (T -2.2)', ['starved'], 1.75, 3],
+];
+for (const [name, [preset, change], safe, breaks] of LANDING_BUILDS) {
+  test(`the landing for the ${name}: a plain jump and a 0.9 m hop never hurt; no fracture to ${safe} m; possible by ${breaks} m; graded`, () => {
+    const fighter = build(preset, change);
+    const rise = jumpOf(fighter).height;
+    const at = (metres) => jumpLanding(fighter, Math.sqrt(2 * 9.81 * (metres + rise)));
+    assert.equal(at(0).legDamage, 0, 'a plain jump on the level');
+    assert.equal(at(0).buckle, false, 'a plain jump on the level is no buckle');
+    for (let metres = 0; metres <= safe + 1e-9; metres += 0.25) assert.equal(at(metres).fracture, 0, `${metres} m`);
+    assert.ok(at(breaks).fracture > 0, `a fracture is possible from ${breaks} m (ratio ${at(breaks).ratio.toFixed(2)} of ${at(breaks).fractureFrom.toFixed(2)})`);
+    let last = 0;
+    for (let metres = 0; metres <= 8; metres += 0.5) {
+      const landing = at(metres);
+      assert.ok(landing.legDamage >= last, 'the harder the landing, the more it hurts');
+      assert.ok(landing.bruise <= WORLD.jump.land.bruiseMost, 'a bruise is a bruise');
+      last = landing.legDamage;
+    }
+  });
+}
+
+test('simulated drops: a fit man is unhurt to 2.5 m, goes over unbroken at 3 m; nobody dies from 3 m; the Rebel from 1.5 m is unhurt', () => {
+  const cases = [['light', {}, 1, 'up'], ['light', {}, 2.5, 'up'], ['light', {}, 3, null], ['knight', {}, 1, 'up'], ['starved', {}, 1.5, 'up'], ['street', { bodyFat: 0.35 }, 2.5, null]];
+  for (const [preset, change, metres, state] of cases) {
+    const r = dropOff(preset, metres, change);
+    assert.ok(r.landed, `${preset} ${metres} m: a jump's landing`);
+    assert.notEqual(r.me.state, 'out', `${preset} ${metres} m: not out`);
+    assert.equal(r.me.broken.size, 0, `${preset} ${metres} m: nothing broken (${[...r.me.broken]})`);
+    if (state) assert.equal(r.me.state, state, `${preset} ${metres} m`);
+    assert.ok((r.me.damage.trunk ?? 0) < 0.3, `${preset} ${metres} m: trunk ${(r.me.damage.trunk ?? 0).toFixed(2)}`);
+    assert.ok((r.me.bloodLost ?? 0) < 0.01, `${preset} ${metres} m: no bleeding out`);
+  }
+});
+
+test('a landing bruise heals: his legs back to what they were in some seconds', () => {
+  const r = dropOff('light', 2.5, {}, 0.1);
+  assert.ok(r.me.legDamage.l > 0, 'jarred');
+  advance(r.world, 15);
+  assert.ok(r.me.legDamage.l < 1e-9 && !r.me.landBruise, `healed: ${r.me.legDamage.l}`);
 });
 
 test('wadeFactor is safe on anyone: 1 out of the water, the wading share in it, or the wading\'s own', () => {
