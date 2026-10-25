@@ -26,7 +26,7 @@ const stub = new Proxy(function stand() {}, { get: (_, key) => (key === Symbol.t
 
 async function withPage(run) {
   const kept = { THREE: globalThis.THREE, document: globalThis.document };
-  const page = fakeDocument(['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard']);
+  const page = fakeDocument(['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
   globalThis.THREE = stub;
   globalThis.document = page.document;
   try {

@@ -1160,6 +1160,8 @@ export function createCastleView(stage) {
   const mechanisms = [];
   const markers = [];
   const lights = [];
+  // What the ear hears of the castle's decor (audio/ambience.js): the flames (a brazier's, a torch's: not the filth's green glow) and the drips.
+  const sounding = { fires: [], drips: [] };
   const stats = { land: 0, sections: {} };
   // The standing water (kitwater.js): its meshes go in the sections' detail, its drops in the stage's group.
   const water = kwtCreate(stage);
@@ -1204,6 +1206,8 @@ export function createCastleView(stage) {
       markers.push(marker);
     }
     for (const l of detail.dyn.lights) lights.push({ ...l, section: section.id });
+    for (const l of detail.dyn.lights) if (l.color !== 0x8fdc50) sounding.fires.push({ at: l.at, power: l.power, section: section.id });
+    for (const d of detail.dyn.drips) sounding.drips.push({ at: d.at, section: section.id });
     sections[section.id] = holder;
     parts[section.id] = { detail, far, dynamic, moving, marks, ext, filth, chunks, decals, silhouette };
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
@@ -1242,7 +1246,7 @@ export function createCastleView(stage) {
     tier: 'high', q: tierOf('high'), held: {}, states: new Map(), hidden: new Set(), menHeld: {}, menSeen: new Map(), open: new Map(), stamp: null,
     sight: seeThroughIds(stage), eye: [0, 0, 0], fogFar: Infinity, paint: { sections: 0, far: 0, chunks: 0, decals: 0 },
   };
-  const view = { stage, group, sections, mechanisms: [], mats, stats, safe: null, water };
+  const view = { stage, group, sections, mechanisms: [], mats, stats, safe: null, water, sounding };
 
   /** Put the picture in a quality tier (quality.js: 'high', 'medium', 'low'): the reaches of the small things and of the shader's finer terms, the rain. */
   view.setQuality = (name) => {
