@@ -4,15 +4,15 @@
 // the end a low door into the crypt's sea-gate chamber (the crypt's `buildCrypt` has the door). From the sea-gate the stair behind the heavy door (lifted by the
 // hidden lever) comes up into the vault's torture chamber: the way into the dungeon level that never goes near the gatehouse. It is dark, wet, rotten and long
 // (about 150 m of passage), slimed green-black, the sewage of the castle standing in it, rubbish and the dead washed against its walls; not a place to rest in
-// but for one smugglers' brazier. No garrison comes down here: no soldier, no prisoner, nobody, but the one thing that lives in the cesspool, Noname, in a
+// but for one smugglers' brazier, in the grotto at the way in (the lobby): a man who dies at the cesspool wakes there and walks the drain again. No garrison comes down here: no soldier, no prisoner, nobody, but the one thing that lives in the cesspool, Noname, in a
 // gladiator's smooth helmet with a long sword, who waits in the sludge and fights to the death.
 //
 //   sewer  (y -5 .. 1.4)  x -56..0, z -52..56 (it runs under the shelf, the mainland and the rock of the headland: nothing else is there)
-//     the grotto           x -55..-42, z 44..54.8, floor -5   (tide pools, a dead man's kegs; the mouth in the cliff face at z 55.4)
+//     the grotto           x -55..-42, z 44..54.8, floor -5   (tide pools, a dead man's kegs; the mouth in the cliff face at z 55.4; the smugglers' brazier, the way's one rest)
 //     the first drain      x -50.2..-46.8, z 22..44           (a wet barrel-vaulted passage, 3.4 m wide)
 //     the cistern          x -55..-42, z 4..22                (a hall of eight pillars flooded with sewage, the causeway down its middle, the bed 0.4 lower)
 //     the second drain     x -50.2..-46.8, z -35..3           (a stair of 17 treads up to y -1.6 at z -7..-13.8)
-//     the long drain       x -52.8..-45.6, z -39.6..-36.2     (the pocket where it turns east: the smugglers' brazier, the way's one rest)
+//     the long drain       x -52.8..-45.6, z -39.6..-36.2     (the pocket where it turns east, a last lit brazier before the cesspool)
 //     the cesspool         centre (-36, -37.9), DN_CESSPOOL   (an eight-sided sump hall 17.2 m across under the inner cell: a pit of sludge 13.6 m across,
 //                                                             thigh-deep, a rim walk round it, ramps down into it on the drain's line and north and south,
 //                                                             outfalls pouring into it, a dead-end alcove north; Noname on the low island in the middle)
@@ -45,6 +45,13 @@ export const DN_CESSPOOL = { at: [-36, -1.86, -37.9], radius: 6.8, hall: 8.6, fl
 export const DN_CESSPOOL_REGION = { at: [DN_CESSPOOL.at[0], DN_CESSPOOL.at[2]], size: [DN_CESSPOOL.radius * 2, DN_CESSPOOL.radius * 2], y: [DN_CESSPOOL.floor - 0.5, DN_CESSPOOL.rim + 4] };
 /** The one man in the drain: his spawn id. */
 export const DN_NONAME_SPAWN = 'noname';
+/**
+ * Where the rest is, in the grotto (the drain's lobby: the entry hall, a long walk from the cesspool: a death at Noname's is a walk back through the whole drain,
+ * which is the price of the fight; it was in the pocket by the cesspool's door, so near the arena that a death cost half a minute), and where the pocket's last
+ * lit brazier is (the man's approach to the cesspool: the bot's `noname` duel starts him there).
+ */
+export const DN_REST = { id: 'restdrain', name: "The Smugglers' Brazier", at: [-46.2, DN_CAVE.floor, 50.2], brazier: [-44.8, DN_CAVE.floor, 50.0] };
+export const DN_POCKET = [-49.2, DN_CAVE.drain, -37.9];
 
 /**
  * The drain's clear width (m) and the head room under its roof: `SW_HEAD` under the shelf (the grotto, the first drain: the shelf's rock is over them),
@@ -95,7 +102,7 @@ export function buildSeaCave(sec) {
   dnProp(sec, 'barrel', [S.head + 2.6, Y.gorge, 54.4], { yaw: 0.2 });
   dnProp(sec, 'lantern', [S.head + 3.0, Y.gorge, 58.9], { yaw: Math.PI });
   dnProp(sec, 'sign', [S.head + 2.9, Y.gorge, 55.4], { yaw: Math.PI });
-  sec.decor.push({ kind: 'waymarks', points: [[-46, 45.6, Y.gorge], [-40, 48.6, Y.gorge], [-34, 51.6, Y.gorge], [S.head + 1.2, 54.6, Y.gorge], [S.head + 1.7, 56.6, Y.gorge]], gap: 1.8, first: 0.8, size: 1.25 });
+  sec.decor.push({ kind: 'waymarks', points: [[-52, 52.8, Y.gorge], [-46, 53.4, Y.gorge], [-40, 53.8, Y.gorge], [-34, 54.0, Y.gorge], [S.head + 1.2, 54.8, Y.gorge], [S.head + 1.7, 56.6, Y.gorge]], gap: 1.8, first: 0.8, size: 1.25 });
   sec.decor.push({ kind: 'waymarks', points: [[S.head + 1.7, 57.8, Y.gorge], [S.head - 0.4, 57.6, -0.4], [S.foot + 0.4, 57.6, F + 0.2], [-48.2, 57.6, F]], gap: 2.0, first: 0.6 });
   dnItem(sec, 'note-drain', 'note', [S.head + 2.6, Y.gorge, 54.4], { note: 'drain', lift: 0.95 });
 }
@@ -164,6 +171,11 @@ export function buildSewer() {
   dnProp(sec, 'rat', [-46.4, F, 49.2], { yaw: 2.4 });
   dnProp(sec, 'slime', [-48.5, F + 0.01, 45.2], { yaw: 0.2, size: 1.1 });
   dnProp(sec, 'flies', [-47.2, F + 0.5, 52.6], { count: 8, radius: 0.4 });
+  // The smugglers' brazier, the rest: to the east of the way in from the mouth, out of its line, a bench and a sack by it, dry rock under a roof that sheds the drip.
+  dnProp(sec, 'brazier', DN_REST.brazier, { lit: true, rest: true });
+  dnProp(sec, 'bench', [-43.3, F, 51.9], { yaw: Math.PI / 2 });
+  dnProp(sec, 'sack', [-43.4, F, 48.6], {});
+  sec.rest = { id: DN_REST.id, name: DN_REST.name, at: DN_REST.at };
 
   // The first drain: wet, 22 m, straight to the cistern; slime down the middle of it, a rotted beam, the dead rats.
   swDrain(sec, { x0: west, x1: east, z0: 22, z1: 44, floor: F, walls: ['w', 'e'] });
@@ -226,12 +238,11 @@ export function buildSewer() {
   dnProp(sec, 'cobweb', [east - 0.1, D + SW_TALL - 0.2, -15.4], { yaw: Math.PI, span: 0.8 });
   dnProp(sec, 'fungus', [west + 0.15, D + 0.4, -31.6], { size: 0.9 });
 
-  // The pocket where the drain turns east: the smugglers' brazier, the way's one rest (dry, a fire), before the cesspool.
+  // The pocket where the drain turns east: a last lit brazier before the cesspool (no rest: that is the grotto's).
   swDrain(sec, {
     x0: west - 2.6, x1: px - hallOut, z0: -39.6, z1: -36.2, floor: D, walls: ['n', 's', 'w'], head: SW_TALL, doors: { s: [{ at: X, width: SW_WIDE, top: D + SW_TALL - 0.2 }] },
   });
-  sec.rest = { id: 'restdrain', name: "The Smugglers' Brazier", at: [-49.2, D, -37.9] };
-  dnProp(sec, 'brazier', [-51.4, D, -37.9], { lit: true, rest: true });
+  dnProp(sec, 'brazier', [-51.4, D, -37.9], { lit: true });
   dnProp(sec, 'barrel', [-52.0, D, -39.0], { yaw: 0.5 });
   dnProp(sec, 'sack', [-52.2, D, -36.8], {});
   dnProp(sec, 'rags', [-47.4, D, -39.1], { yaw: 0.8 });

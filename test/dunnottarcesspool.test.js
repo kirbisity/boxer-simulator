@@ -7,12 +7,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
 import { fearTarget, hurtShare } from '../src/ai.js';
-import { knockOut, placeOnFloor } from '../src/physics.js';
+import { advance, knockOut, placeOnFloor } from '../src/physics.js';
 import { floorAt } from '../src/physics/terrain.js';
 import { outfitOf } from '../src/outfits.js';
 import { interiorAt, regionContains, sectionById, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
-import { createLevelWorld, levelThink, restAtPoint, wadeGear } from '../src/levelmode/level.js';
+import { bossStatus, createLevelWorld, levelThink, restAtPoint, wadeGear } from '../src/levelmode/level.js';
 import { LEVEL_CONFIG } from '../src/levelmode/config.js';
 import { QUALITY_TIERS } from '../src/levelmode/quality.js';
 import { approachLevels, interiorLevels, levelsSettled, STAGE_LOOKS } from '../src/levelmode/stagelooks.js';
@@ -136,6 +136,47 @@ test('cesspool: as Noname dies his helmet comes off (his face bare) and lies by 
   assert.equal(man.state, 'out', 'the miniboss stays down');
   assert.equal(w.stage.level.dropped.length, 1, 'his helmet lies where it fell');
   assert.ok(hurtShare(man) >= 0);
+});
+
+test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health) once he is awake and aware of the player, and it holds empty for a moment when he falls', () => {
+  const w = inCesspool(9);
+  const man = noname(w);
+  const bar = () => bossStatus(w);
+  // Not awake: no bar.
+  man.dormant = true;
+  assert.equal(bar().show, false, 'nothing to show for a man who is not awake');
+  man.dormant = false;
+  // The player at the west door, nine metres from him: he sees, he fights, the bar is up.
+  advance(w, 3, (current, dt) => levelThink(current, dt));
+  assert.equal(bar().show, true, 'aware of the player');
+  assert.equal(bar().name, 'Noname');
+  assert.equal(bar().title, 'The Cesspool');
+  assert.equal(bar().felled, false);
+  assert.ok(bar().fraction > 0.99 && bar().fraction <= 1, 'whole');
+  // Out of range (the player far down the drain): no bar though he is aware.
+  const me = w.fighters[0];
+  placeOnFloor(me, P0.at[0] - P0.hall - 25, P0.at[2], P0.rim, 0);
+  assert.equal(bar().show, false, `${LEVEL_CONFIG.boss.barRange} m is the bar's reach`);
+  placeOnFloor(me, P0.at[0] - P0.hall + 0.4, P0.at[2], P0.rim, 0);
+  assert.equal(bar().show, true);
+  // He falls: the bar is empty and struck through for the felled seconds, then gone. He is not the stage's boss (no phase two, no cutscene).
+  knockOut(w, man, { time: w.time, effects: [] }, 'dies', 'killed');
+  levelThink(w, 1 / 60);
+  assert.equal(bar().show, true);
+  assert.equal(bar().felled, true);
+  assert.equal(bar().fraction, 0);
+  advance(w, LEVEL_CONFIG.boss.felledSeconds + 0.5, (current, dt) => levelThink(current, dt));
+  assert.equal(bar().show, false, 'gone after the seconds it holds');
+  assert.equal(w.stage.level.boss.id !== man.id, true, 'the stage boss is Vaelen, not him');
+});
+
+test('cesspool: Noname is a little harder than he was (body and drill, never a multiplier): more muscle for the same mass and a better-taught sword', () => {
+  const inputs = levelPreset('noname');
+  assert.ok(inputs.exercise >= 0.85 && inputs.skill >= 0.9);
+  assert.ok(!('damage' in inputs) && !('health' in inputs) && !('multiplier' in inputs), 'no hidden multiplier');
+  const body = noname(inCesspool()).body;
+  assert.ok(body.muscleKg >= 37, `${body.muscleKg.toFixed(1)} kg of muscle`);
+  assert.ok(body.bodyMassKg > 78 && body.bodyMassKg < 82, `${body.bodyMassKg.toFixed(1)} kg: still a fit 80-kg gladiator`);
 });
 
 // ---- the water ---------------------------------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { travelPlaces } from '../src/levelmode/travel.js';
 import { DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 import { DN_CAVE, DN_CAVE_STAIR, DN_CESSPOOL } from '../src/levelmode/stages/dunnottar-sewer.js';
+import { findPath } from '../tools/botnav.js';
 import { floodFill } from './edges.js';
 import { walk } from './walker.js';
 
@@ -29,6 +30,12 @@ test('sewer: a section of its own, dark, with one rest half way, no soldier in i
   assert.ok(sewer);
   assert.ok(sewer.activeOnly, 'drawn only while he is in it');
   assert.equal(sewer.rest.id, 'restdrain', 'one smugglers\' brazier on the way');
+  // The rest is in the grotto, the drain's lobby by the mouth: a death at the cesspool, a hundred metres off, wakes a man there and he walks the drain again.
+  const [rx, , rz] = sewer.rest.at;
+  assert.ok(rx > -55 && rx < -42 && rz > 44 && rz < 54.8, `the rest at ${rx},${rz} is in the grotto (x -55..-42, z 44..54.8)`);
+  assert.ok(Math.hypot(rx - DN_CESSPOOL.at[0], rz - DN_CESSPOOL.at[2]) > 80, 'and a long way from the cesspool');
+  assert.ok(sewer.decor.some((decor) => decor.kind === 'prop' && decor.what === 'brazier' && decor.rest && Math.hypot(decor.at[0] - rx, decor.at[2] - rz) < 3), 'a fire by it');
+  assert.ok(!sewer.decor.some((decor) => decor.kind === 'prop' && decor.what === 'brazier' && decor.rest && decor.at[2] < 0), 'and none by the cesspool');
   assert.ok(sewer.light <= 0.25, 'dark');
   assert.deepEqual(sewer.spawns.map((spawn) => spawn.id), ['noname'], 'nobody but Noname');
   assert.ok(sewer.items.some((item) => item.kind === 'bandage') && sewer.items.some((item) => item.kind === 'tonic'));
@@ -139,8 +146,33 @@ test('sewer: the sea-gate lever lifts the heavy door, and the route from the sea
   assert.ok(lever);
   assert.equal(lever.lever, 'seagatelever');
   assert.deepEqual(lever.open, ['cryptgate']);
-  const joined = DUNNOTTAR_SEWER_ROUTE.slice(-DUNNOTTAR_ROUTE.slice(5).length);
-  assert.deepEqual(joined.map((leg) => leg.name), DUNNOTTAR_ROUTE.slice(5).map((leg) => leg.name));
+  // It joins the main route in the cellar and goes on as it does: the iron gate, the stair up into the court, its lane to the keep's door, the keep.
+  const tail = (route) => route.slice(route.findIndex((leg) => leg.name === 'the long cellar')).map((leg) => leg.name);
+  assert.deepEqual(tail(DUNNOTTAR_SEWER_ROUTE), tail(DUNNOTTAR_ROUTE));
+  assert.deepEqual(tail(DUNNOTTAR_ROUTE).slice(0, 5), ['the long cellar', 'the iron gate', 'the iron-gate stair', 'lane C to the keep\'s door', 'the keep to the stair tower']);
+});
+
+test('sewer: the old drain does not come out in the keep: the way on from the sea-gate is up into the court and through its lane to the keep\'s door, and the sections go in that order', () => {
+  /** The sections a route passes through, in order, each once as it comes to it. */
+  const order = (route) => route.map((leg) => leg.to).filter((id, at, all) => id !== all[at - 1]);
+  assert.deepEqual(order(DUNNOTTAR_SEWER_ROUTE), ['cliff', 'sewer', 'crypt', 'vault', 'quad', 'tower', 'chapel']);
+  assert.deepEqual(order(DUNNOTTAR_ROUTE), ['cliff', 'gate', 'ascent', 'quad', 'vault', 'quad', 'tower', 'chapel']);
+  // No stair, no portal between the vault and the keep; the keep is reached from the court only.
+  assert.ok(!sectionById(DUNNOTTAR, 'vault').portals.some((portal) => portal.to === 'tower'));
+  assert.ok(!sectionById(DUNNOTTAR, 'tower').portals.some((portal) => portal.to === 'vault'));
+  // And physically: from the torture chamber's floor (where the stair behind the heavy door comes up) a man can reach the court by the iron gate once its bar is up, and the keep's
+  // hall only through the keep's door, which the turnkey's key opens. (botnav's path finder walks the terrain as the physics keeps a man off it.)
+  const mechanisms = (open) => Object.fromEntries(mechanismsOf(DUNNOTTAR).map((mechanism) => [mechanism.id, open.includes(mechanism.id) ? 'open' : mechanism.state]));
+  const from = { x: 6.6, z: -23.6, y: DN_Y.vault };
+  const way = (open, to, toY) => findPath(stageTerrain(DUNNOTTAR, DUNNOTTAR.sections.map((section) => section.id), mechanisms(open)), from, to, { toY, reach: 60, maxNodes: 300000 });
+  const court = [41.2, -3];
+  const keep = [50, -23];
+  assert.ok(way([], court, DN_Y.quad), 'the court is reached by the west stair, which has no door');
+  const byIronGate = way(['irongate'], court, DN_Y.quad);
+  assert.ok(byIronGate && byIronGate.length < way([], court, DN_Y.quad).length, 'and by the iron gate, once its bar is up, the shorter way');
+  assert.equal(way(['irongate'], keep, DN_Y.quad), null, 'but the keep\'s door is locked: not the keep');
+  assert.equal(way([], keep, DN_Y.quad), null, 'nor from the west stair');
+  assert.ok(way(['irongate', 'keepdoor'], keep, DN_Y.quad), 'the door opened with the key: the keep');
 });
 
 test('sewer: a man knocked down on a floor below y 0 (the cave, the cistern, the drain) gets up again, as he does on the floors above it', () => {

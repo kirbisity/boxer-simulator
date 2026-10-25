@@ -44,7 +44,7 @@ export const NOTES = {
   },
   bridge: {
     title: 'Clutched in a dead levy\'s hand',
-    body: 'Do not cross. They have bows on the barbican now and they see the whole bridge; Tam got as far as the middle. Sir Alasdair stands the ledge behind the gate in his black plate. If you must get in, go down the stair by the lantern to the sea cave: the old drain runs under the gate, and nobody watches it.',
+    body: 'Do not cross. They have bows on the barbican now, knights at both ends of the bridge, and they see the whole of it; Tam got as far as the middle. Sir Alasdair stands the ledge behind the gate in his black plate. If you must get in, go down the stair by the lantern to the sea cave: the old drain runs under the gate, and nobody watches it.',
   },
   drain: {
     title: 'Chalked on a post at the stair head',
@@ -346,7 +346,7 @@ function bossBuild() {
   document.body.append(bossRoot);
 }
 
-/** The stage boss's bar, bottom centre: name and title over a track that drains red, with the pale lag of the last blow behind it. */
+/** The boss's bar (the stage boss's, and a miniboss's: Noname), top centre: name and title over a track that drains red, with the pale lag of the last blow behind it. */
 export const bossBar = {
   /** Show it, full. `title` is the epithet under the name ("Chief Jailer of the Queen"). */
   show(name, title = '') {

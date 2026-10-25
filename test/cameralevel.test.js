@@ -103,7 +103,7 @@ function assertSteady(stats) {
 const legsBetween = (route, from, to) => route.slice(route.findIndex((leg) => leg.name === from), to ? route.findIndex((leg) => leg.name === to) : undefined);
 
 test('the sewer: down the stair, through the grotto, the drains, the cistern and the long drain, the camera is behind him at a third-person pitch, not top-down', () => {
-  const stats = walkWithCamera(legsBetween(DUNNOTTAR_SEWER_ROUTE, 'the shelf to the sea cave stair', 'the stair behind the heavy door'), { start: [-46, 0, 46], yaw: 0 });
+  const stats = walkWithCamera(legsBetween(DUNNOTTAR_SEWER_ROUTE, 'the shelf to the sea cave stair', 'the stair behind the heavy door'), { start: [-58, 0, 41.5], yaw: -Math.PI / 2 });
   assert.ok(stats.frames > 3000, `${stats.frames} frames`);
   assert.ok(stats.pitchMax <= 0.95, `the steepest pitch was ${stats.pitchMax.toFixed(2)} rad (the old camera went to 1.45, straight down)`);
   assert.ok(stats.pitchMin >= ARM.pitchMin - 1e-9);

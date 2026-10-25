@@ -11,6 +11,7 @@
 //   tonics []   tonic effects at work
 //   checkpoint { id, name, at, facing, section, gear, inventory, comrades }    where, in what, with what he wakes, and the spawn ids of the comrades alive at the rest
 //   boss { id, phase } | null
+//   minibossDown { fighterId: time (s) }   when each miniboss (Noname) went out: how long his bar holds, empty, after it (bossStatus)
 //   ending { phase: 'locked' | 'felled' | 'open' | 'horde' | 'fall' | 'landing' | 'reveal' | 'epilogue' | 'done', since, held?, watched?, ... } | null
 //                the boss out, the cutscene, the back room's door, the horde, the chute, the cesspool, the reveal, the new Noname, the cards (ending.js)
 //   ui []        what the screen is to be told, in order: { type: 'toast', text } | { type: 'note', key, id }
@@ -26,6 +27,7 @@
 //   stage.start.items        { bandage, tonic }: the start counts (default LEVEL_CONFIG.start)
 //   spawn.dead: true         a body that lies where it was put, from the start (weapon dropped); never respawned
 //   spawn.boss               { title?, phase2?: { at, foot, accel, work, burst } | false } on a spawn of role 'boss'
+//   spawn.miniboss           { title? } on any spawn: the boss's bar (bossStatus) while he is awake and aware of the player; he stays down after a rest (checkpoints.js)
 //   (and the items / rest / levers / gates / ladders fields of interact.js)
 
 import { hurtShare } from '../ai.js';
@@ -128,6 +130,7 @@ export function levelThink(world, dt) {
   updateAction(world, dt);
   updateTonics(world, dt);
   if (level.boss) watchBoss(world, level.boss);
+  watchMinibosses(world);
   watchEnding(world);
 }
 
@@ -255,20 +258,54 @@ function watchBoss(world, boss) {
   levelOf(world).ui.push({ type: 'phase2', id: fighter.id });
 }
 
+/** The minibosses' fall is noted when it happens (their bars hold a moment after it: bossStatus). */
+function watchMinibosses(world) {
+  const level = levelOf(world);
+  for (const fighter of world.fighters) {
+    if (!fighter.spawn || fighter.state !== 'out' || fighter.dormant || level.minibossDown?.[fighter.id] !== undefined) continue;
+    if (level.spawns[fighter.spawn.id]?.def.miniboss) (level.minibossDown ??= {})[fighter.id] = world.time;
+  }
+}
+
+/** How far the player is from a fighter (m, on the floor plan). */
+function apartFromPlayer(world, fighter) {
+  const me = world.fighters[0];
+  return Math.hypot(fighter.x[P.pelvis * 3] - me.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]);
+}
+
 /**
  * What the boss's bar says: { show, name, title, fraction, felled } (fraction: what is left of his health, the measure of
  * the health bars: 1 - hurtShare). Shown while he is awake, aware of the player and not far; when he is out it stays, empty and
- * struck through (felled), for as long as the cutscene plays (the ending's phase 'felled'), then goes.
+ * struck through (felled), for as long as the cutscene plays (the ending's phase 'felled'), then goes. A miniboss (a spawn with `miniboss`:
+ * Noname) has the same bar while he is awake, aware and within range (the nearest, were there two), and holds it empty for
+ * LEVEL_CONFIG.boss.felledSeconds after he is out; the stage boss's own bar comes first if both would show.
  */
 export function bossStatus(world) {
   const level = levelOf(world);
-  if (!level?.boss) return { show: false, name: '', title: '', fraction: 1 };
-  const fighter = world.fighters[level.boss.id];
-  const me = world.fighters[0];
-  const near = Math.hypot(fighter.x[P.pelvis * 3] - me.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]) <= LEVEL_CONFIG.boss.barRange;
-  const def = level.spawns[fighter.spawn.id].def;
-  const felled = fighter.state === 'out' && level.ending?.phase === 'felled';
-  return { show: felled || (fighter.state !== 'out' && !fighter.dormant && near && levelAware(world, fighter)), name: fighter.body.inputs.name, title: def.boss?.title ?? '', fraction: felled ? 0 : 1 - hurtShare(fighter), felled };
+  let none = { show: false, name: '', title: '', fraction: 1 };
+  if (!level) return none;
+  if (level.boss) {
+    const fighter = world.fighters[level.boss.id];
+    const def = level.spawns[fighter.spawn.id].def;
+    const near = apartFromPlayer(world, fighter) <= LEVEL_CONFIG.boss.barRange;
+    const felled = fighter.state === 'out' && level.ending?.phase === 'felled';
+    const status = { show: felled || (fighter.state !== 'out' && !fighter.dormant && near && levelAware(world, fighter)), name: fighter.body.inputs.name, title: def.boss?.title ?? '', fraction: felled ? 0 : 1 - hurtShare(fighter), felled };
+    if (status.show) return status;
+    none = status;
+  }
+  let best = null;
+  for (const fighter of world.fighters) {
+    const def = fighter.spawn && level.spawns[fighter.spawn.id]?.def;
+    if (!def?.miniboss || (fighter.dormant && fighter.state !== 'out')) continue;
+    const apart = apartFromPlayer(world, fighter);
+    const down = level.minibossDown?.[fighter.id];
+    const felled = fighter.state === 'out' && down !== undefined && world.time - down < LEVEL_CONFIG.boss.felledSeconds;
+    const engaged = fighter.state !== 'out' && apart <= LEVEL_CONFIG.boss.barRange && levelAware(world, fighter);
+    if ((felled || engaged) && (!best || apart < best.apart)) {
+      best = { apart, status: { show: true, name: fighter.body.inputs.name, title: def.miniboss.title ?? '', fraction: felled ? 0 : 1 - hurtShare(fighter), felled } };
+    }
+  }
+  return best ? best.status : none;
 }
 
 // ---- What the screen is told ------------------------------------------------------------------------------------

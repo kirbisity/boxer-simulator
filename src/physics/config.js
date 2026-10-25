@@ -485,6 +485,10 @@ export const WORLD = {
   //     taken at a run puts a foot two or three treads down, with the stance still above them); further, there is no floor to stand
   //     on and he is in the air. airReach: how far under the hips a hanging foot is held. airDamping: the drag (per second) on a body in the air (the floor's is far more: a fall must reach its speed); airborne: how far (m) the hips of a man not on his feet are over the floor for him to be falling. fallingSpeed: a man coming down faster than this (m/s) is in the air until a foot is within `touching` m of the floor.
   //   bodyRadius, bodyHeight: the standing man as the walls see him (the root's push out of a wall).
+  //   playerClearance: m more than bodyRadius that the man played is kept off a wall in a stage (the others keep the bare radius, so the garrison still presses up
+  //     to a doorway as before). Against a wall at the bare 0.3 the camera's arm started with its ball (cameraarm.js ARM.radius 0.42) already touching it and had to
+  //     swing round or climb to find room; 0.3 + 0.14 = 0.44 is a hair more than that ball, so a man at a wall leaves the arm its straight way, and he does not look
+  //     stuck to the stone. Doorways and flights are 1.5 m or wider (the ladder 1.5, the slits are solid): this takes 0.28 m of the width at most.
   //   climb, slopeSpan, slopeMost, slopeHeadroom: on a stair or slope he goes only as fast as his feet climb it: the floor's slope along his way
   //     (over slopeSpan m each side; none if it changes more than slopeMost there: a ledge) times his speed is held to `climb` m/s up or down.
   //   leash: {from, to}: his hips outside the base of his feet by more than `from` of what throws him (WORLD.balance.reach) slow him, stopped at `to` of it (the stance must not outrun the steps).
@@ -497,7 +501,7 @@ export const WORLD = {
   //     `together` s: two feet landing within it are one landing; `airMin` s: a landing is hurt only if he was in the air at least this long (a 0.2 m drop; a foot coming down onto a lower tread is a step). Speeds: a drop of 1 m lands at
   //     4.4 m/s, 3 m at 7.7, 6 m at 10.8, 10 m at 14.0. Calibrated in test/terrain.test.js.
   terrain: {
-    cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, reachDown: 0.6, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, climb: 1, slopeSpan: 0.5, slopeMost: 0.6, slopeHeadroom: 0.5, leash: { from: 0.6, to: 0.9 },
+    cell: 2, margin: 0.75, stepUp: 0.45, stepDown: 0.45, reachDown: 0.6, airReach: 0.05, airDamping: 0.1, airborne: 0.7, fallingSpeed: 1.5, touching: 0.04, bodyRadius: 0.3, playerClearance: 0.14, bodyHeight: 1.7, liftRate: 16, sag: 0.06, rise: 1.5, climb: 1, slopeSpan: 0.5, slopeMost: 0.6, slopeHeadroom: 0.5, leash: { from: 0.6, to: 0.9 },
     fall: { safe: 5, legs: 1.6, bodyFrom: 4.5, body: 1, stumble: 6.5, airMin: 0.2, ankleFrom: 6.8, ankleTo: 11, compress: 12, compressFrom: 8, together: 0.3, footOver: 1 },
   },
   // A jump (physics/jump.js; asked by the player's Jump: control.js), and the landing after it. The takeoff is worked out from his

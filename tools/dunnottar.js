@@ -191,6 +191,7 @@ import { rayBlocked } from '../src/physics/terrain.js';
 import { findPath } from './botnav.js';
 import { OUTFITS } from '../src/outfits.js';
 import { DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DN_POCKET, DN_REST } from '../src/levelmode/stages/dunnottar-sewer.js';
 
 const STEP = 1 / 60;
 /**
@@ -207,7 +208,7 @@ let ALLIES = 2;
 let ROUTE = 'front';
 const routeLegs = () => (ROUTE === 'sewer' ? DUNNOTTAR_SEWER_ROUTE : DUNNOTTAR_ROUTE);
 /** The sections in the order each route reaches them (the cell is a side room). */
-const ORDERS = { front: ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'], sewer: ['cliff', 'sewer', 'crypt', 'vault', 'tower', 'chapel'] };
+const ORDERS = { front: ['cliff', 'gate', 'ascent', 'quad', 'vault', 'tower', 'chapel'], sewer: ['cliff', 'sewer', 'crypt', 'vault', 'quad', 'tower', 'chapel'] };
 const PLAYER = new Set([0]);
 const hipX = (fighter) => fighter.x[P.pelvis * 3];
 const hipZ = (fighter) => fighter.x[P.pelvis * 3 + 2];
@@ -265,17 +266,14 @@ function planFloors() {
   return floors;
 }
 
-/** The nearest trace sample to a point (3 m of height counts as a far step: floors above and below are not near). */
+/**
+ * The nearest trace sample to a point (3 m of height counts as a far step: floors above and below are not near). Where the route passes a place twice
+ * (the court, before the vault and after it: Rest 2 is by both passes) it is the first pass, unless the second is more than 1.5 m nearer.
+ */
 function nearestSample(samples, x, y, z) {
-  let best = null;
-  let bestD = Infinity;
-  for (const sample of samples) {
-    const d = Math.hypot(sample.x - x, sample.z - z) + 4 * Math.abs(sample.y - y);
-    if (d < bestD) {
-      bestD = d;
-      best = sample;
-    }
-  }
+  const measure = (sample) => Math.hypot(sample.x - x, sample.z - z) + 4 * Math.abs(sample.y - y);
+  const bestD = Math.min(...samples.map(measure));
+  const best = samples.find((sample) => measure(sample) <= bestD + 1.5) ?? null;
   return { sample: best, d: bestD, flat: best ? Math.hypot(best.x - x, best.z - z) : Infinity, dy: best ? Math.abs(best.y - y) : Infinity };
 }
 
@@ -288,9 +286,10 @@ function planFor(policy) {
   const stops = [];
   for (const section of DUNNOTTAR.sections) {
     for (const item of section.items) {
-      if (item.kind === 'note' || !spec.items) continue;
+      // (An item the way on needs, the keep's key, is taken by every policy: the keep's door is locked without it.)
+      if (item.kind === 'note' || (!spec.items && !item.required)) continue;
       const { sample, flat, dy } = nearestSample(samples, item.at[0], item.at[1], item.at[2]);
-      if (sample && flat <= spec.items && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [item.at[0], item.at[2]], y: item.at[1], acts: [{ kind: 'item', id: item.id }], before: sample.idx, item });
+      if (sample && flat <= Math.max(spec.items, item.required ? 9 : 0) && dy <= 1.3) stops.push({ order: samples.indexOf(sample), p: [item.at[0], item.at[2]], y: item.at[1], acts: [{ kind: 'item', id: item.id }], before: sample.idx, item });
     }
     if (section.rest) {
       const { sample, flat, dy } = nearestSample(samples, section.rest.at[0], section.rest.at[1], section.rest.at[2]);
@@ -306,6 +305,8 @@ function planFor(policy) {
     for (const section of DUNNOTTAR.sections) {
       for (const gate of section.gates) {
         if (gate.key !== stop.item.id) continue;
+        // (Only a door by the key: the keep's is a court away, and the route opens it at the end of its own leg.)
+        if (Math.hypot(gate.at[0] - stop.item.at[0], gate.at[2] - stop.item.at[2]) > 25 || Math.abs(gate.at[1] - stop.item.at[1]) > 2) continue;
         const at = [gate.at[0], gate.at[2] + 1.2];
         withDoors.push({ p: at, y: gate.at[1], acts: [{ kind: 'gate', id: gate.id }], before: stop.before });
       }
@@ -1371,8 +1372,8 @@ function nonameDuel(seed, log, seconds = 300, tweak = {}) {
     setup: (self) => {
       const comrades = comradesOf(self.world).slice(0, ALLIES).map((fighter) => fighter.spawn.id);
       self.only = ['noname', ...comrades];
-      const rest = RESTS.restdrain;
-      restAtPoint(self.world, { id: rest.id, at: rest.at, name: rest.name });
+      // (He is set down in the pocket before the cesspool, not at the rest in the grotto: the duel is the fight, not the walk to it.)
+      restAtPoint(self.world, { id: DN_REST.id, at: DN_POCKET, name: DN_REST.name });
       self.level.ui.length = 0;
       self.me.mayTarget = (other) => self.wanted(other);
     },
