@@ -259,6 +259,21 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 1.5, blunt: 0.22, cut: 0.3 }, swing: { blunt: 0.5, cut: 0.4 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, grip: 0.5,
   },
+  // The langxian (wolf-brush) of Qi Jiguang's mandarin-duck squad (Jixiao
+  // xinshu): a whole bamboo of about 1 zhang 5 chi (some 4.7 m), its side
+  // branches left on in tiers along the upper part and their ends hardened,
+  // a small iron spearhead at the top; about 7 jin (~4 kg). Held near the
+  // butt in two hands (`handle` behind the front hand), its balance far out
+  // ahead of them, slow to turn. The branches make a brush some 0.3 m
+  // across along its upper part (`radius`): a sword cut meets bamboo,
+  // not the man behind it, and he cannot step through it to the bearer;
+  // swept across, it lashes (`swing`, little harm); the iron head is
+  // driven at the face (`thrust`, the last fifth: `pointFrom`).
+  langxian: {
+    pointFrom: 0.8, label: 'Langxian', hands: 'two', length: 3.3, strikeFrom: 1.3, handle: 1.4, spacing: 0.55, mass: 4, balance: 0.9, radius: 0.15,
+    harm: { thrust: { pierce: 1, blunt: 0.35, cut: 0.05 }, swing: { blunt: 0.45, cut: 0.05 } },
+    contactSeconds: 0.008, rotation: 0.45, wrist: { omega: 6, zeta: 0.9 }, threat: 3.4, grip: 0.6,
+  },
   // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
   // made to fight. Blunt tines that pierce poorly and knock a man about;
   // a farm tool held loosely, easily knocked from the hands.

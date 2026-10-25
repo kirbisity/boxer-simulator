@@ -143,11 +143,138 @@ const ZEELANDIA = {
 // against a garrison with a few brigandine regulars (one in five).
 // The raiding bands were large and the coast garrisons thin: here the raiders outnumber them.
 const WOKOU = {
-  // Japanese and Chinese together, as the raids were: Japanese swords,
-  // a naginata and bows; the Chinese with dao, spears and matchlocks.
-  raiders: { japanese: { katana: 7, naginata: 1, bow: 3 }, chinese: { dao: 6, spear: 5, matchlock: 4 } },
-  garrison: { garrison: { spear: 7, dao: 4, matchlock: 1 }, brigandine: { swordShield: 2, spear: 1 } },
+  // Japanese and Chinese together, as the raids were. The Ming accounts
+  // (Zheng Ruozeng's Chouhai tubian, Qi Jiguang's own) describe the raiders
+  // as swordsmen first: the long Japanese sword and the great two-handed
+  // field sword (the ōdachi) leaping in at a run, the Chinese of the bands
+  // with dao and spear. Few guns or bows among them: they came on and cut.
+  raiders: { japanese: { katana: 9, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
+  // A coast garrison of the 1550s: spears and swords, no guns to speak of.
+  garrison: { garrison: { spear: 7, dao: 5 }, brigandine: { swordShield: 2, spear: 1 } },
+  // One colour to a kind, the dynasty's red, so the two sides read apart
+  // across the square (OUTFITS designs: the garrison's red coat, the
+  // brigandine's red cloth); the raiders are in what they have.
+  design: { garrison: 0, brigandine: 0 },
+  // The lines start this far (m) from the middle of the square: open ground
+  // between them for the raiders' run in, and for guns to be fired before it arrives.
+  front: 8,
 };
+
+// The raiders as they come on: a loose crowd, nine abreast.
+const WOKOU_RAIDERS_ORDER = { front: WOKOU.front, spacing: 1.3, rowSpacing: 1.6, perRow: 9, loose: 0.5 };
+
+/** The raiders of a wokou level, the same in both. */
+function wokouRaiders(random) {
+  return [...company(WOKOU.raiders.japanese, (style) => wokouRaider(random, style, 'japanese')), ...company(WOKOU.raiders.chinese, (style) => wokouRaider(random, style, 'chinese'))];
+}
+
+// Qi Jiguang's army in the Taizhou campaign, 1561: the same raiders (WOKOU)
+// against the army he had raised in Yiwu from miners and farmers and drilled
+// himself. Not elite troops: men in the brigandine, in the mandarin-duck squad
+// (yuanyang zhen) of his Jixiao xinshu, twelve men who fought as one: a
+// leader; two shields (the rattan shield and the dao) in front; two langxian
+// (the wolf-brush: a long bamboo with its branches left on, to entangle a
+// sword and keep a man off) at the shields' shoulders; four spears striking
+// past them; and fowling pieces that fire before the raiders reach the line
+// and fall back behind it. Qi himself, in elite armour, with his household
+// guards (jiading) behind his squads. What made them win nine battles in a
+// month, with a handful of Ming dead against hundreds of raiders, was
+// discipline (his law: a squad that let its leader fall, or ran, was put to
+// death; drilled until they moved as one) and the squad's tactics, not
+// better men or better steel: the raiders here are the wokou level's, man
+// for man, and the soldiers wear the brigandine the garrison's regulars wear.
+const QI = {
+  // A squad's men as they stand, [style, back, across]: m behind the front
+  // (the guns' line), m across from the squad's middle. The two shields
+  // side by side, the wolf-brushes (WEAPONS langxian) at their outer
+  // shoulders, the spears in the gaps behind; the leader behind the spears;
+  // the guns 2.4 m before the shields.
+  squad: [
+    ['matchlock', 0, -1.8], ['matchlock', 0, 0], ['matchlock', 0, 1.8],
+    ['swordShield', 2.4, -0.7], ['swordShield', 2.4, 0.7],
+    ['langxian', 2.9, -1.9], ['langxian', 2.9, 1.9],
+    ['spear', 3.5, -0.6], ['spear', 3.5, 0.6], ['spear', 4.5, -1.3], ['spear', 4.5, 1.3],
+    ['dao', 4.6, 0],
+  ],
+  // Squads side by side, this far (m) between their middles.
+  squads: 2,
+  squadWidth: 5,
+  // Qi Jiguang and his guards, behind the squads' middle: [style, back, across].
+  general: ['guandao', 6.2, 0],
+  guards: [['guandao', 5.8, -1.6], ['swordShield', 5.8, 1.6], ['spear', 6.8, 0]],
+  // One colour to a kind: the brigandine's red cloth (as the garrison's
+  // regulars, WOKOU.design), and the iron lamellar laced in crimson for Qi
+  // and his guards (OUTFITS mingElite's level design).
+  design: { brigandine: 0, elite: 5 },
+};
+
+// How Qi's squads move and fight (formation.js drill): they stand and receive the raiders' rush, and
+// do not run at them (`advance` false); each man of a squad goes for a raider come near his place (`squad`), not the front rank only.
+const QI_DRILL = { advance: false, squad: true };
+// Qi's army's discipline (ai.js AI.morale): his law, and a year of drill.
+const QI_DISCIPLINE = 1;
+
+// Without the squads' arms (qiJiguangLevel `weapons` off, for measuring): the
+// same men armed as the coast garrison was (WOKOU.garrison's spears and dao,
+// a few shields, no guns), in the same proportions.
+const QI_UNARMED_MIX = ['spear', 'dao', 'spear', 'dao', 'spear', 'spear', 'dao', 'spear', 'dao', 'spear', 'swordShield', 'spear'];
+
+/**
+ * Qi Jiguang's army: its squads, then Qi and his guards, and where each man
+ * stands (a formation `layout`). `weapons` false: the squads armed as the
+ * garrison was (QI_UNARMED_MIX), for measuring what the arms did.
+ */
+function qiArmy(random, { weapons = true } = {}) {
+  const men = [];
+  const layout = [];
+  for (let squad = 0; squad < QI.squads; squad += 1) {
+    const middle = (squad - (QI.squads - 1) / 2) * QI.squadWidth;
+    for (const [index, [style, back, across]] of QI.squad.entries()) {
+      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'brigandine', { people: 'mingSouth', design: QI.design.brigandine }));
+      layout.push([back, middle + across]);
+    }
+  }
+  for (const [index, [style, back, across]] of [QI.general, ...QI.guards].entries()) {
+    const man = mingSoldier(random, style, 'elite', { people: 'mingSouth', design: QI.design.elite });
+    men.push(index === 0 ? { ...man, name: 'Qi Jiguang' } : man);
+    layout.push([back, across]);
+  }
+  return { men, layout };
+}
+
+/**
+ * Qi Jiguang's level, with each of what won it (`levers`) or without, to
+ * measure what each did (tools/levels.js `qiJiguang:morale,tactics`): the same
+ * raiders and the same men in the same armour throughout.
+ * - `morale`: Qi's discipline (world.discipline; ai.js AI.morale), or none (the garrison's);
+ * - `tactics`: the squads drawn up and drilled as squads (formation `layout`
+ *   and `drill`: places kept, shooters falling back, the wounded relieved,
+ *   several on one), or a crowd in rows as the garrison stood;
+ * - `weapons`: the squad's arms (shields, spears, fowling pieces), or the garrison's.
+ */
+export function qiJiguangLevel({ morale = true, tactics = true, weapons = true } = {}) {
+  const drawnUp = tactics
+    ? { front: WOKOU.front - 2.4, layout: qiArmy(() => 0.5, { weapons }).layout, loose: 0.1, drill: QI_DRILL }
+    : { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 };
+  return {
+    title: "Qi Jiguang's army",
+    place: 'Taizhou, Zhejiang · 1561',
+    blurb: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, fowling pieces firing as the raiders come on. Qi stands behind them with his guards, in iron lamellar, with the guandao.",
+    scene: 'jiangnan',
+    weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
+    arena: { halfX: 14, halfZ: 9 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
+    roster: `Twenty-six raiders · ${QI.squads} squads of twelve, Qi Jiguang and ${QI.guards.length} guards`,
+    // Each man where his squad puts him; the squads drilled as a whole (formation.js), under Qi's discipline (ai.js AI.morale).
+    formation: { red: WOKOU_RAIDERS_ORDER, blue: { ...drawnUp, discipline: morale ? QI_DISCIPLINE : 0 } },
+    cast: (random) => ({ red: wokouRaiders(random), blue: qiArmy(random, { weapons }).men }),
+    fighters: [],
+  };
+}
+
+// Koxinga's army's discipline (ai.js AI.morale): his military law was famously severe (officers who gave
+// ground were beheaded), his men drilled in the Ming manner; not the whole of Qi Jiguang's (QI_DISCIPLINE).
+const KOXINGA_DISCIPLINE = 0.6;
 
 // Rhodes, 24 September 1522: Süleyman's general assault on the breaches.
 // The Knights of St John in plate, their sergeants and gunners, hold the
@@ -308,7 +435,7 @@ export const SCENARIOS = {
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
     roster: 'Eighteen Dutch · thirty-two of Koxinga\'s army',
-    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35 } },
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35, discipline: KOXINGA_DISCIPLINE } },
     cast: (random) => {
       const army = ZEELANDIA.koxinga;
       // The iron men, every one masked, in scale (the elite's masked scale design).
@@ -340,19 +467,20 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'A water town, Zhejiang · 1554',
-    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, barefoot, some in pieces of samurai armour: swords, bows, dao, spears and guns. In the market square by the bridge they meet the town\'s garrison and the few brigandine regulars among them.',
+    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, barefoot, some in pieces of samurai armour: long swords and great two-handed swords, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison and the few brigandine regulars among them.',
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: 'Twenty-six raiders · fifteen garrison',
-    formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, perRow: 8, loose: 0.5 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 } },
+    formation: { red: WOKOU_RAIDERS_ORDER, blue: { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 } },
     cast: (random) => ({
-      red: shootersBehind([...company(WOKOU.raiders.japanese, (style) => wokouRaider(random, style, 'japanese')), ...company(WOKOU.raiders.chinese, (style) => wokouRaider(random, style, 'chinese'))]),
-      blue: shootersBehind([...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingCoast' })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingCoast' }))]),
+      red: wokouRaiders(random),
+      blue: [...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingCoast', design: WOKOU.design.brigandine })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingCoast', design: WOKOU.design.garrison }))],
     }),
     fighters: [],
   },
+  qiJiguang: qiJiguangLevel(),
   port: {
     title: 'Pier 9',
     place: 'Container port, Yokohama · 2:15 a.m.',

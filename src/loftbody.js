@@ -688,6 +688,16 @@ export const ARMOR_KINDS = {
     upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
     mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
   },
+  // The elite in lamellar (Qi Jiguang's and his guards', Qi Jiguang's level):
+  // small iron plates laced in rows from the collar to below the knee, the
+  // lacing showing (`lace`), the steel mirror over the heart; the arms and
+  // the neck guard as the brigandine elite's. The same protection, drawn so.
+  mingEliteLamellar: {
+    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }], ELITE_GORGET],
+    skirt: [0.95, 0.6, 1.34, { lamellae: 30, edge: 'gold', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
+    mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
+  },
   // Ming elite: the long brigandine coat to below the knee, its plates
   // riveted close (gilt heads, more and smaller than a soldier's), bound in a
   // dark edge, split for riding; a round steel mirror (huxinjing) over the

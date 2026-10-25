@@ -8,7 +8,11 @@
 // their places, so they need no physics beyond a pose (see chooseDetail).
 // A fallen man's place is taken by the man behind him in his file, and a
 // shooter who has loosed changes places with a loaded man behind him.
-// Nothing here knows a unit: it is all slots, files and the kit's `drill`.
+// Nothing here knows a unit: it is all slots, files and the kit's `drill`
+// (or a side's, given by its level: Qi Jiguang's army drilled as a whole).
+// A squad's drill (`drill.squad`) is fought as Qi Jiguang taught his
+// mandarin-duck squads: every man of it goes for the enemy at his place, its
+// guns fall back through it as the enemy comes on, its wounded are relieved.
 //
 // Wings: a side's horsemen (a level's `formation.wings`) are not in the ranks.
 // They stand on the flanks of the foot line, held, and are released to charge
@@ -42,6 +46,8 @@ export const DRILL = {
   leash: 0.9,
   // An enemy this near (m) his slot, beyond his own reach, is the front rank's to fight.
   engage: 1.2,
+  // A squad (a drill with `squad`): every man of it goes for an enemy this near (m, beyond both reaches) his place.
+  squadEngage: 0.6,
   // Slots within this (m) of the foremost are the front rank.
   frontDepth: 0.6,
   // Slots within this (m) across are one file.
@@ -50,6 +56,20 @@ export const DRILL = {
   reviewEvery: 0.25,
   // A shooter changes places at most this often (s).
   swapEvery: 1.5,
+  // A squad's drill (a drill with `squad`, Qi Jiguang's):
+  // shooters before a formation of other arms (the fowling pieces before
+  // his squads): with the enemy within `retireAt` m of the front
+  // they have fired from, they fall back through the files to stand
+  // `retireBehind` m behind its rearmost man, and the hand-to-hand men are its front.
+  retireAt: 5,
+  retireBehind: 1,
+  // The wounded, in a squad: a man of the front rank hurt past `woundedAt` (ai.js
+  // hurtShare) changes places with the first man behind him in his file
+  // hurt less than `freshBelow`, and for `relief` s goes back to his new
+  // place whatever is in front of him (ai.js holdRank), guarding as he goes.
+  woundedAt: 0.3,
+  freshBelow: 0.15,
+  relief: 2.5,
 };
 
 /**
@@ -81,10 +101,13 @@ const fighting = (fighter) => fighter.state === 'up' && !fighter.crawling;
  * (`leaderOf(corner)`: a fighter, or null for the man nearest its middle),
  * facing the enemy; each drilled man's slot his offset from it.
  */
-export function formUp(world, leaderOf = () => null) {
+export function formUp(world, leaderOf = () => null, orders = {}) {
   world.formations = {};
   for (const corner of ['red', 'blue']) {
-    const members = world.fighters.filter((fighter) => fighter.corner === corner && fighter.body.gear.drill && !fighter.mount);
+    // Drilled by his kit (the legion's), or his whole side by its level's order (`orders[corner].drill`).
+    const sideDrill = orders[corner]?.drill ?? null;
+    const drillOf = (fighter) => fighter.body.gear.drill ?? sideDrill;
+    const members = world.fighters.filter((fighter) => fighter.corner === corner && drillOf(fighter) && !fighter.mount);
     if (members.length < DRILL.minMembers) continue;
     const enemies = world.fighters.filter((fighter) => fighter.corner !== corner);
     if (!enemies.length) continue;
@@ -97,7 +120,7 @@ export function formUp(world, leaderOf = () => null) {
     // Left of forward on the floor (x, z), the way the AI's strafe leans.
     const left = [-forward[1], forward[0]];
     let leader = leaderOf(corner);
-    if (!leader || !leader.body.gear.drill) {
+    if (!leader || !drillOf(leader)) {
       leader = members.reduce((best, fighter) => (Math.hypot(at(fighter)[0] - middle[0], at(fighter)[1] - middle[1]) < Math.hypot(at(best)[0] - middle[0], at(best)[1] - middle[1]) ? fighter : best));
     }
     const anchor = at(leader);
@@ -106,7 +129,7 @@ export function formUp(world, leaderOf = () => null) {
       fighter.slot = { ahead: dot(offset, forward), across: dot(offset, left) };
       fighter.formation = corner;
     }
-    world.formations[corner] = { anchor, forward, left, leader: leader.id, drill: leader.body.gear.drill, members: members.map((fighter) => fighter.id), review: 0 };
+    world.formations[corner] = { anchor, forward, left, leader: leader.id, drill: drillOf(leader), members: members.map((fighter) => fighter.id), review: 0 };
   }
 }
 
@@ -123,7 +146,7 @@ export function slotAt(formation, slot) {
  * Each formation, once a step: the anchor up toward the enemy (or held),
  * the front rank marked, and now and then the places reviewed.
  */
-export function moveFormations(world, dt) {
+export function moveFormations(world, dt, hurt = () => 0) {
   for (const [corner, formation] of Object.entries(world.formations ?? {})) {
     const members = formation.members.map((id) => world.fighters[id]);
     const standing = members.filter(holding);
@@ -166,7 +189,45 @@ export function moveFormations(world, dt) {
     if (formation.review > 0) continue;
     formation.review = DRILL.reviewEvery;
     closeRanks(world, members);
+    // A squad's drill (`drill.squad`, Qi Jiguang's) has its guns fall back through it and its wounded relieved.
+    if (formation.drill.squad) retireShooters(members, formation);
     relieveShooters(world, members, formation);
+    if (formation.drill.squad) relieveWounded(world, members, hurt);
+  }
+}
+
+/** A man with a bow or gun (his weapon shoots). */
+const shoots = (fighter) => Boolean(fighter.weapon?.held && (fighter.weapon.spec.shot || fighter.weapon.spec.ranged));
+
+/**
+ * Shooters standing before a formation's hand-to-hand men fall back through
+ * the files once the enemy is near (DRILL.retireAt): each to the rear, in
+ * his own file. A formation all of shooters (the Han crossbowmen) has no one
+ * to fall back behind, and keeps its ranks.
+ */
+function retireShooters(members, formation) {
+  if (formation.gap >= DRILL.retireAt) return;
+  const standing = members.filter(holding);
+  const fighters = standing.filter((fighter) => !shoots(fighter));
+  if (!fighters.length) return;
+  const foremost = Math.max(...fighters.map((fighter) => fighter.slot.ahead));
+  const rearmost = Math.min(...fighters.map((fighter) => fighter.slot.ahead));
+  for (const fighter of standing) {
+    if (shoots(fighter) && fighter.slot.ahead > foremost - DRILL.frontDepth) fighter.slot = { ...fighter.slot, ahead: rearmost - DRILL.retireBehind };
+  }
+}
+
+/**
+ * A man of the front rank badly hurt changes places with a fresh man
+ * behind him in his file, and goes back (DRILL.woundedAt, relief).
+ */
+function relieveWounded(world, members, hurt) {
+  for (const fighter of members) {
+    if (!fighter.inFront || !fighting(fighter) || fighter.panicked || hurt(fighter) < DRILL.woundedAt) continue;
+    const fresh = behindInFile(members, fighter.slot, (other) => fighting(other) && !other.panicked && other.weapon?.held && !shoots(other) && hurt(other) < DRILL.freshBelow);
+    if (!fresh) continue;
+    swapSlots(fighter, fresh);
+    fighter.relievedAt = world.time;
   }
 }
 
@@ -211,7 +272,8 @@ function relieveShooters(world, members, formation) {
     const weapon = fighter.weapon;
     if (!fighter.inFront || !fighting(fighter) || fighter.punch || !weapon?.held || !weapon.spec.shot || weapon.loaded) continue;
     if (world.time - (fighter.swappedAt ?? -Infinity) < DRILL.swapEvery) continue;
-    const loaded = behindInFile(members, fighter.slot, (other) => fighting(other) && other.weapon?.held && other.weapon.loaded && !other.punch);
+    // In a squad, another shooter: its spearmen do not come forward into the guns' place.
+    const loaded = behindInFile(members, fighter.slot, (other) => fighting(other) && other.weapon?.held && other.weapon.loaded && !other.punch && (!formation.drill.squad || shoots(other)));
     if (!loaded) continue;
     swapSlots(fighter, loaded);
     fighter.swappedAt = world.time;

@@ -646,6 +646,29 @@ export const STYLES = {
     // A 5.2 kg lance's thrust costs over half again a spear's; still he bursts in with little wind to spare.
     burstAbove: 0.25,
   },
+  // The langxian (wolf-brush): its bearer stands at the shields' shoulder and
+  // holds the brush out in a raider's face, high, to keep him off and catch
+  // his sword in the branches; he jabs the iron head at him and sweeps the
+  // brush across, and leaves the killing to the spears. Long spells of
+  // holding the point out, few blows; the brush across the line is his guard.
+  langxian: {
+    label: 'Langxian', weapon: 'langxian', fallback: 'mix',
+    cadence: { work: 1.3, move: 0.7, burst: 0.5, mobility: 0.4 },
+    stance: { blade: 0.55, crouch: 0.06, width: 1.3, lean: 0.08, guardHeight: 0.05 },
+    weaponGuard: { hand: [-0.06, 0.66, -0.12], dir: [1, 0.22, 0] },
+    idle: { bounce: 0.1, sway: 0.3, rock: 0.2 },
+    attacks: { spearJab: 0.45, spearThrust: 0.3, spearSweep: 0.25 },
+    combos: { 'spearJab spearJab': 0.5, 'spearSweep spearJab': 0.5 },
+    comboChance: 0.4,
+    tempo: 1.1,
+    defences: { weaponBlock: 0.7, stepBack: 0.3 },
+    defendChance: 0.75,
+    headMovement: 0,
+    plans: { outboxer: 2, counter: 1.2, pressure: 0.3, brawler: 0.1 },
+    pressure: 0.02,
+    rangeInside: 0.06,
+    keepPoint: 1.1,
+  },
   knife: {
     label: 'Knife', weapon: 'knife',
     // Close the distance and keep stabbing: long working spells, in flurries.

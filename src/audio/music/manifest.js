@@ -51,6 +51,7 @@ export const SCENE_MUSIC = {
   otumba: 'aztec',
   zeelandia: 'china',
   wokou: 'china',
+  qiJiguang: 'china',
   rhodes: 'ottoman',
   port: 'modern',
   pride: 'modern',

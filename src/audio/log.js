@@ -68,7 +68,7 @@ const BARE_BELOW = 0.12;
 export const ARMOUR_COVERING = {
   plate: 'plate', breastplate: 'plate', conquistador: 'plate', segmentata: 'plate', toseiDo: 'plate', okegawa: 'plate', roninDo: 'plate', robot: 'plate',
   templar: 'mail', haubergeon: 'mail', hauberk: 'mail', centurion: 'mail', krug: 'mail',
-  lamellar: 'lamellar', oyoroi: 'lamellar', doMaru: 'lamellar', doMaruSode: 'lamellar', hanLamellar: 'lamellar', mingLamellar: 'lamellar',
+  lamellar: 'lamellar', oyoroi: 'lamellar', doMaru: 'lamellar', doMaruSode: 'lamellar', hanLamellar: 'lamellar', mingLamellar: 'lamellar', mingEliteLamellar: 'lamellar',
   mongolLamellar: 'lamellar', mongolIron: 'lamellar', kheshig: 'lamellar', ironPagoda: 'lamellar',
   // Small plates riveted inside cloth or sewn over it: a rattle of little plates under the blow.
   scissor: 'scale', guanYu: 'scale', mingScale: 'scale', mingScaleCoat: 'scale', brigandine: 'scale', mingBrigandine: 'scale', mingElite: 'scale',

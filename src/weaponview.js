@@ -83,6 +83,41 @@ function bladeMesh(geometry, material) {
   return mesh;
 }
 
+// The langxian's look: a node ring every `nodeEvery` m of the culm; its
+// branches in a whorl of `twigs` every `tierEvery` m from the brush's start
+// to its head, raking forward by `rake` rad from square, each as long as the
+// brush is wide (WEAPONS.langxian.radius), turned `turn` rad tier on tier.
+const LANGXIAN = { nodeEvery: 0.32, tierEvery: 0.24, twigs: 5, rake: 0.75, turn: 0.6 };
+
+/** The wolf-brush's branches as one geometry: tiers of thin twigs raking forward along the brush. */
+function langxianBrush(spec) {
+  const headFrom = spec.length - (1 - spec.pointFrom) * (spec.length - spec.strikeFrom);
+  const positions = [];
+  const normals = [];
+  const matrix = new THREE.Matrix4();
+  let tier = 0;
+  for (let at = spec.strikeFrom; at < headFrom - 0.05; at += LANGXIAN.tierEvery, tier += 1) {
+    // Shorter twigs towards the head, as the branches of a culm are.
+    const length = spec.radius * (1.15 - 0.45 * ((at - spec.strikeFrom) / (headFrom - spec.strikeFrom)));
+    for (let twig = 0; twig < LANGXIAN.twigs; twig += 1) {
+      const around = (twig / LANGXIAN.twigs) * Math.PI * 2 + tier * LANGXIAN.turn;
+      const piece = new THREE.CylinderGeometry(0.003, 0.006, length, 4).toNonIndexed();
+      // Stand it out from the culm: its foot at the culm, raked up towards the head, turned round the culm.
+      piece.translate(0, length / 2, 0);
+      piece.applyMatrix4(matrix.makeRotationZ(-(Math.PI / 2 - LANGXIAN.rake)));
+      piece.applyMatrix4(matrix.makeRotationY(around));
+      piece.applyMatrix4(matrix.makeTranslation(0, at, 0));
+      positions.push(...piece.attributes.position.array);
+      normals.push(...piece.attributes.normal.array);
+      piece.dispose();
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geometry;
+}
+
 function cylinder(radiusTop, radiusBottom, from, to, material, sides = 10) {
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, to - from, sides), material);
   mesh.position.y = (from + to) / 2;
@@ -805,6 +840,26 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(bladeMesh(bladeGeometry(headStart, 0.28, 0.055, 0.012, 0.18), polished));
       const socket = cylinder(0.013, 0.018, headStart - 0.07, headStart + 0.01, steel, 8);
       group.add(socket);
+      break;
+    }
+    case 'langxian': {
+      // The wolf-brush: a whole bamboo, thick at the butt and tapering, its
+      // nodes ringed; along the upper part the side branches left on in
+      // tiers, each tier a whorl of stiff twigs raking forward to the brush's
+      // width (spec.radius); the small iron spearhead at the top. The twigs are
+      // one mesh (LANGXIAN), drawn as the brush the physics feels.
+      const bamboo = surface(0x9a9446, { roughness: 0.6 });
+      const node = surface(0x6e6a30, { roughness: 0.7 });
+      const headLength = (1 - spec.pointFrom) * (spec.length - spec.strikeFrom);
+      const culmTo = spec.length - headLength;
+      group.add(cylinder(0.011, 0.024, -spec.handle, culmTo + 0.02, bamboo, 8));
+      for (let at = -spec.handle + LANGXIAN.nodeEvery; at < culmTo; at += LANGXIAN.nodeEvery) {
+        const radius = 0.024 + (0.011 - 0.024) * ((at + spec.handle) / (culmTo + spec.handle)) + 0.003;
+        group.add(cylinder(radius, radius, at - 0.012, at + 0.012, node, 8));
+      }
+      group.add(new THREE.Mesh(langxianBrush(spec), surface(0x7d7a3a, { roughness: 0.8 })));
+      group.add(cylinder(0.01, 0.014, culmTo - 0.06, culmTo + 0.03, steel, 8));
+      group.add(bladeMesh(bladeGeometry(culmTo, headLength, 0.04, 0.01, 0.12), polished));
       break;
     }
     case 'yari': {
