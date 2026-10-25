@@ -110,3 +110,12 @@ test('a blow that wounds is one voice: the stronger of the cry and the grunt', (
   ];
   assert.deepEqual(mergeVoices(events).map((event) => `${event.type}:${event.kind ?? ''}`), ['voice:wound', 'voice:effort', 'hit:']);
 });
+
+test('the men are not heard to cry out or grunt; a blow on armour is heard', () => {
+  const listener = placeListener(createListener(), [0, 1.7, 0], cameraLooking(0));
+  const events = [
+    { type: 'voice', kind: 'wound', strength: 0.9, who: 3, t: 1, x: 1, y: 1.6, z: 0, size: 1.8, f0: 110 },
+    { type: 'hit', energy: 200, x: 1, y: 1.2, z: 0, t: 1 },
+  ];
+  assert.deepEqual(soundCandidates(events, listener).map((candidate) => candidate.event.type), ['hit']);
+});

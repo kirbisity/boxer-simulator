@@ -9,8 +9,12 @@ import { P } from '../body.js';
 import { EAR } from './ear.js';
 import { gainOfLevel, sfxBuffer, sfxRandom, writeGrains, lowpassInPlace } from './synth.js';
 
-/** The far field's numbers: the sectors, and each man's levels at 1 m (dB SPL): a man shouting in a fight, one marching or waiting, the clash of his weapon. */
-export const FAR_FIELD = { sectors: 8, shoutFighting: 88, shoutIdle: 70, clash: 92, ease: 0.6 };
+/**
+ * The far field's numbers: the sectors, and each man's levels at 1 m (dB SPL): a man shouting in a fight, one marching or waiting, the
+ * clash of his weapon. `shouts`: whether the shouting bed is played (off: the men's voices sounded wrong, the user said; the din of
+ * a distant fight is its weapons).
+ */
+export const FAR_FIELD = { sectors: 8, shoutFighting: 88, shoutIdle: 70, clash: 95, ease: 0.6, shouts: false };
 
 /** The sectors' sums, made once: per sector the men counted, those fighting, the nearest, and the energies. */
 export function createSectors(count = FAR_FIELD.sectors) {
@@ -125,20 +129,21 @@ function clashBed(ctx) {
  * to its level. Built into `out` (the ambience bus); `makePanner(azimuth, out)` gives the input of a panner for a side, wired into `out`.
  */
 export function createFarField(ctx, out, makePanner) {
-  const shout = shoutBed(ctx);
+  const shout = FAR_FIELD.shouts ? shoutBed(ctx) : null;
   const clang = clashBed(ctx);
   const beds = [];
   for (let sector = 0; sector < FAR_FIELD.sectors; sector += 1) {
     // (The engine's panner for that side, already wired into `out`: its input.)
     const panner = makePanner(sectorAzimuth(sector), out);
     const pair = [shout, clang].map((buffer) => {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      if (!buffer) return gain;
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
       // Each sector its own place in the loop and a slightly different speed: no two sides alike.
       source.playbackRate.value = 0.94 + 0.12 * ((sector * 37) % 10) / 10;
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
       source.connect(gain);
       gain.connect(panner);
       source.start(ctx.currentTime, (sector * 0.73) % buffer.duration);
@@ -151,7 +156,7 @@ export function createFarField(ctx, out, makePanner) {
       for (let sector = 0; sector < beds.length; sector += 1) {
         const levels = sectorLevels(sectors, sector);
         const bed = beds[sector];
-        bed.shout.gain.setTargetAtTime(Number.isFinite(levels.shout) ? gainOfLevel(levels.shout) : 0, when, FAR_FIELD.ease);
+        if (FAR_FIELD.shouts) bed.shout.gain.setTargetAtTime(Number.isFinite(levels.shout) ? gainOfLevel(levels.shout) : 0, when, FAR_FIELD.ease);
         bed.clash.gain.setTargetAtTime(Number.isFinite(levels.clash) ? gainOfLevel(levels.clash) : 0, when, FAR_FIELD.ease);
       }
     },

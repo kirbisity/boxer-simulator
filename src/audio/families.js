@@ -14,19 +14,23 @@ import { playVoice, voiceParams } from './sfx/voice.js';
 import { mechParams, playMech, playThunder, thunderParams } from './sfx/world.js';
 import { playWound, woundParams } from './sfx/wound.js';
 
-/** Each event type: its parameters, its player, and the bus it goes to ('effects' or 'voices'). */
+/**
+ * Each event type: its parameters, its player, the bus it goes to ('effects' or 'voices'), `boost` (dB over its level, the user's
+ * choice: the weapon's work, on armour, on flesh, on another weapon, and the guns, are what a fight is heard as) and `silent` (logged
+ * but not played: the men's cries and grunts sounded wrong, the user said, and were taken out; breathing is kept).
+ */
 export const SOUND_FAMILIES = {
-  hit: { params: impactParams, play: playImpact, bus: 'effects' },
-  wound: { params: woundParams, play: playWound, bus: 'effects' },
-  clash: { params: clashParams, play: playClash, bus: 'effects' },
+  hit: { params: impactParams, play: playImpact, bus: 'effects', boost: 6 },
+  wound: { params: woundParams, play: playWound, bus: 'effects', boost: 4 },
+  clash: { params: clashParams, play: playClash, bus: 'effects', boost: 6 },
   swing: { params: swingParams, play: playSwing, bus: 'effects' },
   step: { params: stepParams, play: playStep, bus: 'effects' },
   fall: { params: (event) => fallParams(event, 'fall'), play: playFall, bus: 'effects' },
   land: { params: (event) => fallParams(event, 'land'), play: playFall, bus: 'effects' },
-  voice: { params: voiceParams, play: playVoice, bus: 'voices' },
+  voice: { params: voiceParams, play: playVoice, bus: 'voices', silent: true },
   horse: { params: horseParams, play: playHorse, bus: 'effects' },
-  shot: { params: shotParams, play: playShot, bus: 'effects' },
-  arrowhit: { params: arrowHitParams, play: playImpact, bus: 'effects' },
+  shot: { params: shotParams, play: playShot, bus: 'effects', boost: 4 },
+  arrowhit: { params: arrowHitParams, play: playImpact, bus: 'effects', boost: 4 },
   mech: { params: mechParams, play: playMech, bus: 'effects' },
   thunder: { params: thunderParams, play: playThunder, bus: 'ambience' },
 };
@@ -40,12 +44,12 @@ export function soundCandidates(events, listener) {
   const out = [];
   for (const event of mergeVoices(events)) {
     const family = SOUND_FAMILIES[event.type];
-    if (!family) continue;
+    if (!family || family.silent) continue;
     const mapWide = isMapWide(event);
     const direction = earDirection(listener, event.x ?? listener.x, event.y ?? listener.y, event.z ?? listener.z, { distance: 0, azimuth: 0, elevation: 0 });
     const distance = event.type === 'thunder' ? Math.max(direction.distance, event.distance ?? 2000) : direction.distance;
     const params = family.params(event);
-    const atEar = levelAtEar(params.level, distance, mapWide);
+    const atEar = levelAtEar(params.level + (family.boost ?? 0), distance, mapWide);
     if (!thinningKeeps(atEar, distance, mapWide)) continue;
     out.push({ event, family, params, distance, azimuth: direction.azimuth, elevation: direction.elevation, atEar, mapWide });
   }
