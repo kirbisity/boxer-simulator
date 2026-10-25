@@ -1148,6 +1148,13 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       const knot = new THREE.Mesh(new THREE.SphereGeometry(0.22 * r, 10, 8), wrap);
       knot.position.set(-1.12 * r, 0.22 * r, 0);
       group.add(cap, roll, knot);
+      // (`topknot`: the hair cap's knob over the crown, the cloth wound round below it, in the cap's own undyed colour.)
+      if (head.topknot) {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.42 * r, 12, 10), surface(head.topknot, { roughness: 0.9 }));
+        bun.scale.y = 1.15;
+        bun.position.set(0.05 * r, 1.12 * r, 0);
+        group.add(bun);
+      }
       for (const side of [1, -1]) {
         const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.7 * r, 0.22 * r), wrap);
         tail.position.set(-1.18 * r, -0.12 * r, side * 0.14 * r);

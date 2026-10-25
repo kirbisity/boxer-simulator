@@ -366,6 +366,11 @@ const PERIOD_BUILD = {
   // lion): his elite is the big men of his army.
   // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
   mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 160, weightKg: 64, exercise: 0.66 } },
+  // The weisuo garrisons of the Zhejiang coast in the 1550s, as the raids found them: hereditary soldier households, unpaid, their men
+  // worked as servants by their officers, the able-bodied long run off. What was left to muster was boys, the thin and the old: ages
+  // (`ages`: [share, from, to]) from eighteen into the sixties, half again the usual spread of height and weight (`spread`), lean, little
+  // drilled. The few regulars among them are as Koxinga's (mingSouth).
+  mingCoast: { garrison: { heightCm: 162, weightKg: 52, exercise: 0.45, spread: 1.5, ages: [[0.4, 18, 32], [0.32, 32, 48], [0.28, 48, 66]] }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 } },
   japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 60, exercise: 0.92 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
@@ -413,10 +418,24 @@ export function steppeWarrior(random = Math.random, style = 'steppeBow', rank = 
 
 /** This man at a period's build: its height and training, give or take, fed to its weight. */
 function builtLike(inputs, build, random) {
-  const heightCm = Math.round(build.heightCm + jitter(random) * CAST.height * 0.6);
-  const weightKg = build.weightKg * (heightCm / build.heightCm) ** 2 * (1 + jitter(random) * 0.06);
+  const spread = build.spread ?? 1;
+  const heightCm = Math.round(build.heightCm + jitter(random) * CAST.height * 0.6 * spread);
+  const weightKg = build.weightKg * (heightCm / build.heightCm) ** 2 * (1 + jitter(random) * 0.06 * spread);
   const exercise = Math.min(1, Math.max(0.2, build.exercise + jitter(random) * 0.08));
-  return atWeight({ ...inputs, heightCm, exercise }, weightKg);
+  // (Drawn only for a build that gives ages, after the rest, so every other army is cast as before.)
+  const age = build.ages ? ageFrom(build.ages, random) : inputs.age;
+  return atWeight({ ...inputs, heightCm, exercise, age }, weightKg);
+}
+
+/** An age (whole years) from `ages`, [share, from, to] bands. */
+function ageFrom(ages, random) {
+  let roll = random() * ages.reduce((sum, [share]) => sum + share, 0);
+  for (const [share, from, to] of ages) {
+    if (roll < share) return Math.round(from + random() * (to - from));
+    roll -= share;
+  }
+  const [, from, to] = ages[ages.length - 1];
+  return Math.round(from + random() * (to - from));
 }
 
 // ---- Horsemen: the wings of the battle maps (scenarios.js `wings`) ----

@@ -600,6 +600,14 @@ export const ARMOR_KINDS = {
     trunk: [-0.05, 0.95, 1.12, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.8, 0.5, 1.24, { rows: ['cloth', 'cloth', 'cloth2'] }],
     upperArm: [-0.1, 1.0, 1.12, 'cloth'],
   },
+  // Ming garrison as he was (weisuo levy, the 16th century): no armour, a sleeveless vest of coarse hemp to the hip, closed with
+  // knotted cloth buttons down the front, a cloth sash round the waist, its ends hanging at the side.
+  mingVest: {
+    trunk: [-0.1, 0.95, 1.09, 'cloth'], skirt: [0.28, 0.3, 1.17, 'cloth'],
+    belt: [-0.03, 0.12, 1.22, 'cloth2'],
+    studs: [[0.36, 0, 0.03, 1.1, 'leather'], [0.5, 0, 0.03, 1.1, 'leather'], [0.64, 0, 0.03, 1.1, 'leather'], [0.78, 0, 0.03, 1.1, 'leather'], [0.9, 0, 0.03, 1.1, 'leather']],
+    tassels: [[0.55, 0.45, 0.08, 1.26, 'cloth2'], [0.7, 0.38, 0.07, 1.26, 'cloth2']],
+  },
   // Ming brigandine (bumianjia, cloth-faced armour): iron plates riveted
   // inside a long coat of cloth, the brass rivet heads in rows over it; its
   // edges and the front opening bound in a dark cloth; a buckled belt; the

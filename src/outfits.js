@@ -135,9 +135,10 @@ function ashigaruDesign(label, lacquer, lace, mon, cloth) {
   return { label, top: { kind: 'longsleeve', color: cloth }, bottom: { kind: 'pants', color: cloth }, armor: { kind: 'okegawa', color: lacquer, lace, gold: mon }, head: { kind: 'jingasa', color: lacquer, gold: mon }, feet: { kind: 'tabi', color: '#1a1b22' } };
 }
 
-// Ming soldiers. Garrison: the padded coat in its colour, the red wrap.
-function mingGarrisonDesign(label, coat, trousers) {
-  return { label, top: { kind: 'longsleeve', color: coat }, bottom: { kind: 'pants', color: trousers }, armor: { kind: 'mingQuilt', color: coat, cloth: coat, cloth2: shade(coat, 0.78) }, head: { kind: 'clothWrap', color: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+// Ming soldiers. Garrison: the weisuo levy as he was, unpaid and unarmoured: a sleeveless hemp vest over bare arms, a cloth sash,
+// loose dark trousers, a cloth wound round the head under the hair cap's knob.
+function mingGarrisonDesign(label, vest, sash, wrap) {
+  return { label, top: { kind: 'tank', color: vest }, bottom: { kind: 'pants', color: '#1c1b1d' }, armor: { kind: 'mingVest', color: vest, cloth: vest, cloth2: sash, leather: shade(vest, 0.7) }, head: { kind: 'clothWrap', color: wrap, topknot: '#cdb894' }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Brigandine: the coat's cloth, gilt rivets, the iron hat.
 // `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
@@ -837,8 +838,8 @@ export const OUTFITS = {
     courage: 0.3,
     designs: GLADIATOR_LOOKS.map((look) => gladiatorDesign('scissor', look, { kind: 'arenaHelm', style: 'scissor' })),
   },
-  // Ming garrison: a padded cotton coat and a red cloth head wrap. Little
-  // protection beyond the padding; quick on his feet.
+  // Ming garrison: a hemp vest and a cloth head wrap, no armour (the weisuo
+  // levy of the 16th century, unpaid and ill-kept); quick on his feet.
   mingGarrison: {
     skill: 0.25,
     faction: 'chinese',
@@ -848,11 +849,11 @@ export const OUTFITS = {
     protection: { blunt: 0.1, cut: 0.1, pierce: 0.05 },
     courage: 0,
     designs: [
-      mingGarrisonDesign('Red coat', '#a3241e', '#2a2622'),
-      mingGarrisonDesign('Blue coat', '#2a3a6a', '#2a2622'),
-      mingGarrisonDesign('Ochre coat', '#b0862e', '#3a3326'),
-      mingGarrisonDesign('Brown coat', '#6a4428', '#2a2622'),
-      mingGarrisonDesign('Faded red', '#b5574a', '#3a3326'),
+      mingGarrisonDesign('Hemp vest, rose sash', '#7a6450', '#b77f86', '#6b5240'),
+      mingGarrisonDesign('Dark hemp, red sash', '#5e4a3a', '#9a3a34', '#7a6046'),
+      mingGarrisonDesign('Pale hemp, rose sash', '#8f7a62', '#c08a8e', '#5a4636'),
+      mingGarrisonDesign('Hemp vest, faded blue sash', '#73604d', '#5d6f86', '#6b5240'),
+      mingGarrisonDesign('Brown vest, ochre sash', '#6a4f3a', '#b08a4a', '#8a7052'),
     ],
   },
   // Ming brigandine: plates riveted inside a long coat, steel bracers, an
