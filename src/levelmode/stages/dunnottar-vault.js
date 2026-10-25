@@ -1,6 +1,8 @@
 // Stage 1, Dunnottar: Whigs' Vault (section `vault`, the long cellar, the dungeon hall and the cell, the stairs up to the court and the
-// keep) and the Crypt beneath it (section `crypt`, a level down). The main way is the one it always was: down the west stair, along
-// the cellar, past the turnkey, up the east stair. Everything else is optional and dim (no way-marks; the chevrons stay on the main
+// keep) and the Crypt beneath it (section `crypt`, a level down). The main way: down the west stair from the court, along the cellar, past the
+// jailer and the turnkey (whose desk has the keep's key and whose fire is the rest), then back to the iron gate (its bar lifted from the cellar side) and up its stair
+// into the court again, past the Well, to the keep's door. There is no way from the cellar into the keep but through the court. Everything else is optional and dim
+// (no way-marks; the chevrons stay on the main
 // line): a torture chamber and a stores branch off the cellar, a well-shaft stair down to the crypt, and in the crypt an ossuary, the
 // keepers' tombs, a flooded way on a raised causeway to the sea-gate, a hidden lever there that lifts the bars of a stair back up into the
 // torture chamber (a loop: cellar, shaft, crypt, causeway, lever, stair, torture chamber, cellar).
@@ -67,7 +69,7 @@ export function buildVault() {
     { at: 26.2, width: 1.4, sill: V + 1.6, top: V + 3.2, shape: 'lancet', solid: true },
     { at: 30.2, width: 3.0, sill: V, top: V + 3.4, shape: 'round' },
   ]);
-  dnRun(sec, [33.4, -27.6], [33.4, -17.4], 1.2, V - 1, wallTop, 'rubble', [{ at: 5.1, width: 5.8, sill: V, top: V + 3.8, shape: 'round' }]);
+  dnRun(sec, [33.4, -27.6], [33.4, -17.4], 1.2, V - 1, wallTop, 'rubble');
   dnCeiling(sec, 0, 32.8, -26, -19, V + HEAD, V + 4.8);
   sec.decor.push({ kind: 'vault', a: [0, -22.5, V + 3.0 + LIFT], b: [32.8, -22.5, V + 3.0 + LIFT], width: 7, crown: 1.4, ribs: 4.1, style: 'vault' });
   // The west stair down from the court: 31 treads, the first 11 under the court's own slab.
@@ -83,10 +85,8 @@ export function buildVault() {
   dnFlightWalls(sec, gate, { thick: 1.6, head: 4.4, every: 3 });
   dnFlightVault(sec, gate, { head: 3.9, last: DN_COVERED + 1, roof: 0.5 });
   dnGate(sec, 'irongate', [24.7, V, -19.6], [{ ...wallOf([24.7, -17.9], [5.4, 0.3], V, V + 3.6, { id: 'irongate' }), style: 'iron', skin: false }], { kind: 'bars', width: 5.4, height: 3.6 }, { opensFrom: { at: [24.7, -22.5], size: [12, 8.6], y: [V - 1, V + 4] }, label: 'Lift the iron gate bar' });
-  // The east stair up to the tower house: 31 treads, the first 11 under the court.
-  const east = dnFlight(sec, { foot: [34, -22.5], dir: 'E', steps: DN_VAULT_STEPS, tread: 0.34, width: 5.8, from: V, rise, style: 'cobble' });
-  dnFlightWalls(sec, east, { thick: 1.6, head: 4.4, every: 3 });
-  dnFlightVault(sec, east, { head: 3.9, last: DN_COVERED + 1, roof: 0.5 });
+  // (There was an east stair here, up from the turnkey's end into the keep: it is gone. The keep is entered from the court by a door the turnkey's key opens, so that the
+  // way out of the cellar is up into the court, by the west stair or the iron gate's, and never straight into the tower from the dungeon or the old drain.)
   // The dungeon: a hall north of the cellar with its door barred (the turnkey's key), cells in it.
   dnSlab(sec, 9.6, 23.4, -36, -26, V, 'flags', { bottom: V - FLOOR, extra: { room: true } });
   dnRun(sec, [10.8, -35.2], [10.8, -26.8], 1.6, V - 1, wallTop, 'rubble');
@@ -129,7 +129,6 @@ export function buildVault() {
   // The way-marks: the main line only (the branches are left dim).
   sec.decor.push({ kind: 'waymarks', points: [[9, -22.5, V], [17, -22.5, V], [25, -22.5, V], [32, -22.5, V]], gap: 2.1, first: 0.4 });
   sec.portals.push({ to: 'quad', area: [{ at: [5.7, -9], size: [13, 20], y: [8.4, 12] }, { at: [24.7, -11], size: [11, 18], y: [8.4, 12] }] });
-  sec.portals.push({ to: 'tower', area: { at: [41, -22.5], size: [14, 10], y: [8.4, 14.6] } });
   // The crypt wakes while he is on the well shaft's stair (any height of it) or at the head of the stair from the sea-gate.
   sec.portals.push({ to: 'crypt', area: [{ at: DN_SHAFT.at, size: [11.4, 11.4], y: [2.4, 9] }, { at: [1.7, -32.3], size: [3.6, 10], y: [2.4, 9] }] });
 
@@ -141,6 +140,8 @@ export function buildVault() {
 
   dnItem(sec, 'note-ledger', 'note', [29.6, V, -25.4], { note: 'ledger', lift: 0.95 });
   dnItem(sec, 'cellkey', 'key', [31.6, V, -26.2], { label: 'Take the cell key', lift: 1.2 });
+  // The keep's key, on the same peg: the turnkey is the keeper of every door in the castle (the keep's is in the court above: dunnottar.js `keepdoor`). Needed by everyone who is to go on.
+  dnItem(sec, 'keepkey', 'key', [32.5, V, -26.2], { label: 'Take the keep\'s key', lift: 1.2, required: true });
   dnItem(sec, 'bandage6', 'bandage', [2.4, V, -20]);
   dnItem(sec, 'tonic4', 'tonic', [16.4, V, -29.4]);
 
@@ -205,7 +206,6 @@ function buildStores(sec) {
   dnProp(sec, 'table', [14.2, V, -9.4], { yaw: 0 });
   dnProp(sec, 'sack', [12.0, V, -8.4], {});
   dnProp(sec, 'brokencrate', [18.4, V, -6.9], { yaw: 0.4 });
-  dnProp(sec, 'weaponrack', [11.6, V, -9.8], { yaw: Math.PI / 2 });
   // The tunnel: an arch in the south wall choked with the roof that fell, and a draught that leans the torch toward it.
   dnProp(sec, 'rubbleheap', [14.4, V, -6.9], { size: 1.0 });
   dnProp(sec, 'rubbleheap', [16.0, V, -6.9], { size: 1.0 });

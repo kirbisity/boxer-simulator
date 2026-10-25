@@ -27,22 +27,21 @@ test('dunnottar: registered, sound, ten sections with the cast the spec calls fo
   const enemies = spawns.filter((spawn) => (spawn.role === 'enemy' || spawn.role === 'boss') && !spawn.dead && !spawn.hold);
   assert.equal(spawns.filter((spawn) => spawn.hold === 'horde').length, 36, 'the horde in the chapel');
   assert.equal(spawns.filter((spawn) => spawn.hold === 'epilogue').length, 12, 'the epilogue\'s men in the drain');
-  assert.ok(enemies.length >= 12 && enemies.length <= 32, `${enemies.length} enemies`);
-  // The main line's cast stood at 14 (the bot's careful policy reaches Vaelen 12 in 16 against it), 15 with the knight at the postern, 21 with the drawbridge's guard
-  // (three archers on the barbican, three levies at the bridge's end and its forecourt: the front is meant to be very hard); the vault's optional branches add at most six, and the
-  // old drain (the way round the gate) four: a sergeant and three levies.
-  assert.ok(enemies.length >= 28 && enemies.length <= 32, `${enemies.length} enemies: 21 on the main line, 3 to 6 in the optional branches, 4 in the drain`);
+  // The main line's cast stood at 14 once (the bot's careful policy reaches Vaelen 12 in 16 against it), 21 with the drawbridge's guard; the front has since been made a place not to
+  // fight through (thirteen men in front of, over and behind the bridge, with the plate knight on the ledge), and the court a lane with eight men spread along it. The vault's optional
+  // branches add at most six, and the old drain one: Noname (the sergeant and the levies are gone).
+  assert.ok(enemies.length >= 36 && enemies.length <= 42, `${enemies.length} enemies: 13 at the front, 8 in the court, 3 in the gatehouse, 1 on the stair, the keep's 3, the vault's 4 and the crypt's 3, Noname and the boss`);
   // The front's men are one alarm, and the archers keep their posts on the barbican (there is no way up to them).
   const front = enemies.filter((spawn) => spawn.alarm === 'front');
-  assert.deepEqual(front.map((spawn) => spawn.id).sort(), ['archer1', 'archer2', 'archer3', 'bridgeguard1', 'bridgeguard2', 'bridgelevy', 'gateknight'].sort());
+  assert.deepEqual(front.map((spawn) => spawn.id).sort(), ['archer1', 'archer2', 'archer3', 'bridgeguard1', 'bridgeguard2', 'bridgelevy', 'forecourtbow1', 'forecourtbow2', 'frontcrossbow', 'frontguard', 'frontknight1', 'frontknight2', 'gateknight'].sort());
   assert.ok(front.filter((spawn) => spawn.preset === 'dunnottarArcher').every((spawn) => spawn.perch && spawn.post[1] > 6));
   assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 2);
   assert.ok(spawns.some((spawn) => spawn.role === 'boss' && spawn.preset === 'vaelen'));
   assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest2b', 'restdrain', 'rest3']);
-  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'ladder1'].sort());
+  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'keepdoor', 'ladder1'].sort());
   const notes = DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'note').map((item) => item.note).sort();
   assert.deepEqual(notes, ['bridge', 'cellar', 'drain', 'ledger', 'order', 'powder', 'seagate', 'servant', 'soldier', 'warden']);
-  assert.ok(DUNNOTTAR.sections.some((section) => section.items.some((item) => item.kind === 'key')));
+  assert.deepEqual(DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'key').map((item) => item.id).sort(), ['cellkey', 'keepkey']);
 });
 
 test('dunnottar: every spawn, item, lever and rest stands inside its own section, on a floor', () => {
@@ -114,6 +113,8 @@ const CLIFFS = [
   (e) => Math.abs(e.floor) < 0.5 && e.at[0] >= DN_RAVINE.x0 - 1 && e.at[0] <= DN_RAVINE.x0 + 0.5 && e.at[1] > 38 && e.at[1] < 56,
   (e) => e.at[1] <= -38 && e.floor > 17,
   (e) => e.at[0] >= 5 && e.at[0] <= 9 && e.at[1] > -34 && e.at[1] < -33 && e.floor > 17,
+  // The alley's end, on the curtain's foot: the flood's cell on the wall's own face sees the dungeon's floor 6 m under it (the curtain keeps a man 0.3 m off, 0.44 the man played).
+  (e) => e.at[1] === -34 && e.at[0] > 12 && e.at[0] < 19 && e.floor > 12 && e.floor < 13,
   (e) => e.at[0] >= 12.5 && e.at[0] <= 16.5 && e.at[1] > -34 && e.at[1] < -26 && e.floor > 12 && e.floor < 18,
   // The cesspool's pit (dunnottar-sewer.js): the side of a ramp is a step down into the sludge (0.75 m); the ramps are the way out of it.
   (e) => Math.hypot(e.at[0] - DN_CESSPOOL.at[0], e.at[1] - DN_CESSPOOL.at[2]) < DN_CESSPOOL.radius + 0.6 && Math.abs(e.floor - DN_CESSPOOL.rim) < 0.3,
@@ -125,7 +126,8 @@ test('dunnottar: a man can walk off the map only where there is a cliff (every s
     const terrain = stageTerrain(DUNNOTTAR, DUNNOTTAR.sections.map((section) => section.id), states);
     const flood = floodFill(terrain, DUNNOTTAR.start.at);
     assert.ok(!flood.truncated);
-    assert.ok(flood.standing > (open ? 22000 : 19500), `${flood.standing} places to stand`);
+    // (The court is a lane now: the ranges that line it are masonry, where it was open ground to the walls: 17800 places to stand closed, 23100 with every door open.)
+    assert.ok(flood.standing > (open ? 22500 : 17300), `${flood.standing} places to stand`);
     const stray = flood.edges.filter((edge) => !CLIFFS.some((allowed) => allowed(edge)));
     assert.deepEqual(stray.map((edge) => `${edge.at.map((v) => v.toFixed(1))} at ${edge.floor.toFixed(2)}`), [], `open ${open}`);
   }
