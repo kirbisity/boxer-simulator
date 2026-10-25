@@ -11,15 +11,15 @@ import { playArmourShake } from './impact.js';
  * `seconds`, and its make-up: `tap` (the hard click's band), `thud` (the body of it), `grain` (a granular layer: grass, sand, snow).
  */
 export const SURFACES = {
-  stone: { efficiency: 2e-5, seconds: 0.06, tap: 3200, thud: 180 },
-  tile: { efficiency: 2.5e-5, seconds: 0.05, tap: 4200, thud: 220 },
-  wood: { efficiency: 6e-5, seconds: 0.1, tap: 1800, thud: 160, knock: 230 },
-  earth: { efficiency: 6e-6, seconds: 0.08, thud: 110 },
-  grass: { efficiency: 5e-6, seconds: 0.12, thud: 100, grain: { kind: 'swish', low: 2500, high: 7000 } },
-  sand: { efficiency: 5e-6, seconds: 0.14, thud: 90, grain: { kind: 'hiss', low: 3500, high: 9000 } },
-  snow: { efficiency: 6e-6, seconds: 0.16, thud: 120, grain: { kind: 'crunch', low: 900, high: 3200 } },
-  mud: { efficiency: 1.2e-5, seconds: 0.22, thud: 90, squelch: true },
-  water: { efficiency: 4e-5, seconds: 0.2, thud: 80, splash: true },
+  stone: { efficiency: 4e-6, seconds: 0.06, tap: 3200, thud: 180 },
+  tile: { efficiency: 5e-6, seconds: 0.05, tap: 4200, thud: 220 },
+  wood: { efficiency: 1.2e-5, seconds: 0.1, tap: 1800, thud: 160, knock: 230 },
+  earth: { efficiency: 1.2e-6, seconds: 0.08, thud: 110 },
+  grass: { efficiency: 1e-6, seconds: 0.12, thud: 100, grain: { kind: 'swish', low: 2500, high: 7000 } },
+  sand: { efficiency: 1e-6, seconds: 0.14, thud: 90, grain: { kind: 'hiss', low: 3500, high: 9000 } },
+  snow: { efficiency: 1.2e-6, seconds: 0.16, thud: 120, grain: { kind: 'crunch', low: 900, high: 3200 } },
+  mud: { efficiency: 2.5e-6, seconds: 0.22, thud: 90, squelch: true },
+  water: { efficiency: 8e-6, seconds: 0.2, thud: 80, splash: true },
 };
 
 /** The leg's share of the body that comes down with the foot, and how fast it comes down for a pace (m/s): a walk ~0.6, a run ~1.6. */

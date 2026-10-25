@@ -3,7 +3,7 @@
 // of its boards or the clang of its boss. The energy is the relative speed's (a sword's metre of steel, ~1.2 kg at the point of contact
 // meeting another), its share radiated by what met.
 
-import { contactBrightness, levelFromEnergy, sfxBuffer, sfxBurst, sfxClamp, sfxFilter, sfxModes, sfxNoise, sfxEnvelope, sfxPlayBuffer, writeGrains } from '../synth.js';
+import { bandMakeUp, contactBrightness, levelFromEnergy, sfxBuffer, sfxBurst, sfxClamp, sfxFilter, sfxModes, sfxNoise, sfxEnvelope, sfxPlayBuffer, writeGrains } from '../synth.js';
 
 /** How each kind radiates (share of the energy, over how long), how hard it is, and the first mode of what it is. */
 export const CLASH_KINDS = {
@@ -42,22 +42,23 @@ export function clashParams(event) {
 /** Play a clash into `out`. Returns the end time. */
 export function playClash(voice, out, params, when, gain) {
   // The strike: a click of broadband noise as bright as the contact.
-  sfxBurst(voice, out, { when, peak: gain * 0.7, decay: 0.015, type: 'highpass', frequency: sfxClamp(params.brightness * 0.3, 800, 9000) });
+  sfxBurst(voice, out, { when, peak: gain * 0.3, decay: 0.015, type: 'highpass', frequency: sfxClamp(params.brightness * 0.3, 800, 9000) });
   let end = when + 0.1;
+  // (The parts' peaks add up to about the clash's gain: the ring takes most of it, less beside the wood of a haft.)
   if (params.modes.length) {
-    sfxModes(voice, out, when, params.modes, gain);
+    sfxModes(voice, out, when, params.modes, gain * (params.wood ? 0.35 : 0.6));
     end = Math.max(end, when + params.modes[0].decay);
   }
   if (params.wood) {
     // Steel into wood: a chop, the board's knock and the splinters' crackle.
-    sfxModes(voice, out, when, [{ f: params.wood.base, decay: params.wood.decay, amp: 1 }, { f: params.wood.base * 2.4, decay: params.wood.decay * 0.6, amp: 0.5 }], gain * 0.9);
-    sfxBurst(voice, out, { when, peak: gain * 0.6, decay: 0.05, type: 'bandpass', frequency: 1400, q: 0.8, color: 'pink' });
+    sfxModes(voice, out, when, [{ f: params.wood.base, decay: params.wood.decay, amp: 1 }, { f: params.wood.base * 2.4, decay: params.wood.decay * 0.6, amp: 0.5 }], gain * 0.35);
+    sfxBurst(voice, out, { when, peak: gain * 0.25, decay: 0.05, type: 'bandpass', frequency: 1400, q: 0.8, color: 'pink' });
     const buffer = sfxBuffer(voice.ctx, 0.08, (data, rate) => writeGrains(data, rate, { count: 12, spread: 0.04, low: 1500, high: 5000, decay: 0.006, amp: 0.4 }));
-    sfxPlayBuffer(voice, out, buffer, when, gain * 0.5);
+    sfxPlayBuffer(voice, out, buffer, when, gain * 0.25);
   }
   if (params.scrape > 0) {
     // Edge along edge: band-passed noise swept up as the contact runs toward the points, rough with the burrs.
-    const envelope = sfxEnvelope(voice, out, when, gain * 0.45, 0.01, params.scrape * 0.6, params.scrape * 0.5);
+    const envelope = sfxEnvelope(voice, out, when, gain * 0.3 * bandMakeUp(6), 0.01, params.scrape * 0.6, params.scrape * 0.5);
     const band = sfxFilter(voice, envelope, 'bandpass', 2600, 6);
     band.frequency.setValueAtTime(2400, when);
     band.frequency.linearRampToValueAtTime(5200, when + params.scrape);

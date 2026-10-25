@@ -16,7 +16,7 @@
  * and a sword's clash at arm's length is squeezed into the ~40 dB a speaker in a room gives (the ear itself hears loudness as about the
  * 0.6 power of pressure: 0.7 keeps more than that).
  */
-export const AUDIO_LEVEL = { REFERENCE_SPL: 100, SQUEEZE: 0.7, ceiling: 2 };
+export const AUDIO_LEVEL = { REFERENCE_SPL: 100, SQUEEZE: 0.7, ceiling: 1 };
 
 /** The level (dB SPL at 1 m) of `energy` J turned into sound with `efficiency` (a share, the material's radiation) over `seconds`. */
 export function levelFromEnergy(energy, efficiency, seconds) {
@@ -24,7 +24,10 @@ export function levelFromEnergy(energy, efficiency, seconds) {
   return 10 * Math.log10(power / (4 * Math.PI) / 1e-12);
 }
 
-/** The playback gain of a level at the ear (dB SPL): full scale at the reference, the range squeezed; never past the ceiling. */
+/**
+ * The playback gain of a level at the ear (dB SPL): full scale at the reference, the range squeezed; never past full scale (a gun at
+ * arm's length is as loud as the speaker goes). Each family's parts add up to about this peak.
+ */
 export function gainOfLevel(spl) {
   return Math.min(AUDIO_LEVEL.ceiling, 10 ** (((spl - AUDIO_LEVEL.REFERENCE_SPL) * AUDIO_LEVEL.SQUEEZE) / 20));
 }
@@ -127,6 +130,12 @@ export function noiseBuffer(ctx, color = 'white') {
   cache[color] = buffer;
   return buffer;
 }
+
+/**
+ * How much of noise's amplitude a band-pass of quality `q` keeps (about the square root of its share of the spectrum): a family filtering
+ * noise into a band multiplies by its inverse, so that the band, not the noise it was cut from, is at the level asked for.
+ */
+export const bandMakeUp = (q) => Math.sqrt(Math.max(0.5, q) * 6);
 
 /** Noise of a colour into `dest` from `when` for `seconds`, from a random place in the buffer (each sound its own), at `rate`. */
 export function sfxNoise(voice, dest, when, seconds, color = 'white', rate = 1) {

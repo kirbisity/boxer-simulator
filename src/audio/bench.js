@@ -182,7 +182,8 @@ export function installSoundBench(engine) {
     const body = make('div', { className: 'bench-body' });
     root.append(body);
     body.append(familiesPanel(), circlePanel(), placesPanel(), ambiencePanel(), farPanel(), musicPanel(), measurePanel());
-    document.body.append(root);
+    // (Inside the page's arena, beside the menus, so the speaker button stays over it.)
+    (document.querySelector('.arena') ?? document.body).append(root);
     let last = performance.now();
     const step = (now) => {
       if (!root) return;

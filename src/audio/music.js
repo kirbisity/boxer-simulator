@@ -110,8 +110,32 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
     current = track;
   }
 
+  /** Keep the playing cue going: the next copy of a loop laid over the last one's tail, an opening let go after its while. */
+  function maintain(when) {
+    const track = current;
+    if (!track || track.released) return;
+    const last = track.copies[track.copies.length - 1];
+    // An opening loops a short while and fades; a cue that does not loop is done when it ends.
+    if (track.moment === 'opening' && when - track.begun > MUSIC.openingSeconds - MUSIC.fade) {
+      finished.add(track.key);
+      release(track, when, MUSIC.fade * 2);
+      current = null;
+      return;
+    }
+    if (track.cue.loop && last.ends - when < MUSIC.overlap + 0.4) {
+      track.copies.push(copyOf(track, last.ends - MUSIC.overlap, MUSIC.overlap));
+      if (track.copies.length > 3) track.copies.shift();
+    } else if (!track.cue.loop && when > last.ends) {
+      finished.add(track.key);
+      current = null;
+    }
+  }
+
   return {
     master,
+    maintain,
+    /** What is playing (the bench, tests): its cue and how many copies of it are laid down. */
+    status: () => ({ id: current?.id ?? null, copies: current?.copies.length ?? 0, moment: current?.moment ?? null }),
     update({ moment, key, scene, duck = 0 }, when) {
       master.gain.setTargetAtTime(1 - MUSIC.duck * Math.max(0, Math.min(1, duck)), when, 0.25);
       if (key !== wantedKey) {
@@ -125,23 +149,7 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
         } else if (current?.id !== id) start(id, key, moment, when);
         else current.key = key;
       }
-      const track = current;
-      if (!track || track.released) return;
-      const last = track.copies[track.copies.length - 1];
-      // An opening loops a short while and fades; a cue that does not loop is done when it ends.
-      if (track.moment === 'opening' && when - track.begun > MUSIC.openingSeconds - MUSIC.fade) {
-        finished.add(track.key);
-        release(track, when, MUSIC.fade * 2);
-        current = null;
-        return;
-      }
-      if (track.cue.loop && last.ends - when < MUSIC.overlap + 0.4) {
-        track.copies.push(copyOf(track, last.ends - MUSIC.overlap, MUSIC.overlap));
-        if (track.copies.length > 3) track.copies.shift();
-      } else if (!track.cue.loop && when > last.ends) {
-        finished.add(track.key);
-        current = null;
-      }
+      maintain(when);
     },
     /** Play a cue now (the bench), whatever the moment. */
     play(id) {

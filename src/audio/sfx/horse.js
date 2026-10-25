@@ -2,7 +2,7 @@
 // wall in it, on earth a thud), its snort (air blown through the nostrils, fluttering them) and a short neigh (a high voice, wavering,
 // falling). The four-beat walk and the three-beat canter come from the events' own timing.
 
-import { levelFromEnergy, sfxBurst, sfxEnvelope, sfxFilter, sfxGain, sfxModes, sfxNoise, sfxRun } from '../synth.js';
+import { bandMakeUp, levelFromEnergy, sfxBurst, sfxEnvelope, sfxFilter, sfxGain, sfxModes, sfxNoise, sfxRun } from '../synth.js';
 import { SURFACES, playStep, stepParams } from './step.js';
 
 /** What a horse event sounds like, without a context. */
@@ -35,7 +35,7 @@ export function playHorse(voice, out, params, when, gain) {
   }
   if (params.kind === 'snort') {
     // The breath forced out through the nostrils, which flap at their own rate: noise amplitude-modulated by the flutter.
-    const level = sfxEnvelope(voice, out, when, gain, 0.03, 0.15, 0.28);
+    const level = sfxEnvelope(voice, out, when, gain * bandMakeUp(1.2) * 1.5, 0.03, 0.15, 0.28);
     const flap = sfxGain(voice, level, 0.5);
     const flutter = voice.ctx.createOscillator();
     flutter.frequency.value = params.flutter;

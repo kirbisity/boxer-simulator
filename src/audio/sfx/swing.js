@@ -2,7 +2,7 @@
 // the speed over the thickness that meets the air: a blade's edge-on 6 mm sings high, a club or a fist low), its level the aeroacoustic
 // dipole's (sound power ∝ v^6: twice as fast is 18 dB louder), its length the arc's at that speed.
 
-import { sfxClamp, sfxFilter, sfxNoise } from '../synth.js';
+import { bandMakeUp, sfxClamp, sfxFilter, sfxNoise } from '../synth.js';
 
 /** What a swing sounds like, without a context: { level (dB SPL at 1 m), centre (Hz), seconds }. */
 export function swingParams(event) {
@@ -26,7 +26,7 @@ export function playSwing(voice, out, params, when, gain) {
   const envelope = voice.ctx.createGain();
   voice.nodes.push(envelope);
   envelope.gain.setValueAtTime(0.0001, when);
-  envelope.gain.linearRampToValueAtTime(gain, when + seconds * 0.55);
+  envelope.gain.linearRampToValueAtTime(gain * bandMakeUp(2.2), when + seconds * 0.55);
   envelope.gain.exponentialRampToValueAtTime(Math.max(0.0001, gain * 0.001), when + seconds * 1.15);
   envelope.connect(out);
   const band = sfxFilter(voice, envelope, 'bandpass', centre, 2.2);

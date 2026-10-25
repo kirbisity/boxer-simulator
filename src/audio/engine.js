@@ -445,7 +445,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       const scene = { ...info.ambience, room: state.room, ear: [listener.x, listener.y, listener.z], excitement: state.excitement, ...state.bench.ambience };
       state.ambience.update(ambienceTargets(scene), scene, now, step);
     }
-    if (!state.bench.open) {
+    if (state.bench.open) state.music.maintain(now);
+    else {
       const moment = musicMoment({ ...info.music, worldId: worldId(world), worldAge: performance.now() / 1000 - state.worldBorn });
       state.music.update({ ...moment, scene: info.music?.scene, duck: Math.max(0, (state.loud - 78) / 20) }, now);
     }
@@ -575,6 +576,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
   if (env?.addEventListener) {
     // The first gesture starts the sound (sound is on by default); a page back in view takes it up again.
     for (const kind of ['pointerdown', 'keydown', 'touchend']) env.addEventListener(kind, unlock, { capture: true, passive: true });
+    // (A page loaded after a tap already given, a reload, may start at once.)
+    if (env.navigator?.userActivation?.hasBeenActive) unlock();
     env.document?.addEventListener('visibilitychange', () => {
       if (!state.ctx) return;
       if (env.document.hidden) state.ctx.suspend().catch(() => {});
@@ -606,7 +609,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       return () => listeners.delete(callback);
     },
     /** What is going on (the bench, tests): the context's state, voices playing, the room, the far field's sums. */
-    status: () => ({ running: state.ctx?.state === 'running', voices: state.active.length, budget: budget(), room: { ...state.room }, sectors, mode: speakers() ? 'stereo' : 'hrtf' }),
+    status: () => ({ running: state.ctx?.state === 'running', voices: state.active.length, budget: budget(), room: { ...state.room }, sectors, mode: speakers() ? 'stereo' : 'hrtf', music: state.music?.status() ?? null }),
     context: () => state.ctx,
     bench: {
       open(on) {

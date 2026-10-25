@@ -3,7 +3,7 @@
 // broadband snap and the crunch of its splinters; a crush the low grinding of a limb or skull giving way. The severity (0..1) sets the
 // level and the length: a graze is a whisper of it, a limb half off is heard across the yard.
 
-import { sfxBuffer, sfxBurst, sfxClamp, sfxPlayBuffer, sfxTone, writeCrackle, writeGrains, lowpassInPlace } from '../synth.js';
+import { bandMakeUp, sfxBuffer, sfxBurst, sfxClamp, sfxPlayBuffer, sfxTone, writeCrackle, writeGrains, lowpassInPlace } from '../synth.js';
 
 /** What each kind is: its level at full severity (dB SPL at 1 m: a long bone snapping is as loud as a stick of hardwood), and its length. */
 export const WOUND_KINDS = {
@@ -31,8 +31,8 @@ export function playWound(voice, out, params, when, gain) {
       writeCrackle(data, rate, { count: Math.round(120 + 260 * severity), spread: seconds, length: 0.0015, amp: 0.5, shape: (share) => (1 - share) ** 1.5 });
       lowpassInPlace(data, rate, 3200);
     });
-    sfxPlayBuffer(voice, out, buffer, when, gain * 1.6);
-    sfxBurst(voice, out, { when, peak: gain * 0.5, attack: 0.004, decay: seconds * 0.8, type: 'bandpass', frequency: 1100, q: 1.2, color: 'pink' });
+    sfxPlayBuffer(voice, out, buffer, when, gain * 3);
+    sfxBurst(voice, out, { when, peak: gain * 0.5 * bandMakeUp(1.2), attack: 0.004, decay: seconds * 0.8, type: 'bandpass', frequency: 1100, q: 1.2, color: 'pink' });
     // The spatter: drops on what is under him a moment later.
     const drops = sfxBuffer(voice.ctx, 0.4, (data, rate) => writeGrains(data, rate, { count: Math.round(6 + 16 * severity), spread: 0.3, start: 0.05, low: 600, high: 2400, decay: 0.012, amp: 0.25 }));
     sfxPlayBuffer(voice, out, drops, when + seconds * 0.3, gain * 0.5);
@@ -45,7 +45,7 @@ export function playWound(voice, out, params, when, gain) {
       writeCrackle(data, rate, { count: Math.round(60 + 120 * severity), spread: seconds * 0.6, length: 0.002, amp: 0.45, start: seconds * 0.3 });
       lowpassInPlace(data, rate, 1800);
     });
-    sfxPlayBuffer(voice, out, buffer, when, gain * 1.3);
+    sfxPlayBuffer(voice, out, buffer, when, gain * 2.6);
     sfxTone(voice, out, { when: when + seconds * 0.55, peak: gain * 0.25, decay: 0.12, frequency: 260, to: 520, type: 'triangle' });
     return when + seconds + 0.2;
   }

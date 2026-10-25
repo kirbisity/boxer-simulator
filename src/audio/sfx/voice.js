@@ -6,7 +6,7 @@
 // Kinds: `effort` (a grunt on a blow thrown), `struck` (the breath driven out by a blow taken), `wound` (a cry: long, the pitch rising
 // and breaking), `death` (falling away), and breath (in and out, the rate and depth from his exertion: engine.js schedules it).
 
-import { sfxClamp, sfxEnvelope, sfxFilter, sfxGain, sfxKeep, sfxNoise, sfxRun } from '../synth.js';
+import { bandMakeUp, sfxClamp, sfxEnvelope, sfxFilter, sfxGain, sfxKeep, sfxNoise, sfxRun } from '../synth.js';
 
 /** The vowels (formants in Hz for a 17 cm tract, a man of 1.78 m): 'uh' a grunt, 'ah' a cry, 'oh' the end of a dying breath, 'h' the breath. */
 export const VOWELS = {
@@ -107,7 +107,8 @@ export function playVoice(voice, out, params, when, gain) {
 /** One breath, in or out, into `out`: noise through the tract of an open 'h', shorter and higher drawn in. */
 export function playBreath(voice, out, breath, when, gain, inhale) {
   const seconds = inhale ? breath.inSeconds : breath.outSeconds;
-  const level = sfxEnvelope(voice, out, when, gain * (inhale ? 0.7 : 1), seconds * 0.35, seconds * 0.2, seconds * 0.45);
+  // (Noise through the formants: the bands keep little of it, made up so that the breath is at its level.)
+  const level = sfxEnvelope(voice, out, when, gain * (inhale ? 0.7 : 1) * bandMakeUp(8), seconds * 0.35, seconds * 0.2, seconds * 0.45);
   const tract = vocalTract(voice, level, 'h', breath.scale * (inhale ? 1.15 : 1), when, seconds);
   sfxNoise(voice, tract, when, seconds + 0.05, 'pink');
   return when + seconds + 0.05;

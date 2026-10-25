@@ -80,11 +80,11 @@ function roofedAlong(terrain, head, dir) {
   for (let index = 0; index < PROBE.roofChecks.length; index += 1) {
     const along = PROBE.roofChecks[index];
     const point = [head[0] + dir[0] * along, head[1], head[2] + dir[2] * along];
-    if (sweepReach(terrain, point, UP, PROBE.length, PROBE.radius) >= PROBE.length - 1e-6) return index === 0 ? Infinity : along;
+    if (sweepReach(terrain, point, PROBE_UP, PROBE.length, PROBE.radius) >= PROBE.length - 1e-6) return index === 0 ? Infinity : along;
   }
   return PROBE.length;
 }
-const UP = [0, 1, 0];
+const PROBE_UP = [0, 1, 0];
 
 /**
  * The room from a probe's 12 distances (Infinity: nothing met): { enclosure (the share of the energy kept: 0 open .. 1 shut),

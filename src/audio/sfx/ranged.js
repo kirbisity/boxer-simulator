@@ -4,7 +4,7 @@
 // crack (the muzzle blast, a pressure pulse a few ms long) and the boom of the burning powder behind it; a cannon a deep boom and a long
 // rumble. Gunfire is heard over the whole map: the air takes its crack off at a distance (ear.js), the boom carries.
 
-import { sfxBurst, sfxClamp, sfxEnvelope, sfxFilter, sfxModes, sfxNoise, sfxTone } from '../synth.js';
+import { bandMakeUp, sfxBurst, sfxClamp, sfxEnvelope, sfxFilter, sfxModes, sfxNoise, sfxTone } from '../synth.js';
 
 /** Each weapon: its level at 1 m (dB SPL: a matchlock's muzzle blast is ~150 dB, a cannon's ~165; a bow's release ~80) and its make-up. */
 export const SHOTS = {
@@ -42,12 +42,12 @@ export function playShot(voice, out, params, when, gain) {
     return when + params.seconds + 0.1;
   }
   // The crack: a pulse of a few ms, every frequency in it.
-  sfxBurst(voice, out, { when, peak: gain * 1.2, attack: 0.0003, decay: params.kind === 'cannon' ? 0.03 : 0.012, type: 'highpass', frequency: 300 });
+  sfxBurst(voice, out, { when, peak: gain * 0.6, attack: 0.0003, decay: params.kind === 'cannon' ? 0.03 : 0.012, type: 'highpass', frequency: 300 });
   // The boom behind it: the gases, low and rolling, longer for the cannon.
-  const envelope = sfxEnvelope(voice, out, when, gain, 0.004, params.kind === 'cannon' ? 0.15 : 0.03, params.seconds);
+  const envelope = sfxEnvelope(voice, out, when, gain * 0.5, 0.004, params.kind === 'cannon' ? 0.15 : 0.03, params.seconds);
   const low = sfxFilter(voice, envelope, 'lowpass', params.boom * 3, 0.8);
   sfxNoise(voice, low, when, params.seconds + 0.2, 'brown');
-  sfxTone(voice, out, { when, peak: gain * 0.6, decay: params.seconds * 0.6, frequency: params.boom, to: params.boom * 0.6 });
+  sfxTone(voice, out, { when, peak: gain * 0.35, decay: params.seconds * 0.6, frequency: params.boom, to: params.boom * 0.6 });
   return when + params.seconds + 0.25;
 }
 
@@ -57,7 +57,7 @@ export function playWhizz(voice, out, params, when, gain) {
   const envelope = voice.ctx.createGain();
   voice.nodes.push(envelope);
   envelope.gain.setValueAtTime(0.0001, when);
-  envelope.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), when + seconds * 0.5);
+  envelope.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain * bandMakeUp(3)), when + seconds * 0.5);
   envelope.gain.exponentialRampToValueAtTime(Math.max(0.0001, gain * 0.001), when + seconds);
   envelope.connect(out);
   const band = sfxFilter(voice, envelope, 'bandpass', centre * Math.sqrt(drop), 3);
