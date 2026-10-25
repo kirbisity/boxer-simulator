@@ -127,6 +127,11 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     }
     const Context = env?.AudioContext ?? env?.webkitAudioContext;
     if (!Context) return;
+    // An iPhone or iPad keeps Web Audio silent while the ring switch is on silent, unless the page says its sound is playback (as a
+    // video's is), not an alert's.
+    try {
+      if (env.navigator?.audioSession) env.navigator.audioSession.type = 'playback';
+    } catch {}
     try {
       state.ctx = new Context({ latencyHint: 'interactive' });
     } catch {
