@@ -148,12 +148,12 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
     weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
-    bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined,
+    bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined,
     loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
-    panicked: undefined, panics: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined,
+    panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined,
     aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
@@ -1430,7 +1430,16 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
       }
       placeFighter(fighter, Math.max(-(arena.halfX - 0.4), Math.min(arena.halfX - 0.4, x)), Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, across)));
     });
-    if (order?.shootersFront !== undefined) {
+    // `layout`: each man's own place, [back, across] (m behind the front row, m across the field), in the
+    // order the side was cast: a unit drawn up as it fought (the mandarin-duck squad), not rows of the same.
+    if (order?.layout) {
+      team.forEach((fighter, index) => {
+        const [back, across] = order.layout[index] ?? [order.layout.length, 0];
+        const jitter = () => (order.loose ? (random() * 2 - 1) * order.loose : 0);
+        const x = sign * (front + back) + jitter();
+        placeFighter(fighter, Math.max(-(arena.halfX - 0.4), Math.min(arena.halfX - 0.4, x)), Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, sign * across + jitter())));
+      });
+    } else if (order?.shootersFront !== undefined) {
       const shooting = (fighter) => Boolean(STYLES[fighter.style]?.ranged);
       const shooters = team.filter(shooting);
       const rest = team.filter((fighter) => !shooting(fighter));
@@ -1456,7 +1465,10 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // Wings of horse held on the flanks (formation.js moveWings): released when the foot lines close.
   if (wingOrder) world.wings = { release: wingOrder.release ?? WINGS.release, by: wingOrder.by ?? WINGS.by, review: 0 };
   // Drilled men form up on their side's leader (formation.js).
-  if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null));
+  // A side drilled as a whole by the level's order (`formation[corner].drill`: Qi Jiguang's squads) forms up so too.
+  if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null), formation);
+  // A side's discipline (`formation[corner].discipline`, 0..1): a fact about that army, set by the level (ai.js AI.morale).
+  world.discipline = Object.fromEntries(['red', 'blue'].map((corner) => [corner, formation[corner]?.discipline ?? 0]));
   return world;
 }
 

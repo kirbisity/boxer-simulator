@@ -167,6 +167,26 @@ export const AI = {
   // `edge` m) with no enemy within `clearOf` m he has fled: out of the battle,
   // and he does not come back. History has most battles end so.
   rout: { minSide: 4, losses: 0.35, lossesFrom: 0.3, lossesFull: 0.75, contagion: 0.06, contagionMost: 0.18, within: 5, edge: 1.6, clearOf: 4 },
+  // Morale in a battle (a side of at least `rout.minSide`): what the men
+  // round a man do to his fear, whoever they are. Within `near` m of him:
+  // - no man of his own standing there (`alone`): fear; each who stands
+  //   with him takes `support` off, up to `supportMost` (the files at his
+  //   shoulders: men stood in a line who would have run alone);
+  // - more of them there than of his own: `outnumbered` for each man more,
+  //   up to `outnumberedMost` (three on one breaks a man however brave);
+  // - men of the other side in their places in a drilled body (formation.js):
+  //   `formed` each, up to `formedMost` (a line that holds is frightening to run at);
+  // - his own falling round him (out, crawling off), within `fallenWithin`
+  //   m and the last `fallenFor` s: `fallen` each, up to `fallenMost`.
+  // Afraid but not broken (fear 0..1), a man hesitates: he stands `hesitate.range`
+  // m further off at full fear, presses `pressure` less, waits `tempo` longer between
+  // attacks (most men in a melee hang back; the bold and the desperate do the fighting).
+  // Discipline (a side's `discipline`, 0..1, set by its level: a fact about
+  // that army — Qi Jiguang's law and drill; a coast garrison's none): his
+  // fear is taken down by `discipline` of it at full, and he breaks the
+  // later, `breakLater` of the way from breakAt to 1 at full (a man who
+  // knows his squad will be put to death if he runs does not run).
+  morale: { near: 2.5, alone: 0.12, support: 0.04, supportMost: 0.12, outnumbered: 0.08, outnumberedMost: 0.24, formed: 0.1, formedMost: 0.4, fallen: 0.12, fallenMost: 0.36, fallenWithin: 6, fallenFor: 8, shock: 0.4, shockFull: 0.3, shockFor: 10, hesitate: { range: 0.8, pressure: 0.8, tempo: 2 }, discipline: 0.6, breakLater: 0.6 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
@@ -223,6 +243,9 @@ export const AI = {
   // A gang: at most this many take on one man at once; the rest hold this
   // far outside their range and circle until a place or another man frees up.
   engageSlots: 3,
+  // Men of a squad (formation.js, a drill with `squad`: Qi Jiguang's) pick the enemy their own are already on: each of them already
+  // on him counts as `together` m nearer, up to engageSlots (several on one: the squad's local superiority).
+  squad: { together: 1 },
   waitingDistance: 0.5,
   // How often (per second) a waiting fighter looks for a less crowded man.
   refocusRate: 0.6,
@@ -266,7 +289,7 @@ function pick(weights, random) {
 export function thinkAll(world, dt, playerIds = new Set()) {
   keepLeaders(world);
   keepSides(world);
-  moveFormations(world, dt);
+  moveFormations(world, dt, hurtShare);
   moveWings(world, dt);
   // The player's orders to his side (command.js).
   keepOrders(world);
@@ -431,10 +454,18 @@ function holdRank(world, fighter, opponent, style, dt) {
     }
     return true;
   }
+  // Relieved, hurt, by a fresh man (formation.js relieveWounded): back to his place behind, whoever is in front of him.
+  if (world.time - (fighter.relievedAt ?? -Infinity) < DRILL.relief) {
+    walkToSlot(fighter, formation, opponent);
+    if (!fighter.defence && opponent.punch?.target === fighter.id) perform(world, fighter, 'guard');
+    return true;
+  }
   const reach = reachOf(fighter) + reachOf(opponent);
   const onHim = opponent.state === 'up' && distance < reach + 0.3;
   const onSlot = opponent.state === 'up' && fromSlot(fighter, formation, opponent) < reach + DRILL.engage;
-  if (onHim || (fighter.inFront && onSlot)) return false;
+  // A squad (a drill with `squad`: Qi Jiguang's) fights as one: any man of it, not the front rank only, goes for an enemy come within his reach of his place.
+  const squad = formation.drill.squad && opponent.state === 'up' && fromSlot(fighter, formation, opponent) < reach + DRILL.squadEngage;
+  if (onHim || squad || (fighter.inFront && onSlot)) return false;
   walkToSlot(fighter, formation, opponent);
   return true;
 }
@@ -615,7 +646,12 @@ function chooseFocus(world, fighter) {
   // Nearest, least crowded, and (in a group fight) nearer my side's leader.
   // A wing of horse rides at the enemy's shooters first (they cannot stand to a charge).
   const shooters = fighter.wing && !fighter.wing.held ? WINGS.shooters : 0;
-  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + AI.crowdPenalty * (crowds.get(other.id) ?? 0) + AI.cohesion.focus * fromMyLeader(world, fighter, other) - (shooters && !other.mount && STYLES[other.style]?.ranged ? shooters : 0);
+  // A man of a squad (a drill with `squad`) goes for the man his own already have in hand, up to a gang's worth (AI.squad): one enemy at a time, by several.
+  const crowding = (other) => {
+    const crowd = crowds.get(other.id) ?? 0;
+    return fighter.slot && world.formations?.[fighter.formation]?.drill.squad && crowd < AI.engageSlots ? -AI.squad.together * crowd : AI.crowdPenalty * crowd;
+  };
+  const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + crowding(other) + AI.cohesion.focus * fromMyLeader(world, fighter, other) - (shooters && !other.mount && STYLES[other.style]?.ranged ? shooters : 0);
   // The nearest, least crowded: each scored once (the first of equals kept, as before).
   let next = standing[0];
   let best = score(next);
@@ -1113,7 +1149,14 @@ function keepSides(world) {
     const gone = men.filter((fighter) => !inFight(fighter)).length;
     const broken = men.filter((fighter) => inFight(fighter) && fighter.panicked).length;
     side.lost = (gone + 0.5 * broken) / side.men;
+    // How much of it went in the last few seconds (AI.morale shock): kept as a short history.
+    side.history = (side.history ?? []).filter((entry) => world.time - entry[0] <= AI.morale.shockFor);
+    side.history.push([world.time, side.lost]);
+    side.shock = Math.max(0, side.lost - side.history[0][1]);
     side.broken = men.filter((fighter) => fighter.panicked && inFight(fighter)).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
+    // Where his own fell (out, or crawling off), and when: seen by the men near him for a while (AI.morale).
+    for (const fighter of men) if (fighter.goneAt === undefined && !inFight(fighter) && !fighter.fled) fighter.goneAt = world.time;
+    side.fallen = men.filter((fighter) => fighter.goneAt !== undefined && world.time - fighter.goneAt < AI.morale.fallenFor).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
   }
   for (const [corner, other] of [['red', 'blue'], ['blue', 'red']]) {
     if (!sides[corner] || !sides[other] || sides[corner].rear) continue;
@@ -1137,8 +1180,44 @@ export function routFear(world, fighter) {
   let near = 0;
   for (const other of side.broken) if (Math.hypot(other[0] - at[0], other[1] - at[1]) < spec.within) near += 1;
   if (fighter.panicked) near -= 1;
-  return losses + Math.min(spec.contagionMost, spec.contagion * Math.max(0, near));
+  const shock = AI.morale.shock * Math.min(1, (side.shock ?? 0) / AI.morale.shockFull);
+  return losses + shock + Math.min(spec.contagionMost, spec.contagion * Math.max(0, near));
 }
+
+/**
+ * Fear from the men round him (AI.morale): alone or among his own, outnumbered
+ * where he stands, before a drilled body of theirs, his own falling beside him;
+ * in a battle (a side of rout.minSide or more). Not his side's whole state
+ * (routFear's losses) but what he sees within a few strides.
+ */
+export function companyFear(world, fighter) {
+  const spec = AI.morale;
+  const side = world.sides?.[fighter.corner];
+  if (!side || side.men < AI.rout.minSide) return 0;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  let friends = 0;
+  let enemies = 0;
+  let formed = 0;
+  for (const other of world.fighters) {
+    if (other === fighter || other.state !== 'up' || other.crawling || other.fled || other.dormant) continue;
+    if (Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[1]) > spec.near) continue;
+    if (other.corner === fighter.corner) friends += other.panicked ? 0 : 1;
+    else if (hostile(other, fighter) && !other.panicked) {
+      enemies += 1;
+      if (other.slot && world.formations?.[other.formation]) formed += 1;
+    }
+  }
+  let fear = friends ? -Math.min(spec.supportMost, spec.support * friends) : spec.alone;
+  fear += Math.min(spec.outnumberedMost, spec.outnumbered * Math.max(0, enemies - friends - 1));
+  // Men in their places in a drilled body before him: a wall of them that does not give way.
+  fear += Math.min(spec.formedMost, spec.formed * formed);
+  let fallen = 0;
+  for (const where of side.fallen ?? []) if (Math.hypot(where[0] - at[0], where[1] - at[1]) < spec.fallenWithin) fallen += 1;
+  return fear + Math.min(spec.fallenMost, spec.fallen * fallen);
+}
+
+/** His side's discipline, 0..1 (world.discipline, set by the level's order for each side). */
+const disciplineOf = (world, fighter) => world.discipline?.[fighter.corner] ?? 0;
 
 /**
  * A broken man of a big side runs for its rear, off the field; once at the
@@ -1202,14 +1281,16 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
   const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
   const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
-  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter);
+  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter);
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
   const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);
   const rush = AI.adrenaline.nerve + (AI.adrenaline.nerveOutmatched - AI.adrenaline.nerve) * mismatch;
   const ring = opponent && ringBout(world, fighter, opponent) ? spec.ring : 1;
-  const ranks = fighter.body.gear.drill && fighter.slot ? spec.drilled : 1;
-  return Math.max(0, Math.min(1, felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring * ranks));
+  // In his place in a drilled formation (a slot: his kit's drill, or his side's by its level), the ranks hold him.
+  const ranks = fighter.slot && world.formations?.[fighter.formation] ? spec.drilled : 1;
+  const discipline = 1 - AI.morale.discipline * disciplineOf(world, fighter);
+  return Math.max(0, Math.min(1, felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring * ranks * discipline));
 }
 
 /**
@@ -1224,7 +1305,8 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
   // Adrenaline holds him from breaking: easily in an even fight, hardly against a much deadlier man.
   const mismatch = Math.min(1, Math.max(0, -nerve) + (opponent ? weaponDread(fighter, opponent) : 0));
   const held = fighter.adrenaline > spec.adrenalineHolds + (AI.adrenaline.holdsOutmatched - spec.adrenalineHolds) * mismatch;
-  const breakAt = Math.max(spec.breakAtLeast, spec.breakAt - spec.brokeBefore * (fighter.panics ?? 0));
+  const shaky = Math.max(spec.breakAtLeast, spec.breakAt - spec.brokeBefore * (fighter.panics ?? 0));
+  const breakAt = shaky + (1 - shaky) * AI.morale.breakLater * disciplineOf(world, fighter);
   if (!fighter.panicked) {
     if (fighter.fear > breakAt && !held && world.random() < spec.rate * ((fighter.fear - breakAt) / (1 - breakAt)) * dt) {
       fighter.panicked = true;
@@ -1538,11 +1620,15 @@ export function think(world, fighter, dt) {
   const basePlan = chooseStrategy(world, fighter, opponent, dt);
   // Confidence presses: closer, more often inside, quicker to throw, slower
   // to cover up, readier to load up. Fear is the reverse.
+  // Afraid but not broken, he hangs back: further off, slower to go in, less pressing (AI.morale hesitate).
+  // In a battle (a side of rout.minSide or more): a bout's fear is its own (the ring, the duel).
+  const afraid = (world.sides?.[fighter.corner]?.men ?? 0) >= AI.rout.minSide ? fighter.fear ?? 0 : 0;
+  const hesitate = AI.morale.hesitate;
   const plan = {
     ...basePlan,
-    range: basePlan.range - bold.closer * nerve,
-    pressure: basePlan.pressure * Math.exp(bold.pressure * nerve),
-    tempo: basePlan.tempo * Math.exp(-bold.tempo * nerve),
+    range: basePlan.range - bold.closer * nerve + hesitate.range * afraid,
+    pressure: basePlan.pressure * Math.exp(bold.pressure * nerve) * (1 - hesitate.pressure * afraid),
+    tempo: basePlan.tempo * Math.exp(-bold.tempo * nerve) * (1 + hesitate.tempo * afraid),
     defend: basePlan.defend * Math.exp(-bold.defend * nerve),
     heavy: Math.max(0, basePlan.heavy + bold.heavy * nerve),
   };

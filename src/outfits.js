@@ -146,11 +146,11 @@ function mingBrigandineDesign(label, cloth, iron, look = {}) {
 }
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
-// `look`: the same protection drawn as scale armour (`kind: 'mingScale'`).
+// `look`: the same protection drawn as scale armour (`kind: 'mingScale'`), or as lamellar (`kind: 'mingEliteLamellar'`).
 // The helm's flaps are of the coat: the brigandine's own cloth and gilt rivets, or steel where the coat is scale (`flapSteel`).
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
   const scale = look.kind === 'mingScale';
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: scale ? steel : cloth, flapSteel: scale, ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: scale ? steel : cloth, flapSteel: scale, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // The steppe man's kit: his deel (the robe over all) and the robe under it
 // at the hem (`trim`), his hat or helmet, the tall black boots (gutal).
@@ -900,6 +900,9 @@ export const OUTFITS = {
       mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { mask: true }),
       mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
       mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true }, { kind: 'mingScale', lace: '#1a1c24' }),
+      // Qi Jiguang's and his household guards' (Qi Jiguang's level): the elite's protection drawn as
+      // iron lamellar laced in crimson over the crimson coat. A level's, not dealt at random.
+      { ...mingEliteDesign('Iron lamellar, crimson lacing', '#8a1418', '#8a1418', '#8f949b', {}, { kind: 'mingEliteLamellar', lace: '#8a1418' }), levelOnly: true },
     ],
   },
   // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the
@@ -1099,9 +1102,9 @@ export const OUTFITS = {
     protection: { blunt: 0.5, cut: 0.88, pierce: 0.72, bullet: { head: 0.3, torso: 0.35, limb: 0.15 } },
     courage: 0.3,
     designs: [
-      steppeDesign('Iron, maroon deel', { kind: 'mongolIron', color: '#7d8088', lace: '#2a1a12', fur: '#7a5634' }, '#6a1f2a', '#c41e22', { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', plume: '#e8e0cc' }),
-      steppeDesign('Iron, blue deel', { kind: 'mongolIron', color: '#6a6d73', lace: '#8a1418', fur: '#4a3a2a' }, '#2f4a7a', '#8a1418', { kind: 'steppeHelm', color: '#6a6d73', coif: '#4a4d52', plume: '#b3161b' }),
-      steppeDesign('Blackened iron, red deel', { kind: 'mongolIron', color: '#34363a', lace: '#a8742a', fur: '#2a2420' }, '#8a1418', '#24201c', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#1c1a18' }),
+      steppeDesign('Iron, maroon deel', { kind: 'mongolIron', color: '#7d8088', lace: '#2a1a12', fur: '#7a5634' }, '#6a1f2a', '#c41e22', { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', tassel: '#b3161b' }),
+      steppeDesign('Iron, blue deel', { kind: 'mongolIron', color: '#6a6d73', lace: '#8a1418', fur: '#4a3a2a' }, '#2f4a7a', '#8a1418', { kind: 'steppeHelm', color: '#6a6d73', coif: '#4a4d52', tassel: '#b3161b' }),
+      steppeDesign('Blackened iron, red deel', { kind: 'mongolIron', color: '#34363a', lace: '#a8742a', fur: '#2a2420' }, '#8a1418', '#24201c', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', tassel: '#b3161b' }),
     ],
   },
   // The kheshig: the Khan's own guard, from Chinggis Khan's day on through
