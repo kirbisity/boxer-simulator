@@ -44,7 +44,7 @@ export const NOTES = {
   },
   bridge: {
     title: 'Clutched in a dead levy\'s hand',
-    body: 'Do not cross. They have bows on the barbican now and they see the whole bridge; Tam got as far as the middle. Sir Alasdair stands the ledge behind the gate in his black plate. If you must get in, go down the stair by the lantern to the sea cave: the old drain runs under the gate, and nobody watches it.',
+    body: 'Do not cross. They have bows on the barbican now, knights at both ends of the bridge, and they see the whole of it; Tam got as far as the middle. Sir Alasdair stands the ledge behind the gate in his black plate. If you must get in, go down the stair by the lantern to the sea cave: the old drain runs under the gate, and nobody watches it.',
   },
   drain: {
     title: 'Chalked on a post at the stair head',
