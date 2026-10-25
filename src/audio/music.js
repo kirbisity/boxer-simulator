@@ -3,15 +3,15 @@
 // and the fight are the sound.
 //
 // The cues are pre-rendered (ACE-Step, period instruments per scenario: audio/music/manifest.js), embedded as base64; each is decoded
-// the first time it is wanted and kept. A loop is played as overlapping copies, each faded out over its last two seconds as the next
-// fades in (the loop points need no zero crossing); a change of cue cross-fades the same way. Under loud action the music ducks.
+// the first time it is wanted and kept. A loop plays on between its loop points (its seam is cross-faded in the
+// file itself); a change of cue cross-fades one into the next. Under loud action the music ducks.
 //
 // `musicMoment` is pure (Node tests); `createMusic` plays.
 
 import { MUSIC_CUES, cueFor } from './music/manifest.js';
 
-/** The music's numbers (s): the overlap of a loop's copies and of one cue into the next; how long an opening may loop; the duck's depth. */
-export const MUSIC = { overlap: 2, fade: 2, openingSeconds: 45, duck: 0.55 };
+/** The music's numbers (s): the fade of one cue into the next; how long an opening may loop; the duck's depth. */
+export const MUSIC = { fade: 2, openingSeconds: 45, duck: 0.55 };
 
 /**
  * The moment the game is at, for the music: { moment ('menu' | 'opening' | 'boss' | 'victory' | 'defeat' | null), key (one occurrence of
@@ -69,20 +69,22 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
     if (fadeIn > 0) gain.gain.linearRampToValueAtTime(level, when + fadeIn);
     source.connect(gain);
     gain.connect(track.bus);
-    const start = cue.loop ? cue.loopStart ?? 0 : 0;
-    const end = cue.loop ? Math.min(buffer.duration, cue.loopEnd ?? buffer.duration) : buffer.duration;
-    source.start(when, start);
-    const ends = when + (end - start);
-    if (cue.loop) {
-      // The copy's own tail, faded as the next copy comes in over it.
-      gain.gain.setValueAtTime(level, ends - MUSIC.overlap);
-      gain.gain.linearRampToValueAtTime(0.0001, ends);
-    }
-    source.stop(ends + 0.05);
     source.onended = () => {
       source.disconnect();
       gain.disconnect();
     };
+    // A loop's cross-fade is in the file itself (tools/music-convert.py lays its own end over its start), so the source loops
+    // between the manifest's points as it is, and plays on until it is released.
+    if (cue.loop) {
+      source.loop = true;
+      source.loopStart = cue.loopStart ?? 0;
+      source.loopEnd = Math.min(buffer.duration, cue.loopEnd ?? buffer.duration);
+      source.start(when);
+      return { source, gain, ends: Infinity };
+    }
+    source.start(when);
+    const ends = when + buffer.duration;
+    source.stop(ends + 0.05);
     return { source, gain, ends };
   }
 
@@ -122,10 +124,7 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
       current = null;
       return;
     }
-    if (track.cue.loop && last.ends - when < MUSIC.overlap + 0.4) {
-      track.copies.push(copyOf(track, last.ends - MUSIC.overlap, MUSIC.overlap));
-      if (track.copies.length > 3) track.copies.shift();
-    } else if (!track.cue.loop && when > last.ends) {
+    if (!track.cue.loop && when > last.ends) {
       finished.add(track.key);
       current = null;
     }

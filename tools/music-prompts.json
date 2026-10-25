@@ -1,0 +1,155 @@
+{
+  "_about": "Prompts for the Gladiator music cues, rendered with ACE-Step 1.5 (acestep-v15-turbo, 8 steps, no LM thinking) through mugen-lab scripts/gen.py. lyrics '[Instrumental]' sets the model's instrumental flag. render: seconds asked of the model; loop: the loop length taken from it (null for a sting, which is cut to sting seconds and faded). take: the seed picked by tools/music-convert.py (best of the seeds listed).",
+  "common": {
+    "lyrics": "[Instrumental]",
+    "suffix": ", instrumental, no vocals, no singing, no choir, no voice"
+  },
+  "cues": {
+    "menu": {
+      "prompt": "ancient Roman gladiator arena theme, solemn and slow, low bronze cornu horn calls, frame drum, lyre, distant deep drum, sparse, atmospheric, cinematic",
+      "bpm": 70,
+      "key": "D minor",
+      "render": 70,
+      "loop": 54.86,
+      "seeds": [
+        101,
+        102
+      ]
+    },
+    "roman": {
+      "prompt": "ancient Roman legion on the march, low bronze horns, frame drum and tympanum, steady slow march rhythm, sparse, ominous, atmospheric",
+      "bpm": 80,
+      "key": "D minor",
+      "render": 55,
+      "loop": 36,
+      "seeds": [
+        201,
+        202
+      ]
+    },
+    "medieval": {
+      "prompt": "medieval English folk, hurdy-gurdy drone, tabor drum, shawm, bagpipe drone, rustic and tense, sparse, atmospheric",
+      "bpm": 90,
+      "key": "A minor",
+      "render": 55,
+      "loop": 37.33,
+      "seeds": [
+        301,
+        302
+      ]
+    },
+    "japan": {
+      "prompt": "Japanese sengoku battlefield, taiko drums, shakuhachi flute, shamisen, sparse and tense, traditional Japanese, atmospheric",
+      "bpm": 80,
+      "key": "E minor",
+      "render": 55,
+      "loop": 36,
+      "seeds": [
+        401,
+        402
+      ]
+    },
+    "china": {
+      "prompt": "traditional Chinese Ming dynasty, dizi bamboo flute, guzheng, erhu, war drums, gong, coastal, sparse and tense, atmospheric",
+      "bpm": 80,
+      "key": "A minor",
+      "render": 55,
+      "loop": 36,
+      "seeds": [
+        501,
+        502
+      ]
+    },
+    "korea": {
+      "prompt": "traditional Korean Joseon court and war music, buk drum, janggu, piri double reed, daegeum flute, haegeum, cold winter, solemn, sparse, atmospheric",
+      "bpm": 75,
+      "key": "E minor",
+      "render": 55,
+      "loop": 38.4,
+      "seeds": [
+        601,
+        602,
+        603
+      ]
+    },
+    "aztec": {
+      "prompt": "pre-Columbian Aztec ritual, clay ocarina flutes, huehuetl and teponaztli log drums, rattles, conch shell horn, tribal, sparse, ominous, atmospheric",
+      "bpm": 90,
+      "key": "D minor",
+      "render": 55,
+      "loop": 37.33,
+      "seeds": [
+        701,
+        702,
+        703
+      ]
+    },
+    "ottoman": {
+      "prompt": "Ottoman mehter siege music, zurna, davul drum, kettle drums, cymbals, Mediterranean fortress, slow and tense, sparse, atmospheric",
+      "bpm": 80,
+      "key": "D minor",
+      "render": 55,
+      "loop": 36,
+      "seeds": [
+        801,
+        802
+      ]
+    },
+    "modern": {
+      "prompt": "dark ambient electronic, low synth pads, deep sub bass, slow minimal trip-hop beat, night city, tense, minimal, atmospheric",
+      "bpm": 85,
+      "key": "C minor",
+      "render": 55,
+      "loop": 33.88,
+      "seeds": [
+        901,
+        902
+      ]
+    },
+    "scottish": {
+      "prompt": "Scottish Highland lament, great highland bagpipe, low drone, bodhran frame drum, dark and stormy sea cliffs, haunting, sparse, Celtic, atmospheric",
+      "bpm": 75,
+      "key": "A minor",
+      "render": 60,
+      "loop": 44.8,
+      "seeds": [
+        1001,
+        1002,
+        1003
+      ]
+    },
+    "boss": {
+      "prompt": "dark tense dungeon fight, low war drums and taiko, deep drone, cello ostinato, ominous, horror, sparse, cinematic",
+      "bpm": 90,
+      "key": "C minor",
+      "render": 55,
+      "loop": 37.33,
+      "seeds": [
+        1101,
+        1102
+      ]
+    },
+    "victory": {
+      "prompt": "short triumphant fanfare, bronze horns, timpani, ancient, noble, cinematic ending",
+      "bpm": 80,
+      "key": "D major",
+      "render": 16,
+      "sting": 12,
+      "seeds": [
+        1201,
+        1202
+      ]
+    },
+    "defeat": {
+      "prompt": "short somber lament, low strings, solo horn, slow, sad, fading, cinematic ending",
+      "bpm": 60,
+      "key": "D minor",
+      "render": 16,
+      "sting": 12,
+      "seeds": [
+        1301,
+        1302
+      ]
+    }
+  }
+}
