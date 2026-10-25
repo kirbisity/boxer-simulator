@@ -42,7 +42,7 @@ import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
 import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
-import { attemptCount, attemptLog, attemptStory, bannerWinner, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
+import { attemptCount, attemptLog, attemptStory, bannerWinner, bossStatus, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { snapshotGear } from './levelmode/checkpoints.js';
 import { applySandbox, heroClean, heroLoad, heroSave, sandboxBadge, sandboxPlaces, travelTo } from './levelmode/sandbox.js';
@@ -54,7 +54,11 @@ import { createCutsceneDirector, createTwistDirector } from './levelmode/cutscen
 import { STAGES } from './levelmode/stages.js';
 import { createStageView, disposeStageView, placeStageSea, updateStageView } from './levelmode/terrainview.js';
 import { pinnedRung, QUALITY_MODES, readQuality, writeQuality } from './levelmode/quality.js';
-import { stormEnvironment, stormLook, stormOnSkyArrived, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
+import { stormEnvironment, stormLastStrike, stormLook, stormOnSkyArrived, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
+import { stageWaters } from './levelmode/water.js';
+import { createAudioEngine } from './audio/engine.js';
+import { installMuteButton, installUiSounds } from './audio/controls.js';
+import { installSoundBench } from './audio/bench.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
@@ -125,6 +129,12 @@ activateLookNow(startingLookId);
 
 const scene = createScene($('#stage'));
 if (activeLook().id !== DEFAULT_LOOK_ID) reapplyPlace(scene);
+
+// The sound (audio/engine.js): on from the first tap; the speaker button in the corner of every screen, the menus' clicks, the bench.
+const audio = createAudioEngine();
+installMuteButton(audio, $('.arena'));
+installUiSounds(audio);
+const soundBench = installSoundBench(audio);
 
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
 let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
@@ -552,6 +562,8 @@ function frame(now) {
     draw(dt);
     // A fighter drawn in the plain loft while his V7 skin is built: a few ms of it a frame (render.js pumpSkinBuilds).
     pumpSkinBuilds(scene);
+    // The sound of what the camera now shows (audio/engine.js: ~30 Hz of it).
+    if (state.world) audio.frame(audioScene(), dt);
   } catch (error) {
     // Reported once per kind of error, not sixty times a second.
     const key = String(error?.stack ?? error);
@@ -563,6 +575,69 @@ function frame(now) {
   resolution.worked(performance.now() - started);
 }
 const frameErrors = new Set();
+
+// ---- Sound: what the ear is told each frame -------------------------------------------------------------------------------------------
+
+// One object, filled again each frame (audio/engine.js reads it): where the ear is, how the camera faces, the place and its weather, the moment for the music.
+const audioState = { head: [0, 1.6, 0], outcome: null, waters: { def: null, list: [] } };
+const audioInfo = { world: null, camera: null, head: audioState.head, player: null, terrain: null, room: null, place: null, strike: null, ambience: {}, music: {} };
+
+/** The moment the music marks in a stage (levelmode/level.js's messages): his death, the ending; for that world, and a while (he wakes at a rest and goes on). */
+function audioOutcome(world, outcome) {
+  audioState.outcome = { world, outcome, at: realSeconds() };
+}
+
+function audioScene() {
+  const world = state.world;
+  const me = state.mode === 'play' && !document.body.classList.contains('sheet') ? player() : null;
+  const head = audioState.head;
+  if (me) {
+    // His head: distance is from there; the direction is the camera's.
+    head[0] = me.x[P.head * 3];
+    head[1] = me.x[P.head * 3 + 1];
+    head[2] = me.x[P.head * 3 + 2];
+  } else {
+    // Nobody played (a battle watched, a duel spectated): what the camera looks at, at a man's height.
+    const target = scene.orbit.target;
+    head[0] = target.x;
+    head[1] = Math.max(target.y, (world.stage ? target.y : 0) + 1.6);
+    head[2] = target.z;
+  }
+  scene.camera.updateMatrixWorld();
+  const stage = world.stage;
+  const dunnottar = scene.place === 'dunnottar';
+  const look = dunnottar ? STAGE_LOOKS[stormLook()] : null;
+  if (stage && audioState.waters.def !== stage.def) audioState.waters = { def: stage.def, list: stageWaters(stage.def) };
+  Object.assign(audioInfo, {
+    world, camera: scene.camera.matrixWorld.elements, head, player: me,
+    terrain: stage ? cameraTerrain(world) : null,
+    room: stage ? null : cameraWalls,
+    place: scene.place,
+    strike: dunnottar ? stormLastStrike() : null,
+  });
+  Object.assign(audioInfo.ambience, {
+    place: scene.place,
+    // The storm's rain, as hard as its look draws it (a look of no rain to speak of is dry).
+    rain: look?.rain ? (look.rain.opacity > 0.12 ? look.rain.share : 0) : 0,
+    night: scene.place === 'port' || stormLook() === 'squall' && dunnottar,
+    sea: stage?.def.sea,
+    fires: stage ? stageView?.sounding?.fires ?? null : null,
+    drips: stage ? stageView?.sounding?.drips ?? null : null,
+    waters: stage ? audioState.waters.list : null,
+  });
+  // The music's moment: a menu over the fight, a boss's bar, how the bout or the stage ended (for the man played: watching, no fanfare).
+  const winner = state.finishedAt !== null && state.game !== 'home' ? bannerWinner(world) : null;
+  const kept = audioState.outcome?.world === world && realSeconds() - audioState.outcome.at < 15 ? audioState.outcome.outcome : null;
+  const boss = stage?.level ? bossStatus(world) : null;
+  Object.assign(audioInfo.music, {
+    menu: Boolean(document.body.dataset.overlay),
+    game: state.game,
+    boss: Boolean(boss?.show && !boss.felled),
+    outcome: kept ?? (winner && me ? (me.corner === winner ? 'victory' : 'defeat') : null),
+    scene: state.scenario ?? (stage ? stage.def.id ?? scene.place : scene.place),
+  });
+  return audioInfo;
+}
 
 // The most a frame may spend simulating (ms). A big battle at its height
 // can cost more than real time to simulate; past this budget the frame stops
@@ -630,6 +705,9 @@ function drainLevel() {
   const world = state.world;
   for (const id of drainRebuilds(world)) rebuildFighterView(id);
   for (const message of drainUi(world)) {
+    // (The music's moments: audioScene.)
+    if (message.type === 'death') audioOutcome(world, 'defeat');
+    else if (message.type === 'ending') audioOutcome(world, 'victory');
     if (message.type === 'toast') levelHud.toast(message.text);
     else if (message.type === 'note') showNote(NOTES[message.key] ?? { title: 'A note', body: String(message.key) });
     else if (message.type === 'death') showDeath(() => {
@@ -2625,7 +2703,11 @@ const menus = installMenus({
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
   onMenu: (home) => { goHome = home; },
+  audio,
+  soundBench: () => soundBench.open(),
 });
+// The sound bench straight from the address (?bench=sound).
+if (/[?&]bench=sound\b/.test(location.search)) soundBench.open();
 fit();
 // The first visit opens straight in the training yard (Skip tutorial in its corner goes to the menu); after, the menu.
 // The intro is kept for the home screen's "Watch the intro": half a minute is too long before the first fight.
@@ -2958,6 +3040,9 @@ const boxer = window.boxer = {
   },
   // Dev tool: every control on the screen now, judged for size, place and whether anything covers it (uicheck.js).
   checkButtons,
+  // The sound (audio/engine.js): its state and mixer; the bench (audio/bench.js).
+  audio,
+  soundBench: () => soundBench.open(),
   preview,
   // The fight's attack controls: 'target' (tap his man himself, the default) or 'buttons' (fightui/index.js); remembered.
   fightUi: (id) => fightUiChoose(id),

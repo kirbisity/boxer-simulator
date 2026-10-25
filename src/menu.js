@@ -16,6 +16,7 @@ import { canRide, HORSES, mountOf } from './horses.js';
 import { SKIN_TONES } from './render.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
 import { STAGE_LIST } from './levelmode/story.js';
+import { audioMixer } from './audio/controls.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
 export const EVENTS = {
@@ -94,7 +95,7 @@ const STYLE_FACTION = (key) => {
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
   const show = (id) => {
-    for (const other of ['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard']) document.getElementById(other).hidden = other !== id;
+    for (const other of ['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
   };
   const close = () => show(null);
@@ -117,8 +118,20 @@ export function installMenus(game) {
         // The intro (intro.js) again: the legends, then back here.
         el('button', { className: 'replay-intro', type: 'button', textContent: '▶ Watch the intro', onclick: () => { close(); game.intro(home); } }),
         // How the player attacks (fightui/): tapping his man or the buttons; a tap flips it.
-        fightUiHomeSwitch((textContent, onclick) => el('button', { className: 'replay-intro', type: 'button', textContent, onclick }))));
+        fightUiHomeSwitch((textContent, onclick) => el('button', { className: 'replay-intro', type: 'button', textContent, onclick })),
+        el('button', { className: 'replay-intro', type: 'button', textContent: '⚙ Settings', onclick: settings })));
     show('home');
+  }
+
+  // ---- Settings ----------------------------------------------------------
+  // The sound's mixer (audio/controls.js), kept in this browser, and the way to the sound bench (audio/bench.js).
+  function settings() {
+    const body = screen('settings-screen', 'Settings', 'Sound: the mixer, kept in this browser.', home);
+    const panel = el('div', { className: 'settings-panel' });
+    if (game.audio) panel.append(audioMixer(game.audio));
+    panel.append(el('button', { className: 'bench-open', type: 'button', textContent: '🎧 Open the sound bench', onclick: () => game.soundBench?.() }));
+    body.append(panel);
+    show('settings-screen');
   }
 
   // ---- Quick Battle ------------------------------------------------------

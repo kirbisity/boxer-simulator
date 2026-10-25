@@ -88,6 +88,9 @@ export function stormInterior(spec) {
   stormState.interiorSpec = spec ?? null;
 }
 
+/** The last strike of the lightning ({ count, at: [x, z] }), or null before the first: the thunder follows it (audio/engine.js). */
+export const stormLastStrike = () => stormState.lastStrike ?? null;
+
 /** How bright the lightning's flash is now (0..1): the kit's stained glass flashes with it. */
 export const stormFlashLevel = () => stormState.flashNow;
 
@@ -655,6 +658,8 @@ export function buildStormPlace({ buildRain }) {
       const bolt = stormBolt(stormState.random, stormState.follow, boltCore, boltGlow, Math.atan2(heading.z, heading.x));
       place.add(bolt);
       stormState.strike = { start: time, bolt };
+      // (For the thunder: audio/engine.js hears each strike once, by its count, at its distance.)
+      stormState.lastStrike = { count: (stormState.lastStrike?.count ?? 0) + 1, at: bolt.userData.at };
       const gap = stageLookOf(stormState.look).lightning?.gap ?? [9, 22];
       stormState.nextStrike = stormState.still || !stageLookOf(stormState.look).lightning ? Infinity : time + gap[0] + stormState.random() * (gap[1] - gap[0]);
     }
