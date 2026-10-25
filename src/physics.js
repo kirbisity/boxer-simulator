@@ -125,7 +125,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     hitAt: new Float64Array(count).fill(-1e9),
     life: lifePhases(random),
     state: 'up', motorScale: 1, stun: 0, stagger: 0, staggerFor: 0, dazed: 0, dazedFor: 0, downTimer: 0,
-    stamina: 1, concussion: 0, knockdowns: 0, injuries: [],
+    stamina: 1, bank: 0, concussion: 0, knockdowns: 0, injuries: [],
     // A mixed fighter starts in one of his styles and switches as he goes.
     mixed: STYLES[inputs.style]?.mix ? inputs.style : null,
     style: STYLES[inputs.style]?.mix ? STYLES[inputs.style].mix[Math.floor((random ?? Math.random)() * STYLES[inputs.style].mix.length)] : STYLES[inputs.style] ? inputs.style : 'boxing',
@@ -3381,7 +3381,9 @@ function moveRoot(world, fighter, dt) {
   if (fighter.running && !fighter.rush && !fighter.crawling) {
     runPace = Math.max(0, fighter.move) * runSpeed(fighter, Boolean(fighter.runMode));
     // A turn still to make slows him to the pace at which his grip carries him round it in `room` m (gait.js cornerPace).
-    runPace = Math.min(runPace, cornerPace(fighter, toTurn));
+    // (Running to a place nearer than that, the room is the distance to it: he must be round the turn by there, or he circles it, never arriving.)
+    const room = fighter.goTo ? Math.max(WORLD.gait.corner.roomLeast, Math.min(WORLD.gait.corner.room, Math.hypot(fighter.goTo[0] - fighter.root[0], fighter.goTo[2] - fighter.root[1]))) : WORLD.gait.corner.room;
+    runPace = Math.min(runPace, cornerPace(fighter, toTurn, room));
     // Running to a place (an AI man's goTo; the player's is only a way, a little ahead of him): no faster than he can stop there.
     if (fighter.goTo && !fighter.runMode) runPace = Math.min(runPace, arrivalSpeed(fighter, Math.hypot(fighter.goTo[0] - fighter.root[0], fighter.goTo[2] - fighter.root[1])));
   }
@@ -3570,12 +3572,13 @@ const operativeOf = (world, fighter) => Boolean(fighter.player) || (Boolean(worl
 function keepClearOfSolids(terrain, fighter, played = false) {
   const spec = WORLD.terrain;
   // (The man played stands off the stone by more than the others: WORLD.terrain.playerClearance.)
-  const radius = spec.bodyRadius + (played ? spec.playerClearance : 0);
+  const clearance = played ? spec.playerClearance : 0;
+  const radius = spec.bodyRadius;
   const lift = fighter.lift ?? 0;
   const at = [fighter.root[0], fighter.root[1]];
   // A face a foot can be put on (stepUp) is not a wall to him; in a jump's flight, only one his feet are nearly over (WORLD.jump.clear).
   const stepUp = fighter.jump?.phase === 'air' ? WORLD.jump.clear : spec.stepUp;
-  if (!pushOut(terrain, at, radius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, stepUp, standingOn(fighter) + spec.sag)) return;
+  if (!pushOut(terrain, at, radius, lift + spec.sag, lift + spec.sag + spec.bodyHeight, stepUp, standingOn(fighter) + spec.sag, clearance)) return;
   fighter.root[0] = at[0];
   fighter.root[1] = at[1];
   const into = fighter.rootVelocity[0] * terrain.normal[0] + fighter.rootVelocity[1] * terrain.normal[1];

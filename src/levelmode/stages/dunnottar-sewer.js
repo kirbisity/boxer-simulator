@@ -79,8 +79,10 @@ export function buildSeaCave(sec) {
   // The stair: 25 treads of 0.2 along the cliff, from the quay at the waterline in the west up to the shelf's level at its east end (by the
   // ravine and the drawbridge's head: the way round starts beside the way through), 3.2 wide, hung on the face.
   const stair = dnFlight(sec, { foot: [S.foot, 57.6], dir: 'E', steps: 25, tread: 0.4, width: 3.2, from: F, rise: 0.2, style: 'rock' });
-  // (A stepped mass of rock under it, down to the sea, a hand's breadth below the treads: the stair is cut into the cliff's foot, not hung from it.)
-  for (let x = S.foot; x < S.head - 1e-6; x += 2) dnBox(sec, x, x + 2, 56, 59.2, Y.sea - 1, stair.treadY(Math.round((x - S.foot) / 0.4)) - 0.25, 'rock');
+  // (A stepped mass of rock under it, down to the sea: the stair is cut into the cliff's foot, not hung from it. Each block's top is half a metre under the
+  // tread at its start: the man played is kept 0.44 m off a wall, which at a run is up to two treads ahead, and a block closer to the tread he is on than that
+  // would be a wall across the flight.)
+  for (let x = S.foot; x < S.head - 1e-6; x += 2) dnBox(sec, x, x + 2, 56, 59.2, Y.sea - 1, stair.treadY(Math.round((x - S.foot) / 0.4)) - 0.5, 'rock');
   // The quay at the waterline, from the cave's mouth along the cliff's foot to the stair's foot, the new part on its own rock.
   dnSlab(sec, -52.6, S.foot, 56, 59.5, F, 'flags');
   dnBox(sec, -46, S.foot, 56, 59.5, Y.sea - 1, F - 0.25, 'rock');

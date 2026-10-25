@@ -213,9 +213,10 @@ export function ceilingAt(terrain, x, z, y) {
  * top (where the sphere is) is more than `stepUp` above `low`, and whose
  * `bottom` is below `high`. A rise within `stepUp` is not a wall: it is stepped onto
  * (floorAt lifts the part). `wallLow` (default `low`): the height a wall's top is measured from, for a man whose higher foot stands above
- * his lowest point.
+ * his lowest point. `wallExtra`: more radius against walls only (a flight's treads and a kerb are measured at `radius`: a steep stair's next
+ * tread, seen from a wider body, would rise past `stepUp` and bar the way up).
  */
-export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.stepUp, wallLow = low) {
+export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.stepUp, wallLow = low, wallExtra = 0) {
   let pushed = false;
   for (let pass = 0; pass < 3; pass += 1) {
     const list = cellOf(terrain, at[0], at[1]);
@@ -233,7 +234,8 @@ export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.s
       const du = u - cu;
       const dv = v - cv;
       const distance2 = du * du + dv * dv;
-      if (distance2 >= radius * radius) continue;
+      const reach = part.shape === 'wall' ? radius + wallExtra : radius;
+      if (distance2 >= reach * reach) continue;
       if (part.shape !== 'wall' && low >= topAt(part, cu) - stepUp) continue;
       let nu;
       let nv;
@@ -242,21 +244,21 @@ export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.s
         const distance = Math.sqrt(distance2);
         nu = du / distance;
         nv = dv / distance;
-        push = radius - distance;
+        push = reach - distance;
       } else if (part.shape === 'stairs' && (u + part.hu) % ((2 * part.hu) / part.steps) < part.hv - Math.abs(v)) {
         // Inside a flight, under a tread's top: back down the riser it has come up against (not out through the side of the flight).
         nu = -1;
         nv = 0;
-        push = ((u + part.hu) % ((2 * part.hu) / part.steps)) + radius;
+        push = ((u + part.hu) % ((2 * part.hu) / part.steps)) + reach;
       } else if (part.hu - Math.abs(u) < part.hv - Math.abs(v)) {
         // The centre is inside: out through the nearer face.
         nu = u < 0 ? -1 : 1;
         nv = 0;
-        push = part.hu - Math.abs(u) + radius;
+        push = part.hu - Math.abs(u) + reach;
       } else {
         nu = 0;
         nv = v < 0 ? -1 : 1;
-        push = part.hv - Math.abs(v) + radius;
+        push = part.hv - Math.abs(v) + reach;
       }
       const nx = nu * part.cos + nv * part.sin;
       const nz = -nu * part.sin + nv * part.cos;

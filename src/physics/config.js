@@ -678,6 +678,7 @@ export const WORLD = {
   //   and no limit for a gentle bend), so a corridor's corner is taken at a trot, not at his sprint into the wall (4 m left the
   //   walk of Dunnottar's stair at the heavy door swinging into its wall). The forward push shares that grip: gathering speed is cut by the
   //   share of it the turn has used (gait.js cornerShare), so a man at the limit of a turn can only hold his speed.
+  //   `roomLeast`: running to a place nearer than `room`, the room is the distance to it (no less than this), so that he is round the turn by there.
   // - limp: a leg weaker than the other by a share shortens its time bearing him by seconds × that share, and the step
   //   by length × it.
   // - walkRun: the Froude number (speed² over g × leg length) at which a man goes from a walk into a run (people: ~0.5;
@@ -689,7 +690,7 @@ export const WORLD = {
     land: 0.25, landPerSpeed: 0.012, lift: 0.14, liftPerSpeed: 0.035, liftMost: 0.42, tiredLift: 0.35, threshold: 0.2, heelUp: 0.6,
     lean: 0.06, leanPerSpeed: 0.02, accelLean: 0.6, accelSmooth: 0.15, tiredLean: 0.15, leanMost: [-0.3, 0.75],
     limp: { seconds: 0.5, length: 0.4 },
-    corner: { grip: 1, legs: 0.7, room: 2 },
+    corner: { grip: 1, legs: 0.7, room: 2, roomLeast: 0.6 },
     walkRun: 0.5,
   },
   // Walking about (the player's walk mode): upright and square, feet under

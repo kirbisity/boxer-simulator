@@ -188,9 +188,9 @@ export function bankOf(fighter, speed, turn) {
  * radius (v² over the sideways acceleration he can give) × the angle, so v = √(accel × room / angle). A small angle is no limit at all
  * (his pace as it is); a right angle at a sprint's grip is ~4 m/s, a U-turn ~3.
  */
-export function cornerPace(fighter, angle) {
+export function cornerPace(fighter, angle, room = WORLD.gait.corner.room) {
   if (angle < 1e-3) return Infinity;
-  return Math.sqrt((cornering(fighter).accel * WORLD.gait.corner.room) / angle);
+  return Math.sqrt((cornering(fighter).accel * room) / angle);
 }
 
 /** The share (0..1) of the grip a sideways acceleration `lateral` (m/s²) has used: the forward push has the rest, as the root of what is left of a circle (gathering speed in a hard turn). */
