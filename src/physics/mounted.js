@@ -11,6 +11,8 @@
 // and falls as any man, from the saddle's height at the horse's speed, gets
 // up and fights on foot. A horse that falls throws him too.
 
+import { shieldCovering, soundEvent, soundHit } from '../audio/log.js';
+import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
 import { vec, yawRotate, twoBoneIK } from '../pose.js';
@@ -293,11 +295,32 @@ export function stepHorse(world, horse, h) {
     horse.speed *= Math.exp(-h * 6);
   }
   const gait = gaitAt(horse.speed);
+  const stride = horse.stride;
   horse.stride = (horse.stride + gait.hz * h) % 1;
   horse.velocity = [f[0] * horse.speed + horse.shove[0], 0, f[2] * horse.speed + horse.shove[1]];
   poseHorse(horse);
+  if (world.ear && horse.state === 'up' && gait.hz > 0) hoofBeats(world, horse, gait, stride);
   const rider = horse.rider === null ? null : world.fighters[horse.rider];
   if (rider?.mount === horse) absorbMotion(rider, horse, h);
+}
+
+/**
+ * Heard: each hoof that came down this substep, where it is: a leg's stance begins as its phase in the stride passes 0 (poseHorse),
+ * so a walk is four beats, a trot two, a canter three and a gallop four, as the gait's table times them.
+ */
+function hoofBeats(world, horse, gait, before) {
+  for (const leg of HORSE_SHAPE.legs) {
+    const phase = gait.phase[leg.key];
+    if ((horse.stride + phase) % 1 >= (before + phase) % 1) continue;
+    const hoof = horse.legs[leg.key].hoof;
+    soundEvent(world, 'horse', { at: hoof, kind: 'hoof', gait: gait.name, speed: Math.abs(horse.speed), surface: surfaceAt(world, hoof[0], hoof[1], hoof[2]), mass: ladenMass(world, horse), horse: horse.id, leg: leg.key });
+  }
+}
+
+/** A horse's cry (a neigh in pain, as it goes down), from its head. */
+function horseCry(world, horse, kind) {
+  const head = horse.capsules.find((capsule) => capsule.key === 'head')?.b ?? [horse.at[0], horse.withers, horse.at[1]];
+  soundEvent(world, 'horse', { at: head, kind, gait: gaitAt(horse.speed).name, speed: Math.abs(horse.speed), surface: surfaceAt(world, horse.at[0], 0, horse.at[1]), mass: ladenMass(world, horse), horse: horse.id });
 }
 
 /** The share of its blood lost that drops a horse (as a man's). */
@@ -693,6 +716,12 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: normal, impulse: impulse * (1 + WORLD.weaponTransferRestitution.edge) / (1 + WORLD.restitution) });
   world.events.push(event);
+  // Heard: the blow on the horse (on its barding, or its hide), and an edge or a point in it makes it scream.
+  if (world.ear) {
+    const striker = mix.cut + mix.pierce <= mix.blunt ? 'blunt' : mix.pierce > mix.cut ? 'point' : 'blade';
+    soundEvent(world, 'hit', { at: contactPoint, energy, impulse, striker, covering: (protection.blunt ?? 0) > 0 ? horse.barding : 'flesh', part: capsule.key, braced: false, who: -1, by: attacker.id, horse: horse.id });
+    if (cut + pierce > 0.5) horseCry(world, horse, 'neigh');
+  }
   return true;
 }
 
@@ -748,6 +777,7 @@ export function bringDown(world, horse, reason) {
   horse.side = world.random() < 0.5 ? 1 : -1;
   horse.dead = !horse.lame || reason !== 'goes down on a broken leg';
   world.events.push({ time: world.time, kind: 'horseDown', horse: horse.id, rider: horse.rider ?? undefined, attacker: horse.lastHitBy, effects: [reason] });
+  if (world.ear) horseCry(world, horse, 'neigh');
 }
 
 
@@ -997,6 +1027,8 @@ function rideDown(world, horse) {
     if (entry.shield) {
       // On his shield: the arm and what is braced behind it take it.
       const met = crashBetween(horseParty(world, horse, entry.capsule), shieldParty(man), direction, closingMan);
+      // (Heard: the horse's weight on his shield.)
+      if (world.ear) soundHit(world, man, rider, 'shield', entry.at, { energy: met.energy, impulse: met.impulse, striker: 'body', covering: shieldCovering(man.shield) });
       shieldHarm(world, man, { crash: met, closing: closingMan, at: entry.at, normal: vec.scale(direction, -1), offCentre: entry.shield.offCentre, source: rider });
       const blunt = horseCrashHarm(horse, entry.capsule, met.energy, crashHardness(0.5));
       crash.energy += blunt;
@@ -1004,6 +1036,8 @@ function rideDown(world, horse) {
       continue;
     }
     const met = crashBetween(horseParty(world, horse, entry.capsule), fighterParty(man, 'trunk'), direction, closingMan);
+    // (Heard: the horse's chest into him.)
+    if (world.ear) soundHit(world, man, rider, 'trunk', entry.at, { energy: met.energy, impulse: met.impulse, striker: 'body', deltaV: met.impulse / met.massSecond });
     crashHarm(world, man, 'trunk', { impulse: met.impulse, mass: met.massSecond, closing: closingMan, energy: met.energy, point: entry.at, normal: direction, source: rider, hard });
     const blunt = horseCrashHarm(horse, entry.capsule, met.energy, crashHardness(man.body.gear.protection.blunt));
     crash.energy += blunt;
@@ -1069,6 +1103,8 @@ function trodOn(world, horse) {
       const impulse = weight * spec.stance * spec.seconds;
       // A crash with the ground behind him: the impulse on his trunk with the whole of him braced behind it.
       const lying = fighterParty(fighter, 'trunk').whole;
+      // (Heard: a hoof on a man lying there.)
+      if (world.ear) soundHit(world, fighter, horse.rider === null ? null : world.fighters[horse.rider], 'trunk', hoof, { energy: (impulse * impulse) / (2 * lying), impulse, striker: 'blunt', deltaV: impulse / lying });
       crashHarm(world, fighter, 'trunk', { impulse, mass: lying, closing: impulse / lying, energy: (impulse * impulse) / (2 * lying), point: hoof, normal: [0, 1, 0], source: horse.rider === null ? null : world.fighters[horse.rider] });
       world.pendingImpulses.push({ fighter, shares: [[P.pelvis, 1], [P.neck, 1]], direction: [0, -1, 0], impulse, braced: Infinity });
       if (!fighter.trampledAt || world.time - fighter.trampledAt > 0.5) {

@@ -26,6 +26,7 @@ import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
 import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
+import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -593,6 +594,7 @@ function updatePickup(world, fighter, dt) {
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
     world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, effects: [`takes up the ${spec.label.toLowerCase()}`] });
+    if (world.ear) soundEvent(world, 'mech', { at: debris.x, kind: 'pickup', state: 'open', id: `debris${pickup.debris}` });
     return;
   }
   if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
@@ -605,6 +607,8 @@ function updatePickup(world, fighter, dt) {
     emptied(world, fighter);
   }
   world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, weapon: debris.weapon, effects: [`picks up the ${WEAPON_LABEL(debris.weapon)}`] });
+  // Heard: a weapon taken up off the floor (its `state` says only that it is done).
+  if (world.ear) soundEvent(world, 'mech', { at: debris.x, kind: 'pickup', state: 'open', id: `debris${pickup.debris}` });
 }
 
 /**
@@ -1716,6 +1720,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   drawStamina(fighter, drain);
   fighter.stats.thrown += 1;
   if (heavy) world.events.push({ time: world.time, kind: 'heavy', attacker: fighter.id, punch: type, effects: [] });
+  // Heard: a blow loaded with everything he has (a heavy one) comes with a grunt.
+  if (heavy && world.ear) soundVoice(world, fighter, 'effort', 1);
   return true;
 }
 
@@ -1812,6 +1818,8 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if (!spec || !target || fighter.punch || fighter.rush || (fighter.stamina < spec.cost / fighter.body.aerobic && !fighter.player)) return false;
   if (spec.kind === 'rush') {
     fighter.rush = { t: 0, duration: spec.duration, hit: false };
+    // (Heard: a charge goes in with the whole of him, and he shouts it.)
+    if (world.ear) soundVoice(world, fighter, 'effort', 1);
   } else if (spec.kind === 'clinch') {
     const distance = vec.length(vec.sub(point(target.x, P.neck), point(fighter.x, P.neck)));
     if (distance > fighter.body.reach * WORLD.clinch.range) return false;
@@ -2427,7 +2435,7 @@ export function plantFeet(fighter) {
 }
 
 /** Feet stay planted while the stance drifts, then step to catch up, one at a time. */
-function updateFeet(fighter, dt) {
+function updateFeet(world, fighter, dt) {
   // In the stirrups: no steps.
   if (fighter.mount) return;
   if (fighter.state !== 'up' && fighter.state !== 'rising') {
@@ -2484,6 +2492,8 @@ function updateFeet(fighter, dt) {
       else foot.step.retarget = false;
     }
     if (foot.step.t >= 1) {
+      // Heard: the foot coming down, where it lands, at the pace he is going.
+      if (world.ear) soundStep(world, fighter, foot.index === P.lFoot ? 'l' : 'r', [foot.step.to[0], fighter.x[foot.index * 3 + 1], foot.step.to[2]], Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]));
       foot.planted = foot.step.to;
       foot.step = null;
     }
@@ -3004,6 +3014,7 @@ function launch(world, fighter) {
 function landJump(world, fighter, speed, floor) {
   const jump = fighter.jump;
   const landing = jumpLanding(fighter, speed, { legs: limbShares(fighter).leg, strength: fighter.motorScale ?? 1 });
+  if (world.ear) soundDown(world, fighter, 'land', particleAt(fighter, P.lFoot), speed);
   jump.phase = 'land';
   jump.t = 0;
   jump.landing = landing;
@@ -3125,7 +3136,7 @@ export function step(world, dt) {
     if (fighter.detail === 'proxy' && !proxyBeat(world, fighter)) continue;
     const span = fighter.detail === 'proxy' ? dt * WORLD.tiers.proxyEvery : dt;
     updateIntent(world, fighter, span);
-    updateFeet(fighter, span);
+    updateFeet(world, fighter, span);
     // A jump under way holds the stance itself (crouch, flight, landing); otherwise, on terrain, the floor does.
     if (fighter.jump) jumpStance(world, fighter, span);
     if (fighter.arena.terrain) {
@@ -3193,6 +3204,8 @@ export function step(world, dt) {
   for (const fighter of world.fighters) {
     if (fighter.dormant) continue;
     trackHandSpeed(fighter);
+    // Heard: a weapon's stroke whooshing through the air, at its fastest.
+    if (world.ear) for (const weapon of heldBlades(fighter)) trackSwing(world, fighter, weapon, strokeOf(fighter, weapon));
     if (fighter.mount) keepSeat(world, fighter);
     else checkBalance(world, fighter);
     if (fighter.state !== 'up' && fighter.state !== 'rising') knockOff(world, fighter, null);
@@ -4573,6 +4586,7 @@ export function breakJoint(world, fighter, joint) {
   const ending = !joint.endsWith('Elbow');
   const event = { time: world.time, kind: 'broken', fighter: fighter.id, joint, effects: [`${jointName(joint)} broken${ending ? ' — cannot continue' : ''}`] };
   world.events.push(event);
+  if (world.ear && P[joint] !== undefined) soundWound(world, fighter, 'bone', 1, particleAt(fighter, P[joint]));
   fighter.damageVersion += 1;
   if (ending && fighter.state !== 'out') {
     fighter.state = 'down';
@@ -4779,6 +4793,8 @@ const IMPACT_JOINT = { lHand: 'lElbow', rHand: 'rElbow', lElbow: 'lElbow', rElbo
  */
 function groundImpact(world, fighter, index, speed) {
   const spec = WORLD.impact;
+  // Heard: a body come down on the floor (his hips meeting it), hurt or not: a dead man falls as loud as a live one.
+  if (index === P.pelvis && world.ear) soundDown(world, fighter, 'fall', particleAt(fighter, index), speed);
   if (fighter.state === 'out' || speed <= spec.minSpeed) return;
   const name = PARTICLES[index];
   const gear = fighter.body.gear;
@@ -4836,6 +4852,8 @@ function landOnFeet(world, fighter, index, speed) {
   // The first foot down starts the landing; the second, a moment later, is the same fall.
   const first = world.time - (fighter.landedAt ?? -Infinity) > spec.together;
   if (first) fighter.landedAt = world.time;
+  // (Heard: a drop come down hard on his feet.)
+  if (first && world.ear) soundDown(world, fighter, 'land', particleAt(fighter, index), speed);
   fighter.legDamage[side] += (spec.legs * through * (1 - (protectionAt(gear, `${side}Shank`).blunt ?? 0))) / bone;
   const effects = ['lands hard'];
   const joint = `${side}Knee`;
@@ -5754,6 +5772,13 @@ function crashBodies(world, first, second, partFirst, partSecond, normal) {
       world.pendingImpulses.push({ fighter: second, shares: trunk, direction: vec.scale(normal, -1), impulse: crash.motion, braced: speedInto(second, 'trunk', vec.scale(normal, -1)) });
     }
   }
+  // Heard: the bodies meeting, on the one run into (the charger's, or of two that ran together, the first).
+  if (world.ear) {
+    const other = struck === first ? second : first;
+    const struckKey = struck === first ? firstKey : secondKey;
+    const into = struck === first ? normal : vec.scale(normal, -1);
+    soundHit(world, struck, other, struckKey, at, { energy: crash.energy, impulse: crash.impulse, striker: 'body', braced: crashBraced(struck, struckKey, into, closing, other) });
+  }
   // The harm at the first touch (a charge that has hurt at its head and shoulders does not hurt again when the trunks meet).
   if (charger?.rush.harmed) return;
   if (charger) charger.rush.harmed = true;
@@ -5831,6 +5856,8 @@ function crashIntoShield(world, mover, bearer) {
     world.events.push({ time: world.time, kind: 'collision', attacker: mover.id, defender: bearer.id, punch: 'rush', target: 'shield', speed: closing, impulse: crash.impulse, energy: crash.energy, force: 0, headDeltaV: 0, effects: [], point: hit.point, normal: away });
     world.pendingImpulses.push({ fighter: bearer, shares: [[P.lHand, 1], [P.lElbow, 0.8], [P.lShoulder, 0.5], [P.neck, 0.3], [P.pelvis, 0.2]], direction: vec.scale(away, -1), impulse: crash.motion });
   }
+  // Heard: a body against the board.
+  if (world.ear) soundHit(world, bearer, mover, 'shield', hit.point, { energy: crash.energy, impulse: crash.impulse, striker: 'body', covering: shieldCovering(bearer.shield), braced: bearer.defence?.name === 'shieldBlock' });
   crashHarm(world, mover, 'trunk', { impulse: crash.impulse, mass: crash.massFirst, closing, energy: crash.energy, point: hit.point, normal: away, source: bearer, braced: crashBraced(mover, 'trunk', away, closing, bearer) });
   shieldHarm(world, bearer, { crash, closing, at: hit.point, normal: away, offCentre: vec.length(vec.sub(hit.point, disc.centre)) / disc.radius, source: mover });
 }
@@ -5959,6 +5986,8 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   if (BLOCKING.has(capsule.key)) for (const held of heldBlades(defender)) if (capsule.key.startsWith(held.main)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1), held);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, harm, blocked, spec, RECOIL[spec.limb.slice(1)].map(([part, share]) => [P[`${side}${part}`], share]), time, event);
   world.events.push(event);
+  // Heard: the energy the collision took up (half the reduced mass times the closing speed squared, as a weapon's), on what it met.
+  if (world.ear) soundHit(world, defender, attacker, capsule.key, contactPoint, { energy: 0.5 * reducedMass * (closing * glance.share) ** 2, impulse, striker: striker.bash ? 'shield' : limbStriker(spec.limb), deltaV: blocked ? 0 : impulse / struckMass });
 }
 
 // The bone a striking part loads: a fist the forearm's, an elbow the upper arm's, a kick the shin's, a knee the thigh's.
@@ -6034,6 +6063,8 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     if (peakForce * harm > body.fracture.face && !defender.injuries.some((injury) => injury.kind === 'face')) {
       defender.injuries.push({ kind: 'face', time: world.time });
       event.effects.push('facial fracture');
+      // (Its severity: the force over what breaks the face, half at the threshold.)
+      if (world.ear) soundWound(world, defender, 'bone', Math.min(1, (0.5 * peakForce * harm) / body.fracture.face), event.point);
     }
   } else if (capsule.key === 'trunk') {
     // The wind is knocked out of a belly caught slack; a man who went into the crash ready met it on his shoulder, braced (crashBraced).
@@ -6042,6 +6073,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     if (peakForce * harm > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
       defender.injuries.push({ kind: 'rib', time: world.time });
       event.effects.push('rib fracture');
+      if (world.ear) soundWound(world, defender, 'bone', Math.min(1, (0.5 * peakForce * harm) / body.fracture.rib), event.point);
     }
   } else if (onLeg) {
     const legSide = capsule.key[0];
@@ -6192,6 +6224,8 @@ function sever(world, defender, where, event, bladeVelocity) {
   defender.bleedOutside = (defender.bleedOutside ?? 0) + 0.06;
   event.severed = where.joint;
   world.events.push({ time: world.time, kind: 'severed', fighter: defender.id, attacker: event.attacker, joint: where.joint, side: where.side, debris: debris.id, point: base, effects: [part.label] });
+  // (Heard: the worst cut there is, through the bone.)
+  if (world.ear) soundWound(world, defender, 'cut', 1, base);
   knockOut(world, defender, event, `${part.label}: cannot go on`, 'out');
 }
 
@@ -6387,6 +6421,12 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (weapon.twoHanded) recoil.push([P[`${weapon.off}Hand`], 0.8]);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
   world.events.push(event);
+  if (world.ear) {
+    soundHit(world, defender, attacker, capsule.key, contactPoint, { energy, impulse, striker: weaponStriker(mix), deltaV: blocked ? 0 : impulse / struckMass });
+    // (A cut through at a joint is logged by sever; a point's severity is how near it came to running him through.)
+    if (cut > 0.5 && !through) soundWound(world, defender, 'cut', cutSeverity(cut), contactPoint);
+    if (pierce > 0.5) soundWound(world, defender, 'stab', Math.min(1, pierce / (BLADES.lethalPierce * BODY.toughness)), contactPoint);
+  }
   return through;
 }
 
@@ -6456,6 +6496,11 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away, w
   world.pendingImpulses.push({ fighter: defender, shares: [[P[`${weapon.main}Hand`], 1], [P[`${weapon.main}Elbow`], 0.6]], direction: vec.scale(away, -1), impulse });
   strainGrip(world, defender, impulse * 0.3, [0, 0, 0], weapon);
   world.events.push(event);
+  // Heard: the limb driven onto the blade (the blade is what strikes it), and the cut it took.
+  if (world.ear) {
+    soundHit(world, attacker, defender, limbKey, contactPoint, { energy, impulse, striker: 'blade' });
+    if (cut > 0.5) soundWound(world, attacker, 'cut', cutSeverity(cut), contactPoint);
+  }
 }
 
 /**
@@ -6517,6 +6562,11 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   if (striker.weapon) strainGrip(world, attacker, impulse * 0.25, [0, 0, 0], striker.weapon);
   world.events.push(event);
   if (striker.weapon) world.events.push({ time: world.time, kind: 'clash', fighter: defender.id, point: hit.point, normal: away, impulse });
+  // Heard: the blow on the shield's face, braced behind it when he meant the block.
+  if (world.ear) {
+    const strikerKind = striker.weapon ? (spec.mode === 'thrust' && (striker.weapon.spec.harm?.thrust?.pierce ?? 0) > 0 ? 'point' : weaponPart(striker.weapon, Infinity)) : striker.bash ? 'shield' : limbStriker(spec.limb);
+    soundHit(world, defender, attacker, 'shield', hit.point, { energy: 0.5 * reduced * closing * closing, impulse, striker: strikerKind, covering: shieldCovering(defender.shield), braced: defender.defence?.name === 'shieldBlock' });
+  }
   // Each blow strains the shield's hold on his arm, the more the further
   // from the grip it lands (it twists the shield there); past it, it is torn off.
   const shield = defender.shield;
@@ -6694,6 +6744,8 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   }
   const met = vec.lerp(closest.onFirst, closest.onSecond, 0.5);
   world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, effects: ['blades meet'] });
+  // Heard: how fast they met, what of each (an edge, a haft, a head), and whether a point was turned along the blade (a scrape).
+  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed });
   if (parried) {
     const [parrier, blade, striker, stroke] = parried;
     // Parried while his other blade is on its way in: the parry and the cut together.
@@ -6970,8 +7022,15 @@ function sufferInjuries(world, fighter) {
   const spec = WORLD.injury;
   const trauma = fighter.trauma;
   const credit = { time: world.time, kind: 'injuries', attacker: fighter.lastHitBy ?? fighter.lastWoundedBy ?? fighter.id, effects: [] };
-  if ((trauma.trunk ?? 0) >= spec.trunkFatal) return knockOut(world, fighter, credit, 'died of his injuries', 'killed');
-  if ((trauma.head ?? 0) >= spec.headFatal) return knockOut(world, fighter, credit, 'skull broken', 'killed');
+  // (Heard: the chest or the skull stove in.)
+  if ((trauma.trunk ?? 0) >= spec.trunkFatal) {
+    if (world.ear) soundWound(world, fighter, 'crush', 1, particleAt(fighter, P.neck));
+    return knockOut(world, fighter, credit, 'died of his injuries', 'killed');
+  }
+  if ((trauma.head ?? 0) >= spec.headFatal) {
+    if (world.ear) soundWound(world, fighter, 'crush', 1, particleAt(fighter, P.head));
+    return knockOut(world, fighter, credit, 'skull broken', 'killed');
+  }
   for (const [key, amount] of Object.entries(trauma)) {
     const segment = key.replace(/^[lr](?=[A-Z])/, '');
     const joint = BREAKS_AT[segment] && `${key[0]}${BREAKS_AT[segment]}`;
@@ -7015,6 +7074,8 @@ export function knockOut(world, defender, event, reason, kind = 'knockout') {
   event.knockout = true;
   if (standing && world.fighters[event.attacker]) world.fighters[event.attacker].stats.knockdownsScored += 1;
   world.events.push({ time: world.time, kind, fighter: defender.id, attacker: event.attacker, punch: event.punch, point: event.point, effects: [reason] });
+  // Heard: a man killed, bled out, drowned or cut down past going on dies aloud; one knocked cold goes silent.
+  if (world.ear && kind !== 'knockout') soundVoice(world, defender, 'death', 1);
 }
 
 /** Down, counted: the muscles let go and the count begins. */

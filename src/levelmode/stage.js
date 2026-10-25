@@ -69,6 +69,7 @@
 // (physics.js hostile) and the fight AI does not think for them (ai.js thinkAll skips 'grey');
 // levelmode drives them itself.
 
+import { soundEvent } from '../audio/log.js';
 import { P, PRESETS } from '../body.js';
 import { createWorld, placeOnFloor } from '../physics.js';
 import { createTerrain, floorAt } from '../physics/terrain.js';
@@ -393,13 +394,33 @@ export function setMechanism(world, id, state) {
   run.mechanisms[id] = state;
   world.arena.terrain = stageTerrain(run.def, run.active, run.mechanisms);
   world.events.push({ time: world.time, kind: 'mechanism', mechanism: id, state, effects: [`${id} ${state}`] });
+  if (world.ear) mechanismSound(world, id, state);
   return true;
+}
+
+// What a gate is, as it sounds going over, by how the kit draws it (its `look.kind`): a door's leaf or leaves, or bars (a gate).
+const GATE_SOUND = { door: 'door', doubledoor: 'door', bars: 'gate' };
+// A mechanism's new state, as the sound of it starting to move: a gate swings open or shut, a ladder falls (it is down: open).
+const STATE_SOUND = { open: 'opening', closed: 'closing', down: 'opening', up: 'closing' };
+
+/** Heard: a gate, a door or a ladder going over, from the point it is worked from. */
+function mechanismSound(world, id, state) {
+  for (const section of world.stage.def.sections) {
+    const gate = (section.gates ?? []).find((entry) => entry.id === id);
+    const ladder = gate ? null : (section.ladders ?? []).find((entry) => entry.id === id);
+    if (!gate && !ladder) continue;
+    const kind = ladder ? 'ladder' : GATE_SOUND[gate.look?.kind] ?? 'gate';
+    soundEvent(world, 'mech', { at: (gate ?? ladder).at, kind, state: STATE_SOUND[state] ?? state, id });
+    return;
+  }
 }
 
 /** A lever pulled: its mechanism goes to the state it sets. */
 export function pullLever(world, id) {
   for (const section of world.stage.def.sections) {
     const lever = (section.levers ?? []).find((entry) => entry.id === id);
+    // (Heard: the lever thrown, before what it works.)
+    if (lever && world.ear) soundEvent(world, 'mech', { at: lever.at, kind: 'lever', state: lever.state === 'closed' ? 'closing' : 'opening', id });
     if (lever) return setMechanism(world, lever.target, lever.state);
   }
   return false;

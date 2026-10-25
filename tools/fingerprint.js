@@ -6,9 +6,11 @@
 // Usage: node tools/fingerprint.js            (print)
 //        node tools/fingerprint.js save FILE  (write the hashes to FILE)
 //        node tools/fingerprint.js check FILE (compare against FILE; exit 1 if any differ)
+//        ... --ear                            (with an ear on the first fighter's head each step, hearing 20 m round: the
+//                                              sound log recording, which must leave every hash as it was without it)
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { PRESETS } from '../src/body.js';
+import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, seededRandom } from '../src/physics.js';
 import { SCENARIOS } from '../src/scenarios.js';
@@ -48,24 +50,34 @@ function hashWorld(world, hash) {
   return value;
 }
 
-function run() {
+// The listener the audio engine would set: on the first fighter's head (src/audio/log.js world.ear).
+function listen(world) {
+  const head = world.fighters[0].x;
+  world.ear = { x: head[P.head * 3], y: head[P.head * 3 + 1], z: head[P.head * 3 + 2], radius: 20 };
+}
+
+function run(ear) {
   const results = {};
   for (const [name, [make, seconds]] of Object.entries(FIGHTS)) {
     const world = make();
     let hash = 2166136261;
     const started = performance.now();
     for (let second = 0; second < seconds; second += 1) {
-      advance(world, 1, (current, dt) => thinkAll(current, dt));
+      advance(world, 1, (current, dt) => {
+        if (ear) listen(current);
+        thinkAll(current, dt);
+      });
       hash = hashWorld(world, hash);
     }
-    results[name] = { hash: hash.toString(16).padStart(8, '0'), ms: Math.round(performance.now() - started), events: world.events.length };
+    results[name] = { hash: hash.toString(16).padStart(8, '0'), ms: Math.round(performance.now() - started), events: world.events.length, sounds: world.soundsCount ?? 0 };
   }
   return results;
 }
 
-const [mode, file] = process.argv.slice(2);
-const results = run();
-for (const [name, result] of Object.entries(results)) console.log(`${name.padEnd(22)} ${result.hash}  ${String(result.ms).padStart(6)} ms  ${result.events} events`);
+const ear = process.argv.includes('--ear');
+const [mode, file] = process.argv.slice(2).filter((arg) => arg !== '--ear');
+const results = run(ear);
+for (const [name, result] of Object.entries(results)) console.log(`${name.padEnd(22)} ${result.hash}  ${String(result.ms).padStart(6)} ms  ${result.events} events${ear ? `  ${result.sounds} sounds` : ''}`);
 console.log(`total ${Object.values(results).reduce((sum, result) => sum + result.ms, 0)} ms`);
 if (mode === 'save') writeFileSync(file, JSON.stringify(results, null, 2));
 if (mode === 'check') {

@@ -2,6 +2,8 @@
 // (draw, loose, arrows in flight). What a round or an arrow does to a body
 // is here; what a body is, and how it moves, is in ../physics.js.
 
+import { coveringAt, shieldCovering, soundEvent, soundWound } from '../audio/log.js';
+import { surfaceAt } from '../audio/surface.js';
 import { buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
 import { STYLES } from '../moves.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
@@ -197,6 +199,8 @@ export function loose(world, fighter, bolt = null) {
   const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2;
   world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.scale(dir, speed), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
+  // Heard: the string let go (a bow's, or a crossbow's heavier snap).
+  if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });
   // The bow kicks forward a little in the hand as the string goes.
   world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
 }
@@ -214,6 +218,8 @@ export function flyArrows(world, dt) {
     const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
     const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
     if (hit) {
+      // Heard: the arrow going in, at the speed it flew, on what it met.
+      if (world.ear) soundEvent(world, 'arrowhit', { at: hit.point, speed: vec.length(arrow.v), covering: hit.target === 'shield' ? shieldCovering(hit.fighter.shield) : coveringAt(hit.fighter, hit.capsule.key), who: hit.fighter.id });
       arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2, arrow.bounce ?? ARROW.bounce);
       arrow.done = true;
       arrow.x = hit.point;
@@ -222,6 +228,11 @@ export function flyArrows(world, dt) {
     arrow.x = to;
     if (arrow.x[1] <= 0.02 || Math.abs(arrow.x[0]) > 60 || Math.abs(arrow.x[2]) > 60) {
       arrow.x[1] = Math.max(0.02, arrow.x[1]);
+      // Heard: into the ground (or on stone, or boards), at the speed it came down.
+      if (world.ear) {
+        const ground = surfaceAt(world, arrow.x[0], arrow.x[1], arrow.x[2]);
+        soundEvent(world, 'arrowhit', { at: arrow.x, speed: vec.length(arrow.v), covering: ground === 'stone' || ground === 'tile' ? 'stone' : ground === 'wood' ? 'wood' : 'ground', who: -1 });
+      }
       arrow.landed = true;
       arrow.age = 0;
     }
@@ -285,6 +296,8 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   victim.bleed = (victim.bleed ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
   victim.bleedOutside = (victim.bleedOutside ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
   Object.assign(event, { harm, region, pierce: harm * 60 });
+  // Heard: the wound, as bad as its share of what kills.
+  if (world.ear && harm > 0) soundWound(world, victim, 'stab', Math.min(1, harm), hit.point);
   event.effects.push(proof ? `${region}: through a gap` : `${region}`);
   shooter.stats.landed += 1;
   if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key) && world.random() < 0.3) dropWeapon(world, victim, 'disarmed', dir);
@@ -432,6 +445,8 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
   }
   // A crossbow looses its bolt.
   if (shot?.bolt) return loose(world, fighter, shot);
+  // Heard: the powder going off, over the whole field (a matchlock's, or any firearm's: `weapon` says which).
+  if (world.ear) soundEvent(world, 'shot', { at: point(fighter.x, P[`${weapon.main}Hand`]), kind: 'matchlock', weapon: weapon.kind, who: fighter.id });
   const handIndex = P[`${weapon.main}Hand`];
   const barrel = weapon.dir;
   const up = vec.normalize(vec.sub([0, 1, 0], vec.scale(barrel, barrel[1])));
@@ -521,6 +536,8 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   // A heavy ball mostly goes through: seen to strike the surface only where the armour held most of it.
   Object.assign(event, { harm, armour, region, plate: armour > 0 && OUTFITS[kind].plated && (!shot || armour >= GUN.platedHolds) ? kind : null });
   event.effects.push(armour > 0 ? `${region}: armour took ${Math.round(armour * 100)}%` : `${region}`);
+  // Heard: the round's wound, as bad as its share of what kills.
+  if (world.ear && harm > 0) soundWound(world, victim, 'stab', Math.min(1, harm), hit.point);
   shooter.stats.landed += 1;
   world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: shot?.impulse ?? GUN.impulse });
   // A heavy ball in an arm or a leg shatters the bone, most of the time.

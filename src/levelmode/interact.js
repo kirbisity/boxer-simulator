@@ -13,6 +13,7 @@
 //                    `frees`: prisoners let out when it opens. A gate with none of these is worked by a lever only.
 //   section.ladders: [{ id, at, ..., kickFrom?: region }]        kicked down from within `mechanismReach` of the ladder, from within `kickFrom`
 
+import { soundEvent } from '../audio/log.js';
 import { P } from '../body.js';
 import { LEVEL_CONFIG } from './config.js';
 import { collectItem, feetFloor, levelOf, say } from './items.js';
@@ -96,6 +97,8 @@ export function interactions(world) {
         id: `gate:${gate.id}`, kind: 'gate', label: locked ? 'Locked' : gate.label ?? (gate.key ? 'Unlock' : 'Open gate'), icon: locked ? 'lock' : 'gate', distance, disabled: Boolean(locked),
         run: (w) => {
           if (locked) {
+            // (Heard: the door tried, and held by its lock.)
+            if (w.ear) soundEvent(w, 'mech', { at: gate.at, kind: 'lock', state: 'locked', id: gate.id });
             say(w, { type: 'toast', text: gate.lockedText ?? 'It is locked. The key is somewhere in this place.' });
             return false;
           }
@@ -147,6 +150,8 @@ export function interact(world, choice = contextFor(world)) {
 /** A gate opened by hand: its state goes to 'open', the prisoners it frees are let out. */
 function openGate(world, gate) {
   const level = levelOf(world);
+  // (Heard: the key turned in its lock, then the gate going over.)
+  if (gate.key && world.ear) soundEvent(world, 'mech', { at: gate.at, kind: 'lock', state: 'unlocked', id: gate.id });
   setMechanism(world, gate.id, 'open');
   level.opened.add(gate.id);
   for (const id of gate.frees ?? []) if (levelFreePrisoner(world, id)) level.freed.add(id);

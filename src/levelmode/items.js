@@ -5,6 +5,7 @@
 //
 // No DOM here: what the screen must say goes on the level's `ui` queue (see level.js).
 
+import { soundEvent } from '../audio/log.js';
 import { P } from '../body.js';
 import { LEVEL_CONFIG } from './config.js';
 
@@ -191,13 +192,13 @@ export function collectItem(world, item) {
   if (item.kind === 'note') {
     level.notes.add(item.id);
     say(world, { type: 'note', key: item.note ?? item.id, id: item.id });
-    return true;
+    return pickedUp(world, item);
   }
   if (item.kind === 'key') {
     level.keys.add(item.id);
     level.taken.add(item.id);
     say(world, { type: 'toast', text: item.label ?? 'You take the key' });
-    return true;
+    return pickedUp(world, item);
   }
   if (ITEM_KINDS.includes(item.kind)) {
     if (level.inventory[item.kind] >= LEVEL_CONFIG.cap[item.kind]) {
@@ -207,9 +208,15 @@ export function collectItem(world, item) {
     level.inventory[item.kind] += 1;
     level.taken.add(item.id);
     say(world, { type: 'toast', text: `${item.kind === 'bandage' ? 'Bandage' : 'Tonic'} taken (${level.inventory[item.kind]})` });
-    return true;
+    return pickedUp(world, item);
   }
   return false;
+}
+
+/** Heard: a thing taken up (a full pouch takes nothing, and nothing is heard). True: it was taken. */
+function pickedUp(world, item) {
+  if (world.ear) soundEvent(world, 'mech', { at: item.at, kind: 'pickup', state: 'open', id: item.id });
+  return true;
 }
 
 /** The height of the floor under the player's feet (m). */

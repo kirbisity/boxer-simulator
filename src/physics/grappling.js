@@ -1,6 +1,7 @@
 // Grappling: the clinch (hands held to the neck, driven, thrown from the
 // hold) and holding a man down on the floor.
 
+import { soundVoice } from '../audio/log.js';
 import { P } from '../body.js';
 import { STYLES } from '../moves.js';
 import { addDamage, boneShare, dropWeapon, opponentFor, point, protectionAt, TRUNK_PARTICLES, wound } from '../physics.js';
@@ -231,6 +232,8 @@ export function throwFromHold(world, fighter, target) {
   world.pendingImpulses.push({ fighter, shares: TRUNK_PARTICLES.map((index) => [index, 1]), direction: vec.scale(across, -1), impulse: impulse * 0.3, braced: 10 });
   fighter.clinch = null;
   world.events.push({ time: world.time, kind: 'throw', attacker: fighter.id, defender: target.id, impulse, effects: ['thrown'] });
+  // (Heard: the heave of the throw.)
+  if (world.ear) soundVoice(world, fighter, 'effort', 1);
 }
 
 /**
