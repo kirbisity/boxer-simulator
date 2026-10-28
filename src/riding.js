@@ -5,9 +5,9 @@
 // physics' (physics/mounted.js): the horse's speed is in the blade's.
 
 import { P } from './body.js';
-import { MOVES, moveRange } from './moves.js';
+import { MOVES, STYLES, moveRange } from './moves.js';
 import { aimPoint, bladeFor, dropWeapon, point, throwPunch, toLocal, WORLD } from './physics.js';
-import { steerInside, turnRadius } from './physics/mounted.js';
+import { leanedShoulder, steerInside, turnRadius } from './physics/mounted.js';
 import { vec, yawRotate } from './pose.js';
 
 /**
@@ -52,6 +52,9 @@ import { vec, yawRotate } from './pose.js';
  * - patience: after `passes` passes, or `seconds` s, without a blow landing
  *   (on a man or his horse) a rider stops riding past and rides in beside his
  *   man at a pace that lets him strike (as two riders who are together do).
+ * - assist: the player's charge (chargeAt): after the pass he rides on `through` m past his man before he wheels,
+ *   and it is over once he faces him again within `face` rad (reined in there); with his man down or gone, once his
+ *   horse is slower than `halted` m/s. Tapped while he steers himself, the blow alone is readied, for `ready` s.
  * - lane: friends' horses are steered clear of: a friend that will pass within
  *   `gap` m of him inside `look` s (at the speeds they have now) is ridden away
  *   from (`push` of the turn), and one ahead in his lane is not ridden up
@@ -74,6 +77,7 @@ export const RIDING = {
   wheel: { room: 0.45, from: 0.3, slowest: 0.5 },
   patience: { passes: 3, seconds: 25 },
   lane: { gap: 2.6, look: 1.6, push: 1.8, footGap: 1.6 },
+  assist: { through: 8, face: 0.45, halted: 0.5, ready: 4 },
 };
 
 const aheadOf = (yaw) => yawRotate([1, 0, 0], yaw);
@@ -239,8 +243,11 @@ function strikeInPassing(world, fighter, target, attacks, markOf, zoneOf, forwar
     const t = contactTime(fighter, spec);
     if (t > RIDING.lookAhead) continue;
     usable[name] = weight;
-    const shoulder = vec.add(point(fighter.x, P[`${spec.limb[0]}Shoulder`]), vec.scale(mine, t));
     const mark = vec.add(markOf(target), vec.scale(theirs, t));
+    // (From the saddle, from where his shoulder goes leaning out to the mark: physics/mounted.js saddleReach.)
+    const sitting = point(fighter.x, P[`${spec.limb[0]}Shoulder`]);
+    const leaning = fighter.mount && spec.path === 'blade' && !spec.couched;
+    const shoulder = vec.add(leaning ? leanedShoulder(fighter, sitting, vec.sub(mark, vec.scale(mine, t))) : sitting, vec.scale(mine, t));
     const gap = vec.sub(mark, shoulder);
     const reach = reachFromShoulder(fighter, spec) * RIDING.reachShare;
     if (vec.length(gap) > reach) continue;
@@ -289,6 +296,24 @@ function strikeInPassing(world, fighter, target, attacks, markOf, zoneOf, forwar
   }
   fighter.cooldown = RIDING.rest;
   return true;
+}
+
+/** From the shoulder, the furthest any strike of his style reaches (0.7 m at least). */
+function styleReach(fighter, style) {
+  return Math.max(...Object.keys(style.attacks).map((name) => (MOVES[name]?.kind === 'strike' ? reachFromShoulder(fighter, MOVES[name]) : 0)), 0.7);
+}
+
+/**
+ * How far to one side of his man (m) a rider rides his line: beside a man on foot, near enough that his body is well
+ * within the reach from the shoulder (above him: WORLD.mount.passReach of it), and no nearer than `pass`; a rider,
+ * `passMounted`; with a couched lance, `passLance`.
+ */
+function passWidth(fighter, opponent, style, lance) {
+  if (lance) return WORLD.mount.passLance;
+  if (opponent.mount) return WORLD.mount.passMounted;
+  const drop = point(fighter.x, P.rShoulder)[1] - aimPoint(opponent, markZone(opponent))[1];
+  const beside = Math.sqrt(Math.max(0, (styleReach(fighter, style) * WORLD.mount.passReach) ** 2 - drop * drop)) + fighter.body.lengths.shoulderSpan / 2;
+  return Math.max(WORLD.mount.pass, beside);
 }
 
 /** What a rider strikes at: a man on foot below him, his head and shoulders (what is in reach from the saddle); a rider, his body. */
@@ -350,11 +375,8 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   const ahead = vec.dot(along, forward);
   const impatient = keepPatience(world, fighter, ride);
   // To one side of him, his weapon side (the right): pass to his left.
-  const reach = Math.max(...Object.keys(style.attacks).map((name) => (MOVES[name]?.kind === 'strike' ? reachFromShoulder(fighter, MOVES[name]) : 0)), 0.7);
-  // Beside a man on foot, near enough that his body is well within the reach from the shoulder (above him).
-  const drop = point(fighter.x, P.rShoulder)[1] - aimPoint(opponent, markZone(opponent))[1];
-  const beside = Math.sqrt(Math.max(0, (reach * WORLD.mount.passReach) ** 2 - drop * drop)) + fighter.body.lengths.shoulderSpan / 2;
-  const pass = lance ? WORLD.mount.passLance : opponent.mount ? WORLD.mount.passMounted : Math.max(WORLD.mount.pass, beside);
+  const reach = styleReach(fighter, style);
+  const pass = passWidth(fighter, opponent, style, lance);
   const leftOfLine = [-along[2], 0, along[0]];
   // Two riders close and going the same way: a mêlée, not a pass — he keeps beside his man (his
   // man on his weapon side) at his pace and fights there, as long as they stay together. So does a
@@ -408,22 +430,139 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   if (fighter.punch) steerBlow(fighter, opponent);
   if (fighter.punch || fighter.cooldown > 0) return true;
   if (lance) {
-    // The lance couched when the point is about to meet him: its carry and drive do the rest (MOVES couched).
-    const spec = MOVES[lance.move];
-    const mine = groundVelocity(fighter);
-    const theirs = groundVelocity(opponent);
-    const t = RIDING.couchAhead;
-    const shoulder = vec.add(point(fighter.x, P.rShoulder), vec.scale(mine, t));
-    const mark = vec.add(aimPoint(opponent, 'body'), vec.scale(theirs, t));
-    if (ride.phase === 'charge' && vec.length(vec.sub(mark, shoulder)) <= reachFromShoulder(fighter, spec)) {
-      if (throwPunch(world, fighter, lance.move, 'body')) fighter.cooldown = RIDING.rest;
-    }
+    if (ride.phase === 'charge') couchLance(world, fighter, opponent, lance);
     return true;
   }
   // A blow in passing: at a man on foot, his head or body from above; at a rider, his body.
   const zone = markZone(opponent);
   strikeInPassing(world, fighter, opponent, style.attacks, (who) => aimPoint(who, zone), (spec) => (spec.zones.includes(zone) ? zone : spec.zones[0]), forward);
   return true;
+}
+
+/** The lance couched when the point is about to meet him: its carry and drive do the rest (MOVES couched). True if it was. */
+function couchLance(world, fighter, opponent, lance) {
+  const spec = MOVES[lance.move];
+  const mine = groundVelocity(fighter);
+  const theirs = groundVelocity(opponent);
+  const t = RIDING.couchAhead;
+  const shoulder = vec.add(point(fighter.x, P.rShoulder), vec.scale(mine, t));
+  const mark = vec.add(aimPoint(opponent, 'body'), vec.scale(theirs, t));
+  if (vec.length(vec.sub(mark, shoulder)) > reachFromShoulder(fighter, spec) || !throwPunch(world, fighter, lance.move, 'body')) return false;
+  fighter.cooldown = RIDING.rest;
+  return true;
+}
+
+/**
+ * The player's charge (control.js chargeOrder: the attack tapped at a man while he rides): the rider's part of the
+ * charge as the riding AI rides it, at the one man. Phases (`charge.phase`):
+ * - 'charge': at him at the gallop, on the line that passes him on the weapon side (passWidth, as ride()), and the
+ *   blow when its moment comes (blowInPassing), leaning out to him as far as the blade needs (physics/mounted.js
+ *   saddleReach). Ridden past him (or the blow made beside him at a walk), on to:
+ * - 'past': on through, easing to a canter, until he is `assist.through` m behind;
+ * - 'wheel': round to face him again, slowed to a pace whose turning circle fits (wheelPace). Facing him within
+ *   `assist.face` rad, he is reined in and the charge is over.
+ * A man down, out or gone: reined in where he is, and over once the horse stands (`assist.halted` m/s).
+ * Tapped while the player is steering (`charge.reins` false), the horse stays his: only the blow is readied, made
+ * when its moment comes as he rides past the man (asked for too late for it, with the man abreast or past, it is made
+ * at once all the same), and given up after `assist.ready` s without one.
+ * Sets the horse's goal (with the reins); returns whether the charge goes on (false: done, and `charge.end` says how
+ * it ended: 'wheeled', 'beside', 'halted', 'struck', 'late' or 'lapsed').
+ */
+export function chargeAt(world, fighter, charge) {
+  const horse = fighter.mount;
+  const spec = RIDING.assist;
+  const opponent = world.fighters[charge.target];
+  if (fighter.punch && opponent) steerBlow(fighter, opponent);
+  const style = STYLES[fighter.style] ?? STYLES.mix;
+  const lance = style.couchedCharge && fighter.weapon?.held && fighter.weapon.kind === style.weapon ? style.couchedCharge : null;
+  if (!charge.reins) {
+    // Only the blow: made as he passes, steered on to him while it goes; over once it is, or given up.
+    if (!charge.struck && opponent?.state === 'up' && world.time - charge.at <= spec.ready) {
+      blowInPassing(world, fighter, charge, opponent, style, lance);
+      // Asked for too late for its moment (he will be abreast before a blow begun now could land): made at once all the same, at him.
+      const to = vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis));
+      const asked = MOVES[charge.move];
+      const late = vec.dot(to, aheadOf(fighter.mount.yaw)) < Math.abs(fighter.mount.speed) * (asked?.kind === 'strike' ? contactTime(fighter, asked) : 0);
+      if (!charge.struck && !fighter.punch && fighter.cooldown <= 0 && late) {
+        charge.struck = throwPunch(world, fighter, charge.move, charge.zone);
+        charge.late = charge.struck;
+      }
+    }
+    if (fighter.punch && charge.struck) return true;
+    charge.end = charge.struck ? (charge.late ? 'late' : 'struck') : 'lapsed';
+    return !charge.struck && opponent?.state === 'up' && world.time - charge.at <= spec.ready;
+  }
+  horse.goalAt = world.time;
+  fighter.goTo = null;
+  fighter.move = 0;
+  fighter.strafe = 0;
+  if (!opponent || opponent.state !== 'up') {
+    charge.phase = 'halt';
+    horse.goal = { heading: horse.yaw, speed: 0 };
+    if (fighter.punch || Math.abs(horse.speed) > spec.halted) return true;
+    charge.end = 'halted';
+    return false;
+  }
+  const me = [horse.at[0], 0, horse.at[1]];
+  const now = opponent.mount ? [opponent.mount.at[0], 0, opponent.mount.at[1]] : point(opponent.x, P.pelvis);
+  const theirs = groundVelocity(opponent);
+  const lead = Math.min(RIDING.leadMost, Math.hypot(now[0] - me[0], now[2] - me[2]) / Math.max(4, Math.abs(horse.speed)));
+  const target = vec.add(now, vec.scale(theirs, lead));
+  const to = [target[0] - me[0], 0, target[2] - me[2]];
+  const distance = Math.hypot(to[0], to[2]);
+  const along = distance > 1e-6 ? [to[0] / distance, 0, to[2] / distance] : aheadOf(horse.yaw);
+  const forward = aheadOf(horse.yaw);
+  const ahead = vec.dot(along, forward);
+  const toward = headingOf(along[0], along[2]);
+  const setGoal = (heading, speed, room = Infinity) => {
+    let off = heading - horse.yaw;
+    off = Math.atan2(Math.sin(off), Math.cos(off));
+    if (Math.abs(off) > RIDING.wheel.from) speed = Math.min(speed, wheelPace(horse, room));
+    const clear = keepLane(world, fighter, heading, speed);
+    horse.goal = { heading: steerInside(world, horse, clear.heading), speed: clear.speed };
+  };
+  if (charge.phase === 'charge') {
+    // His near side, on his weapon side, at the room the riding AI gives a pass (ride()).
+    const passAt = vec.add(target, vec.scale([-along[2], 0, along[0]], passWidth(fighter, opponent, style, lance)));
+    // (Close in, the line is held: no swerve at the last moment.)
+    setGoal(distance > 3 ? headingOf(passAt[0] - me[0], passAt[2] - me[2]) : horse.goal.heading, horse.paces.gallop);
+    if (!charge.struck) blowInPassing(world, fighter, charge, opponent, style, lance);
+    if (ahead < -0.1 || distance < 1) charge.phase = 'past';
+    // The blow made beside him at a walk (he was there already): nothing to ride through, it is over once it is.
+    else if (charge.struck && !fighter.punch && Math.abs(horse.speed) < RIDING.passing) {
+      horse.goal = { heading: horse.yaw, speed: 0 };
+      charge.end = 'beside';
+      return false;
+    }
+  } else if (charge.phase === 'past') {
+    setGoal(horse.yaw, horse.paces.canter);
+    if (distance > spec.through || horse.goal.heading !== horse.yaw) charge.phase = 'wheel';
+  } else {
+    setGoal(toward, WORLD.mount.turnSpeed, distance);
+    if (ahead > Math.cos(spec.face) && !fighter.punch) {
+      horse.goal = { heading: toward, speed: 0 };
+      charge.end = 'wheeled';
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * The blow of a charge, when its moment comes: a couched lance as the point is about to meet him (couchLance); else
+ * the blow of his style the pass gives (strikeInPassing draws it by the style's weights, as the riding AI's: the move
+ * tapped is not kept, the moment decides), at the place on the man the player asked for (a man on foot, his head,
+ * unless the body was asked). Marks the charge struck once it is thrown.
+ */
+function blowInPassing(world, fighter, charge, opponent, style, lance) {
+  if (fighter.punch || fighter.cooldown > 0) return;
+  if (lance) charge.struck = couchLance(world, fighter, opponent, lance);
+  else {
+    const zone = ['head', 'body'].includes(charge.zone) ? charge.zone : markZone(opponent);
+    const zoneOf = (made) => (made.zones.includes(zone) ? zone : made.zones[0]);
+    charge.struck = strikeInPassing(world, fighter, opponent, style.attacks, (who) => aimPoint(who, zone), zoneOf, aheadOf(fighter.mount.yaw));
+  }
+  if (charge.struck) charge.struckAt = world.time;
 }
 
 /** A wing of horse held on the flank: the horse stands where it is, facing as it was set (formation.js releases it). */

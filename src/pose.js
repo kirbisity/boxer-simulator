@@ -108,6 +108,20 @@ export function twoBoneIK(root, target, upperLength, lowerLength, pole) {
   return vec.add(root, vec.add(vec.scale(axis, along), vec.scale(bend, off)));
 }
 
+/**
+ * A vector tipped over from the vertical by `angle` (rad) towards a way on the floor (`toward`, a unit vector with no height): its
+ * top goes that way and down. (A rotation about the level axis square to `toward`: up × toward, by Rodrigues' formula.)
+ */
+export function tiltToward(v, toward, angle) {
+  if (!angle) return v;
+  const axis = [toward[2], 0, -toward[0]];
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const across = vec.cross(axis, v);
+  const along = vec.dot(axis, v) * (1 - cos);
+  return [v[0] * cos + across[0] * sin + axis[0] * along, v[1] * cos + across[1] * sin + axis[1] * along, v[2] * cos + across[2] * sin + axis[2] * along];
+}
+
 /** Clamp a hand target to what the arm can reach from the shoulder. */
 export function clampReach(shoulder, target, reach) {
   const offset = vec.sub(target, shoulder);
@@ -228,6 +242,12 @@ export function desiredPose(body, intent = {}) {
   out[P.head] = vec.add(neck, [0.012 * H + headOffset[0], L.neckToHead + headOffset[1], headOffset[2]]);
   // A locked head (OUTFITS headLocked) goes where the trunk takes it: no slip, roll or bob of its own.
   if (body.gear?.headLocked) out[P.head] = lockedHead(body, neck, [Math.sin(lean), Math.cos(lean), 0], [Math.cos(lean), -Math.sin(lean), 0], stance.lean);
+  // A rider leaning out of the saddle to his man (`reachOut`: { tilt rad, toward a way on the floor }, physics/mounted.js
+  // saddleReach): his trunk, shoulders and head tipped over about his hips (held in the saddle) that way and down.
+  if (intent.reachOut) {
+    const { tilt, toward } = intent.reachOut;
+    for (const index of [P.neck, P.lShoulder, P.rShoulder, P.head]) out[index] = vec.add(pelvis, tiltToward(vec.sub(out[index], pelvis), toward, tilt));
+  }
 
   if (leaned) {
     const neckAt = out[P.neck];

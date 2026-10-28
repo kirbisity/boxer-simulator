@@ -16,6 +16,7 @@ import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
 import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
+import { chargeAt } from './riding.js';
 
 export const CONTROL = {
   // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`; a walk from `walkFrom` of the footwork's pace up
@@ -92,7 +93,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 } };
+  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null };
 }
 
 /**
@@ -586,6 +587,7 @@ export function swingAt(world, fighter, orders, name, zone) {
   if (finishOnAttack(world, fighter, orders)) return true;
   const mark = attackMark(world, fighter, orders, opponentFor(world, fighter));
   const spec = MOVES[name];
+  if (chargeOrder(world, fighter, orders, mark, name, zone)) return true;
   if (spec?.kind !== 'strike') return throwPunch(world, fighter, name, zone);
   if (mark && (hostile(mark, fighter) || orders.lock === mark.id)) return throwPunch(world, fighter, name, zone);
   if (mark) {
@@ -593,6 +595,24 @@ export function swingAt(world, fighter, orders, name, zone) {
     return throwPunch(world, fighter, name, zone, { at: aimPoint(mark, zone) });
   }
   return throwPunch(world, fighter, name, zone, { at: airAhead(fighter, zone) });
+}
+
+/**
+ * On horseback, an attack asked for at an enemy on his feet is a charge at him (riding.js chargeAt): the rider turns
+ * his horse, rides him down on the line that passes him on the weapon side, makes his blow as they pass (leaning out
+ * to him: physics/mounted.js saddleReach), rides on through, wheels round to face him, and hands the reins back. A
+ * new attack asked for takes another man (or the same again); any movement of the stick or the keys ends it at once
+ * (directFighter). Asked for while he steers himself (the stick or keys held), the reins stay his and only the blow
+ * is readied, made as he passes the man. A bow or a gun is not charged with (it shoots as on foot). True if ordered.
+ */
+export function chargeOrder(world, fighter, orders, man, move, zone) {
+  const spec = MOVES[move];
+  if (!fighter.mount || !man || man.state !== 'up' || !hostile(man, fighter) || spec?.kind !== 'strike' || spec.path === 'aim') return false;
+  // (Steering him himself, the stick or the keys held, he keeps the reins: only the blow is readied for the pass.)
+  const held = orders.stick ?? orders.keyStick;
+  const reins = !(held && held.amount >= CONTROL.stick.deadZone);
+  orders.charge = { target: man.id, move, zone, reins, phase: 'charge', struck: false, struckAt: null, at: world.time, end: null };
+  return true;
 }
 
 /**
@@ -622,7 +642,7 @@ function attack(world, fighter, orders, opponent) {
   }
   opponent = attackMark(world, fighter, orders, opponent);
   if (request.move) {
-    padAttack(world, fighter, request, opponent);
+    if (!chargeOrder(world, fighter, orders, opponent, request.move, request.zone)) padAttack(world, fighter, request, opponent);
     requests.shift();
     return;
   }
@@ -632,7 +652,7 @@ function attack(world, fighter, orders, opponent) {
   const line = aim ? lineFor(fighter, aim, man) : request.line;
   const chosen = chooseAttack(world, fighter, man, line, request.strength, aim);
   requests.shift();
-  if (!chosen) return;
+  if (!chosen || chargeOrder(world, fighter, orders, man, chosen.move, chosen.zone)) return;
   if (aim) fighter.faceAt = { at: aim, until: world.time + CONTROL.faceSeconds };
   // A rush or a clinch goes at the man; a strike at the place.
   // (A man who is no enemy is struck at as the place he is: throwPunch's own man is an enemy.)
@@ -1020,7 +1040,15 @@ export function directFighter(world, fighter, orders, dt) {
     orders.jump = false;
     startJump(world, fighter);
   }
-  fighter.focus = orders.lock ?? undefined;
+  // A charge ordered on horseback (chargeOrder) ends with any movement asked for, or with him off his horse or down.
+  if (orders.charge) {
+    const held = orders.stick ?? orders.keyStick;
+    if (!fighter.mount || fighter.state !== 'up' || (orders.charge.reins && held && held.amount >= CONTROL.stick.deadZone)) {
+      orders.charged = { ...orders.charge, end: fighter.mount && fighter.state === 'up' ? 'cancelled' : 'unhorsed' };
+      orders.charge = null;
+    }
+  }
+  fighter.focus = orders.lock ?? orders.charge?.target ?? undefined;
   // Locked on a man who is no enemy (a civilian, a team-mate): he is still the man he fights, for his blows and his facing.
   fighter.focusAny = Boolean(locked) && orders.lock !== null && !hostile(locked, fighter);
   fighter.faceFoe = facesFoe(world, fighter, orders);
@@ -1040,7 +1068,13 @@ export function directFighter(world, fighter, orders, dt) {
   orders.holds = [];
   if (goPin(world, fighter)) return;
   if (fighter.orderPickup !== undefined && fighter.orderPickup !== null && goPickUp(world, fighter)) return;
-  if (!goClinch(world, fighter, opponent)) steer(world, fighter, orders, opponent, dt);
+  // Charging (chargeOrder): the horse is ridden at his man by the charge, not the stick; over, the reins are the player's.
+  if (!orders.charge?.reins && !goClinch(world, fighter, opponent)) steer(world, fighter, orders, opponent, dt);
+  if (orders.charge && !chargeAt(world, fighter, orders.charge)) {
+    // (Kept, with how it ended, for the screen and the tests.)
+    orders.charged = orders.charge;
+    orders.charge = null;
+  }
   // Running is no fight: while it lasts nothing is guarded, and a block he held when it began comes down. (An attack or the guard
   // asked for ends the run first: runStep.)
   if (fighter.runMode) {
