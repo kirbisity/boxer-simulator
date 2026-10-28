@@ -4,7 +4,7 @@
 
 import { coveringAt, shieldCovering, soundEvent, soundWound } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
-import { buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
+import { BODY, buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
 import { STYLES } from '../moves.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
 import { aimPoint, BLOCKING, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
@@ -165,7 +165,7 @@ export function firstHit(world, shooter, from, to) {
       // Above the chest (past the trunk's top as a blow meets it) is the throat:
       // no vest covers it, and a round there is as deadly as one to the head.
       const throat = capsule.key === 'trunk' && capsule.bLength && meet.t > capsule.bLength;
-      if (!best || s < best.s) best = { fighter: other, capsule, target: throat ? 'throat' : capsule.key, throat, s, point: vec.lerp(from, to, s) };
+      if (!best || s < best.s) best = { fighter: other, capsule, target: throat ? 'throat' : capsule.key, throat, s, point: vec.lerp(from, to, s), offAxis: miss / capsule.radius, along: meet.t };
     }
   }
   return best;
@@ -381,6 +381,33 @@ export function flyArrows(world, dt) {
 }
 
 /**
+ * How fast an arrow wound bleeds (ARROW.wound): by what its path went
+ * through, judged by where it struck the part (how far along it, and how near
+ * its axis the path passed: `hit.along`, `hit.offAxis`). `through`: the share
+ * of a war arrow's energy that got past the armour. Returns { rate, what }
+ * (a share of his blood a second; the vessel opened, if one was).
+ */
+function arrowBleed(victim, hit, key, through, scale) {
+  const spec = ARROW.wound;
+  const deep = (hit.offAxis ?? 1) < spec.deep && through >= spec.deepFrom;
+  const toCollapse = (seconds) => {
+    // The rate that, easing as it clots, has lost what is left of his blood to collapse in `seconds` s.
+    const clot = BLADES.clotSeconds;
+    const left = Math.max(0, BLADES.collapseAt * BODY.toughness - (victim.bloodLost ?? 0));
+    return left / (clot * (1 - Math.exp(-seconds / clot)));
+  };
+  if (hit.throat) return deep || through >= spec.deepFrom ? { rate: toCollapse(spec.seconds.chest), what: 'the neck\'s vessels opened' } : { rate: spec.rate.head * through * scale, what: null };
+  if (key === 'head') return { rate: spec.rate.head * through * scale, what: null };
+  if (key === 'trunk') {
+    if (!deep) return { rate: spec.rate.torso * through * scale, what: null };
+    if ((hit.along ?? 0) > spec.chestFrom) return { rate: toCollapse(spec.seconds.chest), what: 'through the heart\'s great vessels' };
+    return { rate: toCollapse(spec.seconds.abdomen), what: 'into the great vessels of the belly' };
+  }
+  if (deep && (key.endsWith('Thigh') || key.endsWith('UpperArm'))) return { rate: toCollapse(spec.seconds.artery), what: key.endsWith('Thigh') ? 'the femoral artery opened' : 'the brachial artery opened' };
+  return { rate: spec.rate.muscle * through * scale, what: null };
+}
+
+/**
  * An arrow strikes: off a shield, or off good armour (most of the time),
  * it glances; otherwise a piercing wound (cut by the armour's pierce
  * protection), scaled to the part's weight and hurt, bleeding, with a
@@ -432,8 +459,10 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   victim.gunshot = (victim.gunshot ?? 0) + harm;
   victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
   victim.damageVersion += 1;
-  victim.bleed = (victim.bleed ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
-  victim.bleedOutside = (victim.bleedOutside ?? 0) + ARROW.bleed[region] * (1 - stopped) * scale;
+  const vessel = arrowBleed(victim, hit, key, energy * (1 - stopped), scale);
+  victim.bleed = (victim.bleed ?? 0) + vessel.rate;
+  victim.bleedOutside = (victim.bleedOutside ?? 0) + vessel.rate;
+  if (vessel.what) event.effects.push(vessel.what);
   Object.assign(event, { harm, region, pierce: harm * 60 });
   // Heard: the wound, as bad as its share of what kills.
   if (world.ear && harm > 0) soundWound(world, victim, 'stab', Math.min(1, harm), hit.point);
