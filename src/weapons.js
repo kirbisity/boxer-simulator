@@ -1119,7 +1119,28 @@ export function bulletProof(bulletRating, energy = GUN.energy) {
 export const ARROW = {
   speed: 55, gravity: 9.81, spread: 0.02, length: 0.8,
   lethal: { head: 0.85, torso: 0.4, limb: 0.13 },
-  bleed: { head: 0.02, torso: 0.03, limb: 0.012 },
+  // How an arrow (or a bolt) wound bleeds: by what it went through. The shaft and head stay in the track and plug
+  // it, and the track is narrow (a point, not a ball's cavity), so through muscle and the body's soft parts a man
+  // bleeds slowly, over hours (the surgeons of the Hundred Years' War and of the Napoleonic wars both drew arrows
+  // from men who had fought on with them: a share of a man's blood a second at the start, easing as it clots,
+  // BLADES.clotSeconds, so a `muscle` wound loses ~5% of his blood, a `torso` one ~7%, against the ~21% at which he
+  // collapses (BLADES.collapseAt × BODY.toughness): he fights on, slowed, and takes several before he drops of it). It kills in minutes only where it opens a great vessel:
+  // - `artery`: the femoral or brachial artery, deep in the thigh or the upper arm (an arrow whose path passes
+  //   within `deep` of the limb's radius of its axis, where the vessel runs by the bone): `seconds.artery` to collapse;
+  // - `chest`: deep in the upper trunk (the same `deep` share off its axis, above `chestFrom` of the way from
+  //   the pelvis to the neck): the heart and the great vessels, `seconds.chest` s of fight left (an arrow is slower
+  //   than a blade's open cut: the shaft holds the wound, Bodiam's and Towton's men shot through the chest);
+  // - `abdomen`: deep in the belly below that: the aorta, the vena cava, the liver: `seconds.abdomen` to collapse;
+  // - `throat`: the neck's vessels (carotid, jugular): as the chest;
+  // - `head`: the scalp and face bleed freely but little (an arrow into the skull kills by `lethal`).
+  // Each scaled by how much of it got through the armour, and only `deepFrom` of a war arrow's energy or more
+  // reaches a great vessel. A bullet's wound is not this: the ball tears a cavity that bleeds freely (GUN.bleed),
+  // and is left as it is.
+  wound: {
+    rate: { muscle: 0.002, torso: 0.003, head: 0.003 },
+    seconds: { artery: 90, abdomen: 60, chest: 20 },
+    deep: 0.4, chestFrom: 0.45, deepFrom: 0.3,
+  },
   impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
   // What a long bow's war arrow carries (J; energy 1): a ~70 g shaft at ~55 m/s, ~100 J (a heavy war bow's bodkin, more:
   // the longbow's `arrowEnergy`). In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
