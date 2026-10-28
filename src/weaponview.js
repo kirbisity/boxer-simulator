@@ -25,6 +25,9 @@ export const GORE = {
   pieceSeconds: 1.1,
   colour: 0x8a0d12,
   stainColour: 0x5a0a0d,
+  // A machine's severed stump (gear.machine): dark metal round the bright end of an actuator.
+  machineStump: 0x2b2d31,
+  machineCore: 0x9aa3ad,
   // Sparks: steel on steel tears off glowing flecks of hot metal; at most this many in the air.
   maxSparks: 400,
 };
@@ -1631,10 +1634,16 @@ export function severView(view, fighterView, event, debris) {
   const base = P[name(part.base)];
   const proximal = event.joint === 'neck' ? P.neck : P[name({ shoulder: 'Shoulder', elbow: 'Shoulder', wrist: 'Elbow', hip: 'Hip', knee: 'Hip', ankle: 'Knee' }[event.joint])];
   const radius = debris.radius * (event.joint === 'neck' ? 0.55 : 1.12);
-  const stump = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), surface(0x7e1016, { roughness: 0.4 }));
-  stump.add(new THREE.Mesh(new THREE.SphereGeometry(radius * 0.35, 8, 6), surface(0xe8dcc4)));
+  // A machine (gear.machine) has no flesh and no blood: the stump is dark metal round a bright actuator, and it throws sparks, not blood.
+  const machine = Boolean(fighterView.fighter.body.gear.machine);
+  const stump = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), machine ? surface(GORE.machineStump, { roughness: 0.5, metalness: 0.7 }) : surface(0x7e1016, { roughness: 0.4 }));
+  stump.add(new THREE.Mesh(new THREE.SphereGeometry(radius * 0.35, 8, 6), surface(machine ? GORE.machineCore : 0xe8dcc4)));
   fighterView.group.add(stump);
   (fighterView.stumps ??= []).push({ mesh: stump, base: event.joint === 'neck' ? P.head : base, from: proximal, along: event.joint === 'neck' ? 0.55 : 1 });
+  if (machine) {
+    spawnSparks(view, event.point, 30);
+    return;
+  }
   // Blood: from the stump in beats, and from the piece's cut face.
   const blood = bloodOf(view);
   blood.emitters.push({ kind: 'stump', fighterView, base: event.joint === 'neck' ? P.head : base, from: proximal, along: event.joint === 'neck' ? 0.55 : 1, start: view.clock ?? 0, seconds: GORE.stumpSeconds });

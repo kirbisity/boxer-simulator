@@ -1542,9 +1542,10 @@ export const OUTFITS = {
   // off (`deflects`), a blow or an arrow not square on the domed chest
   // shell or the round head shell glances (`breastplate`, `helmet`: a light
   // shell, little padding behind it). Its joints are bare actuators: an
-  // edge finds them as it finds plate's gaps. No fear.
+  // edge finds them as it finds plate's gaps. No fear, and no blood
+  // (`machine`: no morale at all, nothing to bleed; ai.js, physics.js).
   humanoid: {
-    faction: 'specials', bulletRating: 500,
+    faction: 'specials', bulletRating: 500, machine: true,
     label: 'Humanoid robot', movement: 'good', fists: 'gloved-tactical', courage: 1,
     breastplate: 0.6,
     helmet: { mass: 0.8, padding: 0.25, curve: 0.8 },
@@ -1571,7 +1572,8 @@ export const OUTFITS = {
   // picked out in #D97757.
   combatBot: {
     // Its neck in an armoured collar (`arrowproof`: the throat covered as the trunk; an arrow glances off the plate).
-    faction: 'specials', bulletRating: 3500, plated: true, arrowproof: true,
+    // A machine (`machine`): no morale, no blood, as the humanoid.
+    faction: 'specials', bulletRating: 3500, plated: true, arrowproof: true, machine: true,
     label: 'Combat bot — armoured', movement: 'limited', fists: 'gauntlet', courage: 1,
     extraMass: 55 / 115, balance: 1.5,
     mounted: { r: 'armRifle', l: 'armShotgun' },
@@ -1823,6 +1825,8 @@ export function gearTraits(inputs) {
     poise: spec.poise ?? 0,
     // Courage from good armour: less fear, readier to close (0 to 1); a man's own (`outfit.courage`: one who never breaks) before the kit's.
     courage: inputs.outfit?.courage ?? spec.courage ?? 0,
+    // A machine (a robot): no morale (never afraid, never runs; ai.js feelFear) and no blood (never bleeds, nothing spilt; physics.js, weaponview.js).
+    machine: Boolean(spec.machine),
     // Trained to fight in ranks (formation.js): { advance, charge, testudo } — the line moves up to the enemy (closed under its shields if `testudo`; the last `charge` m at a run), or holds.
     drill: spec.drill ?? null,
     // A full plate harness: no gap for an edge (a point may still find one).
