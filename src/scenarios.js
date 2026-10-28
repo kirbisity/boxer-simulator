@@ -303,9 +303,61 @@ const RHODES = {
 export function battleOf(key) {
   const scenario = SCENARIOS[key];
   const wings = scenario.wings;
-  if (!wings) return scenario;
+  if (!wings) return drawnApart(scenario);
   const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, { ...scenario.formation?.[corner], ...wings.formation?.[corner] }]));
-  return { ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation, cast: (random) => wings.cast(random, scenario.cast(random)) };
+  return drawnApart({ ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation, cast: (random) => wings.cast(random, scenario.cast(random)) });
+}
+
+/**
+ * The armies of a battle start further apart than a level's own numbers put
+ * them: room for the bows and guns to shoot before the lines meet, and for a
+ * line to be seen coming. Each side's `front` (m from the middle to its first
+ * row) is drawn back by `factor` (so the gap between the two front lines is
+ * that much wider), to at least `least` m between them; a `layout`'s men
+ * (Qi Jiguang's squads) stand where they did, behind a front drawn back the
+ * same. The floor is lengthened by as much as the further side went back, so
+ * each army keeps the ground it had behind it (the width, across, is as it
+ * was: the lines are no wider), but never past what the
+ * place's fixed scenery leaves open (`room`: the town's house fronts, the
+ * port's lane of containers, the water town's shops); the camera draws back
+ * with the floor, short of a `room`'s `camera` (the square's house fronts).
+ * A level may draw its armies apart by a factor of its own (`spread`): one
+ * whose place is too small for the whole of it.
+ * Only the battles: a duel (no `cast`) and the levels' own data
+ * (SCENARIOS[key], the sandbox's fixtures and the fingerprint's) are left as they are.
+ */
+export const SPREAD = {
+  factor: 1.5,
+  least: 12,
+  room: {
+    // Maidstone's square: the house fronts stand at 12.5 m (render.js buildTown); the camera never further out than they are.
+    town: { halfX: 11.5, camera: 10.5 },
+    // The water town's square: its shops at ±19.5 m (props/jiangnan.js JIANGNAN_PLAN), wine jars before them.
+    jiangnan: { halfX: 18 },
+    // The lane between the container stacks: their ends at ±11.3 m (props/harbour.js).
+    port: { halfX: 11 },
+  },
+};
+
+/** A battle with its armies drawn apart (SPREAD). */
+function drawnApart(level) {
+  if (!level.cast || !level.formation) return level;
+  const factor = level.spread ?? SPREAD.factor;
+  const fronts = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front ?? 0]));
+  const gap = fronts.red + fronts.blue;
+  // To at least SPREAD.least between the lines: both sides drawn back alike.
+  const scale = gap > 0 ? Math.max(factor, SPREAD.least / gap) : factor;
+  const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front === undefined ? level.formation[corner] : { ...level.formation[corner], front: fronts[corner] * scale }]));
+  const back = Math.max(...['red', 'blue'].map((corner) => fronts[corner] * (scale - 1)));
+  const room = SPREAD.room[level.scene];
+  const halfX = Math.min(room?.halfX ?? Infinity, level.arena.halfX + back);
+  const grown = halfX / level.arena.halfX;
+  const camera = level.camera && {
+    ...level.camera,
+    distance: Math.min(room?.camera ?? Infinity, level.camera.distance * grown),
+    ...(level.camera.maxDistance !== undefined ? { maxDistance: Math.min(room?.camera ?? Infinity, level.camera.maxDistance * grown) } : {}),
+  };
+  return { ...level, arena: { ...level.arena, halfX }, camera, formation };
 }
 
 export const SCENARIOS = {
@@ -346,6 +398,8 @@ export const SCENARIOS = {
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
     roster: 'Two mounted knights and three foot soldiers · twenty rebels with spears',
+    // Drawn apart a quarter (not SPREAD's half): the square holds no more between its house fronts, the lords' horses behind their foot.
+    spread: 1.25,
     // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
     formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
