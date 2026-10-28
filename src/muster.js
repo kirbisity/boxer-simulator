@@ -20,7 +20,8 @@ import { WINGS, placeWings } from './formation.js';
 import { ARMIES } from './scenarios.js';
 
 export const MUSTER = {
-  // Men a side at most: the biggest side of the levels (the Japanese at Pyongyang, fifty-two), so
+  // Men a side at most: the biggest side of the levels (Atahualpa's retinue at Cajamarca, fifty-two:
+  // the set battles are otherwise thirty-six a side or fewer, kept to about seventy men in all), so
   // a side set by hand is never bigger than one the game already fights.
   cap: 52,
   // The deployment zone: a side's own half of the floor, from this far (m) behind the middle

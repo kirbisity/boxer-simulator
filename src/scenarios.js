@@ -10,14 +10,15 @@ import { SUBWAY_ARENA } from './props/subway.js';
 import { atahualpa, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 import { gallicHorseman, gothWarrior, hunRider, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from './cast.js';
 
-// Rome against Han: fifty a side, ten to a rank; a centurion to every
+// Rome against Han: thirty-five a side (every level's armies are kept to about seventy men in all: the
+// physics steps every one of them every frame), ten to a rank; a centurion to every
 // eighty legionaries (a century), Li Ling among his crossbowmen.
-export const LEGION = { perSide: 50, arena: { halfX: 26, halfZ: 12 }, wingsArena: { halfX: 42, halfZ: 17 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 10 }, romanFront: 14, hanFront: 3, century: 80 };
+export const LEGION = { perSide: 35, arena: { halfX: 26, halfZ: 12 }, wingsArena: { halfX: 42, halfZ: 17 }, ranks: { spacing: 0.95, rowSpacing: 1.2, perRow: 10 }, romanFront: 14, hanFront: 3, century: 80 };
 
 // The horse of Rome against Han: an ala of auxiliaries (spatha and spear) for the legion, and for
 // the Han a troop of frontier cavalry: sabre and spear, and two horse archers (Li Ling's men met the
-// Xiongnu's). They take the place of a rear rank of foot, so a side stays fifty.
-const LEGION_HORSE = { roman: { longsword: 4, spear: 4 }, han: { dao: 3, spear: 3, steppeBow: 2 } };
+// Xiongnu's). They take the place of a rear rank of foot, so a side stays thirty-five.
+const LEGION_HORSE = { roman: { longsword: 3, spear: 3 }, han: { dao: 2, spear: 2, steppeBow: 2 } };
 const total = (styles) => Object.values(styles).reduce((sum, count) => sum + count, 0);
 
 /** The two armies of Rome against Han, `count` a side. */
@@ -32,10 +33,11 @@ export function legionSides(random, count = LEGION.perSide) {
  * applyWeather): fog [near, far] in metres from the camera, light — at the
  * far edge of the fighting the haze is a fifth to a third, the land beyond
  * goes soft and the far hills are silhouettes. The wokou came up the canals
- * at first light; Maidstone's square, a June dawn. (Nagashino's morning in the
- * rainy season, and Agincourt's after a night's rain, are given with their levels.)
+ * at first light; the morning of Sekigahara was famously foggy; Maidstone's
+ * square, a June dawn. Pyongyang uses the same place as Sekigahara, clear.
+ * (Agincourt's grey morning after a night's rain is given with its level.)
  */
-export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], port: [8, 45] };
+export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [12, 120], port: [8, 45] };
 
 /**
  * Pier 9's sea fog at 2 a.m.: a light fog off the water, dim warm grey where
@@ -51,25 +53,55 @@ const WEATHER_SEA_FOG = { fog: WEATHER_MIST.port, colour: 0x3c362e, sky: 0.85, h
  * the bout is built, as the builder's slider would.
  */
 
-// The West (Ishida's, Toyotomi's) at Sekigahara, in black and blue: the Japanese army's colours at Pyongyang.
+// Sekigahara, 21 October 1600: Tokugawa Ieyasu's Eastern army (some 75-90,000) against the Western army of Ishida
+// Mitsunari and the Toyotomi lords (about as many, a little more on paper) in a valley in the morning fog; the guns
+// and the spears fought it out in the middle until Kobayakawa turned on his own side. Here, as nearly even as the
+// armies were, the West one more: thirty-five to thirty-four, each with its mounted samurai on a flank to charge when
+// the lines close (`wings` below). Blades and polearms first (the front ranks), the bows and guns last.
+const SEKIGAHARA_SIDE = {
+  east: {
+    samurai: { katana: 3, naginata: 2, spear: 2, bow: 1 },
+    ashigaru: { spear: 8, bow: 3, matchlock: 5, katana: 3, naginata: 1 },
+  },
+  west: {
+    samurai: { katana: 3, naginata: 2, spear: 2, bow: 2 },
+    ashigaru: { spear: 8, bow: 3, matchlock: 5, katana: 3, naginata: 1 },
+  },
+};
+
+// Each army's colours: the East (Tokugawa) in red, the West (Ishida's, Toyotomi's) in black and blue (the Japanese army's colours at Pyongyang).
+const SEKIGAHARA_EAST = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
 const SEKIGAHARA_WEST = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
+// A side's mounted samurai: spears (the yari from the saddle), a sword and the bow.
+const SEKIGAHARA_HORSE = { spear: 3, katana: 1, bow: 2 };
+
+function sekigaharaSide(random, army, colours) {
+  const warriors = [];
+  for (const [rank, styles] of Object.entries(SEKIGAHARA_SIDE[army])) {
+    for (const [style, count] of Object.entries(styles)) {
+      for (let index = 0; index < count; index += 1) warriors.push(sengokuWarrior(random, colours, style, rank));
+    }
+  }
+  const shooter = (warrior) => (STYLES[warrior.style]?.ranged ? 1 : 0);
+  return warriors.sort((a, b) => shooter(a) - shooter(b));
+}
 
 // Pyongyang, 1593: the Ming army storms the city held by Konishi
-// Yukinaga. Eighteen Ming foot and fifty-two Japanese; the Ming regulars
+// Yukinaga. Fifteen Ming foot and forty-four Japanese; the Ming regulars
 // only — brigandine and elite — led by an elite with the guandao; gun and bow
 // men behind on both sides. Li Rusong's Liaodong horse ride with them (below):
 // the Ming came south with the northern cavalry the Japanese did not have; here
 // the Japanese hold the city with more men than the Ming bring to this part of the wall.
 const PYONGYANG_MING = {
-  elite: { guandao: 2, matchlock: 1, threeEyed: 1 },
-  brigandine: { swordShield: 6, spear: 4, matchlock: 4 },
+  elite: { guandao: 2, threeEyed: 1 },
+  brigandine: { swordShield: 5, spear: 4, matchlock: 3 },
 };
 const PYONGYANG_JAPANESE = {
-  samurai: { katana: 7, naginata: 3, spear: 4 },
-  ashigaru: { spear: 17, matchlock: 13, bow: 8 },
+  samurai: { katana: 6, naginata: 2, spear: 4 },
+  ashigaru: { spear: 14, matchlock: 11, bow: 7 },
 };
 // The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
-const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 3 };
+const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 2 };
 
 /** Blades and polearms first (the front ranks), bows and guns last. */
 // Where the bows and guns open a battle: in the front rows, shooting, the
@@ -271,6 +303,17 @@ const QI_DRILL = { advance: false, squad: true };
 // Qi's army's discipline (ai.js AI.morale): his law, and a year of drill.
 const QI_DISCIPLINE = 1;
 
+// Qi's trench. His Jixiao xinshu rings a camp with a ditch and its rampart, and his men dug in where they were to
+// stand: a trench across the square before the squads, from the shops on its north side to the canal's embankment (so
+// there is no way round it: `from`, `to`, z in m, the square's edges, props/jiangnan.js JIANGNAN_PLAN), the spoil thrown
+// up on the squads' side into a bank. The raiders' rush has to cross it: down into it and up the bank (a man climbs a
+// slope at a pace that falls with its grade: fieldworks.js FIELDWORKS.climb), the fowling pieces behind it firing at them
+// as they struggle through, the rest of the squads waiting at the top. The Ming do not sally across it (formation `drill`
+// advance false: they hold their places), so it has no gaps. Dug as the ditch at Cerignola was, by hand in a night: 1.2 m
+// down to a bottom a metre wide, the bank 0.7 m over the square, five metres across in all (`profile`: the ground's height
+// by the metre across it, toward the Ming). The bank's back foot stands `before` m short of the guns' line, so the squads' places are on level ground.
+const QI_TRENCH = { from: -15.5, to: 11.8, before: 0.8, profile: [[-2.4, 0], [-1.6, -1.2], [-0.5, -1.2], [0.3, 0.7], [1.5, 0.7], [2.6, 0]] };
+
 // Without the squads' arms (qiJiguangLevel `weapons` off, for measuring): the
 // same men armed as the coast garrison was (WOKOU.garrison's spears and dao,
 // a few shields, no guns), in the same proportions.
@@ -307,19 +350,27 @@ function qiArmy(random, { weapons = true } = {}) {
  * - `tactics`: the squads drawn up and drilled as squads (formation `layout`
  *   and `drill`: places kept, shooters falling back, the wounded relieved,
  *   several on one), or a crowd in rows as the garrison stood;
- * - `weapons`: the squad's arms (shields, spears, fowling pieces), or the garrison's.
+ * - `weapons`: the squad's arms (shields, spears, fowling pieces), or the garrison's;
+ * - `trench`: the ditch and bank across the square before the squads (QI_TRENCH), or open ground.
  */
-export function qiJiguangLevel({ morale = true, tactics = true, weapons = true } = {}) {
+export function qiJiguangLevel({ morale = true, tactics = true, weapons = true, trench = true } = {}) {
+  const gunsFront = WOKOU.front - 2.4;
   const drawnUp = tactics
-    ? { front: WOKOU.front - 2.4, layout: qiArmy(() => 0.5, { weapons }).layout, loose: 0.1, drill: QI_DRILL }
+    ? { front: gunsFront, layout: qiArmy(() => 0.5, { weapons }).layout, loose: 0.1, drill: QI_DRILL }
     : { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 };
+  // The trench is dug before the squads where the battle draws them (SPREAD: the lines start further apart than a level's
+  // own numbers put them, the works are not moved with them), the bank's back foot `before` m short of the guns.
+  const gunsAt = gunsFront * spreadScale({ red: WOKOU.front, blue: gunsFront });
+  const ditch = QI_TRENCH.profile;
+  const line = gunsAt - QI_TRENCH.before - ditch[ditch.length - 1][0];
+  const works = trench ? { ditches: [{ from: [line, QI_TRENCH.from], to: [line, QI_TRENCH.to], profile: ditch }] } : null;
   return {
     title: "Qi Jiguang's army",
     place: 'Taizhou, Zhejiang · 1561',
     blurb: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, fowling pieces firing as the raiders come on. Qi stands behind them with his guards, in iron lamellar, with the guandao.",
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
-    arena: { halfX: 14, halfZ: 9 },
+    arena: { halfX: 14, halfZ: 9, ...(works ? { works } : {}) },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: `Twenty-six raiders · ${QI.squads} squads of twelve, Qi Jiguang and ${QI.guards.length} guards`,
     // Each man where his squad puts him; the squads drilled as a whole (formation.js), under Qi's discipline (ai.js AI.morale).
@@ -389,9 +440,9 @@ function hollowSquare({ sides, spacing }) {
 // horse on both flanks, sabre, spear and bow; against the Xiongnu, every man
 // of them a horse archer in felt and leather, a few with the spear.
 const MOBEI = {
-  crossbow: 30,
-  horse: { dao: 6, spear: 6, steppeBow: 4 },
-  xiongnu: { steppeBow: 44, spear: 4 },
+  crossbow: 23,
+  horse: { dao: 4, spear: 4, steppeBow: 3 },
+  xiongnu: { steppeBow: 32, spear: 3 },
   arena: { halfX: 60, halfZ: 38 },
   // The crossbowmen's front this far (m) from the middle, ten to a rank; the Xiongnu's first riders this far on the other side.
   hanFront: 52,
@@ -412,12 +463,12 @@ const MOBEI = {
 const CATALAUNIAN = {
   // The Roman foot (spear and spatha), and its archers on its flank (sagittarii: the late Roman army shot the
   // composite bow it had taken from the steppe).
-  romans: { spearOval: 12, spathaOval: 6 },
-  archers: { steppeBow: 8 },
-  visigoths: { spearRound: 9, spathaRound: 7 },
-  visigothHorse: { spear: 4, spatha: 4 },
-  huns: { rider: { steppeBow: 12 }, noble: { steppeBow: 2, spatha: 2 } },
-  germans: { spearRound: 20, spathaRound: 14 },
+  romans: { spearOval: 8, spathaOval: 4 },
+  archers: { steppeBow: 6 },
+  visigoths: { spearRound: 6, spathaRound: 5 },
+  visigothHorse: { spear: 3, spatha: 3 },
+  huns: { rider: { steppeBow: 8 }, noble: { steppeBow: 2, spatha: 1 } },
+  germans: { spearRound: 14, spathaRound: 10 },
   arena: { halfX: 58, halfZ: 38 },
   front: 20,
 };
@@ -433,12 +484,12 @@ const CATALAUNIAN = {
 // Gallic horse on its flanks; against horse archers with their camel train behind
 // them (`train`: the floor's end, where render.js draws the camels) and a few cataphracts.
 const CARRHAE = {
-  legionaries: 44,
-  gauls: { spear: 4, longsword: 2 },
-  parthians: { archer: { steppeBow: 24 }, cataphract: { kontos: 3 } },
+  legionaries: 40,
+  gauls: { spear: 3, longsword: 2 },
+  parthians: { archer: { steppeBow: 21 }, cataphract: { kontos: 3 } },
   arena: { halfX: 60, halfZ: 40 },
-  // The square two deep: a ring of eight a side and, two metres within it, one of five; a pace and a quarter apart (the scutum's width and an elbow's room).
-  square: { sides: [8, 5], spacing: 1.25 },
+  // The square two deep: a ring of seven a side and, a pace within it, one of five; a pace and a quarter apart (the scutum's width and an elbow's room).
+  square: { sides: [7, 5], spacing: 1.25 },
   // Crassus's square stood under the arrows (it marched on only at night, in retreat): it holds its ground, shields locked.
   drill: { advance: false, square: true },
   romanFront: 12,
@@ -519,6 +570,7 @@ export const ARMIES = {
     // The rising of 1381: villagers with the fork and the spear, and the longbow every Englishman was bound to practise with.
     ranks: { rebel: { label: 'Rebel', kinds: ['commoner'], styles: ['pitchfork', 'spear', 'bow'], make: (random, style) => normaliseInputs({ ...rebel(random), style }) } },
   },
+  east: { label: 'The East', ...sengokuArmy(SEKIGAHARA_EAST) },
   west: { label: 'The West', ...sengokuArmy(SEKIGAHARA_WEST) },
   ming: {
     label: 'The Ming army',
@@ -708,16 +760,19 @@ export const SPREAD = {
   },
 };
 
+/** How much each front is drawn back (SPREAD): by `factor`, to at least SPREAD.least between the lines, both sides drawn back alike. */
+function spreadScale(fronts, factor = SPREAD.factor) {
+  const gap = fronts.red + fronts.blue;
+  return gap > 0 ? Math.max(factor, SPREAD.least / gap) : factor;
+}
+
 /** A battle with its armies drawn apart (SPREAD). */
-function drawnApart(level) {
+export function drawnApart(level) {
   if (!level.cast || !level.formation) return level;
   // An ambush (a side's `ambush`: Cajamarca) is laid where it was laid: its men are not in lines to draw apart.
   if (level.formation.red?.ambush || level.formation.blue?.ambush) return level;
-  const factor = level.spread ?? SPREAD.factor;
   const fronts = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front ?? 0]));
-  const gap = fronts.red + fronts.blue;
-  // To at least SPREAD.least between the lines: both sides drawn back alike.
-  const scale = gap > 0 ? Math.max(factor, SPREAD.least / gap) : factor;
+  const scale = spreadScale(fronts, level.spread);
   const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front === undefined ? level.formation[corner] : { ...level.formation[corner], front: fronts[corner] * scale }]));
   const back = Math.max(...['red', 'blue'].map((corner) => fronts[corner] * (scale - 1)));
   const room = SPREAD.room[level.scene];
@@ -731,13 +786,14 @@ function drawnApart(level) {
   return { ...level, arena: { ...level.arena, halfX }, camera, formation };
 }
 
-// ---- Agincourt, Cerignola, Nagashino: battles won from behind what was dug, planted and soaked ----
+// ---- Agincourt and Cerignola: battles won from behind what was dug, planted and soaked ----
 //
-// Three defenders' victories, each fought on ground that did half the work: the field, its mud and its
+// Two defenders' victories, each fought on ground that did half the work: the field, its mud and its
 // fieldworks are the level's `arena.works` (physics/fieldworks.js: stakes, walls, ditches, soft ground),
-// as they were there; the armies are what they were, in proportion, fifty-two at most a side
-// (muster.js MUSTER.cap). The defender stands (formation `drill`, advance false: formation.js) and shoots;
-// the attacker comes on, his horse released from the flanks first, as each battle opened.
+// as they were there; the armies are what they were, in proportion, thirty-five or so a side
+// (the game keeps every level to about seventy men in all: the physics steps each of them every frame).
+// The defender stands (formation `drill`, advance false: formation.js) and shoots; the attacker comes on,
+// his horse released from the flanks first, as each battle opened. (Qi Jiguang's trench, with the same works, is with his level.)
 // Red attacks from -x, blue holds at +x. These levels keep their own spacing (`spread` 1): the works stand
 // where the lines are drawn up, and a battle map's drawing apart (SPREAD) would leave them behind.
 
@@ -752,19 +808,21 @@ const AGINCOURT = {
   // The field's length is part of what it did: the French came on across some 250-300 m of it, under the arrows and
   // sinking at every step. Here 55 m of it (the floor's length, `front.french`): as long as a battle can be drawn.
   arena: { halfX: 50, halfZ: 11.5 },
-  // Fifty-two: forty-two archers and ten men-at-arms (the war hammer stands for the poleaxe).
-  english: { archer: 42, men: { longsword: 6, warhammer: 4 } },
-  // Fifty-two: forty-four men-at-arms on foot, four lances on the wings (the cavalry wings were ~1,000 of the host,
+  // Thirty-five: thirty archers and five men-at-arms (the war hammer stands for the poleaxe): six archers to a man-at-arms,
+  // as the host had five or six.
+  english: { archer: 30, men: { longsword: 3, warhammer: 2 } },
+  // Thirty-five: twenty-eight men-at-arms on foot, three lances on the wings (the cavalry wings were ~1,000 of the host,
   // and fewer mounted when the charge went in), four crossbowmen behind. Of the men-at-arms, the knights and esquires
   // in full harness (`foot`) and the men of their retinues in what a lesser man-at-arms had in 1415, a brigandine or a
   // mail shirt with plate at the limbs and a kettle hat or a bascinet (`retinue`: the foot soldier's kit).
-  french: { foot: { longsword: 18, warhammer: 10 }, retinue: { longsword: 10, spear: 6 }, horse: { lance: 4 }, crossbow: 4 },
+  french: { foot: { longsword: 11, warhammer: 7 }, retinue: { longsword: 6, spear: 4 }, horse: { lance: 3 }, crossbow: 4 },
   // The English line's first rank and the French vanguard's, m from the middle.
   front: { english: 7, french: 43 },
   // The archers on the wings, three ranks deep (`rows` back, m), a man every `every` m across from `inner` m out;
-  // the men-at-arms in the middle, two ranks of five.
-  archers: { inner: 3.2, every: 0.78, rows: [0, 1.1, 2.2], perRow: 7 },
-  men: { every: 1.15, rows: [0, 1.2], perRow: 5 },
+  // the men-at-arms in the middle, two ranks of three. (Five archers to a rank: fifteen to a wing in three ranks, a man
+  // every metre, so a wing still reaches the woods.)
+  archers: { inner: 3.2, every: 1.0, rows: [0, 1.1, 2.2], perRow: 5 },
+  men: { every: 1.15, rows: [0, 1.2], perRow: 3 },
   // The field, as it was that morning: fresh plough soaked by a night's rain and churned by the horse. The reference
   // man sinks calf-deep (0.26 m); a man in plate, pressing half as hard again, to the knee; nothing past the plough's
   // pan (0.5 m). Wet clay: a stiff mud (viscosity of the castle's sludge) with little grip.
@@ -817,8 +875,8 @@ function agincourtWorks() {
 const CERIGNOLA = {
   // The French came on across the open plain below the slope under the guns: room for that (`front.french`).
   arena: { halfX: 32, halfZ: 11 },
-  spanish: { arquebusier: 18, pike: 22, rodelero: 12 },
-  french: { gendarme: 12, swiss: 32, crossbow: 8 },
+  spanish: { arquebusier: 12, pike: 15, rodelero: 8 },
+  french: { gendarme: 8, swiss: 22, crossbow: 5 },
   front: { spanish: 7.2, french: 24 },
   // The ditch: its line at x = 4 across the whole front; across it (m toward the Spanish, the ground's height): the
   // French side's lip, down 1.2 m to a bottom a metre wide, up the inner face to the bank's top 0.7 m over the field
@@ -836,60 +894,26 @@ function cerignolaWorks() {
   return { ditches: [{ from: [ditch.x, -ditch.reach], to: [ditch.x, ditch.reach], profile: ditch.profile }] };
 }
 
-// Nagashino (Shitarabagahara), 29 June 1575. Oda Nobunaga and Tokugawa Ieyasu (~38,000, with some 3,000
-// teppō) drew up behind a palisade of posts and rails (the umayoke-saku, the horse-stopping fence) with gaps
-// to sally from, the little Rengo stream and its muddy bed before it; Takeda Katsuyori's ~15,000, his famous
-// horse at their head, came on across the stream at the fence in waves through the morning. The guns, in
-// ranks that fired in turn, shot them down at the fence; the Oda spearmen went out through the gaps to finish
-// what came through. The Takeda lost most of their great captains there.
-// Each army's colours: the Takeda in their red (the akazonae, Yamagata's "red fire" company), the Oda in black with Nobunaga's gold.
-const NAGASHINO_TAKEDA = { tint: { armor: '#a3221a', lace: '#d9b44a' }, banner: '#b3161b' };
-const NAGASHINO_ODA = { tint: { armor: '#1a1a1f', lace: '#c9a23a' }, banner: '#d9b23a' };
-const NAGASHINO = {
-  // The Takeda formed some hundreds of metres off across the Shitarabagahara and came on in waves: room for that (`front.takeda`).
-  arena: { halfX: 32, halfZ: 11 },
-  oda: { ashigaru: { matchlock: 24, spear: 20 }, samurai: { katana: 5, naginata: 3 } },
-  // The Takeda were some 15,000 against 38,000: thirty-two here against the Oda's fifty-two, their horse a third of them.
-  takeda: { horse: { spear: 7, katana: 3 }, samurai: { katana: 5, naginata: 3, spear: 2 }, ashigaru: { spear: 8, bow: 2, matchlock: 2 } },
-  front: { oda: 6, takeda: 24 },
-  // The Oda guns three deep, a file every 2.3 m, 1.5 m behind the fence; the spears and the samurai behind them.
-  shooters: { perRow: 8, spacing: 2.3, rowSpacing: 1.0, behind: 1.6 },
-  // The fence: posts and rails 1.8 m high across the field, 1.5 m before the guns, three gaps 1.4 m wide to sally from (m along it from its -z end).
-  fence: { x: 4.5, height: 1.8, gaps: [[3.6, 5], [10.3, 11.7], [17, 18.4]] },
-  // The Rengo stream: a shallow, quick stream in a muddy bed 3 m across, a few metres before the fence. A man sinks
-  // shin-deep in its bed (water over soft silt, thinner than the plough's clay), a laden horse to the knee.
-  stream: { x: [-2.5, 0.5], depth: 0.3, firm: 0.55, viscosity: 1.6, footing: 0.65, surface: 'water', water: 0.25, edge: 0.6 },
-};
-
-/** Nagashino's works: the stream's bed and the palisade. */
-function nagashinoWorks() {
-  const { arena, fence, stream } = NAGASHINO;
-  return {
-    soft: [{ ...stream, z: [-arena.halfZ, arena.halfZ] }],
-    walls: [{ points: [[fence.x, -arena.halfZ], [fence.x, arena.halfZ]], height: fence.height, kind: 'palisade', gaps: fence.gaps }],
-  };
-}
-
-// The defenders hold their ground and shoot (formation.js: drilled, not advancing): the arquebusiers and the
-// Oda guns fire by ranks, each man who has fired changing places with a loaded man behind him (the countermarch).
+// The defenders hold their ground and shoot (formation.js: drilled, not advancing): the arquebusiers
+// fire by ranks, each man who has fired changing places with a loaded man behind him (the countermarch).
 const HOLD_GROUND = { advance: false };
-// The attackers' horse goes first, as it did in all three: released from the flanks almost at once (formation.js WINGS).
+// The attackers' horse goes first, as it did in both: released from the flanks almost at once (formation.js WINGS).
 const HORSE_FIRST = { by: 3, release: 40 };
 
 const AGINCOURT_LEVEL = {
   title: 'Agincourt',
   place: 'Agincourt, Artois · 25 October 1415',
-  blurb: "King Henry's archers stand behind their stakes at the narrow end of a ploughed field, soaked by a night's rain, between two woods. The French men-at-arms come on across it on foot in plate, sinking to the knee, crowded together as the woods close in; their horse rides first at the archers. Forty-two archers and ten men-at-arms against forty-four men-at-arms, four lances and four crossbows.",
+  blurb: "King Henry's archers stand behind their stakes at the narrow end of a ploughed field, soaked by a night's rain, between two woods. The French men-at-arms come on across it on foot in plate, sinking to the knee, crowded together as the woods close in; their horse rides first at the archers. Thirty archers and five men-at-arms against twenty-eight men-at-arms, three lances and four crossbows.",
   scene: 'agincourt',
   weather: { fog: [10, 95], sky: 0.8, pale: 0.75, sun: 0.55 },
   arena: { ...AGINCOURT.arena, works: agincourtWorks() },
   spread: 1,
   // From behind the English line, looking down the field between the woods (further round, the woods stand in the way).
   camera: { yaw: -0.18, pitch: 0.4, distance: 24, maxDistance: 30 },
-  roster: 'Forty-eight French on foot and four on horse · forty-two English archers and ten men-at-arms',
+  roster: 'Thirty-two French on foot and three on horse · thirty English archers and five men-at-arms',
   formation: {
     // The vanguard packed close, shoulder to shoulder and rank on rank (so tight, the chroniclers say, they could hardly raise their arms).
-    red: { front: AGINCOURT.front.french, spacing: 0.85, rowSpacing: 1.0, perRow: 14, loose: 0.15, wings: HORSE_FIRST },
+    red: { front: AGINCOURT.front.french, spacing: 0.85, rowSpacing: 1.0, perRow: 12, loose: 0.15, wings: HORSE_FIRST },
     blue: { front: AGINCOURT.front.english, layout: agincourtLayout(), loose: 0.08, drill: HOLD_GROUND },
   },
   cast: (random) => ({
@@ -903,13 +927,13 @@ const AGINCOURT_LEVEL = {
 const CERIGNOLA_LEVEL = {
   title: 'Cerignola',
   place: 'Cerignola, Apulia · 28 April 1503',
-  blurb: "Gonzalo de Córdoba's arquebusiers line a fresh ditch and its bank on a vineyard slope, his German pikes and sword-and-buckler men behind them. At dusk the French gendarmes in plate on barded horses charge it, and the Swiss columns follow them in: the ditch stops the horse, the volleys come rank after rank. Fifty-two of Spain against twelve gendarmes, thirty-two Swiss and eight crossbowmen.",
+  blurb: "Gonzalo de Córdoba's arquebusiers line a fresh ditch and its bank on a vineyard slope, his German pikes and sword-and-buckler men behind them. At dusk the French gendarmes in plate on barded horses charge it, and the Swiss columns follow them in: the ditch stops the horse, the volleys come rank after rank. Thirty-five of Spain against eight gendarmes, twenty-two Swiss and five crossbowmen.",
   scene: 'cerignola',
   weather: { fog: [18, 110], sky: 0.35, pale: 0.3, sun: 0.7 },
   arena: { ...CERIGNOLA.arena, works: cerignolaWorks() },
   spread: 1,
   camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 },
-  roster: 'Twelve gendarmes, thirty-two Swiss pikes and eight crossbowmen · eighteen arquebusiers, twenty-two pikes and twelve sword-and-buckler men',
+  roster: 'Eight gendarmes, twenty-two Swiss pikes and five crossbowmen · twelve arquebusiers, fifteen pikes and eight sword-and-buckler men',
   formation: {
     red: { front: CERIGNOLA.front.french, spacing: 0.95, rowSpacing: 1.0, perRow: 8, loose: 0.2, wings: HORSE_FIRST },
     blue: { front: CERIGNOLA.front.spanish, spacing: CERIGNOLA.shooters.spacing, rowSpacing: CERIGNOLA.shooters.rowSpacing, perRow: CERIGNOLA.shooters.perRow, shootersFront: CERIGNOLA.shooters.behind, drill: HOLD_GROUND },
@@ -919,31 +943,6 @@ const CERIGNOLA_LEVEL = {
     blue: shootersBehind([...company({ arquebusier: CERIGNOLA.spanish.arquebusier }, (type) => europeanSoldier(random, type)), ...company({ pike: CERIGNOLA.spanish.pike }, (style) => pikeman(random, 'landsknecht', style)), ...company({ rodelero: CERIGNOLA.spanish.rodelero }, (type) => europeanSoldier(random, type))]),
   }),
   armies: { red: ['france1503'], blue: ['gonzalo'] },
-  fighters: [],
-};
-
-const NAGASHINO_LEVEL = {
-  title: 'Nagashino',
-  place: 'Shitarabagahara, Mikawa · 29 June 1575',
-  blurb: "Oda Nobunaga's teppō ashigaru stand three deep behind a palisade of posts and rails, the muddy bed of the Rengo stream before it, and fire by ranks. Takeda Katsuyori's horse, the finest in Japan, charges across the stream at the fence, his samurai and ashigaru after it. Twenty-four guns, twenty spears and eight samurai against ten horsemen and twenty-two on foot.",
-  scene: 'sengoku',
-  weather: { fog: [12, 120], sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
-  arena: { ...NAGASHINO.arena, works: nagashinoWorks() },
-  spread: 1,
-  camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 },
-  roster: 'Ten Takeda horsemen and twenty-two on foot · twenty-four Oda guns, twenty spears and eight samurai',
-  formation: {
-    red: { front: NAGASHINO.front.takeda, spacing: 1.2, rowSpacing: 1.4, perRow: 12, loose: 0.35, wings: HORSE_FIRST },
-    blue: { front: NAGASHINO.front.oda, spacing: NAGASHINO.shooters.spacing, rowSpacing: NAGASHINO.shooters.rowSpacing, perRow: NAGASHINO.shooters.perRow, shootersFront: NAGASHINO.shooters.behind, drill: HOLD_GROUND },
-  },
-  cast: (random) => {
-    const side = (army, colours) => Object.entries(army).flatMap(([rank, styles]) => (rank === 'horse' ? [] : company(styles, (style) => sengokuWarrior(random, colours, style, rank))));
-    return {
-      red: [...shootersBehind(side(NAGASHINO.takeda, NAGASHINO_TAKEDA)), ...company(NAGASHINO.takeda.horse, (style) => samuraiHorseman(random, NAGASHINO_TAKEDA, style))],
-      blue: shootersBehind(side(NAGASHINO.oda, NAGASHINO_ODA)),
-    };
-  },
-  armies: { red: ['takeda'], blue: ['oda'] },
   fighters: [],
 };
 
@@ -980,27 +979,25 @@ Object.assign(ARMIES, {
       crossbow: { label: 'Gascon crossbowman', kinds: ['footman'], styles: ['crossbow', 'spear'], make: (random, style) => frenchFoot(random, style) },
     },
   },
-  takeda: { label: 'The Takeda', ...sengokuArmy(NAGASHINO_TAKEDA) },
-  oda: { label: 'The Oda and Tokugawa', ...sengokuArmy(NAGASHINO_ODA) },
 });
 
 export const SCENARIOS = {
   // A what-if, not a battle that was: a legion of the early Empire against
   // a Han army of crossbowmen, as Li Ling's five thousand (99 BC) stood
-  // against the Xiongnu. Two drilled armies of fifty, in ranks
+  // against the Xiongnu. Two drilled armies of thirty-five, in ranks
   // (formation.js): the legion walks up in its lines, the Han hold theirs
   // and shoot, the ranks relieving each other.
   legion: {
     title: 'Rome against Han',
     place: 'A what-if · the 1st century',
-    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: forty-two legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into forty-two crossbows; the front ranks meet, the rest hold their places. Eight auxiliary horse in mail ride on one flank and eight Han horsemen on the other, and charge it when the lines close.',
+    blurb: 'A legion of the early Empire meets a Han army of crossbowmen: twenty-nine legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into twenty-nine crossbows; the front ranks meet, the rest hold their places. Six auxiliary horse in mail ride on one flank and six Han horsemen on the other, and charge it when the lines close.',
     scene: 'plain',
     arena: LEGION.arena,
     camera: { yaw: -0.5, pitch: 0.45, distance: 20, maxDistance: 26 },
-    roster: 'Fifty a side: forty-two legionaries and eight auxiliary horse · forty-two Han crossbowmen and eight horsemen',
+    roster: 'Thirty-five a side: twenty-nine legionaries and six auxiliary horse · twenty-nine Han crossbowmen and six horsemen',
     formation: { red: { ...LEGION.ranks, front: LEGION.romanFront }, blue: { ...LEGION.ranks, front: LEGION.hanFront } },
     cast: (random) => legionSides(random),
-    // Eight horse of an auxiliary ala to the legion's side, eight Han horsemen to theirs, in place of the rear rank of the foot.
+    // Six horse of an auxiliary ala to the legion's side, six Han horsemen to theirs, in place of the rear rank of the foot.
     wings: {
       arena: LEGION.wingsArena,
       camera: { yaw: -0.5, pitch: 0.45, distance: 31, maxDistance: 40 },
@@ -1017,12 +1014,12 @@ export const SCENARIOS = {
   mobei: {
     title: 'Mobei',
     place: 'North of the Gobi · 119 BC',
-    blurb: "Wei Qing has crossed the desert to the chanyu's own ground. Thirty Han crossbowmen in iron lamellar stand before the ring of wagons, his horse — sabre, spear and bow — on both flanks; against them come forty-eight Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.",
+    blurb: "Wei Qing has crossed the desert to the chanyu's own ground. Twenty-three Han crossbowmen in iron lamellar stand before the ring of wagons, his horse — sabre, spear and bow — on both flanks; against them come thirty-five Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.",
     scene: 'mobei',
     arena: MOBEI.arena,
     spread: 1,
     camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
-    roster: 'Thirty Han crossbowmen and sixteen horse · forty-eight Xiongnu horsemen',
+    roster: 'Twenty-three Han crossbowmen and eleven horse · thirty-five Xiongnu horsemen',
     // The crossbowmen ten to a rank before the wagons (the floor's end behind them), the horse on both flanks; the Xiongnu a loose mass of riders.
     formation: {
       red: { front: MOBEI.hanFront, facing: 'ahead', spacing: LEGION.ranks.spacing, rowSpacing: LEGION.ranks.rowSpacing, perRow: LEGION.ranks.perRow, wings: { back: 0 } },
@@ -1040,12 +1037,12 @@ export const SCENARIOS = {
   carrhae: {
     title: 'Carrhae',
     place: 'The plain by Harran, Mesopotamia · June 53 BC',
-    blurb: "Crassus's legion stands in a square under a sky of arrows. Forty-four legionaries of the Republic in mail and bronze, shields locked, and six of Publius Crassus's Gallic horse; round them ride twenty-four Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and three cataphracts, man and horse in iron scale, held back for anyone who breaks out.",
+    blurb: "Crassus's legion stands in a square under a sky of arrows. Forty legionaries of the Republic in mail and bronze, shields locked, and five of Publius Crassus's Gallic horse; round them ride twenty-one Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and three cataphracts, man and horse in iron scale, held back for anyone who breaks out.",
     scene: 'carrhae',
     arena: CARRHAE.arena,
     spread: 1,
     camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
-    roster: 'Forty-four legionaries and six Gallic horse · twenty-four horse archers and three cataphracts',
+    roster: 'Forty legionaries and five Gallic horse · twenty-one horse archers and three cataphracts',
     formation: {
       // The square stands (`drill`: over the legion's own, which walks up to the enemy), its outer ring facing out every way, shields a wall, the inner ring's a roof (formation.js).
       red: { front: CARRHAE.romanFront, facing: 'ahead', layout: hollowSquare(CARRHAE.square), spacing: CARRHAE.square.spacing, perRow: CARRHAE.square.sides[0], loose: 0.05, drill: CARRHAE.drill, wings: CARRHAE.wings.red },
@@ -1065,12 +1062,12 @@ export const SCENARIOS = {
   catalaunian: {
     title: 'The Catalaunian Plains',
     place: 'Champagne, Gaul · 20 June 451',
-    blurb: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Eighteen Roman foot in mail with oval shields and spears, and eight Roman archers on their flank, hold the line beside sixteen Visigoths, eight Visigoth horse on the flank; sixteen Huns ride round them shooting — horse archers and a few of Attila's nobles — and thirty-four Ostrogoths and Gepids, Attila's subject peoples, come on behind them on foot.",
+    blurb: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Twelve Roman foot in mail with oval shields and spears, and six Roman archers on their flank, hold the line beside eleven Visigoths, six Visigoth horse on the flank; eleven Huns ride round them shooting — horse archers and a few of Attila's nobles — and twenty-four Ostrogoths and Gepids, Attila's subject peoples, come on behind them on foot.",
     scene: 'catalaunian',
     arena: CATALAUNIAN.arena,
     spread: 1,
     camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
-    roster: 'Twenty-six Romans (eight of them archers), sixteen Visigoths and eight Visigoth horse · sixteen Huns on horse, thirty-four Ostrogoths and Gepids',
+    roster: 'Eighteen Romans (six of them archers), eleven Visigoths and six Visigoth horse · eleven Huns on horse, twenty-four Ostrogoths and Gepids',
     // The Romans and the Visigoths side by side, three deep, the Visigoth horse on the Goths' flank; the Huns in a loose mass of riders, their Germans behind.
     formation: {
       red: {
@@ -1132,15 +1129,40 @@ export const SCENARIOS = {
   },
   agincourt: AGINCOURT_LEVEL,
   cerignola: CERIGNOLA_LEVEL,
-  nagashino: NAGASHINO_LEVEL,
+  sekigahara: {
+    title: 'Sekigahara',
+    place: 'Sekigahara, Mino · 21 October 1600',
+    blurb: 'The battle that ends the Sengoku. Thirty-four of the East in red against thirty-five of the West in black and blue, in the morning fog: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.',
+    scene: 'sengoku',
+    weather: { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
+    arena: { halfX: 17, halfZ: 11 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
+    roster: 'Thirty-four of the East and thirty-five of the West: samurai and ashigaru, six of the samurai on horse a side',
+    // Ten abreast: the bows and teppō in the front rows, the blades and polearms behind them.
+    formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 } },
+    cast: (random) => ({ red: sekigaharaSide(random, 'east', SEKIGAHARA_EAST), blue: sekigaharaSide(random, 'west', SEKIGAHARA_WEST) }),
+    // Each army's mounted samurai on its flanks: six a side, in the armies' colours.
+    wings: {
+      arena: { halfX: 30, halfZ: 16 },
+      camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 },
+      formation: { red: { wings: { side: 1 } }, blue: { wings: { side: -1 } } },
+      cast: (random, sides) => ({
+        red: [...sides.red, ...company(SEKIGAHARA_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_EAST, style))],
+        blue: [...sides.blue, ...company(SEKIGAHARA_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_WEST, style))],
+      }),
+    },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['east'], blue: ['west'] },
+    fighters: [],
+  },
   pyongyang: {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
-    blurb: 'The Ming army retakes the city from the Japanese. Eighteen Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and twelve of Li Rusong\'s horsemen in iron lamellar on the flank, against fifty-two Japanese samurai and ashigaru.',
+    blurb: 'The Ming army retakes the city from the Japanese. Fifteen Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and eleven of Li Rusong\'s horsemen in iron lamellar on the flank, against forty-four Japanese samurai and ashigaru.',
     scene: 'sengoku',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
-    roster: 'Thirty Ming (twelve on horse) · fifty-two Japanese',
+    roster: 'Twenty-six Ming (eleven on horse) · forty-four Japanese',
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
     wings: {

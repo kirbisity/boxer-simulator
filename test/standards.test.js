@@ -36,7 +36,7 @@ test('a big side\'s leader is the man nearest its middle, and bears its standard
 });
 
 test('a samurai leader wears his great banner and keeps his weapon', () => {
-  const world = scenarioWorld('nagashino', 1);
+  const world = scenarioWorld('sekigahara', 1);
   const leader = world.fighters[world.standards.red.leader];
   assert.equal(leader.wornStandard.kind, 'nobori');
   assert.ok(leader.weapon && !leader.weapon.spec.flag);
@@ -62,7 +62,7 @@ test('a dropped standard is not picked up by the enemy, and the nearest of its o
 });
 
 test('a fallen leader\'s worn banner comes off his back and is taken up in the hands', () => {
-  const world = scenarioWorld('nagashino', 1);
+  const world = scenarioWorld('sekigahara', 1);
   advance(world, 0.5, think);
   const leader = world.fighters[world.standards.red.leader];
   leader.state = 'out';

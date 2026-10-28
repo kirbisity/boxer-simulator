@@ -70,7 +70,7 @@ export const DRILL = {
   // through the squad (retireAt) before he is on them.
   holdFire: 12,
   runIn: 5,
-  // Fire by ranks (the countermarch: Nagashino's teppō, the Spanish arquebusiers, the Han crossbows): the front rank
+  // Fire by ranks (the countermarch: the Spanish arquebusiers, the Han crossbows): the front rank
   // of a formation's guns and crossbows fires together in a window `volleyWindow` s long, then holds while the ranks
   // change, the next volley due a reload's time over the number of ranks after it (volleyDue): so with three ranks of
   // matchlocks (15 s to load) a volley every five seconds, the fire never stopping. A bow is shot at will.

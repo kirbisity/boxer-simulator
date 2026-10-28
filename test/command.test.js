@@ -12,7 +12,7 @@ const apart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const mean = (values) => values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 const hearing = (men) => men.filter((fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.crawling);
 
-/** Rome against Han, `count` a side (the player the legion's lead), quicker than the level's fifty. */
+/** Rome against Han, `count` a side (the player the legion's lead), quicker than the level's thirty-five. */
 function legion(count = 12, seed = 3) {
   const sides = legionSides(seededRandom(seed), count);
   const level = SCENARIOS.legion;

@@ -2,7 +2,7 @@
 // How fast the simulation runs (ms of work per simulated second, in
 // windows), how many bodies are in full physics, coarse or posed, how far
 // the ranks hold, and how the battle goes.
-// Usage: node tools/legion.js [perSide=50 (the level's)] [seconds=60] [seed=1]
+// Usage: node tools/legion.js [perSide=35 (the level's)] [seconds=60] [seed=1]
 
 import { thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld, seededRandom } from '../src/physics.js';

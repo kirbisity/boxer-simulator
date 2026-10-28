@@ -1,6 +1,6 @@
 // Fieldworks and soft ground: what a battlefield had dug, planted and soaked
 // into it, as the physics meets it. A level's arena may carry `works` (the
-// battle maps of Agincourt, Cerignola and Nagashino do; nothing here runs
+// battle maps of Agincourt, Cerignola and Qi Jiguang's trench do; nothing here runs
 // for an arena without them):
 //
 //  - stakes: the English archers' sharpened stakes, driven in at a slant with

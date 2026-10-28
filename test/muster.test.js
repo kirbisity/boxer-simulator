@@ -72,7 +72,7 @@ test('every formation draws a side up inside its own zone, the riders on its fla
     }
   }
   // The level's own order is where createWorld puts them, give or take the crowd's scatter.
-  for (const key of ['wokou', 'qiJiguang', 'nagashino', 'zeelandia']) {
+  for (const key of ['wokou', 'qiJiguang', 'sekigahara', 'zeelandia']) {
     const level = battleOf(key);
     const cast = level.cast(seededRandom(8));
     const world = worldOf(level, cast);

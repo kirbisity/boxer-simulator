@@ -231,12 +231,12 @@ test('an arrow or a ball strikes a horse: through its hide, a ball through any b
   assert.ok(horse.bleed > bleed, 'a ball goes through it');
 });
 
-test('the three battles: fifty-two a side, each man of his armies, the works where the lines are, and Sekigahara gone', () => {
-  for (const key of ['agincourt', 'cerignola', 'nagashino']) {
+test('the battles with works (Agincourt, Cerignola, Qi Jiguang): the works where the lines are, the sides within the muster cap, each army one the setup screen has', () => {
+  for (const [key, defenders] of [['agincourt', 35], ['cerignola', 35], ['qiJiguang', 28]]) {
     const level = battleOf(key);
     const cast = level.cast(seededRandom(2));
     assert.ok(cast.red.length <= MUSTER.cap && cast.blue.length <= MUSTER.cap, key);
-    assert.equal(cast.blue.length, 52, key);
+    assert.equal(cast.blue.length, defenders, key);
     assert.ok(level.arena.works, `${key} has its works`);
     const works = worksOf(level.arena);
     // The defenders stand behind their works, the attackers before them.
@@ -250,8 +250,8 @@ test('the three battles: fifty-two a side, each man of his armies, the works whe
     // The setup screen's armies for its sides.
     for (const corner of ['red', 'blue']) for (const army of level.armies[corner]) assert.ok(ARMIES[army], `${key} ${army}`);
   }
-  assert.equal(SCENARIOS.sekigahara, undefined);
-  assert.equal(ARMIES.east, undefined, 'the East went with it');
-  assert.ok(ARMIES.west, 'the West stays: the Japanese at Pyongyang');
-  assert.equal(SCENARIOS.nagashino.scene, 'sengoku', 'Nagashino is fought in the Sengoku place');
+  assert.equal(SCENARIOS.nagashino, undefined, 'Nagashino gave way to Sekigahara');
+  assert.equal(SCENARIOS.sekigahara.scene, 'sengoku', 'Sekigahara is fought in the Sengoku place');
+  assert.equal(SCENARIOS.sekigahara.arena.works, undefined, 'in the open: no works');
+  assert.ok(ARMIES.east && ARMIES.west, 'the East and the West, for the setup screen');
 });

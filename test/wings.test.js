@@ -13,7 +13,7 @@ const sides = (key, seed = 1) => battleOf(key).cast(seededRandom(seed));
 const riders = (side) => side.filter(isMounted);
 
 // Who rides in each map, per side: [red, blue].
-const WINGS_OF = { legion: [8, 8], pyongyang: [12, 0], rebellion: [2, 0] };
+const WINGS_OF = { legion: [6, 6], sekigahara: [6, 6], pyongyang: [11, 0], rebellion: [2, 0] };
 
 test('the cavalry helpers make riders in the kit of their time, on the horse their people rode', () => {
   const random = seededRandom(4);
@@ -60,7 +60,7 @@ test('each battle map has its wings of horse and no others: who rides, how many,
   for (const key of ['pride', 'subway']) assert.equal(battleOf(key), SCENARIOS[key]);
 });
 
-test('the armies are about sixty to a hundred, and a wing is about a fifth of a side (Maidstone: the two lords)', () => {
+test('the armies are about seventy in all, and a wing is about a fifth of a side (Maidstone: the two lords)', () => {
   for (const key of Object.keys(WINGS_OF)) {
     const played = sides(key);
     const total = played.red.length + played.blue.length;
@@ -69,14 +69,14 @@ test('the armies are about sixty to a hundred, and a wing is about a fifth of a 
     for (const corner of ['red', 'blue']) {
       const wing = riders(played[corner]).length;
       // Pyongyang: Li Rusong brought the northern horse south, more of it to this fight than of any other wing (two in five of the Ming).
-      if (key === 'pyongyang' && corner === 'red') assert.ok(wing / played[corner].length <= 0.4 && wing === 12, `${key} ${corner} wing ${wing} of ${played[corner].length}`);
+      if (key === 'pyongyang' && corner === 'red') assert.ok(wing / played[corner].length <= 0.45 && wing === 11, `${key} ${corner} wing ${wing} of ${played[corner].length}`);
       else if (wing && key !== 'rebellion') assert.ok(wing / played[corner].length <= 0.3 && wing >= 6 && wing <= 10, `${key} ${corner} wing ${wing} of ${played[corner].length}`);
     }
   }
 });
 
 test('the battle floors are wider than the foot line had, the scenery stays the map\'s own', () => {
-  for (const key of ['legion', 'pyongyang']) {
+  for (const key of ['legion', 'sekigahara', 'pyongyang']) {
     const foot = SCENARIOS[key].arena;
     const played = battleOf(key);
     assert.equal(played.scene, SCENARIOS[key].scene, `${key} keeps its scene`);
@@ -93,13 +93,13 @@ test('the battle floors are wider than the foot line had, the scenery stays the 
 
 test('a wing starts held on its flank beyond the end of its own foot line and behind its front rank, the two sides on opposite flanks', () => {
   const world = scenarioWorld('legion', 2);
-  assert.equal(world.horses.length, 16);
+  assert.equal(world.horses.length, 12);
   const foot = world.fighters.filter((fighter) => !fighter.mount);
   for (const corner of ['red', 'blue']) {
     const mine = foot.filter((fighter) => fighter.corner === corner);
     const widest = Math.max(...mine.map((fighter) => Math.abs(spot(fighter)[1])));
     const wing = world.fighters.filter((fighter) => fighter.corner === corner && fighter.mount);
-    assert.equal(wing.length, 8, corner);
+    assert.equal(wing.length, 6, corner);
     const sign = corner === 'red' ? -1 : 1;
     const front = Math.min(...mine.map((fighter) => sign * spot(fighter)[0]));
     const flank = wing[0].wing.side;

@@ -652,7 +652,7 @@ export function parthianRider(random = Math.random, style = 'steppeBow', rank = 
   return ancientMan(random, PRESETS.steppeBow, names, rank === 'cataphract' ? 'cataphract' : 'parthianArcher', style, ANCIENT_BUILD.parthian[rank], { mounted: true, look: { skinTone: ['lightTan', 'medium', 'tan'], hairColor: ['#120d0a', '#2a1a10'], hairStyle: ['midLong', 'long'], facialHair: ['beard', 'beard', 'mustache'] } });
 }
 
-// ---- Agincourt, Cerignola and Nagashino: the battles of the bow, the ditch and the palisade ----
+// ---- Agincourt and Cerignola: the battles of the bow and the ditch ----
 
 // Builds of the men of those battles (PERIOD_BUILD, joined here). English archers of the fifteenth
 // century, from the Mary Rose's bowmen and the Towton grave: ~171 cm, heavy-boned and strong in the

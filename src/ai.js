@@ -105,9 +105,11 @@ export const AI = {
   range: { inside: 0.12, outside: 0.25, closingSpeed: 0.4, burstMin: 2, burstRange: 2 },
   // Picking a weapon up: as far as he will go for one (m); it must be this
   // much nearer him than any of them (unless it is at his feet), and not
-  // with a blow coming at him; he stoops for it this near (hips to weapon, m).
+  // with a blow coming at him; he stoops for it this near (hips to weapon, m), and
+  // when it lies no deeper than `reachDown` m below his feet (a hand stooping reaches the ground he stands on, not
+  // the bottom of a ditch: he goes down to it first).
   // `eagerness`: chance per second, when one is there for the taking, that he goes for it.
-  pickup: { enabled: true, maxDistance: 3.5, margin: 0.3, atFeet: 0.7, stoopAt: 0.55, eagerness: 1.5, shieldClear: 2.5 },
+  pickup: { enabled: true, maxDistance: 3.5, margin: 0.3, atFeet: 0.7, stoopAt: 0.55, eagerness: 1.5, shieldClear: 2.5, reachDown: 0.3 },
   // A mixed fighter's spells in one style (s, give or take half).
   mix: { seconds: 10 },
   // Holding the last man down: how near his chest (m, hips to chest) to kneel, and how many hold at once.
@@ -960,7 +962,8 @@ function goForWeapon(world, fighter, opponent, dt) {
   fighter.goTo = target.x;
   fighter.strafe = 0;
   fighter.aiCombo = null;
-  if (mine > AI.pickup.stoopAt) {
+  const below = Math.min(fighter.x[P.lFoot * 3 + 1], fighter.x[P.rFoot * 3 + 1]) - target.x[1];
+  if (mine > AI.pickup.stoopAt || below > AI.pickup.reachDown) {
     fighter.move = Math.min(1.4, 0.6 + mine);
     return true;
   }

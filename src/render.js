@@ -118,7 +118,10 @@ export function setPlace(view, place, arena, weather = null) {
   // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
   const home = PLACE_ARENAS[place];
   const floor = home && arena && arena.halfX >= home.halfX * WIDE_FLOOR ? arena : null;
-  const swapped = swapFloor(view, place, floor);
+  // A place whose ground is dug for a ditch (the works' ditches: Qi Jiguang's trench in the water town's square) is built for
+  // that battle too, apart from the place the other levels there share.
+  const dug = arena?.works?.ditches?.length ? arena : null;
+  const swapped = swapFloor(view, place, floor ?? dug);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
   const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), agincourt: buildAgincourt, cerignola: buildCerignola, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
@@ -1120,6 +1123,11 @@ function buildAgincourt(arena = PLACE_ARENAS.agincourt) {
   return place;
 }
 
+/** The x ranges the ditches of an arena's works cut through its ground (each ditch along z: worksview.js draws its strip), from west to east. */
+function ditchStrips(arena) {
+  return (arena.works?.ditches ?? []).map((ditch) => [ditch.from[0] + Math.min(ditch.profile[0][0], 0), ditch.from[0] + ditch.profile[ditch.profile.length - 1][0]]).sort((a, b) => a[0] - b[0]);
+}
+
 /**
  * Cerignola at dusk on 28 April 1503: an Apulian slope of vineyards and olives, the vines in their rows on
  * stakes behind the Spanish line, the low sun warm over the plain, the town on its hill beyond. The ditch and its
@@ -1140,10 +1148,9 @@ function buildCerignola(arena = PLACE_ARENAS.cerignola) {
     }
   }, [8, 8]);
   // The field's ground, either side of the ditches' strips (each along z: worksview.js draws the strip itself).
-  const strips = (arena.works?.ditches ?? []).map((ditch) => [ditch.from[0] + Math.min(ditch.profile[0][0], 0), ditch.from[0] + ditch.profile[ditch.profile.length - 1][0]]).sort((a, b) => a[0] - b[0]);
   const reach = 75;
   let from = -reach;
-  const cuts = [...strips, [reach, reach]];
+  const cuts = [...ditchStrips(arena), [reach, reach]];
   for (const [start, end] of cuts) {
     if (start - from > 0.01) {
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(start - from, 2 * reach), lit(0xffffff, { map: field }));
@@ -1319,7 +1326,7 @@ function buildTown() {
  * standing in the water, a humpbacked bridge, willows, wooded hills behind.
  * Built for real in src/props/jiangnan.js; here the sky and the ground.
  */
-function buildJiangnan() {
+function buildJiangnan(arena = null) {
   const place = new THREE.Group();
   place.add(daySky());
   const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
@@ -1348,12 +1355,26 @@ function buildJiangnan() {
   // The town's floor: everything north of the canal's near edge.
   const { near, far } = JIANGNAN_PLAN.canal;
   const depth = near + 60;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, depth), lit(0xffffff, { map: slabs, roughness: 0.85 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.z = near - depth / 2;
-  ground.receiveShadow = true;
-  ground.userData.scenery = 'ground';
-  place.add(ground);
+  // In courses of slabs, `x0`..`x1` across and `z0`..`z1` along (the slabs the same size wherever it is cut).
+  const paving = (x0, x1, z0, z1) => {
+    const map = slabs.clone();
+    map.repeat.set((12 * (x1 - x0)) / 150, (12 * (z1 - z0)) / depth);
+    map.needsUpdate = true;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), lit(0xffffff, { map, roughness: 0.85 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    ground.receiveShadow = true;
+    ground.userData.scenery = 'ground';
+    place.add(ground);
+  };
+  // Left open where the level dug a ditch across it (worksview.js draws the strip of earth in its place, from the north
+  // row's foot to the canal's embankment: the paving goes on beyond its ends).
+  let reach = -75;
+  for (const [start, end] of [...ditchStrips(arena ?? {}), [75, 75]]) {
+    if (start - reach > 0.01) paving(reach, start, near - depth, near);
+    if (end > start) paving(start, end, near - depth, JIANGNAN_PLAN.north);
+    reach = end;
+  }
   // The far bank, behind its houses.
   const bank = new THREE.Mesh(new THREE.PlaneGeometry(150, 50), new THREE.MeshLambertMaterial({ color: 0x5a6a48 }));
   bank.rotation.x = -Math.PI / 2;

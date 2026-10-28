@@ -11,17 +11,18 @@ import { normaliseInputs } from '../src/body.js';
 import { AI, thinkAll } from '../src/ai.js';
 import { DRILL } from '../src/formation.js';
 import { advance, boutWinner, createWorld, inFight, seededRandom } from '../src/physics.js';
-import { SPREAD, battleOf, qiJiguangLevel } from '../src/scenarios.js';
+import { SPREAD, battleOf, drawnApart, qiJiguangLevel } from '../src/scenarios.js';
 
 /**
  * A level by its key; `qiJiguang:<levers>` is Qi Jiguang's with only those of
- * its levers (morale, tactics, weapons; comma-separated, or `none`): what each did.
+ * its levers (morale, tactics, weapons, trench; comma-separated, or `none`): what each did,
+ * drawn up as the battle draws it (SPREAD), as the level itself is.
  */
 export function levelOf(key) {
   const [name, levers] = key.split(':');
   if (name !== 'qiJiguang' || levers === undefined) return battleOf(key);
   const on = new Set(levers.split(','));
-  return qiJiguangLevel({ morale: on.has('morale'), tactics: on.has('tactics'), weapons: on.has('weapons') });
+  return drawnApart(qiJiguangLevel({ morale: on.has('morale'), tactics: on.has('tactics'), weapons: on.has('weapons'), trench: on.has('trench') }));
 }
 
 /** One battle of a level at a seed: each side's tally, the winner and the length (s). */

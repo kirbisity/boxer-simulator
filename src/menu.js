@@ -180,7 +180,7 @@ export function installMenus(game) {
     // The training yard first: every control, one at a time.
     const yard = choice({ glyph: '🎯', kicker: 'Start here · two minutes', title: 'Tutorial', text: 'Every control, one at a time, against a knight who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
     const card = ([key, level]) => {
-      const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', agincourt: '🏹', cerignola: '🔥', nagashino: '🏯', pyongyang: '🐉', cajamarca: '☀️', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } });
+      const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', agincourt: '🏹', cerignola: '🔥', sekigahara: '🏯', pyongyang: '🐉', cajamarca: '☀️', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } });
       // A battle of armies (a `cast`) can be set up; a duel cannot.
       if (!level.cast) return play;
       return el('div', { className: 'level-card' }, play, el('button', { className: 'level-setup', type: 'button', textContent: '⚙ Set up', title: `Set up the armies of ${level.title}`, onclick: () => muster(key) }));

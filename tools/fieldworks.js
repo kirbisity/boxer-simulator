@@ -1,10 +1,10 @@
-// The battles fought from behind fieldworks (Agincourt, Cerignola, Nagashino), fought headless over
+// The battles fought from behind fieldworks (Agincourt, Cerignola, Qi Jiguang's trench), fought headless over
 // seeds, and what the works and the ground did: who won and when; each side's men down and fled; how
 // many of the attackers went down before they ever reached the defenders' line (the stakes, the ditch,
 // the palisade); how fast the attackers' foot crossed the soft ground against the firm, how often men
 // fell and how many smothered; and what became of the horses (stopped at a wall or a ditch, run onto
 // stakes, shot, brought down).
-// Usage: node tools/fieldworks.js [levels=agincourt+cerignola+nagashino] [seeds=8] [seconds=180] [firstSeed=1]
+// Usage: node tools/fieldworks.js [levels=agincourt+cerignola+qiJiguang] [seeds=8] [seconds=180] [firstSeed=1]
 // (EACH=1 prints each battle.)
 
 import { normaliseInputs, P } from '../src/body.js';
@@ -80,7 +80,7 @@ export function worksBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const keys = (process.argv[2] ?? 'agincourt+cerignola+nagashino').split('+');
+  const keys = (process.argv[2] ?? 'agincourt+cerignola+qiJiguang').split('+');
   const seeds = Number(process.argv[3] ?? 8);
   const seconds = Number(process.argv[4] ?? 180);
   const firstSeed = Number(process.argv[5] ?? 1);

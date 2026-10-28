@@ -7,7 +7,9 @@ import { OUTFITS } from '../src/outfits.js';
 import { STYLES } from '../src/moves.js';
 import { WEAPONS } from '../src/weapons.js';
 import { advance, createWorld, placeFighter, seededRandom } from '../src/physics.js';
-import { SCENARIOS, qiJiguangLevel } from '../src/scenarios.js';
+import { SCENARIOS, battleOf, qiJiguangLevel } from '../src/scenarios.js';
+import { reliefAt, stepOnWorks, worksOf } from '../src/physics/fieldworks.js';
+import { P } from '../src/body.js';
 import { levelBattle } from '../tools/levels.js';
 
 const count = (men, pick) => men.reduce((tally, man) => ({ ...tally, [pick(man)]: (tally[pick(man)] ?? 0) + 1 }), {});
@@ -141,4 +143,31 @@ test('fought out, the garrison loses the wokou raid and Qi Jiguang\'s army wins 
   assert.equal(qi.winner, 'blue');
   assert.ok(qi.blue.down * 3 <= qi.red.down + qi.red.fled, `Ming down ${qi.blue.down}; raiders down ${qi.red.down}, fled ${qi.red.fled}`);
   assert.equal(qi.blue.fled, 0, 'none of Qi\'s men run');
+});
+
+test('Qi Jiguang\'s men dig a trench across the square before the squads: the raiders before it, every Ming man behind it on level ground, the way across it slow', () => {
+  const level = battleOf('qiJiguang');
+  const works = worksOf(level.arena);
+  assert.equal(works.ditches.length, 1, 'a ditch and its bank');
+  const [ditch] = works.ditches;
+  // Across the whole square, from the shops on its north side to the canal's embankment: no way round it.
+  assert.ok(ditch.from[1] <= -level.arena.halfZ && ditch.from[1] + ditch.length >= level.arena.halfZ, 'the floor from side to side');
+  const world = createWorld(['red', 'blue'].flatMap((corner) => level.cast(seededRandom(5))[corner].map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner }))), { seed: 5, arena: level.arena, formation: level.formation });
+  const lip = ditch.from[0] + ditch.profile[0][0];
+  const back = ditch.from[0] + ditch.profile[ditch.profile.length - 1][0];
+  for (const fighter of world.fighters) {
+    const [x, z] = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+    if (fighter.corner === 'red') assert.ok(x < lip - 3, `${fighter.body.inputs.name} starts well short of the lip`);
+    else {
+      assert.ok(x > back, `${fighter.body.inputs.name} stands behind the bank (${x.toFixed(1)} > ${back.toFixed(1)})`);
+      assert.equal(reliefAt(works, x, z), 0, 'on level ground, the squads\' places untouched');
+    }
+  }
+  // A man running at it is slowed to a crawl at the bank's face, and goes down into it slower than he runs over open ground.
+  const pace = (x) => Math.hypot(...stepOnWorks(works, { root: [x, 0] }, [5, 0])) / 5;
+  assert.ok(pace(lip - 1) > 0.99, 'free before it');
+  assert.ok(pace(ditch.from[0] - 1.65) < 0.6, 'down the lip into it');
+  assert.ok(pace(ditch.from[0] - 0.05) < 0.3, 'up the bank\'s face');
+  assert.equal(qiJiguangLevel({ trench: false }).arena.works, undefined, 'the lever for measuring what it did');
+  assert.equal(level.arena.halfX, 18, 'the floor is the battle\'s, the trench moved back with the lines');
 });
