@@ -380,7 +380,7 @@ export const PLACE_ARENAS = {
   // The square of Cajamarca between its long halls (props/cajamarca.js CAJAMARCA_PLAN).
   cajamarca: { halfX: 16, halfZ: 11 },
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
-  agincourt: { halfX: 40, halfZ: 11.5 },
+  agincourt: { halfX: 50, halfZ: 11.5 },
   cerignola: { halfX: 32, halfZ: 11 },
   // A level-mode stage: the terrain is the floor (the box is only a far limit).
   stage: { halfX: 40, halfZ: 40 },
