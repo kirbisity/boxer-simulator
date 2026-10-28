@@ -26,6 +26,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      # The bundle test needs esbuild, the one dev dependency.
+      - run: npm ci
       - run: npm test
 
   deploy:
