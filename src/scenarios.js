@@ -243,12 +243,12 @@ function qiArmy(random, { weapons = true } = {}) {
   for (let squad = 0; squad < QI.squads; squad += 1) {
     const middle = (squad - (QI.squads - 1) / 2) * QI.squadWidth;
     for (const [index, [style, back, across]] of QI.squad.entries()) {
-      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'brigandine', { people: 'mingSouth', design: QI.design.brigandine }));
+      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'brigandine', { people: MING_PEOPLE.qi, design: QI.design.brigandine }));
       layout.push([back, middle + across]);
     }
   }
   for (const [index, [style, back, across]] of [QI.general, ...QI.guards].entries()) {
-    const man = mingSoldier(random, style, 'elite', { people: 'mingSouth', design: QI.design.elite });
+    const man = mingSoldier(random, style, 'elite', { people: MING_PEOPLE.qi, design: QI.design.elite });
     men.push(index === 0 ? { ...man, name: 'Qi Jiguang' } : man);
     layout.push([back, across]);
   }
@@ -314,7 +314,7 @@ const RHODES = {
  * built, dressed and fed as the level's are). `same`: a style the maker may
  * turn into another (a rōnin swordsman fights with both swords, nitō).
  */
-const MING_PEOPLE = { pyongyang: 'ming', koxinga: 'mingSouth', coast: 'mingCoast', qi: 'mingSouth' };
+const MING_PEOPLE = { pyongyang: 'ming', koxinga: 'mingSouth', coast: 'mingCoast', qi: 'qi' };
 const mingRank = (rank, people, design = null) => (random, style) => mingSoldier(random, style, rank, { people, design });
 const sengokuArmy = (side) => ({
   ranks: {
