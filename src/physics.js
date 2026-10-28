@@ -25,7 +25,7 @@ import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
-import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
+import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
@@ -958,9 +958,13 @@ function weaponIntent(world, fighter, intent) {
 /** The hand and blade direction (local) a stroke wants now: along its path; a thrust's point steered at the mark from where the hand really is. */
 function strokeTargets(fighter, weapon, stroke) {
   const t = stroke.load > 0 ? 0 : Math.max(0, stroke.t);
+  // Leaning out of the saddle to his man (physics/mounted.js saddleReach), the stroke is the one he would make sitting up,
+  // carried out and down with his shoulder (`shift`, his frame): its mark is where it is, the rest of it goes with him.
+  const shift = fighter.mount && !stroke.spec.couched ? fighter.seated?.reach?.shift ?? null : null;
   // From the saddle a cut goes down to a man below: the whole swing pitched down about the shoulder.
-  if (fighter.mount && stroke.spec.mode !== 'thrust') return pitchedSwing(fighter, weapon, stroke, t);
-  const target = bladeTargets(stroke.spec, t, stroke.aim, fighter.body, weapon.spec);
+  if (fighter.mount && stroke.spec.mode !== 'thrust') return pitchedSwing(fighter, weapon, stroke, t, shift);
+  const target = bladeTargets(stroke.spec, t, shift ? vec.sub(stroke.aim, shift) : stroke.aim, fighter.body, weapon.spec);
+  if (shift) target.hand = vec.add(target.hand, shift);
   // A thrust's point is steered at the target from wherever the hand really is (a couched one's line is held as it was set).
   if (stroke.spec.mode === 'thrust' && t >= stroke.spec.windup) {
     const line = vec.normalize(vec.sub(stroke.aim, toLocal(fighter, point(fighter.x, P[`${weapon.main}Hand`]))));
@@ -980,17 +984,23 @@ function strokeTargets(fighter, weapon, stroke) {
  * as at a mark at the usual angle below the shoulder (WORLD.mount.swingPitch),
  * and the whole swing turned down about the shoulder to the real mark.
  */
-function pitchedSwing(fighter, weapon, stroke, t) {
-  const shoulder = fighter.desired[P[`${weapon.main}Shoulder`]];
-  const toAim = vec.sub(stroke.aim, shoulder);
+function pitchedSwing(fighter, weapon, stroke, t, shift = null) {
+  // (Leaning out, `shift`: the swing made from his shoulder sitting up, then carried out with it.)
+  const moved = shift ?? [0, 0, 0];
+  const shoulder = vec.sub(fighter.desired[P[`${weapon.main}Shoulder`]], moved);
+  const aim = vec.sub(stroke.aim, moved);
+  const toAim = vec.sub(aim, shoulder);
   const level = Math.hypot(toAim[0], toAim[2]);
   const delta = Math.atan2(-toAim[1], level) - WORLD.mount.swingPitch;
-  if (delta <= 0 || level < 1e-6) return bladeTargets(stroke.spec, t, stroke.aim, fighter.body, weapon.spec);
+  if (delta <= 0 || level < 1e-6) {
+    const flat = bladeTargets(stroke.spec, t, aim, fighter.body, weapon.spec);
+    return { ...flat, hand: vec.add(flat.hand, moved) };
+  }
   const axis = vec.cross([0, 1, 0], [toAim[0] / level, 0, toAim[2] / level]);
   const turn = (v, angle) => vec.scale(rotateAbout(v, axis, angle), vec.length(v));
   const virtualAim = vec.add(shoulder, turn(toAim, -delta));
   const target = bladeTargets(stroke.spec, t, virtualAim, fighter.body, weapon.spec);
-  return { ...target, hand: vec.add(shoulder, turn(vec.sub(target.hand, shoulder), delta)), dir: turn(target.dir, delta) };
+  return { ...target, hand: vec.add(vec.add(shoulder, turn(vec.sub(target.hand, shoulder), delta)), moved), dir: turn(target.dir, delta) };
 }
 
 /**
@@ -1937,6 +1947,9 @@ function updateIntent(world, fighter, dt) {
     const sit = ridingLean(fighter, dt);
     intent.lean += sit.lean;
     intent.roll = sit.roll;
+    // And through a blow, leaned out of the saddle to his man as far as the blade needs (physics/mounted.js saddleReach).
+    const reach = saddleReach(fighter, dt);
+    if (reach) intent.reachOut = { tilt: reach.tilt, toward: reach.toward };
   }
   // Just up off the floor: unsteady for a moment, the trunk and hips swaying as his legs find their balance (physics/rising.js standWobble).
   if (fighter.wobble) {

@@ -15,9 +15,9 @@ import { shieldCovering, soundEvent, soundHit } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
-import { vec, yawRotate, twoBoneIK } from '../pose.js';
+import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, harmMix, shieldContact } from '../weapons.js';
-import { bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 
 /**
@@ -410,6 +410,93 @@ export function ridingLean(fighter, dt) {
 }
 
 /**
+ * Leaning out of the saddle to his man (WORLD.mount.reach), once a step: through a blow with a blade, his trunk is
+ * tipped over about his hips toward the mark of the blow (its `aim`, in his frame, steered on while it is in the air)
+ * as far as brings it within the distance the stroke is made at, and no further than `most`; between blows, and once the
+ * blade has gone through, he comes back up. The lean is the pose's (pose.js `reachOut`): the muscles take his trunk
+ * there as they take it anywhere, and the stroke goes from where his shoulder then is (physics.js strokeTargets).
+ * Returns { tilt, toward, shift } (rad; a way on the floor in his frame; how far his weapon shoulder went, m in his
+ * frame) while he leans, else null.
+ */
+export function saddleReach(fighter, dt) {
+  const spec = WORLD.mount.reach;
+  const carry = (fighter.seated ??= { y: seatOf(fighter.mount)[1], v: 0, lean: 0, leanV: 0 });
+  const reach = (carry.reach ??= { tilt: 0, v: 0, toward: [1, 0, 0], shift: [0, 0, 0], side: 'r' });
+  const wanted = reachWanted(fighter, reach);
+  const target = wanted ?? 0;
+  const omega = Math.PI * 2 * (target > reach.tilt ? spec.inHz : spec.outHz);
+  // (Sub-stepped, as the gait's lean.)
+  const steps = Math.max(1, Math.ceil(dt / 0.004));
+  for (let k = 0; k < steps; k += 1) {
+    reach.v += (omega * omega * (target - reach.tilt) - 2 * spec.damping * omega * reach.v) * (dt / steps);
+    reach.tilt += reach.v * (dt / steps);
+  }
+  reach.tilt = Math.max(0, Math.min(spec.most, reach.tilt));
+  if (reach.tilt < 1e-3) {
+    reach.shift = [0, 0, 0];
+    return null;
+  }
+  const pelvis = fighter.desired[P.pelvis];
+  const shoulder = vec.sub(uprightShoulder(fighter, reach), pelvis);
+  reach.shift = vec.sub(tiltToward(shoulder, reach.toward, reach.tilt), shoulder);
+  return reach;
+}
+
+/**
+ * Where a rider's shoulder (a point in the world, `shoulder`) goes leaned out of the saddle as far as he leans
+ * (WORLD.mount.reach `most`) toward a mark in the world: what his reckoning of a blow's reach goes by (riding.js).
+ */
+export function leanedShoulder(fighter, shoulder, mark) {
+  const pelvis = point(fighter.x, P.pelvis);
+  const flat = [mark[0] - pelvis[0], 0, mark[2] - pelvis[2]];
+  const out = Math.hypot(flat[0], flat[2]);
+  if (out < 1e-3) return shoulder;
+  return vec.add(pelvis, tiltToward(vec.sub(shoulder, pelvis), [flat[0] / out, 0, flat[2] / out], WORLD.mount.reach.most));
+}
+
+/** His weapon shoulder as it would be sitting up (his frame): where his pose has it, the lean taken back out. */
+function uprightShoulder(fighter, reach) {
+  const pelvis = fighter.desired[P.pelvis];
+  const leaned = vec.sub(fighter.desired[P[`${reach.side}Shoulder`]], pelvis);
+  const posed = fighter.intent?.reachOut;
+  return posed ? vec.add(pelvis, tiltToward(leaned, posed.toward, -posed.tilt)) : vec.add(pelvis, leaned);
+}
+
+/**
+ * The distance (m) from his shoulder at which a blow with a blade is made, as on foot: the arm `easy` out, and beyond it
+ * the blade's contact share of its length (a cut), or its length less the depth it goes in (a thrust).
+ */
+function strokeDistance(fighter, spec, blade) {
+  const L = fighter.body.lengths;
+  const arm = WORLD.mount.reach.easy * (L.upperArm + L.forearmToFist);
+  return spec.mode === 'thrust' ? arm + blade.spec.length - (spec.depth ?? 0.25) : arm + blade.spec.length * (spec.contactAt ?? 0.7);
+}
+
+/** How far over (rad) the blow in hand wants him: none without a blade blow going, or with a mark already within the stroke's distance. */
+function reachWanted(fighter, reach) {
+  const punch = fighter.punch;
+  const spec = punch?.spec;
+  if (!spec || spec.path !== 'blade' || spec.couched || punch.load > 0 || punch.t > spec.extendUntil) return null;
+  const blade = bladeFor(fighter, spec);
+  if (!blade?.held) return null;
+  const pelvis = fighter.desired[P.pelvis];
+  const flat = [punch.aim[0] - pelvis[0], 0, punch.aim[2] - pelvis[2]];
+  const out = Math.hypot(flat[0], flat[2]);
+  if (out < 1e-3) return null;
+  reach.side = blade.main;
+  reach.toward = [flat[0] / out, 0, flat[2] / out];
+  const lean = WORLD.mount.reach;
+  const easy = strokeDistance(fighter, spec, blade);
+  const shoulder = vec.sub(uprightShoulder(fighter, reach), pelvis);
+  // The least lean that brings the mark within the stroke's distance of his shoulder: tried in `steps` from upright to `most`.
+  for (let k = 0; k <= lean.steps; k += 1) {
+    const tilt = (lean.most * k) / lean.steps;
+    if (vec.length(vec.sub(punch.aim, vec.add(pelvis, tiltToward(shoulder, reach.toward, tilt)))) <= easy) return tilt;
+  }
+  return lean.most;
+}
+
+/**
  * Hold the rider in the saddle for this substep: his seated parts where the
  * saddle puts them, moving at the horse's speed; his stance's root and
  * height follow, so everything above is driven from there as on foot.
@@ -526,7 +613,9 @@ export function keepSeat(world, fighter) {
     if (Math.abs(horse.speed) < seat.kickFree) return unhorse(world, fighter, 'comes off as his horse goes down', true, flung, seat.carried);
     return unhorse(world, fighter, 'thrown as his horse goes down', true, flung);
   }
-  if (knock > seat.speed * fighter.body.gear.balance) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true, flung);
+  // (Leaning out of the saddle to strike, his weight is off the horse's line: the seat holds that much less.)
+  const leaning = (fighter.seated?.reach?.tilt ?? 0) / WORLD.mount.reach.most;
+  if (knock > seat.speed * fighter.body.gear.balance * (1 - WORLD.mount.reach.seat * leaning)) return unhorse(world, fighter, `knocked from the saddle (${knock.toFixed(1)} m/s)`, true, flung);
 }
 
 /**

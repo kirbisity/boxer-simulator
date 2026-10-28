@@ -973,10 +973,26 @@ export const WORLD = {
   //   in a turn leans into it as a man does (atan of its sideways acceleration, speed × yaw rate,
   //   over g: its `lateral` is what its legs hold, ~0.6 g), the whole horse about its hooves, the
   //   rider's trunk with it; it takes this many seconds to get there.
+  // - reach: leaning out of the saddle (physics/mounted.js saddleReach). Sitting up, a rider's shoulder is ~2.2 m off the
+  //   ground on a destrier and his man's head ~1.6 m, a metre or more out from the horse's flank: a sabre or a sword
+  //   (0.8-1 m) from a straight arm only brushes him, where a cavalryman leans out and down over his thigh and stirrup to
+  //   put the blade on him. Through a blow with a blade (not a couched lance: the rest and the run carry it), his trunk
+  //   is tipped over about his hips toward his mark, no further than brings the mark within the distance the stroke is
+  //   made at (the arm `easy` out, the blade's contact share of its length beyond it; a thrust's point its length less
+  //   its depth: physics/mounted.js strokeDistance), and never past `most` rad (~40°: the
+  //   lean of the sabre drills, the hips in the saddle, the outside thigh and the stirrup holding him). A lance or a
+  //   long spear already reaches: it needs none; a sabre, a sword, a mace or an axe tens of degrees. He goes over
+  //   quickly (a spring of `inHz`) and comes back up slower (`outHz`: lifting the trunk's weight back over the saddle
+  //   from the stirrup, the obliques against gravity). While he leans his weight is off the horse's line: the seat
+  //   (WORLD.mount.seat `speed`) holds `seat` less at the full lean, in proportion (a knock tips him off more easily).
+  //   `easy` is the arm's share out, not straight: in a cut the blade lags the hand, and measured from the saddle
+  //   (tools/mounted-reach.js) with the arm 0.85 out the sabre's cuts at men "within" it fell 0.05-0.15 m short and he
+  //   hardly ever leaned; at 0.6 he leans for the men a little further out (to ~40° at most) and the cuts meet them.
   mount: {
     startApart: 12,
     line: { spacing: 3, rankBack: 5, margin: 1.5 },
     seat: { speed: 3.8, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
+    reach: { easy: 0.6, most: 0.7, steps: 14, inHz: 3, outHz: 1.2, damping: 1, seat: 0.35 },
     coupling: { forms: { couched: 0.6, twoThrust: 0.35, oneThrust: 0.12, twoSwing: 0.04, oneSwing: 0.03 }, across: 0.4, horse: 0.167 },
     twist: 1.3,
     swingPitch: 0.3,
