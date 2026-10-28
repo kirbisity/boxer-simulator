@@ -933,3 +933,60 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .bench-table { border-collapse: collapse; font: 12px var(--mono); width: 100%; }
 .bench-table th, .bench-table td { text-align: left; padding: 2px 6px; border-bottom: 1px solid var(--line); }
 .bench-panel > button { min-height: 44px; }
+
+/* ---- Battle Mode: a battle's ⚙ setup, and the setup screen (musterview.js) ---- */
+.level-card { position: relative; display: grid; min-width: 0; }
+.level-setup { position: absolute; top: 12px; right: 12px; padding: 7px 12px; border-radius: 999px; background: rgba(10, 12, 18, 0.82); border-color: rgba(255, 207, 74, 0.45); color: var(--gold); font-weight: 600; }
+.level-setup:hover, .level-setup:focus-visible { background: rgba(255, 207, 74, 0.16); }
+/* The whole screen, never scrolled: the map takes what room is left. */
+.screen.muster { overflow: hidden; align-content: stretch; justify-items: stretch; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto; gap: 8px; background: rgba(5, 6, 10, 0.94); }
+.screen.muster > * { width: min(980px, 100%); justify-self: center; min-width: 0; }
+.muster-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
+.muster-head .titles { min-width: 0; }
+.muster-head h1 { margin: 0; font: 700 clamp(20px, 4vw, 30px)/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-head .lede { margin: 0; color: var(--muted); font-size: 13px; }
+.muster-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.muster-side { display: grid; gap: 1px; text-align: left; padding: 7px 12px; border-width: 2px; border-radius: 12px; background: rgba(16, 19, 29, 0.85); min-width: 0; opacity: 0.7; }
+.muster-side b { font: 700 15px var(--display); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-side span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-side.red { border-color: rgba(224, 53, 59, 0.5); }
+.muster-side.blue { border-color: rgba(58, 116, 236, 0.5); }
+.muster-side.on { opacity: 1; color: var(--fg); }
+.muster-side.red.on { border-color: var(--red); background: rgba(224, 53, 59, 0.16); }
+.muster-side.blue.on { border-color: var(--blue); background: rgba(58, 116, 236, 0.18); }
+.muster-map { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; background: #0e1118; border: 1px solid var(--line); }
+.muster-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.muster-hint { position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none; font-size: 12px; color: rgba(238, 240, 245, 0.85); text-shadow: 0 1px 3px #000; }
+.muster-pick { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(12, 14, 22, 0.92); border: 1px solid var(--line); }
+.muster-who { display: grid; flex: 1; min-width: 0; }
+.muster-who b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-who span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-pick button { white-space: nowrap; }
+.muster-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.muster-tabs button { padding: 8px 6px; font: 600 13px var(--body); }
+.muster-panel { display: grid; gap: 8px; align-content: start; height: clamp(108px, 24vh, 190px); overflow: hidden auto; }
+.muster-units { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 5px; }
+.muster-unit { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 9px; font-size: 12px; text-align: left; min-width: 0; }
+.muster-unit span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-unit b { font-variant-numeric: tabular-nums; color: var(--gold); }
+.muster-unit.on, .muster-formation.on { color: var(--fg); border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); background: rgba(255, 207, 74, 0.12); }
+.muster-stepper { display: flex; align-items: center; gap: 6px; }
+.muster-stepper button { min-width: 40px; padding: 6px 10px; font-weight: 700; }
+.muster-stepper span { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-stepper em { font: 12px var(--mono); font-style: normal; color: var(--muted); }
+.muster-formations { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.muster-formation { display: flex; align-items: center; gap: 8px; padding: 8px 10px; text-align: left; font-size: 13px; }
+.muster-formation i { font-style: normal; color: var(--gold); width: 1.2em; text-align: center; }
+.muster-note { margin: 0; color: var(--muted); font-size: 13px; }
+.muster-foot { display: flex; justify-content: space-between; gap: 8px; }
+.muster-foot .muster-start { padding: 10px 24px; font-size: 16px; }
+@media (max-width: 560px) {
+  .muster-head .lede { display: none; }
+  .muster-units { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  .muster-unit { padding: 5px 8px; font-size: 11px; }
+  .muster-hint { font-size: 11px; }
+  .muster-panel { height: clamp(120px, 30vh, 230px); }
+  .muster-formations { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .muster-pick { flex-wrap: wrap; }
+  .muster-who { flex-basis: 100%; }
+}

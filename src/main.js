@@ -29,6 +29,7 @@ import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
 import { checkButtons } from './uicheck.js';
 import { battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
+import { leadOf, musterLevel } from './muster.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
@@ -100,6 +101,10 @@ const state = {
   finishedAt: null,
   drama: { active: null, icons: [] },
   scenario: null,
+  // A battle as the player set it up (muster.js: the armies, their places, the man played), or null for the level's own.
+  muster: null,
+  // The man played on each side: which of its fighters (the first, unless a setup chose another).
+  lead: { red: 0, blue: 0 },
   // How many on each side: 1 to 8, not necessarily the same.
   teamSizes: { red: 1, blue: 1 },
   // The sandbox's place: the ring, the Colosseum, or the subway platform.
@@ -259,6 +264,13 @@ function placeLockRing() {
   lockRing.rotation.z = realSeconds() * 0.8;
 }
 
+/** The battle being fought: its level as Battle Mode plays it (scenarios.js battleOf), as set up (muster.js) if it was; null in the sandbox's ring. */
+const levelNow = () => {
+  if (!state.scenario) return null;
+  const level = battleOf(state.scenario);
+  return state.muster ? musterLevel(level, state.muster) : level;
+};
+
 /** The fighter of a side the builder is editing, and replacing it. */
 // ('hero' is not a corner: the character the sandbox's level is played as, kept in state.levelPlayer.)
 const current = (corner) => (corner === 'hero' ? state.levelPlayer : state.rosters[corner][state.editing[corner]]);
@@ -308,7 +320,7 @@ function newBout() {
   leaveStage();
   state.seed += 1;
   // A scenario is the same world on its own floor, with its own people.
-  const scenario = state.scenario ? battleOf(state.scenario) : null;
+  const scenario = levelNow();
   // Each side: its lead (the one the builder edits) and, in a team fight,
   // the level's crew or, in the ring, fighters from the presets.
   // Who rides is each fighter's own (`inputs.mounted`, set in the builder; those whose kit rides: horses.js canRide).
@@ -375,7 +387,7 @@ function rebuildViews({ progressive = false } = {}) {
   if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);
   const crowd = state.world.fighters.length > CROWD_DRAWING;
   // (In a stage the man played is the one lead: the first man met on the other side is no better drawn than the rest of his garrison.)
-  const leads = new Set(state.world.stage ? [state.world.fighters[0].id] : ['red', 'blue'].map((corner) => state.world.fighters.find((fighter) => fighter.corner === corner)?.id));
+  const leads = new Set(state.world.stage ? [state.world.fighters[0].id] : ['red', 'blue'].map((corner) => leadOf(state.world.fighters, corner, state.lead[corner])?.id));
   const build = (fighter) => {
     const view = buildFighterView(scene, fighter, { simple: crowd && !leads.has(fighter.id) });
     setLayer(view, state.layer);
@@ -882,7 +894,7 @@ function watchCamera(world, middle, dt) {
     orbit.distance = Math.max(min, Math.min(max, orbit.distance));
   } else if (world.fighters.length > 2 || world.horses?.length) {
     // A crowd needs a wider shot: back off with the spread of the fighters.
-    const furthest = state.scenario ? battleOf(state.scenario).camera?.maxDistance ?? Infinity : Infinity;
+    const furthest = levelNow()?.camera?.maxDistance ?? Infinity;
     orbit.distance += (Math.min(furthest, frameDistance(spread)) - orbit.distance) * (1 - 0.97 ** (dt * 60));
     watchCam.reframing = false;
   } else stepReframe(watchCam, orbit, spread, dt);
@@ -1203,7 +1215,7 @@ for (const corner of ['red', 'blue']) {
     const roster = state.rosters[corner];
     for (let index = 1; index < roster.length; index += 1) roster[index] = randomCharacter();
     state.rosters[corner] = roster.slice(0, Math.max(1, state.teamSizes[corner]));
-    ensureRoster(corner, state.scenario ? battleOf(state.scenario) : null);
+    ensureRoster(corner, levelNow());
     refreshBuilder();
     newBout();
   });
@@ -1475,8 +1487,8 @@ function ghostPlayAs(choice, own = null) {
 }
 $('#open-menu').addEventListener('click', () => setSandboxPanel(false));
 
-// The fighter the player controls: his side's lead (the side is chosen with the Play buttons).
-const player = () => state.world.fighters.find((fighter) => fighter.corner === state.playSide) ?? state.world.fighters[0];
+// The fighter the player controls: his side's lead (the side is chosen with the Play buttons; the man, its first or the one a setup chose).
+const player = () => leadOf(state.world.fighters, state.playSide, state.lead[state.playSide]) ?? state.world.fighters[0];
 // Keys: punches on the right hand's home row, kicks and knees above and
 // below, defences on the left hand.
 // The movement keys (w a s d, the arrows) move him the way the camera looks;
@@ -1953,12 +1965,16 @@ function fillCornerForm(corner) {
  * level's. A level's are kept as tuned until the page is reloaded, so the
  * tuning survives going back to the ring and returning.
  */
-function chooseLevel(key) {
+function chooseLevel(key, setup = null) {
   if (!state.scenario) state.sandboxRosters = state.rosters;
+  // A battle set up by the player (muster.js): his armies and the man he plays; else the level's own, its first men leading.
+  state.muster = key && setup ? setup : null;
+  state.lead = { red: 0, blue: 0, ...(state.muster?.lead ? { [state.muster.lead.corner]: state.muster.lead.index } : {}) };
   if (key) {
     const scenario = battleOf(key);
-    // A level with a whole cast is made fresh each visit, at its own sizes.
-    if (scenario.cast) state.levelRosters[key] = scenario.cast(Math.random);
+    // A level with a whole cast is made fresh each visit, at its own sizes (a set-up one is the player's, as he left it).
+    if (state.muster) state.levelRosters[key] = { red: structuredClone(state.muster.cast.red), blue: structuredClone(state.muster.cast.blue) };
+    else if (scenario.cast) state.levelRosters[key] = scenario.cast(Math.random);
     state.levelRosters[key] ??= Object.fromEntries(scenarioFighters(scenario).map(({ inputs, corner }) => [corner, [inputs]]));
     state.rosters = state.levelRosters[key];
     if (scenario.cast) for (const corner of ['red', 'blue']) state.teamSizes[corner] = state.rosters[corner].length;
@@ -1972,7 +1988,7 @@ function chooseLevel(key) {
 
 /** Rosters filled to size, the fighter being edited kept in range, both forms redrawn. */
 function refreshBuilder() {
-  const scenario = state.scenario ? battleOf(state.scenario) : null;
+  const scenario = levelNow();
   for (const corner of ['red', 'blue']) {
     ensureRoster(corner, scenario);
     state.editing[corner] = Math.min(state.editing[corner], state.teamSizes[corner] - 1);
@@ -2090,6 +2106,8 @@ function setGame(game, next = null) {
 function match({ red, blue, place, game, next }) {
   setGame(game, next);
   state.scenario = null;
+  state.muster = null;
+  state.lead = { red: 0, blue: 0 };
   state.rosters = { red: red.map((inputs) => normaliseInputs(structuredClone(inputs))), blue: blue.map((inputs) => normaliseInputs(structuredClone(inputs))) };
   state.teamSizes = { red: red.length, blue: blue.length };
   state.editing = { red: 0, blue: 0 };
@@ -2111,7 +2129,7 @@ function askSide() {
   const pick = $('#side-pick');
   for (const corner of ['red', 'blue']) {
     const team = state.world.fighters.filter((fighter) => fighter.corner === corner);
-    const lead = team[0]?.body.inputs;
+    const lead = leadOf(state.world.fighters, corner, state.lead[corner])?.body.inputs;
     if (!lead) continue;
     const faction = FACTIONS[factionOf(lead)]?.label ?? '';
     pick.querySelector(`[data-side="${corner}"]`).innerHTML = `<em>Play as</em><b>${lead.name}</b><span>${[faction, team.length > 1 ? `${team.length} fighters` : STYLES[lead.style]?.label].filter(Boolean).join(' · ')}</span>`;
@@ -2127,13 +2145,18 @@ $('#side-pick').addEventListener('click', (press) => {
   }
   const side = press.target.closest('button')?.dataset.side;
   if (!side) return;
+  takeSide(side);
+});
+
+/** Play one side ('red' or 'blue') or watch ('watch'): the fight running again. */
+function takeSide(side) {
   $('#side-pick').hidden = true;
   state.paused = false;
   $('#pause').textContent = 'Pause';
   // The footer's own buttons do the switching (hidden in a battle, there in the sandbox).
   const button = side === 'watch' ? $('#modes button[data-value="watch"]') : $(`#modes button[data-value="play"]${side === 'blue' ? '[data-side="blue"]' : ':not([data-side])'}`);
   button.click();
-});
+}
 
 /** The fight behind the menus: two random gladiators in the Colosseum, one after another. */
 function attract() {
@@ -2145,10 +2168,16 @@ function attract() {
   Object.assign(scene.orbit, { distance: 4.6, pitch: 0.12 });
 }
 
-function enterLevel(key) {
-  setGame('level', { text: 'Retry', retry: true, run: () => chooseLevel(key) });
-  chooseLevel(key);
-  askSide();
+/** Into a battle: the level's own, or as set up (`setup`, muster.js); a setup that chose the man played goes straight to him. */
+function enterLevel(key, setup = null) {
+  setGame('level', { text: 'Retry', retry: true, run: () => chooseLevel(key, setup) });
+  chooseLevel(key, setup);
+  if (!setup?.lead) {
+    askSide();
+    return;
+  }
+  state.sideAsked = true;
+  takeSide(setup.lead.corner);
 }
 
 // ---- The tutorial: the training yard ----------------------------------------------
