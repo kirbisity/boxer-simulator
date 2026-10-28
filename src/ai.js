@@ -484,10 +484,28 @@ function keepPlace(world, fighter) {
 }
 
 /**
+ * The guns before a squad (a drill with `squad`: Qi Jiguang's fowling
+ * pieces) have one shot each before they fall back through it
+ * (formation.js retireShooters), and it is held until it is sure
+ * (DRILL.holdFire): while the man he has laid on is further than that, and
+ * coming on (at a run, DRILL.runIn) too fast for the piece to be loaded
+ * again before he arrives, the gunner stands with it ready. Thrown away at
+ * long range, it is the only shot his place gets: the matchlock takes 15 s
+ * to load and a rush covers the ground in five. A line of shooters that
+ * relieve each other (the Han crossbowmen) shoots as it likes.
+ */
+function holdsFire(fighter, formation, distance) {
+  const shot = fighter.weapon.spec.shot;
+  if (!formation.drill.squad || !shot || distance <= DRILL.holdFire) return false;
+  return distance < shot.reloadSeconds * DRILL.runIn;
+}
+
+/**
  * In the ranks: unless the enemy is on his slot (the front rank's to fight,
  * or anyone's once they are through), he stands in his place facing them.
  * A loaded shooter in the front rank shoots from it; one who has loosed
- * spans again in his place. Returns whether that is what he does.
+ * spans again in his place; one with a single slow shot holds it until it
+ * is sure (holdsFire). Returns whether that is what he does.
  */
 function holdRank(world, fighter, opponent, style, dt) {
   const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
@@ -504,6 +522,7 @@ function holdRank(world, fighter, opponent, style, dt) {
       return true;
     }
     if (!fighter.inFront || fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    if (holdsFire(fighter, formation, distance)) return true;
     const zone = world.random() < gun.headShare ? 'head' : 'body';
     if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
       fighter.punch.quick = true;
