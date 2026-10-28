@@ -232,8 +232,8 @@ export const COMPARE_SCENES = {
 };
 
 // The horse-archer plains, wide: two horsemen out on the floor, and what stands at its edge (render.js
-// OPEN_PLAINS): Wei Qing's wagons beyond the floor's −x end at Mobei, the camel train beyond its +x end at
-// Carrhae, the ridge beyond −z on the Catalaunian Plains.
+// OPEN_PLAINS): nothing at Mobei, the camel train beyond its +x end at Carrhae, the ridge beyond −z on the
+// Catalaunian Plains.
 for (const [place, at, yaw] of [['mobei', [-24, 0], 0.4], ['catalaunian', [0, -8], 1.57], ['carrhae', [24, 0], 2.7]]) {
   COMPARE_SCENES[`plains-${place}`] = {
     about: `The ${place} plain, wide, with what stands at its edge.`,

@@ -9,6 +9,7 @@ import { floorUnder, SEVER_PARTS, point, quatRotate, shieldDisc } from './physic
 import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
+import { arrowSightScale } from './arrowsight.js';
 import { outfitOf } from './outfits.js';
 import { featherDevice, steelMaterial } from './wardrobe.js';
 import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
@@ -2169,8 +2170,12 @@ export function updateArrows(view, world) {
     const flying = toVector(arrow.v);
     const along = (arrow.landed ? mesh.userData.along : null) ?? (flying.lengthSq() > 1e-9 ? flying.normalize() : new THREE.Vector3(0, -1, 0));
     mesh.userData.along = along;
+    // From far off an arrow is drawn a little larger than it is, so that a volley can be followed (arrowsight.js): thicker (the shaft and the fletching across), a little
+    // longer (its nock drawn back, the head where it is).
+    const seen = arrowSightScale(view.camera.position.distanceTo(mesh.position.set(arrow.x[0], arrow.x[1], arrow.x[2])), { fovDeg: view.camera.fov, heightPx: view.renderer?.domElement?.clientHeight || 720 });
+    mesh.scale.set(seen.across, seen.along, seen.across);
     // The nock trails the point by the arrow's length; stuck in the ground, the head is in it.
-    mesh.position.set(arrow.x[0], arrow.x[1], arrow.x[2]).addScaledVector(along, -(arrow.length ?? ARROW.length) * (arrow.landed ? 0.75 : 1));
+    mesh.position.addScaledVector(along, -(arrow.length ?? ARROW.length) * seen.along * (arrow.landed ? 0.75 : 1));
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
   }
   for (const [arrow, mesh] of drawn) {

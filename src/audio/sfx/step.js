@@ -34,11 +34,12 @@ export function stepParams(event) {
   const pace = Math.max(0, event.speed ?? 1.4);
   const v = footSpeed(pace);
   const energy = 0.5 * LEG_SHARE * mass * v * v;
-  // Water: what the foot throws up grows with its depth in it and its speed through it (a splash's energy ~ the water moved).
+  // Water: what the foot throws up grows with its depth in it and its speed through it (a splash's energy ~ the water moved). Mud with water standing on it (a
+  // ploughed field after rain) splashes as well as squelches, by the film's depth.
   const depth = sfxClamp(event.depth ?? 0, 0, 1.2);
-  const splash = surface === 'water' ? sfxClamp(depth * 2 * (0.4 + pace / 4), 0.05, 1.5) : 0;
+  const splash = surface === 'water' ? sfxClamp(depth * 2 * (0.4 + pace / 4), 0.05, 1.5) : spec.squelch && depth > 0 ? sfxClamp(depth * 2 * (0.4 + pace / 4), 0.05, 1.5) : 0;
   const seconds = spec.seconds * (1 + (mass - 80) / 400) * (surface === 'water' ? 0.7 + splash : 1);
-  const level = levelFromEnergy(energy * (surface === 'water' ? 1 + splash * 3 : 1), spec.efficiency, seconds);
+  const level = levelFromEnergy(energy * (1 + splash * 3), spec.efficiency, seconds);
   // The heel's thud: the leg's mass on the floor's give (a spring-mass: lower for a heavier man).
   const thud = spec.thud * (80 / mass) ** 0.5;
   return { surface, level, thud, seconds, splash, armour: event.armour ?? 'none', energy, pace };
@@ -70,7 +71,7 @@ export function playStep(voice, out, params, when, gain) {
     const bubbles = sfxBuffer(voice.ctx, seconds, (data, rate) => writeGrains(data, rate, { count: 5, spread: seconds * 0.8, low: 300, high: 900, decay: 0.03, amp: 0.4 }));
     sfxPlayBuffer(voice, out, bubbles, when, gain * 0.5);
   }
-  if (spec.splash) {
+  if (spec.splash || params.splash > 0) {
     // The splash: water broken (bright noise, longer and lower for a deeper, faster foot), the drops falling back, the bubbles of the air carried under.
     const splash = params.splash;
     sfxBurst(voice, out, { when, peak: gain * 0.9, attack: 0.01, decay: seconds, type: 'bandpass', frequency: 2200 - 900 * Math.min(1, splash), q: 0.7 });

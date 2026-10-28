@@ -1,18 +1,18 @@
 // The horse-archer battles' three plains (Mobei, the Catalaunian Plains, Carrhae): each a place in every table an open-air place is
-// in, and what stood at its edge (Wei Qing's wagon laager, the Parthian camel train) drawn beyond the fighting floor, never on it.
+// in, and what stood at its edge (the Parthian camel train; Mobei has none) drawn beyond the fighting floor, never on it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PLACE_AMBIENCE } from '../src/audio/ambience.js';
 import { PLACE_SURFACE } from '../src/audio/surface.js';
 import { SCENE_MUSIC } from '../src/audio/music/manifest.js';
-import { PLAINS_LAAGER, PLAINS_TRAIN, plainsLaagerSpots, plainsTrainSpots } from '../src/props/plains.js';
+import { PLAINS_TRAIN, plainsTrainSpots } from '../src/props/plains.js';
 
 // scenery.js comes with render.js, which makes a few THREE things at load: a THREE that answers anything, for the import.
 const stub = new Proxy(function stand() {}, { get: (_, key) => (key === Symbol.toPrimitive ? () => 0 : stub), apply: () => stub, construct: () => stub });
 const kept = globalThis.THREE;
 globalThis.THREE = stub;
 const { PLACE_GROUND, PLACE_SCENERY } = await import('../src/scenery.js');
-const { PLACE_ARENAS } = await import('../src/render.js');
+const { PLACE_ARENAS, OPEN_PLAINS } = await import('../src/render.js');
 globalThis.THREE = kept;
 
 const PLAINS = ['mobei', 'catalaunian', 'carrhae'];
@@ -30,15 +30,10 @@ test('each plain is a place in every open-air table: its land, ground, footing, 
   }
 });
 
-test('Wei Qing\'s wagons stand beyond the Han (red, -x) end of the floor, across its whole width', () => {
-  for (const floor of FLOORS) {
-    const spots = plainsLaagerSpots(floor);
-    // A wagon's half-length and its shafts reach this far from its middle.
-    const reach = PLAINS_LAAGER.box[0] / 2 + 2;
-    for (const [x] of spots) assert.ok(x + reach < -floor.halfX, `a wagon at x ${x.toFixed(1)} reaches the floor (${-floor.halfX})`);
-    const zs = spots.map(([, z]) => z);
-    assert.ok(Math.min(...zs) < -floor.halfZ && Math.max(...zs) > floor.halfZ, 'the line spans the floor\'s width');
-  }
+test('Mobei has no wagons or carts: Wei Qing\'s ring is not drawn, and nothing of the kind is exported', async () => {
+  const plains = await import('../src/props/plains.js');
+  assert.deepEqual(Object.keys(plains).filter((name) => /wagon|laager|cart/i.test(name)), []);
+  assert.deepEqual(OPEN_PLAINS.mobei.props({ halfX: 60, halfZ: 38 }), [], 'no props at all behind the Han');
 });
 
 test('the Parthian camel train stands beyond the blue (+x) end of the floor', () => {

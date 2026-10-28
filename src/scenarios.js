@@ -442,8 +442,8 @@ function hollowSquare({ sides, spacing }) {
 // at a hundred paces), sent his horse out against the Xiongnu's, fought until
 // dusk and a sandstorm, and sent wings round both flanks: the chanyu broke away
 // north with a few hundred, and the Han took or killed nineteen thousand
-// (Shiji 111). Here: Wei Qing's crossbowmen in iron lamellar, drawn up before
-// the laager (the floor's end at their backs: the wagons, render.js), and his
+// (Shiji 111). Here: Wei Qing's crossbowmen in iron lamellar, drawn up at the
+// floor's end (no wagons are drawn: the Han stand on the open Gobi), and his
 // horse on both flanks, sabre, spear and bow; against the Xiongnu, every man
 // of them a horse archer in felt and leather, a few with the spear.
 const MOBEI = {
@@ -832,8 +832,10 @@ const AGINCOURT = {
   men: { every: 1.15, rows: [0, 1.2], perRow: 3 },
   // The field, as it was that morning: fresh plough soaked by a night's rain and churned by the horse. The reference
   // man sinks calf-deep (0.26 m); a man in plate, pressing half as hard again, to the knee; nothing past the plough's
-  // pan (0.5 m). Wet clay: a stiff mud (viscosity of the castle's sludge) with little grip.
-  mud: { x: [-50, 50], z: [-11.5, 11.5], depth: 0.26, firm: 0.5, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.1 },
+  // pan (0.5 m). Wet clay: a stiff mud (viscosity of the castle's sludge) with little grip. And a film of rain-water standing on it, in the furrows and over
+  // the trodden ground (`water`, 4 cm: a puddled field, not a lake): it is over the men's feet as the mud is, drawn, rung and splashed as the castle's water
+  // is (worksview.js), and heard as a splash with the squelch (audio/sfx/step.js).
+  mud: { x: [-50, 50], z: [-11.5, 11.5], depth: 0.26, firm: 0.5, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.1, water: 0.04 },
   // The woods' edges: the field ~23 m across where the French formed, narrowing to ~17 where the English stood (some
   // 1,200 yards across at the French end, 900 at the English: the French were squeezed together as they came on).
   woods: [[-50, 11.6], [-20, 11.2], [-8, 10.2], [3, 8.5], [50, 8.5]],
@@ -912,11 +914,11 @@ const AGINCOURT_LEVEL = {
   place: 'Agincourt, Artois · 25 October 1415',
   blurb: "King Henry's archers stand behind their stakes at the narrow end of a ploughed field, soaked by a night's rain, between two woods. The French men-at-arms come on across it on foot in plate, sinking to the knee, crowded together as the woods close in; their horse rides first at the archers. Thirty archers and five men-at-arms against twenty-eight men-at-arms, three lances and four crossbows.",
   scene: 'agincourt',
-  weather: { fog: [10, 95], sky: 0.8, pale: 0.75, sun: 0.55 },
+  weather: { fog: [28, 120], sky: 0.8, pale: 0.75, sun: 0.55 },
   arena: { ...AGINCOURT.arena, works: agincourtWorks() },
   spread: 1,
   // From behind the English line, looking down the field between the woods (further round, the woods stand in the way).
-  camera: { yaw: -0.18, pitch: 0.4, distance: 24, maxDistance: 30 },
+  camera: { yaw: 1.25, pitch: 1.0, distance: 44, maxDistance: 46 },
   roster: 'Thirty-two French on foot and three on horse · thirty English archers and five men-at-arms',
   formation: {
     // The vanguard packed close, shoulder to shoulder and rank on rank (so tight, the chroniclers say, they could hardly raise their arms).
@@ -1021,13 +1023,13 @@ export const SCENARIOS = {
   mobei: {
     title: 'Mobei',
     place: 'North of the Gobi · 119 BC',
-    blurb: "Wei Qing has crossed the desert to the chanyu's own ground. Twenty-three Han crossbowmen in iron lamellar stand before the ring of wagons, his horse — sabre, spear and bow — on both flanks; against them come thirty-five Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.",
+    blurb: "Wei Qing has crossed the desert to the chanyu's own ground. Twenty-three Han crossbowmen in iron lamellar stand at the edge of the plain, his horse — sabre, spear and bow — on both flanks; against them come thirty-five Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.",
     scene: 'mobei',
     arena: MOBEI.arena,
     spread: 1,
     camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
     roster: 'Twenty-three Han crossbowmen and eleven horse · thirty-five Xiongnu horsemen',
-    // The crossbowmen ten to a rank before the wagons (the floor's end behind them), the horse on both flanks; the Xiongnu a loose mass of riders.
+    // The crossbowmen ten to a rank at the floor's end, the horse on both flanks; the Xiongnu a loose mass of riders.
     formation: {
       red: { front: MOBEI.hanFront, facing: 'ahead', spacing: LEGION.ranks.spacing, rowSpacing: LEGION.ranks.rowSpacing, perRow: LEGION.ranks.perRow, wings: { back: 0 } },
       blue: { front: MOBEI.xiongnuFront, spacing: RIDERS_LOOSE.spacing, rowSpacing: RIDERS_LOOSE.rowSpacing, perRow: 9, loose: RIDERS_LOOSE.loose },
