@@ -76,19 +76,21 @@ function sekigaharaSide(random, side) {
 }
 
 // Pyongyang, 1593: the Ming army storms the city held by Konishi
-// Yukinaga. Twenty-four Ming foot and twenty-six Japanese; the Ming regulars
+// Yukinaga. Eighteen Ming foot and fifty-two Japanese; the Ming regulars
 // only — brigandine and elite — led by an elite with the guandao; gun and bow
-// men behind on both sides. Li Rusong's Liaodong horse ride with them (below).
+// men behind on both sides. Li Rusong's Liaodong horse ride with them (below):
+// the Ming came south with the northern cavalry the Japanese did not have; here
+// the Japanese hold the city with more men than the Ming bring to this part of the wall.
 const PYONGYANG_MING = {
-  elite: { guandao: 2, matchlock: 1, threeEyed: 2 },
-  brigandine: { swordShield: 8, spear: 6, matchlock: 5 },
+  elite: { guandao: 2, matchlock: 1, threeEyed: 1 },
+  brigandine: { swordShield: 6, spear: 4, matchlock: 4 },
 };
 const PYONGYANG_JAPANESE = {
-  samurai: { katana: 4, naginata: 1, spear: 2 },
-  ashigaru: { spear: 8, matchlock: 7, bow: 4 },
+  samurai: { katana: 7, naginata: 3, spear: 4 },
+  ashigaru: { spear: 17, matchlock: 13, bow: 8 },
 };
 // The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
-const PYONGYANG_HORSE = { dao: 3, spear: 3, threeEyed: 2 };
+const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 3 };
 
 /** Blades and polearms first (the front ranks), bows and guns last. */
 // Where the bows and guns open a battle: in the front rows, shooting, the
@@ -140,7 +142,7 @@ const ZEELANDIA = {
 };
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
-// against a garrison with a few brigandine regulars (one in five).
+// against a garrison with one or two brigandine regulars among it.
 // The raiding bands were large and the coast garrisons thin: here the raiders outnumber them.
 const WOKOU = {
   // Japanese and Chinese together, as the raids were. The Ming accounts
@@ -148,9 +150,12 @@ const WOKOU = {
   // as swordsmen first: the long Japanese sword and the great two-handed
   // field sword (the ōdachi) leaping in at a run, the Chinese of the bands
   // with dao and spear. Few guns or bows among them: they came on and cut.
-  raiders: { japanese: { katana: 9, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
-  // A coast garrison of the 1550s: spears and swords, no guns to speak of.
-  garrison: { garrison: { spear: 7, dao: 5 }, brigandine: { swordShield: 2, spear: 1 } },
+  // A few of the Japanese are rōnin, masterless swordsmen of the wars at
+  // home (the raids' fighting core, as the Ming saw it): they lead the rush.
+  raiders: { ronin: { ronin: 3 }, japanese: { katana: 6, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
+  // A coast garrison of the 1550s: spears and swords, no guns to speak of;
+  // the weisuo levy in its hemp vests, and a pair of regulars in brigandine.
+  garrison: { garrison: { spear: 8, dao: 5 }, brigandine: { swordShield: 1, spear: 1 } },
   // One colour to a kind, the dynasty's red, so the two sides read apart
   // across the square (OUTFITS designs: the garrison's red coat, the
   // brigandine's red cloth); the raiders are in what they have.
@@ -160,12 +165,20 @@ const WOKOU = {
   front: 8,
 };
 
-// The raiders as they come on: a loose crowd, nine abreast.
+// The raiders as they come on: a loose crowd, nine abreast; the Japanese in the front rank, the rōnin first among them.
 const WOKOU_RAIDERS_ORDER = { front: WOKOU.front, spacing: 1.3, rowSpacing: 1.6, perRow: 9, loose: 0.5 };
 
-/** The raiders of a wokou level, the same in both. */
+/**
+ * The raiders of a wokou level, the same in both: the Japanese first (the
+ * front rank, filled from one end to the other), the rōnin spread evenly
+ * along it, then the Chinese.
+ */
 function wokouRaiders(random) {
-  return [...company(WOKOU.raiders.japanese, (style) => wokouRaider(random, style, 'japanese')), ...company(WOKOU.raiders.chinese, (style) => wokouRaider(random, style, 'chinese'))];
+  const ronin = company(WOKOU.raiders.ronin, (style) => roninWarrior(random, style));
+  const japanese = company(WOKOU.raiders.japanese, (style) => wokouRaider(random, style, 'japanese'));
+  const every = Math.ceil(WOKOU_RAIDERS_ORDER.perRow / ronin.length);
+  ronin.forEach((man, index) => japanese.splice(Math.min(japanese.length, index * every + Math.floor(every / 2)), 0, man));
+  return [...japanese, ...company(WOKOU.raiders.chinese, (style) => wokouRaider(random, style, 'chinese'))];
 }
 
 // Qi Jiguang's army in the Taizhou campaign, 1561: the same raiders (WOKOU)
@@ -274,9 +287,8 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true }
   };
 }
 
-// Koxinga's army's discipline (ai.js AI.morale): his military law was famously severe (officers who gave
-// ground were beheaded), his men drilled in the Ming manner; not the whole of Qi Jiguang's (QI_DISCIPLINE).
-const KOXINGA_DISCIPLINE = 0.6;
+// Koxinga's army is given no discipline of its own: what holds it on the sand is what the men see
+// (ai.js standingFear): his iron men and regulars outmatch the Dutch line man for man, and steady the rest.
 
 // Rhodes, 24 September 1522: Süleyman's general assault on the breaches.
 // The Knights of St John in plate, their sergeants and gunners, hold the
@@ -603,11 +615,11 @@ export const SCENARIOS = {
   pyongyang: {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
-    blurb: 'The Ming army retakes the city from the Japanese. Twenty-four Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and eight of Li Rusong\'s horsemen in iron lamellar on the flank, against twenty-six Japanese samurai and ashigaru.',
+    blurb: 'The Ming army retakes the city from the Japanese. Eighteen Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and twelve of Li Rusong\'s horsemen in iron lamellar on the flank, against fifty-two Japanese samurai and ashigaru.',
     scene: 'sengoku',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
-    roster: 'Thirty-two Ming (eight on horse) · twenty-six Japanese',
+    roster: 'Thirty Ming (twelve on horse) · fifty-two Japanese',
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
     wings: {
@@ -652,7 +664,7 @@ export const SCENARIOS = {
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
     roster: 'Eighteen Dutch · thirty-two of Koxinga\'s army',
-    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35, discipline: KOXINGA_DISCIPLINE } },
+    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35 } },
     cast: (random) => {
       const army = ZEELANDIA.koxinga;
       // The iron men, every one masked, in scale (the elite's masked scale design).
@@ -688,7 +700,7 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'A water town, Zhejiang · 1554',
-    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, barefoot, some in pieces of samurai armour: long swords and great two-handed swords, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison and the few brigandine regulars among them.',
+    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, rōnin at their head, barefoot, some in pieces of samurai armour: long swords and great two-handed swords, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison: old men and boys in hemp vests, and a pair of brigandine regulars among them.',
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },

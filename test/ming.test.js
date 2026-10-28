@@ -38,7 +38,7 @@ test('Pyongyang: Ming regulars only, taller and heavier than the Japanese they f
   const weights = { red: [], blue: [] };
   for (let seed = 1; seed <= 3; seed += 1) {
     const cast = SCENARIOS.pyongyang.cast(seededRandom(seed));
-    assert.equal(cast.red.length, 24);
+    assert.equal(cast.red.length, 18);
     assert.ok(cast.red.every((fighter) => ['mingBrigandine', 'mingElite'].includes(fighter.outfit.kind)), 'no garrison levies');
     for (const side of ['red', 'blue']) {
       for (const fighter of cast[side]) {

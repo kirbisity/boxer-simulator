@@ -3797,6 +3797,9 @@ function updateTimers(world, fighter, dt) {
     if (fighter.state !== 'up' || painShare(fighter) <= 0 && fighter.pain.t > 0.3) fighter.pain = null;
   }
   reload(world, fighter, dt);
+  // A machine (gear.machine: a robot) has no blood: what would open a wound in a man opens nothing that
+  // bleeds, and it is never weakened or dropped by blood loss; only broken (its injuries, below) or knocked out.
+  if (fighter.body.gear.machine) fighter.bleed = 0;
   if (fighter.bleed > 0) {
     // Wounds bleed, easing as they clot; lose enough blood and you go down.
     fighter.bloodLost = (fighter.bloodLost ?? 0) + fighter.bleed * dt;

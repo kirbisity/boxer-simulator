@@ -13,7 +13,7 @@ const sides = (key, seed = 1) => battleOf(key).cast(seededRandom(seed));
 const riders = (side) => side.filter(isMounted);
 
 // Who rides in each map, per side: [red, blue].
-const WINGS_OF = { legion: [8, 8], sekigahara: [6, 6], pyongyang: [8, 0], otumba: [7, 0], rebellion: [2, 0] };
+const WINGS_OF = { legion: [8, 8], sekigahara: [6, 6], pyongyang: [12, 0], otumba: [7, 0], rebellion: [2, 0] };
 
 test('the cavalry helpers make riders in the kit of their time, on the horse their people rode', () => {
   const random = seededRandom(4);
@@ -68,7 +68,9 @@ test('the armies are about sixty to a hundred, and a wing is about a fifth of a 
     else assert.ok(total >= 56 && total <= 100, `${key} ${total}`);
     for (const corner of ['red', 'blue']) {
       const wing = riders(played[corner]).length;
-      if (wing && key !== 'rebellion') assert.ok(wing / played[corner].length <= 0.3 && wing >= 6 && wing <= 10, `${key} ${corner} wing ${wing} of ${played[corner].length}`);
+      // Pyongyang: Li Rusong brought the northern horse south, more of it to this fight than of any other wing (two in five of the Ming).
+      if (key === 'pyongyang' && corner === 'red') assert.ok(wing / played[corner].length <= 0.4 && wing === 12, `${key} ${corner} wing ${wing} of ${played[corner].length}`);
+      else if (wing && key !== 'rebellion') assert.ok(wing / played[corner].length <= 0.3 && wing >= 6 && wing <= 10, `${key} ${corner} wing ${wing} of ${played[corner].length}`);
     }
   }
 });

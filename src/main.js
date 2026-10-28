@@ -1027,12 +1027,15 @@ function consumeEvents() {
     const event = events[state.eventCursor];
     state.eventCursor += 1;
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
-    if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked')) woundBlood(scene, event);
+    // A machine struck (gear.machine: a robot) does not bleed: an edge, a point, an arrow or a ball throws sparks off it instead.
+    const machine = Boolean(state.world.fighters[event.defender]?.body.gear.machine);
+    const wound = machine ? (view, at) => spawnSparks(view, at.point, 10) : woundBlood;
+    if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked') && (!machine || (event.cut ?? 0) + (event.pierce ?? 0) >= 1)) wound(scene, event);
     if (event.kind === 'horseHit' && event.cut + event.pierce > 1) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
-    if (event.kind === 'shot') spawnShot(scene, event);
-    if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : woundBlood(scene, event));
-    if (event.kind === 'bladeBlock') (event.cut > 1 ? woundBlood : (view, at) => spawnSparks(view, at.point, 18))(scene, event);
+    if (event.kind === 'shot') spawnShot(scene, machine ? { ...event, harm: 0 } : event);
+    if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : wound(scene, event));
+    if (event.kind === 'bladeBlock') (event.cut > 1 ? wound : (view, at) => spawnSparks(view, at.point, 18))(scene, event);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);

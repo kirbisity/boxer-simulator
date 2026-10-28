@@ -14,7 +14,12 @@ const count = (men, pick) => men.reduce((tally, man) => ({ ...tally, [pick(man)]
 
 test('the wokou raiders charge with swords: katana and ōdachi, dao and spear, no guns or bows; the garrison has no gun either, each kind in one colour', () => {
   const { red, blue } = SCENARIOS.wokou.cast(seededRandom(4));
-  assert.deepEqual(count(red, (man) => man.style), { katana: 9, odachi: 3, dao: 8, spear: 6 });
+  // (A rōnin may fight with two swords: nitō.)
+  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 3, katana: 6, odachi: 3, dao: 8, spear: 6 });
+  // The Japanese in the front rank, the rōnin among them.
+  const front = red.slice(0, SCENARIOS.wokou.formation.red.perRow);
+  assert.ok(front.every((man) => ['katana', 'ronin', 'nito'].includes(man.style)), 'the Japanese swordsmen in front');
+  assert.equal(front.filter((man) => man.outfit.kind === 'ronin').length, 3);
   assert.ok(red.every((man) => !STYLES[man.style].ranged), 'no shooter among the raiders');
   assert.ok(red.every((man) => man.charging > 1), 'they come on at a run');
   assert.ok(blue.every((man) => !STYLES[man.style].ranged), 'no shooter in the garrison');
