@@ -9,5 +9,8 @@
     "bout": "node tools/bout.js",
     "bundle": "node tools/bundle.js",
     "serve": "python3 tools/serve.py 8934"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
   }
 }
