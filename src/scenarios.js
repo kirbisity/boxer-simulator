@@ -7,7 +7,7 @@ import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
-import { conquistadorHorseman, drilledSoldier, europeanSoldier, footSoldier, hanHorseman, hospitaller, mexicaWarrior, mingHorseman, mingSoldier, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+import { conquistadorHorseman, drilledSoldier, europeanSoldier, footSoldier, hanHorseman, hospitaller, mexicaWarrior, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 // Rome against Han: fifty a side, ten to a rank; a centurion to every
 // eighty legionaries (a century), Li Ling among his crossbowmen.
@@ -268,6 +268,8 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true }
     // Each man where his squad puts him; the squads drilled as a whole (formation.js), under Qi's discipline (ai.js AI.morale).
     formation: { red: WOKOU_RAIDERS_ORDER, blue: { ...drawnUp, discipline: morale ? QI_DISCIPLINE : 0 } },
     cast: (random) => ({ red: wokouRaiders(random), blue: qiArmy(random, { weapons }).men }),
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['raiders'], blue: ['qi'] },
     fighters: [],
   };
 }
@@ -283,6 +285,157 @@ const RHODES = {
   hospitallers: { knight: { longsword: 6, warhammer: 2 }, sergeant: { spear: 4, matchlock: 3 } },
   // The whole army was a hundred thousand, but a breach is narrow: these are the men of one wave who reach the defenders.
   ottomans: { heavy: { maceShield: 2, saberShield: 1 }, janissary: { yatagan: 4, matchlock: 3 }, azap: { spear: 4, steppeBow: 3 } },
+};
+
+/**
+ * The armies a battle's sides can be set up from (muster.js: the player's own
+ * composition), one to a people at a time: the kinds of men a level's own
+ * sides are drawn from, and the others of the same people and period the
+ * game has (the garrison men beside the Ming regulars at Pyongyang, the bow
+ * among the Maidstone commons, a samurai's horse for the Japanese); none from
+ * another age (no gun before the matchlock came, no horse where the people had
+ * none). A level names its sides' armies (`armies: { red, blue }`).
+ * Each army's `ranks`: a `label`; the outfit `kinds` its men wear and whether
+ * they ride (`mounted`), by which a level's own men are known as its; the
+ * `styles` they fight in (the first the usual); and `make(random, style)`, a
+ * man of it, made as the level's own cast makes him (so a set-up army's men are
+ * built, dressed and fed as the level's are). `same`: a style the maker may
+ * turn into another (a rōnin swordsman fights with both swords, nitō).
+ */
+const MING_PEOPLE = { pyongyang: 'ming', koxinga: 'mingSouth', coast: 'mingCoast', qi: 'mingSouth' };
+const mingRank = (rank, people, design = null) => (random, style) => mingSoldier(random, style, rank, { people, design });
+const sengokuArmy = (side) => ({
+  ranks: {
+    samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'naginata', 'yari', 'bow'], make: (random, style) => sengokuWarrior(random, side, style, 'samurai') },
+    ashigaru: { label: 'Ashigaru', kinds: ['ashigaru'], styles: ['yari', 'bow', 'matchlock', 'katana', 'naginata'], make: (random, style) => sengokuWarrior(random, side, style, 'ashigaru') },
+    horse: { label: 'Mounted samurai', kinds: ['samurai', 'samuraiTosei'], mounted: true, styles: ['yari', 'katana', 'bow'], make: (random, style) => samuraiHorseman(random, side, style) },
+  },
+});
+// A sea raider wears whatever he has (cast.js WOKOU_KIT): any of these.
+const RAIDER_KINDS = ['wokou', 'wokouArmoured', 'ashigaru', 'samurai'];
+
+export const ARMIES = {
+  legion: {
+    label: 'The legion',
+    ranks: {
+      legionary: { label: 'Legionary', kinds: ['legionary'], styles: ['legionary'], make: (random) => drilledSoldier(PRESETS.legionary, random) },
+      centurion: { label: 'Centurion', kinds: ['centurion'], styles: ['centurion'], make: (random) => drilledSoldier(PRESETS.centurion, random) },
+      ala: { label: 'Auxiliary horse', kinds: ['romanAuxiliary'], mounted: true, styles: ['longsword', 'spear'], make: (random, style) => romanHorseman(random, style) },
+    },
+  },
+  han: {
+    label: 'The Han army',
+    ranks: {
+      crossbow: { label: 'Crossbowman', kinds: ['hanSoldier'], styles: ['nu'], make: (random) => drilledSoldier(PRESETS.hanCrossbow, random) },
+      horse: { label: 'Han horse', kinds: ['hanCavalry'], mounted: true, styles: ['dao', 'spear', 'steppeBow'], make: (random, style) => hanHorseman(random, style) },
+    },
+  },
+  lords: {
+    label: 'The lords and their men',
+    ranks: {
+      knight: { label: 'Knight, mounted', kinds: ['knight'], mounted: true, styles: ['longsword', 'warhammer'], make: (random, style) => mountedKnight(random, style) },
+      knightFoot: { label: 'Knight', kinds: ['knight'], styles: ['longsword', 'warhammer'], make: (random, style) => nobleKnight(random, style) },
+      foot: { label: 'Foot soldier', kinds: ['footman'], styles: ['spear', 'bow', 'longsword'], make: (random, style) => footSoldier(random, style) },
+    },
+  },
+  commons: {
+    label: 'The commons',
+    // The rising of 1381: villagers with the fork and the spear, and the longbow every Englishman was bound to practise with.
+    ranks: { rebel: { label: 'Rebel', kinds: ['commoner'], styles: ['pitchfork', 'spear', 'bow'], make: (random, style) => normaliseInputs({ ...rebel(random), style }) } },
+  },
+  east: { label: 'The East', ...sengokuArmy(SEKIGAHARA_EAST) },
+  west: { label: 'The West', ...sengokuArmy(SEKIGAHARA_WEST) },
+  ming: {
+    label: 'The Ming army',
+    ranks: {
+      elite: { label: 'Elite', kinds: ['mingElite'], styles: ['guandao', 'matchlock', 'threeEyed', 'swordShield'], make: mingRank('elite', MING_PEOPLE.pyongyang) },
+      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.pyongyang) },
+      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.pyongyang) },
+      horse: { label: 'Liaodong horse', kinds: ['mingIronLamellar'], mounted: true, styles: ['dao', 'spear', 'threeEyed'], make: (random, style) => mingHorseman(random, style) },
+    },
+  },
+  spanish: {
+    label: 'The Spaniards',
+    ranks: {
+      hidalgo: { label: 'Hidalgo', kinds: ['conquistadorPlate'], styles: ['espada'], make: (random) => europeanSoldier(random, 'hidalgo') },
+      rodelero: { label: 'Rodelero', kinds: ['conquistadorQuilted'], styles: ['espadaRodela'], make: (random) => europeanSoldier(random, 'rodelero') },
+      arquebusier: { label: 'Arquebusier', kinds: ['conquistadorQuilted'], styles: ['matchlock'], make: (random) => europeanSoldier(random, 'arquebusier') },
+      horse: { label: 'Jinete', kinds: ['conquistadorPlate'], mounted: true, styles: ['lance', 'espada'], make: (random, style) => conquistadorHorseman(random, style) },
+    },
+  },
+  tlaxcala: {
+    label: 'Tlaxcala',
+    ranks: { warrior: { label: 'Tlaxcalan', kinds: ['mexicaWarrior'], styles: ['macuahuitl', 'tepoztopilli', 'bow'], make: (random, style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }) } },
+  },
+  mexica: {
+    label: 'The Mexica',
+    ranks: {
+      warrior: { label: 'Warrior', kinds: ['mexicaWarrior'], styles: ['macuahuitl', 'tepoztopilli', 'bow'], make: (random, style) => mexicaWarrior(random, style, 'warrior') },
+      elite: { label: 'Jaguar or eagle', kinds: ['mexicaElite'], styles: ['macuahuitl', 'tepoztopilli'], make: (random, style) => mexicaWarrior(random, style, 'elite') },
+    },
+  },
+  dutch: {
+    label: 'The VOC',
+    ranks: {
+      musketeer: { label: 'Musketeer', kinds: ['conquistadorQuilted'], styles: ['matchlock'], make: (random) => europeanSoldier(random, 'musketeer') },
+      pikeman: { label: 'Pikeman', kinds: ['conquistadorPlate'], styles: ['spear'], make: (random) => europeanSoldier(random, 'pikeman') },
+      officer: { label: 'Officer', kinds: ['conquistadorPlate'], styles: ['espada'], make: (random) => europeanSoldier(random, 'officer') },
+    },
+  },
+  koxinga: {
+    label: "Koxinga's army",
+    ranks: {
+      // His iron men, every one masked, in scale (the elite's masked scale design).
+      elite: { label: 'Iron man', kinds: ['mingElite'], styles: ['guandao', 'swordShield'], make: mingRank('elite', MING_PEOPLE.koxinga, 4) },
+      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.koxinga) },
+      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.koxinga) },
+      ronin: { label: 'Rōnin', kinds: ['ronin'], styles: ['ronin'], same: { nito: 'ronin' }, make: (random, style) => roninWarrior(random, style) },
+    },
+  },
+  hospitallers: {
+    label: 'The Order of St John',
+    ranks: {
+      knight: { label: 'Knight', kinds: ['knight'], styles: ['longsword', 'warhammer'], make: (random, style) => hospitaller(random, style, 'knight') },
+      sergeant: { label: 'Sergeant', kinds: ['footman'], styles: ['spear', 'matchlock'], make: (random, style) => hospitaller(random, style, 'sergeant') },
+    },
+  },
+  ottomans: {
+    label: 'The Ottomans',
+    ranks: {
+      heavy: { label: 'Heavy', kinds: ['ottomanHeavy'], styles: ['maceShield', 'saberShield'], make: (random, style) => ottomanSoldier(random, style, 'heavy') },
+      janissary: { label: 'Janissary', kinds: ['janissary'], styles: ['yatagan', 'matchlock'], make: (random, style) => ottomanSoldier(random, style, 'janissary') },
+      azap: { label: 'Azap', kinds: ['azap'], styles: ['spear', 'steppeBow'], make: (random, style) => ottomanSoldier(random, style, 'azap') },
+    },
+  },
+  raiders: {
+    label: 'The wokou',
+    ranks: {
+      japanese: { label: 'Japanese raider', kinds: RAIDER_KINDS, styles: ['katana', 'odachi', 'naginata', 'bow'], make: (random, style) => wokouRaider(random, style, 'japanese') },
+      chinese: { label: 'Chinese raider', kinds: RAIDER_KINDS, styles: ['dao', 'spear', 'matchlock'], make: (random, style) => wokouRaider(random, style, 'chinese') },
+    },
+  },
+  coast: {
+    label: 'The coast garrison',
+    ranks: {
+      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.coast, WOKOU.design.garrison) },
+      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.coast, WOKOU.design.brigandine) },
+    },
+  },
+  qi: {
+    label: "Qi Jiguang's army",
+    ranks: {
+      brigandine: { label: 'Squad man', kinds: ['mingBrigandine'], styles: ['swordShield', 'langxian', 'spear', 'matchlock', 'dao'], make: mingRank('brigandine', MING_PEOPLE.qi, QI.design.brigandine) },
+      elite: { label: 'Guard', kinds: ['mingElite'], styles: ['guandao', 'swordShield', 'spear'], make: mingRank('elite', MING_PEOPLE.qi, QI.design.elite) },
+    },
+  },
+  swat: {
+    label: 'SWAT',
+    ranks: { officer: { label: 'Officer', kinds: ['swat'], styles: ['handgun', 'baton'], make: (random, style) => swatOfficer(random, style) } },
+  },
+  yakuza: {
+    label: 'The yakuza',
+    ranks: { soldier: { label: 'Yakuza', kinds: ['yakuza'], styles: ['knife', 'katana', 'handgun'], make: (random, style) => yakuza(random, style) } },
+  },
 };
 
 /**
@@ -303,9 +456,61 @@ const RHODES = {
 export function battleOf(key) {
   const scenario = SCENARIOS[key];
   const wings = scenario.wings;
-  if (!wings) return scenario;
+  if (!wings) return drawnApart(scenario);
   const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, { ...scenario.formation?.[corner], ...wings.formation?.[corner] }]));
-  return { ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation, cast: (random) => wings.cast(random, scenario.cast(random)) };
+  return drawnApart({ ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation, cast: (random) => wings.cast(random, scenario.cast(random)) });
+}
+
+/**
+ * The armies of a battle start further apart than a level's own numbers put
+ * them: room for the bows and guns to shoot before the lines meet, and for a
+ * line to be seen coming. Each side's `front` (m from the middle to its first
+ * row) is drawn back by `factor` (so the gap between the two front lines is
+ * that much wider), to at least `least` m between them; a `layout`'s men
+ * (Qi Jiguang's squads) stand where they did, behind a front drawn back the
+ * same. The floor is lengthened by as much as the further side went back, so
+ * each army keeps the ground it had behind it (the width, across, is as it
+ * was: the lines are no wider), but never past what the
+ * place's fixed scenery leaves open (`room`: the town's house fronts, the
+ * port's lane of containers, the water town's shops); the camera draws back
+ * with the floor, short of a `room`'s `camera` (the square's house fronts).
+ * A level may draw its armies apart by a factor of its own (`spread`): one
+ * whose place is too small for the whole of it.
+ * Only the battles: a duel (no `cast`) and the levels' own data
+ * (SCENARIOS[key], the sandbox's fixtures and the fingerprint's) are left as they are.
+ */
+export const SPREAD = {
+  factor: 1.5,
+  least: 12,
+  room: {
+    // Maidstone's square: the house fronts stand at 12.5 m (render.js buildTown); the camera never further out than they are.
+    town: { halfX: 11.5, camera: 10.5 },
+    // The water town's square: its shops at ±19.5 m (props/jiangnan.js JIANGNAN_PLAN), wine jars before them.
+    jiangnan: { halfX: 18 },
+    // The lane between the container stacks: their ends at ±11.3 m (props/harbour.js).
+    port: { halfX: 11 },
+  },
+};
+
+/** A battle with its armies drawn apart (SPREAD). */
+function drawnApart(level) {
+  if (!level.cast || !level.formation) return level;
+  const factor = level.spread ?? SPREAD.factor;
+  const fronts = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front ?? 0]));
+  const gap = fronts.red + fronts.blue;
+  // To at least SPREAD.least between the lines: both sides drawn back alike.
+  const scale = gap > 0 ? Math.max(factor, SPREAD.least / gap) : factor;
+  const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front === undefined ? level.formation[corner] : { ...level.formation[corner], front: fronts[corner] * scale }]));
+  const back = Math.max(...['red', 'blue'].map((corner) => fronts[corner] * (scale - 1)));
+  const room = SPREAD.room[level.scene];
+  const halfX = Math.min(room?.halfX ?? Infinity, level.arena.halfX + back);
+  const grown = halfX / level.arena.halfX;
+  const camera = level.camera && {
+    ...level.camera,
+    distance: Math.min(room?.camera ?? Infinity, level.camera.distance * grown),
+    ...(level.camera.maxDistance !== undefined ? { maxDistance: Math.min(room?.camera ?? Infinity, level.camera.maxDistance * grown) } : {}),
+  };
+  return { ...level, arena: { ...level.arena, halfX }, camera, formation };
 }
 
 export const SCENARIOS = {
@@ -334,6 +539,8 @@ export const SCENARIOS = {
         blue: [...sides.blue.slice(0, LEGION.perSide - total(LEGION_HORSE.han)), ...company(LEGION_HORSE.han, (style) => hanHorseman(random, style))],
       }),
     },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['legion'], blue: ['han'] },
     fighters: [],
   },
   rebellion: {
@@ -346,6 +553,8 @@ export const SCENARIOS = {
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
     roster: 'Two mounted knights and three foot soldiers · twenty rebels with spears',
+    // Drawn apart a quarter (not SPREAD's half): the square holds no more between its house fronts, the lords' horses behind their foot.
+    spread: 1.25,
     // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
     formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
@@ -359,6 +568,8 @@ export const SCENARIOS = {
       formation: { red: { front: 7.5, spacing: 1.2, wings: { out: 2, back: 1, spacing: 3, release: 14, by: 6 } } },
       cast: (random, sides) => ({ red: sides.red.map((inputs) => (inputs.outfit.kind === 'knight' ? { ...inputs, mounted: true } : inputs)), blue: sides.blue }),
     },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['lords'], blue: ['commons'] },
     fighters: [],
   },
   sekigahara: {
@@ -385,6 +596,8 @@ export const SCENARIOS = {
         blue: [...sides.blue, ...company(SEKIGAHARA_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_WEST, style))],
       }),
     },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['east'], blue: ['west'] },
     fighters: [],
   },
   pyongyang: {
@@ -403,6 +616,8 @@ export const SCENARIOS = {
       formation: { red: { wings: { side: 1 } } },
       cast: (random, sides) => ({ red: [...sides.red, ...company(PYONGYANG_HORSE, (style) => mingHorseman(random, style))], blue: sides.blue }),
     },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['ming'], blue: ['west'] },
     fighters: [],
   },
   otumba: {
@@ -425,6 +640,8 @@ export const SCENARIOS = {
       formation: { red: { wings: { side: 1 } } },
       cast: (random, sides) => ({ red: [...sides.red, ...company(OTUMBA.horse, (style) => conquistadorHorseman(random, style))], blue: sides.blue }),
     },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['spanish', 'tlaxcala'], blue: ['mexica'] },
     fighters: [],
   },
   zeelandia: {
@@ -447,6 +664,8 @@ export const SCENARIOS = {
         blue: shootersBehind([...ironMen, ...regulars, ...garrison, ...company(army.ronin, (style) => roninWarrior(random, style))]),
       };
     },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['dutch'], blue: ['koxinga'] },
     fighters: [],
   },
   rhodes: {
@@ -462,6 +681,8 @@ export const SCENARIOS = {
       red: shootersBehind([...company(RHODES.hospitallers.knight, (style) => hospitaller(random, style, 'knight')), ...company(RHODES.hospitallers.sergeant, (style) => hospitaller(random, style, 'sergeant'))]),
       blue: shootersBehind([...company(RHODES.ottomans.heavy, (style) => ottomanSoldier(random, style, 'heavy')), ...company(RHODES.ottomans.janissary, (style) => ottomanSoldier(random, style, 'janissary')), ...company(RHODES.ottomans.azap, (style) => ottomanSoldier(random, style, 'azap'))]),
     }),
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['hospitallers'], blue: ['ottomans'] },
     fighters: [],
   },
   wokou: {
@@ -478,6 +699,8 @@ export const SCENARIOS = {
       red: wokouRaiders(random),
       blue: [...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingCoast', design: WOKOU.design.brigandine })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingCoast', design: WOKOU.design.garrison }))],
     }),
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['raiders'], blue: ['coast'] },
     fighters: [],
   },
   qiJiguang: qiJiguangLevel(),
@@ -495,6 +718,8 @@ export const SCENARIOS = {
       red: [swatOfficer(random, 'handgun'), swatOfficer(random, 'baton'), swatOfficer(random, 'baton'), swatOfficer(random, 'handgun')],
       blue: [yakuza(random, 'knife'), yakuza(random, 'katana'), yakuza(random, 'knife'), yakuza(random, 'handgun'), yakuza(random, 'knife'), yakuza(random, 'knife')],
     }),
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['swat'], blue: ['yakuza'] },
     fighters: [],
   },
   pride: {

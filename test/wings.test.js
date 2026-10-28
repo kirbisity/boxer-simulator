@@ -50,11 +50,14 @@ test('each battle map has its wings of horse and no others: who rides, how many,
     const foot = SCENARIOS[key].cast(seededRandom(1));
     assert.equal(riders(foot.red).length + riders(foot.blue).length, 0, `${key} on foot`);
   }
-  // The maps without horse in history have none, and keep their own floor.
+  // The maps without horse in history have none, and keep their own place and people (their armies only drawn apart: scenarios.js SPREAD).
   for (const key of ['zeelandia', 'rhodes', 'wokou', 'port', 'pride', 'subway']) {
     assert.equal(SCENARIOS[key].wings, undefined, key);
-    assert.equal(battleOf(key), SCENARIOS[key]);
+    assert.equal(battleOf(key).scene, SCENARIOS[key].scene, key);
+    assert.equal(battleOf(key).cast, SCENARIOS[key].cast, key);
   }
+  // A duel is left as it is.
+  for (const key of ['pride', 'subway']) assert.equal(battleOf(key), SCENARIOS[key]);
 });
 
 test('the armies are about sixty to a hundred, and a wing is about a fifth of a side (Maidstone: the two lords)', () => {

@@ -9,7 +9,8 @@ import { normaliseInputs, PRESETS } from './body.js';
 import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
 import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, PICKABLE_OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
-import { SCENARIOS } from './scenarios.js';
+import { battleOf, SCENARIOS } from './scenarios.js';
+import { musterScreen } from './musterview.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { canRide, HORSES, mountOf } from './horses.js';
@@ -95,7 +96,7 @@ const STYLE_FACTION = (key) => {
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
   const show = (id) => {
-    for (const other of ['home', 'quick', 'levels-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
+    for (const other of ['home', 'quick', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
   };
   const close = () => show(null);
@@ -173,12 +174,25 @@ export function installMenus(game) {
   }
 
   // ---- Battle Mode: the levels --------------------------------------------------
+  // A battle is one tap from here as the level has it; its ⚙ opens the setup (musterview.js): the armies, their order, the man played.
   function levels() {
-    const body = screen('levels-screen', 'Battle Mode', 'Tap a battle, then choose your side.', home);
+    const body = screen('levels-screen', 'Battle Mode', 'Tap a battle, then choose your side. ⚙ sets up the armies yourself.', home);
     // The training yard first: every control, one at a time.
     const yard = choice({ glyph: '🎯', kicker: 'Start here · two minutes', title: 'Tutorial', text: 'Every control, one at a time, against a knight who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
-    body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(([key, level]) => choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } }))));
+    const card = ([key, level]) => {
+      const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', sekigahara: '🏯', pyongyang: '🐉', otumba: '🦅', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } });
+      // A battle of armies (a `cast`) can be set up; a duel cannot.
+      if (!level.cast) return play;
+      return el('div', { className: 'level-card' }, play, el('button', { className: 'level-setup', type: 'button', textContent: '⚙ Set up', title: `Set up the armies of ${level.title}`, onclick: () => muster(key) }));
+    };
+    body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(card)));
     show('levels-screen');
+  }
+
+  /** A battle's setup screen (musterview.js); started, the battle as set up (main.js enterLevel). */
+  function muster(key) {
+    show('muster-screen');
+    musterScreen(document.getElementById('muster-screen'), { key, level: battleOf(key), onBack: levels, onStart: (setup) => { close(); game.level(key, setup); } });
   }
 
   // ---- Deadliest Warrior -------------------------------------------------------

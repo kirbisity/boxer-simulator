@@ -1406,8 +1406,10 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const order = formation[corner];
     if (everyone.length < 2 && !order) continue;
     // `wings`: the riders stand on the flanks of the line, held, not in its rows (formation.js placeWings).
+    // An army set up by the player (`placed`: muster.js) has a place in its `layout` for every man, riders
+    // too: they wait where he put them, held all the same.
     const riders = order?.wings ? everyone.filter((fighter) => riding(fighter.body.inputs)) : [];
-    const team = riders.length ? everyone.filter((fighter) => !riders.includes(fighter)) : everyone;
+    const team = riders.length && !order.placed ? everyone.filter((fighter) => !riders.includes(fighter)) : everyone;
     // With riders in the fight, every team lines up at the charging distance: the foot in rows, the riders on their flanks.
     if (mounted && !order) {
       lineUpMounted(team, corner === 'red' ? -1 : 1, apart, arena, (fighter) => riding(fighter.body.inputs));
@@ -1448,7 +1450,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     } else placeRows(team, 0);
     if (riders.length) {
       const widest = Math.min(perRow, team.length);
-      placeWings(riders, sign, order, { front, width: (widest - 1) * spacing }, arena, (fighter, x, z) => placeFighter(fighter, x, z));
+      if (order.placed) for (const fighter of riders) fighter.wing = { held: true, side: Math.sign(fighter.x[P.pelvis * 3 + 2]) || 1 };
+      else placeWings(riders, sign, order, { front, width: (widest - 1) * spacing }, arena, (fighter, x, z) => placeFighter(fighter, x, z));
       wingOrder ??= order.wings;
     }
   }

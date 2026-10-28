@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, boutWinner, fistsOf, placeFighter, point, throwPunch, WORLD } from '../src/physics.js';
-import { SCENARIOS, scenarioWorld } from '../src/scenarios.js';
+import { battleOf, SCENARIOS, scenarioWorld, SPREAD } from '../src/scenarios.js';
 
 test('the subway fighters are who the scenario says: height, weight, bare fists, the headset on', () => {
   const world = scenarioWorld('subway');
@@ -62,4 +62,37 @@ test('a subway fight runs to an end on the same physics, inside the platform', (
     }
   }
   assert.ok(world.fighters.every((fighter) => fighter.stats.thrown > 0));
+});
+
+test('the battles start further apart than the levels\' own lines: the gap half as wide again, the floor longer by as much, inside the place', () => {
+  // The gap before: the level's own fronts, with its wings' (the foot line the battle is fought on).
+  const ownGap = (key) => {
+    const level = SCENARIOS[key];
+    const front = (corner) => level.wings?.formation?.[corner]?.front ?? level.formation[corner].front;
+    return front('red') + front('blue');
+  };
+  for (const key of Object.keys(SCENARIOS).filter((name) => SCENARIOS[name].cast)) {
+    const played = battleOf(key);
+    const gap = played.formation.red.front + played.formation.blue.front;
+    const factor = SCENARIOS[key].spread ?? SPREAD.factor;
+    assert.ok(Math.abs(gap - Math.max(ownGap(key) * factor, SPREAD.least)) < 1e-9, `${key}: ${ownGap(key)} m to ${gap} m`);
+    assert.ok(gap >= SPREAD.least, key);
+    // The floor is longer, never past the place's fixed scenery; no narrower.
+    const own = SCENARIOS[key].wings?.arena ?? SCENARIOS[key].arena;
+    assert.ok(played.arena.halfX >= own.halfX, key);
+    assert.ok(played.arena.halfX <= (SPREAD.room[played.scene]?.halfX ?? Infinity), key);
+    assert.equal(played.arena.halfZ, own.halfZ, key);
+    // Every man starts on the floor, both armies on their own halves.
+    const world = scenarioWorld(key, 2);
+    for (const fighter of world.fighters) {
+      const [x, z] = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+      const who = `${key}: ${fighter.body.inputs.name}`;
+      assert.ok(Math.abs(x) < played.arena.halfX && Math.abs(z) < played.arena.halfZ, `${who} on the floor`);
+      assert.ok((fighter.corner === 'red' ? -x : x) > played.formation[fighter.corner].front - 1, `${who} behind his line`);
+    }
+  }
+  // The two wokou levels: 16 m between the lines become 24.
+  assert.equal(battleOf('wokou').formation.red.front + battleOf('wokou').formation.blue.front, 24);
+  // Qi Jiguang's squads keep their shape (each man's place in the layout), only further back.
+  assert.deepEqual(battleOf('qiJiguang').formation.blue.layout, SCENARIOS.qiJiguang.formation.blue.layout);
 });
