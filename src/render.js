@@ -375,8 +375,8 @@ export const PLACE_ARENAS = {
   // The square between the shops and the canal: room for the wokou raid's formations.
   jiangnan: { halfX: 14, halfZ: 9 },
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
-  agincourt: { halfX: 24, halfZ: 11.5 },
-  cerignola: { halfX: 24, halfZ: 11 },
+  agincourt: { halfX: 40, halfZ: 11.5 },
+  cerignola: { halfX: 32, halfZ: 11 },
   // A level-mode stage: the terrain is the floor (the box is only a far limit).
   stage: { halfX: 40, halfZ: 40 },
   dunnottar: { halfX: 40, halfZ: 40 },

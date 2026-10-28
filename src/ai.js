@@ -1337,8 +1337,10 @@ export function standingFear(world, fighter) {
   const enemies = world.fighters.filter((other) => hostile(other, fighter) && !other.dormant && inFight(other));
   let nearest = null;
   let nearestApart = Infinity;
+  // (Behind a palisade or a ditch, an enemy is as far as he would have to walk to get at him: physics/fieldworks.js walkingDistance.)
+  const works = Boolean(world.arena.works);
   for (const enemy of enemies) {
-    const apart = Math.hypot(where(enemy)[0] - at[0], where(enemy)[1] - at[1]);
+    const apart = works ? walkingDistance(world, where(enemy), at) : Math.hypot(where(enemy)[0] - at[0], where(enemy)[1] - at[1]);
     if (apart < nearestApart) [nearest, nearestApart] = [enemy, apart];
   }
   if (!nearest || nearestApart >= spec.sight) return 0;

@@ -19,7 +19,7 @@ export const WORKS_VIEW = {
   // off their places; trunk and crown sizes; undergrowth bushes along the line itself.
   wood: { rows: 3, depth: 2.2, every: 2.4, scatter: 0.9, trunk: [0.16, 0.26], height: [6, 10], crown: [2.2, 3.4], bark: 0x3e3226, leaves: [0x5a5a2a, 0x6a5a26, 0x4a5228, 0x7a5a24], bush: 0x4a4a26 },
   // Mud: wet plough-clay, puddles standing in the furrows; a stream's water over its silt.
-  mud: { colour: [72, 56, 38], wet: [52, 42, 32], puddle: [120, 118, 112] },
+  mud: { colour: [104, 82, 56], wet: [78, 60, 40], puddle: [128, 118, 100] },
   water: { colour: 0x5a6a62, opacity: 0.72, bank: 0x4a3c2c },
   // A ditch strip's ground: cells across and along it (m).
   ditch: { across: 0.2, along: 0.6, earth: 0x6a5238, cut: 0x4a3a28, grass: 0x6a7040 },
@@ -281,8 +281,8 @@ function worksSoftGround(area, random) {
     g.fillStyle = `rgba(${40 + shade * 60},${32 + shade * 44},${22 + shade * 30},${0.2 + random() * 0.3})`;
     g.fillRect(random() * pixels, random() * pixels, 2 + random() * 6, 1 + random() * 3);
   }
-  for (let k = 0; k < 70; k += 1) {
-    g.fillStyle = `rgba(${spec.puddle.join(',')},${0.25 + random() * 0.3})`;
+  for (let k = 0; k < 30; k += 1) {
+    g.fillStyle = `rgba(${spec.puddle.join(',')},${0.15 + random() * 0.2})`;
     g.beginPath();
     g.ellipse(random() * pixels, random() * pixels, 6 + random() * 30, 3 + random() * 9, 0, 0, Math.PI * 2);
     g.fill();
@@ -290,8 +290,8 @@ function worksSoftGround(area, random) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(width / 12, depth / 12);
-  const mud = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), worksLit(0xffffff, { map: texture, roughness: 0.55 }));
-  mud.material.userData.reflects = 0.25;
+  const mud = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), worksLit(0xffffff, { map: texture, roughness: 0.75 }));
+  mud.material.userData.reflects = 0.08;
   mud.rotation.x = -Math.PI / 2;
   mud.position.set(centre[0], 0.008, centre[1]);
   mud.receiveShadow = true;

@@ -482,20 +482,35 @@ export function walkingDistance(world, from, to) {
   return longest;
 }
 
-/** The way from `from` to `to` straight over the relief, each `span` m of it lengthened as its slope slows a man (FIELDWORKS.climb). */
+/**
+ * The way from `from` to `to` straight over the relief: its length, and for the stretch of it across each ditch's
+ * profile, each `span` m of that lengthened as its slope slows a man (FIELDWORKS.climb). Only the stretch over a ditch is
+ * sampled: a line that does not cross one costs no more than its length.
+ */
 function climbedDistance(works, from, to) {
   const spec = FIELDWORKS.climb;
   const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
-  const steps = Math.max(1, Math.ceil(length / spec.span));
-  let total = 0;
-  let before = reliefAt(works, from[0], from[1]);
-  for (let k = 1; k <= steps; k += 1) {
-    const x = from[0] + ((to[0] - from[0]) * k) / steps;
-    const z = from[1] + ((to[1] - from[1]) * k) / steps;
-    const here = reliefAt(works, x, z);
-    const grade = (here - before) / (length / steps);
-    total += (length / steps) * (1 + (grade > 0 ? spec.up * grade : -spec.down * grade));
-    before = here;
+  let total = length;
+  for (const ditch of works.ditches) {
+    const across = (p) => (p[0] - ditch.from[0]) * ditch.left[0] + (p[1] - ditch.from[1]) * ditch.left[1];
+    const a = across(from);
+    const b = across(to);
+    const low = ditch.profile[0][0];
+    const high = ditch.profile[ditch.profile.length - 1][0];
+    if (Math.max(a, b) <= low || Math.min(a, b) >= high || Math.abs(b - a) < 1e-9) continue;
+    // The shares of the way where it enters and leaves the profile.
+    const t0 = Math.max(0, Math.min(1, ((a < b ? low : high) - a) / (b - a)));
+    const t1 = Math.max(0, Math.min(1, ((a < b ? high : low) - a) / (b - a)));
+    const stretch = length * Math.abs(t1 - t0);
+    const steps = Math.max(1, Math.ceil(stretch / spec.span));
+    const at = (t) => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
+    let before = reliefAt(works, ...at(Math.min(t0, t1)));
+    for (let k = 1; k <= steps; k += 1) {
+      const here = reliefAt(works, ...at(Math.min(t0, t1) + (Math.abs(t1 - t0) * k) / steps));
+      const grade = (here - before) / (stretch / steps);
+      total += (stretch / steps) * (grade > 0 ? spec.up * grade : -spec.down * grade);
+      before = here;
+    }
   }
   return total;
 }

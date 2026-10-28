@@ -521,7 +521,9 @@ function drawnApart(level) {
 // the vanguard reached the English line spent, pressed so tight they could not lift their arms, and went
 // down in heaps in the mud, where the archers fell on them with mallets, swords and daggers.
 const AGINCOURT = {
-  arena: { halfX: 24, halfZ: 11.5 },
+  // The field's length is part of what it did: the French came on across some 300 m of it, under the arrows and
+  // sinking at every step. Here 45 m of it (the floor's length, `front.french`): as long as a battle can be drawn.
+  arena: { halfX: 40, halfZ: 11.5 },
   // Fifty-two: forty-two archers and ten men-at-arms (the war hammer stands for the poleaxe).
   english: { archer: 42, men: { longsword: 6, warhammer: 4 } },
   // Fifty-two: forty-four men-at-arms on foot, four lances on the wings (the cavalry wings were ~1,000 of the host,
@@ -530,7 +532,7 @@ const AGINCOURT = {
   // mail shirt with plate at the limbs and a kettle hat or a bascinet (`retinue`: the foot soldier's kit).
   french: { foot: { longsword: 18, warhammer: 10 }, retinue: { longsword: 10, spear: 6 }, horse: { lance: 4 }, crossbow: 4 },
   // The English line's first rank and the French vanguard's, m from the middle.
-  front: { english: 7, french: 11 },
+  front: { english: 7, french: 33 },
   // The archers on the wings, three ranks deep (`rows` back, m), a man every `every` m across from `inner` m out;
   // the men-at-arms in the middle, two ranks of five.
   archers: { inner: 3.3, every: 0.86, rows: [0, 1.1, 2.2], perRow: 7 },
@@ -538,9 +540,9 @@ const AGINCOURT = {
   // The field, as it was that morning: fresh plough soaked by rain. The reference man sinks calf-deep (0.22 m); a
   // man in plate, pressing half as hard again, near knee-deep; nothing past the plough's pan (0.5 m). Wet clay:
   // a stiff mud (viscosity of the castle's sludge) with little grip.
-  mud: { x: [-24, 24], z: [-11.5, 11.5], depth: 0.22, firm: 0.5, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.1 },
+  mud: { x: [-40, 40], z: [-11.5, 11.5], depth: 0.22, firm: 0.5, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.1 },
   // The woods' edges: the field ~23 m across where the French formed, ~18.6 where the English stood.
-  woods: [[-24, 11.2], [-6, 10.6], [5, 9.3], [24, 9.3]],
+  woods: [[-40, 11.6], [-20, 11.2], [-6, 10.6], [5, 9.3], [40, 9.3]],
   // The archers' stakes before each wing: two staggered rows, the points leaning out at a horse's chest.
   stakes: { first: 1.6, rows: 2, every: 0.95, rowGap: 0.9, height: 1.05, reach: 0.95 },
 };
@@ -584,23 +586,25 @@ function agincourtWorks() {
 // led the gendarmes at the ditch, could not cross it and was shot dead before it; the Swiss came on, stalled
 // at the ditch and the bank under the volleys, and broke. The first battle won by hand guns.
 const CERIGNOLA = {
-  arena: { halfX: 24, halfZ: 11 },
+  // The French came on across the open plain below the slope under the guns: room for that (`front.french`).
+  arena: { halfX: 32, halfZ: 11 },
   spanish: { arquebusier: 18, pike: 22, rodelero: 12 },
   french: { gendarme: 12, swiss: 32, crossbow: 8 },
-  front: { spanish: 7.2, french: 12 },
+  front: { spanish: 7.2, french: 24 },
   // The ditch: its line at x = 4 across the whole front; across it (m toward the Spanish, the ground's height): the
   // French side's lip, down 1.2 m to a bottom a metre wide, up the inner face to the bank's top 0.7 m over the field
   // (1.9 m from the bottom), the bank's back sloping down to the field. Dug by hand in an afternoon: a ditch a horse
   // could not cross, and a man only climbing.
-  ditch: { x: 4, profile: [[-2.4, 0], [-1.6, -1.2], [-0.5, -1.2], [0.3, 0.7], [1.5, 0.7], [2.6, 0]] },
+  ditch: { x: 4, reach: 75, profile: [[-2.4, 0], [-1.6, -1.2], [-0.5, -1.2], [0.3, 0.7], [1.5, 0.7], [2.6, 0]] },
   // The arquebusiers three deep behind the bank, a file every 1.9 m; the pikes and bucklers 2 m behind them.
   shooters: { perRow: 6, spacing: 1.9, rowSpacing: 1.0, behind: 2 },
 };
 
 /** Cerignola's works: the ditch and its bank before the Spanish line. */
 function cerignolaWorks() {
-  const { arena, ditch } = CERIGNOLA;
-  return { ditches: [{ from: [ditch.x, -arena.halfZ], to: [ditch.x, arena.halfZ], profile: ditch.profile }] };
+  // (Dug right across the field and on beyond the floor's sides, out of sight: the place's ground is open over all of it.)
+  const { ditch } = CERIGNOLA;
+  return { ditches: [{ from: [ditch.x, -ditch.reach], to: [ditch.x, ditch.reach], profile: ditch.profile }] };
 }
 
 // Nagashino (Shitarabagahara), 29 June 1575. Oda Nobunaga and Tokugawa Ieyasu (~38,000, with some 3,000
@@ -613,10 +617,11 @@ function cerignolaWorks() {
 const NAGASHINO_TAKEDA = { tint: { armor: '#a3221a', lace: '#d9b44a' }, banner: '#b3161b' };
 const NAGASHINO_ODA = { tint: { armor: '#1a1a1f', lace: '#c9a23a' }, banner: '#d9b23a' };
 const NAGASHINO = {
-  arena: { halfX: 24, halfZ: 11 },
+  // The Takeda formed some hundreds of metres off across the Shitarabagahara and came on in waves: room for that (`front.takeda`).
+  arena: { halfX: 32, halfZ: 11 },
   oda: { ashigaru: { matchlock: 24, spear: 20 }, samurai: { katana: 5, naginata: 3 } },
   takeda: { horse: { spear: 10, katana: 4 }, samurai: { katana: 8, naginata: 4, spear: 4 }, ashigaru: { spear: 14, bow: 4, matchlock: 4 } },
-  front: { oda: 6, takeda: 12 },
+  front: { oda: 6, takeda: 24 },
   // The Oda guns three deep, a file every 2.3 m, 1.5 m behind the fence; the spears and the samurai behind them.
   shooters: { perRow: 8, spacing: 2.3, rowSpacing: 1.0, behind: 1.6 },
   // The fence: posts and rails 1.8 m high across the field, 1.5 m before the guns, three gaps 1.4 m wide to sally from (m along it from its -z end).
@@ -649,7 +654,8 @@ const AGINCOURT_LEVEL = {
   weather: { fog: [10, 95], sky: 0.8, pale: 0.75, sun: 0.55 },
   arena: { ...AGINCOURT.arena, works: agincourtWorks() },
   spread: 1,
-  camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 },
+  // From behind the English line, looking down the field between the woods (further round, the woods stand in the way).
+  camera: { yaw: -0.18, pitch: 0.4, distance: 24, maxDistance: 30 },
   roster: 'Forty-eight French on foot and four on horse · forty-two English archers and ten men-at-arms',
   formation: {
     red: { front: AGINCOURT.front.french, spacing: 1.0, rowSpacing: 1.2, perRow: 12, loose: 0.25, wings: HORSE_FIRST },
