@@ -199,6 +199,21 @@ function mexicaDesign(label, cotton, band) {
   return { label, bottom: { kind: 'loincloth', color: '#ece4d0' }, armor: { kind: 'ichcahuipilli', color: cotton, cloth: cotton, cloth2: shade(cotton, 0.85) }, head: band ? { kind: 'featherBand', color: band } : null, feet: { kind: 'sandal', color: '#5a3a22' } };
 }
 
+// An Inca man (Cajamarca, 1532): the uncu tunic (`weave`: plain, a tocapu band,
+// the checkerboard, the royal tocapu all over: loftbody.js ARMOR_KINDS) in its
+// colours, the loincloth beneath, usuta sandals of hide, the llautu wound round
+// the head in two colours; a lord's gold earspools, the Sapa Inca's mascapaicha.
+function incaDesign(label, weave, field, second, { cord = '#1c1c20', cord2 = '#b3161b', earspools = null, fringe = null, cloak = null, special = false } = {}) {
+  return {
+    label, ...(special ? { special: true } : {}),
+    bottom: { kind: 'loincloth', color: '#d8cfb8' },
+    armor: { kind: weave, color: field, cloth: field, cloth2: second, lace: '#1c1c20', gold: '#d6a743', leather: '#2f6a4a' },
+    head: { kind: 'llautu', color: cord, lace: cord2, ...(earspools ? { earspools } : {}), ...(fringe ? { fringe } : {}) },
+    feet: { kind: 'sandal', color: '#6a4a2a' },
+    ...(cloak ? { extras: [{ kind: 'mantle', color: cloak, length: 0.9 }] } : {}),
+  };
+}
+
 // A gladiator's five looks: his metal, his loincloth, his plume.
 // The arena's armour, part by part: gladiators fought with the chest bare
 // and the limbs most exposed in their stance covered, each kind differently
@@ -1366,6 +1381,46 @@ export const OUTFITS = {
       { label: 'Red jaguar', top: { kind: 'longsleeve', color: '#a8401e' }, bottom: { kind: 'pants', color: '#a8401e' }, armor: { kind: 'jaguarSuit', color: '#a8401e', cloth: '#d08a2e', cloth2: '#2a1d14' }, head: { kind: 'jaguarHelm', color: '#d08a2e' }, feet: { kind: 'sandal', color: '#5a3a22' } },
     ],
   },
+  // Atahualpa's people at Cajamarca, 16 November 1532: by his order they came
+  // into the square without their arms (the chroniclers have some with slings
+  // and small maces under their tunics), in their finest, singing, sweeping
+  // the way before the litter. No armour of any kind: cloth over the body.
+  // The commons (`incaUncu`): bearers, sweepers, attendants, in the plain uncu
+  // or the checkerboard the Inca gave his guards; the lords (`incaNoble`):
+  // the orejones of the Inca's own lineage, in the tocapu-banded uncu with the
+  // gold earspools, the Sapa Inca alone in the royal tocapu (a design of its
+  // own, `special`: not dealt to another). They never saw a horse or a gun
+  // before that year (FACTIONS inca `strangers`).
+  incaUncu: {
+    faction: 'inca',
+    label: 'Inca — uncu', family: 'inca', movement: 'excellent', fists: 'bare',
+    extraMass: 0.02,
+    protection: { blunt: 0.04, cut: 0.05, pierce: 0.03, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.05,
+    designs: [
+      incaDesign('Undyed uncu', 'uncu', '#c8b89a', '#6a4428'),
+      incaDesign('Brown uncu', 'uncu', '#6a4a32', '#d8cfb8', { cord: '#d8cfb8' }),
+      incaDesign('Checkerboard uncu', 'uncuChecks', '#1c1c20', '#ece4d0', { cord2: '#d6a743' }),
+      incaDesign('Red uncu', 'uncu', '#9a2a1e', '#ece4d0', { cord: '#d6a743' }),
+      incaDesign('Checkerboard, gold cord', 'uncuChecks', '#1c1c20', '#ece4d0', { cord: '#b3161b', cord2: '#d6a743' }),
+    ],
+  },
+  incaNoble: {
+    faction: 'inca',
+    label: 'Inca — lord', family: 'inca', movement: 'excellent', fists: 'bare',
+    extraMass: 0.03,
+    protection: { blunt: 0.04, cut: 0.05, pierce: 0.03, bullet: { head: 0, torso: 0, limb: 0 } },
+    // The lords of the Inca's lineage held up the litter while their arms were cut from them (Xerez, Pedro Pizarro): bound to him, not to the fight.
+    courage: 0.2,
+    designs: [
+      incaDesign('Red uncu, tocapu band', 'uncuTocapu', '#9a2a1e', '#ece4d0', { cord: '#d6a743', earspools: '#d6a743' }),
+      incaDesign('Blue uncu, tocapu band', 'uncuTocapu', '#2a3f7a', '#ece4d0', { cord: '#b3161b', cord2: '#d6a743', earspools: '#d6a743' }),
+      incaDesign('Checkerboard, red yoke', 'uncuChecks', '#1c1c20', '#ece4d0', { cord2: '#d6a743', earspools: '#d6a743' }),
+      incaDesign('Brown uncu, tocapu band', 'uncuTocapu', '#6a4a32', '#d6a743', { cord: '#ece4d0', earspools: '#d6a743' }),
+      // The Sapa Inca: the royal tocapu, the mascapaicha's red fringe, a cloak of fine vicuña.
+      incaDesign('Sapa Inca', 'uncuRoyal', '#9a2a1e', '#ece4d0', { cord: '#b3161b', cord2: '#d6a743', earspools: '#d6a743', fringe: '#c41a1a', cloak: '#3a2a5a', special: true }),
+    ],
+  },
   // A rōnin: no lord, no armour; a kimono and hakama, a headband.
   ronin: {
     skill: 0.85,
@@ -1662,8 +1717,12 @@ export function familyKinds(family) {
 
 /**
  * The factions characters are grouped under, by culture and era: for
- * choosing them in the menus. A faction has no effect on the fight.
+ * choosing them in the menus. In the fight a faction is only its standard and its strangers (below).
  */
+// A faction's `strangers`: what its people had never met before the
+// Spaniards brought it ('horse', 'gun'): the Americas had no horse and no
+// powder. A man of it feels the shock of such a thing the more (ai.js AI.shock
+// `strange`): a general rule, the faction only says who.
 // A faction's `standard`: what its leader carries in a group fight (a
 // weapon in WEAPONS with a `flag`), in his hands, or `worn` on his back
 // (a samurai commander's great sashimono) leaving his hands to his weapon;
@@ -1671,7 +1730,8 @@ export function familyKinds(family) {
 export const FACTIONS = {
   knights: { label: 'Knights', glyph: '🏰', standard: { weapon: 'banner', colour: '#b3161b' }, blurb: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.' },
   japanese: { label: 'Japanese', glyph: '⛩️', standard: { weapon: 'nobori', worn: true }, blurb: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.' },
-  mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
+  mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, strangers: ['horse', 'gun'], blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
+  inca: { label: 'Inca', glyph: '☀️', strangers: ['horse', 'gun'], blurb: 'Atahualpa\'s people at Cajamarca: lords and attendants in the woven uncu, the llautu round the head, the champi star mace.' },
   chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
   steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale.' },
   // Keyed `ottomans` (saves and levels name it); it holds the Turkish and Kurdish sultanates both, Saladin's Ayyubids of the 1100s and the Ottomans after them.
@@ -1783,6 +1843,8 @@ export const HELMETS = {
   beanie: { mass: 0.1, padding: 0.1, curve: 0 },
   clothWrap: { mass: 0.1, padding: 0.1, curve: 0 },
   hachimaki: { mass: 0.05, padding: 0.05, curve: 0 },
+  // The llautu: a few turns of braided wool cord round the head.
+  llautu: { mass: 0.08, padding: 0.06, curve: 0 },
   policeCap: { mass: 0.2, padding: 0.1, curve: 0 },
   topHat: { mass: 0.15, padding: 0.1, curve: 0 },
   feltHat: { mass: 0.15, padding: 0.1, curve: 0 },

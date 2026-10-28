@@ -1482,6 +1482,14 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null), formation);
   // A side's discipline (`formation[corner].discipline`, 0..1): a fact about that army, set by the level (ai.js AI.morale).
   world.discipline = Object.fromEntries(['red', 'blue'].map((corner) => [corner, formation[corner]?.discipline ?? 0]));
+  // A side lying in ambush (`formation[corner].ambush`: { signal } s; Cajamarca's Spaniards in the halls' doorways): its
+  // men hidden (`hidden`: unseen by the other side, waiting) until the signal or until one of them strikes (ai.js springAmbush).
+  for (const corner of ['red', 'blue']) {
+    const ambush = formation[corner]?.ambush;
+    if (!ambush) continue;
+    world.ambush = { corner, signal: ambush.signal ?? 0, sprung: false, cursor: 0 };
+    for (const fighter of fighters) if (fighter.corner === corner) fighter.hidden = true;
+  }
   return world;
 }
 

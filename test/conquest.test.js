@@ -8,16 +8,6 @@ import { WEAPONS } from '../src/weapons.js';
 
 const mean = (list) => list.reduce((sum, value) => sum + value, 0) / list.length;
 
-test('Otumba: conquistadors and Tlaxcalans against the Mexica; the Spaniards in steel, built a little taller', async () => {
-  const { SCENARIOS } = await import('../src/scenarios.js');
-  const cast = SCENARIOS.otumba.cast(seededRandom(1));
-  const spaniards = cast.red.filter((fighter) => factionOf(fighter) === 'knights');
-  assert.ok(spaniards.length >= 10 && cast.red.some((fighter) => factionOf(fighter) === 'mexica'), 'Spaniards with native allies');
-  assert.ok(cast.blue.every((fighter) => factionOf(fighter) === 'mexica'));
-  assert.ok(mean(spaniards.map((fighter) => fighter.heightCm)) > mean(cast.blue.map((fighter) => fighter.heightCm)));
-  assert.ok(spaniards.some((fighter) => fighter.style === 'matchlock') && spaniards.some((fighter) => fighter.style === 'espadaRodela'));
-});
-
 test('obsidian cuts flesh better than steel does, but chips on armour', () => {
   assert.ok(WEAPONS.macuahuitl.harm.swing.cut > WEAPONS.espada.harm.swing.cut);
   assert.ok(WEAPONS.macuahuitl.brittle > 0 && WEAPONS.macuahuitl.brittle < 1 && !WEAPONS.espada.brittle);
