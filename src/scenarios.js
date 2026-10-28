@@ -585,9 +585,9 @@ function drawnApart(level) {
 // the vanguard reached the English line spent, pressed so tight they could not lift their arms, and went
 // down in heaps in the mud, where the archers fell on them with mallets, swords and daggers.
 const AGINCOURT = {
-  // The field's length is part of what it did: the French came on across some 300 m of it, under the arrows and
-  // sinking at every step. Here 45 m of it (the floor's length, `front.french`): as long as a battle can be drawn.
-  arena: { halfX: 40, halfZ: 11.5 },
+  // The field's length is part of what it did: the French came on across some 250-300 m of it, under the arrows and
+  // sinking at every step. Here 55 m of it (the floor's length, `front.french`): as long as a battle can be drawn.
+  arena: { halfX: 50, halfZ: 11.5 },
   // Fifty-two: forty-two archers and ten men-at-arms (the war hammer stands for the poleaxe).
   english: { archer: 42, men: { longsword: 6, warhammer: 4 } },
   // Fifty-two: forty-four men-at-arms on foot, four lances on the wings (the cavalry wings were ~1,000 of the host,
@@ -596,17 +596,18 @@ const AGINCOURT = {
   // mail shirt with plate at the limbs and a kettle hat or a bascinet (`retinue`: the foot soldier's kit).
   french: { foot: { longsword: 18, warhammer: 10 }, retinue: { longsword: 10, spear: 6 }, horse: { lance: 4 }, crossbow: 4 },
   // The English line's first rank and the French vanguard's, m from the middle.
-  front: { english: 7, french: 33 },
+  front: { english: 7, french: 43 },
   // The archers on the wings, three ranks deep (`rows` back, m), a man every `every` m across from `inner` m out;
   // the men-at-arms in the middle, two ranks of five.
-  archers: { inner: 3.3, every: 0.86, rows: [0, 1.1, 2.2], perRow: 7 },
+  archers: { inner: 3.2, every: 0.78, rows: [0, 1.1, 2.2], perRow: 7 },
   men: { every: 1.15, rows: [0, 1.2], perRow: 5 },
-  // The field, as it was that morning: fresh plough soaked by rain. The reference man sinks calf-deep (0.22 m); a
-  // man in plate, pressing half as hard again, near knee-deep; nothing past the plough's pan (0.5 m). Wet clay:
-  // a stiff mud (viscosity of the castle's sludge) with little grip.
-  mud: { x: [-40, 40], z: [-11.5, 11.5], depth: 0.22, firm: 0.5, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.1 },
-  // The woods' edges: the field ~23 m across where the French formed, ~18.6 where the English stood.
-  woods: [[-40, 11.6], [-20, 11.2], [-6, 10.6], [5, 9.3], [40, 9.3]],
+  // The field, as it was that morning: fresh plough soaked by a night's rain and churned by the horse. The reference
+  // man sinks calf-deep (0.26 m); a man in plate, pressing half as hard again, to the knee; nothing past the plough's
+  // pan (0.5 m). Wet clay: a stiff mud (viscosity of the castle's sludge) with little grip.
+  mud: { x: [-50, 50], z: [-11.5, 11.5], depth: 0.26, firm: 0.5, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.1 },
+  // The woods' edges: the field ~23 m across where the French formed, narrowing to ~17 where the English stood (some
+  // 1,200 yards across at the French end, 900 at the English: the French were squeezed together as they came on).
+  woods: [[-50, 11.6], [-20, 11.2], [-8, 10.2], [3, 8.5], [50, 8.5]],
   // The archers' stakes before each wing: two staggered rows, the points leaning out at a horse's chest.
   stakes: { first: 1.6, rows: 2, every: 0.95, rowGap: 0.9, height: 1.05, reach: 0.95 },
 };
@@ -723,7 +724,8 @@ const AGINCOURT_LEVEL = {
   camera: { yaw: -0.18, pitch: 0.4, distance: 24, maxDistance: 30 },
   roster: 'Forty-eight French on foot and four on horse · forty-two English archers and ten men-at-arms',
   formation: {
-    red: { front: AGINCOURT.front.french, spacing: 1.0, rowSpacing: 1.2, perRow: 12, loose: 0.25, wings: HORSE_FIRST },
+    // The vanguard packed close, shoulder to shoulder and rank on rank (so tight, the chroniclers say, they could hardly raise their arms).
+    red: { front: AGINCOURT.front.french, spacing: 0.85, rowSpacing: 1.0, perRow: 14, loose: 0.15, wings: HORSE_FIRST },
     blue: { front: AGINCOURT.front.english, layout: agincourtLayout(), loose: 0.08, drill: HOLD_GROUND },
   },
   cast: (random) => ({
