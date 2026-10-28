@@ -31,7 +31,7 @@ function roomWithDoor() {
 }
 
 test('an open battle field is nearly dry', () => {
-  const world = scenarioWorld('sekigahara', 1);
+  const world = scenarioWorld('pyongyang', 1);
   const fighter = world.fighters[0];
   const head = [fighter.x[P.head * 3], fighter.x[P.head * 3 + 1], fighter.x[P.head * 3 + 2]];
   const room = roomAt(world.arena.terrain ?? null, null, head);

@@ -521,6 +521,30 @@ export const WEAPONS = {
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
     drawN: 340,
   },
+  // ---- Agincourt, Cerignola (the battle maps of 1415 and 1503) ----
+  // The English war bow (the longbow of the Mary Rose's ~140 staves): a self bow of yew about 1.9 m long,
+  // drawn to the ear at 100–185 lbf (most near 150, ~670 N; here 600 N, a common archer's), shooting a war
+  // arrow of 60–100 g with a needle bodkin or a broadhead. A heavier arrow a little slower than the light
+  // bow's (`arrowSpeed`), carrying more (`arrowEnergy`: against ARROW's long bow arrow, ~115 J for ~100).
+  // Drawn only by a man trained to it from boyhood (handling.js: a weak man draws it part way and slowly).
+  // Against plate it is the armour's physics that decides (ARROW.bounce, gapHarm), not the bow.
+  longbow: {
+    label: 'Longbow', hands: 'one', hand: 'l', length: 1.0, strikeFrom: 1.0, handle: 0.9, mass: 0.8, balance: 0, radius: 0.016,
+    harm: { swing: { blunt: 0.35 }, thrust: { blunt: 0.25 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
+    drawN: 600, arrowSpeed: 52, arrowEnergy: 1.3,
+  },
+  // The pike of the Swiss and the Landsknechts (and Gonzalo's Germans at Cerignola): an ash shaft of 5 m
+  // (16–18 ft), a small leaf head on long langets, ~3.5 kg; held with both hands a third of the way up from
+  // the butt (`handle` behind the rear hand), the front hand far out on the shaft, levelled at chest height
+  // and pushed (the "push of pike"), not swung. Its weight far out before the hands makes it slow to bring
+  // round (`wrist`), and a blow on its long shaft levers it from the hands easily (`grip`). Set against a
+  // horse's charge with the butt to the ground, the man's weight is behind its point (WORLD.mount.brace).
+  pike: {
+    pointFrom: 0, label: 'Pike', hands: 'two', length: 3.4, strikeFrom: 3.1, handle: 1.6, spacing: 0.6, leadAhead: true, mass: 3.5, balance: 0.7, radius: 0.017,
+    harm: { thrust: { pierce: 1.5, blunt: 0.25, cut: 0.1 }, swing: { blunt: 0.6, cut: 0.1 } },
+    contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 8, zeta: 0.9 }, threat: 4, grip: 0.45,
+  },
   // Sidearms, drawn when the main weapon is lost (an outfit's `sidearm`):
   // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
   // short sword; a samurai's wakizashi, the short companion of the katana.
@@ -1097,6 +1121,15 @@ export const ARROW = {
   lethal: { head: 0.85, torso: 0.4, limb: 0.13 },
   bleed: { head: 0.02, torso: 0.03, limb: 0.012 },
   impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
+  // What a long bow's war arrow carries (J; energy 1): a ~70 g shaft at ~55 m/s, ~100 J (a heavy war bow's bodkin, more:
+  // the longbow's `arrowEnergy`). In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
+  joules: 100,
+  // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (within `clear` m of its
+  // line) by `above` m, at an elevation of `most` rad at most (the massed archery of a deep line: the rear ranks lob).
+  over: { clear: 0.6, above: 0.35, most: 0.75 },
+  // The share of a ball's energy left in a horse it strikes (the ball goes on through a body that size, or lodges with what
+  // little it has left): a quarter, taken over the wound channel.
+  horseShare: 0.25,
 };
 
 /** What a bullet hit is to: head, torso (the trunk) or limb. */

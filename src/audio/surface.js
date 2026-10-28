@@ -11,6 +11,7 @@
 // The names are the step event's: stone | earth | grass | sand | wood | mud | water | tile | snow.
 
 import { stageWaters, waterAt, waterDepth } from '../levelmode/water.js';
+import { softAt, worksOf } from '../physics/fieldworks.js';
 
 /** A stage solid's drawn style, as the ground it is to walk on. (Stairs with no style are cut stone, as the test yard's are.) */
 export const STYLE_SURFACE = {
@@ -29,6 +30,8 @@ export const PLACE_SURFACE = {
   sengoku: 'earth', plain: 'earth', coastFort: 'sand', coastVillage: 'sand', jiangnan: 'stone', cajamarca: 'earth',
   // The horse-archer plains: the Gobi's gravel steppe and the dry plain below Harran are earth underfoot and hoof; Champagne's summer grass, grass.
   mobei: 'earth', catalaunian: 'grass', carrhae: 'earth',
+  // Agincourt's ploughland (its mud is the works': surfaceUnder); Cerignola's vineyard earth.
+  agincourt: 'mud', cerignola: 'earth',
 };
 
 // Water shallower than this (m) is a wet floor, not a wade.
@@ -111,6 +114,9 @@ export function surfaceUnder(world, x, y, z) {
   // (Terrain with no stage to name it: a test's flight of stairs.)
   if (terrain) return { surface: 'stone', depth: 0 };
   const arena = world.arena ?? {};
+  // A battle's soft ground (physics/fieldworks.js): its mud, or a stream's water over its bed, as deep as it stands.
+  const soft = arena.works ? softAt(worksOf(arena), x, z) : null;
+  if (soft) return { surface: soft.area.surface, depth: soft.area.surface === 'water' ? (soft.area.water ?? 0) * soft.share : 0 };
   const surface = PLACE_SURFACE[world.place] ?? (arena.ring ? 'wood' : arena.drop ? 'stone' : 'earth');
   return { surface, depth: 0 };
 }

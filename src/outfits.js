@@ -1507,6 +1507,26 @@ export const OUTFITS = {
       escaupilDesign('Escaupil, blue sleeves', '#d8cfb8', '#22356a', 'cabasset'),
     ],
   },
+  // ---- The battle maps of 1415: Agincourt ----
+  // An English or Welsh archer of Henry V's army: a padded jack (linen or fustian stuffed and quilted, a dozen
+  // layers or more: proof against a spent arrow and a glancing cut, not against a blow), in the livery colours a
+  // company was clothed in, hose, and a kettle hat or a sallet, or nothing (many fought bareheaded, and some barefoot
+  // in the mud). Light and free: the archers ran in among the French men-at-arms. At his belt a falchion or a
+  // short sword (`sidearm`); a lead mallet for the stakes, and a dagger.
+  archer: {
+    faction: 'knights',
+    label: 'Archer — padded jack', movement: 'excellent', fists: 'bare',
+    sidearm: 'shortSword',
+    extraMass: 0.08,
+    protection: { blunt: 0.2, cut: 0.45, pierce: 0.3, bullet: { head: 0.1, torso: 0.08, limb: 0 } },
+    courage: 0.3,
+    designs: [
+      { label: 'White jack, kettle hat', top: { kind: 'longsleeve', color: '#d8d0bc' }, bottom: { kind: 'tights', color: '#5a2a22' }, armor: { kind: 'escaupil', color: '#d2c8b0', cloth: '#d2c8b0', cloth2: '#b8ad94' }, head: { kind: 'kettleHat', color: '#8a8e95', brim: 1.7 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Russet jack, bare head', top: { kind: 'longsleeve', color: '#7a4a2a' }, bottom: { kind: 'tights', color: '#3a3326' }, armor: { kind: 'escaupil', color: '#8a5a36', cloth: '#8a5a36', cloth2: '#6e4628' }, head: null, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Green-and-white livery', top: { kind: 'longsleeve', color: '#2f5a32' }, bottom: { kind: 'tights', color: '#d8d0bc' }, armor: { kind: 'escaupil', color: '#d2c8b0', cloth: '#d2c8b0', cloth2: '#2f5a32' }, head: { kind: 'kettleHat', color: '#7d8087', brim: 1.85 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Red jack, sallet', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'tights', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#9a3a2c', cloth: '#9a3a2c', cloth2: '#7a2a20' }, head: { kind: 'kettleHat', color: '#9aa0a8', brim: 1.55, tall: true }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+    ],
+  },
   // ---- Level Mode (Dunnottar): kits no random deal and no picker offers (`levelOnly`) ----
   // The Forgers' operative: a padded gambeson over a dark arming doublet, hose and boots, the head bare.
   // Light and quiet: some cut and point protection from the quilting, none against a blow.

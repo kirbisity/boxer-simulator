@@ -25,6 +25,7 @@ import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
+import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
@@ -3171,6 +3172,8 @@ export function step(world, dt) {
   stepStamp += 1;
   measureNearestFoes(world);
   world.steps = (world.steps ?? 0) + 1;
+  // Fieldworks and soft ground (an arena's `works`: physics/fieldworks.js): how deep each man stands, how the mud holds his legs, who is smothering.
+  if (world.arena.works) mireStep(world, dt);
   for (const fighter of world.fighters) {
     if (fighter.state === 'out') fighter.outFor = (fighter.outFor ?? 0) + dt;
     if (gone(fighter)) continue;
@@ -3289,7 +3292,8 @@ function checkBalance(world, fighter) {
   const outside = planted && !striding(fighter) ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
-  const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
+  // (Wet clay under him, fieldworks.js `mired`: a shove puts him down sooner.)
+  const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1);
   // Knocked about in armour: reeling, not falling, unless it is too much.
   const pushed = knock / (WORLD.balance.speed * footing);
   const overreached = outside / (WORLD.balance.reach * legLength * footing);
@@ -3473,6 +3477,9 @@ function moveRoot(world, fighter, dt) {
     wanted[0] *= slowed;
     wanted[1] *= slowed;
   }
+  // On fieldworks: a ditch's slope slows him as it is steep, and a step into a palisade or a wood's edge goes along it.
+  const works = worksOf(world.arena);
+  if (works) [wanted[0], wanted[1]] = stepOnWorks(works, fighter, wanted);
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const speedNow = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
@@ -3506,6 +3513,7 @@ function moveRoot(world, fighter, dt) {
   // ... but a shove can: out across the strip to the edge and over it.
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
   if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter, operativeOf(world, fighter));
+  if (works) keepRootOff(works, fighter);
 }
 
 /** The speed (m/s) from which a runner stops in `distance` m, at his brake (physics/gait.js: `arrive` of it, and never under a walk). */
@@ -3565,7 +3573,7 @@ function leashShare(fighter) {
 function balanceFooting(fighter) {
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
-  return legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1);
+  return legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1);
 }
 
 /** The turns (rad) from his way at which the floor's slope is looked at. */
@@ -4755,6 +4763,8 @@ function collideGround(world, fighter, h, arena) {
   }
   const friction = Math.exp(-WORLD.groundFriction * h);
   const drop = arena.drop;
+  // Fieldworks (physics/fieldworks.js): the ground's relief, and each part as far into the mud as it bears on it.
+  const works = worksOf(arena);
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const base = index * 3;
     // The platform's face: a part gone over the edge and below its top is held off the slab, not lifted back onto it.
@@ -4762,7 +4772,7 @@ function collideGround(world, fighter, h, arena) {
       fighter.x[base + 2] = drop.at;
       fighter.prev[base + 2] = Math.max(fighter.prev[base + 2], drop.at);
     }
-    const floor = fighter.radius[index] + floorUnder(arena, fighter.x[base + 2]);
+    const floor = fighter.radius[index] + (works ? floorFor(works, fighter, index, fighter.x[base], fighter.x[base + 2]) : floorUnder(arena, fighter.x[base + 2]));
     if (fighter.x[base + 1] < floor) {
       // Arriving this substep (it was clear of the floor): how fast it hit.
       if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, (fighter.prev[base + 1] - fighter.x[base + 1]) / h);
@@ -4789,6 +4799,8 @@ function collideGround(world, fighter, h, arena) {
       }
     }
   }
+  // The stakes and walls keep his parts out of them.
+  if (works) collideWorks(world, fighter);
 }
 
 /**
@@ -4801,6 +4813,8 @@ export function floorUnder(arena, z, x = 0, y = 0) {
     const floor = floorAt(arena.terrain, x, z, y + WORLD.terrain.stepUp);
     return floor === -Infinity ? arena.terrain.sea : floor;
   }
+  // On fieldworks, the ground's relief there, sunk into its mud as something lying loose on it sinks.
+  if (arena?.works) return looseFloor(worksOf(arena), x, z);
   const drop = arena?.drop;
   return drop && z > drop.at ? drop.floor : 0;
 }

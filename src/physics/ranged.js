@@ -12,7 +12,8 @@ import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
 import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir } from '../weapons.js';
 import { WORLD } from './config.js';
-import { gaitAt } from './mounted.js';
+import { BARDING } from '../horses.js';
+import { gaitAt, harmHorse } from './mounted.js';
 
 /**
  * The gun arm for a shot: up from the guard and out along the line from the
@@ -170,6 +171,53 @@ export function firstHit(world, shooter, from, to) {
   return best;
 }
 
+/**
+ * The first horse on a missile's path from `from` to `to` (not the shooter's own, not one lying dead), as
+ * { horse, capsule, s (share of the way), point }, or null.
+ */
+export function horseOnPath(world, shooter, from, to) {
+  if (!world.horses?.length) return null;
+  const length = vec.length(vec.sub(to, from));
+  if (length < 1e-9) return null;
+  const along = vec.scale(vec.sub(to, from), 1 / length);
+  let best = null;
+  for (const horse of world.horses) {
+    if (horse === shooter?.mount || horse.state === 'down') continue;
+    const middle = [horse.at[0], horse.withers * 0.7, horse.at[1]];
+    const t = Math.max(0, Math.min(length, vec.dot(vec.sub(middle, from), along)));
+    if (vec.length(vec.sub(middle, vec.add(from, vec.scale(along, t)))) > 1.6 * horse.withers) continue;
+    for (const capsule of horse.capsules) {
+      const meet = closestBetween(from, to, capsule.a, capsule.b);
+      const miss = vec.length(vec.sub(meet.onFirst, meet.onSecond));
+      if (miss > capsule.radius) continue;
+      const s = Math.max(0, meet.s - Math.sqrt(capsule.radius * capsule.radius - miss * miss) / length);
+      if (!best || s < best.s) best = { horse, capsule, s, point: vec.lerp(from, to, s) };
+    }
+  }
+  return best;
+}
+
+/**
+ * A missile in a horse: its energy (J) a point's, through the barding on that part (horses.js BARDING): an arrow
+ * glances off plate barding as off a man's plate (`bounce`), and goes into lamellar for what it does not stop; a ball
+ * goes through any barding a horse could carry (a millimetre or two of steel) and leaves `ARROW.horseShare` of its
+ * energy in it (it passes on through: the rest goes with it). The harm is mounted.js harmHorse's, as a lance's point
+ * would be: it bleeds, and in the chest or neck deep enough it opens the heart.
+ */
+export function missileInHorse(world, shooter, hit, dir, joules, { arrow = true, bounce = ARROW.bounce } = {}) {
+  const horse = hit.horse;
+  const barding = BARDING[horse.barding].parts[hit.capsule.part];
+  const event = { time: world.time, kind: 'horseHit', attacker: shooter?.id ?? -1, horse: horse.id, rider: horse.rider ?? undefined, weapon: arrow ? 'arrow' : 'ball', target: hit.capsule.key, energy: joules, point: hit.point, normal: vec.scale(dir, -1), effects: [] };
+  world.events.push(event);
+  if (arrow && barding.deflects && world.random() < bounce) {
+    event.effects.push('glances off the barding');
+    return;
+  }
+  const pierce = arrow ? joules * (1 - (barding.pierce ?? 0)) : joules * ARROW.horseShare;
+  if (shooter) shooter.stats.landed += 1;
+  harmHorse(world, horse, hit.capsule, { blunt: 0, cut: 0, pierce }, event, shooter);
+}
+
 /** Whether the barrel has come onto the line from the muzzle to the mark: then he fires. */
 export function sightsOn(fighter) {
   const weapon = fighter.weapon;
@@ -230,7 +278,10 @@ export function loose(world, fighter, bolt = null) {
   // Aimed above the mark by the drop over the distance.
   // A bow drawn only part way (too heavy for him: handling.js) casts the arrow that much slower.
   const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
-  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
+  let lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
+  // An arrow (not a bolt) loosed from a rank behind his own men goes up over their heads (ARROW.over): the
+  // elevation that clears the nearest comrade in the line, the shaft coming down beyond the mark among those behind it.
+  if (!bolt) lift = Math.max(lift, overHeads(world, fighter, grip, dir, distance));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
   // On foot, a man shooting on the move shoots wide by his pace; in the saddle, by the horse's gait (SADDLE_SPREAD).
   const unsteady = fighter.mount ? SADDLE_SPREAD[gaitAt(fighter.mount.speed).name] ?? 0 : GUN.movingSpread * Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
@@ -240,8 +291,8 @@ export function loose(world, fighter, bolt = null) {
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
   const upward = vec.cross(across, dir);
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
-  // Its energy against a long bow's arrow: by its speed, or a bolt's own weight.
-  const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2;
+  // Its energy against a long bow's arrow: by its speed (and a war bow's heavier shaft, `arrowEnergy`), or a bolt's own weight.
+  const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2 * (weapon.spec.arrowEnergy ?? 1);
   // A counted quiver (a kit's `quiver`): one arrow fewer; the last gone, the bow is spent until he is given more (resupply).
   if (!bolt && fighter.body.gear.quiver) {
     fighter.arrows = (fighter.arrows ?? fighter.body.gear.quiver) - 1;
@@ -260,6 +311,29 @@ export function loose(world, fighter, bolt = null) {
   world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
 }
 
+/**
+ * The elevation (rad above the line to the mark) an arrow from `grip` must have to go over the heads of his own
+ * men standing in the way (within ARROW.over.clear m of the line, short of the mark): over the highest of them by
+ * `above` m, at most `most` rad; 0 with none in the way.
+ */
+function overHeads(world, fighter, grip, dir, distance) {
+  const spec = ARROW.over;
+  let most = 0;
+  const flat = Math.hypot(dir[0], dir[2]) || 1;
+  const way = [dir[0] / flat, dir[2] / flat];
+  for (const mate of world.fighters) {
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out' || mate.mount) continue;
+    const head = point(mate.x, P.head);
+    const offset = [head[0] - grip[0], head[2] - grip[2]];
+    const along = offset[0] * way[0] + offset[1] * way[1];
+    if (along <= 0.2 || along >= distance - 0.5) continue;
+    if (Math.abs(offset[0] * way[1] - offset[1] * way[0]) > spec.clear) continue;
+    const above = head[1] + spec.above - grip[1] - dir[1] / flat * along;
+    most = Math.max(most, Math.atan2(above, along));
+  }
+  return Math.min(spec.most, most);
+}
+
 /** Arrows in the air: they fall, and the first thing on their path takes them. */
 export function flyArrows(world, dt) {
   for (const arrow of world.arrows) {
@@ -272,6 +346,16 @@ export function flyArrows(world, dt) {
     arrow.v[1] -= ARROW.gravity * dt;
     const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
     const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
+    // A horse nearer on its path than any man takes it (the riders' horses were what the archers hit most).
+    const horseHit = horseOnPath(world, world.fighters[arrow.owner], arrow.x, to);
+    if (horseHit && (!hit || horseHit.s < hit.s)) {
+      if (world.ear) soundEvent(world, 'arrowhit', { at: horseHit.point, speed: vec.length(arrow.v), covering: 'flesh', who: -1 });
+      const energy = arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2;
+      missileInHorse(world, world.fighters[arrow.owner], horseHit, vec.normalize(arrow.v), energy * ARROW.joules, { arrow: true, bounce: arrow.bounce ?? ARROW.bounce });
+      arrow.done = true;
+      arrow.x = horseHit.point;
+      continue;
+    }
     if (hit) {
       // Heard: the arrow going in, at the speed it flew, on what it met.
       if (world.ear) soundEvent(world, 'arrowhit', { at: hit.point, speed: vec.length(arrow.v), covering: hit.target === 'shield' ? shieldCovering(hit.fighter.shield) : coveringAt(hit.fighter, hit.capsule.key), who: hit.fighter.id });
@@ -530,7 +614,15 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
   for (let pellet = 0; pellet < (shot?.pellets ?? 1); pellet += 1) {
     const flight = shot?.pellets ? vec.normalize(vec.add(dir, vec.add(vec.scale(up, gauss() * shot.pellet), vec.scale(across, gauss() * shot.pellet)))) : dir;
     const end = vec.add(muzzle, vec.scale(flight, GUN.range));
-    const hit = firstHit(world, fighter, muzzle, end);
+    const manHit = firstHit(world, fighter, muzzle, end);
+    // A horse nearer on the ball's line than any man takes it.
+    const horseHit = horseOnPath(world, fighter, muzzle, end);
+    if (horseHit && (!manHit || horseHit.s < manHit.s)) {
+      world.events.push({ time: world.time, kind: 'shot', attacker: fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: horseHit.point, target: 'horse', point: horseHit.point, normal: vec.scale(flight, -1), harm: 0, effects: ['into a horse'] });
+      missileInHorse(world, fighter, horseHit, flight, (shot?.energy ?? GUN.energy) / (shot?.pellets ?? 1), { arrow: false });
+      continue;
+    }
+    const hit = manHit;
     const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
     world.events.push(event);
     if (hit?.target === 'shield') event.effects.push('stopped by the shield');

@@ -169,9 +169,9 @@ export const COMPARE_SCENES = {
     camera: { focus: { at: [-1.5, -16.5], height: 0.2 }, yaw: 1.66, pitch: 0.4, distance: 7, fov: 50 },
   },
   'sengoku-army': {
-    about: 'Sekigahara in daylight, sixty fighters in formation: a wide shot for load (many fighters, crowd batching).',
+    about: 'Nagashino in daylight, a hundred fighters, the palisade and the stream: a wide shot for load (many fighters, crowd batching).',
     place: 'sengoku',
-    level: 'sekigahara',
+    level: 'nagashino',
     seed: 21,
     frames: 120,
     camera: { focus: { centre: true, height: 1.0 }, yaw: -0.5, pitch: 0.34, distance: 26, fov: 40 },

@@ -334,6 +334,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   const brass = steelMaterial(envMap, { vertexColors: false, color: BRONZE, roughness: 0.35 });
   switch (kind) {
     case 'bow':
+    case 'longbow':
     case 'yumi':
     case 'compositeBow': {
       // A recurved stave bowed towards the mark (+z), bound at the grip; the
@@ -844,6 +845,16 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(bladeMesh(bladeGeometry(headStart, 0.28, 0.055, 0.012, 0.18), polished));
       const socket = cylinder(0.013, 0.018, headStart - 0.07, headStart + 0.01, steel, 8);
       group.add(socket);
+      break;
+    }
+    case 'pike': {
+      // The pike: a long ash shaft, a small leaf head on langets (the iron strips nailed down the shaft so a
+      // sword could not lop the head off), a butt cap.
+      const headStart = spec.length - 0.22;
+      group.add(cylinder(0.014, 0.018, -spec.handle, headStart + 0.02, wood, 8));
+      group.add(bladeMesh(bladeGeometry(headStart, 0.22, 0.04, 0.01, 0.14), polished));
+      group.add(cylinder(0.016, 0.016, headStart - 0.6, headStart + 0.01, dark, 6));
+      group.add(cylinder(0.019, 0.017, -spec.handle - 0.04, -spec.handle + 0.02, steel, 8));
       break;
     }
     case 'langxian': {

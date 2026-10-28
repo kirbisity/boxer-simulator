@@ -20,6 +20,7 @@
 // their patience runs out): placeWings puts them there, moveWings lets them go.
 
 import { P } from './body.js';
+import { walkingDistance } from './physics/fieldworks.js';
 
 export const DRILL = {
   // Drilled men on a side before it forms up.
@@ -69,6 +70,11 @@ export const DRILL = {
   // through the squad (retireAt) before he is on them.
   holdFire: 12,
   runIn: 5,
+  // Fire by ranks (the countermarch: Nagashino's teppō, the Spanish arquebusiers, the Han crossbows): the front rank
+  // of a formation's guns and crossbows fires together in a window `volleyWindow` s long, then holds while the ranks
+  // change, the next volley due a reload's time over the number of ranks after it (volleyDue): so with three ranks of
+  // matchlocks (15 s to load) a volley every five seconds, the fire never stopping. A bow is shot at will.
+  volleyWindow: 1.2,
   // A squad's drill (a drill with `squad`, Qi Jiguang's):
   // shooters before a formation of other arms (the fowling pieces before
   // his squads): with the enemy within `retireAt` m of the front
@@ -186,6 +192,10 @@ export function moveFormations(world, dt, hurt = () => 0) {
     if (theirs === Infinity) continue;
     // A square (`drill.square`) has no front: the gap is from its outer ring to the nearest of them, whichever way.
     const gap = middle ? nearest : theirs - front;
+    // How near the enemy could come to our front on his feet: across open ground the gap; behind a palisade or a ditch
+    // (an arena's works: physics/fieldworks.js walkingDistance), the way round it or over it. The shooters change places
+    // while he cannot be on them (relieveShooters).
+    formation.reachGap = world.arena?.works ? walkingGap(world, corner, formation, front) : gap;
     let lag = 0;
     for (const fighter of standing) {
       const slot = slotAt(formation, fighter.slot);
@@ -243,8 +253,41 @@ function ringOf(formation, slot) {
   return Math.max(Math.abs(slot.ahead - middle.ahead), Math.abs(slot.across - middle.across));
 }
 
+/** The walking distance (m) from the nearest enemy on foot to the point of our front line before him. */
+function walkingGap(world, corner, formation, front) {
+  let nearest = Infinity;
+  for (const other of world.fighters) {
+    if (other.corner === corner || other.mount || !fighting(other)) continue;
+    const position = at(other);
+    const along = dot([position[0] - formation.anchor[0], position[1] - formation.anchor[1]], formation.forward);
+    const toFront = along - front;
+    if (toFront > nearest + 4) continue;
+    const onLine = [position[0] - formation.forward[0] * toFront, position[1] - formation.forward[1] * toFront];
+    nearest = Math.min(nearest, walkingDistance(world, position, onLine) * Math.sign(toFront || 1));
+  }
+  return nearest;
+}
+
 /** A man with a bow or gun (his weapon shoots). */
 const shoots = (fighter) => Boolean(fighter.weapon?.held && (fighter.weapon.spec.shot || fighter.weapon.spec.ranged));
+
+/**
+ * Whether a drilled man in the front rank may fire his gun or crossbow now: in the window of his formation's
+ * volley, which opens a reload's time over the ranks of its shooters after the last one opened (DRILL.volleyWindow).
+ */
+export function volleyDue(world, formation, fighter) {
+  const shot = fighter.weapon?.spec.shot;
+  if (!shot || formation.drill.squad) return true;
+  const volley = (formation.volley ??= { opened: -Infinity, ranks: null });
+  if (world.time < volley.opened + DRILL.volleyWindow) return true;
+  if (volley.ranks === null) {
+    const ahead = new Set(formation.members.map((id) => world.fighters[id]).filter((man) => man.weapon?.spec.shot).map((man) => Math.round(man.slot.ahead * 4)));
+    volley.ranks = Math.max(1, ahead.size);
+  }
+  if (world.time < volley.opened + (shot.reloadSeconds ?? 0) / volley.ranks) return false;
+  volley.opened = world.time;
+  return true;
+}
 
 /**
  * Shooters standing before a formation's hand-to-hand men fall back through
@@ -311,10 +354,11 @@ function closeRanks(world, members) {
 /**
  * A shooter in the front rank who has loosed changes places with the first
  * loaded man behind him in his file, and goes back to span again; not with
- * the enemy on the line (then the front rank fights with what it has).
+ * the enemy on the line (then the front rank fights with what it has), unless
+ * a palisade or a ditch keeps him off it (moveFormations' `reachGap`).
  */
 function relieveShooters(world, members, formation) {
-  if (formation.gap < DRILL.contact + 2) return;
+  if ((formation.reachGap ?? formation.gap) < DRILL.contact + 2) return;
   for (const fighter of members) {
     const weapon = fighter.weapon;
     if (!fighter.inFront || !fighting(fighter) || fighter.punch || !weapon?.held || !weapon.spec.shot || weapon.loaded) continue;
