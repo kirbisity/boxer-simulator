@@ -100,11 +100,12 @@ test('the rebellion opens with the knights in a tight line and the rebels a loos
 test('Nagashino: the Oda guns and spears in their black, the Takeda in red with their horse; Agincourt\'s archers and men-at-arms; Cerignola\'s arquebusiers, Landsknechts, gendarmes and Swiss', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const nagashino = SCENARIOS.nagashino.cast(seededRandom(7));
-  for (const side of [nagashino.red, nagashino.blue]) assert.equal(side.length, 52);
+  assert.equal(nagashino.blue.length, 52);
+  assert.equal(nagashino.red.length, 32, 'the Takeda fewer, as they were');
   const oda = nagashino.blue;
   assert.equal(oda.filter((man) => man.style === 'matchlock' && man.outfit.kind === 'ashigaru').length, 24, 'twenty-four teppō ashigaru');
   assert.ok(oda.every((man) => !man.mounted), 'the Oda fought on foot behind the fence');
-  assert.equal(nagashino.red.filter((man) => man.mounted).length, 14, 'the Takeda horse');
+  assert.equal(nagashino.red.filter((man) => man.mounted).length, 10, 'the Takeda horse');
   assert.ok(nagashino.red.every((man) => man.outfit.tint.armor === nagashino.red[0].outfit.tint.armor) && oda.every((man) => man.outfit.tint.armor !== nagashino.red[0].outfit.tint.armor), 'each army in its own colour');
   const agincourt = SCENARIOS.agincourt.cast(seededRandom(7));
   assert.equal(agincourt.blue.filter((man) => man.style === 'longbow' && man.outfit.kind === 'archer').length, 42, 'forty-two archers');

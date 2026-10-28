@@ -620,7 +620,8 @@ const NAGASHINO = {
   // The Takeda formed some hundreds of metres off across the Shitarabagahara and came on in waves: room for that (`front.takeda`).
   arena: { halfX: 32, halfZ: 11 },
   oda: { ashigaru: { matchlock: 24, spear: 20 }, samurai: { katana: 5, naginata: 3 } },
-  takeda: { horse: { spear: 10, katana: 4 }, samurai: { katana: 8, naginata: 4, spear: 4 }, ashigaru: { spear: 14, bow: 4, matchlock: 4 } },
+  // The Takeda were some 15,000 against 38,000: thirty-two here against the Oda's fifty-two, their horse a third of them.
+  takeda: { horse: { spear: 7, katana: 3 }, samurai: { katana: 5, naginata: 3, spear: 2 }, ashigaru: { spear: 8, bow: 2, matchlock: 2 } },
   front: { oda: 6, takeda: 24 },
   // The Oda guns three deep, a file every 2.3 m, 1.5 m behind the fence; the spears and the samurai behind them.
   shooters: { perRow: 8, spacing: 2.3, rowSpacing: 1.0, behind: 1.6 },
@@ -694,13 +695,13 @@ const CERIGNOLA_LEVEL = {
 const NAGASHINO_LEVEL = {
   title: 'Nagashino',
   place: 'Shitarabagahara, Mikawa · 29 June 1575',
-  blurb: "Oda Nobunaga's teppō ashigaru stand three deep behind a palisade of posts and rails, the muddy bed of the Rengo stream before it, and fire by ranks. Takeda Katsuyori's horse, the finest in Japan, charges across the stream at the fence, his samurai and ashigaru after it. Twenty-four guns, twenty spears and eight samurai against fourteen horsemen and thirty-eight on foot.",
+  blurb: "Oda Nobunaga's teppō ashigaru stand three deep behind a palisade of posts and rails, the muddy bed of the Rengo stream before it, and fire by ranks. Takeda Katsuyori's horse, the finest in Japan, charges across the stream at the fence, his samurai and ashigaru after it. Twenty-four guns, twenty spears and eight samurai against ten horsemen and twenty-two on foot.",
   scene: 'sengoku',
   weather: { fog: [12, 120], sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
   arena: { ...NAGASHINO.arena, works: nagashinoWorks() },
   spread: 1,
   camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 },
-  roster: 'Fourteen Takeda horsemen and thirty-eight on foot · twenty-four Oda guns, twenty spears and eight samurai',
+  roster: 'Ten Takeda horsemen and twenty-two on foot · twenty-four Oda guns, twenty spears and eight samurai',
   formation: {
     red: { front: NAGASHINO.front.takeda, spacing: 1.2, rowSpacing: 1.4, perRow: 12, loose: 0.35, wings: HORSE_FIRST },
     blue: { front: NAGASHINO.front.oda, spacing: NAGASHINO.shooters.spacing, rowSpacing: NAGASHINO.shooters.rowSpacing, perRow: NAGASHINO.shooters.perRow, shootersFront: NAGASHINO.shooters.behind, drill: HOLD_GROUND },

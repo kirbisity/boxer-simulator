@@ -236,7 +236,7 @@ test('the three battles: fifty-two a side, each man of his armies, the works whe
     const level = battleOf(key);
     const cast = level.cast(seededRandom(2));
     assert.ok(cast.red.length <= MUSTER.cap && cast.blue.length <= MUSTER.cap, key);
-    assert.equal(cast.red.length + cast.blue.length, 104, key);
+    assert.equal(cast.blue.length, 52, key);
     assert.ok(level.arena.works, `${key} has its works`);
     const works = worksOf(level.arena);
     // The defenders stand behind their works, the attackers before them.
