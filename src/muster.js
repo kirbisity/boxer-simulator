@@ -20,9 +20,9 @@ import { WINGS, placeWings } from './formation.js';
 import { ARMIES } from './scenarios.js';
 
 export const MUSTER = {
-  // Men a side at most: Rome against Han's fifty, the biggest of the levels, is as many as a
-  // phone keeps near its frame time (a hundred bodies stepped, drawn as a crowd).
-  cap: 50,
+  // Men a side at most: the biggest side of the levels (the Japanese at Pyongyang, fifty-two), so
+  // a side set by hand is never bigger than one the game already fights.
+  cap: 52,
   // The deployment zone: a side's own half of the floor, from this far (m) behind the middle
   // line (no man starts nearer the enemy) to `edge` m short of the floor's ends and sides.
   neutral: 3,

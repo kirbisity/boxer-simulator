@@ -422,6 +422,7 @@ export const ARMIES = {
   raiders: {
     label: 'The wokou',
     ranks: {
+      ronin: { label: 'Rōnin', kinds: ['ronin'], styles: ['ronin'], make: (random, style) => roninWarrior(random, style) },
       japanese: { label: 'Japanese raider', kinds: RAIDER_KINDS, styles: ['katana', 'odachi', 'naginata', 'bow'], make: (random, style) => wokouRaider(random, style, 'japanese') },
       chinese: { label: 'Chinese raider', kinds: RAIDER_KINDS, styles: ['dao', 'spear', 'matchlock'], make: (random, style) => wokouRaider(random, style, 'chinese') },
     },

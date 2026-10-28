@@ -11,7 +11,7 @@ import { normaliseInputs } from '../src/body.js';
 import { AI, thinkAll } from '../src/ai.js';
 import { DRILL } from '../src/formation.js';
 import { advance, boutWinner, createWorld, inFight, seededRandom } from '../src/physics.js';
-import { battleOf, qiJiguangLevel } from '../src/scenarios.js';
+import { SPREAD, battleOf, qiJiguangLevel } from '../src/scenarios.js';
 
 /**
  * A level by its key; `qiJiguang:<levers>` is Qi Jiguang's with only those of
@@ -67,7 +67,7 @@ export function levelOutcomes(key, { seeds = 12, firstSeed = 1, seconds = 180 } 
  * AI's and the drill's tables before the battles, to see what a change would do.
  */
 export function tryValues(spec = '') {
-  const tables = { AI, DRILL };
+  const tables = { AI, DRILL, SPREAD };
   for (const pair of spec.split(';').filter(Boolean)) {
     const [path, value] = pair.split('=');
     const keys = path.split('.');
