@@ -13,7 +13,7 @@ import { vec, yawRotate } from '../pose.js';
 import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir } from '../weapons.js';
 import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
-import { harmHorse } from './mounted.js';
+import { gaitAt, harmHorse } from './mounted.js';
 
 /**
  * The gun arm for a shot: up from the guard and out along the line from the
@@ -32,7 +32,7 @@ function skillSpread(fighter) {
 export function aimTargets(world, fighter, punch, guard) {
   const spec = punch.spec;
   const target = world.fighters[punch.target];
-  if (target && !punch.fired) punch.aim = toLocal(fighter, aimPoint(target, punch.zone));
+  if (target && !punch.fired) punch.aim = toLocal(fighter, leadFor(fighter, target, aimPoint(target, punch.zone)));
   const raised = raisedAim(fighter, punch.aim);
   const smooth = (value) => value * value * (3 - 2 * value);
   const up = Math.min(1, punch.t / spec.windup);
@@ -44,6 +44,44 @@ export function aimTargets(world, fighter, punch, guard) {
 // The support hand on a two-handed pistol, from the gun hand (heights, local):
 // a little behind, below and to the left, cupping the grip.
 export const SUPPORT_GRIP = [-0.012, -0.018, 0.022];
+
+/** How fast a man goes over the ground (m/s, world): his horse's pace under him, or his own steps. */
+export function overGround(fighter) {
+  if (fighter.mount) return fighter.mount.velocity ?? [0, 0, 0];
+  return [fighter.rootVelocity?.[0] ?? 0, 0, fighter.rootVelocity?.[1] ?? 0];
+}
+
+/**
+ * Where to aim an arrow or a bolt so that it meets the man: ahead of where he
+ * is by how far he will have gone, against the shooter, in the time it flies
+ * there. An arrow leaves the bow carrying the shooter's own way over the ground
+ * (loose: a man on a galloping horse throws it forward at the horse's pace as
+ * well as the bow's), so it is the two men's speeds against each other that
+ * the aim leads by; over the flight at the bow's speed (`ARROW.speed`, a
+ * composite bow's own, a crossbow's), reckoned twice (the time to where he
+ * will be, not to where he is). A gun's ball is too quick to lead.
+ */
+export function leadFor(fighter, target, mark) {
+  const weapon = fighter.weapon;
+  const bolt = weapon?.spec.shot?.bolt ? weapon.spec.shot : null;
+  if (!weapon?.held || (!weapon.spec.bow && !bolt)) return mark;
+  const speed = bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed;
+  const relative = vec.sub(overGround(target), overGround(fighter));
+  const from = point(fighter.x, P[`${weapon.main}Hand`]);
+  let led = mark;
+  for (let pass = 0; pass < 2; pass += 1) led = vec.add(mark, vec.scale(relative, vec.length(vec.sub(led, from)) / speed));
+  return led;
+}
+
+/**
+ * How unsteady a bow is in the saddle (rad of spread, added to the arrow's
+ * own), by the horse's gait: a horse archer looses in the moment the horse is
+ * off the ground in its stride, when the saddle is still (the trained shot of
+ * the steppe, of the Parthians, of yabusame), so the smooth canter and gallop
+ * add little; the trot's jolt, a great deal; standing, nothing. Not the horse's
+ * speed: the arrow is carried at it (loose), and the man moves with the saddle.
+ */
+export const SADDLE_SPREAD = { stand: 0, walk: 0.004, trot: 0.03, canter: 0.01, gallop: 0.014 };
 
 /** The gun arm up on a mark (local): out straight from the shoulder along the line to it, locked (`weapon`: the gun on that arm). */
 export function raisedAim(fighter, mark, weapon = fighter.weapon) {
@@ -224,6 +262,11 @@ export function drawBow(world, fighter, punch, target, intent) {
  */
 export function loose(world, fighter, bolt = null) {
   const punch = fighter.punch;
+  // A counted quiver already empty (a bow taken up again off the floor): there is no arrow to nock.
+  if (!bolt && fighter.body.gear.quiver && (fighter.arrows ?? fighter.body.gear.quiver) <= 0) {
+    fighter.weapon.spent = true;
+    return;
+  }
   // Arrows (and bolts) loosed this bout: a volley style counts them (ranged.volley).
   fighter.loosed = (fighter.loosed ?? 0) + 1;
   const weapon = fighter.weapon;
@@ -240,8 +283,9 @@ export function loose(world, fighter, bolt = null) {
   // elevation that clears the nearest comrade in the line, the shaft coming down beyond the mark among those behind it.
   if (!bolt) lift = Math.max(lift, overHeads(world, fighter, grip, dir, distance));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
-  const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  const spread = ((bolt?.spread ?? ARROW.spread) + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * skillSpread(fighter);
+  // On foot, a man shooting on the move shoots wide by his pace; in the saddle, by the horse's gait (SADDLE_SPREAD).
+  const unsteady = fighter.mount ? SADDLE_SPREAD[gaitAt(fighter.mount.speed).name] ?? 0 : GUN.movingSpread * Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
+  const spread = ((bolt?.spread ?? ARROW.spread) + unsteady) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * skillSpread(fighter);
   const random = world.random;
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
@@ -249,7 +293,17 @@ export function loose(world, fighter, bolt = null) {
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
   // Its energy against a long bow's arrow: by its speed (and a war bow's heavier shaft, `arrowEnergy`), or a bolt's own weight.
   const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2 * (weapon.spec.arrowEnergy ?? 1);
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.scale(dir, speed), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
+  // A counted quiver (a kit's `quiver`): one arrow fewer; the last gone, the bow is spent until he is given more (resupply).
+  if (!bolt && fighter.body.gear.quiver) {
+    fighter.arrows = (fighter.arrows ?? fighter.body.gear.quiver) - 1;
+    if (fighter.arrows <= 0) {
+      weapon.spent = true;
+      world.events.push({ time: world.time, kind: 'quiverEmpty', fighter: fighter.id, effects: ['his quiver is empty'] });
+    }
+  }
+  // The arrow leaves the bow with the bow's own way over the ground (a horse's gallop, a man's step) as well as its cast.
+  const carried = overGround(fighter);
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // Heard: the string let go (a bow's, or a crossbow's heavier snap).
   if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });

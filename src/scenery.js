@@ -49,6 +49,27 @@ export const PLACE_SCENERY = {
     ],
     trees: { kind: 'none', count: 0, from: 0, to: 0, colour: 0x6a8a6a, bark: 0x4a3626 },
   },
+  // The northern edge of the Gobi (Mobei, 119 BC): gravel steppe, low bare swells, dark ridges far off; no trees.
+  mobei: {
+    keepOut: [32, 22], groundColour: 0x857a5e,
+    hills: { from: 50, to: 95, height: [3, 9], colour: 0x6e664e, character: 'dry' },
+    mountains: [{ ring: true, from: 90, to: 120, height: [8, 14], colour: 0x5a5a5e, forested: false }],
+    trees: { kind: 'none', count: 0, from: 0, to: 0, colour: 0x6a8a6a, bark: 0x4a3626 },
+  },
+  // The Catalaunian Plains (451): rolling summer grass, the long ridge beyond the far side (−z), woods far off.
+  catalaunian: {
+    keepOut: [32, 22], groundColour: 0x7c8a44,
+    hills: { from: 48, to: 95, height: [3, 10], colour: 0x6f8444, character: 'rolling' },
+    mountains: [],
+    trees: { kind: 'broadleaf', count: 8, from: 70, to: 100, colour: 0x3f6a2a, bark: 0x5a4128 },
+  },
+  // Carrhae (53 BC): flat sand and gravel with camelthorn, a few bare hills far off in the haze; no trees.
+  carrhae: {
+    keepOut: [32, 22], groundColour: 0xc2ac84,
+    hills: { from: 60, to: 110, height: [2, 6], colour: 0xa8906a, character: 'dry' },
+    mountains: [],
+    trees: { kind: 'none', count: 0, from: 0, to: 0, colour: 0x6a8a6a, bark: 0x4a3626 },
+  },
   // Sekigahara: a valley ringed by forested mountains, pines about the field.
   sengoku: {
     keepOut: [13, 9], groundColour: 0x7d8a4a,
@@ -181,6 +202,9 @@ export const PLACE_GROUND = {
   field: { kind: 'grass', about: 'open pasture churned by hooves down the middle' },
   plain: { kind: 'dry', about: 'the high plain of Mexico: dry bunch grass, volcanic grit and stones' },
   sengoku: { kind: 'trampled', about: 'autumn grass trampled to earth by armies, mud patches' },
+  mobei: { kind: 'dry', about: 'the edge of the Gobi: short sparse steppe grass on grey-brown gravel and grit' },
+  catalaunian: { kind: 'grass', about: 'the plain of Champagne in summer: grass gone green-gold, hoof-churned where the horse rode' },
+  carrhae: { kind: 'dry', about: 'the plain below Harran in June: pale sand and gravel, camelthorn in low grey-green tufts' },
   colosseum: { kind: 'arena-sand', about: 'raked arena sand (harena), footprints, a few dark stains' },
   town: { kind: 'cobbles', about: 'a market square of worn cobbles, mud and straw in the joints' },
   coastFort: { kind: 'beach', about: 'a tropical beach before a brick fort: dry sand, wet sand at the tide line, shells' },

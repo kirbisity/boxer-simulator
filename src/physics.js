@@ -1419,7 +1419,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     // `wings`: the riders stand on the flanks of the line, held, not in its rows (formation.js placeWings).
     // An army set up by the player (`placed`: muster.js) has a place in its `layout` for every man, riders
     // too: they wait where he put them, held all the same.
-    const riders = order?.wings ? everyone.filter((fighter) => riding(fighter.body.inputs)) : [];
+    // (A wing of some of its riders only, `wings.styles`: Surena's cataphracts held back while his horse archers ride and shoot.)
+    const riders = order?.wings ? everyone.filter((fighter) => riding(fighter.body.inputs) && (!order.wings.styles || order.wings.styles.includes(fighter.body.inputs.style))) : [];
     const team = riders.length && !order.placed ? everyone.filter((fighter) => !riders.includes(fighter)) : everyone;
     // With riders in the fight, every team lines up at the charging distance: the foot in rows, the riders on their flanks.
     if (mounted && !order) {
@@ -1478,6 +1479,14 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
   // Wings of horse held on the flanks (formation.js moveWings): released when the foot lines close.
   if (wingOrder) world.wings = { release: wingOrder.release ?? WINGS.release, by: wingOrder.by ?? WINGS.by, review: 0 };
+  // A side's baggage train on the field (`formation[corner].train`: { back }, m in from its own end of the floor, on the
+  // middle line): where its horse archers go for fresh arrows when their quivers are empty (riding.js resupply).
+  for (const corner of ['red', 'blue']) {
+    const train = formation[corner]?.train;
+    if (!train) continue;
+    world.trains ??= {};
+    world.trains[corner] = { at: [(corner === 'red' ? -1 : 1) * Math.max(0, arena.halfX - (train.back ?? 2)), train.across ?? 0] };
+  }
   // Drilled men form up on their side's leader (formation.js).
   // A side drilled as a whole by the level's order (`formation[corner].drill`: Qi Jiguang's squads) forms up so too.
   if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null), formation);

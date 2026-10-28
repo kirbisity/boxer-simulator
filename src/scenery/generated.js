@@ -116,6 +116,26 @@ const GENERATED_PLACES = {
       { angle: -1.36, distance: 185, height: 30, radius: 95, shape: 'ridge', snow: 0.62 },
     ],
   },
+  // The edge of the Gobi: gravel steppe in long low swells, bare; its far ridges come from the photograph.
+  mobei: {
+    character: 'dry', ramp: 40, slope: 0.06, scale: 110,
+    grass: 0x857a5e, lush: 0x78744e, woods: 0x4e4c3a, rock: 0x5e5a54, dry: 0x968a66,
+    ridge: 0x5e5a4c, ridgeAngle: 0.6, tuft: 0x8e8a5a, bush: 0x5e5e44, bushes: 300,
+  },
+  // Champagne: rolling grass, and the long ridge (Jordanes's) beyond the far side (−z), its crest some
+  // 70 m out and 12 m up, running the floor's length: built as Iztaccíhuatl's long ridge is, without snow.
+  catalaunian: {
+    character: 'rolling', ramp: 30, slope: 0.09, scale: 100,
+    grass: 0x7c8a44, lush: 0x667a3a, woods: 0x34532a, rock: 0x77735f, dry: 0x9a9a52,
+    ridge: 0x5e7440, ridgeAngle: 0.5, tuft: 0x8a9046, bush: 0x34532a, bushes: 900,
+    volcanoes: [{ angle: -Math.PI / 2, distance: 72, height: 12, radius: 60, shape: 'ridge', snow: 99 }],
+  },
+  // Below Harran: nearly flat sand and gravel, a few bare hills far off.
+  carrhae: {
+    character: 'dry', ramp: 45, slope: 0.035, scale: 120,
+    grass: 0xc2ac84, lush: 0xa89a70, woods: 0x7a7458, rock: 0x9a8a6e, dry: 0xd0b890,
+    ridge: 0xa8906a, ridgeAngle: 0.9, tuft: 0x7e8458, bush: 0x6e7450, bushes: 200,
+  },
   sengoku: {
     character: 'forested', ramp: 22, slope: 0.2, scale: 85,
     grass: 0x6a7a40, lush: 0x4a6a34, woods: 0x2c4a2c, rock: 0x666660, dry: 0x7d8a4a,
@@ -139,6 +159,9 @@ const GENERATED_FOOTHILLS = {
   meadow: { ...GENERATED_PLACES.meadow, bump: 0.8, slope: 0.075, ramp: 12, radius: 360, cap: 22, farTint: 0x6a724c },
   field: { ...GENERATED_PLACES.field, bump: 0.7, slope: 0.065, ramp: 14, radius: 360, cap: 20, farTint: 0x6a724c },
   plain: { ...GENERATED_PLACES.plain, bump: 0.6, slope: 0.06, ramp: 16, radius: 360, cap: 16, farTint: 0x9a908b },
+  mobei: { ...GENERATED_PLACES.mobei, bump: 0.5, slope: 0.045, ramp: 18, radius: 360, cap: 12, farTint: 0x9a908b },
+  catalaunian: { ...GENERATED_PLACES.catalaunian, bump: 0.7, slope: 0.06, ramp: 14, radius: 360, cap: 16, farTint: 0x6a724c },
+  carrhae: { ...GENERATED_PLACES.carrhae, bump: 0.35, slope: 0.03, ramp: 20, radius: 360, cap: 8, farTint: 0x9a908b },
   sengoku: { ...GENERATED_PLACES.sengoku, bump: 0.9, slope: 0.11, ramp: 12, radius: 360, cap: 32, farTint: 0x858759 },
 };
 

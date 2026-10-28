@@ -8,6 +8,7 @@ import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
 import { atahualpa, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+import { gallicHorseman, gothWarrior, hunRider, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from './cast.js';
 
 // Rome against Han: fifty a side, ten to a rank; a centurion to every
 // eighty legionaries (a century), Li Ling among his crossbowmen.
@@ -330,6 +331,126 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true }
   };
 }
 
+// ---- The horse peoples: Mobei (119 BC), Carrhae (53 BC), the Catalaunian Plains (451) ----
+// Battles of foot against horse archers, on open plains: the floors wide and long
+// for riders who shoot, wheel off and come back (riding.js skirmish), the armies
+// drawn up where the levels put them (`spread` 1: not drawn further apart, the
+// gaps already a horse archer's range).
+
+// A mass of horse archers as it comes onto the field: open order, a horse's length and more between
+// riders (m) and between their rows, each a little off his place; packed closer, the first wheel throws
+// them into each other.
+const RIDERS_LOOSE = { spacing: 5, rowSpacing: 6, loose: 0.9 };
+
+/**
+ * Places in a block (`layout` entries, [back, across]: m behind the front, m
+ * across), `perRow` abreast `spacing` m apart, rows `rowSpacing` m behind each
+ * other, its first row `back` m behind the front and centred `across` m off the
+ * middle: as many as `count`.
+ */
+function block(count, { back = 0, across = 0, perRow, spacing, rowSpacing }) {
+  return Array.from({ length: count }, (_, index) => {
+    const row = Math.floor(index / perRow);
+    const inRow = Math.min(perRow, count - row * perRow);
+    return [back + row * rowSpacing, across + ((index % perRow) - (inRow - 1) / 2) * spacing];
+  });
+}
+
+/**
+ * A hollow square (the agmen quadratum, Crassus's plinthion at Carrhae: Plutarch,
+ * Crassus 23), as many rings deep as `sides` has: each ring a square of `n` men
+ * to a side, `spacing` m apart, all about the one middle (so a ring of fewer a
+ * side stands inside the one before). Places [back, across] from the outer
+ * ring's front side, round each ring from its front left corner (front, right
+ * side, rear, left side): 4·(n − 1) men to a ring of n a side.
+ */
+function hollowSquare({ sides, spacing }) {
+  const middle = ((sides[0] - 1) * spacing) / 2;
+  const places = [];
+  for (const n of sides) {
+    const half = ((n - 1) * spacing) / 2;
+    for (let t = 0; t < 4 * (n - 1); t += 1) {
+      const along = (t % (n - 1)) * spacing - half;
+      places.push([[middle - half, along], [middle + along, half], [middle + half, -along], [middle - along, -half]][Math.floor(t / (n - 1))]);
+    }
+  }
+  return places;
+}
+
+// Mobei, 119 BC. Wei Qing crossed the Gobi with fifty thousand horse and met the
+// chanyu Yizhixie's army on its northern edge. He ringed his wagons (the
+// wugang che, hide-covered) into a laager and shot from it with the crossbow
+// (the nu: a trigger, a bronze lock, a bolt that went through felt and leather
+// at a hundred paces), sent his horse out against the Xiongnu's, fought until
+// dusk and a sandstorm, and sent wings round both flanks: the chanyu broke away
+// north with a few hundred, and the Han took or killed nineteen thousand
+// (Shiji 111). Here: Wei Qing's crossbowmen in iron lamellar, drawn up before
+// the laager (the floor's end at their backs: the wagons, render.js), and his
+// horse on both flanks, sabre, spear and bow; against the Xiongnu, every man
+// of them a horse archer in felt and leather, a few with the spear.
+const MOBEI = {
+  crossbow: 30,
+  horse: { dao: 6, spear: 6, steppeBow: 4 },
+  xiongnu: { steppeBow: 44, spear: 4 },
+  arena: { halfX: 60, halfZ: 38 },
+  // The crossbowmen's front this far (m) from the middle, ten to a rank; the Xiongnu's first riders this far on the other side.
+  hanFront: 52,
+  xiongnuFront: 20,
+};
+
+// The Catalaunian Plains, 451. Aetius's Romans and Theoderic's Visigoths (with
+// the Alans) against Attila's Huns and his Germanic subjects, the Ostrogoths and
+// Gepids; fought over a ridge from the afternoon into the night. Theoderic fell;
+// his son Thorismund's horse came down off the heights on the Huns; Attila drew
+// back into his wagon laager and the next days left Gaul (Jordanes, Getica
+// 36–41): a bloody day without a rout, held by the Romans and Goths. Here: the
+// late Roman foot in mail with the oval shield and spear, holding (their kit's
+// drill), the Visigoths beside them, and a troop of Visigoth horse on the flank;
+// against Hun horse archers and a few of Attila's nobles, and behind them the
+// greater part of his army, the Ostrogoth and Gepid foot (Jordanes has the subject
+// peoples on both wings and the Huns, the smaller part, in the centre).
+const CATALAUNIAN = {
+  // The Roman foot (spear and spatha), and its archers on its flank (sagittarii: the late Roman army shot the
+  // composite bow it had taken from the steppe).
+  romans: { spearOval: 12, spathaOval: 6 },
+  archers: { steppeBow: 8 },
+  visigoths: { spearRound: 9, spathaRound: 7 },
+  visigothHorse: { spear: 4, spatha: 4 },
+  huns: { rider: { steppeBow: 12 }, noble: { steppeBow: 2, spatha: 2 } },
+  germans: { spearRound: 20, spathaRound: 14 },
+  arena: { halfX: 58, halfZ: 38 },
+  front: 20,
+};
+
+// Carrhae, June 53 BC. Crassus's seven legions and four thousand horse, marching
+// across the plain near Harran, were met by Surena's ten thousand horsemen: a
+// thousand cataphracts and nine thousand horse archers, and a train of a thousand
+// camels laden with arrows. Crassus formed a hollow square; the archers rode round
+// it and shot, and the arrows never ran out; his son Publius broke out with his
+// Gallic horse and eight cohorts and was cut off by the cataphracts and killed;
+// the square stood under the arrows until dark and then broke (Plutarch, Crassus
+// 23–27). Here: the legion of the Republic in a tight square, two ranks deep, the
+// Gallic horse on its flanks; against horse archers with their camel train behind
+// them (`train`: the floor's end, where render.js draws the camels) and a few cataphracts.
+const CARRHAE = {
+  legionaries: 44,
+  gauls: { spear: 4, longsword: 2 },
+  parthians: { archer: { steppeBow: 24 }, cataphract: { kontos: 3 } },
+  arena: { halfX: 60, halfZ: 40 },
+  // The square two deep: a ring of eight a side and, two metres within it, one of five; a pace and a quarter apart (the scutum's width and an elbow's room).
+  square: { sides: [8, 5], spacing: 1.25 },
+  // Crassus's square stood under the arrows (it marched on only at night, in retreat): it holds its ground, shields locked.
+  drill: { advance: false, square: true },
+  romanFront: 12,
+  parthianFront: 24,
+  // The camels this far (m) in from the Parthians' end of the floor (on its middle line).
+  train: { back: 3 },
+  // The horse held: Publius's Gauls on the square's flanks, Surena's cataphracts (only they: `styles`) behind his
+  // archers' flanks; each goes when the other side's horse comes near it or it is struck (formation.js WINGS alarm),
+  // and not before `by` s otherwise: Surena kept his heavy horse for the Romans who came out of the square.
+  wings: { red: { back: 0, by: 120 }, blue: { styles: ['kontos'], back: 2, by: 120 } },
+};
+
 // Koxinga's army is given no discipline of its own: what holds it on the sand is what the men see
 // (ai.js standingFear): his iron men and regulars outmatch the Dutch line man for man, and steady the rest.
 
@@ -487,6 +608,49 @@ export const ARMIES = {
   yakuza: {
     label: 'The yakuza',
     ranks: { soldier: { label: 'Yakuza', kinds: ['yakuza'], styles: ['knife', 'katana', 'handgun'], make: (random, style) => yakuza(random, style) } },
+  },
+  // ---- The horse peoples and the armies that met them (Mobei, Carrhae, the Catalaunian Plains) ----
+  xiongnu: {
+    label: 'The Xiongnu',
+    ranks: { rider: { label: 'Xiongnu horseman', kinds: ['xiongnu'], mounted: true, styles: ['steppeBow', 'spear'], make: (random, style) => xiongnuRider(random, style) } },
+  },
+  crassus: {
+    label: "Crassus's army",
+    ranks: {
+      legionary: { label: 'Legionary', kinds: ['republicanLegionary'], styles: ['legionary'], make: (random) => republicanLegionary(random) },
+      gauls: { label: 'Gallic horse', kinds: ['romanAuxiliary'], mounted: true, styles: ['spear', 'longsword'], make: (random, style) => gallicHorseman(random, style) },
+    },
+  },
+  parthians: {
+    label: "Surena's army",
+    ranks: {
+      archer: { label: 'Horse archer', kinds: ['parthianArcher'], mounted: true, styles: ['steppeBow'], make: (random, style) => parthianRider(random, style, 'archer') },
+      cataphract: { label: 'Cataphract', kinds: ['cataphract'], mounted: true, styles: ['kontos', 'spatha'], make: (random, style) => parthianRider(random, style, 'cataphract') },
+    },
+  },
+  lateRome: {
+    label: "Aetius's Romans",
+    ranks: { soldier: { label: 'Late Roman foot', kinds: ['lateRoman'], styles: ['spearOval', 'spathaOval', 'steppeBow'], make: (random, style) => lateRomanSoldier(random, style) } },
+  },
+  visigoths: {
+    label: 'The Visigoths',
+    ranks: {
+      warrior: { label: 'Visigoth', kinds: ['goth'], styles: ['spearRound', 'spathaRound'], make: (random, style) => gothWarrior(random, style) },
+      noble: { label: 'Visigoth noble', kinds: ['gothNoble'], styles: ['spathaRound', 'spearRound'], make: (random, style) => gothWarrior(random, style, 'noble') },
+      horse: { label: 'Visigoth horse', kinds: ['gothNoble'], mounted: true, styles: ['spear', 'spatha'], make: (random, style) => gothWarrior(random, style, 'noble', { mounted: true }) },
+    },
+  },
+  huns: {
+    label: 'The Huns',
+    ranks: {
+      rider: { label: 'Hun horse archer', kinds: ['hun'], mounted: true, styles: ['steppeBow', 'spatha'], make: (random, style) => hunRider(random, style) },
+      noble: { label: "Attila's noble", kinds: ['hunNoble'], mounted: true, styles: ['steppeBow', 'spatha'], make: (random, style) => hunRider(random, style, 'noble') },
+    },
+  },
+  // Attila's Germanic subjects, the Ostrogoths and Gepids, on foot.
+  germans: {
+    label: 'Ostrogoths and Gepids',
+    ranks: { warrior: { label: 'Ostrogoth or Gepid', kinds: ['goth'], styles: ['spearRound', 'spathaRound'], make: (random, style) => gothWarrior(random, style) } },
   },
 };
 
@@ -848,6 +1012,93 @@ export const SCENARIOS = {
     },
     // The armies its sides may be set up from (ARMIES; muster.js).
     armies: { red: ['legion'], blue: ['han'] },
+    fighters: [],
+  },
+  mobei: {
+    title: 'Mobei',
+    place: 'North of the Gobi · 119 BC',
+    blurb: "Wei Qing has crossed the desert to the chanyu's own ground. Thirty Han crossbowmen in iron lamellar stand before the ring of wagons, his horse — sabre, spear and bow — on both flanks; against them come forty-eight Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.",
+    scene: 'mobei',
+    arena: MOBEI.arena,
+    spread: 1,
+    camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
+    roster: 'Thirty Han crossbowmen and sixteen horse · forty-eight Xiongnu horsemen',
+    // The crossbowmen ten to a rank before the wagons (the floor's end behind them), the horse on both flanks; the Xiongnu a loose mass of riders.
+    formation: {
+      red: { front: MOBEI.hanFront, facing: 'ahead', spacing: LEGION.ranks.spacing, rowSpacing: LEGION.ranks.rowSpacing, perRow: LEGION.ranks.perRow, wings: { back: 0 } },
+      blue: { front: MOBEI.xiongnuFront, spacing: RIDERS_LOOSE.spacing, rowSpacing: RIDERS_LOOSE.rowSpacing, perRow: 9, loose: RIDERS_LOOSE.loose },
+    },
+    cast: (random) => {
+      const crossbowmen = Array.from({ length: MOBEI.crossbow }, (_, index) => drilledSoldier(PRESETS.hanCrossbow, random, index === Math.floor(LEGION.ranks.perRow / 2) ? { name: 'Wei Qing' } : {}));
+      const xiongnu = company(MOBEI.xiongnu, (style) => xiongnuRider(random, style));
+      xiongnu[0] = { ...xiongnu[0], name: 'Yizhixie' };
+      return { red: [...crossbowmen, ...company(MOBEI.horse, (style) => hanHorseman(random, style))], blue: xiongnu };
+    },
+    armies: { red: ['han'], blue: ['xiongnu'] },
+    fighters: [],
+  },
+  carrhae: {
+    title: 'Carrhae',
+    place: 'The plain by Harran, Mesopotamia · June 53 BC',
+    blurb: "Crassus's legion stands in a square under a sky of arrows. Forty-four legionaries of the Republic in mail and bronze, shields locked, and six of Publius Crassus's Gallic horse; round them ride twenty-four Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and three cataphracts, man and horse in iron scale, held back for anyone who breaks out.",
+    scene: 'carrhae',
+    arena: CARRHAE.arena,
+    spread: 1,
+    camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
+    roster: 'Forty-four legionaries and six Gallic horse · twenty-four horse archers and three cataphracts',
+    formation: {
+      // The square stands (`drill`: over the legion's own, which walks up to the enemy), its outer ring facing out every way, shields a wall, the inner ring's a roof (formation.js).
+      red: { front: CARRHAE.romanFront, facing: 'ahead', layout: hollowSquare(CARRHAE.square), spacing: CARRHAE.square.spacing, perRow: CARRHAE.square.sides[0], loose: 0.05, drill: CARRHAE.drill, wings: CARRHAE.wings.red },
+      blue: { front: CARRHAE.parthianFront, spacing: RIDERS_LOOSE.spacing, rowSpacing: RIDERS_LOOSE.rowSpacing, perRow: 8, loose: RIDERS_LOOSE.loose, train: CARRHAE.train, wings: CARRHAE.wings.blue },
+    },
+    cast: (random) => {
+      const parthians = [...company(CARRHAE.parthians.archer, (style) => parthianRider(random, style, 'archer')), ...company(CARRHAE.parthians.cataphract, (style) => parthianRider(random, style, 'cataphract'))];
+      parthians[CARRHAE.parthians.archer.steppeBow] = { ...parthians[CARRHAE.parthians.archer.steppeBow], name: 'Surena' };
+      const legion = Array.from({ length: CARRHAE.legionaries }, (_, index) => republicanLegionary(random, index === 0 ? { name: 'Marcus Licinius Crassus' } : {}));
+      const gauls = company(CARRHAE.gauls, (style) => gallicHorseman(random, style));
+      gauls[0] = { ...gauls[0], name: 'Publius Licinius Crassus' };
+      return { red: [...legion, ...gauls], blue: parthians };
+    },
+    armies: { red: ['crassus'], blue: ['parthians'] },
+    fighters: [],
+  },
+  catalaunian: {
+    title: 'The Catalaunian Plains',
+    place: 'Champagne, Gaul · 20 June 451',
+    blurb: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Eighteen Roman foot in mail with oval shields and spears, and eight Roman archers on their flank, hold the line beside sixteen Visigoths, eight Visigoth horse on the flank; sixteen Huns ride round them shooting — horse archers and a few of Attila's nobles — and thirty-four Ostrogoths and Gepids, Attila's subject peoples, come on behind them on foot.",
+    scene: 'catalaunian',
+    arena: CATALAUNIAN.arena,
+    spread: 1,
+    camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
+    roster: 'Twenty-six Romans (eight of them archers), sixteen Visigoths and eight Visigoth horse · sixteen Huns on horse, thirty-four Ostrogoths and Gepids',
+    // The Romans and the Visigoths side by side, three deep, the Visigoth horse on the Goths' flank; the Huns in a loose mass of riders, their Germans behind.
+    formation: {
+      red: {
+        front: CATALAUNIAN.front,
+        facing: 'ahead',
+        layout: [...block(total(CATALAUNIAN.romans), { across: -4, perRow: 6, spacing: 1, rowSpacing: 1.2 }), ...block(total(CATALAUNIAN.archers), { across: -10.5, perRow: 6, spacing: 1, rowSpacing: 1.2 }), ...block(total(CATALAUNIAN.visigoths), { across: 4, perRow: 6, spacing: 1, rowSpacing: 1.2 })],
+        spacing: 1, perRow: 14, loose: 0.1, wings: { side: 1, back: 0 },
+      },
+      blue: {
+        front: CATALAUNIAN.front,
+        layout: [...block(total(CATALAUNIAN.huns.rider) + total(CATALAUNIAN.huns.noble), { perRow: 9, spacing: RIDERS_LOOSE.spacing, rowSpacing: RIDERS_LOOSE.rowSpacing }), ...block(total(CATALAUNIAN.germans), { back: 25, perRow: 7, spacing: 1.2, rowSpacing: 1.5 })],
+        loose: 0.5,
+      },
+    },
+    cast: (random) => {
+      const romans = company(CATALAUNIAN.romans, (style) => lateRomanSoldier(random, style));
+      romans[0] = { ...romans[0], name: 'Flavius Aetius' };
+      const horse = company(CATALAUNIAN.visigothHorse, (style) => gothWarrior(random, style, 'noble', { mounted: true }));
+      horse[0] = { ...horse[0], name: 'Theoderic' };
+      horse[1] = { ...horse[1], name: 'Thorismund' };
+      const nobles = company(CATALAUNIAN.huns.noble, (style) => hunRider(random, style, 'noble'));
+      nobles[0] = { ...nobles[0], name: 'Attila' };
+      return {
+        red: [...romans, ...company(CATALAUNIAN.archers, (style) => lateRomanSoldier(random, style)), ...company(CATALAUNIAN.visigoths, (style) => gothWarrior(random, style)), ...horse],
+        blue: [...nobles, ...company(CATALAUNIAN.huns.rider, (style) => hunRider(random, style)), ...company(CATALAUNIAN.germans, (style) => gothWarrior(random, style))],
+      };
+    },
+    armies: { red: ['lateRome', 'visigoths'], blue: ['huns', 'germans'] },
     fighters: [],
   },
   rebellion: {

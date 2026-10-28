@@ -373,6 +373,19 @@ const HAN_HELM = {
   faceOpen: 1.5,
 };
 
+// The helmets of the Republic and of late antiquity (head radii):
+// - the Montefortino's bowl radius, how much higher than round it rises
+//   (`peak`), how far its neck brim flares out, and how high it sits above the
+//   head's middle (`lift`: worn up on the forehead, as the galea, clear of the eyes);
+// - the ridge helmet's bowl, its height, its lift;
+// - the spangenhelm: `plates` plates (and as many spangen), the cone's base
+//   radius and height, the brow band's height;
+// - the bashlyk's tip folded forward this far (rad).
+const MONTEFORTINO = { bowl: 1.24, peak: 1.12, brim: 0.32, lift: 0.18 };
+const RIDGE_HELM = { bowl: 1.24, height: 1.08, lift: 0.18 };
+const SPANGENHELM = { plates: 6, base: 1.24, height: 1.6, brow: 0.16 };
+const BASHLYK = { fold: 0.9 };
+
 export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail = false } = {}) {
   if (!head) return null;
   const r = body.lengths.headRadius;
@@ -1252,6 +1265,148 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.07 * r, 1.0 * r, 8), iron);
       spike.position.y = 1.85 * r;
       group.add(crown, brim, spike, hongying(r, { top: 1.95, length: 0.85, spread: 0.85, colour: head.tassel }));
+      break;
+    }
+    case 'montefortino': {
+      // The Montefortino helmet of the Republic's legions (Crassus's men, 53
+      // BC): a bronze bowl spun nearly to a hemisphere, a little peaked, with a
+      // cast knob on the crown that holds the horsehair plume; a short neck
+      // brim flared out behind (the old helmet's only guard for the nape),
+      // a rolled rim, and broad hinged cheek pieces (scalloped, here rounded)
+      // hanging over the jaw. Worn up on the forehead as the galea is.
+      const bronze = metal(steel, color);
+      const lift = MONTEFORTINO.lift * r;
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(MONTEFORTINO.bowl * r, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), bronze);
+      bowl.scale.y = MONTEFORTINO.peak;
+      bowl.position.y = lift;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(MONTEFORTINO.bowl * r, 0.05 * r, 6, 28), bronze);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = lift;
+      // The neck brim: a short flared ring behind (cylinder angle π..2π is x < 0).
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(MONTEFORTINO.bowl * r, (MONTEFORTINO.bowl + MONTEFORTINO.brim) * r, 0.18 * r, 22, 1, true, Math.PI * 1.15, Math.PI * 0.7), bronze.clone());
+      brim.material.side = THREE.DoubleSide;
+      brim.position.y = lift - 0.08 * r;
+      const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * r, 0.16 * r, 0.3 * r, 10), bronze);
+      knob.position.y = lift + MONTEFORTINO.bowl * MONTEFORTINO.peak * r + 0.1 * r;
+      const button = new THREE.Mesh(new THREE.SphereGeometry(0.13 * r, 10, 6), bronze);
+      button.position.y = knob.position.y + 0.17 * r;
+      group.add(bowl, rim, brim, knob, button);
+      // The plume: a tuft of horsehair standing from the knob and falling back.
+      if (head.plume) {
+        const hair = surface(head.plume, { roughness: 1 });
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.28 * r, 1.1 * r, 8), hair);
+        tuft.position.set(-0.25 * r, button.position.y + 0.45 * r, 0);
+        tuft.rotation.z = 0.5;
+        group.add(tuft);
+      }
+      for (const side of [1, -1]) {
+        const cheek = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), bronze);
+        cheek.scale.set(0.44 * r, 0.68 * r, 0.07 * r);
+        cheek.position.set(0.24 * r, -0.36 * r, side * 1.18 * r);
+        cheek.rotation.set(side * -0.18, 0, -0.1);
+        group.add(cheek);
+      }
+      break;
+    }
+    case 'ridgeHelm': {
+      // The late Roman ridge helmet (the Intercisa and Berkasovo kind, c.
+      // 300–450): a bowl raised in two iron halves joined along a ridge band
+      // from brow to nape, riveted to a brow band; a nasal down from the brow,
+      // broad cheek pieces laced at the jaw, a small neck guard laced on behind.
+      // The parade ones were silvered and gilt (`gold`: the bands).
+      const iron = metal(steel, color);
+      const bands = metal(steel, head.gold ?? color);
+      const lift = RIDGE_HELM.lift * r;
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(RIDGE_HELM.bowl * r, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      bowl.scale.set(1.04, RIDGE_HELM.height, 0.98);
+      bowl.position.y = lift;
+      // The ridge: a band arched over the crown from front to back, standing up a little.
+      const ridge = new THREE.Mesh(new THREE.TorusGeometry(RIDGE_HELM.bowl * r * 1.02, 0.06 * r, 5, 24, Math.PI), bands);
+      ridge.scale.set(1.04, RIDGE_HELM.height, 1);
+      ridge.position.y = lift;
+      const brow = new THREE.Mesh(new THREE.TorusGeometry(RIDGE_HELM.bowl * r * 1.03, 0.07 * r, 6, 28), bands);
+      brow.rotation.x = Math.PI / 2;
+      brow.position.y = lift + 0.04 * r;
+      const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.6 * r, 0.16 * r), iron);
+      nasal.position.set(RIDGE_HELM.bowl * r * 1.04, lift - 0.24 * r, 0);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(RIDGE_HELM.bowl * r, (RIDGE_HELM.bowl + 0.22) * r, 0.42 * r, 20, 1, true, Math.PI * 1.15, Math.PI * 0.7), iron.clone());
+      neck.material.side = THREE.DoubleSide;
+      neck.position.y = lift - 0.24 * r;
+      group.add(bowl, ridge, brow, nasal, neck);
+      for (const side of [1, -1]) {
+        const cheek = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), iron);
+        cheek.scale.set(0.66 * r, 0.9 * r, 0.08 * r);
+        cheek.position.set(0.3 * r, -0.42 * r, side * 1.16 * r);
+        cheek.rotation.set(side * -0.16, 0, -0.08);
+        group.add(cheek);
+      }
+      break;
+    }
+    case 'spangenhelm': {
+      // The spangenhelm of the migrations (Germanic and Hunnic lords, and the
+      // late Roman army's too): a conical bowl of `plates` iron plates riveted
+      // between as many bands (spangen) that run up from the brow band to a
+      // small crown knob; a short mail aventail hung from the brow band round
+      // the sides and back, open at the face. `gold`: the bands gilt bronze.
+      const iron = metal(steel, color).clone();
+      iron.flatShading = true;
+      const bands = metal(steel, head.gold ?? color);
+      const plates = SPANGENHELM.plates;
+      const bowl = new THREE.Mesh(new THREE.ConeGeometry(SPANGENHELM.base * r, SPANGENHELM.height * r, plates * 2, 1, true), iron);
+      bowl.material.side = THREE.DoubleSide;
+      bowl.position.y = (SPANGENHELM.brow + SPANGENHELM.height / 2) * r;
+      const brow = new THREE.Mesh(new THREE.TorusGeometry(SPANGENHELM.base * r, 0.07 * r, 6, 28), bands);
+      brow.rotation.x = Math.PI / 2;
+      brow.position.y = SPANGENHELM.brow * r;
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11 * r, 8, 6), bands);
+      knob.position.y = (SPANGENHELM.brow + SPANGENHELM.height) * r;
+      group.add(bowl, brow, knob);
+      // The spangen: a band up each seam from the brow to the knob, lying on the cone.
+      const slant = Math.atan2(SPANGENHELM.base, SPANGENHELM.height);
+      const length = Math.hypot(SPANGENHELM.base, SPANGENHELM.height) * r;
+      for (let seam = 0; seam < plates; seam += 1) {
+        const angle = (seam / plates) * Math.PI * 2;
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.16 * r, length, 0.05 * r), bands);
+        const holder = new THREE.Group();
+        holder.rotation.y = angle;
+        band.position.set(0, 0, (SPANGENHELM.base / 2) * r + 0.02 * r);
+        band.rotation.x = -slant;
+        holder.position.y = bowl.position.y;
+        holder.add(band);
+        group.add(holder);
+      }
+      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(SPANGENHELM.base * r, (SPANGENHELM.base + 0.3) * r, 0.9 * r, 20, 2, true, Math.PI * 0.8, Math.PI * 1.4), metal(steel, head.coif ?? color));
+      aventail.material.side = THREE.DoubleSide;
+      aventail.position.y = (SPANGENHELM.brow - 0.45) * r;
+      group.add(aventail);
+      break;
+    }
+    case 'bashlyk': {
+      // The bashlyk: the soft felt cap of the Iranian horse peoples (Scythians,
+      // Parthians, as the coins of the Arsacid kings and the Palmyrene reliefs
+      // show it): a tall crown of felt that stands up and folds its tip
+      // forward, and long lappets down over the ears and the nape, tied under
+      // the chin or thrown back.
+      const felt = surface(color, { roughness: 1 });
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), felt);
+      crown.scale.y = 1.25;
+      crown.position.y = 0.06 * r;
+      // The tip: a soft cone rising from the crown and bent over toward the brow.
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.5 * r, 1.1 * r, 10), felt);
+      tip.position.set(0.28 * r, 1.55 * r, 0);
+      tip.rotation.z = -BASHLYK.fold;
+      const flapFelt = felt.clone();
+      flapFelt.side = THREE.DoubleSide;
+      // The lappets: down over each ear to the jaw, and a broad one over the nape.
+      const nape = new THREE.Mesh(new THREE.CylinderGeometry(1.14 * r, 1.3 * r, 1.0 * r, 16, 1, true, Math.PI * 1.2, Math.PI * 0.6), flapFelt);
+      nape.position.y = -0.45 * r;
+      group.add(crown, tip, nape);
+      for (const side of [1, -1]) {
+        const lappet = new THREE.Mesh(new THREE.BoxGeometry(0.42 * r, 1.25 * r, 0.06 * r), flapFelt);
+        lappet.position.set(0.05 * r, -0.5 * r, side * 1.12 * r);
+        lappet.rotation.x = side * -0.12;
+        group.add(lappet);
+      }
       break;
     }
     case 'hanHelm': {

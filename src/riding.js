@@ -26,9 +26,26 @@ import { vec, yawRotate } from './pose.js';
  *   land no more than `early` s before the two are nearest (abreast); a
  *   point, driven along the line he rides at the man, goes while the man is
  *   within `cone` rad of it.
- * - archer: a mounted archer rides round his man at a canter, `radius` m
- *   off, his man on his left (the bow side), turning in by `inward` rad per
- *   radius off his ring.
+ * - archer: a horse archer (skirmish) rides round the body of men his man stands
+ *   in (his side's men on foot within `body` m of him) at a canter, `standoff` m
+ *   off its edge (each man's own, within `spread` of the noise's aim), the body on
+ *   his left (the bow side), turning in by `inward` rad per radius off his ring (a
+ *   gun from the saddle rides round its man, `gunRadius` m off); from further than
+ *   `approach` rings off he rides in on a line that will pass his man on his left.
+ *   He looses at a man within `range` m (Mongol and Parthian practice: aimed shots
+ *   inside fifty or sixty metres) who is within his bow arm's sweep: on the bow
+ *   side as far round as his shoulders turn off the horse's line
+ *   (WORLD.mount.twist) and `arc.left` further with the arm, on the off side only
+ *   `arc.right` off the horse's line; never past a friend within `friend` m of the
+ *   line, nor past the mark within `beyond` m (a miss flies on). He never lets
+ *   heavier men come to him: an enemy rider within `wary.horse` m closing faster
+ *   than `closing` m/s, or a man on foot within `wary.foot` m, and he gallops away
+ *   from them (the ground's edge, within `wall` m, pushing him back along it; his
+ *   own side's horses within `crowd` m pushing him off them), for `away` s at least
+ *   and until they are `clear` m further off; then he wheels and comes back to
+ *   shoot. His quiver counted (a kit's `quiver`) and empty, with his side's train
+ *   on the field, he rides back to it and is given a fresh one there (`resupply`:
+ *   the last `near` m at a trot; within `radius` m of it, `seconds` s to take it).
  * - melee: two riders within `within` m closing slower than `closing` m/s
  *   fight beside each other: he rides to his man's side, at his pace and
  *   up to `closeIn` m/s more per m he is off it (`slowest` at least while he is
@@ -69,7 +86,14 @@ export const RIDING = {
   couchAhead: 0.9,
   rest: 0.35,
   passing: 3, early: 0.06, cone: 0.8,
-  archer: { radius: 11, inward: 0.6 },
+  archer: {
+    gunRadius: 11, inward: 0.6,
+    standoff: 30, spread: 0.5, body: 12, approach: 1.6, range: 60,
+    wary: { horse: 20, foot: 8 }, closing: 1.5, clear: 8, away: 2.5, wall: 10, crowd: 8, crowdPush: 0.8,
+    arc: { left: 0.35, right: 0.5 },
+    friend: 2.2, beyond: 15,
+    resupply: { radius: 3, near: 15, seconds: 6 },
+  },
   melee: { within: 4, closing: 4, slowest: 1.5, closeIn: 1.5, still: 2, standing: 0.5, reroll: 3 },
   brace: { length: 1.8 },
   charging: 3, within: 14,
@@ -354,17 +378,27 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     setGoal(headingOf(-along[2], along[0]) , horse.paces.walk);
     return true;
   }
-  // A bow: round him at a canter, his man on the bow side, shooting as on foot.
+  // A bow (a gun) from the saddle: the horse archer's way of fighting (skirmish).
   const gun = style.ranged && fighter.weapon?.held && !fighter.weapon.spent ? style.ranged : null;
+  if (gun && fighter.weapon.spec.bow) {
+    skirmish(world, fighter, opponent, gun, distance, along, setGoal);
+    return true;
+  }
   if (gun) {
+    // A gun (the three-eyed gun): round him at a canter, his man on the bow side, shooting as on foot.
     gunfight(world, fighter, opponent, distance, gun, dt);
     const spec = RIDING.archer;
     fighter.ride ??= { phase: 'charge' };
     if (!fighter.ride.plan) drawPass(world, fighter.ride, world.time);
     // On the left: the heading a quarter turn clockwise of the way to him, turned in or out to keep the ring (his own, a little different each).
-    const radius = spec.radius * (1 + fighter.ride.plan.aim);
+    const radius = spec.gunRadius * (1 + fighter.ride.plan.aim);
     const off = Math.max(-1, Math.min(1, (distance - radius) / radius));
     setGoal(headingOf(along[0], along[2]) - Math.PI / 2 + spec.inward * off, horse.paces.canter);
+    return true;
+  }
+  // Out of arrows, with his side's train on the field (a level's `train`: the camels with fresh sheaves): back to it for more.
+  if (style.ranged && fighter.weapon?.held && fighter.weapon.spec.bow && world.trains?.[fighter.corner]) {
+    resupply(world, fighter, setGoal, dt);
     return true;
   }
   if (style.ranged && fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
@@ -437,6 +471,220 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   const zone = markZone(opponent);
   strikeInPassing(world, fighter, opponent, style.attacks, (who) => aimPoint(who, zone), (spec) => (spec.zones.includes(zone) ? zone : spec.zones[0]), forward);
   return true;
+}
+
+/** The way from one floor point to another as a heading, and how far. */
+function bearing(from, to) {
+  return { heading: headingOf(to[0] - from[0], to[2] - from[2]), distance: Math.hypot(to[0] - from[0], to[2] - from[2]) };
+}
+
+/** Where a man stands on the floor (his horse's place, if he rides). */
+function standingAt(fighter) {
+  return fighter.mount ? [fighter.mount.at[0], 0, fighter.mount.at[1]] : point(fighter.x, P.pelvis);
+}
+
+/**
+ * The enemies a horse archer will not let come to him: riders within
+ * `wary.horse` m closing on him faster than `closing` m/s (or near enough that
+ * they need not), men on foot within `wary.foot` m. Returns them, each with its
+ * distance and the way from it to him, nearest first.
+ */
+function threatsTo(world, fighter, spec) {
+  const me = standingAt(fighter);
+  const mine = groundVelocity(fighter);
+  const threats = [];
+  for (const other of world.fighters) {
+    if (other.corner === fighter.corner || other.state !== 'up' || other.fled || other.panicked) continue;
+    const at = standingAt(other);
+    const away = [me[0] - at[0], 0, me[2] - at[2]];
+    const distance = Math.hypot(away[0], away[2]) || 1e-6;
+    const unit = vec.scale(away, 1 / distance);
+    if (other.mount) {
+      if (other.mount.state !== 'up' || distance > spec.wary.horse) continue;
+      const closing = vec.dot(vec.sub(groundVelocity(other), mine), unit);
+      if (closing < spec.closing && distance > spec.wary.horse * 0.4) continue;
+    } else if (distance > spec.wary.foot) continue;
+    threats.push({ other, distance, unit });
+  }
+  return threats.sort((a, b) => a.distance - b.distance);
+}
+
+/**
+ * Away from them: each pushes him straight off it, the nearer the harder; the
+ * floor's edge within `wall` m pushes him back inside, so he runs along it
+ * rather than into the corner; a horse of his own side within `crowd` m pushes him
+ * off it (up to `crowdPush` of the threats' push), so he does not turn about into
+ * the rank behind him. A heading.
+ */
+function awayFrom(world, fighter, threats, spec) {
+  const me = standingAt(fighter);
+  let push = [0, 0];
+  for (const threat of threats) {
+    const weight = 1 / Math.max(1, threat.distance);
+    push = [push[0] + threat.unit[0] * weight, push[1] + threat.unit[2] * weight];
+  }
+  const scale = Math.hypot(push[0], push[1]) || 1;
+  push = [push[0] / scale, push[1] / scale];
+  // His own side's horses near him are ridden round, not into (turning about at the gallop into the rank behind him).
+  const horse = fighter.mount;
+  for (const other of world.horses) {
+    if (other === horse || other.corner !== horse.corner || other.state !== 'up') continue;
+    const gap = [me[0] - other.at[0], me[2] - other.at[1]];
+    const apart = Math.hypot(gap[0], gap[1]);
+    if (apart > spec.crowd || apart < 1e-6) continue;
+    const weight = (1 - apart / spec.crowd) * spec.crowdPush;
+    push = [push[0] + (gap[0] / apart) * weight, push[1] + (gap[1] / apart) * weight];
+  }
+  const arena = world.arena;
+  const wall = (offset, half) => Math.max(0, (Math.abs(offset) - (half - spec.wall)) / spec.wall) * -Math.sign(offset);
+  push = [push[0] + wall(me[0], arena.halfX), push[1] + wall(me[2], arena.halfZ)];
+  return headingOf(push[0], push[1]);
+}
+
+/** Off the horse's line (rad, + to his left, the bow side) the way to a point lies. */
+function offTheLine(fighter, at) {
+  const from = standingAt(fighter);
+  let off = headingOf(at[0] - from[0], at[2] - from[2]) - fighter.mount.yaw;
+  off = Math.atan2(Math.sin(off), Math.cos(off));
+  return off;
+}
+
+/** No friend of his within `friend` m of the arrow's line, short of the mark or `beyond` m past it. */
+function clearShot(world, fighter, target, spec) {
+  const from = point(fighter.x, P.pelvis);
+  const to = point(target.x, P.pelvis);
+  const line = [to[0] - from[0], 0, to[2] - from[2]];
+  const length = Math.hypot(line[0], line[2]) || 1e-6;
+  const unit = vec.scale(line, 1 / length);
+  return !world.fighters.some((mate) => {
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') return false;
+    const at = standingAt(mate);
+    const offset = [at[0] - from[0], 0, at[2] - from[2]];
+    const along = vec.dot(offset, unit);
+    // (Short of the mark, or beyond it within `beyond` m: an arrow that misses flies on.)
+    return along > 0 && along < length + spec.beyond && Math.hypot(offset[0] - unit[0] * along, offset[2] - unit[2] * along) < spec.friend;
+  });
+}
+
+/**
+ * The body of men a man stands in, as a horse archer rides round it: the
+ * middle of his side's men on foot within `body` m of him (or of him alone, a
+ * rider or a man on his own), and how far its furthest man stands from that
+ * middle (m).
+ */
+function bodyOf(world, man, spec) {
+  const at = standingAt(man);
+  if (man.mount) return { at, radius: 0 };
+  const near = world.fighters.filter((other) => other.corner === man.corner && !other.mount && other.state !== 'out' && !other.fled && Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]) < spec.body);
+  const middle = near.reduce((sum, other) => [sum[0] + other.x[P.pelvis * 3] / near.length, 0, sum[2] + other.x[P.pelvis * 3 + 2] / near.length], [0, 0, 0]);
+  const radius = Math.max(0, ...near.map((other) => Math.hypot(other.x[P.pelvis * 3] - middle[0], other.x[P.pelvis * 3 + 2] - middle[2])));
+  return { at: middle, radius };
+}
+
+/**
+ * The horse archer: he rides round his man at a canter and shoots, never
+ * lets heavier men come to him, and wheels back once they are left behind
+ * (RIDING.archer). The arrow is aimed where the man will be against the
+ * horse's own way (physics/ranged.js leadFor), loosed in the stride's
+ * stillness (SADDLE_SPREAD), and carried at the horse's speed.
+ */
+function skirmish(world, fighter, opponent, gun, distance, along, setGoal) {
+  const spec = RIDING.archer;
+  const horse = fighter.mount;
+  fighter.ride ??= { phase: 'charge' };
+  const ride = fighter.ride;
+  if (!ride.plan) drawPass(world, ride, world.time);
+  const threats = threatsTo(world, fighter, spec);
+  const nearest = threats[0]?.distance ?? Infinity;
+  if (threats.length) {
+    ride.away = true;
+    ride.awayUntil = world.time + spec.away;
+  } else if (ride.away && world.time >= ride.awayUntil && !threatsTo(world, fighter, { ...spec, wary: { horse: spec.wary.horse + spec.clear, foot: spec.wary.foot + spec.clear } }).length) ride.away = false;
+  if (ride.away) {
+    // Off at the gallop, away from what is coming (the last way he had, once it is behind him and he has not yet the room to turn).
+    if (threats.length) ride.awayHeading = awayFrom(world, fighter, threats, spec);
+    setGoal(ride.awayHeading ?? horse.yaw, horse.paces.gallop);
+  } else {
+    // His ring round the body of men his man stands in (all of his side's riders round the same body go round it
+    // together, the same way, none crossing another's ring), `standoff` m off its edge (his own distance, a little
+    // different each), the body on his left: from far off, in on a line that will pass it there; on the ring, a
+    // quarter turn clockwise of the way to its middle, turned in or out to keep it.
+    const body = bodyOf(world, opponent, spec);
+    const radius = (body.radius + spec.standoff) * (1 + ride.plan.aim * spec.spread);
+    const to = [body.at[0] - horse.at[0], body.at[2] - horse.at[1]];
+    const apart = Math.hypot(to[0], to[1]) || 1e-6;
+    const toward = headingOf(to[0], to[1]);
+    if (apart > radius * spec.approach) setGoal(toward - Math.asin(Math.min(1, radius / apart)), horse.paces.canter);
+    else {
+      const off = Math.max(-1, Math.min(1, (apart - radius) / radius));
+      setGoal(toward - Math.PI / 2 + spec.inward * off, horse.paces.canter);
+    }
+  }
+  // The shot: any man in range within the sweep of his bow arm; his own man first, else whoever is nearest of those he can.
+  fighter.aimAt = undefined;
+  if (fighter.punch || fighter.cooldown > 0) return;
+  const reachable = (other) => {
+    if (other.corner === fighter.corner || other.state !== 'up' || other.fled) return false;
+    const mark = aimPoint(other, 'body');
+    const from = point(fighter.x, P.pelvis);
+    if (Math.hypot(mark[0] - from[0], mark[2] - from[2]) > spec.range) return false;
+    const off = offTheLine(fighter, mark);
+    return off <= WORLD.mount.twist + spec.arc.left && off >= -spec.arc.right && clearShot(world, fighter, other, spec);
+  };
+  let target = reachable(opponent) ? opponent : null;
+  if (!target) {
+    let best = Infinity;
+    for (const other of world.fighters) {
+      if (other === opponent || !reachable(other)) continue;
+      const apart = bearing(standingAt(fighter), standingAt(other)).distance;
+      if (apart < best) {
+        best = apart;
+        target = other;
+      }
+    }
+  }
+  if (!target) return;
+  const zone = world.random() < gun.headShare ? 'head' : 'body';
+  // (Turned to his mark for the shot: the punch's target is who it is aimed at.)
+  if (target !== opponent) fighter.focus = target.id;
+  if (throwPunch(world, fighter, gun.move ?? 'loose', zone)) {
+    fighter.punch.quick = true;
+    fighter.cooldown = gun.between[0] + world.random() * gun.between[1];
+    ride.shotAt = world.time;
+    ride.nearest = nearest;
+  }
+}
+
+/**
+ * Out of arrows, back to his side's train (world.trains: where the level puts
+ * it, behind its own end of the field) for a fresh quiver: there, slowed to a
+ * stand, it takes him `resupply.seconds` s. Still kept clear of anyone coming at
+ * him on the way.
+ */
+function resupply(world, fighter, setGoal, dt) {
+  const spec = RIDING.archer;
+  const horse = fighter.mount;
+  const train = world.trains[fighter.corner];
+  const there = bearing(standingAt(fighter), [train.at[0], 0, train.at[1]]);
+  const threats = threatsTo(world, fighter, spec);
+  if (threats.length && there.distance > spec.resupply.radius) {
+    setGoal(awayFrom(world, fighter, threats, spec), horse.paces.gallop);
+    return;
+  }
+  if (there.distance > spec.resupply.radius) {
+    fighter.refilling = 0;
+    // (The last stretch at a trot straight in: the train stands near the floor's end, where a rider would otherwise be turned back off it.)
+    if (there.distance > spec.resupply.near) setGoal(there.heading, horse.paces.gallop);
+    else horse.goal = { heading: there.heading, speed: horse.paces.trot };
+    return;
+  }
+  setGoal(horse.yaw, 0);
+  fighter.refilling = (fighter.refilling ?? 0) + dt;
+  if (fighter.refilling < spec.resupply.seconds) return;
+  fighter.refilling = 0;
+  fighter.arrows = fighter.body.gear.quiver;
+  fighter.weapon.spent = false;
+  world.events.push({ time: world.time, kind: 'resupplied', fighter: fighter.id, effects: ['a fresh quiver from the train'] });
 }
 
 /** The lance couched when the point is about to meet him: its carry and drive do the rest (MOVES couched). True if it was. */

@@ -659,6 +659,28 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 0.85, cut: 0.2, blunt: 0.3 }, swing: { blunt: 0.55 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.8, grip: 0.5,
   },
+  // ---- Late antiquity and the Parthians (Carrhae, the Catalaunian Plains) ----
+  // The spatha: the long straight two-edged sword of the late Roman army and
+  // the Germanic peoples (and the Hunnic nobility), ~0.8 m of blade with a
+  // small guard and a mushroom pommel, ~1.2 kg; a cut-and-thrust sword for a
+  // man with a shield, longer than the legion's old gladius. As the arming
+  // sword (a sword of the same kind a thousand years on) in all but the hilt.
+  spatha: {
+    label: 'Spatha', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.12, mass: 1.2, balance: 0.13, radius: 0.011,
+    harm: { thrust: { pierce: 0.95, cut: 0.2, blunt: 0.12 }, swing: { cut: 0.95, blunt: 0.4 } },
+    contactSeconds: 0.004, rotation: 0.72, wrist: { omega: 23, zeta: 0.8 }, threat: 3.4,
+  },
+  // The kontos: the cataphract's lance, ~3.7 m (Plutarch's and Heliodorus's
+  // 'long pike'; the Sarmatian and Parthian horse's), held in both hands across
+  // the horse's neck and driven with the horse's weight behind it: no vamplate
+  // and no rest, a long ash or cornel shaft with a heavy socketed point. Longer
+  // and a little heavier than the knight's war lance (`lance`), as much of it
+  // behind the grip; its grip a two-handed one, firmer than a spear's.
+  kontos: {
+    pointFrom: 0.78, label: 'Kontos', hands: 'two', length: 2.65, strikeFrom: 1.5, handle: 1.05, spacing: 0.55, mass: 5.6, balance: 0.2, radius: 0.025,
+    harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
+    contactSeconds: 0.005, rotation: 0.38, wrist: { omega: 6.5, zeta: 0.9 }, threat: 4, grip: 0.75,
+  },
   // Standards: the side's flag on a staff, carried by its leader (see
   // FACTIONS[...].standard). A bearer wants both hands for it; it is a poor
   // weapon, a long ash pole heavy at the top with the cloth and finial (~3.5 kg,
@@ -730,6 +752,16 @@ export const SHIELDS = {
   // arm; wood faced with leather, painted (the Temple's white with its red cross).
   heater: { label: 'Heater shield', shape: 'curved', width: 0.56, height: 0.8, curve: 0.75, mass: 4, offset: 0.1, armHarm: 0.08, hold: 1.6, look: 'heater' },
   scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'scutum' },
+  // The late Roman infantry's shield (scutum of the 4th–5th centuries, as the
+  // Dura-Europos and Notitia shields show it): a broad oval of glued planks,
+  // ~0.8 × 1.05 m, faced with painted leather (each unit its own device), an
+  // iron boss over a horizontal grip; only gently dished, not the old
+  // semicylinder. Met as a rectangle (`shape: 'curved'`) a little inside the
+  // oval (0.72 × 0.98 m): the corners an oval has not are left out; ~5.5 kg.
+  oval: { label: 'Oval shield', shape: 'curved', width: 0.72, height: 0.98, curve: 1.6, mass: 5.5, offset: 0.1, armHarm: 0.08, hold: 1.3, look: 'oval' },
+  // The Germanic round shield (the Visigoths', the Franks', the Huns' foot): planks of
+  // lime or alder ~0.85 m across, rawhide-edged, a domed iron boss over a single grip; ~4 kg.
+  germanic: { label: 'Round shield', radius: 0.42, mass: 4, offset: 0.08, armHarm: 0.14, hold: 1.1, look: 'germanic' },
   // The thraex's parmula: small and nearly square (~0.36 × 0.42 m), flat-ish.
   parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, hold: 1.1, look: 'parmula' },
   // The scissor's arm: a steel tube over the left forearm and fist, ending in

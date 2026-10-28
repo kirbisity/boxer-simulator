@@ -17,7 +17,7 @@ import { ARMIES } from './scenarios.js';
 
 // The map's look: the floor's colour by its place (the ground it is drawn on), the sides' colours, sizes.
 const MUSTER_VIEW = {
-  ground: { plain: '#6c6a40', sengoku: '#66753f', town: '#6a645a', jiangnan: '#5a6058', cajamarca: '#8c7556', coastFort: '#a08e64', port: '#3c3e44' },
+  ground: { plain: '#6c6a40', sengoku: '#66753f', town: '#6a645a', jiangnan: '#5a6058', cajamarca: '#8c7556', coastFort: '#a08e64', port: '#3c3e44', mobei: '#857a5e', catalaunian: '#7c8a44', carrhae: '#c2ac84' },
   side: { red: '#e0353b', blue: '#3a74ec' },
   gold: '#ffcf4a',
   // A man's dot (m of radius, and at least this many px); a rider's the size of his horse.

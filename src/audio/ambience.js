@@ -33,6 +33,11 @@ export const PLACE_AMBIENCE = {
   jiangnan: { wind: 38, birds: 5, flow: 48 },
   // A walled square in a highland valley: the wind off the hills, a few birds over the fields beyond the walls.
   cajamarca: { wind: 44, birds: 3 },
+  // The open steppe at the Gobi's edge: the wind across it never stops, hardly a bird. Champagne in summer: larks over the grass.
+  // The plain below Harran at noon in June: a hot wind, no birds to speak of.
+  mobei: { wind: 54, birds: 1 },
+  catalaunian: { wind: 46, birds: 5 },
+  carrhae: { wind: 48, birds: 1 },
   // Agincourt's wet field in October between two woods (the wind in the trees, few birds); Cerignola's vineyard slope at dusk.
   agincourt: { wind: 52, birds: 1 },
   cerignola: { wind: 42, birds: 4 },

@@ -75,6 +75,12 @@ const SKYBALL_PHOTO_PLACES = {
   field: { photo: 'meadow', turn: 0 },
   plain: { photo: 'plain', turn: 0 },
   sengoku: { photo: 'valley', turn: 0 },
+  // No CC0 panorama of the Gobi's edge, of Champagne or of the Jazira: the dry plateau's far ranges for the two dry
+  // plains, the green meadow's for Champagne; not turned, so the photograph's sun stays where the game's is (the
+  // land in front of it, generated, is each place's own).
+  mobei: { photo: 'plain', turn: 0 },
+  catalaunian: { photo: 'meadow', turn: 0 },
+  carrhae: { photo: 'plain', turn: 0 },
 };
 
 const skyballPhotoTextures = {};
