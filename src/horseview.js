@@ -620,7 +620,7 @@ export function updateHorseView(view, world = null) {
   const moving = up ? Math.min(1, speed / 1.5) : 0;
   const nod = Math.sin(cycle * Math.PI * 2 * (speed > 2.4 && speed < 4.6 ? 2 : 1) + 0.6) * moving;
   const idle = Math.sin(time * 0.7 + (horse.id ?? 0)) * 0.025 * (1 - moving);
-  view.group.position.set(horse.at[0], drawn.bob ?? 0, horse.at[1]);
+  view.group.position.set(horse.at[0], (drawn.bob ?? 0) - (horse.sunk ?? 0), horse.at[1]);
   view.group.rotation.y = horse.yaw;
   // The body pitches (nose up and down) and rocks about its barrel with the stride, as the physics has it (physics/mounted.js horseMotion), and the fall's roll.
   view.body.rotation.z = drawn.pitch ?? 0;

@@ -46,7 +46,10 @@ export const MUSIC_CUES = {
 export const SCENE_MUSIC = {
   legion: 'roman',
   rebellion: 'medieval',
-  sekigahara: 'japan',
+  // The battles of the stake, the ditch and the palisade: no new music, the cue of their people.
+  agincourt: 'medieval',
+  cerignola: 'medieval',
+  nagashino: 'japan',
   pyongyang: 'korea',
   // No Andean cue: the nearest in the game, the Americas' (the Mexica's).
   cajamarca: 'aztec',

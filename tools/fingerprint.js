@@ -32,7 +32,7 @@ const FIGHTS = {
   'rifle v shotgun': [duel('rifle', 'shotgun', { distance: 8 }), 10],
   'police v katana': [duel('police', 'katana', { distance: 6 }), 15],
   'rhodes 1522': [level('rhodes'), 12],
-  'sekigahara': [level('sekigahara'), 6],
+  'nagashino': [level('nagashino'), 6],
   // The big battles: the legion's march and first melee, and the proxies and crossbows with it.
   'legion': [level('legion'), 30],
   // The ambush at Cajamarca: hidden men, the signal, horses and guns among a crowd.

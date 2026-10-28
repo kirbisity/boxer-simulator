@@ -43,6 +43,7 @@ import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } f
 import { prepareScenery, updateSceneryLod } from './scenerylod.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
 import { buildStormPlace, stormRelease } from './levelmode/storm.js';
+import { showWorks, updateWorksView } from './worksview.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -110,6 +111,8 @@ export function createScene(canvas) {
  * scene is built the first time it is needed; lighting goes with it.
  */
 export function setPlace(view, place, arena, weather = null) {
+  // A battle's fieldworks (its arena's `works`: stakes, palisades, woods, ditches, mud), over whatever place it is fought in.
+  showWorks(view, arena);
   // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
   // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
   const home = PLACE_ARENAS[place];
@@ -117,7 +120,7 @@ export function setPlace(view, place, arena, weather = null) {
   const swapped = swapFloor(view, place, floor);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, agincourt: buildAgincourt, cerignola: buildCerignola, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -345,6 +348,10 @@ const PLACE_LIGHT = {
   jiangnan: { background: 0xc6d6e0, fog: [30, 110], far: 112, key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
   // A highland valley at 2,700 m late in the afternoon: thin clear air, the haze warm toward evening, the hills 90 m out and more.
   cajamarca: { background: 0xd8d0bc, fog: [60, 190], far: 200, key: 0xffe2b8, keyIntensity: 0.12, rim: 0xffd6a0, sun: 0.95 },
+  // Agincourt: a low grey October sky after rain, the light flat, the woods dark.
+  agincourt: { background: 0x9aa0a2, fog: [25, 100], key: 0xe8ecf0, keyIntensity: 0.2, rim: 0xb8c4d0, sun: 0.5, hemi: 0.78 },
+  // Cerignola at dusk: the sun low and warm across the slope, a golden haze.
+  cerignola: { background: 0xe6c8a0, fog: [30, 120], key: 0xffd8a8, keyIntensity: 0.15, rim: 0xffc890, sun: 0.85, hemi: 0.55 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
   // Rain on the quay: a little more moonlight and fill than a clear night, so the wet reads.
   port: { background: 0x0b1020, fog: [16, 54], key: 0xa8bcff, keyIntensity: 1.05, rim: 0x6a88d0, hemi: 0.36 },
@@ -372,6 +379,9 @@ export const PLACE_ARENAS = {
   jiangnan: { halfX: 14, halfZ: 9 },
   // The square of Cajamarca between its long halls (props/cajamarca.js CAJAMARCA_PLAN).
   cajamarca: { halfX: 16, halfZ: 11 },
+  // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
+  agincourt: { halfX: 40, halfZ: 11.5 },
+  cerignola: { halfX: 32, halfZ: 11 },
   // A level-mode stage: the terrain is the floor (the box is only a far limit).
   stage: { halfX: 40, halfZ: 40 },
   dunnottar: { halfX: 40, halfZ: 40 },
@@ -957,6 +967,176 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
   // Autumn grass in tufts and field stones beyond the trampled ground.
   place.add(...fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] }));
   return place;
+}
+
+// ---- The battlefields of 1415 and 1503 (their fieldworks are drawn over them: worksview.js) ----
+
+/**
+ * Agincourt on 25 October 1415: fresh ploughland under a low grey sky after a night of rain, the woods of
+ * Agincourt and Tramecourt closing the field on either hand (drawn from the level's works, as the physics has
+ * them), a hamlet's roofs and a church tower beyond, low bare ridges round. The mud of the field itself is the
+ * works' (its surface over the ground).
+ */
+function buildAgincourt(arena = PLACE_ARENAS.agincourt) {
+  const place = new THREE.Group();
+  const outX = Math.max(0, arena.halfX - PLACE_ARENAS.agincourt.halfX);
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...options });
+  place.add(greySky());
+  const field = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#5c4a34';
+    g.fillRect(0, 0, w, h);
+    // Furrows, and the stubble and weeds of the field's edges.
+    for (let row = 0; row < 120; row += 1) {
+      g.fillStyle = `rgba(40,30,20,${0.25 + Math.random() * 0.2})`;
+      g.fillRect(0, (row / 120) * h, w, 2 + Math.random() * 3);
+    }
+    for (let index = 0; index < 14000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${70 + shade * 50},${60 + shade * 40},${36 + shade * 26},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
+    }
+  }, [10, 10]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(140 + 2 * outX, 120), lit(0xffffff, { map: field }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
+  place.add(ground);
+  // Low bare ridges, far off in the murk.
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (index / 12) * Math.PI * 2;
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(14 + Math.random() * 8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x5a5e48));
+    hill.scale.y = 0.18 + Math.random() * 0.12;
+    hill.position.set(Math.cos(angle) * (55 + outX), -0.5, Math.sin(angle) * 50);
+    hill.userData.scenery = 'hills';
+    place.add(hill);
+  }
+  // Beyond the French end: the hamlet of Agincourt's roofs and its church tower in the grey.
+  const thatch = lit(0x6a5a3c);
+  const wall = lit(0xb0a690);
+  for (let index = 0; index < 6; index += 1) {
+    const house = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), wall);
+    house.position.set(-arena.halfX - 14 - (index % 3) * 6, 1.5, -10 + index * 4.5);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(4, 2.6, 4), thatch);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(house.position.x, 4.3, house.position.z);
+    place.add(house, roof);
+  }
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(3, 11, 3), lit(0x9a9484));
+  tower.position.set(-arena.halfX - 22, 5.5, 6);
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(2.3, 5, 4), lit(0x4a4a4e));
+  spire.rotation.y = Math.PI / 4;
+  spire.position.set(tower.position.x, 13.5, 6);
+  place.add(tower, spire);
+  // Tufts of stubble and a few stones beyond the plough.
+  place.add(...fieldLitter(83, arena, { grass: 0x6a6a3a, stone: 0x7a766c, tufts: 500, stones: 80, half: [55, 45] }));
+  return place;
+}
+
+/**
+ * Cerignola at dusk on 28 April 1503: an Apulian slope of vineyards and olives, the vines in their rows on
+ * stakes behind the Spanish line, the low sun warm over the plain, the town on its hill beyond. The ditch and its
+ * bank (the level's works: worksview.js draws their ground) cross the field: the field's own ground is left open
+ * over them.
+ */
+function buildCerignola(arena = PLACE_ARENAS.cerignola) {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.93, ...options });
+  place.add(daySky());
+  const field = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#7a6a44';
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 18000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${110 + shade * 50},${100 + shade * 46},${56 + shade * 30},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
+    }
+  }, [8, 8]);
+  // The field's ground, either side of the ditches' strips (each along z: worksview.js draws the strip itself).
+  const strips = (arena.works?.ditches ?? []).map((ditch) => [ditch.from[0] + Math.min(ditch.profile[0][0], 0), ditch.from[0] + ditch.profile[ditch.profile.length - 1][0]]).sort((a, b) => a[0] - b[0]);
+  const reach = 75;
+  let from = -reach;
+  const cuts = [...strips, [reach, reach]];
+  for (const [start, end] of cuts) {
+    if (start - from > 0.01) {
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(start - from, 2 * reach), lit(0xffffff, { map: field }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.x = (start + from) / 2;
+      ground.receiveShadow = true;
+      ground.userData.scenery = 'ground';
+      place.add(ground);
+    }
+    from = end;
+  }
+  // The vineyard behind the Spanish: rows of vines on their stakes, from behind the line up the slope.
+  const vine = new THREE.IcosahedronGeometry(0.45, 0);
+  vine.scale(1, 0.8, 1.4);
+  vine.translate(0, 0.75, 0);
+  const vines = [];
+  for (let x = arena.halfX * 0.55; x < arena.halfX + 30; x += 2.2) for (let z = -40; z < 40; z += 1.4) if (x > arena.halfX + 1 || Math.abs(z) > arena.halfZ + 1.5) vines.push([x, z, 0.8 + Math.random() * 0.4, Math.random() * 6]);
+  place.add(scatter(vine, lit(0x5a7a34, { flatShading: true }), vines));
+  // Olive trees about the slope, silver-green.
+  const random = scatterRandom(91);
+  for (let index = 0; index < 26; index += 1) {
+    const angle = random() * Math.PI * 2;
+    const distance = 22 + random() * 18;
+    const x = Math.cos(angle) * distance;
+    const z = Math.sin(angle) * distance * 0.9;
+    if (Math.abs(x) < arena.halfX + 2 && Math.abs(z) < arena.halfZ + 2) continue;
+    const tree = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.32, 1.8, 6), lit(0x5a4a38));
+    trunk.position.y = 0.9;
+    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8, 1), lit(0x7a8a6a, { flatShading: true }));
+    crown.scale.y = 0.7;
+    crown.position.y = 2.4;
+    tree.add(trunk, crown);
+    tree.position.set(x, 0, z);
+    tree.userData.scenery = 'trees';
+    place.add(tree);
+  }
+  // The town of Cerignola on its rise beyond, warm stone in the low sun; low hills round the plain.
+  const stone = lit(0xd8c8a0);
+  for (let index = 0; index < 9; index += 1) {
+    const house = new THREE.Mesh(new THREE.BoxGeometry(4 + random() * 3, 3 + random() * 4, 4 + random() * 2), stone);
+    house.position.set(arena.halfX + 34 + random() * 10, 2 + random(), -16 + index * 4);
+    place.add(house);
+  }
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (index / 10) * Math.PI * 2;
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(12 + Math.random() * 6, 3 + Math.random() * 3, 8), lit(0x8a8a5a));
+    hill.position.set(Math.cos(angle) * 62, 1, Math.sin(angle) * 56);
+    hill.userData.scenery = 'hills';
+    place.add(hill);
+  }
+  place.add(...fieldLitter(97, arena, { grass: 0x8a8a48, stone: 0x9a8e74, tufts: 600, stones: 100, half: [50, 40] }));
+  return place;
+}
+
+/** A low overcast sky: a grey dome, lighter toward the horizon, behind everything and out of the fog. */
+function greySky() {
+  const texture = paintedTexture(512, 256, (g, w, h) => {
+    const gradient = g.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, '#6e7478');
+    gradient.addColorStop(0.45, '#8a9094');
+    gradient.addColorStop(0.5, '#a4a8a8');
+    gradient.addColorStop(1, '#a8aca8');
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < 40; index += 1) {
+      const x = Math.random() * w;
+      const y = h * (0.1 + Math.random() * 0.35);
+      const size = 30 + Math.random() * 60;
+      const glow = g.createRadialGradient(x, y, 0, x, y, size);
+      glow.addColorStop(0, `rgba(${Math.random() < 0.5 ? '70,74,78' : '150,154,156'},0.35)`);
+      glow.addColorStop(1, 'rgba(120,124,126,0)');
+      g.fillStyle = glow;
+      g.fillRect(x - size, y - size, size * 2, size * 2);
+    }
+  });
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(52, 32, 16), new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide, fog: false, depthWrite: false }));
+  sky.renderOrder = -1;
+  sky.userData.paintedSky = true;
+  return sky;
 }
 
 /** A day sky: a dome painted from deep blue overhead to pale haze at the horizon, with soft high cloud, behind everything and out of the fog. */
@@ -2725,6 +2905,7 @@ function reddenBrokenBones(fighterView) {
  * off, a loose copy flies, tumbles and lies where the physics put it.
  */
 export function updateProps(view, fighterViews, world) {
+  updateWorksView(view, world);
   for (const prop of world.props ?? []) {
     const owner = fighterViews.find((entry) => entry.fighter.id === prop.owner);
     const worn = owner?.headProps?.find((entry) => entry.kind === prop.kind);

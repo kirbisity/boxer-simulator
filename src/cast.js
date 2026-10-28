@@ -568,3 +568,69 @@ export function footSoldier(random = Math.random, style = 'spear') {
   const name = `${pickOne(['Will', 'Tom', 'Jack', 'Rob', 'Hal', 'Ned', 'Wat', 'Dick'], random)} ${pickOne(['Archer', 'Baker', 'Cotton', 'Fowler', 'Mason', 'Ward', 'Turner', 'Webb'], random)}`;
   return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'footman', design: randomDesign('footman', random) }, accessories: [] });
 }
+
+// ---- Agincourt, Cerignola and Nagashino: the battles of the bow, the ditch and the palisade ----
+
+// Builds of the men of those battles (PERIOD_BUILD, joined here). English archers of the fifteenth
+// century, from the Mary Rose's bowmen and the Towton grave: ~171 cm, heavy-boned and strong in the
+// shoulders from a boyhood at the butts; the men-at-arms of either side, fed and trained to arms, about
+// the same. The Swiss and the Landsknechts of 1500 a little shorter, hardened by years of campaigning.
+// The Gascon and Picard foot of the French host, smaller men of the commons.
+Object.assign(PERIOD_BUILD, {
+  english: { archer: { heightCm: 171, weightKg: 70, exercise: 0.86 }, manAtArms: { heightCm: 172, weightKg: 74, exercise: 0.8 } },
+  french: { knight: { heightCm: 171, weightKg: 73, exercise: 0.78 }, foot: { heightCm: 167, weightKg: 64, exercise: 0.62 } },
+  swiss: { pike: { heightCm: 168, weightKg: 67, exercise: 0.8 } },
+  landsknecht: { pike: { heightCm: 168, weightKg: 67, exercise: 0.74 } },
+});
+
+/**
+ * An English or Welsh archer of 1415: the war bow (longbow), the padded jack in one of its liveries, a
+ * falchion at his belt.
+ */
+export function englishArcher(random = Math.random, style = 'longbow') {
+  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
+  const welsh = random() < 0.3;
+  const name = welsh
+    ? `${pickOne(['Dafydd', 'Hywel', 'Ieuan', 'Gruffydd', 'Rhys', 'Madog', 'Owain', 'Llywelyn'], random)} ap ${pickOne(['Llywelyn', 'Gwilym', 'Rhys', 'Ieuan', 'Hywel', 'Madog'], random)}`
+    : `${pickOne(['John', 'William', 'Thomas', 'Richard', 'Robert', 'Walter', 'Hugh', 'Roger', 'Nicholas', 'Simon'], random)} ${pickOne(['Fletcher', 'Bowyer', 'Archer', 'Hayward', 'Wode', 'Lyttle', 'Smyth', 'Carter', 'Baker', 'Gamage'], random)}`;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'archer', design: randomDesign('archer', random) }, accessories: [], look: { ...base.look, skinTone: pickOne(['light', 'light', 'lightTan'], random), facialHair: pickOne(['none', 'stubble', 'beard', 'mustache'], random) } };
+  return builtLike(soldier, PERIOD_BUILD.english.archer, random);
+}
+
+/** One of King Henry's men-at-arms, on foot in plate as the English fought at Agincourt, with a long sword or a war hammer. */
+export function englishManAtArms(random = Math.random, style = 'longsword') {
+  return builtLike(nobleKnight(random, style), PERIOD_BUILD.english.manAtArms, random);
+}
+
+/**
+ * A French man-at-arms of 1415 or a gendarme of 1503 (`mounted`): a noble in full plate with the bascinet, on
+ * foot with a long sword or a war hammer (the lances cut down for fighting on foot), or on his destrier in its
+ * steel bard, with the lance.
+ */
+export function frenchKnight(random = Math.random, style = 'longsword', { mounted = false } = {}) {
+  const knight = nobleKnight(random, style);
+  const name = `${pickOne(['Messire', 'Messire', 'Sire'], random)} ${pickOne(['Jean', 'Guillaume', 'Charles', 'Louis', 'Pierre', 'Jacques', 'Robert', 'Antoine', 'Philippe', 'Raoul'], random)} ${pickOne(['de Croÿ', "d'Albret", 'de Rambures', 'de Bournonville', 'de Montmorency', 'de Bacqueville', 'de Hangest', "d'Aumont", 'de Lannoy', 'de Saveuse'], random)}`;
+  const built = builtLike({ ...knight, name }, PERIOD_BUILD.french.knight, random);
+  return mounted ? { ...built, mounted: true } : built;
+}
+
+/**
+ * A pikeman of 1503: Swiss (`swiss`, the French king's hired columns) or a Landsknecht (`landsknecht`,
+ * Gonzalo's Germans): the pike, little armour (a breastplate in the front ranks, a brigandine or a mail
+ * shirt, a kettle hat: the foot soldier's kit), the short sword for the press.
+ */
+export function pikeman(random = Math.random, people = 'swiss', style = 'pike') {
+  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
+  const name = people === 'swiss'
+    ? `${pickOne(['Hans', 'Ueli', 'Heini', 'Rudolf', 'Jörg', 'Kaspar', 'Peter', 'Werner'], random)} ${pickOne(['von Uri', 'Zurbriggen', 'Ammann', 'Kälin', 'Stauffacher', 'Imhof', 'Schwarzmurer', 'Winkelried'], random)}`
+    : `${pickOne(['Hans', 'Jakob', 'Lienhard', 'Wolf', 'Michel', 'Konrad', 'Sebastian', 'Ulrich'], random)} ${pickOne(['Schertlin', 'Frundsberg', 'Weber', 'Kessler', 'Gruber', 'Bauer', 'Vogt', 'Raidt'], random)}`;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind: 'footman', design: randomDesign('footman', random) }, accessories: [], look: { ...base.look, skinTone: pickOne(['light', 'lightTan'], random), facialHair: pickOne(['beard', 'mustache', 'stubble', 'beard'], random) } };
+  return builtLike(soldier, PERIOD_BUILD[people].pike, random);
+}
+
+/** A French foot soldier of 1503 (the Gascon crossbowmen): in what armour he has, with the crossbow or a spear. */
+export function frenchFoot(random = Math.random, style = 'crossbow') {
+  const base = footSoldier(random, style);
+  const name = `${pickOne(['Arnaud', 'Bernard', 'Guilhem', 'Peyre', 'Ramon', 'Bertrand', 'Sans', 'Joan'], random)} ${pickOne(['de Lescun', 'Barrère', 'Lafitte', 'Cazaux', 'Labat', 'Pujol', 'Darrigrand', 'Lacoste'], random)}`;
+  return builtLike({ ...base, name }, PERIOD_BUILD.french.foot, random);
+}

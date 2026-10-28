@@ -33,6 +33,9 @@ export const PLACE_AMBIENCE = {
   jiangnan: { wind: 38, birds: 5, flow: 48 },
   // A walled square in a highland valley: the wind off the hills, a few birds over the fields beyond the walls.
   cajamarca: { wind: 44, birds: 3 },
+  // Agincourt's wet field in October between two woods (the wind in the trees, few birds); Cerignola's vineyard slope at dusk.
+  agincourt: { wind: 52, birds: 1 },
+  cerignola: { wind: 42, birds: 4 },
   stage: { wind: 36 },
   dunnottar: { wind: 58, surf: 76 },
 };
