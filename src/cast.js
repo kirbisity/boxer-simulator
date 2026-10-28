@@ -366,6 +366,18 @@ const PERIOD_BUILD = {
   // lion): his elite is the big men of his army.
   // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
   mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 160, weightKg: 64, exercise: 0.66 } },
+  // Qi Jiguang's army (1559 on): not the weisuo's hereditary men but Yiwu
+  // miners and hill farmers he recruited himself, after seeing the Yiwu men
+  // fight the silver-mine feud of 1558. He chose them for it (the Jixiao
+  // xinshu wants countrymen, strong and plain, and turns away the quick-
+  // talking men of the towns), fed and paid them, and drilled them daily
+  // with weapon and shield: a few kilograms heavier than the coast's other
+  // regulars (mingSouth brigandine, 165 cm 62 kg), of the same height, and
+  // harder worked (`exercise`). And trained: `skill` (body.js; their kit,
+  // the brigandine's, is 0.35, a regular's) half again, a man who has struck
+  // and parried at the post every day for a year, short of the 0.45 of a
+  // professional elite. His guards are his household men, as Koxinga's elite.
+  qi: { brigandine: { heightCm: 165, weightKg: 65, exercise: 0.8, skill: 0.5 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8, skill: 0.55 } },
   // The weisuo garrisons of the Zhejiang coast in the 1550s, as the raids found them: hereditary soldier households, unpaid, their men
   // worked as servants by their officers, the able-bodied long run off. What was left to muster was boys, the thin and the old: ages
   // (`ages`: [share, from, to]) from eighteen into the sixties, half again the usual spread of height and weight (`spread`), lean, little
@@ -424,7 +436,9 @@ function builtLike(inputs, build, random) {
   const exercise = Math.min(1, Math.max(0.2, build.exercise + jitter(random) * 0.08));
   // (Drawn only for a build that gives ages, after the rest, so every other army is cast as before.)
   const age = build.ages ? ageFrom(build.ages, random) : inputs.age;
-  return atWeight({ ...inputs, heightCm, exercise, age }, weightKg);
+  // A build that gives a `skill` trains its men past their kit's (Qi Jiguang's): drawn from nothing, so the rest are cast as before.
+  const skill = build.skill ?? inputs.skill;
+  return atWeight({ ...inputs, heightCm, exercise, age, ...(skill === undefined ? {} : { skill }) }, weightKg);
 }
 
 /** An age (whole years) from `ages`, [share, from, to] bands. */
