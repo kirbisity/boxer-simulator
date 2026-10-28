@@ -1054,6 +1054,12 @@ export const ARROW = {
   lethal: { head: 0.85, torso: 0.4, limb: 0.13 },
   bleed: { head: 0.02, torso: 0.03, limb: 0.012 },
   impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
+  // What a long bow's war arrow carries (J; energy 1): a ~70 g shaft at ~55 m/s, ~100 J (a heavy war bow's bodkin, more:
+  // the longbow's `arrowEnergy`). In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
+  joules: 100,
+  // The share of a ball's energy left in a horse it strikes (the ball goes on through a body that size, or lodges with what
+  // little it has left): a quarter, taken over the wound channel.
+  horseShare: 0.25,
 };
 
 /** What a bullet hit is to: head, torso (the trunk) or limb. */

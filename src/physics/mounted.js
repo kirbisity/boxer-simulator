@@ -19,6 +19,7 @@ import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, harmMix, shieldContact } from '../weapons.js';
 import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
+import { horseMire, horseOnWorks } from './fieldworks.js';
 
 /**
  * A horse's shape in units of its height at the withers (x forward, y up,
@@ -141,7 +142,8 @@ export function horsePoint(horse, local) {
   }
   const f = forwardOf(horse.yaw);
   const l = leftOf(horse.yaw);
-  return [horse.at[0] + f[0] * x + l[0] * z, y + (horse.bob ?? 0), horse.at[1] + f[2] * x + l[2] * z];
+  // (Sunk into soft ground, fieldworks.js horseMire: its hooves on the firm layer under the mud.)
+  return [horse.at[0] + f[0] * x + l[0] * z, y + (horse.bob ?? 0) - (horse.sunk ?? 0), horse.at[1] + f[2] * x + l[2] * z];
 }
 
 /** How much of each gait a speed is in (they blend over `motion.blend` m/s at the changes: the motion has no jump). */
@@ -256,7 +258,10 @@ export function stepHorse(world, horse, h) {
     }
   } else {
     const goal = horse.goal;
-    const top = horse.paces.gallop * (horse.lame ? 0.3 : 1) * (1 - 0.5 * Math.min(1, horse.bloodLost / collapseShare())) * (1 - WORLD.mount.stamina.slows * (horse.tire ?? 0));
+    // In soft ground it sinks by its weight on its hooves, and its legs are held there (fieldworks.js horseMire).
+    const mire = world.arena.works ? horseMire(world, horse) : null;
+    horse.sunk = mire?.sunk ?? 0;
+    const top = (mire?.pace ?? 1) * horse.paces.gallop * (horse.lame ? 0.3 : 1) * (1 - 0.5 * Math.min(1, horse.bloodLost / collapseShare())) * (1 - WORLD.mount.stamina.slows * (horse.tire ?? 0));
     const wanted = Math.max(-1, Math.min(top, goal.speed));
     const change = wanted - horse.speed;
     // Pulling up is harder than getting away (a horse sits back on its hocks).
@@ -279,8 +284,11 @@ export function stepHorse(world, horse, h) {
     horse.bank = (horse.bank ?? 0) + (leanWanted - (horse.bank ?? 0)) * Math.min(1, h / WORLD.mount.motion.bankLag);
   }
   const f = forwardOf(horse.yaw);
+  const before = [horse.at[0], horse.at[1]];
   horse.at[0] += (f[0] * horse.speed + horse.shove[0]) * h;
   horse.at[1] += (f[2] * horse.speed + horse.shove[1]) * h;
+  // Fieldworks: a wall or a ditch's lip stops it, a stake's point goes into it (fieldworks.js).
+  if (world.arena.works) horseOnWorks(world, horse, before, HORSE_HURT);
   // What a crash shoved it sideways by dies away as its legs find the ground.
   const settle = Math.exp(-h * WORLD.mount.crash.shoveDecay);
   horse.shove[0] *= settle;
@@ -857,6 +865,9 @@ export function horseTimers(world, horse, dt) {
     if (horse.bloodLost >= collapseShare()) bringDown(world, horse, 'bled out');
   }
 }
+
+// What the fieldworks do to a horse, by this module's own means (fieldworks.js cannot import them: it is imported here).
+const HORSE_HURT = { jolt: (...args) => jolt(...args), harm: (...args) => harmHorse(...args) };
 
 /** Down it goes (once): over onto a side, and its rider thrown (keepSeat). */
 export function bringDown(world, horse, reason) {
