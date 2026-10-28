@@ -179,6 +179,19 @@ export const PRESETS = {
     outfit: { kind: 'samurai', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // An English archer of Agincourt: the war bow of yew (WEAPONS.longbow, ~60 kg of draw), the padded jack and
+  // kettle hat, a falchion at his belt; a boyhood at the butts in his shoulders.
+  longbow: {
+    name: 'Will Bowyer', style: 'longbow', sex: 'male', heightCm: 172, frame: 'medium', age: 27, exercise: 0.86, calories: 3900,
+    outfit: { kind: 'archer', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#6b4a2a', facialHair: 'stubble', eyeColor: 'blue' },
+  },
+  // A Swiss pikeman of the Italian wars: the 5 m pike, a breastplate and a kettle hat, a short sword for the press.
+  pike: {
+    name: 'Ueli Stauffacher', style: 'pike', sex: 'male', heightCm: 170, frame: 'large', age: 29, exercise: 0.8, calories: 3900,
+    outfit: { kind: 'footman', design: 3 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#8a6a3a', facialHair: 'beard', eyeColor: 'grey' },
+  },
   // A teppō gunner of the Saika: an ashigaru's kit, the matchlock, a
   // wakizashi (the kit's sidearm) for when they close.
   matchlock: {

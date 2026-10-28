@@ -31,6 +31,9 @@ export const PLACE_AMBIENCE = {
   coastFort: { wind: 52, surf: 68, birds: 2 },
   coastVillage: { wind: 50, surf: 66, birds: 3 },
   jiangnan: { wind: 38, birds: 5, flow: 48 },
+  // Agincourt's wet field in October between two woods (the wind in the trees, few birds); Cerignola's vineyard slope at dusk.
+  agincourt: { wind: 52, birds: 1 },
+  cerignola: { wind: 42, birds: 4 },
   stage: { wind: 36 },
   dunnottar: { wind: 58, surf: 76 },
 };

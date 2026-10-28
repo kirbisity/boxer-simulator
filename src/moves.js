@@ -615,6 +615,27 @@ export const STYLES = {
     // too close, the shaft, not the point, meets him.
     keepPoint: 1.1,
   },
+  // The pikeman: the point held out before the block at chest height, pushed in and drawn back; he keeps
+  // his man out at its full length (`keepPoint`), and a man come inside the point has only the shaft
+  // against him (the pike's `pointFrom`): he backs off for room, or the files beside and behind him take it.
+  pike: {
+    label: 'Pike', weapon: 'pike', fallback: 'mix',
+    cadence: { work: 1.4, move: 0.55, burst: 0.6, mobility: 0.35 },
+    stance: { blade: 0.65, crouch: 0.08, width: 1.35, lean: 0.1, guardHeight: 0 },
+    weaponGuard: { hand: [-0.12, 0.6, -0.1], dir: [1, 0.08, 0] },
+    idle: { bounce: 0.1, sway: 0.25, rock: 0.2 },
+    attacks: { spearThrust: 0.7, spearJab: 0.3 },
+    combos: { 'spearJab spearThrust': 0.6, 'spearThrust spearThrust': 0.4 },
+    comboChance: 0.5,
+    tempo: 0.75,
+    defences: { weaponBlock: 0.35, stepBack: 0.65 },
+    defendChance: 0.6,
+    headMovement: 0,
+    plans: { outboxer: 2, counter: 1.2, pressure: 0.4, brawler: 0.1 },
+    pressure: 0.02,
+    rangeInside: 0.06,
+    keepPoint: 1.1,
+  },
   // The tournament knight on foot with the lance: he stands his ground and
   // holds his man at the point, thrusts with his weight behind each, and
   // little else; slow in everything (the harness, the helm that cannot turn,
@@ -825,6 +846,14 @@ export const STYLES = {
   bow: SHOOTING_STYLES.bow,
   // The steppe archer's composite bow: the same loose, a faster arrow.
   steppeBow: { ...SHOOTING_STYLES.bow, label: 'Composite bow', weapon: 'compositeBow' },
+  // The English archer: the war bow from as far as it carries; with a man on him, the bow let fall for
+  // what hangs at his belt (his kit's sidearm: a falchion, a mallet, a dagger). He stands and shoots behind
+  // his stake (`holdGround`), as the archers at Agincourt did until the French were among them.
+  // A heavy war bow is not shot as fast as a light one: an arrow taken from the belt or the ground, nocked, the
+  // bow drawn to the ear against ~60 kg and loosed at once (it cannot be held), then a breath: some ten aimed shafts
+  // a minute (`between`, s, with the draw's own time: handling.js), six or so kept up for long (the archers' 'twelve a
+  // minute' was the most a picked man could loose, not what a line kept up).
+  longbow: { ...SHOOTING_STYLES.bow, label: 'Longbow', weapon: 'longbow', ranged: { ...SHOOTING_STYLES.bow.ranged, close: 2.2, holdGround: true, between: [4.6, 2] } },
   // The dao: a one-handed curved sabre, used as a short sword is: cut and thrust in turn.
   dao: {
     label: 'Dao', weapon: 'dao', fallback: 'mix',

@@ -235,7 +235,10 @@ export function loose(world, fighter, bolt = null) {
   // Aimed above the mark by the drop over the distance.
   // A bow drawn only part way (too heavy for him: handling.js) casts the arrow that much slower.
   const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
-  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
+  let lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
+  // An arrow (not a bolt) loosed from a rank behind his own men goes up over their heads (ARROW.over): the
+  // elevation that clears the nearest comrade in the line, the shaft coming down beyond the mark among those behind it.
+  if (!bolt) lift = Math.max(lift, overHeads(world, fighter, grip, dir, distance));
   dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
   const moving = Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
   const spread = ((bolt?.spread ?? ARROW.spread) + GUN.movingSpread * moving) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * skillSpread(fighter);
@@ -244,14 +247,37 @@ export function loose(world, fighter, bolt = null) {
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
   const upward = vec.cross(across, dir);
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
-  // Its energy against a long bow's arrow: by its speed, or a bolt's own weight.
-  const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2;
+  // Its energy against a long bow's arrow: by its speed (and a war bow's heavier shaft, `arrowEnergy`), or a bolt's own weight.
+  const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2 * (weapon.spec.arrowEnergy ?? 1);
   world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.scale(dir, speed), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // Heard: the string let go (a bow's, or a crossbow's heavier snap).
   if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });
   // The bow kicks forward a little in the hand as the string goes.
   world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
+}
+
+/**
+ * The elevation (rad above the line to the mark) an arrow from `grip` must have to go over the heads of his own
+ * men standing in the way (within ARROW.over.clear m of the line, short of the mark): over the highest of them by
+ * `above` m, at most `most` rad; 0 with none in the way.
+ */
+function overHeads(world, fighter, grip, dir, distance) {
+  const spec = ARROW.over;
+  let most = 0;
+  const flat = Math.hypot(dir[0], dir[2]) || 1;
+  const way = [dir[0] / flat, dir[2] / flat];
+  for (const mate of world.fighters) {
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out' || mate.mount) continue;
+    const head = point(mate.x, P.head);
+    const offset = [head[0] - grip[0], head[2] - grip[2]];
+    const along = offset[0] * way[0] + offset[1] * way[1];
+    if (along <= 0.2 || along >= distance - 0.5) continue;
+    if (Math.abs(offset[0] * way[1] - offset[1] * way[0]) > spec.clear) continue;
+    const above = head[1] + spec.above - grip[1] - dir[1] / flat * along;
+    most = Math.max(most, Math.atan2(above, along));
+  }
+  return Math.min(spec.most, most);
 }
 
 /** Arrows in the air: they fall, and the first thing on their path takes them. */

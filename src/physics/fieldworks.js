@@ -37,7 +37,7 @@
 //    A horse sinks by the pressure under its hooves, and is held by it the same way.
 //
 // The level gives the works as data (`arena.works`: see `compileWorks` for every
-// field); they are compiled once per arena (a WeakMap: the arena is shared by
+// field); they are compiledWorks once per arena (a WeakMap: the arena is shared by
 // every world of a level) and what the battle does to them (a broken stake) is the
 // world's (`world.worksState`). Numbers are physical and named here.
 
@@ -49,14 +49,14 @@ import { knockOut } from '../physics.js';
 
 export const FIELDWORKS = {
   stake: {
-    // An archer's stake: about six feet of green ash or oak, ~6 cm thick, sharpened at both ends, driven in a
-    // foot and a half at a slant so the upper point stood at a horse's chest. `radius` m of the shaft.
-    radius: 0.03,
+    // An archer's stake: about six feet of green ash or oak "as thick as a man's arm" (~8 cm), sharpened at both ends,
+    // driven in a foot and a half at a slant so the upper point stood at a horse's chest. `radius` m of the shaft.
+    radius: 0.04,
     // What a stake takes along its line before it gives (buckles, splits, or tears out of soft ground), as an
-    // impulse (N·s): a 6 cm shaft 1.4 m out of the ground buckles at ~8 kN (Euler, green wood E ~10 GPa, a
-    // post fixed at its foot), over the ~0.15 s a horse's chest takes to drive onto it. Across its line it bends
-    // and snaps at a tenth of that (`across`).
-    holds: 1200,
+    // impulse (N·s): an 8 cm shaft 1.4 m out of the ground buckles at ~25 kN (Euler, green wood E ~10 GPa, a
+    // post fixed at its foot; ~8 kN for a 6 cm one), over the ~0.15 s a horse's chest takes to drive onto it.
+    // Across its line it bends and snaps at a tenth of that (`across`).
+    holds: 3600,
     across: 0.1,
     // The part of a horse's front a point meets: chest and neck (the capsules horses.js names), within `reach` m
     // of their surface; the energy a stake's point drives in that counts as the point's (`pierce`), the rest a
@@ -81,6 +81,14 @@ export const FIELDWORKS = {
     front: 0.6,
     // A stop faster than this (m/s) is told as an event (a horse run into it, not pressing on it).
     told: 1,
+    // A horse will not run onto what it sees before it if it can stop short of it (horseBalks): stake points within
+    // `lane` m of its line, a wall, a ditch's lip or a bank's face, looked for up to `look` m ahead; it pulls up to stand
+    // `short` m off it, braking as hard as it can (its acceleration × `brake`: a horse sits back on its hocks). One
+    // galloping at it from too close to stop is committed, and runs on into it. (A gallop's stopping distance is ~10 m.)
+    look: 14,
+    lane: 0.7,
+    short: 0.5,
+    brake: 1.4,
   },
   climb: {
     // A slope slows a man by its grade along his way (rise over run): to 1 / (1 + up × grade) going up, and
@@ -137,10 +145,10 @@ export const FIELDWORKS = {
   },
 };
 
-const compiled = new WeakMap();
+const compiledWorks = new WeakMap();
 
 /**
- * The works of an arena, compiled (null for an arena without `works`). The level's data:
+ * The works of an arena, compiledWorks (null for an arena without `works`). The level's data:
  * - `stakes`: lines of stakes, each { from: [x, z], to: [x, z], rows, every (m along), rowGap (m back from
  *   the line, a row each), toward (+1 or -1: the way along x the points lean, at the enemy), height (m, the
  *   point's), reach (m, the point's lean out ahead of its foot), stagger (share of `every` each row shifts) }.
@@ -155,10 +163,10 @@ const compiled = new WeakMap();
 export function worksOf(arena) {
   const spec = arena?.works;
   if (!spec) return null;
-  let works = compiled.get(spec);
+  let works = compiledWorks.get(spec);
   if (!works) {
     works = compileWorks(spec);
-    compiled.set(spec, works);
+    compiledWorks.set(spec, works);
   }
   return works;
 }
@@ -220,13 +228,13 @@ function compileWorks(spec) {
 }
 
 /** The world's own state of its works: which stakes are broken. */
-function stateOf(world) {
+function worksStateOf(world) {
   world.worksState ??= { broken: new Set(), smother: 0 };
   return world.worksState;
 }
 
 /** Whether a stake still stands in this world. */
-export const standing = (world, stake) => !stateOf(world).broken.has(stake.id);
+export const stakeStanding = (world, stake) => !worksStateOf(world).broken.has(stake.id);
 
 // ---- The ground: relief and soft places --------------------------------------------------
 
@@ -279,7 +287,7 @@ export function footSink(works, fighter, x, z) {
 }
 
 // The parts that bear on the ground as he lies or kneels, and how hard (FIELDWORKS.mud): his feet his whole weight, his knees and hands much of it.
-const BEARING = PARTICLES.map((name, index) => (index === P.lFoot || index === P.rFoot ? 1 : index === P.lKnee || index === P.rKnee ? 'knee' : index === P.lHand || index === P.rHand ? 'hand' : 'lying'));
+const WORKS_BEARING = PARTICLES.map((name, index) => (index === P.lFoot || index === P.rFoot ? 1 : index === P.lKnee || index === P.rKnee ? 'knee' : index === P.lHand || index === P.rHand ? 'hand' : 'lying'));
 
 /**
  * The floor under a man's part `index` at (x, z): the ground's relief, less how far that part sinks into soft
@@ -290,7 +298,7 @@ export function floorFor(works, fighter, index, x, z) {
   if (!works.soft.length) return floor;
   const soft = softAt(works, x, z);
   if (!soft) return floor;
-  const bearing = BEARING[index];
+  const bearing = WORKS_BEARING[index];
   const share = bearing === 1 ? 1 : FIELDWORKS.mud[bearing];
   floor -= sinkage(soft.area, fighter.body.massKg + (fighter.weapon?.spec.mass ?? 0)) * soft.share * share;
   return floor;
@@ -336,7 +344,7 @@ export function mireStep(world, dt) {
       fighter.lift = reliefAt(works, x, z) - mired.sunk;
       plantOnWorks(works, fighter, mired.sunk);
     }
-    holdLegs(fighter, soft, mired.sunk, dt);
+    mireHoldLegs(fighter, soft, mired.sunk, dt);
   }
   smotherStep(world, works, dt);
 }
@@ -364,7 +372,7 @@ function plantOnWorks(works, fighter, sunk) {
 }
 
 /** The soft ground's hold on his legs, as standing water's (levelmode/level.js wadeGear, which does not run in a battle). */
-function holdLegs(fighter, soft, sunk, dt) {
+function mireHoldLegs(fighter, soft, sunk, dt) {
   const gear = fighter.body.gear;
   if (fighter.wading && fighter.wading.gear !== gear) fighter.wading = null;
   const drag = soft && sunk > 0 ? wadeDrag(soft.area, sunk, fighter.body.heightM) : null;
@@ -454,6 +462,50 @@ export function stepOnWorks(works, fighter, wanted) {
   return [vx, vz];
 }
 
+/**
+ * How far a man at `from` ([x, z]) has to go to reach `to` on his feet: straight there (over a ditch and its bank, as
+ * far as the climbing makes it), or, with a wall across the way (a palisade, a wood's edge), round the nearer end of it
+ * (a gap, or where it stops). What a man behind a palisade
+ * weighs when he asks whether the enemy beyond it can get at him (ai.js: a gun reloaded behind the fence).
+ */
+export function walkingDistance(world, from, to) {
+  const works = worksOf(world.arena);
+  const straight = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  if (!works) return straight;
+  // Over a ditch and its bank, each stretch as long as its slope makes it to walk (FIELDWORKS.climb, as stepOnWorks slows him).
+  let longest = works.ditches.length ? climbedDistance(works, from, to) : straight;
+  for (const wall of works.walls) {
+    if (!wallCrosses(from, to, wall.a, wall.b)) continue;
+    const round = (end) => Math.hypot(end[0] - from[0], end[1] - from[1]) + Math.hypot(to[0] - end[0], to[1] - end[1]);
+    longest = Math.max(longest, Math.min(round(wall.a), round(wall.b)));
+  }
+  return longest;
+}
+
+/** The way from `from` to `to` straight over the relief, each `span` m of it lengthened as its slope slows a man (FIELDWORKS.climb). */
+function climbedDistance(works, from, to) {
+  const spec = FIELDWORKS.climb;
+  const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  const steps = Math.max(1, Math.ceil(length / spec.span));
+  let total = 0;
+  let before = reliefAt(works, from[0], from[1]);
+  for (let k = 1; k <= steps; k += 1) {
+    const x = from[0] + ((to[0] - from[0]) * k) / steps;
+    const z = from[1] + ((to[1] - from[1]) * k) / steps;
+    const here = reliefAt(works, x, z);
+    const grade = (here - before) / (length / steps);
+    total += (length / steps) * (1 + (grade > 0 ? spec.up * grade : -spec.down * grade));
+    before = here;
+  }
+  return total;
+}
+
+/** Whether the segments p-q and a-b cross (on the floor). */
+function wallCrosses(p, q, a, b) {
+  const side = (u, v, w) => (v[0] - u[0]) * (w[1] - u[1]) - (v[1] - u[1]) * (w[0] - u[0]);
+  return side(p, q, a) * side(p, q, b) < 0 && side(a, b, p) * side(a, b, q) < 0;
+}
+
 /** A man's root (where his stance stands) kept off the walls. */
 export function keepRootOff(works, fighter) {
   if (!works.walls.length) return;
@@ -514,11 +566,11 @@ export function collideWorks(world, fighter) {
       const size = Math.hypot(nx, nz) || 1;
       nx /= size;
       nz /= size;
-      pushPart(fighter, base, near.at[0] + nx * keep, near.at[1] + nz * keep, nx, nz);
+      pushWorksPart(fighter, base, near.at[0] + nx * keep, near.at[1] + nz * keep, nx, nz);
     }
     for (const stake of works.stakes) {
       if (Math.abs(fighter.x[base] - stake.foot[0]) > 1.6 || Math.abs(fighter.x[base + 2] - stake.foot[1]) > 1.6) continue;
-      if (!standing(world, stake)) continue;
+      if (!stakeStanding(world, stake)) continue;
       const near = nearestOnStake(stake, fighter.x[base], fighter.x[base + 1], fighter.x[base + 2]);
       const keep = radius + stakeRadius;
       if (near.distance >= keep) continue;
@@ -526,13 +578,13 @@ export function collideWorks(world, fighter) {
       const nz = fighter.x[base + 2] - near.at[2];
       const flat = Math.hypot(nx, nz);
       if (flat < 1e-6) continue;
-      pushPart(fighter, base, near.at[0] + (nx / flat) * keep, near.at[2] + (nz / flat) * keep, nx / flat, nz / flat);
+      pushWorksPart(fighter, base, near.at[0] + (nx / flat) * keep, near.at[2] + (nz / flat) * keep, nx / flat, nz / flat);
     }
   }
 }
 
 /** A part put at (x, z), its motion along -n (into what it met) taken away. */
-function pushPart(fighter, base, x, z, nx, nz) {
+function pushWorksPart(fighter, base, x, z, nx, nz) {
   let vx = fighter.x[base] - fighter.prev[base];
   let vz = fighter.x[base + 2] - fighter.prev[base + 2];
   const into = vx * nx + vz * nz;
@@ -554,7 +606,7 @@ function pushPart(fighter, base, x, z, nx, nz) {
  * `seconds` he is out (knocked out where he lies: physics.js knockOut, as 'smothered').
  */
 function smotherStep(world, works, dt) {
-  const state = stateOf(world);
+  const state = worksStateOf(world);
   state.smother += dt;
   const spec = FIELDWORKS.smother;
   if (state.smother < spec.every) return;
@@ -615,7 +667,7 @@ export function smothering(world, works, fighter) {
 // ---- Horses on the works -----------------------------------------------------------------
 
 /** A horse's laden weight on its hooves (kg): the horse and its armour, and its rider with all he carries. */
-function horseKg(world, horse) {
+function worksHorseKg(world, horse) {
   const rider = horse.rider === null ? null : world.fighters[horse.rider];
   return horse.mass + (rider?.mount === horse ? rider.body.massKg + (rider.weapon?.spec.mass ?? 0) : 0);
 }
@@ -629,9 +681,45 @@ export function horseMire(world, horse) {
   const soft = works?.soft.length ? softAt(works, horse.at[0], horse.at[1]) : null;
   if (!soft) return { sunk: 0, pace: 1 };
   const spec = FIELDWORKS.mud;
-  const sunk = sinkage(soft.area, horseKg(world, horse) / spec.hoofs, spec.hoofArea) * soft.share;
+  const sunk = sinkage(soft.area, worksHorseKg(world, horse) / spec.hoofs, spec.hoofArea) * soft.share;
   const drag = wadeDrag(soft.area, sunk, horse.withers * spec.horseHeight);
   return { sunk, pace: drag.foot };
+}
+
+/**
+ * How fast a horse is willing to go on toward what stands before it (m/s; Infinity when nothing does): the speed
+ * from which it can still stop `short` of the nearest stake point, wall or ditch lip within `look` m along its
+ * line (FIELDWORKS.horse). A horse balks at a hedge of points or a fence it can see in time; one already too close
+ * at a gallop brakes as hard as it can (stepHorse: its pulling up is limited) and runs into it slower.
+ */
+export function horseBalks(world, horse) {
+  const works = worksOf(world.arena);
+  if (!works || horse.state !== 'up') return Infinity;
+  const spec = FIELDWORKS.horse;
+  const f = [Math.cos(horse.yaw), -Math.sin(horse.yaw)];
+  const front = spec.front * horse.withers;
+  let nearest = Infinity;
+  const ahead = (x, z) => {
+    const dx = x - horse.at[0];
+    const dz = z - horse.at[1];
+    const along = dx * f[0] + dz * f[1] - front;
+    if (along < -0.2 || along > spec.look) return;
+    if (Math.abs(dx * f[1] - dz * f[0]) > spec.lane + 0.3 * horse.withers) return;
+    nearest = Math.min(nearest, Math.max(0, along));
+  };
+  for (const stake of works.stakes) if (stakeStanding(world, stake)) ahead(stake.tip[0], stake.tip[2]);
+  // A wall or a ditch's lip: felt along its line ahead, a step at a time.
+  for (let along = 0; along <= spec.look; along += 0.5) {
+    const x = horse.at[0] + f[0] * (front + along);
+    const z = horse.at[1] + f[1] * (front + along);
+    if (works.walls.some((wall) => nearestOnWall(wall, x, z).distance < 0.3) || (works.ditches.length && Math.abs(reliefAt(works, x, z) - reliefAt(works, horse.at[0], horse.at[1])) > spec.step)) {
+      nearest = Math.min(nearest, along);
+      break;
+    }
+  }
+  if (nearest === Infinity) return Infinity;
+  const room = Math.max(0, nearest - spec.short);
+  return Math.sqrt(2 * horse.accel * spec.brake * room);
 }
 
 /**
@@ -650,7 +738,7 @@ export function horseOnWorks(world, horse, before, hurt) {
     const ahead = reliefAt(works, front[0], front[1]);
     if (Math.abs(ahead - here) > FIELDWORKS.horse.step) {
       const along = velocity[0] * f[0] + velocity[2] * f[1];
-      if (along > 0) stopHorse(world, horse, before, [-f[0], -f[1]], along, hurt.jolt, ahead < here ? 'goes down into the ditch' : 'falls at the bank');
+      if (along > 0) stopHorseAtWorks(world, horse, before, [-f[0], -f[1]], along, hurt.jolt, ahead < here ? 'goes down into the ditch' : 'falls at the bank');
     }
   }
   for (const wall of works.walls) {
@@ -663,13 +751,13 @@ export function horseOnWorks(world, horse, before, hurt) {
     nx /= size;
     nz /= size;
     const into = -(velocity[0] * nx + velocity[2] * nz);
-    if (into > 0) stopHorse(world, horse, before, [nx, nz], into, hurt.jolt, wall.kind === 'wood' ? 'brought down in the trees' : 'brought down against the palisade');
+    if (into > 0) stopHorseAtWorks(world, horse, before, [nx, nz], into, hurt.jolt, wall.kind === 'wood' ? 'brought down in the trees' : 'brought down against the palisade');
   }
-  if (works.stakes.length) onStakes(world, horse, works, velocity, hurt);
+  if (works.stakes.length) horseOnStakes(world, horse, works, velocity, hurt);
 }
 
 /** A horse stopped by what stands before it: back where it was, its speed into it (`into`, m/s, along -n) taken away as a jolt. */
-function stopHorse(world, horse, before, normal, into, jolt, reason) {
+function stopHorseAtWorks(world, horse, before, normal, into, jolt, reason) {
   horse.at[0] = before[0];
   horse.at[1] = before[1];
   jolt(world, horse, [normal[0] * into, 0, normal[1] * into], reason);
@@ -683,13 +771,13 @@ function stopHorse(world, horse, before, normal, into, jolt, reason) {
  * and drives the work it did into the horse as a point (FIELDWORKS.stake pierce, through the barding there); past what
  * it holds it breaks (the world's `worksState.broken`).
  */
-function onStakes(world, horse, works, velocity, hurt) {
+function horseOnStakes(world, horse, works, velocity, hurt) {
   const spec = FIELDWORKS.stake;
   for (const capsule of horse.capsules) {
     if (capsule.part !== 'chest' && capsule.part !== 'neck') continue;
     for (const stake of works.stakes) {
       if (Math.abs(stake.foot[0] - horse.at[0]) > 2.5 || Math.abs(stake.foot[1] - horse.at[1]) > 2.5) continue;
-      if (!standing(world, stake)) continue;
+      if (!stakeStanding(world, stake)) continue;
       const tip = stake.tip;
       // The point against the capsule: how far from its surface.
       const ab = [capsule.b[0] - capsule.a[0], capsule.b[1] - capsule.a[1], capsule.b[2] - capsule.a[2]];
@@ -704,7 +792,7 @@ function onStakes(world, horse, works, velocity, hurt) {
       const unit = axis.map((value) => value / axisLength);
       const closing = -(velocity[0] * unit[0] + velocity[1] * unit[1] + velocity[2] * unit[2]);
       if (closing <= 0.3) continue;
-      const kg = horseKg(world, horse);
+      const kg = worksHorseKg(world, horse);
       const wanted = kg * closing;
       const square = Math.abs(closing) / (Math.hypot(velocity[0], velocity[2]) || closing);
       const holds = spec.holds * (spec.across + (1 - spec.across) * square);
@@ -717,7 +805,7 @@ function onStakes(world, horse, works, velocity, hurt) {
       hurt.harm(world, horse, capsule, { blunt: energy * spec.blunt * (1 - (barding.blunt ?? 0)), cut: 0, pierce: energy * spec.pierce * (1 - (barding.pierce ?? 0)) }, event);
       hurt.jolt(world, horse, [unit[0] * (impulse / kg), 0, unit[2] * (impulse / kg)], 'brought down on the stakes');
       if (impulse >= holds - 1e-6) {
-        stateOf(world).broken.add(stake.id);
+        worksStateOf(world).broken.add(stake.id);
         event.effects.push('the stake breaks');
       }
       world.events.push(event);

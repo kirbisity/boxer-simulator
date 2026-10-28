@@ -19,7 +19,7 @@ import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, harmMix, shieldContact } from '../weapons.js';
 import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
-import { horseMire, horseOnWorks } from './fieldworks.js';
+import { horseBalks, horseMire, horseOnWorks } from './fieldworks.js';
 
 /**
  * A horse's shape in units of its height at the withers (x forward, y up,
@@ -262,7 +262,9 @@ export function stepHorse(world, horse, h) {
     const mire = world.arena.works ? horseMire(world, horse) : null;
     horse.sunk = mire?.sunk ?? 0;
     const top = (mire?.pace ?? 1) * horse.paces.gallop * (horse.lame ? 0.3 : 1) * (1 - 0.5 * Math.min(1, horse.bloodLost / collapseShare())) * (1 - WORLD.mount.stamina.slows * (horse.tire ?? 0));
-    const wanted = Math.max(-1, Math.min(top, goal.speed));
+    // It will not run onto stakes, a fence or a ditch before it (fieldworks.js horseBalks): it pulls up as hard as it can; too close to stop, it runs into them slower.
+    const balk = mire ? horseBalks(world, horse) : Infinity;
+    const wanted = Math.max(-1, Math.min(top, balk, goal.speed));
     const change = wanted - horse.speed;
     // Pulling up is harder than getting away (a horse sits back on its hocks).
     const most = horse.accel * (change < 0 ? 1.4 : 1) * h;

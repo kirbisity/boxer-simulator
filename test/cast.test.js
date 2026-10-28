@@ -97,20 +97,23 @@ test('the rebellion opens with the knights in a tight line and the rebels a loos
   assert.ok(new Set(rebels.map((fighter) => fighter.root[0].toFixed(1))).size > 6, 'not in ranks');
 });
 
-test('Sekigahara: forty a side, samurai and ashigaru each with several weapons, the bows and teppō behind', async () => {
+test('Nagashino: the Oda guns and spears in their black, the Takeda in red with their horse; Agincourt\'s archers and men-at-arms; Cerignola\'s arquebusiers, Landsknechts, gendarmes and Swiss', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
-  const cast = SCENARIOS.sekigahara.cast(seededRandom(7));
-  for (const side of [cast.red, cast.blue]) {
-    assert.equal(side.length, 30);
-    const samurai = side.filter((fighter) => fighter.outfit.kind !== 'ashigaru');
-    const ashigaru = side.filter((fighter) => fighter.outfit.kind === 'ashigaru');
-    assert.ok(new Set(samurai.map((fighter) => fighter.style)).size >= 3, 'samurai weapons differ');
-    assert.ok(new Set(ashigaru.map((fighter) => fighter.style)).size >= 3, 'ashigaru weapons differ');
-    const shooting = (fighter) => fighter.style === 'bow' || fighter.style === 'matchlock';
-    assert.ok(side.filter((fighter) => fighter.style === 'bow').length >= 5, 'archers');
-    assert.ok(side.some((fighter) => fighter.style === 'matchlock' && fighter.outfit.kind === 'ashigaru'), 'teppō ashigaru');
-    const firstShooter = side.findIndex(shooting);
-    assert.ok(side.slice(firstShooter).every(shooting), 'bows and guns in the rear ranks');
-    assert.notEqual(side[0].outfit.kind, 'ashigaru', 'a samurai leads');
-  }
+  const nagashino = SCENARIOS.nagashino.cast(seededRandom(7));
+  for (const side of [nagashino.red, nagashino.blue]) assert.equal(side.length, 52);
+  const oda = nagashino.blue;
+  assert.equal(oda.filter((man) => man.style === 'matchlock' && man.outfit.kind === 'ashigaru').length, 24, 'twenty-four teppō ashigaru');
+  assert.ok(oda.every((man) => !man.mounted), 'the Oda fought on foot behind the fence');
+  assert.equal(nagashino.red.filter((man) => man.mounted).length, 14, 'the Takeda horse');
+  assert.ok(nagashino.red.every((man) => man.outfit.tint.armor === nagashino.red[0].outfit.tint.armor) && oda.every((man) => man.outfit.tint.armor !== nagashino.red[0].outfit.tint.armor), 'each army in its own colour');
+  const agincourt = SCENARIOS.agincourt.cast(seededRandom(7));
+  assert.equal(agincourt.blue.filter((man) => man.style === 'longbow' && man.outfit.kind === 'archer').length, 42, 'forty-two archers');
+  assert.equal(agincourt.blue.filter((man) => man.outfit.kind === 'knight').length, 10, 'ten men-at-arms');
+  assert.equal(agincourt.red.filter((man) => man.outfit.kind === 'knight').length, 32, 'the French knights in plate, four of them mounted');
+  assert.equal(agincourt.red.filter((man) => man.outfit.kind === 'footman').length, 20, 'their retinues and the crossbows');
+  const cerignola = SCENARIOS.cerignola.cast(seededRandom(7));
+  assert.equal(cerignola.blue.filter((man) => man.style === 'matchlock').length, 18, 'arquebusiers');
+  assert.equal(cerignola.blue.filter((man) => man.style === 'pike').length, 22, 'the Landsknechts');
+  assert.equal(cerignola.red.filter((man) => man.mounted && man.style === 'lance' && man.outfit.kind === 'knight').length, 12, 'gendarmes with the lance');
+  assert.equal(cerignola.red.filter((man) => man.style === 'pike').length, 32, 'the Swiss');
 });

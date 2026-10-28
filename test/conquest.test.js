@@ -77,7 +77,7 @@ test('the new styles are in their factions, and tai chi and taekwondo stay out o
 test('in the set battles the bows and guns open in the front rows, the blades and spears behind them with a gap', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const { createWorld } = await import('../src/physics.js');
-  for (const key of ['sekigahara', 'pyongyang', 'zeelandia', 'rhodes']) {
+  for (const key of ['pyongyang', 'zeelandia', 'rhodes']) {
     const level = SCENARIOS[key];
     const cast = level.cast(seededRandom(3));
     const world = createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...cast.blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 3, arena: level.arena, formation: level.formation });

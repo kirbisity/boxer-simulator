@@ -2,7 +2,7 @@
 // starting, its own stamina) and issues the same commands a player would,
 // choosing from its style's moves those that reach from where it stands.
 
-import { aheadOfSlot, DRILL, fromSlot, moveFormations, moveWings, walkToSlot, WINGS } from './formation.js';
+import { aheadOfSlot, DRILL, fromSlot, moveFormations, moveWings, volleyDue, walkToSlot, WINGS } from './formation.js';
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
@@ -12,6 +12,7 @@ import { WEAPONS } from './weapons.js';
 import { castNet } from './physics/net.js';
 import { handling } from './handling.js';
 import { holdWing, ride, standToRider } from './riding.js';
+import { walkingDistance } from './physics/fieldworks.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -503,7 +504,10 @@ function holdRank(world, fighter, opponent, style, dt) {
       fighter.reloading = true;
       return true;
     }
-    if (!fighter.inFront || fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    // (A bow shoots from any rank: its arrow goes up over the heads in front, physics/ranged.js overHeads; a gun or a crossbow only from the front.)
+    if ((!fighter.inFront && !weapon.spec.bow) || fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    // A gun or a crossbow fires with its rank's volley (formation.js volleyDue).
+    if (!volleyDue(world, formation, fighter)) return true;
     const zone = world.random() < gun.headShare ? 'head' : 'body';
     if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
       fighter.punch.quick = true;
@@ -1560,7 +1564,9 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   const weapon = fighter.weapon;
   if (weapon.spec.shot && !weapon.loaded) {
     fighter.aimAt = undefined;
-    const nearest = Math.min(...world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up').map((other) => vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis)))));
+    // (Behind a palisade, how far the enemy would have to walk round it: physics/fieldworks.js walkingDistance.)
+    const me = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+    const nearest = Math.min(...world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up').map((other) => (world.arena.works ? walkingDistance(world, [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]], me) : vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis))))));
     if (nearest > gun.reloadSafe) {
       fighter.reloading = true;
       fighter.goTo = null;
