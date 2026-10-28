@@ -273,6 +273,9 @@ export const WEAPONS = {
     pointFrom: 0.8, label: 'Langxian', hands: 'two', length: 3.3, strikeFrom: 1.3, handle: 1.4, spacing: 0.55, mass: 4, balance: 0.9, radius: 0.15,
     harm: { thrust: { pierce: 1, blunt: 0.35, cut: 0.05 }, swing: { blunt: 0.45, cut: 0.05 } },
     contactSeconds: 0.008, rotation: 0.45, wrist: { omega: 6, zeta: 0.9 }, threat: 3.4, grip: 0.6,
+    // Where its branches are, m out from the front hand: from a little past the hands to just short of the iron head.
+    // A blade that comes in among them may be caught there (physics/brush.js).
+    brush: { from: 1.2, to: 3.0 },
   },
   // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
   // made to fight. Blunt tines that pierce poorly and knock a man about;

@@ -119,6 +119,31 @@ test('a ditch: the ground goes down into it and up onto its bank; a horse is sto
   assert.ok(ditch.t > flat.t + 2 && ditch.t < Infinity, `across the ditch in ${ditch.t.toFixed(1)} s, the flat in ${flat.t.toFixed(1)} s`);
 });
 
+test('a ditch dug along a bending line, deeper and wider in places: its ground follows the line, eases between its points, and is whole round the bends', () => {
+  const profile = [[-1, 0], [-0.5, -0.6], [0, -0.6], [0.5, 0]];
+  const works = worksOf({ works: { ditches: [{ points: [[0, -6, 1, 1], [0.6, 0, 1.5, 2], [0, 6, 1, 1]], profile }] } });
+  const [ditch] = works.ditches;
+  assert.equal(ditch.pieces.length, 2);
+  // At its points: the profile as dug there (heights × deep, offsets × wide).
+  assert.ok(Math.abs(reliefAt(works, 0.6 - 0.25, 0) + 0.9) < 0.01, 'the bottom at the bend, half as deep again');
+  assert.ok(reliefAt(works, 0.6 - 1.7, 0) < -0.05 && reliefAt(works, 0.6 - 2.1, 0) === 0, 'twice as wide there: its lip two metres off the line');
+  const [first] = ditch.pieces;
+  const nearFirst = [first.a[0] - first.left[0] * 0.25 + first.u[0] * 0.01, first.a[1] - first.left[1] * 0.25 + first.u[1] * 0.01];
+  assert.ok(Math.abs(reliefAt(works, ...nearFirst) + 0.6) < 0.01, 'at its first point as the profile says');
+  // Halfway along a piece, eased between them.
+  const between = reliefAt(works, 0.3 - 0.25, -3);
+  assert.ok(between < -0.6 && between > -0.9, `eased (${between.toFixed(2)})`);
+  // No step anywhere across the bend, and nothing beyond its ends.
+  let worst = 0;
+  for (let x = -2; x <= 2; x += 0.1) {
+    for (let z = -1; z <= 1; z += 0.02) worst = Math.max(worst, Math.abs(reliefAt(works, x, z + 0.02) - reliefAt(works, x, z)));
+  }
+  assert.ok(worst < 0.1, `smooth round the bend (${worst.toFixed(3)} m per 2 cm)`);
+  assert.equal(reliefAt(works, 0, -6.5), 0, 'beyond its ends, level ground');
+  // A man's way over it is the longer for the climb.
+  assert.ok(walkingDistance({ arena: { works: { ditches: [{ points: [[0, -6], [0.6, 0], [0, 6]], profile }] } } }, [-3, 0], [3, 0]) > 6.3, 'the climb counts');
+});
+
 test('mud: a man sinks by his weight, the knight in plate deeper than the archer; it holds his legs and his footing, slows and tires him, and sounds as mud', () => {
   const works = worksOf({ works: MUD });
   const world = createWorld([{ inputs: normaliseInputs(structuredClone(PRESETS.knight)), corner: 'red' }, { inputs: normaliseInputs(structuredClone(PRESETS.longbow)), corner: 'blue' }], { seed: 3, arena: { halfX: 30, halfZ: 10, works: MUD } });

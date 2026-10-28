@@ -16,6 +16,7 @@ import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from '.
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
+import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
@@ -154,7 +155,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
-    panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined,
+    panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
     aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
@@ -1719,6 +1720,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // On his knees by his own choice (the player's crawl), a blow of the hand is still his: low and weak (WORLD.crawl.strike).
   const fromKnees = fighter.crawling && fighter.crawlChosen && fighter.player && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
   if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
+  // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
+  if (blade && fighter.caught && blade === caughtBlade(fighter)) return false;
   const aimZone = fromKnees ? 'legs' : spec.zones.includes(zone) ? zone : spec.zones[0];
   // A wild swinger's aim wanders off the mark.
   // A heavy weapon is hard to steer: past heavyFrom its blows wander (`heavyAimJitter` m per unit of mass over).
@@ -1843,6 +1846,8 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if (name === 'shieldBlock' && !fighter.shield) name = 'guard';
   // His shield knocked out of line: it cannot be brought to meet this one.
   if (name === 'shieldBlock' && fighter.shieldOpen > world.time) return false;
+  // His blade caught in a wolf-brush (physics/brush.js): it cannot be brought across to meet a blow.
+  if ((name === 'weaponBlock' || name === 'parry') && fighter.caught) return false;
   if (DEFENCES[name]) {
     // The player's dodge or block takes breath (the plain guard held up does not); he may go into the overdraft for it.
     if (fighter.player && name !== 'guard') drawStamina(fighter, WORLD.overdraft.defenceCost / fighter.body.aerobic);
@@ -2139,6 +2144,8 @@ function updateIntent(world, fighter, dt) {
     intent.bladeDir = null;
     intent.offBladeDir = null;
   }
+  // His blade caught in a wolf-brush: his weapon hand dragged to where it is held (physics/brush.js).
+  if (fighter.caught) pinnedByBrush(world, fighter, intent);
   runCarry(world, fighter, intent, dt);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
@@ -3263,6 +3270,7 @@ export function step(world, dt) {
   moveDebris(world, dt);
   if (world.arrows.length) flyArrows(world, dt);
   if (world.nets?.length) flyNets(world, dt);
+  if (world.brushTouches) holdBrushes(world, dt);
   world.time += dt;
   world.lastDt = dt;
 }
@@ -3480,6 +3488,8 @@ function moveRoot(world, fighter, dt) {
   // On fieldworks: a ditch's slope slows him as it is steep, and a step into a palisade or a wood's edge goes along it.
   const works = worksOf(world.arena);
   if (works) [wanted[0], wanted[1]] = stepOnWorks(works, fighter, wanted);
+  // His blade caught in a wolf-brush: its branches in his face, he does not get in on its bearer (physics/brush.js).
+  if (fighter.caught) [wanted[0], wanted[1]] = brushKeepsOff(world, fighter, wanted);
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const speedNow = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
@@ -6760,8 +6770,11 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   const distance = vec.length(offset);
   const reach = a.spec.radius + b.spec.radius;
   const key = `${first.id}${a === first.offWeapon ? 'o' : ''}:${second.id}${b === second.offWeapon ? 'o' : ''}`;
+  // (A wolf-brush's branches against a blade: apart, a touch to come is a new one; physics/brush.js.)
+  const brush = a.spec.brush || b.spec.brush;
   if (distance >= reach || distance < 1e-9) {
     world.clashing.delete(key);
+    if (brush) brushTouch(world, first, second, a, b, 0, 0, false);
     return;
   }
   const normal = vec.scale(offset, 1 / distance);
@@ -6771,6 +6784,11 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   };
   const one = at(first, a, closest.s);
   const two = at(second, b, closest.t);
+  // A blade in among a wolf-brush's branches may be caught there; caught, the two are tangled and move together (physics/brush.js).
+  if (brush) {
+    brushTouch(world, first, second, a, b, one.along, two.along, true);
+    if (tangled(first, second, a, b)) return;
+  }
   // Apart, shared by the hands' inverse masses.
   const mainA = P[`${a.main}Hand`];
   const mainB = P[`${b.main}Hand`];

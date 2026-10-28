@@ -6,7 +6,8 @@ import { DRILL, moveFormations } from '../src/formation.js';
 import { OUTFITS } from '../src/outfits.js';
 import { STYLES } from '../src/moves.js';
 import { WEAPONS } from '../src/weapons.js';
-import { advance, createWorld, placeFighter, seededRandom } from '../src/physics.js';
+import { advance, createWorld, perform, placeFighter, seededRandom, throwPunch } from '../src/physics.js';
+import { BRUSH, brushKeepsOff, brushTouch, heldOffAt } from '../src/physics/brush.js';
 import { SCENARIOS, battleOf, qiJiguangLevel } from '../src/scenarios.js';
 import { reliefAt, stepOnWorks, worksOf } from '../src/physics/fieldworks.js';
 import { P } from '../src/body.js';
@@ -161,29 +162,154 @@ test('fought out, the garrison loses the wokou raid and Qi Jiguang\'s army wins 
   assert.equal(qi.blue.fled, 0, 'none of Qi\'s men run');
 });
 
-test('Qi Jiguang\'s men dig a trench across the square before the squads: the raiders before it, every Ming man behind it on level ground, the way across it slow', () => {
+test('Qi Jiguang\'s men dig a trench across the square before the squads: small and hastily dug, its line wandering, the raiders before it, every Ming man behind it on level ground, the way across it slowed', () => {
   const level = battleOf('qiJiguang');
   const works = worksOf(level.arena);
   assert.equal(works.ditches.length, 1, 'a ditch and its bank');
   const [ditch] = works.ditches;
   // Across the whole square, from the shops on its north side to the canal's embankment: no way round it.
-  assert.ok(ditch.from[1] <= -level.arena.halfZ && ditch.from[1] + ditch.length >= level.arena.halfZ, 'the floor from side to side');
+  assert.ok(ditch.box.z[0] <= -level.arena.halfZ && ditch.box.z[1] >= level.arena.halfZ, 'the floor from side to side');
+  // Not ruler-straight: its line bends, a few tenths of a metre either way, and it is dug unevenly along it.
+  const xs = ditch.pieces.map((piece) => piece.a[0]);
+  assert.ok(ditch.pieces.length >= 3 && Math.max(...xs) - Math.min(...xs) > 0.3 && Math.max(...xs) - Math.min(...xs) < 1.2, 'a wandering line');
+  // Across it at several places: a ditch some 0.6-0.8 m deep and 2-3.5 m across with its low bank, the depth not the
+  // same everywhere.
+  const crossings = [-12, -6, 0, 5, 9].map((z) => {
+    const heights = [];
+    for (let x = ditch.box.x[0] - 1; x <= ditch.box.x[1] + 1; x += 0.02) heights.push([x, reliefAt(works, x, z)]);
+    const dug = heights.filter(([, y]) => Math.abs(y) > 1e-6);
+    return { z, deepest: Math.min(...dug.map(([, y]) => y)), bank: Math.max(...dug.map(([, y]) => y)), across: dug.at(-1)[0] - dug[0][0], lip: dug[0][0], back: dug.at(-1)[0] };
+  });
+  for (const crossing of crossings) {
+    assert.ok(crossing.deepest < -0.55 && crossing.deepest > -0.85, `0.6-0.8 m deep at z ${crossing.z} (${crossing.deepest.toFixed(2)})`);
+    assert.ok(crossing.bank > 0.2 && crossing.bank < 0.45, `a low spoil bank at z ${crossing.z} (${crossing.bank.toFixed(2)})`);
+    assert.ok(crossing.across > 2 && crossing.across < 3.5, `2-3.5 m across at z ${crossing.z} (${crossing.across.toFixed(2)})`);
+  }
+  const depths = crossings.map((crossing) => crossing.deepest);
+  assert.ok(Math.max(...depths) - Math.min(...depths) > 0.05, 'dug deeper in places than in others');
+  // Where the men stand.
   const world = createWorld(['red', 'blue'].flatMap((corner) => level.cast(seededRandom(5))[corner].map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner }))), { seed: 5, arena: level.arena, formation: level.formation });
-  const lip = ditch.from[0] + ditch.profile[0][0];
-  const back = ditch.from[0] + ditch.profile[ditch.profile.length - 1][0];
+  const lip = Math.min(...crossings.map((crossing) => crossing.lip));
   for (const fighter of world.fighters) {
     const [x, z] = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
     if (fighter.corner === 'red') assert.ok(x < lip - 3, `${fighter.body.inputs.name} starts well short of the lip`);
-    else {
-      assert.ok(x > back, `${fighter.body.inputs.name} stands behind the bank (${x.toFixed(1)} > ${back.toFixed(1)})`);
-      assert.equal(reliefAt(works, x, z), 0, 'on level ground, the squads\' places untouched');
-    }
+    else assert.equal(reliefAt(works, x, z), 0, `${fighter.body.inputs.name} on level ground behind it, the squads' places untouched`);
   }
-  // A man running at it is slowed to a crawl at the bank's face, and goes down into it slower than he runs over open ground.
+  // A man running at it is slowed down into it and more up the bank's face; free before it.
+  const { lip: front, back } = crossings[2];
   const pace = (x) => Math.hypot(...stepOnWorks(works, { root: [x, 0] }, [5, 0])) / 5;
-  assert.ok(pace(lip - 1) > 0.99, 'free before it');
-  assert.ok(pace(ditch.from[0] - 1.65) < 0.6, 'down the lip into it');
-  assert.ok(pace(ditch.from[0] - 0.05) < 0.3, 'up the bank\'s face');
+  assert.ok(pace(front - 1) > 0.99, 'free before it');
+  let slowest = 1;
+  for (let x = front; x < back; x += 0.05) slowest = Math.min(slowest, pace(x));
+  assert.ok(slowest < 0.4, `up the bank's face at a scramble (${slowest.toFixed(2)} of his pace)`);
   assert.equal(qiJiguangLevel({ trench: false }).arena.works, undefined, 'the lever for measuring what it did');
   assert.equal(level.arena.halfX, 18, 'the floor is the battle\'s, the trench moved back with the lines');
+});
+
+/** Qi Jiguang's level as fought (seed `seed`), the AI on both sides, for `seconds`; calls `each(world)` after every tenth of a second. */
+function foughtQi(seed, seconds, each = () => {}) {
+  const level = battleOf('qiJiguang');
+  const sides = level.cast(seededRandom(seed));
+  const world = createWorld(['red', 'blue'].flatMap((corner) => sides[corner].map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner }))), { seed, arena: level.arena, formation: level.formation });
+  for (let t = 0; t < seconds; t += 0.1) {
+    advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+    each(world);
+  }
+  return world;
+}
+
+test('Qi Jiguang\'s fowling pieces hold their fire for one volley on the word, close, then let the guns fall, draw the dao and fall in with the shields', { timeout: 60000 }, () => {
+  const at = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  let word = null;
+  const gaps = [];
+  const world = foughtQi(3, 9, (current) => {
+    const formation = current.formations.blue;
+    if (word === null && formation.volleyAt !== undefined) word = formation.volleyAt;
+    if (word === null) gaps.push(formation.reachGap);
+  });
+  const formation = world.formations.blue;
+  assert.ok(word !== null, 'the word given');
+  assert.ok(Math.min(...gaps) > DRILL.volley.at, 'not before the raiders were within the volley\'s distance on their feet');
+  const guns = world.fighters.filter((fighter) => fighter.body.inputs.style === 'matchlock');
+  const shots = world.events.filter((event) => event.kind === 'shot' || event.kind === 'misfire');
+  assert.ok(shots.length >= guns.length - 1, `every piece fired, or near it (${shots.length} of ${guns.length})`);
+  for (const shot of shots) {
+    assert.ok(shot.time >= word && shot.time < word + 2, `on the word, together (${shot.time.toFixed(1)} s, the word at ${word.toFixed(1)} s)`);
+    const target = world.fighters[shot.aimedAt];
+    if (shot.kind === 'shot' && target) assert.ok(Math.hypot(at(target)[0] - shot.from[0], at(target)[1] - shot.from[2]) < DRILL.volley.at, 'close');
+  }
+  // One shot each: no gun loaded again; each gunner standing has his dao out and his place in the shields' rank.
+  assert.ok(!world.events.some((event) => event.kind === 'shot' && event.time > word + 2), 'one volley, no second');
+  for (const gun of guns.filter((fighter) => fighter.state === 'up')) {
+    assert.equal(gun.weapon?.kind, 'dao', `${gun.body.inputs.name} has drawn his dao`);
+    assert.equal(gun.slot.ahead, formation.handFront, 'and fallen in with the shields');
+    const drew = world.events.find((event) => event.kind === 'drew' && event.fighter === gun.id);
+    const fired = shots.find((event) => (event.attacker ?? event.fighter) === gun.id);
+    if (fired) assert.ok(drew.time - fired.time < 1.5, `quickly (${(drew.time - fired.time).toFixed(1)} s after his shot)`);
+  }
+  assert.ok(world.debris.filter((debris) => debris.weapon === 'matchlock').length >= guns.length - 1, 'the guns let fall');
+});
+
+test('a wolf-brush catches a raider\'s blade and holds him off at its length, his sword useless, while the squad\'s spears go out to him and kill him; the shields leave him to them', { timeout: 60000 }, () => {
+  const level = battleOf('qiJiguang');
+  // The squads without their guns (their volley long fired and the gunners elsewhere), each man in his place.
+  const all = level.cast(seededRandom(4)).blue;
+  const kept = all.flatMap((inputs, index) => (inputs.style === 'matchlock' ? [] : [index]));
+  const blue = kept.map((index) => all[index]);
+  const formation = { ...level.formation, blue: { ...level.formation.blue, layout: kept.map((index) => level.formation.blue.layout[index]) } };
+  // Two raiders: one at a wolf-brush, the other coming on before the squads a little way off.
+  const raiders = SCENARIOS.wokou.cast(seededRandom(4)).red.filter((inputs) => inputs.style === 'katana').slice(0, 2);
+  const world = createWorld([...blue.map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'blue' })), ...raiders.map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }))], { seed: 4, arena: { halfX: 18, halfZ: 9 }, formation });
+  const [man, other] = world.fighters.filter((fighter) => fighter.corner === 'red');
+  const brush = world.fighters.find((fighter) => fighter.style === 'langxian');
+  const { forward: toward, anchor } = world.formations.blue;
+  placeFighter(man, brush.x[P.pelvis * 3] + toward[0] * 2.3, brush.x[P.pelvis * 3 + 2] + toward[1] * 2.3);
+  placeFighter(other, anchor[0] + toward[0] * 7, anchor[1] + toward[1] * 7);
+  thinkAll(world, 0.01);
+  // Free, he can cut.
+  man.focus = brush.id;
+  man.punch = null;
+  assert.equal(throwPunch(world, man, 'kesagiri'), true, 'free, he cuts');
+  man.punch = null;
+  // The blade meets the branches (as physics.js clashWeapons finds it), and is caught.
+  const draw = world.random;
+  world.random = () => 0;
+  brushTouch(world, brush, man, brush.weapon, man.weapon, 2.2, 0.8, true);
+  world.random = draw;
+  assert.equal(man.caught?.by, brush.id, 'caught');
+  assert.equal(brush.holding, man.id);
+  assert.equal(throwPunch(world, man, 'kesagiri'), false, 'no blow with it');
+  assert.equal(perform(world, man, 'weaponBlock'), false, 'no parry with it');
+  // A step in at the bearer is mostly taken off him, inside the brush's hold; a step away is his.
+  const bearerAt = [brush.root[0], brush.root[1]];
+  const into = [bearerAt[0] - man.root[0], bearerAt[1] - man.root[1]];
+  const length = Math.hypot(...into);
+  const step = brushKeepsOff(world, man, [(into[0] / length) * 2, (into[1] / length) * 2]);
+  assert.ok(Math.hypot(...step) < 2 * (BRUSH.step + 0.01), 'kept off');
+  const back = brushKeepsOff(world, man, [(-into[0] / length) * 2, (-into[1] / length) * 2]);
+  assert.ok(Math.hypot(...back) > 1.99, 'free to back off');
+  // The squad's men: the spears within a stride or two go for him, the shields leave him.
+  const freeRate = BRUSH.freeRate;
+  BRUSH.freeRate = 0;
+  try {
+    let spearsOn = 0;
+    let shieldsOn = 0;
+    let nearest = Infinity;
+    let stabbed = null;
+    for (let t = 0; t < 6 && man.state === 'up'; t += 0.1) {
+      advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+      if (!man.caught) break;
+      nearest = Math.min(nearest, Math.hypot(man.root[0] - brush.root[0], man.root[1] - brush.root[1]));
+      spearsOn = Math.max(spearsOn, world.fighters.filter((fighter) => fighter.style === 'spear' && fighter.focus === man.id).length);
+      // (Each man takes his man again as he thinks: a moment for it.)
+      if (t > 0.3) shieldsOn = Math.max(shieldsOn, world.fighters.filter((fighter) => fighter.style === 'swordShield' && fighter.focus === man.id).length);
+      stabbed ??= world.events.find((event) => event.kind === 'landed' && event.defender === man.id && world.fighters[event.attacker].style === 'spear') ?? null;
+    }
+    assert.ok(spearsOn >= 1, `the spears go for him (${spearsOn})`);
+    assert.equal(shieldsOn, 0, 'the shields leave him to them');
+    assert.ok(nearest > heldOffAt({ caught: { along: 2.2 } }) - 0.5, `held off at the brush's length (${nearest.toFixed(2)} m)`);
+    assert.ok(stabbed, 'a spear finds him');
+  } finally {
+    BRUSH.freeRate = freeRate;
+  }
 });

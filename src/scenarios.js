@@ -305,21 +305,46 @@ const QI = {
 };
 
 // How Qi's squads move and fight (formation.js drill): they stand and receive the raiders' rush, and
-// do not run at them (`advance` false); each man of a squad goes for a raider come near his place (`squad`), not the front rank only.
-const QI_DRILL = { advance: false, squad: true };
+// do not run at them (`advance` false); each man of a squad goes for a raider come near his place (`squad`), not the front rank only;
+// the fowling pieces fire one volley on the word, close (DRILL.volley), then are let fall for the dao at the gunner's belt, and the
+// gunners fall in with the shields (`sidearm`: formation.js DRILL.volley).
+const QI_DRILL = { advance: false, squad: true, sidearm: true };
 // Qi's army's discipline (ai.js AI.morale): his law, and a year of drill.
 const QI_DISCIPLINE = 1;
 
 // Qi's trench. His Jixiao xinshu rings a camp with a ditch and its rampart, and his men dug in where they were to
 // stand: a trench across the square before the squads, from the shops on its north side to the canal's embankment (so
-// there is no way round it: `from`, `to`, z in m, the square's edges, props/jiangnan.js JIANGNAN_PLAN), the spoil thrown
-// up on the squads' side into a bank. The raiders' rush has to cross it: down into it and up the bank (a man climbs a
-// slope at a pace that falls with its grade: fieldworks.js FIELDWORKS.climb), the fowling pieces behind it firing at them
-// as they struggle through, the rest of the squads waiting at the top. The Ming do not sally across it (formation `drill`
-// advance false: they hold their places), so it has no gaps. Dug as the ditch at Cerignola was, by hand in a night: 1.2 m
-// down to a bottom a metre wide, the bank 0.7 m over the square, five metres across in all (`profile`: the ground's height
-// by the metre across it, toward the Ming). The bank's back foot stands `before` m short of the guns' line, so the squads' places are on level ground.
-const QI_TRENCH = { from: -15.5, to: 11.8, before: 0.8, profile: [[-2.4, 0], [-1.6, -1.2], [-0.5, -1.2], [0.3, 0.7], [1.5, 0.7], [2.6, 0]] };
+// there is no way round it: the first and last points' z, the square's edges, props/jiangnan.js JIANGNAN_PLAN), the spoil
+// thrown up on the squads' side into a bank. Not an engineer's work dug overnight (Cerignola's ditch, 1.2 m down behind a
+// bank of 0.7) but what a few score men with spades dig through a town's paving in the hour or two before the raiders
+// come: a ditch some 0.7 m down and a metre and a half across at the top, its sides fallen in to slopes (loose fill
+// stands at about 35-45 degrees; the bottom half a metre wide), and the spoil heaped behind it into a low bank of about
+// 0.35 m (`profile`: the ground's height by the metre across it, toward the Ming; the bank's earth is the ditch's, less
+// what was spread behind it and the slabs prised up and stacked). Dug by many hands, each man's stretch his own, it
+// does not run true: its line wanders a few tenths of a metre either way and it is dug a little deeper here, a
+// little wider there (`points`: [z, x off the line, deep, wide], each the profile's heights × deep and offsets ×
+// wide at that point). It does not stop a man (FIELDWORKS.climb: he goes down into it and up the bank at a
+// scramble) but it takes the run out of a rush at the squads' feet, the guns firing as it comes to it (QI_DRILL),
+// the squads waiting at the top. The Ming do not sally across it (formation `drill` advance false: they hold their
+// places), so it has no gaps. The bank's back foot stands `before` m short of the guns' line, so the squads' places
+// are on level ground, and the slabs are lifted `apron` m either side of what was dug (render.js leaves that unpaved).
+const QI_TRENCH = {
+  before: 0.8,
+  apron: 0.3,
+  profile: [[-1.25, 0], [-0.75, -0.65], [-0.25, -0.7], [0.2, 0.3], [0.85, 0.35], [1.5, 0]],
+  points: [[-15.5, 0.3, 0.9, 1], [-10.2, -0.2, 1.1, 1.15], [-4.6, 0.35, 0.95, 0.9], [0.6, -0.3, 1.05, 1.05], [6.1, 0.1, 0.85, 1.1], [11.8, 0.4, 1, 0.92]],
+};
+
+/**
+ * Qi's trench where the battle draws the guns' line to (`gunsAt`, m along x): its points moved so that the furthest
+ * back of its bank's foot is QI_TRENCH.before m short of it.
+ */
+function qiTrench(gunsAt) {
+  const { profile, points, before, apron } = QI_TRENCH;
+  const back = profile[profile.length - 1][0];
+  const line = gunsAt - before - Math.max(...points.map(([, off, , wide]) => off + back * wide));
+  return { ditches: [{ points: points.map(([z, off, deep, wide]) => [line + off, z, deep, wide]), profile, apron }] };
+}
 
 // Without the squads' arms (qiJiguangLevel `weapons` off, for measuring): the
 // same men armed as the coast garrison was (WOKOU.garrison's spears and dao,
@@ -368,13 +393,11 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true, 
   // The trench is dug before the squads where the battle draws them (SPREAD: the lines start further apart than a level's
   // own numbers put them, the works are not moved with them), the bank's back foot `before` m short of the guns.
   const gunsAt = gunsFront * spreadScale({ red: WOKOU.front, blue: gunsFront });
-  const ditch = QI_TRENCH.profile;
-  const line = gunsAt - QI_TRENCH.before - ditch[ditch.length - 1][0];
-  const works = trench ? { ditches: [{ from: [line, QI_TRENCH.from], to: [line, QI_TRENCH.to], profile: ditch }] } : null;
+  const works = trench ? qiTrench(gunsAt) : null;
   return {
     title: "Qi Jiguang's army",
     place: 'Taizhou, Zhejiang · 1561',
-    blurb: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, fowling pieces firing as the raiders come on. Qi stands behind them with his guards, in iron lamellar, with the guandao.",
+    blurb: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, fowling pieces holding their fire for one volley at close range, then the gunners drawing their dao. Qi stands behind them with his guards, in iron lamellar, with the guandao.",
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9, ...(works ? { works } : {}) },

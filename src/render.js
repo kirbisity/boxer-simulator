@@ -45,6 +45,7 @@ import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rur
 import { plainsCamelTrain, plainsRidge, plainsWagonLaager } from './props/plains.js';
 import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 import { showWorks, updateWorksView } from './worksview.js';
+import { worksOf } from './physics/fieldworks.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -1123,9 +1124,12 @@ function buildAgincourt(arena = PLACE_ARENAS.agincourt) {
   return place;
 }
 
-/** The x ranges the ditches of an arena's works cut through its ground (each ditch along z: worksview.js draws its strip), from west to east. */
+/**
+ * The x ranges the ditches of an arena's works cut through its ground (each ditch along z, straight or wandering: the box
+ * round all it digs and lays bare, physics/fieldworks.js; worksview.js draws its strip), from west to east.
+ */
 function ditchStrips(arena) {
-  return (arena.works?.ditches ?? []).map((ditch) => [ditch.from[0] + Math.min(ditch.profile[0][0], 0), ditch.from[0] + ditch.profile[ditch.profile.length - 1][0]]).sort((a, b) => a[0] - b[0]);
+  return (worksOf(arena)?.ditches ?? []).map((ditch) => [...ditch.box.x]).sort((a, b) => a[0] - b[0]);
 }
 
 /**

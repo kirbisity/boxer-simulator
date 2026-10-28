@@ -57,18 +57,27 @@ export const DRILL = {
   reviewEvery: 0.25,
   // A shooter changes places at most this often (s).
   swapEvery: 1.5,
-  // The guns before a squad (a drill with `squad`) fire once and fall back
-  // through it (retireAt), so each holds his one shot until the man he has
-  // laid on is within `holdFire` m (ai.js holdsFire), unless he is far
-  // enough off that it can be loaded again before he arrives at a run of
-  // `runIn` m/s. The Jixiao xinshu has the fowling pieces fire only when
-  // the enemy is close, then by ranks; a volley at long range is mostly
-  // thrown away (MATCHLOCK spread: ~0.27 m off at 19 m, about a man's
-  // half-width; ~0.17 m at 12 m), and with the pieces empty the rush
-  // arrives unhurt. Held to 12 m, the shot goes off with the man some 8-9 m
-  // away (the aim takes its moment), early enough for the guns to fall back
-  // through the squad (retireAt) before he is on them.
-  holdFire: 12,
+  // The guns before a squad (a drill with `squad`) have one shot each before the rush is on them, and it
+  // is fired as one volley, on the word (formation.volleyAt), when the nearest of the enemy is `volley.at`
+  // m from the guns' front as he would have to go on his feet (over a ditch and its bank, the climb
+  // counted: physics/fieldworks.js walkingDistance), unless he is far enough off that a piece can be
+  // loaded again before he arrives at a run of `runIn` m/s (ai.js holdsFire). The Jixiao xinshu has the
+  // fowling pieces fire only when the enemy is close: a volley at long range is mostly thrown away
+  // (MATCHLOCK spread 0.014 rad, a man of middling skill a little wider: about one ball in five into
+  // a man's trunk at 25 m, two in five at 15 m, nine in ten at 6 m), and with the pieces empty the
+  // rush arrives unhurt. How close: as close as leaves the gunner his shot and then his sword before
+  // the man is on him. The word given, the aim takes ~0.8 s (MOVES fireLong), and letting the gun go and
+  // drawing the sword (`draw` s, below) as long again, while a raider runs 5-6 m/s; with ~2 m of a
+  // sword's reach and a step left over, 2 + 6 × 1.6 ≈ 12 m. So the balls go off at 6-8 m (the trench
+  // before the guns puts the raiders in it as they do), and the swords are out as the rush gets there.
+  // In a drill with `sidearm` (Qi Jiguang's) the gunners, their volley fired and no time to load again,
+  // let the piece fall and draw their kit's sidearm (the dao at a brigandine man's belt: as quick as a
+  // man drops a gun and pulls a sword, `draw` s before his first blow), and fall in at the front of the
+  // hand-to-hand men, in their own files (fallIn): the shields' rank, beside the shields and before the
+  // wolf-brushes, as many blades more in the squad's front as it had guns. A man standing behind his
+  // squad with a gun he cannot load in time is a man out of the fight. (Without it, they fall back
+  // through the squad: retireAt.)
+  volley: { at: 12, draw: 0.8 },
   runIn: 5,
   // Fire by ranks (the countermarch: the Spanish arquebusiers, the Han crossbows): the front rank
   // of a formation's guns and crossbows fires together in a window `volleyWindow` s long, then holds while the ranks
@@ -151,7 +160,10 @@ export function formUp(world, leaderOf = () => null, orders = {}) {
       fighter.formation = corner;
     }
     // (The level's order for the side over its kit's drill: Crassus's legion, drilled to advance, stood in its square.)
-    world.formations[corner] = { anchor, forward, left, leader: leader.id, drill: { ...drillOf(leader), ...sideDrill }, members: members.map((fighter) => fighter.id), review: 0 };
+    // (Its hand-to-hand men's front, as drawn up: where its gunners fall in once their swords are out, fallIn.)
+    const hands = members.filter((fighter) => !shoots(fighter));
+    const handFront = hands.length ? Math.max(...hands.map((fighter) => fighter.slot.ahead)) : null;
+    world.formations[corner] = { anchor, forward, left, leader: leader.id, drill: { ...drillOf(leader), ...sideDrill }, members: members.map((fighter) => fighter.id), review: 0, handFront };
   }
 }
 
@@ -196,6 +208,8 @@ export function moveFormations(world, dt, hurt = () => 0) {
     // (an arena's works: physics/fieldworks.js walkingDistance), the way round it or over it. The shooters change places
     // while he cannot be on them (relieveShooters).
     formation.reachGap = world.arena?.works ? walkingGap(world, corner, formation, front) : gap;
+    // A squad's guns are given the word to fire (DRILL.volley) once the enemy is that near on his feet; it stands.
+    if (formation.drill.squad && formation.volleyAt === undefined && formation.reachGap <= DRILL.volley.at) formation.volleyAt = world.time;
     let lag = 0;
     for (const fighter of standing) {
       const slot = slotAt(formation, fighter.slot);
@@ -330,6 +344,16 @@ function behindInFile(members, slot, accept = () => true) {
     if (!best || fighter.slot.ahead > best.slot.ahead) best = fighter;
   }
   return best;
+}
+
+/**
+ * A squad's gunner who has let his piece fall and drawn his sidearm (DRILL.volley, ai.js drawAfterVolley) falls in at
+ * the front of its hand-to-hand men (their foremost rank as they were drawn up), in his own file.
+ */
+export function fallIn(world, fighter, formation) {
+  if (formation.handFront === null || !fighter.slot) return;
+  fighter.slot = { ...fighter.slot, ahead: formation.handFront };
+  fighter.fellIn = world.time;
 }
 
 /** Swap two men's places. */

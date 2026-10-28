@@ -2,7 +2,7 @@
 // starting, its own stamina) and issues the same commands a player would,
 // choosing from its style's moves those that reach from where it stands.
 
-import { aheadOfSlot, DRILL, fromSlot, moveFormations, moveWings, volleyDue, walkToSlot, WINGS } from './formation.js';
+import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volleyDue, walkToSlot, WINGS } from './formation.js';
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
@@ -11,6 +11,7 @@ import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
+import { heldOffAt } from './physics/brush.js';
 import { handling } from './handling.js';
 import { holdWing, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
@@ -337,7 +338,16 @@ export const AI = {
   engageSlots: 3,
   // Men of a squad (formation.js, a drill with `squad`: Qi Jiguang's) pick the enemy their own are already on: each of them already
   // on him counts as `together` m nearer, up to engageSlots (several on one: the squad's local superiority).
-  squad: { together: 1 },
+  // A raider held off by one of their wolf-brushes (physics/brush.js) within `held` m (a stride or two) beyond a man's own reach is his to
+  // strike, whoever he was on, if his weapon reaches `longFrom` m or more (a spear, a guandao): the langxian guards, the
+  // spear kills (the Jixiao xinshu's order of the squad). The short arms (the shields' and the swords') leave him to
+  // them while there is another raider to face, and keep the front against the rest: crowding in on him, they would
+  // only stand in the spears' way (teamSpacing: no thrust through a comrade).
+  // Going out to him, a man walks up to `strikeAt` of his reach (where a point lands: STYLES keepPoint) and strikes.
+  squad: { together: 1, held: 2.5, longFrom: 1.6, strikeAt: 0.9 },
+  // A wolf-brush's bearer holding a man (holdWithBrush): within `band` m of the distance it holds him at he stands; off
+  // it, he steps in or gives ground at `give` of his footwork, the brush kept on him.
+  brush: { band: 0.25, give: 0.5 },
   waitingDistance: 0.5,
   // How often (per second) a waiting fighter looks for a less crowded man.
   refocusRate: 0.6,
@@ -515,8 +525,10 @@ function keepPlace(world, fighter) {
   if (fighter.state !== 'up' || fighter.clinch || fighter.pin || fighter.pickup || fighter.panicked || fighter.crawling) return;
   // Out past his leash (after a man, or carried on by a blow): back to his place,
   // still facing them and free to strike and guard as he goes.
-  if (aheadOfSlot(fighter, formation) > DRILL.leash) {
-    const opponent = fighter.focus === undefined ? null : world.fighters[fighter.focus];
+  // (A spear going out to a man held in one of his squad's wolf-brushes goes as far as it takes: AI.squad.held.)
+  const opponent = fighter.focus === undefined ? null : world.fighters[fighter.focus];
+  const leash = opponent && heldByMyBrush(world, fighter) === opponent ? DRILL.leash + AI.squad.held : DRILL.leash;
+  if (aheadOfSlot(fighter, formation) > leash) {
     walkToSlot(fighter, formation, opponent);
     fighter.running = false;
   }
@@ -524,19 +536,39 @@ function keepPlace(world, fighter) {
 
 /**
  * The guns before a squad (a drill with `squad`: Qi Jiguang's fowling
- * pieces) have one shot each before they fall back through it
- * (formation.js retireShooters), and it is held until it is sure
- * (DRILL.holdFire): while the man he has laid on is further than that, and
- * coming on (at a run, DRILL.runIn) too fast for the piece to be loaded
- * again before he arrives, the gunner stands with it ready. Thrown away at
- * long range, it is the only shot his place gets: the matchlock takes 15 s
- * to load and a rush covers the ground in five. A line of shooters that
- * relieve each other (the Han crossbowmen) shoots as it likes.
+ * pieces) have one shot each before the rush is on them, and it is held
+ * for the squad's volley (DRILL.volley): until the word is given
+ * (formation.volleyAt) the gunner stands with it ready, while the man he
+ * has laid on is coming on (at a run, DRILL.runIn) too fast for the piece
+ * to be loaded again before he arrives. Thrown away at long range, it is
+ * the only shot his place gets: the matchlock takes 15 s to load and a rush
+ * covers the ground in a few. A line of shooters that relieve each other
+ * (the Han crossbowmen) shoots as it likes.
  */
 function holdsFire(fighter, formation, distance) {
   const shot = fighter.weapon.spec.shot;
-  if (!formation.drill.squad || !shot || distance <= DRILL.holdFire) return false;
+  if (!formation.drill.squad || !shot || formation.volleyAt !== undefined) return false;
   return distance < shot.reloadSeconds * DRILL.runIn;
+}
+
+/**
+ * A squad's gunner whose volley is fired, with the enemy too near to load
+ * again (DRILL.runIn), in a drill with `sidearm` (Qi Jiguang's): the shot done, he lets the
+ * piece fall and draws his kit's sidearm (physics.js dropWeapon: the dao at a
+ * brigandine man's belt), is a moment about it (DRILL.volley.draw: no blow
+ * before), and falls in at his squad's front (formation.js fallIn). Returns
+ * whether he did.
+ */
+function drawAfterVolley(world, fighter, formation, distance) {
+  const weapon = fighter.weapon;
+  if (!formation.drill.sidearm || !weapon.spec.shot || weapon.loaded || fighter.punch || fighter.sidearmDrawn || !fighter.body.gear.sidearm) return false;
+  if (distance >= weapon.spec.shot.reloadSeconds * DRILL.runIn) return false;
+  dropWeapon(world, fighter, 'dropped');
+  if (fighter.weapon?.held) {
+    fighter.cooldown = Math.max(fighter.cooldown ?? 0, DRILL.volley.draw);
+    fallIn(world, fighter, formation);
+  }
+  return true;
 }
 
 /**
@@ -555,6 +587,8 @@ function holdRank(world, fighter, opponent, style, dt) {
   if (gun) {
     // Close enough to need the sword: the ordinary way (the crossbow let fall, the sidearm drawn).
     if (distance <= gun.close) return false;
+    // His volley fired and no time to load: the gun let fall and the sword drawn (a drill with `sidearm`).
+    if (drawAfterVolley(world, fighter, formation, distance)) return true;
     const away = walkToSlot(fighter, formation, opponent);
     if (weapon.spec.shot && !weapon.loaded) {
       fighter.reloading = true;
@@ -583,7 +617,8 @@ function holdRank(world, fighter, opponent, style, dt) {
   const onSlot = opponent.state === 'up' && fromSlot(fighter, formation, opponent) < reach + DRILL.engage;
   // A squad (a drill with `squad`: Qi Jiguang's) fights as one: any man of it, not the front rank only, goes for an enemy come within his reach of his place.
   const squad = formation.drill.squad && opponent.state === 'up' && fromSlot(fighter, formation, opponent) < reach + DRILL.squadEngage;
-  if (onHim || squad || (fighter.inFront && onSlot)) return false;
+  // (And a man held in one of its wolf-brushes is the spears' to go out to, a stride or two past their places: AI.squad.held.)
+  if (onHim || squad || (fighter.inFront && onSlot) || heldByMyBrush(world, fighter) === opponent) return false;
   walkToSlot(fighter, formation, opponent);
   return true;
 }
@@ -749,7 +784,14 @@ function chooseFocus(world, fighter) {
     fighter.focus = hitBy;
     return world.fighters[hitBy];
   }
-  if (current && current.state === 'up' && !crawlingAway(current) && !closerAtHand(world, fighter, current)) return current;
+  // A wolf-brush holding a man: its bearer keeps on him (holdWithBrush); his squad's men within reach of him go for him.
+  const held = heldByMyBrush(world, fighter);
+  if (held) {
+    if (held.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: held.id, effects: [] });
+    fighter.focus = held.id;
+    return held;
+  }
+  if (current && current.state === 'up' && !crawlingAway(current) && !closerAtHand(world, fighter, current) && !leavesHeld(world, fighter, current)) return current;
   const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !crawlingAway(other));
   if (!standing.length) {
     fighter.focus = undefined;
@@ -773,18 +815,68 @@ function chooseFocus(world, fighter) {
   };
   const score = (other) => vec.length(vec.sub(point(other.x, P.pelvis), at)) + crowding(other) + AI.cohesion.focus * fromMyLeader(world, fighter, other) - (shooters && !other.mount && STYLES[other.style]?.ranged ? shooters : 0);
   // The nearest, least crowded: each scored once (the first of equals kept, as before).
-  let next = standing[0];
+  // (A man held in our wolf-brush is left to the spears by the short arms of a squad while there is another to face.)
+  const facing = standing.filter((other) => !leavesHeld(world, fighter, other));
+  const pool = facing.length ? facing : standing;
+  let next = pool[0];
   let best = score(next);
-  for (let index = 1; index < standing.length; index += 1) {
-    const value = score(standing[index]);
+  for (let index = 1; index < pool.length; index += 1) {
+    const value = score(pool[index]);
     if (value < best) {
-      next = standing[index];
+      next = pool[index];
       best = value;
     }
   }
   if (next.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: next.id, effects: [] });
   fighter.focus = next.id;
   return next;
+}
+
+/**
+ * The enemy held in a wolf-brush (physics/brush.js) that this man should be on: for its bearer, the man he holds; for
+ * a man of a squad (a drill with `squad`), the nearest held by one of his side's brushes within his reach and
+ * AI.squad.held m. Null if none.
+ */
+function heldByMyBrush(world, fighter) {
+  if (fighter.holding !== undefined) {
+    const man = world.fighters[fighter.holding];
+    return man?.caught?.by === fighter.id ? man : null;
+  }
+  if (!fighter.slot || !world.formations?.[fighter.formation]?.drill.squad || !world.brushTouches || reachOf(fighter) < AI.squad.longFrom) return null;
+  const within = reachOf(fighter) + AI.squad.held;
+  let best = null;
+  let nearest = within;
+  for (const other of world.fighters) {
+    if (!other.caught || other.state !== 'up' || world.fighters[other.caught.by].corner !== fighter.corner) continue;
+    const distance = Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+    if (distance < nearest) {
+      nearest = distance;
+      best = other;
+    }
+  }
+  return best;
+}
+
+/** Whether a man of a squad with a short weapon leaves this enemy, held in his side's wolf-brush, to the spears (AI.squad.longFrom). */
+function leavesHeld(world, fighter, other) {
+  if (!other.caught || !fighter.slot || fighter.holding !== undefined || world.fighters[other.caught.by].corner !== fighter.corner) return false;
+  return Boolean(world.formations?.[fighter.formation]?.drill.squad) && reachOf(fighter) < AI.squad.longFrom;
+}
+
+/**
+ * A wolf-brush holding a man (physics/brush.js): its bearer does not strike (a thrust would take the brush off him)
+ * but keeps it steady in his face, standing off at the distance it holds him at (brush.js heldOffAt) while his squad's
+ * spears go for him. Returns whether that is what he does.
+ */
+function holdWithBrush(world, fighter, opponent) {
+  if (fighter.holding === undefined || opponent.id !== fighter.holding || opponent.caught?.by !== fighter.id) return false;
+  const distance = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+  const want = heldOffAt(opponent);
+  fighter.move = distance < want - AI.brush.band ? -AI.brush.give : distance > want + AI.brush.band ? AI.brush.give : 0;
+  fighter.strafe = 0;
+  fighter.running = false;
+  fighter.aiCombo = null;
+  return true;
 }
 
 /**
@@ -842,6 +934,9 @@ function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
 
 /** Whether team-mates nearer my man already fill the places to take him on. */
 function waitingTurn(world, fighter, opponent) {
+  // A man held in one of our wolf-brushes (physics/brush.js) cannot turn his blade on those who come at him: no one
+  // waits his turn at him (the spears thrust past the shields' shoulders at him, as the squad was drawn up to).
+  if (opponent.caught && world.fighters[opponent.caught.by].corner === fighter.corner) return false;
   const at = point(opponent.x, P.pelvis);
   const away = (other) => Math.hypot(...[0, 2].map((axis) => point(other.x, P.pelvis)[axis] - at[axis]));
   const mine = away(fighter);
@@ -891,6 +986,8 @@ export function confidence(fighter, opponent, world = null) {
  * point with nothing as long in his own hands.
  */
 export function outreached(fighter, opponent) {
+  // His blade caught in a wolf-brush (physics/brush.js) reaches no one: he is gone in on, not held off.
+  if (opponent.caught) return false;
   const theirs = opponent.weapon?.held ? opponent.weapon.spec : null;
   const mine = fighter.weapon?.held ? fighter.weapon.spec : null;
   if (reachOf(opponent) - reachOf(fighter) > AI.blade.outreachedBy) return true;
@@ -1034,6 +1131,13 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   const safe = reachOf(opponent) + fighter.body.lengths.headRadius + blade.margin;
   const myRange = reachOf(fighter) + opponent.body.lengths.headRadius;
   let phase = fighter.aiCadence;
+  // A man held in one of my side's wolf-brushes (physics/brush.js) cannot come at me: there is nothing to wait for or
+  // keep out of. Up to where my point lands (AI.squad.strikeAt of my reach), and strike.
+  if (opponent.caught && world.fighters[opponent.caught.by].corner === fighter.corner) {
+    const at = myRange * AI.squad.strikeAt;
+    fighter.move = distance > at + AI.rangeSlack ? 1 : distance < at - AI.rangeSlack * 2 ? -0.5 : 0;
+    return true;
+  }
   // The longer weapon: hold at the edge of his reach, inside mine; answer
   // whoever steps in with a burst; step back when pressed.
   const outreaching = !wary && fighter.weapon?.held && reachOf(fighter) - reachOf(opponent) > blade.outreachedBy;
@@ -1940,6 +2044,8 @@ export function think(world, fighter, dt) {
     keepAway(world, fighter, opponent, dt);
     return;
   }
+  // A man held in his wolf-brush: kept there, not struck at (holdWithBrush).
+  if (holdWithBrush(world, fighter, opponent)) return;
   // The player's order (command.js): to him, a charge, a hold; over his place in the ranks.
   const order = obeyOrder(world, fighter, opponent, style, dt);
   if (order === 'obeyed') return;

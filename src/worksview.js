@@ -23,6 +23,12 @@ export const WORKS_VIEW = {
   water: { colour: 0x5a6a62, opacity: 0.72, bank: 0x4a3c2c },
   // A ditch strip's ground: cells across and along it (m).
   ditch: { across: 0.2, along: 0.6, earth: 0x6a5238, cut: 0x4a3a28, grass: 0x6a7040 },
+  // A ditch dug in haste whose line wanders (a ditch with `points`: Qi Jiguang's trench): the ground over the box round it
+  // in cells of `cell` m, fresh spoil (`spoil`, lighter: turned-up subsoil drying) on the bank, the cut faces `cut`, the
+  // trodden ground of its apron `trodden`; every cell's colour off by up to `mottle` of itself (clods, damp, stones),
+  // and the surface `rough` m up or down (spade-cut earth is never smooth). `slabs`: the paving prised up to dig it,
+  // stacked in heaps behind the bank, one every `every` m along it ([width, depth, thickness] of a slab, m).
+  rough: { cell: 0.15, spoil: 0x7a6044, cut: 0x47372a, trodden: 0x5e4a36, mottle: 0.18, rough: 0.025, slabs: { every: 3.4, size: [0.6, 0.4, 0.08], colour: 0x8c8c86 } },
 };
 
 /** A seeded generator (mulberry32), so a battle's woods and mud are drawn the same each time. */
@@ -60,7 +66,7 @@ export function showWorks(view, arena) {
   group.name = 'fieldworks';
   const random = worksRandom(works.stakes.length * 7919 + works.walls.length * 104729 + Math.round(arena.halfX * 31));
   for (const area of works.soft) group.add(worksSoftGround(area, random));
-  for (const ditch of works.ditches) group.add(worksDitchStrip(works, ditch));
+  for (const ditch of works.ditches) group.add(ditch.bends ? worksRoughDitch(works, ditch, random) : worksDitchStrip(works, ditch));
   const stakes = worksStakeMeshes(works.stakes);
   group.add(stakes.group);
   for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : worksPalisade(wall));
@@ -340,4 +346,82 @@ function worksDitchStrip(works, ditch) {
   mesh.receiveShadow = true;
   mesh.castShadow = true;
   return mesh;
+}
+
+/**
+ * A ditch dug in haste, its line wandering (a ditch with `points`): the ground over the whole box round it (the strip
+ * the place leaves unpaved, render.js ditchStrips), from the line's first point to its last, its height the relief's;
+ * the colours of fresh-dug earth mottled cell by cell and the surface roughened; the slabs lifted to dig it stacked
+ * behind the bank.
+ */
+function worksRoughDitch(works, ditch, random) {
+  const spec = WORKS_VIEW.rough;
+  const [x0, x1] = ditch.box.x;
+  const zs = ditch.pieces.map((piece) => piece.a[1]).concat(ditch.pieces.at(-1).a[1] + ditch.pieces.at(-1).u[1] * ditch.pieces.at(-1).length);
+  const [z0, z1] = [Math.min(...zs), Math.max(...zs)];
+  const across = Math.max(2, Math.ceil((x1 - x0) / spec.cell));
+  const along = Math.max(2, Math.ceil((z1 - z0) / spec.cell));
+  const positions = [];
+  const colours = [];
+  const colour = new THREE.Color();
+  const tint = new THREE.Color();
+  const deepest = Math.min(...ditch.profile.map(([, height]) => height));
+  for (let j = 0; j <= along; j += 1) {
+    for (let i = 0; i <= across; i += 1) {
+      const x = x0 + ((x1 - x0) * i) / across;
+      const z = z0 + ((z1 - z0) * j) / along;
+      const y = reliefAt(works, x, z);
+      // Rough where it was dug or thrown up, the trodden apron flat; the box's edges left at the paving's level.
+      const edge = i === 0 || i === across || j === 0 || j === along;
+      const lumpy = !edge && Math.abs(y) > 0.02 ? (random() * 2 - 1) * spec.rough : 0;
+      positions.push(x, y + lumpy + 0.004, z);
+      // The cut darker the deeper (damp subsoil), the bank's spoil lighter, the apron trodden.
+      if (y < -0.02) colour.set(spec.cut).lerp(tint.set(spec.trodden), Math.max(0, 1 - y / deepest) * 0.6);
+      else if (y > 0.02) colour.set(spec.spoil);
+      else colour.set(spec.trodden);
+      colour.multiplyScalar(1 + (random() * 2 - 1) * spec.mottle);
+      colours.push(colour.r, colour.g, colour.b);
+    }
+  }
+  const indices = [];
+  for (let j = 0; j < along; j += 1) {
+    for (let i = 0; i < across; i += 1) {
+      const a = j * (across + 1) + i;
+      const b = a + 1;
+      const c = a + across + 1;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const group = new THREE.Group();
+  const ground = new THREE.Mesh(geometry, worksLit(0xffffff, { vertexColors: true, side: THREE.DoubleSide, roughness: 0.97 }));
+  ground.receiveShadow = true;
+  ground.castShadow = true;
+  group.add(ground);
+  // The lifted slabs, in small leaning stacks on the trodden ground behind the bank (toward the profile's far end).
+  const slab = spec.slabs;
+  const back = ditch.profile[ditch.profile.length - 1][0];
+  const box = new THREE.BoxGeometry(slab.size[0], slab.size[2], slab.size[1]);
+  const stone = worksLit(slab.colour, { roughness: 0.85 });
+  for (let t = slab.every / 2; t < ditch.length; t += slab.every * (0.7 + random() * 0.6)) {
+    const piece = ditch.pieces.find((p) => t >= p.start && t <= p.start + p.length) ?? ditch.pieces.at(-1);
+    const s = t - piece.start;
+    const off = back * Math.max(...ditch.wide) + ditch.apron * (0.3 + random() * 0.5);
+    const base = [piece.a[0] + piece.u[0] * s + piece.left[0] * off, piece.a[1] + piece.u[1] * s + piece.left[1] * off];
+    const count = 1 + Math.floor(random() * 4);
+    for (let k = 0; k < count; k += 1) {
+      const mesh = new THREE.Mesh(box, stone);
+      mesh.position.set(base[0] + (random() - 0.5) * 0.12, slab.size[2] * (k + 0.5), base[1] + (random() - 0.5) * 0.12);
+      mesh.rotation.set((random() - 0.5) * 0.08, Math.atan2(piece.u[0], piece.u[1]) + (random() - 0.5) * 0.5, (random() - 0.5) * 0.08);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+  }
+  return group;
 }

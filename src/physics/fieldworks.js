@@ -19,7 +19,9 @@
 //    the speed it had into it (mounted.js jolt: past what its legs take, down).
 //    Shot and arrows go through a palisade's rails, and a spear over and between them.
 //  - ditches: a ditch dug with its spoil thrown up into a bank (Cerignola's),
-//    as the height of the ground across it (`profile`). The ground is the floor
+//    as the height of the ground across it (`profile`), along a straight line or
+//    a line through several points (a trench dug in haste wanders), dug deeper or
+//    shallower, wider or narrower, from one point to the next. The ground is the floor
 //    there (physics.js floorUnder, the stance's lift): a man goes down into it
 //    and climbs out, slowly as the slope is steep; a horse does not go where the
 //    ground falls or rises more than a step at its chest's front, and is
@@ -155,7 +157,11 @@ const compiledWorks = new WeakMap();
  * - `walls`: { points: [[x, z], ...] (a line through them), height (m), kind ('palisade' | 'wood'),
  *   gaps: [[from, to], ...] (m along the line where it is open) }.
  * - `ditches`: { from: [x, z], to: [x, z] (its line), profile: [[offset, height], ...] (m across the line, to its
- *   left looking from `from` to `to`; the ground's height there, 0 beyond the ends of the profile) }.
+ *   left looking from `from` to `to`; the ground's height there, 0 beyond the ends of the profile) }; or, for a
+ *   line that bends, `points: [[x, z, deep, wide], ...]` in place of `from` and `to`: at each point the profile's
+ *   heights × `deep` and its offsets × `wide` (each 1 if left out), eased from one point to the next (a ditch dug
+ *   shallower throws up a lower bank: the spoil is what came out of it); `apron` (m): the ground either side of
+ *   the profile that its digging laid bare (a paved square's slabs lifted to dig it; the place leaves it unpaved).
  * - `soft`: { x: [x0, x1], z: [z0, z1], depth (m, the reference man's sinkage), firm (m, the layer under it),
  *   viscosity (as water's: 1 water, ~2 the cesspool's sludge), footing (share of his grip left), surface ('mud' |
  *   'water': the ear's), water (m of standing water over it), edge (m it deepens over from its sides) }.
@@ -211,12 +217,7 @@ function compileWorks(spec) {
       along += length;
     }
   }
-  const ditches = (spec.ditches ?? []).map((ditch) => {
-    const dx = ditch.to[0] - ditch.from[0];
-    const dz = ditch.to[1] - ditch.from[1];
-    const length = Math.hypot(dx, dz) || 1;
-    return { from: ditch.from, u: [dx / length, dz / length], left: [dz / length, -dx / length], length, profile: ditch.profile };
-  });
+  const ditches = (spec.ditches ?? []).map(compileDitch);
   const soft = (spec.soft ?? []).map((area) => ({ surface: 'mud', viscosity: 2, footing: 0.7, firm: 0.5, water: 0, ...area }));
   // A box round everything, to pass over a man far from all of it at once.
   const xs = [];
@@ -225,6 +226,65 @@ function compileWorks(spec) {
   for (const wall of walls) xs.push(wall.a[0], wall.b[0]), zs.push(wall.a[1], wall.b[1]);
   const near = xs.length ? { x: [Math.min(...xs) - 1.5, Math.max(...xs) + 1.5], z: [Math.min(...zs) - 1.5, Math.max(...zs) + 1.5] } : null;
   return { stakes, walls, ditches, soft, near, spec };
+}
+
+/**
+ * A ditch's line as the pieces it runs in (`pieces`: each from `a`, along `u` for `length` m, its left `left`, `start` m
+ * along the whole line), with the profile's scales at each point (`deep`, `wide`), and a box round all it digs or throws
+ * up (`box`, with its `apron`). `from`, `u`, `left` are its first piece's, `length` the whole line's.
+ */
+function compileDitch(ditch) {
+  const points = ditch.points ?? [[...ditch.from, 1, 1], [...ditch.to, 1, 1]];
+  const pieces = [];
+  let start = 0;
+  for (let k = 0; k + 1 < points.length; k += 1) {
+    const a = points[k];
+    const b = points[k + 1];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const u = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+    pieces.push({ a: [a[0], a[1]], u, left: [u[1], -u[0]], length, start });
+    start += length;
+  }
+  const deep = points.map((point) => point[2] ?? 1);
+  const wide = points.map((point) => point[3] ?? 1);
+  const apron = ditch.apron ?? 0;
+  const widest = Math.max(...wide);
+  const low = ditch.profile[0][0] * widest - apron;
+  const high = ditch.profile[ditch.profile.length - 1][0] * widest + apron;
+  const reach = Math.max(-low, high);
+  const xs = points.map((point) => point[0]);
+  const zs = points.map((point) => point[1]);
+  // (A straight ditch along z, as Cerignola's: its box is its strip exactly, the profile's own ends.)
+  const along = pieces.length === 1 && Math.abs(pieces[0].u[0]) < 1e-9;
+  const box = along
+    ? { x: [Math.min(...xs) + low * pieces[0].left[0], Math.max(...xs) + high * pieces[0].left[0]].sort((p, q) => p - q), z: [Math.min(...zs), Math.max(...zs)] }
+    : { x: [Math.min(...xs) - reach, Math.max(...xs) + reach], z: [Math.min(...zs) - reach, Math.max(...zs) + reach] };
+  return { from: pieces[0].a, u: pieces[0].u, left: pieces[0].left, length: start, profile: ditch.profile, pieces, deep, wide, apron, box, bends: Boolean(ditch.points) };
+}
+
+/**
+ * Where (x, z) is against a ditch's line: `across` (m, to its left, signed; the distance to the nearest point of the
+ * line) and the profile's scales there (`deep`, `wide`), or null beyond the line's ends.
+ */
+function onDitch(ditch, x, z) {
+  let best = null;
+  for (let k = 0; k < ditch.pieces.length; k += 1) {
+    const piece = ditch.pieces[k];
+    const rx = x - piece.a[0];
+    const rz = z - piece.a[1];
+    const along = rx * piece.u[0] + rz * piece.u[1];
+    const clamped = Math.max(0, Math.min(piece.length, along));
+    const side = rx * piece.left[0] + rz * piece.left[1];
+    const off = Math.hypot(rx - piece.u[0] * clamped, rz - piece.u[1] * clamped);
+    if (best && off >= best.off) continue;
+    best = { off, side, k, along, clamped };
+  }
+  const first = best.k === 0 && best.along < 0;
+  const last = best.k === ditch.pieces.length - 1 && best.along > ditch.pieces[best.k].length;
+  if (first || last) return null;
+  const share = best.clamped / ditch.pieces[best.k].length;
+  const ease = (values) => values[best.k] + (values[best.k + 1] - values[best.k]) * share;
+  return { across: best.side < 0 ? -best.off : best.off, deep: ease(ditch.deep), wide: ease(ditch.wide) };
 }
 
 /** The world's own state of its works: which stakes are broken. */
@@ -243,18 +303,18 @@ export function reliefAt(works, x, z) {
   if (!works?.ditches.length) return 0;
   let height = 0;
   for (const ditch of works.ditches) {
-    const rx = x - ditch.from[0];
-    const rz = z - ditch.from[1];
-    const along = rx * ditch.u[0] + rz * ditch.u[1];
-    if (along < 0 || along > ditch.length) continue;
-    const across = rx * ditch.left[0] + rz * ditch.left[1];
+    if (x < ditch.box.x[0] || x > ditch.box.x[1] || z < ditch.box.z[0] || z > ditch.box.z[1]) continue;
+    const at = onDitch(ditch, x, z);
+    if (!at) continue;
+    // Read against the profile as dug here: its offsets × `wide`, its heights × `deep`.
+    const across = at.across / at.wide;
     const profile = ditch.profile;
     if (across <= profile[0][0] || across >= profile[profile.length - 1][0]) continue;
     for (let k = 1; k < profile.length; k += 1) {
       if (across > profile[k][0]) continue;
       const [o0, h0] = profile[k - 1];
       const [o1, h1] = profile[k];
-      height += h0 + ((h1 - h0) * (across - o0)) / (o1 - o0);
+      height += (h0 + ((h1 - h0) * (across - o0)) / (o1 - o0)) * at.deep;
       break;
     }
   }
@@ -492,15 +552,10 @@ function climbedDistance(works, from, to) {
   const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
   let total = length;
   for (const ditch of works.ditches) {
-    const across = (p) => (p[0] - ditch.from[0]) * ditch.left[0] + (p[1] - ditch.from[1]) * ditch.left[1];
-    const a = across(from);
-    const b = across(to);
-    const low = ditch.profile[0][0];
-    const high = ditch.profile[ditch.profile.length - 1][0];
-    if (Math.max(a, b) <= low || Math.min(a, b) >= high || Math.abs(b - a) < 1e-9) continue;
-    // The shares of the way where it enters and leaves the profile.
-    const t0 = Math.max(0, Math.min(1, ((a < b ? low : high) - a) / (b - a)));
-    const t1 = Math.max(0, Math.min(1, ((a < b ? high : low) - a) / (b - a)));
+    // The shares of the way where it enters and leaves the box round the ditch (its relief is all inside it).
+    const inside = clipToBox(from, to, ditch.box);
+    if (!inside) continue;
+    const [t0, t1] = inside;
     const stretch = length * Math.abs(t1 - t0);
     const steps = Math.max(1, Math.ceil(stretch / spec.span));
     const at = (t) => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
@@ -513,6 +568,25 @@ function climbedDistance(works, from, to) {
     }
   }
   return total;
+}
+
+/** The shares [t0, t1] of the way from `from` to `to` inside `box` ({ x: [x0, x1], z: [z0, z1] }), or null (Liang–Barsky). */
+function clipToBox(from, to, box) {
+  let t0 = 0;
+  let t1 = 1;
+  for (const [axis, [low, high]] of [[0, box.x], [1, box.z]]) {
+    const d = to[axis] - from[axis];
+    if (Math.abs(d) < 1e-12) {
+      if (from[axis] < low || from[axis] > high) return null;
+      continue;
+    }
+    const a = (low - from[axis]) / d;
+    const b = (high - from[axis]) / d;
+    t0 = Math.max(t0, Math.min(a, b));
+    t1 = Math.min(t1, Math.max(a, b));
+    if (t0 >= t1) return null;
+  }
+  return [t0, t1];
 }
 
 /** Whether the segments p-q and a-b cross (on the floor). */
