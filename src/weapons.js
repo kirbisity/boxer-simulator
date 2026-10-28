@@ -466,6 +466,17 @@ export const WEAPONS = {
     harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, crush: 0.55,
   },
+  // The Inca champi (the Spaniards' porra): a star-shaped head of cast bronze
+  // (or ground stone), five or six points round a hole, on a wooden haft of
+  // some 80 cm; the warrior's weapon of the Andes, and what Atahualpa's men
+  // were said to carry under their tunics at Cajamarca. Lighter in the head
+  // than an iron mace (a bronze star of ~0.6 kg, `mass` with the haft), so
+  // less crush against steel; its points bite as it lands (`pierce`).
+  champi: {
+    label: 'Champi', hands: 'one', length: 0.74, strikeFrom: 0.62, handle: 0.12, mass: 1.25, balance: 0.74, radius: 0.05,
+    harm: { swing: { blunt: 1.3, pierce: 0.25 }, thrust: { blunt: 0.35 } },
+    contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.6, crush: 0.3,
+  },
   // The steppe and Turkish sabre (Mongol sabre, Ottoman kılıç): a long,
   // gently curved single edge for the draw cut. The yatagan, the Janissary's
   // short sword, curves forward instead, its weight out towards the point.

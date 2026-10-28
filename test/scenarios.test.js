@@ -71,7 +71,8 @@ test('the battles start further apart than the levels\' own lines: the gap half 
     const front = (corner) => level.wings?.formation?.[corner]?.front ?? level.formation[corner].front;
     return front('red') + front('blue');
   };
-  for (const key of Object.keys(SCENARIOS).filter((name) => SCENARIOS[name].cast)) {
+  // (An ambush, Cajamarca's, is laid where it was laid: not drawn apart. Its own test is in test/cajamarca.test.js.)
+  for (const key of Object.keys(SCENARIOS).filter((name) => SCENARIOS[name].cast && !SCENARIOS[name].formation.red.ambush)) {
     const played = battleOf(key);
     const gap = played.formation.red.front + played.formation.blue.front;
     const factor = SCENARIOS[key].spread ?? SPREAD.factor;

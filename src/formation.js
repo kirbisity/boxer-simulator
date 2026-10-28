@@ -57,6 +57,19 @@ export const DRILL = {
   reviewEvery: 0.25,
   // A shooter changes places at most this often (s).
   swapEvery: 1.5,
+  // The guns before a squad (a drill with `squad`) fire once and fall back
+  // through it (retireAt), so each holds his one shot until the man he has
+  // laid on is within `holdFire` m (ai.js holdsFire), unless he is far
+  // enough off that it can be loaded again before he arrives at a run of
+  // `runIn` m/s. The Jixiao xinshu has the fowling pieces fire only when
+  // the enemy is close, then by ranks; a volley at long range is mostly
+  // thrown away (MATCHLOCK spread: ~0.27 m off at 19 m, about a man's
+  // half-width; ~0.17 m at 12 m), and with the pieces empty the rush
+  // arrives unhurt. Held to 12 m, the shot goes off with the man some 8-9 m
+  // away (the aim takes its moment), early enough for the guns to fall back
+  // through the squad (retireAt) before he is on them.
+  holdFire: 12,
+  runIn: 5,
   // Fire by ranks (the countermarch: Nagashino's teppō, the Spanish arquebusiers, the Han crossbows): the front rank
   // of a formation's guns and crossbows fires together in a window `volleyWindow` s long, then holds while the ranks
   // change, the next volley due a reload's time over the number of ranks after it (volleyDue): so with three ranks of

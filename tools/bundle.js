@@ -1,12 +1,18 @@
 // Inline the modules and stylesheet into one page for the hosted review copy.
-// Usage: node tools/bundle.js [out.html]
+// Usage: node tools/bundle.js [out.html] [--no-minify]
+// The code is minified with esbuild (comments and whitespace gone, names mangled) unless --no-minify is given, which keeps the source as it is for debugging.
+// A minified build also writes <out>.map, a source map to the unminified bundle; the page names it in a sourceMappingURL comment but does not carry it.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import vm from 'node:vm';
+import { transformSync } from 'esbuild';
 
 // In load order: a module's top-level code may use only what comes before it. The looks (the kit, one file per look, then the registry) come before toon.js, which asks the registry which look is in force.
-const MODULES = ['aging', 'outfits', 'horses', 'physiology', 'body', 'physics/config', 'physics/overdraft', 'physics/terrain', 'physics/jump', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics/fieldworks', 'audio/surface', 'audio/log', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/whip', 'physics/rising', 'physics/gait', 'physics/mounted', 'cast', 'riding', 'command', 'ai', 'gesture', 'finisher', 'runsteer', 'control', 'followcam', 'watchcam', 'cameraarm', 'occluders', 'camerarig', 'scenerylod', 'levelmode/quality', 'adaptres', 'rig', 'bodymesh', 'skintones', 'sculpt', 'skinrules', 'skindetail', 'skintex', 'loftbody', 'fleshbody', 'bodystyles', 'skinworker', 'looks/kit', 'looks/toon', 'looks/probe-lite', 'looks', 'blooddye', 'ground/painted', 'ground/living', 'scenery/skyball-photo-data', 'scenery/skyball', 'scenery/generated', 'scenery/trees', 'scenery', 'toon', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'facemorph', 'face', 'wardrobe', 'robotview', 'oyoroi', 'crowdview', 'crowdlod', 'props/town', 'props/rural', 'props/arena', 'props/harbour', 'props/coast', 'props/subway', 'props/jiangnan', 'fightui/logic', 'fightui/icons', 'fightui/kit', 'fightui/command', 'fightui/buttons', 'fightui/target', 'fightui/index', 'fightui/toggle', 'fightui/marker', 'depthrange', 'levelmode/kitpaint', 'levelmode/kitshadow', 'levelmode/kitwear', 'levelmode/kittex', 'levelmode/kitgeo', 'levelmode/kitchapel', 'levelmode/kitfilth', 'levelmode/kitprops', 'levelmode/stagelooks', 'levelmode/stormsky-data', 'levelmode/stagesky', 'levelmode/storm', 'worksview', 'render', 'battlefx', 'weaponview', 'horsemesh', 'horsehair', 'horseview', 'drama', 'scenarios', 'muster', 'musterview', 'ratings', 'roster', 'overdraftview', 'touch', 'tutorial', 'intro', 'levelmode/presets', 'levelmode/story', 'audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/ui', 'audio/families', 'audio/acoustics', 'audio/farfield', 'audio/ambience', 'audio/music/data/menu', 'audio/music/data/roman', 'audio/music/data/medieval', 'audio/music/data/japan', 'audio/music/data/china', 'audio/music/data/korea', 'audio/music/data/aztec', 'audio/music/data/ottoman', 'audio/music/data/modern', 'audio/music/data/scottish', 'audio/music/data/boss', 'audio/music/data/victory', 'audio/music/data/defeat', 'audio/music/manifest', 'audio/music', 'audio/engine', 'audio/controls', 'audio/bench', 'menu', 'uicheck', 'looksbench', 'levelmode/stages/testyard-vault', 'levelmode/stages/testyard', 'levelmode/landform', 'levelmode/stages/dnbuild', 'levelmode/stages/dunnottar-sewer', 'levelmode/stages/dunnottar-vault', 'levelmode/stages/dunnottar-chapel', 'levelmode/stages/dunnottar-light', 'levelmode/stages/dunnottar', 'levelmode/stages', 'levelmode/awareness', 'levelmode/stage', 'levelmode/travel', 'levelmode/config', 'levelmode/adapter', 'levelmode/items', 'levelmode/loot', 'levelmode/attempts', 'levelmode/checkpoints', 'levelmode/interact', 'levelmode/cutscene', 'levelmode/ending', 'levelmode/level', 'levelmode/team', 'levelmode/sandbox', 'levelmode/teamview', 'levelmode/hud', 'levelmode/markers', 'levelmode/endingview', 'levelmode/cutsceneview', 'levelmode/torchpool', 'levelmode/visibility', 'levelmode/water', 'levelmode/kitwater', 'levelmode/kit', 'levelmode/terrainview', 'levelmode/awarenessview', 'main'];
-const out = process.argv[2] ?? 'dist/gladiator.html';
+const MODULES = ['aging', 'outfits', 'horses', 'physiology', 'body', 'physics/config', 'physics/overdraft', 'physics/terrain', 'physics/jump', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics/fieldworks', 'audio/surface', 'audio/log', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/whip', 'physics/rising', 'physics/gait', 'physics/mounted', 'cast', 'riding', 'command', 'ai', 'gesture', 'finisher', 'runsteer', 'control', 'followcam', 'watchcam', 'cameraarm', 'occluders', 'camerarig', 'scenerylod', 'levelmode/quality', 'adaptres', 'rig', 'bodymesh', 'skintones', 'sculpt', 'skinrules', 'skindetail', 'skintex', 'loftbody', 'fleshbody', 'bodystyles', 'skinworker', 'looks/kit', 'looks/toon', 'looks/probe-lite', 'looks', 'blooddye', 'ground/painted', 'ground/living', 'scenery/skyball-photo-data', 'scenery/skyball', 'scenery/generated', 'scenery/trees', 'scenery', 'toon', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'facemorph', 'face', 'wardrobe', 'robotview', 'oyoroi', 'crowdview', 'crowdlod', 'props/town', 'props/rural', 'props/arena', 'props/harbour', 'props/coast', 'props/subway', 'props/jiangnan', 'props/cajamarca', 'fightui/logic', 'fightui/icons', 'fightui/kit', 'fightui/command', 'fightui/buttons', 'fightui/target', 'fightui/index', 'fightui/toggle', 'fightui/marker', 'depthrange', 'levelmode/kitpaint', 'levelmode/kitshadow', 'levelmode/kitwear', 'levelmode/kittex', 'levelmode/kitgeo', 'levelmode/kitchapel', 'levelmode/kitfilth', 'levelmode/kitprops', 'levelmode/stagelooks', 'levelmode/stormsky-data', 'levelmode/stagesky', 'levelmode/storm', 'worksview', 'render', 'battlefx', 'weaponview', 'horsemesh', 'horsehair', 'horseview', 'drama', 'scenarios', 'muster', 'musterview', 'ratings', 'roster', 'overdraftview', 'touch', 'tutorial', 'intro', 'levelmode/presets', 'levelmode/story', 'audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/ui', 'audio/families', 'audio/acoustics', 'audio/farfield', 'audio/ambience', 'audio/music/data/menu', 'audio/music/data/roman', 'audio/music/data/medieval', 'audio/music/data/japan', 'audio/music/data/china', 'audio/music/data/korea', 'audio/music/data/aztec', 'audio/music/data/ottoman', 'audio/music/data/modern', 'audio/music/data/scottish', 'audio/music/data/boss', 'audio/music/data/victory', 'audio/music/data/defeat', 'audio/music/manifest', 'audio/music', 'audio/engine', 'audio/controls', 'audio/bench', 'menu', 'uicheck', 'looksbench', 'levelmode/stages/testyard-vault', 'levelmode/stages/testyard', 'levelmode/landform', 'levelmode/stages/dnbuild', 'levelmode/stages/dunnottar-sewer', 'levelmode/stages/dunnottar-vault', 'levelmode/stages/dunnottar-chapel', 'levelmode/stages/dunnottar-light', 'levelmode/stages/dunnottar', 'levelmode/stages', 'levelmode/awareness', 'levelmode/stage', 'levelmode/travel', 'levelmode/config', 'levelmode/adapter', 'levelmode/items', 'levelmode/loot', 'levelmode/attempts', 'levelmode/checkpoints', 'levelmode/interact', 'levelmode/cutscene', 'levelmode/ending', 'levelmode/level', 'levelmode/team', 'levelmode/sandbox', 'levelmode/teamview', 'levelmode/hud', 'levelmode/markers', 'levelmode/endingview', 'levelmode/cutsceneview', 'levelmode/torchpool', 'levelmode/visibility', 'levelmode/water', 'levelmode/kitwater', 'levelmode/kit', 'levelmode/terrainview', 'levelmode/awarenessview', 'main'];
+const args = process.argv.slice(2);
+const minify = !args.includes('--no-minify');
+const out = args.find((arg) => !arg.startsWith('--')) ?? 'dist/gladiator.html';
 
 const html = readFileSync('index.html', 'utf8');
 const css = readFileSync('boxer.css', 'utf8') + readFileSync('fightui.css', 'utf8');
@@ -76,7 +82,31 @@ try {
 } catch (error) {
   throw new Error(`the bundled skin worker does not compile: ${error.message}`);
 }
-if (/<\/script/i.test(code + workerCode)) throw new Error('a closing script tag inside the code would end the page\'s script early');
-const page = `${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n<script type="text/plain" id="skin-worker-source">\n${workerCode}</script>\n<script type="module">\n${code}</script>\n`;
+/**
+ * The code minified. The bundle is one ES module (or the worker's one classic script), so every top-level name is as local as an inner one and may be mangled with the rest; properties are never touched (window.boxer, data keys, THREE's own).
+ * Long string literals (the base64 audio and sky pictures) are lifted out first and put back after, so the minifier never reads or rewrites them.
+ */
+function minified(source, sourcefile) {
+  const strings = [];
+  const lifted = source.replace(/'[^'\\\n]{2000,}'/g, (literal) => `'@@DATA${strings.push(literal) - 1}@@'`);
+  const result = transformSync(lifted, { minify: true, format: 'esm', target: 'es2022', legalComments: 'none', sourcemap: 'external', sourcefile });
+  let restored = 0;
+  const code = result.code.replace(/(["'`])@@DATA(\d+)@@\1/g, (match, quote, index) => (restored++, strings[index]));
+  if (restored !== strings.length) throw new Error(`minifying lost ${strings.length - restored} of ${strings.length} long strings`);
+  return { code, map: result.map };
+}
+let pageCode = code;
+let pageWorker = workerCode;
+if (minify) {
+  const mapName = `${basename(out)}.map`;
+  const main = minified(code, 'gladiator-src.js');
+  pageCode = main.code;
+  pageWorker = minified(workerCode, 'skin-worker-src.js').code;
+  new vm.Script(pageCode);
+  pageCode += `\n//# sourceMappingURL=${mapName}\n`;
+  writeFileSync(`${out}.map`, main.map);
+}
+if (/<\/script/i.test(pageCode + pageWorker)) throw new Error('a closing script tag inside the code would end the page\'s script early');
+const page = `${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n<script type="text/plain" id="skin-worker-source">\n${pageWorker}</script>\n<script type="module">\n${pageCode}</script>\n`;
 writeFileSync(out, page);
 console.log(`${out}: ${(page.length / 1024).toFixed(0)} KB`);

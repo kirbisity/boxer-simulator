@@ -37,6 +37,7 @@ import { buildRobotBody } from './robotview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
+import { cajamarcaTown } from './props/cajamarca.js';
 import { CAMERA_NEAR } from './depthrange.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 import { prepareScenery, updateSceneryLod } from './scenerylod.js';
@@ -119,7 +120,7 @@ export function setPlace(view, place, arena, weather = null) {
   const swapped = swapFloor(view, place, floor);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, agincourt: buildAgincourt, cerignola: buildCerignola, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, agincourt: buildAgincourt, cerignola: buildCerignola, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -345,6 +346,8 @@ const PLACE_LIGHT = {
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   // A water town south of the Yangtze: soft bright sky, damp air, the wooded hills 50–80 m out in the haze.
   jiangnan: { background: 0xc6d6e0, fog: [30, 110], far: 112, key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // A highland valley at 2,700 m late in the afternoon: thin clear air, the haze warm toward evening, the hills 90 m out and more.
+  cajamarca: { background: 0xd8d0bc, fog: [60, 190], far: 200, key: 0xffe2b8, keyIntensity: 0.12, rim: 0xffd6a0, sun: 0.95 },
   // Agincourt: a low grey October sky after rain, the light flat, the woods dark.
   agincourt: { background: 0x9aa0a2, fog: [25, 100], key: 0xe8ecf0, keyIntensity: 0.2, rim: 0xb8c4d0, sun: 0.5, hemi: 0.78 },
   // Cerignola at dusk: the sun low and warm across the slope, a golden haze.
@@ -374,6 +377,8 @@ export const PLACE_ARENAS = {
   coastVillage: { halfX: 12, halfZ: 8 },
   // The square between the shops and the canal: room for the wokou raid's formations.
   jiangnan: { halfX: 14, halfZ: 9 },
+  // The square of Cajamarca between its long halls (props/cajamarca.js CAJAMARCA_PLAN).
+  cajamarca: { halfX: 16, halfZ: 11 },
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
   agincourt: { halfX: 40, halfZ: 11.5 },
   cerignola: { halfX: 32, halfZ: 11 },
@@ -1268,6 +1273,16 @@ function buildJiangnan() {
   place.add(bank);
   jiangnanTown(place);
   return place;
+}
+
+/**
+ * The walled square of Cajamarca in 1532 (the ambush): built in
+ * src/props/cajamarca.js; here the sky.
+ */
+function buildCajamarca() {
+  const place = new THREE.Group();
+  place.add(daySky());
+  return cajamarcaTown(place);
 }
 
 /**

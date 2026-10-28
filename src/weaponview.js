@@ -1013,6 +1013,24 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'champi': {
+      // The Inca star mace: a wooden haft lashed at the grip, and at its end a
+      // six-pointed star of cast bronze round the haft's tip.
+      const bronze = steelMaterial(envMap, { vertexColors: false, color: 0xb0813a, roughness: 0.45 });
+      group.add(cylinder(0.014, 0.016, -spec.handle, spec.length, wood, 8));
+      group.add(cylinder(0.017, 0.017, -spec.handle, 0.0, leather, 8));
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.045, 12), bronze);
+      hub.position.y = spec.length - 0.03;
+      group.add(hub);
+      for (let point = 0; point < 6; point += 1) {
+        const angle = (point / 6) * Math.PI * 2;
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.016, spec.radius, 5), bronze);
+        spike.position.set(Math.cos(angle) * (0.026 + spec.radius / 2), spec.length - 0.03, Math.sin(angle) * (0.026 + spec.radius / 2));
+        spike.rotation.set(0, -angle, -Math.PI / 2);
+        group.add(spike);
+      }
+      break;
+    }
     case 'saber':
     case 'yatagan': {
       // The sabre: a long, gently curved blade, a cross guard, a pistol grip.

@@ -27,7 +27,7 @@ export const STYLE_SURFACE = {
  */
 export const PLACE_SURFACE = {
   ring: 'wood', stadium: 'wood', colosseum: 'sand', subway: 'stone', meadow: 'grass', field: 'grass', town: 'stone', port: 'stone',
-  sengoku: 'earth', plain: 'earth', coastFort: 'sand', coastVillage: 'sand', jiangnan: 'stone',
+  sengoku: 'earth', plain: 'earth', coastFort: 'sand', coastVillage: 'sand', jiangnan: 'stone', cajamarca: 'earth',
   // Agincourt's ploughland (its mud is the works': surfaceUnder); Cerignola's vineyard earth.
   agincourt: 'mud', cerignola: 'earth',
 };

@@ -7,7 +7,7 @@ import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
-import { conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, mexicaWarrior, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
+import { atahualpa, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, yakuza } from './cast.js';
 
 // Rome against Han: fifty a side, ten to a rank; a centurion to every
 // eighty legionaries (a century), Li Ling among his crossbowmen.
@@ -100,16 +100,81 @@ function company(styles, make) {
   return men;
 }
 
-// Otumba, 1520: the Spaniards, few and worn from the Noche Triste, with
-// their Tlaxcalan allies (warriors armed as the Mexica were), meet the
-// Mexica host on the plain. Steel against obsidian and cotton.
-const OTUMBA = {
-  spanish: { hidalgo: 4, rodelero: 7, arquebusier: 3 },
-  // The jinetes of Cortés's horse: lances first, as at Otumba, where he rode the Mexica commander down.
-  horse: { lance: 5, espada: 2 },
-  tlaxcalan: { macuahuitl: 15, tepoztopilli: 10 },
-  mexica: { warrior: { macuahuitl: 18, tepoztopilli: 10, bow: 4 }, elite: { macuahuitl: 5, tepoztopilli: 3 } },
+// Cajamarca, 16 November 1532. Pizarro's hundred and sixty-eight Spaniards
+// (sixty-two of them horse, a few arquebusiers and two small falconets) hid
+// in the long halls round the town's walled square; Atahualpa came in at the
+// end of the afternoon on his litter with some five or six thousand of his
+// people, by his own order without their arms (a few slings and small maces
+// under their tunics, the Spaniards said). At Pizarro's signal Candia's gun
+// fired, the trumpets sounded, and horse and foot burst out of the doorways
+// on every side crying Santiago; the crowd broke and ran, threw down a stretch
+// of the square's wall in the crush, and was cut down in the fields beyond.
+// No Spaniard was killed. Atahualpa was dragged from his litter within the
+// half hour, his lords holding it up as their arms were cut from them.
+// Here at the game's scale: fourteen Spaniards (five of them horse, as the
+// horse was a third of Pizarro's men) against fifty-two (MUSTER.cap) of the
+// retinue, the same lopsided arms on both sides as there were. What panics
+// them is the general morale: their fear of the strength before them (steel,
+// armour, horses: ai.js AI.standing), and the shock of a gun or a charging
+// horse among people who had never met either (AI.shock, FACTIONS inca
+// `strangers`). Nothing here is the level's own but the men, where they
+// stand and when the signal comes.
+const CAJAMARCA = {
+  // Each Spaniard in the order cast, and where he waits (world [x, z], m):
+  // Pizarro, two hidalgos and the two arquebusiers (Candia's) at the west end
+  // before the ushnu; the horse and the sword-and-buckler men in the doorways
+  // of the long halls on the north and south sides. Names from the roll of Cajamarca.
+  spanish: [
+    ['hidalgo', null, [-14.8, 0], 'Francisco Pizarro'],
+    ['hidalgo', null, [-14.8, -1.6], 'Miguel de Estete'],
+    ['hidalgo', null, [-14.8, 1.6], 'Juan de Salcedo'],
+    ['arquebusier', null, [-15, -3.6], 'Pedro de Candia'],
+    ['arquebusier', null, [-15, 3.6], 'Alonso Pérez'],
+    ['horse', 'lance', [-11, -9.4], 'Hernando Pizarro'],
+    ['rodelero', null, [-7, -9.8], 'Diego de Trujillo'],
+    ['horse', 'lance', [-3, -9.4], 'Juan Pizarro'],
+    ['rodelero', null, [1, -9.8], 'Pedro Pizarro'],
+    ['horse', 'lance', [-11, 9.4], 'Hernando de Soto'],
+    ['rodelero', null, [-7, 9.8], 'Juan Ruiz de Arce'],
+    ['horse', 'espada', [-3, 9.4], 'Sebastián de Benalcázar'],
+    ['rodelero', null, [1, 9.8], 'Pedro Sancho'],
+    ['horse', 'espada', [5, 9.4], 'Gonzalo Pizarro'],
+  ],
+  // The retinue: lords of the Inca's lineage round him, the commons round them;
+  // most unarmed, a few with the champi under the tunic.
+  inca: { noble: { unskilled: 6, champi: 3 }, commoner: { unskilled: 32, champi: 10 } },
+  // The crowd stands round Atahualpa in the square's middle, a little east of
+  // it (it came in at the east gate): `middle` [x, z], a man to `room` m² (a
+  // packed crowd), `loose` m out of a sunflower's places.
+  crowd: { middle: [4, 0], room: 1.1, loose: 0.25 },
+  // Every `champiEvery`th of the commons from the middle out is one of the armed (as long as they last).
+  champiEvery: 4,
+  // The signal (s after the start): Candia's gun; till then the Spaniards are hidden (ai.js springAmbush).
+  signal: 5,
 };
+// The red side faces +x from -x: a man at world [x, z] stands at [back, across] = [-x, -z] of a red layout from front 0; blue's is [x, z].
+const cajamarcaLayout = (corner, spots) => spots.map(([x, z]) => (corner === 'red' ? [-x, -z] : [x, z]));
+/** The crowd's places round its middle, from the middle out (a sunflower: even, unrowed), world [x, z]. */
+function crowdSpots(count, { middle, room }) {
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const step = Math.sqrt(room / Math.PI);
+  return Array.from({ length: count }, (_, index) => [middle[0] + step * Math.sqrt(index) * Math.cos(index * golden), middle[1] + step * Math.sqrt(index) * Math.sin(index * golden)]);
+}
+/** Atahualpa's retinue in order from the middle out: he, his lords, the commons with the armed among them. */
+function cajamarcaInca(random) {
+  const lords = company(CAJAMARCA.inca.noble, (style) => incaMan(random, style, 'noble'));
+  const unarmed = company({ unskilled: CAJAMARCA.inca.commoner.unskilled }, (style) => incaMan(random, style, 'commoner'));
+  const armed = company({ champi: CAJAMARCA.inca.commoner.champi }, (style) => incaMan(random, style, 'commoner'));
+  const commons = [];
+  while (unarmed.length || armed.length) commons.push(commons.length % CAJAMARCA.champiEvery === 1 && armed.length ? armed.shift() : unarmed.shift() ?? armed.shift());
+  return [atahualpa(random), ...lords, ...commons];
+}
+/** Pizarro's men, in CAJAMARCA.spanish's order, each by name; Pizarro (about fifty-four) leads. */
+function cajamarcaSpaniards(random) {
+  return CAJAMARCA.spanish.map(([type, style, , name]) => ({ ...(type === 'horse' ? conquistadorHorseman(random, style) : europeanSoldier(random, type)), name, ...(name === 'Francisco Pizarro' ? { age: 54, leads: true } : {}) }));
+}
+// The retinue's men: Atahualpa and the rest.
+const CAJAMARCA_INCA = 1 + Object.values(CAJAMARCA.inca).reduce((sum, styles) => sum + total(styles), 0);
 
 // Baxemboy, Formosa, 1661: the VOC's musketeers and pikemen from Fort
 // Zeelandia against Koxinga's army: his masked "iron men" in scale, his
@@ -221,12 +286,12 @@ function qiArmy(random, { weapons = true } = {}) {
   for (let squad = 0; squad < QI.squads; squad += 1) {
     const middle = (squad - (QI.squads - 1) / 2) * QI.squadWidth;
     for (const [index, [style, back, across]] of QI.squad.entries()) {
-      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'brigandine', { people: 'mingSouth', design: QI.design.brigandine }));
+      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'brigandine', { people: MING_PEOPLE.qi, design: QI.design.brigandine }));
       layout.push([back, middle + across]);
     }
   }
   for (const [index, [style, back, across]] of [QI.general, ...QI.guards].entries()) {
-    const man = mingSoldier(random, style, 'elite', { people: 'mingSouth', design: QI.design.elite });
+    const man = mingSoldier(random, style, 'elite', { people: MING_PEOPLE.qi, design: QI.design.elite });
     men.push(index === 0 ? { ...man, name: 'Qi Jiguang' } : man);
     layout.push([back, across]);
   }
@@ -292,7 +357,7 @@ const RHODES = {
  * built, dressed and fed as the level's are). `same`: a style the maker may
  * turn into another (a rōnin swordsman fights with both swords, nitō).
  */
-const MING_PEOPLE = { pyongyang: 'ming', koxinga: 'mingSouth', coast: 'mingCoast', qi: 'mingSouth' };
+const MING_PEOPLE = { pyongyang: 'ming', koxinga: 'mingSouth', coast: 'mingCoast', qi: 'qi' };
 const mingRank = (rank, people, design = null) => (random, style) => mingSoldier(random, style, rank, { people, design });
 const sengokuArmy = (side) => ({
   ranks: {
@@ -352,15 +417,12 @@ export const ARMIES = {
       horse: { label: 'Jinete', kinds: ['conquistadorPlate'], mounted: true, styles: ['lance', 'espada'], make: (random, style) => conquistadorHorseman(random, style) },
     },
   },
-  tlaxcala: {
-    label: 'Tlaxcala',
-    ranks: { warrior: { label: 'Tlaxcalan', kinds: ['mexicaWarrior'], styles: ['macuahuitl', 'tepoztopilli', 'bow'], make: (random, style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }) } },
-  },
-  mexica: {
-    label: 'The Mexica',
+  inca: {
+    label: "Atahualpa's retinue",
+    // No horse, no steel, no gun: the commons and the lords of 1532, unarmed or with the champi (the sling is not in the game).
     ranks: {
-      warrior: { label: 'Warrior', kinds: ['mexicaWarrior'], styles: ['macuahuitl', 'tepoztopilli', 'bow'], make: (random, style) => mexicaWarrior(random, style, 'warrior') },
-      elite: { label: 'Jaguar or eagle', kinds: ['mexicaElite'], styles: ['macuahuitl', 'tepoztopilli'], make: (random, style) => mexicaWarrior(random, style, 'elite') },
+      lord: { label: 'Lord', kinds: ['incaNoble'], styles: ['unskilled', 'champi'], make: (random, style) => incaMan(random, style, 'noble') },
+      commoner: { label: 'Attendant', kinds: ['incaUncu'], styles: ['unskilled', 'champi'], make: (random, style) => incaMan(random, style, 'commoner') },
     },
   },
   dutch: {
@@ -485,6 +547,8 @@ export const SPREAD = {
 /** A battle with its armies drawn apart (SPREAD). */
 function drawnApart(level) {
   if (!level.cast || !level.formation) return level;
+  // An ambush (a side's `ambush`: Cajamarca) is laid where it was laid: its men are not in lines to draw apart.
+  if (level.formation.red?.ambush || level.formation.blue?.ambush) return level;
   const factor = level.spread ?? SPREAD.factor;
   const fronts = Object.fromEntries(['red', 'blue'].map((corner) => [corner, level.formation[corner]?.front ?? 0]));
   const gap = fronts.red + fronts.blue;
@@ -836,28 +900,22 @@ export const SCENARIOS = {
     armies: { red: ['ming'], blue: ['west'] },
     fighters: [],
   },
-  otumba: {
-    title: 'Otumba',
-    place: 'Otumba, Valley of Mexico · 7 July 1520',
-    blurb: 'Days after the Noche Triste, the Spaniards and their Tlaxcalan allies are caught on the open plain by the Mexica host: steel breastplates, espadas and arquebuses, and the few horse Cortés had left, against obsidian blades and quilted cotton.',
-    scene: 'plain',
-    arena: { halfX: 15, halfZ: 10 },
-    camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
-    roster: 'Fourteen conquistadors on foot and seven on horse, and twenty-five Tlaxcalans · forty Mexica',
-    formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 10, loose: 0.3 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, perRow: 10, loose: 0.5 } },
-    cast: (random) => ({
-      red: shootersBehind([...company(OTUMBA.spanish, (type) => europeanSoldier(random, type)), ...company(OTUMBA.tlaxcalan, (style) => mexicaWarrior(random, style, 'warrior', { people: 'Tlaxcala', band: 1 }))]),
-      blue: shootersBehind([...company(OTUMBA.mexica.elite, (style) => mexicaWarrior(random, style, 'elite')), ...company(OTUMBA.mexica.warrior, (style) => mexicaWarrior(random, style, 'warrior'))]),
-    }),
-    // Cortés's few horse (about twenty survived the Noche Triste) ride on the Spanish flanks: no Tlaxcalan or Mexica horse (the Americas had none).
-    wings: {
-      arena: { halfX: 30, halfZ: 16 },
-      camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 },
-      formation: { red: { wings: { side: 1 } } },
-      cast: (random, sides) => ({ red: [...sides.red, ...company(OTUMBA.horse, (style) => conquistadorHorseman(random, style))], blue: sides.blue }),
+  cajamarca: {
+    title: 'Cajamarca',
+    place: 'The square of Cajamarca, Peru · 16 November 1532',
+    blurb: "Late in the afternoon Atahualpa is carried into the walled square among his lords and attendants, unarmed by his own order, in their finest woven tunics. Pizarro's men wait out of sight in the doorways of the long halls round it: steel, horses and guns these people have never seen. At the signal Candia's gun fires and horse and foot burst out from every side.",
+    scene: 'cajamarca',
+    arena: { halfX: 16, halfZ: 11 },
+    camera: { yaw: -0.5, pitch: 0.48, distance: 19, maxDistance: 25 },
+    roster: 'Fourteen Spaniards, five of them on horse · Atahualpa and fifty-one of his retinue',
+    // Each man where the ambush put him (`layout`, from no front); the Spaniards hidden till the signal (`ambush`: ai.js springAmbush).
+    formation: {
+      red: { front: 0, layout: cajamarcaLayout('red', CAJAMARCA.spanish.map(([, , spot]) => spot)), loose: 0.1, ambush: { signal: CAJAMARCA.signal } },
+      blue: { front: 0, layout: cajamarcaLayout('blue', crowdSpots(CAJAMARCA_INCA, CAJAMARCA.crowd)), loose: CAJAMARCA.crowd.loose },
     },
+    cast: (random) => ({ red: cajamarcaSpaniards(random), blue: cajamarcaInca(random) }),
     // The armies its sides may be set up from (ARMIES; muster.js).
-    armies: { red: ['spanish', 'tlaxcala'], blue: ['mexica'] },
+    armies: { red: ['spanish'], blue: ['inca'] },
     fighters: [],
   },
   zeelandia: {
