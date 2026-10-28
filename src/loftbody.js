@@ -747,6 +747,32 @@ export const ARMOR_KINDS = {
     // The gilt boss over the heart.
     studs: [[0.64, 0, 0.16, 1.32, 'gold']],
   },
+  // The lorica hamata of the Republic's legionary: mail to the hips over the
+  // tunic (lofted out past the tunic's loose cloth, whose skirt shows below
+  // it), the shoulders doubled with a mail cape (humeralia), short sleeves; a belt.
+  hamata: {
+    trunk: [[-0.12, 0.98, 1.16, MAIL], [0.72, 1.02, 1.24, MAIL]], skirt: [0.28, 0.4, 1.2, MAIL], upperArm: [-0.32, 0.32, 1.22, MAIL],
+    belt: [0.02, 0.14, 1.22, { rows: ['lace', 'gold', 'lace'] }],
+  },
+  // No armour: a leather belt with a bronze buckle over the tunic (a Visigoth
+  // warrior's dress, 451). The kit's `cloth` is his shield's paint (weaponview.js).
+  girdle: {
+    trunk: [0.14, 0.22, 1.2, { buckle: 'gold', base: 'leather' }],
+  },
+  // The Parthian cataphract (Carrhae, 53 BC; the Dura-Europos graffito and the
+  // Khalchayan and Tang-i Sarvak reliefs): a coat of iron scales hung point down
+  // from the collar to the knee, split before and behind for the saddle, over a
+  // tunic (`cloth`) that shows at the hem, a buckled belt; and the limbs in
+  // laminated defences, iron hoops lapping one over the next (as a manica is
+  // made) from the shoulder to the wrist and from the hip down to the ankle —
+  // the man as closed in iron as his horse. The scales' lacing is `lace`.
+  cataphract: {
+    trunk: [[-0.08, 1.0, 1.22, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.36, { buckle: 'gold', base: 'leather' }]],
+    skirt: [[1.12, 0.6, 1.16, 'cloth'], [1.02, 0.68, 1.32, { lamellae: 30, pointDown: true, gaps: [0, Math.PI], gapWidth: 0.06 }]], collar: 'steel',
+    upperArm: [[-0.3, 0.38, 1.6, { lamellae: 18, pointDown: true }], [0.3, 1.02, 1.36, { lames: 6, base: 'steel2' }]],
+    forearm: [-0.04, -0.03, 1.32, { lames: 7, base: 'steel2' }],
+    thigh: [0.55, 1.02, 1.3, { lames: 6, base: 'steel2' }], shin: [-0.06, 0.92, 1.3, { lames: 8, base: 'steel2' }],
+  },
   // The Mongol kit as worn by the steppe peoples into the 1600s: the deel to
   // mid-calf over a second robe of another colour showing at the hem, a
   // leather belt with a gilt buckle; the lamellar a vest over it, its skirt

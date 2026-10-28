@@ -1477,6 +1477,14 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
   // Wings of horse held on the flanks (formation.js moveWings): released when the foot lines close.
   if (wingOrder) world.wings = { release: wingOrder.release ?? WINGS.release, by: wingOrder.by ?? WINGS.by, review: 0 };
+  // A side's baggage train on the field (`formation[corner].train`: { back }, m in from its own end of the floor, on the
+  // middle line): where its horse archers go for fresh arrows when their quivers are empty (riding.js resupply).
+  for (const corner of ['red', 'blue']) {
+    const train = formation[corner]?.train;
+    if (!train) continue;
+    world.trains ??= {};
+    world.trains[corner] = { at: [(corner === 'red' ? -1 : 1) * Math.max(0, arena.halfX - (train.back ?? 2)), train.across ?? 0] };
+  }
   // Drilled men form up on their side's leader (formation.js).
   // A side drilled as a whole by the level's order (`formation[corner].drill`: Qi Jiguang's squads) forms up so too.
   if (!rules.noStandards) formUp(world, (corner) => (standards[corner] ? fighters[standards[corner].leader] : null), formation);

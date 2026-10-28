@@ -84,10 +84,10 @@ export const ARMOUR_COVERING = {
 export const HELM_COVERING = {
   bascinet: 'plate', stechhelm: 'plate', greatHelm: 'plate', kettleHat: 'plate', kabuto: 'plate', jingasa: 'plate', arenaHelm: 'plate', mingHat: 'plate',
   mingHelm: 'plate', pagodaHelm: 'plate', hanHelm: 'plate', galea: 'plate', steppeHelm: 'plate', chichak: 'plate', ayyubidHelm: 'plate', morion: 'plate',
-  cabasset: 'plate', potHelmet: 'plate', robotHead: 'plate',
+  cabasset: 'plate', potHelmet: 'plate', robotHead: 'plate', montefortino: 'plate', ridgeHelm: 'plate', spangenhelm: 'plate',
   riotHelmet: 'leather', opsHelmet: 'leather', lionHead: 'leather',
   jaguarHelm: 'wood', eagleHelm: 'wood',
-  turban: 'padded', bork: 'padded',
+  turban: 'padded', bork: 'padded', bashlyk: 'padded',
 };
 
 /** What a blow on a fighter's part (a capsule key: head, trunk, lForearm...) meets: flesh, or what covers it there. */

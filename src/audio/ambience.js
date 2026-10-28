@@ -31,6 +31,11 @@ export const PLACE_AMBIENCE = {
   coastFort: { wind: 52, surf: 68, birds: 2 },
   coastVillage: { wind: 50, surf: 66, birds: 3 },
   jiangnan: { wind: 38, birds: 5, flow: 48 },
+  // The open steppe at the Gobi's edge: the wind across it never stops, hardly a bird. Champagne in summer: larks over the grass.
+  // The plain below Harran at noon in June: a hot wind, no birds to speak of.
+  mobei: { wind: 54, birds: 1 },
+  catalaunian: { wind: 46, birds: 5 },
+  carrhae: { wind: 48, birds: 1 },
   stage: { wind: 36 },
   dunnottar: { wind: 58, surf: 76 },
 };

@@ -233,6 +233,9 @@ export function musterLevel(level, setup) {
     formation[corner] = {
       ...(own.drill ? { drill: own.drill } : {}),
       ...(own.discipline !== undefined ? { discipline: own.discipline } : {}),
+      // Its baggage train (the camels with fresh arrows) stays where the level has it.
+      ...(own.train ? { train: own.train } : {}),
+      ...(own.facing ? { facing: own.facing } : {}),
       ...(own.wings || riders ? { wings: own.wings ?? {} } : {}),
       front: 0,
       // createWorld puts a layout's man at x = sign·(front + back), z = sign·across.

@@ -961,6 +961,9 @@ export const OUTFITS = {
     // Han crossbowmen stood in ranks and shot, the ranks relieving each other; they held their ground.
     drill: { advance: false },
     sidearm: 'jian',
+    // Iron lamellae turn an arrow that does not find a gap, as any rigid iron does (`arrowproof`; ranged.js arrowHit):
+    // Chao Cuo's memorial (169 BC) has the Xiongnu's leather and their arrows no match for Han iron. The arms and legs, cloth.
+    arrowproof: true,
     extraMass: 0.18,
     // The head: an iron lamellar helmet over a padded cap (the Linzi helmet):
     // iron plates turn an edge almost as the coat does; a point finds the
@@ -982,6 +985,7 @@ export const OUTFITS = {
     faction: 'chinese',
     label: 'Han cavalry — iron lamellar', movement: 'good', fists: 'bare',
     sidearm: 'jian',
+    arrowproof: true,
     extraMass: 0.18,
     protection: { blunt: 0.4, cut: 0.82, pierce: 0.62, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.5 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
     courage: 0.3,
@@ -1124,6 +1128,192 @@ export const OUTFITS = {
     designs: [
       steppeDesign('Gilt scale, black deel', { kind: 'kheshig', color: '#8f949b', lace: '#1c1a18' }, '#1c1a18', '#d6a743', { kind: 'steppeHelm', color: '#8f949b', coif: '#6a6d73', plume: '#1c1a18', mask: true, gold: '#d6a743' }),
       steppeDesign('Black scale, red deel', { kind: 'kheshig', color: '#34363a', lace: '#8a1418' }, '#7a1418', '#d6a743', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#b3161b', mask: true, gold: '#d6a743' }),
+    ],
+  },
+  // ---- The horse peoples and the armies that met them (the Battle Mode levels of
+  // Mobei, the Catalaunian Plains and Carrhae): the Xiongnu and the Huns, horse
+  // archers in felt and leather; the late Roman foot and the Visigoths of 451;
+  // the Roman legion of the Republic (53 BC); the Parthians' cataphracts and
+  // horse archers. ----
+  // A Xiongnu horseman of the 2nd century BC (the Noin-Ula and Ivolga graves,
+  // Sima Qian's account): a felt or leather coat belted over trousers, soft
+  // boots, a fur hat; the composite bow and its quiver at the hip, a short iron
+  // sword. No armour to speak of for most: what the felt and leather keep off
+  // a glancing cut, little against a point. Raised to the bow in the saddle from
+  // boyhood (the Shiji: 'the boys ride sheep and shoot birds and rats'): a
+  // better shot than a levied crossbowman (`skill`).
+  xiongnu: {
+    // Rides (every Xiongnu man rode; the small hardy steppe horse).
+    horse: 'steppe',
+    skill: 0.55,
+    faction: 'steppe',
+    label: 'Xiongnu — felt coat, fur hat', movement: 'good', fists: 'bare',
+    // A horse archer's quiver: thirty to forty arrows (the Strategikon's; a Mongol carried two such), and no more until he is resupplied.
+    quiver: 36,
+    sidearm: 'shortSword',
+    extraMass: 0.06,
+    protection: { blunt: 0.15, cut: 0.25, pierce: 0.12, bullet: { head: 0, torso: 0, limb: 0 }, regions: { head: { blunt: 0.12, cut: 0.18, pierce: 0.06 } } },
+    courage: 0.25,
+    designs: [
+      steppeDesign('Undyed felt, fox hat', { kind: 'mongolDeel' }, '#9a8a6a', '#5a4030', { kind: 'furHat', color: '#6a5a44', fur: 0x8a5a2a }),
+      steppeDesign('Brown leather, wolf hat', { kind: 'mongolDeel' }, '#6a4a2e', '#2a2018', { kind: 'furHat', color: '#4a3a2a', fur: 0x6a6258 }),
+      steppeDesign('Dark felt, sable hat', { kind: 'mongolDeel' }, '#3a3430', '#8a2a1e', { kind: 'furHat', color: '#2a2420', fur: 0x2a2018 }),
+    ],
+  },
+  // A Hun horseman of Attila's day (451): the same horse-people's dress, a
+  // caftan of felt or leather over trousers, a cap; the composite bow (the
+  // asymmetric Hunnic bow with its bone laths), and the long straight sword the
+  // Huns carried, a spatha. Most unarmoured.
+  hun: {
+    horse: 'steppe',
+    skill: 0.55,
+    faction: 'steppe',
+    label: 'Hun — caftan and cap', movement: 'good', fists: 'bare',
+    quiver: 36,
+    sidearm: 'spatha',
+    extraMass: 0.06,
+    protection: { blunt: 0.15, cut: 0.25, pierce: 0.12, bullet: { head: 0, torso: 0, limb: 0 }, regions: { head: { blunt: 0.12, cut: 0.18, pierce: 0.06 } } },
+    courage: 0.25,
+    designs: [
+      steppeDesign('Grey felt, fur cap', { kind: 'mongolDeel' }, '#7a7468', '#3a2a1e', { kind: 'furHat', color: '#5a5044', fur: 0x5a4a38 }),
+      steppeDesign('Red-brown caftan, fur cap', { kind: 'mongolDeel' }, '#7a3a24', '#d6a743', { kind: 'furHat', color: '#3a2a1e', fur: 0x3a2e24 }),
+      steppeDesign('Ochre leather, felt cap', { kind: 'mongolDeel' }, '#9a7440', '#2a2420', { kind: 'bashlyk', color: '#6a5a44' }),
+    ],
+  },
+  // A Hunnic noble, one of Attila's own (logades): what a lord of the
+  // horse-peoples could buy or take: a mail shirt or leather lamellar, a
+  // segmented iron helmet (the spangenhelm the Huns and Germans shared).
+  hunNoble: {
+    horse: 'steppe',
+    skill: 0.6,
+    faction: 'steppe',
+    label: 'Hun noble — mail and spangenhelm', movement: 'good', fists: 'bare',
+    quiver: 36,
+    sidearm: 'spatha',
+    extraMass: 0.2,
+    protection: { blunt: 0.35, cut: 0.85, pierce: 0.48, bullet: { head: 0.2, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.5, cut: 0.92, pierce: 0.7, deflects: true }, limb: { blunt: 0.04, cut: 0.1, pierce: 0.04 } } },
+    courage: 0.4,
+    designs: [
+      steppeDesign('Mail, red caftan', { kind: 'hauberk', color: '#8d9097' }, '#7a2a1e', '#d6a743', { kind: 'spangenhelm', color: '#7d8088', gold: '#b98a3e' }),
+      steppeDesign('Leather lamellar, blue caftan', { kind: 'mongolLamellar', matte: true, color: '#5a3e24', lace: '#1c1410', fur: '#5a4030' }, '#2f4468', '#8a1418', { kind: 'spangenhelm', color: '#6a6d73', gold: '#9a7a3a' }),
+    ],
+  },
+  // A soldier of the late Roman field army (comitatenses) in Aetius's Gaul,
+  // 451: a mail shirt (lorica hamata) over the long-sleeved tunic, trousers
+  // and closed boots (the army's dress by then), the ridge helmet (two iron
+  // halves joined by a ridge, cheek pieces, a neck guard: the Berkasovo and
+  // Intercisa type), and the big oval shield painted with his unit's device;
+  // the spear (hasta) and the spatha. Mail turns a cut; a point or an arrow
+  // goes through it more often than through plate (`pierce`).
+  lateRoman: {
+    faction: 'romans',
+    skill: 0.4,
+    label: 'Late Roman — mail and ridge helmet', movement: 'good', fists: 'bare',
+    // The late Roman line received a charge standing, shields locked (the foulkon), and held.
+    drill: { advance: false, testudo: true },
+    sidearm: 'spatha',
+    extraMass: 0.24,
+    protection: { blunt: 0.35, cut: 0.88, pierce: 0.5, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.08, pierce: 0.03 }, UpperArm: { blunt: 0.3, cut: 0.82, pierce: 0.45 } } },
+    courage: 0.4,
+    designs: [
+      { label: 'Mail, white tunic, red shield', top: { kind: 'longsleeve', color: '#d8cfb8' }, bottom: { kind: 'pants', color: '#4a4036' }, armor: { kind: 'haubergeon', color: '#8d9097', cloth: '#b3161b' }, head: { kind: 'ridgeHelm', color: '#8d9097', gold: '#b98a3e' }, feet: { kind: 'compactBoot', color: '#2a1e16' } },
+      { label: 'Mail, red tunic, blue shield', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#3a342c' }, armor: { kind: 'haubergeon', color: '#8d9097', cloth: '#2a4a8a' }, head: { kind: 'ridgeHelm', color: '#7d8088', gold: '#9a7a3a' }, feet: { kind: 'compactBoot', color: '#2a1e16' } },
+    ],
+  },
+  // A Visigoth warrior of Theoderic's army: a tunic and trousers, a cloak,
+  // the round shield of planks with its iron boss, the spear or the spatha;
+  // a helmet and mail only for the well-off (`gothNoble`).
+  goth: {
+    faction: 'goths',
+    skill: 0.35,
+    label: 'Visigoth — tunic and round shield', movement: 'good', fists: 'bare',
+    sidearm: 'spatha',
+    extraMass: 0.04,
+    protection: { blunt: 0.08, cut: 0.12, pierce: 0.06, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.35,
+    designs: [
+      { label: 'Undyed tunic, green trousers', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#3f5a3a' }, armor: { kind: 'girdle', color: '#c8bc9e', cloth: '#3f5a3a' }, feet: { kind: 'compactBoot', color: '#3a2a1e' } },
+      { label: 'Blue tunic, brown trousers', top: { kind: 'tunic', color: '#3a5276' }, bottom: { kind: 'pants', color: '#5a4430' }, armor: { kind: 'girdle', color: '#3a5276', cloth: '#9a2a1e' }, feet: { kind: 'compactBoot', color: '#3a2a1e' } },
+      { label: 'Red tunic, grey trousers', top: { kind: 'tunic', color: '#8a3424' }, bottom: { kind: 'pants', color: '#6b6e74' }, armor: { kind: 'girdle', color: '#8a3424', cloth: '#d6a743' }, feet: { kind: 'compactBoot', color: '#3a2a1e' } },
+    ],
+  },
+  // A Visigoth noble and his household men: mail, the spangenhelm, a riding
+  // horse of his own (Thorismund's horse came down off the ridge on the Huns).
+  gothNoble: {
+    horse: 'warhorse',
+    faction: 'goths',
+    skill: 0.5,
+    label: 'Visigoth noble — mail and spangenhelm', movement: 'good', fists: 'bare',
+    sidearm: 'spatha',
+    extraMass: 0.22,
+    protection: { blunt: 0.35, cut: 0.88, pierce: 0.5, bullet: { head: 0.2, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.5, cut: 0.92, pierce: 0.7, deflects: true }, limb: { blunt: 0.04, cut: 0.1, pierce: 0.04 } } },
+    courage: 0.5,
+    designs: [
+      { label: 'Mail, red cloak', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#4a3e30' }, armor: { kind: 'hauberk', color: '#8d9097', cloth: '#8a2a22' }, head: { kind: 'spangenhelm', color: '#8d9097', gold: '#b98a3e' }, feet: { kind: 'compactBoot', color: '#2a1e16' } },
+      { label: 'Mail, blue cloak', top: { kind: 'longsleeve', color: '#2f4468' }, bottom: { kind: 'pants', color: '#3a342c' }, armor: { kind: 'hauberk', color: '#8d9097', cloth: '#2f4468' }, head: { kind: 'spangenhelm', color: '#7d8088', gold: '#c9a24a' }, feet: { kind: 'compactBoot', color: '#2a1e16' } },
+    ],
+  },
+  // A legionary of the late Republic (Crassus's legions, 53 BC): the mail
+  // shirt (lorica hamata) to the hip with doubled shoulders, the bronze
+  // Montefortino helmet with its knob and horsehair plume, the oval curved
+  // scutum, the gladius (and the pilum, thrown before the charge: not here).
+  // Mail over the trunk and shoulders, the arms and legs bare: at Carrhae the
+  // arrows that came round and over the shields nailed hands to shields and feet
+  // to the ground (Plutarch, Crassus 25).
+  republicanLegionary: {
+    faction: 'romans', plated: true,
+    label: 'Legionary of the Republic — mail and Montefortino', movement: 'good', fists: 'bare',
+    drill: { advance: true, charge: 8, testudo: true },
+    sidearm: 'dagger',
+    extraMass: 0.25,
+    protection: { blunt: 0.35, cut: 0.9, pierce: 0.5, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.92, pierce: 0.72, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 } } },
+    courage: 0.4,
+    designs: [
+      { label: 'Mail, red tunic, bronze helmet', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'loincloth', color: '#8a2a22' }, armor: { kind: 'hamata', color: '#8d9097', gold: '#b98a3e', lace: '#3a2416' }, head: { kind: 'montefortino', color: '#b98a3e', plume: '#1a1a1d' }, feet: { kind: 'sandal', color: '#3a2416' } },
+    ],
+  },
+  // A Parthian cataphract (Surena's, at Carrhae): man and horse in armour,
+  // the man in a coat of iron scales to the knee over a tunic, laminated
+  // defences of iron hoops on arms and legs (as the Dura-Europos and Khalchayan
+  // finds and the Tang-i Sarvak relief show), a conical helmet with a mail
+  // hood over the face; the horse in a trapper of scales (drawn, and met, as
+  // lamellar barding). The kontos in both hands. Plutarch has the Romans
+  // dismayed by the glitter of the 'helmets and breastplates of Margianian
+  // steel' when the Parthians threw off their coverings.
+  cataphract: {
+    horse: 'arabian', barding: 'lamellar',
+    faction: 'parthians',
+    skill: 0.5,
+    label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'gauntlet',
+    sidearm: 'spatha',
+    arrowproof: true,
+    extraMass: 0.4,
+    protection: { blunt: 0.55, cut: 0.94, pierce: 0.82, bullet: { head: 0.4, torso: 0.4, limb: 0.3 } },
+    courage: 0.55,
+    designs: [
+      { label: 'Iron scale, red tunic', top: { kind: 'longsleeve', color: '#7a1e1e' }, bottom: { kind: 'pants', color: '#4a2a22' }, armor: { kind: 'cataphract', color: '#7d8088', lace: '#2a1a12', cloth: '#7a1e1e' }, head: { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', mask: true, plume: '#b3161b' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
+      { label: 'Bright scale, dark tunic', top: { kind: 'longsleeve', color: '#2a2a30' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'cataphract', color: '#a7adb6', lace: '#3a2416', cloth: '#2a2a30' }, head: { kind: 'steppeHelm', color: '#a7adb6', coif: '#7d8088', mask: true, gold: '#c9a24a' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
+    ],
+  },
+  // A Parthian horse archer: the belted tunic and baggy trousers of the
+  // Iranian horseman, a soft felt cap (bashlyk) or bare-headed; no armour;
+  // the composite bow and a full quiver, a dagger or short sword. The bulk of
+  // Surena's ten thousand.
+  parthianArcher: {
+    horse: 'arabian',
+    faction: 'parthians',
+    skill: 0.55,
+    label: 'Parthian horse archer — tunic and bashlyk', movement: 'good', fists: 'bare',
+    // The same quiver; at Carrhae Surena's camel train brought them fresh arrows (Plutarch, Crassus 25): a level's `train`.
+    quiver: 36,
+    sidearm: 'shortSword',
+    extraMass: 0.03,
+    protection: { blunt: 0.06, cut: 0.1, pierce: 0.05, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.3,
+    designs: [
+      { label: 'Ochre tunic, felt cap', top: { kind: 'longsleeve', color: '#b8862e' }, bottom: { kind: 'pants', color: '#6a3a24' }, armor: { kind: 'deel', color: '#b8862e', cloth: '#b8862e', cloth2: '#7a1e1e' }, head: { kind: 'bashlyk', color: '#c8bc9e' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+      { label: 'Red tunic, felt cap', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#d8cfb8' }, armor: { kind: 'deel', color: '#8a2a22', cloth: '#8a2a22', cloth2: '#d6a743' }, head: { kind: 'bashlyk', color: '#8a2a22' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+      { label: 'Blue tunic, bare head', top: { kind: 'longsleeve', color: '#2f4a7a' }, bottom: { kind: 'pants', color: '#6a5a44' }, armor: { kind: 'deel', color: '#2f4a7a', cloth: '#2f4a7a', cloth2: '#d6a743' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
     ],
   },
   // ---- The Ottomans, 15th–17th centuries: the azap (light infantry, bow
@@ -1679,6 +1869,10 @@ export const FACTIONS = {
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },
   ring: { label: 'Ring', glyph: '🥊', blurb: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.' },
   street: { label: 'Street', glyph: '🏙️', blurb: 'Ordinary people and the underworld: brawlers, yakuza, office workers.' },
+  // The Goths of the migrations (the Visigoths of Toulouse, the Ostrogoths and Gepids under Attila).
+  goths: { label: 'Goths', glyph: '🪓', standard: { weapon: 'banner', colour: '#2f4468' }, blurb: 'The Visigoths of 451 and the Germanic peoples under Attila: tunic and round shield, spear and spatha; their nobles in mail and spangenhelm, on horse.' },
+  // Parthia (Surena's army at Carrhae, 53 BC): Iranian horsemen.
+  parthians: { label: 'Parthia', glyph: '🏹', standard: { weapon: 'tug' }, blurb: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.' },
   romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
   law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT and special forces: the baton, the service pistol, the shotgun and the AR-15.' },
   specials: { label: 'Beasts & Machines', glyph: '🦍', blurb: 'Not men: a silverback gorilla, a humanoid robot, and a combat bot whose forearms are an AR-15 and a shotgun.' },
@@ -1771,6 +1965,12 @@ export const HELMETS = {
   mingHat: { mass: 1.4, padding: 0.35, curve: 0.7 },
   mingHelm: { mass: 2.0, padding: 0.45, curve: 0.85 },
   hanHelm: { mass: 1.5, padding: 0.3, curve: 0.6 },
+  // The Republic's bronze Montefortino (1–1.5 kg, a cast knob, a short brim) on a felt cap; the late Roman
+  // ridge helmet (two iron halves on a ridge, broad cheek pieces, ~1.5 kg) on a padded lining; the Germanic and
+  // Hunnic spangenhelm, a pointed bowl of riveted plates.
+  montefortino: { mass: 1.3, padding: 0.35, curve: 0.85 },
+  ridgeHelm: { mass: 1.5, padding: 0.4, curve: 0.75 },
+  spangenhelm: { mass: 1.6, padding: 0.4, curve: 0.85 },
   // Mexica war helmets: carved wood and quilted cotton, animal-headed (flat planes, little curve).
   jaguarHelm: { mass: 1.0, padding: 0.45, curve: 0.35 },
   eagleHelm: { mass: 1.0, padding: 0.45, curve: 0.35 },
@@ -1847,6 +2047,8 @@ export function gearTraits(inputs) {
     unarmed: Boolean(spec.unarmed),
     spare: spec.spare ?? null,
     arrowproof: Boolean(spec.arrowproof),
+    // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).
+    quiver: spec.quiver ?? null,
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },
   };
 }

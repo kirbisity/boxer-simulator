@@ -114,7 +114,9 @@ export function formUp(world, leaderOf = () => null, orders = {}) {
     const mean = (list) => list.reduce((sum, fighter) => [sum[0] + at(fighter)[0] / list.length, sum[1] + at(fighter)[1] / list.length], [0, 0]);
     const middle = mean(members);
     const theirs = mean(enemies);
-    const toward = [theirs[0] - middle[0], theirs[1] - middle[1]];
+    // A line drawn up facing straight down the field (a level's order `facing: 'ahead'`: a line of several bodies side
+    // by side, its middle not across from the enemy's) faces that way, from its own end toward the other; else toward them.
+    const toward = orders[corner]?.facing === 'ahead' ? [corner === 'red' ? 1 : -1, 0] : [theirs[0] - middle[0], theirs[1] - middle[1]];
     const length = Math.hypot(toward[0], toward[1]) || 1;
     const forward = [toward[0] / length, toward[1] / length];
     // Left of forward on the floor (x, z), the way the AI's strafe leans.
@@ -129,7 +131,8 @@ export function formUp(world, leaderOf = () => null, orders = {}) {
       fighter.slot = { ahead: dot(offset, forward), across: dot(offset, left) };
       fighter.formation = corner;
     }
-    world.formations[corner] = { anchor, forward, left, leader: leader.id, drill: drillOf(leader), members: members.map((fighter) => fighter.id), review: 0 };
+    // (The level's order for the side over its kit's drill: Crassus's legion, drilled to advance, stood in its square.)
+    world.formations[corner] = { anchor, forward, left, leader: leader.id, drill: { ...drillOf(leader), ...sideDrill }, members: members.map((fighter) => fighter.id), review: 0 };
   }
 }
 
@@ -153,15 +156,23 @@ export function moveFormations(world, dt, hurt = () => 0) {
     if (!standing.length) continue;
     let front = -Infinity;
     for (const fighter of standing) front = Math.max(front, fighter.slot.ahead);
-    // Their nearest man on foot, along our way forward from the anchor (their horse is not the line we are closing on).
+    // Their nearest man on foot, along our way forward from the anchor (their horse is not the line we are closing on);
+    // an army all of horse (the Xiongnu, the Parthians), their nearest rider: that is the enemy the ranks face.
     let theirs = Infinity;
-    for (const other of world.fighters) {
-      if (other.corner === corner || other.mount || !fighting(other)) continue;
-      const position = at(other);
-      theirs = Math.min(theirs, dot([position[0] - formation.anchor[0], position[1] - formation.anchor[1]], formation.forward));
+    let nearest = Infinity;
+    const middle = formation.drill.square ? slotsMiddle(formation, standing) : null;
+    for (const mounted of [false, true]) {
+      for (const other of world.fighters) {
+        if (other.corner === corner || Boolean(other.mount) !== mounted || !fighting(other)) continue;
+        const position = at(other);
+        theirs = Math.min(theirs, dot([position[0] - formation.anchor[0], position[1] - formation.anchor[1]], formation.forward));
+        if (middle) nearest = Math.min(nearest, Math.hypot(position[0] - middle.at[0], position[1] - middle.at[1]) - middle.radius);
+      }
+      if (theirs < Infinity) break;
     }
     if (theirs === Infinity) continue;
-    const gap = theirs - front;
+    // A square (`drill.square`) has no front: the gap is from its outer ring to the nearest of them, whichever way.
+    const gap = middle ? nearest : theirs - front;
     let lag = 0;
     for (const fighter of standing) {
       const slot = slotAt(formation, fighter.slot);
@@ -181,7 +192,8 @@ export function moveFormations(world, dt, hurt = () => 0) {
     }
     formation.gap = gap;
     for (const fighter of members) {
-      fighter.inFront = holding(fighter) && fighter.slot.ahead >= front - DRILL.frontDepth;
+      // A square's front rank is its outer ring, facing out every way.
+      fighter.inFront = holding(fighter) && (middle ? ringOf(formation, fighter.slot) >= middle.ring - DRILL.frontDepth : fighter.slot.ahead >= front - DRILL.frontDepth);
       // In the testudo: the front rank's shields a wall, the rest a roof.
       fighter.shieldPose = formation.testudo && fighter.shield ? (fighter.inFront ? 'wall' : 'roof') : null;
     }
@@ -194,6 +206,28 @@ export function moveFormations(world, dt, hurt = () => 0) {
     relieveShooters(world, members, formation);
     if (formation.drill.squad) relieveWounded(world, members, hurt);
   }
+}
+
+/**
+ * The middle of a square's slots on the floor, the half-width of its outer ring
+ * from there (`ring`: the furthest a slot stands off the middle, along or
+ * across: a square's rings), and the radius on the floor its outermost men stand
+ * at (`radius`).
+ */
+function slotsMiddle(formation, standing) {
+  const slots = standing.length ? standing.map((fighter) => fighter.slot) : [{ ahead: 0, across: 0 }];
+  const ahead = (Math.max(...slots.map((slot) => slot.ahead)) + Math.min(...slots.map((slot) => slot.ahead))) / 2;
+  const across = (Math.max(...slots.map((slot) => slot.across)) + Math.min(...slots.map((slot) => slot.across))) / 2;
+  formation.middle = { ahead, across };
+  const centre = slotAt(formation, formation.middle);
+  const ring = Math.max(...slots.map((slot) => ringOf(formation, slot)));
+  return { at: centre, ring, radius: ring * (formation.close ?? 1) };
+}
+
+/** How far a slot stands off its square's middle: the larger of along and across (its ring). */
+function ringOf(formation, slot) {
+  const middle = formation.middle ?? { ahead: 0, across: 0 };
+  return Math.max(Math.abs(slot.ahead - middle.ahead), Math.abs(slot.across - middle.across));
 }
 
 /** A man with a bow or gun (his weapon shoots). */

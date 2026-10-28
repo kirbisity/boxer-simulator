@@ -9,6 +9,7 @@ import { floorUnder, SEVER_PARTS, point, quatRotate, shieldDisc } from './physic
 import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
+import { outfitOf } from './outfits.js';
 import { featherDevice, steelMaterial } from './wardrobe.js';
 import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
 import { crowdBatch } from './crowdview.js';
@@ -1146,6 +1147,44 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(fuller, cross, pommel, cylinder(0.014, 0.015, -spec.handle, 0.012, leather));
       break;
     }
+    case 'spatha': {
+      // The spatha of the late Roman army and the Germanic and Hunnic
+      // horsemen: a long straight two-edged blade of near even width to a
+      // rounded point, a broad shallow fuller; no cross to speak of, only a
+      // short bar guard of bone or iron (the Roman guard plate); a ribbed grip
+      // and the mushroom pommel the period's swords end in.
+      group.add(bladeMesh(bladeGeometry(0.03, spec.length - 0.03, 0.05, 0.008, 0.09), polished));
+      const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.003, spec.length * 0.78, 0.017), dark);
+      fuller.position.set(0.0045, 0.04 + spec.length * 0.39, 0);
+      fuller.userData.blade = true;
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.085), steel);
+      guard.position.y = 0.018;
+      const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.026, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), brass);
+      pommel.rotation.x = Math.PI;
+      pommel.scale.y = 0.75;
+      pommel.position.y = -spec.handle - 0.004;
+      group.add(fuller, guard, pommel, cylinder(0.015, 0.016, -spec.handle, 0.01, wood));
+      for (let rib = 1; rib < 4; rib += 1) group.add(cylinder(0.0175, 0.0175, -spec.handle + rib * spec.handle / 4 - 0.004, -spec.handle + rib * spec.handle / 4 + 0.004, leather, 10));
+      break;
+    }
+    case 'kontos': {
+      // The cataphract's kontos: a long plain shaft, thickest at the hands and
+      // tapering to the head, a long socketed leaf point; no vamplate, no rest
+      // (it was held in both hands across the horse's neck); an iron shoe on
+      // the butt to stand it in the ground.
+      const headLength = (1 - spec.pointFrom) * (spec.length - spec.strikeFrom) + 0.08;
+      const shaftTo = spec.length - headLength + 0.03;
+      const turned = [[-spec.handle, 0.02], [-spec.handle * 0.5, 0.025], [0, 0.026], [spec.length * 0.45, 0.022], [shaftTo, 0.016]];
+      group.add(new THREE.Mesh(new THREE.LatheGeometry(turned.map(([y, radius]) => new THREE.Vector2(radius, y)), 10), wood));
+      group.add(cylinder(0.028, 0.028, -0.05, 0.05, leather, 10), cylinder(0.028, 0.028, -0.6, -0.5, leather, 10));
+      group.add(cylinder(0.012, 0.019, shaftTo - 0.12, shaftTo + 0.02, steel, 8));
+      group.add(bladeMesh(bladeGeometry(shaftTo, headLength, 0.04, 0.012, 0.35), polished));
+      const butt = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.08, 8), steel);
+      butt.rotation.x = Math.PI;
+      butt.position.y = -spec.handle - 0.04;
+      group.add(butt);
+      break;
+    }
     case 'sayf': {
       // A broad straight blade, two-edged, a wide fuller to near the point; a
       // short cross with its langets running up the blade's flats; a grip
@@ -1217,8 +1256,154 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   return group;
 }
 
-/** The parma: a small, round, convex bronze shield, boss at the centre. Faces +z. */
-export function buildShieldMesh(spec, envMap) {
+/**
+ * The painted shields of late antiquity, as drawn (SHIELDS.oval, SHIELDS.germanic):
+ * - oval: the late Roman board drawn at its full size (`width` × `height` m,
+ *   wider than the rectangle a blow meets: SHIELDS.oval), dished round an
+ *   upright axis `curve` m behind it; the device painted on it is a ring
+ *   round the boss with `rays` rays out from it, in a lighter `ray` colour on
+ *   the unit's field (the wearer's paint), a pale `border` inside a rawhide
+ *   rim; a domed iron boss of `boss` m.
+ * - germanic: `planks` boards across, the field quartered in the wearer's
+ *   paint and a pale second colour (`ray`) turned `turn` rad, a rawhide rim,
+ *   a tall domed iron boss of `boss` m on its flange.
+ * `paint` (a field colour) when the wearer gives none.
+ */
+// The looks painted in the wearer's colour.
+const PAINTED_SHIELDS = new Set(['oval', 'germanic']);
+const LATE_SHIELDS = {
+  oval: { width: 0.8, height: 1.05, rays: 8, ray: '#e2d6b4', border: '#e2d6b4', paint: '#9a2a1e', boss: 0.075, rim: 0.012 },
+  germanic: { planks: 6, ray: '#d8cfb8', paint: '#2f4468', turn: Math.PI / 4, boss: 0.08, rim: 0.016 },
+};
+
+/** A canvas painted by `paint(g, w, h)`, as a texture. */
+function paintedFace(width, height, paint) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  paint(canvas.getContext('2d'), width, height);
+  return new THREE.CanvasTexture(canvas);
+}
+
+/** The late Roman oval shield: the dished board cut to its oval from the painted face, rimmed, its boss. Faces +z. */
+function ovalShield(spec, envMap, paint) {
+  const look = LATE_SHIELDS.oval;
+  const group = new THREE.Group();
+  const R = spec.curve;
+  const half = look.width / 2 / R;
+  const texture = paintedFace(256, Math.round((256 * look.height) / look.width), (g, w, h) => {
+    const oval = (inset) => {
+      g.beginPath();
+      g.ellipse(w / 2, h / 2, w / 2 - inset, h / 2 - inset * (h / w), 0, 0, Math.PI * 2);
+    };
+    g.clearRect(0, 0, w, h);
+    oval(0);
+    g.fillStyle = paint ?? look.paint;
+    g.fill();
+    // The rawhide edge, and a pale border painted inside it.
+    g.lineWidth = w * 0.04;
+    g.strokeStyle = '#8a6a44';
+    g.stroke();
+    oval(w * 0.07);
+    g.lineWidth = w * 0.02;
+    g.strokeStyle = look.border;
+    g.stroke();
+    // The device: a ring round the boss and rays out from it.
+    g.strokeStyle = look.ray;
+    g.lineWidth = w * 0.025;
+    g.beginPath();
+    g.arc(w / 2, h / 2, w * 0.17, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = look.ray;
+    for (let ray = 0; ray < look.rays; ray += 1) {
+      g.save();
+      g.translate(w / 2, h / 2);
+      g.rotate((ray / look.rays) * Math.PI * 2);
+      g.beginPath();
+      g.moveTo(-w * 0.025, -w * 0.19);
+      g.lineTo(w * 0.025, -w * 0.19);
+      g.lineTo(0, -w * 0.36);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+  });
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(R, R, look.height, 28, 1, true, -half, half * 2), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, side: THREE.DoubleSide, alphaTest: 0.5 }));
+  // Cylinder angle 0 is +z: the face's middle; the axis behind it.
+  face.position.z = -R;
+  const iron = steelMaterial(envMap, { vertexColors: false, color: 0x6a6e76, roughness: 0.4 });
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(look.boss, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), iron);
+  boss.rotation.x = Math.PI / 2;
+  boss.position.z = 0.004;
+  // The rim: a rawhide edge bound round the oval, lying on the dished face.
+  const rimPoints = [];
+  for (let step = 0; step <= 48; step += 1) {
+    const angle = (step / 48) * Math.PI * 2;
+    const across = (look.width / 2) * Math.cos(angle);
+    const turned = across / R;
+    rimPoints.push(new THREE.Vector3(Math.sin(turned) * R, (look.height / 2) * Math.sin(angle), Math.cos(turned) * R - R));
+  }
+  const rim = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rimPoints, true), 64, look.rim, 5, true), surface(0x8a6a44, { roughness: 0.75 }));
+  group.add(face, boss, rim);
+  for (const mesh of [face, boss]) {
+    mesh.castShadow = true;
+    mesh.add(outlineFor(mesh, 0.003));
+  }
+  return group;
+}
+
+/** The Germanic round shield: flat boards painted in quarters of two colours, a rawhide rim, a tall iron boss. Faces +z. */
+function germanicShield(spec, envMap, paint) {
+  const look = LATE_SHIELDS.germanic;
+  const group = new THREE.Group();
+  const texture = paintedFace(256, 256, (g, w, h) => {
+    g.fillStyle = paint ?? look.paint;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = look.ray;
+    for (let quarter = 0; quarter < 4; quarter += 2) {
+      g.beginPath();
+      g.moveTo(w / 2, h / 2);
+      g.arc(w / 2, h / 2, w / 2, look.turn + (quarter * Math.PI) / 2, look.turn + ((quarter + 1) * Math.PI) / 2);
+      g.closePath();
+      g.fill();
+    }
+    // The joints between the boards, showing through the paint.
+    g.strokeStyle = 'rgba(30, 20, 12, 0.45)';
+    g.lineWidth = 2;
+    for (let plank = 1; plank < look.planks; plank += 1) {
+      g.beginPath();
+      g.moveTo((plank / look.planks) * w, 0);
+      g.lineTo((plank / look.planks) * w, h);
+      g.stroke();
+    }
+  });
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius, spec.radius, 0.012, 36), [surface(0x8a6a44, { roughness: 0.75 }), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75 }), surface(0x5a4028, { roughness: 0.8 })]);
+  face.rotation.x = Math.PI / 2;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(spec.radius, look.rim, 6, 40), surface(0x8a6a44, { roughness: 0.7 }));
+  const iron = steelMaterial(envMap, { vertexColors: false, color: 0x5d6066, roughness: 0.42 });
+  const flange = new THREE.Mesh(new THREE.CylinderGeometry(look.boss * 1.25, look.boss * 1.3, 0.008, 20), iron);
+  flange.rotation.x = Math.PI / 2;
+  flange.position.z = 0.008;
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(look.boss, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), iron);
+  boss.rotation.x = Math.PI / 2;
+  boss.scale.y = 1.3;
+  boss.position.z = 0.01;
+  group.add(face, rim, flange, boss);
+  for (const mesh of [face, rim, boss]) {
+    mesh.castShadow = true;
+    mesh.add(outlineFor(mesh, 0.003));
+  }
+  return group;
+}
+
+/**
+ * A shield, facing +z: the parma (a small, round, convex bronze shield, boss
+ * at the centre) unless its look is another's. `paint`: the wearer's colour
+ * for a shield painted in his unit's (the late Roman oval, the Germanic round).
+ */
+export function buildShieldMesh(spec, envMap, paint = null) {
+  if (spec.look === 'oval') return ovalShield(spec, envMap, paint);
+  if (spec.look === 'germanic') return germanicShield(spec, envMap, paint);
   // The arena's shaped shields and the scissor's crescent, in detail.
   if (spec.shape || spec.look === 'scissores') return buildArenaShield(spec, envMap, steelMaterial);
   const group = new THREE.Group();
@@ -1553,8 +1738,10 @@ function drawMounted(view, fighterView, arms, weapon, showing) {
   if (fighter.shield) {
     if (!arms.shield) {
       arms.shieldKind = fighter.shield.kind;
-      const build = () => buildShieldMesh(fighter.shield.spec, view.steelEnv);
-      arms.shield = fighterView.baked ? crowdArms(view, `shield:${fighter.shield.kind}`, build) : build();
+      // A shield painted in his unit's colour (the late Roman oval, the Germanic round) takes it from his kit's cloth.
+      const paint = PAINTED_SHIELDS.has(fighter.shield.spec.look) ? outfitOf(fighter.body.inputs).look.armor?.cloth ?? null : null;
+      const build = () => buildShieldMesh(fighter.shield.spec, view.steelEnv, paint);
+      arms.shield = fighterView.baked ? crowdArms(view, `shield:${fighter.shield.kind}${paint ? `:${paint}` : ''}`, build) : build();
       fighterView.group.add(arms.shield);
     }
     const disc = shieldDisc(fighter);

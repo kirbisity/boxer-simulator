@@ -41,6 +41,7 @@ import { CAMERA_NEAR } from './depthrange.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 import { prepareScenery, updateSceneryLod } from './scenerylod.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
+import { plainsCamelTrain, plainsRidge, plainsWagonLaager } from './props/plains.js';
 import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
@@ -116,7 +117,7 @@ export function setPlace(view, place, arena, weather = null) {
   const swapped = swapFloor(view, place, floor);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -331,6 +332,12 @@ const PLACE_LIGHT = {
   sengoku: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.1 },
   // The high plain of the Valley of Mexico: thin bright air, a hard sun.
   plain: { background: 0xbcd8f0, fog: [40, 140], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // The edge of the Gobi in the late afternoon (Mobei: the fighting ran on to dusk, a wind getting up): a pale dusty sky, a warm low sun, haze early.
+  mobei: { background: 0xd6d0bc, fog: [45, 150], key: 0xffe0b4, keyIntensity: 0.14, rim: 0xe8d8c0, sun: 0.95 },
+  // Champagne in high summer: a mild clear day, soft haze on the far woods.
+  catalaunian: { background: 0xbcd6ee, fog: [45, 150], key: 0xfff4e0, keyIntensity: 0.12, rim: 0xd6e6ff, sun: 1.0 },
+  // The plain below Harran in June: a hard white sun near overhead, the sky bleached pale, heat haze thick on the distance.
+  carrhae: { background: 0xe2e2da, fog: [40, 130], key: 0xfff8ec, keyIntensity: 0.08, rim: 0xf0ece0, sun: 1.2 },
   // A level-mode stage: open sky and a sea below; the stage's own terrain stands in it (levelmode/terrainview.js).
   stage: { background: 0xbcd8f0, fog: [60, 220], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
   // Stage 1, Dunnottar: a storm at dusk over a black sea; a bruised purple-grey haze that thickens with distance (levelmode/storm.js).
@@ -367,6 +374,10 @@ export const PLACE_ARENAS = {
   coastVillage: { halfX: 12, halfZ: 8 },
   // The square between the shops and the canal: room for the wokou raid's formations.
   jiangnan: { halfX: 14, halfZ: 9 },
+  // The horse-archer battles' plains: the field's room for horsemen to ride round, shoot and wheel (a battle's floor is wider still: scenarios.js).
+  mobei: { halfX: 30, halfZ: 20 },
+  catalaunian: { halfX: 30, halfZ: 20 },
+  carrhae: { halfX: 30, halfZ: 20 },
   // A level-mode stage: the terrain is the floor (the box is only a far limit).
   stage: { halfX: 40, halfZ: 40 },
   dunnottar: { halfX: 40, halfZ: 40 },
@@ -737,6 +748,83 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
   }
   // Dry bunch grass and volcanic stones over the plain.
   place.add(...fieldLitter(31, arena, { grass: 0x8a8448, stone: 0x5a524a, tufts: 800, stones: 160, half: [50, 40] }));
+  return place;
+}
+
+/**
+ * The open plains of the horse-archer battles, one builder for the three:
+ * each its ground's colour (`ground`: the base and the speckle's channels,
+ * low to high, painted in fine strokes), its far hills (`hills`: how many, how
+ * high, their colour and how far out, round the floor; flattened domes),
+ * what lies about it (`litter`: tufts and stones, render.js fieldLitter) and
+ * what stood at its edge (`props`: src/props/plains.js). Like the plain of
+ * Mexico, on a battle map's wider floor everything stands that much further out.
+ * - mobei: the northern edge of the Gobi, where Wei Qing met the Chanyu (119
+ *   BC): short sparse grass on grey-brown gravel, low bare swells and dark far
+ *   ridges; his wagon laager behind the Han end of the floor.
+ * - catalaunian: the plain of Champagne (451): summer grass gone green-gold,
+ *   rolling, a few woods far off; the ridge the armies fought for beyond the far side.
+ * - carrhae: the plain south of Carrhae towards Harran in June (53 BC): pale
+ *   sand and gravel, camelthorn in low grey-green tufts, a few bare hills far
+ *   off; the Parthian camel train behind their end of the floor.
+ */
+const OPEN_PLAINS = {
+  mobei: {
+    ground: { base: '#857a5e', speckle: [[95, 150], [88, 132], [64, 100]], strokes: 16000, repeat: [6, 6] },
+    hills: { count: 12, radius: [14, 24], height: [0.12, 0.26], colour: 0x6e664e, distance: [58, 54] },
+    litter: { grass: 0x8e8a5a, stone: 0x5e5850, tufts: 700, stones: 260 },
+    props: (arena) => [plainsWagonLaager(arena)],
+  },
+  catalaunian: {
+    ground: { base: '#7c8a44', speckle: [[100, 165], [110, 165], [40, 75]], strokes: 22000, repeat: [8, 8] },
+    hills: { count: 9, radius: [16, 26], height: [0.14, 0.3], colour: 0x6f8444, distance: [62, 60] },
+    litter: { grass: 0x9a9a4e, stone: 0x8a8478, tufts: 900, stones: 60 },
+    props: (arena) => [plainsRidge(arena)],
+  },
+  carrhae: {
+    ground: { base: '#c2ac84', speckle: [[170, 225], [150, 205], [110, 160]], strokes: 14000, repeat: [5, 5] },
+    hills: { count: 7, radius: [12, 20], height: [0.1, 0.2], colour: 0xa8906a, distance: [70, 66] },
+    litter: { grass: 0x7e8458, stone: 0x9a8a6e, tufts: 260, stones: 220 },
+    props: (arena) => [plainsCamelTrain(arena)],
+  },
+};
+
+function buildOpenPlain(key, arena = PLACE_ARENAS[key]) {
+  const spec = OPEN_PLAINS[key];
+  const home = PLACE_ARENAS[key];
+  const place = new THREE.Group();
+  const outX = Math.max(0, arena.halfX - home.halfX);
+  const outZ = Math.max(0, arena.halfZ - home.halfZ);
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...options });
+  place.add(daySky());
+  const { base, speckle, strokes, repeat } = spec.ground;
+  const texture = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let index = 0; index < strokes; index += 1) {
+      const shade = Math.random();
+      const [r, gr, b] = speckle.map(([low, high]) => Math.round(low + shade * (high - low)));
+      g.fillStyle = `rgba(${r},${gr},${b},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
+    }
+  }, repeat);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150 + 2 * outX, 150 + 2 * outZ), lit(0xffffff, { map: texture }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
+  place.add(ground);
+  const hills = spec.hills;
+  for (let index = 0; index < hills.count; index += 1) {
+    const angle = ((index + 0.5) / hills.count) * Math.PI * 2;
+    const radius = hills.radius[0] + Math.random() * (hills.radius[1] - hills.radius[0]);
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(hills.colour));
+    hill.scale.y = hills.height[0] + Math.random() * (hills.height[1] - hills.height[0]);
+    hill.position.set(Math.cos(angle) * (hills.distance[0] + outX), -0.5, Math.sin(angle) * (hills.distance[1] + outZ));
+    hill.userData.scenery = 'hills';
+    place.add(hill);
+  }
+  place.add(...fieldLitter(key.length * 7 + 3, arena, { ...spec.litter, half: [55 + outX, 45 + outZ] }));
+  place.add(...spec.props(arena));
   return place;
 }
 

@@ -933,6 +933,23 @@ const LIVING_GREENS = {
   field: [0x5f8838, 0x6c943e, 0x7a9a44, 0x58803a, 0x8aa250],
   sengoku: [0x8e8a42, 0x9a8a48, 0x7e8442, 0xa89458, 0x6f7a3c],
   jiangnan: [0x4f7a30, 0x5c8a36, 0x46702c, 0x6a9440, 0x3f6428],
+  // Champagne in high summer: the grass going over, green with gold through it.
+  catalaunian: [0x6f8a3a, 0x8a9440, 0x9a9a48, 0x647e36, 0xa8a050],
+};
+
+/**
+ * The dry places' living ground (livingDryPlace): the tussocks' colours and how
+ * thick they grow (per m², and their height, m), the stones' and pebbles'
+ * colours and counts, the grit speckled over the dust (its colours, and their
+ * share), the dust's colour, and whether a cart track crosses it.
+ * - plain: the Valley of Mexico (its look before this table: tall straw bunch grass, basalt and red tezontle);
+ * - mobei: the Gobi's edge: short grey-green and straw steppe grass in low clumps, grey gravel, a wheel track;
+ * - carrhae: below Harran: camelthorn in low grey-green tufts, few; pale flint and limestone gravel.
+ */
+const LIVING_DRY = {
+  plain: { tufts: [0xb0a060, 0xa89458, 0x9a9a5a, 0xc0ac70], perSquareMetre: 0.9, tall: [0.28, 0.4], stones: [0x3a3634, 0x4a4240, 0x6a3a2c, 0x7a4632, 0x5a5550], grit: [[48, 42, 40], [116, 64, 44], 0.65], dust: [172, 152, 110], track: true },
+  mobei: { tufts: [0x8e9466, 0xa09a68, 0x7e8a5e, 0xb0a474], perSquareMetre: 1.1, tall: [0.12, 0.18], stones: [0x4a4642, 0x5e5a54, 0x6e6860, 0x3e3a36, 0x7a7266], grit: [[70, 66, 60], [110, 100, 84], 0.6], dust: [150, 138, 112], track: true },
+  carrhae: { tufts: [0x7a8a5e, 0x8a9468, 0x6e7e56, 0x9a9a70], perSquareMetre: 0.35, tall: [0.2, 0.25], stones: [0xb0a080, 0x9a8a6e, 0xc4b494, 0x8a7a62, 0xd0c4a4], grit: [[150, 130, 100], [200, 184, 150], 0.5], dust: [214, 196, 160], track: false },
 };
 
 /** Grass places: meadow, field, sengoku. */
@@ -1157,6 +1174,7 @@ function livingPond({ land, view, rng, pond }) {
 function livingDryPlace({ place, view, arena, grounds, rng }) {
   const group = new THREE.Group();
   const land = livingLand(view, place);
+  const dry = LIVING_DRY[place] ?? LIVING_DRY.plain;
   const relief = livingRelief({ land, arena, grounds, reach: 13, amplitude: 0.14, seed: 41 });
   if (relief) group.add(relief);
   // Tussocks: tall arching clumps of straw-coloured blades with a green heart.
@@ -1165,7 +1183,7 @@ function livingDryPlace({ place, view, arena, grounds, rng }) {
   const reach = Math.max(arena.halfX, arena.halfZ) + 40;
   for (const { x, z } of livingSample(rng, {
     box: [-reach, -reach, reach, reach],
-    perSquareMetre: 0.9,
+    perSquareMetre: dry.perSquareMetre,
     density: (x, z) => {
       const outside = livingOutside(arena, x, z);
       if (outside < 0.6) return 0;
@@ -1174,11 +1192,11 @@ function livingDryPlace({ place, view, arena, grounds, rng }) {
     },
   })) {
     const outside = livingOutside(arena, x, z);
-    const tall = (0.28 + rng() * 0.4) * (0.5 + 0.5 * livingSmooth(0.5, 2.5, outside)) * (1 + Math.min(0.8, outside / 25));
-    items.push({ x, y: land.at(x, z) - 0.02, z, sx: tall * (1.4 + rng() * 0.8), sy: tall, ry: rng() * 6.28, colour: livingColour([0xb0a060, 0xa89458, 0x9a9a5a, 0xc0ac70][Math.floor(rng() * 4)], 0.1, rng) });
+    const tall = (dry.tall[0] + rng() * dry.tall[1]) * (0.5 + 0.5 * livingSmooth(0.5, 2.5, outside)) * (1 + Math.min(0.8, outside / 25));
+    items.push({ x, y: land.at(x, z) - 0.02, z, sx: tall * (1.4 + rng() * 0.8), sy: tall, ry: rng() * 6.28, colour: livingColour(dry.tufts[Math.floor(rng() * dry.tufts.length)], 0.1, rng) });
   }
   group.add(livingInstanced(tussock, livingSwayMaterial({ sway: 0.14 }), items, { sectors: 8 }));
-  group.add(livingStones({ land, arena, rng, count: 700, pebbles: 2600, to: 28, palette: [0x3a3634, 0x4a4240, 0x6a3a2c, 0x7a4632, 0x5a5550], size: [0.03, 0.22], seed: 47 }));
+  group.add(livingStones({ land, arena, rng, count: 700, pebbles: 2600, to: 28, palette: dry.stones, size: [0.03, 0.22], seed: 47 }));
   // Dust: pale bare patches, darker grit speckle, a cart track.
   const width = 2 * (Math.max(arena.halfX, arena.halfZ) + 10);
   const decal = livingCanvas({ width, depth: width, pixels: 2048 });
@@ -1186,15 +1204,16 @@ function livingDryPlace({ place, view, arena, grounds, rng }) {
   livingPaintNoise(decal, 400, (x, z) => {
     const bare = livingFbm(x / 3.5, z / 3.5, 45, 4);
     const fine = livingFbm(x / 0.6, z / 0.6, 47, 2);
-    return [172 + 20 * fine, 152 + 16 * fine, 110 + 10 * fine, livingSmooth(0.0, 0.35, bare) * (0.38 + 0.12 * fine)];
+    return [dry.dust[0] + 20 * fine, dry.dust[1] + 16 * fine, dry.dust[2] + 10 * fine, livingSmooth(0.0, 0.35, bare) * (0.38 + 0.12 * fine)];
   });
-  // Volcanic grit: dark basalt and red tezontle crumbs.
+  // Grit: the place's own (the plain's dark basalt and red tezontle crumbs).
+  const [darkGrit, lightGrit, darkShare] = dry.grit;
   for (let index = 0; index < 9000 * LIVING_DENSITY; index += 1) {
     const [cx, cy] = px((rng() - 0.5) * width, (rng() - 0.5) * width);
-    g.fillStyle = rng() < 0.65 ? `rgba(48,42,40,${0.15 + rng() * 0.2})` : `rgba(116,64,44,${0.15 + rng() * 0.2})`;
+    g.fillStyle = `rgba(${(rng() < darkShare ? darkGrit : lightGrit).join(',')},${0.15 + rng() * 0.2})`;
     g.fillRect(cx, cy, 0.8 + rng() * 0.8, 0.8 + rng() * 0.8);
   }
-  for (const side of [-0.7, 0.7]) {
+  for (const side of dry.track ? [-0.7, 0.7] : []) {
     g.strokeStyle = 'rgba(120,100,70,0.22)';
     g.lineWidth = 0.18 * scale;
     g.beginPath();

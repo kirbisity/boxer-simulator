@@ -231,9 +231,24 @@ export const COMPARE_SCENES = {
   },
 };
 
+// The horse-archer plains, wide: two horsemen out on the floor, and what stands at its edge (render.js
+// OPEN_PLAINS): Wei Qing's wagons beyond the floor's −x end at Mobei, the camel train beyond its +x end at
+// Carrhae, the ridge beyond −z on the Catalaunian Plains.
+for (const [place, at, yaw] of [['mobei', [-24, 0], 0.4], ['catalaunian', [0, -8], 1.57], ['carrhae', [24, 0], 2.7]]) {
+  COMPARE_SCENES[`plains-${place}`] = {
+    about: `The ${place} plain, wide, with what stands at its edge.`,
+    place,
+    seed: 5,
+    frames: 60,
+    red: [{ preset: 'saber', mounted: true }],
+    blue: [{ preset: 'steppeBow', mounted: true }],
+    camera: { focus: { at, height: 1.5 }, yaw, pitch: 0.12, distance: 22, fov: 50 },
+  };
+}
+
 // Close shots of the ground at each open-air place: two fighters, the camera
 // at head height a few metres off, looking down past them at the ground.
-for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['jiangnan', 0.9], ['port', 1.2], ['subway', -0.4]]) {
+for (const [place, yaw] of [['meadow', 0.9], ['field', 0.9], ['plain', 0.9], ['sengoku', 0.9], ['colosseum', 0.6], ['town', 0.9], ['coastFort', 2.6], ['coastVillage', 2.6], ['jiangnan', 0.9], ['port', 1.2], ['subway', -0.4], ['mobei', 0.9], ['catalaunian', 0.9], ['carrhae', 0.9]]) {
   COMPARE_SCENES[`ground-${place}`] = {
     about: `Two fighters at the ${place}, a close shot looking down at the ground round their feet: the ground.`,
     place,

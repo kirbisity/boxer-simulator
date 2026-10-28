@@ -64,6 +64,11 @@ export const SCENE_MUSIC = {
   coastFort: 'china',
   coastVillage: 'china',
   jiangnan: 'china',
+  // The horse-archer battles and their plains (no music of the steppe or of Parthia here): Mobei is the Han army's, the
+  // Catalaunian Plains and Carrhae the Romans' (the side the player leads).
+  mobei: 'china',
+  catalaunian: 'roman',
+  carrhae: 'roman',
 };
 
 const BOSS_MUSIC = { dunnottar: 'boss' };

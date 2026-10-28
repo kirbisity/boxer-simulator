@@ -432,6 +432,95 @@ const PAINTED_GROUND_LAYERS = {
     });
   },
 
+  /**
+   * Gobi-edge steppe (Mobei): short, sparse grass in thin clumps on grey-brown
+   * gravel and grit, the ground between showing everywhere: a grazed, wind-dried
+   * sward, not the high plain's bunch grass.
+   */
+  steppe(random) {
+    const s = paintedGroundSheet(random, '#7e7458', 0.45);
+    const { rr } = s;
+    for (let index = 0; index < 12000; index += 1) {
+      const kind = random();
+      const fill = kind < 0.4 ? paintedGroundHsl(30, 8, rr(30, 42)) : kind < 0.8 ? paintedGroundHsl(36, 14, rr(44, 56)) : paintedGroundHsl(40, 18, rr(62, 72));
+      s.blob(rr(0, 512), rr(0, 512), rr(0.6, 1.4), rr(0.6, 1.4), 0, fill, rr(0.4, 0.65));
+    }
+    for (let index = 0; index < 90; index += 1) {
+      const r = rr(2, 5);
+      s.dome(rr(0, 512), rr(0, 512), r, r * rr(0.6, 0.9), rr(0, 3), paintedGroundHsl(28, 6, rr(28, 44)), 0.9, 0.48);
+    }
+    for (let clump = 0; clump < 260; clump += 1) {
+      const cx = rr(0, 512);
+      const cy = rr(0, 512);
+      const reach = rr(4, 10);
+      for (let blade = 0; blade < 14; blade += 1) {
+        s.stroke(cx + rr(-2, 2), cy + rr(-2, 2), reach * rr(0.5, 1), rr(0, 6.3), rr(-0.2, 0.2), rr(0.8, 1.3), paintedGroundHsl(rr(48, 70), rr(18, 34), rr(38, 56)), 0.56);
+      }
+    }
+    return paintedGroundFinish(s, {
+      relief: 4,
+      rough: 0.95,
+      post: ({ size, rgb, random: rnd }) => paintedGroundMottle(rgb, size, paintedGroundTileNoise(size, 4, rnd, 3), 0.86, 1.12),
+    });
+  },
+
+  /** Bare gravel and grit, grey-brown (Mobei) or, `pale`, sand-coloured flint and limestone scree (Carrhae). */
+  gravel(random, { pale = false } = {}) {
+    const s = paintedGroundSheet(random, pale ? '#b8a07a' : '#6e6656', 0.5);
+    const { rr } = s;
+    const light = pale ? [58, 82] : [38, 60];
+    for (let index = 0; index < 16000; index += 1) {
+      const kind = random();
+      const fill = kind < 0.3 ? paintedGroundHsl(28, 8, rr(light[0] - 16, light[0])) : kind < 0.8 ? paintedGroundHsl(34, pale ? 26 : 12, rr(...light)) : paintedGroundHsl(22, 20, rr(light[0] - 6, light[1] - 10));
+      const r = rr(0.6, 1.8);
+      s.blob(rr(0, 512), rr(0, 512), r, r * rr(0.7, 1), 0, fill, rr(0.45, 0.8));
+    }
+    for (let index = 0; index < 220; index += 1) {
+      const r = rr(1.5, 5);
+      s.dome(rr(0, 512), rr(0, 512), r, r * rr(0.6, 0.9), rr(0, 3), paintedGroundHsl(30, pale ? 18 : 8, rr(light[0] - 10, light[1])), 0.95, 0.5);
+    }
+    return paintedGroundFinish(s, {
+      relief: 4,
+      rough: 0.96,
+      post: ({ size, height, rgb, random: rnd }) => {
+        const lumps = paintedGroundTileNoise(size, 6, rnd, 3);
+        for (let index = 0; index < size * size; index += 1) height[index] += (lumps[index] - 0.5) * 0.18;
+        paintedGroundMottle(rgb, size, paintedGroundTileNoise(size, 3, rnd, 3), 0.88, 1.12);
+      },
+    });
+  },
+
+  /**
+   * The Jazira's plain below Harran in summer (Carrhae): pale sand blown thin
+   * over gravel, dry dead stalks, and camelthorn (Alhagi) in low grey-green tufts.
+   */
+  desert(random) {
+    const s = paintedGroundSheet(random, '#c8b08a', 0.5);
+    const { rr } = s;
+    for (let index = 0; index < 10000; index += 1) {
+      const kind = random();
+      const fill = kind < 0.55 ? paintedGroundHsl(38, 38, rr(70, 84), 0.6) : kind < 0.9 ? paintedGroundHsl(32, 22, rr(52, 64), 0.55) : paintedGroundHsl(25, 12, rr(36, 46), 0.6);
+      s.blob(rr(0, 512), rr(0, 512), rr(0.5, 1.2), rr(0.5, 1.2), 0, fill, null);
+    }
+    for (let index = 0; index < 120; index += 1) {
+      const r = rr(1.5, 4);
+      s.dome(rr(0, 512), rr(0, 512), r, r * 0.8, rr(0, 3), paintedGroundHsl(32, 20, rr(58, 74)), 0.9, 0.5);
+    }
+    for (let index = 0; index < 500; index += 1) s.stroke(rr(0, 512), rr(0, 512), rr(4, 9), rr(0, 6.3), rr(-0.3, 0.3), 0.8, paintedGroundHsl(rr(36, 44), rr(20, 32), rr(56, 68), 0.85), 0.52);
+    for (let tuft = 0; tuft < 40; tuft += 1) {
+      const cx = rr(0, 512);
+      const cy = rr(0, 512);
+      const reach = rr(6, 13);
+      s.blob(cx, cy, reach * 0.4, reach * 0.4, 0, paintedGroundHsl(35, 20, 40, 0.5), 0.56);
+      for (let twig = 0; twig < 30; twig += 1) s.stroke(cx, cy, reach * rr(0.4, 1), rr(0, 6.3), rr(-0.5, 0.5), rr(0.8, 1.4), paintedGroundHsl(rr(70, 95), rr(12, 24), rr(34, 48)), 0.6);
+    }
+    return paintedGroundFinish(s, {
+      relief: 5,
+      rough: 0.93,
+      post: ({ size, rgb, random: rnd }) => paintedGroundMottle(rgb, size, paintedGroundTileNoise(size, 3, rnd, 3), 0.9, 1.1),
+    });
+  },
+
   /** Autumn grass trodden flat: long stalks lying one way, earth between. */
   trampled(random) {
     const s = paintedGroundSheet(random, '#5a5233', 0.4);
@@ -790,7 +879,7 @@ const paintedGroundLayerCache = new Map();
 function paintedGroundLayer(name) {
   if (!paintedGroundLayerCache.has(name)) {
     const [painter, variant] = name.split(':');
-    const options = { 'grass:flowers': { flowers: true }, 'mud:foot': { prints: 'foot' }, 'mud:mixed': { prints: 'mixed' }, 'cobbles:worn': { worn: true }, 'concrete:worn': { worn: true } }[name] ?? {};
+    const options = { 'grass:flowers': { flowers: true }, 'mud:foot': { prints: 'foot' }, 'mud:mixed': { prints: 'mixed' }, 'cobbles:worn': { worn: true }, 'concrete:worn': { worn: true }, 'gravel:pale': { pale: true } }[name] ?? {};
     void variant;
     const started = performance.now();
     paintedGroundLayerCache.set(name, PAINTED_GROUND_LAYERS[painter](paintedGroundRandom(`painted:${name}`), options));
@@ -861,6 +950,34 @@ const PAINTED_GROUND_PLACES = {
       const reach = Math.hypot(x, z);
       const grit = paintedGroundSmooth(0.5, 0.66, f(x * 0.16, z * 0.16, 12) * 0.75 + f(x * 0.8, z * 0.8, 13) * 0.25 + (1 - paintedGroundSmooth(2, 8, reach)) * 0.15);
       return [grit, f(x * 0.05, z * 0.05, 14) * 0.7 + f(x * 0.3, z * 0.3, 15) * 0.3, 0, 0];
+    },
+  },
+  // The Gobi's edge: sparse steppe grass, bare gravel in patches and in long wind-scoured streaks.
+  mobei: {
+    a: 'steppe', b: 'gravel', tiles: [1.6, 1.4], bomb: [1, 1], macro: PAINTED_GROUND_DRY_MACRO, keepOut: [32, 22], match: 0.85,
+    layout: (x, z, f) => {
+      const streak = f(x * 0.05, z * 0.22, 50);
+      const bare = paintedGroundSmooth(0.5, 0.68, f(x * 0.14, z * 0.14, 51) * 0.7 + streak * 0.3);
+      return [bare, f(x * 0.04, z * 0.04, 52) * 0.7 + f(x * 0.3, z * 0.3, 53) * 0.3, 0, 0];
+    },
+  },
+  // Champagne: summer grass, churned to earth across the middle where the horse rode and the lines met.
+  catalaunian: {
+    a: 'grass', b: 'mud:hoof', tiles: [1.4, 1.6], bomb: [1, 1], macro: PAINTED_GROUND_GRASS_MACRO, keepOut: [32, 22], match: 0.85,
+    layout: (x, z, f) => {
+      const ex = Math.abs(x) - 22 + (f(x * 0.1, z * 0.1, 54) - 0.5) * 6;
+      const ez = Math.abs(z) - 9 + (f(x * 0.15, z * 0.15, 55) - 0.5) * 5;
+      let churn = (1 - paintedGroundSmooth(-1, 2, ez)) * (1 - paintedGroundSmooth(-2, 3, ex));
+      churn *= 0.55 + 0.45 * f(x * 0.5, z * 0.5, 56);
+      return [Math.min(1, churn), f(x * 0.04, z * 0.04, 57) * 0.7 + f(x * 0.25, z * 0.25, 58) * 0.3, 0, 0];
+    },
+  },
+  // Below Harran: sand over gravel, the gravel bared in patches.
+  carrhae: {
+    a: 'desert', b: 'gravel:pale', tiles: [1.8, 1.4], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, keepOut: [32, 22], match: 0.7,
+    layout: (x, z, f) => {
+      const bare = paintedGroundSmooth(0.55, 0.7, f(x * 0.12, z * 0.12, 59) * 0.75 + f(x * 0.6, z * 0.6, 60) * 0.25);
+      return [bare, f(x * 0.05, z * 0.05, 61) * 0.7 + f(x * 0.3, z * 0.3, 62) * 0.3, 0, 0];
     },
   },
   sengoku: {

@@ -512,3 +512,86 @@ export function footSoldier(random = Math.random, style = 'spear') {
   const name = `${pickOne(['Will', 'Tom', 'Jack', 'Rob', 'Hal', 'Ned', 'Wat', 'Dick'], random)} ${pickOne(['Archer', 'Baker', 'Cotton', 'Fowler', 'Mason', 'Ward', 'Turner', 'Webb'], random)}`;
   return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'footman', design: randomDesign('footman', random) }, accessories: [] });
 }
+
+// ---- Late antiquity and the horse peoples (Battle Mode: Mobei, 119 BC; Carrhae, 53 BC; the Catalaunian Plains, 451) ----
+
+/**
+ * Builds of the men of these battles, by people and rank, as builtLike takes
+ * them (mean height cm, weight kg, training). From the graves: Xiongnu men of
+ * the Egiin Gol and Duurlig Nars cemeteries ~165 cm; Hunnic-period men of the
+ * Carpathian basin ~166–168; Romans of the Republic ~165–168 (Herculaneum's,
+ * a century on, ~169); late Roman soldiers and the Goths of the 5th century
+ * taller (Germanic row-grave men ~170–174); Parthian-period Iranians ~167. Riders
+ * from boyhood, the nomads lean and hard; the nobles and the cataphracts fed
+ * better and trained more.
+ */
+const ANCIENT_BUILD = {
+  xiongnu: { rider: { heightCm: 165, weightKg: 62, exercise: 0.76 } },
+  hun: { rider: { heightCm: 166, weightKg: 63, exercise: 0.76 }, noble: { heightCm: 168, weightKg: 67, exercise: 0.8 } },
+  lateRoman: { soldier: { heightCm: 169, weightKg: 66, exercise: 0.72 } },
+  goth: { warrior: { heightCm: 172, weightKg: 68, exercise: 0.66 }, noble: { heightCm: 174, weightKg: 72, exercise: 0.76 } },
+  parthian: { archer: { heightCm: 167, weightKg: 63, exercise: 0.74 }, cataphract: { heightCm: 170, weightKg: 70, exercise: 0.8 } },
+};
+
+// The legionary of the Republic: the Empire's legionary (PRESETS.legionary), shorter by the century and a half, in Crassus's kit.
+const REPUBLICAN_LEGIONARY = { ...PRESETS.legionary, name: 'Publius Octavius', heightCm: 167, calories: 3950, outfit: { kind: 'republicanLegionary', design: 0 } };
+
+/** A man of one of these peoples: `base` varied, a name from `names` (or a first name and a second), in his kit, at his people's build, his looks drawn from `look`'s choices. */
+function ancientMan(random, base, names, kind, style, build, { mounted = false, look = {} } = {}) {
+  const man = varyCharacter(base, random, { sex: 'male' });
+  const name = Array.isArray(names[0]) ? `${pickOne(names[0], random)} ${pickOne(names[1], random)}` : pickOne(names, random);
+  const drawn = Object.fromEntries(Object.entries(look).map(([key, choices]) => [key, pickOne(choices, random)]));
+  const inputs = { ...man, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [], look: { ...man.look, ...drawn } };
+  return { ...builtLike(inputs, build, random), ...(mounted ? { mounted: true } : {}) };
+}
+
+// Black hair, long or bound up, a nomad's sun- and wind-darkened skin.
+const NOMAD_LOOK = { skinTone: ['lightTan', 'medium', 'tan'], hairColor: ['#120d0a', '#1a120c'], hairStyle: ['long', 'midLong', 'bun'], facialHair: ['none', 'mustache', 'stubble'] };
+
+/** A Xiongnu horse archer (the composite bow), or a horseman with the spear: every man of them rode. */
+export function xiongnuRider(random = Math.random, style = 'steppeBow') {
+  // Names the Han histories give (Sima Qian, Ban Gu): chanyus, kings and their men.
+  const names = ['Yizhixie', 'Hunye', 'Xiutu', 'Zhaoxin', 'Bizhi', 'Tuqi', 'Huyan', 'Lan', 'Xubu', 'Qiulin', 'Gulu', 'Hanxie', 'Wuwei', 'Juqu'];
+  return ancientMan(random, PRESETS.steppeBow, names, 'xiongnu', style, ANCIENT_BUILD.xiongnu.rider, { mounted: true, look: NOMAD_LOOK });
+}
+
+/** A Hun of Attila's army: a horse archer (`rider`), or one of his nobles (`noble`: mail, spangenhelm) with the bow or the sword. */
+export function hunRider(random = Math.random, style = 'steppeBow', rank = 'rider') {
+  const names = ['Bleda', 'Ellac', 'Dengizich', 'Ernak', 'Edeko', 'Onegesius', 'Berik', 'Eskam', 'Kursik', 'Basik', 'Atakam', 'Uldin', 'Charaton', 'Oebarsius'];
+  return ancientMan(random, PRESETS.steppeBow, names, rank === 'noble' ? 'hunNoble' : 'hun', style, ANCIENT_BUILD.hun[rank], { mounted: true, look: NOMAD_LOOK });
+}
+
+/** A soldier of Aetius's late Roman field army: spear or spatha, and the oval shield. */
+export function lateRomanSoldier(random = Math.random, style = 'spearOval') {
+  const names = [['Flavius', 'Aurelius', 'Valerius', 'Julius', 'Claudius'], ['Maximus', 'Severus', 'Victor', 'Ursus', 'Dagalaifus', 'Bonitus', 'Sabinianus', 'Gaudentius', 'Iovinus', 'Merobaudes']];
+  return ancientMan(random, PRESETS.legionary, names, 'lateRoman', style, ANCIENT_BUILD.lateRoman.soldier, { look: { skinTone: ['light', 'lightTan', 'medium'], hairStyle: ['buzz', 'cleanShort', 'midLong'], facialHair: ['none', 'stubble', 'beard'] } });
+}
+
+/** A Goth: a warrior with spear or spatha and the round shield, or a noble (mail, spangenhelm), on foot or `mounted`. */
+export function gothWarrior(random = Math.random, style = 'spearRound', rank = 'warrior', { mounted = false } = {}) {
+  const names = ['Thorismund', 'Theoderic', 'Frideric', 'Euric', 'Athaulf', 'Wallia', 'Sigeric', 'Fritigern', 'Athanaric', 'Wittigis', 'Gunthamund', 'Hildebrand', 'Wulfila', 'Sigismer'];
+  return ancientMan(random, PRESETS.contender, names, rank === 'noble' ? 'gothNoble' : 'goth', style, ANCIENT_BUILD.goth[rank], { mounted, look: { skinTone: ['light', 'light', 'lightTan'], hairColor: ['#6b4a2a', '#c9a25e', '#2a1a10', '#8a3a1c'], hairStyle: ['long', 'midLong', 'long'], facialHair: ['beard', 'mustache', 'beard', 'stubble'] } });
+}
+
+/** A legionary of Crassus's army (53 BC): drilled, one look to the unit (drilledSoldier). */
+export function republicanLegionary(random = Math.random, { name = null } = {}) {
+  const roman = `${pickOne(['Gaius', 'Lucius', 'Marcus', 'Publius', 'Quintus', 'Titus', 'Gnaeus', 'Sextus'], random)} ${pickOne(['Octavius', 'Petronius', 'Vargunteius', 'Censorinus', 'Ignatius', 'Cassius', 'Megabacchus', 'Coponius', 'Egnatius', 'Roscius'], random)}`;
+  return drilledSoldier(REPUBLICAN_LEGIONARY, random, { name: name ?? roman });
+}
+
+/**
+ * A Gallic horseman of Publius Crassus's thousand (Caesar's Gauls, lent for
+ * the war: Plutarch, Crassus 17, 25): mail and a riding horse of his own, the
+ * long sword or the spear; the kit of the later auxiliary alae, which were
+ * raised from such men.
+ */
+export function gallicHorseman(random = Math.random, style = 'spear') {
+  const name = `${pickOne(['Vercassivellaunus', 'Litaviccus', 'Commius', 'Dumnorix', 'Cingetorix', 'Epasnactus', 'Andecombogius', 'Viridomarus', 'Eporedorix', 'Cotuatus'], random)}`;
+  return { ...romanHorseman(random, style), name };
+}
+
+/** A Parthian of Surena's army: a horse archer (`archer`), or a cataphract with the kontos (`cataphract`). */
+export function parthianRider(random = Math.random, style = 'steppeBow', rank = 'archer') {
+  const names = ['Silaces', 'Arsaces', 'Pacorus', 'Mithridates', 'Vardanes', 'Gotarzes', 'Phraates', 'Orodes', 'Vologases', 'Artabanus', 'Osaces', 'Sinnaces', 'Abdagases', 'Monaeses'];
+  return ancientMan(random, PRESETS.steppeBow, names, rank === 'cataphract' ? 'cataphract' : 'parthianArcher', style, ANCIENT_BUILD.parthian[rank], { mounted: true, look: { skinTone: ['lightTan', 'medium', 'tan'], hairColor: ['#120d0a', '#2a1a10'], hairStyle: ['midLong', 'long'], facialHair: ['beard', 'beard', 'mustache'] } });
+}

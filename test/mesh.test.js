@@ -125,3 +125,21 @@ test('a plate breastplate rides the chest bone alone (rigid: no bend, twist or d
   }
   assert.ok(!buildLoftBody(buildBody(PRESETS.heavy)).rigid.some(Boolean), 'no rigid piece without a breastplate');
 });
+
+test('the horse peoples\' kit and the armies that met them loft whole: every design of each new outfit, its armour drawn', async () => {
+  const { buildLoftBody, ARMOR_KINDS } = await import('../src/loftbody.js');
+  const { OUTFITS } = await import('../src/outfits.js');
+  const kinds = ['xiongnu', 'hun', 'hunNoble', 'lateRoman', 'goth', 'gothNoble', 'republicanLegionary', 'cataphract', 'parthianArcher'];
+  for (const kind of kinds) {
+    OUTFITS[kind].designs.forEach((design, index) => {
+      if (design.armor) assert.ok(ARMOR_KINDS[design.armor.kind], `${kind} #${index}: armour ${design.armor.kind} is drawn`);
+      const mesh = buildLoftBody(buildBody({ ...PRESETS.heavy, outfit: { kind, design: index }, accessories: [] }));
+      assert.ok(mesh.positions.length > 0, `${kind} #${index}`);
+      if (design.armor) assert.ok(mesh.regions.some((region) => region !== 'skin'), `${kind} #${index}: something over the skin`);
+    });
+  }
+  // The cataphract is in iron to the wrists and the ankles.
+  const cataphract = buildLoftBody(buildBody({ ...PRESETS.heavy, outfit: { kind: 'cataphract', design: 0 }, accessories: [] }));
+  const steelBelow = cataphract.regions.some((region, vertex) => (region === 'steel' || region === 'steel2') && cataphract.positions[vertex * 3 + 1] < cataphract.bindPoints[P.lKnee][1] - 0.1);
+  assert.ok(steelBelow, 'iron on the shins');
+});
