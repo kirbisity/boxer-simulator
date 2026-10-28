@@ -33,7 +33,8 @@
 //    is in it and how thick it is), tires him as he lifts himself out at every step (`slogCost`), takes away
 //    footing (`footing`: wet clay grips a foot about as well as ice grips a boot,
 //    so a shove puts him down sooner), and his feet stand on the firm ground under
-//    it (his stance lowered: drawn, his legs go into the mud). Lying in it, a man
+//    it (his stance lowered: drawn, his legs go into the mud; any water standing over the mud, `water`, is over his feet too, and is drawn, rung and splashed as
+//    the castle's standing water is: worksview.js). Lying in it, a man
 //    presses on it over his whole body and sinks little; face down in it, or
 //    under the weight of the men piled on him, he cannot breathe (`smother`).
 //    A horse sinks by the pressure under its hooves, and is held by it the same way.
@@ -332,6 +333,11 @@ export function softAt(works, x, z) {
   return null;
 }
 
+/** The water standing over a soft place's surface where `soft` ({ area, share }: softAt) is (m; 0 for dry-surfaced mud): the film a night's rain left on the field. */
+export function standingWater(soft) {
+  return soft ? (soft.area.water ?? 0) * soft.share : 0;
+}
+
 /** How deep (m) a load `kg` pressing on `area` m² sinks into a soft place, to its firm layer. */
 export function sinkage(area, kg, contact = FIELDWORKS.mud.footArea) {
   const spec = FIELDWORKS.mud;
@@ -435,7 +441,8 @@ function plantOnWorks(works, fighter, sunk) {
 function mireHoldLegs(fighter, soft, sunk, dt) {
   const gear = fighter.body.gear;
   if (fighter.wading && fighter.wading.gear !== gear) fighter.wading = null;
-  const drag = soft && sunk > 0 ? wadeDrag(soft.area, sunk, fighter.body.heightM) : null;
+  // (What stands on the mud, `water` m, is over his feet as much as the mud he is sunk in.)
+  const drag = soft && sunk > 0 ? wadeDrag(soft.area, sunk + standingWater(soft), fighter.body.heightM) : null;
   const held = drag && drag.foot < 1 ? drag : null;
   let wading = fighter.wading;
   if (held) {
@@ -771,7 +778,7 @@ export function horseMire(world, horse) {
   if (!soft) return { sunk: 0, pace: 1 };
   const spec = FIELDWORKS.mud;
   const sunk = sinkage(soft.area, worksHorseKg(world, horse) / spec.hoofs, spec.hoofArea) * soft.share;
-  const drag = wadeDrag(soft.area, sunk, horse.withers * spec.horseHeight);
+  const drag = wadeDrag(soft.area, sunk + standingWater(soft), horse.withers * spec.horseHeight);
   return { sunk, pace: drag.foot };
 }
 

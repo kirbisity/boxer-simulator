@@ -11,7 +11,7 @@
 // The names are the step event's: stone | earth | grass | sand | wood | mud | water | tile | snow.
 
 import { stageWaters, waterAt, waterDepth } from '../levelmode/water.js';
-import { reliefAt, softAt, worksOf } from '../physics/fieldworks.js';
+import { reliefAt, softAt, standingWater, worksOf } from '../physics/fieldworks.js';
 
 /** A stage solid's drawn style, as the ground it is to walk on. (Stairs with no style are cut stone, as the test yard's are.) */
 export const STYLE_SURFACE = {
@@ -116,7 +116,8 @@ export function surfaceUnder(world, x, y, z) {
   const arena = world.arena ?? {};
   // A battle's soft ground (physics/fieldworks.js): its mud, or a stream's water over its bed, as deep as it stands.
   const soft = arena.works ? softAt(worksOf(arena), x, z) : null;
-  if (soft) return { surface: soft.area.surface, depth: soft.area.surface === 'water' ? (soft.area.water ?? 0) * soft.share : 0 };
+  // (Water standing over mud is heard as it is stepped in, a splash with the squelch: step.js.)
+  if (soft) return { surface: soft.area.surface, depth: standingWater(soft) };
   // A ditch dug across a paved place (Qi Jiguang's trench in the water town's square) is earth, and so is its bank.
   if (arena.works && reliefAt(worksOf(arena), x, z) !== 0) return { surface: 'earth', depth: 0 };
   const surface = PLACE_SURFACE[world.place] ?? (arena.ring ? 'wood' : arena.drop ? 'stone' : 'earth');

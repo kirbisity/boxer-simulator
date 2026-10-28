@@ -9,6 +9,8 @@
 
 /* global THREE */
 import { reliefAt, worksOf } from './physics/fieldworks.js';
+import { kwtCreate } from './levelmode/kitwater.js';
+import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 
 export const WORKS_VIEW = {
   // A stake's shaft and its buried length (m), as fieldworks.js FIELDWORKS.stake's radius.
@@ -21,6 +23,12 @@ export const WORKS_VIEW = {
   // Mud: wet plough-clay, puddles standing in the furrows; a stream's water over its silt.
   mud: { colour: [104, 82, 56], wet: [78, 60, 40], puddle: [128, 118, 100] },
   water: { colour: 0x5a6a62, opacity: 0.72, bank: 0x4a3c2c },
+  // The film of water standing on mud (a soft place's `water`, m): its surface lies this far over the painted mud's, drawn as the castle's standing water is
+  // (levelmode/kitwater.js, its 'mud' look): it rings round every foot and hoof that moves in it and trails a wake, and the splashes are brown.
+  // Its rings are made only within `range` m of the camera (seventy men's would be a blur of them, and from a long way off a ring is a pixel); drops are clay-coloured.
+  film: { mud: 0.008, range: 30, drops: 0x7a6a4e },
+  // The quality the battle's water is drawn at (levelmode/quality.js's keys): no reflection of the scene, the rings at most the pool holds, every drop.
+  waterQuality: { waterReflect: 0, ripples: BATTLE_WATER.ripples, waterDrops: 1 },
   // A ditch strip's ground: cells across and along it (m).
   ditch: { across: 0.2, along: 0.6, earth: 0x6a5238, cut: 0x4a3a28, grass: 0x6a7040 },
   // A ditch dug in haste whose line wanders (a ditch with `points`: Qi Jiguang's trench): the ground over the box round it
@@ -66,16 +74,27 @@ export function showWorks(view, arena) {
   group.name = 'fieldworks';
   const random = worksRandom(works.stakes.length * 7919 + works.walls.length * 104729 + Math.round(arena.halfX * 31));
   for (const area of works.soft) group.add(worksSoftGround(area, random));
+  const water = worksStandingWater(view, works, group);
   for (const ditch of works.ditches) group.add(ditch.bends ? worksRoughDitch(works, ditch, random) : worksDitchStrip(works, ditch));
   const stakes = worksStakeMeshes(works.stakes);
   group.add(stakes.group);
   for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : worksPalisade(wall));
   view.scene.add(group);
-  view.works = { group, stakes, broken: 0 };
+  view.works = { group, stakes, broken: 0, water, waterAt: -Infinity };
 }
 
-/** Each frame: the stakes the battle has broken lie over. */
+/** Each frame: the water rung by the men and horses wading in it, and the stakes the battle has broken lie over. */
 export function updateWorksView(view, world) {
+  const water = view.works?.water;
+  if (water && world) {
+    // (A battle begun again, its clock back at nought: the rings of the one before are forgotten.)
+    if (world.time < view.works.waterAt) {
+      water.pool.list.length = 0;
+      water.drops.length = 0;
+    }
+    water.update(world, world.time, Math.max(0, world.time - view.works.waterAt), new Map(), WORKS_VIEW.waterQuality);
+    view.works.waterAt = world.time;
+  }
   const broken = world?.worksState?.broken;
   if (!view.works || !broken || broken.size === view.works.broken) return;
   view.works.broken = broken.size;
@@ -86,6 +105,36 @@ export function updateWorksView(view, world) {
     mesh.setMatrixAt(index, matrix);
   });
   mesh.instanceMatrix.needsUpdate = true;
+}
+
+// ---- Standing water ----
+
+/**
+ * The water standing on the works' soft places that have `water` over them (Agincourt's field after the night's rain): one sheet over each, a few cm over the
+ * painted mud (its furrows seen through it), in kitwater.js's hands: the surface that rings and trails wakes where men and horses wade, the sky in it (the steel's
+ * environment: a battlefield's one reflection, taken once), the splashes. Returns its controller (`update` each frame: updateWorksView), or null when nothing is wet.
+ * The physics is the soft ground's own (fieldworks.js: the water is over the feet as the mud is, and as the cesspool's is over a man's in the castle).
+ */
+function worksStandingWater(view, works, group) {
+  const spec = WORKS_VIEW.film;
+  const decor = worksWaters(works, spec.mud);
+  if (!decor.length) return null;
+  const camera = new THREE.Vector3();
+  const water = kwtCreate({ sections: [{ id: 'field', decor }] }, {
+    ripples: BATTLE_WATER.ripples, config: BATTLE_WATER, horses: true, range: spec.range, drops: spec.drops,
+    near: () => view.camera?.getWorldPosition(camera).toArray() ?? null,
+  });
+  const holder = new THREE.Group();
+  holder.name = 'standing-water';
+  water.addSection('field', water.waters, holder);
+  holder.traverse((object) => {
+    if (!object.material) return;
+    // The grey sky lies in it (the one reflection of the battlefield, taken in render.js for the steel and the wet ground); no cube map of the scene is taken here.
+    object.material.envMap = view.steelEnv ?? null;
+    object.material.needsUpdate = true;
+  });
+  group.add(holder, water.group);
+  return water;
 }
 
 // ---- Stakes ----

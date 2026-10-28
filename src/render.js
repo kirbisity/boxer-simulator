@@ -42,7 +42,7 @@ import { CAMERA_NEAR } from './depthrange.js';
 import { applyLook, captureViewDefaults, drawFrame, resetForLook, resizeLook } from './looks.js';
 import { prepareScenery, updateSceneryLod } from './scenerylod.js';
 import { ruralFieldRail, ruralMeadowProps, ruralSengokuCamps } from './props/rural.js';
-import { plainsCamelTrain, plainsRidge, plainsWagonLaager } from './props/plains.js';
+import { plainsCamelTrain, plainsRidge } from './props/plains.js';
 import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 import { showWorks, updateWorksView } from './worksview.js';
 import { worksOf } from './physics/fieldworks.js';
@@ -780,19 +780,19 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
  * Mexico, on a battle map's wider floor everything stands that much further out.
  * - mobei: the northern edge of the Gobi, where Wei Qing met the Chanyu (119
  *   BC): short sparse grass on grey-brown gravel, low bare swells and dark far
- *   ridges; his wagon laager behind the Han end of the floor.
+ *   ridges; no props (the Han stand on the open Gobi, no wagons).
  * - catalaunian: the plain of Champagne (451): summer grass gone green-gold,
  *   rolling, a few woods far off; the ridge the armies fought for beyond the far side.
  * - carrhae: the plain south of Carrhae towards Harran in June (53 BC): pale
  *   sand and gravel, camelthorn in low grey-green tufts, a few bare hills far
  *   off; the Parthian camel train behind their end of the floor.
  */
-const OPEN_PLAINS = {
+export const OPEN_PLAINS = {
   mobei: {
     ground: { base: '#857a5e', speckle: [[95, 150], [88, 132], [64, 100]], strokes: 16000, repeat: [6, 6] },
     hills: { count: 12, radius: [14, 24], height: [0.12, 0.26], colour: 0x6e664e, distance: [58, 54] },
     litter: { grass: 0x8e8a5a, stone: 0x5e5850, tufts: 700, stones: 260 },
-    props: (arena) => [plainsWagonLaager(arena)],
+    props: () => [],
   },
   catalaunian: {
     ground: { base: '#7c8a44', speckle: [[100, 165], [110, 165], [40, 75]], strokes: 22000, repeat: [8, 8] },

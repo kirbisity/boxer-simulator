@@ -1,16 +1,16 @@
 // The open plains of the horse-archer battles: what stood at the edge of the
-// fighting there and is drawn, not fought over. At Mobei (119 BC) Wei Qing's
-// armoured wagons (wugang che), drawn up in a ring for a laager behind the Han
-// line; at Carrhae (53 BC) the Parthian camel train that brought Surena's
-// archers fresh arrows; on the Catalaunian Plains (451) the long low ridge the
+// fighting there and is drawn, not fought over. At Carrhae (53 BC) the Parthian
+// camel train that brought Surena's archers fresh arrows; on the Catalaunian
+// Plains (451) the long low ridge the
 // armies fought for, for the classic look (the realistic looks raise it in the
 // generated land: scenery/generated.js). Called from the place builders in
 // render.js. Everything stands beyond the fighting floor, never on it: the
 // floor is flat at y = 0 and what is on it is the physics' alone.
 //
 // Each prop is a few simple shapes merged per material (two or three draw
-// calls for the lot), coloured per part by vertex colour, so a row of a dozen
-// wagons or camels costs no more than one.
+// calls for the lot), coloured per part by vertex colour, so a dozen camels
+// cost no more than one. (Mobei has none: Wei Qing's wagon ring is not drawn;
+// the Han stand on the open Gobi.)
 
 /* global THREE */
 
@@ -45,7 +45,7 @@ function plainsBatch() {
       position.set(x, y, z);
       matrix.compose(position, quaternion, scale);
       const placed = (geometry.index ? geometry.toNonIndexed() : geometry.clone()).applyMatrix4(matrix);
-      // A whole prop (a wagon, a camel) is built about its own origin and then set in its place.
+      // A whole prop (a camel) is built about its own origin and then set in its place.
       if (frame) placed.applyMatrix4(frame);
       parts.push({ geometry: placed, colour: new THREE.Color(hex) });
     },
@@ -76,91 +76,6 @@ function plainsBatch() {
 /** A frame: a prop built about its origin, turned by `yaw` and set at (x, 0, z). */
 function plainsFrame(x, z, yaw) {
   return new THREE.Matrix4().makeRotationY(yaw).setPosition(x, 0, z);
-}
-
-// ---- Mobei: Wei Qing's wagon laager ---------------------------------------------------
-//
-// Wei Qing, crossing the Gobi to find the Chanyu's army waiting, "ordered the
-// armoured wagons drawn up in a ring to make a camp" (Shiji 111, Hanshu 55) and
-// sent five thousand horse out from it; the crossbowmen shot from among the
-// wagons. A wugang che was a two-wheeled cart of the army's train, its box
-// screened round with boards and hide against arrows. Here a line of them stands
-// end to end across the width behind the Han end of the floor, its ends curving
-// back as the ring does, so the line of crossbowmen has the laager at its back.
-
-/**
- * The laager's shape: a wagon's box (m: length along its line, width, height of
- * the screened sides off the bed), its wheels (radius, how far apart), the bed's
- * height; how far (m) the line stands beyond the floor's end; the gap (m) between
- * one wagon's tail and the next one's shafts; and how far the ends of the line
- * curve back (the ring bending away beyond the floor's corners, `bend` m back at
- * the last wagon).
- */
-export const PLAINS_LAAGER = {
-  box: [2.6, 1.5, 1.15], wheel: 0.62, track: 1.75, bed: 0.75,
-  beyond: 3.5, gap: 0.5, bend: 9,
-  // Weathered boards, rawhide stretched over the screens, iron-shod wheels.
-  colours: { board: 0x6e5236, boardDark: 0x4e3a28, hide: 0xa88a62, wheel: 0x4a3626, iron: 0x3a3836, shaft: 0x5a4430 },
-};
-
-/** One armoured wagon, built about its middle on the ground, its length along x. */
-function plainsWagon(batch, frame, random) {
-  const spec = PLAINS_LAAGER;
-  const [length, width, screen] = spec.box;
-  const c = spec.colours;
-  const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-  // The bed and the screened box on it: boards below, hide stretched over the screens above.
-  batch.add(box(length, 0.16, width), c.boardDark, [0, spec.bed, 0], [], frame);
-  for (const side of [-1, 1]) {
-    batch.add(box(length, screen * 0.45, 0.08), c.board, [0, spec.bed + screen * 0.225, side * (width / 2 - 0.04)], [], frame);
-    batch.add(box(length * 0.98, screen * 0.55, 0.06), random() < 0.5 ? c.hide : c.board, [0, spec.bed + screen * 0.72, side * (width / 2 - 0.02)], [(side * 0.06), 0, 0], frame);
-  }
-  for (const end of [-1, 1]) batch.add(box(0.08, screen, width - 0.1), c.board, [end * (length / 2 - 0.04), spec.bed + screen / 2, 0], [], frame);
-  // A low arched hide roof over the back half (the stores under it), on hoops.
-  const roof = new THREE.CylinderGeometry(width / 2, width / 2, length * 0.5, 10, 1, true, 0, Math.PI);
-  batch.add(roof, c.hide, [-length * 0.22, spec.bed + screen, 0], [0, 0, Math.PI / 2], frame);
-  // Two wheels on their axle, iron rims and spokes as a disc.
-  for (const side of [-1, 1]) {
-    batch.add(new THREE.CylinderGeometry(spec.wheel, spec.wheel, 0.1, 16), c.wheel, [0, spec.wheel, side * spec.track / 2], [Math.PI / 2, 0, 0], frame);
-    batch.add(new THREE.TorusGeometry(spec.wheel, 0.035, 4, 18), c.iron, [0, spec.wheel, side * (spec.track / 2 + 0.04)], [], frame);
-  }
-  batch.add(new THREE.CylinderGeometry(0.05, 0.05, spec.track + 0.3, 6), c.iron, [0, spec.wheel, 0], [Math.PI / 2, 0, 0], frame);
-  // The shafts, let down to the ground ahead (the horses taken out).
-  for (const side of [-1, 1]) {
-    const shaft = new THREE.CylinderGeometry(0.045, 0.05, 2.3, 6);
-    batch.add(shaft, c.shaft, [length / 2 + 0.95, spec.bed * 0.5, side * 0.45], [0, 0, Math.PI / 2 - 0.32], frame);
-  }
-}
-
-/** Where each wagon of the laager stands: [x, z, yaw] (its middle on the ground; yaw turns its length, built along x, onto the line). */
-export function plainsLaagerSpots({ halfX, halfZ }) {
-  const spec = PLAINS_LAAGER;
-  const step = spec.box[0] + spec.gap + 1.2;
-  const reach = halfZ + 6;
-  const count = Math.ceil((2 * reach) / step) + 1;
-  return Array.from({ length: count }, (_, index) => {
-    const z = -reach + index * step;
-    // Past the floor's sides the line curves back: x drawn back with the square of how far out, the wagon turned along the curve.
-    const out = Math.max(0, Math.abs(z) - halfZ) / 6;
-    const x = -(halfX + spec.beyond) - spec.bend * out * out;
-    const slope = -spec.bend * 2 * out / 6 * Math.sign(z);
-    return [x, z, -Math.PI / 2 + Math.atan(slope)];
-  });
-}
-
-/**
- * Wei Qing's laager behind the Han (red, −x) end of the floor: wagons end to
- * end along z at x = −(halfX + beyond), across the floor's whole width and a
- * little more, the last few bending back towards −x. Drawn only.
- */
-export function plainsWagonLaager(arena) {
-  const random = plainsRandom(119);
-  const batch = plainsBatch();
-  for (const [x, z, yaw] of plainsLaagerSpots(arena)) plainsWagon(batch, plainsFrame(x, z, yaw + (random() - 0.5) * 0.06), random);
-  const group = new THREE.Group();
-  group.add(batch.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 })));
-  group.userData.plains = 'laager';
-  return group;
 }
 
 // ---- Carrhae: the camel train ---------------------------------------------------------

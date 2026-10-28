@@ -8,6 +8,9 @@
 // A body of water may carry `viscosity` (1 water, thicker the more it holds a man: `WATER.viscosity` by murk when it has none) for what it does to the legs of
 // the men in it (`wadeDrag`).
 //
+// A battlefield's soaked ground is a body of water too (Agincourt's ploughland, with the film standing on it: worksview.js), and it is the same wade and the same
+// rings; its men are many, so kitwater.js makes fewer rings for them (`BATTLE_WATER`).
+//
 // A ripple is { x, z, born (s), amp (0..1+), water (id) }: a ring that spreads at `speed` m/s and dies over `life` s (the shader draws it: kitwater.js).
 
 import { LEVEL_CONFIG } from './config.js';
@@ -34,9 +37,30 @@ export const WATER = {
   bigDrops: 26,
   // How far above the surface (m) a foot still counts as in it (a foot lifted out and set back makes the ring as it goes in).
   above: 0.06,
-  // How thick a body of water is for a man in it when it has no `viscosity` of its own, by murk: clear water 1, the castle's sewage 1.6.
-  viscosity: { clear: 1, sludge: 1.6 },
+  // How thick a body of water is for a man in it when it has no `viscosity` of its own, by murk: clear water 1, the castle's sewage 1.6, a rain-soaked
+  // field's clay-water 2 (a battle's soft ground carries its own: fieldworks.js).
+  viscosity: { clear: 1, sludge: 1.6, mud: 2 },
 };
+
+/**
+ * How a battle's water is made (WATER's keys, over WATER): where seventy men wade, a ring a step and a wake every fifth of a second would be hundreds alive at
+ * once and a pool of 40 would hold each for a blink; each foot rings once a stride, a wake is left less often, and they die sooner.
+ */
+export const BATTLE_WATER = { ...WATER, ripples: 40, life: 1.7, footSpeed: 0.9, stepGap: 0.55, wakeSpeed: 0.6, wakeGap: 0.8, splashSpeed: 3.2 };
+
+/**
+ * The bodies of water a battle's works have: one over each soft place of mud that has `water` standing on it (Agincourt's ploughland after the night's rain), its
+ * surface that much over the mud's (`over`: m the painted mud lies above the ground), its bed the firm layer under it, its viscosity the soft ground's own. As a
+ * stage's `water` decor (stageWaters), so that the castle's water code draws it and rings it.
+ */
+export function worksWaters(works, over = 0.008) {
+  return (works?.soft ?? [])
+    .filter((area) => area.surface === 'mud' && area.water > 0)
+    .map((area, index) => ({
+      kind: 'water', id: `field-${index}`, shape: 'rect', murk: 'mud', viscosity: area.viscosity,
+      at: [(area.x[0] + area.x[1]) / 2, over + area.water, (area.z[0] + area.z[1]) / 2], size: [area.x[1] - area.x[0], area.z[1] - area.z[0]], bed: -area.firm,
+    }));
+}
 
 /** The bodies of water of a stage: every section's `water` decor, with its section's id. */
 export function stageWaters(stage) {
