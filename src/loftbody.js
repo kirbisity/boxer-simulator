@@ -654,6 +654,26 @@ export const ARMOR_KINDS = {
   ichcahuipilli: {
     trunk: [0.0, 0.94, 1.16, { rows: ['cloth', 'cloth', 'cloth2'] }], skirt: [0.22, 0.35, 1.18, { rows: ['cloth', 'cloth', 'cloth2'] }],
   },
+  // The Inca uncu: the Andean man's tunic, one length of cloth woven to
+  // shape, folded over the shoulders and sewn up the sides, sleeveless, to
+  // the knee; its hem bound in a second colour. Plain (a commoner's, of
+  // undyed or brown camelid wool and cotton); with a band of tocapu (squares
+  // each woven with its own device) round the waist (a lord's); the black
+  // and white checkerboard with a red stepped yoke at the neck (the dress
+  // the Inca gave his soldiers and guards, `uncuChecks`); and the tocapu all
+  // over (the Sapa Inca's own, `uncuRoyal`: none but he wore it).
+  uncu: {
+    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
+  },
+  uncuTocapu: {
+    trunk: [-0.1, 0.95, 1.08, { tocapu: [-0.12, 0.16], base: 'cloth' }], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
+  },
+  uncuChecks: {
+    trunk: [-0.1, 0.95, 1.08, { checks: true, yoke: [0.8, 'lace'] }], skirt: [0.88, 0.32, 1.16, { checks: true }],
+  },
+  uncuRoyal: {
+    trunk: [-0.1, 0.95, 1.08, { tocapu: true }], skirt: [0.88, 0.32, 1.16, { tocapu: true }],
+  },
   // The jaguar knight's suit: the spotted skin over everything, to the wrists and ankles.
   jaguarSuit: {
     trunk: [-0.06, 0.98, 1.16, { spots: true }], skirt: [0.3, 0.4, 1.2, { spots: true }],
@@ -919,6 +939,9 @@ function armorPieces(kind, slot, side) {
   return Array.isArray(forSide[0]) ? forSide : [forSide];
 }
 
+// Tocapu's squares in turn: the cloth's red, its white, yellow (the `gold`), black (the `lace`), and the green or blue (the `leather`).
+const TOCAPU_ROLES = ['cloth', 'gold', 'lace', 'cloth2', 'leather', 'cloth', 'lace', 'gold', 'cloth2'];
+
 /** A paint as the loft wants it: a role, or a function of the ring and its place. */
 function paintFor(paint, armor) {
   if (typeof paint === 'string' || typeof paint === 'function') return paint;
@@ -938,6 +961,19 @@ function paintFor(paint, armor) {
     if (paint.back && ring.t > paint.back[0] && ring.t < paint.back[1] && Math.cos(angle) < -0.2) return paint.back[2];
     // A round plate over the breast (`mirror`: centre up the trunk, size, role), riveted cloth round it.
     if (paint.mirror && Math.cos(angle) > 0 && Math.hypot((ring.t - paint.mirror[0]) / paint.mirror[1], Math.sin(angle) / (paint.mirror[1] * 2.6)) < 1) return paint.mirror[2];
+    // An Andean weave (the uncu): a checkerboard of the cloth's two colours
+    // (`checks`), each square a few rings and steps (a hand's breadth), under a
+    // stepped yoke at the neck (`yoke`: from how far up the trunk, its role)
+    // that comes down in a point before and behind; or tocapu (`tocapu`: a
+    // band from, to up the trunk, or `true` all over), squares each of their
+    // own colour in turn (TOCAPU_ROLES).
+    if (paint.checks) {
+      if (paint.yoke && ring.t > paint.yoke[0] - 0.14 * Math.max(0, Math.abs(Math.cos(angle)) - 0.4)) return paint.yoke[1];
+      return (Math.floor(index / 3) + Math.floor(step / 2)) % 2 ? 'cloth2' : 'cloth';
+    }
+    if (paint.tocapu && (paint.tocapu === true || (ring.t > paint.tocapu[0] && ring.t < paint.tocapu[1]))) {
+      return TOCAPU_ROLES[(Math.floor(index / 2) * 2 + Math.floor(step / 2)) % TOCAPU_ROLES.length];
+    }
     // A big cat's rosettes, scattered: a dark spot every few rings and steps.
     if (paint.spots) return (index * 7 + step * 3) % 5 === 0 ? 'cloth2' : 'cloth';
     // Sheer lace: the skin showing through an open mesh.

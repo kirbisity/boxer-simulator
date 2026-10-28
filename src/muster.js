@@ -236,6 +236,8 @@ export function musterLevel(level, setup) {
       // Its baggage train (the camels with fresh arrows) stays where the level has it.
       ...(own.train ? { train: own.train } : {}),
       ...(own.facing ? { facing: own.facing } : {}),
+      // A side that lies in ambush (Cajamarca's Spaniards) still waits hidden for its signal, wherever he puts its men.
+      ...(own.ambush ? { ambush: own.ambush } : {}),
       ...(own.wings || riders ? { wings: own.wings ?? {} } : {}),
       front: 0,
       // createWorld puts a layout's man at x = sign·(front + back), z = sign·across.

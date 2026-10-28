@@ -1154,6 +1154,46 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       }
       break;
     }
+    case 'llautu': {
+      // The Inca's llautu: a braided cord of coloured wool wound several times
+      // round the head over the cropped hair, the turns in two colours (the
+      // head's and its `lace`). A lord's ears (the Spaniards' orejones) were
+      // stretched round great plugs of gold (`earspools`). The Sapa Inca's
+      // mascapaicha (`fringe`): a fringe of red wool tassels hung from the
+      // llautu over his brow, and a little upright of feathers above it.
+      hidesHair = false;
+      const second = surface(head.lace ?? color);
+      for (let turn = 0; turn < 3; turn += 1) {
+        const cord = new THREE.Mesh(new THREE.TorusGeometry(1.07 * r, 0.075 * r, 6, 22), turn % 2 ? second : cloth);
+        cord.rotation.x = Math.PI / 2;
+        cord.position.y = (0.2 + turn * 0.13) * r;
+        group.add(cord);
+      }
+      if (head.earspools) {
+        const gold = surface(head.earspools, { roughness: 0.3 });
+        for (const side of [1, -1]) {
+          const spool = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * r, 0.3 * r, 0.1 * r, 14), gold);
+          spool.rotation.x = Math.PI / 2;
+          spool.position.set(-0.08 * r, -0.12 * r, side * 1.0 * r);
+          group.add(spool);
+        }
+      }
+      if (head.fringe) {
+        const wool = surface(head.fringe, { roughness: 0.95 });
+        for (let tassel = 0; tassel < 9; tassel += 1) {
+          const angle = ((tassel - 4) / 4) * 0.55;
+          const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * r, 0.035 * r, 0.42 * r, 5), wool);
+          strand.position.set(Math.cos(angle) * 1.1 * r, 0.02 * r, Math.sin(angle) * 1.1 * r);
+          group.add(strand);
+        }
+        const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * r, 0.03 * r, 0.6 * r, 5), second);
+        staff.position.set(0.55 * r, 1.25 * r, 0);
+        const feathers = new THREE.Mesh(new THREE.ConeGeometry(0.14 * r, 0.55 * r, 5), surface(0xece4d0));
+        feathers.position.set(0.55 * r, 1.75 * r, 0);
+        group.add(staff, feathers);
+      }
+      break;
+    }
     case 'clothWrap': {
       // A Ming garrison soldier's cloth wrapped round the head and knotted behind.
       const wrap = cloth;

@@ -207,9 +207,27 @@ test('the margin kept round each piece is a few centimetres', () => {
   assert.ok(LOFT.cover.margin >= 0.03 && LOFT.cover.margin <= 0.08);
 });
 
+test('the default bundle is minified, keeps the long data strings whole, and writes a source map beside it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'min-bundle-'));
+  const [plain, small] = ['--no-minify', '--minify'].map((flag) => {
+    const out = join(dir, `${flag.slice(2)}.html`);
+    execFileSync('node', ['tools/bundle.js', out, ...(flag === '--no-minify' ? [flag] : [])], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
+    return { out, page: readFileSync(out, 'utf8') };
+  });
+  assert.ok(small.page.length < plain.page.length * 0.8, 'the minified page is much smaller');
+  assert.ok(!small.page.includes('// ---- src/'), 'no comments left');
+  assert.ok(!small.page.includes('@@DATA'), 'no placeholder left');
+  const longStrings = (page) => (page.match(/'[A-Za-z0-9+/=]{20000,}'/g) ?? []).map((text) => createHash('sha1').update(text).digest('hex'));
+  const data = longStrings(plain.page);
+  assert.ok(data.length >= 10);
+  assert.deepEqual(longStrings(small.page).sort(), data.sort(), 'the base64 data is byte for byte the same');
+  assert.ok(small.page.includes('//# sourceMappingURL=minify.html.map'));
+  assert.ok(JSON.parse(readFileSync(`${small.out}.map`, 'utf8')).mappings.length > 1000);
+});
+
 test('the one-file bundle carries the skin worker\'s code, and refuses an aliased import', () => {
   const out = join(mkdtempSync(join(tmpdir(), 'v7-bundle-')), 'gladiator.html');
-  execFileSync('node', ['tools/bundle.js', out], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
+  execFileSync('node', ['tools/bundle.js', out, '--no-minify'], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
   const page = readFileSync(out, 'utf8');
   const worker = page.match(/<script type="text\/plain" id="skin-worker-source">([\s\S]*?)<\/script>/)?.[1];
   assert.ok(worker, 'the worker source is in the page');

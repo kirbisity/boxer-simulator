@@ -40,8 +40,8 @@ test('a side\'s units are of its own people and period: the factions its level\'
   }
   // Rome against Han and Maidstone, 1381: no guns. The Mexica and their allies: no horse.
   for (const key of ['legion', 'rebellion']) for (const corner of ['red', 'blue']) for (const unit of unitsOf(battleOf(key), corner)) assert.ok(!gun(unit.style), `${key}: ${unit.label}`);
-  for (const unit of unitsOf(battleOf('otumba'), 'blue')) assert.ok(!unit.mounted, unit.label);
-  assert.ok(!unitsOf(battleOf('otumba'), 'red').some((unit) => unit.army === 'tlaxcala' && unit.mounted));
+  // The Inca at Cajamarca: no horse, no gun, no steel.
+  for (const unit of unitsOf(battleOf('cajamarca'), 'blue')) assert.ok(!unit.mounted && !gun(unit.style) && ['unskilled', 'champi'].includes(unit.style), unit.label);
   // The Romans have no musketeer, the Dutch no Roman.
   assert.ok(!unitsOf(battleOf('legion'), 'red').some((unit) => unit.style === 'matchlock'));
   assert.ok(unitsOf(battleOf('zeelandia'), 'red').every((unit) => unit.army === 'dutch'));

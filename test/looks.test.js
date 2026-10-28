@@ -131,7 +131,7 @@ test('the bundle carries the kit, the registry and every look file, and refuses 
   for (const name of ['looks/kit', 'looks', 'looksbench', ...LOOKS.map((look) => `looks/${look.id}`)]) assert.ok(bundler.includes(`'${name}'`), `${name} is not in tools/bundle.js MODULES`);
   const out = join(mkdtempSync(join(tmpdir(), 'looks-bundle-')), 'gladiator.html');
   // The bundler throws if two modules declare one top-level name or a module does not compile.
-  execFileSync('node', ['tools/bundle.js', out], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
+  execFileSync('node', ['tools/bundle.js', out, '--no-minify'], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
   const page = readFileSync(out, 'utf8');
   for (const name of ['looks/kit', 'looks', 'looksbench', ...LOOKS.map((look) => `looks/${look.id}`)]) assert.ok(page.includes(`// ---- src/${name}.js ----`), `${name} is not in the bundle`);
   assert.ok(page.indexOf('src/looks/kit.js') < page.indexOf('src/looks/toon.js') && page.indexOf('src/looks.js') < page.indexOf('src/toon.js'), 'the registry loads before toon.js, which reads it');

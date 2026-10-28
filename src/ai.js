@@ -9,6 +9,7 @@ import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { bladeFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
+import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { handling } from './handling.js';
 import { holdWing, ride, standToRider } from './riding.js';
@@ -244,6 +245,37 @@ export const AI = {
   // later, `breakLater` of the way from breakAt to 1 at full (a man who
   // knows his squad will be put to death if he runs does not run).
   morale: { near: 2.5, alone: 0.12, support: 0.04, supportMost: 0.12, worthLeast: 0.5, worthMost: 3, formed: 0.1, formedMost: 0.4, fallen: 0.12, fallenMost: 0.36, fallenWithin: 6, fallenFor: 8, shock: 0.4, shockFull: 0.3, shockFor: 10, hesitate: { range: 0.8, pressure: 0.8, tempo: 2 }, discipline: 0.6, breakLater: 0.6 },
+  // Shock: what frightens beyond the harm it does (shockFear). Any man, any side.
+  // - A gun going off near him (a 'shot': the powder's bang and flash and
+  //   smoke): each heard startles him by `blast`, in full within `blastNear` m
+  //   of the muzzle and fading to nothing at `blastFar` (the enemy's guns:
+  //   his own he expects, and they fire away from him); the startle adds up
+  //   and dies away with a half-life of `halfLife` s, and frightens him up to
+  //   `blastMost`. Small for men used to it: a soldier who has stood in a line
+  //   of guns flinches and goes on (men stood under volleys; few broke at the first).
+  // - A horse coming at him (a rider of the other side at more than
+  //   `horseSpeed` m/s, heading within `horseCone` (cosine) of straight at
+  //   him): `horse` in full within `horseNear` m, fading to nothing at
+  //   `horseFar` (half a tonne at a gallop: men on foot have always given way
+  //   before it). Only the nearest such horse counts.
+  // - `strange`: to a people who had never met it (FACTIONS `strangers`: the
+  //   Inca, the Mexica: the Americas had no horse and no powder), each of
+  //   these is `strange` times the shock. Why three: the Spaniards and the Inca
+  //   tell alike how the first guns and horses struck the Andes. The Inca
+  //   called the gun illapa, the thunder; at Cajamarca the crowd, thousands
+  //   strong, ran from a few dozen horse and a falconet's shot until they threw
+  //   down a wall in the crush, which no account has a European army do at a
+  //   handful of shots. Within four years (Sacsayhuamán, 1536) the same people
+  //   fought horse with pits and bolas: it was the strangeness, not the
+  //   strength. Three makes a blast or a charge a frightening thing to them
+  //   (near a third of the way to breaking alone) and leaves it a flinch to
+  //   others; relative strength (AI.standing) already counts the horse's and
+  //   the steel's real advantage, for everyone alike.
+  shock: { blast: 0.06, blastMost: 0.15, blastNear: 4, blastFar: 16, halfLife: 5, horse: 0.1, horseNear: 3, horseFar: 10, horseSpeed: 3, horseCone: 0.7, strange: 3 },
+  // An ambush (a side's `ambush`, physics.js createWorld: hidden men) is
+  // sprung at its signal, when one of its men strikes, or when one of the
+  // other side comes within `spotted` m of one (he is found out).
+  ambush: { spotted: 1.5 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
@@ -346,6 +378,8 @@ function pick(weights, random) {
 export function thinkAll(world, dt, playerIds = new Set()) {
   keepLeaders(world);
   keepSides(world);
+  springAmbush(world);
+  keepShock(world, dt);
   moveFormations(world, dt, hurtShare);
   moveWings(world, dt);
   // The player's orders to his side (command.js).
@@ -357,6 +391,8 @@ export function thinkAll(world, dt, playerIds = new Set()) {
     if (playerIds.has(fighter.id)) continue;
     // Level mode: a dormant man (his section is not active) is not thought for; nor is a neutral one (corner 'grey': civilians, prisoners), nor one levelmode drives itself (`driven`: unaware, searching, following; levelmode/awareness.js).
     if (fighter.dormant || fighter.corner === 'grey' || fighter.driven) continue;
+    // A man lying in ambush waits where he is, unseen, for the signal (springAmbush).
+    if (fighter.hidden) continue;
     if (!staggered || fighter.detail === 'full' || fighter.detail === undefined) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
@@ -484,10 +520,28 @@ function keepPlace(world, fighter) {
 }
 
 /**
+ * The guns before a squad (a drill with `squad`: Qi Jiguang's fowling
+ * pieces) have one shot each before they fall back through it
+ * (formation.js retireShooters), and it is held until it is sure
+ * (DRILL.holdFire): while the man he has laid on is further than that, and
+ * coming on (at a run, DRILL.runIn) too fast for the piece to be loaded
+ * again before he arrives, the gunner stands with it ready. Thrown away at
+ * long range, it is the only shot his place gets: the matchlock takes 15 s
+ * to load and a rush covers the ground in five. A line of shooters that
+ * relieve each other (the Han crossbowmen) shoots as it likes.
+ */
+function holdsFire(fighter, formation, distance) {
+  const shot = fighter.weapon.spec.shot;
+  if (!formation.drill.squad || !shot || distance <= DRILL.holdFire) return false;
+  return distance < shot.reloadSeconds * DRILL.runIn;
+}
+
+/**
  * In the ranks: unless the enemy is on his slot (the front rank's to fight,
  * or anyone's once they are through), he stands in his place facing them.
  * A loaded shooter in the front rank shoots from it; one who has loosed
- * spans again in his place. Returns whether that is what he does.
+ * spans again in his place; one with a single slow shot holds it until it
+ * is sure (holdsFire). Returns whether that is what he does.
  */
 function holdRank(world, fighter, opponent, style, dt) {
   const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
@@ -504,6 +558,7 @@ function holdRank(world, fighter, opponent, style, dt) {
       return true;
     }
     if (!fighter.inFront || fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    if (holdsFire(fighter, formation, distance)) return true;
     const zone = world.random() < gun.headShare ? 'head' : 'body';
     if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
       fighter.punch.quick = true;
@@ -656,7 +711,7 @@ function pickDefence(style, incoming, random, heavy = 0, long = false) {
  * the player fights). In a battle, simply the other side.
  */
 function foeOf(fighter, other) {
-  return hostile(other, fighter) && !other.dormant && (!fighter.mayTarget || fighter.mayTarget(other));
+  return hostile(other, fighter) && !other.dormant && !other.hidden && (!fighter.mayTarget || fighter.mayTarget(other));
 }
 
 /**
@@ -692,7 +747,9 @@ function chooseFocus(world, fighter) {
   const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !crawlingAway(other));
   if (!standing.length) {
     fighter.focus = undefined;
-    return fighter.mayTarget ? null : nearestOpponent(world, fighter);
+    // (Nobody at all in sight: the other side hidden in an ambush. He waits.)
+    const nearest = fighter.mayTarget ? null : nearestOpponent(world, fighter);
+    return nearest?.hidden ? null : nearest;
   }
   const at = point(fighter.x, P.pelvis);
   // How many of his side already go for each man: counted once, not per comparison.
@@ -1306,7 +1363,7 @@ export function companyFear(world, fighter) {
   let friends = 0;
   let formed = 0;
   for (const other of world.fighters) {
-    if (other === fighter || other.state !== 'up' || other.crawling || other.fled || other.dormant) continue;
+    if (other === fighter || other.state !== 'up' || other.crawling || other.fled || other.dormant || other.hidden) continue;
     if (Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[1]) > spec.near) continue;
     if (other.corner === fighter.corner) friends += other.panicked ? 0 : 1;
     // Men in their places in a drilled body before him: a wall of them that does not give way.
@@ -1330,7 +1387,7 @@ export function standingFear(world, fighter) {
   const spec = AI.standing;
   const where = (other) => [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]];
   const at = where(fighter);
-  const enemies = world.fighters.filter((other) => hostile(other, fighter) && !other.dormant && inFight(other));
+  const enemies = world.fighters.filter((other) => hostile(other, fighter) && !other.dormant && !other.hidden && inFight(other));
   let nearest = null;
   let nearestApart = Infinity;
   for (const enemy of enemies) {
@@ -1352,6 +1409,97 @@ export function standingFear(world, fighter) {
   const past = (value) => Math.max(0, Math.min(1, (value - spec.parity) / spec.span));
   const coming = Math.min(1, 1 - (nearestApart - spec.near) / (spec.sight - spec.near));
   return coming * (spec.fear * past(gap) - spec.steady * past(-gap));
+}
+
+/** How many times the shock of a thing (`what`: 'gun', 'horse') is to him: AI.shock `strange` if his people had never met it (FACTIONS `strangers`), else 1. */
+export function strangeness(fighter, what) {
+  return FACTIONS[factionOf(fighter.body.inputs)]?.strangers?.includes(what) ? AI.shock.strange : 1;
+}
+
+/**
+ * The ambush (world.ambush, a side's men `hidden`: physics.js createWorld) is
+ * sprung at its signal, or the moment one of them strikes (the player may go
+ * early), or one of the other side comes on one of them (AI.ambush `spotted`):
+ * from then they are seen, and fight.
+ */
+function springAmbush(world) {
+  const ambush = world.ambush;
+  if (!ambush || ambush.sprung) return;
+  const hidden = world.fighters.filter((fighter) => fighter.hidden);
+  let sprung = world.time >= ambush.signal || !hidden.length;
+  for (let index = Math.min(ambush.cursor, world.events.length); index < world.events.length && !sprung; index += 1) {
+    const event = world.events[index];
+    if (event.attacker !== undefined && world.fighters[event.attacker]?.hidden) sprung = true;
+  }
+  ambush.cursor = world.events.length;
+  for (const fighter of hidden) {
+    if (sprung) break;
+    const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+    sprung = world.fighters.some((other) => hostile(other, fighter) && inFight(other) && Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[1]) < AI.ambush.spotted);
+  }
+  if (!sprung) return;
+  ambush.sprung = true;
+  ambush.at = world.time;
+  for (const fighter of hidden) fighter.hidden = false;
+  world.events.push({ time: world.time, kind: 'ambush', corner: ambush.corner, effects: ['the signal: the ambush is sprung'] });
+}
+
+/**
+ * Each man's startle from the guns (AI.shock): every gun fired since the last
+ * look ('shot' events, one to a man's firing however many balls or pellets)
+ * startles the other side's men near its muzzle, the more the nearer, `strange` times a
+ * man whose people had never heard one; the startle dies away.
+ */
+function keepShock(world, dt) {
+  const spec = AI.shock;
+  const events = world.events;
+  if ((world.shockCursor ?? 0) > events.length) world.shockCursor = events.length;
+  const blasts = [];
+  const fired = new Set();
+  for (let index = world.shockCursor ?? 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (event.kind !== 'shot' || !event.from || fired.has(`${event.attacker}:${event.time}`)) continue;
+    fired.add(`${event.attacker}:${event.time}`);
+    blasts.push([event.from[0], event.from[2], world.fighters[event.attacker]]);
+  }
+  world.shockCursor = events.length;
+  const fade = 0.5 ** (dt / spec.halfLife);
+  for (const fighter of world.fighters) {
+    if (fighter.startle) fighter.startle *= fade;
+    if (!blasts.length || fighter.state === 'out') continue;
+    const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+    for (const [x, z, shooter] of blasts) {
+      // His own side's guns are no shock to him: he knew they would fire, and they fire at the others.
+      if (shooter && !hostile(shooter, fighter)) continue;
+      const heard = Math.max(0, Math.min(1, 1 - (Math.hypot(x - at[0], z - at[1]) - spec.blastNear) / (spec.blastFar - spec.blastNear)));
+      if (heard > 0) fighter.startle = (fighter.startle ?? 0) + spec.blast * heard * strangeness(fighter, 'gun');
+    }
+  }
+}
+
+/**
+ * Fear from shock (AI.shock): the startle of guns gone off near him (keepShock),
+ * and a horse of theirs coming at him at speed, the nearest such; each the
+ * more if his people had never met it (strangeness). In a battle or a duel alike.
+ */
+export function shockFear(world, fighter) {
+  const spec = AI.shock;
+  const guns = Math.min(spec.blastMost * strangeness(fighter, 'gun'), fighter.startle ?? 0);
+  if (fighter.mount) return guns;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  let horse = 0;
+  for (const other of world.fighters) {
+    const mount = other.mount;
+    if (!mount || !hostile(other, fighter) || other.hidden || other.dormant || !inFight(other) || mount.speed < spec.horseSpeed) continue;
+    const off = [at[0] - mount.at[0], at[1] - mount.at[1]];
+    const apart = Math.hypot(off[0], off[1]);
+    if (apart >= spec.horseFar) continue;
+    // Its heading on the floor (yaw 0 runs along +x), against the line to him.
+    const heading = [Math.cos(mount.yaw), -Math.sin(mount.yaw)];
+    if ((off[0] * heading[0] + off[1] * heading[1]) / Math.max(apart, 1e-6) < spec.horseCone) continue;
+    horse = Math.max(horse, Math.min(1, 1 - (apart - spec.horseNear) / (spec.horseFar - spec.horseNear)));
+  }
+  return guns + spec.horse * horse * (horse > 0 ? strangeness(fighter, 'horse') : 1);
 }
 
 /** His side's discipline, 0..1 (world.discipline, set by the level's order for each side). */
@@ -1420,7 +1568,7 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
   const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
   const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
-  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter);
+  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + shockFear(world, fighter);
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
   const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);

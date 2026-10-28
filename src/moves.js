@@ -1605,6 +1605,25 @@ export const STYLES = {
     plans: { pressure: 1.5, brawler: 1.1, counter: 0.6, outboxer: 0.4 },
     pressure: 0.3,
   },
+  // The Inca champi alone, no shield (none were carried into Cajamarca's
+  // square): the star-headed mace swung overhead and from the side. A level's
+  // (Atahualpa's retinue), with no character of its own in the menus (`hidden`).
+  champi: {
+    label: 'Champi', hidden: true, weapon: 'champi', fallback: 'mix',
+    cadence: { work: 1, move: 0.85, burst: 0.55, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.06, width: 1.15, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.66, -0.14], dir: [0.45, 0.88, 0] },
+    idle: { bounce: 0.2, sway: 0.5, rock: 0.35 },
+    attacks: { maceOverhead: 0.55, maceSide: 0.45 },
+    combos: { 'maceSide maceOverhead': 0.6, 'maceOverhead maceSide': 0.4 },
+    comboChance: 0.35,
+    tempo: 1.3,
+    defences: { weaponBlock: 0.35, stepBack: 0.5, slip: 0.15 },
+    defendChance: 0.5,
+    headMovement: 0.1,
+    plans: { pressure: 1.3, brawler: 1.1, counter: 0.6, outboxer: 0.4 },
+    pressure: 0.25,
+  },
   // Scissor: in scale and a smooth helmet, the left arm cased in a steel
   // tube ending in a crescent blade that parries and slashes, the gladius in the right.
   scissor: {

@@ -26,7 +26,7 @@ export const STYLE_SURFACE = {
  */
 export const PLACE_SURFACE = {
   ring: 'wood', stadium: 'wood', colosseum: 'sand', subway: 'stone', meadow: 'grass', field: 'grass', town: 'stone', port: 'stone',
-  sengoku: 'earth', plain: 'earth', coastFort: 'sand', coastVillage: 'sand', jiangnan: 'stone',
+  sengoku: 'earth', plain: 'earth', coastFort: 'sand', coastVillage: 'sand', jiangnan: 'stone', cajamarca: 'earth',
   // The horse-archer plains: the Gobi's gravel steppe and the dry plain below Harran are earth underfoot and hoof; Champagne's summer grass, grass.
   mobei: 'earth', catalaunian: 'grass', carrhae: 'earth',
 };
