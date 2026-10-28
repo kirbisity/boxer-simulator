@@ -390,6 +390,13 @@ const PERIOD_BUILD = {
   // Italy, hidalgos raised to arms): a little above the Castilian mean, and strong.
   spanish: { soldier: { heightCm: 168, weightKg: 70, exercise: 0.76 }, officer: { heightCm: 170, weightKg: 73, exercise: 0.78 } },
   mexica: { warrior: { heightCm: 160, weightKg: 58, exercise: 0.72 }, elite: { heightCm: 162, weightKg: 60, exercise: 0.82 } },
+  // Andean men of the Inca period: from highland skeletons about 157–160 cm,
+  // short and stocky, broad and deep in the chest (bodies made at 2,700 m and
+  // more), heavy for their height. The commons (hatun runa) carried, built and
+  // walked the roads under the mit'a; the litter's bearers (the Lucanas) were
+  // picked for it. The lords of the Inca's lineage ate better and were trained
+  // to arms in their youth (the warachikuy): a little taller and fitter.
+  inca: { commoner: { heightCm: 157, weightKg: 62, exercise: 0.7 }, noble: { heightCm: 160, weightKg: 65, exercise: 0.74 } },
   // The Hospitaller knights at Rhodes, nobles of France, Spain, Italy and England, fed and trained
   // from boyhood; their sergeants and gunners. Ottoman soldiers of the 1500s
   // about 165–168 cm; the Janissaries picked young (the devşirme) for build.
@@ -401,6 +408,41 @@ const PERIOD_BUILD = {
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };
+
+// ---- The Inca at Cajamarca (scenarios.js cajamarca) ----
+
+// Quechua names, given and second: the sky, the beasts, the stone.
+const INCA_NAMES = [
+  ['Waman', 'Kusi', 'Titu', 'Amaru', 'Rumi', 'Wayna', 'Sinchi', 'Kuntur', 'Puma', 'Illapa', 'Atoq', 'Wari'],
+  ['Yupanki', 'Kapaq', 'Rimachi', 'Paukar', 'Sullka', 'Tupaq', 'Maywa', 'Chalco', 'Quispe', 'Mayta', 'Wallpa', 'Rawa'],
+];
+
+/**
+ * A man of Atahualpa's retinue: one of the commons (`commoner`: bearer,
+ * sweeper, attendant, guard, in the uncu) or a lord of the Inca's lineage
+ * (`noble`: the tocapu band and the gold earspools), most of them unarmed
+ * (`unskilled`: he fights, if he must, with his hands), some with the champi;
+ * hair cropped short, no beard to speak of. `design`: one of the kit's.
+ */
+export function incaMan(random = Math.random, style = 'unskilled', rank = 'commoner', { design = null } = {}) {
+  const kind = rank === 'noble' ? 'incaNoble' : 'incaUncu';
+  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
+  const name = `${pickOne(INCA_NAMES[0], random)} ${pickOne(INCA_NAMES[1], random)}`;
+  const man = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random) }, accessories: [], look: { ...base.look, skinTone: pickOne(['tan', 'medium', 'tan'], random), hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none' } };
+  return builtLike(man, PERIOD_BUILD.inca[rank], random);
+}
+
+// Atahualpa as the Spaniards saw him in 1532 (Xerez, Pedro Pizarro): about
+// thirty, well made and somewhat stout, grave; in the royal tocapu and the
+// mascapaicha (the incaNoble kit's Sapa Inca design). He leads his people
+// (`leads`): they keep round him, and his fall is theirs.
+const ATAHUALPA = { age: 30, heightCm: 165, weightKg: 72, design: 4 };
+
+/** Atahualpa, the Sapa Inca: unarmed among his lords. */
+export function atahualpa(random = Math.random) {
+  const man = incaMan(random, 'unskilled', 'noble', { design: ATAHUALPA.design });
+  return atWeight({ ...man, name: 'Atahualpa', age: ATAHUALPA.age, heightCm: ATAHUALPA.heightCm, leads: true }, ATAHUALPA.weightKg);
+}
 
 /** A knight of St John (in plate, sword or hammer) or one of the Order's sergeants (in mail, spear or gun). */
 export function hospitaller(random = Math.random, style = 'longsword', rank = 'knight') {
@@ -479,7 +521,7 @@ export function mingHorseman(random = Math.random, style = 'dao') {
 /**
  * A Spanish horseman of Cortés's cavalry in 1520 (a jinete or a caballero in
  * breastplate and morion on an Andalusian horse): with the lance, as the horse
- * charged at Otumba, or the espada.
+ * charged at Otumba (1520) and burst out on the square at Cajamarca (1532), or the espada.
  */
 export function conquistadorHorseman(random = Math.random, style = 'lance') {
   return { ...europeanSoldier(random, 'hidalgo'), style, mounted: true };

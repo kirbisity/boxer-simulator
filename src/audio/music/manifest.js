@@ -48,7 +48,8 @@ export const SCENE_MUSIC = {
   rebellion: 'medieval',
   sekigahara: 'japan',
   pyongyang: 'korea',
-  otumba: 'aztec',
+  // No Andean cue: the nearest in the game, the Americas' (the Mexica's).
+  cajamarca: 'aztec',
   zeelandia: 'china',
   wokou: 'china',
   qiJiguang: 'china',

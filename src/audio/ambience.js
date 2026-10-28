@@ -31,6 +31,8 @@ export const PLACE_AMBIENCE = {
   coastFort: { wind: 52, surf: 68, birds: 2 },
   coastVillage: { wind: 50, surf: 66, birds: 3 },
   jiangnan: { wind: 38, birds: 5, flow: 48 },
+  // A walled square in a highland valley: the wind off the hills, a few birds over the fields beyond the walls.
+  cajamarca: { wind: 44, birds: 3 },
   stage: { wind: 36 },
   dunnottar: { wind: 58, surf: 76 },
 };
