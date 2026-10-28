@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normaliseInputs } from '../src/body.js';
-import { AI, companyFear, fearTarget, thinkAll } from '../src/ai.js';
+import { AI, companyFear, fearTarget, strengthOf, thinkAll } from '../src/ai.js';
 import { DRILL, moveFormations } from '../src/formation.js';
 import { OUTFITS } from '../src/outfits.js';
 import { STYLES } from '../src/moves.js';
@@ -14,7 +14,7 @@ import { levelBattle } from '../tools/levels.js';
 
 const count = (men, pick) => men.reduce((tally, man) => ({ ...tally, [pick(man)]: (tally[pick(man)] ?? 0) + 1 }), {});
 
-test('the wokou raiders charge with swords: katana and ōdachi, dao and spear, no guns or bows; the garrison has no gun either, each kind in one colour', () => {
+test('the wokou raiders charge with swords: katana and ōdachi, dao and spear, no guns or bows; the garrison has bows but no gun, more men than the raiders, each kind in one colour', () => {
   const { red, blue } = SCENARIOS.wokou.cast(seededRandom(4));
   // (A rōnin may fight with two swords: nitō.)
   assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 3, katana: 6, odachi: 3, dao: 8, spear: 6 });
@@ -24,8 +24,10 @@ test('the wokou raiders charge with swords: katana and ōdachi, dao and spear, n
   assert.equal(front.filter((man) => man.outfit.kind === 'ronin').length, 3);
   assert.ok(red.every((man) => !STYLES[man.style].ranged), 'no shooter among the raiders');
   assert.ok(red.every((man) => man.charging > 1), 'they come on at a run');
-  assert.ok(blue.every((man) => !STYLES[man.style].ranged), 'no shooter in the garrison');
-  assert.equal(blue.length, 15);
+  assert.ok(blue.every((man) => !STYLES[man.style].ranged || man.style === 'bow'), 'no gun in the garrison');
+  assert.equal(blue.filter((man) => man.style === 'bow').length, 4);
+  assert.equal(blue.length, 34);
+  assert.ok(blue.length > red.length, 'the garrison outnumbers the raiders');
   for (const kind of ['mingGarrison', 'mingBrigandine']) assert.equal(new Set(blue.filter((man) => man.outfit.kind === kind).map((man) => man.outfit.design)).size, 1, `${kind}: one design`);
   // The lines start well apart: open ground for the run in.
   for (const corner of ['red', 'blue']) assert.ok(SCENARIOS.wokou.formation[corner].front >= 8);
@@ -55,6 +57,20 @@ test("Qi Jiguang's army: Qi in the elite's lamellar with the guandao, three guar
   assert.equal(order.layout.length, blue.length);
   assert.ok(order.drill.squad && order.discipline === 1);
   assert.ok(!SCENARIOS.wokou.formation.blue.discipline, 'the garrison has none');
+});
+
+test('the coast garrison is the weaker for its men: some old, some thin and untaught, each worth less than a raider, together less than the raiders though more of them', () => {
+  const { red, blue } = SCENARIOS.wokou.cast(seededRandom(4));
+  const levy = blue.filter((man) => man.outfit.kind === 'mingGarrison');
+  const bodies = (men) => men.map((man) => normaliseInputs(structuredClone(man)));
+  assert.ok(levy.some((man) => man.age >= 47), 'old men among them');
+  assert.ok(levy.some((man) => man.age <= 30 && man.skill < 0.2), 'thin, untaught boys among them');
+  const strengths = (men, corner) => createWorld(bodies(men).map((inputs) => ({ inputs, corner })), { seed: 4 }).fighters.map(strengthOf);
+  const sum = (values) => values.reduce((total, value) => total + value, 0);
+  const raiders = strengths(red, 'red');
+  const garrison = strengths(blue, 'blue');
+  assert.ok(sum(garrison) / garrison.length < sum(raiders) / raiders.length * 0.65, 'a garrison man is worth well under a raider');
+  assert.ok(sum(garrison) < sum(raiders), 'all of them together are worth less than the raiders');
 });
 
 test('the raiders are the same men in both wokou levels', () => {

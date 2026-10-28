@@ -219,7 +219,11 @@ const ZEELANDIA = {
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
 // against a garrison with one or two brigandine regulars among it.
-// The raiding bands were large and the coast garrisons thin: here the raiders outnumber them.
+// The coast garrisons on paper were a good many (a weisuo's rolls ran to hundreds),
+// the raiding bands a few score: here the garrison has the numbers. What it lacks is
+// the men: old, underfed and undrilled (cast.js PERIOD_BUILD mingCoast), with a few
+// bows and nothing that fires powder. Whether they stand is for the general weighing
+// of strength to say (ai.js AI.standing), not for this table.
 const WOKOU = {
   // Japanese and Chinese together, as the raids were. The Ming accounts
   // (Zheng Ruozeng's Chouhai tubian, Qi Jiguang's own) describe the raiders
@@ -229,9 +233,9 @@ const WOKOU = {
   // A few of the Japanese are rōnin, masterless swordsmen of the wars at
   // home (the raids' fighting core, as the Ming saw it): they lead the rush.
   raiders: { ronin: { ronin: 3 }, japanese: { katana: 6, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
-  // A coast garrison of the 1550s: spears and swords, no guns to speak of;
-  // the weisuo levy in its hemp vests, and a pair of regulars in brigandine.
-  garrison: { garrison: { spear: 8, dao: 5 }, brigandine: { swordShield: 1, spear: 1 } },
+  // A coast garrison of the 1550s: mostly spears and swords, a few bows, no
+  // firearms; the weisuo levy in its hemp vests, and a pair of regulars in brigandine.
+  garrison: { garrison: { spear: 17, dao: 11, bow: 4 }, brigandine: { swordShield: 1, spear: 1 } },
   // One colour to a kind, the dynasty's red, so the two sides read apart
   // across the square (OUTFITS designs: the garrison's red coat, the
   // brigandine's red cloth); the raiders are in what they have.
@@ -243,6 +247,9 @@ const WOKOU = {
 
 // The raiders as they come on: a loose crowd, nine abreast; the Japanese in the front rank, the rōnin first among them.
 const WOKOU_RAIDERS_ORDER = { front: WOKOU.front, spacing: 1.3, rowSpacing: 1.6, perRow: 9, loose: 0.5 };
+// The garrison drawn up across the square in two long ranks, the bows in a row of their own before them to loose as the raiders come
+// on, the spears and dao close behind (the square is too shallow for the usual 4 m: `shootersFront` here 1.5 m).
+const WOKOU_GARRISON_ORDER = { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6, perRow: 15, shootersFront: 1.5, loose: 0.25 };
 
 /**
  * The raiders of a wokou level, the same in both: the Japanese first (the
@@ -642,8 +649,8 @@ export const ARMIES = {
   coast: {
     label: 'The coast garrison',
     ranks: {
-      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.coast, WOKOU.design.garrison) },
-      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.coast, WOKOU.design.brigandine) },
+      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'bow'], make: mingRank('garrison', MING_PEOPLE.coast, WOKOU.design.garrison) },
+      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'bow'], make: mingRank('brigandine', MING_PEOPLE.coast, WOKOU.design.brigandine) },
     },
   },
   qi: {
@@ -1237,16 +1244,16 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'A water town, Zhejiang · 1554',
-    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, rōnin at their head, barefoot, some in pieces of samurai armour: long swords and great two-handed swords, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison: old men and boys in hemp vests, and a pair of brigandine regulars among them.',
+    blurb: 'Sea raiders come up the canals in the morning mist, Japanese and Chinese together, rōnin at their head, barefoot, some in pieces of samurai armour: long swords and great two-handed swords, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.',
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
-    roster: 'Twenty-six raiders · fifteen garrison',
-    formation: { red: WOKOU_RAIDERS_ORDER, blue: { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 } },
+    roster: 'Twenty-six raiders · thirty-four garrison',
+    formation: { red: WOKOU_RAIDERS_ORDER, blue: WOKOU_GARRISON_ORDER },
     cast: (random) => ({
       red: wokouRaiders(random),
-      blue: [...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingCoast', design: WOKOU.design.brigandine })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingCoast', design: WOKOU.design.garrison }))],
+      blue: shootersBehind([...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingCoast', design: WOKOU.design.brigandine })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingCoast', design: WOKOU.design.garrison }))]),
     }),
     // The armies its sides may be set up from (ARMIES; muster.js).
     armies: { red: ['raiders'], blue: ['coast'] },

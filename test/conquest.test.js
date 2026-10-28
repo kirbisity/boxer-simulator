@@ -36,7 +36,7 @@ test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin amon
   assert.ok(cast.red.every((fighter) => factionOf(fighter) === 'knights'));
 });
 
-test('Wokou raid: Japanese and Chinese raiders, many barefoot and unarmoured, many in a dō-maru, against a garrison with about one brigandine man in five', async () => {
+test('Wokou raid: Japanese and Chinese raiders, many barefoot and unarmoured, many in a dō-maru, against a garrison with a pair of brigandine regulars among a levy', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const { OUTFITS } = await import('../src/outfits.js');
   // Over a few casts: most raiders unarmoured, some in a piece, a few in full armour.
@@ -51,7 +51,7 @@ test('Wokou raid: Japanese and Chinese raiders, many barefoot and unarmoured, ma
   assert.ok(OUTFITS.wokouArmoured.protection.cut > 0.5 && OUTFITS.wokouArmoured.protection.regions.limb.cut < 0.1);
   const cast = SCENARIOS.wokou.cast(seededRandom(3));
   const regulars = cast.blue.filter((fighter) => fighter.outfit.kind === 'mingBrigandine').length;
-  assert.ok(regulars / cast.blue.length > 0.12 && regulars / cast.blue.length < 0.28, `${regulars} of ${cast.blue.length}`);
+  assert.ok(regulars >= 1 && regulars <= 2 && cast.blue.length > regulars * 10, `${regulars} of ${cast.blue.length}`);
 });
 
 test('the new styles are in their factions, and tai chi and taekwondo stay out of the mixed style', () => {

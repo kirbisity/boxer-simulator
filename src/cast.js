@@ -379,10 +379,23 @@ const PERIOD_BUILD = {
   // professional elite. His guards are his household men, as Koxinga's elite.
   qi: { brigandine: { heightCm: 165, weightKg: 65, exercise: 0.8, skill: 0.5 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8, skill: 0.55 } },
   // The weisuo garrisons of the Zhejiang coast in the 1550s, as the raids found them: hereditary soldier households, unpaid, their men
-  // worked as servants by their officers, the able-bodied long run off. What was left to muster was boys, the thin and the old: ages
-  // (`ages`: [share, from, to]) from eighteen into the sixties, half again the usual spread of height and weight (`spread`), lean, little
-  // drilled. The few regulars among them are as Koxinga's (mingSouth).
-  mingCoast: { garrison: { heightCm: 162, weightKg: 52, exercise: 0.45, spread: 1.5, ages: [[0.4, 18, 32], [0.32, 32, 48], [0.28, 48, 66]] }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 } },
+  // worked as servants by their officers, the able-bodied long run off. What was left to muster was a mixed lot, drawn by `mix`
+  // ([share, what differs from the rest of the build]): the household soldiers, grown men in their twenties and thirties, lean and
+  // little drilled; the old, men in their late forties and fifties and past sixty, stooped, their wind and their joints half gone,
+  // kept on the rolls for their fathers' sake; and the thin, underfed boys and young men, small, light and hardly exercised (a
+  // bad year's hunger takes strength and wind, body.js: a body below its healthy weight is older than its years), taught
+  // nothing (`skill`, the levy's). Half again the usual spread of height and weight (`spread`). The few regulars among them are as Koxinga's (mingSouth).
+  mingCoast: {
+    garrison: {
+      heightCm: 162, weightKg: 54, exercise: 0.45, spread: 1.5,
+      mix: [
+        [0.4, { ages: [[1, 22, 40]] }],
+        [0.3, { ages: [[1, 47, 66]], exercise: 0.35 }],
+        [0.3, { ages: [[1, 16, 30]], heightCm: 156, weightKg: 45, exercise: 0.3, skill: 0.15 }],
+      ],
+    },
+    brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 },
+  },
   japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 60, exercise: 0.92 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
@@ -471,7 +484,9 @@ export function steppeWarrior(random = Math.random, style = 'steppeBow', rank = 
 }
 
 /** This man at a period's build: its height and training, give or take, fed to its weight. */
-function builtLike(inputs, build, random) {
+function builtLike(inputs, kind, random) {
+  // A build that gives a `mix` is of several kinds of man: one is drawn first (a build without one draws nothing, so every other army is cast as before).
+  const build = kind.mix ? { ...kind, ...pickByShare(kind.mix, random) } : kind;
   const spread = build.spread ?? 1;
   const heightCm = Math.round(build.heightCm + jitter(random) * CAST.height * 0.6 * spread);
   const weightKg = build.weightKg * (heightCm / build.heightCm) ** 2 * (1 + jitter(random) * 0.06 * spread);
@@ -481,6 +496,16 @@ function builtLike(inputs, build, random) {
   // A build that gives a `skill` trains its men past their kit's (Qi Jiguang's): drawn from nothing, so the rest are cast as before.
   const skill = build.skill ?? inputs.skill;
   return atWeight({ ...inputs, heightCm, exercise, age, ...(skill === undefined ? {} : { skill }) }, weightKg);
+}
+
+/** One of [share, value] pairs, by its share. */
+function pickByShare(pairs, random) {
+  let roll = random() * pairs.reduce((sum, [share]) => sum + share, 0);
+  for (const [share, value] of pairs) {
+    if (roll < share) return value;
+    roll -= share;
+  }
+  return pairs[pairs.length - 1][1];
 }
 
 /** An age (whole years) from `ages`, [share, from, to] bands. */
