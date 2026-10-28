@@ -162,22 +162,79 @@ export const AI = {
   // crawl off or break, fear runs through the rest. In a side of at least
   // `minSide`, each man fears `losses` at full as the share of his side lost
   // goes from `lossesFrom` to `lossesFull`, and `contagion` for each of his
-  // own he sees broken within `within` m (up to `contagionMost`). A broken
+  // own he sees broken within `within` m (up to `contagionMost`). The share
+  // lost is of the side's strength, not its heads (each man as much as he
+  // was worth at the start, AI.strength): the best of a side going down takes
+  // more of its heart than as many of the rest. A broken
   // man of such a side runs for his own rear; at the field's edge (within
   // `edge` m) with no enemy within `clearOf` m he has fled: out of the battle,
   // and he does not come back. History has most battles end so.
-  rout: { minSide: 4, losses: 0.35, lossesFrom: 0.3, lossesFull: 0.75, contagion: 0.06, contagionMost: 0.18, within: 5, edge: 1.6, clearOf: 4 },
+  // Contagion: a comrade breaking and running is the most frightening thing
+  // a man in a line can see. Each broken man of his own within `within` m
+  // counts in full within `close` m, fading to nothing at `within`; one well
+  // behind him (more than `behindFrom` m back, by his side's front) he hardly
+  // sees, `behind` of it (a man running back through the ranks is in front of
+  // those behind him, and is seen: the rear feels a front that breaks).
+  // `follow`: a man beside a runner (within `beside` m) may go with him: a
+  // chance a second of `rate` at full fear for each runner beside him (up to
+  // `followMost` of them), from fear `from` (a steady man does not run because
+  // his neighbour does; a frightened one does), less discipline's `discipline`
+  // share of it at full (Qi's law: the squad of a man who ran died with him).
+  // So a weak line that starts to go, goes all at once: the domino.
+  rout: {
+    minSide: 4, losses: 0.35, lossesFrom: 0.3, lossesFull: 0.75, contagion: 0.1, contagionMost: 0.3, within: 5, close: 1.5, behind: 0.35, behindFrom: 1, edge: 1.6, clearOf: 4,
+    follow: { beside: 3, rate: 1.5, followMost: 2, from: 0.3, discipline: 0.9 },
+  },
+  // How much fight there is in a man, as another sizes him up at a glance
+  // (strengthOf): his weapon's harm, its reach, his armour, a horse under
+  // him, his training and his size, and the state he is in. Each a factor,
+  // 1 for a bare-handed, fit, ordinary man on foot, unhurt and unarmoured:
+  // - `weapon`: what he holds, WEAPONS threat (fists 1, a knife 2.2, a sword
+  //   3–4.9, a gun 5–7) to this power: a sword makes a man about twice as
+  //   much to face as bare hands; a gun a little more again;
+  // - `reach`: per metre of reach past his bare arm (a spear keeps a sword off);
+  // - `armour`: × (1 + `armour` × his kit's protection, the mean of blunt, cut
+  //   and pierce): plate (0.8) about double, brigandine 1.9, a hemp vest 1.1;
+  // - `mounted`: on a horse: above you, ten times your weight, and fast. Men
+  //   on foot dreaded horse, the more so men who had never seen one;
+  // - `skill`: × (1 + `skill` × (his skill − 0.5)): a samurai (0.7–0.85) over a levy (0.25);
+  // - `size`: his muscle over `muscleKg` (a fit 70 kg man's), to this power:
+  //   strength, not weight (armour is counted above; age and want show here:
+  //   a thin old levy has three quarters of a young raider's);
+  // - `hurt`: × (1 − `hurt` × how hurt he is, hurtShare);
+  // - `broken`: a man broken and running is this share of what he was (nobody fears a back);
+  //   one down on his knees or crawling, `down` of it.
+  strength: { weapon: 0.6, reach: 0.3, armour: 1.2, mounted: 2.5, skill: 1.2, size: 1, muscleKg: 28, hurt: 0.8, broken: 0.2, down: 0.1 },
+  // Perceived relative strength (standingFear): each man weighs the knot of
+  // enemies before him (those round the nearest of them) against himself and
+  // the comrades round him, every man by strengthOf, each counted in full
+  // within `group` m of the middle of his own knot and fading out over
+  // `groupFade` m more. The log of their strength over ours is the gap: within
+  // `parity` of even (e^0.25: a quarter stronger either way) it is nothing, and
+  // morale is as it would be; past it, fear grows to `fear` over `span` more
+  // (e^0.9: ×2.5), and the stronger side is steadied as much, down to
+  // −`steady` (a samurai among frightened levies is sure of himself; the
+  // levies are not). It is felt as they come: in full with the nearest of them
+  // within `near` m (a few strides: a charge that close is upon him), fading
+  // to nothing at `sight` m (a charge seen coming across a square frightens
+  // before it lands: men broke at the sight of it). The same weighing in a duel, one
+  // against many and a battle: only who is there differs. (It stands in for
+  // counting heads: three on one is three times one man's strength.)
+  standing: { group: 3, groupFade: 3, near: 6, sight: 16, parity: 0.25, span: 0.9, fear: 0.5, steady: 0.25 },
   // Morale in a battle (a side of at least `rout.minSide`): what the men
   // round a man do to his fear, whoever they are. Within `near` m of him:
   // - no man of his own standing there (`alone`): fear; each who stands
   //   with him takes `support` off, up to `supportMost` (the files at his
   //   shoulders: men stood in a line who would have run alone);
-  // - more of them there than of his own: `outnumbered` for each man more,
-  //   up to `outnumberedMost` (three on one breaks a man however brave);
+  // - (more of them than of his own, and stronger: AI.standing, by strength, not heads);
   // - men of the other side in their places in a drilled body (formation.js):
   //   `formed` each, up to `formedMost` (a line that holds is frightening to run at);
   // - his own falling round him (out, crawling off), within `fallenWithin`
-  //   m and the last `fallenFor` s: `fallen` each, up to `fallenMost`.
+  //   m and the last `fallenFor` s: `fallen` each, up to `fallenMost`; each
+  //   counted by what he was worth to the side (AI.strength) against its
+  //   average, from `worthLeast` to `worthMost` of an ordinary man (the
+  //   samurai who led the rush cut down before you is worth three of the boys
+  //   beside him: it is losing your best that breaks a side).
   // Afraid but not broken (fear 0..1), a man hesitates: he stands `hesitate.range`
   // m further off at full fear, presses `pressure` less, waits `tempo` longer between
   // attacks (most men in a melee hang back; the bold and the desperate do the fighting).
@@ -186,7 +243,7 @@ export const AI = {
   // fear is taken down by `discipline` of it at full, and he breaks the
   // later, `breakLater` of the way from breakAt to 1 at full (a man who
   // knows his squad will be put to death if he runs does not run).
-  morale: { near: 2.5, alone: 0.12, support: 0.04, supportMost: 0.12, outnumbered: 0.08, outnumberedMost: 0.24, formed: 0.1, formedMost: 0.4, fallen: 0.12, fallenMost: 0.36, fallenWithin: 6, fallenFor: 8, shock: 0.4, shockFull: 0.3, shockFor: 10, hesitate: { range: 0.8, pressure: 0.8, tempo: 2 }, discipline: 0.6, breakLater: 0.6 },
+  morale: { near: 2.5, alone: 0.12, support: 0.04, supportMost: 0.12, worthLeast: 0.5, worthMost: 3, formed: 0.1, formedMost: 0.4, fallen: 0.12, fallenMost: 0.36, fallenWithin: 6, fallenFor: 8, shock: 0.4, shockFull: 0.3, shockFor: 10, hesitate: { range: 0.8, pressure: 0.8, tempo: 2 }, discipline: 0.6, breakLater: 0.6 },
   // Adrenaline 0..1: a surge on knocking a man down (`knockdown`) or on a
   // very hard blow survived (`hardHit` per unit of severity over `hardFrom`),
   // fading with `halfLife` s; how much a body surges depends on age, size
@@ -1135,28 +1192,59 @@ function crawlOnBrokenLimb(world, fighter, dt) {
 }
 
 /**
- * Each side's state for the rout (world.sides): its men at the start, the
- * share lost (out, crawling off, broken or fled), where the broken stand,
+ * How much fight there is in a man, as another sizes him up (AI.strength):
+ * his weapon's harm and reach, his armour, a horse under him, his training,
+ * his strength, and the state he is in now. 1 for a bare-handed, unarmoured,
+ * fit, ordinary man on foot. Nothing to fear in a man out of the fight.
+ */
+export function strengthOf(fighter) {
+  if (!inFight(fighter)) return 0;
+  const spec = AI.strength;
+  const { protection } = fighter.body.gear;
+  const armour = ((protection.blunt ?? 0) + (protection.cut ?? 0) + (protection.pierce ?? 0)) / 3;
+  const reach = Math.max(0, reachOf(fighter) - fighter.body.reach);
+  let strength = lethality(fighter) ** spec.weapon * (1 + spec.reach * reach) * (1 + spec.armour * armour);
+  strength *= (fighter.mount ? spec.mounted : 1) * Math.max(0.2, 1 + spec.skill * ((fighter.body.skill ?? 0.5) - 0.5));
+  strength *= (fighter.body.muscleKg / spec.muscleKg) ** spec.size * (1 - spec.hurt * hurtShare(fighter));
+  if (fighter.panicked) strength *= spec.broken;
+  else if (fighter.state !== 'up' || fighter.crawling) strength *= spec.down;
+  return strength;
+}
+
+/** A man's strength as of this think (kept by keepSides), or reckoned now. */
+const strengthNow = (fighter) => fighter.aiStrength ?? strengthOf(fighter);
+
+/**
+ * Each side's state for the rout (world.sides): its men at the start, what
+ * they were worth (each man's strength as he came to the field), the share
+ * of that lost (out, crawling off, broken or fled), where the broken stand,
  * and the way to its rear (away from the other side, as they stood at the start).
  */
 function keepSides(world) {
   const sides = (world.sides ??= {});
+  for (const fighter of world.fighters) {
+    fighter.aiStrength = strengthOf(fighter);
+    // What he was worth to his side, fresh: who he was (his arms, his kit, his horse), not how he fares.
+    if (fighter.aiWorth === undefined && fighter.aiStrength > 0) fighter.aiWorth = fighter.aiStrength;
+  }
   for (const corner of ['red', 'blue']) {
     const men = world.fighters.filter((fighter) => fighter.corner === corner);
     if (!men.length) continue;
     const side = (sides[corner] ??= { men: men.length, rear: null });
-    // A man gone counts whole; one broken but still on the field, half (he may yet rally).
-    const gone = men.filter((fighter) => !inFight(fighter)).length;
-    const broken = men.filter((fighter) => inFight(fighter) && fighter.panicked).length;
-    side.lost = (gone + 0.5 * broken) / side.men;
+    side.worth = men.reduce((sum, fighter) => sum + (fighter.aiWorth ?? 1), 0);
+    // A man gone counts whole; one broken but still on the field, half (he may yet rally); each by what he was worth.
+    const lost = men.reduce((sum, fighter) => sum + (fighter.aiWorth ?? 1) * (!inFight(fighter) ? 1 : fighter.panicked ? 0.5 : 0), 0);
+    side.lost = lost / side.worth;
     // How much of it went in the last few seconds (AI.morale shock): kept as a short history.
     side.history = (side.history ?? []).filter((entry) => world.time - entry[0] <= AI.morale.shockFor);
     side.history.push([world.time, side.lost]);
     side.shock = Math.max(0, side.lost - side.history[0][1]);
     side.broken = men.filter((fighter) => fighter.panicked && inFight(fighter)).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
-    // Where his own fell (out, or crawling off), and when: seen by the men near him for a while (AI.morale).
+    // Where his own fell (out, or crawling off), and when, and what each was worth against the side's average: seen by the men near him for a while (AI.morale).
     for (const fighter of men) if (fighter.goneAt === undefined && !inFight(fighter) && !fighter.fled) fighter.goneAt = world.time;
-    side.fallen = men.filter((fighter) => fighter.goneAt !== undefined && world.time - fighter.goneAt < AI.morale.fallenFor).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
+    const average = side.worth / men.length;
+    const worth = (fighter) => Math.max(AI.morale.worthLeast, Math.min(AI.morale.worthMost, (fighter.aiWorth ?? average) / average));
+    side.fallen = men.filter((fighter) => fighter.goneAt !== undefined && world.time - fighter.goneAt < AI.morale.fallenFor).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2], worth(fighter)]);
   }
   for (const [corner, other] of [['red', 'blue'], ['blue', 'red']]) {
     if (!sides[corner] || !sides[other] || sides[corner].rear) continue;
@@ -1170,24 +1258,44 @@ function keepSides(world) {
   }
 }
 
+/**
+ * The runners of his own he sees, 0.. (AI.rout): each broken man within
+ * `within` m, in full within `close` m and fading beyond; one well behind
+ * him (by his side's front) hardly. `within` overrides how far he looks.
+ */
+export function runnersSeen(world, fighter, within = AI.rout.within) {
+  const spec = AI.rout;
+  const side = world.sides?.[fighter.corner];
+  if (!side?.broken?.length) return 0;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  const front = side.rear ? [-side.rear[0], -side.rear[1]] : null;
+  let seen = 0;
+  for (const other of side.broken) {
+    const off = [other[0] - at[0], other[1] - at[1]];
+    const apart = Math.hypot(off[0], off[1]);
+    // (Himself, if he is one of them.)
+    if (apart < 1e-6 || apart > within) continue;
+    const near = apart <= spec.close ? 1 : 1 - (apart - spec.close) / (within - spec.close);
+    const behind = front && off[0] * front[0] + off[1] * front[1] < -spec.behindFrom;
+    seen += near * (behind ? spec.behind : 1);
+  }
+  return seen;
+}
+
 /** Fear from how his side goes: its losses, and his own broken near him. Only in a side big enough. */
 export function routFear(world, fighter) {
   const spec = AI.rout;
   const side = world.sides?.[fighter.corner];
   if (!side || side.men < spec.minSide) return 0;
   const losses = spec.losses * Math.max(0, Math.min(1, (side.lost - spec.lossesFrom) / (spec.lossesFull - spec.lossesFrom)));
-  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
-  let near = 0;
-  for (const other of side.broken) if (Math.hypot(other[0] - at[0], other[1] - at[1]) < spec.within) near += 1;
-  if (fighter.panicked) near -= 1;
   const shock = AI.morale.shock * Math.min(1, (side.shock ?? 0) / AI.morale.shockFull);
-  return losses + shock + Math.min(spec.contagionMost, spec.contagion * Math.max(0, near));
+  return losses + shock + Math.min(spec.contagionMost, spec.contagion * runnersSeen(world, fighter));
 }
 
 /**
- * Fear from the men round him (AI.morale): alone or among his own, outnumbered
- * where he stands, before a drilled body of theirs, his own falling beside him;
- * in a battle (a side of rout.minSide or more). Not his side's whole state
+ * Fear from the men round him (AI.morale): alone or among his own, before a
+ * drilled body of theirs, his own falling beside him (the best of them the
+ * most); in a battle (a side of rout.minSide or more). Not his side's whole state
  * (routFear's losses) but what he sees within a few strides.
  */
 export function companyFear(world, fighter) {
@@ -1196,24 +1304,54 @@ export function companyFear(world, fighter) {
   if (!side || side.men < AI.rout.minSide) return 0;
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   let friends = 0;
-  let enemies = 0;
   let formed = 0;
   for (const other of world.fighters) {
     if (other === fighter || other.state !== 'up' || other.crawling || other.fled || other.dormant) continue;
     if (Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[1]) > spec.near) continue;
     if (other.corner === fighter.corner) friends += other.panicked ? 0 : 1;
-    else if (hostile(other, fighter) && !other.panicked) {
-      enemies += 1;
-      if (other.slot && world.formations?.[other.formation]) formed += 1;
-    }
+    // Men in their places in a drilled body before him: a wall of them that does not give way.
+    else if (hostile(other, fighter) && !other.panicked && other.slot && world.formations?.[other.formation]) formed += 1;
   }
   let fear = friends ? -Math.min(spec.supportMost, spec.support * friends) : spec.alone;
-  fear += Math.min(spec.outnumberedMost, spec.outnumbered * Math.max(0, enemies - friends - 1));
-  // Men in their places in a drilled body before him: a wall of them that does not give way.
   fear += Math.min(spec.formedMost, spec.formed * formed);
   let fallen = 0;
-  for (const where of side.fallen ?? []) if (Math.hypot(where[0] - at[0], where[1] - at[1]) < spec.fallenWithin) fallen += 1;
+  for (const [x, z, worth = 1] of side.fallen ?? []) if (Math.hypot(x - at[0], z - at[1]) < spec.fallenWithin) fallen += worth;
   return fear + Math.min(spec.fallenMost, spec.fallen * fallen);
+}
+
+/**
+ * Perceived relative strength (AI.standing), −steady..fear: the knot of
+ * enemies round the nearest of them against himself and his own round him,
+ * each man by strengthOf; felt the more the nearer they are. Near even,
+ * nothing; much stronger than us, fear; much weaker, steadiness. The same in
+ * a duel, one against many and a battle.
+ */
+export function standingFear(world, fighter) {
+  const spec = AI.standing;
+  const where = (other) => [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]];
+  const at = where(fighter);
+  const enemies = world.fighters.filter((other) => hostile(other, fighter) && !other.dormant && inFight(other));
+  let nearest = null;
+  let nearestApart = Infinity;
+  for (const enemy of enemies) {
+    const apart = Math.hypot(where(enemy)[0] - at[0], where(enemy)[1] - at[1]);
+    if (apart < nearestApart) [nearest, nearestApart] = [enemy, apart];
+  }
+  if (!nearest || nearestApart >= spec.sight) return 0;
+  const middle = where(nearest);
+  const weight = (other, from) => {
+    const apart = Math.hypot(where(other)[0] - from[0], where(other)[1] - from[1]);
+    return Math.max(0, Math.min(1, 1 - (apart - spec.group) / spec.groupFade));
+  };
+  let ours = strengthNow(fighter);
+  for (const other of world.fighters) if (other !== fighter && other.corner === fighter.corner && !other.dormant) ours += weight(other, at) * strengthNow(other);
+  let theirs = 0;
+  for (const enemy of enemies) theirs += weight(enemy, middle) * strengthNow(enemy);
+  if (!theirs || !ours) return 0;
+  const gap = Math.log(theirs / ours);
+  const past = (value) => Math.max(0, Math.min(1, (value - spec.parity) / spec.span));
+  const coming = Math.min(1, 1 - (nearestApart - spec.near) / (spec.sight - spec.near));
+  return coming * (spec.fear * past(gap) - spec.steady * past(-gap));
 }
 
 /** His side's discipline, 0..1 (world.discipline, set by the level's order for each side). */
@@ -1270,7 +1408,8 @@ const ringBout = (world, fighter, opponent) => Boolean(world.arena.ring) && !fig
 
 /**
  * What he fears now, 0..1: being outmatched (`nerve` −1..1: size, strength,
- * skill; `dread`: the weapon), being hurt and broken, his side's state; all
+ * skill; `dread`: the weapon), being hurt and broken, his side's state, the
+ * strength of the men before him against his own round him (standingFear); all
  * multiplied by how outmatched he is, damped by armour, by adrenaline (most
  * in an even fight) and by the ring.
  */
@@ -1281,7 +1420,7 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
   const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
   const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
-  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter);
+  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter);
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
   const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);
@@ -1299,6 +1438,12 @@ export function fearTarget(world, fighter, nerve, opponent) {
  */
 function feelFear(world, fighter, nerve, dt, opponent = null) {
   const spec = AI.panic;
+  // A machine (`gear.machine`: a robot) has no morale: it is never afraid and never runs; it fights until it is destroyed.
+  if (fighter.body.gear.machine) {
+    fighter.fear = 0;
+    fighter.panicked = false;
+    return;
+  }
   fighter.adrenaline = (fighter.adrenaline ?? 0) * 0.5 ** (dt / AI.adrenaline.halfLife);
   const target = fearTarget(world, fighter, nerve, opponent);
   fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
@@ -1308,7 +1453,7 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
   const shaky = Math.max(spec.breakAtLeast, spec.breakAt - spec.brokeBefore * (fighter.panics ?? 0));
   const breakAt = shaky + (1 - shaky) * AI.morale.breakLater * disciplineOf(world, fighter);
   if (!fighter.panicked) {
-    if (fighter.fear > breakAt && !held && world.random() < spec.rate * ((fighter.fear - breakAt) / (1 - breakAt)) * dt) {
+    if (!held && (breaks(world, fighter, breakAt, dt) || followsRunners(world, fighter, dt))) {
       fighter.panicked = true;
       fighter.panics = (fighter.panics ?? 0) + 1;
       fighter.calmFor = 0;
@@ -1336,6 +1481,31 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
     fighter.panicked = false;
     world.events.push({ time: world.time, kind: 'rally', fighter: fighter.id, effects: [held ? 'adrenaline: fights on' : 'steadies'] });
   }
+}
+
+/** Past his breaking point, whether he breaks this step: the further past it, the likelier (AI.panic `rate` a second at full fear). */
+function breaks(world, fighter, breakAt, dt) {
+  return fighter.fear > breakAt && world.random() < AI.panic.rate * ((fighter.fear - breakAt) / (1 - breakAt)) * dt;
+}
+
+/**
+ * How readily he goes with the runners beside him, a chance a second (AI.rout
+ * `follow`): for each of his own broken within `beside` m (seen as
+ * runnersSeen sees them), as afraid as he is past `from`, less his side's
+ * discipline. In a battle only (a side of rout.minSide or more).
+ */
+export function followRate(world, fighter) {
+  const spec = AI.rout.follow;
+  if ((world.sides?.[fighter.corner]?.men ?? 0) < AI.rout.minSide || (fighter.fear ?? 0) <= spec.from) return 0;
+  const runners = Math.min(spec.followMost, runnersSeen(world, fighter, spec.beside));
+  const afraid = (fighter.fear - spec.from) / (1 - spec.from);
+  return spec.rate * runners * afraid * (1 - spec.discipline * disciplineOf(world, fighter));
+}
+
+/** Whether he goes with the runners beside him this step (followRate). */
+function followsRunners(world, fighter, dt) {
+  const rate = followRate(world, fighter);
+  return rate > 0 && world.random() < rate * dt;
 }
 
 /** Passive: get away from whoever is nearest, covering up when one swings. */
