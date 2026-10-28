@@ -33,17 +33,19 @@ import { vec, yawRotate } from './pose.js';
  *   gun from the saddle rides round its man, `gunRadius` m off); from further than
  *   `approach` rings off he rides in on a line that will pass his man on his left.
  *   He looses at a man within `range` m (Mongol and Parthian practice: aimed shots
- *   inside fifty or sixty metres; the floor is smaller) who is within his bow arm's
- *   sweep: on the bow side as far round as his shoulders turn off the horse's line
+ *   inside fifty or sixty metres) who is within his bow arm's sweep: on the bow
+ *   side as far round as his shoulders turn off the horse's line
  *   (WORLD.mount.twist) and `arc.left` further with the arm, on the off side only
  *   `arc.right` off the horse's line; never past a friend within `friend` m of the
- *   line, nor past the mark within `beyond` m (a miss flies on). He never lets heavier men come to him: an enemy rider within `wary.horse` m
- *   closing faster than `closing` m/s, or a man on foot within `wary.foot` m, and he
- *   gallops away from them (the ground's edge, within `wall` m, pushing him back
- *   along it), for `away` s at least and until they are `clear` m further off; then he
- *   wheels and comes back to shoot. His quiver counted (a kit's `quiver`) and empty,
- *   with his side's train on the field, he rides back to it and is given a fresh
- *   one there (`resupply`: within `radius` m of it, `seconds` s to take it).
+ *   line, nor past the mark within `beyond` m (a miss flies on). He never lets
+ *   heavier men come to him: an enemy rider within `wary.horse` m closing faster
+ *   than `closing` m/s, or a man on foot within `wary.foot` m, and he gallops away
+ *   from them (the ground's edge, within `wall` m, pushing him back along it; his
+ *   own side's horses within `crowd` m pushing him off them), for `away` s at least
+ *   and until they are `clear` m further off; then he wheels and comes back to
+ *   shoot. His quiver counted (a kit's `quiver`) and empty, with his side's train
+ *   on the field, he rides back to it and is given a fresh one there (`resupply`:
+ *   the last `near` m at a trot; within `radius` m of it, `seconds` s to take it).
  * - melee: two riders within `within` m closing slower than `closing` m/s
  *   fight beside each other: he rides to his man's side, at his pace and
  *   up to `closeIn` m/s more per m he is off it (`slowest` at least while he is
@@ -90,7 +92,7 @@ export const RIDING = {
     wary: { horse: 20, foot: 8 }, closing: 1.5, clear: 8, away: 2.5, wall: 10, crowd: 8, crowdPush: 0.8,
     arc: { left: 0.35, right: 0.5 },
     friend: 2.2, beyond: 15,
-    resupply: { radius: 3, seconds: 6 },
+    resupply: { radius: 3, near: 15, seconds: 6 },
   },
   melee: { within: 4, closing: 4, slowest: 1.5, closeIn: 1.5, still: 2, standing: 0.5, reroll: 3 },
   brace: { length: 1.8 },
@@ -671,7 +673,9 @@ function resupply(world, fighter, setGoal, dt) {
   }
   if (there.distance > spec.resupply.radius) {
     fighter.refilling = 0;
-    setGoal(there.heading, there.distance > 12 ? horse.paces.gallop : horse.paces.trot);
+    // (The last stretch at a trot straight in: the train stands near the floor's end, where a rider would otherwise be turned back off it.)
+    if (there.distance > spec.resupply.near) setGoal(there.heading, horse.paces.gallop);
+    else horse.goal = { heading: there.heading, speed: horse.paces.trot };
     return;
   }
   setGoal(horse.yaw, 0);

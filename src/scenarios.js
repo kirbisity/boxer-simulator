@@ -362,7 +362,7 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true }
 // A mass of horse archers as it comes onto the field: open order, a horse's length and more between
 // riders (m) and between their rows, each a little off his place; packed closer, the first wheel throws
 // them into each other.
-const RIDERS_LOOSE = { spacing: 5, rowSpacing: 6, loose: 1.2 };
+const RIDERS_LOOSE = { spacing: 5, rowSpacing: 6, loose: 0.9 };
 
 /**
  * Places in a block (`layout` entries, [back, across]: m behind the front, m
@@ -428,17 +428,18 @@ const MOBEI = {
 // 36–41): a bloody day without a rout, held by the Romans and Goths. Here: the
 // late Roman foot in mail with the oval shield and spear, holding (their kit's
 // drill), the Visigoths beside them, and a troop of Visigoth horse on the flank;
-// against Hun horse archers and a few of Attila's nobles, and Ostrogoth and Gepid
-// foot behind them.
+// against Hun horse archers and a few of Attila's nobles, and behind them the
+// greater part of his army, the Ostrogoth and Gepid foot (Jordanes has the subject
+// peoples on both wings and the Huns, the smaller part, in the centre).
 const CATALAUNIAN = {
   // The Roman foot (spear and spatha), and its archers on its flank (sagittarii: the late Roman army shot the
   // composite bow it had taken from the steppe).
   romans: { spearOval: 12, spathaOval: 6 },
-  archers: { steppeBow: 6 },
-  visigoths: { spearRound: 10, spathaRound: 8 },
+  archers: { steppeBow: 8 },
+  visigoths: { spearRound: 9, spathaRound: 7 },
   visigothHorse: { spear: 4, spatha: 4 },
-  huns: { rider: { steppeBow: 30 }, noble: { steppeBow: 3, spatha: 3 } },
-  germans: { spearRound: 8, spathaRound: 6 },
+  huns: { rider: { steppeBow: 12 }, noble: { steppeBow: 2, spatha: 2 } },
+  germans: { spearRound: 20, spathaRound: 14 },
   arena: { halfX: 58, halfZ: 38 },
   front: 20,
 };
@@ -456,7 +457,7 @@ const CATALAUNIAN = {
 const CARRHAE = {
   legionaries: 44,
   gauls: { spear: 4, longsword: 2 },
-  parthians: { archer: { steppeBow: 24 }, cataphract: { kontos: 6 } },
+  parthians: { archer: { steppeBow: 24 }, cataphract: { kontos: 3 } },
   arena: { halfX: 60, halfZ: 40 },
   // The square two deep: a ring of eight a side and, two metres within it, one of five; a pace and a quarter apart (the scutum's width and an elbow's room).
   square: { sides: [8, 5], spacing: 1.25 },
@@ -466,6 +467,10 @@ const CARRHAE = {
   parthianFront: 24,
   // The camels this far (m) in from the Parthians' end of the floor (on its middle line).
   train: { back: 3 },
+  // The horse held: Publius's Gauls on the square's flanks, Surena's cataphracts (only they: `styles`) behind his
+  // archers' flanks; each goes when the other side's horse comes near it or it is struck (formation.js WINGS alarm),
+  // and not before `by` s otherwise: Surena kept his heavy horse for the Romans who came out of the square.
+  wings: { red: { back: 0, by: 120 }, blue: { styles: ['kontos'], back: 2, by: 120 } },
 };
 
 // Koxinga's army is given no discipline of its own: what holds it on the sand is what the men see
@@ -805,16 +810,16 @@ export const SCENARIOS = {
   carrhae: {
     title: 'Carrhae',
     place: 'The plain by Harran, Mesopotamia · June 53 BC',
-    blurb: "Crassus's legion stands in a square under a sky of arrows. Forty-four legionaries of the Republic in mail and bronze, shields locked, and six of Publius Crassus's Gallic horse; round them ride twenty-four Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and six cataphracts, man and horse in iron scale, waiting for anyone who breaks out.",
+    blurb: "Crassus's legion stands in a square under a sky of arrows. Forty-four legionaries of the Republic in mail and bronze, shields locked, and six of Publius Crassus's Gallic horse; round them ride twenty-four Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and three cataphracts, man and horse in iron scale, held back for anyone who breaks out.",
     scene: 'carrhae',
     arena: CARRHAE.arena,
     spread: 1,
     camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
-    roster: 'Forty-four legionaries and six Gallic horse · twenty-four horse archers and six cataphracts',
+    roster: 'Forty-four legionaries and six Gallic horse · twenty-four horse archers and three cataphracts',
     formation: {
       // The square stands (`drill`: over the legion's own, which walks up to the enemy), its outer ring facing out every way, shields a wall, the inner ring's a roof (formation.js).
-      red: { front: CARRHAE.romanFront, facing: 'ahead', layout: hollowSquare(CARRHAE.square), spacing: CARRHAE.square.spacing, perRow: CARRHAE.square.sides[0], loose: 0.05, drill: CARRHAE.drill, wings: { back: 0 } },
-      blue: { front: CARRHAE.parthianFront, spacing: RIDERS_LOOSE.spacing, rowSpacing: RIDERS_LOOSE.rowSpacing, perRow: 8, loose: RIDERS_LOOSE.loose, train: CARRHAE.train },
+      red: { front: CARRHAE.romanFront, facing: 'ahead', layout: hollowSquare(CARRHAE.square), spacing: CARRHAE.square.spacing, perRow: CARRHAE.square.sides[0], loose: 0.05, drill: CARRHAE.drill, wings: CARRHAE.wings.red },
+      blue: { front: CARRHAE.parthianFront, spacing: RIDERS_LOOSE.spacing, rowSpacing: RIDERS_LOOSE.rowSpacing, perRow: 8, loose: RIDERS_LOOSE.loose, train: CARRHAE.train, wings: CARRHAE.wings.blue },
     },
     cast: (random) => {
       const parthians = [...company(CARRHAE.parthians.archer, (style) => parthianRider(random, style, 'archer')), ...company(CARRHAE.parthians.cataphract, (style) => parthianRider(random, style, 'cataphract'))];
@@ -830,12 +835,12 @@ export const SCENARIOS = {
   catalaunian: {
     title: 'The Catalaunian Plains',
     place: 'Champagne, Gaul · 20 June 451',
-    blurb: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Eighteen Roman foot in mail with oval shields and spears, and six Roman archers on their flank, hold the line beside eighteen Visigoths, eight Visigoth horse on the flank; thirty-six Huns ride in shooting — horse archers and a few of Attila's nobles — with fourteen Ostrogoths and Gepids on foot behind them.",
+    blurb: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Eighteen Roman foot in mail with oval shields and spears, and eight Roman archers on their flank, hold the line beside sixteen Visigoths, eight Visigoth horse on the flank; sixteen Huns ride round them shooting — horse archers and a few of Attila's nobles — and thirty-four Ostrogoths and Gepids, Attila's subject peoples, come on behind them on foot.",
     scene: 'catalaunian',
     arena: CATALAUNIAN.arena,
     spread: 1,
     camera: { yaw: -0.5, pitch: 0.42, distance: 40, maxDistance: 60 },
-    roster: 'Twenty-four Romans (six of them archers), eighteen Visigoths and eight Visigoth horse · thirty-six Huns on horse, fourteen Ostrogoths and Gepids',
+    roster: 'Twenty-six Romans (eight of them archers), sixteen Visigoths and eight Visigoth horse · sixteen Huns on horse, thirty-four Ostrogoths and Gepids',
     // The Romans and the Visigoths side by side, three deep, the Visigoth horse on the Goths' flank; the Huns in a loose mass of riders, their Germans behind.
     formation: {
       red: {

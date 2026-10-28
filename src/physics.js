@@ -1418,7 +1418,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     // `wings`: the riders stand on the flanks of the line, held, not in its rows (formation.js placeWings).
     // An army set up by the player (`placed`: muster.js) has a place in its `layout` for every man, riders
     // too: they wait where he put them, held all the same.
-    const riders = order?.wings ? everyone.filter((fighter) => riding(fighter.body.inputs)) : [];
+    // (A wing of some of its riders only, `wings.styles`: Surena's cataphracts held back while his horse archers ride and shoot.)
+    const riders = order?.wings ? everyone.filter((fighter) => riding(fighter.body.inputs) && (!order.wings.styles || order.wings.styles.includes(fighter.body.inputs.style))) : [];
     const team = riders.length && !order.placed ? everyone.filter((fighter) => !riders.includes(fighter)) : everyone;
     // With riders in the fight, every team lines up at the charging distance: the foot in rows, the riders on their flanks.
     if (mounted && !order) {

@@ -1737,18 +1737,19 @@ STYLES.armingBuckler = {
 };
 
 // ---- Late antiquity: the late Roman foot and the Goths of 451, the Parthian cataphract ----
+// (The battles' own, `hidden` from the builder's pick until each has a character of its own in PRESETS.)
 // The spatha alone, cut and thrust as the arming sword is (the sidearm drawn; a horseman's sword).
-STYLES.spatha = { ...STYLES.joan, label: 'Spatha', weapon: 'spatha' };
+STYLES.spatha = { ...STYLES.joan, label: 'Spatha', weapon: 'spatha', hidden: true };
 // The late Roman infantryman's way: the spear (hasta) overhand over the rim of the big oval shield, the
 // shield square before him (Vegetius; the foulkon of the Strategikon); losing the spear, the spatha (his kit's).
-STYLES.spearOval = { ...STYLES.hoplomachus, label: 'Spear and oval shield', shield: 'oval', fallback: 'mix', shieldGuard: [0.32, 0.6, 0.08] };
-STYLES.spathaOval = { ...STYLES.templar, label: 'Spatha and oval shield', weapon: 'spatha', shield: 'oval' };
+STYLES.spearOval = { ...STYLES.hoplomachus, label: 'Spear and oval shield', hidden: true, shield: 'oval', fallback: 'mix', shieldGuard: [0.32, 0.6, 0.08] };
+STYLES.spathaOval = { ...STYLES.templar, label: 'Spatha and oval shield', hidden: true, weapon: 'spatha', shield: 'oval' };
 // The Goths' the same with the round shield of planks.
-STYLES.spearRound = { ...STYLES.hoplomachus, label: 'Spear and round shield', shield: 'germanic', fallback: 'mix' };
-STYLES.spathaRound = { ...STYLES.templar, label: 'Spatha and round shield', weapon: 'spatha', shield: 'germanic' };
+STYLES.spearRound = { ...STYLES.hoplomachus, label: 'Spear and round shield', hidden: true, shield: 'germanic', fallback: 'mix' };
+STYLES.spathaRound = { ...STYLES.templar, label: 'Spatha and round shield', hidden: true, weapon: 'spatha', shield: 'germanic' };
 // The cataphract's kontos: the lance's charge (one charge with the point driven home, the horse's weight
 // behind it, then the sword), with the longer, two-handed pike of the Parthian and Sarmatian horse.
-STYLES.kontos = { ...STYLES.lance, label: 'Kontos', weapon: 'kontos' };
+STYLES.kontos = { ...STYLES.lance, label: 'Kontos', weapon: 'kontos', hidden: true };
 
 /** Styles a player can pick (a fallback such as the drawn gladius is not one). */
 export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden);

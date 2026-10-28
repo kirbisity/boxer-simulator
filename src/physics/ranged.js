@@ -214,6 +214,11 @@ export function drawBow(world, fighter, punch, target, intent) {
  */
 export function loose(world, fighter, bolt = null) {
   const punch = fighter.punch;
+  // A counted quiver already empty (a bow taken up again off the floor): there is no arrow to nock.
+  if (!bolt && fighter.body.gear.quiver && (fighter.arrows ?? fighter.body.gear.quiver) <= 0) {
+    fighter.weapon.spent = true;
+    return;
+  }
   // Arrows (and bolts) loosed this bout: a volley style counts them (ranged.volley).
   fighter.loosed = (fighter.loosed ?? 0) + 1;
   const weapon = fighter.weapon;
