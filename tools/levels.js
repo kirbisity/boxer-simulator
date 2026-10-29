@@ -39,6 +39,9 @@ export function levelBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
     for (const fighter of world.fighters) if (fighter.panicked) broke.add(fighter.id);
   }
   const killed = new Set(world.events.filter((event) => event.kind === 'killed' || event.kind === 'bledOut').map((event) => event.fighter));
+  // Broken in the rout (ai.js AI.rout): who went down to crawl, and each time one came back to the fight.
+  const crawled = new Set(world.events.filter((event) => event.kind === 'crawl' && event.effects[0] === 'crawls away in the rout').map((event) => event.fighter));
+  const rallies = world.events.filter((event) => event.kind === 'rally' && event.effects[0] === 'comes back to the fight').map((event) => event.fighter);
   const tally = {};
   for (const corner of ['red', 'blue']) {
     const men = world.fighters.filter((fighter) => fighter.corner === corner);
@@ -48,6 +51,10 @@ export function levelBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
       down: men.filter((fighter) => fighter.state === 'out' && !fighter.fled).length,
       broke: men.filter((fighter) => broke.has(fighter.id)).length,
       fled: men.filter((fighter) => fighter.fled).length,
+      crawled: men.filter((fighter) => crawled.has(fighter.id)).length,
+      // Still on his knees, crawling off, at the end: out of the fight, though neither down nor fled.
+      crawling: men.filter((fighter) => fighter.crawling && fighter.state !== 'out' && !fighter.fled).length,
+      rallied: rallies.filter((id) => world.fighters[id].corner === corner).length,
       standing: men.filter((fighter) => inFight(fighter) && !fighter.panicked).length,
     };
   }
@@ -58,7 +65,7 @@ export function levelBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
 export function levelOutcomes(key, { seeds = 12, firstSeed = 1, seconds = 180 } = {}) {
   const battles = Array.from({ length: seeds }, (_, index) => levelBattle(key, { seed: firstSeed + index, seconds }));
   const mean = (pick) => battles.reduce((sum, battle) => sum + pick(battle), 0) / battles.length;
-  const side = (corner) => Object.fromEntries(['men', 'killed', 'down', 'broke', 'fled', 'standing'].map((field) => [field, mean((battle) => battle[corner][field])]));
+  const side = (corner) => Object.fromEntries(['men', 'killed', 'down', 'broke', 'fled', 'crawled', 'rallied', 'standing'].map((field) => [field, mean((battle) => battle[corner][field])]));
   const wins = { red: battles.filter((battle) => battle.winner === 'red').length, blue: battles.filter((battle) => battle.winner === 'blue').length };
   return { key, seeds, wins, seconds: mean((battle) => battle.seconds), red: side('red'), blue: side('blue'), battles };
 }
@@ -85,10 +92,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const seconds = Number(process.argv[4] ?? 180);
   const firstSeed = Number(process.argv[5] ?? 1);
   const figure = (value) => value.toFixed(1).padStart(5);
-  const side = (s) => `${figure(s.men)} men: killed ${figure(s.killed)} down ${figure(s.down)} broke ${figure(s.broke)} fled ${figure(s.fled)} standing ${figure(s.standing)}`;
+  const side = (s) => `${figure(s.men)} men: killed ${figure(s.killed)} down ${figure(s.down)} broke ${figure(s.broke)} fled ${figure(s.fled)} crawled ${figure(s.crawled)} rallied ${figure(s.rallied)} standing ${figure(s.standing)}`;
   for (const key of keys) {
     const row = levelOutcomes(key, { seeds, firstSeed, seconds });
     console.log(`${key.padEnd(10)} ${seeds} seeds ${figure(row.seconds)} s  wins red ${row.wins.red} blue ${row.wins.blue} | red ${side(row.red)} | blue ${side(row.blue)}`);
-    if (process.env.EACH) for (const battle of row.battles) console.log(`  seed ${battle.seed}: ${battle.winner ?? '-'} ${battle.seconds.toFixed(0)} s  red down ${battle.red.down} fled ${battle.red.fled} killed ${battle.red.killed} · blue down ${battle.blue.down} fled ${battle.blue.fled} killed ${battle.blue.killed}`);
+    if (process.env.EACH) for (const battle of row.battles) console.log(`  seed ${battle.seed}: ${battle.winner ?? '-'} ${battle.seconds.toFixed(0)} s  red down ${battle.red.down} fled ${battle.red.fled} crawled ${battle.red.crawled} rallied ${battle.red.rallied} killed ${battle.red.killed} · blue down ${battle.blue.down} fled ${battle.blue.fled} crawled ${battle.blue.crawled} rallied ${battle.blue.rallied} killed ${battle.blue.killed}`);
   }
 }

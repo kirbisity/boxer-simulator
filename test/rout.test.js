@@ -44,8 +44,50 @@ test('the broken of a big losing side run for their rear and leave the field; th
   const blue = world.fighters.filter((fighter) => fighter.corner === 'blue');
   const moved = blue.map((fighter, index) => fighter.x[P.pelvis * 3] * rear[0] + fighter.x[P.pelvis * 3 + 2] * rear[1] - start[index]);
   assert.ok(moved.filter((metres) => metres > 1).length >= 3, `most ran back: ${moved.map((m) => m.toFixed(1)).join(', ')}`);
-  assert.ok(blue.some((fighter) => fighter.fled), 'some reached the edge and fled');
-  for (const fighter of blue.filter((each) => each.fled)) assert.equal(inFight(fighter), false);
+  assert.ok(blue.some((fighter) => fighter.fled || fighter.rallies), 'some reached the edge: fled, or came back');
+  for (const fighter of blue.filter((each) => each.fled)) {
+    assert.equal(inFight(fighter), false);
+    assert.equal(fighter.dormant, true, 'off the field: gone, not standing at its edge');
+  }
+});
+
+test('a broken man runs at a broken man\'s jog, not a charge; at the edge he comes back or leaves, never stands there', () => {
+  const men = (count, corner, preset) => Array.from({ length: count }, () => ({ inputs: structuredClone(PRESETS[preset]), corner }));
+  let rallied = 0;
+  let left = 0;
+  for (const seed of [5, 6]) {
+    const world = createWorld([...men(6, 'red', 'heavy'), ...men(6, 'blue', 'light')], { seed, arena: { halfX: 9, halfZ: 6 } });
+    thinkAll(world, 1 / 60);
+    const blue = world.fighters.filter((fighter) => fighter.corner === 'blue');
+    for (const man of blue) man.panicked = true;
+    thinkAll(world, 1 / 60);
+    const running = blue.filter((fighter) => fighter.panicked && fighter.goTo);
+    assert.ok(running.length && running.every((fighter) => fighter.move <= AI.rout.pace + 1e-9), 'a jog, at most rout.pace of a run');
+    for (let t = 0; t < 20; t += 0.25) advance(world, 0.25, (current, dt) => thinkAll(current, dt));
+    rallied += world.events.filter((event) => event.kind === 'rally' && event.effects[0] === 'comes back to the fight').length;
+    left += blue.filter((fighter) => fighter.fled).length;
+    for (const fighter of blue) assert.ok((fighter.rallies ?? 0) <= AI.rout.rally.most, 'comes back at most rally.most times');
+  }
+  assert.ok(rallied > 0, `some came back (${rallied})`);
+  assert.ok(left > 0, `some left the field (${left})`);
+});
+
+test('who crawls and who comes back: the hurt and spent go down; each return the less likely, none past the most', async () => {
+  const { crawlShare, rallyChance } = await import('../src/ai.js');
+  const world = duel('contender', 'contender');
+  const man = world.fighters[0];
+  man.fear = AI.panic.breakAt;
+  const fresh = crawlShare(man);
+  man.stamina = 0.1;
+  man.legDamage.l = 1e4;
+  assert.ok(crawlShare(man) > fresh + 0.3, `fresh ${fresh.toFixed(2)}, spent and lamed ${crawlShare(man).toFixed(2)}`);
+  assert.ok(crawlShare(man) <= AI.rout.crawl.most);
+  const other = world.fighters[1];
+  const first = rallyChance(other);
+  other.rallies = 1;
+  assert.ok(rallyChance(other) < first && rallyChance(other) > 0);
+  other.rallies = AI.rout.rally.most;
+  assert.equal(rallyChance(other), 0);
 });
 
 test('a broken arm can put a man on his knees, panicked or not', () => {

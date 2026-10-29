@@ -337,6 +337,15 @@ const RONIN_CHARGING = 2.5;
 const RONIN_TWO_SWORDS = 1 / 3;
 
 /**
+ * A samurai gone raiding (the wokou level's band): a man of the class in his
+ * own armour and with his own swords (sengokuWarrior), under no lord's colours
+ * (`side`: no tint, no banner), who comes on at a run as the raiders do.
+ */
+export function wokouSamurai(random = Math.random, style = 'katana', side = { tint: null, banner: null }) {
+  return { ...sengokuWarrior(random, side, style, 'samurai'), charging: RAIDER_CHARGING };
+}
+
+/**
  * A sea raider of the 1550s (wokou): Chinese (dao, spear, matchlock) or
  * Japanese (katana, naginata, bow), `people`. Most go barefoot in a robe or
  * a loincloth; some in a captured dō-maru; a few in full armour.

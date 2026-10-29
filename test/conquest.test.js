@@ -39,9 +39,10 @@ test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin amon
 test('Wokou raid: Japanese and Chinese raiders, many barefoot and unarmoured, many in a dō-maru, against a garrison with a pair of brigandine regulars among a levy', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const { OUTFITS } = await import('../src/outfits.js');
-  // Over a few casts: most raiders unarmoured, some in a piece, a few in full armour.
+  // Over a few casts: most of the sea raiders unarmoured, some in a piece, a few in full armour (the rōnin
+  // and the samurai of the class, in their own kit with the crest, apart).
   const kinds = {};
-  for (const seed of [1, 2, 3, 4, 5]) for (const fighter of SCENARIOS.wokou.cast(seededRandom(seed)).red) kinds[fighter.outfit.kind] = (kinds[fighter.outfit.kind] ?? 0) + 1;
+  for (const seed of [1, 2, 3, 4, 5]) for (const fighter of SCENARIOS.wokou.cast(seededRandom(seed)).red) if (fighter.outfit.kind !== 'ronin' && !fighter.accessories.includes('crest')) kinds[fighter.outfit.kind] = (kinds[fighter.outfit.kind] ?? 0) + 1;
   const total = Object.values(kinds).reduce((sum, count) => sum + count, 0);
   // Better armoured than a mob: under half in nothing at all, but still the largest kind.
   assert.ok(kinds.wokou / total > 0.3 && kinds.wokou / total < 0.6 && kinds.wokouArmoured > 0, JSON.stringify(kinds));

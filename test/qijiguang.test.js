@@ -15,14 +15,17 @@ import { levelBattle } from '../tools/levels.js';
 
 const count = (men, pick) => men.reduce((tally, man) => ({ ...tally, [pick(man)]: (tally[pick(man)] ?? 0) + 1 }), {});
 
-test('the wokou raiders charge with swords: katana and ōdachi, dao and spear, no guns or bows; the garrison has bows but no gun, more men than the raiders, each kind in one colour', () => {
+test('the wokou raiders are mostly Japanese and charge with swords: rōnin and samurai in front, a few Chinese at the back, no guns or bows; the garrison has bows but no gun, more men than the raiders, each kind in one colour', () => {
   const { red, blue } = SCENARIOS.wokou.cast(seededRandom(4));
   // (A rōnin may fight with two swords: nitō.)
-  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 3, katana: 6, odachi: 3, dao: 8, spear: 6 });
-  // The Japanese in the front rank, the rōnin among them.
+  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 6, katana: 8, yari: 2, odachi: 3, naginata: 1, dao: 4, spear: 2 });
+  assert.equal(red.length, 26);
+  // The Japanese in the front rank, the rōnin among them; the samurai in their armour; the Chinese (dao, spear) all in the back rows.
   const front = red.slice(0, SCENARIOS.wokou.formation.red.perRow);
   assert.ok(front.every((man) => ['katana', 'ronin', 'nito'].includes(man.style)), 'the Japanese swordsmen in front');
-  assert.equal(front.filter((man) => man.outfit.kind === 'ronin').length, 3);
+  assert.equal(front.filter((man) => man.outfit.kind === 'ronin').length, 6);
+  assert.equal(red.filter((man) => ['samurai', 'samuraiTosei'].includes(man.outfit.kind) && man.accessories.includes('crest')).length, 6, 'six samurai of the class');
+  assert.ok(red.slice(-6).every((man) => ['dao', 'spear'].includes(man.style)), 'the Chinese at the back');
   assert.ok(red.every((man) => !STYLES[man.style].ranged), 'no shooter among the raiders');
   assert.ok(red.every((man) => man.charging > 1), 'they come on at a run');
   assert.ok(blue.every((man) => !STYLES[man.style].ranged || man.style === 'bow'), 'no gun in the garrison');
@@ -74,8 +77,11 @@ test('the coast garrison is the weaker for its men: some old, some thin and unta
   assert.ok(sum(garrison) < sum(raiders), 'all of them together are worth less than the raiders');
 });
 
-test('the raiders are the same men in both wokou levels', () => {
-  for (const seed of [1, 7]) assert.deepEqual(SCENARIOS.qiJiguang.cast(seededRandom(seed)).red, SCENARIOS.wokou.cast(seededRandom(seed)).red);
+test('Qi Jiguang\'s raiders are the Taizhou band, mostly Chinese; the 1554 raid\'s mostly Japanese; drawn up alike', () => {
+  const { red } = SCENARIOS.qiJiguang.cast(seededRandom(1));
+  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 3, katana: 6, odachi: 3, dao: 8, spear: 6 });
+  const chinese = (men) => men.filter((man) => ['dao', 'spear'].includes(man.style)).length;
+  assert.ok(chinese(SCENARIOS.wokou.cast(seededRandom(1)).red) < chinese(red) / 2);
   assert.deepEqual(SCENARIOS.qiJiguang.formation.red, SCENARIOS.wokou.formation.red);
   assert.equal(SCENARIOS.qiJiguang.scene, SCENARIOS.wokou.scene);
 });
@@ -158,7 +164,9 @@ test('fought out, the garrison loses the wokou raid and Qi Jiguang\'s army wins 
   assert.equal(raid.winner, 'red');
   const qi = levelBattle('qiJiguang', { seed: 3 });
   assert.equal(qi.winner, 'blue');
-  assert.ok(qi.blue.down * 3 <= qi.red.down + qi.red.fled, `Ming down ${qi.blue.down}; raiders down ${qi.red.down}, fled ${qi.red.fled}`);
+  // The raiders lost: down, fled, or crawling off on their knees (ai.js AI.rout crawl).
+  const lost = qi.red.down + qi.red.fled + qi.red.crawling;
+  assert.ok(qi.blue.down * 3 <= lost, `Ming down ${qi.blue.down}; raiders down ${qi.red.down}, fled ${qi.red.fled}, crawling ${qi.red.crawling}`);
   assert.equal(qi.blue.fled, 0, 'none of Qi\'s men run');
 });
 
@@ -258,7 +266,7 @@ test('a wolf-brush catches a raider\'s blade and holds him off at its length, hi
   const blue = kept.map((index) => all[index]);
   const formation = { ...level.formation, blue: { ...level.formation.blue, layout: kept.map((index) => level.formation.blue.layout[index]) } };
   // Two raiders: one at a wolf-brush, the other coming on before the squads a little way off.
-  const raiders = SCENARIOS.wokou.cast(seededRandom(4)).red.filter((inputs) => inputs.style === 'katana').slice(0, 2);
+  const raiders = SCENARIOS.qiJiguang.cast(seededRandom(4)).red.filter((inputs) => inputs.style === 'katana').slice(0, 2);
   const world = createWorld([...blue.map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'blue' })), ...raiders.map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }))], { seed: 4, arena: { halfX: 18, halfZ: 9 }, formation });
   const [man, other] = world.fighters.filter((fighter) => fighter.corner === 'red');
   const brush = world.fighters.find((fighter) => fighter.style === 'langxian');

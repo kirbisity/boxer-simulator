@@ -186,9 +186,40 @@ export const AI = {
   // his neighbour does; a frightened one does), less discipline's `discipline`
   // share of it at full (Qi's law: the squad of a man who ran died with him).
   // So a weak line that starts to go, goes all at once: the domino.
+  // How the broken go (in a battle on a closed field: not level mode, whose
+  // stages have their own rout). A man who breaks goes one of two ways,
+  // decided as he breaks:
+  // - `crawl`: down on his hands and knees, crawling away (out of the fight:
+  //   a man on his knees is no longer a soldier). The chance is `share`, and
+  //   `hurt` more at full hurt (hurtShare, his legs'), `tired` more with his
+  //   stamina spent, `afraid` more as far past breaking as his fear goes, up
+  //   to `most`: the wounded and the spent go down, the merely frightened run.
+  //   A crawler who reaches the edge with nobody within `clearOf` m has
+  //   crawled off the field.
+  // - else he runs, and a broken man's flight is no charge: a stumbling jog,
+  //   looking back, at `pace` of the run he would charge at (fear takes the
+  //   legs: men who ran from a field ran badly, and were cut down from behind).
+  // `rally`: a runner who gets clear (at the field's edge, nobody within
+  // `clearOf` m) does not stand there. Often he finds his nerve and comes
+  // back: a chance of `chance`, less `hurt` of it at full hurt, `again` of
+  // that for each time he has come back already, never more than `most`
+  // times (so a battle still ends: each man comes back at most twice, and
+  // breaks the easier each time, AI.panic brokeBefore). Else he goes, off the
+  // field and out of the battle (not drawn: gone, as men who fled were).
+  // A man who comes back comes back with his fear at `nerve`, felt `steadied`
+  // less for `steadyFor` s (he has talked himself into it); and for `shaky` s
+  // he is hesitant: he goes in at `pace` of his steps and never at a run,
+  // hangs back as a man `hesitant` afraid would (morale hesitate) and covers
+  // up `guard` less (his mind is on the way out). Broken again, he runs
+  // again: scared, run, return, scared, his back to the enemy half the time —
+  // a side that has started to go fights badly, and does not stand at the
+  // edge of the field in a line doing nothing.
   rout: {
     minSide: 4, losses: 0.35, lossesFrom: 0.3, lossesFull: 0.75, contagion: 0.1, contagionMost: 0.3, within: 5, close: 1.5, behind: 0.35, behindFrom: 1, edge: 1.6, clearOf: 4,
     follow: { beside: 3, rate: 1.5, followMost: 2, from: 0.3, discipline: 0.9 },
+    pace: 0.7,
+    crawl: { share: 0.15, hurt: 0.9, tired: 0.35, afraid: 0.4, most: 0.85 },
+    rally: { chance: 0.65, hurt: 1, again: 0.5, most: 2, nerve: 0.35, steadied: 0.35, steadyFor: 8, shaky: 10, pace: 0.6, hesitant: 0.7, guard: 0.5 },
   },
   // How much fight there is in a man, as another sizes him up at a glance
   // (strengthOf): his weapon's harm, its reach, his armour, a horse under
@@ -1618,9 +1649,76 @@ export function shockFear(world, fighter) {
 /** His side's discipline, 0..1 (world.discipline, set by the level's order for each side). */
 const disciplineOf = (world, fighter) => world.discipline?.[fighter.corner] ?? 0;
 
+/** A battle on a closed field (not level mode's open stages): where the broken run, crawl, come back or leave (AI.rout). */
+const battleField = (world, fighter) => !world.arena.open && (world.sides?.[fighter.corner]?.men ?? 0) >= AI.rout.minSide;
+
+/** At the field's edge (within rout `edge` m of it). */
+function atFieldEdge(world, fighter) {
+  const { halfX, halfZ } = world.arena;
+  const edge = AI.rout.edge;
+  return Math.abs(fighter.x[P.pelvis * 3]) > halfX - edge || Math.abs(fighter.x[P.pelvis * 3 + 2]) > halfZ - edge;
+}
+
+/** How far the nearest enemy still up is (m; Infinity if none). */
+function nearestFoeAt(world, fighter) {
+  let nearest = Infinity;
+  for (const other of world.fighters) {
+    if (!foeOf(fighter, other) || other.state !== 'up') continue;
+    nearest = Math.min(nearest, Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
+  }
+  return nearest;
+}
+
+/** Off the field: out of the battle for good, and not drawn or moved (dormant, as a stage's sleeping men are). */
+function leaveField(world, fighter, how) {
+  fighter.fled = true;
+  fighter.dormant = true;
+  fighter.goTo = null;
+  fighter.move = 0;
+  fighter.running = false;
+  world.events.push({ time: world.time, kind: 'fled', fighter: fighter.id, effects: [how] });
+}
+
 /**
- * A broken man of a big side runs for its rear, off the field; once at the
- * edge with no enemy near, he has fled. True while this has him.
+ * The chance a runner who has got clear comes back (AI.rout rally): less the
+ * more he is hurt, `again` as much each time he has come back, none past `most`.
+ */
+export function rallyChance(fighter) {
+  const spec = AI.rout.rally;
+  const times = fighter.rallies ?? 0;
+  if (times >= spec.most) return 0;
+  return Math.max(0, spec.chance * (1 - spec.hurt * hurtShare(fighter)) * spec.again ** times);
+}
+
+/** He finds his nerve and goes back in, hesitant for a while (AI.rout rally). */
+function comeBack(world, fighter) {
+  const spec = AI.rout.rally;
+  fighter.panicked = false;
+  fighter.rallies = (fighter.rallies ?? 0) + 1;
+  fighter.fear = Math.min(fighter.fear ?? 0, spec.nerve);
+  fighter.calmFor = 0;
+  fighter.steadyUntil = world.time + spec.steadyFor;
+  fighter.shakyUntil = world.time + spec.shaky;
+  fighter.goTo = null;
+  world.events.push({ time: world.time, kind: 'rally', fighter: fighter.id, effects: ['comes back to the fight'] });
+}
+
+/**
+ * The chance a man breaking goes down to crawl rather than run (AI.rout
+ * crawl): the hurt, the spent and the most afraid go down. Decided once, as he breaks.
+ */
+export function crawlShare(fighter, breakAt = AI.panic.breakAt) {
+  const spec = AI.rout.crawl;
+  const hurt = Math.max(hurtShare(fighter), legShare(fighter));
+  const tired = 1 - Math.max(0, Math.min(1, fighter.stamina ?? 1));
+  const afraid = Math.max(0, Math.min(1, ((fighter.fear ?? 0) - breakAt) / Math.max(1e-6, 1 - breakAt)));
+  return Math.min(spec.most, spec.share + spec.hurt * hurt + spec.tired * tired + spec.afraid * afraid);
+}
+
+/**
+ * A broken man of a big side runs for its rear, at a broken man's pace (AI.rout
+ * `pace`). Once at the edge with no enemy near, he comes back (rallyChance) or
+ * leaves the field: never stands there. True while this has him.
  */
 function rout(world, fighter, opponent) {
   const spec = AI.rout;
@@ -1630,21 +1728,21 @@ function rout(world, fighter, opponent) {
   if (!side?.rear || side.men < spec.minSide) return false;
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   const { halfX, halfZ } = world.arena;
-  const atEdge = Math.abs(at[0]) > halfX - spec.edge || Math.abs(at[1]) > halfZ - spec.edge;
   const nearest = opponent ? Math.hypot(opponent.x[P.pelvis * 3] - at[0], opponent.x[P.pelvis * 3 + 2] - at[1]) : Infinity;
-  if (atEdge && nearest > spec.clearOf) {
-    fighter.fled = true;
-    fighter.goTo = null;
-    fighter.move = 0;
-    fighter.running = false;
-    world.events.push({ time: world.time, kind: 'fled', fighter: fighter.id, effects: ['flees the field'] });
+  if (atFieldEdge(world, fighter) && nearest > spec.clearOf) {
+    // Clear of them, the edge of the field before him: back in, or away for good.
+    if (world.random() < rallyChance(fighter)) {
+      comeBack(world, fighter);
+      return false;
+    }
+    leaveField(world, fighter, 'flees the field');
     return true;
   }
   // Pressed close, he first gets clear of the man on him.
   if (nearest < AI.passive.safeDistance) return false;
   const margin = spec.edge * 0.5;
   fighter.goTo = [Math.max(-(halfX - margin), Math.min(halfX - margin, at[0] + side.rear[0] * 30)), 0, Math.max(-(halfZ - margin), Math.min(halfZ - margin, at[1] + side.rear[1] * 30))];
-  fighter.move = 1;
+  fighter.move = spec.pace;
   fighter.running = fighter.stamina > AI.passive.runWhile;
   return true;
 }
@@ -1706,7 +1804,9 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
     return;
   }
   fighter.adrenaline = (fighter.adrenaline ?? 0) * 0.5 ** (dt / AI.adrenaline.halfLife);
-  const target = fearTarget(world, fighter, nerve, opponent);
+  // Come back from a rout, he has talked himself into it: for a while he feels it the less (AI.rout rally).
+  const steadied = world.time < (fighter.steadyUntil ?? -Infinity) ? 1 - AI.rout.rally.steadied : 1;
+  const target = fearTarget(world, fighter, nerve, opponent) * steadied;
   fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
   // Adrenaline holds him from breaking: easily in an even fight, hardly against a much deadlier man.
   const mismatch = Math.min(1, Math.max(0, -nerve) + (opponent ? weaponDread(fighter, opponent) : 0));
@@ -1723,6 +1823,10 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
       // Whatever is in his hands goes: he runs.
       if (fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
       world.events.push({ time: world.time, kind: 'panic', fighter: fighter.id, effects: ['breaks and runs'] });
+      fighter.shakyUntil = undefined;
+      fighter.steadyUntil = undefined;
+      // In a battle the hurt, the spent and the most afraid go down on their knees and crawl; the rest run (AI.rout crawl).
+      if (battleField(world, fighter) && !fighter.mount && world.random() < crawlShare(fighter, breakAt)) startCrawl(world, fighter, 'crawls away in the rout');
     }
     crawlOnBrokenLimb(world, fighter, dt);
     return;
@@ -1789,7 +1893,8 @@ function keepAway(world, fighter, opponent, dt) {
       fighter.aiEscapeAge = 0;
     }
     fighter.goTo = fighter.aiEscape;
-    fighter.move = 1;
+    // (Broken in a battle: a broken man's jog, AI.rout pace.)
+    fighter.move = fighter.panicked && battleField(world, fighter) ? AI.rout.pace : 1;
     fighter.running = fighter.stamina > AI.passive.runWhile;
   } else fighter.move = 0;
   // Hands up whenever someone swings at him.
@@ -1987,6 +2092,16 @@ function crawlTarget(world, at, away, pressed) {
 }
 
 export function think(world, fighter, dt) {
+  decide(world, fighter, dt);
+  // Come back from a rout and not yet over it: he goes in at a hesitant walk, never a run (AI.rout rally).
+  if (world.time < (fighter.shakyUntil ?? -Infinity) && !fighter.panicked && !fighter.crawling && fighter.move > 0) {
+    fighter.move *= AI.rout.rally.pace;
+    fighter.running = false;
+  }
+}
+
+/** What he does this step (think). */
+function decide(world, fighter, dt) {
   const random = world.random;
   fighter.strafe = 0;
   fighter.running = false;
@@ -1996,6 +2111,11 @@ export function think(world, fighter, dt) {
     return;
   }
   if (fighter.crawling) {
+    // Crawled to the edge of a battle's field with nobody near: off it (AI.rout crawl).
+    if (crawlingAway(fighter) && battleField(world, fighter) && atFieldEdge(world, fighter) && nearestFoeAt(world, fighter) > AI.rout.clearOf) {
+      leaveField(world, fighter, 'crawls off the field');
+      return;
+    }
     crawlAway(world, fighter, dt);
     return;
   }
@@ -2057,14 +2177,16 @@ export function think(world, fighter, dt) {
   // to cover up, readier to load up. Fear is the reverse.
   // Afraid but not broken, he hangs back: further off, slower to go in, less pressing (AI.morale hesitate).
   // In a battle (a side of rout.minSide or more): a bout's fear is its own (the ring, the duel).
-  const afraid = (world.sides?.[fighter.corner]?.men ?? 0) >= AI.rout.minSide ? fighter.fear ?? 0 : 0;
+  // Come back from a rout, he hangs back as a frightened man would, and his guard is poor (AI.rout rally).
+  const shaky = world.time < (fighter.shakyUntil ?? -Infinity);
+  const afraid = (world.sides?.[fighter.corner]?.men ?? 0) >= AI.rout.minSide ? Math.max(fighter.fear ?? 0, shaky ? AI.rout.rally.hesitant : 0) : 0;
   const hesitate = AI.morale.hesitate;
   const plan = {
     ...basePlan,
     range: basePlan.range - bold.closer * nerve + hesitate.range * afraid,
     pressure: basePlan.pressure * Math.exp(bold.pressure * nerve) * (1 - hesitate.pressure * afraid),
     tempo: basePlan.tempo * Math.exp(-bold.tempo * nerve) * (1 + hesitate.tempo * afraid),
-    defend: basePlan.defend * Math.exp(-bold.defend * nerve),
+    defend: basePlan.defend * Math.exp(-bold.defend * nerve) * (shaky ? 1 - AI.rout.rally.guard : 1),
     heavy: Math.max(0, basePlan.heavy + bold.heavy * nerve),
   };
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
