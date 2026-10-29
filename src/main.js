@@ -28,7 +28,8 @@ import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
 import { checkButtons } from './uicheck.js';
-import { battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
+import { ARMIES, battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
+import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battletally.js';
 import { leadOf, musterLevel } from './muster.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -694,7 +695,74 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', drowned: 'Lost to the sea', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
     const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
     $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
+    // A battle (more than one man on a side) ends on its summary; a duel keeps the plain banner, which says all there is.
+    const battle = ['red', 'blue'].some((corner) => state.world.fighters.filter((fighter) => fighter.corner === corner).length > 1);
+    if (battle) showSummary(state.world, winner);
+    else hideSummary();
   }
+}
+
+// ---- The end of a battle: what it came to --------------------------------------------------------
+// When the last of a side is out, the banner becomes a short account of the
+// battle: which side won, by its own name; how the other lost; the battle's
+// name and length; and for each side its men, killed, wounded, down, crawled
+// away, fled, rallied and still standing (battletally.js: the same count the
+// level tool makes). Only the rows some side has any of are shown, to keep it
+// short. It comes up a moment after the end (boxer.css: the last blow and the
+// last man falling are seen first), and a tap folds it to the banner alone,
+// so the field can be looked at again.
+
+/** A side's name: its armies' (ARMIES labels, without a muster's year: "The French"), else Red or Blue team. */
+function sideName(corner) {
+  const armies = (state.scenario && SCENARIOS[state.scenario]?.armies?.[corner]) || [];
+  const name = armies.map((key) => ARMIES[key]?.label?.replace(/, \d{3,4}$/, '')).filter(Boolean).join(' & ');
+  return name || `${corner === 'red' ? 'Red' : 'Blue'} team`;
+}
+
+/** An element with a class and its text (or children). */
+function summaryEl(tag, className, content = '') {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (typeof content === 'string') el.textContent = content;
+  else el.append(...content);
+  return el;
+}
+
+/** The banner as a battle's summary: the headline, how it went, each side's tally and a fact or two. */
+function showSummary(world, winner) {
+  const loser = winner === 'red' ? 'blue' : 'red';
+  const tally = battleTally(world);
+  const names = { red: sideName('red'), blue: sideName('blue') };
+  const title = state.scenario ? SCENARIOS[state.scenario]?.title : null;
+  $('#banner-eyebrow').textContent = [title, clock(world.time)].filter(Boolean).join(' · ');
+  $('#banner-eyebrow').hidden = false;
+  $('#banner-text').replaceChildren(summaryEl('span', `summary-winner ${winner}`, names[winner]), ' hold the field');
+  const won = (corner) => (corner === winner ? ' won' : '');
+  // The tally: each side's figures either side of the labels down the middle, the winner's column the brighter, a nought faint.
+  const cells = [summaryEl('span', `tally-side red${won('red')}`, names.red), summaryEl('span', 'tally-label', ''), summaryEl('span', `tally-side blue${won('blue')}`, names.blue)];
+  const figure = (corner, field) => summaryEl('b', `tally-figure ${corner}${won(corner)}${tally[corner][field] ? '' : ' nil'}`, String(tally[corner][field]));
+  for (const [field, label] of tallyRows(tally)) cells.push(figure('red', field), summaryEl('span', 'tally-label', label), figure('blue', field));
+  const parts = [
+    summaryEl('div', 'summary-verdict', [summaryEl('span', loser, names[loser]), ` ${howBeaten(tally[loser])}`]),
+    summaryEl('div', 'tally', cells),
+  ];
+  const facts = notableFacts(world);
+  if (facts.length) {
+    parts.push(summaryEl('div', 'summary-facts', facts.map((fact) => summaryEl('span', 'summary-fact', fact.who
+      ? [summaryEl('span', 'fact-label', fact.label), summaryEl('b', fact.who.corner, fact.name), summaryEl('b', '', String(fact.count))]
+      : [summaryEl('span', 'fact-label', fact.label), summaryEl('b', '', String(fact.count))]))));
+  }
+  $('#battle-summary').replaceChildren(...parts);
+  $('#battle-summary').hidden = false;
+  $('#banner').classList.add('summary-mode');
+  $('#banner').classList.remove('folded');
+}
+
+/** The banner back to a plain one (a duel's). */
+function hideSummary() {
+  $('#banner').classList.remove('summary-mode', 'folded');
+  $('#banner-eyebrow').hidden = true;
+  $('#battle-summary').hidden = true;
 }
 
 // ---- Level mode: what the player's systems tell the screen ---------------------------------------
@@ -1279,6 +1347,11 @@ $('#restart').addEventListener('click', () => {
   newBout();
   state.paused = false;
   $('#pause').textContent = 'Pause';
+});
+// A tap on a battle's summary (not on its buttons) folds it to the banner, to see the field; another brings it back.
+$('#banner').addEventListener('click', (event) => {
+  if (!$('#banner').classList.contains('summary-mode') || event.target.closest('button')) return;
+  $('#banner').classList.toggle('folded');
 });
 $('#banner-again').addEventListener('click', () => (state.next ? state.next.run() : newBout()));
 $('#banner-menu').addEventListener('click', () => goHome());
