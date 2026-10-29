@@ -31,6 +31,7 @@ import { checkButtons } from './uicheck.js';
 import { ARMIES, battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battletally.js';
 import { judgeBattle } from './battleend.js';
+import { createGeneralMarks } from './generalmark.js';
 import { leadOf, musterLevel } from './muster.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -160,6 +161,8 @@ const cameraRig = createCameraRig();
 
 // The marks of the player's blows in the fight (fightui/marker.js): where each goes, its way, how it went.
 const fightMarks = createFightUiMarks(scene);
+// The crown over each side's general in a battle (generalmark.js; ai.js AI.general).
+const generalMarks = createGeneralMarks(scene);
 let fightMarksClock = 0;
 
 // The player's stamina overdraft fade over the picture (overdraftview.js).
@@ -1100,6 +1103,7 @@ function drawWorld(dt, drawIt = true) {
   // The marks keep the fight's pace: slowed with it (a slow-motion moment, ¼×), still while it is paused.
   fightMarksClock += dt * (state.paused ? 0 : state.speed * paceNow());
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
+  generalMarks.update(world);
   if (drawIt) render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();
@@ -1197,6 +1201,8 @@ function logEvent(event) {
   else if (event.kind === 'loosed') return;
   else if (event.kind === 'arrow') text = `🏹 <b>${name(event.attacker)}</b> → <b>${name(event.defender)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'shot') text = `🔫 <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'generalFell') text = `👑 <b>${name(event.fighter)}</b>, the ${world.fighters[event.fighter].corner} general, has fallen`;
+  else if (event.kind === 'newGeneral') text = `👑 <b>${name(event.fighter)}</b> takes command`;
   else if (event.kind === 'panic' || event.kind === 'rally') text = `${event.kind === 'panic' ? '😱' : '🔥'} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
   else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;

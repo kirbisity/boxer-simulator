@@ -272,6 +272,26 @@ export const AI = {
   // still damp it, fearTarget). Strength, not heads, as AI.standing: a knot
   // of armoured knights is not outnumbered by a crowd of peasants twice its number.
   outnumbered: { from: 1.5, full: 3, fear: 0.45, beyond: 6, most: 0.8 },
+  // The general (keepGenerals): each side of at least `minSide` men (a
+  // company or more; a handful of men, who all see each other, fight as one
+  // knot round the standard and its leader, as before) has one man in command: the man played, while he fights (the player
+  // leads his side); else its leader (the standard's: one who led in life, or
+  // the man at its middle). His side forms on him: the rallying point the
+  // loose men keep near (AI.cohesion) is where he stands, the standard beside
+  // him; drilled men keep their places in the ranks (formation.js) and are
+  // not drawn off. When an enemy still fighting comes within `threat` m of
+  // him, the `guards` men of his own nearest him (loose men, within `guardFrom`
+  // m: his household, his retinue) go for that man first: they put themselves
+  // between him and the blow, as a lord's men did. Men within `heartWithin` m
+  // who see him still on his feet take heart, `heart` off their fear (the
+  // general in the thick of it). If he falls (out, fled, crawling off, or
+  // broken and running), his whole side feels it, `fell` and `saw` more for
+  // a man within `sawWithin` m of where he went down, fading over `fellFor`
+  // s (armies broke at the cry that the king was dead: Hastings, Bosworth);
+  // and command passes at once to the strongest man still fighting within
+  // `successorWithin` m of where he fell (strengthOf: the best-armed, the
+  // best-trained, the knight among the levies), else the nearest of them.
+  general: { minSide: 8, threat: 5, guards: 3, guardFrom: 10, heartWithin: 8, heart: 0.06, fell: 0.2, saw: 0.15, sawWithin: 10, fellFor: 8, successorWithin: 8 },
   // Morale in a battle (a side of at least `rout.minSide`): what the men
   // round a man do to his fear, whoever they are. Within `near` m of him:
   // - no man of his own standing there (`alone`): fear; each who stands
@@ -435,6 +455,7 @@ function pick(weights, random) {
 
 /** One AI decision tick for every fighter not driven by the player. */
 export function thinkAll(world, dt, playerIds = new Set()) {
+  keepGenerals(world, playerIds);
   keepLeaders(world);
   keepSides(world);
   springAmbush(world);
@@ -494,20 +515,132 @@ function keepLeaders(world) {
         if (!lying) standard.kind = null;
       }
     }
+    // The side's general (keepGenerals), while he fights: the man it forms on.
+    const general = generalOf(world, corner);
     if (!standard.kind) {
-      bearer = leader.state === 'out' ? nearestTo(side.filter((fighter) => fighter.state === 'up'), point(leader.x, P.pelvis)) ?? leader : leader;
-      if (bearer !== leader) standard.lostAt = world.time;
+      // No flag: the general is the leader; his fall is felt as a general's (generalFear), not twice.
+      bearer = general ?? (leader.state === 'out' ? nearestTo(side.filter((fighter) => fighter.state === 'up'), point(leader.x, P.pelvis)) ?? leader : leader);
+      if (bearer !== leader && !general) standard.lostAt = world.time;
     }
     if (bearer) standard.leader = bearer.id;
-    const at = bearer ? point(bearer.x, P.pelvis) : lying.x;
+    // Where they rally: the standard where it lies (taking it up comes first), else the general, the standard beside him.
+    const at = lying ? lying.x : general ? point(general.x, P.pelvis) : point(bearer.x, P.pelvis);
     // The man going for it keeps going while he can, rather than two turning back and forth.
     const able = side.filter((fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.clinch && !fighter.pin);
     const going = lying && able.find((fighter) => fighter.id === standard.taker);
     const taker = lying ? going ?? nearestTo(able, at) : null;
     standard.taker = taker?.id;
     const shaken = Boolean(lying) || world.time - (standard.lostAt ?? -Infinity) < AI.panic.leaderLostFor;
-    world.leaders[corner] = { leader: bearer, at: [at[0], at[2]], standing: side.length, lying, taker, shaken };
+    world.leaders[corner] = { leader: bearer, general, at: [at[0], at[2]], standing: side.length, lying, taker, shaken };
   }
+}
+
+/** A side's general (AI.general), if he is still fighting (stillFighting; the man played while he is in the fight); else null. */
+export function generalOf(world, corner) {
+  const id = world.generals?.[corner]?.id;
+  const general = id === null || id === undefined ? null : world.fighters[id];
+  return general && (general.player ? inFight(general) : stillFighting(general)) ? general : null;
+}
+
+/** Fallen from command: out, fled, crawling off, or broken and running (the man played never breaks: only down or gone). */
+const fallenFromCommand = (fighter) => !inFight(fighter) || fighter.crawling || (fighter.panicked && !fighter.player);
+
+/** He takes command of his side (a 'newGeneral' event, for the log). */
+function appointGeneral(world, entry, fighter, how) {
+  entry.id = fighter?.id ?? null;
+  if (fighter) world.events.push({ time: world.time, kind: 'newGeneral', fighter: fighter.id, effects: [how] });
+}
+
+/**
+ * The man who takes command where the general fell (AI.general): the
+ * strongest still fighting within `successorWithin` m, else the nearest.
+ */
+export function successorOf(world, corner, where) {
+  const spec = AI.general;
+  const able = world.fighters.filter((fighter) => fighter.corner === corner && stillFighting(fighter));
+  const apart = (fighter) => Math.hypot(fighter.x[P.pelvis * 3] - where[0], fighter.x[P.pelvis * 3 + 2] - where[1]);
+  const near = able.filter((fighter) => apart(fighter) <= spec.successorWithin);
+  if (near.length) return near.reduce((best, fighter) => (strengthNow(fighter) > strengthNow(best) ? fighter : best));
+  return able.reduce((best, fighter) => (!best || apart(fighter) < apart(best) ? fighter : best), null);
+}
+
+/**
+ * Each side's general (world.generals: { corner: { id, fellAt, fellWhere,
+ * threat, guards } }), on the sides with a standard (world.standards) of
+ * AI.general `minSide` men or more: the man played while he fights; else its leader at the
+ * start; fallen, the strongest near where he fell (successorOf). And while
+ * an enemy is upon him, the men nearest him who guard him (AI.general).
+ */
+function keepGenerals(world, playerIds) {
+  const spec = AI.general;
+  for (const corner of Object.keys(world.standards ?? {})) {
+    if ((world.sides?.[corner]?.men ?? world.fighters.filter((fighter) => fighter.corner === corner).length) < spec.minSide) continue;
+    const generals = (world.generals ??= {});
+    const entry = (generals[corner] ??= { id: world.standards[corner].leader, fellAt: null, fellWhere: null, threat: null, guards: [] });
+    const general = entry.id === null ? null : world.fighters[entry.id];
+    if (general && fallenFromCommand(general)) {
+      // Fallen: felt by his side (generalFear), and command passes.
+      entry.fellAt = world.time;
+      entry.fellWhere = [general.x[P.pelvis * 3], general.x[P.pelvis * 3 + 2]];
+      world.events.push({ time: world.time, kind: 'generalFell', fighter: general.id, effects: ['the general has fallen'] });
+      appointGeneral(world, entry, successorOf(world, corner, entry.fellWhere), 'takes command');
+    } else if (!general) {
+      // Nobody was left to take it the last time; someone may be on his feet again.
+      const successor = successorOf(world, corner, entry.fellWhere ?? [0, 0]);
+      if (successor) appointGeneral(world, entry, successor, 'takes command');
+    }
+    // The man played leads his side while he is in the fight.
+    const played = world.fighters.find((fighter) => fighter.corner === corner && playerIds.has(fighter.id) && inFight(fighter) && !fighter.crawling);
+    if (played && entry.id !== played.id) appointGeneral(world, entry, played, 'takes command');
+    // His guard: the nearest enemy still fighting within `threat` m of him, and the men nearest him to meet that man.
+    entry.threat = null;
+    entry.guards = [];
+    const now = generalOf(world, corner);
+    if (!now) continue;
+    const at = [now.x[P.pelvis * 3], now.x[P.pelvis * 3 + 2]];
+    const apart = (fighter) => Math.hypot(fighter.x[P.pelvis * 3] - at[0], fighter.x[P.pelvis * 3 + 2] - at[1]);
+    let threat = null;
+    for (const other of world.fighters) {
+      if (hostile(other, now) && !other.dormant && stillFighting(other) && apart(other) < spec.threat && (!threat || apart(other) < apart(threat))) threat = other;
+    }
+    if (!threat) continue;
+    entry.threat = threat.id;
+    // (Loose men only: a man in his place in a drilled body keeps it.)
+    entry.guards = world.fighters
+      .filter((fighter) => fighter.corner === corner && fighter !== now && !playerIds.has(fighter.id) && !fighter.slot && stillFighting(fighter) && apart(fighter) < spec.guardFrom)
+      .sort((a, b) => apart(a) - apart(b))
+      .slice(0, spec.guards)
+      .map((fighter) => fighter.id);
+  }
+}
+
+/** The enemy he goes for to guard his general (AI.general), if he is one of the guard and that man is still on his feet; else null. */
+function guardingAgainst(world, fighter) {
+  const entry = world.generals?.[fighter.corner];
+  if (!entry || entry.threat === null || !entry.guards.includes(fighter.id)) return null;
+  const threat = world.fighters[entry.threat];
+  return threat && threat.state === 'up' && !crawlingAway(threat) ? threat : null;
+}
+
+/**
+ * Fear from his general (AI.general), −heart..fell+saw: heart from seeing
+ * him on his feet near by; dread, for a while, when he has fallen. On a side
+ * with a general only (a battle: a side big enough to raise a standard).
+ */
+export function generalFear(world, fighter) {
+  const spec = AI.general;
+  const entry = world.generals?.[fighter.corner];
+  if (!entry) return 0;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  let fear = 0;
+  const since = entry.fellAt === null ? Infinity : world.time - entry.fellAt;
+  if (since < spec.fellFor) {
+    const saw = Math.hypot(entry.fellWhere[0] - at[0], entry.fellWhere[1] - at[1]) < spec.sawWithin;
+    fear += (1 - since / spec.fellFor) * (spec.fell + (saw ? spec.saw : 0));
+  }
+  const general = generalOf(world, fighter.corner);
+  if (general && general !== fighter && Math.hypot(general.x[P.pelvis * 3] - at[0], general.x[P.pelvis * 3 + 2] - at[1]) < spec.heartWithin) fear -= spec.heart;
+  return fear;
 }
 
 /** Of these fighters, the one nearest a point. */
@@ -678,7 +811,7 @@ function holdRank(world, fighter, opponent, style, dt) {
 function keepWithLeader(world, fighter) {
   const spec = AI.cohesion;
   const side = world.leaders?.[fighter.corner];
-  if (!side || side.leader === fighter || side.taker === fighter || fighter.state !== 'up') return;
+  if (!side || (side.general ?? side.leader) === fighter || side.taker === fighter || fighter.state !== 'up') return;
   // Busy with something of his own: a hold, a blow, a weapon to pick up, a gun's room to find.
   if (fighter.clinch || fighter.pin || fighter.punch || fighter.pickup || fighter.goTo || fighter.panicked) return;
   const foe = fighter.focus === undefined ? null : world.fighters[fighter.focus];
@@ -704,7 +837,7 @@ function keepWithLeader(world, fighter) {
 function strayFromLeader(world, fighter, at) {
   const spec = AI.cohesion;
   const side = world.leaders?.[fighter.corner];
-  if (!side || side.leader === fighter) return 0;
+  if (!side || (side.general ?? side.leader) === fighter) return 0;
   const distance = Math.hypot(side.at[0] - at[0], side.at[1] - at[1]);
   return Math.max(0, distance - spec.radius - spec.radiusPerSqrt * Math.sqrt(side.standing));
 }
@@ -712,7 +845,7 @@ function strayFromLeader(world, fighter, at) {
 /** How far a target is from my side's standard (m), in a group fight; 0 otherwise. */
 function fromMyLeader(world, fighter, other) {
   const side = world.leaders?.[fighter.corner];
-  if (!side || side.leader === fighter) return 0;
+  if (!side || (side.general ?? side.leader) === fighter) return 0;
   return Math.hypot(other.x[P.pelvis * 3] - side.at[0], other.x[P.pelvis * 3 + 2] - side.at[1]);
 }
 
@@ -836,6 +969,13 @@ function chooseFocus(world, fighter) {
     if (held.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: held.id, effects: [] });
     fighter.focus = held.id;
     return held;
+  }
+  // One of his general's guard, an enemy upon the general: that man first (AI.general).
+  const threat = guardingAgainst(world, fighter);
+  if (threat) {
+    if (threat.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: threat.id, effects: [] });
+    fighter.focus = threat.id;
+    return threat;
   }
   if (current && current.state === 'up' && !crawlingAway(current) && !closerAtHand(world, fighter, current) && !leavesHeld(world, fighter, current)) return current;
   const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !crawlingAway(other));
@@ -1825,7 +1965,7 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
   const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
   const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
-  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + outnumberedFear(world, fighter) + shockFear(world, fighter);
+  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + outnumberedFear(world, fighter) + generalFear(world, fighter) + shockFear(world, fighter);
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
   const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);

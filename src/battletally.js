@@ -122,6 +122,9 @@ export function notableFacts(world, nameOf = (fighter) => fighter.body.inputs.na
   else if (blows) facts.push({ label: 'Most blows', who: blows.fighter, name: nameOf(blows.fighter), count: blows.count });
   const arrows = world.events.filter((event) => event.kind === 'loosed').length;
   const shots = world.events.filter((event) => event.kind === 'shot').length;
+  // A general cut down, or broken, and command passed (ai.js AI.general).
+  const generals = world.events.filter((event) => event.kind === 'generalFell').length;
+  if (generals) facts.push({ label: generals > 1 ? 'Generals fallen' : 'A general fell', count: generals });
   if (arrows) facts.push({ label: 'Arrows loosed', count: arrows });
   if (shots) facts.push({ label: 'Shots fired', count: shots });
   return facts;
