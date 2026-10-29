@@ -685,7 +685,8 @@ body[data-game="intro"] .hud, body[data-game="intro"] .controls, body[data-game=
 .banner.summary-mode::after { content: 'Tap for the tally'; display: block; margin-top: 5px; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(142, 150, 170, 0.6); }
 .banner.summary-mode.expanded::after { content: 'Tap to fold'; }
 @media (max-width: 560px) {
-  .banner.summary-mode { top: calc(52px + env(safe-area-inset-top, 0px)); padding: 7px 10px 8px; }
+  /* (Below the HUD's names and bars, which run the width of a phone.) */
+  .banner.summary-mode { top: calc(64px + env(safe-area-inset-top, 0px)); padding: 7px 10px 8px; }
   .banner.summary-mode p { font-size: 17px; }
   /* A finger's height, still in one short row. */
   .banner.summary-mode .banner-actions button { min-height: 40px; flex: 1; }
