@@ -30,6 +30,7 @@ import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_S
 import { checkButtons } from './uicheck.js';
 import { ARMIES, battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
 import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battletally.js';
+import { judgeBattle } from './battleend.js';
 import { leadOf, musterLevel } from './muster.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
@@ -44,7 +45,7 @@ import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
 import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
-import { attemptCount, attemptLog, attemptStory, bannerWinner, bossStatus, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
+import { attemptCount, attemptLog, attemptStory, bossStatus, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { snapshotGear } from './levelmode/checkpoints.js';
 import { applySandbox, heroClean, heroLoad, heroSave, sandboxBadge, sandboxPlaces, travelTo } from './levelmode/sandbox.js';
@@ -639,7 +640,7 @@ function audioScene() {
     waters: stage ? audioState.waters.list : null,
   });
   // The music's moment: a menu over the fight, a boss's bar, how the bout or the stage ended (for the man played: watching, no fanfare).
-  const winner = state.finishedAt !== null && state.game !== 'home' ? bannerWinner(world) : null;
+  const winner = state.finishedAt !== null && state.game !== 'home' ? world.verdict?.winner ?? null : null;
   const kept = audioState.outcome?.world === world && realSeconds() - audioState.outcome.at < 15 ? audioState.outcome.outcome : null;
   const boss = stage?.level ? bossStatus(world) : null;
   Object.assign(audioInfo.music, {
@@ -682,35 +683,40 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   if (state.world.stage?.level) drainLevel();
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
   if (state.game === 'intro' || state.game === 'tutorial') return;
-  // (A stage has no banner: bannerWinner is none there.)
-  const winner = bannerWinner(state.world);
+  // A stage has no banner (levelmode bannerWinner is none there). A duel or a small fight ends with its last man;
+  // a battle is decided before that, when a side's fighting strength has gone, or at its time limit (battleend.js).
+  const verdict = state.world.stage ? null : judgeBattle(state.world);
   // Behind the menus, one fight follows another.
   if (state.game === 'home' && state.finishedAt !== null && state.world.time > state.finishedAt + 3) state.next.run();
-  if (winner && state.finishedAt === null && !momentPlaying(state.drama, realSeconds())) {
+  if (verdict && state.finishedAt === null && !momentPlaying(state.drama, realSeconds())) {
     state.finishedAt = state.world.time;
+    $('#banner').hidden = state.game === 'home';
+    // A battle (more than one man on a side) ends on its summary, and goes on under it: decided is not over (the
+    // player keeps his man, the winners chase; nothing stops: the world runs on, as it does after any bout).
+    const battle = ['red', 'blue'].some((corner) => state.world.fighters.filter((fighter) => fighter.corner === corner).length > 1);
+    if (battle) return showSummary(state.world, verdict);
+    const winner = verdict.winner;
     const team = state.world.fighters.filter((fighter) => fighter.corner === winner);
     const name = team.length > 1 ? `${winner === 'red' ? 'Red' : 'Blue'} team` : team[0].body.inputs.name;
-    $('#banner').hidden = state.game === 'home';
     // How it ended: the last fighter out on the losing side says.
     const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', drowned: 'Lost to the sea', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
     const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
     $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
-    // A battle (more than one man on a side) ends on its summary; a duel keeps the plain banner, which says all there is.
-    const battle = ['red', 'blue'].some((corner) => state.world.fighters.filter((fighter) => fighter.corner === corner).length > 1);
-    if (battle) showSummary(state.world, winner);
-    else hideSummary();
+    hideSummary();
   }
 }
 
 // ---- The end of a battle: what it came to --------------------------------------------------------
-// When the last of a side is out, the banner becomes a short account of the
-// battle: which side won, by its own name; how the other lost; the battle's
-// name and length; and for each side its men, killed, wounded, down, crawled
-// away, fled, rallied and still standing (battletally.js: the same count the
-// level tool makes). Only the rows some side has any of are shown, to keep it
-// short. It comes up a moment after the end (boxer.css: the last blow and the
-// last man falling are seen first), and a tap folds it to the banner alone,
-// so the field can be looked at again.
+// When a battle is decided (battleend.js: a side's fighting strength gone, or
+// the time limit), the banner becomes a short account of it: which side won,
+// by its own name, and a line a side of what it lost, in a slim card at the
+// top of the screen, clear of the field: the battle goes on under it, and the
+// player may fight on, chase the runners or walk the field. A tap opens the
+// rest: how the other side lost, the battle's name and length, and for each
+// side its men, killed, wounded, down, crawled away, fled, rallied and still
+// standing (battletally.js: the same count the level tool makes; as it stood
+// when the battle was decided). Only the rows some side has any of are shown.
+// It comes up a moment after the decision (boxer.css: the last blow is seen first).
 
 /** A side's name: its armies' (ARMIES labels, without a muster's year: "The French"), else Red or Blue team. */
 function sideName(corner) {
@@ -728,39 +734,55 @@ function summaryEl(tag, className, content = '') {
   return el;
 }
 
-/** The banner as a battle's summary: the headline, how it went, each side's tally and a fact or two. */
-function showSummary(world, winner) {
-  const loser = winner === 'red' ? 'blue' : 'red';
+/**
+ * The banner as a battle's summary, at the moment it was decided (the tally is
+ * of that moment; the battle goes on under it): the headline and one line a
+ * side (killed, wounded, fled), small at the top of the screen; a tap opens how
+ * it went, each side's whole tally and a fact or two. A draw at the time limit
+ * (verdict.winner null): neither side holds the field.
+ */
+function showSummary(world, verdict) {
+  const winner = verdict.winner;
+  const loser = winner === 'red' ? 'blue' : winner === 'blue' ? 'red' : null;
   const tally = battleTally(world);
   const names = { red: sideName('red'), blue: sideName('blue') };
   const title = state.scenario ? SCENARIOS[state.scenario]?.title : null;
-  $('#banner-eyebrow').textContent = [title, clock(world.time)].filter(Boolean).join(' · ');
+  $('#banner-eyebrow').textContent = [title, clock(world.time), verdict.how === 'time' ? 'time' : null].filter(Boolean).join(' · ');
   $('#banner-eyebrow').hidden = false;
-  $('#banner-text').replaceChildren(summaryEl('span', `summary-winner ${winner}`, names[winner]), ' hold the field');
+  if (winner) $('#banner-text').replaceChildren(summaryEl('span', `summary-winner ${winner}`, names[winner]), ' hold the field');
+  else $('#banner-text').replaceChildren('A drawn field');
   const won = (corner) => (corner === winner ? ' won' : '');
+  // The brief: a line a side, what it lost (a nought left out; nothing lost, "unbroken").
+  const brief = summaryEl('div', 'summary-brief', ['red', 'blue'].map((corner) => {
+    const lost = [['killed', 'killed'], ['wounded', 'wounded'], ['fled', 'fled']].filter(([field]) => tally[corner][field] > 0);
+    return summaryEl('div', 'brief-side', [
+      summaryEl('span', `brief-name ${corner}${won(corner)}`, names[corner]),
+      summaryEl('span', 'brief-figures', lost.length ? lost.map(([field, label]) => `${tally[corner][field]} ${label}`).join(' · ') : 'unbroken'),
+    ]);
+  }));
   // The tally: each side's figures either side of the labels down the middle, the winner's column the brighter, a nought faint.
   const cells = [summaryEl('span', `tally-side red${won('red')}`, names.red), summaryEl('span', 'tally-label', ''), summaryEl('span', `tally-side blue${won('blue')}`, names.blue)];
   const figure = (corner, field) => summaryEl('b', `tally-figure ${corner}${won(corner)}${tally[corner][field] ? '' : ' nil'}`, String(tally[corner][field]));
   for (const [field, label] of tallyRows(tally)) cells.push(figure('red', field), summaryEl('span', 'tally-label', label), figure('blue', field));
-  const parts = [
-    summaryEl('div', 'summary-verdict', [summaryEl('span', loser, names[loser]), ` ${howBeaten(tally[loser])}`]),
-    summaryEl('div', 'tally', cells),
-  ];
+  const verdictLine = loser
+    ? summaryEl('div', 'summary-verdict', [summaryEl('span', loser, names[loser]), ` ${howBeaten(tally[loser])}`])
+    : summaryEl('div', 'summary-verdict', 'Neither side broke: at the end of the day both drew off');
+  const full = [verdictLine, summaryEl('div', 'tally', cells)];
   const facts = notableFacts(world);
   if (facts.length) {
-    parts.push(summaryEl('div', 'summary-facts', facts.map((fact) => summaryEl('span', 'summary-fact', fact.who
+    full.push(summaryEl('div', 'summary-facts', facts.map((fact) => summaryEl('span', 'summary-fact', fact.who
       ? [summaryEl('span', 'fact-label', fact.label), summaryEl('b', fact.who.corner, fact.name), summaryEl('b', '', String(fact.count))]
       : [summaryEl('span', 'fact-label', fact.label), summaryEl('b', '', String(fact.count))]))));
   }
-  $('#battle-summary').replaceChildren(...parts);
+  $('#battle-summary').replaceChildren(brief, summaryEl('div', 'summary-full', full));
   $('#battle-summary').hidden = false;
   $('#banner').classList.add('summary-mode');
-  $('#banner').classList.remove('folded');
+  $('#banner').classList.remove('expanded');
 }
 
 /** The banner back to a plain one (a duel's). */
 function hideSummary() {
-  $('#banner').classList.remove('summary-mode', 'folded');
+  $('#banner').classList.remove('summary-mode', 'expanded');
   $('#banner-eyebrow').hidden = true;
   $('#battle-summary').hidden = true;
 }
@@ -1348,10 +1370,10 @@ $('#restart').addEventListener('click', () => {
   state.paused = false;
   $('#pause').textContent = 'Pause';
 });
-// A tap on a battle's summary (not on its buttons) folds it to the banner, to see the field; another brings it back.
+// A tap on a battle's summary (not on its buttons) opens its whole tally; another folds it back to the brief.
 $('#banner').addEventListener('click', (event) => {
   if (!$('#banner').classList.contains('summary-mode') || event.target.closest('button')) return;
-  $('#banner').classList.toggle('folded');
+  $('#banner').classList.toggle('expanded');
 });
 $('#banner-again').addEventListener('click', () => (state.next ? state.next.run() : newBout()));
 $('#banner-menu').addEventListener('click', () => goHome());

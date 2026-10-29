@@ -622,9 +622,10 @@ body[data-game="intro"] .hud, body[data-game="intro"] .controls, body[data-game=
 .controls { z-index: 2; }
 .banner { z-index: 8; }
 .builder { z-index: 9; }
-/* A bout over: the fight surface and its buttons step aside, so nothing of the fight takes a press meant for Menu, Retry or Next. */
-.banner:not([hidden]) ~ .fight-ui .touch-surface, .banner:not([hidden]) ~ .fight-ui .fight-button { pointer-events: none; }
-.banner:not([hidden]) ~ .fight-ui .fight-button, .banner:not([hidden]) ~ .fight-ui .stick, .banner:not([hidden]) ~ .fight-ui .fu-target, .banner:not([hidden]) ~ .fight-ui .fu-btn, .banner:not([hidden]) ~ .fight-ui .fu-toast, .banner:not([hidden]) ~ .fight-ui .fu-legend, .banner:not([hidden]) ~ .fight-ui .zone-hints { visibility: hidden; }
+/* A bout over: the fight surface and its buttons step aside, so nothing of the fight takes a press meant for Menu, Retry or Next.
+   Not a battle decided (summary-mode): it goes on, and the player with it; its card sits at the top, clear of his controls. */
+.banner:not([hidden]):not(.summary-mode) ~ .fight-ui .touch-surface, .banner:not([hidden]):not(.summary-mode) ~ .fight-ui .fight-button { pointer-events: none; }
+.banner:not([hidden]):not(.summary-mode) ~ .fight-ui :is(.fight-button, .stick, .fu-target, .fu-btn, .fu-toast, .fu-legend, .zone-hints) { visibility: hidden; }
 /* Choosing a side, and the sandbox's builder, are screens of their own: the footer waits behind them. */
 .side-pick:not([hidden]) ~ .controls, body:has(.builder:not([hidden])) .controls { display: none; }
 .banner { width: max-content; max-width: calc(100% - 32px); }
@@ -637,46 +638,60 @@ body[data-game="intro"] .hud, body[data-game="intro"] .controls, body[data-game=
   .banner-actions button { flex: 1; min-width: 0; padding: 10px 12px; }
 }
 
-/* ---- A battle's end: the banner as its summary (main.js showSummary) ----
-   It comes up a moment and a half after the end, so the last man falling is
-   seen before anything covers him; the figures are the sides' own colours,
-   set either side of their labels, the winner's column the brighter. A tap
-   folds it to the headline and the buttons, to look at the field again. */
-.banner.summary-mode { width: min(440px, calc(100% - 32px)); padding: 16px 22px 18px; cursor: pointer; background: rgba(12, 14, 22, 0.9); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: summary-in 0.7s ease-out 1.5s both; }
+/* ---- A battle decided: the banner as its summary (main.js showSummary) ----
+   The battle goes on under it, so it keeps out of the way: a slim card at the
+   top centre, under the HUD's bar, the headline and a line a side of what it
+   lost, the buttons small; never over the middle of the field, where the
+   player still fights. It comes up a moment and a half after the decision, so
+   the last blow is seen before anything else; the figures are the sides' own
+   colours, the winner's the brighter. A tap opens the whole tally below it
+   (the card grows down the screen: the player asked for it), another folds it. */
+.banner.summary-mode { top: calc(58px + env(safe-area-inset-top, 0px)); transform: translate(-50%, 0); width: min(420px, calc(100% - 32px)); padding: 8px 14px 10px; cursor: pointer; background: rgba(12, 14, 22, 0.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: summary-in 0.7s ease-out 1.5s both; max-height: calc(100% - 140px); overflow-y: auto; }
 @keyframes summary-in {
-  from { opacity: 0; visibility: hidden; transform: translate(-50%, calc(-50% + 10px)); }
-  to { opacity: 1; visibility: visible; transform: translate(-50%, -50%); }
+  from { opacity: 0; visibility: hidden; transform: translate(-50%, -8px); }
+  to { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
 }
 .banner-eyebrow { font: 500 11px var(--display); letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
-.banner.summary-mode p { font-size: 28px; line-height: 1.1; margin-bottom: 6px; }
+.banner.summary-mode .banner-eyebrow { font-size: 9.5px; letter-spacing: 0.18em; margin-bottom: 2px; }
+.banner.summary-mode p { font-size: 19px; line-height: 1.1; margin-bottom: 4px; }
 .summary-winner.red, .battle-summary .red { color: color-mix(in srgb, var(--red) 70%, var(--fg)); }
 .summary-winner.blue, .battle-summary .blue { color: color-mix(in srgb, var(--blue) 62%, var(--fg)); }
 .battle-summary { cursor: pointer; }
-.summary-verdict { color: var(--muted); font-size: 13px; margin-bottom: 14px; text-wrap: balance; }
-.tally { display: grid; grid-template-columns: 1fr auto 1fr; column-gap: 18px; align-items: baseline; padding: 10px 0 8px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+/* The brief: a line a side, the side's name and what it lost. */
+.summary-brief { display: grid; gap: 1px; margin-bottom: 8px; font-size: 12px; }
+.brief-side { display: flex; justify-content: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+.brief-name { font: 600 10.5px/1.6 var(--display); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+.brief-name.won { opacity: 1; }
+.brief-figures { color: var(--fg); opacity: 0.85; font-variant-numeric: tabular-nums; }
+/* The rest, opened by a tap. */
+.summary-full { display: none; padding-top: 6px; }
+.banner.summary-mode.expanded .summary-full { display: block; }
+.summary-verdict { color: var(--muted); font-size: 13px; margin-bottom: 10px; text-wrap: balance; }
+.tally { display: grid; grid-template-columns: 1fr auto 1fr; column-gap: 18px; align-items: baseline; padding: 8px 0 6px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .tally-side { font: 600 11px var(--display); letter-spacing: 0.12em; text-transform: uppercase; padding-bottom: 6px; opacity: 0.75; text-wrap: balance; }
 .tally-side.won { opacity: 1; }
 .tally-side.red, .tally-figure.red { text-align: right; }
 .tally-side.blue, .tally-figure.blue { text-align: left; }
-.tally-figure { font: 500 22px/1.25 var(--display); font-variant-numeric: tabular-nums; opacity: 0.72; }
+.tally-figure { font: 500 19px/1.25 var(--display); font-variant-numeric: tabular-nums; opacity: 0.72; }
 .tally-figure.won { opacity: 1; }
 .tally-figure.nil { opacity: 0.28; }
 .tally-label { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); text-align: center; white-space: nowrap; }
-.summary-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.summary-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
 .summary-fact { display: inline-flex; align-items: baseline; gap: 6px; }
 .fact-label { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; }
 .summary-facts b { font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
-.banner.summary-mode::after { content: 'Tap to see the field'; display: block; margin-top: 10px; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(142, 150, 170, 0.6); }
-/* Folded: the headline and the buttons only, small, low on the screen just over the footer: the field and the HUD clear. */
-.banner.summary-mode.folded { top: auto; bottom: calc(var(--controls-height, 56px) + 10px); transform: translate(-50%, 0); width: max-content; max-width: calc(100% - 32px); padding: 10px 16px 12px; animation: none; }
-.banner.summary-mode.folded .battle-summary, .banner.summary-mode.folded .banner-eyebrow { display: none; }
-.banner.summary-mode.folded p { font-size: 20px; }
-.banner.summary-mode.folded::after { content: 'Tap for the tally'; margin-top: 6px; }
-@media (max-width: 400px) {
-  .banner.summary-mode { padding: 14px 14px 14px; }
-  .banner.summary-mode p { font-size: 23px; }
+/* Its buttons small: the card is a note over a battle still going, not a screen of its own. */
+.banner.summary-mode .banner-actions button { min-height: 34px; min-width: 0; padding: 5px 14px; font-size: 13.5px; border-radius: 8px; }
+.banner.summary-mode::after { content: 'Tap for the tally'; display: block; margin-top: 5px; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(142, 150, 170, 0.6); }
+.banner.summary-mode.expanded::after { content: 'Tap to fold'; }
+@media (max-width: 560px) {
+  .banner.summary-mode { top: calc(52px + env(safe-area-inset-top, 0px)); padding: 7px 10px 8px; }
+  .banner.summary-mode p { font-size: 17px; }
+  /* A finger's height, still in one short row. */
+  .banner.summary-mode .banner-actions button { min-height: 40px; flex: 1; }
+  .summary-brief { font-size: 11.5px; }
   .tally { column-gap: 12px; }
-  .tally-figure { font-size: 20px; }
+  .tally-figure { font-size: 18px; }
   .tally-label { font-size: 9.5px; letter-spacing: 0.1em; }
 }
 /* The footer's fixed three (Menu, Pause, Restart) always finger-sized. */

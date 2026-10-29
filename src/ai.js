@@ -257,6 +257,21 @@ export const AI = {
   // against many and a battle: only who is there differs. (It stands in for
   // counting heads: three on one is three times one man's strength.)
   standing: { group: 3, groupFade: 3, near: 6, sight: 16, parity: 0.25, span: 0.9, fear: 0.5, steady: 0.25 },
+  // The field seen (outnumberedFear): in a battle (a side of `rout.minSide`
+  // or more), what a man makes of the whole of it, not the knot before him:
+  // how many of his own still fight (on their feet, not broken, not crawling
+  // off: stillFighting) against how many of theirs, each by strengthOf. Even
+  // to `from` (half as many again) a man does not count heads: battles were
+  // fought at worse odds every day. Past it fear grows, log by log, to `fear`
+  // at `full` (three to one: the line has gone, the men round him are all
+  // that is left) and on to `most` at `beyond` (six to one: there is nothing
+  // left to fight for). Felt by every man of the side, wherever he stands: the
+  // last handful of a beaten army knew the battle was lost and broke, or
+  // threw down their arms, rather than die to the last man (who fights on at
+  // such odds are the few with the courage or the discipline for it: both
+  // still damp it, fearTarget). Strength, not heads, as AI.standing: a knot
+  // of armoured knights is not outnumbered by a crowd of peasants twice its number.
+  outnumbered: { from: 1.5, full: 3, fear: 0.45, beyond: 6, most: 0.8 },
   // Morale in a battle (a side of at least `rout.minSide`): what the men
   // round a man do to his fear, whoever they are. Within `near` m of him:
   // - no man of his own standing there (`alone`): fear; each who stands
@@ -1410,6 +1425,15 @@ export function strengthOf(fighter) {
   return strength;
 }
 
+/**
+ * Still fighting: in the fight (inFight), on his feet (or getting up), not
+ * broken and not crawling off. What a side has left to fight with, as the men
+ * of both sides see it (AI.outnumbered) and as a battle is decided (battleend.js).
+ */
+export function stillFighting(fighter) {
+  return inFight(fighter) && !fighter.panicked && !fighter.crawling && (fighter.state === 'up' || fighter.state === 'rising');
+}
+
 /** A man's strength as of this think (kept by keepSides), or reckoned now. */
 const strengthNow = (fighter) => fighter.aiStrength ?? strengthOf(fighter);
 
@@ -1438,6 +1462,10 @@ function keepSides(world) {
     side.history = (side.history ?? []).filter((entry) => world.time - entry[0] <= AI.morale.shockFor);
     side.history.push([world.time, side.lost]);
     side.shock = Math.max(0, side.lost - side.history[0][1]);
+    // Its men still fighting, and their strength (AI.outnumbered: the field seen; battleend.js: a battle decided).
+    const fighting = men.filter(stillFighting);
+    side.fighting = fighting.length;
+    side.strength = fighting.reduce((sum, fighter) => sum + fighter.aiStrength, 0);
     side.broken = men.filter((fighter) => fighter.panicked && inFight(fighter)).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
     // Where his own fell (out, or crawling off), and when, and what each was worth against the side's average: seen by the men near him for a while (AI.morale).
     for (const fighter of men) if (fighter.goneAt === undefined && !inFight(fighter) && !fighter.fled) fighter.goneAt = world.time;
@@ -1516,6 +1544,24 @@ export function companyFear(world, fighter) {
   let fallen = 0;
   for (const [x, z, worth = 1] of side.fallen ?? []) if (Math.hypot(x - at[0], z - at[1]) < spec.fallenWithin) fallen += worth;
   return fear + Math.min(spec.fallenMost, spec.fallen * fallen);
+}
+
+/**
+ * Fear from the field seen (AI.outnumbered): the strength of his side's men
+ * still fighting against the other side's, wherever they stand. Nothing to
+ * `from` to one; `fear` at `full`, `most` at `beyond` (log by log between). In
+ * a battle only (a side of rout.minSide or more): a duel or a brawl has
+ * standingFear, which weighs the men before him.
+ */
+export function outnumberedFear(world, fighter) {
+  const spec = AI.outnumbered;
+  const side = world.sides?.[fighter.corner];
+  const other = world.sides?.[fighter.corner === 'red' ? 'blue' : 'red'];
+  if (!side || !other || side.men < AI.rout.minSide || !other.strength) return 0;
+  const odds = other.strength / Math.max(1e-6, side.strength);
+  if (odds <= spec.from) return 0;
+  const along = (low, high) => Math.max(0, Math.min(1, Math.log(odds / low) / Math.log(high / low)));
+  return spec.fear * along(spec.from, spec.full) + (spec.most - spec.fear) * along(spec.full, spec.beyond);
 }
 
 /**
@@ -1779,7 +1825,7 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
   const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
   const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
-  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + shockFear(world, fighter);
+  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + outnumberedFear(world, fighter) + shockFear(world, fighter);
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
   const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);

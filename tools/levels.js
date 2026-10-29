@@ -11,7 +11,8 @@
 import { normaliseInputs } from '../src/body.js';
 import { AI, thinkAll } from '../src/ai.js';
 import { DRILL } from '../src/formation.js';
-import { advance, boutWinner, createWorld, seededRandom } from '../src/physics.js';
+import { advance, createWorld, seededRandom } from '../src/physics.js';
+import { judgeBattle } from '../src/battleend.js';
 import { battleTally } from '../src/battletally.js';
 import { SPREAD, battleOf, drawnApart, qiJiguangLevel } from '../src/scenarios.js';
 
@@ -34,13 +35,14 @@ export function levelBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
   const entries = ['red', 'blue'].flatMap((corner) => sides[corner].map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner })));
   const world = createWorld(entries, { seed, arena: level.arena, rules: level.rules, formation: level.formation });
   let elapsed = 0;
-  while (elapsed < seconds && !boutWinner(world)) {
+  // Ended as the game ends it (battleend.js): decided when a side's fighting strength has gone, or at the time limit.
+  while (elapsed < seconds && !judgeBattle(world)) {
     advance(world, step, (current, dt) => thinkAll(current, dt));
     elapsed += step;
   }
   // Counted as the end-of-battle summary counts them (battletally.js), so the two agree.
   const tally = battleTally(world);
-  return { key, seed, seconds: elapsed, winner: boutWinner(world), ...tally };
+  return { key, seed, seconds: elapsed, winner: judgeBattle(world)?.winner ?? null, how: world.verdict?.how ?? null, ...tally };
 }
 
 /** A level over `seeds` seeds from `firstSeed`: the battles, and each side's average. */
@@ -78,6 +80,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   for (const key of keys) {
     const row = levelOutcomes(key, { seeds, firstSeed, seconds });
     console.log(`${key.padEnd(10)} ${seeds} seeds ${figure(row.seconds)} s  wins red ${row.wins.red} blue ${row.wins.blue} | red ${side(row.red)} | blue ${side(row.blue)}`);
-    if (process.env.EACH) for (const battle of row.battles) console.log(`  seed ${battle.seed}: ${battle.winner ?? '-'} ${battle.seconds.toFixed(0)} s  red down ${battle.red.down} fled ${battle.red.fled} crawled ${battle.red.crawled} rallied ${battle.red.rallied} killed ${battle.red.killed} · blue down ${battle.blue.down} fled ${battle.blue.fled} crawled ${battle.blue.crawled} rallied ${battle.blue.rallied} killed ${battle.blue.killed}`);
+    if (process.env.EACH) for (const battle of row.battles) console.log(`  seed ${battle.seed}: ${battle.winner ?? '-'} (${battle.how ?? 'undecided'}) ${battle.seconds.toFixed(0)} s  red down ${battle.red.down} fled ${battle.red.fled} crawled ${battle.red.crawled} rallied ${battle.red.rallied} killed ${battle.red.killed} · blue down ${battle.blue.down} fled ${battle.blue.fled} crawled ${battle.blue.crawled} rallied ${battle.blue.rallied} killed ${battle.blue.killed}`);
   }
 }
