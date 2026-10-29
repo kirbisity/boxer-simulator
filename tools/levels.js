@@ -1,6 +1,7 @@
 // A level's battle, fought headless by the AI on both sides over many seeds,
 // and what it comes to on average: for each side its men, how many were
-// killed (cut, stabbed, shot or bled to death), how many lay down (dead, knocked cold or unable to go on), how many broke at some
+// killed (cut, stabbed, shot, drowned or bled to death), how many were wounded
+// and lived (battletally.js WOUNDED_AT), how many lay down (dead, knocked cold or unable to go on), how many broke at some
 // point, how many fled the field, how many were still standing at the end;
 // who won, and how long it took. The way to see whether a level comes out as
 // history had it, and what a change to the AI does to every battle.
@@ -10,7 +11,8 @@
 import { normaliseInputs } from '../src/body.js';
 import { AI, thinkAll } from '../src/ai.js';
 import { DRILL } from '../src/formation.js';
-import { advance, boutWinner, createWorld, inFight, seededRandom } from '../src/physics.js';
+import { advance, boutWinner, createWorld, seededRandom } from '../src/physics.js';
+import { battleTally } from '../src/battletally.js';
 import { SPREAD, battleOf, drawnApart, qiJiguangLevel } from '../src/scenarios.js';
 
 /**
@@ -31,33 +33,13 @@ export function levelBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
   const sides = level.cast(seededRandom(seed));
   const entries = ['red', 'blue'].flatMap((corner) => sides[corner].map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner })));
   const world = createWorld(entries, { seed, arena: level.arena, rules: level.rules, formation: level.formation });
-  const broke = new Set();
   let elapsed = 0;
   while (elapsed < seconds && !boutWinner(world)) {
     advance(world, step, (current, dt) => thinkAll(current, dt));
     elapsed += step;
-    for (const fighter of world.fighters) if (fighter.panicked) broke.add(fighter.id);
   }
-  const killed = new Set(world.events.filter((event) => event.kind === 'killed' || event.kind === 'bledOut').map((event) => event.fighter));
-  // Broken in the rout (ai.js AI.rout): who went down to crawl, and each time one came back to the fight.
-  const crawled = new Set(world.events.filter((event) => event.kind === 'crawl' && event.effects[0] === 'crawls away in the rout').map((event) => event.fighter));
-  const rallies = world.events.filter((event) => event.kind === 'rally' && event.effects[0] === 'comes back to the fight').map((event) => event.fighter);
-  const tally = {};
-  for (const corner of ['red', 'blue']) {
-    const men = world.fighters.filter((fighter) => fighter.corner === corner);
-    tally[corner] = {
-      men: men.length,
-      killed: men.filter((fighter) => killed.has(fighter.id)).length,
-      down: men.filter((fighter) => fighter.state === 'out' && !fighter.fled).length,
-      broke: men.filter((fighter) => broke.has(fighter.id)).length,
-      fled: men.filter((fighter) => fighter.fled).length,
-      crawled: men.filter((fighter) => crawled.has(fighter.id)).length,
-      // Still on his knees, crawling off, at the end: out of the fight, though neither down nor fled.
-      crawling: men.filter((fighter) => fighter.crawling && fighter.state !== 'out' && !fighter.fled).length,
-      rallied: rallies.filter((id) => world.fighters[id].corner === corner).length,
-      standing: men.filter((fighter) => inFight(fighter) && !fighter.panicked).length,
-    };
-  }
+  // Counted as the end-of-battle summary counts them (battletally.js), so the two agree.
+  const tally = battleTally(world);
   return { key, seed, seconds: elapsed, winner: boutWinner(world), ...tally };
 }
 
@@ -65,7 +47,7 @@ export function levelBattle(key, { seed = 1, seconds = 180, step = 0.1 } = {}) {
 export function levelOutcomes(key, { seeds = 12, firstSeed = 1, seconds = 180 } = {}) {
   const battles = Array.from({ length: seeds }, (_, index) => levelBattle(key, { seed: firstSeed + index, seconds }));
   const mean = (pick) => battles.reduce((sum, battle) => sum + pick(battle), 0) / battles.length;
-  const side = (corner) => Object.fromEntries(['men', 'killed', 'down', 'broke', 'fled', 'crawled', 'rallied', 'standing'].map((field) => [field, mean((battle) => battle[corner][field])]));
+  const side = (corner) => Object.fromEntries(['men', 'killed', 'wounded', 'down', 'broke', 'fled', 'crawled', 'rallied', 'standing'].map((field) => [field, mean((battle) => battle[corner][field])]));
   const wins = { red: battles.filter((battle) => battle.winner === 'red').length, blue: battles.filter((battle) => battle.winner === 'blue').length };
   return { key, seeds, wins, seconds: mean((battle) => battle.seconds), red: side('red'), blue: side('blue'), battles };
 }
@@ -92,7 +74,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const seconds = Number(process.argv[4] ?? 180);
   const firstSeed = Number(process.argv[5] ?? 1);
   const figure = (value) => value.toFixed(1).padStart(5);
-  const side = (s) => `${figure(s.men)} men: killed ${figure(s.killed)} down ${figure(s.down)} broke ${figure(s.broke)} fled ${figure(s.fled)} crawled ${figure(s.crawled)} rallied ${figure(s.rallied)} standing ${figure(s.standing)}`;
+  const side = (s) => `${figure(s.men)} men: killed ${figure(s.killed)} wounded ${figure(s.wounded)} down ${figure(s.down)} broke ${figure(s.broke)} fled ${figure(s.fled)} crawled ${figure(s.crawled)} rallied ${figure(s.rallied)} standing ${figure(s.standing)}`;
   for (const key of keys) {
     const row = levelOutcomes(key, { seeds, firstSeed, seconds });
     console.log(`${key.padEnd(10)} ${seeds} seeds ${figure(row.seconds)} s  wins red ${row.wins.red} blue ${row.wins.blue} | red ${side(row.red)} | blue ${side(row.blue)}`);
