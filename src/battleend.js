@@ -38,24 +38,24 @@ export const BATTLE_END = {
   drawWithin: 1.25,
 };
 
-const CORNERS = ['red', 'blue'];
-const otherOf = (corner) => (corner === 'red' ? 'blue' : 'red');
+const BATTLE_CORNERS = ['red', 'blue'];
+const foeCorner = (corner) => (corner === 'red' ? 'blue' : 'red');
 
 /** Whether the world is a battle by BATTLE_END's rule (each side `minSide` men or more at the start); a level's stage never is. */
 export function isBattle(world) {
   if (world.stage) return false;
-  return CORNERS.every((corner) => world.fighters.filter((fighter) => fighter.corner === corner).length >= BATTLE_END.minSide);
+  return BATTLE_CORNERS.every((corner) => world.fighters.filter((fighter) => fighter.corner === corner).length >= BATTLE_END.minSide);
 }
 
 /** A side's men still fighting: how many, how many it had, and their strength. */
-function fightingOf(world, corner) {
+function sideFighting(world, corner) {
   const men = world.fighters.filter((fighter) => fighter.corner === corner);
   const fighting = men.filter(stillFighting);
   return { men: men.length, fighting: fighting.length, strength: fighting.reduce((sum, fighter) => sum + strengthOf(fighter), 0) };
 }
 
 /** Whether `corner` has collapsed against `other` (BATTLE_END): nobody still fighting, or a remnant outnumbered. */
-function collapsed(mine, theirs) {
+function sideCollapsed(mine, theirs) {
   if (mine.fighting === 0) return true;
   return mine.fighting <= BATTLE_END.remnant * mine.men && theirs.strength >= BATTLE_END.outnumbered * mine.strength;
 }
@@ -72,15 +72,15 @@ export function judgeBattle(world) {
   const last = boutWinner(world);
   if (last) return (world.verdict = { winner: last, how: 'last', time: world.time });
   if (!isBattle(world)) return null;
-  const sides = { red: fightingOf(world, 'red'), blue: fightingOf(world, 'blue') };
+  const sides = { red: sideFighting(world, 'red'), blue: sideFighting(world, 'blue') };
   const since = (world.collapseSince ??= { red: null, blue: null });
-  for (const corner of CORNERS) {
-    const down = collapsed(sides[corner], sides[otherOf(corner)]);
+  for (const corner of BATTLE_CORNERS) {
+    const down = sideCollapsed(sides[corner], sides[foeCorner(corner)]);
     since[corner] = down ? since[corner] ?? world.time : null;
   }
   // Both gone at once (the last two killing each other): the one that went first lost.
-  const lost = CORNERS.filter((corner) => since[corner] !== null && world.time - since[corner] >= BATTLE_END.holdFor).sort((a, b) => since[a] - since[b])[0];
-  if (lost) return (world.verdict = { winner: otherOf(lost), how: 'collapsed', time: world.time });
+  const lost = BATTLE_CORNERS.filter((corner) => since[corner] !== null && world.time - since[corner] >= BATTLE_END.holdFor).sort((a, b) => since[a] - since[b])[0];
+  if (lost) return (world.verdict = { winner: foeCorner(lost), how: 'collapsed', time: world.time });
   if (world.time >= BATTLE_END.timeLimit) {
     const [red, blue] = [sides.red.strength, sides.blue.strength];
     const even = Math.max(red, blue) <= BATTLE_END.drawWithin * Math.min(red, blue);
