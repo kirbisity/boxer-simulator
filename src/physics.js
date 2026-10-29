@@ -1478,6 +1478,9 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const horses = [];
   if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
   const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
+  // A fight with weapons in it: someone came armed (a weapon in hand or a sidearm in his kit). A bout of bare hands (the ring, the
+  // cage, a brawl) is not one, and no one in it draws a knife on a man who is down (finisher.js).
+  world.armed = fighters.some((fighter) => fighter.weapon || fighter.body.gear.sidearm);
   // Wings of horse held on the flanks (formation.js moveWings): released when the foot lines close.
   if (wingOrder) world.wings = { release: wingOrder.release ?? WINGS.release, by: wingOrder.by ?? WINGS.by, review: 0 };
   // A side's baggage train on the field (`formation[corner].train`: { back }, m in from its own end of the floor, on the

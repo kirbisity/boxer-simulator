@@ -138,11 +138,12 @@ function engaged(world, fighter) {
 
 /**
  * The man the finisher is offered for, or null: an enemy on the floor within reach (the one he is locked on first, else the
- * nearest), while he can kneel and no enemy on his feet is on him. `anyone`: a man of any side (a team-mate, a civilian) is
+ * nearest), in a fight with weapons, while he can kneel and no enemy on his feet is on him. `anyone`: a man of any side (a team-mate, a civilian) is
  * also a target, if no enemy is (the player's own choice: an explicit call, not the button).
  */
 export function finishTarget(world, fighter, { anyone = false, locked = null } = {}) {
-  if (!canFinish(fighter) || engaged(world, fighter)) return null;
+  // Only where it is a fight with weapons (world.armed): in a bout of fists a man down is stood up or counted out, not stabbed.
+  if (world.armed === false || !canFinish(fighter) || engaged(world, fighter)) return null;
   const pick = (allowed) => {
     let best = null;
     let bestApart = Infinity;
@@ -187,7 +188,7 @@ function logFinisher(world, fighter, kind, target, effects) {
  * cannot (not on his feet, hands busy, the man not on the floor or too far, no blade to hold).
  */
 export function startFinisher(world, fighter, target, { region = null, force = false } = {}) {
-  if (!canFinish(fighter) || !target || target === fighter || !helplessOnFloor(target) || !within(fighter, target, FINISHER.reach * (force ? 2 : 1))) return false;
+  if (world.armed === false || !canFinish(fighter) || !target || target === fighter || !helplessOnFloor(target) || !within(fighter, target, FINISHER.reach * (force ? 2 : 1))) return false;
   const entry = (region && REGIONS.find((item) => item.region === region)) || leastProtected(target);
   const kind = finisherBlade(fighter);
   let keep = null;

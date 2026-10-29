@@ -18,8 +18,10 @@ import { TESTYARD } from '../src/levelmode/stages/testyard.js';
  * The player (`attacker`, red) and a man of `corner` put on the floor a metre off (state 'down', as a knockdown leaves him), settled.
  * Both are still for the AI; the orders drive the player.
  */
-function floored(defender, { attacker = 'light', corner = 'blue', seed = 1, apart = 1, count = 8 } = {}) {
+function floored(defender, { attacker = 'light', corner = 'blue', seed = 1, apart = 1, count = 8, armed = true } = {}) {
   const world = createWorld([{ inputs: structuredClone(PRESETS[attacker]), corner: 'red' }, { inputs: structuredClone(PRESETS[defender]), corner }], { seed });
+  // The presets are boxers, bare-handed: taken as a fight with weapons in it unless `armed` is false (a bout of fists).
+  world.armed = armed;
   const orders = newOrders();
   const me = world.fighters[0];
   const him = world.fighters[1];
@@ -69,6 +71,7 @@ test('offered for a man lying within reach; not for one on his feet, rising, out
 
 test('a foe on his feet near the player keeps the attack for himself', () => {
   const world = createWorld([{ inputs: structuredClone(PRESETS.light), corner: 'red' }, { inputs: structuredClone(PRESETS.amateur), corner: 'blue' }, { inputs: structuredClone(PRESETS.street), corner: 'blue' }], { seed: 2 });
+  world.armed = true;
   const [me, down, standing] = world.fighters;
   placeFighter(down, me.root[0] + 1, me.root[1]);
   placeFighter(standing, me.root[0] + 1.8, me.root[1] + 0.6);
@@ -229,4 +232,12 @@ test('the AI never finishes anyone: a bout of men knocked about between them lea
   advance(world, 20, (w, dt) => thinkAll(w, dt));
   assert.equal(events(world, 'finisher').length, 0);
   assert.ok(world.fighters.every((fighter) => !fighter.finisher));
+});
+
+test('a bout of bare hands offers no finisher: a man down in the ring is not stabbed', () => {
+  const { world, me, him } = floored('heavy', { armed: false });
+  assert.equal(createWorld([{ inputs: structuredClone(PRESETS.light), corner: 'red' }, { inputs: structuredClone(PRESETS.heavy), corner: 'blue' }]).armed, false);
+  assert.ok(helplessOnFloor(him));
+  assert.equal(finishTarget(world, me), null);
+  assert.equal(startFinisher(world, me, him), false);
 });
