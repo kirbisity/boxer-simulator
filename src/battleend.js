@@ -11,6 +11,9 @@
 //   strength (strengthOf), held for `holdFor` s (a man knocked down who gets
 //   up, or a runner who rallies inside that, and it is not over yet); after
 //   that a runner who comes back changes nothing: the battle has been lost;
+// - or its assault is spent: what it has still fighting is `spent` of the
+//   strength it came with or less, and the enemy has `spentOutnumbered` times
+//   that; the few still standing could not carry it again (the same hold);
 // - or, at `timeLimit` s of battle, whichever side has the more fighting
 //   strength holds the field; within `drawWithin` of even (a ratio), a draw:
 //   both sides drew off (an afternoon of fighting with neither side broken
@@ -30,6 +33,10 @@ export const BATTLE_END = {
   remnant: 0.15,
   // …and outnumbered this many to one by strength.
   outnumbered: 3,
+  // Spent: at most this share of its strength at the start still fighting…
+  spent: 0.25,
+  // …against at least this many times its strength.
+  spentOutnumbered: 2,
   // How long the collapse must hold (s): a couple of seconds, to see that the last man down stays down.
   holdFor: 3,
   // The battle's length (s of battle time): five minutes, and whoever has more fight left holds the field.
@@ -51,13 +58,16 @@ export function isBattle(world) {
 function sideFighting(world, corner) {
   const men = world.fighters.filter((fighter) => fighter.corner === corner);
   const fighting = men.filter(stillFighting);
-  return { men: men.length, fighting: fighting.length, strength: fighting.reduce((sum, fighter) => sum + strengthOf(fighter), 0) };
+  // What it came with: each man's worth as he came to the field (ai.js keepSides), or as he is if not yet sized up.
+  const worth = men.reduce((sum, fighter) => sum + (fighter.aiWorth ?? strengthOf(fighter)), 0);
+  return { men: men.length, fighting: fighting.length, worth, strength: fighting.reduce((sum, fighter) => sum + strengthOf(fighter), 0) };
 }
 
-/** Whether `corner` has collapsed against `other` (BATTLE_END): nobody still fighting, or a remnant outnumbered. */
+/** Whether `corner` has collapsed against `other` (BATTLE_END): nobody still fighting, a remnant outnumbered, or its assault spent. */
 function sideCollapsed(mine, theirs) {
   if (mine.fighting === 0) return true;
-  return mine.fighting <= BATTLE_END.remnant * mine.men && theirs.strength >= BATTLE_END.outnumbered * mine.strength;
+  if (mine.fighting <= BATTLE_END.remnant * mine.men && theirs.strength >= BATTLE_END.outnumbered * mine.strength) return true;
+  return mine.strength <= BATTLE_END.spent * mine.worth && theirs.strength >= BATTLE_END.spentOutnumbered * mine.strength;
 }
 
 /**

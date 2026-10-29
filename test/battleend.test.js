@@ -86,3 +86,36 @@ test('heavily outnumbered on the field, every man of the side is afraid; at even
   thinkAll(world, 0.01);
   assert.ok(outnumberedFear(world, me) > three + 0.15, `six to one: ${outnumberedFear(world, me).toFixed(2)}`);
 });
+
+test('a side whose assault is spent is beaten, though more than a remnant still stands', () => {
+  const world = battle(10, 10);
+  const blues = side(world, 'blue');
+  // Sized up as they came to the field (what each side came with).
+  thinkAll(world, 0.01);
+  // Two of ten standing: past the remnant (15%), but a fifth of its strength against all of red's.
+  for (const fighter of blues.slice(2)) fighter.state = 'out';
+  judgeBattle(world);
+  world.time += BATTLE_END.holdFor + 0.1;
+  assert.deepEqual([judgeBattle(world)?.winner, judgeBattle(world)?.how], ['red', 'collapsed']);
+  // Three of ten standing is still a fight.
+  const fighting = battle(10, 10);
+  thinkAll(fighting, 0.01);
+  for (const fighter of side(fighting, 'blue').slice(3)) fighter.state = 'out';
+  judgeBattle(fighting);
+  fighting.time += BATTLE_END.holdFor + 0.1;
+  assert.equal(judgeBattle(fighting), null);
+});
+
+test('one broken man running is chased by the few near him, not by the whole army', () => {
+  const world = battle(8, 6);
+  const blues = side(world, 'blue');
+  for (const fighter of blues.slice(1)) fighter.state = 'out';
+  blues[0].panicked = true;
+  for (let step = 0; step < 5; step += 1) thinkAll(world, 0.01);
+  const after = side(world, 'red').filter((fighter) => fighter.focus === blues[0].id).length;
+  assert.ok(after >= 1 && after <= AI.pursuit.chasers, `${after} chase him`);
+  // Rallied, he is a man to fight again: anyone near may go for him.
+  blues[0].panicked = false;
+  for (let step = 0; step < 5; step += 1) thinkAll(world, 0.01);
+  assert.ok(side(world, 'red').filter((fighter) => fighter.focus === blues[0].id).length > AI.pursuit.chasers);
+});

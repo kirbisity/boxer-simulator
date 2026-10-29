@@ -367,6 +367,11 @@ export const AI = {
   // a shooter who hits him draws him only from within `shooterWithin` m.
   retarget: { every: 0.3, margin: 1, ratio: 0.67, shooterWithin: 3 },
   crowdPenalty: 0.7,
+  // The pursuit, in a battle: a broken man running is chased by those near him
+  // (within `within` m), `chasers` of them at most; the rest let him go and
+  // turn to whoever still stands to fight. A whole army did not run down one
+  // fugitive: the winners kept their ground, and a few rode or ran after the runners.
+  pursuit: { within: 10, chasers: 2 },
   // Team-mates keep this far apart (m), and treat one within this far of
   // the line to their man as in the line of fire.
   mateSpacing: 1.0,
@@ -977,8 +982,21 @@ function chooseFocus(world, fighter) {
     fighter.focus = threat.id;
     return threat;
   }
-  if (current && current.state === 'up' && !crawlingAway(current) && !closerAtHand(world, fighter, current) && !leavesHeld(world, fighter, current)) return current;
+  // How many of his side already go for each man: counted once, not per comparison.
+  const crowds = new Map();
+  for (const mate of world.fighters) {
+    if (mate !== fighter && mate.corner === fighter.corner && mate.state === 'up' && mate.focus !== undefined) crowds.set(mate.focus, (crowds.get(mate.focus) ?? 0) + 1);
+  }
+  const chased = (other) => !pursuedByOthers(world, fighter, other, crowds);
+  if (current && current.state === 'up' && !crawlingAway(current) && chased(current) && !closerAtHand(world, fighter, current) && !leavesHeld(world, fighter, current)) return current;
   const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !crawlingAway(other));
+  const worth = standing.filter(chased);
+  // Only runners left, all far off or chased enough: he lets them go and keeps his ground.
+  if (standing.length && !worth.length) {
+    fighter.focus = undefined;
+    return null;
+  }
+  standing.splice(0, standing.length, ...worth);
   if (!standing.length) {
     fighter.focus = undefined;
     // (Nobody at all in sight: the other side hidden in an ambush. He waits.)
@@ -986,11 +1004,6 @@ function chooseFocus(world, fighter) {
     return nearest?.hidden ? null : nearest;
   }
   const at = point(fighter.x, P.pelvis);
-  // How many of his side already go for each man: counted once, not per comparison.
-  const crowds = new Map();
-  for (const mate of world.fighters) {
-    if (mate !== fighter && mate.corner === fighter.corner && mate.state === 'up' && mate.focus !== undefined) crowds.set(mate.focus, (crowds.get(mate.focus) ?? 0) + 1);
-  }
   // Nearest, least crowded, and (in a group fight) nearer my side's leader.
   // A wing of horse rides at the enemy's shooters first (they cannot stand to a charge).
   const shooters = fighter.wing && !fighter.wing.held ? WINGS.shooters : 0;
@@ -1016,6 +1029,18 @@ function chooseFocus(world, fighter) {
   if (next.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: next.id, effects: [] });
   fighter.focus = next.id;
   return next;
+}
+
+/**
+ * Whether a broken man running (`other`) is left by `fighter` to others (AI.pursuit): in a battle, he is too far
+ * off to chase, or enough of `fighter`'s side are already after him. A man who stands and fights is never left.
+ */
+function pursuedByOthers(world, fighter, other, crowds) {
+  if (!other.panicked || !battleField(world, fighter)) return false;
+  const spec = AI.pursuit;
+  const apart = Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+  // (crowds counts the others of his side on him, not himself.)
+  return apart > spec.within || (crowds.get(other.id) ?? 0) >= spec.chasers;
 }
 
 /**
