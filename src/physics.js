@@ -737,12 +737,16 @@ function coverArms(world, fighter, intent) {
   const line = vec.sub(blow.threat, blow.mine);
   const length = vec.length(line);
   if (length < 1e-3) return;
-  const meet = toLocal(fighter, vec.add(blow.mine, vec.scale(line, Math.min(1, (WORLD.guardCover.out * fighter.body.heightM) / length))));
+  const meet = vec.add(blow.mine, vec.scale(line, Math.min(1, (WORLD.guardCover.out * fighter.body.heightM) / length)));
+  // A blow coming up at the body (a kick, an uppercut to the ribs) is covered with the elbow dropped onto its line and the hand
+  // kept up, not with the hand reached down to it: the forearm stands along the ribs, where the blow meets it.
+  if (blow.punch.zone !== 'head') meet[1] = Math.max(meet[1], blow.mine[1]);
+  const local = toLocal(fighter, meet);
   // (His left is +z in his own frame.)
   // (The arm is chosen once for the blow, by the side it first comes from: his left is +z in his own frame. Chosen again each
   // step, a blow straight down the middle had the two arms trading places and neither there.)
-  fighter.defence.cover ??= meet[2] >= 0 ? 'lHand' : 'rHand';
-  intent[fighter.defence.cover] = meet;
+  fighter.defence.cover ??= local[2] >= 0 ? 'lHand' : 'rHand';
+  intent[fighter.defence.cover] = local;
 }
 
 /**
