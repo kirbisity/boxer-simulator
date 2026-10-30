@@ -1,7 +1,8 @@
 // Recorded sound effects (src/audio/samples/*.mp3, cut from the user's clips: samples/README.md): a sword on a sword, a blade through
 // flesh, a blow on bone, bones breaking, steel on plate, a man in armour walking, a weapon clattering down, a mace's swing, a pistol's
 // shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny; heels on a
-// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder.
+// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder; a man's and a woman's
+// cries (hurt, scream, moan, fear, dying), an army's charge.
 // Each set is a few takes of one sound; a take is picked at random each time.
 //
 // From the source (the ES-module page, index.html) the files are fetched from src/audio/samples/; the single-file bundle (tools/bundle.js) puts their
@@ -38,7 +39,18 @@ export const SAMPLE_SETS = {
   punch: Array.from({ length: 7 }, (_, index) => `punch-${index + 1}`),
   fistswing: Array.from({ length: 5 }, (_, index) => `fistswing-${index + 1}`),
   thunder: ['thunder-1', 'thunder-2'],
+  // Cries (sfx/voice.js CRY_KINDS; chosen by audio/cries.js): a man's and a woman's, each a set per kind (a few composed of two pieces).
+  ...voiceSets({ male: { hurt: 7, scream: 3, moan: 4, fear: 4, dying: 2 }, female: { hurt: 4, scream: 3, moan: 3, fear: 2, dying: 2 } }),
+  // An army's charge roared: one loop (engine.js plays it under a large side running at the enemy: audio/charge.js).
+  charge: ['charge-1'],
 };
+
+/** The cry sets: voice-<sex>-<kind>, each `count` takes. */
+function voiceSets(counts) {
+  const sets = {};
+  for (const [sex, kinds] of Object.entries(counts)) for (const [kind, count] of Object.entries(kinds)) sets[`voice-${sex}-${kind}`] = Array.from({ length: count }, (_, index) => `voice-${sex}-${kind}-${index + 1}`);
+  return sets;
+}
 
 /** Every file of every set. */
 export const SAMPLE_FILES = [...new Set(Object.values(SAMPLE_SETS).flat())];

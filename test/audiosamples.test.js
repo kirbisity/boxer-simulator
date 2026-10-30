@@ -9,9 +9,10 @@ import { playSample, samplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 
 const DIR = 'src/audio/samples';
-// (A thunder's roar is the longest take, 2.6 s.)
-const FILE_CAP = 16 * 1024;
-const TOTAL_CAP = 300 * 1024;
+// (A thunder's roar is the longest single take, 2.6 s; the army's charge loop, 6 s of a dull roar at 32 kb/s, is the largest file.)
+const FILE_CAP = 25 * 1024;
+// (The cries and the charge, ~170 KB, over the 256 KB before them.)
+const TOTAL_CAP = 460 * 1024;
 const half = () => 0.5;
 const plan = (event) => samplePlan(event.type, SOUND_FAMILIES[event.type].params(event), event, half);
 

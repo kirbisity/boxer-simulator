@@ -10,14 +10,15 @@ import { arrowHitParams, impactParams, playImpact } from './sfx/impact.js';
 import { playShot, shotParams } from './sfx/ranged.js';
 import { playStep, stepParams } from './sfx/step.js';
 import { playSwing, swingParams } from './sfx/swing.js';
-import { playVoice, voiceParams } from './sfx/voice.js';
+import { cryLevel, cryOfEvent, playVoice, voiceParams } from './sfx/voice.js';
 import { mechParams, playMech, playThunder, thunderParams } from './sfx/world.js';
 import { playWound, woundParams } from './sfx/wound.js';
 
 /**
  * Each event type: its parameters, its player, the bus it goes to ('effects' or 'voices'), `boost` (dB over its level, the user's
- * choice: the weapon's work, on armour, on flesh, on another weapon, and the guns, are what a fight is heard as) and `silent` (logged
- * but not played: the men's cries and grunts sounded wrong, the user said, and were taken out; breathing is kept).
+ * choice: the weapon's work, on armour, on flesh, on another weapon, and the guns, are what a fight is heard as), `silent` (logged
+ * but not played) and `sampledOnly` (played only from its recordings: the synth's cries and grunts sounded wrong, the user said; the
+ * cries are now the recorded ones, rationed by audio/cries.js, and an effort, which has no recording, is silent).
  */
 export const SOUND_FAMILIES = {
   hit: { params: impactParams, play: playImpact, bus: 'effects', boost: 6 },
@@ -28,13 +29,20 @@ export const SOUND_FAMILIES = {
   fall: { params: (event) => fallParams(event, 'fall'), play: playFall, bus: 'effects' },
   land: { params: (event) => fallParams(event, 'land'), play: playFall, bus: 'effects' },
   clatter: { params: clatterParams, play: playClatter, bus: 'effects' },
-  voice: { params: voiceParams, play: playVoice, bus: 'voices', silent: true },
+  voice: { params: voiceFamilyParams, play: playVoice, bus: 'voices', sampledOnly: true },
   horse: { params: horseParams, play: playHorse, bus: 'effects' },
   shot: { params: shotParams, play: playShot, bus: 'effects', boost: 4 },
   arrowhit: { params: arrowHitParams, play: playImpact, bus: 'effects', boost: 4 },
   mech: { params: mechParams, play: playMech, bus: 'effects' },
   thunder: { params: thunderParams, play: playThunder, bus: 'ambience' },
 };
+
+/** A voice event's params: the synth's, at its cry's level where it is one (cryOfEvent), else silent (an effort: no recording). */
+function voiceFamilyParams(event) {
+  const params = voiceParams(event);
+  const cry = cryOfEvent(event);
+  return { ...params, level: cry ? cryLevel(cry) : -Infinity };
+}
 
 /**
  * One tick's events as candidates for voices: { event, family, params, distance, azimuth, elevation, atEar, mapWide }, those the
@@ -50,6 +58,7 @@ export function soundCandidates(events, listener) {
     const direction = earDirection(listener, event.x ?? listener.x, event.y ?? listener.y, event.z ?? listener.z, { distance: 0, azimuth: 0, elevation: 0 });
     const distance = event.type === 'thunder' ? Math.max(direction.distance, event.distance ?? 2000) : direction.distance;
     const params = family.params(event);
+    if (params.level === -Infinity) continue;
     const atEar = levelAtEar(params.level + (family.boost ?? 0), distance, mapWide);
     if (!thinningKeeps(atEar, distance, mapWide)) continue;
     out.push({ event, family, params, distance, azimuth: direction.azimuth, elevation: direction.elevation, atEar, mapWide });
