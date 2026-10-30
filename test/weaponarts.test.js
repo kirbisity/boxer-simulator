@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
 import { MOVES, STYLES } from '../src/moves.js';
-import { advance, createWorld, placeFighter } from '../src/physics.js';
+import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { contextAction, directFighter, doAction, newOrders } from '../src/control.js';
 import { WEAPONS } from '../src/weapons.js';
-import { ARTS, artCost, artOf, artReady, feelAdrenaline, startArt } from '../src/weaponarts.js';
+import { ARTS, artBlocked, artCost, artOf, artPrimed, artReady, feelAdrenaline, startArt } from '../src/weaponarts.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 
 /** The player (red, `style`) and a man before him `distance` m off, settled; the orders drive red, nobody thinks for blue. */
@@ -25,16 +25,16 @@ test('weapon arts: none below the adrenaline it wants; offered and made above it
   assert.equal(artOf(me), 'artIai');
   me.adrenaline = ARTS.ready - 0.1;
   assert.equal(artReady(me), false);
-  assert.notEqual(contextAction(world, me), 'art', 'not on the special button');
+  assert.equal(artPrimed(me), false, 'its button not shown');
   assert.equal(startArt(world, me), false);
   assert.equal(me.punch, null);
 
   me.adrenaline = ARTS.ready + 0.15;
   assert.equal(artReady(me), true);
-  assert.equal(contextAction(world, me), 'art', 'the special button offers it');
+  assert.notEqual(contextAction(world, me), 'art', 'never on the special button: the art has its own');
   const stamina = me.stamina;
   const adrenaline = me.adrenaline;
-  // Pressed (the special button, or F): carried out with the orders.
+  // Pressed (its own button, or P): carried out with the orders.
   orders.actions = ['art'];
   step(1 / 60);
   assert.equal(me.punch?.type, 'artIai');
@@ -44,16 +44,71 @@ test('weapon arts: none below the adrenaline it wants; offered and made above it
   assert.ok(artCost(me, 'artIai') > 4 * MOVES.kesagiri.cost / me.body.aerobic);
   assert.ok(me.adrenaline < adrenaline - ARTS.spend + 0.01, `adrenaline ${adrenaline} → ${me.adrenaline}`);
   assert.equal(artReady(me), false, 'not again at once');
+  assert.equal(me.artCharged, false, 'the charge spent');
+  assert.equal(artPrimed(me), false, 'its button gone once made');
 });
 
-test('weapon arts: not without the stamina, and not at the air', () => {
-  const { world, me } = bout('naginata', 6);
+test('weapon arts: once charged, the art stays until it is used, however his blood falls and whoever is near', () => {
+  const { world, me, him, orders, step } = bout('katana', 1.5);
+  me.adrenaline = ARTS.ready + 0.05;
+  step(1 / 60);
+  assert.equal(me.artCharged, true, 'charged at his blood\'s height');
+  // His man gone and his blood cooled far below the mark: still charged, still offered.
+  him.state = 'out';
+  for (let second = 0; second < 20; second += 1) feelAdrenaline(world, me, 1);
+  assert.ok(me.adrenaline < ARTS.ready - 0.1, `cooled: ${me.adrenaline}`);
+  assert.equal(artPrimed(me), true, 'its button still shown');
+  assert.equal(artReady(me), true, 'and it can be made');
+  // Made with nobody near: into the air, the charge spent.
+  orders.actions = ['art'];
+  step(1 / 60);
+  assert.equal(me.punch?.type, 'artIai', 'made into the air');
+  const event = world.events.findLast((entry) => entry.kind === 'art');
+  assert.equal(event?.attacker, me.id);
+  assert.equal(event.defender, undefined, 'at nobody');
+  assert.equal(me.artCharged, false);
+  assert.equal(artPrimed(me), false);
+});
+
+test('weapon arts: a man out of reach does not stop it: it is made toward him', () => {
+  const { world, me, orders, step } = bout('naginata', 6);
   me.adrenaline = 0.9;
-  assert.equal(doAction(world, me, 'art'), false, 'nobody within reach');
+  step(1 / 60);
+  assert.equal(artPrimed(me), true);
+  orders.actions = ['art'];
+  step(1 / 60);
+  assert.equal(me.punch?.type, 'artWheel');
+  assert.equal(me.artCharged, false);
+});
+
+test('weapon arts: winded, the button stays (dimmed) and the art waits; pressed while busy, it is made when he is free', () => {
   const near = bout('naginata', 2);
   near.me.adrenaline = 0.9;
+  near.step(1 / 60);
   near.me.stamina = artCost(near.me, 'artWheel') * 0.5;
   assert.equal(artReady(near.me), false, 'winded');
+  assert.equal(artPrimed(near.me), true, 'its button still there');
+  assert.equal(artBlocked(near.me), 'winded', 'and says why');
+  near.orders.actions = ['art'];
+  near.step(1 / 60);
+  assert.notEqual(near.me.punch?.type, 'artWheel');
+  assert.equal(near.me.artCharged, true, 'the charge kept');
+
+  // A plain cut in flight near its end, then the art pressed: kept asked a moment (ARTS.askedFor) and made once he is free.
+  const busy = bout('katana', 1.5);
+  busy.me.adrenaline = 0.9;
+  busy.step(1 / 60);
+  const plain = Object.keys(STYLES.katana.attacks).find((name) => MOVES[name].path === 'blade' && MOVES[name].mode === 'swing');
+  assert.ok(throwPunch(busy.world, busy.me, plain, MOVES[plain].zones[0]), 'a plain cut thrown');
+  while (busy.me.punch && busy.me.punch.t < MOVES[plain].duration - ARTS.askedFor * 0.5) busy.step(1 / 60);
+  assert.equal(artBlocked(busy.me), 'busy');
+  busy.orders.actions = ['art'];
+  let made = false;
+  for (let frame = 0; frame < 40 && !made; frame += 1) {
+    busy.step(1 / 60);
+    made = busy.me.punch?.type === 'artIai';
+  }
+  assert.ok(made, 'made the moment the cut was done');
 });
 
 test('no gun and no bow has an art', () => {

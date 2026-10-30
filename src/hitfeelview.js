@@ -17,7 +17,7 @@ export const HITFEEL_VIEW = {
 };
 
 /** A soft round puff (a radial fade), drawn once. */
-function hitFeelMistTexture() {
+export function hitFeelMistTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;

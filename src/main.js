@@ -63,6 +63,8 @@ import { stageWaters } from './levelmode/water.js';
 import { createAudioEngine } from './audio/engine.js';
 import { createHitFeel, hitFeelFromHash, loadHitFeel, saveHitFeel } from './hitfeel.js';
 import { createHitFeelView } from './hitfeelview.js';
+import { createArtDrama } from './artdrama.js';
+import { createArtDramaView } from './artdramaview.js';
 import { installMuteButton, installUiSounds } from './audio/controls.js';
 import { installSoundBench } from './audio/bench.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
@@ -158,6 +160,9 @@ const hitFeelStorage = (() => {
 })();
 const hitFeel = createHitFeel(hitFeelFromHash(loadHitFeel(hitFeelStorage), location.hash));
 const hitFeelView = createHitFeelView(scene, { layer: $('#hit-vignette'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
+// The player's weapon arts made an event of (artdrama.js): toned down for a visitor who asks for less motion.
+const artDrama = createArtDrama({ reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
+const artDramaView = createArtDramaView(scene, { flash: $('#art-flash'), caption: $('#art-name'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
 
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
 let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
@@ -225,8 +230,9 @@ const cutsceneDirector = createCutsceneDirector({
 const twistDirector = createTwistDirector({ orbit: () => scene.orbit, roomTest: (x, z, y) => cameraRoomTest(x, z, y) });
 /** Simulated seconds per real second now: a big moment's slow motion, or the cutscene's (the slower of the two; never a stop). */
 const paceNow = () => Math.min(timeScale(state.drama, realSeconds()), cutsceneDirector.speed());
-// The page's pace: that, held a moment more by a hit-stop of the player's blow (hitfeel.js).
-const fightPace = () => paceNow() * hitFeel.pace(realSeconds());
+// The page's pace: that, held a moment more by a hit-stop of the player's blow (hitfeel.js), and slowed through a weapon art's
+// wind-up and held at its contact (artdrama.js). The frame's pace only: never the physics step, never boxer.advance or playFrames.
+const fightPace = () => paceNow() * hitFeel.pace(realSeconds()) * artDrama.pace(realSeconds());
 const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds, camera: () => scene.camera });
 
 // The ring on the floor round the man locked on.
@@ -1154,6 +1160,8 @@ function drawWorld(dt, drawIt = true) {
   cutsceneDirector.jolt(scene.camera);
   // The player's blows felt (hitfeel.js): the camera's jolt along the blow, the narrowing, the dark edges, the mist.
   hitFeelView.apply(hitFeel, realSeconds(), state.paused ? 0 : dt);
+  // A weapon art's push-in, tilt and shake (the camera only when it is the player's own), its gleam, trail, dust, glare and name.
+  artDramaView.apply(artDrama, realSeconds(), state.paused ? 0 : dt, world, { camera: Boolean(followed) && !cutsceneDirector.active && !endingCam });
   showCameraBar(!followed && !sheet);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
@@ -1225,6 +1233,8 @@ function consumeEvents() {
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
     // A blow the player's man lands, takes or has blocked: felt (hitfeel.js). Only while he is played (not the fight behind the menus, the intro).
     if (feltBy !== null) hitFeelView.felt(hitFeel.hear(event, feltBy, realSeconds()));
+    // His weapon art's start and its first contact (artdrama.js).
+    if (feltBy !== null) artDramaView.felt(artDrama.hear(event, feltBy, realSeconds()), state.world);
     // A machine struck (gear.machine: a robot) does not bleed: an edge, a point, an arrow or a ball throws sparks off it instead.
     const machine = Boolean(state.world.fighters[event.defender]?.body.gear.machine);
     const wound = machine ? (view, at) => spawnSparks(view, at.point, 10) : woundBlood;
@@ -1703,7 +1713,7 @@ const player = () => leadOf(state.world.fighters, state.playSide, state.lead[sta
 // Keys: punches on the right hand's home row, kicks and knees above and
 // below, defences on the left hand.
 // The movement keys (w a s d, the arrows) move him the way the camera looks;
-// F does the special action; Tab locks on; T held guards, tapped dodges; Space jumps; C crawls (or stands).
+// F does the special action, P the weapon art (when charged); Tab locks on; T held guards, tapped dodges; Space jumps; C crawls (or stands).
 const KEYS = {
   j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
   c: 'clinch', r: 'rush', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', y: 'rHook', g: 'collarTie',
@@ -1714,6 +1724,8 @@ const ORDER_KEYS = Object.fromEntries(COMMAND_ORDERS.map((entry) => [entry.key, 
 const fightKeys = new Set();
 let guardKeyDown = null;
 const GUARD_KEY = 't';
+// The weapon art's key: P (R is the rush and Q the roll; F the special action).
+const ART_KEY = 'p';
 const LABELS = {
   jab: 'Jab', cross: 'Cross', hook: 'Hook', uppercut: 'Upper', roundhouse: 'Kick', lowKick: 'Low kick', teep: 'Teep', knee: 'Knee',
   elbow: 'Elbow', upElbow: 'Up elbow', clinch: 'Clinch', rush: 'Charge', guard: 'Guard', slip: 'Slip', roll: 'Roll', parry: 'Parry',
@@ -1785,6 +1797,10 @@ window.addEventListener('keydown', (press) => {
       (state.orders.actions ??= []).push(action);
       tutorial.signal('action', action);
     }
+  } else if (key === ART_KEY) {
+    // His weapon's art, whenever it is charged (its own button; F stays the special action's).
+    press.preventDefault();
+    fightControls.art();
   } else if (ORDER_KEYS[key]) {
     press.preventDefault();
     orderSide(ORDER_KEYS[key]);
@@ -3353,6 +3369,9 @@ const boxer = window.boxer = {
   // The hit feel (hitfeel.js): its settings (changed in place), what it is doing now; its view (felt(result): a blow's mist, thump, vibration).
   hitFeel,
   hitFeelView,
+  // The weapon arts' drama (artdrama.js): what it is doing now; its view.
+  artDrama,
+  artDramaView,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),

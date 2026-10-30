@@ -18,7 +18,7 @@ import { jogSpeed, runSpeed } from './physics/gait.js';
 import { FINISHER, finishTarget, startFinisher, updateFinisher } from './finisher.js';
 import { lowTarget, startLowStrike, updateLowStrike } from './lowstrike.js';
 import { chargeAt } from './riding.js';
-import { artReady, artTarget, feelAdrenaline, startArt } from './weaponarts.js';
+import { ARTS, artBlocked, feelAdrenaline, startArt } from './weaponarts.js';
 
 export const CONTROL = {
   // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`; a walk from `walkFrom` of the footwork's pace up
@@ -116,7 +116,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false };
+  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false, artAskedUntil: 0 };
 }
 
 /**
@@ -473,6 +473,9 @@ export const MOVE_NAMES = {
   maceOverhead: ['Mace', 'overhead'], maceSide: ['Mace', 'side blow'], maceOverheadLeft: ['Mace', 'overhead'], maceSideLeft: ['Mace', 'side blow'],
   botCut: ['Blade cut'], botThrust: ['Blade thrust'], botSweep: ['Blade sweep'],
   shoot: ['Shot'], fireLong: ['Shot'], fireRifle: ['Shot'], firePump: ['Shot'], fireVolley: ['Volley'], loose: ['Arrow loosed'],
+  // The weapon arts (weaponarts.js), named as artdrama.js shows them.
+  artIai: ['Iai', 'drawing cut'], artPommel: ['Knaufschlag', 'pommel strike'], artDrawCut: ['Drawing cut'], artWheel: ['Wheel cut'],
+  artCrush: ['Crushing blow'], artCrushOne: ['Crushing blow'], artSpear: ['Lunge'],
 };
 
 /** A move's name, and a gloss if it has one: { name, gloss }. Unnamed: its key in words ("hammerOverhead" → "Hammer overhead"). */
@@ -911,7 +914,8 @@ export const ACTIONS = {
   crawl: { label: 'Crawl', icon: '🐾' },
   stand: { label: 'Stand', icon: '⤒' },
   finish: { label: 'Finish him', icon: '🔪' },
-  // His weapon's art (weaponarts.js), with his blood up: the button names it (weaponarts.js artLabel).
+  // His weapon's art (weaponarts.js): not the special button's (it has its own, shown while the art is charged), but asked
+  // for the same way, in `orders.actions`; its button names it (weaponarts.js artLabel).
   art: { label: 'Weapon art', icon: '✦' },
 };
 
@@ -957,8 +961,6 @@ export function contextAction(world, fighter) {
   const weapon = fighter.weapon?.held ? fighter.weapon : null;
   const opponent = opponentFor(world, fighter);
   const distance = opponent ? vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis))) : Infinity;
-  // His blood up and his man before him: his weapon's art (weaponarts.js; never a gun's or a bow's).
-  if (fighter.player && artReady(fighter) && artTarget(world, fighter)) return 'art';
   if (weapon?.spec.ranged && !weapon.spent) {
     const sidearm = fighter.body.gear.sidearm && !fighter.sidearmDrawn;
     if (sidearm && distance < (style?.ranged?.close ?? 1.5) + 0.5) return 'drawSidearm';
@@ -1034,6 +1036,8 @@ function steepUnder(world, fighter) {
 
 /** Do a special action now (when it still applies). */
 export function doAction(world, fighter, name) {
+  // His weapon's art has its own button, apart from the special one: made whenever it is charged (weaponarts.js).
+  if (name === 'art') return Boolean(fighter) && startArt(world, fighter);
   if (!fighter || name !== contextAction(world, fighter)) return false;
   const style = STYLES[fighter.style];
   const opponent = opponentFor(world, fighter);
@@ -1077,7 +1081,6 @@ export function doAction(world, fighter, name) {
     return true;
   }
   if (name === 'crawl' || name === 'stand') return playerCrawl(world, fighter, name === 'crawl');
-  if (name === 'art') return startArt(world, fighter);
   if (name === 'finish') {
     const prey = finishTarget(world, fighter, { locked: fighter.focus });
     return Boolean(prey) && !fighter.punch && startFinisher(world, fighter, prey);
@@ -1182,8 +1185,13 @@ export function directFighter(world, fighter, orders, dt) {
     fighter.strafe = 0;
     return;
   }
-  for (const action of orders.actions ?? []) doAction(world, fighter, action);
+  for (const action of orders.actions ?? []) {
+    // The art asked for (its button, or P): kept asked a moment (ARTS.askedFor) and made as soon as he is free; winded, not.
+    if (action === 'art') orders.artAskedUntil = artBlocked(fighter) === 'winded' ? 0 : world.time + ARTS.askedFor;
+    else doAction(world, fighter, action);
+  }
   orders.actions = [];
+  if (orders.artAskedUntil > world.time && startArt(world, fighter)) orders.artAskedUntil = 0;
   for (const press of orders.holds ?? []) pressHeld(world, fighter, press);
   orders.holds = [];
   if (goPin(world, fighter)) return;
