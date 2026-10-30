@@ -137,8 +137,6 @@ export function useItem(world, kind) {
 function bandaged(world) {
   const me = world.fighters[0];
   me.bleed = 0;
-  me.bleedInside = 0;
-  me.bleedOutside = 0;
   say(world, { type: 'toast', text: 'Bleeding stopped' });
   world.events.push({ time: world.time, kind: 'bandaged', fighter: 0, effects: ['the bleeding is stopped'] });
 }
@@ -151,7 +149,7 @@ function tonicEffect(me) {
   return {
     t: 0,
     seconds: LEVEL_CONFIG.tonic.seconds,
-    from: { bloodLost: me.bloodLost ?? 0, concussion: me.concussion, gunshot: me.gunshot ?? 0, damage: { ...me.damage }, trauma: { head: me.trauma?.head ?? 0, trunk: me.trauma?.trunk ?? 0 } },
+    from: { bloodLost: me.bloodLost ?? 0, concussion: me.concussion, gunshot: me.gunshot ?? 0, damage: { ...me.damage }, trauma: { ...me.trauma } },
   };
 }
 
@@ -173,7 +171,12 @@ export function updateTonics(world, dt) {
       me.damage[key] = Math.max(0, me.damage[key] - (from.damage[key] ?? 0) * step);
     }
     me.damageVersion += 1;
-    for (const key of ['head', 'trunk']) if (me.trauma?.[key]) me.trauma[key] = Math.max(0, me.trauma[key] - from.trauma[key] * step);
+    // The injury to every part (the health bar's), but a broken limb's: that stays broken.
+    for (const key of Object.keys(from.trauma)) {
+      const joint = SEGMENT_JOINT[key.replace(/^[lr]/, '')];
+      if (joint && me.broken.has(`${key[0]}${joint}`)) continue;
+      if (me.trauma?.[key]) me.trauma[key] = Math.max(0, me.trauma[key] - from.trauma[key] * step);
+    }
     if (effect.t >= effect.seconds) {
       me.knockdowns = 0;
       level.tonics.splice(index, 1);

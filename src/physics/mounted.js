@@ -16,7 +16,7 @@ import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
-import { BLADES, harmMix, shieldContact } from '../weapons.js';
+import { BLADES, bleedRate, bleedToLose, harmMix, shieldContact } from '../weapons.js';
 import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
@@ -828,8 +828,8 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
 }
 
 /**
- * Harm to a horse: an edge or a point bleeds it (its blood is ~8% of its
- * weight, so the same wound is a smaller share than a man's), a point in
+ * Harm to a horse: a deep edge or point bleeds it (as a man's wound, BLADES.bleed;
+ * its blood is ~8% of its weight, so the same wound is a smaller share than a man's), a point in
  * its chest or neck past the lethal depth opens the heart or the great
  * vessels (down in `heartSeconds`), a leg cut or broken cripples it, a heavy
  * blow to the head drops it, and blunt harm summed on its body kills it.
@@ -838,15 +838,14 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
   const spec = WORLD.mount.horse;
   const share = spec.manBlood / horse.mass;
   const zone = capsule.part === 'legs' ? 'limb' : capsule.part === 'head' ? 'head' : 'trunk';
-  const bleed = (cut * BLADES.bleedPerJoule.cut + pierce * BLADES.bleedPerJoule.pierce) * BLADES.bleedZone[zone] * share;
+  const bleed = (bleedRate('cut', cut, zone) + bleedRate('pierce', pierce, zone)) * share;
   horse.bleed += bleed;
   horse.wounds[capsule.key] = (horse.wounds[capsule.key] ?? 0) + cut + pierce + blunt;
   if (attacker) horse.lastHitBy = attacker.id;
   if (cut > 1) event.effects.push(cut > 60 ? 'a deep cut' : 'cut');
   if (pierce > 1) event.effects.push(pierce > 40 ? 'run through' : 'stabbed');
   if ((capsule.part === 'chest' || capsule.part === 'neck') && pierce > BLADES.lethalPierce * BODY.toughness * Math.sqrt(horse.mass / spec.manBlood)) {
-    const left = Math.max(0, collapseShare() - horse.bloodLost);
-    horse.bleed += left / (BLADES.clotSeconds * (1 - Math.exp(-spec.heartSeconds / BLADES.clotSeconds)));
+    horse.bleed += bleedToLose(collapseShare() - horse.bloodLost, spec.heartSeconds);
     event.effects.push('through the heart');
   }
   if (capsule.part === 'legs' && blunt + cut > spec.legBreak) {

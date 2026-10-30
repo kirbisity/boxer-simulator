@@ -110,8 +110,6 @@ test('a bandage is a 2.5 s action that stops all bleeding; the man stands still 
   assert.equal(useItem(world, 'bandage'), false, 'not bleeding: not used');
   assert.equal(level.inventory.bandage, START_BANDAGES);
   me.bleed = 0.08;
-  me.bleedInside = 0.03;
-  me.bleedOutside = 0.05;
   assert.equal(useItem(world, 'bandage'), true);
   assert.equal(level.inventory.bandage, START_BANDAGES - 1);
   assert.ok(levelBusy(world));
@@ -124,8 +122,6 @@ test('a bandage is a 2.5 s action that stops all bleeding; the man stands still 
   assert.ok(me.tending, 'hands at the wound');
   run(world, 0.6, orders);
   assert.equal(me.bleed, 0);
-  assert.equal(me.bleedInside, 0);
-  assert.equal(me.bleedOutside, 0);
   assert.equal(level.action, null);
   assert.equal(me.tending, undefined);
   assert.equal(levelBusy(world), false);
