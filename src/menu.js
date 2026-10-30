@@ -18,6 +18,7 @@ import { SKIN_TONES } from './render.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
 import { STAGE_LIST } from './levelmode/story.js';
 import { audioMixer } from './audio/controls.js';
+import { hitFeelPanel } from './hitfeelview.js';
 import { LAST_GATE, LAST_GATE_HEROES, LAST_GATE_HERO_KEYS } from './lastgate.js';
 import { lastGateBoardList } from './lastgateview.js';
 
@@ -130,9 +131,10 @@ export function installMenus(game) {
   // ---- Settings ----------------------------------------------------------
   // The sound's mixer (audio/controls.js), kept in this browser, and the way to the sound bench (audio/bench.js).
   function settings() {
-    const body = screen('settings-screen', 'Settings', 'Sound: the mixer, kept in this browser.', home);
+    const body = screen('settings-screen', 'Settings', 'Sound and the feel of a blow, kept in this browser.', home);
     const panel = el('div', { className: 'settings-panel' });
     if (game.audio) panel.append(audioMixer(game.audio));
+    if (game.hitFeel) panel.append(hitFeelPanel(game.hitFeel.settings, game.hitFeel.save));
     panel.append(el('button', { className: 'bench-open', type: 'button', textContent: '🎧 Open the sound bench', onclick: () => game.soundBench?.() }));
     body.append(panel);
     show('settings-screen');

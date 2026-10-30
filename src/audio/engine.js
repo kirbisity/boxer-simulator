@@ -29,6 +29,7 @@ import { playWithSamples } from './sfx/sampled.js';
 import { breathParams, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
 import { playUi, uiParams } from './sfx/ui.js';
+import { playThump, thumpParams } from './sfx/thump.js';
 
 /** The mixer's settings: the five levels (0..1), the Speakers toggle (null: the machine's default), mute. Kept in this browser. */
 export const AUDIO_SETTINGS = { key: 'gladiator-audio', defaults: { master: 0.8, effects: 1, ambience: 0.8, music: 0.6, voices: 1, speakers: null, muted: false } };
@@ -554,6 +555,13 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     playUi(voice, voice.out, uiParams(kind), state.ctx.currentTime + 0.005, 0.8);
   }
 
+  /** The hit feel's thump (hitfeel.js) of a blow the player felt, at `gain` (0..1), a blow of `strength` (0..1: lower and longer the heavier), straight into the effects bus. */
+  function thump(gain, strength = gain) {
+    if (!state.ctx || state.ctx.state !== 'running' || !(gain > 0)) return;
+    const voice = sfxVoice(state.ctx, state.buses.effects.dry);
+    playThump(voice, voice.out, thumpParams(strength), state.ctx.currentTime + 0.002, Math.min(1, gain));
+  }
+
   /**
    * Play an event as the bench asks: `event` (its type and fields) at `at` ([x, y, z], round a listener at the origin facing -z), now.
    * Returns { params, atEar, distance } (what was played), or null without a context.
@@ -600,6 +608,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     listener,
     frame,
     ui,
+    thump,
     unlock,
     /** Set a mixer level or toggle (name: master, effects, ambience, music, voices, speakers, muted); kept. */
     set(name, value) {

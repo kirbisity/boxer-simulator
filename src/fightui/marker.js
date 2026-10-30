@@ -7,6 +7,11 @@
 // flash of its colour, a block a steel shield, a glance a spark's arc, a
 // miss the ring sweeping on past, dashed, as it fades.
 //
+// Quiet, to sit in the scene's own look rather than over it: thin lines, the
+// kind's colour muted toward the warm grey of the scene's light, never fully
+// opaque, the arrow dimming once it has shown the way, and all of it gone a
+// moment after the blow (the men under the marks must stay in view).
+//
 // Cheap: a fixed handful of flat meshes made once and reused, all one plain
 // unlit material kind (one shader, warmed at the start of each fight),
 // drawn over everything, facing the camera, never made see-through.
@@ -26,17 +31,38 @@ export const FIGHT_UI_MARKS = {
   closeIn: 0.15,
   flyIn: 0.18,
   // s: the aim fades this long once how it went is known; a press never thrown fades after this.
-  fadeOut: 0.18,
+  fadeOut: 0.14,
   giveUp: 1.4,
   // s: a burst lasts this long; a miss sweeps on for this long.
-  burst: 0.5,
+  burst: 0.4,
   sweep: 0.45,
   // The burst's size (m).
   burstSize: 0.1,
   // The dark shadow under each mark (keeps it legible on a bright scene): its offset (in ring radii) and strength.
-  shadowOffset: 0.09,
-  shadowOpacity: 0.45,
+  // Soft: enough to lift a thin line off a pale wall, not a black outline.
+  shadowOffset: 0.07,
+  shadowOpacity: 0.3,
+  // The kind's colour is mixed this share toward a warm grey (the scene's lit stone and skin), so the marks
+  // keep their hue (which kind of blow) but not the buttons' signal brightness, which shouted over the fight.
+  mute: 0.38,
+  muteToward: '#cfc6b6',
+  // The most each mark is shown (opacity): the ring on him, the arrow, the burst of how it went. Never solid,
+  // so the man under the ring is still seen through it; the arrow the least, as it crosses the fight.
+  opacity: { aim: 0.62, arrow: 0.5, burst: 0.55 },
+  // s: the arrow, once it has flown in and held this long, dims to `arrowRest` of itself (the way is read by then).
+  arrowHold: 0.22,
+  arrowRest: 0.6,
 };
+
+const fightUiMuted = new Map();
+/** A colour muted for the marks (FIGHT_UI_MARKS.mute), as a hex string; made once per colour. */
+export function fightUiMarkColour(hex) {
+  if (!fightUiMuted.has(hex)) {
+    const toward = new THREE.Color(FIGHT_UI_MARKS.muteToward);
+    fightUiMuted.set(hex, `#${new THREE.Color(hex).lerp(toward, FIGHT_UI_MARKS.mute).getHexString()}`);
+  }
+  return fightUiMuted.get(hex);
+}
 
 const fightUiMarksMaterial = (hex, opacity = 1) => new THREE.MeshBasicMaterial({
   color: new THREE.Color(hex), transparent: true, opacity, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide, toneMapped: false,
@@ -90,32 +116,33 @@ function fightUiMarkGeometries() {
   const ticks = [0, 1, 2, 3].map((quarter) => {
     const angle = (quarter * Math.PI) / 2;
     const way = [Math.cos(angle), Math.sin(angle)];
-    const across = [-way[1] * 0.08, way[0] * 0.08];
-    const near = 1.16;
-    const far = 1.55;
+    const across = [-way[1] * 0.045, way[0] * 0.045];
+    const near = 1.14;
+    const far = 1.42;
     return fightUiPolygon([[way[0] * near + across[0], way[1] * near + across[1]], [way[0] * far + across[0], way[1] * far + across[1]], [way[0] * far - across[0], way[1] * far - across[1]], [way[0] * near - across[0], way[1] * near - across[1]]]);
   });
   const dashes = Array.from({ length: 10 }, (_, index) => {
     const from = (index / 10) * Math.PI * 2;
     const arc = (Math.PI * 2) / 10 * 0.55;
     const outer = Array.from({ length: 7 }, (__, step) => from + (arc * step) / 6).map((angle) => [Math.cos(angle), Math.sin(angle)]);
-    const inner = outer.slice().reverse().map(([x, y]) => [x * 0.8, y * 0.8]);
+    const inner = outer.slice().reverse().map(([x, y]) => [x * 0.88, y * 0.88]);
     return fightUiPolygon([...outer, ...inner]);
   });
   // A straight arrow: a shaft, then a head whose tip is at the ring's edge.
-  const straight = [fightUiRibbon([[-4.1, 0], [-1.85, 0]], (t) => 0.22 + 0.2 * t), fightUiHead([-1.12, 0], [1, 0], 0.85, 0.62)];
+  // (Thin: a line drawn in the air, not a road sign; its head small.)
+  const straight = [fightUiRibbon([[-3.6, 0], [-1.65, 0]], (t) => 0.1 + 0.1 * t), fightUiHead([-1.12, 0], [1, 0], 0.6, 0.36)];
   // A sweep: in from behind, bowed over, into the ring, widening as it comes.
-  const sweepPoints = fightUiCurve([-4.4, -1.3], [-3.0, 1.35], [-1.55, 0.32]);
+  const sweepPoints = fightUiCurve([-3.9, -1.1], [-2.8, 1.2], [-1.55, 0.32]);
   const endWay = (() => {
     const [a, b] = sweepPoints.slice(-2);
     const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     return [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
   })();
-  const sweepTip = [sweepPoints.at(-1)[0] + endWay[0] * 0.72, sweepPoints.at(-1)[1] + endWay[1] * 0.72];
-  const sweep = [fightUiRibbon(sweepPoints, (t) => 0.1 + 0.36 * t), fightUiHead(sweepTip, endWay, 0.85, 0.6)];
+  const sweepTip = [sweepPoints.at(-1)[0] + endWay[0] * 0.52, sweepPoints.at(-1)[1] + endWay[1] * 0.52];
+  const sweep = [fightUiRibbon(sweepPoints, (t) => 0.05 + 0.17 * t), fightUiHead(sweepTip, endWay, 0.6, 0.36)];
   // Chevrons: two, then a third, nearer the ring each.
-  const chevron = (x, size) => fightUiPolygon([[x - 0.75 * size, 0.85 * size], [x, 0], [x - 0.75 * size, -0.85 * size], [x - 1.2 * size, -0.85 * size], [x - 0.45 * size, 0], [x - 1.2 * size, 0.85 * size]]);
-  const chevrons = [chevron(-1.2, 1), chevron(-2.15, 0.85), chevron(-2.95, 0.7)];
+  const chevron = (x, size) => fightUiPolygon([[x - 0.6 * size, 0.62 * size], [x, 0], [x - 0.6 * size, -0.62 * size], [x - 0.84 * size, -0.62 * size], [x - 0.24 * size, 0], [x - 0.84 * size, 0.62 * size]]);
+  const chevrons = [chevron(-1.2, 1), chevron(-1.95, 0.85), chevron(-2.6, 0.7)];
   // The block's shield; the glance's spark arc.
   const shieldPoints = [[0, 1], [0.85, 0.7], [0.85, 0.05], ...fightUiCurve([0.85, 0.05], [0.8, -0.75], [0, -1.12], 8).slice(1), ...fightUiCurve([0, -1.12], [-0.8, -0.75], [-0.85, 0.05], 8).slice(1), [-0.85, 0.7]];
   const sparkArc = Array.from({ length: 13 }, (_, index) => 0.25 + (index / 12) * 1.7).map((angle) => [Math.cos(angle), Math.sin(angle)]);
@@ -125,15 +152,15 @@ function fightUiMarkGeometries() {
     return fightUiRibbon([[way[0] * 1.15, way[1] * 1.15], [way[0] * (1.15 + length), way[1] * (1.15 + length)]], () => 0.12);
   })];
   return {
-    ring: new THREE.RingGeometry(0.8, 1, 48),
+    ring: new THREE.RingGeometry(0.9, 1, 48),
     ticks: new THREE.ShapeGeometry(ticks),
-    dot: new THREE.CircleGeometry(0.15, 16),
+    dot: new THREE.CircleGeometry(0.09, 16),
     dashed: new THREE.ShapeGeometry(dashes),
     straight: new THREE.ShapeGeometry(straight),
     sweep: new THREE.ShapeGeometry(sweep),
     chevrons: new THREE.ShapeGeometry(chevrons),
     disc: new THREE.CircleGeometry(1, 32),
-    thin: new THREE.RingGeometry(0.88, 1, 48),
+    thin: new THREE.RingGeometry(0.93, 1, 48),
     shield: new THREE.ShapeGeometry(fightUiPolygon(shieldPoints)),
     spark: new THREE.ShapeGeometry(spark),
   };
@@ -240,7 +267,7 @@ export function createFightUiMarks(view) {
   const grow = (at) => Math.max(1, at.distanceTo(camera.position) / FIGHT_UI_MARKS.growFrom);
 
   function aimAt(spec) {
-    aim = { ...spec, start: null, landAt: null, outcome: null, way: spec.travel, colour: FIGHT_UI.colours[spec.group] ?? '#ffffff', sweptBy: 0 };
+    aim = { ...spec, start: null, landAt: null, outcome: null, way: spec.travel, colour: fightUiMarkColour(FIGHT_UI.colours[spec.group] ?? '#ffffff'), sweptBy: 0 };
     aim.arrow = spec.group === 'side' || spec.group === 'low' ? 'sweep' : spec.group === 'straight' ? 'straight' : 'chevrons';
   }
 
@@ -317,10 +344,11 @@ export function createFightUiMarks(view) {
     ringGroup.scale.setScalar(close * (missed ? 1 + 0.4 * since / FIGHT_UI_MARKS.sweep : 1));
     const swept = missed ? fightUiEase(since / FIGHT_UI_MARKS.sweep) * 2.4 : 0;
     ringGroup.position.set(wx * swept, wy * swept, 0);
-    fightUiPaint(ring, aim.colour, missed ? 0 : fade);
-    fightUiPaint(ticks, aim.colour, missed ? 0 : fade * 0.95);
-    fightUiPaint(dot, aim.colour, missed ? 0 : fade * 0.9);
-    fightUiPaint(dashed, FIGHT_UI.outcomeColours.miss, missed ? fade : 0);
+    const shown = FIGHT_UI_MARKS.opacity.aim;
+    fightUiPaint(ring, aim.colour, missed ? 0 : fade * shown);
+    fightUiPaint(ticks, aim.colour, missed ? 0 : fade * shown * 0.85);
+    fightUiPaint(dot, aim.colour, missed ? 0 : fade * shown * 0.8);
+    fightUiPaint(dashed, fightUiMarkColour(FIGHT_UI.outcomeColours.miss), missed ? fade * shown : 0);
     // The arrow: flies in to the ring at the press; on the blow landing, on into it.
     const angle = Math.atan2(wy, wx);
     arrowTurn.rotation.z = angle;
@@ -328,7 +356,9 @@ export function createFightUiMarks(view) {
     arrowTurn.scale.set(1, Math.cos(angle) < -1e-3 ? -1 : 1, 1);
     const flown = fightUiEase(age / FIGHT_UI_MARKS.flyIn);
     arrowSlide.position.x = -1.3 * (1 - flown) + (aim.outcome && aim.outcome !== 'gone' && !missed ? 0.9 * fightUiEase(since / FIGHT_UI_MARKS.fadeOut) : missed ? swept : 0);
-    for (const [kind, mark] of Object.entries(arrows)) fightUiPaint(mark, aim.colour, kind === aim.arrow ? fade * (0.35 + 0.65 * flown) : 0);
+    // Once it has shown the way, the arrow dims (it crosses the fight; the ring on him is what stays).
+    const resting = 1 - (1 - FIGHT_UI_MARKS.arrowRest) * fightUiEase((age - FIGHT_UI_MARKS.flyIn - FIGHT_UI_MARKS.arrowHold) / 0.2);
+    for (const [kind, mark] of Object.entries(arrows)) fightUiPaint(mark, aim.colour, kind === aim.arrow ? fade * (0.35 + 0.65 * flown) * resting * FIGHT_UI_MARKS.opacity.arrow : 0);
   }
 
   function updateBurst(burst, now) {
@@ -351,26 +381,28 @@ export function createFightUiMarks(view) {
     const size = FIGHT_UI_MARKS.burstSize * grow(state.point);
     burst.group.scale.setScalar(size);
     const out = fightUiEase(t);
-    const fade = 1 - t;
+    const fade = (1 - t) * FIGHT_UI_MARKS.opacity.burst;
+    const outcome = (name) => fightUiMarkColour(FIGHT_UI.outcomeColours[name]);
     const kind = state.outcome === 'parried' ? 'blocked' : state.outcome;
     for (const part of parts) part.holder.visible = false;
     if (kind === 'hit') {
       burst.flash.holder.scale.setScalar(0.8 + 0.9 * out);
-      fightUiPaint(burst.flash, state.colour, Math.max(0, 0.75 * (1 - t * 1.6)));
+      // (A faint flash: the blow is seen on the man himself, not under a disc of colour.)
+      fightUiPaint(burst.flash, state.colour, Math.max(0, 0.22 * (1 - t * 2)));
       burst.ring.holder.scale.setScalar(0.7 + 1.8 * out);
-      fightUiPaint(burst.ring, FIGHT_UI.outcomeColours.hit, fade);
+      fightUiPaint(burst.ring, outcome('hit'), fade);
       burst.outer.holder.scale.setScalar(1 + 2.4 * fightUiEase(t * 0.85));
-      fightUiPaint(burst.outer, state.colour, fade * 0.9);
+      fightUiPaint(burst.outer, state.colour, fade * 0.7);
     } else if (kind === 'blocked') {
       const pop = t < 0.2 ? 0.7 + 1.9 * t : 1.08 - 0.08 * ((t - 0.2) / 0.8);
       burst.shield.holder.scale.setScalar(pop);
-      fightUiPaint(burst.shield, FIGHT_UI.outcomeColours.blocked, fade * 0.85);
+      fightUiPaint(burst.shield, outcome('blocked'), fade * 0.85);
       burst.ring.holder.scale.setScalar(1.2 + 1.2 * out);
-      fightUiPaint(burst.ring, FIGHT_UI.outcomeColours.blocked, fade * 0.6);
+      fightUiPaint(burst.ring, outcome('blocked'), fade * 0.6);
     } else if (kind === 'glance') {
       burst.spark.holder.rotation.z = state.turn;
       burst.spark.holder.scale.setScalar(0.8 + 0.7 * out);
-      fightUiPaint(burst.spark, FIGHT_UI.outcomeColours.glance, fade);
+      fightUiPaint(burst.spark, outcome('glance'), fade);
     }
   }
 
