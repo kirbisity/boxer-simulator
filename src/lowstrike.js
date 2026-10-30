@@ -33,7 +33,7 @@ function stanceOf(fighter) {
 }
 
 /** His shoulder standing upright in his stance (local m: forward of the hips, up from the floor). */
-function uprightShoulder(fighter) {
+function standingShoulder(fighter) {
   const L = fighter.body.lengths;
   const { lean, crouch } = stanceOf(fighter);
   return [L.trunk * Math.sin(lean), L.ankle + L.shank + L.thigh - crouch * fighter.body.heightM + L.trunk * Math.cos(lean)];
@@ -43,7 +43,7 @@ function uprightShoulder(fighter) {
 export function lowMan(fighter, man) {
   if (!man || man === fighter || man.state === 'out' || man.dormant || man.fled || man.mount) return false;
   if (man.state === 'down' || man.state === 'rising' || man.crawling) return true;
-  return man.x[P.head * 3 + 1] - floorOf(fighter) < WORLD.lowStrike.headBelow * uprightShoulder(fighter)[1];
+  return man.x[P.head * 3 + 1] - floorOf(fighter) < WORLD.lowStrike.headBelow * standingShoulder(fighter)[1];
 }
 
 /**
@@ -133,7 +133,7 @@ export function stoopNeeded(fighter, spec, apart, height) {
     const hip = fighter.body.lengths.ankle + fighter.body.lengths.shank + fighter.body.lengths.thigh;
     return Math.hypot(apart, hip - height) <= outer ? 0 : null;
   }
-  const shoulder = uprightShoulder(fighter);
+  const shoulder = standingShoulder(fighter);
   for (let stoop = 0; stoop <= 1.0001; stoop += 0.05) {
     const shift = stoopShift(fighter, stoop);
     const distance = Math.hypot(apart - shoulder[0] - shift[0], height - shoulder[1] - shift[1]);
@@ -161,7 +161,7 @@ function standingOff(fighter, spec, height, stoop) {
     const hip = fighter.body.lengths.ankle + fighter.body.lengths.shank + fighter.body.lengths.thigh;
     return Math.max(WORLD.lowStrike.standOff, Math.sqrt(Math.max(0, outer ** 2 - (hip - height) ** 2)) * 0.9);
   }
-  const shoulder = vec.add([...uprightShoulder(fighter), 0], stoopShift(fighter, stoop));
+  const shoulder = vec.add([...standingShoulder(fighter), 0], stoopShift(fighter, stoop));
   const drop = height - shoulder[1];
   let near = shoulder[0] + Math.sqrt(Math.max(0, how.inner ** 2 - drop ** 2));
   if (how.start) {
