@@ -11,6 +11,8 @@
 // with the armour's clank on top for plate or mail; heels on a hard floor (stone, tile, boards) click (the recorded heels; boards, the
 // ring's canvas among them, are otherwise the synth's). Hooves: on hard ground or soft by the surface, by the gait; the neigh recorded. Blows: a helmet rings, a wooden shield
 // (or a haft) knocks, a fist, foot, knee or elbow on the body punches, the fist's whoosh rises into it; thunder near cracks, far rumbles.
+// A man going down thuds (the recorded body fall; in plate or mail the crash of his kit over it), a whip's tip cracks on what it lashes, a
+// wooden door creaks as it swings and slams as it shuts (a chest's lid the same, smaller).
 
 import { sfxClamp, sfxKeep, sfxRun } from '../synth.js';
 
@@ -59,6 +61,17 @@ const HOOF_HARD = new Set(['stone', 'tile', 'wood']);
 const HOOF_SOFT = new Set(['earth', 'grass', 'sand', 'snow']);
 /** A hoof by its gait: the trim and the rate. */
 const HOOF_PACE = { walk: { trim: 0.7, rate: 0.94 }, trot: { trim: 0.85, rate: 0.97 }, canter: { trim: 1, rate: 1 }, gallop: { trim: 1.1, rate: 1.03 } };
+/**
+ * A body falling (the recorded thud, cut on a hard floor): on soft ground duller and a little lower; in water or mud the synth's splash
+ * and slap instead. Its weight: from `light` to `heavy` kg, `gainDb` over the fall's own level and the share of the length played.
+ * (The trims are about 6 dB over the synth's thud: at the fall's own level, a man going down at 3 m/s was under the footsteps.)
+ */
+const BODY_FALL_GROUND = { stone: { trim: 2.4, rate: 1 }, tile: { trim: 2.4, rate: 1.03 }, wood: { trim: 2.5, rate: 0.97 }, earth: { trim: 2.2, rate: 0.94 }, grass: { trim: 2, rate: 0.94 }, sand: { trim: 1.8, rate: 0.9 }, snow: { trim: 1.7, rate: 0.9 } };
+export const BODY_FALL_WEIGHT = { light: 50, heavy: 120, gainDb: [-3, 3], length: [0.85, 1.2] };
+/** A whip's lash (its tip's energy, J, from `low` to `high`): lifted by `lift` to be heard as the crack it is, not the tip's few joules. */
+export const WHIP_LASH = { low: 2, high: 40, lift: 2.5 };
+/** The wooden mechanisms the door's takes play, by weight 0..1 (a chest's lid light: higher, quieter, shorter; a door heavy). */
+const WOODEN_MECHS = { chest: 0, door: 1 };
 
 /** Where `mass` (kg) is on the weight curve, 0 (light) .. 1 (heavy). */
 export const stepWeight = (mass) => sfxClamp(((mass ?? 80) - STEP_WEIGHT.light) / (STEP_WEIGHT.heavy - STEP_WEIGHT.light), 0, 1);
@@ -82,13 +95,20 @@ function groundStep(params, event, jitter) {
 /**
  * The plan for an event (its type, its family's params, the event): { set, trim (× the gain), rate (playback), seconds (the most to play,
  * null for the whole take), share (of that, played; 1 if absent), fade (s, at its end), skip (s more into the take), extra (more takes
- * played with it: { set, trim, rate, seconds, fade, skip }), synth (params the synth plays beside it, or null), synthGain },
+ * played with it: { set, trim, rate, seconds, fade, skip, delay (s after the first) }), synth (params the synth plays beside it, or null), synthGain },
  * or null where the synth alone plays it.
  */
 export function samplePlan(type, params, event = {}, random = Math.random) {
   const jitter = (spread = 0.06) => 1 + (random() * 2 - 1) * spread;
   switch (type) {
     case 'hit': {
+      // A whip's tip (physics/whip.js) cracks on whatever it lashes: the harder lash louder and rung out longer; on armour or a shield
+      // the crack shorter and higher, the synth's knock of what it struck beside it.
+      if (params.striker === 'lash') {
+        const s = sampleStrength(params.energy, WHIP_LASH.low, WHIP_LASH.high);
+        const soft = SAMPLED_SOFT.has(params.covering);
+        return { set: 'whip', trim: WHIP_LASH.lift * (soft ? 1 : 0.6) * sampleLerp(0.7, 1.25, s), rate: (soft ? 1 : 1.1) * sampleLerp(1.06, 0.96, s) * jitter(0.05), seconds: (soft ? 1 : 0.6) * sampleLerp(0.18, 0.55, s), fade: sampleLerp(0.05, 0.2, s), skip: 0, synth: soft ? null : params, synthGain: soft ? 0 : 0.6 };
+      }
       const limb = LIMB_BLOWS[params.striker];
       if (!SAMPLED_HEADS.has(params.striker) && !limb) return null;
       const s = sampleStrength(params.energy, 5, 400);
@@ -148,12 +168,33 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
     }
     case 'fall':
     case 'land': {
-      if (params.armour !== 'plate' && params.armour !== 'mail') return null;
+      const armoured = params.armour === 'plate' || params.armour === 'mail';
       const s = sampleStrength(params.speed, 0.8, 9);
       const synth = { ...params, armour: 'none' };
-      // A man in armour going down crashes with it; landing on his feet, a heavy step's clank.
-      if (params.kind === 'fall') return { set: 'clatter', trim: (params.armour === 'mail' ? 0.5 : 0.75) * sampleLerp(0.6, 1.1, s), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.2, 0.85, 1.15) * 0.9 * jitter(0.04), seconds: sampleLerp(0.4, 1, s), fade: 0.2, skip: 0, synth, synthGain: 1 };
+      // A body going down (any man, any kit): the recorded thud, harder the faster he comes down and louder, lower and drawn out the
+      // heavier he is; where the ground has no recording of it (water, mud), the synth's thud and splash.
+      const ground = params.kind === 'fall' ? BODY_FALL_GROUND[params.surface] : null;
+      const w = sfxClamp(((event.mass ?? 80) - BODY_FALL_WEIGHT.light) / (BODY_FALL_WEIGHT.heavy - BODY_FALL_WEIGHT.light), 0, 1);
+      const body = ground ? {
+        set: 'bodyfall', trim: ground.trim * sampleLerp(0.6, 1.15, s) * 10 ** (sampleLerp(...BODY_FALL_WEIGHT.gainDb, w) / 20), rate: ground.rate * sfxClamp((80 / Math.max(40, event.mass ?? 80)) ** 0.25, 0.85, 1.15) * jitter(0.04),
+        seconds: sampleLerp(0.3, 1.1, s) * sampleLerp(...BODY_FALL_WEIGHT.length, w), fade: sampleLerp(0.06, 0.3, s), skip: 0,
+      } : null;
+      if (!armoured) return body ? { ...body, synth: null, synthGain: 0 } : null;
+      // A man in armour going down crashes with it (over the body's thud); landing on his feet, a heavy step's clank.
+      if (params.kind === 'fall') return { set: 'clatter', trim: (params.armour === 'mail' ? 0.5 : 0.75) * sampleLerp(0.6, 1.1, s), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.2, 0.85, 1.15) * 0.9 * jitter(0.04), seconds: sampleLerp(0.4, 1, s), fade: 0.2, skip: 0, extra: body ? [body] : [], synth: body ? null : synth, synthGain: 1 };
       return { set: 'armourstep', trim: 0.8 * sampleLerp(0.7, 1.2, s), rate: 0.9 * jitter(0.05), seconds: null, fade: 0.06, skip: 0, synth, synthGain: 1 };
+    }
+    case 'mech': {
+      // A wooden door (a chest's lid lighter: higher, quieter, shorter) creaks as it swings; shut, it creaks a moment and slams (the slam
+      // `delay` s into the creak, as the synth's). Other mechanisms (a gate of bars, a portcullis, a lock) stay the synth's.
+      if (!(params.kind in WOODEN_MECHS)) return null;
+      const w = WOODEN_MECHS[params.kind];
+      const opening = params.state !== 'closed' && params.state !== 'shut' && params.state !== 'down' && params.state !== 'closing';
+      const rate = sampleLerp(1.15, 1, w) * jitter(0.04);
+      const length = sampleLerp(0.55, 1, w);
+      const creak = { set: 'door-creak', trim: sampleLerp(0.8, 1.1, w), rate, seconds: (opening ? 0.95 : 0.5) * length, fade: opening ? 0.25 : 0.08, skip: 0, synth: null, synthGain: 0 };
+      if (opening) return creak;
+      return { ...creak, extra: [{ set: 'door-slam', trim: sampleLerp(1.2, 2, w), rate: rate * 0.98, seconds: sampleLerp(0.5, 1.4, w), fade: sampleLerp(0.15, 0.4, w), skip: 0, delay: 0.45 * length }] };
     }
     case 'clatter': {
       const s = sampleStrength(params.speed, 1.2, 8);
@@ -231,7 +272,7 @@ export function playWithSamples(bank, voice, family, event, params, when, gain) 
   let end = playSample(voice, voice.out, take, plan, when, gain);
   for (const layer of plan.extra ?? []) {
     const more = bank.pick(layer.set);
-    if (more) end = Math.max(end, playSample(voice, voice.out, more, layer, when, gain));
+    if (more) end = Math.max(end, playSample(voice, voice.out, more, layer, when + (layer.delay ?? 0), gain));
   }
   if (plan.synth) end = Math.max(end, family.play(voice, voice.out, plan.synth, when, gain * plan.synthGain));
   return end;
