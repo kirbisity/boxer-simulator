@@ -58,7 +58,8 @@ test('more skill, fewer blows land: an elite reads them, holds his guard and mee
   const shares = `landed: ${novice.share.toFixed(2)} at 0.1, ${regular.share.toFixed(2)} at 0.5, ${elite.share.toFixed(2)} at 0.9`;
   assert.ok(novice.share > regular.share && regular.share > elite.share, shares);
   assert.ok(elite.share <= 0.2, shares);
-  assert.ok(novice.share >= 0.4, shares);
+  // (0.4 before AI.armourSense: the ordinary knight at him now mostly thrusts at the plate, and his points land a little less than his cuts did.)
+  assert.ok(novice.share >= 0.35, shares);
   assert.ok(elite.read && elite.held, 'the elite read the blows and held his guard');
 });
 
