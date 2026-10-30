@@ -545,7 +545,9 @@ export const WORLD = {
   //   puts him over. Met front-on he leans into it off his back foot; from the
   //   side or behind, his base narrow and nothing to lean with, `sideOn` of
   //   that. In the air, running (a foot up), mid-blow (the legs drive the
-  //   blow, not the brace) or already reeling, there is nothing (or less) to hold with.
+  //   blow, not the brace) or already reeling, there is nothing (or less) to hold with. Against a charge the
+  //   charger's feet drive him on with the same grip on his own weight (physics.js braceAgainstCharge): a
+  //   heavier man's charge overpowers the brace, a lighter man's is partly held.
   crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05, lying: 0.1, brace: { grip: 0.7, seconds: 0.1, shieldSeconds: 0.2, sideOn: 0.4 } },
   // Static scenery in the physics (physics/terrain.js), only in an arena that
   // carries `terrain`; none of this is read otherwise.

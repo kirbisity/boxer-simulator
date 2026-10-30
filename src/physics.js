@@ -6084,6 +6084,18 @@ export function groundBrace(fighter, direction, set = false) {
   return spec.grip * (fighter.mired?.footing ?? 1) * WORLD.gravity * (set ? spec.shieldSeconds : spec.seconds) * lean * spent;
 }
 
+/**
+ * What a man standing holds against a charge (m/s): his brace (groundBrace) less the charger's drive. The charger's feet
+ * are on the same ground for the same shove, driving him on with the same grip on his own weight, and that drive moves
+ * the man he hits by the ratio of their weights. A heavier man's charge overpowers the brace of a lighter one; a
+ * lighter man's charge is held, in part, by a heavier one's feet.
+ */
+function braceAgainstCharge(fighter, direction, charger) {
+  const spec = WORLD.crash.brace;
+  const drive = spec.grip * (charger.mired?.footing ?? 1) * WORLD.gravity * spec.seconds * (charger.body.massKg / fighter.body.massKg);
+  return Math.max(0, groundBrace(fighter, direction) - drive);
+}
+
 /** How fast a fighter's part (trunk or head) is going into a contact that pushes him along `direction` (m/s; none standing or backing off). */
 function speedInto(fighter, part, direction) {
   return Math.max(0, -vec.dot(partVelocity(fighter, part), direction));
@@ -6141,8 +6153,9 @@ function crashBodies(world, first, second, partFirst, partSecond, normal) {
   const at = point(struck.x, P.neck);
   if (pushing) {
     const everywhere = (part) => (part === 'head' ? [[P.head, 1]] : TRUNK_PARTICLES.map((index) => [index, 1]));
-    // The charger goes in braced by his own run; the man he hits by what his feet can hold against the ground (groundBrace).
-    const braced = (fighter, part, direction) => (fighter === charger ? Math.max(0, vec.dot(partVelocity(fighter, part), vec.scale(direction, -1))) : groundBrace(fighter, direction));
+    // The charger goes in braced by his own run; the man he hits by what his feet can hold against the ground, less the
+    // charger's own drive (braceAgainstCharge).
+    const braced = (fighter, part, direction) => (fighter === charger ? Math.max(0, vec.dot(partVelocity(fighter, part), vec.scale(direction, -1))) : braceAgainstCharge(fighter, direction, charger));
     pushCrash(world, { fighter: first, shares: everywhere(firstKey), direction: normal, impulse: crash.motion, braced: braced(first, firstKey, normal) });
     pushCrash(world, { fighter: second, shares: everywhere(secondKey), direction: vec.scale(normal, -1), impulse: crash.motion, braced: braced(second, secondKey, vec.scale(normal, -1)) });
     world.events.push({ time: world.time, kind: 'collision', attacker: charger.id, defender: struck.id, punch: 'rush', target: 'trunk', speed: closing, impulse: crash.impulse, energy: crash.energy, force: 0, headDeltaV: 0, effects: [], point: at, normal });
