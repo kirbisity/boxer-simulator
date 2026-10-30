@@ -17,7 +17,7 @@ import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN,
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
-import { artTurn, coiledTwist, hiltMix, retreatDrive, strikeSpan } from './physics/arts.js';
+import { artTurn, coiledTwist, hiltMix, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
@@ -1767,7 +1767,7 @@ export function nearestOpponent(world, fighter) {
 // ---- Commands -----------------------------------------------------------
 
 /** Where on the target a strike aims: the head, the body, or the lead thigh. */
-export function aimPoint(target, zone) {
+export function aimPoint(target, zone, spec = null) {
   if (zone === 'head') return point(target.x, P.head);
   // His horse: its chest (the part that comes first), if he is mounted.
   if (zone === 'horse' && target.mount) return vec.lerp(target.mount.capsules[0].a, target.mount.capsules[0].b, 0.6);
@@ -1776,7 +1776,8 @@ export function aimPoint(target, zone) {
     return vec.add(point(target.x, P[`${target.weapon.main}Hand`]), vec.scale(target.weapon.dir, target.weapon.spec.length * 0.5));
   }
   if (zone === 'legs') return vec.lerp(point(target.x, P.lHip), point(target.x, P.lKnee), 0.55);
-  return vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.6);
+  // (The body: the chest, `bodyAt` of the way from his hips to his neck, unless the move cuts lower: a wheel's flat arc at his waist.)
+  return vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), spec?.bodyAt ?? 0.6);
 }
 
 /** How far (m) a couched point is from its man's front, along the lance (Infinity with no man or no lance). */
@@ -1839,7 +1840,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft);
   // What of it is the weapon's weight (a point that wanders so finds a gap in armour the less: BLADES.gaps.size).
   const wander = heft > 0 ? skillScatter(fighter, spec, WORLD.weapons.heavyAimJitter * heft) : 0;
-  const mark = at ?? aimPoint(target, aimZone);
+  const mark = at ?? aimPoint(target, aimZone, spec);
   const aimed = jitter > 0 ? vec.add(mark, [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : mark;
   fighter.punch = {
     type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target?.id ?? null, landed: false, peakSpeed: 0, limb: P[spec.limb],
@@ -1855,7 +1856,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     wander,
     // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
     riposte: undefined, finisher: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
-    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined, low: undefined,
+    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined, low: undefined, rangeOff: undefined,
     // From his knees (the player's crawl: WORLD.crawl.strike): the blow's mass behind it is this share.
     weak: undefined,
   };
@@ -2227,6 +2228,16 @@ function updateIntent(world, fighter, dt) {
     intent.lean += (spec.lean ?? 0.12) * shape;
     intent.shift += (spec.shift ?? 0) * shape;
     if (punch.at) punch.aim = toLocal(fighter, punch.at);
+    // A weapon art measured to its distance (`range`, physics/arts.js): through the wind-up the stroke is laid for where his man
+    // stands now, in the frame squared to him (as it will be when the blow lands: the art's own turn away is undone by then),
+    // and how far off its distance he is, kept.
+    const measured = spec.range && punch.t < spec.windup && punch.target !== null && !punch.at ? world.fighters[punch.target] : null;
+    if (measured?.state === 'up') {
+      const mark = vec.add(aimPoint(measured, punch.zone, spec), punch.miss);
+      const square = Math.atan2(-(measured.x[P.pelvis * 3 + 2] - fighter.root[1]), measured.x[P.pelvis * 3] - fighter.root[0]);
+      punch.aim = yawRotate([mark[0] - fighter.root[0], mark[1] - (fighter.lift ?? 0), mark[2] - fighter.root[1]], -square);
+      punch.rangeOff = rangeOff(spec, punch.aim, fighter.body, bladeFor(fighter, spec).spec);
+    }
     if (punch.t < spec.extendUntil) Object.assign(intent, strikeTargets(spec, punch.t, punch.aim, fighter.body, WORLD.followThrough));
     else if (spec.limb.endsWith('Foot') || spec.limb.endsWith('Knee')) {
       // Recovering a kick: the leg comes back down under the hip.
@@ -3648,9 +3659,9 @@ function moveRoot(world, fighter, dt) {
   // (Not kneeling over a man: the stab is driven down from where he kneels. Nor at a man low before him: lowstrike.js stepped
   // him to where the blow meets him, and bent him to it; a lunge on from there carries it past. Nor a thrust made `planted`, his
   // man already about the point: a lunge would carry the point past him and put the haft on him, ai.js AI.pointRoom.)
-  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && !punch.planted && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
+  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && !punch.planted && punch.t >= punch.spec.windup - (punch.spec.stepLead ?? 0) && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   // A weapon art that steps back first (the spear's: physics/arts.js retreatDrive), through its wind-up.
-  drive = retreatDrive(punch) ?? drive;
+  drive = retreatDrive(punch) ?? rangeDrive(punch) ?? drive;
   // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.
   let runPace = null;
   if (fighter.running && !fighter.rush && !fighter.crawling) {
@@ -6669,13 +6680,18 @@ export function bladeStrike(attacker, weapon, punch, relative, distance) {
   const limbs = attacker.body.limbKg;
   const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
   // (A finisher's thrust is driven down with the whole weight of the kneeling man behind the dagger: finisher.js.)
-  const armMass = ((spec.mass.arm ?? 0) * arms + (punch.finisher?.body ?? spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
+  const share = attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
+  const armsKg = (spec.mass.arm ?? 0) * arms * share;
+  const bodyKg = (punch.finisher?.body ?? spec.mass.body ?? 0) * attacker.body.massKg * share;
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
   // (Whichever way the blade turns about the grip, what the weapon is coupled to goes with the point.)
   const carried = attacker.mount ? mountedBehind(attacker, spec, relative) * staggerShare(attacker, WORLD.stagger.harm) : 0;
-  return { strikeMass: effectiveMassAt(wspec, armMass, distance, armLength, along) + carried, along };
+  const struck = effectiveMassAt(wspec, armsKg + bodyKg, distance, armLength, along);
+  // (A weapon art turning the whole body through the blow, `turn`: all of it turns about the spine: physics/arts.js.)
+  const turned = turnsWithBlow(spec) ? turningMass(wspec, armsKg, bodyKg, distance, armLength, attacker.body.lengths.shoulderSpan / 2, along) : 0;
+  return { strikeMass: Math.max(struck, turned) + carried, along };
 }
 
 export function strikeLiveUntil(spec) {

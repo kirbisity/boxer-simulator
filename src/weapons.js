@@ -476,7 +476,7 @@ export const WEAPONS = {
   kanabo: {
     label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.25, handle: 0.35, spacing: 0.17, mass: 5, balance: 0.68, radius: 0.05,
     harm: { swing: { blunt: 1.4 }, thrust: { blunt: 0.4 } },
-    contactSeconds: 0.006, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, art: 'artCrush', crush: 0.5,
+    contactSeconds: 0.006, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, art: 'artCrushClub', crush: 0.5,
   },
   // One-handed maces, the horseman's answer to armour (swords skate off it):
   // a short iron-bound haft and a heavy head, swung with the wrist and arm
@@ -1380,6 +1380,15 @@ export function guardTargets(style, body) {
 }
 
 /**
+ * The share of a blade's length at which a swing is laid to meet its mark (`contactAt`, 0.7 if unset); a move made to land
+ * with the weapon's sweet spot (`sweetSpot`: a weapon art's) lays it at the middle of the striking part, from `strikeFrom` to
+ * the tip: a hammer's head, a club's thick half, not its haft.
+ */
+export function contactShare(move, spec) {
+  return move.sweetSpot ? (spec.strikeFrom + spec.length) / (2 * spec.length) : move.contactAt ?? 0.7;
+}
+
+/**
  * Targets for a weapon move at time t: the main hand (local) and the blade's
  * direction. A swing is a curve from the cocked position to the follow-
  * through, bent so that `contactAt` of the blade passes through the aim
@@ -1413,9 +1422,11 @@ export function bladeTargets(move, t, aim, body, spec, reachShare = 1) {
   if (t < move.windup) return from;
   const u = Math.min(1, (t - move.windup) / (move.extendUntil - move.windup));
   const middleDir = move.mid ? vec.normalize(move.mid) : slerpDir(from.dir, to.dir, 0.5);
-  const middle = vec.sub(aim, vec.scale(middleDir, spec.length * (move.contactAt ?? 0.7)));
-  // A quadratic curve through `middle` at u = ½.
-  const control = vec.sub(vec.scale(middle, 2), vec.scale(vec.add(from.hand, to.hand), 0.5));
+  const middle = vec.sub(aim, vec.scale(middleDir, spec.length * contactShare(move, spec)));
+  // A quadratic curve through `middle` at u = `meet` (½ unless the move says: a weapon art meets its mark later in the
+  // stroke, where the weapon, lagging the hands that drive it, has come up to its full speed).
+  const meet = move.meet ?? 0.5;
+  const control = vec.scale(vec.sub(vec.sub(middle, scale3(from.hand, (1 - meet) ** 2)), scale3(to.hand, meet * meet)), 1 / (2 * meet * (1 - meet)));
   const hand = addVec(addVec(scale3(from.hand, (1 - u) ** 2), scale3(control, 2 * u * (1 - u))), scale3(to.hand, u * u));
-  return { hand, dir: u < 0.5 ? slerpDir(from.dir, middleDir, u * 2) : slerpDir(middleDir, to.dir, u * 2 - 1) };
+  return { hand, dir: u < meet ? slerpDir(from.dir, middleDir, u / meet) : slerpDir(middleDir, to.dir, (u - meet) / (1 - meet)) };
 }

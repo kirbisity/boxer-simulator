@@ -54,7 +54,7 @@ export const ARTDRAMA = {
   // The art's name on screen: real seconds shown (faded in and out within it).
   caption: { seconds: 1.8 },
   // The names shown (an art's own name; else its button's, ARTS.labels).
-  titles: { artIai: 'Iai', artPommel: 'Knaufschlag', artDrawCut: 'Drawing cut', artWheel: 'Wheel cut', artCrush: 'Crushing blow', artCrushOne: 'Crushing blow', artSpear: 'Lunge' },
+  titles: { artIai: 'Iai', artPommel: 'Knaufschlag', artDrawCut: 'Drawing cut', artWheel: 'Wheel cut', artCrush: 'Crushing blow', artCrushClub: 'Crushing blow', artCrushOne: 'Crushing blow', artSpear: 'Lunge' },
   // A contact counts as the art's only within its stroke: its duration (fight seconds) and this much after.
   contactSlack: 0.1,
   // Toned down for prefers-reduced-motion: each a share of the full effect (the wind-up's and the impact's slowing are

@@ -172,30 +172,62 @@ export const MOVES = {
   // turned off his man and back into the blow (`turn`, rad: the turn's speed carries the arms round with it), a step back
   // first (`retreat`), a step or a lunge carrying the body in behind it (`step`), more of the body's mass behind the blow
   // (`mass.body`), the pommel instead of the blade (`hilt`) (physics/arts.js). They cost an all-out effort (`cost`, five or
-  // six times a plain blow's). `art` marks them (in no style: no AI picks them).
+  // six times a plain blow's), and a committed blow leaves him open after it (a long `duration`). `art` marks them (in no
+  // style: no AI picks them).
+  // How an art is measured and timed (the swung ones): made at the distance its head lands at (`range`: through the wind-up
+  // his feet take him in or back to it, his eye on his man, physics/arts.js), the head's sweet spot laid on the mark
+  // (`sweetSpot`: the middle of the striking part, a hammer's head, a club's thick half, weapons.js contactShare), the mark met
+  // late in the stroke (`meet` of the drive, not half way: the weapon, lagging the hands, is then at its full speed), at his
+  // waist below his guard for a flat arc (`bodyAt`: the share of the way from his hips to his neck it aims at), the legs
+  // launching the lunge a moment before the arms strike (`stepLead`, s: the legs first in the chain). With the whole body
+  // turning through it (`turn`) the arms are locked and everything turns about his spine (physics/arts.js turningMass). The
+  // mass behind a swung art (`mass.body`) is a quarter of him at most: his weight stepping in and turning behind the blow,
+  // coupled through locked arms (a thrust's lunge puts a third behind its point). The tuning of each was measured (test/
+  // weaponarts.test.js: its best blow against its weapon's best plain one, by its family's harm, 1.6 to 2 times; the guandao's
+  // and the flanged mace's a little less, 1.5 and 1.6), and the head speeds kept a man's: no faster than his plain blows'
+  // by much (polearm and hammer heads ~32-33 m/s at the most, a sword's point 23-27, an ōdachi's 31, a one-handed mace's 23-26).
   // Iai (nukitsuke): the katana or ōdachi brought back to the left hip as if in its scabbard, point trailing behind, the hips
-  // turned away; then drawn out in one horizontal cut across him from left to right with a stamping step: the hand travels
-  // from behind the hip to beyond his far side, the blade turns nearly 200 degrees, in a shorter time than a plain cut.
-  artIai: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, sweep: true, from: { hand: [-0.04, 0.5, 0.14], dir: [-0.85, -0.2, 0.45] }, mid: [1, 0.06, 0], to: { hand: [0.2, 0.64, -0.32], dir: [0.1, 0.08, -1] }, windup: 0.34, extendUntil: 0.5, duration: 1, twist: 0.95, coil: 0.7, lean: 0.12, shift: 0.12, step: 2.2, cost: 0.16, mass: { arm: 0.65, body: 0.07 }, rotation: 0.9, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.75 },
+  // and the whole body turned away to the left after it (`turn` < 0: a swing from his left); then drawn out in one horizontal
+  // cut across him from left to right with a stamping step, the body turning back through with it: the hand travels from
+  // behind the hip to beyond his far side, the blade turns nearly 200 degrees. Measured to his distance, the last fifth of
+  // the blade on him (`range`, `contactAt`), met late in the stroke. (Its point at ~23 m/s, the ōdachi's ~31, as their plain
+  // cuts' ~24 and ~30: once drawn faster than any man's, ~31 and ~39; now the gain is the body turning behind it.)
+  artIai: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, sweep: true, turn: -1.43, from: { hand: [-0.04, 0.5, 0.14], dir: [-0.85, -0.2, 0.45] }, mid: [1, 0.06, 0], to: { hand: [0.2, 0.64, -0.32], dir: [0.1, 0.08, -1] }, windup: 0.3, extendUntil: 0.6, duration: 1.1, twist: 0.97, coil: 0.53, lean: 0.12, shift: 0.12, step: 2.36, range: 1.14, meet: 0.64, bodyAt: 0.46, cost: 0.16, mass: { arm: 0.78, body: 0.21 }, rotation: 0.9, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.79 },
   // The pommel strike (Knaufschlag): the long sword's hilt drawn back by the right shoulder, the blade laid back over it, then
   // driven pommel first into his face or chest (`hilt`: the pommel strikes, all blunt) with both hands, a deep step in and the
   // trunk thrown in behind it, as a spear's point is: a steel knob with both arms and the body behind it, a mace's blow.
   artPommel: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', art: true, hilt: true, from: { hand: [-0.1, 0.76, -0.14], dir: [-0.6, 0.75, -0.2] }, windup: 0.2, extendUntil: 0.42, duration: 0.8, twist: -0.8, coil: 0.5, lean: 0.28, shift: 0.18, depth: 0.12, step: 2.6, cost: 0.14, extendShare: 0.6, mass: { arm: 0.85, body: 0.2 }, rotation: 1.2, zones: ['body', 'head'], reach: 'close' },
-  // The jian's art: a drawing cut. The sword hand rises high over the right shoulder with a lunging step, and the edge is laid
-  // true along the line of the cut (no turn off the edge: `trueEdge`) and drawn through him back towards the hip, the arm
-  // pulling as it falls, so the whole length of the edge passes through the flesh: the deepest wound a light sword makes.
-  artDrawCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', art: true, trueEdge: true, from: { hand: [0.02, 0.98, -0.24], dir: [-0.55, 0.7, -0.45] }, mid: [0.95, 0.1, 0.12], to: { hand: [0.1, 0.46, 0.2], dir: [-0.1, -0.55, 0.85] }, windup: 0.16, extendUntil: 0.38, duration: 0.7, twist: -0.85, lean: 0.22, shift: 0.15, step: 2.4, cost: 0.12, mass: { arm: 0.65, body: 0.05 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.72 },
-  // The polearm's wheel: the head swung right round behind him, the body turned away after it (`turn`) and the hips wound
-  // (`coil`), almost his back to his man; then the whole body turns back through with a step as the blade comes round in a
-  // wide flat arc at his middle: some 250 degrees of the blade's turn, not a plain sweep's 180, the body's turn added to it.
-  artWheel: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, sweep: true, turn: 1.2, from: { hand: [-0.16, 0.68, -0.26], dir: [-0.75, 0.12, -0.65] }, mid: [1, 0.05, 0], to: { hand: [0.12, 0.66, 0.32], dir: [-0.35, 0, 1] }, windup: 0.44, extendUntil: 0.74, duration: 1.3, twist: -1.5, coil: 0.8, lean: 0.08, shift: 0.08, step: 1.6, cost: 0.18, mass: { arm: 0.65, body: 0.09 }, rotation: 1.4, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.8 },
-  // The charged blow of a war hammer or a kanabo: the head swung right back and up behind the right shoulder, the body turned
-  // away after it (`turn`) and held there a moment; then the whole body turns back into the blow as it comes down and across
-  // him with a step: the turning trunk carries the hands round, its speed added to the arms'.
-  artCrush: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, turn: 0.9, from: { hand: [-0.1, 0.8, -0.3], dir: [-0.7, 0.45, -0.55] }, mid: [1, 0.15, 0], to: { hand: [0.22, 0.6, 0.25], dir: [0.2, -0.2, 1] }, windup: 0.45, extendUntil: 0.75, duration: 1.3, twist: -0.9, lean: 0.15, dip: 0.07, shift: 0.1, step: 1.2, cost: 0.2, mass: { arm: 0.8, body: 0.12 }, rotation: 1.5, zones: ['head', 'body'], reach: 'weapon', contactAt: 0.88 },
-  // The same with a one-handed mace: a shorter turn, a longer step in (one arm cannot swing it as hard; the legs and the
-  // trunk must bring more of it), the shoulder dropping in behind the blow.
-  artCrushOne: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', art: true, turn: 0.6, from: { hand: [-0.08, 0.82, -0.32], dir: [-0.7, 0.45, -0.55] }, mid: [1, 0.15, 0], to: { hand: [0.24, 0.62, 0.25], dir: [0.2, -0.2, 1] }, windup: 0.36, extendUntil: 0.58, duration: 1.05, twist: -0.9, lean: 0.2, dip: 0.05, shift: 0.1, step: 2, cost: 0.15, mass: { arm: 0.75, body: 0.12 }, rotation: 1.3, zones: ['head', 'body'], reach: 'weapon', contactAt: 0.86 },
+  // The jian's art: a drawing cut. The sword hand rises high over the right shoulder, the blade laid back behind it, the hips
+  // wound (`coil`) and the shoulders turned off him (`turn`); then with a lunging step the whole body turns back through as the
+  // edge, laid true along the line of the cut (no turn off the edge: `trueEdge`), is drawn through him back towards the hip,
+  // the arm pulling as it falls, so the whole length of the edge passes through the flesh: the deepest wound a light sword
+  // makes. Measured to put the last third of the edge on him (`range`, `contactAt`), met late in the stroke at full speed.
+  // (Wuxia/dao: about twice the plain forehand's cut; the point at 23-27 m/s, as a plain jian cut's ~27.)
+  artDrawCut: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', art: true, trueEdge: true, turn: 0.77, from: { hand: [0.02, 0.98, -0.24], dir: [-0.7, 0.5, -0.5] }, mid: [0.95, 0.1, 0.12], to: { hand: [0.1, 0.46, 0.2], dir: [-0.1, -0.55, 0.85] }, windup: 0.27, extendUntil: 0.53, duration: 0.85, twist: -0.62, coil: 0.67, lean: 0.1, shift: 0.15, step: 1.9, range: 1.19, meet: 0.66, cost: 0.12, mass: { arm: 0.87, body: 0.2 }, rotation: 0.8, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.82 },
+  // The polearm's wheel: the head swung right round behind him and high, the body turned away after it (`turn`, ~80 degrees)
+  // and the hips wound (`coil`), almost his back to his man; then the whole body turns back through with a long step as the
+  // blade comes round in a wide flat arc at his waist, under his arms (`bodyAt`): the blade's turn and the body's together,
+  // both arms locked to the shaft and the trunk behind them (everything turning about his spine). The blade meets him with
+  // its lower half (`contactAt`) late in the stroke (`meet`), its head then at ~32-33 m/s, a plain cut's ~32: the gain is the
+  // mass turning behind it. (The naginata's wound ~1.7 times its plain cut's, the guandao's ~1.5: its plain cut is already
+  // as fast as a polearm goes.)
+  artWheel: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, sweep: true, turn: 1.45, from: { hand: [0, 0.92, -0.14], dir: [-0.7, 0.5, -0.5] }, mid: [1, 0, 0], to: { hand: [0.22, 0.55, 0.3], dir: [-0.35, 0, 1] }, windup: 0.51, extendUntil: 0.89, duration: 1.4, twist: -0.8, coil: 0.71, lean: 0.24, dip: 0.06, shift: 0.08, step: 2.31, stepLead: 0.05, range: 1.13, meet: 0.6, bodyAt: 0.28, cost: 0.18, mass: { arm: 0.91, body: 0.25 }, rotation: 1.4, zones: ['body', 'head'], reach: 'weapon', contactAt: 0.68 },
+  // The war hammer's charged blow: the head swung right back behind the right shoulder, the body turned away after it (`turn`)
+  // and the hips wound (`coil`), held there a moment; then with a long driving step the whole body turns back into the blow
+  // as it comes down and across him, the body dropping into it (`dip`, `lean`): the turning trunk carries the hands round,
+  // its speed added to the arms', and the hammer's head (`sweetSpot`) meets him, not its haft, at ~27 m/s (its top ~33; a
+  // plain blow's ~20 and ~26), a quarter of him behind it.
+  artCrush: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, turn: 0.79, from: { hand: [-0.1, 0.8, -0.3], dir: [-0.9, 0.3, -0.3] }, mid: [1, 0.2, -0.15], to: { hand: [0.22, 0.6, 0.25], dir: [-0.2, -0.4, 1] }, windup: 0.52, extendUntil: 0.79, duration: 1.35, twist: -0.96, coil: 0.49, lean: 0.22, dip: 0.08, shift: 0.1, step: 2.8, stepLead: 0.03, range: 0.89, meet: 0.53, bodyAt: 0.46, sweetSpot: true, cost: 0.2, mass: { arm: 0.8, body: 0.25 }, rotation: 1.5, zones: ['head', 'body'], reach: 'weapon' },
+  // The kanabo's: a five-kilo club is not whipped round like a hammer: it is laid back flat behind his right side, the body
+  // turned after it, and carried into him by the body — a long drive (a slower stroke than the hammer's), the longest step,
+  // the body dropping into it (`dip`) — so that its thick half (`sweetSpot`), not its end, lands with a quarter of him behind
+  // it: the club's head at ~28 m/s, the thick of it at ~14 (a plain blow's ~12), a mass more than speed.
+  artCrushClub: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'two', art: true, turn: 0.7, from: { hand: [-0.1, 0.8, -0.3], dir: [-0.6, 0.2, -0.75] }, mid: [1, 0.2, -0.15], to: { hand: [0.22, 0.55, 0.3], dir: [-0.2, -0.4, 1] }, windup: 0.6, extendUntil: 0.9, duration: 1.5, twist: -0.46, coil: 0.31, lean: 0.17, dip: 0.19, shift: 0.1, step: 2.92, stepLead: 0.07, range: 1.01, meet: 0.51, bodyAt: 0.37, sweetSpot: true, cost: 0.2, mass: { arm: 0.8, body: 0.25 }, rotation: 1.5, zones: ['head', 'body'], reach: 'weapon' },
+  // The same with a one-handed mace: no turn of the body away (the shield arm stays before him), but the mace swung back low
+  // and far behind him and the hips wound hard (`coil`); the legs launch the lunge a moment before the arm strikes
+  // (`stepLead`), so his weight is moving in as the blow lands, low at his side under the guard (`bodyAt`), the shoulder
+  // dropping in behind it: its head at ~24 m/s, a plain blow's ~18.
+  artCrushOne: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'swing', grip: 'one', art: true, from: { hand: [-0.15, 0.85, -0.35], dir: [-0.9, 0.1, -0.4] }, mid: [1, 0.1, -0.2], to: { hand: [0.2, 0.5, 0.35], dir: [-0.2, -0.3, 1] }, windup: 0.48, extendUntil: 0.71, duration: 1.1, twist: -0.69, coil: 0.8, lean: 0.11, dip: 0.14, shift: 0.1, step: 1.8, stepLead: 0.19, range: 1.11, meet: 0.62, bodyAt: 0.27, sweetSpot: true, cost: 0.15, mass: { arm: 0.84, body: 0.25 }, rotation: 1.3, zones: ['head', 'body'], reach: 'weapon' },
   // The spear's art: a step back out of his reach (`retreat`, the legs driving him back through the wind-up) with the shaft drawn
   // right back to the rear hip; then the whole body thrown forward in a long lunge behind the point, a third of his weight
   // behind it: it needs the room it made, and from there it goes in deeper than a thrust from where he stood.
