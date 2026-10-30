@@ -108,10 +108,10 @@ test('hit feel: an effect turned off does nothing; its intensity scales it', () 
   assert.ok(Math.abs(ratio - 0.5) < 0.02, `${ratio}`);
 });
 
-test('hit feel: the defaults are the quiet ones; settings keep in storage; the address picks some for a visit', () => {
+test('hit feel: every effect is on by default; settings keep in storage; the address picks some for a visit', () => {
   const defaults = loadHitFeel(null);
   assert.ok(defaults.kick.on && defaults.hitStop.on && defaults.thump.on);
-  assert.ok(!defaults.vignette.on && !defaults.fov.on);
+  assert.ok(Object.values(defaults).every((effect) => effect.on), 'every effect on while they are tried');
   const kept = new Map();
   const storage = { getItem: (key) => kept.get(key) ?? null, setItem: (key, value) => kept.set(key, value) };
   defaults.kick.on = false;

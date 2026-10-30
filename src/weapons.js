@@ -1067,7 +1067,10 @@ export const BLADES = {
   // A point through the heart or the great vessels of the chest: about this many seconds of fight left in him (a man stabbed through the heart may run or fight on for several seconds before he drops; through the head it is at once).
   heartSeconds: 8,
   // How much of a point's energy (J) counts as injury to the trunk or the head (a limb's: 0.25, as its bone takes it).
-  pierceTrauma: 0.04,
+  // A cut counts 1/6 (~0.17): a stab counts 0.1, more than half of that, for what it does inside him at once (a punctured
+  // lung or gut, the shock of it) besides the bleeding and the heart that `heartSeconds` and `lethalPierce` give. It was
+  // 0.04: a spear run into a man's belly barely moved him, and the man stabbed fought on as if grazed.
+  pierceTrauma: 0.1,
   // Edge alignment: a cut needs the edge moving across the blade, not along it.
   cutAlignmentPower: 2,
   // A thrust pierces only with the point: contact this far out along the striking length.

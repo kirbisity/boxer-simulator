@@ -33,10 +33,10 @@ export const HITFEEL = {
     kick: { on: true, intensity: 1, label: 'Camera kick', note: 'The view jolts along the blow' },
     hitStop: { on: true, intensity: 1, label: 'Hit-stop', note: 'A heavy blow holds the moment' },
     puff: { on: true, intensity: 1, label: 'Impact mist', note: 'Sweat and dust off the struck place' },
-    vignette: { on: false, intensity: 1, label: 'Dark edges', note: 'The edges dim on a heavy blow' },
+    vignette: { on: true, intensity: 1, label: 'Dark edges', note: 'The edges dim on a heavy blow' },
     haptic: { on: true, intensity: 1, label: 'Vibration', note: 'A buzz on phones that have it' },
     thump: { on: true, intensity: 1, label: 'Body thump', note: 'A low thud under the blow' },
-    fov: { on: false, intensity: 1, label: 'Focus punch', note: 'The view narrows for an instant' },
+    fov: { on: true, intensity: 1, label: 'Focus punch', note: 'The view narrows for an instant' },
   },
   // The camera's jolt: metres at full strength (3 cm at 2.5 m is about 1% of the screen: felt, not seen as a shake),
   // how fast it rings (Hz: a body's sway, not a buzz) and dies (s, its time constant), and how long it is kept.
