@@ -1887,7 +1887,7 @@ const FIELDS = [
   { key: 'age', label: 'Age', type: 'range', min: 18, max: 100, step: 1, unit: 'yr' },
   { key: 'exercise', label: 'Exercise', type: 'range', min: 0, max: 1, step: 0.01, format: (value) => `${Math.round(exerciseHours(value))} h/wk` },
   // Body fat is not set but settles from what goes in and what is burnt; the
-  // slider spans the intakes that settle between BMI 10 and BMI 100.
+  // slider spans the intakes that settle between BMI 8 and BMI 125.
   { key: 'calories', label: 'Calories', type: 'range', step: 10, range: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean), format: (value) => `${Math.round(value).toLocaleString('en')} kcal` },
   // How precisely he places his blows, apart from his body (WORLD.skill).
   { key: 'skill', label: 'Skill', type: 'range', min: 0, max: 1, step: 0.05, format: (value) => `${Math.round((value ?? 0.5) * 100)}%` },
@@ -3027,9 +3027,9 @@ const SHEETS = {
     // Inside the ropes (the ring edge is 3 m out), so none cross the view.
     camera: { distance: 2.75, pitch: 0.1, yaw: 0.15, height: 0.95 },
   },
-  // One build fed for BMI 10 to 100: the extremes of the calorie slider.
+  // One build fed for BMI 8 to 125: the extremes of the calorie slider.
   physiques: {
-    options: [10, 17, 24, 45, 100].map((bmi) => [{ bmi }, `BMI ${bmi}`, '']),
+    options: [8, 17, 24, 45, 125].map((bmi) => [{ bmi }, `BMI ${bmi}`, '']),
     rows: [{ ...PRESETS.amateur, exercise: 0.3 }, { ...PRESETS.contender, exercise: 0.3 }],
     camera: { distance: 4.2, pitch: 0.08, yaw: 0.15, height: 0.95 },
   },

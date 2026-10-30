@@ -46,7 +46,7 @@ test('fat is an outcome: more calories, more fat; more exercise, more lean at th
   assert.ok(at(0.8, 3200).bodyFat < at(0, 3200).bodyFat, 'and burns fat at the same intake');
 });
 
-test('the calorie slider spans BMI 10 to 100, and nothing settles outside it', () => {
+test('the calorie slider spans BMI 8 to 125, and nothing settles outside it', () => {
   for (const sex of ['male', 'female']) {
     const inputs = { ...BASE, sex, exercise: 0.3 };
     const [low, high] = calorieRange(inputs, FRAMES.medium.lean);
