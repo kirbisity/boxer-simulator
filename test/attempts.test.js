@@ -6,13 +6,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { knockOut, placeOnFloor } from '../src/physics.js';
 import { levelPreset } from '../src/levelmode/presets.js';
-import { DN_Y, DUNNOTTAR } from '../src/levelmode/stages/dunnottar.js';
+import { DN_Y, DUNNOTTAR, dunnottarWithTeam } from '../src/levelmode/stages/dunnottar.js';
 import { attemptCount, attemptLog, attemptStory, createLevelWorld, levelThink, respawnPlayer, restAtPoint, restartFromRest } from '../src/levelmode/level.js';
 import { deathOf } from '../src/levelmode/attempts.js';
 import { attemptsLine, endingLines } from '../src/levelmode/story.js';
 
 const man = (world, id) => world.fighters.find((fighter) => fighter.spawn?.id === id);
-const dunnottar = (seed = 3) => createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed });
+const dunnottar = (seed = 3) => createLevelWorld(dunnottarWithTeam(), levelPreset('forger'), { seed });
 const fall = (world, fighter, attacker = undefined, reason = 'is struck down', kind = 'killed') => knockOut(world, fighter, { time: world.time, attacker, effects: [] }, reason, kind);
 const REST = DUNNOTTAR.sections.find((section) => section.rest).rest;
 

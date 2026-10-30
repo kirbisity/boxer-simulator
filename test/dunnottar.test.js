@@ -8,7 +8,10 @@ import { placeOnFloor } from '../src/physics.js';
 import { activeSections, checkStage, createStageWorld, mechanismsOf, pullLever, regionContains, setMechanism, stageTerrain, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { STAGES } from '../src/levelmode/stages.js';
-import { DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS } from '../src/levelmode/stages/dunnottar.js';
+import { DN_RAVINE, DN_TEAM, DN_Y, DUNNOTTAR, DUNNOTTAR_BRANCHES, DUNNOTTAR_ROUTE, DUNNOTTAR_SHORTCUTS, dunnottarWithTeam } from '../src/levelmode/stages/dunnottar.js';
+import { createLevelWorld } from '../src/levelmode/level.js';
+import { comradesOf, teamStatus } from '../src/levelmode/team.js';
+import { freePrisoner } from '../src/levelmode/awareness.js';
 import { DN_CESSPOOL } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floodFill } from './edges.js';
 import { hipsAt, walk } from './walker.js';
@@ -30,18 +33,35 @@ test('dunnottar: registered, sound, ten sections with the cast the spec calls fo
   // The main line's cast stood at 14 once (the bot's careful policy reaches Vaelen 12 in 16 against it), 21 with the drawbridge's guard; the front has since been made a place not to
   // fight through (thirteen men in front of, over and behind the bridge, with the plate knight on the ledge), and the court a lane with eight men spread along it. The vault's optional
   // branches add at most six, and the old drain one: Noname (the sergeant and the levies are gone).
-  assert.ok(enemies.length >= 36 && enemies.length <= 42, `${enemies.length} enemies: 13 at the front, 8 in the court, 3 in the gatehouse, 1 on the stair, the keep's 3, the vault's 4 and the crypt's 3, Noname and the boss`);
+  // (Three more archers on the barbican since: sixteen at the front.)
+  assert.ok(enemies.length >= 39 && enemies.length <= 45, `${enemies.length} enemies: 16 at the front, 8 in the court, 3 in the gatehouse, 1 on the stair, the keep's 3, the vault's 4 and the crypt's 3, Noname and the boss`);
   // The front's men are one alarm, and the archers keep their posts on the barbican (there is no way up to them).
   const front = enemies.filter((spawn) => spawn.alarm === 'front');
-  assert.deepEqual(front.map((spawn) => spawn.id).sort(), ['archer1', 'archer2', 'archer3', 'bridgeguard1', 'bridgeguard2', 'bridgelevy', 'forecourtbow1', 'forecourtbow2', 'frontcrossbow', 'frontguard', 'frontknight1', 'frontknight2', 'gateknight'].sort());
+  assert.deepEqual(front.map((spawn) => spawn.id).sort(), ['archer1', 'archer2', 'archer3', 'archer4', 'archer5', 'archer6', 'bridgeguard1', 'bridgeguard2', 'bridgelevy', 'forecourtbow1', 'forecourtbow2', 'frontcrossbow', 'frontguard', 'frontknight1', 'frontknight2', 'gateknight'].sort());
   assert.ok(front.filter((spawn) => spawn.preset === 'dunnottarArcher').every((spawn) => spawn.perch && spawn.post[1] > 6));
   assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 2);
   assert.ok(spawns.some((spawn) => spawn.role === 'boss' && spawn.preset === 'vaelen'));
   assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest2b', 'restdrain', 'rest3']);
-  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'keepdoor', 'ladder1'].sort());
+  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['archbar', 'cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'keepdoor', 'ladder1'].sort());
   const notes = DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'note').map((item) => item.note).sort();
   assert.deepEqual(notes, ['bridge', 'cellar', 'drain', 'ledger', 'order', 'powder', 'seagate', 'servant', 'soldier', 'warden']);
   assert.deepEqual(DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'key').map((item) => item.id).sort(), ['cellkey', 'keepkey']);
+});
+
+test('dunnottar: the operative goes alone: no comrade is spawned, the team is empty, and the vault\'s prisoners let out stay neutral in their cell', () => {
+  const spawns = DUNNOTTAR.sections.flatMap((section) => section.spawns);
+  assert.deepEqual(spawns.filter((spawn) => spawn.role === 'ally' || spawn.team).map((spawn) => spawn.id), []);
+  const w = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 3 });
+  assert.deepEqual(comradesOf(w), []);
+  assert.deepEqual(teamStatus(w), []);
+  for (const id of ['miner', 'captive']) {
+    assert.equal(freePrisoner(w, id), true, `${id} is let out`);
+    const man = w.fighters.find((fighter) => fighter.spawn?.id === id);
+    assert.equal(man.corner, 'grey', `${id} does not take a side`);
+  }
+  assert.deepEqual(comradesOf(w), [], 'and nobody follows him');
+  // (The team's code is kept: Stage 1 as it was, with the two Forgers, is still a stage.)
+  assert.deepEqual(comradesOf(createLevelWorld(dunnottarWithTeam(), levelPreset('forger'), { seed: 3 })).map((fighter) => fighter.spawn.id), DN_TEAM.map((spawn) => spawn.id));
 });
 
 test('dunnottar: every spawn, item, lever and rest stands inside its own section, on a floor', () => {

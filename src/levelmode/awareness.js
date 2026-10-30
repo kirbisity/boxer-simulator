@@ -17,11 +17,13 @@
 // Seeing (the user's algorithm, run from the player outward, about 5 times a second, each man on his own beat):
 //   1. Candidates: the men awake within R of the player (a sweep of the sight lines in a circle is
 //      a ray to each man in it: the same thing, and cheaper than casting at every angle). R is the
-//      section's `vision` (m), else AWARE.radius dimmed by its `light` (0 dark .. 1 bright).
+//      section's `vision` (m), else AWARE.radius dimmed by its `light` (0 dark .. 1 bright): 20 to 30 m.
 //   2. Mutual visibility, cheapest test first: in range; the player inside the man's forward cone
 //      (AWARE.cone, full angle, from his yaw; narrower in a helm with a slit); no wall or ledge between
 //      the two heads (physics/terrain.js rayBlocked). Only then he is aggro.
-//   3. Seen but facing away: nothing. He stays idle or on his round: the player can walk up behind him.
+//   3. Facing away: only within AWARE.nearSense (2.5 m, all round, no wall between) does he notice him.
+//      Farther off he may hear him (AWARE.hear: by his pace and his harness, less through a wall) and
+//      turn to look (search): the player can creep up behind him, not run.
 //   4. A man the player has not seen (off screen, behind a corner) whose cone holds the player with
 //      no wall between is the same test: he is aggro too (the "rear threat": the test is mutual).
 // Besides sight: a blow that lands on or is blocked by an unaware man makes him aggro; a clash of arms
@@ -38,9 +40,22 @@ import { floorAt, rayBlocked } from '../physics/terrain.js';
 import { regionContains, sectionById, stageTerrain } from './stage.js';
 
 export const AWARE = {
-  // How far a man sees (m) in full light; at light 0 this share of it. A section's own `vision` overrides.
-  radius: 25,
-  darkest: 0.35,
+  // How far a man sees (m) ahead of him in full light; at light 0 this share of it. A section's own `vision` overrides; a post's (`spawn.vision`) caps it
+  // until he is roused (an archer set to watch a bridge, not the cliff beside it: once he fights he follows his man as far as the light lets him).
+  // (The user's numbers: a man facing the player makes him out at 20 to 30 m. 30 x (0.66 + 0.34 x light): 22 m in the drain's dark (light 0.18),
+  // 25 m in the cellars and the court (0.3 to 0.55), 27.5 m on the cliff (0.75). It was 25 x (0.35 + 0.65 x light): 12 m in the drain, 21 on the cliff.)
+  radius: 30,
+  darkest: 0.66,
+  // m: all round, at his back too, a man notices a man this close (a footfall on the flags, a breath, a shadow beside him) if no wall is between
+  // them: the user's 2 to 3 m behind. (A player crawling is noticed at `crawlSight` of it.)
+  nearSense: 2.5,
+  // Hearing (heardPlayer): the player's own noise carries `pace` m for each m/s he moves (a walk, 1.2 m/s, 2.6 m: about the near sense, so that
+  // walking up behind a man is heard as he is felt; a run, 3.5 m/s, 8 m; a sprint, 6 m/s, 13 m), none under `quiet` m/s (a creep, a man turning
+  // on the spot), and at most `most` m. His harness rattles: x(1 + `armour` x its weight as a share of his body's: plate, about 0.35, x1.7; a
+  // gambeson, 0.1, x1.2). On his knees (`crawl`) a share of it. A hard landing (a jump down, a fall) is heard `fall` m off for `seconds`. Through
+  // a wall or a shut door the sound carries `through` of the way. What is heard is not seen: the man turns and goes to look (search), and with his
+  // wider searching cone he sees him, or does not.
+  hear: { pace: 2.2, quiet: 0.9, most: 16, armour: 2, crawl: 0.5, fall: 12, seconds: 1.5, through: 0.4 },
   // The cone of sight (full angle, degrees) from his yaw; in a helm with a slit; while searching (he is looking about).
   cone: 120,
   slitCone: 50,
@@ -73,8 +88,9 @@ export const AWARE = {
   arrive: 0.7,
   // A shout reaches allies within this (m) that have a clear sight line to the shouter.
   shoutRadius: 15,
-  // Noise: a blow struck or blocked within this (m) of an unaware man, for this long (s), draws him to look.
-  noiseRadius: 6,
+  // Noise: a blow struck or blocked within this (m) of an unaware man, for this long (s), draws him to look: steel on steel and a man's cry carry
+  // (it was 6 m; a fight is the loudest thing in a castle). Through a wall, `hear.through` of it.
+  noiseRadius: 12,
   noiseSeconds: 1.5,
   // Civilians and prisoners: a fight, or an aggro enemy in sight, within these (m) makes them run.
   fleeRadius: 8,
@@ -181,6 +197,10 @@ export function createAwareness(world, config = {}) {
       // The post's alarm (raiseAlarm), and how far he looks from it (m) if not as far as his section lets him (an archer watching a bridge, not the cliff beside it).
       alarm: post.alarm ?? null,
       vision: post.vision ?? null,
+      // A region he lies in wait for (`spawn.ambush`): the player in it, he has him, seen or not (lookGuard).
+      ambush: post.ambush ?? null,
+      // A prisoner who, freed, goes his own way and not with the player (`spawn.follows: false`: freePrisoner).
+      follows: post.follows ?? null,
       leg: 0,
       step: 1,
       pauseUntil: 0,
@@ -242,10 +262,10 @@ function setState(world, aware, mind, fighter, state, why = '') {
 
 // ---- Seeing --------------------------------------------------------------------------------
 
-/** How far this man sees (m): his section's `vision`, or the radius dimmed by its light. */
-function rangeOf(aware, world, fighter) {
+/** How far this man sees (m) ahead: his post's `vision` (until he is `roused`), his section's, or the radius dimmed by its light. */
+function rangeOf(aware, world, fighter, roused = false) {
   const own = aware.minds[fighter.id]?.vision;
-  if (own) return own;
+  if (own && !roused) return own;
   const section = fighter.spawn ? sectionById(world.stage.def, fighter.spawn.section) : null;
   if (section?.vision !== undefined) return section.vision;
   const light = section?.light ?? 1;
@@ -294,7 +314,7 @@ export function sprintUnseen(world, aware = world.stage?.aware) {
   return Boolean(aware?.config.sprintUnseen) && world.time - aware.sprintAt < aware.config.sprintGrace + 1e-9;
 }
 
-/** The first of the targets this man sees, or null. A sprinting player is not one of them. */
+/** The first of the targets this man sees ahead of him or notices close by (any way he faces), or null. A sprinting player is not one of them. */
 function spot(world, aware, fighter, mind) {
   const range = rangeOf(aware, world, fighter);
   const cone = coneOf(aware, fighter, mind);
@@ -302,9 +322,42 @@ function spot(world, aware, fighter, mind) {
   const player = sprintUnseen(world, aware) ? me : null;
   for (const target of targetsOf(world, aware)) {
     if (target === fighter || target === player) continue;
-    if (sees(world, fighter, target, target === me && me.crawling ? range * aware.config.crawlSight : range, cone)) return target;
+    const low = target === me && me.crawling ? aware.config.crawlSight : 1;
+    if (sees(world, fighter, target, range * low, cone)) return target;
+    if (Math.abs(floorOf(target) - floorOf(fighter)) < 1.5 && sees(world, fighter, target, aware.config.nearSense * low, 360)) return target;
   }
   return null;
+}
+
+/**
+ * How far the player's noise carries now (m, before walls): his pace (AWARE.hear.pace m for each m/s over `quiet`), his harness, his knees; a hard
+ * landing a moment ago is louder. Worked out once a step.
+ */
+function playerNoise(world, aware) {
+  if (aware.noiseAt === world.time) return aware.noise;
+  aware.noiseAt = world.time;
+  const me = world.fighters[0];
+  const hear = aware.config.hear;
+  let noise = 0;
+  if (me && me.state !== 'out' && !me.dormant) {
+    const pace = Math.hypot(me.rootVelocity?.[0] ?? 0, me.rootVelocity?.[1] ?? 0);
+    const body = me.body;
+    const harness = body.bodyMassKg > 0 ? (body.gearKg ?? 0) / body.bodyMassKg : 0;
+    if (pace > hear.quiet) noise = Math.min(hear.most, pace * hear.pace * (1 + hear.armour * harness) * (me.crawling ? hear.crawl : 1));
+    if (me.landedAt !== undefined && world.time - me.landedAt < hear.seconds) noise = Math.max(noise, hear.fall);
+  }
+  aware.noise = noise;
+  return noise;
+}
+
+/** Whether this man hears the player now: within his noise's reach on about the same floor, a wall between cutting it to `hear.through`. */
+function heardPlayer(world, aware, fighter) {
+  const me = world.fighters[0];
+  const noise = playerNoise(world, aware);
+  if (!noise || Math.abs(floorOf(me) - floorOf(fighter)) > 3) return false;
+  const apart = flatApart(fighter, me);
+  if (apart > noise) return false;
+  return apart <= noise * aware.config.hear.through || lineBetween(world, fighter, me);
 }
 
 // ---- Alarm ----------------------------------------------------------------------------------
@@ -419,7 +472,10 @@ function clashNear(aware, world, fighter, radius, seconds) {
   for (let index = aware.clashes.length - 1; index >= 0; index -= 1) {
     const clash = aware.clashes[index];
     if (world.time - clash.time > seconds) return null;
-    if (Math.abs(clash.y - y) < 3 && Math.hypot(clash.x - x, clash.z - z) < radius) return clash;
+    const apart = Math.hypot(clash.x - x, clash.z - z);
+    if (Math.abs(clash.y - y) >= 3 || apart >= radius) continue;
+    // (Through a wall the noise carries a share of the way: AWARE.hear.through.)
+    if (apart < radius * aware.config.hear.through || !rayBlocked(world.arena.terrain, [x, z], [clash.x, clash.z], eyeY(fighter), clash.y + 1.5)) return clash;
   }
   return null;
 }
@@ -607,13 +663,23 @@ function lookGuard(world, aware, mind, fighter) {
     lookAggro(world, aware, mind, fighter);
     return;
   }
+  // Lying in wait (`ambush`): the player has stepped into his ground (the cesspool's Noname, as he comes over the pit's edge).
+  const me = world.fighters[0];
+  if (mind.ambush && me.state !== 'out' && !me.dormant && regionContains(mind.ambush, hipX(me), hipZ(me), floorOf(me))) {
+    alarm(world, aware, mind, fighter, 'ambush', me);
+    return;
+  }
   const seen = spot(world, aware, fighter, mind);
   if (seen) {
     alarm(world, aware, mind, fighter, 'saw', seen);
     return;
   }
-  // A clash of arms near: he goes to see (unless he is already looking for trouble).
-  const noise = mind.state === 'search' || sprintUnseen(world, aware) ? null : clashNear(aware, world, fighter, config.noiseRadius, config.noiseSeconds);
+  // A clash of arms near, or the player himself heard (his steps, his harness, a fall): he goes to see (unless he is already looking for trouble).
+  // (A sprint is heard: it is not seen, sprintUnseen, but a man turns to the sound of it.)
+  let noise = mind.state === 'search' ? null : clashNear(aware, world, fighter, config.noiseRadius, config.noiseSeconds);
+  if (mind.state !== 'search' && !noise && heardPlayer(world, aware, fighter)) {
+    noise = { x: hipX(me), z: hipZ(me), y: floorOf(me), time: world.time };
+  }
   if (noise && (mind.heardAt ?? -Infinity) < noise.time) {
     mind.heardAt = noise.time;
     mind.lastSeen = { x: noise.x, z: noise.z, y: noise.y };
@@ -686,7 +752,7 @@ function lookAggro(world, aware, mind, fighter) {
     mind.lastSeen = { x: hipX(me), z: hipZ(me), y: floorOf(me) };
     return;
   }
-  const range = rangeOf(aware, world, fighter);
+  const range = rangeOf(aware, world, fighter, true);
   let nearest = null;
   let nearestApart = Infinity;
   for (const foe of foesOf(world)) {
@@ -847,6 +913,8 @@ function doCower(world, aware, mind, fighter) {
 /**
  * A prisoner freed: he is an ally from now on (corner 'red'), and follows the player. `id`: his spawn id
  * ('captive') or his fighter id. Returns false if there is no such man or he is not a prisoner.
+ * One whose spawn says `follows: false` is let out and no more: he stays a neutral (grey), keeps to his cell and hides from a fight (the
+ * player who goes alone: Dunnottar's). True all the same: he is freed.
  */
 export function freePrisoner(world, id) {
   const aware = world.stage?.aware;
@@ -854,6 +922,12 @@ export function freePrisoner(world, id) {
   const fighter = typeof id === 'number' ? world.fighters[id] : world.fighters.find((each) => each.spawn?.id === id);
   const mind = fighter && aware.minds[fighter.id];
   if (!mind || mind.kind !== 'captive') return false;
+  if (mind.follows === false) {
+    if (mind.freed) return false;
+    mind.freed = true;
+    world.events.push({ time: world.time, kind: 'freed', fighter: fighter.id, effects: ['is freed'] });
+    return true;
+  }
   fighter.corner = 'red';
   fighter.spawn.role = 'ally';
   if (fighter.crawling) fighter.crawling = false;

@@ -8,7 +8,7 @@ import { thinkAll } from '../src/ai.js';
 import { P } from '../src/body.js';
 import { advance, knockOut, placeOnFloor } from '../src/physics.js';
 import { levelPreset } from '../src/levelmode/presets.js';
-import { DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, dunnottarWithTeam } from '../src/levelmode/stages/dunnottar.js';
 import { setMechanism, updateStage } from '../src/levelmode/stage.js';
 import { createLevelWorld, drainUi, levelThink, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
 import { freePrisoner, mindState } from '../src/levelmode/awareness.js';
@@ -39,7 +39,7 @@ const run = (world, seconds) => advance(world, seconds, thinking);
 /** The garrison asleep, the comrades awake: they are the question. */
 const garrisonAsleep = (world) => { for (const fighter of world.fighters) if (fighter.spawn && fighter.spawn.role !== 'ally') fighter.dormant = true; };
 
-const dunnottar = (seed = 3) => createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed });
+const dunnottar = (seed = 3) => createLevelWorld(dunnottarWithTeam(), levelPreset('forger'), { seed });
 const fall = (world, fighter) => knockOut(world, fighter, { time: world.time, effects: [] }, 'is struck down', 'killed');
 
 test('team: Dunnottar starts the operative with two named Forger comrades on his side, following, a short sword each', () => {

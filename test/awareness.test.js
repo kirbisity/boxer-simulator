@@ -57,13 +57,52 @@ test('ghost walk (the sandbox debug): a guard facing the player never notices hi
   assert.equal(man(w, 'g').driven, true);
 });
 
-test('a guard with his back to the player stays idle however near: the player can walk up behind him', () => {
-  const w = world({ spawns: [guard('g', 12, 0, 0)] });
-  const me = w.fighters[0];
-  const result = walk(w, me, [[10.7, 0]], { within: 0.4, seconds: 30, think });
-  assert.equal(result.reached, 1);
-  run(w, 1);
-  assert.equal(state(w, 'g'), 'idle', 'close behind him and unseen');
+test('a guard with his back to the player notices him only close (2 to 3 m, all round); facing him, he sees him 20 to 30 m off', () => {
+  assert.ok(AWARE.nearSense >= 2 && AWARE.nearSense <= 3, `near sense ${AWARE.nearSense} m`);
+  assert.ok(AWARE.radius * AWARE.darkest >= 18 && AWARE.radius <= 30, `ahead: ${(AWARE.radius * AWARE.darkest).toFixed(1)} to ${AWARE.radius} m by the light`);
+  // Standing still behind him (no noise): at 3.5 m he does not know; at 2 m he does.
+  const far = world({ spawns: [guard('g', 3.5, 0, 0)] });
+  run(far, 2);
+  assert.equal(state(far, 'g'), 'idle', '3.5 m behind him, still: unnoticed');
+  const near = world({ spawns: [guard('g', 2, 0, 0)] });
+  run(near, 1);
+  assert.equal(state(near, 'g'), 'aggro', '2 m behind him: noticed');
+  // Facing him in full light: 26 m off he is seen; 33 m off he is not.
+  const ahead = world({ spawns: [guard('g', 26, 0, Math.PI)] });
+  run(ahead, 2);
+  assert.equal(state(ahead, 'g'), 'aggro', '26 m ahead of him');
+  const beyond = world({ spawns: [guard('g', 33, 0, Math.PI)] });
+  run(beyond, 2);
+  assert.equal(state(beyond, 'g'), 'idle', '33 m ahead of him');
+});
+
+test('hearing: a man running behind him is heard far off and he turns to look; one creeping is not; a wall muffles it', () => {
+  const noise = (pace, wall = null) => {
+    const w = world({ spawns: [guard('g', 9, 0, 0)], walls: wall ? [wall] : [] });
+    const me = w.fighters[0];
+    // The player going at `pace` m/s, from 9 m behind the guard's back and away from it (the guard looks away, +x).
+    let heard = false;
+    advance(w, 1.5, (current, dt) => {
+      me.rootVelocity[0] = -pace;
+      me.rootVelocity[1] = 0;
+      stageThink(current, dt, think);
+      if (state(w, 'g') === 'search') heard = true;
+    });
+    return heard;
+  };
+  // (Armour on him: the hero is a knight in plate, x1.7: a run, 3.5 m/s, carries about 13 m; a creep under 0.9 m/s nothing.)
+  assert.equal(noise(3.5), true, 'a run 9 m behind him is heard');
+  assert.equal(noise(0.7), false, 'a creep is not');
+  assert.equal(noise(3.5, wallLine([4.5, -10], [4.5, 10], 0.4, 0, 3)), false, 'nor a run through a wall at 9 m');
+});
+
+test('a man held to a pen (`spawn.pen`) fights from inside it: he sees the player and comes for him only as far as its edge', () => {
+  const w = world({ spawns: [guard('g', 8, 0, Math.PI, { pen: { at: [8, 0], size: [3, 3] } })] });
+  run(w, 5);
+  assert.equal(state(w, 'g'), 'aggro');
+  const [x, z] = hipsAt(man(w, 'g'));
+  assert.ok(x > 8 - 1.5 - 0.35 && x < 8 + 1.5 + 0.35 && Math.abs(z) < 1.5 + 0.35, `he stays in his pen: ${x.toFixed(2)}, ${z.toFixed(2)}`);
+  assert.ok(x < 7.2, `he came to its edge: ${x.toFixed(2)}`);
 });
 
 test('a wall between them: a guard facing the player does not see him', () => {
@@ -74,15 +113,15 @@ test('a wall between them: a guard facing the player does not see him', () => {
 });
 
 test('beyond the sight radius he does not see: the section sets it, and its light dims it', () => {
-  const far = world({ spawns: [guard('g', 30, 0, Math.PI)] });
+  const far = world({ spawns: [guard('g', 32, 0, Math.PI)] });
   run(far, 2);
-  assert.equal(state(far, 'g'), 'idle', 'past 25 m');
-  const dark = field({ spawns: [guard('g', 12, 0, Math.PI)] });
+  assert.equal(state(far, 'g'), 'idle', 'past 30 m');
+  const dark = field({ spawns: [guard('g', 22, 0, Math.PI)] });
   dark.sections[0].light = 0;
   const w = createStageWorld(dark, hero(), { seed: 7 });
   run(w, 2);
-  assert.equal(state(w, 'g'), 'idle', `12 m in the dark (${(AWARE.radius * AWARE.darkest).toFixed(1)} m)`);
-  dark.sections[0].vision = 20;
+  assert.equal(state(w, 'g'), 'idle', `22 m in the dark (${(AWARE.radius * AWARE.darkest).toFixed(1)} m)`);
+  dark.sections[0].vision = 25;
   const lit = createStageWorld(dark, hero(), { seed: 7 });
   run(lit, 2);
   assert.equal(state(lit, 'g'), 'aggro', 'the section\'s own vision wins');
@@ -117,6 +156,8 @@ test('a man in a helm with a slit sees through a narrower cone', () => {
 
 test('an unaware man is relaxed: guard down, no parry; a blow from behind lands, and only then he is aggro', () => {
   const w = world({ spawns: [guard('g', 12, 0, 0)] });
+  // (A deaf man with no near sense: the question is the unaware man's guard, not how close a man can come behind him, the test above.)
+  Object.assign(w.stage.aware.config, { nearSense: 0, hear: { ...AWARE.hear, pace: 0 } });
   const g = man(w, 'g');
   const me = w.fighters[0];
   walk(w, me, [[10.9, 0]], { within: 0.3, seconds: 30, think });

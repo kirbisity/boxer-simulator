@@ -116,6 +116,15 @@ const DN_L3 = dnLerp(-100.5, -62.5, Y.pathB, Y.pathC);
 export const DN_RAVINE = { x0: -26, x1: -12 };
 export const DN_BRIDGE = { x0: DN_RAVINE.x0 - 0.4, x1: DN_RAVINE.x1 + 0.4, z0: 44.2, z1: 48.2, y: Y.gorge };
 export const DN_BARBICAN = { x0: -14, x1: -11, z0: 39.4, z1: 53, top: 7.2, arch: 4.6 };
+/** The embrasures in the barbican's west parapet (z), an archer at each: six, 2.08 m apart (there were three; the user asked for more on the walls). */
+export const DN_LOOPS = [0, 1, 2, 3, 4, 5].map((k) => 41.0 + (k * (51.4 - 41.0)) / 5);
+/**
+ * The barrier before the arch (x, a line across the deck a stride short of the barbican, x0 -14): a timber rail from each of the bridge's rails, leaving a
+ * gap `gap` m wide on the deck's middle, and the two men-at-arms shoulder to shoulder in the gap (`knights`: their z), held to it (`pen`, the spawn's:
+ * physics.js keepToPen). Two men 0.7 m apart (shoulder to shoulder) in 2 m leave 0.3 m either side and nothing between: no body (0.6 m across) goes past them; the bridge is
+ * railed, the barrier's rails too high to step over. The way through is through them.
+ */
+export const DN_ARCH_BAR = { x: -15.0, gap: 2.0, knights: [45.85, 46.55] };
 
 function buildDrawbridge(sec) {
   const G = Y.gorge;
@@ -130,6 +139,10 @@ function buildDrawbridge(sec) {
   dnSlab(sec, DN_BRIDGE.x0, DN_BRIDGE.x1, DN_BRIDGE.z0, DN_BRIDGE.z1, DN_BRIDGE.y, 'boards', { bottom: DN_BRIDGE.y - 0.5, extra: { span: true } });
   dnFence(sec, [[DN_RAVINE.x0, DN_BRIDGE.z0 + 0.05, G], [DN_BRIDGE.x1, DN_BRIDGE.z0 + 0.05, G]], { style: 'fence', height: 1.1 });
   dnFence(sec, [[DN_RAVINE.x0, DN_BRIDGE.z1 - 0.05, G], [DN_BRIDGE.x1, DN_BRIDGE.z1 - 0.05, G]], { style: 'fence', height: 1.1 });
+  // The barrier across the deck before the arch (DN_ARCH_BAR): a rail from each side, the gap between them the knights'.
+  const bar = DN_ARCH_BAR;
+  dnFence(sec, [[bar.x, DN_BRIDGE.z0 - 0.1, G], [bar.x, mid - bar.gap / 2, G]], { style: 'fence', height: 1.3 });
+  dnFence(sec, [[bar.x, mid + bar.gap / 2, G], [bar.x, DN_BRIDGE.z1 + 0.1, G]], { style: 'fence', height: 1.3 });
   dnProp(sec, 'drawbridge', [(DN_RAVINE.x0 + B.x0) / 2, G, mid], { yaw: 0, length: B.x0 - DN_RAVINE.x0, width: DN_BRIDGE.z1 - DN_BRIDGE.z0, chainTo: [(B.x0 - DN_RAVINE.x0) / 2 - 0.1, B.arch + 1.6] });
   // The barbican: two towers rising from the sea joined by an arch over the bridge's end (a wall run with the arch in it), and on top a
   // platform with crenellated parapets all round: the archers' (there is no way up for him: they are for arrows from afar).
@@ -138,7 +151,7 @@ function buildDrawbridge(sec) {
   const t = 0.45;
   const parapet = (a, b) => sec.terrain.push({ ...wallLine(a, b, t, B.top - 0.3, B.top + 0.9), style: 'parapet' });
   // (The west parapet, over the bridge, has an embrasure at each archer's post: a gap down to a low sill, through which he looses down the bridge.)
-  const loops = [B.z0 + 1.6, mid, B.z1 - 1.6];
+  const loops = DN_LOOPS;
   let from = B.z0 + t / 2;
   for (const z of loops) {
     parapet([B.x0 + t / 2, from], [B.x0 + t / 2, z - 0.6]);
@@ -161,27 +174,38 @@ function buildDrawbridge(sec) {
   dnProp(sec, 'weapon', [-21, G, mid - 1.1], { what2: 'spear', yaw: 0.2 });
   dnProp(sec, 'raven', [B.x0 + 0.3, B.top + 0.9, B.z0 + 0.3], { yaw: 2.2 });
 
-  // The guard. The front is held to be given up on: it is not meant to be fought through (the sea cave's lit stair, 8 m off, is the way). Over the bridge three archers on the
-  // barbican; in front of it, on the shelf, across the bridge's mouth, two men-at-arms, a guard and a crossbowman; behind it, in the forecourt under the arch and before the gate,
-  // two men-at-arms at the arch's end, a crossbowman at each end of the forecourt and a guard at the ledge's corner; and on the ledge Sir Alasdair (the gate section's). It was
-  // three archers and three levies (tuned so that the bot got through it): now thirteen men (seven in plate or brigandine, six with a bow or crossbow). They are one alarm
-  // (`alarm`): one who sees him raises them all.
+  // The guard. The front is held to be given up on: it is not meant to be fought through (the sea cave's lit stair, 8 m off, is the way). Over the bridge six archers on the
+  // barbican; in front of it, on the shelf, across the bridge's mouth, two men-at-arms, a guard and a crossbowman; before the arch, two men-at-arms shoulder to shoulder in
+  // the barrier's gap (they hold it: no dash goes past them); behind it, a crossbowman at each end of the forecourt and a guard at the ledge's corner; and on the ledge Sir Alasdair
+  // (the gate section's). It was three archers and three levies (tuned so that the bot got through it), then thirteen men; now sixteen (seven in plate or brigandine, nine with a
+  // bow or crossbow). They are one alarm (`alarm`): one who sees him raises them all.
   // (Each watches the bridge, not the shelf beside it: the men at its head face east along the deck with their backs to the way to the sea cave's stair, and the barbican and
   // the arch are too far from it: test/dunnottarbridge.test.js "the front watches the bridge, not the way round".)
   const front = { alarm: 'front', vision: 14 };
   const archer = { ...front, perch: true, vision: 15 };
-  dnSpawn(sec, 'archer1', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, B.z0 + 1.6], DN_FACE.W, { ...archer, inputs: { name: 'Archer Gow' } });
-  dnSpawn(sec, 'archer2', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, mid], DN_FACE.W, { ...archer, inputs: { name: 'Archer Strachan' } });
-  dnSpawn(sec, 'archer3', 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, B.z1 - 1.6], DN_FACE.W, { ...archer, inputs: { name: 'Archer Duthie' } });
+  // (Once roused, an archer shoots at the man as far as the light lets him see, awareness.js rangeOf: his `vision` is only how far he watches.)
+  const ARCHERS = ['Archer Gow', 'Archer Keith', 'Archer Strachan', 'Archer Mowat', 'Archer Duthie', 'Archer Garden'];
+  DN_LOOPS.forEach((z, k) => dnSpawn(sec, `archer${k + 1}`, 'dunnottarArcher', 'enemy', 2, [B.x0 + 0.85, B.top, z], DN_FACE.W, { ...archer, inputs: { name: ARCHERS[k] } }));
   // In front of the bridge, on the shelf: facing east along the deck, so that the way to the sea cave's stair (south and west of them) is behind their cones.
   const head = { ...front, vision: 13 };
   dnSpawn(sec, 'frontknight1', 'dunnottarKnight', 'enemy', 3, [-29.6, G, 42.4], DN_FACE.E, { ...head, inputs: { name: 'Sir Hew' } });
   dnSpawn(sec, 'frontknight2', 'dunnottarKnight', 'enemy', 3, [-30.4, G, 47.4], DN_FACE.E, { ...head, inputs: { name: 'Sir Malcolm' } });
   dnSpawn(sec, 'frontguard', 'dunnottarGuard', 'enemy', 2, [-31.8, G, 46.2], DN_FACE.E, { ...head, inputs: { name: 'Sergeant Fyfe' } });
   dnSpawn(sec, 'frontcrossbow', 'dunnottarCrossbow', 'enemy', 2, [-33.8, G, 43.6], DN_FACE.E, { ...head, vision: 11, inputs: { name: 'Crossbowman Tait' } });
-  // Behind the bridge: men-at-arms at the arch's end, a crossbowman at each end of the forecourt, a guard at the ledge's corner.
-  dnSpawn(sec, 'bridgeguard1', 'dunnottarKnight', 'enemy', 3, [-9.4, G, DN_BRIDGE.z0 + 0.5], DN_FACE.W, { ...front, inputs: { name: 'Sir Ure' } });
-  dnSpawn(sec, 'bridgeguard2', 'dunnottarKnight', 'enemy', 3, [-9.4, G, DN_BRIDGE.z1 - 0.5], DN_FACE.W, { ...front, inputs: { name: 'Sir Jock' } });
+  // Before the arch: two men-at-arms in the barrier's gap, shoulder to shoulder, facing the bridge, penned to the spot (a box a step deep and a hand wide):
+  // they fight from it and are never drawn out of it, by a feint or by the chase. (They stood 3 m apart at the arch's end in the open forecourt, and a
+  // sprint went between them.) Then a crossbowman at each end of the forecourt, a guard at the ledge's corner.
+  ['Sir Ure', 'Sir Jock'].forEach((name, k) => {
+    const z = DN_ARCH_BAR.knights[k];
+    dnSpawn(sec, `bridgeguard${k + 1}`, 'dunnottarKnight', 'enemy', 3, [bar.x, G, z], DN_FACE.W, { ...front, inputs: { name }, pen: { at: [bar.x, z], size: [0.8, 0.3] } });
+  });
+  // (Bodies give: a man sprinting into them knocked one flat and walked past while he was getting up, in plate, slowly. So the gap is theirs while
+  // either stands: their locked shields, a waist-high stop at their backs that nothing draws (`heldBy`: stage.js keepHeld opens it when both are out,
+  // and a rest that brings them back shuts it). Waist-high: it hides nothing and stops no blow.)
+  sec.gates.push({
+    id: 'archbar', at: [bar.x + 0.55, G, mid], state: 'closed', heldBy: ['bridgeguard1', 'bridgeguard2'], look: {},
+    states: { closed: [{ ...wallOf([bar.x + 0.55, mid], [0.25, bar.gap + 0.3], G - 0.5, G + 1.2, { id: 'archbar' }), style: 'hidden', skin: false }], open: [] },
+  });
   dnSpawn(sec, 'forecourtbow1', 'dunnottarCrossbow', 'enemy', 2, [-8.4, G, 41.0], DN_FACE.W, { ...front, inputs: { name: 'Crossbowman Rhind' } });
   dnSpawn(sec, 'forecourtbow2', 'dunnottarCrossbow', 'enemy', 2, [-8.4, G, 51.0], DN_FACE.W, { ...front, inputs: { name: 'Crossbowman Lyall' } });
   dnSpawn(sec, 'bridgelevy', 'dunnottarGuard', 'enemy', 2, [-8.2, G, 54.6], DN_FACE.W, { ...front, inputs: { name: 'Sergeant Wattie' } });
@@ -863,17 +887,14 @@ for (const section of DN_SECTIONS) {
 }
 
 // ==== The team (begin) ======================================================================================================
-// Two Forger comrades stand beside the operative where the cliff path begins (his start, [-114, 14, -4], facing east), weak: a
-// short sword and plain clothes each. They follow him (levelmode/awareness.js followers), fight what he fights and stop at the
-// chapel gate (`followStopsAt`). A rest records who is alive; a death brings back exactly those (levelmode/checkpoints.js, team.js).
-// Appended last in the cliff section.
-const DN_TEAM = [
+// The operative goes in alone: no comrades at his side (the user's call). The two weak Forgers who stood beside him where the cliff path begins (his
+// start, [-114, 14, -4], facing east) are kept here and not spawned: `DN_TEAM`, their spawns, for a later stage or a test that puts them back
+// (dunnottarWithTeam). The team's code (team.js, awareness.js followers, a rest's roster, the attempts' names) runs on whoever is an ally: in this
+// stage nobody (the HUD's team panel is empty, the story says he went in alone).
+export const DN_TEAM = [
   ['maren', 'forgerMaren', [-116.4, Y.start, -2.4], 'Maren'],
   ['tobin', 'forgerTobin', [-116.4, Y.start, -5.6], 'Old Tobin'],
-];
-for (const [id, preset, post, name] of DN_TEAM) {
-  dnSpawn(DN_SECTIONS.find((section) => section.id === 'cliff'), id, preset, 'ally', 2, post, DN_FACE.E, { inputs: { name }, team: true });
-}
+].map(([id, preset, post, name]) => ({ id, preset, role: 'ally', tier: 2, post, facing: DN_FACE.E, inputs: { name }, team: true }));
 // ==== The team (end) ========================================================================================================
 
 export const DUNNOTTAR = {
@@ -935,6 +956,15 @@ const dnSpiralWaypoints = (every = 2) => {
   points.push(windingTread(DN_SPIRAL, DN_SPIRAL.steps - 1));
   return points;
 };
+
+/**
+ * Stage 1 as it was, with company: the two Forger comrades beside him at the start (DN_TEAM, appended last in the cliff section) and the vault's prisoners
+ * following him once freed. For the team's tests (the code is kept for a stage that wants it).
+ */
+export function dunnottarWithTeam() {
+  const follow = (spawn) => (spawn.follows === false ? { ...spawn, follows: true } : spawn);
+  return { ...DUNNOTTAR, sections: DUNNOTTAR.sections.map((section) => ({ ...section, spawns: [...section.spawns.map(follow), ...(section.id === 'cliff' ? DN_TEAM : [])] })) };
+}
 
 /**
  * The way through the stage, as legs of waypoints [x, z] for a walker (test/walker.js): the main route in order, each leg

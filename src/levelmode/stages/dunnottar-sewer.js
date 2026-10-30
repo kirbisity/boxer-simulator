@@ -15,7 +15,8 @@
 //     the long drain       x -52.8..-45.6, z -39.6..-36.2     (the pocket where it turns east, a last lit brazier before the cesspool)
 //     the cesspool         centre (-36, -37.9), DN_CESSPOOL   (an eight-sided sump hall 17.2 m across under the inner cell: a pit of sludge 13.6 m across,
 //                                                             thigh-deep, a rim walk round it, ramps down into it on the drain's line and north and south,
-//                                                             outfalls pouring into it, a dead-end alcove north; Noname on the low island in the middle)
+//                                                             outfalls pouring into it, a dead-end alcove north where Noname waits among the dead, out of
+//                                                             sight of the drain, and a low island in the middle)
 //     the long drain, east x -26.4..-13, z -39.6..-36.2      and a stair of 15 treads up to y 1.4
 //     the low door         x -7..0                            (into the crypt's sea-gate chamber at x 0)
 //
@@ -37,14 +38,20 @@ export const DN_CAVE_STAIR = { foot: -39.6, head: -29.6 };
 /**
  * The cesspool: `at` its centre [x, y, z] (y: the sludge's surface), `radius` the pit's (the apothem of its eight sides: the arena), `hall` the hall's inside
  * (the rim walk runs from `radius` to `hall`), `floor` the bed under the sludge (y), `rim` the walk's level (y, the long drain's floor), `depth` the sludge over the
- * bed, `island` the low stone platform in the middle where Noname waits ({ at: [x, z], size, top }: its top a hand under the sludge, so a man lying dead on it
- * has his face out of it). Directly under the inner cell (x -44.4..-35.2, z -41.2..-30.8): a man dropped down its garderobe lands in the pit.
+ * bed, `island` the low stone platform in the middle where the ending lays him out ({ at: [x, z], size, top }: its top a hand under the sludge, so a man lying dead
+ * on it has his face out of it). Directly under the inner cell (x -44.4..-35.2, z -41.2..-30.8): a man dropped down its garderobe lands in the pit.
  */
 export const DN_CESSPOOL = { at: [-36, -1.86, -37.9], radius: 6.8, hall: 8.6, floor: -2.35, rim: -1.6, depth: 0.49, island: { at: [-35.2, -37.9], size: 3.2, top: -1.93 } };
 /** The cesspool's arena as a stage region (x, z box, y range): `stage.regions.cesspool`. */
 export const DN_CESSPOOL_REGION = { at: [DN_CESSPOOL.at[0], DN_CESSPOOL.at[2]], size: [DN_CESSPOOL.radius * 2, DN_CESSPOOL.radius * 2], y: [DN_CESSPOOL.floor - 0.5, DN_CESSPOOL.rim + 4] };
 /** The one man in the drain: his spawn id. */
 export const DN_NONAME_SPAWN = 'noname';
+/**
+ * Where he waits: the back of the dead-end alcove north of the pit (its inside z from the hall's wall, `hall` + 1 from the centre, 3.8 m north; 1.4 m short
+ * of its end wall, a little west of its middle), on the rim walk's level, facing south into the hall. The drain comes in on the pit's west-east line, and the alcove's jambs hide its
+ * back from the whole of the drain and the hall's west door: the line to him opens a few metres into the hall.
+ */
+export const DN_NONAME_POST = [DN_CESSPOOL.at[0] - 0.4, DN_CESSPOOL.rim, DN_CESSPOOL.at[2] - (DN_CESSPOOL.hall + 1) - 3.8 + 1.4];
 /**
  * Where the rest is, in the grotto (the drain's lobby: the entry hall, a long walk from the cesspool: a death at Noname's is a walk back through the whole drain,
  * which is the price of the fight; it was in the pocket by the cesspool's door, so near the arena that a death cost half a minute), and where the pocket's last
@@ -266,8 +273,15 @@ export function buildSewer() {
   sec.decor.push({ kind: 'waymarks', points: [[-46.2, -37.9, D], [px - P.radius - 0.4, -37.9, D]], gap: 2.6, first: 0.6 });
   sec.decor.push({ kind: 'waymarks', points: [[px + P.radius + 0.4, -37.9, D], [-14, -37.9, D], [-4, -37.9, C]], gap: 2.6, first: 0.6 });
 
-  // The one man down here: Noname, waiting in the middle of the sludge (presets.js `noname`; a guard's mind: he waits, he sees, he fights to the death).
-  dnSpawn(sec, DN_NONAME_SPAWN, 'noname', 'enemy', 3, [P.island.at[0], P.island.top, P.island.at[1]], DN_FACE.W, { inputs: { name: 'Noname' }, miniboss: { title: 'The Cesspool' } });
+  // The one man down here: Noname (presets.js `noname`; a guard's mind: he waits, he sees, he fights to the death). He waits at the back of the alcove, among
+  // the drain's dead, facing the pit (DN_NONAME_POST): from the long drain and its door the alcove's jambs hide him (he stood on the island in the middle and
+  // was seen 15 m off down the drain, a man in a helmet with a sword: no surprise left). The player walks into the hall; once he is over the pit's edge
+  // (`ambush`: the arena, DN_CESSPOOL_REGION) Noname has him, and comes out of the dark at him: his bar, the boss's music, a line (`reveal`). He never
+  // leaves the hall (`pen`: the hall and the alcove; the drains are not his).
+  dnSpawn(sec, DN_NONAME_SPAWN, 'noname', 'enemy', 3, DN_NONAME_POST, DN_FACE.S, {
+    inputs: { name: 'Noname' }, miniboss: { title: 'The Cesspool' }, ambush: DN_CESSPOOL_REGION, reveal: 'Something stirs among the dead in the alcove.',
+    pen: { at: [px, (alcove.z0 + pz + P.hall) / 2], size: [P.hall * 2, pz + P.hall - alcove.z0] },
+  });
 
   dnItem(sec, 'bandage12', 'bandage', [-53.4, F, 52.6]);
   dnItem(sec, 'tonic9', 'tonic', [-54.0, bed, 5.4]);
@@ -364,7 +378,7 @@ function swCesspool(sec, alcove) {
   dnProp(sec, 'flies', [cx - 1.5, surface + 0.6, cz + 1.2], { count: 14, radius: 1.2 });
   // The alcove: bones and skulls heaped, a second dead man, rags.
   const ax = (alcove.x0 + alcove.x1) / 2;
-  dnProp(sec, 'skullpile', [ax - 0.6, D, alcove.z0 + 1.0], { size: 0.8 });
+  dnProp(sec, 'skullpile', [ax + 0.9, D, alcove.z0 + 0.8], { size: 0.8 });
   dnProp(sec, 'corpse', [ax + 0.4, D, alcove.z0 + 2.4], { yaw: 0.3 });
   dnProp(sec, 'rags', [ax - 0.9, D, alcove.z1 - 0.8], { yaw: 1.4 });
   dnProp(sec, 'fungus', [alcove.x0 + 0.2, D + 0.5, alcove.z0 + 0.6], { size: 0.7, light: false });

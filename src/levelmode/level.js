@@ -28,6 +28,8 @@
 //   spawn.dead: true         a body that lies where it was put, from the start (weapon dropped); never respawned
 //   spawn.boss               { title?, phase2?: { at, foot, accel, work, burst } | false } on a spawn of role 'boss'
 //   spawn.miniboss           { title? } on any spawn: the boss's bar (bossStatus) while he is awake and aware of the player; he stays down after a rest (checkpoints.js)
+//   spawn.reveal             'text': said (a toast) the first time in a run he is on the player (a boss kept out of sight until then: the cesspool's Noname)
+//   spawn.ambush, spawn.pen  regions: the ground he lies in wait for (awareness.js), and the box he never leaves (stage.js, physics.js keepToPen)
 //   (and the items / rest / levers / gates / ladders fields of interact.js)
 
 import { hurtShare } from '../ai.js';
@@ -262,8 +264,15 @@ function watchBoss(world, boss) {
 function watchMinibosses(world) {
   const level = levelOf(world);
   for (const fighter of world.fighters) {
-    if (!fighter.spawn || fighter.state !== 'out' || fighter.dormant || level.minibossDown?.[fighter.id] !== undefined) continue;
-    if (level.spawns[fighter.spawn.id]?.def.miniboss) (level.minibossDown ??= {})[fighter.id] = world.time;
+    if (!fighter.spawn || fighter.dormant) continue;
+    const def = level.spawns[fighter.spawn.id]?.def;
+    // A man with a `reveal` (the cesspool's Noname, out of sight until the player is in his hall): the line, once a run, the first time he is on him.
+    if (def?.reveal && !level.revealed?.has(fighter.spawn.id) && levelAware(world, fighter)) {
+      (level.revealed ??= new Set()).add(fighter.spawn.id);
+      level.ui.push({ type: 'toast', text: def.reveal });
+    }
+    if (fighter.state !== 'out' || level.minibossDown?.[fighter.id] !== undefined) continue;
+    if (def?.miniboss) (level.minibossDown ??= {})[fighter.id] = world.time;
   }
 }
 

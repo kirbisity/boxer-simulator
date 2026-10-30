@@ -213,6 +213,8 @@ test('items lying about are taken at the button: bandages and tonics into the po
 
 test('the button hides while an enemy aware of him is within 6 m (awareness.js: aggro or search), and not for one who has not noticed him', () => {
   const world = yard();
+  // (Nobody notices him by himself: the yard's patrol sees 30 m now, and the question here is the button, the minds being set by hand.)
+  world.stage.ghost = true;
   // The hall's rest point is at (48, 0, 0): the guards stand about it.
   standAt(world, 46.8, 0, 0.5);
   assert.ok(interactions(world).some((entry) => entry.kind === 'rest'), 'the rest point is within reach');
@@ -393,6 +395,8 @@ test('the swapped body is a body as at the start of a bout: weapon masses carrie
 
 test('a rest heals the operative whole, refills his items, puts the enemies back and keeps what was opened, freed and taken', () => {
   const world = yard();
+  // (Nobody notices him by himself, as above: the minds are set by hand.)
+  world.stage.ghost = true;
   const me = world.fighters[0];
   const level = world.stage.level;
   // Take the knight's harness first: the gear at the rest is this.

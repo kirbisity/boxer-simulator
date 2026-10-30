@@ -41,6 +41,8 @@ const run = (world, seconds) => advance(world, seconds, thinking);
 function bare() {
   const stage = structuredClone(DUNNOTTAR);
   for (const section of stage.sections) section.spawns = section.spawns.filter((spawn) => spawn.hold || ['vaelen', 'miner', 'captive', 'noname'].includes(spawn.id));
+  // (Dunnottar's prisoners stay in their cell once let out, `follows: false`: here they follow, for the followers' stop at the chapel gate.)
+  for (const section of stage.sections) for (const spawn of section.spawns) if (spawn.follows === false) spawn.follows = true;
   return stage;
 }
 const standAt = (world, x, y, z, yaw) => {

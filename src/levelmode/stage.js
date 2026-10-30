@@ -32,6 +32,8 @@
 //       post: [x, y, z], facing: yaw,     // where he stands, on the floor at height y
 //       patrol: [[x, z], ...],            // optional: the path he walks when unaware (not used here)
 //       hold: 'horde',                    // optional: held out of the world (dormant whatever is active) until released by name (releaseHeld)
+//       pen: { at: [x, z], size: [w, d] }, // optional: a box his own steps never take him out of, aware or not (physics.js keepToPen): a boss
+//                                         // who keeps to his hall, a gate's men who hold their line; shoved out, he steps back in
 //     } ],
 //     // Things to find (not used here): { id, kind: 'bandage', at: [x, y, z] }.
 //     items: [ ],
@@ -131,9 +133,9 @@ export function sectionById(stage, id) {
   return stage.sections.find((section) => section.id === id);
 }
 
-/** Every gate and ladder of a stage: [{ id, section, state, states }]. */
+/** Every gate and ladder of a stage: [{ id, section, state, states, heldBy? }]. */
 export function mechanismsOf(stage) {
-  return stage.sections.flatMap((section) => [...(section.gates ?? []), ...(section.ladders ?? [])].map((mechanism) => ({ id: mechanism.id, section: section.id, state: mechanism.state ?? Object.keys(mechanism.states)[0], states: mechanism.states })));
+  return stage.sections.flatMap((section) => [...(section.gates ?? []), ...(section.ladders ?? [])].map((mechanism) => ({ id: mechanism.id, section: section.id, state: mechanism.state ?? Object.keys(mechanism.states)[0], states: mechanism.states, ...(mechanism.heldBy ? { heldBy: mechanism.heldBy } : {}) })));
 }
 
 /** What is wrong with a stage's data, as a list of sentences (empty if it is sound). */
@@ -246,7 +248,7 @@ export function createStageWorld(stage, playerInputs, { seed = 1, awareness = tr
   for (const section of stage.sections) {
     for (const spawn of section.spawns ?? []) {
       entries.push({ inputs: spawnInputs(spawn), corner: ROLE_CORNER[spawn.role] });
-      posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id, held: spawn.hold ?? null, ...(spawn.perch ? { perch: true } : {}) } });
+      posts.push({ at: spawn.post, facing: spawn.facing ?? 0, spawn: { id: spawn.id, role: spawn.role, tier: spawn.tier ?? 1, patrol: spawn.patrol ?? null, section: section.id, home: section.id, held: spawn.hold ?? null, ...(spawn.perch ? { perch: true } : {}), ...(spawn.pen ? { pen: spawn.pen } : {}) } });
     }
   }
   // An open arena: the box is a far limit, the terrain the floor.
@@ -295,8 +297,23 @@ export function updateStage(world, force = false) {
     changed = true;
   }
   if (run.steps % REHOME_EVERY === 0) rehome(world);
+  keepHeld(world);
   updateAwareness(world);
   return changed;
+}
+
+/**
+ * A mechanism held by men (a gate's `heldBy`: spawn ids, the men who are the gate: the arch's knights at Dunnottar): closed while any of them is awake
+ * and not out, open once all are out; a rest that makes them new shuts it again. It makes no sound and is not drawn (no `look.kind`).
+ */
+function keepHeld(world) {
+  const run = world.stage;
+  run.held ??= mechanismsOf(run.def).filter((mechanism) => mechanism.heldBy).map((mechanism) => ({ id: mechanism.id, men: world.fighters.filter((fighter) => mechanism.heldBy.includes(fighter.spawn?.id)) }));
+  for (const { id, men } of run.held) {
+    // (Men asleep, their section not awake, hold nothing; nor does anyone against the ghost walk, the designer's debug.)
+    const state = !run.ghost && men.some((fighter) => fighter.state !== 'out' && !fighter.dormant) ? 'closed' : 'open';
+    if (run.mechanisms[id] !== state) setMechanism(world, id, state);
+  }
 }
 
 /** A think function for `advance`/the page: the stage keeps up, then the fight AI thinks (`then`). */
@@ -409,6 +426,8 @@ function mechanismSound(world, id, state) {
     const gate = (section.gates ?? []).find((entry) => entry.id === id);
     const ladder = gate ? null : (section.ladders ?? []).find((entry) => entry.id === id);
     if (!gate && !ladder) continue;
+    // (A gate that is not drawn, the men who hold a gap, makes no sound of its own.)
+    if (gate && !gate.look?.kind) return;
     const kind = ladder ? 'ladder' : GATE_SOUND[gate.look?.kind] ?? 'gate';
     soundEvent(world, 'mech', { at: (gate ?? ladder).at, kind, state: STATE_SOUND[state] ?? state, id });
     return;
