@@ -506,3 +506,20 @@ export function lastGateShareText(result) {
   const hero = LAST_GATE_HEROES[result.hero]?.label ?? 'Samurai';
   return `I held ${LAST_GATE.title} for ${lastGateClock(result.seconds)} as the ${hero} — ${result.kills} rebel${result.kills === 1 ? '' : 's'} cut down. Gladiator`;
 }
+
+/**
+ * The words on a run's poster: the line over the time, the time the gate held, the rebels he cut down ("57 FELL"), the hero's
+ * name and what he is ("THE SAMURAI · ŌDACHI"), and the mark. Two numbers only: the time and his kills.
+ */
+export function lastGatePosterWords(result, name = null) {
+  const hero = LAST_GATE_HEROES[result.hero] ?? LAST_GATE_HEROES.samurai;
+  return {
+    over: 'THE GATE HELD',
+    held: lastGateClock(result.seconds),
+    fell: `${result.kills} FELL`,
+    by: 'BY HIS HAND',
+    name: (name ?? hero.label).toUpperCase(),
+    title: `THE ${hero.label.toUpperCase()} · ${hero.weapon.toUpperCase()}`,
+    mark: 'GLADIATOR · THE LAST GATE',
+  };
+}

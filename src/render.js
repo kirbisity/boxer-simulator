@@ -65,8 +65,9 @@ const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 
 // ---- Scene -----------------------------------------------------------------
 
-export function createScene(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+export function createScene(canvas, { alpha = false } = {}) {
+  // (`alpha`: a view drawn over something else, its background clear: The Last Gate's poster, its hero drawn alone.)
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;

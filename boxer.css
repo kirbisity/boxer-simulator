@@ -1124,3 +1124,14 @@ body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none
   .lg-end-card h2 { font-size: 26px; }
   .lg-figure.big b { font-size: 30px; }
 }
+
+/* The end poster (lastgateview.js lastGatePoster): the 9:16 canvas as large as the screen lets it be, the buttons under it. */
+.lg-end-stack { display: grid; gap: 8px; justify-items: center; max-height: 100%; }
+.lg-poster-frame { position: relative; line-height: 0; }
+.lg-poster { display: block; height: min(calc(100dvh - 150px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 1100px); width: auto; max-width: calc(100vw - 32px); aspect-ratio: 9 / 16; object-fit: contain; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.lg-end-board { position: absolute; left: 8px; right: 8px; bottom: 8px; max-height: 72%; overflow: auto; line-height: 1.4; display: grid; gap: 6px; padding: 10px; border-radius: 10px; background: rgba(12, 15, 19, 0.93); border: 1px solid rgba(255, 255, 255, 0.12); }
+.lg-end-stack .lg-actions { width: min(100%, 420px); grid-template-columns: auto 1fr 1.3fr; }
+.lg-share { font-weight: 600; }
+.lg-board-link { background: none; border: 0; padding: 2px 8px; font-size: 13px; color: var(--muted); }
+/* Over everything of the fight (its buttons and the strip), on a near-black ground: the poster alone. */
+.lg-end { z-index: 60; background: radial-gradient(ellipse at 50% 40%, #10151c, #030406); }

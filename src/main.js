@@ -480,7 +480,16 @@ function lastGateFrame(world) {
   audioOutcome(world, 'defeat');
   // A moment to see it happen, then the card (unless the run has been left).
   setTimeout(() => {
-    if (state.world === world) lastGateView.end(result, ranked, { again: () => newBout(), menu: () => goHome() });
+    if (state.world !== world) return;
+    // The poster's hero: his own fighter, in his kit, drawn alone (drawHeroFigure), the poster made round him.
+    const inputs = world.fighters[world.lastGate.heroId].body.inputs;
+    let hero = null;
+    try {
+      hero = drawHeroFigure(inputs);
+    } catch (error) {
+      console.warn('The Last Gate: the hero could not be drawn for the poster', error);
+    }
+    lastGateView.end(result, ranked, { again: () => newBout(), menu: () => goHome(), hero, name: inputs.name });
   }, 1400);
 }
 
@@ -2736,6 +2745,59 @@ function drawPortrait(inputs, yaw = -0.45) {
   const url = portraitView.renderer.domElement.toDataURL('image/png');
   disposeFighterView(portraitView, view);
   return url;
+}
+
+// The Last Gate's poster: the hero alone, drawn from below and lit hard from behind, on a clear background (lastgateview.js composes it).
+const HERO_FIGURE = { size: [600, 960], yaw: -0.35, orbit: { distance: 3.15, pitch: -0.12, yaw: 0.2 }, target: 1.05, rim: 2.6, key: 1.9, hemi: 0.55 };
+let heroFigureView = null;
+
+/** A fighter drawn alone in his guard (his kit and weapon), seen from a little below, rim-lit: a canvas clear round him. */
+function drawHeroFigure(inputs) {
+  const spec = HERO_FIGURE;
+  const [width, height] = spec.size;
+  if (!heroFigureView) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    heroFigureView = createScene(canvas, { alpha: true });
+    heroFigureView.renderer.setPixelRatio(1);
+    heroFigureView.defaults.renderer.pixelRatio = 1;
+    resize(heroFigureView, width, height);
+    heroFigureView.places.ring.visible = false;
+  }
+  const view = heroFigureView;
+  view.scene.background = null;
+  view.scene.fog = null;
+  view.renderer.setClearColor(0x000000, 0);
+  const world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed: 5 });
+  const fighter = world.fighters[0];
+  placeFighter(fighter, 0, 0);
+  fighter.yaw = spec.yaw;
+  advance(world, 0.7, null, STEP);
+  flattenView(view);
+  const figure = buildFighterView(view, fighter);
+  setLayer(figure, 'skin');
+  updateFighterView(figure, 0, world.time);
+  updateArms(view, figure, world.time);
+  updateProps(view, [figure], world);
+  Object.assign(view.orbit, spec.orbit);
+  view.orbit.target.set(0, spec.target, 0);
+  placeCamera(view, null);
+  flattenView(view);
+  // The light of a poster: a cold rim from behind him, the key from above in front, little fill.
+  view.lights.rim.intensity = spec.rim;
+  view.lights.rim.position.set(-3, 4, -5);
+  view.lights.key.intensity = spec.key;
+  view.lights.hemi.intensity = spec.hemi;
+  view.scene.background = null;
+  view.renderer.setClearColor(0x000000, 0);
+  render(view);
+  const out = document.createElement('canvas');
+  out.width = width;
+  out.height = height;
+  out.getContext('2d').drawImage(view.renderer.domElement, 0, 0);
+  disposeFighterView(view, figure);
+  return out;
 }
 
 /** The character creator's fighter: standing alone, facing the camera, to one side of the panel. */
