@@ -7,7 +7,7 @@
 
 import { P } from '../body.js';
 import { opponentFor } from '../physics.js';
-import { attackMark } from '../control.js';
+import { attackMark, moveName } from '../control.js';
 import { FIGHT_UI, fightUiColour, fightUiMoves, fightUiZoneOf } from './logic.js';
 import { FIGHT_UI_OUTCOME_GLYPHS, fightUiIcon } from './icons.js';
 
@@ -183,7 +183,7 @@ export function fightUiKit(root, hooks) {
       const colour = entry ? fightUiColour(entry.group) : '#ffffff';
       toast.style.setProperty('--fu-col', colour);
       toast.querySelector('.fu-toast-icon').innerHTML = entry ? fightUiIcon(entry, { mark: false }) : '';
-      toast.querySelector('.fu-toast-name').textContent = entry?.name ?? punch.type;
+      toast.querySelector('.fu-toast-name').textContent = entry?.name ?? moveName(punch.type).name;
       toast.querySelector('.fu-toast-outcome span').textContent = '';
       toast.querySelector('.fu-toast-outcome i').innerHTML = '';
       toast.dataset.outcome = '';

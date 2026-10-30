@@ -5,7 +5,8 @@
 // the floor), the attack controls the player chose (fightui/: a tap on
 // his man himself where to hit, or a button for each kind of blow, with the
 // name of each attack he makes and how it went), a big Guard button, a Lock
-// button above it, Jump above Lock and Crawl below Guard, one special button in a fixed place, and the fight-mode
+// button above it, Jump above Lock and Crawl below Guard, one special button in a fixed place, the weapon art's own
+// button (shown while the art is charged, weaponarts.js), and the fight-mode
 // HUD (the player's status low down, his man's over his head); in a battle,
 // a small column of orders to his men at the top left (fightui/command.js).
 // Only this surface takes the browser's gestures from it: menus and text
@@ -20,7 +21,7 @@ import { fightUiInstall } from './fightui/index.js';
 import { FIGHT_UI_CONTROL_ICONS } from './fightui/icons.js';
 import { fightUiCommandBar } from './fightui/command.js';
 import { paintStamina } from './overdraftview.js';
-import { ARTS, artLabel, artPrimed } from './weaponarts.js';
+import { ARTS, artBlocked, artLabel, artPrimed } from './weaponarts.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -73,6 +74,11 @@ export function installFightControls(root, hooks) {
   guard.innerHTML = '<b>🛡</b><span>Guard</span>';
   const action = root.appendChild(uiElement('button', 'fight-button action-button'));
   action.innerHTML = '<b></b><span></span>';
+  // The weapon art's own button (weaponarts.js): shown, glowing, from the moment the art is charged until it is made; dimmed
+  // (and saying why, small) while he has not the stamina for it.
+  const art = root.appendChild(uiElement('button', 'fight-button art-button'));
+  art.innerHTML = '<b>✦</b><span class="label">Art</span><span class="why"></span><kbd>P</kbd>';
+  art.hidden = true;
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
   lock.innerHTML = '<b>◎</b><span class="label">Lock</span><span class="who"></span>';
   // Jump (above Lock) and Crawl (below Guard): round, in the right-hand stack.
@@ -267,7 +273,7 @@ export function installFightControls(root, hooks) {
   surface.addEventListener('lostpointercapture', drop);
   // No callout, selection, context menu or page zoom from the fight.
   for (const kind of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) {
-    for (const target of [surface, guard, action, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
+    for (const target of [surface, guard, action, art, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
   }
 
   // Guard: held, the block; tapped, an evasion.
@@ -299,6 +305,13 @@ export function installFightControls(root, hooks) {
     navigator.vibrate?.(10);
     signal('action', lastAction);
   });
+  // The art: asked for with the orders (control.js directFighter keeps it a moment if he is still busy).
+  art.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    if (!active || art.hidden) return;
+    askArt();
+    navigator.vibrate?.(18);
+  });
   // Lock: on the man he is on (the nearest), or off.
   lock.addEventListener('pointerdown', (press) => {
     press.preventDefault();
@@ -321,6 +334,15 @@ export function installFightControls(root, hooks) {
     pressCrawl();
     navigator.vibrate?.(12);
   });
+
+  /** His weapon's art asked for (its button, or P): carried out with the orders, if it is charged (weaponarts.js). */
+  function askArt() {
+    const me = hooks.player();
+    if (!me || !artPrimed(me)) return false;
+    (hooks.orders().actions ??= []).push('art');
+    signal('action', 'art');
+    return true;
+  }
 
   /** A jump asked for (the button or Space): carried out with the orders (control.js directFighter). */
   function askJump() {
@@ -412,10 +434,19 @@ export function installFightControls(root, hooks) {
       lastAction = name;
       action.disabled = !name;
       action.classList.toggle('idle', !name);
-      // His weapon's art: the button glows and names it (weaponarts.js).
-      action.classList.toggle('art', name === 'art');
       action.querySelector('b').textContent = name ? ACTIONS[name].icon : '·';
-      action.querySelector('span').textContent = name === 'art' ? artLabel(me) : name ? ACTIONS[name].label : 'Action';
+      action.querySelector('span').textContent = name ? ACTIONS[name].label : 'Action';
+    }
+    // The art's own button: there while charged, named for his weapon's art; dimmed, with a word why, while winded.
+    const charged = artPrimed(me);
+    if (art.hidden === charged) art.hidden = !charged;
+    if (charged) {
+      const label = artLabel(me);
+      if (art.querySelector('.label').textContent !== label) art.querySelector('.label').textContent = label;
+      const winded = artBlocked(me) === 'winded';
+      art.classList.toggle('winded', winded);
+      art.querySelector('.why').textContent = winded ? 'winded' : '';
+      art.setAttribute('aria-label', winded ? `${label}: weapon art, too winded` : `${label}: weapon art`);
     }
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
     lock.classList.toggle('on', Boolean(locked));
@@ -472,7 +503,8 @@ export function installFightControls(root, hooks) {
     mark.hidden = true;
     guard.classList.remove('on');
     jump.classList.remove('on', 'blocked');
-    action.classList.remove('art');
+    art.hidden = true;
+    art.classList.remove('winded');
     crawl.classList.remove('on', 'blocked');
     awake.clear();
     incoming = null;
@@ -481,7 +513,7 @@ export function installFightControls(root, hooks) {
     commandBar.reset();
   }
 
-  return { update, setActive, reset, toggleLock, jump: askJump, toggleCrawl: pressCrawl, setDevice, get device() { return device; }, fightUi: fightUi.choose };
+  return { update, setActive, reset, toggleLock, jump: askJump, toggleCrawl: pressCrawl, art: askArt, setDevice, get device() { return device; }, fightUi: fightUi.choose };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */

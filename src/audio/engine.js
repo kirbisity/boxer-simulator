@@ -30,6 +30,7 @@ import { breathParams, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
 import { playUi, uiParams } from './sfx/ui.js';
 import { playThump, thumpParams } from './sfx/thump.js';
+import { artDrawParams, artImpactParams, playArtDraw, playArtImpact } from './sfx/art.js';
 
 /** The mixer's settings: the five levels (0..1), the Speakers toggle (null: the machine's default), mute. Kept in this browser. */
 export const AUDIO_SETTINGS = { key: 'gladiator-audio', defaults: { master: 0.8, effects: 1, ambience: 0.8, music: 0.6, voices: 1, speakers: null, muted: false } };
@@ -563,6 +564,18 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
   }
 
   /**
+   * A weapon art's own layer (artdrama.js), straight into the effects bus: 'draw' at its start (`blade`: with the steel's ring),
+   * 'impact' at its contact, by `strength` (0..1; `metal`: with a ring of steel), at `gain` (0..1).
+   */
+  function art(kind, gain, { strength = 1, metal = false, blade = true } = {}) {
+    if (!state.ctx || state.ctx.state !== 'running' || !(gain > 0)) return;
+    const voice = sfxVoice(state.ctx, state.buses.effects.dry);
+    const when = state.ctx.currentTime + 0.002;
+    if (kind === 'draw') playArtDraw(voice, voice.out, artDrawParams(blade), when, Math.min(1, gain));
+    else playArtImpact(voice, voice.out, artImpactParams(strength, metal), when, Math.min(1, gain));
+  }
+
+  /**
    * Play an event as the bench asks: `event` (its type and fields) at `at` ([x, y, z], round a listener at the origin facing -z), now.
    * Returns { params, atEar, distance } (what was played), or null without a context.
    */
@@ -609,6 +622,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     frame,
     ui,
     thump,
+    art,
     unlock,
     /** Set a mixer level or toggle (name: master, effects, ambience, music, voices, speakers, muted); kept. */
     set(name, value) {
