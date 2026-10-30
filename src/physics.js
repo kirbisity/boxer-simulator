@@ -3870,7 +3870,9 @@ function updateTimers(world, fighter, dt) {
   updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
   if (fighter.player) overdraftStep(world, fighter, dt);
-  if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+  // A machine (gear.machine: a robot) does not tire: what an attack or a run costs a man costs it nothing.
+  if (fighter.body.gear.machine) fighter.stamina = 1;
+  else if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * recoveryShare(fighter.stamina) * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;

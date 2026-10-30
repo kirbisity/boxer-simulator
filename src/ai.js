@@ -401,6 +401,10 @@ export const AI = {
   // (e^±spread on each trait); the gap between attacks in a burst (s); and
   // how readily a moving fighter jumps on an opponent recovering from a miss.
   cadence: { workSeconds: 4.5, moveSeconds: 1.6, spread: 0.45, burstGap: 0.1, openingChance: 0.7 },
+  // A machine (`gear.machine`: a robot) never tires (physics.js: its stamina stays full), so it has no
+  // reason to pause: no circling between flurries, no surge-and-retreat against a longer reach, one
+  // attack after another as fast as its motors reset (`rest`: this share of a fresh man's pause after an attack).
+  machine: { rest: 0.35 },
   // Numbers: confidence gained per doubling of my side's standing fighters
   // over theirs (lost when outnumbered).
   numbersConfidence: 0.45,
@@ -1357,6 +1361,11 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
     phase = fighter.aiCadence = { name, t: 0, length, thrownAtStart: fighter.stats.thrown, burstLeft: 0 };
     if (name === 'work' && wary) world.events.push({ time: world.time, kind: 'surge', fighter: fighter.id, style: fighter.style, effects: [] });
   };
+  // A machine works without a pause, and wary of nothing (AI.machine).
+  if (fighter.body.gear.machine) {
+    wary = false;
+    if (phase?.name !== 'work') start('work', Infinity);
+  }
   if (!phase) start('work', phaseLength(random, cadence.work));
   phase.t += dt;
   // Openings: he is recovering from a blow, committed, giving ground, or
@@ -1449,6 +1458,7 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
 function nextGap(world, fighter, style, plan, cadence) {
   const random = world.random;
   const phase = fighter.aiCadence;
+  if (fighter.body.gear.machine) return restAfterAttack(fighter, style, random) * AI.machine.rest;
   if (phase?.burstLeft > 0) {
     phase.burstLeft -= 1;
     return AI.cadence.burstGap;
