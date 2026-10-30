@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mechanismsOf, sectionById, stageTerrain } from '../src/levelmode/stage.js';
-import { DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DN_ARCH_BAR, DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 import { findPath, standable } from '../tools/botnav.js';
 
 const spawns = DUNNOTTAR.sections.flatMap((section) => section.spawns);
@@ -28,7 +28,8 @@ test('no armour stands, mannequins or racks of arms anywhere on the map, nor a w
 test('the front gate is held in front of the bridge and behind it: men-at-arms, a guard and crossbowmen at each, so that nobody means to fight past it', () => {
   const front = spawns.filter((spawn) => spawn.alarm === 'front' && spawn.role === 'enemy');
   const inFront = front.filter((spawn) => spawn.post[0] < DN_RAVINE.x0 && !spawn.perch);
-  const behind = front.filter((spawn) => spawn.post[0] > DN_RAVINE.x1 && spawn.id !== 'gateknight');
+  // (Behind it: at its castle end, the knights in the barrier's gap before the arch, and the forecourt beyond.)
+  const behind = front.filter((spawn) => spawn.post[0] > DN_ARCH_BAR.x - 1 && !spawn.perch && spawn.id !== 'gateknight');
   const of = (list, preset) => list.filter((spawn) => spawn.preset === preset).length;
   // In front of the bridge, on the shelf at its head: several men, two of them knights, a guard and a crossbowman, all on the bridge's alarm.
   assert.ok(inFront.length >= 4, `${inFront.length} men in front of the bridge`);
@@ -36,9 +37,9 @@ test('the front gate is held in front of the bridge and behind it: men-at-arms, 
   // Behind it, in the forecourt and at the ledge's corner.
   assert.ok(behind.length >= 5, `${behind.length} men behind the bridge`);
   assert.ok(of(behind, 'dunnottarKnight') >= 2 && of(behind, 'dunnottarCrossbow') >= 2 && of(behind, 'dunnottarGuard') >= 1);
-  // And over it three archers, and the plate knight on the ledge beyond: thirteen men in all on the one alarm.
-  assert.equal(front.length, 13);
-  assert.equal(front.filter((spawn) => spawn.perch).length, 3);
+  // And over it six archers, and the plate knight on the ledge beyond: sixteen men in all on the one alarm.
+  assert.equal(front.length, 16);
+  assert.equal(front.filter((spawn) => spawn.perch).length, 6);
   assert.ok(front.some((spawn) => spawn.id === 'gateknight' && spawn.preset === 'dunnottarPlateKnight'));
   // Strong ones: tier 2 or 3 every one (the levies who stood under the arch are gone).
   assert.ok(front.every((spawn) => spawn.tier >= 2), 'no levy among them');

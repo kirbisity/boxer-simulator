@@ -126,7 +126,8 @@ export function buildChapel() {
   // (Overlapping the wall walk's end at x -2, so that the walk stays awake the whole way in: a gap here dropped the wall walk's floor for a step.)
   sec.portals.push({ to: 'tower', area: { at: [-5, -36], size: [7, 7] } });
   sec.portals.push({ to: 'cell', area: { at: [-34.4, -36], size: [10, 8] } });
-  dnSpawn(sec, 'vaelen', 'vaelen', 'boss', 4, [-22, floor, mid], DN_FACE.E, { inputs: { name: 'Lord Vaelen' }, boss: { title: "The Queen's Chief Jailer" } });
+  // (Held to the nave, `pen`: he fights in his hall and never follows the player out of the great door; at its threshold he stops and waits.)
+  dnSpawn(sec, 'vaelen', 'vaelen', 'boss', 4, [-22, floor, mid], DN_FACE.E, { inputs: { name: 'Lord Vaelen' }, boss: { title: "The Queen's Chief Jailer" }, pen: { at: [(CH.x0 + CH.x1) / 2, (CH.z0 + CH.z1) / 2], size: [CH.x1 - CH.x0, CH.z1 - CH.z0] } });
   dnHorde(sec);
   return sec;
 }

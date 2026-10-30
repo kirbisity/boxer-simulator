@@ -5,11 +5,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
-import { advance, placeOnFloor } from '../src/physics.js';
-import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
+import { advance, knockOut, placeOnFloor } from '../src/physics.js';
+import { thinkAll } from '../src/ai.js';
+import { directFighter, newOrders } from '../src/control.js';
+import { createLevelWorld, levelThink, restAtPoint } from '../src/levelmode/level.js';
 import { levelPreset } from '../src/levelmode/presets.js';
-import { activeSections, mechanismsOf, stageTerrain, updateStage } from '../src/levelmode/stage.js';
-import { DN_BARBICAN, DN_BRIDGE, DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { activeSections, mechanismsOf, stageTerrain, stageThink, updateStage } from '../src/levelmode/stage.js';
+import { DN_ARCH_BAR, DN_BARBICAN, DN_BRIDGE, DN_RAVINE, DN_Y, DUNNOTTAR, DUNNOTTAR_ROUTE, DUNNOTTAR_SEWER_ROUTE } from '../src/levelmode/stages/dunnottar.js';
 import { DN_CAVE_STAIR } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { floorAt, rayBlocked } from '../src/physics/terrain.js';
 import { walk } from './walker.js';
@@ -91,8 +93,9 @@ test('approach: the gate is close to the sea cave\'s stair head and in sight of 
   assert.ok(!marks.some(([x, z]) => x > DN_RAVINE.x0 - 1 && x < DN_RAVINE.x1 && z > 40 && z < 52), 'no way-mark on the bridge');
 });
 
-test('approach: the front is held: archers on the barbican with lines of fire along the bridge and its head, guards at its end, the knight on the ledge, one alarm', () => {
-  const archers = ['archer1', 'archer2', 'archer3'].map(spawn);
+test('approach: the front is held: six archers on the barbican with lines of fire along the bridge and its head, guards at its end, the knight on the ledge, one alarm', () => {
+  const archers = ['archer1', 'archer2', 'archer3', 'archer4', 'archer5', 'archer6'].map(spawn);
+  assert.equal(spawns.filter((entry) => entry.preset === 'dunnottarArcher' && entry.perch).length, 6, 'twice the three there were');
   for (const archer of archers) {
     assert.equal(archer.preset, 'dunnottarArcher');
     assert.ok(archer.perch && archer.alarm === 'front');
@@ -123,8 +126,8 @@ test('approach: one of the front\'s men who sees him raises them all, the archer
   // On the bridge's head, in front of the guards' eyes (they look west along the bridge).
   placeOnFloor(me, -24, 46.2, DN_Y.gorge, 0);
   updateStage(w, true);
-  const front = w.fighters.filter((fighter) => ['archer1', 'archer2', 'archer3', 'bridgeguard1', 'bridgeguard2', 'bridgelevy'].includes(fighter.spawn?.id));
-  assert.equal(front.length, 6);
+  const front = w.fighters.filter((fighter) => ['archer1', 'archer2', 'archer3', 'archer4', 'archer5', 'archer6', 'bridgeguard1', 'bridgeguard2', 'bridgelevy'].includes(fighter.spawn?.id));
+  assert.equal(front.length, 9);
   advance(w, 2, (current, dt) => levelThink(current, dt));
   const minds = w.stage.aware.minds;
   const state = (fighter) => minds[fighter.id]?.state;
@@ -156,5 +159,68 @@ test('approach: the front watches the bridge, not the way round: no man of it se
     }
   }
   assert.deepEqual(seen, []);
-  for (let x = DN_RAVINE.x0 + 1; x < DN_RAVINE.x1; x += 2) assert.ok(front.some((post) => watches(post, x, 46.2)), `the bridge at ${x} is watched`);
+  // (The deck up to the knights in the barrier's gap: what is past them is past the way through.)
+  for (let x = DN_RAVINE.x0 + 1; x < DN_ARCH_BAR.x - 0.5; x += 2) assert.ok(front.some((post) => watches(post, x, 46.2)), `the bridge at ${x} is watched`);
+});
+
+test('approach: the way into the arch is shut by two knights: shoulder to shoulder in the barrier\'s gap on the deck, no room for a body past them, held to the spot', () => {
+  const bar = DN_ARCH_BAR;
+  const mid = (DN_BRIDGE.z0 + DN_BRIDGE.z1) / 2;
+  const knights = ['bridgeguard1', 'bridgeguard2'].map(spawn);
+  for (const [k, knight] of knights.entries()) {
+    assert.equal(knight.preset, 'dunnottarKnight');
+    assert.deepEqual([knight.post[0], knight.post[2]], [bar.x, bar.knights[k]]);
+    assert.ok(knight.pen && knight.pen.size[0] <= 1 && knight.pen.size[1] <= 0.5, 'penned to his place');
+  }
+  // On the deck right before the arch (the barbican's door), the gap between the rails just two men wide; the two of them fill it.
+  assert.ok(bar.x < DN_BARBICAN.x0 && bar.x > DN_BARBICAN.x0 - 2);
+  assert.ok(bar.gap <= 2 && Math.abs(bar.knights[1] - bar.knights[0]) < 1 && Math.abs((bar.knights[0] + bar.knights[1]) / 2 - mid) < 0.05);
+  // The rails: nobody stands where they are (from the arch's wall to the gap on each side).
+  for (const z of [DN_BRIDGE.z0 + 0.4, mid - bar.gap / 2 - 0.1, mid + bar.gap / 2 + 0.1, DN_BRIDGE.z1 - 0.4]) assert.ok(rayBlocked(terrain, [bar.x - 1, z], [bar.x + 1, z], DN_Y.gorge + 0.8, DN_Y.gorge + 0.8), `a rail at ${z}`);
+  // While they stand, the gap behind them is shut (their locked shields: `archbar`); with both out it opens, and a rest that brings them back shuts it.
+  assert.ok(rayBlocked(terrain, [bar.x - 1, mid], [bar.x + 1, mid], DN_Y.gorge + 0.8, DN_Y.gorge + 0.8), 'the gap is shut behind them');
+  const w = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 5 });
+  placeOnFloor(w.fighters[0], -24, 46.2, DN_Y.gorge, 0);
+  updateStage(w, true);
+  assert.equal(w.stage.mechanisms.archbar, 'closed');
+  const men = w.fighters.filter((fighter) => fighter.spawn?.id.startsWith('bridgeguard'));
+  knockOut(w, men[0], { time: w.time, effects: [] }, 'dies', 'killed');
+  updateStage(w);
+  assert.equal(w.stage.mechanisms.archbar, 'closed', 'one of them still holds it');
+  knockOut(w, men[1], { time: w.time, effects: [] }, 'dies', 'killed');
+  updateStage(w);
+  assert.equal(w.stage.mechanisms.archbar, 'open', 'both down: the way is open');
+  assert.ok(!rayBlocked(w.arena.terrain, [bar.x - 1, mid], [bar.x + 1, mid], DN_Y.gorge + 0.8, DN_Y.gorge + 0.8));
+  restAtPoint(w, cliff.rest);
+  assert.equal(w.stage.mechanisms.archbar, 'closed', 'a rest puts them back, and the gap with them');
+});
+
+test('approach: a sprint across the bridge does not get through the arch: the knights stop him (they hold their place, and the gap is theirs)', () => {
+  const w = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 3 });
+  const me = w.fighters[0];
+  placeOnFloor(me, -24, 46.2, DN_Y.gorge, 0);
+  updateStage(w, true);
+  const orders = newOrders();
+  const hips = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  let furthest = -Infinity;
+  const step = (current, dt) => {
+    stageThink(current, dt);
+    levelThink(current, dt);
+    if (me.state === 'out') return;
+    thinkAll(current, dt, new Set([0]));
+    // The stick held flat out for the forecourt beyond the arch (a run), along the deck's middle.
+    const [x, z] = hips(me);
+    const d = Math.hypot(-5 - x, 46.2 - z) || 1;
+    orders.keyStick = { dir: [(-5 - x) / d, (46.2 - z) / d], amount: 1 };
+    directFighter(current, me, orders, dt);
+  };
+  for (let t = 0; t < 10 && me.state !== 'out'; t += 0.5) {
+    advance(w, 0.5, step);
+    furthest = Math.max(furthest, hips(me)[0]);
+  }
+  assert.ok(furthest < DN_ARCH_BAR.x + 0.6, `he got no further than ${furthest.toFixed(2)} (the knights stand at ${DN_ARCH_BAR.x})`);
+  for (const knight of w.fighters.filter((fighter) => fighter.spawn?.id.startsWith('bridgeguard'))) {
+    const [x, z] = hips(knight);
+    assert.ok(Math.abs(x - DN_ARCH_BAR.x) < 1 && Math.abs(z - knight.spawn.pen.at[1]) < 0.8, `${knight.spawn.id} held his place: ${x.toFixed(2)}, ${z.toFixed(2)}`);
+  }
 });

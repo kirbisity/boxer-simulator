@@ -132,11 +132,12 @@ export function buildVault() {
   // The crypt wakes while he is on the well shaft's stair (any height of it) or at the head of the stair from the sea-gate.
   sec.portals.push({ to: 'crypt', area: [{ at: DN_SHAFT.at, size: [11.4, 11.4], y: [2.4, 9] }, { at: [1.7, -32.3], size: [3.6, 10], y: [2.4, 9] }] });
 
-  // Men: skeletons are scenery; the jailers and the turnkey are not. Two prisoners behind the barred door.
+  // Men: skeletons are scenery; the jailers and the turnkey are not. Two prisoners behind the barred door: let out, they stay in the cell, too weak to
+  // fight (`follows: false`): the operative goes on alone, as he came.
   dnSpawn(sec, 'jailer1', 'dunnottarGuard', 'enemy', 2, [12, V, -21.4], DN_FACE.W, { inputs: { name: 'Jailer Wyllie' }, patrol: [[12, -21.4], [12, -24.2]] });
   dnSpawn(sec, 'turnkey', 'turnkey', 'enemy', 2, [23.5, V, -22.4], DN_FACE.W, { inputs: { name: 'The Turnkey' } });
-  dnSpawn(sec, 'miner', 'cabyMiner', 'prisoner', 0, [14.4, V, -33.2], DN_FACE.S, { inputs: { name: 'Bran the miner' }, follows: true });
-  dnSpawn(sec, 'captive', 'cabySoldier', 'prisoner', 0, [18.8, V, -33.2], DN_FACE.S, { inputs: { name: 'One-Eye Colm' }, follows: true });
+  dnSpawn(sec, 'miner', 'cabyMiner', 'prisoner', 0, [14.4, V, -33.2], DN_FACE.S, { inputs: { name: 'Bran the miner' }, follows: false });
+  dnSpawn(sec, 'captive', 'cabySoldier', 'prisoner', 0, [18.8, V, -33.2], DN_FACE.S, { inputs: { name: 'One-Eye Colm' }, follows: false });
 
   dnItem(sec, 'note-ledger', 'note', [29.6, V, -25.4], { note: 'ledger', lift: 0.95 });
   dnItem(sec, 'cellkey', 'key', [31.6, V, -26.2], { label: 'Take the cell key', lift: 1.2 });

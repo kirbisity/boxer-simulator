@@ -3702,6 +3702,8 @@ function moveRoot(world, fighter, dt) {
     wanted[0] *= slowed;
     wanted[1] *= slowed;
   }
+  // Held to a pen (level mode: his spawn's `pen`, a boss who keeps to his hall, a gate's men who hold their line): his steps stop at its edge.
+  if (fighter.spawn?.pen) keepToPen(fighter.spawn.pen, fighter, wanted, footwork);
   // On fieldworks: a ditch's slope slows him as it is steep, and a step into a palisade or a wood's edge goes along it.
   const works = worksOf(world.arena);
   if (works) [wanted[0], wanted[1]] = stepOnWorks(works, fighter, wanted);
@@ -3741,6 +3743,24 @@ function moveRoot(world, fighter, dt) {
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
   if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter, operativeOf(world, fighter));
   if (works) keepRootOff(works, fighter);
+}
+
+/**
+ * A man's wanted stance velocity kept to his pen (a box { at: [x, z], size: [w, d] } on the floor), axis by axis: inside, no faster toward an edge than
+ * reaches it in PEN_LOOK s (he stops at it, whatever the fight AI or a lunge would have); outside it (shoved, or carried by a blow), at least `pace` x
+ * PEN_BACK back in. He still turns to face his man: a boss at his hall's door watches the player go.
+ */
+const PEN_LOOK = 0.25;
+const PEN_BACK = 0.7;
+function keepToPen(pen, fighter, wanted, pace) {
+  for (const axis of [0, 1]) {
+    const low = pen.at[axis] - pen.size[axis] / 2;
+    const high = pen.at[axis] + pen.size[axis] / 2;
+    const at = fighter.root[axis];
+    if (at < low) wanted[axis] = Math.max(wanted[axis], pace * PEN_BACK);
+    else if (at > high) wanted[axis] = Math.min(wanted[axis], -pace * PEN_BACK);
+    else wanted[axis] = Math.max((low - at) / PEN_LOOK, Math.min((high - at) / PEN_LOOK, wanted[axis]));
+  }
 }
 
 /** The speed (m/s) from which a runner stops in `distance` m, at his brake (physics/gait.js: `arrive` of it, and never under a walk). */

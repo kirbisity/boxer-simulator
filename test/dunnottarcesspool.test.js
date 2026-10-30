@@ -6,9 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
-import { fearTarget, hurtShare } from '../src/ai.js';
+import { fearTarget, hurtShare, thinkAll } from '../src/ai.js';
 import { advance, knockOut, placeOnFloor } from '../src/physics.js';
-import { floorAt } from '../src/physics/terrain.js';
+import { floorAt, rayBlocked } from '../src/physics/terrain.js';
 import { outfitOf } from '../src/outfits.js';
 import { interiorAt, regionContains, sectionById, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
@@ -18,7 +18,7 @@ import { QUALITY_TIERS } from '../src/levelmode/quality.js';
 import { approachLevels, interiorLevels, levelsSettled, STAGE_LOOKS } from '../src/levelmode/stagelooks.js';
 import { addRipple, ageRipples, newRipples, rippleRing, stageWaters, WATER, wadeDrag, waterAt, waterContains, waterSources } from '../src/levelmode/water.js';
 import { DUNNOTTAR } from '../src/levelmode/stages/dunnottar.js';
-import { DN_CESSPOOL, DN_CESSPOOL_REGION, DN_NONAME_SPAWN } from '../src/levelmode/stages/dunnottar-sewer.js';
+import { DN_CESSPOOL, DN_CESSPOOL_REGION, DN_NONAME_POST, DN_NONAME_SPAWN } from '../src/levelmode/stages/dunnottar-sewer.js';
 import { DN_DARK_FLOOR, DN_DARK_MOST, DN_INTERIOR } from '../src/levelmode/stages/dunnottar-light.js';
 
 const sewer = sectionById(DUNNOTTAR, 'sewer');
@@ -35,7 +35,7 @@ const noname = (w) => w.fighters.find((fighter) => fighter.spawn?.id === DN_NONA
 
 // ---- the sewer's cast ----------------------------------------------------------------------------------------
 
-test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 in the middle of the pit; the levies, the sergeant and everybody else are gone', () => {
+test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 waiting in the alcove off the pit; the levies, the sergeant and everybody else are gone', () => {
   assert.equal(sewer.spawns.length, 1);
   const [spawn] = sewer.spawns;
   assert.equal(spawn.id, 'noname');
@@ -46,9 +46,9 @@ test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 in the middl
   assert.equal(spawn.inputs.name, 'Noname');
   assert.ok(spawn.miniboss, 'a miniboss (he stays dead after a rest)');
   for (const gone of ['drain1', 'drain2', 'drainward', 'drain3']) assert.ok(!DUNNOTTAR.sections.some((section) => section.spawns.some((entry) => entry.id === gone)), `${gone} is gone`);
-  // He stands in the middle of the pit, on the low island a hand under the sludge (a man who dies on it has his face out of the sludge).
-  assert.ok(Math.hypot(spawn.post[0] - P0.at[0], spawn.post[2] - P0.at[2]) < P0.radius - 2.5);
-  assert.deepEqual(spawn.post, [P0.island.at[0], P0.island.top, P0.island.at[1]]);
+  // He waits at the back of the alcove north of the pit, facing it (the ending lays the body out on the island, a hand under the sludge: a man who dies on it has his face out of it).
+  assert.deepEqual(spawn.post, DN_NONAME_POST);
+  assert.ok(spawn.post[2] < P0.at[2] - P0.hall - 1, 'north of the hall, in the alcove');
   assert.ok(P0.island.top < P0.at[1] && P0.island.top + 0.2 > P0.at[1], 'the island just under the surface');
   assert.ok(P0.island.top - P0.floor <= 0.45, 'a step up from the bed');
 });
@@ -146,8 +146,16 @@ test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health
   man.dormant = true;
   assert.equal(bar().show, false, 'nothing to show for a man who is not awake');
   man.dormant = false;
-  // The player at the west door, nine metres from him: he sees, he fights, the bar is up.
-  advance(w, 3, (current, dt) => levelThink(current, dt));
+  // The player at the west door: Noname is out of sight in his alcove and does not know of him: no bar.
+  const look = (current, dt) => {
+    updateStage(current);
+    levelThink(current, dt);
+  };
+  advance(w, 1, look);
+  assert.equal(bar().show, false, 'not yet: he is hidden');
+  // Two strides on, over the pit's edge: he has him, he fights, the bar is up.
+  placeOnFloor(w.fighters[0], P0.at[0] - P0.radius + 1.2, P0.at[2], P0.rim, 0);
+  advance(w, 1, look);
   assert.equal(bar().show, true, 'aware of the player');
   assert.equal(bar().name, 'Noname');
   assert.equal(bar().title, 'The Cesspool');
@@ -157,7 +165,7 @@ test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health
   const me = w.fighters[0];
   placeOnFloor(me, P0.at[0] - P0.hall - 25, P0.at[2], P0.rim, 0);
   assert.equal(bar().show, false, `${LEVEL_CONFIG.boss.barRange} m is the bar's reach`);
-  placeOnFloor(me, P0.at[0] - P0.hall + 0.4, P0.at[2], P0.rim, 0);
+  placeOnFloor(me, P0.at[0] - P0.radius + 1.2, P0.at[2], P0.rim, 0);
   assert.equal(bar().show, true);
   // He falls: the bar is empty and struck through for the felled seconds, then gone. He is not the stage's boss (no phase two, no cutscene).
   knockOut(w, man, { time: w.time, effects: [] }, 'dies', 'killed');
@@ -168,6 +176,61 @@ test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health
   advance(w, LEVEL_CONFIG.boss.felledSeconds + 0.5, (current, dt) => levelThink(current, dt));
   assert.equal(bar().show, false, 'gone after the seconds it holds');
   assert.equal(w.stage.level.boss.id !== man.id, true, 'the stage boss is Vaelen, not him');
+});
+
+test('cesspool: the reveal: Noname is out of sight from the long drain and the hall\'s west door; over the pit\'s edge he comes out at the player, his bar up, a line said once', () => {
+  const terrain = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 2 });
+  placeOnFloor(terrain.fighters[0], P0.at[0] - P0.hall + 0.4, P0.at[2], P0.rim, 0);
+  updateStage(terrain, true);
+  const solids = terrain.arena.terrain;
+  const eye = P0.rim + 1.6;
+  // The way in: the long drain from the pocket to the hall's west door, and three steps into the hall. From none of it is he in sight (at a man's eye, his and the player's).
+  for (let x = -52; x <= P0.at[0] - P0.hall + 2; x += 0.5) {
+    for (const z of [P0.at[2] - 1.2, P0.at[2], P0.at[2] + 1.2]) assert.ok(rayBlocked(solids, [x, z], [DN_NONAME_POST[0], DN_NONAME_POST[2]], eye, eye), `he is seen from ${x}, ${z}`);
+  }
+  const w = inCesspool(5);
+  const man = noname(w);
+  const me = w.fighters[0];
+  const step = (seconds) => advance(w, seconds, (current, dt) => {
+    updateStage(current);
+    levelThink(current, dt);
+    thinkAll(current, dt, new Set([0]));
+  });
+  step(2);
+  assert.equal(bossStatus(w).show, false, 'at the door: no bar');
+  assert.ok(!w.stage.level.ui.some((message) => message.type === 'toast' && message.text === sewer.spawns[0].reveal));
+  // Over the pit's edge (the arena, stage.regions.cesspool): he has him.
+  placeOnFloor(me, DN_CESSPOOL_REGION.at[0] - DN_CESSPOOL_REGION.size[0] / 2 + 1, P0.at[2], P0.rim, 0);
+  step(0.5);
+  assert.equal(bossStatus(w).show, true, 'his bar is up (and with it the boss music, main.js audioScene)');
+  assert.equal(w.stage.level.ui.filter((message) => message.type === 'toast' && message.text === sewer.spawns[0].reveal).length, 1, 'the line, once');
+  const from = man.x[P.pelvis * 3 + 2];
+  step(3);
+  assert.ok(man.x[P.pelvis * 3 + 2] > from + 1.5, `he comes out of the alcove (z ${from.toFixed(1)} to ${man.x[P.pelvis * 3 + 2].toFixed(1)})`);
+});
+
+test('cesspool: Noname never leaves his hall: the player who backs out into the drain is not followed past its door', () => {
+  const w = inCesspool(6);
+  const man = noname(w);
+  const me = w.fighters[0];
+  placeOnFloor(me, DN_CESSPOOL_REGION.at[0] - DN_CESSPOOL_REGION.size[0] / 2 + 1, P0.at[2], P0.rim, 0);
+  const step = (seconds) => advance(w, seconds, (current, dt) => {
+    updateStage(current);
+    levelThink(current, dt);
+    thinkAll(current, dt, new Set([0]));
+  });
+  step(1);
+  // Out into the drain, 6 m past the door, and he stands there.
+  placeOnFloor(me, P0.at[0] - P0.hall - 6, P0.at[2], P0.rim, 0);
+  let west = Infinity;
+  for (let k = 0; k < 20; k += 1) {
+    me.goTo = null;
+    me.move = 0;
+    step(0.5);
+    west = Math.min(west, man.x[P.pelvis * 3]);
+  }
+  const pen = sewer.spawns[0].pen;
+  assert.ok(west > pen.at[0] - pen.size[0] / 2 - 0.5, `the farthest west he went: ${west.toFixed(2)} (the hall's wall at ${(P0.at[0] - P0.hall).toFixed(2)})`);
 });
 
 test('cesspool: Noname is a little harder than he was (body and drill, never a multiplier): more muscle for the same mass and a better-taught sword', () => {

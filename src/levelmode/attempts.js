@@ -189,7 +189,7 @@ function taleLast(final, seed, failures) {
   const company = taleCompany(final.comrades, seed, 900);
   const lost = final.comrades.filter((name) => !final.survivors.includes(name));
   let left;
-  if (!final.comrades.length) left = talePick(seed, 901, ['No one was left to wait for you.', 'There was no one left to come back for.']);
+  if (!final.comrades.length) left = talePick(seed, 901, ['You had gone in alone, and no one waited for you at the chapel gate.', 'You came alone; there was no one to come back for.']);
   else if (!lost.length) left = talePick(seed, 901, [`${taleCapital(taleList(final.comrades))} waited at the chapel gate for a man who did not come back.`, `${taleCapital(taleList(final.comrades))} waited at the chapel gate. You never came back for them.`]);
   else if (lost.length === final.comrades.length) left = talePick(seed, 901, [`${taleCapital(taleList(lost))} did not live to see the chapel.`, 'You went on alone, and you remembered every name.']);
   else left = `${taleCapital(taleList(final.survivors))} waited at the chapel gate; ${taleList(lost)} did not live to.`;

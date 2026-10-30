@@ -1,5 +1,5 @@
 // Stage 1 run by a player who holds the run key: the whole route, cliff path to the chapel, sprinting (Shift+forward) with the stick held toward the
-// next point of the route, through the real controls (control.js directFighter: run mode, the run's steering along walls), with the two comrades
+// next point of the route, through the real controls (control.js directFighter: run mode, the run's steering along walls), with the two comrades (Stage 1 as it was: dunnottarWithTeam)
 // awake and following (a comrade must not wall him in at a door or on the path) and the garrison asleep. A snag shows as a leg he does not finish.
 
 import test from 'node:test';
@@ -9,7 +9,7 @@ import { directFighter, newOrders } from '../src/control.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { setMechanism, stageThink, updateStage } from '../src/levelmode/stage.js';
-import { DUNNOTTAR, DUNNOTTAR_ROUTE } from '../src/levelmode/stages/dunnottar.js';
+import { DUNNOTTAR_ROUTE, dunnottarWithTeam } from '../src/levelmode/stages/dunnottar.js';
 import { advance } from '../src/physics.js';
 
 const hips = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
@@ -17,7 +17,7 @@ const hips = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]
 // (Seed 6 since the drawbridge: with the barbican's men in the world the draws differ, and seed 5 stalls for 6 s on the winding stair, far from anything that changed; 4, 6 and 7 run clean.)
 /** Run the route; returns { leg, point, at, seconds } of the first point he did not reach in `most` seconds, or null. */
 function runRoute({ allies = true, seed = 6, most = 40, near = 1.4 } = {}) {
-  const world = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed });
+  const world = createLevelWorld(dunnottarWithTeam(), levelPreset('forger'), { seed });
   const me = world.fighters[0];
   for (const fighter of world.fighters.slice(1)) if (!(allies && fighter.spawn?.role === 'ally')) fighter.dormant = true;
   updateStage(world, true);
@@ -25,6 +25,8 @@ function runRoute({ allies = true, seed = 6, most = 40, near = 1.4 } = {}) {
   orders.keyStick = null;
   const step = (current, dt) => {
     stageThink(current, dt);
+    // (The garrison kept asleep: a section that wakes wakes its men, and the arch's knights stand in the way.)
+    for (const fighter of current.fighters.slice(1)) if (!(allies && fighter.spawn?.role === 'ally')) fighter.dormant = true;
     levelThink(current, dt);
     directFighter(current, me, orders, dt);
   };
