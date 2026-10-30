@@ -294,8 +294,8 @@ test('men in close order are one block to the horse and stop it where it rides d
   // (How fast a man is flung depends on where on his shield the horse meets him: the median of five seeds, a wall no worse for each man than a lone man.)
   const flung = (count, places) => median([4000, 4001, 4002, 4003, 4004].map((seed) => chargeInto(rider('knight'), row('hoplomachus', count), places, seed).peak));
   assert.ok(flung(9, block(3, 3)) < flung(1, [[12, 0]]) * 1.1, 'the men of a wall take no more each than a lone man');
-  // (The median of three seeds: the front men driven back into the ranks behind hand on their momentum, and how many of those go over depends on how they were thrown.)
-  const standing = median([wall, ...[4001, 4002].map((seed) => chargeInto(rider('knight'), row('hoplomachus', 9), block(3, 3), seed))].map((run) => run.foes.filter((man) => man.state === 'up').length));
+  // (The median of five seeds: the front men driven back into the ranks behind hand on their momentum, now through the shields of the men behind as well, and how many of those go over depends on how they were thrown: three seeds ran 4-7 of 9 either way.)
+  const standing = median([wall, ...[4001, 4002, 4003, 4004].map((seed) => chargeInto(rider('knight'), row('hoplomachus', 9), block(3, 3), seed))].map((run) => run.foes.filter((man) => man.state === 'up').length));
   assert.ok(standing >= 5, `most of the wall stays on its feet (${standing} of 9)`);
 });
 

@@ -17,7 +17,7 @@ import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, harmMix, shieldContact } from '../weapons.js';
-import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
 
@@ -1066,15 +1066,20 @@ function rideDown(world, horse) {
       continue;
     }
     let best = null;
+    // His body: the trunk (hips to neck) and the breadth of his shoulders (joint to joint, the deltoid over them),
+    // so a horse's chest that takes a man on the shoulder is not let through beside his spine.
+    const shoulders = [point(fighter.x, P.lShoulder), point(fighter.x, P.rShoulder), fighter.body.segments.lUpperArm.skinRadius];
     for (const capsule of horse.capsules) {
       if (capsule.part === 'legs') continue;
-      const closest = closestBetween(pelvis, neck, capsule.a, capsule.b);
-      const offset = vec.sub(closest.onFirst, closest.onSecond);
-      const gap = vec.length(offset) - radius - capsule.radius;
-      if (gap >= 0 || (best && gap >= best.gap)) continue;
-      const flat = [offset[0], 0, offset[2]];
-      const normal = vec.length(flat) > 1e-6 ? vec.normalize(flat) : vec.normalize([forwardOf(horse.yaw)[2], 0, -forwardOf(horse.yaw)[0]]);
-      best = { fighter, capsule, gap, normal, at: closest.onSecond };
+      for (const [from, to, thick] of [[pelvis, neck, radius], shoulders]) {
+        const closest = closestBetween(from, to, capsule.a, capsule.b);
+        const offset = vec.sub(closest.onFirst, closest.onSecond);
+        const gap = vec.length(offset) - thick - capsule.radius;
+        if (gap >= 0 || (best && gap >= best.gap)) continue;
+        const flat = [offset[0], 0, offset[2]];
+        const normal = vec.length(flat) > 1e-6 ? vec.normalize(flat) : vec.normalize([forwardOf(horse.yaw)[2], 0, -forwardOf(horse.yaw)[0]]);
+        best = { fighter, capsule, gap, normal, at: closest.onSecond };
+      }
     }
     // A shield held in front of him is what the horse meets first.
     if (fighter.shield && fighter.state !== 'out') {
@@ -1159,12 +1164,15 @@ function rideDown(world, horse) {
     const limit = spec.fell * (1 + spec.poiseGain * (poiseOf(man) - 1)) * man.body.gear.balance;
     const event = { time: world.time, kind: 'trampled', fighter: man.id, horse: horse.id, attacker: rider?.id, speed: closing, impulse: dv * wholeManKg(man), dv, block: block.length, effects };
     if (man.state === 'up') {
+      // What his feet hold against the ground while the horse shoves him (physics.js groundBrace: more front-on, on a set shield) is no fling.
+      const set = Boolean(man.shield) && (man.defence?.name === 'shieldBlock' || man.shieldPose === 'wall');
+      const flung = Math.max(0, dv - groundBrace(man, direction, set));
       man.knock = [0, 0, 0];
-      if (dv > limit) {
+      if (flung > limit) {
         effects.push(`knocked down, flung at ${dv.toFixed(1)} m/s`);
         fall(world, man, 'ridden down by a horse');
         event.fell = true;
-      } else if (dv > limit * WORLD.stagger.startAt && stagger(world, man, dv / limit, event, true)) effects.push('reels');
+      } else if (flung > limit * WORLD.stagger.startAt && stagger(world, man, flung / limit, event, true)) effects.push('reels');
     }
     if (!man.trampledAt || world.time - man.trampledAt > 0.5) {
       man.trampledAt = world.time;
