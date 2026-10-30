@@ -160,6 +160,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
+    // What he has left to shoot (physics/ranged.js ammoLeft: arrows, or bolts and charges), and since when he has held a shot his own men foul (ai.js).
+    arrows: undefined, rounds: undefined, holdingShot: undefined,
     aiFleeing: undefined, aiFleeSince: undefined, aiCharge: undefined,
     mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
     // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).

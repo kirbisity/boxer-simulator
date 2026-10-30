@@ -888,6 +888,8 @@ function keepWithHisMen(world, fighter) {
   const spec = AI.general;
   const side = world.leaders?.[fighter.corner];
   if (side?.leader !== fighter || fighter.state !== 'up' || fighter.panicked || fighter.wing?.held) return;
+  // A general's is an army's: a side of `minSide` men or more at the start (a skirmish of a few has its leader in it with the rest).
+  if (world.fighters.filter((other) => other.corner === fighter.corner).length < spec.minSide) return;
   if (fighter.clinch || fighter.pin || fighter.pickup) return;
   const where = (man) => (man.mount ? man.mount.at : [man.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2]]);
   const foes = world.fighters.filter((other) => hostile(other, fighter) && other.state === 'up' && inFight(other) && !other.hidden);
@@ -1076,6 +1078,7 @@ function chooseFocus(world, fighter) {
   if (current && current.state === 'up' && !crawlingAway(current) && chased(current) && !closerAtHand(world, fighter, current) && !leavesHeld(world, fighter, current)) return current;
   const standing = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up' && !crawlingAway(other));
   const worth = standing.filter(chased);
+  const leftToOthers = worth.length < standing.length;
   // Only runners left, all far off or chased enough: he lets them go and keeps his ground.
   if (standing.length && !worth.length) {
     fighter.focus = undefined;
@@ -1101,6 +1104,11 @@ function chooseFocus(world, fighter) {
   // The nearest, least crowded: each scored once (the first of equals kept, as before).
   // (A man held in our wolf-brush is left to the spears by the short arms of a squad while there is another to face.)
   const facing = standing.filter((other) => !leavesHeld(world, fighter, other));
+  // Only a man held in our brush left to him, and runners left to others: he leaves that one to the spears too, and keeps his ground.
+  if (!facing.length && leftToOthers) {
+    fighter.focus = undefined;
+    return null;
+  }
   const pool = facing.length ? facing : standing;
   let next = pool[0];
   let best = score(next);
