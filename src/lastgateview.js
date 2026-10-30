@@ -1,9 +1,9 @@
 // The Last Gate on the page (lastgate.js is the run): the strip at the top (the gate's breaches as pips, the time held, the
-// hero's kills, the wave), a word in the middle when a wave comes or a rebel gets through, and at the end a poster of the run:
+// hero's kills, the wave), a word in the middle when a wave comes or a foe gets through, and at the end a poster of the run:
 // the hero drawn large before the gate in the mist, how long it held and how many fell to him, to share as an image; Play
 // again, Menu, and this browser's best runs one tap away. DOM and 2D canvas only (the hero's figure is drawn by main.js).
 
-import { LAST_GATE, LAST_GATE_HEROES, lastGateClock, lastGatePosterWords, lastGateShareText } from './lastgate.js';
+import { LAST_GATE, LAST_GATE_MODES, lastGateClock, lastGatePosterWords, lastGateShareText } from './lastgate.js';
 
 const lgEl = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -21,7 +21,7 @@ export function createLastGateView(root) {
   const kills = lgEl('b', { className: 'lg-kills', textContent: '0' });
   const wave = lgEl('b', { className: 'lg-wave', textContent: '1' });
   const hud = lgEl('div', { className: 'lg-hud', hidden: true, ariaLive: 'off' },
-    lgEl('span', { className: 'lg-gate', title: 'The gate: each rebel through is a breach' }, lgEl('em', { textContent: 'Gate' }), pips),
+    lgEl('span', { className: 'lg-gate', title: 'The gate: each one through is a breach' }, lgEl('em', { textContent: 'Gate' }), pips),
     lgEl('span', { className: 'lg-stat' }, lgEl('em', { textContent: 'Held' }), time),
     lgEl('span', { className: 'lg-stat' }, lgEl('em', { textContent: 'Kills' }), kills),
     lgEl('span', { className: 'lg-stat' }, lgEl('em', { textContent: 'Wave' }), wave));
@@ -130,7 +130,7 @@ export function lastGateBoardList(runs, mark = null) {
   };
   return lgEl('ol', { className: 'lg-board' }, ...runs.map((run, index) => lgEl('li', { className: index + 1 === mark ? 'mine' : '' },
     lgEl('span', { className: 'lg-board-rank', textContent: String(index + 1) }),
-    lgEl('span', { className: 'lg-board-hero', textContent: `${LAST_GATE_HEROES[run.hero]?.glyph ?? ''} ${LAST_GATE_HEROES[run.hero]?.label ?? run.hero}` }),
+    lgEl('span', { className: 'lg-board-hero', textContent: `${LAST_GATE_MODES[run.hero]?.glyph ?? ''} ${LAST_GATE_MODES[run.hero]?.label ?? run.hero}` }),
     lgEl('b', { textContent: `${run.kills} kill${run.kills === 1 ? '' : 's'}` }),
     lgEl('span', { textContent: lastGateClock(run.seconds) }),
     lgEl('span', { className: 'lg-board-date', textContent: day(run.date) }))));

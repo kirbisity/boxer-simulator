@@ -40,6 +40,7 @@ import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
 import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
+import { placeMounted } from './physics/mounted.js';
 import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
 import { installFade, paintStamina } from './overdraftview.js';
@@ -446,7 +447,7 @@ const lastGateView = createLastGateView($('.arena'));
 // The best runs, kept in this browser (behind list/add, so a server's board can take its place).
 const lastGateBoard = createLastGateBoard(browserStorage());
 
-/** Into The Last Gate as this hero (lastgate.js LAST_GATE_HEROES): straight into the run, played. */
+/** Into The Last Gate in this mode, as its hero (lastgate.js LAST_GATE_MODES): straight into the run, played. */
 function enterLastGate(heroKey) {
   setGame('lastgate', { text: 'Play again', retry: true, run: () => newBout() });
   state.lastGateHero = heroKey;
@@ -470,7 +471,8 @@ function newLastGateRun() {
   cameraWalls = cameraRoom(place, arena);
   followCam.reset();
   // Behind the gate, looking out into the mist.
-  Object.assign(scene.orbit, { yaw: Math.PI, pitch: 0.22, distance: 5 });
+  // (A rider further back: his horse fills the frame.)
+  Object.assign(scene.orbit, { yaw: Math.PI, pitch: 0.22, distance: state.world.fighters[0].mount ? 7 : 5 });
   watchCam = createWatchCam();
   cameraNote = '';
   document.body.dataset.place = place;
@@ -2764,11 +2766,7 @@ function drawPortrait(inputs, yaw = -0.45) {
     portraitView.scene.background = new THREE.Color(0x1a1f2c);
     portraitView.scene.fog = null;
   }
-  const world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed: 3 });
-  const fighter = world.fighters[0];
-  placeFighter(fighter, 0, 0);
-  fighter.yaw = yaw;
-  advance(world, 0.7, null, STEP);
+  const { world, fighter } = posedAlone(inputs, yaw, 3);
   // Drawn plainly in the look's renderer settings and colours: its steel map must be in place before the fighter is built.
   flattenView(portraitView);
   const view = buildFighterView(portraitView, fighter);
@@ -2776,18 +2774,36 @@ function drawPortrait(inputs, yaw = -0.45) {
   updateFighterView(view, 0, world.time);
   updateArms(portraitView, view, world.time);
   updateProps(portraitView, [view], world);
-  Object.assign(portraitView.orbit, { distance: 2.35, pitch: 0.08, yaw: 0.15 });
-  portraitView.orbit.target.set(0, 1.0, 0);
+  const horse = fighter.mount ? buildHorseView(portraitView, fighter.mount) : null;
+  if (horse) updateHorseView(horse, world);
+  // A rider framed with his horse (PORTRAIT_RIDER): further off, higher, from his horse's quarter.
+  Object.assign(portraitView.orbit, horse ? PORTRAIT_RIDER.orbit : { distance: 2.35, pitch: 0.08, yaw: 0.15 });
+  portraitView.orbit.target.set(0, horse ? PORTRAIT_RIDER.target : 1.0, 0);
   placeCamera(portraitView, null);
   flattenView(portraitView);
   render(portraitView);
   const url = portraitView.renderer.domElement.toDataURL('image/png');
   disposeFighterView(portraitView, view);
+  if (horse) disposeHorseView(portraitView, horse);
   return url;
 }
 
+// A rider's portrait and poster figure take in his horse: the camera this much further off and aimed this high (m), its yaw off his side.
+const PORTRAIT_RIDER = { orbit: { distance: 4.9, pitch: 0.1, yaw: 0.55 }, target: 1.45 };
+
+/** A fighter alone in a world of his own, in his guard (on his horse, if he rides), facing `yaw`, settled for a moment. */
+function posedAlone(inputs, yaw, seed) {
+  const world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed });
+  const fighter = world.fighters[0];
+  placeFighter(fighter, 0, 0);
+  fighter.yaw = yaw;
+  if (fighter.mount) placeMounted(fighter, 0, 0, yaw);
+  advance(world, 0.7, null, STEP);
+  return { world, fighter };
+}
+
 // The Last Gate's poster: the hero alone, drawn from below and lit hard from behind, on a clear background (lastgateview.js composes it).
-const HERO_FIGURE = { size: [600, 960], yaw: -0.35, orbit: { distance: 3.15, pitch: -0.12, yaw: 0.2 }, target: 1.05, rim: 2.6, key: 1.9, hemi: 0.55 };
+const HERO_FIGURE = { size: [600, 960], yaw: -0.35, orbit: { distance: 3.15, pitch: -0.12, yaw: 0.2 }, target: 1.05, rider: { orbit: { distance: 5.6, pitch: -0.08, yaw: 0.6 }, target: 1.5 }, rim: 2.6, key: 1.9, hemi: 0.55 };
 let heroFigureView = null;
 
 /** A fighter drawn alone in his guard (his kit and weapon), seen from a little below, rim-lit: a canvas clear round him. */
@@ -2808,19 +2824,18 @@ function drawHeroFigure(inputs) {
   view.scene.background = null;
   view.scene.fog = null;
   view.renderer.setClearColor(0x000000, 0);
-  const world = createWorld([{ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }], { seed: 5 });
-  const fighter = world.fighters[0];
-  placeFighter(fighter, 0, 0);
-  fighter.yaw = spec.yaw;
-  advance(world, 0.7, null, STEP);
+  const { world, fighter } = posedAlone(inputs, spec.yaw, 5);
   flattenView(view);
   const figure = buildFighterView(view, fighter);
   setLayer(figure, 'skin');
   updateFighterView(figure, 0, world.time);
   updateArms(view, figure, world.time);
   updateProps(view, [figure], world);
-  Object.assign(view.orbit, spec.orbit);
-  view.orbit.target.set(0, spec.target, 0);
+  // A rider stands on the poster with his horse (HERO_FIGURE.rider: the camera further off, aimed higher).
+  const horse = fighter.mount ? buildHorseView(view, fighter.mount) : null;
+  if (horse) updateHorseView(horse, world);
+  Object.assign(view.orbit, horse ? spec.rider.orbit : spec.orbit);
+  view.orbit.target.set(0, horse ? spec.rider.target : spec.target, 0);
   placeCamera(view, null);
   flattenView(view);
   // The light of a poster: a cold rim from behind him, the key from above in front, little fill.
@@ -2836,6 +2851,7 @@ function drawHeroFigure(inputs) {
   out.height = height;
   out.getContext('2d').drawImage(view.renderer.domElement, 0, 0);
   disposeFighterView(view, figure);
+  if (horse) disposeHorseView(view, horse);
   return out;
 }
 
@@ -3221,7 +3237,7 @@ installLooksBench({
 const boxer = window.boxer = {
   state,
   scene,
-  // The Last Gate as this hero ('samurai', 'ironPagoda', 'knight'), from anywhere (tests, shots).
+  // The Last Gate in this mode ('samurai', 'knight', 'mongol', 'police': lastgate.js LAST_GATE_MODES), from anywhere (tests, shots).
   lastGate: (hero = 'samurai') => {
     menus.close();
     enterLastGate(hero);

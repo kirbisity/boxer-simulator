@@ -272,6 +272,12 @@ export const WEAPONS = {
     pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, vamplate: 0.13,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.8,
+    // The ash shaft breaks only on heavy armour (physics.js shattersOn): its point met by armour proof against it to `pierce`
+    // or more (plate 0.85–0.95, heavy lamellar 0.72–0.8; mail alone ~0.6, a brigandine, leather and cloth less), with `joules`
+    // or more taken up (a couched charge from the saddle: 500–2,000 J; on foot at a run, 40–160 J: it never breaks a lance).
+    // Anything else (flesh, light armour, a shield) it goes into or skids off whole, and is kept, its jar taken up along the
+    // shaft by the rest and the arm (no grip strain), to be couched again.
+    shatters: { pierce: 0.7, joules: 250 },
   },
   // The yari, as the ashigaru carried it: the war spear's long straight head
   // with a cross blade (jūmonji) below the point. The side blades cut and

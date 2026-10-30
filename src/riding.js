@@ -69,7 +69,10 @@ import { vec, yawRotate } from './pose.js';
  * - wheel: turning more than `from` rad towards a point, he slows to a pace
  *   whose turning circle is `room` of the distance to it (a horse that cannot
  *   turn inside the circle of a man standing in it would ride round him for
- *   ever), no slower than `slowest` m/s (a step).
+ *   ever), no slower than `slowest` m/s (a step). A lancer whose man is within
+ *   `clear` m and not ahead rides on for room instead (a point is not brought
+ *   round on a man inside the horse's own turning circle: he would circle a
+ *   crowd at a step, the lance never couched).
  * - patience: after `passes` passes, or `seconds` s, without a blow landing
  *   (on a man or his horse) a rider stops riding past and rides in beside his
  *   man at a pace that lets him strike (as two riders who are together do).
@@ -105,7 +108,7 @@ export const RIDING = {
   brace: { length: 1.8 },
   charging: 3, within: 14,
   noise: { aim: 0.3, pause: 0.6, pace: 0.1, wheel: 0.3 },
-  wheel: { room: 0.45, from: 0.3, slowest: 0.5 },
+  wheel: { room: 0.45, from: 0.3, slowest: 0.5, clear: 4 },
   patience: { passes: 3, seconds: 25 },
   lane: { gap: 2.6, look: 1.6, push: 1.8, footGap: 1.6 },
   assist: { through: 8, face: 0.45, halted: 0.5, ready: 4 },
@@ -480,6 +483,10 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
       ride.phase = 'wheel';
       drawPass(world, ride, world.time);
     }
+  } else if (lance && distance < RIDING.wheel.clear && ahead < Math.cos(0.45)) {
+    // A lancer whose man is too near to bring the point round on (inside the circle his horse wheels on): on, straight, for room.
+    ride.phase = 'past';
+    setGoal(horse.yaw, horse.paces.gallop);
   } else {
     // Wheeling round (to the side he has drawn if his man is behind him): slowed to a pace his turning circle fits the room he has,
     // then the charge again once his man is ahead (and he has made up his mind).

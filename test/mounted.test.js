@@ -7,6 +7,7 @@ import { ladenMass, turnRadius } from '../src/physics/mounted.js';
 import { ATTACKERS, firstBlow } from '../tools/couched.js';
 import { thinkAll } from '../src/ai.js';
 import { MOVES } from '../src/moves.js';
+import { WEAPONS } from '../src/weapons.js';
 import { vec } from '../src/pose.js';
 import { WORLD } from '../src/physics/config.js';
 import { measure } from '../tools/riding-motion.js';
@@ -222,6 +223,30 @@ test('the same lance couched from a destrier at the gallop spends an order of ma
   assert.ok(median(mounted.map((hit) => hit.pierce)) >= 8 * median(onFoot.map((hit) => hit.pierce)));
   // On foot it is still tens of joules; from the saddle hundreds, kilojoule class when it meets square at the gallop.
   assert.ok(energy(onFoot) < 160 && energy(mounted) > 400, `${energy(mounted).toFixed(0)} J v ${energy(onFoot).toFixed(0)} J`);
+});
+
+test('the couched lance breaks only on heavy armour: on an unarmoured man it goes in and is kept in hand; on plate (not into a gap) it shatters, nothing left to pick up, and the sidearm is drawn', () => {
+  const saddle = ATTACKERS[1];
+  const runs = (target) => [0, 1, 2, 3, 4, 5, 6, 7].map((seed) => firstBlow(saddle[1], target, 3000 + seed, saddle[2])).filter(Boolean);
+  const shattered = (hit) => hit.effects.some((effect) => effect === 'the lance shattered');
+  const bare = runs('street');
+  assert.ok(bare.length >= 2, `landed ${bare.length}`);
+  for (const { hit, attacker } of bare) {
+    assert.ok(!shattered(hit), `${hit.energy.toFixed(0)} J into a bare man, kept`);
+    assert.equal(attacker.weapon?.kind, 'lance');
+    assert.ok(attacker.weapon.held);
+  }
+  assert.ok(bare.some(({ hit }) => hit.energy >= WEAPONS.lance.shatters.joules), 'as hard as would break it on plate');
+  const plate = runs('knight');
+  const broke = plate.filter(({ hit }) => shattered(hit));
+  assert.ok(broke.length >= 1, `shattered on plate in ${broke.length} of ${plate.length}`);
+  for (const { hit, attacker, world: w } of plate) {
+    const gap = hit.effects.includes('into a gap in the armour');
+    assert.equal(shattered(hit), !gap && hit.energy >= WEAPONS.lance.shatters.joules, hit.effects.join(', '));
+    if (!shattered(hit)) continue;
+    assert.notEqual(attacker.weapon?.kind, 'lance', 'the sidearm drawn');
+    assert.ok(!w.debris.some((piece) => piece.weapon === 'lance'), 'no lance left whole on the ground');
+  }
 });
 
 /** A rider at the gallop straight at men standing where they are put (no blow struck): what the horse and the men did, to 3 s after the first contact. */

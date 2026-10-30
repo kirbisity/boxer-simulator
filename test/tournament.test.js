@@ -183,7 +183,7 @@ test('the couched charge: run in, the point meets the man first along the shaft,
   assert.ok(mean(charges) > mean(thrusts), `charge ${mean(charges).toFixed(0)} J against a thrust's ${mean(thrusts).toFixed(0)} J`);
 });
 
-test('the lance is used once: after the charge, hit or miss, it is let fall and the long sword drawn', () => {
+test('the lance is kept: after the charge, hit or miss, he fights on with it at the point (on foot it never breaks on plate: too little goes into it)', () => {
   // (A bout with Sir Edric that the charge does not end.)
   const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS.knight }], { seed: 1002 });
   const knight = world.fighters[0];
@@ -196,9 +196,11 @@ test('the lance is used once: after the charge, hit or miss, it is let fall and 
     wasCharging = charging;
   }
   assert.equal(charges, 1);
-  assert.equal(world.events.filter((event) => event.attacker === 0 && ['lanceThrust', 'lanceHigh', 'lanceJab'].includes(event.punch)).length, 0, 'no poking with the lance');
+  assert.ok(world.events.filter((event) => event.attacker === 0 && ['lanceThrust', 'lanceHigh', 'lanceJab'].includes(event.punch)).length > 0, 'the lance thrust with after the charge');
   assert.notEqual(world.fighters[1].state, 'out', 'the bout goes on after the charge');
-  assert.equal(knight.weapon?.kind, 'longsword');
+  assert.equal(knight.weapon?.kind, 'lance');
+  assert.ok(knight.weapon.held, 'still in his hands');
+  assert.ok(!world.events.some((event) => event.effects?.some((effect) => /lance shattered/.test(effect))), 'not broken on foot');
 });
 
 /** The couched charge at a man standing still, aimed `across` m to the side of his middle (a world place): the contact, or null. */
