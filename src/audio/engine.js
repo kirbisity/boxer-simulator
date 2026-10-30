@@ -176,7 +176,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     state.music = createMusic(ctx, state.buses.music.dry, { onMissing: (moment) => ui(moment) });
     // The recorded takes (samples.js), decoded in the background: until they are, the synth plays everything.
     state.samples = createSampleBank(ctx);
-    state.ambience = createAmbience(ctx, state.buses.ambience.dry, (at, bus, mapWide) => placeVoice(at, bus, { mapWide, priority: -Infinity }));
+    state.ambience = createAmbience(ctx, state.buses.ambience.dry, (at, bus, mapWide) => placeVoice(at, bus, { mapWide, priority: -Infinity }), state.samples);
     buildFarField();
     applyLevels();
     state.reverb.set(state.room, ctx.currentTime);
@@ -453,7 +453,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     if (state.ambienceClock <= 0) {
       const step = 1 / RATES.ambience;
       state.ambienceClock = step;
-      const scene = { ...info.ambience, room: state.room, ear: [listener.x, listener.y, listener.z], excitement: state.excitement, ...state.bench.ambience };
+      // (The beds duck under a loud fight as the music does.)
+      const scene = { ...info.ambience, room: state.room, ear: [listener.x, listener.y, listener.z], excitement: state.excitement, duck: Math.max(0, (state.loud - 78) / 20), ...state.bench.ambience };
       state.ambience.update(ambienceTargets(scene), scene, now, step);
     }
     if (state.bench.open) state.music.maintain(now);
@@ -641,7 +642,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       return () => listeners.delete(callback);
     },
     /** What is going on (the bench, tests): the context's state, voices playing, the room, the far field's sums. */
-    status: () => ({ running: state.ctx?.state === 'running', voices: state.active.length, budget: budget(), room: { ...state.room }, sectors, mode: speakers() ? 'stereo' : 'hrtf', music: state.music?.status() ?? null, samples: state.samples?.count() ?? 0 }),
+    status: () => ({ running: state.ctx?.state === 'running', voices: state.active.length, budget: budget(), room: { ...state.room }, sectors, mode: speakers() ? 'stereo' : 'hrtf', music: state.music?.status() ?? null, samples: state.samples?.count() ?? 0, loops: Object.keys(state.ambience?.recorded ?? {}) }),
     context: () => state.ctx,
     bench: {
       open(on) {

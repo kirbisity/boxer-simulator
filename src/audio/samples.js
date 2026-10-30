@@ -1,7 +1,8 @@
 // Recorded sound effects (src/audio/samples/*.mp3, cut from the user's clips: samples/README.md): a sword on a sword, a blade through
 // flesh, a blow on bone, bones breaking, steel on plate, a man in armour walking, a weapon clattering down, a mace's swing, a pistol's
 // shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny; heels on a
-// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder.
+// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder. And three ambience
+// loops, the places' beds (ambience.js): rain, wind, a town's market.
 // Each set is a few takes of one sound; a take is picked at random each time.
 //
 // From the source (the ES-module page, index.html) the files are fetched from src/audio/samples/; the single-file bundle (tools/bundle.js) puts their
@@ -48,6 +49,21 @@ export const SAMPLE_SETS = {
 /** Every file of every set. */
 export const SAMPLE_FILES = [...new Set(Object.values(SAMPLE_SETS).flat())];
 
+/**
+ * The ambience loops (samples/loop-*.mp3, ambience.js plays them as beds): each one period of `seconds`, cut seamless (its tail
+ * crossfaded into its head), mono. The file carries `lead` s of the period's own tail before it and of its head after it, so an MP3's
+ * priming silence and end padding fall outside the period, and a decoder that trims its priming or keeps it only slides the period along
+ * the repeated audio: looped from loopStart = lead to loopEnd = lead + seconds, it has no gap and no seam either way.
+ */
+export const AMBIENCE_LOOPS = {
+  rain: { file: 'loop-rain', seconds: 9.24, lead: 0.25 },
+  wind: { file: 'loop-wind', seconds: 12.5, lead: 0.25 },
+  market: { file: 'loop-market', seconds: 17, lead: 0.25 },
+};
+
+/** Every loop's file. */
+export const LOOP_FILES = Object.values(AMBIENCE_LOOPS).map((loop) => loop.file);
+
 /** The bytes of each file (base64), put here by tools/bundle.js; null from the source, which fetches the files. */
 const SAMPLE_EMBED = null;
 
@@ -71,12 +87,13 @@ function sampleBytes(base64) {
 
 /**
  * The bank for a context: every file decoded in the background. `pick(set)` a random decoded take of a set ({ buffer, offset }) or null;
- * `take(name)` one file's take, or null (the sound board plays each); `count()` how many have decoded; `ready` a promise of that count
- * once all have been tried.
+ * `take(name)` one file's take, or null (the sound board plays each); `loop(name)` an ambience loop ({ buffer, loopStart, loopEnd }) or
+ * null; `count()` how many have decoded; `ready` a promise of that count once all have been tried.
  */
 export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetcher = globalThis.fetch?.bind(globalThis), random = Math.random } = {}) {
   const takes = new Map();
-  async function load(name) {
+  const loops = new Map();
+  async function decode(name) {
     let bytes;
     if (embed?.[name]) bytes = sampleBytes(embed[name]);
     else {
@@ -86,17 +103,66 @@ export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetch
       if (!response.ok) throw new Error(`${response.status}`);
       bytes = await response.arrayBuffer();
     }
-    const buffer = await ctx.decodeAudioData(bytes);
+    return ctx.decodeAudioData(bytes);
+  }
+  async function load(name) {
+    const buffer = await decode(name);
     takes.set(name, { buffer, offset: transientStart(buffer.getChannelData(0), buffer.sampleRate) });
   }
-  const ready = Promise.all(SAMPLE_FILES.map((name) => load(name).catch((error) => console.warn(`Gladiator: the sound ${name} could not be loaded`, error)))).then(() => takes.size);
+  async function loadLoop(name) {
+    const { file, seconds, lead } = AMBIENCE_LOOPS[name];
+    const buffer = await decode(file);
+    // (A file cut short would loop on its padding: refused, and the synth bed plays.)
+    if (buffer.duration < lead + seconds + 0.02) throw new Error(`${buffer.duration.toFixed(3)} s, short of its period`);
+    loops.set(name, { buffer, loopStart: lead, loopEnd: lead + seconds });
+  }
+  const warn = (name) => (error) => console.warn(`Gladiator: the sound ${name} could not be loaded`, error);
+  const ready = Promise.all([...SAMPLE_FILES.map((name) => load(name).catch(warn(name))), ...Object.keys(AMBIENCE_LOOPS).map((name) => loadLoop(name).catch(warn(name)))]).then(() => takes.size + loops.size);
   return {
     ready,
-    count: () => takes.size,
+    count: () => takes.size + loops.size,
     take: (name) => takes.get(name) ?? null,
+    loop: (name) => loops.get(name) ?? null,
     pick(set) {
       const names = (SAMPLE_SETS[set] ?? []).filter((name) => takes.has(name));
       return names.length ? takes.get(names[Math.floor(random() * names.length)]) : null;
     },
   };
+}
+
+/**
+ * A loop ({ buffer, loopStart, loopEnd }: the bank's) played into `out` from `when` on, until stopped: the mono period read twice, half a
+ * period apart, one to the left and one to the right, so the bed is wide and round the head; started at a random point of it. Returns
+ * { stop(at) }.
+ */
+export function startLoop(ctx, loop, out, when, random = Math.random) {
+  const merger = ctx.createChannelMerger(2);
+  merger.connect(out);
+  const period = loop.loopEnd - loop.loopStart;
+  const first = random() * period;
+  const sources = [0, 1].map((channel) => {
+    const source = ctx.createBufferSource();
+    source.buffer = loop.buffer;
+    source.loop = true;
+    source.loopStart = loop.loopStart;
+    source.loopEnd = loop.loopEnd;
+    source.connect(merger, 0, channel);
+    source.start(when, loop.loopStart + ((first + (channel * period) / 2) % period));
+    return source;
+  });
+  return {
+    stop(at) {
+      for (const source of sources) source.stop(at);
+    },
+  };
+}
+
+/** A loop's level: the RMS of its period (first channel). */
+export function loopRms(loop) {
+  const data = loop.buffer.getChannelData(0);
+  const from = Math.floor(loop.loopStart * loop.buffer.sampleRate);
+  const to = Math.min(data.length, Math.floor(loop.loopEnd * loop.buffer.sampleRate));
+  let sum = 0;
+  for (let index = from; index < to; index += 1) sum += data[index] * data[index];
+  return Math.sqrt(sum / Math.max(1, to - from));
 }
