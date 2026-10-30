@@ -153,6 +153,9 @@ export function particleAt(fighter, index) {
 
 // ---- The events the hooks write ------------------------------------------------------------------------------------------------
 
+// The strikers that are a weapon's head (log.js weaponStriker).
+const WEAPON_STRIKERS = new Set(['blade', 'point', 'blunt']);
+
 // A blow that moves the part struck this fast (m/s: its impulse over the mass it meets) is as hard as a cry gets; a lighter one, less.
 const STRUCK_FULL = 3;
 // A cut into the flesh that spends this much (J) is the worst there is: twice what physics.js calls a deep cut.
@@ -167,7 +170,9 @@ const CRY_FROM = 0.5;
  */
 export function soundHit(world, struck, by, part, at, { energy, impulse, striker, covering = null, braced = false, deltaV = 0 }) {
   if (!world.ear) return;
-  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: covering ?? coveringAt(struck, part), part, braced, who: struck.id, by: by ? by.id : -1 });
+  // `mass`: the weapon's (kg) for a weapon's blow: a heavier one is heard lower.
+  const mass = WEAPON_STRIKERS.has(striker) ? by?.weapon?.spec?.mass : undefined;
+  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: covering ?? coveringAt(struck, part), part, braced, who: struck.id, by: by ? by.id : -1, mass });
   if (deltaV > 0 && struck.state !== 'out') soundVoice(world, struck, 'struck', Math.min(1, deltaV / STRUCK_FULL));
 }
 
@@ -236,5 +241,6 @@ export function trackSwing(world, fighter, weapon, stroke) {
   if (seen.peak < SWING_FROM || !seen.at) return;
   seen.sent = true;
   const spec = weapon.spec;
-  soundEvent(world, 'swing', { at: seen.at, speed: seen.peak, length: spec.length, mass: spec.mass, who: fighter.id });
+  // `head`: what leads the stroke through the air (a weight, a mace's: the recorded whoosh; or an edge).
+  soundEvent(world, 'swing', { at: seen.at, speed: seen.peak, length: spec.length, mass: spec.mass, head: (spec.harm?.swing?.cut ?? 0) > 0 ? 'blade' : 'blunt', who: fighter.id });
 }

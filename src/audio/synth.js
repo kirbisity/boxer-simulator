@@ -56,12 +56,12 @@ export function sfxKeep(voice, node) {
   return node;
 }
 
-/** Start a source in the voice from `when` to `stop`; the last source to end takes the voice's nodes down. */
-export function sfxRun(voice, source, when, stop) {
+/** Start a source in the voice from `when` (`offset` s into its buffer) to `stop`; the last source to end takes the voice's nodes down. */
+export function sfxRun(voice, source, when, stop, offset = 0) {
   sfxKeep(voice, source);
   voice.live += 1;
   source.onended = sfxEnded(voice);
-  source.start(when);
+  source.start(when, offset);
   source.stop(stop);
   voice.end = Math.max(voice.end, stop);
   return source;

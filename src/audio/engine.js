@@ -1,6 +1,6 @@
 // The sound engine: the AudioContext and its buses, the mixer's settings, and the audio tick that turns what the ear hears into voices.
 //
-//   voice:  [synth family] → gain → low-pass (the air, a wall between, behind on speakers) → panner (HRTF, or stereo on speakers)
+//   voice:  [synth family, or a recorded take: sfx/sampled.js] → gain → low-pass (the air, a wall between, behind on speakers) → panner (HRTF, or stereo on speakers)
 //                                 ↘ send (by the voice's distance and the room) → the reverb
 //   buses:  effects | voices | ambience | music → master → compressor → mute → out;  the reverb (probed: acoustics.js) → master
 //
@@ -24,6 +24,8 @@ import { ambienceTargets, createAmbience } from './ambience.js';
 import { createMusic, musicMoment } from './music.js';
 import { SOUND_FAMILIES, soundCandidates } from './families.js';
 import { gainOfLevel, sfxVoice } from './synth.js';
+import { createSampleBank } from './samples.js';
+import { playWithSamples } from './sfx/sampled.js';
 import { breathParams, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
 import { playUi, uiParams } from './sfx/ui.js';
@@ -91,7 +93,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
   const sectors = createSectors();
   const listeners = new Set();
   const state = {
-    ctx: null, buses: null, master: null, mute: null, reverb: null, music: null, ambience: null, farField: null, farMode: null,
+    ctx: null, samples: null, buses: null, master: null, mute: null, reverb: null, music: null, ambience: null, farField: null, farMode: null,
     active: [], world: null, cursor: 0, clock: 0, occlusionClock: 0, probeClock: 0, ambienceClock: 0,
     room: copyRoom(OPEN_ROOM), probeHits: new Array(12), terrain: null, roomTest: null,
     breaths: new Map(), whizzed: new WeakSet(), excitement: 0, loud: 0, worldBorn: 0,
@@ -170,6 +172,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       state.buses[name] = { dry, wet };
     }
     state.music = createMusic(ctx, state.buses.music.dry, { onMissing: (moment) => ui(moment) });
+    // The recorded takes (samples.js), decoded in the background: until they are, the synth plays everything.
+    state.samples = createSampleBank(ctx);
     state.ambience = createAmbience(ctx, state.buses.ambience.dry, (at, bus, mapWide) => placeVoice(at, bus, { mapWide, priority: -Infinity }));
     buildFarField();
     applyLevels();
@@ -333,7 +337,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     }
     const when = state.ctx.currentTime + 0.01 + distance / 343;
     const gain = gainOfLevel(candidate.atEar);
-    chain.ends = family.play(voice, voice.out, params, when, gain);
+    chain.ends = playWithSamples(state.samples, voice, family, event, params, when, gain);
   }
 
   // ---- The tick -----------------------------------------------------------------------------------------------------------------------
@@ -614,7 +618,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       return () => listeners.delete(callback);
     },
     /** What is going on (the bench, tests): the context's state, voices playing, the room, the far field's sums. */
-    status: () => ({ running: state.ctx?.state === 'running', voices: state.active.length, budget: budget(), room: { ...state.room }, sectors, mode: speakers() ? 'stereo' : 'hrtf', music: state.music?.status() ?? null }),
+    status: () => ({ running: state.ctx?.state === 'running', voices: state.active.length, budget: budget(), room: { ...state.room }, sectors, mode: speakers() ? 'stereo' : 'hrtf', music: state.music?.status() ?? null, samples: state.samples?.count() ?? 0 }),
     context: () => state.ctx,
     bench: {
       open(on) {

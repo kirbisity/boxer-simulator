@@ -2,7 +2,7 @@
 // whole body's this time, on the surface's give), the surface's own layer (a splash in water, a slap of mud, grit on stone), and the
 // armour crashing with it.
 
-import { levelFromEnergy, sfxBurst, sfxClamp, sfxTone } from '../synth.js';
+import { levelFromEnergy, sfxBurst, sfxClamp, sfxModes, sfxTone } from '../synth.js';
 import { playArmourShake } from './impact.js';
 import { SURFACES, playStep, stepParams } from './step.js';
 
@@ -37,4 +37,22 @@ export function playFall(voice, out, params, when, gain) {
     if (params.armour === 'plate') playArmourShake(voice, out, 'plate', when + 0.1, gain * 0.6, 0.25);
   }
   return Math.max(end, when + seconds + 0.35);
+}
+
+/** A dropped weapon striking the floor (`clatter`): its energy ½mv² into the steel's ring (a recorded clatter plays it where it has loaded). */
+export function clatterParams(event) {
+  const mass = sfxClamp(event.mass ?? 1.2, 0.2, 6);
+  const speed = Math.max(0.5, event.speed ?? 3);
+  const energy = 0.5 * mass * speed * speed;
+  return { level: levelFromEnergy(energy, 2e-3, 0.4), energy, mass, speed, base: sfxClamp(900 * (1.2 / mass) ** 0.3, 400, 1600) };
+}
+
+/** Play a clatter into `out` (the synth's: two knocks of a ringing bar). Returns the end time. */
+export function playClatter(voice, out, params, when, gain) {
+  for (let k = 0; k < 2; k += 1) {
+    const at = when + k * 0.11;
+    sfxModes(voice, out, at, [{ f: params.base, decay: 0.25, amp: 1 }, { f: params.base * 2.756, decay: 0.14, amp: 0.5 }, { f: params.base * 5.4, decay: 0.08, amp: 0.3 }], gain * (k ? 0.4 : 0.8));
+    sfxBurst(voice, out, { when: at, peak: gain * (k ? 0.2 : 0.4), decay: 0.015, type: 'highpass', frequency: 2500 });
+  }
+  return when + 0.45;
 }
