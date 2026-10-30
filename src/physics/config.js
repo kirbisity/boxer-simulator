@@ -757,18 +757,22 @@ export const WORLD = {
   // rest as damage to the part (`body` of it), less what armour spreads,
   // less again for dense bone. A hand or elbow landing faster than
   // `fractureSpeed` × bone density breaks the joint (two bodies meeting: `crash`).
-  // A hard blow to the trunk (a fall on it, a collision) bleeds inside:
-  // `internalBleed` of the blood a second per m/s that got through armour and
-  // bone, clotting as a wound does. One fall is a bruise; fall after fall, or
-  // trampled in a crush, a man can collapse and die of it.
-  impact: { minSpeed: 2.2, head: 0.6, body: 1.0, fractureSpeed: 9.5, internalBleed: 0.0003 },
+  // A hard blow to the trunk (a fall on it, a collision) is injury to it
+  // (WORLD.injury), not bleeding: one fall is a bruise; fall after fall, or
+  // trampled in a crush, a man can die of it. (It used to bleed inside, as a
+  // wound does, and a man in plate battered without a cut bled out.)
+  impact: { minSpeed: 2.2, head: 0.6, body: 1.0, fractureSpeed: 9.5 },
   // Injury piling up, from blows, falls and collisions alike (in each part's
   // damage capacity, uncapped): the trunk past `trunkFatal` and he dies of
   // his injuries; the head past `headFatal`, the skull breaks; an arm or leg
   // past `limbBreak`, it breaks (a leg: down, then crawling). Before that,
   // a battered trunk saps him, as blood loss does (to `shockStrength` of his
-  // strength at the fatal mark). Knockdowns and bleeding still end most fights.
-  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, shockStrength: 0.6 },
+  // strength at the fatal mark). These are each part's health (partHealth:
+  // 1 at none, 0 at the mark), and his health (bodyHarm, the health bar) is
+  // above all the head's and the trunk's: a limb gone or broken costs
+  // `limbWeight` of it (he lives without it), and the blood lost its share of
+  // what collapses him. Injury, not bleeding, ends most fights with blades.
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, shockStrength: 0.6, limbWeight: 0.12 },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).
   // Against the gun hand's strength (N; `reference` an average man's) the

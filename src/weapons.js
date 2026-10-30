@@ -51,7 +51,7 @@ export const NU = { ...CROSSBOW, speed: 48, energy: 1.45, length: 0.42, bounce: 
 export const ADAMS = {
   energy: 280,
   lethal: { head: 1, torso: 1.05, limb: 0.32 },
-  bleed: { head: 0.03, torso: 0.035, limb: 0.018 },
+  bleed: { head: 0.0024, torso: 0.0028, limb: 0.0014 },
   limbBreak: 0.55,
   impulse: 2.8,
   recoil: 4.5,
@@ -94,7 +94,7 @@ export const MATCHLOCK = {
   // A body hit: past the line that drops a man (1) unless armour proofed against
   // it (tōsei, plate, a SWAT vest) held a good share.
   lethal: { head: 1, torso: 1.35, limb: 0.45 },
-  bleed: { head: 0.03, torso: 0.04, limb: 0.02 },
+  bleed: { head: 0.0024, torso: 0.0032, limb: 0.0016 },
   limbBreak: 0.75,
   impulse: 5.2,
   recoil: 9,
@@ -119,7 +119,7 @@ export const MATCHLOCK = {
 export const THREE_EYED = {
   energy: 350,
   lethal: { head: 0.95, torso: 0.6, limb: 0.25 },
-  bleed: { head: 0.02, torso: 0.03, limb: 0.012 },
+  bleed: { head: 0.0016, torso: 0.0024, limb: 0.001 },
   limbBreak: 0.25,
   impulse: 2.2,
   recoil: 5,
@@ -144,7 +144,7 @@ export const THREE_EYED = {
 export const RIFLE = {
   energy: 1750,
   lethal: { head: 1.2, torso: 1.7, limb: 0.6 },
-  bleed: { head: 0.04, torso: 0.06, limb: 0.03 },
+  bleed: { head: 0.0032, torso: 0.0048, limb: 0.0024 },
   limbBreak: 0.65,
   impulse: 3.8,
   recoil: 5,
@@ -173,7 +173,7 @@ export const SHOTGUN = {
   pellets: 9,
   pellet: 0.016,
   lethal: { head: 0.55, torso: 0.26, limb: 0.1 },
-  bleed: { head: 0.012, torso: 0.016, limb: 0.006 },
+  bleed: { head: 0.001, torso: 0.0013, limb: 0.0005 },
   limbBreak: 0.08,
   impulse: 1.4,
   recoil: 16,
@@ -1030,9 +1030,10 @@ export function shieldContact(a, b, shield, radius) {
 // Cutting and piercing, in joules of a contact's collision energy after
 // armour. A cut this deep within `zone` of a joint takes the limb off there
 // (scaled by the limb's thickness against a typical one); a stab this deep
-// into the chest or head is fatal. Wounds bleed: blood lost per second per
-// joule, the bleeding easing as it clots, and a man who has lost this share
-// of his blood collapses.
+// into the chest or head is the worst of injuries. Deep wounds bleed (`bleed`):
+// blood lost per second per joule past what the skin and flesh take, easing as
+// it clots, and a man who has lost this share of his blood collapses — slowly,
+// and second to the injury itself (addDamage: the part's health).
 export const BLADES = {
   // Armour this proof against cuts chips a brittle (obsidian) edge.
   chipsOn: 0.6,
@@ -1061,25 +1062,43 @@ export const BLADES = {
   // from the axis, the bone) carries `grazeShare` of that, a square one all
   // of it. So force and precision both decide; short of the bone it bleeds.
   // Below the sever energies: a hard square cut breaks a limb before it takes it off.
-  bone: { fleshJ: 15, fullJ: 60, grazeShare: 0.3 },
+  // `flesh`: what a limb wound that stops short of the bone still counts towards the limb's health: cut muscle and
+  // tendon weaken it, and enough of them disable it as a broken bone does (before, it only bled, and a forearm cut
+  // to the bone's edge twice over did nothing but bleed).
+  bone: { fleshJ: 15, fullJ: 60, grazeShare: 0.3, flesh: 0.35 },
   zone: 0.32, // share of the segment's length from its end that counts as at the joint
   lethalPierce: 45,
-  // A point through the heart or the great vessels of the chest: about this many seconds of fight left in him (a man stabbed through the heart may run or fight on for several seconds before he drops; through the head it is at once).
-  heartSeconds: 8,
+  // A point through the heart or the great vessels of the chest (past `lethalPierce`, in the upper trunk) is the worst
+  // injury there is short of the head: it takes `organ` of the chest's health at once (WORLD.injury.trunkFatal), on top
+  // of the point's own harm (pierceTrauma), and the vessels bleed him to collapse in `seconds` s. A hard thrust through
+  // the heart (~55 J) so kills him outright, by the chest's health; one barely past the mark leaves him a fifth of it,
+  // fighting on for a little until the next blow there or the blood ends him. (It was a bleed timer that dropped him
+  // 8 s later however hard the thrust, and the chest's health did not move.)
+  vital: { organ: 0.6, seconds: 45 },
   // How much of a point's energy (J) counts as injury to the trunk or the head (a limb's: 0.25, as its bone takes it).
-  // A cut counts 1/6 (~0.17): a stab counts 0.1, more than half of that, for what it does inside him at once (a punctured
-  // lung or gut, the shock of it) besides the bleeding and the heart that `heartSeconds` and `lethalPierce` give. It was
-  // 0.04: a spear run into a man's belly barely moved him, and the man stabbed fought on as if grazed.
-  pierceTrauma: 0.1,
+  // As much as an edge (1/6, ~0.17): what a point does is inside him — a lung, the gut, the liver opened — and that
+  // is the injury, not the bleeding. It was 0.04 and then 0.1, when the wound's bleeding was taken for its harm:
+  // a spear in the belly then barely moved the health he had, and only killed by bleeding.
+  pierceTrauma: 0.17,
   // Edge alignment: a cut needs the edge moving across the blade, not along it.
   cutAlignmentPower: 2,
   // A thrust pierces only with the point: contact this far out along the striking length.
   pointShare: 0.78,
-  bleedPerJoule: { cut: 0.00006, pierce: 0.00012 },
-  // A limb's great vessels (the femoral, the brachial) bleed a man out fast:
-  // a deep cut there ends a fight by blood loss, not on the spot.
-  bleedZone: { head: 1.4, trunk: 1.5, limb: 1.6 },
-  clotSeconds: 25,
+  // Bleeding (bleedRate): a wound bleeds only past `from` J of edge or point through the armour — what the log calls a
+  // deep cut (> 40 J) or a man run through (> 25 J). Short of it (a graze, a nick, a cut stopped in the mail or the
+  // padding, a point turned by the plate) it bleeds a little and stops of itself, and does not count; past it,
+  // `perJoule` of his blood a second for each joule beyond, by where it is (`zone`), easing as it clots over
+  // `clotSeconds`. So most blows open nothing that bleeds, and a deep wound bleeds slowly: a 60 J cut through a
+  // forearm loses ~2 % of his blood, a 100 J cut across the belly ~11 %, a 50 J thrust into it ~7 %, against the
+  // ~21 % at which he collapses (collapseAt × BODY.toughness) — several deep wounds and minutes, not one and seconds.
+  // What kills is the injury to the head and the trunk (WORLD.injury, the parts' health).
+  // The great vessels are their own: a limb's artery opened (`artery`: a cut or point that goes to the bone of the
+  // thigh or the upper arm, where the femoral and brachial run, `reach` of the way there by boneShare) collapses him in
+  // `seconds`; the chest's, `vital`. Before this a wound bled 3–4× as fast past 0.5 J, by the blade's full energy:
+  // three in four blows started a bleed, and a cut or two dropped a man in seconds.
+  bleed: { from: { cut: 40, pierce: 25 }, perJoule: { cut: 0.00002, pierce: 0.00003 }, zone: { head: 1.2, trunk: 1.5, limb: 1 }, artery: { reach: 0.6, seconds: 90 } },
+  // A wound eases as it clots, over about a minute of fighting (exertion keeps it open).
+  clotSeconds: 60,
   collapseAt: 0.38,
   // Blood loss weakens: muscles at this share at the point of collapse.
   shockStrength: 0.55,
@@ -1098,13 +1117,28 @@ export const BLADES = {
 
 export const WEAPON_KEYS = Object.keys(WEAPONS);
 
+/** How fast a wound of `joules` (edge or point, `kind`, past the armour) bleeds, a share of his blood a second; 0 short of a deep one. */
+export function bleedRate(kind, joules, zone) {
+  const spec = BLADES.bleed;
+  return Math.max(0, joules - spec.from[kind]) * spec.perJoule[kind] * spec.zone[zone];
+}
+
+/** The bleeding (share a second) that, easing as it clots, loses `left` of the blood in `seconds` s: a great vessel opened. */
+export function bleedToLose(left, seconds) {
+  const clot = BLADES.clotSeconds;
+  return Math.max(0, left) / (clot * (1 - Math.exp(-seconds / clot)));
+}
+
 /**
  * Pistol shots. `lethal`: what one hit does to an unarmoured 80 kg man
  * (`referenceKg`), as a share of what kills him — one to the head, two to
  * the body, five to the arms and legs; a heavier part takes less, a hurt
  * one more (`hurtShare` per unit of damage). Armour (an outfit's
  * `protection.bullet`) takes its share off. A hit to head or body staggers
- * at once, armoured or not; every wound bleeds (`bleed`, per unit of harm).
+ * at once, armoured or not; every wound bleeds (`bleed`, a share of his
+ * blood a second, easing as it clots: a ball in the body loses ~12 % of it,
+ * in a limb ~4 %, against the ~21 % that collapses him; it was ~5× as much,
+ * and a ball in the body bled him out in ten seconds whatever else it did).
  * `muzzle`: the barrel's end from the hand (along, above, m); `spread`:
  * the aim's error (rad, standard deviation) standing still, more moving or
  * reeling; `range` (m); `recoil` (N·s on the hand).
@@ -1113,7 +1147,7 @@ export const GUN = {
   referenceKg: 80,
   lethal: { head: 1, torso: 0.5, limb: 0.2 },
   hurtShare: 0.5,
-  bleed: { head: 0.02, torso: 0.025, limb: 0.01 },
+  bleed: { head: 0.0008, torso: 0.002, limb: 0.0006 },
   muzzle: [0.17, 0.045],
   spread: 0.022,
   barrelShare: 0.15, // of the barrel's own misalignment that goes into the shot
@@ -1161,7 +1195,7 @@ export const ARROW = {
   // bleeds slowly, over hours (the surgeons of the Hundred Years' War and of the Napoleonic wars both drew arrows
   // from men who had fought on with them: a share of a man's blood a second at the start, easing as it clots,
   // BLADES.clotSeconds, so a `muscle` wound loses ~5% of his blood, a `torso` one ~7%, against the ~21% at which he
-  // collapses (BLADES.collapseAt × BODY.toughness): he fights on, slowed, and takes several before he drops of it). It kills in minutes only where it opens a great vessel:
+  // collapses (BLADES.collapseAt × BODY.toughness): he fights on, slowed, and takes several before he drops of it). It kills in a minute or more only where it opens a great vessel:
   // - `artery`: the femoral or brachial artery, deep in the thigh or the upper arm (an arrow whose path passes
   //   within `deep` of the limb's radius of its axis, where the vessel runs by the bone): `seconds.artery` to collapse;
   // - `chest`: deep in the upper trunk (the same `deep` share off its axis, above `chestFrom` of the way from
@@ -1174,8 +1208,9 @@ export const ARROW = {
   // reaches a great vessel. A bullet's wound is not this: the ball tears a cavity that bleeds freely (GUN.bleed),
   // and is left as it is.
   wound: {
-    rate: { muscle: 0.002, torso: 0.003, head: 0.003 },
-    seconds: { artery: 90, abdomen: 60, chest: 20 },
+    rate: { muscle: 0.0008, torso: 0.0012, head: 0.0012 },
+    // (`chest` as a blade's through the heart, BLADES.vital; it was 20 s, a timer that dropped him before anything else could.)
+    seconds: { artery: 90, abdomen: 75, chest: 45 },
     deep: 0.4, chestFrom: 0.45, deepFrom: 0.3,
   },
   impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,

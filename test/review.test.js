@@ -89,7 +89,7 @@ test('the stamina a strike needs is what it costs', () => {
   assert.equal(throwPunch(world, fighter, 'hook', 'head'), true, 'enough for it');
 });
 
-test('a hard landing hurts the body; fall after fall a man dies of his injuries (bleeding a little inside)', () => {
+test('a hard landing hurts the body; fall after fall a man dies of his injuries (not of bleeding)', () => {
   const world = duel(PRESETS.heavy, PRESETS.light);
   const man = world.fighters[0];
   man.state = 'down';
@@ -99,7 +99,7 @@ test('a hard landing hurts the body; fall after fall a man dies of his injuries 
     for (let index = 0; index < man.v.length / 3; index += 1) man.v[index * 3 + 1] = -7;
     advance(world, 0.25);
   }
-  assert.ok(man.bleedInside > 0, 'bleeding inside');
+  assert.ok(!(man.bleed > 0), 'blunt harm does not bleed');
   assert.ok(man.trauma.trunk > 0, 'the trunk hurt');
   assert.equal(man.state, 'out');
   assert.ok(world.events.some((event) => /injuries/.test(event.effects?.join(' ') ?? '')), 'died of his injuries');
