@@ -13,8 +13,11 @@
 // (or a haft) knocks, a fist, foot, knee or elbow on the body punches, the fist's whoosh rises into it; thunder near cracks, far rumbles.
 // A man going down thuds (the recorded body fall; in plate or mail the crash of his kit over it), a whip's tip cracks on what it lashes, a
 // wooden door creaks as it swings and slams as it shuts (a chest's lid the same, smaller).
+// Cries (a voice event the cry director, audio/cries.js, let through: its `cry`): the sex's set of its kind, at the voice's pitch, a
+// light hurt cut short; with no take they are silent (the synth's voice is not played: families.js `sampledOnly`).
 
 import { sfxClamp, sfxKeep, sfxRun } from '../synth.js';
+import { cryOfEvent } from './voice.js';
 
 const SAMPLED_HEADS = new Set(['blade', 'point', 'blunt']);
 const SAMPLED_SOFT = new Set(['flesh', 'padded', 'leather']);
@@ -233,10 +236,24 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const near = params.crack;
       return { set: 'thunder', trim: sampleLerp(0.85, 1.2, near), rate: sampleLerp(0.78, 1, near) * jitter(0.04), seconds: null, fade: sampleLerp(0.9, 0.5, near), skip: sampleLerp(0.12, 0, near), synth: { ...params, crack: 0 }, synthGain: sampleLerp(0.8, 0.35, near) };
     }
+    case 'voice': {
+      const cry = cryOfEvent(event);
+      if (!cry) return null;
+      const i = sfxClamp(cry.intensity ?? 0.5, 0, 1);
+      // A light hurt is a catch of the breath (the take's head, faded), a hard one the whole cry; a moan and a dying cry let die away.
+      const share = cry.kind === 'hurt' ? sampleLerp(CRY_PLAY.hurtShare, 1, i) : 1;
+      return { set: `voice-${cry.sex}-${cry.kind}`, trim: sampleLerp(CRY_PLAY.trim[0], CRY_PLAY.trim[1], i), rate: cry.rate ?? 1, seconds: null, share, fade: CRY_PLAY.fade[cry.kind] ?? 0.08, skip: 0, synth: null, synthGain: 0 };
+    }
+    case 'charge':
+      // The army's roar (engine.js loops it; the board plays it once): its whole take.
+      return { set: 'charge', trim: 1, rate: jitter(0.03), seconds: null, fade: 0.5, skip: 0, synth: null, synthGain: 0 };
     default:
       return null;
   }
 }
+
+/** A cry's take: its trim from none to full intensity (the takes are cut to one peak), the least share of a hurt cry played, each kind's fade (s). */
+export const CRY_PLAY = { trim: [0.55, 1], hurtShare: 0.6, fade: { hurt: 0.06, scream: 0.12, moan: 0.25, fear: 0.1, dying: 0.35 } };
 
 /** Play a take into `out` at `when` by a plan, at `gain` (the engine's). Returns the end time. */
 export function playSample(voice, out, take, plan, when, gain) {
@@ -268,7 +285,8 @@ export function playSample(voice, out, take, plan, when, gain) {
 export function playWithSamples(bank, voice, family, event, params, when, gain) {
   const plan = bank ? samplePlan(event.type, params, event) : null;
   const take = plan ? bank.pick(plan.set) : null;
-  if (!take) return family.play(voice, voice.out, params, when, gain);
+  // (A family played only from its recordings, the cries: nothing until they have loaded.)
+  if (!take) return family.sampledOnly ? when : family.play(voice, voice.out, params, when, gain);
   let end = playSample(voice, voice.out, take, plan, when, gain);
   for (const layer of plan.extra ?? []) {
     const more = bank.pick(layer.set);

@@ -111,11 +111,14 @@ test('a blow that wounds is one voice: the stronger of the cry and the grunt', (
   assert.deepEqual(mergeVoices(events).map((event) => `${event.type}:${event.kind ?? ''}`), ['voice:wound', 'voice:effort', 'hit:']);
 });
 
-test('the men are not heard to cry out or grunt; a blow on armour is heard', () => {
+test('the men are heard to cry out only in the recorded voices (the synth\'s never), and never to grunt; a blow on armour is heard', () => {
   const listener = placeListener(createListener(), [0, 1.7, 0], cameraLooking(0));
   const events = [
     { type: 'voice', kind: 'wound', strength: 0.9, who: 3, t: 1, x: 1, y: 1.6, z: 0, size: 1.8, f0: 110 },
+    { type: 'voice', kind: 'effort', strength: 0.9, who: 4, t: 1, x: 1, y: 1.6, z: 0, size: 1.8, f0: 110 },
     { type: 'hit', energy: 200, x: 1, y: 1.2, z: 0, t: 1 },
   ];
-  assert.deepEqual(soundCandidates(events, listener).map((candidate) => candidate.event.type), ['hit']);
+  const heard = soundCandidates(events, listener);
+  assert.deepEqual(heard.map((candidate) => `${candidate.event.type}:${candidate.event.kind ?? ''}`), ['voice:wound', 'hit:']);
+  assert.ok(heard[0].family.sampledOnly, 'a cry is played only from its recordings (cries.js rations them in the game)');
 });

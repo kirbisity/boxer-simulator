@@ -5,6 +5,10 @@
 //
 // Kinds: `effort` (a grunt on a blow thrown), `struck` (the breath driven out by a blow taken), `wound` (a cry: long, the pitch rising
 // and breaking), `death` (falling away), and breath (in and out, the rate and depth from his exertion: engine.js schedules it).
+//
+// The synth's cries are not played (the user found them wrong): a cry is a recorded one (samples voice-<sex>-<kind>, cut from the user's
+// recordings of a man and a woman crying), chosen and rationed by audio/cries.js, played by sfx/sampled.js. What is here for them is
+// pure: the kinds, how loud each is, and the pitch of a body's voice (CRY_VOICE).
 
 import { bandMakeUp, sfxClamp, sfxEnvelope, sfxFilter, sfxGain, sfxKeep, sfxNoise, sfxRun } from '../synth.js';
 
@@ -128,4 +132,70 @@ export function playBreath(voice, out, breath, when, gain, inhale) {
   const tract = vocalTract(voice, level, 'h', breath.scale * (inhale ? 1.15 : 1), when, seconds);
   sfxNoise(voice, tract, when, seconds + 0.05, 'pink');
   return when + seconds + 0.05;
+}
+
+// ---- The recorded cries ---------------------------------------------------------------------------------------------------------------
+
+/**
+ * The kinds of cry (each a set per sex, voice-<sex>-<kind>), with
+ *   level    dB SPL at 1 m at full intensity, `low` less at none: a scream as loud as a voice goes (~100 dB at 1 m shouted), the hurt cry
+ *            under it, the moan of a man lying hurt a voice's ordinary loudness; all kept ~6 dB under a heavy blow's own level at the ear
+ *            (impact.js, + its family boost), so a cry never buries the blow that caused it
+ *   seconds  about how long a take lasts (s): for the director's count of who is still crying
+ *   weight   its rank when there are more cries than voices for them: a death and a scream before a grunt, a moan last
+ */
+export const CRY_KINDS = {
+  hurt: { level: 84, low: 8, seconds: 0.45, weight: 1 },
+  scream: { level: 92, low: 6, seconds: 1.1, weight: 2 },
+  moan: { level: 72, low: 4, seconds: 1.4, weight: 0.5 },
+  fear: { level: 86, low: 6, seconds: 0.9, weight: 1 },
+  dying: { level: 88, low: 4, seconds: 1.6, weight: 3 },
+};
+
+/**
+ * A voice's pitch (the take's playback rate) by the body. The recorded voices are an adult man's and woman's (`ref`: the body their
+ * voices are taken to be); a body larger than that is lower (`height`: the rate falls as (ref/height)^0.9, the folds and the tract
+ * longer), a heavier one a little lower again (`mass`), a child's higher (`youngUnder`: `young` up a year under it), an old one lower
+ * and duller (`oldFrom`: `old` down a year over it, to `oldFloor`). Each man his own voice (`personal`: ± that share, the same each
+ * time, from his id) and each cry a little off it (`utterance`: ±). Kept within `range` (past it a take sounds like a tape sped up).
+ */
+export const CRY_VOICE = {
+  ref: { male: { height: 1.78, mass: 80 }, female: { height: 1.65, mass: 62 } },
+  height: 0.9, mass: 0.12, youngUnder: 18, young: 0.025, oldFrom: 40, old: 0.004, oldFloor: 0.9, personal: 0.05, utterance: 0.03, range: [0.78, 1.3],
+};
+
+/** A body's sex as its voice is: 'female' or 'male'. */
+export const crySex = (sex) => (sex === 'female' ? 'female' : 'male');
+
+/** A stable share 0..1 from an id (a man's own voice: the same each fight). */
+export function cryPersonal(id) {
+  let h = (Math.imul((id ?? 0) + 1, 2654435761) >>> 0) ^ 0x9e3779b9;
+  h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0;
+  return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
+}
+
+/** The rate of a voice: { sex, height (m), mass (kg), age (years), id }; `jitter` -1..1 the utterance's own (0: his voice itself). */
+export function cryRate({ sex, height, mass, age, id }, jitter = 0) {
+  const spec = CRY_VOICE;
+  const ref = spec.ref[crySex(sex)];
+  const years = age ?? 30;
+  const youth = 1 + spec.young * Math.max(0, spec.youngUnder - years);
+  const elder = Math.max(spec.oldFloor, 1 - spec.old * Math.max(0, years - spec.oldFrom));
+  const own = 1 + spec.personal * (cryPersonal(id) * 2 - 1);
+  const rate = (ref.height / sfxClamp(height ?? ref.height, 0.9, 2.4)) ** spec.height * (ref.mass / sfxClamp(mass ?? ref.mass, 25, 220)) ** spec.mass * youth * elder * own * (1 + spec.utterance * jitter);
+  return sfxClamp(rate, spec.range[0], spec.range[1]);
+}
+
+/** A cry's level at 1 m (dB SPL) by its kind and intensity (0..1). */
+export const cryLevel = (cry) => CRY_KINDS[cry.kind].level - CRY_KINDS[cry.kind].low * (1 - sfxClamp(cry.intensity ?? 0.5, 0, 1));
+
+/**
+ * The cry a voice event stands for when nothing chose one (the bench's, the board's): a blow taken a hurt cry, a wound a scream, a death
+ * dying; an effort none (no recording of one). { kind, sex, intensity, rate } or null.
+ */
+export function cryOfEvent(event) {
+  if (event.cry) return event.cry;
+  const kind = { struck: 'hurt', wound: 'scream', death: 'dying', moan: 'moan', fear: 'fear', hurt: 'hurt', scream: 'scream', dying: 'dying' }[event.kind];
+  if (!kind) return null;
+  return { kind, sex: crySex(event.sex), intensity: sfxClamp(event.strength ?? 0.6, 0, 1), rate: cryRate({ sex: event.sex, height: event.size, mass: event.mass, age: event.age, id: event.who }) };
 }

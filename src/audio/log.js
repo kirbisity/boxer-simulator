@@ -143,7 +143,7 @@ export function weaponPart(weapon, along) {
 
 /** A man's voice, as the synthesised one is pitched: his standing height (m) and his body's own mass (kg, without his kit). */
 export function voiceOf(fighter) {
-  return { size: fighter.body.heightM, mass: fighter.body.bodyMassKg ?? fighter.body.massKg, who: fighter.id };
+  return { size: fighter.body.heightM, mass: fighter.body.bodyMassKg ?? fighter.body.massKg, who: fighter.id, sex: fighter.body.inputs?.sex, age: fighter.body.inputs?.age };
 }
 
 /** Where a fighter's particle is: [x, y, z] (a copy). */
@@ -172,8 +172,10 @@ export function soundHit(world, struck, by, part, at, { energy, impulse, striker
   if (!world.ear) return;
   // `mass`: the weapon's (kg) for a weapon's blow: a heavier one is heard lower.
   const mass = WEAPON_STRIKERS.has(striker) ? by?.weapon?.spec?.mass : undefined;
-  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: covering ?? coveringAt(struck, part), part, braced, who: struck.id, by: by ? by.id : -1, mass });
-  if (deltaV > 0 && struck.state !== 'out') soundVoice(world, struck, 'struck', Math.min(1, deltaV / STRUCK_FULL));
+  const met = covering ?? coveringAt(struck, part);
+  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: met, part, braced, who: struck.id, by: by ? by.id : -1, mass });
+  // (The blow's energy and what it met go with his voice: the pain of it to him is the cry director's, audio/cries.js.)
+  if (deltaV > 0 && struck.state !== 'out') soundVoice(world, struck, 'struck', Math.min(1, deltaV / STRUCK_FULL), { energy, covering: met });
 }
 
 /** A wound opened or a bone broken on `fighter` at `at`: cut | stab | bone | crush, `severity` 0..1; a bad one and he cries out. */
@@ -186,10 +188,10 @@ export function soundWound(world, fighter, kind, severity, at) {
 /** A cut's severity, from the energy (J) it spent opening the flesh. */
 export const cutSeverity = (joules) => Math.min(1, joules / CUT_FULL);
 
-/** His voice: effort | struck | wound | death, `strength` 0..1, from his head. */
-export function soundVoice(world, fighter, kind, strength) {
+/** His voice: effort | struck | wound | death, `strength` 0..1, from his head (`more`: the blow's energy and covering, for a struck). */
+export function soundVoice(world, fighter, kind, strength, more = null) {
   if (!world.ear) return;
-  soundEvent(world, 'voice', { at: particleAt(fighter, P.head), kind, strength, ...voiceOf(fighter) });
+  soundEvent(world, 'voice', { at: particleAt(fighter, P.head), kind, strength, ...voiceOf(fighter), ...more });
 }
 
 // A body settling onto the floor slower than this (m/s) makes no thud; once down, his hips bouncing on it within `FALL_AGAIN` s are the same fall.

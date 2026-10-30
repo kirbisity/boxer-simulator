@@ -9,10 +9,10 @@ import { playSample, playWithSamples, samplePlan } from '../src/audio/sfx/sample
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 
 const DIR = 'src/audio/samples';
-// (A thunder's roar is the longest take, 2.6 s.)
-const FILE_CAP = 16 * 1024;
-// (Room for the voices and the looping ambience beds coming in; the one-shot takes alone are ~300 KB.)
-const TOTAL_CAP = 700 * 1024;
+// (A thunder's roar is the longest single take, 2.6 s; the army's charge loop, 6 s of a dull roar at 32 kb/s, is the largest one-shot file.)
+const FILE_CAP = 25 * 1024;
+// (The one-shot takes ~300 KB, the cries and the charge ~170 KB, the three ambience beds ~230 KB.)
+const TOTAL_CAP = 900 * 1024;
 const half = () => 0.5;
 const plan = (event) => samplePlan(event.type, SOUND_FAMILIES[event.type].params(event), event, half);
 

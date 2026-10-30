@@ -28,6 +28,8 @@ import { createSampleBank } from './samples.js';
 import { playWithSamples } from './sfx/sampled.js';
 import { breathParams, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
+import { CRIES, createCryDirector } from './cries.js';
+import { CHARGE, chargeOf } from './charge.js';
 import { playUi, uiParams } from './sfx/ui.js';
 import { playThump, thumpParams } from './sfx/thump.js';
 import { artDrawParams, artImpactParams, playArtDraw, playArtImpact } from './sfx/art.js';
@@ -98,7 +100,9 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     ctx: null, samples: null, buses: null, master: null, mute: null, reverb: null, music: null, ambience: null, farField: null, farMode: null,
     active: [], world: null, cursor: 0, clock: 0, occlusionClock: 0, probeClock: 0, ambienceClock: 0,
     room: copyRoom(OPEN_ROOM), probeHits: new Array(12), terrain: null, roomTest: null,
-    breaths: new Map(), whizzed: new WeakSet(), excitement: 0, loud: 0, worldBorn: 0,
+    breaths: new Map(), whizzed: new WeakSet(), excitement: 0, loud: 0, loudNow: 0, worldBorn: 0,
+    // The cries rationed (cries.js), and each side's charge roar (charge.js): { sides (chargeOf's last), beds: corner → { source, gain, chain } }.
+    cries: createCryDirector(), charge: { sides: null, beds: new Map() },
     bench: { room: null, ambience: null, far: null, open: false },
   };
   const speakers = () => (settings.speakers === null ? phone : Boolean(settings.speakers));
@@ -184,6 +188,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
 
   function buildFarField() {
     if (!state.ctx) return;
+    // (The charge's panners are the far field's kind: rebuilt with them, their roars begun again on the next update.)
+    stopCharges();
     for (const bed of state.farField?.beds ?? []) bed.panner.disconnect();
     state.farMode = speakers();
     state.farPanners = [];
@@ -337,8 +343,10 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       chain.distance = distance;
       chain.filter.frequency.value = cutoffFor(chain);
     }
-    const when = state.ctx.currentTime + 0.01 + distance / 343;
-    const gain = gainOfLevel(candidate.atEar);
+    // A cry: after its reaction's delay, ducked under a louder sound just heard (the blow first: cries.js).
+    const cry = event.cry;
+    const when = state.ctx.currentTime + 0.01 + distance / 343 + (cry?.delay ?? 0);
+    const gain = gainOfLevel(candidate.atEar) * (cry && state.loudNow > candidate.atEar + CRIES.duckOver ? 10 ** (-CRIES.duckDb / 20) : 1);
     chain.ends = playWithSamples(state.samples, voice, family, event, params, when, gain);
   }
 
@@ -363,6 +371,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       state.cursor = readSounds(world, 0).cursor;
       state.worldBorn = performance.now() / 1000;
       state.breaths.clear();
+      state.cries.reset();
+      stopCharges();
       state.strikeCount = info.strike?.count ?? 0;
     }
     // The storm's lightning (levelmode/storm.js): each new strike is thunder, heard at its distance (after distance / 343 s: playCandidate).
@@ -403,9 +413,11 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       ctx.listener.setPosition(listener.x, listener.y, listener.z);
       ctx.listener.setOrientation(...listener.forward, ...listener.up);
     }
-    // The events of this tick: gathered, limited, ranked against the playing voices, played.
-    const candidates = soundCandidates(events, listener);
+    // The events of this tick, the voices among them rationed into cries (cries.js): gathered, limited, ranked against the playing voices, played.
+    const candidates = soundCandidates(state.cries.tick(events, world.fighters ?? [], listener, now), listener);
     if (candidates.length) {
+      state.loudNow = state.loud;
+      for (const candidate of candidates) if (candidate.family.bus !== 'voices') state.loudNow = Math.max(state.loudNow, candidate.atEar);
       const { start } = allocateVoices(state.active, candidates, budget());
       for (const candidate of start) playCandidate(candidate);
       for (const candidate of candidates) {
@@ -456,12 +468,72 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       // (The beds duck under a loud fight as the music does.)
       const scene = { ...info.ambience, room: state.room, ear: [listener.x, listener.y, listener.z], excitement: state.excitement, duck: Math.max(0, (state.loud - 78) / 20), ...state.bench.ambience };
       state.ambience.update(ambienceTargets(scene), scene, now, step);
+      charges(world, now);
     }
     if (state.bench.open) state.music.maintain(now);
     else {
       const moment = musicMoment({ ...info.music, worldId: worldId(world), worldAge: performance.now() / 1000 - state.worldBorn });
       state.music.update({ ...moment, scene: info.music?.scene, duck: Math.max(0, (state.loud - 78) / 20) }, now);
     }
+  }
+
+  /** The charge roars: each side charging (charge.js) its loop, panned to where its men are, eased to its level; faded out after. */
+  function charges(world, now) {
+    const take = state.samples?.pick('charge');
+    if (!take || !state.farField) return;
+    const sides = chargeOf(world.fighters ?? [], listener, state.charge.sides, world.time ?? null);
+    state.charge.sides = sides;
+    for (const [corner, side] of Object.entries(sides)) {
+      let bed = state.charge.beds.get(corner);
+      if (!bed && !(side.charging && Number.isFinite(side.level))) continue;
+      if (!bed) {
+        const ctx = state.ctx;
+        const chain = makePanner(0, state.buses.ambience.dry);
+        state.farPanners.push(chain);
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        gain.connect(chain.input);
+        const source = ctx.createBufferSource();
+        source.buffer = take.buffer;
+        source.loop = true;
+        // (The loop's own seconds from its first sound: the decoder's padding at either end left out.)
+        source.loopStart = take.offset;
+        source.loopEnd = Math.min(take.buffer.duration, take.offset + CHARGE.loopSeconds);
+        source.playbackRate.value = 0.95 + 0.1 * Math.random();
+        source.connect(gain);
+        source.start(now, take.offset + Math.random() * CHARGE.loopSeconds);
+        bed = { source, gain, chain };
+        state.charge.beds.set(corner, bed);
+      }
+      if (side.at) {
+        const seen = earDirection(listener, side.at[0], listener.y, side.at[1]);
+        bed.chain.azimuth = seen.azimuth;
+        if (bed.chain.panner.pan) bed.chain.panner.pan.value = Math.sin(seen.azimuth);
+      }
+      const level = side.charging && Number.isFinite(side.level) ? gainOfLevel(side.level) : 0;
+      bed.gain.gain.setTargetAtTime(level, now, CHARGE.ease / 3);
+      // Over (the lines met, the men stopped): faded, then taken down.
+      if (!level) {
+        bed.idle = (bed.idle ?? 0) + 1 / RATES.ambience;
+        if (bed.idle > CHARGE.ease * 3) stopCharge(corner, bed);
+      } else bed.idle = 0;
+    }
+  }
+
+  function stopCharge(corner, bed) {
+    try {
+      bed.source.stop();
+    } catch {}
+    bed.gain.disconnect();
+    bed.chain.input.disconnect();
+    bed.chain.panner.disconnect();
+    state.farPanners = (state.farPanners ?? []).filter((chain) => chain !== bed.chain);
+    state.charge.beds.delete(corner);
+  }
+
+  function stopCharges() {
+    for (const [corner, bed] of [...state.charge.beds]) stopCharge(corner, bed);
+    state.charge.sides = null;
   }
 
   const worldIds = new WeakMap();

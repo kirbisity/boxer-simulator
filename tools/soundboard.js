@@ -103,6 +103,22 @@ function board() {
       { title: 'Portcullis (synth)', sets: [], event: () => ({ type: 'mech', kind: 'portcullis', state: 'down' }), ends: null },
       { title: 'Lock (synth)', sets: [], event: () => ({ type: 'mech', kind: 'lock' }), ends: null },
     ]],
+    ['Cries and the charge', 'The recorded cries, a man\'s and a woman\'s, as the game plays them (rationed by audio/cries.js: most blows are taken in silence). The slider is the body, small to big; the second the age: the voice\'s pitch follows both.', [
+      ...['male', 'female'].flatMap((sex) => [['hurt', 'Hurt (a blow taken)'], ['scream', 'Scream (a severe wound, a limb lost)'], ['moan', 'Moan (lying or crawling hurt)'], ['fear', 'Fear (broken, running)'], ['dying', 'Dying']].map(([kind, what]) => ({
+        title: `${sex === 'male' ? 'Man' : 'Woman'}: ${what}`, sets: [`voice-${sex}-${kind}`], isNew: true, age: true,
+        event: (s, age = 30) => {
+          const body = sex === 'male' ? { height: lerp(1.6, 1.98, s), mass: lerp(58, 115, s) } : { height: lerp(1.5, 1.82, s), mass: lerp(45, 85, s) };
+          return { type: 'voice', kind, sex, who: 7, cry: { kind, sex, intensity: 0.8, rate: cryRate({ sex, age, id: 7, ...body }, Math.random() * 2 - 1) } };
+        },
+        ends: sex === 'male' ? ['1.60 m', '1.98 m'] : ['1.50 m', '1.82 m'],
+      }))),
+      { title: 'Army charge', sets: ['charge'], isNew: true, direct: (voice, out, when, s) => {
+        const take = bank?.pick('charge');
+        // (As engine.js plays it: each man's shout, 92 dB at 1 m, summed over `s`'s men, the line 60 m off; here 4 s of the loop.)
+        const men = Math.round(log(16, 400, s));
+        return take ? playSample(voice, out, take, { rate: 1, trim: 1, seconds: 4, fade: 1, skip: 0 }, when, gainOfLevel(92 + 10 * Math.log10(men / 3600))) : when;
+      }, ends: ['16 men', '400 men'], note: 'Heard only when a side of 20 or more has 10 or more (and a third of it) running at the enemy together; fades as the lines meet.' },
+    ]],
     ['Synthesised families', 'What the game makes with no recording, and the synth under the recorded ones.', [
       { title: 'Impact: blade on mail', sets: [], event: (s) => ({ type: 'hit', energy: log(5, 400, s), striker: 'blade', covering: 'mail', part: 'trunk' }), ends: ['5 J', '400 J'] },
       { title: 'Impact: blade on lamellar', sets: [], event: (s) => ({ type: 'hit', energy: log(5, 400, s), striker: 'blade', covering: 'lamellar', part: 'trunk' }), ends: ['5 J', '400 J'] },
@@ -111,7 +127,7 @@ function board() {
       { title: 'Swing: sword', sets: [], event: (s) => ({ type: 'swing', speed: lerp(8, 35, s), length: 1, mass: 1.3, head: 'blade' }), ends: ['8 m/s', '35 m/s'] },
       { title: 'Wound: stab', sets: [], event: (s) => ({ type: 'wound', kind: 'stab', severity: s }), ends: ['minor', 'deep'] },
       { title: 'Fall: unarmoured in water', sets: [], event: (s) => ({ type: 'fall', mass: 80, speed: log(0.8, 9, s), surface: 'water', armour: 'none' }), ends: ['0.8 m/s', '9 m/s'] },
-      { title: 'Voice: effort', sets: [], event: (s) => ({ type: 'voice', kind: 'effort', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'], note: 'Voices are off in the game; heard here only.' },
+      { title: 'Voice: effort', sets: [], event: (s) => ({ type: 'voice', kind: 'effort', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'], note: 'The synth\'s voices are not played in the game: the recorded cries are (Synth only plays this one).' },
       { title: 'Voice: struck', sets: [], event: (s) => ({ type: 'voice', kind: 'struck', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'] },
       { title: 'Voice: cry of a wound', sets: [], event: (s) => ({ type: 'voice', kind: 'wound', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'] },
       { title: 'Voice: death', sets: [], event: (s) => ({ type: 'voice', kind: 'death', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'] },
@@ -152,7 +168,7 @@ function board() {
   }
   /** What the game would play for a card at a weight: its event, family, params, gain at the ear (as engine.js playCandidate). */
   function prepared(card, s) {
-    const event = card.event(s);
+    const event = card.event(s, card.ageOf?.());
     const family = SOUND_FAMILIES[event.type];
     const params = family.params(event);
     const distance = typeof card.distance === 'function' ? card.distance(s) : card.distance ?? 2;
@@ -214,12 +230,15 @@ function board() {
       n += 1;
       const recorded = card.sets.length > 0;
       const slider = card.ends ? el('input', { type: 'range', min: '0', max: '1', step: '0.01', value: '0.5', id: `weight-${n}`, className: 'weight' }) : null;
+      // (A cry's card: the age as well, 14 to 70 years.)
+      const ageSlider = card.age ? el('input', { type: 'range', min: '14', max: '70', step: '1', value: '30', id: `age-${n}`, className: 'weight' }) : null;
+      if (ageSlider) card.ageOf = () => Number(ageSlider.value);
       const info = el('p', { className: 'readout' });
       const weight = () => (slider ? Number(slider.value) : 1);
       const refresh = () => (info.textContent = readout(card, weight()));
       const buttons = el('div', { className: 'actions' },
         el('button', { type: 'button', className: 'play', textContent: recorded ? 'Play as in game' : 'Play', onclick: () => play(card, weight(), 'game') }),
-        recorded && !card.direct ? el('button', { type: 'button', className: 'ghost', textContent: 'Synth only', onclick: () => play(card, weight(), 'synth') }) : null);
+        recorded && !card.direct && !card.age ? el('button', { type: 'button', className: 'ghost', textContent: 'Synth only', onclick: () => play(card, weight(), 'synth') }) : null);
       const takes = recorded ? el('div', { className: 'takes' }, ...[...new Set(card.sets)].flatMap((set) => [
         el('span', { className: 'set', textContent: set }),
         ...SAMPLE_SETS[set].map((file, index) => el('button', { type: 'button', className: 'take', textContent: String(index + 1), title: `${file}.mp3, as recorded`, onclick: () => playTake(file) })),
@@ -229,8 +248,10 @@ function board() {
         el('header', {}, el('h3', { textContent: card.title }), tags),
         card.note ? el('p', { className: 'note', textContent: card.note }) : null,
         slider ? el('label', { className: 'slider', htmlFor: slider.id }, el('span', { textContent: card.ends[0] }), slider, el('span', { textContent: card.ends[1] })) : null,
+        ageSlider ? el('label', { className: 'slider', htmlFor: ageSlider.id }, el('span', { textContent: 'age 14' }), ageSlider, el('span', { textContent: '70' })) : null,
         buttons, takes, info));
       if (slider) slider.addEventListener('input', refresh);
+      if (ageSlider) ageSlider.addEventListener('input', refresh);
       refresh();
     }
   }
