@@ -148,6 +148,25 @@ function keepPatience(world, fighter, ride) {
 }
 
 /**
+ * A rider held from going nearer the enemy (ai.js keepWithHisMen: a leader out ahead of his men): of the way his
+ * horse is set to go, the part towards them (`toward`, [x, z], a unit way) is taken out, and he rides on across
+ * it at the pace he had (round with his men, not in); set to ride straight at them, he reins in to a stand.
+ */
+export function reinFrom(world, fighter, toward) {
+  const horse = fighter.mount;
+  if (!horse?.goal) return;
+  const way = aheadOf(horse.goal.heading);
+  const into = way[0] * toward[0] + way[2] * toward[1];
+  if (into <= 0) return;
+  const across = [way[0] - into * toward[0], way[2] - into * toward[1]];
+  if (Math.hypot(across[0], across[1]) < 0.2) {
+    horse.goal = { heading: horse.goal.heading, speed: 0 };
+    return;
+  }
+  horse.goal = { heading: steerInside(world, horse, headingOf(across[0], across[1])), speed: horse.goal.speed };
+}
+
+/**
  * A heading and pace turned clear of his side's other horses: each friend whose
  * path, carried on as it goes now, will pass within `lane.gap` of his own inside
  * `lane.look` s pushes him across (away from it; to the side he turns to if it is

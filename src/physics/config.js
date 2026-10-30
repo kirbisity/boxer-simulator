@@ -829,7 +829,11 @@ export const WORLD = {
   // A side of `minSide` or more has a leader, the man nearest its middle at
   // the start, and he carries its standard if its faction has one (FACTIONS).
   // Without a banner colour of its own, a side's flag is its corner's.
-  standard: { minSide: 4, colours: { red: '#b3161b', blue: '#1f3f8a' } },
+  // A leader who shoots, whose side is more than `shooters` (a share) men who shoot (bow, crossbow, gun), keeps his
+  // weapon and wears the standard on his back (physics.js raiseStandards): he fights the way the bulk of his men do.
+  // Set at a majority: the Xiongnu and the Parthians all horse archers but a few spears; a side of mostly hand-to-hand
+  // men with some archers (the Visigoths') keeps its standard in its leader's hands.
+  standard: { minSide: 4, shooters: 0.5, colours: { red: '#b3161b', blue: '#1f3f8a' } },
   // Holding the last man down. Pinners kneel beside him (hips this share of
   // height lower, leaning in), lock their hands on his chest and hips once
   // within `lockDistance` (m), and press with this share of their weight;

@@ -13,7 +13,7 @@ import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { heldOffAt } from './physics/brush.js';
 import { handling } from './handling.js';
-import { holdWing, ride, standToRider } from './riding.js';
+import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 
 export const AI = {
@@ -40,6 +40,20 @@ export const AI = {
   // A man going to take up his fallen standard runs to it from further than `runFor` m.
   // Weighted heavily: a man keeps with his leader (and picks men near him) before going off on his own fight.
   cohesion: { radius: 1.6, radiusPerSqrt: 0.6, ramp: 2.5, strafe: 0.8, holdBack: 0.9, engaged: 0.8, focus: 0.6, escape: 0.5, runFor: 1.5 },
+  // A side's leader (its standard's bearer, its general), when the AI has him and he has no place in the ranks (a rider,
+  // a man of a loose army), keeps with the body of his men rather than going on at the enemy ahead of them
+  // (keepWithHisMen): he goes no nearer the enemy than the man of them a `body` share of the way out from the
+  // nearest (each man's distance to his own nearest enemy; 0.5, the middle one: at the main body, not before it),
+  // give or take `slack` m. Held there, on foot he does not step forward; on a horse he rides on across the way to
+  // them and not into it (riding.js reinFrom), reckoned from where his horse will be `foresee` s on at the pace it
+  // closes with them (a horse at the gallop, 9 m/s, needs a second and more to be turned off its line: measured at
+  // Pyongyang, a general held from the moment he was level with his men's middle still rode 7 m past it). The enemy come to him, within both reaches and `engaged` m (the
+  // cohesion's), he fights where he is; and as his men close, the line he may come to closes with them, so he comes
+  // to hand-to-hand when they do. Only with `minMen` of his men or more on their feet (fewer are not a body to keep
+  // with). A general led from among his men, not before them: the chanyu among his riders, Surena with his horse
+  // archers; the commander who rode out ahead of his own was the one cut off (Publius Crassus at Carrhae).
+  // (His kit is his men's way of fighting too: a shooter leading shooters keeps his bow, WORLD.standard.shooters.)
+  general: { body: 0.5, slack: 1, foresee: 1.2, engaged: 0.8, minMen: 3 },
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
   passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
@@ -708,6 +722,7 @@ function keepPlace(world, fighter) {
   const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
   if (!formation) {
     keepWithLeader(world, fighter);
+    keepWithHisMen(world, fighter);
     return;
   }
   if (fighter.state !== 'up' || fighter.clinch || fighter.pin || fighter.pickup || fighter.panicked || fighter.crawling) return;
@@ -840,6 +855,50 @@ function keepWithLeader(world, fighter) {
   fighter.strafe = Math.max(-1, Math.min(1, (fighter.strafe ?? 0) + Math.sign(across) * spec.strafe * pull * Math.min(1, Math.abs(across) / distance + 0.2)));
   // Out ahead of the standard, going further: he eases off.
   if (vec.dot(offset, forward) < 0 && fighter.move > 0) fighter.move *= 1 - spec.holdBack * pull;
+}
+
+/**
+ * A side's leader out of the ranks keeps with the body of his men (AI.general): after his own decision, if he is
+ * nearer the enemy than the middle of his men are (each to his nearest), and no enemy is on him, he goes no nearer:
+ * no step forward on foot, and on a horse he rides on across the way to them, not into it.
+ */
+function keepWithHisMen(world, fighter) {
+  const spec = AI.general;
+  const side = world.leaders?.[fighter.corner];
+  if (side?.leader !== fighter || fighter.state !== 'up' || fighter.panicked || fighter.wing?.held) return;
+  if (fighter.clinch || fighter.pin || fighter.pickup) return;
+  const where = (man) => (man.mount ? man.mount.at : [man.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2]]);
+  const foes = world.fighters.filter((other) => hostile(other, fighter) && other.state === 'up' && inFight(other) && !other.hidden);
+  const men = world.fighters.filter((other) => other !== fighter && other.corner === fighter.corner && other.state === 'up' && inFight(other) && !other.panicked && !other.hidden);
+  if (!foes.length || men.length < spec.minMen) return;
+  const nearestFoe = (man) => {
+    const at = where(man);
+    let best = { foe: null, distance: Infinity };
+    for (const foe of foes) {
+      const there = where(foe);
+      const distance = Math.hypot(there[0] - at[0], there[1] - at[1]);
+      if (distance < best.distance) best = { foe, distance };
+    }
+    return best;
+  };
+  const theirs = men.map((man) => nearestFoe(man).distance).sort((a, b) => a - b);
+  const line = theirs[Math.round(spec.body * (theirs.length - 1))];
+  const mine = nearestFoe(fighter);
+  const at = where(fighter);
+  const there = where(mine.foe);
+  const toward = [(there[0] - at[0]) / mine.distance, (there[1] - at[1]) / mine.distance];
+  // On a horse, where he will be: a horse going on at them is reckoned `foresee` s further on.
+  const going = fighter.mount?.velocity ? Math.max(0, fighter.mount.velocity[0] * toward[0] + fighter.mount.velocity[2] * toward[1]) : 0;
+  if (mine.distance - going * spec.foresee >= line - spec.slack) return;
+  // The enemy come to him: he fights where he stands.
+  if (mine.distance < reachOf(fighter) + reachOf(mine.foe) + spec.engaged) return;
+  if (fighter.mount) {
+    reinFrom(world, fighter, toward);
+    return;
+  }
+  // (His step is along the line to the man he faces: forward taken away; back and across are left to him.)
+  if (fighter.move > 0) fighter.move = 0;
+  fighter.running = false;
 }
 
 /** How far (m) a spot ([x, z]) lies beyond the ground a fighter keeps near his standard; 0 within it, or out of a group fight. */

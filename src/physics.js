@@ -1576,7 +1576,13 @@ function raiseStandards(fighters, random) {
     const colour = leader.body.inputs.standardColour ?? leader.body.inputs.outfit?.banner ?? (ownColours ? colours[corner] : undefined) ?? WORLD.standard.colours[corner];
     Object.assign(entry, { kind: standard?.weapon ?? null, colour });
     if (!standard) continue;
-    if (standard.worn) {
+    // A shooter leading men who mostly shoot (horse archers, a line of crossbows) fights as they do: his bow kept in his
+    // hands, the standard worn up his back (WORLD.standard.shooters). Given it to hold, he would have no way to fight
+    // but to ride or walk at them with its pole.
+    const team = fighters.filter((fighter) => fighter.corner === corner && fighter !== leader);
+    const shoots = (fighter) => Boolean(STYLES[fighter.style]?.ranged);
+    const shootersLed = shoots(leader) && team.filter(shoots).length > WORLD.standard.shooters * team.length;
+    if (standard.worn || shootersLed) {
       leader.wornStandard = { kind: standard.weapon, colour };
       continue;
     }

@@ -2741,6 +2741,33 @@ export function buildBanner(body, colorHex, great = false, look = null) {
     group.add(pole, device);
     return group;
   }
+  if (look === 'steppe') {
+    // The tug up the back of a horse archer who leads (his bow in his hands): no cloth, horse-tails hung in a ring
+    // under a brass disc and a trident at the top of its pole, standing well clear of his head as the carried one does.
+    const height = 1.9 * scale;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, height, 6), surface(0x3a2a1c));
+    pole.position.set(back, height / 2 - 0.25 * scale, 0);
+    group.add(pole);
+    const top = height - 0.25 * scale;
+    const brass = surface(0xc8a040, { roughness: 0.4 });
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * scale, 0.07 * scale, 0.015 * scale, 12), brass);
+    disc.position.set(back, top - 0.04 * scale, 0);
+    group.add(disc);
+    const hair = surface(0x1d1a17, { roughness: 1 });
+    const pale = surface(0xe8e2d4, { roughness: 1 });
+    for (let tail = 0; tail < 7; tail += 1) {
+      const angle = (tail / 7) * Math.PI * 2;
+      const plume = new THREE.Mesh(new THREE.ConeGeometry(0.035 * scale, 0.6 * scale, 5), tail % 2 ? pale : hair);
+      plume.position.set(back + Math.cos(angle) * 0.05 * scale, top - 0.36 * scale, Math.sin(angle) * 0.05 * scale);
+      group.add(plume);
+    }
+    for (const side of [-1, 0, 1]) {
+      const prong = new THREE.Mesh(new THREE.ConeGeometry(0.012 * scale, (side ? 0.12 : 0.18) * scale, 5), surface(0xb8bcc2, { roughness: 0.35 }));
+      prong.position.set(back, top + (side ? 0.06 : 0.09) * scale, side * 0.04 * scale);
+      group.add(prong);
+    }
+    return group;
+  }
   // A commander's great banner: twice as tall, and a field three times the size.
   const size = great ? { pole: 1.9, width: 0.34, height: 0.95 } : { pole: 1.0, width: 0.2, height: 0.4 };
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * scale, 0.01 * scale, size.pole * scale, 6), surface(0x3a2a1c));

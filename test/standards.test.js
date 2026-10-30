@@ -42,6 +42,31 @@ test('a samurai leader wears his great banner and keeps his weapon', () => {
   assert.ok(leader.weapon && !leader.weapon.spec.flag);
 });
 
+test('a horse archer leading horse archers keeps his bow and wears the tug; a leader of hand-to-hand men holds his standard', () => {
+  const mobei = scenarioWorld('mobei', 1);
+  const chanyu = mobei.fighters[mobei.standards.blue.leader];
+  assert.ok(chanyu.mount && chanyu.weapon?.spec.bow, 'the chanyu rides with his bow');
+  assert.equal(chanyu.wornStandard.kind, 'tug');
+  const catalaunian = scenarioWorld('catalaunian', 1);
+  assert.equal(catalaunian.fighters[catalaunian.standards.blue.leader].weapon.kind, 'banner');
+});
+
+test('the general of a side of horse archers does not ride out ahead of his men into the enemy', () => {
+  const world = scenarioWorld('mobei', 1);
+  const leader = world.fighters[world.standards.blue.leader];
+  const where = (man) => (man.mount ? man.mount.at : [man.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2]]);
+  const nearestFoe = (man) => Math.min(...world.fighters.filter((other) => other.corner !== man.corner && other.state === 'up').map((other) => Math.hypot(where(other)[0] - where(man)[0], where(other)[1] - where(man)[1])));
+  for (let t = 0; t < 12; t += 0.5) {
+    advance(world, 0.5, think);
+    if (leader.state !== 'up') break;
+    const men = world.fighters.filter((other) => other.corner === 'blue' && other !== leader && other.state === 'up').map(nearestFoe).sort((a, b) => a - b);
+    const middle = men[Math.round((men.length - 1) / 2)];
+    // No nearer the enemy than the middle of his men (with the slack, and a horse's few metres of going on before it answers).
+    assert.ok(nearestFoe(leader) > middle - 6, `at ${t + 0.5} s the chanyu is ${nearestFoe(leader).toFixed(1)} m from the enemy, his men's middle ${middle.toFixed(1)} m`);
+    assert.ok(nearestFoe(leader) > 3 || men[0] < 3, `at ${t + 0.5} s the chanyu reached the enemy before any of his men`);
+  }
+});
+
 test('a one-on-one has no standard', () => {
   assert.deepEqual(duel('knight', 'samurai').standards, {});
 });
