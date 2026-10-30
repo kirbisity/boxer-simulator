@@ -147,8 +147,13 @@ test("the player's adrenaline: up with blows landed and taken and with danger ne
 });
 
 // Each art against the plain blows of the same weapon (its style's own swings, or thrusts for a thrust), thrown at an
-// unresisting man from a few distances: the art's best contact beats every plain blow's best, by the measure its
-// family is about — the cut it opens, the blunt blow (impulse × its blunt share), the point's wound.
+// unresisting man from a few distances: the art's best contact beats every plain blow's best by at least ART_MARGIN, by the
+// measure its family is about — the cut it opens, the blunt blow (impulse × its blunt share), the point's wound — and it
+// lands: most of its strikes meet him with the weapon's head (not short, not the haft).
+// Two fall a little short of it, by the physics rather than the tuning: the guandao's plain diagonal cut already meets him
+// at about the polearm's top speed (~32 m/s, its head's ~34 in the art), so its wheel gains only by the mass turning behind
+// it; and a one-handed mace has one arm to swing it (its art's head ~23 m/s, a plain blow's ~18).
+const ART_MARGIN = 1.6;
 const FAMILIES = [
   { style: 'katana', art: 'artIai', measure: 'cut', distances: [1.2, 1.5, 1.8] },
   { style: 'odachi', art: 'artIai', measure: 'cut', distances: [1.5, 1.8, 2.1] },
@@ -156,31 +161,38 @@ const FAMILIES = [
   { style: 'wuxia', art: 'artDrawCut', measure: 'cut', distances: [1.2, 1.5, 1.8] },
   { style: 'dao', art: 'artDrawCut', measure: 'cut', distances: [1.2, 1.5, 1.8] },
   { style: 'naginata', art: 'artWheel', measure: 'cut', distances: [1.5, 2.1, 2.4] },
-  { style: 'guandao', art: 'artWheel', measure: 'cut', distances: [1.8, 2.1, 2.4] },
+  { style: 'guandao', art: 'artWheel', measure: 'cut', distances: [1.8, 2.1, 2.4], margin: 1.45 },
   { style: 'warhammer', art: 'artCrush', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
-  { style: 'kanabo', art: 'artCrush', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
-  { style: 'maceShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5] },
+  { style: 'kanabo', art: 'artCrushClub', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
+  { style: 'maceShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5], margin: 1.55 },
+  { style: 'langyaShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5] },
   { style: 'spear', art: 'artSpear', measure: 'pierce', distances: [2.3, 2.6, 2.9] },
 ];
 const measured = (hit, measure) => (measure === 'blunt' ? hit.impulse * hit.bluntMix : hit[measure] ?? 0);
+/** A move's best contact by `measure` over its zones and `distances`, and how many of its strikes met him with the head first. */
 function best(style, move, measure, distances) {
   let top = 0;
+  let headFirst = 0;
+  let tries = 0;
   for (const zone of MOVES[move].zones.filter((name) => name !== 'legs')) for (const distance of distances) {
     // The weapon's head is what an art is about: a haft met first (physics.js WORLD.haft) is not its blow.
     const { hit, events } = strikeAt(style, move, zone, distance);
+    tries += 1;
     if (!hit) continue;
+    if (!hit.haft) headFirst += 1;
     for (const event of events) if (event.attacker === hit.attacker && (event.kind === 'landed' || event.kind === 'blocked') && !event.haft) top = Math.max(top, measured(event, measure));
   }
-  return top;
+  return { top, headFirst, tries };
 }
 
-for (const { style, art, measure, distances } of FAMILIES) {
-  test(`weapon art ${art} with the ${STYLES[style].label}: harder than any of its plain blows (${measure})`, () => {
+for (const { style, art, measure, distances, margin = ART_MARGIN } of FAMILIES) {
+  test(`weapon art ${art} with the ${STYLES[style].label}: decisively harder than any of its plain blows (${measure}), and it lands`, () => {
     assert.equal(WEAPONS[STYLES[style].weapon].art, art);
     const mode = measure === 'pierce' ? 'thrust' : 'swing';
     const plain = Object.keys(STYLES[style].attacks).filter((move) => MOVES[move].path === 'blade' && MOVES[move].mode === mode);
-    const strongest = Math.max(...plain.map((move) => best(style, move, measure, distances)));
+    const strongest = Math.max(...plain.map((move) => best(style, move, measure, distances).top));
     const own = best(style, art, measure, distances);
-    assert.ok(own > strongest * 1.05, `${art} ${own.toFixed(1)} against the best plain blow's ${strongest.toFixed(1)}`);
+    assert.ok(own.top > strongest * margin, `${art} ${own.top.toFixed(1)} against the best plain blow's ${strongest.toFixed(1)}`);
+    assert.ok(own.headFirst >= own.tries * 0.75, `${art} met him with the head in ${own.headFirst} of ${own.tries}`);
   });
 }

@@ -475,7 +475,7 @@ export const MOVE_NAMES = {
   shoot: ['Shot'], fireLong: ['Shot'], fireRifle: ['Shot'], firePump: ['Shot'], fireVolley: ['Volley'], loose: ['Arrow loosed'],
   // The weapon arts (weaponarts.js), named as artdrama.js shows them.
   artIai: ['Iai', 'drawing cut'], artPommel: ['Knaufschlag', 'pommel strike'], artDrawCut: ['Drawing cut'], artWheel: ['Wheel cut'],
-  artCrush: ['Crushing blow'], artCrushOne: ['Crushing blow'], artSpear: ['Lunge'],
+  artCrush: ['Crushing blow'], artCrushClub: ['Crushing blow'], artCrushOne: ['Crushing blow'], artSpear: ['Lunge'],
 };
 
 /** A move's name, and a gloss if it has one: { name, gloss }. Unnamed: its key in words ("hammerOverhead" → "Hammer overhead"). */

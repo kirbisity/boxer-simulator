@@ -13,6 +13,7 @@ import { MOVES, STYLES } from './moves.js';
 import { POSE, vec } from './pose.js';
 import { bladeFor, hostile, point, stoopShift, throwPunch, WORLD } from './physics.js';
 import { stepTowards } from './finisher.js';
+import { contactShare } from './weapons.js';
 
 /** The places on a man a low blow goes to (world points), and the zone each is for the blow. */
 const PARTS = {
@@ -65,7 +66,7 @@ function strikeReachOf(fighter, spec) {
   const held = blade.spec;
   if (held.reach) return { from: 'shoulder', outer: arm + held.reach, inner: handIn + held.strikeFrom };
   if (spec.mode === 'thrust') return { from: 'shoulder', outer: arm + held.length - (spec.depth ?? 0.25), inner: handIn, start: spec.from.hand, length: held.length };
-  const contact = held.length * (spec.contactAt ?? 0.7);
+  const contact = held.length * contactShare(spec, held);
   return { from: 'shoulder', outer: arm + contact, inner: handIn + contact };
 }
 

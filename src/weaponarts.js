@@ -42,7 +42,7 @@ export const ARTS = {
   // made the moment he is free, so a press a beat early is not lost.
   askedFor: 0.4,
   // The art's name on its button.
-  labels: { artIai: 'Iai', artPommel: 'Pommel', artDrawCut: 'Draw cut', artWheel: 'Wheel', artCrush: 'Crush', artCrushOne: 'Crush', artSpear: 'Lunge' },
+  labels: { artIai: 'Iai', artPommel: 'Pommel', artDrawCut: 'Draw cut', artWheel: 'Wheel', artCrush: 'Crush', artCrushClub: 'Crush', artCrushOne: 'Crush', artSpear: 'Lunge' },
 };
 
 /** The art his weapon has (a move's name), or null: none for an empty hand, a gun, a bow, or from the saddle. */

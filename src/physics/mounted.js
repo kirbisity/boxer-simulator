@@ -16,7 +16,7 @@ import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
-import { BLADES, bleedRate, bleedToLose, harmMix, shieldContact } from '../weapons.js';
+import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
 import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
@@ -482,7 +482,7 @@ function uprightShoulder(fighter, reach) {
 function strokeDistance(fighter, spec, blade) {
   const L = fighter.body.lengths;
   const arm = WORLD.mount.reach.easy * (L.upperArm + L.forearmToFist);
-  return spec.mode === 'thrust' ? arm + blade.spec.length - (spec.depth ?? 0.25) : arm + blade.spec.length * (spec.contactAt ?? 0.7);
+  return spec.mode === 'thrust' ? arm + blade.spec.length - (spec.depth ?? 0.25) : arm + blade.spec.length * contactShare(spec, blade.spec);
 }
 
 /** How far over (rad) the blow in hand wants him: none without a blade blow going, or with a mark already within the stroke's distance. */
