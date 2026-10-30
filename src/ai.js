@@ -5,7 +5,7 @@
 import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volleyDue, walkToSlot, WINGS } from './formation.js';
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
-import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
+import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
@@ -119,6 +119,17 @@ export const AI = {
   // he is coming in when the gap closes faster than `closingSpeed` (m/s);
   // then a burst of `burstMin` + up to `burstRange` × burstiness attacks.
   range: { inside: 0.12, outside: 0.25, closingSpeed: 0.4, burstMin: 2, burstRange: 2 },
+  // A long weapon's room (moves.js pointRoomOf, as the player's: control.js CONTROL.spacing): his man inside where its
+  // striking part begins, he gives ground at `pace` of his footwork (blade.retreatSpeed's: at 1 a sword's surge, 1.8, ran him
+  // down) and strikes nothing with the weapon's head until the man is `room` m past that line again. A man he cannot shake off
+  // in `patience` s (a wall behind, a faster man pressing) is struck all the same, haft and all: it outlasts a sword's surge
+  // (blade.surgeSeconds); at 1 s he struck haft-first at the end of nearly every one. Not looked at for `forget` s (his man
+  // down, a spell elsewhere), the patience starts again. A blow begun with his man within `lungeFrom` m beyond the line is
+  // made planted (physics.js: no lunge's step, which carried the point past him). Spear v dao, 16 bouts: thrusts that touched
+  // with the haft alone 53 of 112 before, 10 of 67 after; pierce a thrust 5.1 J to 9.5. In the ranks he gives at most
+  // `rankGive` m behind his place (formation.js; files ~1.2 m apart: into the room of the rank behind, not through it), then
+  // stands and strikes from there.
+  pointRoom: { pace: 1.4, room: 0.15, patience: 2, forget: 0.25, lungeFrom: 0.5, rankGive: 0.5 },
   // Picking a weapon up: as far as he will go for one (m); it must be this
   // much nearer him than any of them (unless it is at his feet), and not
   // with a blow coming at him; he stoops for it this near (hips to weapon, m), and
@@ -1541,6 +1552,45 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
   return true;
 }
 
+/** How far (m) his man stands beyond where his long weapon begins to strike (moves.js pointRoomOf); null for a short one. */
+function pointGap(fighter, opponent) {
+  const line = pointRoomOf(fighter, opponent);
+  if (line === null) return null;
+  return Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) - line;
+}
+
+/**
+ * A long weapon's room (AI.pointRoom): his man nearer than where its striking part begins, he gives ground, and until the
+ * man is `room` past that line again (or `patience` has run out, or his place in the ranks lets him give no more) the
+ * weapon's head is not struck with. Returns whether he holds those blows.
+ */
+function makeRoom(world, fighter, opponent) {
+  const spec = AI.pointRoom;
+  const gap = opponent.state === 'up' && !fighter.clinch && !fighter.mount ? pointGap(fighter, opponent) : null;
+  // (Kept only while it is looked at each step: a spell away from him, the patience starts again.)
+  const kept = fighter.aiRoom && world.time - fighter.aiRoom.seen <= spec.forget ? fighter.aiRoom : null;
+  if (gap === null || gap >= (kept ? spec.room : 0)) {
+    fighter.aiRoom = null;
+    return false;
+  }
+  fighter.aiRoom = { since: kept?.since ?? world.time, seen: world.time };
+  const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
+  if (formation && -aheadOfSlot(fighter, formation) >= spec.rankGive) return false;
+  fighter.move = Math.min(fighter.move, -spec.pace);
+  fighter.running = false;
+  return world.time - fighter.aiRoom.since < spec.patience;
+}
+
+/** Whether a move strikes with the weapon's head: one a man inside the head meets only the haft of. */
+const strikesWithHead = (name) => MOVES[name]?.reach === 'weapon';
+
+/** A blow of the weapon's head just begun with his man within `lungeFrom` of where it starts to strike: made planted (AI.pointRoom). */
+function plantNearPoint(fighter, opponent) {
+  if (!fighter.punch || !strikesWithHead(fighter.punch.type)) return;
+  const gap = pointGap(fighter, opponent);
+  if (gap !== null && gap < AI.pointRoom.lungeFrom) fighter.punch.planted = true;
+}
+
 /**
  * The rest after an attack: in a burst, hardly any; between bursts the
  * style's rest, stretched so that a bursty fighter throws about as much
@@ -2503,6 +2553,11 @@ function decide(world, fighter, dt) {
   fighter.strafe = 0;
   fighter.running = false;
   fighter.aimAt = undefined;
+  // A machine has no morale whatever state it is in, down or dragging itself on a broken leg too (feelFear's rule).
+  if (fighter.body.gear.machine) {
+    fighter.fear = 0;
+    fighter.panicked = false;
+  }
   if (fighter.state !== 'up') {
     fighter.move = 0;
     return;
@@ -2691,6 +2746,8 @@ function decide(world, fighter, dt) {
   } else if (!fighter.defence || (fighter.defence.name !== 'stepBack' && fighter.defence.name !== 'sidestep')) {
     mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt });
   }
+  // His man inside his long weapon's head: room first, then the point (AI.pointRoom).
+  const cramped = makeRoom(world, fighter, opponent);
 
   // React to a strike once it can be seen coming: after a reaction time
   // that training shortens, and only if not busy throwing one.
@@ -2760,10 +2817,14 @@ function decide(world, fighter, dt) {
   }
   // The rest of a combination follows as soon as the last hand is back.
   if (fighter.aiCombo?.length) {
+    if (cramped && strikesWithHead(fighter.aiCombo[0])) return;
     const next = fighter.aiCombo.shift();
     fighter.aiComboStep += 1;
     if (!throwPunch(world, fighter, next, fighter.aiComboZone)) fighter.aiCombo = null;
-    else if (!fighter.aiCombo.length) fighter.cooldown = nextGap(world, fighter, style, plan, cadence);
+    else {
+      plantNearPoint(fighter, opponent);
+      if (!fighter.aiCombo.length) fighter.cooldown = nextGap(world, fighter, style, plan, cadence);
+    }
     return;
   }
   fighter.aiComboStep = 0;
@@ -2794,6 +2855,7 @@ function decide(world, fighter, dt) {
     const blade = spec.path === 'blade' ? bladeFor(fighter, spec) : fighter.weapon;
     const held = blade?.held ? blade.spec : null;
     if (spec.reach === 'weapon' && !held) continue;
+    if (cramped && strikesWithHead(name)) continue;
     const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius;
     // Close-range moves only when close; long ones only when there is room.
     if (distance <= reach && (spec.reach !== 'leg' || distance > fighter.body.reach * 0.9)) choices[name] = weight;
@@ -2823,6 +2885,7 @@ function decide(world, fighter, dt) {
   const spec = MOVES[move];
   const zone = spec.zones ? (random() < AI.bodyShotShare ? spec.zones.at(-1) : spec.zones[0]) : null;
   if (throwPunch(world, fighter, move, zone, { heavy })) {
+    plantNearPoint(fighter, opponent);
     fighter.aiCombo = combo;
     fighter.aiComboZone = zone;
     fighter.cooldown = combo ? 0 : nextGap(world, fighter, style, plan, cadence);

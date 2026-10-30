@@ -10,7 +10,7 @@ import { OUTFITS, outfitOf } from '../outfits.js';
 import { aimPoint, BLOCKING, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
-import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir, SUPPLY } from '../weapons.js';
+import { ARROW, BLADES, bleedToLose, bulletProof, bulletRegion, GUN, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
 import { gaitAt, harmHorse } from './mounted.js';
@@ -430,12 +430,8 @@ export function flyArrows(world, dt) {
 function arrowBleed(victim, hit, key, through, scale) {
   const spec = ARROW.wound;
   const deep = (hit.offAxis ?? 1) < spec.deep && through >= spec.deepFrom;
-  const toCollapse = (seconds) => {
-    // The rate that, easing as it clots, has lost what is left of his blood to collapse in `seconds` s.
-    const clot = BLADES.clotSeconds;
-    const left = Math.max(0, BLADES.collapseAt * BODY.toughness - (victim.bloodLost ?? 0));
-    return left / (clot * (1 - Math.exp(-seconds / clot)));
-  };
+  // The rate that, easing as it clots, has lost what is left of his blood to collapse in `seconds` s.
+  const toCollapse = (seconds) => bleedToLose(BLADES.collapseAt * BODY.toughness - (victim.bloodLost ?? 0), seconds);
   if (hit.throat) return deep || through >= spec.deepFrom ? { rate: toCollapse(spec.seconds.chest), what: 'the neck\'s vessels opened' } : { rate: spec.rate.head * through * scale, what: null };
   if (key === 'head') return { rate: spec.rate.head * through * scale, what: null };
   if (key === 'trunk') {
@@ -501,7 +497,6 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   victim.damageVersion += 1;
   const vessel = arrowBleed(victim, hit, key, energy * (1 - stopped), scale);
   victim.bleed = (victim.bleed ?? 0) + vessel.rate;
-  victim.bleedOutside = (victim.bleedOutside ?? 0) + vessel.rate;
   if (vessel.what) event.effects.push(vessel.what);
   Object.assign(event, { harm, region, pierce: harm * 60 });
   // Heard: the wound, as bad as its share of what kills.
@@ -756,7 +751,6 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
   victim.damageVersion += 1;
   victim.bleed = (victim.bleed ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * (1 - armour) * scale;
-  victim.bleedOutside = (victim.bleedOutside ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * (1 - armour) * scale;
   // Hard armour over the part takes the round on its surface: no wound to see.
   // A heavy ball mostly goes through: seen to strike the surface only where the armour held most of it.
   Object.assign(event, { harm, armour, region, plate: armour > 0 && OUTFITS[kind].plated && (!shot || armour >= GUN.platedHolds) ? kind : null });

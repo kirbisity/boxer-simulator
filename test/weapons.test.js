@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { gearTraits } from '../src/outfits.js';
 import { MOVES, STYLES, STYLE_KEYS } from '../src/moves.js';
-import { SEVER_PARTS, advance, boutWinner, capsules, collapseAt, createWorld, dropWeapon, perform, placeFighter, shieldDisc, throwPunch, WORLD } from '../src/physics.js';
+import { SEVER_PARTS, advance, bodyHarm, boutWinner, capsules, collapseAt, partHealth, createWorld, dropWeapon, perform, placeFighter, shieldDisc, throwPunch, WORLD } from '../src/physics.js';
 import { AI, thinkAll } from '../src/ai.js';
 import { BLADES, SHIELDS, WEAPONS, harmMix, shieldContact } from '../src/weapons.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
@@ -78,14 +78,23 @@ test('plate turns the same cut aside: the push lands, the edge does not', () => 
   assert.notEqual(world.fighters[1].state, 'out');
 });
 
-test('a thrust driven point-first into the chest is mortal within seconds, not on the spot; plate stops it', () => {
+test('a point through the heart takes the chest\'s health, not a bleed timer: a hard thrust kills by it, a lighter one leaves a little; plate stops it', () => {
   const bare = strikeAt('katana', 'tsuki', 'body', 1.5);
   assert.ok(bare.hit.along > 0.9, 'point first');
   assert.ok(bare.events.some((event) => (event.effects ?? []).includes('stabbed through the chest')));
-  assert.ok(!bare.events.some((event) => event.kind === 'killed'), 'not dead on the spot');
-  const stabbed = bare.world.fighters.find((fighter) => fighter.bleed > 0);
-  advance(bare.world, BLADES.heartSeconds + 1);
-  assert.equal(stabbed.state, 'out', 'down from the blood he lost within seconds');
+  assert.ok(bare.events.some((event) => event.kind === 'killed' && event.effects.includes('died of his injuries')), 'dead of the injury to his chest');
+  assert.ok(!bare.events.some((event) => event.kind === 'bledOut'));
+  // A knife only just past the mark: a tenth of his chest left, fighting on, bleeding out over most of a minute.
+  const knifed = strikeAt('knife', 'stab', 'body', 0.8);
+  const victim = knifed.world.fighters[1];
+  assert.ok(knifed.events.some((event) => (event.effects ?? []).includes('stabbed through the chest')));
+  assert.notEqual(victim.state, 'out', 'not dead on the spot');
+  assert.ok(partHealth(victim, 'trunk') < 0.2, `chest ${partHealth(victim, 'trunk')}`);
+  assert.ok(bodyHarm(victim) > 0.8, 'the health bar near empty');
+  advance(knifed.world, 20);
+  assert.notEqual(victim.state, 'out', 'not bled out in seconds');
+  advance(knifed.world, 40);
+  assert.equal(victim.state, 'out', 'the vessels bleed him out within a minute or so');
   const plated = strikeAt('katana', 'tsuki', 'body', 1.5, { outfit: 'knight' });
   assert.ok(plated.hit && plated.hit.pierce < 15);
   assert.ok(!plated.events.some((event) => event.kind === 'killed'));
@@ -215,15 +224,14 @@ test('a shield on arm straps is harder to tear away than one held in the fist', 
   assert.ok(lost('buckler') >= 1);
 });
 
-test('knife wounds bleed; enough of them and a man collapses', () => {
-  // Through lamellar: a wound, not a kill.
+test('a knife stab through lamellar hurts the trunk and opens nothing that bleeds; enough bleeding still collapses a man', () => {
+  // Through lamellar: the point gets a little way in — an injury, not a bleed.
   const { hit, world } = strikeAt('knife', 'stab', 'body', 1.2, { outfit: 'samurai' });
   assert.ok(hit.pierce > 0, 'the stab went in');
+  assert.equal(hit.bleeds, false);
   const victim = world.fighters[1];
-  assert.ok(victim.bleed > 0, 'and it bleeds');
-  const before = victim.bloodLost;
-  advance(world, 2);
-  assert.ok(victim.bloodLost > before, 'blood keeps going');
+  assert.ok(!(victim.bleed > 0), 'it does not bleed');
+  assert.ok(partHealth(victim, 'trunk') < 1 && bodyHarm(victim) > 0, 'but the trunk is hurt, and the health bar shows it');
   // Enough bleeding, and he goes down for good.
   victim.bleed = 0.05;
   advance(world, 20);
@@ -332,7 +340,8 @@ test('a fighter who loses his weapon fights mixed, and anyone can pick a loose w
 test('weapon holders keep their arms forward: elbows seldom fall behind the shoulder', async () => {
   const { armFolding } = await import('../tools/arms.js');
   for (const style of ['longsword', 'warhammer', 'naginata', 'spear']) {
-    const row = armFolding(style, 1, 25);
+    // (The spear over four bouts: in one, its share swings with how that bout goes, 25–34%.)
+    const row = armFolding(style, style === 'spear' ? 4 : 1, 25);
     // Before the arms were held forward: 24–65% (the spear worst).
     // (The spear's thrust draws the shaft right back to the hip before it drives: its elbow goes behind on purpose for that moment.)
     const most = style === 'spear' ? 0.3 : 0.25;

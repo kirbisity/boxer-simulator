@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
+import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
@@ -151,7 +151,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
     weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
-    bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined,
+    bleed: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined,
     loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, lowStrike: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
@@ -159,7 +159,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
     aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined, artEventCursor: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
-    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
+    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
     // What he has left to shoot (physics/ranged.js ammoLeft: arrows, or bolts and charges), and since when he has held a shot his own men foul (ai.js).
     arrows: undefined, rounds: undefined, holdingShot: undefined,
@@ -1819,6 +1819,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   fighter.punch = {
     type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target?.id ?? null, landed: false, peakSpeed: 0, limb: P[spec.limb],
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
+    // Made without the lunge's step (ai.js AI.pointRoom: his man already about the point).
+    planted: false,
     // A place in the world: the strike follows it as he turns to it.
     at: at ? aimed : null,
     // How far off his mark it went (a couched point carried in keeps it as it follows him).
@@ -3616,8 +3618,9 @@ function moveRoot(world, fighter, dt) {
   // A lunge: the legs drive the body in behind the point while it travels.
   const punch = fighter.punch;
   // (Not kneeling over a man: the stab is driven down from where he kneels. Nor at a man low before him: lowstrike.js stepped
-  // him to where the blow meets him, and bent him to it; a lunge on from there carries it past.)
-  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
+  // him to where the blow meets him, and bent him to it; a lunge on from there carries it past. Nor a thrust made `planted`, his
+  // man already about the point: a lunge would carry the point past him and put the haft on him, ai.js AI.pointRoom.)
+  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && !punch.planted && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   // A weapon art that steps back first (the spear's: physics/arts.js retreatDrive), through its wind-up.
   drive = retreatDrive(punch) ?? drive;
   // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.
@@ -4015,8 +4018,7 @@ function updateTimers(world, fighter, dt) {
     fighter.bleed *= Math.exp(-dt / BLADES.clotSeconds);
     if (fighter.state !== 'out' && fighter.bloodLost >= collapseAt()) {
       const event = { time: world.time, kind: 'bled', attacker: fighter.lastWoundedBy ?? fighter.id, effects: [] };
-      // Mostly from blows that broke nothing open: internal injuries.
-      knockOut(world, fighter, event, (fighter.bleedInside ?? 0) > (fighter.bleedOutside ?? 0) ? 'collapsed from internal injuries' : 'collapsed from blood loss', 'bledOut');
+      knockOut(world, fighter, event, 'collapsed from blood loss', 'bledOut');
     }
   }
   if (fighter.trauma && fighter.state !== 'out') sufferInjuries(world, fighter);
@@ -5074,7 +5076,6 @@ function groundImpact(world, fighter, index, speed) {
   if (!part) return;
   const bruise = (through * spec.body * scale * (1 - (protectionAt(gear, part).blunt ?? 0))) / bone;
   addDamage(fighter, part, bruise, false);
-  if (part === 'trunk') bleedInside(fighter, bruise);
   const joint = IMPACT_JOINT[name];
   if (joint && !fighter.broken.has(joint) && speed > spec.fractureSpeed * bone) {
     breakJoint(world, fighter, joint);
@@ -5116,7 +5117,6 @@ function landOnFeet(world, fighter, index, speed) {
   if (first && speed > spec.compressFrom) {
     const jar = ((speed - spec.compressFrom) * spec.compress * (1 - (protectionAt(gear, 'trunk').blunt ?? 0))) / bone;
     addDamage(fighter, 'trunk', jar, false);
-    bleedInside(fighter, jar);
     effects.push('spine jarred');
   }
   world.events.push({ time: world.time, kind: 'impact', fighter: fighter.id, target: 'legs', speed, effects, point: point(fighter.x, index) });
@@ -5972,8 +5972,7 @@ export function crashBetween(first, second, toward, closing, bounce = WORLD.cras
 /**
  * A crash's toll on one fighter's part `key`: the speed change the impulse gives
  * the part, through his armour, as a blow's (the head's brain strain and
- * knockout, the trunk's wind, ribs and trauma, a leg's giving), and a hard blow
- * to the trunk bleeds inside. `source` is the fighter who did it, if any (a
+ * knockout, the trunk's wind, ribs and trauma, a leg's giving). `source` is the fighter who did it, if any (a
  * horse's rider), `hard` how much worse the other's hard armour makes it.
  * Tissue takes a shove unharmed: the energy of the closing speed beyond
  * `crash.tolerance` is what hurts (the impulse is scaled by the root of it).
@@ -5994,7 +5993,6 @@ export function crashHarm(world, victim, key, { impulse: whole, mass, closing, e
   // (The head's speed change is the impulse over the mass behind it in this crash, not over its own: a head carried by a charging body is not whipped.)
   const turn = key === 'head' ? (WORLD.crash.rotation * body.headEffectiveMass) / mass : WORLD.crash.rotation;
   bluntConsequences(world, source, victim, { key }, event, { impulse, struckMass: mass, peakForce, harm, blocked: false, rotation: turn, side: 'r', push: true, braced });
-  if (key === 'trunk') bleedInside(victim, (impulse / mass) * harm);
   world.events.push(event);
   return event;
 }
@@ -6226,13 +6224,6 @@ function crashIntoShield(world, mover, bearer) {
   if (world.ear) soundHit(world, bearer, mover, 'shield', hit.point, { energy: crash.energy, impulse: crash.impulse, striker: 'body', covering: shieldCovering(bearer.shield), braced: bearer.defence?.name === 'shieldBlock' });
   crashHarm(world, mover, 'trunk', { impulse: crash.impulse, mass: crash.massFirst, closing: met, energy: crash.energy, point: hit.point, normal: away, source: bearer, braced: crashBraced(mover, 'trunk', away, met, bearer) });
   shieldHarm(world, bearer, { crash, closing: met, at: hit.point, normal: away, offCentre: vec.length(vec.sub(hit.point, disc.centre)) / disc.radius, source: mover });
-}
-
-/** A blunt blow to the trunk (m/s through armour and bone) bleeds inside, as a wound does outside. */
-function bleedInside(fighter, deltaV) {
-  const rate = deltaV * WORLD.impact.internalBleed;
-  fighter.bleed = (fighter.bleed ?? 0) + rate;
-  fighter.bleedInside = (fighter.bleedInside ?? 0) + rate;
 }
 
 /** Which of the struck fighter's particles take the blow, and in what share. */
@@ -6545,18 +6536,33 @@ function vital(defender, capsule, contactPoint) {
   return along > 0.45;
 }
 
+/**
+ * An edge or a point in the flesh, `joules` past the armour: it bleeds only if
+ * it went deep (BLADES.bleed, bleedRate). Returns the bleeding it opened (a
+ * share of his blood a second; 0 for most blows).
+ */
 export function wound(defender, kind, joules, key, attacker) {
-  const zone = key === 'head' ? 'head' : key === 'trunk' ? 'trunk' : 'limb';
-  const rate = joules * BLADES.bleedPerJoule[kind] * BLADES.bleedZone[zone];
+  const rate = bleedRate(kind, joules, key === 'head' ? 'head' : key === 'trunk' ? 'trunk' : 'limb');
+  if (rate <= 0) return 0;
   defender.bleed = (defender.bleed ?? 0) + rate;
-  defender.bleedOutside = (defender.bleedOutside ?? 0) + rate;
+  defender.lastWoundedBy = attacker.id;
+  return rate;
+}
+
+// The segments a great artery runs down by the bone: the femoral in the thigh, the brachial in the upper arm.
+const ARTERY_SEGMENTS = new Set(['Thigh', 'UpperArm']);
+
+/** A great vessel opened: he bleeds on top of what he does, to collapse in `seconds` s if nothing else drops him. */
+function openVessel(defender, seconds, attacker) {
+  defender.bleed = (defender.bleed ?? 0) + bleedToLose(collapseAt() - (defender.bloodLost ?? 0), seconds);
   defender.lastWoundedBy = attacker.id;
 }
 
 /**
  * Cut through at a joint: the part beyond comes away as a loose piece with
- * the blade's push in it, the stump bleeds hard, and the fight is over for
- * this man.
+ * the blade's push in it, the stump bleeds as an opened artery does
+ * (BLADES.bleed.artery), and the fight is over for this man (the head off,
+ * he is dead: battletally.js counts him so).
  */
 function sever(world, defender, where, event, bladeVelocity) {
   const part = SEVER_PARTS[where.joint];
@@ -6586,8 +6592,7 @@ function sever(world, defender, where, event, bladeVelocity) {
     q: [0, 0, 0, 1], spin, radius, axis, half: Math.max(radius, vec.length(vec.sub(far, base)) / 2), cut: vec.sub(base, centre), origin: centre, resting: false,
   };
   world.debris.push(debris);
-  defender.bleed = (defender.bleed ?? 0) + 0.06;
-  defender.bleedOutside = (defender.bleedOutside ?? 0) + 0.06;
+  openVessel(defender, BLADES.bleed.artery.seconds, world.fighters[event.attacker] ?? defender);
   event.severed = where.joint;
   world.events.push({ time: world.time, kind: 'severed', fighter: defender.id, attacker: event.attacker, joint: where.joint, side: where.side, debris: debris.id, point: base, effects: [part.label] });
   // (Heard: the worst cut there is, through the bone.)
@@ -6750,26 +6755,35 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   }
   if (intoGap) event.effects.push('into a gap in the armour');
   if (glance.share < WORLD.helmet.glancedBelow) event.effects.push('glanced off the helmet');
-  // An edge or a point opens a wound: it bleeds. On a limb it breaks the
-  // bone only as far as it reaches it (BLADES.bone: by its force, and by how
-  // squarely across the limb it came); short of that he bleeds, fast from a
-  // deep one, until he collapses, unless it takes the limb off.
+  // An edge or a point that gets through the armour injures the part it is in (addDamage: the part's health; the head's
+  // and the trunk's are his life). On a limb the flesh it cuts weakens it (BLADES.bone.flesh of it) and the bone, as far
+  // as it reaches it (BLADES.bone: by its force, and by how squarely across the limb it came), breaks it. Only a deep
+  // one bleeds (wound: BLADES.bleed), and slowly; one to the bone of the thigh or the upper arm opens the artery there.
   const limb = capsule.key !== 'head' && capsule.key !== 'trunk';
   const square = Math.max(0, 1 - vec.length(vec.sub(closest.onFirst, closest.onSecond)) / capsule.radius);
-  const toBone = (joules) => (limb ? boneShare(joules, square) : 1);
+  const flesh = BLADES.bone.flesh;
+  const toBone = (joules) => (limb ? flesh + (1 - flesh) * boneShare(joules, square) : 1);
   // An edge that cannot bite deep (`cleave`: obsidian flakes in a wooden groove) opens the flesh but takes less of the bone.
   const cleaving = cut * (wspec.cleave ?? 1);
+  let bleeds = 0;
   if (cut > 0.5) {
-    wound(defender, 'cut', cut, capsule.key, attacker);
+    bleeds += wound(defender, 'cut', cut, capsule.key, attacker);
     addDamage(defender, capsule.key, cut / 6, false, toBone(cleaving));
     event.effects.push(cut > 40 ? 'deep cut' : 'cut');
   }
   if (pierce > 0.5) {
-    wound(defender, 'pierce', pierce, capsule.key, attacker);
-    // A point's harm to the trunk and the head is its wound (it bleeds, and through the heart it drops him, above), not a crushing injury: it counts for less there.
+    bleeds += wound(defender, 'pierce', pierce, capsule.key, attacker);
     addDamage(defender, capsule.key, pierce * (limb ? 0.25 : BLADES.pierceTrauma), false, toBone(pierce));
     event.effects.push(pierce > 25 ? 'run through' : 'stabbed');
   }
+  const artery = BLADES.bleed.artery;
+  if (ARTERY_SEGMENTS.has(capsule.key.slice(1)) && Math.max(boneShare(cleaving, square), boneShare(pierce, square)) >= artery.reach) {
+    openVessel(defender, artery.seconds, attacker);
+    bleeds += 1;
+    event.effects.push(capsule.key.endsWith('Thigh') ? 'the femoral artery opened' : 'the brachial artery opened');
+  }
+  // (Whether this blow opened a wound that bleeds: most do not.)
+  event.bleeds = bleeds > 0;
   let through = false;
   if (defender.state !== 'out') {
     const joint = cut > 0 ? jointAt(defender, capsule, closest.t, contactPoint) : null;
@@ -6779,13 +6793,14 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     } else if (pierce > BLADES.lethalPierce * BODY.toughness && vital(defender, capsule, contactPoint)) {
       if (capsule.key === 'head') knockOut(world, defender, event, 'stabbed through the head', 'killed');
       else {
-        // Through the heart or the great vessels: not dead on the spot — he has
-        // seconds (BLADES.heartSeconds) before the blood he loses drops him.
-        const clot = BLADES.clotSeconds;
-        const left = Math.max(0, collapseAt() - (defender.bloodLost ?? 0));
-        defender.bleed = (defender.bleed ?? 0) + left / (clot * (1 - Math.exp(-BLADES.heartSeconds / clot)));
-        defender.bleedOutside = (defender.bleedOutside ?? 0) + left;
-        defender.lastWoundedBy = attacker.id;
+        // Through the heart or the great vessels: most of the chest's health gone at once (it kills, with what he has
+        // taken there already or the next blow), and the vessels bleed him to collapse in BLADES.vital.seconds.
+        defender.trauma ??= {};
+        defender.trauma.trunk = (defender.trauma.trunk ?? 0) + BLADES.vital.organ * WORLD.injury.trunkFatal;
+        defender.damage.trunk = 1;
+        defender.damageVersion += 1;
+        openVessel(defender, BLADES.vital.seconds, attacker);
+        event.bleeds = true;
         event.effects.push('stabbed through the chest');
       }
     }
@@ -7387,8 +7402,8 @@ export function addDamage(fighter, key, deltaV, blocked, toBone = 1) {
   const share = (deltaV * (blocked ? WORLD.blockedDamageShare : 1)) / capacity;
   fighter.damage[key] = Math.min(1, (fighter.damage[key] ?? 0) + share);
   fighter.damageVersion += 1;
-  // The injury itself, uncapped (in the part's capacities): what breaks a limb or kills.
-  // `toBone`: of a cut or a stab in a limb, the share that reaches the bone (the rest only bleeds).
+  // The injury itself, uncapped (in the part's capacities): the part's health (partHealth), what breaks a limb or kills.
+  // `toBone`: of a cut or a stab in a limb, the share that counts (the flesh's share, and all that reaches the bone).
   if (toBone <= 0) return;
   fighter.trauma ??= {};
   fighter.trauma[key] = (fighter.trauma[key] ?? 0) + share * toBone;
@@ -7444,9 +7459,35 @@ export function collapseAt() {
   return BLADES.collapseAt * BODY.toughness;
 }
 
-/** How hurt the body is, 0 (fresh) to 1 (spent): the worst of the brain's strain, the blood lost and gunshot wounds. */
+// The four limbs, each by its segments (a limb is as far gone as its worse one).
+const LIMBS = [['lUpperArm', 'lForearm'], ['rUpperArm', 'rForearm'], ['lThigh', 'lShank'], ['rThigh', 'rShank']];
+
+/** The injury (fighter.trauma) a part takes before it is gone: the head's and the trunk's kill him, a limb's breaks it. */
+function injuryMark(key) {
+  const spec = WORLD.injury;
+  return key === 'head' ? spec.headFatal : key === 'trunk' ? spec.trunkFatal : spec.limbBreak;
+}
+
+/** A body part's health, 1 (whole) to 0 (the head or trunk past what kills, a limb broken or off): its injury against its mark. */
+export function partHealth(fighter, key) {
+  if (fighter.severedCapsules?.has(key)) return 0;
+  for (const joint of fighter.broken ?? []) if (JOINT_SEGMENTS[joint]?.includes(key) && joint !== 'neck') return 0;
+  return Math.max(0, 1 - (fighter.trauma?.[key] ?? 0) / injuryMark(key));
+}
+
+/**
+ * How hurt the body is, 0 (fresh) to 1 (spent) — what the health bar shows: the
+ * injury to the head and the trunk above all (either at its mark, he is dead),
+ * the limbs a little each (WORLD.injury.limbWeight: he lives without one), the
+ * blood lost against what collapses him and gunshot wounds, each taking its
+ * share of what the others leave; or the brain's strain, if that is worse.
+ */
 export function bodyHarm(fighter) {
-  return Math.min(1, Math.max(fighter.concussion / concussionCapacity(fighter), (fighter.bloodLost ?? 0) / collapseAt(), fighter.gunshot ?? 0));
+  const vital = partHealth(fighter, 'head') * partHealth(fighter, 'trunk');
+  const limbs = WORLD.injury.limbWeight * LIMBS.reduce((sum, segments) => sum + 1 - Math.min(...segments.map((key) => partHealth(fighter, key))), 0);
+  const blood = Math.min(1, (fighter.bloodLost ?? 0) / collapseAt());
+  const injured = 1 - vital * (1 - Math.min(1, limbs)) * (1 - blood) * (1 - Math.min(1, fighter.gunshot ?? 0));
+  return Math.min(1, Math.max(fighter.concussion / concussionCapacity(fighter), injured));
 }
 
 /** Out on the spot: the bout is over, no count. */

@@ -3310,7 +3310,7 @@ const boxer = window.boxer = {
       // The boss's cutscene as it stands (null when none plays), and a skip.
       cutscene: () => cutsceneDirector.state,
       skipCutscene: () => cutsceneDirector.skip(),
-      hurt: (amount = 0.05) => { const me = world.fighters[0]; me.bleed = (me.bleed ?? 0) + amount; me.bleedOutside = (me.bleedOutside ?? 0) + amount; return me.bleed; },
+      hurt: (amount = 0.05) => { const me = world.fighters[0]; me.bleed = (me.bleed ?? 0) + amount; return me.bleed; },
     };
   },
   // `awareness()`: what each man is doing (idle, patrol, aggro, search, return, flee, cower, follow, stayed); `free(id)`: a prisoner (spawn id) becomes an ally who follows; `gather()`: the followers to the player's side; `overlay(on)`: a letter over each head.
