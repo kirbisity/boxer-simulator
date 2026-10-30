@@ -32,6 +32,8 @@ export const PLACE_SURFACE = {
   mobei: 'earth', catalaunian: 'grass', carrhae: 'earth',
   // Agincourt's ploughland (its mud is the works': surfaceUnder); Cerignola's vineyard earth.
   agincourt: 'mud', cerignola: 'earth',
+  // The Last Gate's trodden wet earth (its puddles are the works': surfaceUnder).
+  lastgate: 'mud',
 };
 
 // Water shallower than this (m) is a wet floor, not a wade.

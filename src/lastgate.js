@@ -26,13 +26,13 @@ import { createWorld, inFight, placeOnFloor, reviveFighter, seededRandom } from 
 
 export const LAST_GATE = {
   title: 'The Last Gate',
-  // The place drawn round it: Agincourt's grey ploughland after rain (render.js), closed in by woods (the works below).
-  place: 'agincourt',
+  // The place drawn round it (render.js `lastgate`, ground/painted.js): trodden wet earth, the gate's worn cobbles, puddles; closed in by woods (the works below).
+  place: 'lastgate',
   // The floor: the field before the gate from x = gate.x to +halfX, a courtyard behind it.
   arena: { halfX: 18, halfZ: 10.5 },
-  // A grey dawn mist (render.js applyWeather): clear to 2 m from the camera, gone by 24; the sky the fog's, the sun weak.
+  // A grey dawn mist (render.js applyWeather): clear to 3 m from the camera, gone by 26, cold blue-grey (`colour`); the sky the fog's, the sun weak through it.
   // Set against the spawn line: a rebel is woken some 28–32 m from a camera behind the gate, past the fog's far edge.
-  weather: { fog: [2, 24], sky: 0.85, pale: 0.7, sun: 0.55 },
+  weather: { fog: [3, 26], sky: 0.85, colour: 0x8e99a3, sun: 0.7 },
   // The gate: its line at x (the wall along z), open |z| < halfWidth (a gateway a cart goes through, ~5 m).
   // A rebel whose hips are `breachBehind` m inside the line is through: a breach.
   gate: { x: -12, halfWidth: 2.5, wallHeight: 3.2, towerHeight: 5.2, breachBehind: 1 },
@@ -74,6 +74,15 @@ export const LAST_GATE = {
   },
   // The first rebels are already coming out of the mist: this many, this far (m) in front of the gate.
   opening: { count: 2, x: 9 },
+  // Rain standing in the field's hollows, [x, z, half-length, half-width] (m): shallow puddles (soft ground with water over it: physics/fieldworks.js),
+  // drawn as Dunnottar's water is (levelmode/kitwater.js 'puddle', rung by feet and splashed), heard as a splash, reddened by the blood that falls in.
+  // A few in the gateway's mouth, where the fighting is; more out across the field.
+  puddles: [
+    [-8.6, 0.7, 1.6, 0.9], [-9.8, -4.6, 1.3, 0.75], [-9.4, 5.6, 1.2, 0.7], [-6.0, -2.6, 1.1, 0.7], [-4.2, 2.2, 1.8, 1.0], [-1.6, -0.9, 1.3, 0.8],
+    [-3.2, -6.6, 1.6, 0.9], [1.2, 3.8, 1.5, 0.9], [2.8, -4.3, 2.0, 1.1], [5.4, 0.5, 1.4, 0.8], [4.4, 7.1, 1.8, 0.9], [8.2, -1.9, 1.7, 1.0], [10.6, 4.6, 2.2, 1.2],
+  ],
+  // A puddle's ground: a few cm of rain over a firm bed (sinkage `depth`, firm `firm`, m), water's viscosity, wet clay's grip (`footing`, of a dry foot's).
+  puddleGround: { depth: 0.02, firm: 0.05, viscosity: 1, footing: 0.8, water: 0.035 },
   // A rebel has nothing left to lose: his kit's courage (outfits.js gearTraits `outfit.courage`; 1 is a machine's: no fear at all).
   desperate: 1,
 };
@@ -189,6 +198,8 @@ export function lastGateArena() {
         { points: [[gate.x, -halfZ - 0.5], [gate.x, halfZ + 0.5]], height: gate.wallHeight, kind: 'stone', gaps: [[halfZ + 0.5 - gate.halfWidth, halfZ + 0.5 + gate.halfWidth]] },
         ...[1, -1].map((sign) => ({ points: [[gate.x + 0.5, sign * (halfZ - 0.3)], [halfX + 6, sign * (halfZ - 0.3)]], height: 6, kind: 'wood' })),
       ],
+      // The puddles: soft ground under rain water, ellipses (`bare`: the painted ground draws the earth round them; only the water is drawn here).
+      soft: LAST_GATE.puddles.map(([x, z, rx, rz]) => ({ ...LAST_GATE.puddleGround, x: [x - rx, x + rx], z: [z - rz, z + rz], shape: 'ellipse', murk: 'puddle', bare: true, surface: 'mud', edge: Math.min(rx, rz) * 0.5 })),
       // Drawn only (worksview.js): the gatehouse's towers either side of the gateway, its arch and its doors standing open.
       gatehouse: { x: gate.x, halfWidth: gate.halfWidth, height: gate.towerHeight, wall: gate.wallHeight },
     },

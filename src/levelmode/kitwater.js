@@ -9,6 +9,7 @@
 // And the splashes: a pool of drops (one instanced mesh for the whole stage) thrown up by a running foot or a body dropping in, falling back under gravity.
 
 import { P } from '../body.js';
+import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
 import { ageRipples, addRipple, newRipples, rippleRing, stageWaters, WATER, waterSources } from './water.js';
 
 /** How each kind of water looks. */
@@ -19,7 +20,11 @@ export const KWT_LOOKS = {
   sludge: { colour: 0x24260e, roughness: 0.3, metalness: 0.0, reflect: 0.75, opacity: 1, scum: 0.75, scumColour: 0x4b4a24, wave: 0.35 },
   // The water standing on a ploughed field after a night's rain: thin brown clay-water over the furrows (they show through it), a grey sky in it, silt churned up
   // in patches where it lies pale and rough. (Drawn as a film a few cm deep: what is under it, the field's painted mud, is seen through.)
-  mud: { colour: 0x4a3a28, roughness: 0.3, metalness: 0.0, reflect: 0.45, opacity: 0.5, scum: 0.45, scumColour: 0x6a5a40, wave: 0.55 },
+  mud: { colour: 0x4a3a28, roughness: 0.3, metalness: 0.0, reflect: 0.45, opacity: 0.5, scum: 0.45, scumColour: 0x6a5a40, wave: 0.55, blood: true },
+  // Rain standing in the hollows of a trodden field (The Last Gate): clear water a few cm deep over dark mud, a mirror of the grey sky at a grazing look,
+  // a little silt in it. Blood that falls in clouds it red (`blood`: blooddye.js, as the realistic grounds' puddles do).
+  // Its rim (`edge`: from that share of the way out it thins to nothing, ragged by a noise) soaks into the mud rather than ending in a line.
+  puddle: { colour: 0x1a1814, roughness: 0.05, metalness: 0.0, reflect: 0.85, opacity: 0.72, scum: 0.1, scumColour: 0x4a4234, wave: 0.35, blood: true, edge: 0.55 },
 };
 
 const KWT_MAX = WATER.ripples;
@@ -78,11 +83,14 @@ function kwtMaterial(look, uniforms, max = KWT_MAX) {
   const own = { uKwScum: { value: look.scum }, uKwScumColour: { value: new THREE.Color(look.scumColour) }, uKwWave: { value: look.wave } };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, own);
+    // Blood in it (a battle's standing water): the shared clouds of blooddye.js, the water tinted where they lie.
+    if (look.blood) bloodDyeShader(shader);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vKwAt;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKwAt = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKwAt = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvKwLocal = position.xy;')
+      .replace('#include <common>', '#include <common>\nvarying vec2 vKwLocal;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${kwtGlsl(max)}`)
+      .replace('#include <common>', `#include <common>\n${kwtGlsl(max)}${look.blood ? BLOOD_DYE_GLSL : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   float kwScum = uKwScum * smoothstep(0.52, 0.78, kwNoise(vKwAt.xz * 0.55 + vec2(uKwTime * 0.021, uKwTime * 0.013)) * 0.65 + kwNoise(vKwAt.xz * 2.7 - uKwTime * 0.01) * 0.35);
   diffuseColor.rgb = mix(diffuseColor.rgb, uKwScumColour, kwScum);
@@ -94,8 +102,24 @@ function kwtMaterial(look, uniforms, max = KWT_MAX) {
   roughnessFactor = mix(roughnessFactor, 0.9, kwScum);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   normal = normalize((viewMatrix * vec4(normalize(vec3(-kwG.x, 1.0, -kwG.y)), 0.0)).xyz);`);
+    if (look.edge) {
+      // (The mesh is a disc of radius 0.5 scaled to the puddle: twice its local radius is the share of the way to the rim.)
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vKwLocal;')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+  float kwRim = length(vKwLocal) * 2.0 + (kwNoise(vKwAt.xz * 1.7) - 0.5) * 0.35;
+  diffuseColor.a *= 1.0 - smoothstep(${look.edge.toFixed(2)}, 1.0, kwRim);`);
+    }
+    if (look.blood) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+  float kwBlood = bloodDyeAt(vKwAt.xz);
+  diffuseColor.rgb = mix(diffuseColor.rgb, bloodDyeColour, kwBlood);
+  diffuseColor.a = mix(diffuseColor.a, 1.0, kwBlood * 0.6);`)
+        .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb *= mix(vec3(1.0), bloodDyeFilter, kwBlood);\n#include <tonemapping_fragment>');
+    }
   };
-  material.customProgramCacheKey = () => `kitwater-${look.scum > 0 ? 'sludge' : 'clear'}-${max}`;
+  material.customProgramCacheKey = () => `kitwater-${look.scum > 0 ? 'sludge' : 'clear'}-${max}${look.blood ? '-blood' : ''}${look.edge ? `-edge${look.edge}` : ''}`;
   return material;
 }
 

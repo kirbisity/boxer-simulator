@@ -57,7 +57,8 @@ export function worksWaters(works, over = 0.008) {
   return (works?.soft ?? [])
     .filter((area) => area.surface === 'mud' && area.water > 0)
     .map((area, index) => ({
-      kind: 'water', id: `field-${index}`, shape: 'rect', murk: 'mud', viscosity: area.viscosity,
+      // (A puddle's own shape and look: `shape` 'ellipse', `murk` a KWT_LOOKS key, e.g. 'puddle'.)
+      kind: 'water', id: `field-${index}`, shape: area.shape ?? 'rect', murk: area.murk ?? 'mud', viscosity: area.viscosity,
       at: [(area.x[0] + area.x[1]) / 2, over + area.water, (area.z[0] + area.z[1]) / 2], size: [area.x[1] - area.x[0], area.z[1] - area.z[0]], bed: -area.firm,
     }));
 }

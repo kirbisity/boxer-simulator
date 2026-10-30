@@ -125,7 +125,7 @@ export function setPlace(view, place, arena, weather = null) {
   const swapped = swapFloor(view, place, floor ?? dug);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), agincourt: buildAgincourt, cerignola: buildCerignola, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -361,6 +361,8 @@ const PLACE_LIGHT = {
   cajamarca: { background: 0xd8d0bc, fog: [60, 190], far: 200, key: 0xffe2b8, keyIntensity: 0.12, rim: 0xffd6a0, sun: 0.95 },
   // Agincourt: a low grey October sky after rain, the light flat, the woods dark.
   agincourt: { background: 0x9aa0a2, fog: [25, 100], key: 0xe8ecf0, keyIntensity: 0.2, rim: 0xb8c4d0, sun: 0.5, hemi: 0.78 },
+  // The Last Gate: a cold grey dawn after rain, the sun a pale disc low in the mist behind the horde, the light flat and blue, the shadows soft.
+  lastgate: { background: 0x8e979e, fog: [6, 60], key: 0xc8d4e2, keyIntensity: 0.22, rim: 0xa6b8cc, sun: 0.6, hemi: 0.7 },
   // Cerignola at dusk: the sun low and warm across the slope, a golden haze.
   cerignola: { background: 0xe6c8a0, fog: [30, 120], key: 0xffd8a8, keyIntensity: 0.15, rim: 0xffc890, sun: 0.85, hemi: 0.55 },
   // Night on the quay: moonlight from above, faint; the lamps do the rest.
@@ -393,6 +395,8 @@ export const PLACE_ARENAS = {
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
   agincourt: { halfX: 50, halfZ: 11.5 },
   cerignola: { halfX: 32, halfZ: 11 },
+  // The Last Gate's field before the castle's gate (lastgate.js LAST_GATE.arena: the same numbers).
+  lastgate: { halfX: 18, halfZ: 10.5 },
   // The horse-archer battles' plains: the field's room for horsemen to ride round, shoot and wheel (a battle's floor is wider still: scenarios.js).
   mobei: { halfX: 30, halfZ: 20 },
   catalaunian: { halfX: 30, halfZ: 20 },
@@ -1121,6 +1125,48 @@ function buildAgincourt(arena = PLACE_ARENAS.agincourt) {
   place.add(tower, spire);
   // Tufts of stubble and a few stones beyond the plough.
   place.add(...fieldLitter(83, arena, { grass: 0x6a6a3a, stone: 0x7a766c, tufts: 500, stones: 80, half: [55, 45] }));
+  return place;
+}
+
+/**
+ * The Last Gate's field: trodden wet earth before a castle's gate, rain standing in its hollows (the arena's works: lastgate.js),
+ * the woods close on either hand, low bare ridges far off in the mist, a cold grey sky. The ground's own texture is the classic
+ * look's; the realistic looks draw it over (ground/painted.js `lastgate`: wet earth, worn cobbles by the gate, the puddles' dark rims).
+ */
+function buildLastGateField(arena = PLACE_ARENAS.lastgate) {
+  const place = new THREE.Group();
+  const lit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...options });
+  place.add(greySky());
+  const earth = paintedTexture(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#463a2e';
+    g.fillRect(0, 0, w, h);
+    // Trodden earth: dark wet patches, clods, foot-churned streaks.
+    for (let index = 0; index < 220; index += 1) {
+      g.fillStyle = `rgba(${22 + Math.random() * 20},${20 + Math.random() * 16},${16 + Math.random() * 12},${0.2 + Math.random() * 0.25})`;
+      g.beginPath();
+      g.ellipse(Math.random() * w, Math.random() * h, 8 + Math.random() * 40, 5 + Math.random() * 24, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (let index = 0; index < 12000; index += 1) {
+      const shade = Math.random();
+      g.fillStyle = `rgba(${60 + shade * 44},${52 + shade * 36},${40 + shade * 26},${0.2 + Math.random() * 0.3})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1 + Math.random() * 3);
+    }
+  }, [12, 12]);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 120), lit(0xffffff, { map: earth, roughness: 0.8 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  ground.userData.scenery = 'ground';
+  place.add(ground);
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (index / 12) * Math.PI * 2;
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(14 + Math.random() * 8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x4e544a));
+    hill.scale.y = 0.18 + Math.random() * 0.12;
+    hill.position.set(Math.cos(angle) * 55, -0.5, Math.sin(angle) * 50);
+    hill.userData.scenery = 'hills';
+    place.add(hill);
+  }
+  place.add(...fieldLitter(97, arena, { grass: 0x5a5a36, stone: 0x6e6a62, tufts: 300, stones: 120, half: [45, 38] }));
   return place;
 }
 

@@ -8,7 +8,7 @@
 // leaves that strip open (render.js buildCerignola).
 
 /* global THREE */
-import { reliefAt, worksOf } from './physics/fieldworks.js';
+import { reliefAt, softAt, worksOf } from './physics/fieldworks.js';
 import { kwtCreate } from './levelmode/kitwater.js';
 import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 
@@ -38,7 +38,8 @@ export const WORKS_VIEW = {
   // stacked in heaps behind the bank, one every `every` m along it ([width, depth, thickness] of a slab, m).
   // A stone curtain wall (`kind` 'stone': The Last Gate's): `thick` m through, merlons `merlon` [wide, high] every `every` m along its top;
   // the courses painted on it (`course` m high, blocks `block` m long), its stone `colour` and mortar, and damp darkening its foot.
-  stone: { thick: 0.7, merlon: [0.6, 0.65], every: 1.15, course: 0.42, block: [0.7, 1.2], colour: [118, 112, 100], mortar: [78, 74, 66], damp: 0.35, metres: 3.2 },
+  // Weathered and wet: a grey-brown stone darkened by the rain, `streaks` of it run down the face, `moss` in the joints low down; its sheen (`rough`).
+  stone: { thick: 0.7, merlon: [0.6, 0.65], every: 1.15, course: 0.42, block: [0.7, 1.2], colour: [84, 82, 76], mortar: [44, 43, 40], damp: 0.45, metres: 3.2, streaks: 70, moss: 0.5, rough: 0.78 },
   // A gatehouse over a gateway (works `gatehouse`): a tower either side `tower` m square, the arch's beam over the way, the
   // doors of oak standing open inside it (`door`: thickness, share of the gateway's height).
   gatehouse: { tower: 2.8, back: 2.4, arch: 1.1, door: [0.12, 0.95], oak: 0x4a3626, iron: 0x2a2a2c },
@@ -79,7 +80,10 @@ export function showWorks(view, arena) {
   const group = new THREE.Group();
   group.name = 'fieldworks';
   const random = worksRandom(works.stakes.length * 7919 + works.walls.length * 104729 + Math.round(arena.halfX * 31));
-  for (const area of works.soft) group.add(worksSoftGround(area, random));
+  // (A soft place drawn by the ground under it, `bare`: a puddle on the painted ground; only its water is drawn.)
+  for (const area of works.soft) if (!area.bare) group.add(worksSoftGround(area, random));
+  // Blood falling into its standing water clouds it (blooddye.js); the cloud spreads at most across the water.
+  group.userData.bloodDyeWater = [worksBloodWater(works)];
   const water = worksStandingWater(view, works, group);
   for (const ditch of works.ditches) group.add(ditch.bends ? worksRoughDitch(works, ditch, random) : worksDitchStrip(works, ditch));
   const stakes = worksStakeMeshes(works.stakes);
@@ -248,6 +252,17 @@ function worksPalisade(wall) {
   return group;
 }
 
+/** Where the works' standing water is, for the blood: (x, z) → { wet, reach } in a soft place with water over it, else null. */
+function worksBloodWater(works) {
+  const wet = works.soft.filter((area) => area.water > 0);
+  return (x, z) => {
+    if (!wet.length) return null;
+    const soft = softAt({ soft: wet }, x, z);
+    if (!soft) return null;
+    return { wet: soft.share, reach: Math.min(3, 0.5 * Math.min(soft.area.x[1] - soft.area.x[0], soft.area.z[1] - soft.area.z[0])) };
+  };
+}
+
 // ---- Stone: a curtain wall and a gatehouse (The Last Gate) ----
 
 let stoneCanvas = null;
@@ -282,6 +297,22 @@ function stoneFace() {
       x += long;
     }
   }
+  // Rain run down the face from the joints: dark streaks.
+  for (let streak = 0; streak < spec.streaks; streak += 1) {
+    const x = random() * size;
+    const top = random() * size * 0.6;
+    const run = g.createLinearGradient(0, top, 0, top + size * (0.2 + random() * 0.5));
+    run.addColorStop(0, `rgba(24,24,22,${0.18 + random() * 0.2})`);
+    run.addColorStop(1, 'rgba(24,24,22,0)');
+    g.fillStyle = run;
+    g.fillRect(x, top, 1.5 + random() * 3, size);
+  }
+  // Moss in the joints of the lower courses.
+  for (let tuft = 0; tuft < 260; tuft += 1) {
+    const y = size * (1 - spec.moss * Math.pow(random(), 1.6));
+    g.fillStyle = `rgba(${48 + random() * 20},${62 + random() * 22},${30 + random() * 14},${0.25 + random() * 0.35})`;
+    g.fillRect(random() * size, y, 2 + random() * 7, 1 + random() * 3);
+  }
   // Damp rising from the foot of the wall (the bottom of the canvas is the wall's foot).
   const damp = g.createLinearGradient(0, size, 0, size * (1 - spec.damp));
   damp.addColorStop(0, 'rgba(36,40,30,0.55)');
@@ -292,6 +323,40 @@ function stoneFace() {
   return canvas;
 }
 
+let stoneBumps = null;
+
+/** The face's relief as a normal map: the painted shade as height (the mortar sunk, each block's face uneven), by its slope. */
+function stoneNormal() {
+  if (stoneBumps) return stoneBumps;
+  const face = stoneFace();
+  const size = face.width;
+  const pixels = face.getContext('2d').getImageData(0, 0, size, size).data;
+  const height = (x, y) => {
+    const at = (((y + size) % size) * size + ((x + size) % size)) * 4;
+    return (pixels[at] + pixels[at + 1] + pixels[at + 2]) / 765;
+  };
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext('2d');
+  const out = g.createImageData(size, size);
+  const strength = 3;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const dx = (height(x + 1, y) - height(x - 1, y)) * strength;
+      const dy = (height(x, y + 1) - height(x, y - 1)) * strength;
+      const length = Math.hypot(dx, dy, 1);
+      const at = (y * size + x) * 4;
+      out.data[at] = Math.round((0.5 - dx / length / 2) * 255);
+      out.data[at + 1] = Math.round((0.5 + dy / length / 2) * 255);
+      out.data[at + 2] = Math.round((0.5 + 0.5 / length) * 255);
+      out.data[at + 3] = 255;
+    }
+  }
+  g.putImageData(out, 0, 0);
+  stoneBumps = canvas;
+  return canvas;
+}
+
 /** The stone's material for a face `wide` × `high` m (the painted courses kept to their size in metres). */
 function stoneLit(wide, high) {
   const metres = WORKS_VIEW.stone.metres;
@@ -299,7 +364,46 @@ function stoneLit(wide, high) {
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
   map.repeat.set(Math.max(0.25, wide / metres), Math.max(0.25, high / metres));
   if ('colorSpace' in map) map.colorSpace = THREE.SRGBColorSpace;
-  return worksLit(0xffffff, { map, roughness: 0.96 });
+  const normalMap = new THREE.CanvasTexture(stoneNormal());
+  normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+  normalMap.repeat.copy(map.repeat);
+  return worksLit(0xffffff, { map, normalMap, normalScale: new THREE.Vector2(1.2, 1.2), roughness: WORKS_VIEW.stone.rough });
+}
+
+let oakCanvas = null;
+
+/** Old oak boards for the gate's doors: vertical planks, the grain, dark seams, rain-greyed. */
+function worksOak(wide, high) {
+  if (!oakCanvas) {
+    const size = 256;
+    oakCanvas = document.createElement('canvas');
+    oakCanvas.width = oakCanvas.height = size;
+    const g = oakCanvas.getContext('2d');
+    const random = worksRandom(9133);
+    const planks = 6;
+    for (let plank = 0; plank < planks; plank += 1) {
+      const x = (plank / planks) * size;
+      const shade = 0.8 + random() * 0.3;
+      g.fillStyle = `rgb(${Math.round(74 * shade)},${Math.round(56 * shade)},${Math.round(40 * shade)})`;
+      g.fillRect(x, 0, size / planks, size);
+      for (let line = 0; line < 30; line += 1) {
+        g.fillStyle = `rgba(30,22,16,${0.08 + random() * 0.18})`;
+        g.fillRect(x + random() * (size / planks), 0, 1, size);
+      }
+      g.fillStyle = 'rgba(16,12,10,0.8)';
+      g.fillRect(x, 0, 2, size);
+    }
+    const grey = g.createLinearGradient(0, 0, 0, size);
+    grey.addColorStop(0, 'rgba(120,124,124,0.18)');
+    grey.addColorStop(1, 'rgba(30,30,26,0.25)');
+    g.fillStyle = grey;
+    g.fillRect(0, 0, size, size);
+  }
+  const map = new THREE.CanvasTexture(oakCanvas);
+  if ('colorSpace' in map) map.colorSpace = THREE.SRGBColorSpace;
+  void wide;
+  void high;
+  return worksLit(0xffffff, { map, roughness: 0.8 });
 }
 
 /** A block of stone from (x0, z0) to (x1, z1) on the floor, `high` m tall, standing on `base` m. */
@@ -367,7 +471,7 @@ function worksGatehouse(gate) {
     // The door leaf, swung back against the tower's inner face; its iron straps.
     const [thick, share] = spec.door;
     const high = (gate.wall + 0.2) * share;
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(gate.halfWidth * 0.95, high, thick), worksLit(spec.oak, { roughness: 0.85 }));
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(gate.halfWidth * 0.95, high, thick), worksOak(gate.halfWidth * 0.95, high));
     leaf.position.set(gate.x - WORKS_VIEW.stone.thick / 2 - (gate.halfWidth * 0.95) / 2, high / 2, inner - sign * (thick / 2 + 0.02));
     leaf.castShadow = true;
     group.add(leaf);

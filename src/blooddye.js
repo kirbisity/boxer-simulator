@@ -53,6 +53,11 @@ export function bloodDyeShader(shader) {
 /** The visible water of the place on show at (x, z): the wettest, with its reach. */
 export function bloodDyeWaterAt(view, x, z) {
   let best = { wet: 0, reach: 0 };
+  // A battle's works (worksview.js: the water standing on its soft ground, a field's puddles) count wherever they are shown.
+  for (const water of view.works?.group?.userData?.bloodDyeWater ?? []) {
+    const found = water(x, z);
+    if (found && found.wet > best.wet) best = found;
+  }
   const place = view.places?.[view.place];
   if (!place || place.visible === false) return best;
   for (const child of place.children ?? []) {

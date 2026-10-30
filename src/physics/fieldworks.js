@@ -178,7 +178,7 @@ const compiledWorks = new WeakMap();
  *   heights × `deep` and its offsets × `wide` (each 1 if left out), eased from one point to the next (a ditch dug
  *   shallower throws up a lower bank: the spoil is what came out of it); `apron` (m): the ground either side of
  *   the profile that its digging laid bare (a paved square's slabs lifted to dig it; the place leaves it unpaved).
- * - `soft`: { x: [x0, x1], z: [z0, z1], depth (m, the reference man's sinkage), firm (m, the layer under it),
+ * - `soft`: { x: [x0, x1], z: [z0, z1] (its box; `shape` 'ellipse': the ellipse in it, a puddle), depth (m, the reference man's sinkage), firm (m, the layer under it),
  *   viscosity (as water's: 1 water, ~2 the cesspool's sludge), footing (share of his grip left), surface ('mud' |
  *   'water': the ear's), water (m of standing water over it), edge (m it deepens over from its sides) }.
  */
@@ -337,11 +337,20 @@ export function reliefAt(works, x, z) {
   return height;
 }
 
+/** How far (m) a point is inside a soft place drawn as the ellipse in its box (negative: outside). */
+function softEllipseInside(area, x, z) {
+  const hx = (area.x[1] - area.x[0]) / 2;
+  const hz = (area.z[1] - area.z[0]) / 2;
+  const reach = Math.hypot((x - (area.x[0] + hx)) / hx, (z - (area.z[0] + hz)) / hz);
+  return (1 - reach) * Math.min(hx, hz);
+}
+
 /** The soft place at (x, z) and how far into it (1 well inside, less within its `edge`), or null. */
 export function softAt(works, x, z) {
   if (!works?.soft.length) return null;
   for (const area of works.soft) {
-    const inside = Math.min(x - area.x[0], area.x[1] - x, z - area.z[0], area.z[1] - z);
+    // (A puddle, `shape` 'ellipse': the ellipse in its box, `inside` how far in from its rim along the shorter half-axis.)
+    const inside = area.shape === 'ellipse' ? softEllipseInside(area, x, z) : Math.min(x - area.x[0], area.x[1] - x, z - area.z[0], area.z[1] - z);
     if (inside <= 0) continue;
     return { area, share: Math.min(1, inside / (area.edge ?? FIELDWORKS.mud.edge)) };
   }

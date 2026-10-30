@@ -70,6 +70,13 @@ export const PLACE_SCENERY = {
     mountains: [],
     trees: { kind: 'none', count: 0, from: 0, to: 0, colour: 0x6a8a6a, bark: 0x4a3626 },
   },
+  // The Last Gate: low bare ridges and leafless woods about the field before the gate, lost in the dawn mist.
+  lastgate: {
+    keepOut: [20, 13], groundColour: 0x4a3e30,
+    hills: { from: 34, to: 70, height: [1.5, 4], colour: 0x4e5648, character: 'rolling' },
+    mountains: [],
+    trees: { kind: 'broadleaf', count: 46, from: 16, to: 44, colour: 0x3a4430, bark: 0x3a3026 },
+  },
   // Sekigahara: a valley ringed by forested mountains, pines about the field.
   sengoku: {
     keepOut: [13, 9], groundColour: 0x7d8a4a,
@@ -211,6 +218,7 @@ export const PLACE_GROUND = {
   coastVillage: { kind: 'beach', about: 'a beach before a fishing village: sand, wet sand, nets, seaweed' },
   subway: { kind: 'subway', about: 'a New York subway platform: grimy concrete, gum, puddles under the leaks in the ceiling' },
   jiangnan: { kind: 'slabs', about: 'a water town square of granite slabs, grass and moss in the joints and at the edges, damp with the morning mist' },
+  lastgate: { kind: 'gate-mud', about: 'trodden wet earth before a castle gate, worn cobbles by the gate, rain standing in the hollows' },
   port: { kind: 'wet-concrete', about: 'a container quay at night in the rain: wet concrete, puddles reflecting the lamps, painted lines' },
 };
 

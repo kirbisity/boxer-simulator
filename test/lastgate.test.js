@@ -160,3 +160,34 @@ test('the line to share', () => {
   assert.equal(lastGateShareText({ hero: 'samurai', seconds: 222, kills: 57 }), 'I held The Last Gate for 3:42 as the Samurai — 57 rebels cut down. Gladiator');
   assert.equal(lastGateShareText({ hero: 'ironPagoda', seconds: 61, kills: 1 }), 'I held The Last Gate for 1:01 as the Iron Pagoda — 1 rebel cut down. Gladiator');
 });
+
+test('the field\'s puddles: shallow water in ellipses, splashed and heard as water over mud, drawn as the castle\'s water, and blood clouds in them', async () => {
+  const { lastGateArena } = await import('../src/lastgate.js');
+  const { softAt, standingWater, worksOf } = await import('../src/physics/fieldworks.js');
+  const { worksWaters } = await import('../src/levelmode/water.js');
+  const { surfaceUnder } = await import('../src/audio/surface.js');
+  const { bloodDyeCreate, bloodDyeLand } = await import('../src/blooddye.js');
+  const arena = lastGateArena();
+  const works = worksOf(arena);
+  assert.equal(works.soft.length, LAST_GATE.puddles.length);
+  const [x, z, rx, rz] = LAST_GATE.puddles[0];
+  const middle = softAt(works, x, z);
+  assert.ok(middle && standingWater(middle) > 0.02, 'water in the middle');
+  // The ellipse, not its box: the box's corner is dry.
+  assert.equal(softAt(works, x + rx * 0.95, z + rz * 0.95), null);
+  const waters = worksWaters(arena.works);
+  assert.equal(waters.length, LAST_GATE.puddles.length);
+  assert.ok(waters.every((water) => water.shape === 'ellipse' && water.murk === 'puddle'));
+  // Heard: mud with water over it (a splash with the squelch: audio/sfx/step.js); out of it, the place's wet earth.
+  const world = { arena, place: 'lastgate' };
+  const step = surfaceUnder(world, x, 0, z);
+  assert.equal(step.surface, 'mud');
+  assert.ok(step.depth > 0.02);
+  assert.equal(surfaceUnder(world, 15, 0, -9.5).depth, 0);
+  // Blood that falls in the water clouds it; on the mud beside it, a stain.
+  const view = { works: { group: { userData: { bloodDyeWater: [(px, pz) => { const soft = softAt(works, px, pz); return soft ? { wet: soft.share, reach: 1 } : null; }] } } }, places: {}, place: 'lastgate' };
+  const dye = bloodDyeCreate();
+  assert.equal(bloodDyeLand(view, dye, x, z, 1, 0), true);
+  assert.equal(dye.clouds.length, 1);
+  assert.equal(bloodDyeLand(view, dye, x + rx + 1, z, 1, 0), false);
+});

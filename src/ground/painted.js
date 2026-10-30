@@ -16,6 +16,7 @@
 
 /* global THREE */
 import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
+import { LAST_GATE } from '../lastgate.js';
 
 const PAINTED_GROUND_TEXELS = 512;
 
@@ -1035,6 +1036,23 @@ const PAINTED_GROUND_PLACES = {
     a: 'beachDry', b: 'beachWet', tiles: [1.6, 1.6], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, match: 0.35,
     wet: [0.55, 0.22, 1, 0.6], env: 1, envSplit: [0.15, 0.55], decal: [0.2, 0.22, 0.12, 0.9], decalRough: 0.3,
     layout: (x, z, f) => paintedGroundShore(x, z, f, 29),
+  },
+  // The Last Gate: earth trodden to wet mud by the defenders' feet, the worn cobbles of the road into the gate (and under it), every
+  // hollow darker and glossy round the rain standing in it (the puddles are the arena's works: lastgate.js; their water kitwater.js's).
+  lastgate: {
+    a: 'mud:foot', b: 'cobbles:worn', tiles: [1.7, 2.1], bomb: [1, 1], macro: PAINTED_GROUND_STONE_MACRO, keepOut: [20, 13], match: 0.3,
+    wet: [0.7, 0.12, 2, 0.8], env: 1, envSplit: [0.2, 1.2],
+    layout: (x, z, f) => {
+      const gate = LAST_GATE.gate.x;
+      // The road: cobbles from behind the gate out some 4 m before it, its edge ragged where the mud has come over the stones.
+      const road = 1 - paintedGroundSmooth(-0.6, 0.8, x - gate - 4 + (f(x * 0.5, z * 0.5, 70) - 0.5) * 2.4 + Math.max(0, Math.abs(z) - 3.2) * 0.6);
+      let wet = 0.35 + 0.35 * paintedGroundSmooth(0.45, 0.7, f(x * 0.25, z * 0.25, 71));
+      for (const [px, pz, rx, rz] of LAST_GATE.puddles) {
+        const d = Math.hypot((x - px) / rx, (z - pz) / rz) + (f(x * 1.3, z * 1.3, 72) - 0.5) * 0.3;
+        wet = Math.max(wet, 1 - paintedGroundSmooth(0.95, 1.6, d));
+      }
+      return [road, f(x * 0.05, z * 0.05, 73) * 0.6 + f(x * 0.3, z * 0.3, 74) * 0.4, wet, 0];
+    },
   },
   port: {
     a: 'concrete', b: 'concrete:worn', tiles: [2.2, 2.6], bomb: [1, 1], macro: PAINTED_GROUND_STONE_MACRO, match: 0.5, quay: true,
