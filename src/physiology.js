@@ -43,7 +43,7 @@ export const PHYSIOLOGY = {
   // last muscle), as a share of sedentary baseline lean; and essential fat.
   minimumLeanShare: 0.36,
   essentialFatKg: { male: 0.6, female: 2 },
-  bmi: { min: 8, max: 125 },
+  bmi: { min: 10, max: 100 },
   weeksSimulated: 780, // fifteen years: enough for any diet to settle
   // Bone density as a T-score: loading from exercise and from carried mass
   // raises it; starvation (fat below the essential-plus margin) strips it.
@@ -93,7 +93,7 @@ function compositionForEnergy(inputs, energy, frameLean) {
   const leanAt = leanCurve(inputs, frameLean);
   const stored = (fat) => PHYSIOLOGY.leanKcalPerKg * leanAt(fat) + PHYSIOLOGY.fatKcalPerKg * fat;
   let low = minFat;
-  let high = 700;
+  let high = 400;
   // With the fat spent, starvation burns protein: lean goes on falling
   // until the BMI floor stops it.
   if (energy <= stored(low)) return { lean: Math.max(1, (energy - PHYSIOLOGY.fatKcalPerKg * low) / PHYSIOLOGY.leanKcalPerKg), fat: low };
@@ -146,7 +146,7 @@ function simulateComposition(inputs, frameLean) {
     const balance = inputs.calories - dailyExpenditure(inputs, lean, fat);
     energy = Math.max(0, energy + balance * 7);
     ({ lean, fat } = compositionForEnergy(inputs, energy, frameLean));
-    // Weight is held to BMI 8–125: beyond that is not a body to fight in.
+    // Weight is held to BMI 10–100: beyond that is not a body to fight in.
     const weight = lean + fat;
     if (weight < bounds[0] || weight > bounds[1]) {
       const target = Math.min(bounds[1], Math.max(bounds[0], weight));
@@ -164,7 +164,7 @@ function scaleToWeight(inputs, weight, frameLean) {
   const leanAt = leanCurve(inputs, frameLean);
   let low = PHYSIOLOGY.essentialFatKg[inputs.sex];
   if (leanAt(low) + low >= weight) return { lean: weight - low, fat: low };
-  let high = 700;
+  let high = 400;
   for (let step = 0; step < 60; step += 1) {
     const middle = (low + high) / 2;
     if (leanAt(middle) + middle < weight) low = middle;
@@ -191,7 +191,7 @@ export function caloriesForBodyFat(inputs, bodyFat, frameLean = 1) {
   return dailyExpenditure(inputs, leanForFat(inputs, low, frameLean), low);
 }
 
-/** The calorie range that spans BMI 8 to 125 for this body. */
+/** The calorie range that spans BMI 10 to 100 for this body. */
 export function calorieRange(inputs, frameLean = 1) {
   const height = inputs.heightCm / 100;
   return [caloriesForWeight(inputs, PHYSIOLOGY.bmi.min * height * height, frameLean), caloriesForWeight(inputs, PHYSIOLOGY.bmi.max * height * height, frameLean)];
