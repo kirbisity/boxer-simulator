@@ -16,7 +16,8 @@ import { WEAPONS } from './weapons.js';
 import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
-import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
+import { FINISHER, finishTarget, startFinisher, updateFinisher } from './finisher.js';
+import { lowTarget, startLowStrike, updateLowStrike } from './lowstrike.js';
 import { chargeAt } from './riding.js';
 import { artReady, artTarget, feelAdrenaline, startArt } from './weaponarts.js';
 
@@ -634,11 +635,26 @@ function reachBetween(fighter, other) {
   return Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
 }
 
-/** An attack asked for while a man lies helpless within reach (and none stands on him): the finisher instead. True if it began. */
+/**
+ * An attack asked for while a man lies helpless within reach (and none stands on him): the finisher instead. True if it began.
+ * A tap takes a man a few steps off (FINISHER.tapReach): he steps in to him. Only a man lying: one crawling on his hands and
+ * knees has his throat up off the floor, level with the hand a kneeling stab starts from, and a belt knife put to it from a
+ * kneel met it with nothing behind it (2 of 6 landed); the tap at him is a blow of the player's own, bent down to him
+ * (lowOnAttack). The special button still offers the finisher for him.
+ */
 export function finishOnAttack(world, fighter, orders) {
   if (fighter.punch) return false;
-  const prey = finishTarget(world, fighter, { locked: orders.lock });
-  return Boolean(prey) && startFinisher(world, fighter, prey);
+  const prey = finishTarget(world, fighter, { locked: orders.lock, range: FINISHER.tapReach });
+  return Boolean(prey) && prey.state === 'down' && startFinisher(world, fighter, prey, { range: FINISHER.tapReach });
+}
+
+/**
+ * An attack asked for at a man low before him (lying, getting up, on his knees: lowstrike.js), within a few steps: made at his
+ * body as it lies, the striker stepping in and bending to it. `mark` is the man the attack would go at. True if it began.
+ */
+export function lowOnAttack(world, fighter, mark, move, { heavy = false } = {}) {
+  if (fighter.punch || fighter.mount) return false;
+  return startLowStrike(world, fighter, lowTarget(world, fighter, mark), move, { heavy });
 }
 
 /**
@@ -648,6 +664,7 @@ export function finishOnAttack(world, fighter, orders) {
 export function swingAt(world, fighter, orders, name, zone) {
   if (finishOnAttack(world, fighter, orders)) return true;
   const mark = attackMark(world, fighter, orders, opponentFor(world, fighter));
+  if (MOVES[name]?.kind === 'strike' && lowOnAttack(world, fighter, mark, name)) return true;
   const spec = MOVES[name];
   if (chargeOrder(world, fighter, orders, mark, name, zone)) return true;
   if (spec?.kind !== 'strike') return throwPunch(world, fighter, name, zone);
@@ -703,6 +720,14 @@ function attack(world, fighter, orders, opponent) {
     return;
   }
   opponent = attackMark(world, fighter, orders, opponent);
+  // A man low before him (on the floor, getting up, on his knees): the blow goes down to his body as it lies.
+  if (!request.point && (!request.move || MOVES[request.move]?.kind === 'strike')) {
+    const wanted = request.move ?? chooseAttack(world, fighter, opponent, request.line ?? 'mid', request.strength)?.move;
+    if (wanted && lowOnAttack(world, fighter, opponent, wanted, { heavy: request.strength === 'heavy' })) {
+      requests.shift();
+      return;
+    }
+  }
   if (request.move) {
     if (runStrikeWaits(fighter, request, opponent)) return;
     if (!chargeOrder(world, fighter, orders, opponent, request.move, request.zone)) padAttack(world, fighter, request, opponent);
@@ -1177,6 +1202,11 @@ export function directFighter(world, fighter, orders, dt) {
   // Down on his knees over a man, a dagger going in: that holds him until it is done or he is struck (finisher.js).
   if (fighter.finisher && updateFinisher(world, fighter, dt)) {
     orders.requests.length = 0;
+    orders.actions = [];
+    return;
+  }
+  // Bent to a man low before him, the blow going down to him: that holds him until it is made (lowstrike.js).
+  if (fighter.lowStrike && updateLowStrike(world, fighter, dt)) {
     orders.actions = [];
     return;
   }

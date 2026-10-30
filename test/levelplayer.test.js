@@ -77,11 +77,10 @@ test('level mode: running does not guard, and an attack asked for breaks the run
   running.keyStick = keyStick(new Set(['d']), { ahead: [1, 0], right: [0, 1] }, true);
   run(world, 0.3, running);
   assert.equal(me.running, true, 'eased off and pushed again: running');
-  // An attack asked for ends the run and is thrown.
+  // An attack asked for while running keeps the run: he strikes on the run (control.js runStrike).
   running.requests.push({ at: world.time, line: 'mid', strength: 'quick' });
   run(world, 0.1, running);
-  assert.equal(me.running, false, 'an attack asked for while running breaks the run');
-  assert.ok(me.stats.thrown > stats || me.punch, 'and is thrown');
+  assert.equal(me.running, true, 'an attack asked for while running keeps the run');
   // Back inside the threshold: attacks work again.
   const walking = newOrders();
   walking.keyStick = keyStick(new Set(['d']), { ahead: [1, 0], right: [0, 1] }, false);
@@ -90,7 +89,7 @@ test('level mode: running does not guard, and an attack asked for breaks the run
   assert.ok(me.stats.thrown > stats || me.punch, 'a walking man can strike');
 });
 
-test('Battle Mode: running is the same gait (run mode), and a blow asked for while running is thrown, ending the run', () => {
+test('Battle Mode: running is the same gait (run mode), and a blow asked for while running is thrown on the run', () => {
   const world = createWorld([{ inputs: structuredClone(PRESETS.heavy), corner: 'red' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 5 });
   const me = world.fighters[0];
   const orders = newOrders();
@@ -98,7 +97,7 @@ test('Battle Mode: running is the same gait (run mode), and a blow asked for whi
   orders.requests.push({ at: 0, move: 'jab', zone: 'head' });
   advance(world, 0.3, (w, dt) => directFighter(w, me, orders, dt));
   assert.ok(me.stats.thrown > 0, 'in a battle he may strike while running');
-  assert.equal(me.running, false, 'the blow ended the run');
+  assert.equal(me.running, true, 'the blow keeps the run');
 });
 
 // ---- Bandage and tonic -------------------------------------------------------------------------------------
