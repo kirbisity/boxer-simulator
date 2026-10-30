@@ -44,6 +44,18 @@ export const WORLD = {
   // A polearm's front hand slides along the shaft: no closer to the rear
   // hand than this share of its usual spacing, and this far short of the head (m).
   grip: { shortest: 0.4, headClear: 0.08 },
+  // A weapon's haft, from the hands out to where its head strikes from (`strikeFrom`): wood (or an iron-bound
+  // shaft) that meets a man who has come inside the head, or that the head carries past him. It strikes as
+  // any part of a rigid weapon does, at its own speed (the line from the hand's to the tip's: slow near the
+  // hands, the swing's ω × r) and its own effective mass there (weapons.js effectiveMassAt), so the head is
+  // the hardest place by the physics, not by a factor. What it adds is only its profile: round wood, no edge
+  // and no point, the staff's (`blunt` and `contactSeconds`, WEAPONS.staff), no head's weight to drive a blow
+  // through plate (no `crush`). `from` (m beyond the main hand): the fist round the grip is its own striker;
+  // `shortest` (m): a hilt shorter than this (a sword's, a knife's: the grip is in the hand) is no haft;
+  // `radius` (m): a spear or polearm shaft of ~3.5 cm, never thicker than the head.
+  // `slides`: a haft meeting him moving along its length by more than this share (cosine) of its speed
+  // there (a thrust going on past an arm) slides on, and the head can still land; met across, it stops the stroke.
+  haft: { from: 0.1, shortest: 0.25, radius: 0.017, blunt: 1, contactSeconds: 0.007, slides: 0.5 },
   contactRange: 2.6, // m between hips beyond which two fighters cannot touch
   // A big fight looks for near pairs once a step, out to this much beyond
   // contactRange (more than two men can close in one step), and checks the

@@ -5279,8 +5279,19 @@ function collideCrowd(world, time, substep) {
 }
 
 /** A striker with every field set (unset ones undefined), so all strikers share one shape. */
-function strikerOf(key, a, b, radius, side, { weapon, bash, shin, pa, pb } = {}) {
-  return { key, weapon, bash, shin, a, b, pa, pb, radius, side };
+function strikerOf(key, a, b, radius, side, { weapon, haft = false, bash, shin, pa, pb } = {}) {
+  return { key, weapon, haft, bash, shin, a, b, pa, pb, radius, side };
+}
+
+/** Whether a weapon has a haft that strikes (WORLD.haft): a shaft at least `shortest` long between the hand and the head. */
+export function hasHaft(spec) {
+  return !spec.rope && spec.strikeFrom < spec.length && spec.strikeFrom - WORLD.haft.from >= WORLD.haft.shortest;
+}
+
+/** How far along a weapon (m from the main hand) a weapon striker is touched at `s` (0..1) of it: its haft, or its head. */
+function strikerDistance(striker, s) {
+  const spec = striker.weapon.spec;
+  return striker.haft ? WORLD.haft.from + s * (spec.strikeFrom - WORLD.haft.from) : spec.strikeFrom + s * (spec.length - spec.strikeFrom);
 }
 
 // The two hands as strikers, by fist radius (gloved or bare): nothing in them changes, so they are made once.
@@ -5316,7 +5327,12 @@ function strikers(fighter) {
     if (weapon.spec.rope) continue;
     // The weapon, from where it starts to strike to its tip.
     const hand = P[`${weapon.main}Hand`];
-    list.push(strikerOf(weapon === fighter.weapon ? 'weapon' : 'offWeapon', hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: vec.add(point(fighter.x, hand), vec.scale(weapon.dir, weapon.spec.strikeFrom)), pb: weapon.tip }));
+    const key = weapon === fighter.weapon ? 'weapon' : 'offWeapon';
+    const grip = point(fighter.x, hand);
+    const head = vec.add(grip, vec.scale(weapon.dir, weapon.spec.strikeFrom));
+    list.push(strikerOf(key, hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: head, pb: weapon.tip }));
+    // Its haft, short of the head (WORLD.haft): a man inside the head meets the wood.
+    if (hasHaft(weapon.spec)) list.push(strikerOf(`${key}Haft`, hand, hand, Math.min(WORLD.haft.radius, weapon.spec.radius), weapon.main, { weapon, haft: true, pa: vec.add(grip, vec.scale(weapon.dir, WORLD.haft.from)), pb: head }));
   }
   const punch = fighter.punch;
   if (!punch || punch.t > punch.spec.extendUntil + 0.06) return list;
@@ -5492,6 +5508,8 @@ function guardKey(key) {
 }
 
 function collideStriker(world, attacker, defender, striker, time) {
+  // A haft among his own side's men is carried past them (over a shoulder, between files): the ranks are not drawn man by man.
+  if (striker.haft && attacker.corner === defender.corner) return;
   const from = striker.pa;
   const to = striker.pb;
   // Out of reach of all of him, shield and blade too (most pairs in a
@@ -5532,6 +5550,13 @@ function collideStriker(world, attacker, defender, striker, time) {
   // The stroke this striker is making (a blade's own, with two), if any.
   const stroke = striker.weapon ? strokeOf(attacker, striker.weapon) : attacker.punch?.spec.limb === striker.key ? attacker.punch : null;
   const striking = Boolean(stroke);
+  // A haft not striking gives: the hands let the shaft slide and turn as a man comes onto it (a held
+  // polearm is not braced against every touch), so it neither shoves him nor is jammed back into its holder.
+  // So too once its blow is struck (or the stroke is spent): the weapon is drawn back, not leant on him.
+  if (striker.haft && (!striking || stroke.landed || stroke.stopped || stroke.t > strikeLiveUntil(stroke.spec))) {
+    if (touching) for (const key of attacker.contacts) if (key.startsWith(prefix) && !guardKey(key)) attacker.contacts.delete(key);
+    return;
+  }
   // A shield the strike has met: what lies behind its face is out of reach.
   let shadow = null;
   if (defender.shield && defender.state !== 'out') {
@@ -5638,7 +5663,11 @@ function collideStriker(world, attacker, defender, striker, time) {
     if (!attacker.contacts.has(contactKey)) {
       attacker.contacts.add(contactKey);
       if (striker.weapon) {
-        if (registerWeaponImpact(world, attacker, defender, striker, closest, capsule, normal, time)) attacker.contacts.add(`${contactKey}:through`);
+        const landed = registerWeaponImpact(world, attacker, defender, striker, closest, capsule, normal, time);
+        if (landed) attacker.contacts.add(`${contactKey}:through`);
+        // Touching him before the blow is struck (its windup), or too slowly to count yet (a point laid on
+        // him as the drive begins): not a blow, so not remembered as one, and tested again while it stays.
+        else if (landed === null) attacker.contacts.delete(contactKey);
       } else registerImpact(world, attacker, defender, striker, closest, capsule, normal, time);
     }
     // A blade that went through is not held back by what it cut.
@@ -6475,8 +6504,10 @@ export function strikeLiveUntil(spec) {
  * effective mass of weapon and arm at the point of contact and the part
  * struck, the push and recoil from it. The harm splits by what the contact
  * was — blunt, cut (edge across), pierce (point first) — and the armour
- * answers each its own way; plate turns a blade aside. Returns whether it
- * cut through (the blade then carries on).
+ * answers each its own way; plate turns a blade aside. Its haft (WORLD.haft)
+ * strikes the same way, slower and lighter where it is, round wood: blunt.
+ * Returns whether it cut through (the blade then carries on); null if it did
+ * not strike yet (before the drive, or touching too slowly), to be tried again.
  */
 function registerWeaponImpact(world, attacker, defender, striker, closest, capsule, normal, time) {
   // The blade that met him, and the stroke it is making (with two blades, each its own).
@@ -6484,20 +6515,24 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const punch = strokeOf(attacker, weapon);
   if (!punch) return false;
   const spec = punch.spec;
-  if (punch.load > 0 || punch.t < spec.windup || punch.t > strikeLiveUntil(spec)) return false;
+  if (punch.t > strikeLiveUntil(spec)) return false;
+  if (punch.load > 0 || punch.t < spec.windup) return null;
   punch.hits ??= new Set();
+  // The haft's blows are its own (`haftHits`): a shaft driven along its length that knocks against him
+  // slides on past, and does not stop the head (below).
+  const haft = striker.haft;
+  const struck = haft ? (punch.haftHits ??= new Set()) : punch.hits;
   // A sweep carries on through what it cuts, but not through a shield or a blade that stopped it.
-  if (punch.stopped || punch.hits.has(defender.id) || (punch.landed && !spec.sweep)) return false;
+  if (punch.stopped || struck.has(defender.id) || (punch.landed && !spec.sweep)) return false;
   const wspec = weapon.spec;
   const main = P[`${weapon.main}Hand`];
-  const distance = wspec.strikeFrom + closest.s * (wspec.length - wspec.strikeFrom);
+  const distance = strikerDistance(striker, closest.s);
   const bladeVelocity = vec.lerp(handVelocityOf(attacker, main), weapon.tipVelocity, distance / wspec.length);
   const struckVelocity = vec.lerp(point(defender.v, capsule.a), point(defender.v, capsule.b), closest.t);
   const relative = vec.sub(bladeVelocity, struckVelocity);
   const closing = -vec.dot(relative, normal);
-  if (closing < WORLD.minImpactSpeed) return false;
-  punch.hits.add(defender.id);
-  punch.landed = true;
+  if (closing < WORLD.minImpactSpeed) return null;
+  struck.add(defender.id);
   // On a curved helmet a blow not square to it skids: less of it goes in, edge and point and weight alike.
   const glance = helmetGlance(defender, capsule, relative, closing);
   // (A finisher's point is driven down with his weight: never slower than `finisher.drive` m/s, however the arm slowed at the floor.)
@@ -6505,12 +6540,16 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
 
   const body = defender.body;
   const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance);
+  // Met across, the weapon is stopped there, head and all, as by any blow; a haft running along its length (a thrust) slides on.
+  if (!haft || along < WORLD.haft.slides) punch.landed = true;
   const struckMass = struckMassOf(defender, capsule);
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
   const impulse = reducedMass * goingIn * (1 + WORLD.restitution);
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * goingIn * goingIn;
-  const mix = harmMix(wspec, spec.mode, along, closest.s);
+  // The haft: round wood, no edge and no point.
+  const mix = haft ? { blunt: WORLD.haft.blunt, cut: 0, pierce: 0 } : harmMix(wspec, spec.mode, along, closest.s);
+  const contactSeconds = haft ? WORLD.haft.contactSeconds : wspec.contactSeconds;
   // A dagger driven into a man lying helpless: all point, little blunt (finisher.js).
   if (punch.finisher) {
     mix.pierce *= punch.finisher.pierce;
@@ -6539,11 +6578,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
-  const peakForce = ((Math.PI / 2) * impulse) / (wspec.contactSeconds * (1 + 0.6 * (1 - firmness)));
+  const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const blocked = BLOCKING.has(capsule.key);
   // A heavy hard head drives part of its blow through armour (`crush`).
-  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
+  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : wspec.crush ?? 0)));
   // A brittle edge (obsidian) cuts only as well as it is still sharp.
   const sharp = weapon.edge ?? 1;
   // A point on plate bites only if it meets it near square (BLADES.bite: the cosine of the steepest
@@ -6568,11 +6607,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     off: weapon === attacker.offWeapon || undefined, riposte: attacker.punch?.riposte || undefined,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
     point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt,
-    edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce),
+    edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce), haft: haft || undefined,
   };
   // A cut on the helmet takes what is fixed on it (a crest) away, whatever the helmet turns.
   if (capsule.key === 'head') cutOffHeadgear(world, defender, event, energy * mix.cut, contactPoint);
-  const concentration = Math.sqrt(WORLD.contactSeconds / wspec.contactSeconds);
+  const concentration = Math.sqrt(WORLD.contactSeconds / contactSeconds);
   bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration });
   if (glanced) {
     // Off the plate: the blade is turned along it.
@@ -6728,7 +6767,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   const strikeVelocity = strikerVelocity(attacker, striker, hit.along);
   if (striker.weapon) {
     const weapon = striker.weapon;
-    const distance = weapon.spec.strikeFrom + hit.along * (weapon.spec.length - weapon.spec.strikeFrom);
+    const distance = strikerDistance(striker, hit.along);
     const arms = attacker.body.limbKg[`${weapon.main}Arm`] + (weapon.twoHanded ? attacker.body.limbKg[`${weapon.off}Arm`] : 0);
     const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
     const moving = vec.sub(strikeVelocity, point(defender.v, P.lHand));
@@ -6789,7 +6828,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
 function strikerVelocity(attacker, striker, along) {
   if (!striker.weapon) return vec.lerp(point(attacker.v, striker.a), point(attacker.v, striker.b), along);
   const weapon = striker.weapon;
-  const distance = weapon.spec.strikeFrom + along * (weapon.spec.length - weapon.spec.strikeFrom);
+  const distance = strikerDistance(striker, along);
   return vec.lerp(handVelocityOf(attacker, P[`${weapon.main}Hand`]), weapon.tipVelocity, distance / weapon.spec.length);
 }
 

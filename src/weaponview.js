@@ -713,7 +713,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       break;
     }
     case 'kanabo': {
-      // An oak club swelling to an eight-sided head, rows of iron studs over its upper half, a grip and a pommel ring.
+      // An oak club swelling to an eight-sided head, rows of iron studs from above the grip to the end (`strikeFrom`), a grip and a pommel ring.
       const oak = surface(0x3a2416, { roughness: 0.75 });
       const body = new THREE.Mesh(new THREE.CylinderGeometry(spec.radius * 1.15, spec.radius * 0.45, spec.length + spec.handle, 8), oak);
       body.position.y = (spec.length - spec.handle) / 2;
