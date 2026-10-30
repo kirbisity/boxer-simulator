@@ -305,6 +305,12 @@ export function heelFooting(heels) {
   return heels ? Math.max(0.3, 1 - HEEL_FOOTING_PER_RADIAN * heels.pitch) : 1;
 }
 
+// What his kit's men are trained to (`skill`, 0..1; body.js normaliseInputs: a man's own, else his kit's, else 0.5): it places his
+// blows (WORLD.skill) and reads the blows at him (WORLD.guardRead: under 0.3 a block is never brought onto a blow's line). The
+// tiers: civilians and peasants 0.1 (never trained); levies, garrisons, raiders 0.2-0.3 (weeks of drill: they try to block and
+// cannot); regulars 0.35-0.6 (drilled: they read a blow, late); elites 0.6-0.8 (trained from boyhood, or picked and drilled for
+// years: samurai, knights, the Khan's guard, the Iron Pagoda, gladiators); masters and legends 0.85-1 (ronin, sohei; a preset's
+// `hero`: 1). A kit without one is 0.5, the sports' (boxing, MMA, kung fu: trained, not soldiers).
 export const OUTFITS = {
   boxing: {
     faction: 'ring',
@@ -343,6 +349,8 @@ export const OUTFITS = {
     ],
   },
   hiking: {
+    // Trained: a civilian: never trained to fight (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'street',
     label: 'Hiking', movement: 'good', fists: 'bare',
     headgear: ['boonie'],
@@ -354,6 +362,8 @@ export const OUTFITS = {
     ],
   },
   casual: {
+    // Trained: a civilian: never trained to fight (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'street',
     label: 'Casual', movement: 'good', fists: 'bare',
     palette: [['maroon', 'sand'], ['navy', 'denim'], ['forest', 'sand'], ['purple', 'charcoal'], ['rust', 'denim'], ['grey', 'black']],
@@ -366,6 +376,8 @@ export const OUTFITS = {
   },
   // A street thug: a zipped track jacket, joggers, trainers, a beanie.
   thug: {
+    // Trained: street fights, no teacher (`skill`: OUTFITS' tiers).
+    skill: 0.25,
     faction: 'street',
     label: 'Street thug', movement: 'good', fists: 'bare',
     palette: [['black', 'black'], ['navy', 'charcoal'], ['maroon', 'black']],
@@ -375,6 +387,8 @@ export const OUTFITS = {
     ],
   },
   business: {
+    // Trained: a civilian: never trained to fight (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'street',
     label: 'Business', movement: 'limited', fists: 'bare',
     palette: [['black', 'black'], ['charcoal', 'charcoal'], ['navy', 'navy'], ['slate', 'slate']],
@@ -386,6 +400,8 @@ export const OUTFITS = {
     ],
   },
   yakuza: {
+    // Trained: a gang's enforcer: fights often, untaught (`skill`: OUTFITS' tiers).
+    skill: 0.3,
     faction: 'street',
     label: 'Yakuza', movement: 'good', fists: 'bare', kick: 1.1,
     headgear: ['hat'],
@@ -395,6 +411,8 @@ export const OUTFITS = {
     ],
   },
   swat: {
+    // Trained: a tactical team's training (`skill`: OUTFITS' tiers).
+    skill: 0.55,
     faction: 'law', bulletRating: 1500, plated: true,
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
     palette: [['charcoal', 'charcoal'], ['olive', 'olive'], ['slate', 'slate']],
@@ -414,6 +432,8 @@ export const OUTFITS = {
   // over the shirt, the duty belt, the peaked cap. The vest stops handgun
   // rounds over the torso and little of a blade; nothing else is covered.
   police: {
+    // Trained: academy defensive tactics (`skill`: OUTFITS' tiers).
+    skill: 0.4,
     faction: 'law', bulletRating: 500,
     label: 'Police — patrol uniform', movement: 'good', fists: 'bare',
     sidearm: 'baton',
@@ -430,6 +450,8 @@ export const OUTFITS = {
   // riot suit over a stab vest (torso, shoulders, forearms and shins padded
   // hard), heavy boots. It spreads a blow and turns an edge; not a round.
   riot: {
+    // Trained: drilled to the shield line (`skill`: OUTFITS' tiers).
+    skill: 0.45,
     faction: 'law', bulletRating: 300,
     label: 'Riot officer', movement: 'limited', fists: 'gloved-tactical',
     sidearm: 'baton',
@@ -450,6 +472,8 @@ export const OUTFITS = {
   // 25–30 kg. Very well protected against bullets over the torso and head;
   // the limbs bare to a round and nearly so to a blade. Slow under the load.
   specialForces: {
+    // Trained: selected and trained for years (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'law', bulletRating: 4000, plated: true,
     label: 'Special forces — plate carrier', movement: 'limited', fists: 'gloved-tactical',
     sidearm: 'dagger',
@@ -465,6 +489,8 @@ export const OUTFITS = {
     ],
   },
   knight: {
+    // Trained: a knight: trained in arms from a page (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     // Rides (full plate: the great horse in a steel bard).
     horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 650, plated: true,
@@ -502,6 +528,8 @@ export const OUTFITS = {
   // and over the plate the huque of crimson cloth the Duke of Orléans gave
   // her. The plate's protection, the head bare.
   joan: {
+    // Trained: in plate among knights (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     // Rides (full plate: the great horse in a steel bard).
     horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 650, plated: true,
@@ -537,6 +565,8 @@ export const OUTFITS = {
   //   against a blow (`poise`), and he moves slowly (`movement: 'slow'`).
   // Not dealt at random (no `family`); in no level.
   tournament: {
+    // Trained: a knight: trained in arms from a page (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     // Rides (full plate: the great horse in a steel bard).
     horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 1000, plated: true,
@@ -583,6 +613,8 @@ export const OUTFITS = {
   // it), poorly against a blow (mail moves with it: only the gambeson takes
   // a little); the legs a little better for the greaves.
   templar: {
+    // Trained: a brother-knight: a life of arms under a Rule (`skill`: OUTFITS' tiers).
+    skill: 0.8,
     // Rides (a knight of the Temple: the great horse, unarmoured (the Rule kept the brothers plain)).
     horse: 'destrier',
     faction: 'knights',
@@ -611,6 +643,8 @@ export const OUTFITS = {
   // inside cloth), a mail shirt, or a breastplate — over a quilted coat,
   // and a kettle hat. Never full cover; light enough to march in.
   footman: {
+    // Trained: a drilled foot soldier (`skill`: OUTFITS' tiers).
+    skill: 0.35,
     faction: 'knights',
     label: 'Foot soldier', family: 'knight', movement: 'good', fists: 'bare',
     sidearm: 'shortSword',
@@ -628,6 +662,8 @@ export const OUTFITS = {
   // Lamellar: small lacquered steel scales laced in rows, in red. Proof
   // against most cuts, good against points; lighter than plate.
   samurai: {
+    // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     // Rides (the samurai fought from the saddle, the bow first).
     horse: 'japanese',
     faction: 'japanese', plated: true,
@@ -663,6 +699,8 @@ export const OUTFITS = {
   // finds the openings of the box (armpits, the waidate's seam, under the
   // skirt) more often than in later armour (`gaps`).
   oyoroi: {
+    // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     // Rides (the o-yoroi was made to be worn on horseback).
     horse: 'japanese',
     faction: 'japanese', plated: true,
@@ -697,6 +735,8 @@ export const OUTFITS = {
   // steel lames, laced skirt and sleeves, and the menpo war mask. Better
   // than ō-yoroi against points and bullets, and heavier.
   samuraiTosei: {
+    // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     // Rides (mounted samurai of the Sengoku).
     horse: 'japanese',
     faction: 'japanese', bulletRating: 900, plated: true,
@@ -726,6 +766,8 @@ export const OUTFITS = {
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,
   // cloth sleeves, the jingasa hat; less protection, lighter, quicker.
   ashigaru: {
+    // Trained: a drilled foot soldier, a season's training (`skill`: OUTFITS' tiers).
+    skill: 0.35,
     faction: 'japanese',
     label: 'Ashigaru', family: 'samurai', movement: 'good', fists: 'bare',
     sidearm: 'wakizashi',
@@ -743,6 +785,8 @@ export const OUTFITS = {
   },
   // A gladiator armed as a Greek hoplite: little armour over a bare body.
   hoplomachus: {
+    // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'gladiators',
     label: 'Gladiator — hoplomachus', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
@@ -756,6 +800,8 @@ export const OUTFITS = {
   // Murmillo: the big fish-crested helmet with its grille, a manica on the
   // sword arm, a short greave: the head well kept, the body bare.
   murmillo: {
+    // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'gladiators',
     label: 'Gladiator — murmillo', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
@@ -767,6 +813,8 @@ export const OUTFITS = {
   },
   // Secutor: the smooth egg helmet that nothing catches on, manica, high greave.
   secutor: {
+    // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'gladiators',
     label: 'Gladiator — secutor', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
@@ -779,6 +827,8 @@ export const OUTFITS = {
   // Retiarius: the net-fighter, almost naked: no helmet, the galerus on the
   // left shoulder and a manica on that arm. Fast, and easily hurt.
   retiarius: {
+    // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'gladiators',
     label: 'Gladiator — retiarius', family: 'gladiator', movement: 'excellent', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
@@ -791,6 +841,8 @@ export const OUTFITS = {
   // Thraex: the griffin-crested brimmed helmet, quilted wraps and high
   // greaves on both legs, manica: the legs best kept of any.
   thraex: {
+    // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'gladiators',
     label: 'Gladiator — thraex', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
@@ -806,6 +858,8 @@ export const OUTFITS = {
   // (pteruges); a blue-grey tunic to the thigh; leather bracers. Leather
   // turns a cut, less a point, and a blow hardly at all; the head bare.
   maximus: {
+    // Trained: a general made gladiator (`skill`: OUTFITS' tiers).
+    skill: 0.85,
     faction: 'gladiators',
     label: 'Gladiator — the general', movement: 'good', fists: 'bare',
     extraMass: 0.12,
@@ -820,6 +874,8 @@ export const OUTFITS = {
   // his back and its forelegs knotted on his chest; a white loincloth edged
   // in gold, gilt sandals. The pelt turns a little; the rest is bare.
   commodus: {
+    // Trained: an emperor who trained with the gladiators (`skill`: OUTFITS' tiers).
+    skill: 0.6,
     faction: 'gladiators',
     label: 'Commodus — as Hercules', movement: 'good', fists: 'bare',
     extraMass: 0.06,
@@ -832,6 +888,8 @@ export const OUTFITS = {
   // A lorarius: one of the arena's attendants who drove reluctant fighters
   // on with the lash; a plain belted tunic, sandals, no armour.
   lorarius: {
+    // Trained: an arena hand, not a fighter (`skill`: OUTFITS' tiers).
+    skill: 0.35,
     faction: 'gladiators',
     label: 'Lorarius — the arena\'s whip-man', movement: 'good', fists: 'bare',
     sidearm: 'dagger',
@@ -845,6 +903,8 @@ export const OUTFITS = {
   // left arm cased in the steel tube of the scissores, a manica on the sword
   // arm, greaves on both shins; the thighs bare.
   scissor: {
+    // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     faction: 'gladiators',
     label: 'Gladiator — scissor', family: 'gladiator', movement: 'good', fists: 'bare',
     palette: [[null, 'cream'], [null, 'undyed'], [null, 'wine'], [null, 'rust']],
@@ -900,7 +960,7 @@ export const OUTFITS = {
   mingElite: {
     // Rides (Ming elite cavalry on northern horses).
     horse: 'steppe',
-    skill: 0.45,
+    skill: 0.6,
     faction: 'chinese', bulletRating: 650, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
@@ -930,7 +990,7 @@ export const OUTFITS = {
   ironPagoda: {
     // Rides (the Jurchen iron pagoda: men and horses in iron lamellar).
     horse: 'steppe', barding: 'lamellar',
-    skill: 0.45,
+    skill: 0.7,
     faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
     sidearm: 'dao',
@@ -951,6 +1011,8 @@ export const OUTFITS = {
   // (zhanpao) over gilt scale armour, the scale at the shoulders and arms, a green soft cap tied at the
   // back, black boots. The scale is a general's; the head is in cloth.
   guanYu: {
+    // Trained: a legend (`skill`: OUTFITS' tiers).
+    skill: 0.9,
     // Rides (Red Hare).
     horse: 'warhorse',
     faction: 'chinese', plated: true,
@@ -1026,6 +1088,8 @@ export const OUTFITS = {
   // guard, the belt and its studded apron, hobnailed caligae. Iron over the
   // trunk and shoulders, the head in iron; the arms and legs bare.
   legionary: {
+    // Trained: a professional of 25 years' service, drilled at the post daily (`skill`: OUTFITS' tiers).
+    skill: 0.55,
     faction: 'romans', plated: true,
     label: 'Legionary — lorica segmentata', movement: 'good', fists: 'bare',
     // The legion walked up in its ranks (under missiles, in the testudo: shields locked in front and overhead) and went in at a run for the last stretch (Caesar, Gallic War I.52; Cassius Dio 49.30).
@@ -1043,6 +1107,8 @@ export const OUTFITS = {
   // (lorica hamata) to the thigh, on his harness the phalerae (his medals)
   // and torcs, greaves, the helmet with its crest worn side to side.
   centurion: {
+    // Trained: a centurion: risen through the ranks (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     faction: 'romans', plated: true,
     label: 'Centurion — mail and phalerae', movement: 'good', fists: 'bare',
     drill: { advance: true, charge: 8, testudo: true },
@@ -1061,6 +1127,8 @@ export const OUTFITS = {
   // brought their own horses (HORSES.warhorse: the light Iberian and Gallic
   // riding horse).
   romanAuxiliary: {
+    // Trained: a long-service auxiliary (`skill`: OUTFITS' tiers).
+    skill: 0.5,
     // Rides (auxiliary cavalry).
     horse: 'warhorse',
     faction: 'romans',
@@ -1078,6 +1146,8 @@ export const OUTFITS = {
   // the archer in his deel, the man in leather lamellar; and the Khan's own
   // guard in gilt iron scale. Fought on foot here. ----
   steppeLight: {
+    // Trained: raised in the saddle and the hunt (`skill`: OUTFITS' tiers).
+    skill: 0.45,
     // Rides (every steppe warrior rode).
     horse: 'steppe',
     faction: 'steppe',
@@ -1093,6 +1163,8 @@ export const OUTFITS = {
   // body proof against a glancing cut; the hat's thick fur and felt take the
   // edge off a blow but no more (`regions`).
   steppeMedium: {
+    // Trained: a seasoned steppe warrior (`skill`: OUTFITS' tiers).
+    skill: 0.5,
     // Rides (every steppe warrior rode).
     horse: 'steppe',
     faction: 'steppe',
@@ -1131,6 +1203,8 @@ export const OUTFITS = {
   // the Northern Yuan khans (Mandukhai's, Ganbold's): gilt-edged iron
   // scale with broad shoulder guards and a gilt boss, the masked helmet.
   kheshig: {
+    // Trained: the Khan's picked guard (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     // Rides (the khan's guard: the heaviest steppe kit, its horses in lamellar).
     horse: 'steppe', barding: 'lamellar',
     faction: 'steppe',
@@ -1276,6 +1350,8 @@ export const OUTFITS = {
   // arrows that came round and over the shields nailed hands to shields and feet
   // to the ground (Plutarch, Crassus 25).
   republicanLegionary: {
+    // Trained: a professional, drilled at the post (`skill`: OUTFITS' tiers).
+    skill: 0.55,
     faction: 'romans', plated: true,
     label: 'Legionary of the Republic — mail and Montefortino', movement: 'good', fists: 'bare',
     drill: { advance: true, charge: 8, testudo: true },
@@ -1298,7 +1374,7 @@ export const OUTFITS = {
   cataphract: {
     horse: 'arabian', barding: 'lamellar',
     faction: 'parthians',
-    skill: 0.5,
+    skill: 0.65,
     label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'gauntlet',
     sidearm: 'spatha',
     arrowproof: true,
@@ -1347,7 +1423,7 @@ export const OUTFITS = {
     ],
   },
   janissary: {
-    skill: 0.4,
+    skill: 0.5,
     faction: 'ottomans',
     label: 'Ottoman — Janissary', movement: 'good', fists: 'bare',
     sidearm: 'yatagan',
@@ -1364,7 +1440,7 @@ export const OUTFITS = {
   ottomanHeavy: {
     // Rides (the sipahi: the Sultan's horsemen).
     horse: 'arabian',
-    skill: 0.45,
+    skill: 0.6,
     faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
     sidearm: 'saber',
@@ -1382,6 +1458,8 @@ export const OUTFITS = {
   // the levels): a mail hauberk, a conical helmet with a mail aventail and a
   // turban wound round it.
   gaziAlp: {
+    // Trained: a frontier raider of a warrior band (`skill`: OUTFITS' tiers).
+    skill: 0.7,
     // Rides (the gazi raiders rode Turkoman horses).
     horse: 'arabian',
     faction: 'ottomans',
@@ -1409,6 +1487,8 @@ export const OUTFITS = {
   // head guarded by steel over quilting and the turban's wraps, the face
   // open; the shins only in boot leather.
   saladin: {
+    // Trained: a sultan's mamluk household (`skill`: OUTFITS' tiers).
+    skill: 0.8,
     // Rides (Saladin's Arab horses).
     horse: 'arabian',
     faction: 'ottomans',
@@ -1468,6 +1548,8 @@ export const OUTFITS = {
   // and collar under a morion; a doublet and breeches. Proof against most
   // cuts and points; a gun's ball goes through it unless it is proofed.
   conquistadorPlate: {
+    // Trained: veterans of the Italian wars (`skill`: OUTFITS' tiers).
+    skill: 0.6,
     // Rides (the conquistadors' Andalusian horses).
     horse: 'warhorse',
     faction: 'knights', plated: true,
@@ -1491,6 +1573,8 @@ export const OUTFITS = {
   // A conquistador in escaupil: the quilted cotton armour taken from the
   // Mexica, good against obsidian and arrows, under a morion or cabasset.
   conquistadorQuilted: {
+    // Trained: veterans of the Caribbean and Mexico (`skill`: OUTFITS' tiers).
+    skill: 0.5,
     faction: 'knights',
     label: 'Conquistador — escaupil', family: 'conquistador', movement: 'good', fists: 'bare',
     sidearm: 'espada',
@@ -1514,6 +1598,8 @@ export const OUTFITS = {
   // in the mud). Light and free: the archers ran in among the French men-at-arms. At his belt a falchion or a
   // short sword (`sidearm`); a lead mallet for the stakes, and a dagger.
   archer: {
+    // Trained: trained to the bow, not to the hand-stroke (`skill`: OUTFITS' tiers).
+    skill: 0.35,
     faction: 'knights',
     label: 'Archer — padded jack', movement: 'excellent', fists: 'bare',
     sidearm: 'shortSword',
@@ -1544,6 +1630,8 @@ export const OUTFITS = {
   },
   // The garrison's levy: a quilted jack and a kettle hat, the cheapest kit a lord could issue.
   levy: {
+    // Trained: a few weeks' drill (`skill`: OUTFITS' tiers).
+    skill: 0.2,
     levelOnly: true,
     faction: 'knights',
     label: 'Levy — quilted jack', movement: 'good', fists: 'bare',
@@ -1559,6 +1647,8 @@ export const OUTFITS = {
   // A Mexica warrior: the ichcahuipilli (quilted cotton armour, soaked in
   // brine), a loincloth, sandals, a feathered band. Little against steel.
   mexicaWarrior: {
+    // Trained: schooled for war from boyhood (the telpochcalli), a commoner's (`skill`: OUTFITS' tiers).
+    skill: 0.4,
     faction: 'mexica',
     label: 'Mexica — warrior', family: 'mexica', movement: 'excellent', fists: 'bare',
     sidearm: 'macuahuitl',
@@ -1577,6 +1667,8 @@ export const OUTFITS = {
   // jaguar skin or eagle feathers, and a carved wooden helmet: a jaguar's
   // open jaws, an eagle's beak. A little better kept; prized captives.
   mexicaElite: {
+    // Trained: the jaguar and eagle orders: proven in captures (`skill`: OUTFITS' tiers).
+    skill: 0.75,
     faction: 'mexica',
     label: 'Mexica — jaguar and eagle', family: 'mexica', movement: 'excellent', fists: 'bare',
     sidearm: 'macuahuitl',
@@ -1602,6 +1694,8 @@ export const OUTFITS = {
   // own, `special`: not dealt to another). They never saw a horse or a gun
   // before that year (FACTIONS inca `strangers`).
   incaUncu: {
+    // Trained: bearers and attendants, come unarmed (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'inca',
     label: 'Inca — uncu', family: 'inca', movement: 'excellent', fists: 'bare',
     extraMass: 0.02,
@@ -1616,6 +1710,8 @@ export const OUTFITS = {
     ],
   },
   incaNoble: {
+    // Trained: lords at a ceremony, not a war band (`skill`: OUTFITS' tiers).
+    skill: 0.2,
     faction: 'inca',
     label: 'Inca — lord', family: 'inca', movement: 'excellent', fists: 'bare',
     extraMass: 0.03,
@@ -1731,6 +1827,8 @@ export const OUTFITS = {
   // corset's boning turns a little of a cut (30%), nothing of a blow or a
   // point. The game shuffles her three silhouettes of the reign.
   victorianLady: {
+    // Trained: a civilian: never trained to fight (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'street',
     label: 'Victorian — corset and gown', movement: 'limited', fists: 'bare',
     // Her hair decoration (the gothic flower, the tilted hat's plume, the widow's cap) is hers to wear or leave off: the headgear choice; on to begin with.
@@ -1754,6 +1852,8 @@ export const OUTFITS = {
   },
   // A Victorian gentleman: a frock coat to the knee, a top hat, polished shoes.
   victorianGent: {
+    // Trained: a gentleman's fencing lessons (`skill`: OUTFITS' tiers).
+    skill: 0.4,
     faction: 'street',
     label: 'Victorian — frock coat and top hat', movement: 'good', fists: 'bare',
     designs: [
@@ -1764,6 +1864,8 @@ export const OUTFITS = {
   },
   // A medieval common man: a belted tunic, hose, bare feet. No traits.
   commoner: {
+    // Trained: a peasant: never drilled (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'knights',
     label: 'Commoner', movement: 'good', fists: 'bare',
     headgear: ['headWrap'],
@@ -1776,6 +1878,8 @@ export const OUTFITS = {
   // sleeve gone (how, each man's own: `outfit.tear`, see RAGS), strips of it hanging; breeches cut off below the knee and
   // held up with a rope; bare feet or feet wrapped in rags. No traits: cloth turns nothing.
   rags: {
+    // Trained: a starving peasant: never drilled (`skill`: OUTFITS' tiers).
+    skill: 0.1,
     faction: 'knights',
     label: 'Rags', movement: 'good', fists: 'bare',
     headgear: ['headWrap'],

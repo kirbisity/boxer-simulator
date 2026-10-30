@@ -274,10 +274,45 @@ export const WORLD = {
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
   staminaRecovery: 0.07,
-  // The player's guard held up (fighter.guardHeld, control.js CONTROL.guard): the shoulders and legs are at work, not resting, so
-  // he gets back only `recovery` of that while he holds it (as a run's WORLD.runMode.recovery): else a fit man's recovery
-  // (0.063 a second) would cancel the guard's own cost and holding it up all day would be free.
-  guardHeld: { recovery: 0.25 },
+  // The guard held up (fighter.guardHeld: the player's guard button, control.js; an AI's block kept up through the blows coming,
+  // ai.js keepGuard; both physics.js holdGuard): the block stays up, put back as each one runs out, set to meet the blow coming.
+  // Held up, it is work, the same for anyone:
+  // - recovery: the shoulders and legs are at work, not resting, so he gets back only this share of his recovery while he holds
+  //   it (as a run's WORLD.runMode.recovery): else a fit man's recovery (0.063 a second) would cancel the guard's own cost and
+  //   holding it up all day would be free.
+  // - staminaPerSecond: what holding it costs (before his aerobic, as the run's; in place of the per-block cost of a dodge,
+  //   WORLD.overdraft.defenceCost, which re-raising a held block every 0.45 s used to charge: ~0.027 a second). A weapon or a shield
+  //   held up and ready is steady work for the shoulders, a little more than a run's flat out (0.02): with `recovery`, a fit man
+  //   (aerobic 0.9) loses ~0.012 a second net, empty after ~80 s of nothing but guarding (at 0.015 and full recovery it was
+  //   free: the recovery outran it). It does not take him past empty: a man does not faint holding his guard up (the blows on it can).
+  // - perJoule: each blow taken on any block (on the arms or the shield, fended off by the blade, parried; held or not, player or
+  //   AI: physics.js payForBlocks) costs this much stamina per joule the collision took up (before his aerobic): the arms and legs
+  //   soak what the blow brought. Blows met on a guard take up ~15-130 J (a light jab to a heavyweight's cross or a full cut):
+  //   ~0.006-0.05 of the bar each, a dozen hard ones in a quarter of a minute about a third of it (overdraft.js drawStamina).
+  // - spentBelow: stamina under this, he is spent: the block is no longer brought onto the blow's line, only held where it is (and
+  //   the arms holding it are weaker anyway: fatigueScale). A guard kept up too long gives.
+  guardHeld: { recovery: 0.25, staminaPerSecond: 0.025, perJoule: 0.0004, spentBelow: 0 },
+  // Reading the blow (physics.js blowRead): a block made against a blow (its striker as `defence.from`: the player's held guard,
+  // an AI's block) is brought onto the blow's line only as well as he is trained to read it (body.skill, 0..1: OUTFITS' tiers).
+  // Nothing is multiplied: the block is where his reading puts it, and the blow meets it there or comes round it.
+  // - untrainedBelow: under this skill (a commoner, a starved rebel, a levy of a few weeks' drill: 0.1-0.25) he does not read it
+  //   at all: the block stays where it was put (the blade across before his head, the shield before his chest, the arms at his
+  //   face) and a blow coming round or under it comes in. He tries; he cannot.
+  // - from there to 1 his reading (`share`, 0..1) runs [at untrainedBelow, at 1] through:
+  //   - delay (s): how long after the blow starts moving before his block starts for its line: a novice watches the hand go
+  //     (by then a quick blow is half way: AI.reactionSeconds' ~0.2 s), a master reads the shoulder and the hips before it
+  //     moves, so his block goes with it from its start. This is the most of it: measured (samurai, a held guard, 8 × 20 s
+  //     against an ordinary swordsman) blows landing went 0.80, 0.55, 0.45, 0.16, 0.07 at skill 0.3, 0.45, 0.6, 0.75, 1 with
+  //     this; a master's at 0.03 s left 0.75 at 0.26 (a samurai's blows are on him in ~0.15 s);
+  //   - lag (s): the time constant his block trails the blow by once read (where it was, not where it is: the arm chasing the
+  //     blade);
+  //   - error (of his height): how far off the line he puts it, a new miss for each blow (~11 cm for a 1.8 m man at the threshold,
+  //     ~1 cm for a master).
+  //   At 0.75 (a samurai's, a knight's: share ~0.64) about 0.09 s, 0.04 s and 4 cm.
+  // - linger (s): an AI's answer to a blow is his guard, held up through the blows that follow (as the player's button), with
+  //   the chance of his share (a master always, a man just past the threshold seldom; else his style's dodge: ai.js), and let
+  //   down this long after the last blow at him (keepGuard).
+  guardRead: { untrainedBelow: 0.3, delay: [0.25, 0], lag: [0.09, 0.008], error: [0.06, 0.005], linger: 0.5 },
   // The guard held up with bare arms (physics.js coverArms): the forearm nearer the blow goes onto its line this share of his
   // height out from what it is aimed at (~20 cm for a 1.8 m man: a forearm's length before the face or the ribs, where a boxer's
   // shell meets a punch).

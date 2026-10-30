@@ -183,8 +183,10 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).
     // gaitCarry: running, or carried on from a run until braked to his footwork's pace.
     runMode: undefined, runPose: undefined, runSlope: undefined, turn: undefined, yawWas: undefined, gaitBody: undefined, gaitAlong: undefined, gaitAccel: undefined, gaitCarry: undefined,
-    // guardHeld: the player holding his guard up (control.js CONTROL.guard): he recovers less (WORLD.guardHeld).
-    guardHeld: undefined,
+    // guardHeld: his guard held up (the player's button, control.js; an AI's, ai.js keepGuard): it costs breath and he recovers
+    // less (WORLD.guardHeld). guardUntil: when an AI's held guard comes down with no blow at him (WORLD.guardRead.linger).
+    // blowRead: how his block reads the blow it is made against ({ punch, point, at, off }: blowRead, WORLD.guardRead).
+    guardHeld: undefined, guardUntil: undefined, blowRead: undefined,
     // limbCache: limbShares worked out this step.
     limbCache: undefined,
   };
@@ -656,29 +658,59 @@ export function strainGrip(world, fighter, impulse, push = [0, 0, 0], weapon = f
 
 /** The weapon's targets for this frame: guard, block or the move in flight, and how many hands hold it. */
 /**
- * The blow a defence is made against (its striker: `defence.from`): where it is now (`threat`: the blade's striking part, with
- * two the one striking, else the limb) and the part of him it is aimed at (`mine`: the head, or the chest). Null if none comes.
+ * The blow a defence is made against (its striker: `defence.from`): where he reads it to be (`threat`: the blade's striking part,
+ * with two the one striking, else the limb, as blowRead has it) and the part of him it is aimed at (`mine`: the head, or the
+ * chest). Null if none comes, or he does not read it (yet): the block stays where it is.
  */
 function blowComing(world, fighter) {
   const attacker = world.fighters[fighter.defence?.from];
   const punch = attacker?.punch;
   if (!punch) return null;
   const coming = punch.spec.path === 'blade' ? bladeFor(attacker, punch.spec) : null;
-  const threat = coming?.held
+  const threat = blowRead(world, fighter, punch, coming?.held
     ? vec.add(point(attacker.x, P[`${coming.main}Hand`]), vec.scale(coming.dir, coming.spec.length * 0.7))
-    : point(attacker.x, P[punch.spec.limb]);
+    : point(attacker.x, P[punch.spec.limb]));
+  if (!threat) return null;
   const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
   return { attacker, punch, threat, mine };
 }
 
+/** How well he reads a blow (WORLD.guardRead), 0 to 1 by his skill; null untrained: he does not read it at all. */
+export function guardReading(fighter) {
+  const below = WORLD.guardRead.untrainedBelow;
+  const skill = fighter.body.skill ?? 0.5;
+  return skill < below ? null : Math.min(1, (skill - below) / (1 - below));
+}
+
 /**
- * The guard held up and watching the blow (fighter.guardHeld: the player's guard button) with nothing in his hands to meet it
- * (the plain 'guard'): the forearm on the side the blow comes from is put onto its line, WORLD.guardCover.out of his height out
- * from what it is aimed at, so the blow comes into the arm (BLOCKING) and not round or under the gloves. A weapon's or a
- * shield's arm is set after this (weaponIntent) and keeps its own place.
+ * Where his block takes a blow to be (WORLD.guardRead), from where it is (`threat`): nowhere until `delay` after it starts to
+ * move; then where it was, trailing it by `lag`, off its line by his `error` (a new miss each blow). Null if not read.
+ */
+function blowRead(world, fighter, punch, threat) {
+  const share = guardReading(fighter);
+  if (share === null) return null;
+  const spec = WORLD.guardRead;
+  const by = ([novice, master]) => novice + (master - novice) * share;
+  if ((punch.age ?? punch.t) < by(spec.delay)) return null;
+  const read = fighter.blowRead;
+  if (read?.punch !== punch) {
+    const error = by(spec.error) * fighter.body.heightM;
+    fighter.blowRead = { punch, point: threat, at: world.time, off: [0, 1, 2].map(() => (world.random() * 2 - 1) * error) };
+  } else {
+    read.point = vec.lerp(read.point, threat, 1 - Math.exp(-(world.time - read.at) / by(spec.lag)));
+    read.at = world.time;
+  }
+  return vec.add(fighter.blowRead.point, fighter.blowRead.off);
+}
+
+/**
+ * The guard up against a blow and watching it (`defence.from`: the player's guard button, an AI's block) with nothing in his
+ * hands to meet it (the plain 'guard'): the forearm on the side the blow comes from is put onto its line as he reads it
+ * (blowComing), WORLD.guardCover.out of his height out from what it is aimed at, so the blow comes into the arm (BLOCKING) and
+ * not round or under the gloves. A weapon's or a shield's arm is set after this (weaponIntent) and keeps its own place.
  */
 function coverArms(world, fighter, intent) {
-  if (fighter.defence?.name !== 'guard' || !fighter.guardHeld || fighter.punch) return;
+  if (fighter.defence?.name !== 'guard' || fighter.punch) return;
   const blow = blowComing(world, fighter);
   if (!blow) return;
   const line = vec.sub(blow.threat, blow.mine);
@@ -730,15 +762,14 @@ export function longPoint(striker, punch) {
 }
 
 /**
- * Where (local) the shield hand goes to put the shield on a long point's line, held out as far as a block; held up on the guard
- * button and watching the blow (fighter.guardHeld), onto any blow's line. Null otherwise.
+ * Where (local) the shield hand goes to put the shield on the line of the blow it is raised against (a long point's: its tip),
+ * held out as far as a block, as he reads it (blowComing). Null if none, or not read.
  */
 function shieldOnLine(world, fighter, guard) {
   const blow = blowComing(world, fighter);
   if (!blow) return null;
   const { attacker, punch, mine } = blow;
   const long = longPoint(attacker, punch);
-  if (!long && !fighter.guardHeld) return null;
   const line = vec.sub(long ? bladeFor(attacker, punch.spec).tip : blow.threat, mine);
   if (vec.length(line) < 1e-3) return null;
   return toLocal(fighter, vec.add(mine, vec.scale(vec.normalize(line), (guard[0] + 0.1) * fighter.body.heightM)));
@@ -1891,6 +1922,54 @@ export function nearestAnyone(world, fighter, range) {
   return best;
 }
 
+/** The blocks a guard is held with. */
+export const BLOCKS = new Set(['guard', 'weaponBlock', 'shieldBlock']);
+
+/** The block he holds: his shield, his weapon across, or his arms. */
+export function blockFor(fighter) {
+  if (fighter.shield) return 'shieldBlock';
+  if (fighter.weapon?.held && STYLES[fighter.style]?.defences?.weaponBlock) return 'weaponBlock';
+  return 'guard';
+}
+
+/**
+ * The guard held (WORLD.guardHeld; the player's button, an AI's keepGuard): the block stays up, put back as each one runs out
+ * (not over a strike he is throwing), set to meet the blow coming at him from `striker` (as he reads it: WORLD.guardRead) while
+ * he has the breath (`spentBelow`), else held where it is.
+ */
+export function holdGuard(world, fighter, striker) {
+  const from = striker && fighter.stamina >= WORLD.guardHeld.spentBelow ? striker.id : null;
+  if (!fighter.punch && !fighter.defence) perform(world, fighter, blockFor(fighter), { from, held: true });
+  // (A blow begun while the block was already up: the block goes to meet it.)
+  else if (BLOCKS.has(fighter.defence?.name) && from !== null && fighter.defence.from !== from) {
+    fighter.defence.from = from;
+    fighter.defence.cover = undefined;
+  }
+}
+
+/** Whether an event is a blow taken on a block of his: on his arms or shield, fended off by his blade, or parried by it. */
+function blockerOf(event) {
+  if (event.kind === 'blocked') return event.defender;
+  if (event.kind === 'bladeBlock') return event.attacker;
+  if (event.kind === 'parry') return event.fighter;
+  return undefined;
+}
+
+/** Each blow taken on a block this step, anyone's, costs its blocker stamina by its energy (WORLD.guardHeld.perJoule). */
+function payForBlocks(world) {
+  const events = world.events;
+  if ((world.blockCursor ?? 0) > events.length) world.blockCursor = events.length;
+  for (let index = world.blockCursor ?? 0; index < events.length; index += 1) {
+    const event = events[index];
+    const blocker = world.fighters[blockerOf(event)];
+    if (!blocker || blocker.body.gear.machine) continue;
+    // (A shield's block has its impulse and closing speed: the energy is half their product over 1 + restitution.)
+    const energy = event.energy ?? 0.5 * (event.impulse ?? 0) * (event.speed ?? 0) / (1 + WORLD.restitution);
+    if (energy > 0) drawStamina(blocker, energy * WORLD.guardHeld.perJoule / blocker.body.aerobic);
+  }
+  world.blockCursor = events.length;
+}
+
 /** Start a whole-body move (rush, clinch) or a defence. */
 export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1, from = null, held = false } = {}) {
   if (fighter.state !== 'up' || fighter.netted) return false;
@@ -1902,7 +1981,7 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if ((name === 'weaponBlock' || name === 'parry') && fighter.caught) return false;
   if (DEFENCES[name]) {
     // The player's dodge or block takes breath (the plain guard held up does not); he may go into the overdraft for it.
-    // (`held`: a block kept up on the guard button, paid for by the second instead: control.js CONTROL.guard.)
+    // (`held`: a block kept up as a held guard, paid for by the second instead: WORLD.guardHeld.)
     if (fighter.player && name !== 'guard' && !held) drawStamina(fighter, WORLD.overdraft.defenceCost / fighter.body.aerobic);
     // `from`: who the strike comes from, for a block that goes to meet it.
     // (`cover`: the arm a held guard puts on the blow's line, coverArms.)
@@ -3361,6 +3440,7 @@ export function step(world, dt) {
   if (world.arrows.length) flyArrows(world, dt);
   if (world.nets?.length) flyNets(world, dt);
   if (world.brushTouches) holdBrushes(world, dt);
+  payForBlocks(world);
   world.time += dt;
   world.lastDt = dt;
 }
@@ -3963,7 +4043,11 @@ function updateTimers(world, fighter, dt) {
   if (fighter.player) overdraftStep(world, fighter, dt);
   // A machine (gear.machine: a robot) does not tire: what an attack or a run costs a man costs it nothing.
   if (fighter.body.gear.machine) fighter.stamina = 1;
-  else if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+  else {
+    // His guard held up: a steady draw (WORLD.guardHeld), never past empty.
+    if (fighter.guardHeld) fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - WORLD.guardHeld.staminaPerSecond * dt / fighter.body.aerobic);
+    if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+  }
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;

@@ -6,7 +6,7 @@ import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volley
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bladeFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -2499,6 +2499,7 @@ export function think(world, fighter, dt) {
 /** What he does this step (think). */
 function decide(world, fighter, dt) {
   const random = world.random;
+  keepGuard(world, fighter);
   fighter.strafe = 0;
   fighter.running = false;
   fighter.aimAt = undefined;
@@ -2713,6 +2714,8 @@ function decide(world, fighter, dt) {
     if (incoming.watchedFrom === undefined && (incoming.driven || couchedGap(world, striker, incoming) <= AI.couchedWatch)) incoming.watchedFrom = incoming.age;
     seenFor = incoming.watchedFrom === undefined ? 0 : incoming.age - incoming.watchedFrom;
   }
+  // His guard held up (keepGuard) is his answer: it goes to meet the blow as well as he reads it.
+  if (incoming && fighter.guardHeld) fighter.reacted = true;
   if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && seenFor >= fighter.reactAt) {
     fighter.reacted = true;
     // Reeling from a blow, he is slow to cover up.
@@ -2723,9 +2726,17 @@ function decide(world, fighter, dt) {
       let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
       // Two blades: meet it with one and cut with the other.
       if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;
+      // A trained man answers with his guard, held up through the blows that follow, as often as he is trained to read them
+      // (WORLD.guardRead, keepGuard); a long point he still gets off the line of (AI.offLine).
+      const guards = !longPoint(striker, incoming) && random() < (guardReading(fighter) ?? 0);
+      if (guards) name = blockFor(fighter);
       // A blade coming is got away from, not blocked with an arm.
-      if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';
-      perform(world, fighter, name, { side, from: striker.id });
+      else if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';
+      perform(world, fighter, name, { side, from: striker.id, held: guards });
+      if (guards) {
+        fighter.guardHeld = true;
+        fighter.guardUntil = world.time + WORLD.guardRead.linger;
+      }
       // Slip and fire back: the counter comes while the attacker's hand is out.
       if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {
         fighter.cooldown = Math.min(fighter.cooldown, 0.12);
@@ -2816,6 +2827,22 @@ function decide(world, fighter, dt) {
     fighter.aiComboZone = zone;
     fighter.cooldown = combo ? 0 : nextGap(world, fighter, style, plan, cadence);
   }
+}
+
+/**
+ * His guard held (as the player's on his button: physics.js holdGuard, WORLD.guardHeld): a block he made against a blow kept up
+ * through the blows that follow, each met as well as his skill reads it (WORLD.guardRead), paying for it by the second; let down
+ * `linger` s after the last blow at him, or when he is off his feet.
+ */
+function keepGuard(world, fighter) {
+  if (!fighter.guardHeld) return;
+  const striker = fighter.state === 'up' ? world.fighters.find((other) => hostile(other, fighter) && other.punch?.target === fighter.id) : null;
+  if (striker) fighter.guardUntil = world.time + WORLD.guardRead.linger;
+  if (fighter.state !== 'up' || !(world.time < fighter.guardUntil)) {
+    fighter.guardHeld = false;
+    return;
+  }
+  holdGuard(world, fighter, striker);
 }
 
 /**

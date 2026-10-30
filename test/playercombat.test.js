@@ -12,9 +12,10 @@ import { thinkAll } from '../src/ai.js';
 import { CONTROL, directFighter, newOrders } from '../src/control.js';
 import { advance, createWorld, handVelocityOf, placeFighter, WORLD } from '../src/physics.js';
 
-/** Red played, blue (`blue`) still or (`fights`) left to the AI, `distance` m apart. */
-function bout(red, distance, { blue = 'light', fights = false, seed = 4 } = {}) {
-  const world = createWorld([{ inputs: structuredClone(PRESETS[red]), corner: 'red' }, { inputs: structuredClone(PRESETS[blue]), corner: 'blue' }], { seed });
+/** Red played (at `skill`, else his own), blue (`blue`) still or (`fights`) left to the AI, `distance` m apart. */
+function bout(red, distance, { blue = 'light', fights = false, seed = 4, skill } = {}) {
+  const played = { ...structuredClone(PRESETS[red]), ...(skill === undefined ? {} : { skill }) };
+  const world = createWorld([{ inputs: played, corner: 'red' }, { inputs: structuredClone(PRESETS[blue]), corner: 'blue' }], { seed });
   placeFighter(world.fighters[0], -distance / 2);
   placeFighter(world.fighters[1], distance / 2);
   const orders = newOrders();
@@ -132,24 +133,33 @@ test('each blow taken on the guard costs breath by its energy', () => {
   assert.ok(Math.abs(lost - hold - blow) < 0.003, `a 100 J blow: ${lost.toFixed(4)} lost, ${(hold + blow).toFixed(4)} expected (less a little recovery)`);
 });
 
-test('the guard held stops most blows: it goes onto the line of each one', () => {
-  const landed = (guard) => {
+test('the guard held stops most blows: it goes onto the line of each one, as well as he is trained to read it', () => {
+  // (Shares of the blows thrown at him: open, one that lands may end it.)
+  const landed = (guard, skill) => {
+    let blows = 0;
     let count = 0;
     let blocked = 0;
-    for (const seed of [1, 2]) {
-      const game = bout('samurai', 2.5, { blue: 'samurai', fights: true, seed });
+    for (const seed of [1, 2, 3, 4]) {
+      const game = bout('samurai', 2.5, { blue: 'samurai', fights: true, seed, skill });
       game.orders.lock = 1;
       game.orders.guard = guard;
-      game.step(12);
+      const thrown = new Set();
+      game.step(12, () => {
+        if (game.him.punch?.target === 0) thrown.add(game.him.punch);
+      });
+      blows += thrown.size;
       count += game.world.events.filter((event) => event.kind === 'landed' && event.defender === 0).length;
       blocked += game.world.events.filter((event) => event.kind === 'parry' && event.fighter === 0 || event.kind === 'bladeBlock' && event.attacker === 0 || event.kind === 'blocked' && event.defender === 0).length;
     }
-    return { count, blocked };
+    return { share: count / blows, blocked };
   };
-  const open = landed(false);
-  const guarded = landed(true);
-  assert.ok(guarded.count * 3 <= open.count, `landed on him: ${open.count} open, ${guarded.count} guarded`);
+  const open = landed(false, 0.9);
+  const guarded = landed(true, 0.9);
+  const untrained = landed(true, 0.1);
+  const shares = `landed on him: ${open.share.toFixed(2)} open, ${guarded.share.toFixed(2)} guarded at skill 0.9, ${untrained.share.toFixed(2)} at 0.1`;
+  assert.ok(guarded.share * 3 <= open.share, shares);
   assert.ok(guarded.blocked > open.blocked, `met on the guard: ${guarded.blocked}, against ${open.blocked} open`);
+  assert.ok(untrained.share >= 2 * guarded.share, shares);
 });
 
 test('spent, the guard is no longer brought onto the blow: it is held where it is', () => {

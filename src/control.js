@@ -7,9 +7,8 @@
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
-import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, throwPunch, WORLD } from './physics.js';
+import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
-import { drawStamina } from './physics/overdraft.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
@@ -85,24 +84,13 @@ export const CONTROL = {
   comboWithin: 0.45,
   // Holding the guard, the footwork slows to this share.
   guardFootwork: 0.6,
-  // The guard held (the button held, T held): the block kept up (shield, weapon across, or arms: blockFor) and put onto the line of
-  // the blow coming at him (its striker as the block's `from`: physics.js interceptBlock, shieldOnLine), so it is in the way where
-  // the blow comes rather than wherever it happened to be. Held up, it is work:
-  // - staminaPerSecond: what holding it costs (before his aerobic, as the run's; in place of the per-block cost of a dodge,
-  //   WORLD.overdraft.defenceCost, which re-raising a held block every 0.45 s used to charge: ~0.027 a second). A weapon or a shield
-  //   held up and ready is steady work for the shoulders, a little more than a run's flat out (0.02): with his recovery cut while
-  //   he holds it (WORLD.guardHeld.recovery), a fit man (aerobic 0.9) loses ~0.012 a second net, empty after ~80 s of nothing but
-  //   guarding (at 0.015 and full recovery it was free: the recovery outran it). It does not take him past empty: a man does not
-  //   faint holding his guard up (the blows on it can: perJoule).
-  // - perJoule: each blow taken on it (blocked on the arms or the shield, fended off by the blade, parried) costs this much stamina
-  //   per joule the collision took up (before his aerobic): the arms and legs soak what the blow brought. Blows met on a guard here
-  //   take up ~15-130 J (a light jab to a heavyweight's cross or a full cut): ~0.006-0.05 of the bar each, a dozen hard ones
-  //   in a quarter of a minute about a third of it. This draws like any work (physics/overdraft.js drawStamina).
-  // - spentBelow: stamina under this, he is spent: the block is no longer brought onto the blow's line, only held where it is (and
-  //   the arms holding it are weaker anyway: fatigueScale). A guard kept up too long gives.
+  // The guard held (the button held, T held): the block kept up (shield, weapon across, or arms: physics.js blockFor) and put onto
+  // the line of the blow coming at him (physics.js holdGuard: its striker as the block's `from`), so it is in the way where the blow
+  // comes rather than wherever it happened to be, as well as his skill reads it (WORLD.guardRead: the same for the AI's guard).
+  // What it costs, held and per blow taken on it, is WORLD.guardHeld (anyone's guard: these are its numbers).
   // He can strike from it: an attack asked for while it is held is thrown (the block keeps what the strike does not need) and the
   // block is back up after it.
-  guard: { staminaPerSecond: 0.025, perJoule: 0.0004, spentBelow: 0 },
+  guard: WORLD.guardHeld,
   // A long weapon's room (its striking part `deadFrom` m or more beyond the hands: weapon.spec.strikeFrom, a spear's head, a
   // naginata's blade, a hammer's head on its haft): with his man inside it only the haft meets him. His man (an enemy on his feet,
   // the one he faces) nearer than his reach plus that dead length (plus the man's head's radius, as holdDistance), the stick idle
@@ -127,7 +115,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false, blockCursor: undefined };
+  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false };
 }
 
 /**
@@ -883,16 +871,6 @@ function goPin(world, fighter) {
 
 // ---- Defence ----------------------------------------------------------------
 
-/** The block he holds: his shield, his weapon across, or his arms. */
-export function blockFor(fighter) {
-  const style = STYLES[fighter.style];
-  if (fighter.shield) return 'shieldBlock';
-  if (fighter.weapon?.held && style?.defences?.weaponBlock) return 'weaponBlock';
-  return 'guard';
-}
-
-const BLOCKS = new Set(['guard', 'weaponBlock', 'shieldBlock']);
-
 /** A tap of the guard: out of the way of what is coming, as his style would; with nothing coming, a step back. */
 export function evasionFor(world, fighter) {
   const style = STYLES[fighter.style];
@@ -907,58 +885,17 @@ export function evasionFor(world, fighter) {
   return { name: style?.defences?.slip && !fighter.weapon?.held ? 'slip' : 'stepBack', side: world.random() < 0.5 ? 1 : -1, from: null };
 }
 
-function defend(world, fighter, orders, dt) {
+function defend(world, fighter, orders) {
   if (fighter.state !== 'up') return;
-  guardCosts(world, fighter, orders, dt);
+  // (What it costs, held and per blow on it: physics.js, as anyone's guard.)
   fighter.guardHeld = Boolean(orders.guard);
-  if (orders.guard) holdGuard(world, fighter);
+  if (orders.guard) holdGuard(world, fighter, world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id));
   for (const request of orders.evasions ?? []) {
     const evasion = evasionFor(world, fighter);
     if (!fighter.punch) perform(world, fighter, evasion.name, { side: evasion.side, from: evasion.from });
     else if (evasion.name === 'stepBack') fighter.punch = null;
   }
   orders.evasions = [];
-}
-
-/** Whether an event is a blow taken on his guard: blocked on his arms or shield, fended off by his blade, or parried by it. */
-function blockedBy(event, id) {
-  if (event.kind === 'blocked') return event.defender === id;
-  if (event.kind === 'bladeBlock') return event.attacker === id;
-  if (event.kind === 'parry') return event.fighter === id;
-  return false;
-}
-
-/**
- * The guard held (CONTROL.guard): the block stays up, put back as each one runs out (not over a strike he is throwing), set to
- * meet the blow coming at him: onto its line while he has the breath (`spentBelow`), else held where it is.
- */
-function holdGuard(world, fighter) {
-  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id);
-  const from = striker && fighter.stamina >= CONTROL.guard.spentBelow ? striker.id : null;
-  if (!fighter.punch && !fighter.defence) perform(world, fighter, blockFor(fighter), { from, held: true });
-  // (A blow begun while the block was already up: the block goes to meet it.)
-  else if (BLOCKS.has(fighter.defence?.name) && from !== null && fighter.defence.from !== from) {
-    fighter.defence.from = from;
-    fighter.defence.cover = undefined;
-  }
-}
-
-/** What the guard costs (CONTROL.guard): held up, a steady draw (never past empty); each blow taken on it, its energy. */
-function guardCosts(world, fighter, orders, dt) {
-  const spec = CONTROL.guard;
-  const aerobic = fighter.body.aerobic;
-  if (orders.guard) fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - spec.staminaPerSecond * dt / aerobic);
-  const events = world.events;
-  if ((orders.blockCursor ?? 0) > events.length) orders.blockCursor = events.length;
-  for (let index = orders.blockCursor ?? events.length; index < events.length; index += 1) {
-    const event = events[index];
-    // (Only fresh ones: events from while he was not on his feet to defend are past.)
-    if (!blockedBy(event, fighter.id) || event.time < world.time - 2 * dt) continue;
-    // (A shield's block has its impulse and closing speed: the energy is half their product over 1 + restitution.)
-    const energy = event.energy ?? 0.5 * (event.impulse ?? 0) * (event.speed ?? 0) / (1 + WORLD.restitution);
-    if (energy > 0) drawStamina(fighter, energy * spec.perJoule / aerobic);
-  }
-  orders.blockCursor = events.length;
 }
 
 // ---- Special actions ---------------------------------------------------------
@@ -1266,7 +1203,7 @@ export function directFighter(world, fighter, orders, dt) {
     attack(world, fighter, orders, opponent);
     return;
   }
-  defend(world, fighter, orders, dt);
+  defend(world, fighter, orders);
   continueCombo(world, fighter);
   attack(world, fighter, orders, opponent);
 }

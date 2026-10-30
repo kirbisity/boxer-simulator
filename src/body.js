@@ -142,7 +142,8 @@ export const PRESETS = {
   },
   // A character for every other style, dressed for it.
   street: {
-    name: 'Vinnie Russo', style: 'street', sex: 'male', heightCm: 178, frame: 'medium', age: 31, exercise: 0.3, calories: 3100,
+    // A street fighter in a civilian's clothes: a brawler's skill, not his kit's (a civilian's 0.1).
+    name: 'Vinnie Russo', style: 'street', sex: 'male', heightCm: 178, frame: 'medium', age: 31, exercise: 0.3, calories: 3100, skill: 0.3,
     outfit: { kind: 'casual', design: 0 },
     look: { skinTone: 'light', hairStyle: 'fade', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
@@ -405,7 +406,8 @@ export const PRESETS = {
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'mustache', eyeColor: 'blue' },
   },
   revolver: {
-    name: 'Lady Ashford', style: 'revolver', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2550,
+    // A duellist with her revolver in a lady's gown: practised at the mark, not her kit's civilian 0.1 (skill steadies a shot).
+    name: 'Lady Ashford', style: 'revolver', sex: 'female', heightCm: 163, frame: 'small', age: 29, exercise: 0.6, calories: 2550, skill: 0.45,
     outfit: { kind: 'victorianLady', design: 0 }, accessories: ['hairDecor'],
     look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#4a2a1a', facialHair: 'none', eyeColor: 'green' },
   },
