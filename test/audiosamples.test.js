@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { LOOP_FILES, SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
-import { playSample, playWithSamples, samplePlan } from '../src/audio/sfx/sampled.js';
+import { BLOW_TAIL, playSample, playWithSamples, samplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 
 const DIR = 'src/audio/samples';
@@ -38,21 +38,22 @@ test('the events a recording fits play it; the rest are left to the synth', () =
   assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'flesh' }).set, 'slice');
   assert.equal(plan({ type: 'hit', energy: 150, striker: 'blunt', covering: 'flesh' }).set, 'bonehit');
   assert.equal(plan({ type: 'hit', energy: 300, striker: 'blade', covering: 'plate' }).set, 'break');
-  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'plate' }), null);
-  assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'mail' }), null);
+  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'plate' }).set, 'platepunch');
+  assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'mail' }).set, 'mail');
   assert.equal(plan({ type: 'wound', kind: 'cut', severity: 0.8 }).set, 'gore');
   assert.equal(plan({ type: 'wound', kind: 'bone', severity: 0.8 }).set, 'bones');
-  assert.equal(plan({ type: 'wound', kind: 'stab', severity: 0.8 }), null);
+  assert.equal(plan({ type: 'wound', kind: 'stab', severity: 0.8 }).set, 'stab');
   const step = plan({ type: 'step', speed: 2, mass: 90, surface: 'sand', armour: 'plate' });
-  assert.equal(step.set, 'armourstep');
-  assert.equal(step.synth.armour, 'none', 'the ground with no recording (sand) still the synth, the armour the recording');
-  assert.equal(plan({ type: 'step', speed: 2, mass: 80, surface: 'snow', armour: 'none' }), null);
+  assert.equal(step.set, 'step-grass-walk', 'sand: the grass\'s steps, lower');
+  assert.deepEqual(step.extra.map((layer) => layer.set), ['armourstep']);
+  assert.equal(step.synth.armour, 'none', 'the synth\'s crunch of the sand beside it, without the armour');
+  assert.equal(plan({ type: 'step', speed: 2, mass: 80, surface: 'snow', armour: 'none' }).set, 'step-grass-walk');
   assert.equal(plan({ type: 'fall', mass: 85, speed: 4, surface: 'earth', armour: 'plate' }).set, 'clatter');
   assert.equal(plan({ type: 'clatter', speed: 3, mass: 1.2 }).set, 'clatter');
   assert.equal(plan({ type: 'swing', speed: 15, length: 0.7, mass: 1.6, head: 'blunt' }).set, 'maceswing');
-  assert.equal(plan({ type: 'swing', speed: 22, length: 1, mass: 1.3, head: 'blade' }), null);
+  assert.equal(plan({ type: 'swing', speed: 22, length: 1, mass: 1.3, head: 'blade' }).set, 'bladeswing');
   assert.equal(plan({ type: 'shot', kind: 'matchlock' }).set, 'gunshot');
-  assert.equal(plan({ type: 'shot', kind: 'bow' }), null);
+  assert.equal(plan({ type: 'shot', kind: 'bow' }).set, 'bow');
   for (const set of ['clash', 'slice', 'bonehit', 'break', 'gore', 'bones', 'armourstep', 'clatter', 'maceswing', 'gunshot', 'step-heel', 'helmet', 'woodshield', 'punch', 'fistswing', 'thunder']) assert.ok(SAMPLE_SETS[set]?.length, set);
 });
 
@@ -80,11 +81,13 @@ test('a footstep plays its ground\'s recording, walking or running by the pace, 
   assert.equal(plan({ type: 'step', speed: 5, mass: 80, surface: 'earth', armour: 'none' }).set, 'step-grass-run');
   assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'mud', armour: 'none' }).set, 'step-mud');
   assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'water', depth: 0.3, armour: 'none' }).set, 'step-water');
-  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'wood', armour: 'none' }), null, 'no recording of boards (the ring\'s canvas): the synth');
+  const boards = plan({ type: 'step', speed: 1.4, mass: 80, surface: 'wood', armour: 'none' });
+  assert.equal(boards.set, 'step-stone-walk', 'no recording of boards (the ring\'s canvas): the stone\'s steps, lower');
+  assert.ok(boards.synth && boards.synthGain > 0, 'the synth\'s knock of the planks beside them');
   const plated = plan({ type: 'step', speed: 1.4, mass: 90, surface: 'stone', armour: 'plate' });
   assert.equal(plated.set, 'step-stone-walk');
   assert.deepEqual(plated.extra.map((layer) => layer.set), ['armourstep']);
-  assert.equal(plan({ type: 'step', speed: 1.4, mass: 90, surface: 'sand', armour: 'plate' }).set, 'armourstep');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 90, surface: 'sand', armour: 'plate' }).extra[0].set, 'armourstep');
 });
 
 test('a heavier man\'s step is louder, lower and drawn out; a lighter man\'s quieter, shorter, crisper', () => {
@@ -104,7 +107,7 @@ test('hooves: hard ground clops, soft ground thuds, by the gait; the neigh recor
   const hoof = (surface, gait) => plan({ type: 'horse', kind: 'hoof', surface, gait, speed: 3, mass: 550 });
   assert.equal(hoof('stone', 'walk').set, 'hoof-stone');
   assert.equal(hoof('earth', 'gallop').set, 'hoof-soft');
-  assert.equal(hoof('mud', 'trot'), null);
+  assert.equal(hoof('mud', 'trot').set, 'step-mud');
   assert.ok(hoof('grass', 'gallop').trim > hoof('grass', 'walk').trim);
   assert.equal(plan({ type: 'horse', kind: 'neigh', mass: 500 }).set, 'neigh');
   assert.equal(plan({ type: 'horse', kind: 'snort', mass: 500 }), null);
@@ -201,7 +204,8 @@ test('the fourth batch: a body falling, a whip\'s lash, a wooden door\'s creak a
   const fall = (fields) => plan({ type: 'fall', mass: 80, speed: 4, surface: 'stone', armour: 'none', ...fields });
   for (const surface of ['stone', 'tile', 'wood', 'earth', 'grass', 'sand', 'snow']) assert.equal(fall({ surface }).set, 'bodyfall', surface);
   assert.equal(fall({ surface: 'stone' }).synth, null);
-  assert.equal(fall({ surface: 'water' }), null, 'a fall in water: the synth\'s splash');
+  assert.equal(fall({ surface: 'water' }).set, 'step-water', 'a fall in water: the steps\' splash, lower');
+  assert.ok(fall({ surface: 'water' }).synth, 'the synth\'s splash beside it');
   const plated = fall({ armour: 'plate', surface: 'earth' });
   assert.equal(plated.set, 'clatter');
   assert.deepEqual(plated.extra.map((layer) => layer.set), ['bodyfall'], 'the kit\'s crash over the body\'s thud');
@@ -221,7 +225,7 @@ test('the fourth batch: a body falling, a whip\'s lash, a wooden door\'s creak a
   assert.ok(shut.extra[0].delay > 0 && shut.extra[0].delay < shut.seconds + 0.2, 'the slam into the creak');
   assert.equal(door('closed').extra[0].set, 'door-slam');
   assert.equal(door('closing', 'chest').extra[0].set, 'door-slam');
-  for (const kind of ['gate', 'portcullis', 'lock', 'lever', 'ladder', 'pickup']) assert.equal(door('closing', kind), null, kind);
+  assert.equal(door('closing', 'pickup'), null, 'a thing picked up: the synth\'s');
 });
 
 test('the fourth batch scales: a harder fall or lash louder and longer, a heavier body lower, a door heavier than a chest', () => {
@@ -246,4 +250,79 @@ test('a layer with a delay is played that long after the take', () => {
   playWithSamples(bank, voice, SOUND_FAMILIES.mech, event, SOUND_FAMILIES.mech.params(event), 1, 0.5);
   assert.equal(started.length, 2);
   assert.ok(started[1] - started[0] > 0.3, `${started}`);
+});
+
+test('the fifth batch: a bow, a crossbow, a portcullis, a sword on mail and into leather, each in its set', () => {
+  for (const set of ['bow', 'crossbow', 'crossbow-latch', 'crossbow-crank', 'portcullis-chain', 'portcullis-slam', 'mail', 'stab', 'platepunch', 'lamellar', 'bladeswing', 'shieldclang']) assert.ok(SAMPLE_SETS[set]?.length, set);
+  assert.equal(plan({ type: 'shot', kind: 'bow' }).set, 'bow');
+  assert.ok(plan({ type: 'shot', kind: 'bow' }).synth, 'the synth\'s thrum of the string under the release');
+  assert.equal(plan({ type: 'shot', kind: 'crossbow' }).set, 'crossbow');
+  const cannon = plan({ type: 'shot', kind: 'cannon' });
+  assert.equal(cannon.set, 'gunshot');
+  assert.ok(cannon.rate < 0.6 && cannon.synth, 'a cannon: the report slowed, the synth\'s boom under it');
+  const down = plan({ type: 'mech', kind: 'portcullis', state: 'down' });
+  assert.equal(down.set, 'portcullis-chain');
+  assert.deepEqual(down.extra.map((layer) => layer.set), ['portcullis-slam']);
+  assert.equal(plan({ type: 'mech', kind: 'portcullis', state: 'opening' }).extra, undefined, 'raised: the chain alone');
+  assert.equal(plan({ type: 'mech', kind: 'gate', state: 'closing' }).extra[0].set, 'portcullis-slam');
+  assert.equal(plan({ type: 'mech', kind: 'lock', state: 'unlocked' }).set, 'crossbow-latch');
+  assert.equal(plan({ type: 'mech', kind: 'lever', state: 'opening' }).set, 'crossbow-crank');
+  for (const striker of ['blade', 'point', 'blunt']) assert.equal(plan({ type: 'hit', energy: 100, striker, covering: 'mail', part: 'trunk' }).set, 'mail', striker);
+  assert.ok(plan({ type: 'hit', energy: 100, striker: 'blunt', covering: 'mail', mass: 1.2 }).rate < plan({ type: 'hit', energy: 100, striker: 'blade', covering: 'mail', mass: 1.2 }).rate, 'a weight on mail lower');
+  assert.equal(plan({ type: 'hit', energy: 100, striker: 'point', covering: 'flesh', part: 'trunk' }).set, 'stab');
+  assert.equal(plan({ type: 'hit', energy: 100, striker: 'blade', covering: 'leather', part: 'trunk' }).set, 'stab');
+  assert.equal(plan({ type: 'hit', energy: 100, striker: 'blade', covering: 'flesh', part: 'trunk' }).set, 'slice', 'an edge into flesh still slices');
+  assert.equal(plan({ type: 'arrowhit', speed: 50, covering: 'mail' }).set, 'mail');
+  assert.equal(plan({ type: 'arrowhit', speed: 50, covering: 'flesh' }).set, 'stab');
+  assert.equal(plan({ type: 'arrowhit', speed: 50, covering: 'ground' }), null, 'into the ground: the synth\'s');
+});
+
+test('what was the synth\'s plays recordings: a punch on plate (four variants), lamellar, a steel shield, a sword\'s swing', () => {
+  // A fist or a gauntlet on plate: its own set of at least three derived takes, a harder blow louder and longer, a kick lower.
+  assert.ok(SAMPLE_SETS.platepunch.length >= 3);
+  const punch = (energy, striker = 'fist') => plan({ type: 'hit', energy, striker, covering: 'plate', part: 'trunk' });
+  for (const striker of ['fist', 'foot', 'knee', 'elbow', 'body']) assert.equal(punch(60, striker).set, 'platepunch', striker);
+  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'shieldmetal', part: 'shield' }).set, 'platepunch');
+  assert.ok(punch(250).trim > punch(5).trim && punch(250).seconds > punch(5).seconds && punch(250).fade > punch(5).fade);
+  assert.ok(punch(60, 'foot').rate < punch(60).rate, 'a kick lower');
+  assert.ok(punch(250).seconds < plan({ type: 'hit', energy: 250, striker: 'blade', covering: 'plate', part: 'trunk', mass: 1.2 }).seconds, 'shorter than a blade\'s');
+  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'plate', part: 'head' }).set, 'helmet', 'on a helmet: the helmet');
+  // On mail: the punch, the rings under it.
+  const mailPunch = plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'mail', part: 'trunk' });
+  assert.equal(mailPunch.set, 'punch');
+  assert.deepEqual(mailPunch.extra.map((layer) => layer.set), ['mail']);
+  // Lamellar and scale: the lamellar set, scale higher; a harder blow longer.
+  const lam = (energy, covering = 'lamellar') => plan({ type: 'hit', energy, striker: 'blade', covering, part: 'trunk', mass: 1.2 });
+  assert.equal(lam(100).set, 'lamellar');
+  assert.equal(lam(100, 'scale').set, 'lamellar');
+  assert.ok(lam(100, 'scale').rate > lam(100).rate);
+  assert.ok(lam(300).seconds > lam(10).seconds && lam(300).trim > lam(10).trim);
+  // Steel on a steel shield.
+  const clang = (speed) => plan({ type: 'clash', speed, a: 'blade', b: 'shieldmetal', mass: 1.2 });
+  assert.equal(clang(10).set, 'shieldclang');
+  assert.ok(clang(18).seconds > clang(2).seconds && clang(18).trim > clang(2).trim);
+  // A sword's swing: a faster stroke louder and higher.
+  const swing = (speed) => plan({ type: 'swing', speed, length: 1, mass: 1.3, head: 'blade' });
+  assert.equal(swing(20).set, 'bladeswing');
+  assert.ok(swing(32).trim > swing(10).trim && swing(32).rate > swing(10).rate);
+  assert.equal(plan({ type: 'wound', kind: 'stab', severity: 1 }).set, 'stab');
+  assert.ok(plan({ type: 'wound', kind: 'stab', severity: 1 }).seconds > plan({ type: 'wound', kind: 'stab', severity: 0 }).seconds);
+});
+
+test('every blow is played a little longer than before, the heaviest the longest, with a slower fade', () => {
+  // (Before BLOW_TAIL: a blade on flesh played 0.22 s at 5 J and 0.75 s at 400 J, its fade 0.04 and 0.2 s; a clash 0.15-0.8 s.)
+  const blade = (energy) => plan({ type: 'hit', energy, striker: 'blade', covering: 'flesh', part: 'trunk', mass: 1.2 });
+  assert.ok(blade(5).seconds > 0.22 * 1.1 && blade(5).seconds < 0.22 * 1.3, `${blade(5).seconds}`);
+  assert.ok(blade(400).seconds >= 0.75 * 1.5, `${blade(400).seconds}`);
+  assert.ok(blade(5).fade > 0.04 && blade(400).fade > 0.2 * 2);
+  const clash = (speed) => plan({ type: 'clash', speed, a: 'blade', b: 'blade', mass: 1.2 });
+  assert.ok(clash(1).seconds > 0.15 * 1.1 && clash(20).seconds >= 0.8 * 1.5);
+  // The length rises with the energy, and the share it is drawn out by rises too.
+  for (const blow of [blade, (e) => plan({ type: 'hit', energy: e, striker: 'blunt', covering: 'plate', part: 'trunk', mass: 1.6 }), (e) => plan({ type: 'hit', energy: e, striker: 'fist', covering: 'flesh', part: 'head' }), (e) => plan({ type: 'hit', energy: e, striker: 'blade', covering: 'mail', part: 'trunk' })]) {
+    const lengths = [5, 20, 80, 400].map((energy) => blow(energy).seconds);
+    for (let k = 1; k < lengths.length; k += 1) assert.ok(lengths[k] > lengths[k - 1], `${lengths}`);
+  }
+  assert.ok(BLOW_TAIL.heavy > BLOW_TAIL.light && BLOW_TAIL.light > 1 && BLOW_TAIL.fadeHeavy > BLOW_TAIL.fadeLight);
+  // The loudness is as it was.
+  assert.equal(blade(400).trim, 0.85);
 });

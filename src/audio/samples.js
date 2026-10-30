@@ -1,7 +1,8 @@
 // Recorded sound effects (src/audio/samples/*.mp3, cut from the user's clips: samples/README.md): a sword on a sword, a blade through
 // flesh, a blow on bone, bones breaking, steel on plate, a man in armour walking, a weapon clattering down, a mace's swing, a pistol's
 // shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny; heels on a
-// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder; a man's and a woman's
+// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder; a bow and a crossbow, a
+// portcullis, a sword on mail and into leather (and variants derived from the takes: a fist on plate, lamellar, a blade's swing); a man's and a woman's
 // cries (hurt, scream, moan, fear, dying), an army's charge. And three ambience loops, the places' beds (ambience.js): rain, wind, a town's market.
 // Each set is a few takes of one sound; a take is picked at random each time.
 //
@@ -44,6 +45,24 @@ export const SAMPLE_SETS = {
   whip: ['whip-1'],
   'door-creak': ['door-creak-1', 'door-creak-2'],
   'door-slam': ['door-slam-1'],
+  // (The fifth batch: a bow and a crossbow loosed, the crossbow's latch and its crank, a portcullis's chain and its slam, a sword on mail,
+  // a sword stabbed into leather.)
+  bow: ['bow-1'],
+  crossbow: ['crossbow-1'],
+  'crossbow-latch': ['crossbow-latch-1'],
+  'crossbow-crank': ['crossbow-crank-1'],
+  'portcullis-chain': ['portcullis-chain-1'],
+  'portcullis-slam': ['portcullis-slam-1'],
+  mail: ['mail-1', 'mail-2', 'mail-3'],
+  stab: ['stab-1', 'stab-2', 'stab-3'],
+  // Derived from the takes above (samples/README.md says from what): a fist or a shoulder on plate (the punch's thud under the plate's
+  // clank, duller and shorter), a blow on lamellar or scale (the mail's rattle lower over a plate's knock), a blade's swing (the fist's and
+  // the mace's whooshes, higher and thinner).
+  platepunch: ['platepunch-1', 'platepunch-2', 'platepunch-3', 'platepunch-4'],
+  lamellar: ['lamellar-1', 'lamellar-2', 'lamellar-3'],
+  bladeswing: ['bladeswing-1', 'bladeswing-2', 'bladeswing-3', 'bladeswing-4'],
+  // Steel on a steel shield: the shells' takes already here (a helmet's ring, steel on plate), none new.
+  shieldclang: ['helmet-1', 'break-1', 'break-3'],
   // Cries (sfx/voice.js CRY_KINDS; chosen by audio/cries.js): a man's and a woman's, each a set per kind (a few composed of two pieces).
   ...voiceSets({ male: { hurt: 7, scream: 3, moan: 4, fear: 4, dying: 2 }, female: { hurt: 4, scream: 3, moan: 3, fear: 2, dying: 2 } }),
   // An army's charge roared: one loop (engine.js plays it under a large side running at the enemy: audio/charge.js).

@@ -9,6 +9,8 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 
 139 files, 426 KB in all (the cries and the charge: 35 files, 170 KB).
 
+174 files, 746 KB in all, the three ambience loops among them (the fifth batch and its derived variants: 23 files, 56 KB).
+
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
 | slice-1.mp3 | ScreenRecording_10-29-2026_20-52-57_1.mov | 0.359-1.109 | SLICE | 0.029 | 4140 | hit: a blade or point on flesh, padding or leather |
@@ -124,6 +126,29 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | door-creak-1.mp3 | ScreenRecording_10-30-2026_13-52-06_1.mov | 0.900-1.880 | Medieval Castle Wood Door (7 Version) | 0.000 | 5220 | mech: a wooden door (or a chest's lid, higher and shorter) swinging open, or the start of its shutting |
 | door-creak-2.mp3 | ScreenRecording_10-30-2026_13-52-06_1.mov | 1.880-2.850 | Medieval Castle Wood Door (7 Version) | 0.000 | 5040 | mech: a wooden door (or a chest's lid, higher and shorter) swinging open, or the start of its shutting |
 | door-slam-1.mp3 | ScreenRecording_10-30-2026_13-52-06_1.mov | 2.855-4.297 | Medieval Castle Wood Door (7 Version) | 0.000 | 7560 | mech: a wooden door (or a chest's lid) shut, into the creak |
+| bow-1.mp3 | ScreenRecording_10-30-2026_14-41-05_1.mov | 1.882-2.107 | Bow and Arrow Sound Effect | 0.082 | 1440 | shot: a bow loosed (the synth's thrum of the string under it); the recording ends 0.23 s into the release, faded there |
+| crossbow-1.mp3 | ScreenRecording_10-30-2026_14-42-23_1.mov | 4.272-4.795 | Crossbow | 0.072 | 2880 | shot: a crossbow loosed (the synth's knock and thrum under it, quieter) |
+| crossbow-latch-1.mp3 | ScreenRecording_10-30-2026_14-42-23_1.mov | 2.745-2.847 | Crossbow | 0.065 | 720 | mech: a lock (the key's click high, the bolt going over low, 0.3 s later) |
+| crossbow-crank-1.mp3 | ScreenRecording_10-30-2026_14-42-23_1.mov | 1.020-1.800 | Crossbow | 0.000 | 4140 | mech: a lever's ratchet (the synth's clunk of the arm beside it); the window as is |
+| portcullis-chain-1.mp3 | ScreenRecording_10-30-2026_14-44-06_1.mov | 0.220-1.250 | (no text: a picture of a portcullis) | 0.000 | 5400 | mech: a portcullis's chain running (raised a little slower and lower); a drawbridge's (slower, lower, the synth's beside it); the window as is |
+| portcullis-slam-1.mp3 | ScreenRecording_10-30-2026_14-44-06_1.mov | 1.235-4.015 | (no text: a picture of a portcullis) | 0.000 | 14220 | mech: a portcullis let down (1 s into the chain) slamming and rumbling; a gate of bars clanging shut (higher, shorter) |
+| mail-1.mp3 | ScreenRecording_10-30-2026_14-47-18_1.mov | 0.267-0.715 | (Swor)d Impact On Chain Mail A(rmor) | 0.047 | 2520 | hit: a blade, point or weight on mail (a weight lower); a fist on mail (quieter, under the punch); an arrow on mail (higher, shorter) |
+| stab-1.mp3 | ScreenRecording_10-30-2026_14-47-58_1.mov | 0.074-0.291 | (Swor)d Stab Into Leather Armor So(und) | 0.044 | 1440 | hit: a point on flesh, padding or leather, a blade's edge on leather; wound: stab; an arrow into the body (higher, shorter) |
+| stab-2.mp3 | ScreenRecording_10-30-2026_14-47-58_1.mov | 0.484-0.857 | (Swor)d Stab Into Leather Armor So(und) | 0.044 | 2160 | hit: a point on flesh, padding or leather, a blade's edge on leather; wound: stab; an arrow into the body (higher, shorter) |
+| stab-3.mp3 | ScreenRecording_10-30-2026_14-47-58_1.mov | 0.898-1.205 | (Swor)d Stab Into Leather Armor So(und) | 0.038 | 1800 | hit: a point on flesh, padding or leather, a blade's edge on leather; wound: stab; an arrow into the body (higher, shorter) |
+| platepunch-1.mp3 | punch-2.mp3 (low-passed 1.8 kHz) + break-1.mp3 (x1.12 pitch, low-passed 4000 Hz, at 0.9), 0.3 s | 0-0.300 | (derived) | 0.000 | 1800 | hit: a fist, foot, knee, elbow, head, shoulder or shield rim on plate or a steel shield (on a helmet: the helmet's take) |
+| platepunch-2.mp3 | punch-4.mp3 (low-passed 1.8 kHz) + helmet-1.mp3 (x1.18 pitch, low-passed 4500 Hz, at 0.85), 0.34 s | 0-0.334 | (derived) | 0.000 | 1980 | hit: a fist, foot, knee, elbow, head, shoulder or shield rim on plate or a steel shield (on a helmet: the helmet's take) |
+| platepunch-3.mp3 | punch-6.mp3 (low-passed 1.8 kHz) + break-3.mp3 (x1.08 pitch, low-passed 3500 Hz, at 0.95), 0.28 s | 0-0.280 | (derived) | 0.000 | 1620 | hit: a fist, foot, knee, elbow, head, shoulder or shield rim on plate or a steel shield (on a helmet: the helmet's take) |
+| platepunch-4.mp3 | punch-3.mp3 (low-passed 1.8 kHz) + clash-6.mp3 (x0.92 pitch, low-passed 3000 Hz, at 0.7), 0.3 s | 0-0.300 | (derived) | 0.000 | 1800 | hit: a fist, foot, knee, elbow, head, shoulder or shield rim on plate or a steel shield (on a helmet: the helmet's take) |
+| lamellar-1.mp3 | mail-1.mp3 (x0.8 pitch, low-passed 4500 Hz) + break-2.mp3 (x0.8 pitch, low-passed 1.5 kHz, at 0.5), 0.32 s | 0-0.304 | (derived) | 0.000 | 1800 | hit: a weapon on lamellar or scale (scale higher), a fist under the punch, an arrow |
+| lamellar-2.mp3 | mail-1.mp3 (x0.74 pitch, low-passed 3800 Hz) + break-1.mp3 (x0.8 pitch, low-passed 1.5 kHz, at 0.6), 0.36 s | 0-0.360 | (derived) | 0.000 | 1980 | hit: a weapon on lamellar or scale (scale higher), a fist under the punch, an arrow |
+| lamellar-3.mp3 | mail-1.mp3 (x0.86 pitch, low-passed 5000 Hz) + helmet-1.mp3 (x0.8 pitch, low-passed 1.5 kHz, at 0.4), 0.3 s | 0-0.300 | (derived) | 0.000 | 1800 | hit: a weapon on lamellar or scale (scale higher), a fist under the punch, an arrow |
+| mail-2.mp3 | mail-1.mp3 (x0.9 pitch, low-passed 7 kHz) | 0-0.272 | (derived) | 0.000 | 1620 | hit: a blade, point or weight on mail (a weight lower); a fist on mail (quieter, under the punch); an arrow on mail (higher, shorter) |
+| mail-3.mp3 | mail-1.mp3 (x1.1 pitch), 0.32 s | 0-0.249 | (derived) | 0.000 | 1440 | hit: a blade, point or weight on mail (a weight lower); a fist on mail (quieter, under the punch); an arrow on mail (higher, shorter) |
+| bladeswing-1.mp3 | maceswing-1.mp3 (x1.55 pitch, high-passed 700 Hz) | 0-0.249 | (derived) | 0.000 | 1440 | swing: a blade (a sword, a spear's head), a faster stroke louder and higher |
+| bladeswing-2.mp3 | fistswing-1.mp3 (x1.7 pitch, high-passed 900 Hz, its rise mirrored after it) | 0-0.195 | (derived) | 0.000 | 1260 | swing: a blade (a sword, a spear's head), a faster stroke louder and higher |
+| bladeswing-3.mp3 | fistswing-2.mp3 (x1.6 pitch, high-passed 800 Hz, its rise mirrored after it) | 0-0.245 | (derived) | 0.000 | 1440 | swing: a blade (a sword, a spear's head), a faster stroke louder and higher |
+| bladeswing-4.mp3 | fistswing-4.mp3 (x1.8 pitch, high-passed 1000 Hz, its rise mirrored after it) | 0-0.135 | (derived) | 0.000 | 900 | swing: a blade (a sword, a spear's head), a faster stroke louder and higher |
 
 | voice-female-hurt-1.mp3 | ScreenRecording_10-30-2026_13-58-29_1.mov | 1.08-1.56 | Woman sobbing and crying | 0.022 | 2520 | a short rising cry; cry: a blow that hurt him (pain by his body, masked by adrenaline; cries.js), a knockdown groan (woman) |
 | voice-female-hurt-2.mp3 | ScreenRecording_10-30-2026_13-58-29_1.mov | 2.02-2.62 | Woman sobbing and crying | 0.002 | 3240 | a cry, up and broken off; cry: a blow that hurt him (pain by his body, masked by adrenaline; cries.js), a knockdown groan (woman) |
@@ -177,3 +202,21 @@ Checked decoded (as the encoder left it, and again with the encoder's 1105-sampl
 | loop-market.mp3 | ScreenRecording_10-30-2026_13-49-57_1.mov | 3.30-21.80 | Medieval city market sound effect | 17.0 | 1.5 | 105624 | a town's market square by day (places tagged `market`: Maidstone, the Jiangnan water town); thinned by rain, none at night; 48 kb/s |
 
 The cries (2026-10-30, three recordings: a woman sobbing and crying, whose second half ("#2", from 16.47 s) repeats the first exactly and was not used; a man crying; an army's charge) are cut one vocalisation at a time: the onset the first 10 ms frame within 30 dB of the piece's peak, from 8 ms before it; the end the last frame within 38 dB, plus 30 ms; a 4 ms fade in and the fade out given; -1 dBFS. Times are the piece's in the recording; a `+` joins pieces composed into one take with an equal-power crossfade (30-80 ms), the second at 0.85 of the first's peak; `trim` is each piece's lead cut. The man's recording at 2.13-2.6 s (a broadband rush, no voice in it) is not used. The charge is one loop: 0.55-7.55 s of the roar, its last 1 s crossfaded into its head, 6.0 s, at 32 kb/s; engine.js loops it from its first sound for 6 s (the decoder's padding left out).
+
+The fifth batch (10-30, five recordings): a bow (its draw's creak, 0.15-1.27 s, is not used: no event draws a bow; the release at 1.88 s
+runs to the recording's end, 0.23 s of it, faded there); a crossbow (its winding, 0-1.8 s: one stretch of it, the window as it is, is the
+ratchet of a lever; the click at 2.75 s, the latch, is a lock's; its shot at 4.27 s); a portcullis (no text on screen, a picture of one:
+its chain rattling, 0.22-1.25 s, cut as it is, and the grate slamming down at 1.24 s and rumbling for 2.8 s); a sword on mail (one
+blow: the tail of an earlier one at 0 s left out); a sword stabbed into leather (three stabs). A video's on-screen text describes it only.
+
+Derived variants (the Source column says from what; made with ffmpeg from the takes here, then cut and normalised as the rest):
+`platepunch` is a fist or a gauntlet on plate: the punch's thud (low-passed at 1.8 kHz) under a plate's ring from the sword-on-plate,
+helmet or clash takes, pitched up a little (a smaller struck area), low-passed at 3-4.5 kHz (no edge, so no bright first instant) and
+cut at 0.28-0.34 s (a fist does not drive the plate to ring out). `lamellar` is the mail's take lower and duller over a plate's knock
+low-passed hard. `mail-2` and `mail-3` are the mail's take lower and duller, and higher and shorter. `bladeswing` is the mace's and the
+fist's whooshes pitched up 1.55-1.8 times and high-passed (a thin edge sheds the air higher); the fist's whooshes, which rise into the
+blow and stop, have their rise mirrored after them, so the edge passes and dies away. `shieldclang` (steel on a steel shield) is a set of
+takes already here: helmet-1, break-1, break-3.
+
+Every blow (sfx/sampled.js BLOW_TAIL) is played a little longer than before (x1.15 at the lightest), the heaviest longest (x1.8, its fade
+x2.4): a take is never played past its own end, where it was cut 45 dB under its peak.

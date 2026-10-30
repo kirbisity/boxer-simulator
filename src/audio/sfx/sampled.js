@@ -13,6 +13,16 @@
 // (or a haft) knocks, a fist, foot, knee or elbow on the body punches, the fist's whoosh rises into it; thunder near cracks, far rumbles.
 // A man going down thuds (the recorded body fall; in plate or mail the crash of his kit over it), a whip's tip cracks on what it lashes, a
 // wooden door creaks as it swings and slams as it shuts (a chest's lid the same, smaller).
+// The fifth batch and what was the synth's: a blade on mail (recorded), on lamellar or scale (the mail's rattle lower over a plate's knock); a
+// point (or a blade on leather) stabs; a fist, a foot or a shoulder on plate is the punch's thud under a dull, short clank (derived from the
+// sword-on-plate, helmet and clash takes); on mail the punch with the rings under it; steel on a steel shield clangs (the helmet's and the
+// plate's takes); a blade's swing whooshes (the fist's and the mace's whooshes, higher); a bow and a crossbow are loosed (recorded), a
+// cannon is the gunshot slowed under the synth's boom; an arrow strikes as a point does; a portcullis rattles down on its chain and slams,
+// a barred gate creaks and clangs, a drawbridge runs its chain, a lock's latch clicks, a lever ratchets, a ladder knocks; a man falls
+// into water or mud (the steps' splash and squelch, lower); steps on boards, sand and snow (stone's and grass's, lower, the synth's ground
+// beside); hooves in mud and water.
+// Every blow (a hit, a clash, an arrow) is played a little longer than its energy's share of the take alone, the heaviest ringing out
+// longest, with a long fade (BLOW_TAIL).
 // Cries (a voice event the cry director, audio/cries.js, let through: its `cry`): the sex's set of its kind, at the voice's pitch, a
 // light hurt cut short; with no take they are silent (the synth's voice is not played: families.js `sampledOnly`).
 
@@ -22,6 +32,20 @@ import { cryOfEvent } from './voice.js';
 const SAMPLED_HEADS = new Set(['blade', 'point', 'blunt']);
 const SAMPLED_SOFT = new Set(['flesh', 'padded', 'leather']);
 const SAMPLED_HARD = new Set(['plate', 'shieldmetal']);
+/** Mail, lamellar and scale: each its set, its pitch and trim (scale's plates smaller than lamellar's, higher). */
+const ARMOUR_RINGS = { mail: { set: 'mail', rate: 1, trim: 1 }, lamellar: { set: 'lamellar', rate: 1, trim: 1 }, scale: { set: 'lamellar', rate: 1.12, trim: 0.9 } };
+/**
+ * A blow's length (the user's ask: every blow a little longer, the heaviest ringing out longest): at strength 0 its length and fade × `light`
+ * and `fadeLight`, at 1 × `heavy` and `fadeHeavy` (in a line between). The take itself ends where it was cut (45 dB under its peak), so a
+ * heavy blow's tail is its whole ring, faded out slowly, never cut short.
+ */
+export const BLOW_TAIL = { light: 1.15, heavy: 1.8, fadeLight: 1.3, fadeHeavy: 2.4 };
+/** A blow's plan with its length and fade drawn out by BLOW_TAIL at strength `s`. */
+export function blowTail(plan, s) {
+  if (!plan) return plan;
+  const k = sfxClamp(s, 0, 1);
+  return { ...plan, seconds: plan.seconds === null ? null : plan.seconds * sampleLerp(BLOW_TAIL.light, BLOW_TAIL.heavy, k), fade: plan.fade * sampleLerp(BLOW_TAIL.fadeLight, BLOW_TAIL.fadeHeavy, k) };
+}
 
 /** A strength 0..1 of `value` on a log scale from `low` to `high`. */
 export const sampleStrength = (value, low, high) => sfxClamp(Math.log(Math.max(low, value) / low) / Math.log(high / low), 0, 1);
@@ -51,6 +75,11 @@ const GROUND_STEPS = {
   earth: { walk: 'step-grass-walk', run: 'step-grass-run', trim: 0.75, rate: 0.88, synthGain: 0.5 },
   mud: { walk: 'step-mud', run: 'step-mud', trim: 1, rate: 1 },
   water: { walk: 'step-water', run: 'step-water', trim: 1, rate: 1 },
+  // No recording of boards, sand or snow: boards the stone's steps lower and duller with the synth's hollow knock of the planks beside;
+  // sand and snow the grass's (a soft crunch), sand a little lower, snow lower still, the synth's crunch beside.
+  wood: { walk: 'step-stone-walk', run: 'step-stone-run', trim: 0.8, rate: 0.86, synthGain: 0.6 },
+  sand: { walk: 'step-grass-walk', run: 'step-grass-run', trim: 0.85, rate: 0.92, synthGain: 0.45 },
+  snow: { walk: 'step-grass-walk', run: 'step-grass-run', trim: 0.85, rate: 0.8, synthGain: 0.6 },
 };
 /** Heels (a heeled boot, outfits.js `heels`: the gear's heelLift) on a hard floor click: the recorded heels, whatever the pace. */
 const HEEL_STEPS = {
@@ -59,9 +88,11 @@ const HEEL_STEPS = {
   wood: { walk: 'step-heel', run: 'step-heel', trim: 1.1, rate: 0.95, synthGain: 0.35 },
 };
 /** A limb's (or a body's) blow: its pitch (a foot or a knee heavier than a fist, lower; a shoulder's crash a dull thud) and its trim. */
-const LIMB_BLOWS = { fist: { rate: 1.04, trim: 1.2 }, elbow: { rate: 1, trim: 1.2 }, head: { rate: 0.95, trim: 1.1 }, knee: { rate: 0.92, trim: 1.25 }, foot: { rate: 0.88, trim: 1.3 }, body: { rate: 0.8, trim: 1 } };
+const LIMB_BLOWS = { fist: { rate: 1.04, trim: 1.2 }, elbow: { rate: 1, trim: 1.2 }, head: { rate: 0.95, trim: 1.1 }, knee: { rate: 0.92, trim: 1.25 }, foot: { rate: 0.88, trim: 1.3 }, body: { rate: 0.8, trim: 1 }, shield: { rate: 0.85, trim: 1.15 } };
 const HOOF_HARD = new Set(['stone', 'tile', 'wood']);
 const HOOF_SOFT = new Set(['earth', 'grass', 'sand', 'snow']);
+/** A hoof in mud or water: the man's squelch or splash, lower (a horse's weight on it). */
+const HOOF_WET = { mud: 'step-mud', water: 'step-water' };
 /** A hoof by its gait: the trim and the rate. */
 const HOOF_PACE = { walk: { trim: 0.7, rate: 0.94 }, trot: { trim: 0.85, rate: 0.97 }, canter: { trim: 1, rate: 1 }, gallop: { trim: 1.1, rate: 1.03 } };
 /**
@@ -70,6 +101,8 @@ const HOOF_PACE = { walk: { trim: 0.7, rate: 0.94 }, trot: { trim: 0.85, rate: 0
  * (The trims are about 6 dB over the synth's thud: at the fall's own level, a man going down at 3 m/s was under the footsteps.)
  */
 const BODY_FALL_GROUND = { stone: { trim: 2.4, rate: 1 }, tile: { trim: 2.4, rate: 1.03 }, wood: { trim: 2.5, rate: 0.97 }, earth: { trim: 2.2, rate: 0.94 }, grass: { trim: 2, rate: 0.94 }, sand: { trim: 1.8, rate: 0.9 }, snow: { trim: 1.7, rate: 0.9 } };
+/** A body going down in water or mud: the steps' splash or squelch, lower and drawn out (a whole man, not a foot), the synth's splash beside. */
+const BODY_FALL_WET = { water: { set: 'step-water', trim: 2.4, rate: 0.7, synthGain: 0.5 }, mud: { set: 'step-mud', trim: 2.4, rate: 0.72, synthGain: 0.4 } };
 export const BODY_FALL_WEIGHT = { light: 50, heavy: 120, gainDb: [-3, 3], length: [0.85, 1.2] };
 /** A whip's lash (its tip's energy, J, from `low` to `high`): lifted by `lift` to be heard as the crack it is, not the tip's few joules. */
 export const WHIP_LASH = { low: 2, high: 40, lift: 2.5 };
@@ -118,28 +151,60 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const rate = sampleMassRate(event.mass) * jitter();
       // A helmet struck rings (by a weapon, a fist or a boot; a shoulder's crash is the synth's): a heavier blow louder and rung out longer.
       if (event.part === 'head' && params.covering === 'plate' && params.striker !== 'body') {
-        return { set: 'helmet', trim: (limb ? 0.8 : 1) * sampleLerp(0.75, 1.15, s), rate: rate * (params.striker === 'blunt' ? 0.88 : 1) * (limb ? 1.08 : 1), seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.06, 0.3, s), skip: 0, synth: null, synthGain: 0 };
+        return blowTail({ set: 'helmet', trim: (limb ? 0.8 : 1) * sampleLerp(0.75, 1.15, s), rate: rate * (params.striker === 'blunt' ? 0.88 : 1) * (limb ? 1.08 : 1), seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.06, 0.3, s), skip: 0, synth: null, synthGain: 0 }, s);
       }
       // A wooden shield's boards knocked hollow (anything on them): a heavier blow fuller and longer, a weight's lower.
       if (params.covering === 'wood') {
-        return { set: 'woodshield', trim: (limb ? limb.trim * 0.75 : 1) * sampleLerp(0.75, 1.15, s), rate: (limb ? limb.rate : rate) * (params.striker === 'blunt' ? 0.9 : 1), seconds: sampleLerp(0.12, 0.32, s), fade: sampleLerp(0.04, 0.14, s), skip: 0, synth: null, synthGain: 0 };
+        return blowTail({ set: 'woodshield', trim: (limb ? limb.trim * 0.75 : 1) * sampleLerp(0.75, 1.15, s), rate: (limb ? limb.rate : rate) * (params.striker === 'blunt' ? 0.9 : 1), seconds: sampleLerp(0.12, 0.32, s), fade: sampleLerp(0.04, 0.14, s), skip: 0, synth: null, synthGain: 0 }, s);
       }
-      // A punch, a kick, a knee, an elbow, a head or a shoulder into the body (bare, padded or leather): the recorded punch, the harder
-      // blow louder and its whole take, the lighter one clipped short.
       if (limb) {
-        if (!SAMPLED_SOFT.has(params.covering)) return null;
         const p = sampleStrength(params.energy, 3, 300);
-        return { set: 'punch', trim: limb.trim * sampleLerp(0.75, 1.2, p), rate: limb.rate * jitter(), seconds: sampleLerp(0.1, 0.26, p), fade: sampleLerp(0.03, 0.1, p), skip: 0, synth: null, synthGain: 0 };
+        const punch = { set: 'punch', trim: limb.trim * sampleLerp(0.75, 1.2, p), rate: limb.rate * jitter(), seconds: sampleLerp(0.1, 0.26, p), fade: sampleLerp(0.03, 0.1, p), skip: 0, synth: null, synthGain: 0 };
+        // A punch, a kick, a knee, an elbow, a head, a shoulder or a shield's rim into the body (bare, padded or leather): the recorded
+        // punch, the harder blow louder and its whole take, the lighter one clipped short.
+        if (SAMPLED_SOFT.has(params.covering)) return blowTail(punch, p);
+        // On plate (or a steel shield's face): the thud of the body behind it under a dull, short clank (no edge to ring it bright; a
+        // harder blow louder and longer, a kick or a shoulder lower).
+        if (SAMPLED_HARD.has(params.covering)) {
+          return blowTail({ set: 'platepunch', trim: limb.trim * sampleLerp(0.7, 1.15, p), rate: limb.rate * jitter(), seconds: sampleLerp(0.12, 0.3, p), fade: sampleLerp(0.04, 0.12, p), skip: 0, synth: null, synthGain: 0 }, p);
+        }
+        // On mail, lamellar or scale: the punch, and the rings or plates shaken under it, quieter.
+        const rings = ARMOUR_RINGS[params.covering];
+        if (rings) return blowTail({ ...punch, extra: [{ set: rings.set, trim: rings.trim * sampleLerp(0.35, 0.6, p), rate: rings.rate * limb.rate * jitter(0.05), seconds: sampleLerp(0.12, 0.25, p), fade: sampleLerp(0.04, 0.1, p), skip: 0 }] }, p);
+        return null;
       }
-      // A blade into flesh slices; a weight into it lands on the bone under it.
-      if (SAMPLED_SOFT.has(params.covering)) return { set: params.striker === 'blunt' ? 'bonehit' : 'slice', trim: params.striker === 'blunt' ? 1 : 0.85, rate, seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.04, 0.2, s), skip: 0, synth: null, synthGain: 0 };
+      if (SAMPLED_SOFT.has(params.covering)) {
+        // A weight into flesh lands on the bone under it; a point stabs in (a blade's edge into leather too: it bites, it does not slice);
+        // a blade's edge into flesh or a gambeson slices.
+        if (params.striker === 'blunt') return blowTail({ set: 'bonehit', trim: 1, rate, seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.04, 0.2, s), skip: 0, synth: null, synthGain: 0 }, s);
+        if (params.striker === 'point' || params.covering === 'leather') return blowTail({ set: 'stab', trim: 0.95 * sampleLerp(0.8, 1.15, s), rate, seconds: sampleLerp(0.14, 0.4, s), fade: sampleLerp(0.04, 0.15, s), skip: 0, synth: null, synthGain: 0 }, s);
+        return blowTail({ set: 'slice', trim: 0.85, rate, seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.04, 0.2, s), skip: 0, synth: null, synthGain: 0 }, s);
+      }
+      // Mail rings jangle; lamellar's and scale's laced plates clack (a weight lower).
+      const rings = ARMOUR_RINGS[params.covering];
+      if (rings) return blowTail({ set: rings.set, trim: rings.trim * sampleLerp(0.75, 1.15, s), rate: rate * rings.rate * (params.striker === 'blunt' ? 0.88 : 1), seconds: sampleLerp(0.15, 0.45, s), fade: sampleLerp(0.04, 0.15, s), skip: 0, synth: null, synthGain: 0 }, s);
       // Steel on steel plate (or a steel shield): the crash of it; a weight heavier, lower.
-      if (SAMPLED_HARD.has(params.covering)) return { set: 'break', trim: 0.9, rate: rate * (params.striker === 'blunt' ? 0.85 : 1), seconds: sampleLerp(0.2, 0.6, s), fade: sampleLerp(0.05, 0.2, s), skip: 0, synth: null, synthGain: 0 };
+      if (SAMPLED_HARD.has(params.covering)) return blowTail({ set: 'break', trim: 0.9, rate: rate * (params.striker === 'blunt' ? 0.85 : 1), seconds: sampleLerp(0.2, 0.6, s), fade: sampleLerp(0.05, 0.2, s), skip: 0, synth: null, synthGain: 0 }, s);
+      return null;
+    }
+    case 'arrowhit': {
+      // An arrow or a bolt striking (its energy from its speed: 8 J at 15 m/s, 280 J at 90): as a point does, higher and shorter (a light
+      // shaft); into the ground or stone the synth's.
+      const s = sampleStrength(params.energy, 8, 280);
+      const covering = event.covering ?? params.covering;
+      const rate = 1.12 * jitter();
+      const plan = (set, trim, low, high) => blowTail({ set, trim: trim * sampleLerp(0.75, 1.15, s), rate, seconds: sampleLerp(low, high, s), fade: sampleLerp(0.03, 0.12, s), skip: 0, synth: null, synthGain: 0 }, s);
+      if (SAMPLED_SOFT.has(covering)) return plan('stab', 0.9, 0.12, 0.3);
+      if (ARMOUR_RINGS[covering]) return { ...plan(ARMOUR_RINGS[covering].set, ARMOUR_RINGS[covering].trim, 0.12, 0.3), rate: rate * ARMOUR_RINGS[covering].rate };
+      if (SAMPLED_HARD.has(covering)) return { ...plan(event.part === 'head' ? 'helmet' : 'break', 0.85, 0.12, 0.35), rate: rate * 1.1 };
+      if (covering === 'wood') return plan('woodshield', 1, 0.1, 0.25);
       return null;
     }
     case 'wound': {
       const s = params.severity;
       if (params.kind === 'cut') return { set: 'gore', trim: 0.7, rate: jitter(), seconds: sampleLerp(0.25, 0.85, s), fade: sampleLerp(0.06, 0.25, s), skip: 0, synth: null, synthGain: 0 };
+      // A point driven in: the stab into leather and what is under it, a deeper one longer.
+      if (params.kind === 'stab') return { set: 'stab', trim: sampleLerp(0.6, 0.9, s), rate: sampleLerp(1.05, 0.92, s) * jitter(0.05), seconds: sampleLerp(0.15, 0.4, s), fade: sampleLerp(0.04, 0.15, s), skip: 0, synth: null, synthGain: 0 };
       if (params.kind === 'bone') return { set: 'bones', trim: 1, rate: jitter(), seconds: sampleLerp(0.15, 0.5, s), fade: sampleLerp(0.03, 0.12, s), skip: 0, synth: null, synthGain: 0 };
       // A skull or a neck giving way: the bones' snap, lower and slower.
       if (params.kind === 'crush') return { set: 'bones', trim: 1, rate: 0.8 * jitter(0.04), seconds: null, fade: 0.12, skip: 0, synth: null, synthGain: 0 };
@@ -149,14 +214,19 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const s = sampleStrength(params.speed, 1, 20);
       // Steel into wood: a wooden shield's boards knocked; a haft (thinner, its first mode higher) the same take a little higher and shorter.
       if (params.wood) {
-        return { set: 'woodshield', trim: sampleLerp(0.75, 1.15, s), rate: sfxClamp((params.wood.base / 300) ** 0.5, 0.9, 1.3) * jitter(), seconds: sampleLerp(0.1, 0.3, s) * (300 / params.wood.base), fade: sampleLerp(0.04, 0.12, s), skip: 0, synth: null, synthGain: 0 };
+        return blowTail({ set: 'woodshield', trim: sampleLerp(0.75, 1.15, s), rate: sfxClamp((params.wood.base / 300) ** 0.5, 0.9, 1.3) * jitter(), seconds: sampleLerp(0.1, 0.3, s) * (300 / params.wood.base), fade: sampleLerp(0.04, 0.12, s), skip: 0, synth: null, synthGain: 0 }, s);
+      }
+      // Steel on a steel shield's face or boss: a shell's clang (the helmet's and the plate's takes), a weight's lower.
+      if (event.a === 'shieldmetal' || event.b === 'shieldmetal') {
+        const blunt = event.a === 'blunt' || event.b === 'blunt';
+        return blowTail({ set: 'shieldclang', trim: sampleLerp(0.75, 1.15, s), rate: sampleMassRate(event.mass) * (blunt ? 0.88 : 1) * jitter(), seconds: sampleLerp(0.2, 0.7, s), fade: sampleLerp(0.05, 0.25, s), skip: 0, synth: params.scrape > 0 ? { ...params, modes: [] } : null, synthGain: 0.7 }, s);
       }
       const blunt = !params.modes.length || params.modes[0].f < 500;
-      return {
+      return blowTail({
         set: 'clash', trim: 1, rate: sampleMassRate(event.mass) * (blunt ? 0.85 : 1) * jitter(), seconds: sampleLerp(0.15, 0.8, s), fade: sampleLerp(0.04, 0.25, s), skip: 0,
         // Edge along edge: the synth's scrape beside it (without its own ring).
         synth: params.scrape > 0 ? { ...params, modes: [] } : null, synthGain: 0.7,
-      };
+      }, s);
     }
     case 'step': {
       const armoured = params.armour === 'plate' || params.armour === 'mail';
@@ -176,20 +246,42 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const synth = { ...params, armour: 'none' };
       // A body going down (any man, any kit): the recorded thud, harder the faster he comes down and louder, lower and drawn out the
       // heavier he is; where the ground has no recording of it (water, mud), the synth's thud and splash.
-      const ground = params.kind === 'fall' ? BODY_FALL_GROUND[params.surface] : null;
+      // (In water or mud: the steps' splash or squelch, lower, the synth's splash beside it.)
+      const wet = params.kind === 'fall' ? BODY_FALL_WET[params.surface] : null;
+      const ground = params.kind === 'fall' ? BODY_FALL_GROUND[params.surface] ?? wet : null;
       const w = sfxClamp(((event.mass ?? 80) - BODY_FALL_WEIGHT.light) / (BODY_FALL_WEIGHT.heavy - BODY_FALL_WEIGHT.light), 0, 1);
       const body = ground ? {
-        set: 'bodyfall', trim: ground.trim * sampleLerp(0.6, 1.15, s) * 10 ** (sampleLerp(...BODY_FALL_WEIGHT.gainDb, w) / 20), rate: ground.rate * sfxClamp((80 / Math.max(40, event.mass ?? 80)) ** 0.25, 0.85, 1.15) * jitter(0.04),
+        set: wet ? wet.set : 'bodyfall', trim: ground.trim * sampleLerp(0.6, 1.15, s) * 10 ** (sampleLerp(...BODY_FALL_WEIGHT.gainDb, w) / 20), rate: ground.rate * sfxClamp((80 / Math.max(40, event.mass ?? 80)) ** 0.25, 0.85, 1.15) * jitter(0.04),
         seconds: sampleLerp(0.3, 1.1, s) * sampleLerp(...BODY_FALL_WEIGHT.length, w), fade: sampleLerp(0.06, 0.3, s), skip: 0,
       } : null;
-      if (!armoured) return body ? { ...body, synth: null, synthGain: 0 } : null;
+      if (!armoured) return body ? { ...body, synth: wet ? synth : null, synthGain: wet ? wet.synthGain : 0 } : null;
       // A man in armour going down crashes with it (over the body's thud); landing on his feet, a heavy step's clank.
-      if (params.kind === 'fall') return { set: 'clatter', trim: (params.armour === 'mail' ? 0.5 : 0.75) * sampleLerp(0.6, 1.1, s), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.2, 0.85, 1.15) * 0.9 * jitter(0.04), seconds: sampleLerp(0.4, 1, s), fade: 0.2, skip: 0, extra: body ? [body] : [], synth: body ? null : synth, synthGain: 1 };
+      if (params.kind === 'fall') return { set: 'clatter', trim: (params.armour === 'mail' ? 0.5 : 0.75) * sampleLerp(0.6, 1.1, s), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.2, 0.85, 1.15) * 0.9 * jitter(0.04), seconds: sampleLerp(0.4, 1, s), fade: 0.2, skip: 0, extra: body ? [body] : [], synth: body && !wet ? null : synth, synthGain: wet ? wet.synthGain : 1 };
       return { set: 'armourstep', trim: 0.8 * sampleLerp(0.7, 1.2, s), rate: 0.9 * jitter(0.05), seconds: null, fade: 0.06, skip: 0, synth, synthGain: 1 };
     }
     case 'mech': {
+      const shutting = params.state === 'closed' || params.state === 'shut' || params.state === 'down' || params.state === 'closing';
+      // A portcullis: its chain run over the wheel (raised, a little slower and lower: wound up), let down it runs and the grate slams
+      // on the stone and rumbles (the slam `delay` s into the chain, as the recording has it).
+      if (params.kind === 'portcullis') {
+        const chain = { set: 'portcullis-chain', trim: 1, rate: (shutting ? 1 : 0.9) * jitter(0.03), seconds: null, fade: 0.1, skip: 0, synth: null, synthGain: 0 };
+        return shutting ? { ...chain, extra: [{ set: 'portcullis-slam', trim: 1.2, rate: jitter(0.03), seconds: null, fade: 0.6, skip: 0, delay: 1 }] } : chain;
+      }
+      // A drawbridge: the portcullis's chain, slower and lower (a bigger wheel), the synth's chain and timber slam carrying it on.
+      if (params.kind === 'drawbridge') return { set: 'portcullis-chain', trim: 1, rate: 0.8 * jitter(0.03), seconds: null, fade: 0.2, skip: 0, synth: params, synthGain: 0.5 };
+      // A gate of bars: its hinges creak (the door's creak, lower: iron), shut it clangs (the portcullis's slam, higher and shorter: a lighter grate).
+      if (params.kind === 'gate') {
+        const creak = { set: 'door-creak', trim: 0.9, rate: 0.85 * jitter(0.04), seconds: shutting ? 0.6 : 1, fade: shutting ? 0.08 : 0.25, skip: 0, synth: null, synthGain: 0 };
+        return shutting ? { ...creak, extra: [{ set: 'portcullis-slam', trim: 1.1, rate: 1.25 * jitter(0.04), seconds: 0.9, fade: 0.4, skip: 0, delay: 0.55 }] } : creak;
+      }
+      // A lock: the key's first click and the bolt going over (the crossbow's latch, high then low).
+      if (params.kind === 'lock') return { set: 'crossbow-latch', trim: 0.7, rate: 1.3 * jitter(0.04), seconds: null, fade: 0.02, skip: 0, extra: [{ set: 'crossbow-latch', trim: 1, rate: 0.85 * jitter(0.04), seconds: null, fade: 0.03, skip: 0, delay: 0.3 }], synth: null, synthGain: 0 };
+      // A lever thrown: its ratchet (the crossbow's crank), the synth's clunk of the arm beside it.
+      if (params.kind === 'lever') return { set: 'crossbow-crank', trim: 0.9, rate: jitter(0.04), seconds: 0.5, fade: 0.12, skip: 0, synth: params, synthGain: 0.5 };
+      // A ladder falling against the wall or set down: a knock of wood (the wooden shield's, lower: a longer pole).
+      if (params.kind === 'ladder') return { set: 'woodshield', trim: 1, rate: 0.75 * jitter(0.05), seconds: 0.35, fade: 0.1, skip: 0, synth: null, synthGain: 0 };
       // A wooden door (a chest's lid lighter: higher, quieter, shorter) creaks as it swings; shut, it creaks a moment and slams (the slam
-      // `delay` s into the creak, as the synth's). Other mechanisms (a gate of bars, a portcullis, a lock) stay the synth's.
+      // `delay` s into the creak, as the synth's). A thing picked up stays the synth's.
       if (!(params.kind in WOODEN_MECHS)) return null;
       const w = WOODEN_MECHS[params.kind];
       const opening = params.state !== 'closed' && params.state !== 'shut' && params.state !== 'down' && params.state !== 'closing';
@@ -204,7 +296,7 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       return { set: 'clatter', trim: sampleLerp(0.6, 1, s), rate: sampleMassRate(params.mass) * jitter(), seconds: sampleLerp(0.3, 1, s), fade: sampleLerp(0.08, 0.3, s), skip: 0, synth: null, synthGain: 0 };
     }
     case 'swing': {
-      // A weight's whoosh (a mace, a club, an axe's head); a blade's thin whistle stays the synth's. The swing is logged at the stroke's
+      // A weight's whoosh (a mace, a club, an axe's head); a blade's edge a thin whoosh (below). The swing is logged at the stroke's
       // fastest, so the take starts a little into its rise.
       // A fist or a foot driven at a man (log.js trackPunchSwing: logged as the drive starts): the whoosh rising into the blow, its loud
       // end played (the take's last `seconds`, about the drive's), a faster drive louder and longer, a kick lower. The air off a limb is
@@ -213,6 +305,11 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
         const s = sampleStrength(params.speed, 4, 14);
         return { set: 'fistswing', trim: 18 * sampleLerp(0.7, 1.3, s), rate: sfxClamp((params.speed / 9) ** 0.15, 0.9, 1.12) * (event.head === 'foot' ? 0.85 : 1) * jitter(0.05), seconds: sfxClamp(event.reach ?? 0.25, 0.15, 0.4) * sampleLerp(0.8, 1.2, s), fade: 0.03, skip: 0, fromEnd: true, synth: null, synthGain: 0 };
       }
+      // A blade's thin whoosh (the fist's and the mace's whooshes, pitched up and thinned), a faster stroke louder, higher and its whole pass.
+      if (event.head === 'blade') {
+        const s = sampleStrength(params.speed, 8, 35);
+        return { set: 'bladeswing', trim: sampleLerp(0.8, 1.2, s), rate: sfxClamp((params.speed / 20) ** 0.2, 0.88, 1.15) * jitter(0.05), seconds: sfxClamp(params.seconds * 1.6, 0.12, 0.3), fade: 0.06, skip: 0, synth: null, synthGain: 0 };
+      }
       if (event.head !== 'blunt') return null;
       return { set: 'maceswing', trim: 0.9, rate: sfxClamp((params.speed / 15) ** 0.2, 0.85, 1.2) * jitter(0.05), seconds: sfxClamp(params.seconds * 2, 0.25, 0.6), fade: 0.12, skip: 0.06, synth: null, synthGain: 0 };
     }
@@ -220,14 +317,22 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       if (params.kind === 'neigh') return { set: 'neigh', trim: 1, rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.2, 0.85, 1.2) * jitter(0.04), seconds: null, fade: 0.25, skip: 0, synth: null, synthGain: 0 };
       if (params.kind !== 'hoof') return null;
       // A hoof on hard ground (stone, tile, boards) clops; on earth, grass, sand or snow it thuds (the gallop's). Mud and water are the synth's.
-      const set = HOOF_HARD.has(params.surface) ? 'hoof-stone' : HOOF_SOFT.has(params.surface) ? 'hoof-soft' : null;
+      const set = HOOF_HARD.has(params.surface) ? 'hoof-stone' : HOOF_SOFT.has(params.surface) ? 'hoof-soft' : HOOF_WET[params.surface] ?? null;
       if (!set) return null;
-      // A walking horse sets its hooves down softer and slower than a galloping one comes down on them.
+      // A walking horse sets its hooves down softer and slower than a galloping one comes down on them; in mud or water a man's
+      // squelch or splash, lower and louder (a horse's weight).
       const pace = HOOF_PACE[event.gait] ?? HOOF_PACE.trot;
-      return { set, trim: pace.trim, rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.15, 0.85, 1.15) * pace.rate * jitter(0.05), seconds: null, fade: 0.03, skip: 0, synth: null, synthGain: 0 };
+      const wet = Boolean(HOOF_WET[params.surface]);
+      return { set, trim: pace.trim * (wet ? 1.3 : 1), rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.15, 0.85, 1.15) * pace.rate * (wet ? 0.75 : 1) * jitter(0.05), seconds: null, fade: wet ? 0.08 : 0.03, skip: 0, synth: null, synthGain: 0 };
     }
     case 'shot':
       // A matchlock: the recorded report, the synth's low boom under it (what a recording through a phone has little of).
+      // A bow loosed (the recorded release; the synth's thrum of the string under it) and a crossbow's prod snapping (recorded, its knock
+      // and thrum under it, quieter). A cannon: the pistol's report slowed to half (a far bigger charge, its crack lower and longer), the
+      // synth's deep boom and rumble carrying it.
+      if (params.kind === 'bow') return { set: 'bow', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.06, skip: 0, synth: params, synthGain: 0.45 };
+      if (params.kind === 'crossbow') return { set: 'crossbow', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.1, skip: 0, synth: params, synthGain: 0.3 };
+      if (params.kind === 'cannon') return { set: 'gunshot', trim: 1, rate: 0.5 * jitter(0.04), seconds: null, fade: 0.8, skip: 0, synth: params, synthGain: 0.8 };
       if (params.kind !== 'matchlock') return null;
       return { set: 'gunshot', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.3, skip: 0, synth: params, synthGain: 0.35 };
     case 'thunder': {
