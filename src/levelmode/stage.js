@@ -426,8 +426,8 @@ function mechanismSound(world, id, state) {
     const gate = (section.gates ?? []).find((entry) => entry.id === id);
     const ladder = gate ? null : (section.ladders ?? []).find((entry) => entry.id === id);
     if (!gate && !ladder) continue;
-    // (A gate that is not drawn, the men who hold a gap, makes no sound of its own.)
-    if (gate && !gate.look?.kind) return;
+    // (A gate that is only the men who hold a gap, `heldBy`, undrawn, makes no sound of its own.)
+    if (gate?.heldBy && !gate.look?.kind) return;
     const kind = ladder ? 'ladder' : GATE_SOUND[gate.look?.kind] ?? 'gate';
     soundEvent(world, 'mech', { at: (gate ?? ladder).at, kind, state: STATE_SOUND[state] ?? state, id });
     return;
