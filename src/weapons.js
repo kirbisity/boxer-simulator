@@ -22,8 +22,12 @@ import { vec } from './pose.js';
 // ~100–200 J against a war bow's ~80–100; ~8 s a shot. The Chinese nu, the
 // Han's spanned with the feet (jue zhang) and the Ming's with the waist: a
 // little less, quicker to span.
-export const CROSSBOW = { bolt: true, speed: 50, energy: 1.7, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8 };
-export const NU = { ...CROSSBOW, speed: 48, energy: 1.45, length: 0.42, bounce: 0.78, reloadSeconds: 6 };
+// What he carries (`ammo`, every missile weapon's: the bolts, balls or arrows he has in all, the loaded one
+// counted; physics/ranged.js ammoLeft): a crossbowman's quiver held ~18-20 bolts (the Genoese at Crécy, the
+// inventories of the Italian communes' companies). The Han nu-men's sheaves were bigger, ~50 (Li Ling's five
+// thousand loosed half a million bolts in a day, ~100 a man, the rest from the carts: SUPPLY).
+export const CROSSBOW = { bolt: true, speed: 50, energy: 1.7, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8, ammo: 20 };
+export const NU = { ...CROSSBOW, speed: 48, energy: 1.45, length: 0.42, bounce: 0.78, reloadSeconds: 6, ammo: 50 };
 
 /**
  * A matchlock's shot, for its realism. A lead ball of ~13 g leaves the
@@ -56,6 +60,8 @@ export const ADAMS = {
   misfire: 0.03,
   reloadSeconds: 40,
   rounds: 5,
+  // A flask and a box of combustible cartridges and caps in the pocket: five loads of the cylinder (`ammo`, every round).
+  ammo: 25,
   // Loaded at the front of the cylinder, chamber by chamber, the rammer lever
   // under the barrel pressing each ball home (the reload pose: physics weaponIntent).
   cylinder: true,
@@ -96,6 +102,9 @@ export const MATCHLOCK = {
   movingSpread: 0.035,
   misfire: 0.08,
   reloadSeconds: 15,
+  // A bandolier of a dozen wooden charges, each a measure of powder ("the twelve apostles"), a flask for more and a
+  // pouch of balls: ~20-30 shots (an ashigaru's cartridge box held about as many). In all, the loaded one counted.
+  ammo: 24,
 };
 
 /**
@@ -120,6 +129,8 @@ export const THREE_EYED = {
   barrels: 3,
   between: 0.45,
   reloadSeconds: 40,
+  // Three loads for its three barrels (in all, nine shots): it was reloaded seldom, and then swung.
+  ammo: 9,
 };
 
 /**
@@ -143,6 +154,8 @@ export const RIFLE = {
   misfire: 0.002,
   rounds: 30,
   reloadSeconds: 2.5,
+  // A soldier's basic load: seven magazines (210 rounds).
+  ammo: 210,
   // Fully automatic (the M16/M4 family's select fire): ~12 rounds a second (~720 a minute), in bursts of 3-6.
   automatic: { rate: 12, burst: [3, 6] },
 };
@@ -171,12 +184,14 @@ export const SHOTGUN = {
   misfire: 0.002,
   rounds: 5,
   reloadSeconds: 4,
+  // Five in the tube and a bandolier or a sidesaddle of shells: ~30.
+  ammo: 30,
 };
 
 // The combat bot's forearm guns: the AR-15's round and rate, the shotgun's
 // buckshot, fed from the body (`rounds` without end: never reloaded).
-export const ARM_RIFLE = { ...RIFLE, rounds: Infinity };
-export const ARM_SHOTGUN = { ...SHOTGUN, rounds: Infinity };
+export const ARM_RIFLE = { ...RIFLE, rounds: Infinity, ammo: Infinity };
+export const ARM_SHOTGUN = { ...SHOTGUN, rounds: Infinity, ammo: Infinity };
 
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
@@ -502,6 +517,8 @@ export const WEAPONS = {
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.5, grip: 0.4, ranged: true, bow: true,
     // A war bow's draw weight (a yumi of ~26 kgf).
     drawN: 260,
+    // The arrows a foot archer carries (`ammo`, a kit's `quiver` before it): a sheaf of 24, a quiver's worth.
+    ammo: 24,
   },
   // The steppe composite bow (Mongol, Turkish): short and sharply recurved,
   // horn, wood and sinew, a heavy draw; it casts the same arrow faster than
@@ -513,6 +530,8 @@ export const WEAPONS = {
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.6, grip: 0.4, ranged: true, bow: true, arrowSpeed: 62,
     // The steppe bow's heavier draw (~34 kgf, ~75 lb).
     drawN: 330,
+    // The steppe quiver: thirty to forty arrows (the Strategikon's; a horse archer's kit says its own, outfits.js `quiver`).
+    ammo: 36,
   },
   // The yumi: the Japanese war bow, over two metres of laminated bamboo
   // and wood bound in rattan, gripped a third of the way up (`handle` the
@@ -523,6 +542,8 @@ export const WEAPONS = {
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
     drawN: 340,
+    // The ebira (the quiver on the back) held ~24 arrows.
+    ammo: 24,
   },
   // ---- Agincourt, Cerignola (the battle maps of 1415 and 1503) ----
   // The English war bow (the longbow of the Mary Rose's ~140 staves): a self bow of yew about 1.9 m long,
@@ -536,6 +557,9 @@ export const WEAPONS = {
     harm: { swing: { blunt: 0.35 }, thrust: { blunt: 0.25 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
     drawN: 600, arrowSpeed: 52, arrowEnergy: 1.3,
+    // Two sheaves of 24 (a sheaf at the belt and one stuck in the ground before him), the more brought up to the line by
+    // the boys of the baggage (SUPPLY).
+    ammo: 48,
   },
   // The pike of the Swiss and the Landsknechts (and Gonzalo's Germans at Cerignola): an ash shaft of 5 m
   // (16–18 ft), a small leaf head on long langets, ~3.5 kg; held with both hands a third of the way up from
@@ -1179,6 +1203,17 @@ export function offHandAlong(spec) {
  * hands straddle that point, so the front hand is no further out — no more
  * exposed to a blade — than a single grip there would be.
  */
+/**
+ * Missiles brought up to the line: a shooter on foot standing in his side's formation (a drawn-up line, `slot`)
+ * is not left with what he carried. The boys of the baggage ran sheaves up to the English archers (Agincourt,
+ * Crécy: the wagons stood behind the line); the Han crossbowmen had bolts from the carts; the gunners' powder and
+ * ball came up from the munition wagons. His ammunition spent, a fresh load (his weapon's `ammo`, or his kit's) is
+ * put into his hands after `seconds` s (the bearer's run along the back of the line), at most `loads` times: a long
+ * battle's worth at the game's rate of shooting, and then that is all there is (physics/ranged.js resupplyInLine).
+ * A man out of his ranks (a skirmisher, a horse archer) has only what he carries, or his side's train (riding.js).
+ */
+export const SUPPLY = { seconds: 5, loads: 2 };
+
 export const LEAD_GRIP = { rearShare: 0.5 };
 
 /**

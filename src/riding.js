@@ -8,6 +8,7 @@ import { P } from './body.js';
 import { MOVES, STYLES, moveRange } from './moves.js';
 import { aimPoint, bladeFor, dropWeapon, point, throwPunch, toLocal, WORLD } from './physics.js';
 import { leanedShoulder, steerInside, turnRadius } from './physics/mounted.js';
+import { ammoCarried } from './physics/ranged.js';
 import { vec, yawRotate } from './pose.js';
 
 /**
@@ -45,7 +46,10 @@ import { vec, yawRotate } from './pose.js';
  *   and until they are `clear` m further off; then he wheels and comes back to
  *   shoot. His quiver counted (a kit's `quiver`) and empty, with his side's train
  *   on the field, he rides back to it and is given a fresh one there (`resupply`:
- *   the last `near` m at a trot; within `radius` m of it, `seconds` s to take it).
+ *   the last `near` m at a trot; within `radius` m of it, `seconds` s to take it),
+ *   `loads` times at most: the train's store is shared out among the whole host, and
+ *   it runs out. After that, his quiver empty, he lets the bow go, draws his sword and
+ *   closes (he does not ride round them for ever).
  * - melee: two riders within `within` m closing slower than `closing` m/s
  *   fight beside each other: he rides to his man's side, at his pace and
  *   up to `closeIn` m/s more per m he is off it (`slowest` at least while he is
@@ -91,8 +95,11 @@ export const RIDING = {
     standoff: 30, spread: 0.5, body: 12, approach: 1.6, range: 60,
     wary: { horse: 20, foot: 8 }, closing: 1.5, clear: 8, away: 2.5, wall: 10, crowd: 8, crowdPush: 0.8,
     arc: { left: 0.35, right: 0.5 },
-    friend: 2.2, beyond: 15,
-    resupply: { radius: 3, near: 15, seconds: 6 },
+    friend: 2.2, beyond: 15, ahead: 0.8,
+    // (`loads`: one fresh quiver from the train, two in all, ~72 arrows, as many as a Mongol's two quivers held (Carpini:
+    // two or three quivers a man). Surena's thousand camels kept nine thousand archers shooting through a day; a battle
+    // here is minutes, and it ends: the store shared out, he closes with the sword.)
+    resupply: { radius: 3, near: 15, seconds: 6, loads: 1 },
   },
   melee: { within: 4, closing: 4, slowest: 1.5, closeIn: 1.5, still: 2, standing: 0.5, reroll: 3 },
   brace: { length: 1.8 },
@@ -397,7 +404,7 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     return true;
   }
   // Out of arrows, with his side's train on the field (a level's `train`: the camels with fresh sheaves): back to it for more.
-  if (style.ranged && fighter.weapon?.held && fighter.weapon.spec.bow && world.trains?.[fighter.corner]) {
+  if (style.ranged && fighter.weapon?.held && fighter.weapon.spec.bow && world.trains?.[fighter.corner] && (fighter.resupplied ?? 0) < RIDING.archer.resupply.loads) {
     resupply(world, fighter, setGoal, dt);
     return true;
   }
@@ -549,20 +556,26 @@ function offTheLine(fighter, at) {
   return off;
 }
 
-/** No friend of his within `friend` m of the arrow's line, short of the mark or `beyond` m past it. */
+/** No friend of his within `friend` m of the arrow's line, short of the mark or `beyond` m past it, now or `ahead` s on. */
 function clearShot(world, fighter, target, spec) {
   const from = point(fighter.x, P.pelvis);
   const to = point(target.x, P.pelvis);
   const line = [to[0] - from[0], 0, to[2] - from[2]];
   const length = Math.hypot(line[0], line[2]) || 1e-6;
   const unit = vec.scale(line, 1 / length);
+  // Where each of his own is now, and where he will be when the arrow goes (`ahead` s: the draw and the flight, his
+  // comrades riding on and he with them): clear of the line at both.
+  const mine = groundVelocity(fighter);
   return !world.fighters.some((mate) => {
     if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') return false;
-    const at = standingAt(mate);
-    const offset = [at[0] - from[0], 0, at[2] - from[2]];
-    const along = vec.dot(offset, unit);
-    // (Short of the mark, or beyond it within `beyond` m: an arrow that misses flies on.)
-    return along > 0 && along < length + spec.beyond && Math.hypot(offset[0] - unit[0] * along, offset[2] - unit[2] * along) < spec.friend;
+    const now = standingAt(mate);
+    const theirs = groundVelocity(mate);
+    return [0, spec.ahead].some((t) => {
+      const offset = [now[0] + (theirs[0] - mine[0]) * t - from[0], 0, now[2] + (theirs[2] - mine[2]) * t - from[2]];
+      const along = vec.dot(offset, unit);
+      // (Short of the mark, or beyond it within `beyond` m: an arrow that misses flies on.)
+      return along > 0 && along < length + spec.beyond && Math.hypot(offset[0] - unit[0] * along, offset[2] - unit[2] * along) < spec.friend;
+    });
   });
 }
 
@@ -682,7 +695,8 @@ function resupply(world, fighter, setGoal, dt) {
   fighter.refilling = (fighter.refilling ?? 0) + dt;
   if (fighter.refilling < spec.resupply.seconds) return;
   fighter.refilling = 0;
-  fighter.arrows = fighter.body.gear.quiver;
+  fighter.arrows = ammoCarried(fighter);
+  fighter.resupplied = (fighter.resupplied ?? 0) + 1;
   fighter.weapon.spent = false;
   world.events.push({ time: world.time, kind: 'resupplied', fighter: fighter.id, effects: ['a fresh quiver from the train'] });
 }

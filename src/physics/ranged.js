@@ -10,7 +10,7 @@ import { OUTFITS, outfitOf } from '../outfits.js';
 import { aimPoint, BLOCKING, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
-import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir } from '../weapons.js';
+import { ARROW, BLADES, bulletProof, bulletRegion, GUN, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
 import { gaitAt, harmHorse } from './mounted.js';
@@ -262,8 +262,8 @@ export function drawBow(world, fighter, punch, target, intent) {
  */
 export function loose(world, fighter, bolt = null) {
   const punch = fighter.punch;
-  // A counted quiver already empty (a bow taken up again off the floor): there is no arrow to nock.
-  if (!bolt && fighter.body.gear.quiver && (fighter.arrows ?? fighter.body.gear.quiver) <= 0) {
+  // His quiver already empty (a bow taken up again off the floor): there is no arrow to nock.
+  if (!bolt && ammoLeft(fighter) <= 0) {
     fighter.weapon.spent = true;
     return;
   }
@@ -293,14 +293,8 @@ export function loose(world, fighter, bolt = null) {
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
   // Its energy against a long bow's arrow: by its speed (and a war bow's heavier shaft, `arrowEnergy`), or a bolt's own weight.
   const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2 * (weapon.spec.arrowEnergy ?? 1);
-  // A counted quiver (a kit's `quiver`): one arrow fewer; the last gone, the bow is spent until he is given more (resupply).
-  if (!bolt && fighter.body.gear.quiver) {
-    fighter.arrows = (fighter.arrows ?? fighter.body.gear.quiver) - 1;
-    if (fighter.arrows <= 0) {
-      weapon.spent = true;
-      world.events.push({ time: world.time, kind: 'quiverEmpty', fighter: fighter.id, effects: ['his quiver is empty'] });
-    }
-  }
+  // One arrow fewer from his quiver (ammoLeft); the last gone, the bow is spent until he is given more.
+  if (!bolt) spendMissile(world, fighter, weapon);
   // The arrow leaves the bow with the bow's own way over the ground (a horse's gallop, a man's step) as well as its cast.
   const carried = overGround(fighter);
   world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
@@ -309,6 +303,52 @@ export function loose(world, fighter, bolt = null) {
   if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });
   // The bow kicks forward a little in the hand as the string goes.
   world.pendingImpulses.push({ fighter, shares: [[P[`${weapon.main}Hand`], 1]], direction: dir, impulse: 0.6 });
+}
+
+/**
+ * The missiles a man carries for a weapon at the start (bolts, balls, arrows): a bow's from his kit's `quiver`
+ * (a horse archer's) or the bow's own `ammo`; a gun's or a crossbow's, its shot's `ammo`. None counted: Infinity
+ * (a forearm gun fed from the body, a modern pistol).
+ */
+export function ammoCarried(fighter, weapon = fighter.weapon) {
+  const spec = weapon.spec;
+  return (spec.bow ? fighter.body.gear.quiver ?? spec.ammo : spec.shot?.ammo) ?? Infinity;
+}
+
+/** What he has left for it (`arrows` for a bow, `rounds` for a gun or a crossbow: the loaded one counted). */
+export function ammoLeft(fighter, weapon = fighter.weapon) {
+  return (weapon.spec.bow ? fighter.arrows : fighter.rounds) ?? ammoCarried(fighter, weapon);
+}
+
+/**
+ * One missile spent from what he carries. The last gone: in his side's formation on foot, a fresh load is brought up
+ * to him (resupplyInLine); else the weapon is spent (the AI lets it fall and draws his sidearm: ai.js castAside).
+ */
+function spendMissile(world, fighter, weapon) {
+  const carried = ammoCarried(fighter, weapon);
+  if (carried === Infinity) return;
+  const left = ammoLeft(fighter, weapon) - 1;
+  if (weapon.spec.bow) fighter.arrows = left;
+  else fighter.rounds = left;
+  if (left > 0 || resupplyInLine(world, fighter, weapon, carried)) return;
+  weapon.spent = true;
+  const what = weapon.spec.bow ? 'his quiver is empty' : weapon.spec.shot.bolt ? 'his bolts are spent' : 'his powder and shot are spent';
+  world.events.push({ time: world.time, kind: weapon.spec.bow ? 'quiverEmpty' : 'ammoEmpty', fighter: fighter.id, weapon: weapon.kind, effects: [what] });
+}
+
+/**
+ * His ammunition brought up to him where he stands in the line (SUPPLY): a man on foot in his side's formation
+ * (`slot`), not yet given `loads` fresh loads. The load is his own again (`carried`), in his hands after the
+ * bearer's run (he shoots again only after `seconds`). Returns whether he was.
+ */
+function resupplyInLine(world, fighter, weapon, carried) {
+  if (!fighter.slot || fighter.mount || (fighter.supplied ?? 0) >= SUPPLY.loads) return false;
+  fighter.supplied = (fighter.supplied ?? 0) + 1;
+  if (weapon.spec.bow) fighter.arrows = carried;
+  else fighter.rounds = carried;
+  fighter.cooldown = Math.max(fighter.cooldown ?? 0, SUPPLY.seconds);
+  world.events.push({ time: world.time, kind: 'resupplied', fighter: fighter.id, effects: [weapon.spec.bow ? 'fresh sheaves brought up to the line' : 'more brought up to him in the line'] });
+  return true;
 }
 
 /**
@@ -525,12 +565,18 @@ export function reload(world, fighter, dt) {
   const weapon = fighter.weapon;
   if (!weapon?.held || !weapon.spec.shot || weapon.loaded) return;
   if (!fighter.reloading || fighter.state !== 'up' || fighter.punch) return;
+  // Nothing left to load (ammoLeft): it is spent.
+  if (ammoLeft(fighter, weapon) <= 0) {
+    weapon.spent = true;
+    fighter.reloading = false;
+    return;
+  }
   // Loading takes both hands and a standing man: walking on, it waits.
   if (Math.hypot(...(fighter.rootVelocity ?? [0, 0])) > WORLD.reloadMaxSpeed) return;
   weapon.reloaded = (weapon.reloaded ?? 0) + dt;
   if (weapon.reloaded < weapon.spec.shot.reloadSeconds) return;
   weapon.loaded = true;
-  weapon.charges = weapon.spec.shot.rounds ?? weapon.spec.shot.barrels ?? 1;
+  weapon.charges = Math.min(weapon.spec.shot.rounds ?? weapon.spec.shot.barrels ?? 1, ammoLeft(fighter, weapon));
   fighter.reloading = false;
   world.events.push({ time: world.time, kind: 'reloaded', fighter: fighter.id, effects: [] });
 }
@@ -593,6 +639,9 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
     if (damp === 'click' || damp === 'reprime') return;
     // Several barrels (the three-eyed gun) or a magazine (`rounds`): each shot in turn, empty after the last.
     weapon.charges = (weapon.charges ?? shot.rounds ?? shot.barrels ?? 1) - 1;
+    // And one fewer of all he carries (ammoLeft): the last spent, the weapon is (unless more is brought up to the line).
+    if (own) spendMissile(world, fighter, weapon);
+    weapon.charges = Math.min(weapon.charges, ammoLeft(fighter, weapon));
     weapon.loaded = weapon.charges > 0;
     weapon.reloaded = 0;
     if (!weapon.loaded && own) emptied(world, fighter);

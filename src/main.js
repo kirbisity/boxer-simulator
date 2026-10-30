@@ -1199,6 +1199,8 @@ function logEvent(event) {
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
   else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'loosed') return;
+  // His arrows (bolts, charges) all spent, or more brought up to him (physics/ranged.js spendMissile).
+  else if (event.kind === 'quiverEmpty' || event.kind === 'ammoEmpty' || event.kind === 'resupplied') text = `${event.kind === 'resupplied' ? '📦' : '🏹'} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'arrow') text = `🏹 <b>${name(event.attacker)}</b> → <b>${name(event.defender)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'shot') text = `🔫 <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'generalFell') text = `👑 <b>${name(event.fighter)}</b>, the ${world.fighters[event.fighter].corner} general, has fallen`;

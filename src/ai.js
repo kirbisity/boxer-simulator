@@ -15,6 +15,7 @@ import { heldOffAt } from './physics/brush.js';
 import { handling } from './handling.js';
 import { holdWing, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
+import { ammoLeft, emptied } from './physics/ranged.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -379,8 +380,19 @@ export const AI = {
   // m: in level mode a shooter holds his shot with a team-mate (the player among them) this near the line to his man: a shaft or a ball
   // does not fly true and the man moves as it comes. (Battles keep `lineOfFire`: their fingerprints.)
   shotLineOfFire: 0.9,
-  // m: a heavy gun holds its shot at a man with a comrade this near him.
+  // m: a heavy gun holds its shot at a man with a comrade this near him (and any bow or gun at a man at grips with ours).
   gunCrowd: 1.2,
+  // s: a shooter who has held his shot this long for his own men in the way, his mark at grips with them, lets the bow
+  // or the gun go and draws his sidearm to join them (heldTooLong): his shooting is done where the lines have met.
+  holdShot: 4,
+  // m: an arrow's drop and its spread at a long mark (and the mark on the move) want more room round him than a ball's.
+  arrowCrowd: 2,
+  // m: a comrade nearer than this on the line is not shot over (the man beside him, when the mark is off to that side:
+  // the arrow cannot rise over his head so soon), nor a comrade on a horse at any range (physics/ranged.js overHeads
+  // lifts over men on foot only). The man in the rank before him (DRILL's ~1.2 m) is shot over.
+  overHeadsFrom: 1,
+  // m: how far off a shooter looks for another mark when his own is fouled (clearMark).
+  markWithin: 60,
   pastTarget: 0.45, // m: a team-mate this close behind my man is in the line too
   kickClearance: 1.3, // m: no kicks or knees with a team-mate this close, beside or ahead
   // Facing a longer reach (a sword, a baton, a spear) or a blade: keep out of
@@ -787,6 +799,16 @@ function holdRank(world, fighter, opponent, style, dt) {
     // A gun or a crossbow fires with its rank's volley (formation.js volleyDue).
     if (!volleyDue(world, formation, fighter)) return true;
     if (holdsFire(fighter, formation, distance)) return true;
+    // His own men in the way (shotFouled; a bow's arrow goes over the heads before it): held, and after a while at a
+    // man at grips with them, the weapon put by and the sidearm drawn (heldTooLong).
+    const fouled = shotFouled(world, fighter, opponent, { overHeads: Boolean(weapon.spec.bow) });
+    if (fouled) {
+      const other = clearMark(world, fighter, { overHeads: Boolean(weapon.spec.bow) });
+      if (other) fighter.focus = other.id;
+      else heldTooLong(world, fighter, fouled);
+      return true;
+    }
+    heldTooLong(world, fighter, null);
     const zone = world.random() < gun.headShare ? 'head' : 'body';
     if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
       fighter.punch.quick = true;
@@ -1243,6 +1265,8 @@ function goForWeapon(world, fighter, opponent, dt) {
     if (debris.kind === 'shield' ? !wantsShield : debris.kind !== 'weapon' || !wantsWeapon || WEAPONS[debris.weapon]?.flag) return null;
     // Not a weapon he cannot lift (handling.js).
     if (debris.kind === 'weapon' && !handling(fighter.body, WEAPONS[debris.weapon]).canHold) return null;
+    // Nor a bow or a gun he has nothing left to shoot from (physics/ranged.js ammoLeft).
+    if (debris.kind === 'weapon' && WEAPONS[debris.weapon]?.ranged && ammoLeft(fighter, { spec: WEAPONS[debris.weapon] }) <= 0) return null;
     const mine = flat(debris.x, at);
     const theirs = enemies.reduce((least, other) => Math.min(least, flat(debris.x, point(other.x, P.pelvis))), Infinity);
     if (mine > AI.pickup.maxDistance || (mine > AI.pickup.atFeet && mine > theirs - AI.pickup.margin)) return null;
@@ -2141,6 +2165,88 @@ function switchArms(world, fighter, style, distance) {
   return Boolean(rule) && useMounted(world, fighter, rule.to);
 }
 
+/**
+ * A bow or a gun with nothing left to shoot (physics/ranged.js ammoLeft, or given up: heldTooLong) is spent: he lets it
+ * fall and draws his kit's sidearm (physics.js dropWeapon), and fights as the men of his side's line do, in his
+ * place in the ranks or at the man before him; never idle with it, nor off the field. A gun that is also a club
+ * (`emptyStyle`, the three-eyed gun) is kept and swung; a forearm gun cannot be let go. Returns the style he fights in.
+ */
+function castAside(world, fighter, style) {
+  const weapon = fighter.weapon;
+  if (!style.ranged || !weapon?.held || !weapon.spent || !weapon.spec.ranged || weapon.spec.mounted) return style;
+  if (style.emptyStyle) emptied(world, fighter);
+  else dropWeapon(world, fighter, 'dropped');
+  fighter.aimAt = undefined;
+  fighter.reloading = false;
+  return STYLES[fighter.style] ?? STYLES.mix;
+}
+
+/**
+ * Whether a shot at his man now would put his own men in its way, so he holds it: any shot at a man with a comrade
+ * within AI.gunCrowd of him (at grips with ours: a miss, or an arrow's drop, finds ours); a flat shot (a gun, a
+ * crossbow, or a bow not shooting over heads) with a comrade near the line to him, too (teamSpacing). A bow in the
+ * ranks puts its arrow up over the heads before it (physics/ranged.js overHeads), as archers shot over their own lines.
+ */
+function shotFouled(world, fighter, opponent, { overHeads = false } = {}) {
+  const lineOfFire = world.stage ? AI.shotLineOfFire : AI.lineOfFire;
+  if (!overHeads && teamSpacing(world, fighter, opponent, lineOfFire).blocked) return 'line';
+  const at = point(fighter.x, P.pelvis);
+  const mark = point(opponent.x, P.pelvis);
+  const length = Math.hypot(mark[0] - at[0], mark[2] - at[2]) || 1e-6;
+  const ahead = [(mark[0] - at[0]) / length, (mark[2] - at[2]) / length];
+  const bow = Boolean(fighter.weapon?.spec.bow);
+  const crowd = bow ? AI.arrowCrowd : AI.gunCrowd;
+  let fouled = null;
+  for (const mate of world.fighters) {
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') continue;
+    const there = point(mate.x, P.pelvis);
+    if (Math.hypot(there[0] - mark[0], there[2] - mark[2]) < crowd) return 'crowd';
+    // Over the heads: not one too near to rise over, nor a rider.
+    if (!overHeads) continue;
+    const offset = [there[0] - at[0], there[2] - at[2]];
+    const along = offset[0] * ahead[0] + offset[1] * ahead[1];
+    const across = Math.abs(offset[0] * ahead[1] - offset[1] * ahead[0]);
+    if (along > 0.1 && along < length && across < lineOfFire + (mate.mount ? 0.5 : 0) && (mate.mount || along < AI.overHeadsFrom)) fouled = 'line';
+  }
+  return fouled;
+}
+
+/**
+ * Another man to shoot at when his own mark is fouled (shotFouled): the nearest enemy standing within AI.markWithin m
+ * with no comrade of his in the way. The rear of their line, the men not yet at grips with ours: where the archers
+ * shot once the lines had met. Null when there is none.
+ */
+function clearMark(world, fighter, options) {
+  const at = point(fighter.x, P.pelvis);
+  let best = null;
+  let nearest = AI.markWithin;
+  for (const other of world.fighters) {
+    if (!foeOf(fighter, other) || other.state !== 'up' || other.fled || other.hidden) continue;
+    const apart = Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
+    if (apart >= nearest || shotFouled(world, fighter, other, options)) continue;
+    best = other;
+    nearest = apart;
+  }
+  return best;
+}
+
+/**
+ * A shot held (shotFouled) or not: how long he has been holding it (since his last shot). Past AI.holdShot s, his
+ * man at grips with ours (`crowd`) and no other to shoot at (clearMark), he gives up shooting: the weapon is spent and
+ * next think he lets it go and draws (castAside). Returns whether he did.
+ */
+function heldTooLong(world, fighter, fouled) {
+  if (!fouled) {
+    fighter.holdingShot = undefined;
+    return false;
+  }
+  fighter.holdingShot ??= world.time;
+  if (fouled !== 'crowd' || world.time - fighter.holdingShot < AI.holdShot || fighter.weapon.spec.mounted) return false;
+  fighter.weapon.spent = true;
+  fighter.holdingShot = undefined;
+  return true;
+}
+
 function gunfight(world, fighter, opponent, distance, gun, dt) {
   // A fired matchlock: loaded only with nobody near; with someone coming,
   // away from him for room to load.
@@ -2210,12 +2316,14 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   fighter.move = gun.advance ?? (!gun.holdGround && roomBehind > AI.gunKite.wallMargin ? -0.6 : 0);
   fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
   if (fighter.punch || fighter.cooldown > 0) return;
-  if (teamSpacing(world, fighter, opponent, world.stage ? AI.shotLineOfFire : AI.lineOfFire).blocked) return;
-  // One slow, heavy shot is not fired into a man with comrades round him.
-  if (weapon.spec.shot && world.fighters.some((mate) => mate !== fighter && mate.corner === fighter.corner && mate.state !== 'out' && vec.length(vec.sub(point(mate.x, P.pelvis), point(opponent.x, P.pelvis))) < AI.gunCrowd)) {
-    if (world.random() < AI.refocusRate * dt) fighter.focus = undefined;
-    return;
-  }
+  // His own men in the way: no shot (shotFouled). One on the line, he steps off it for a clear one; his man at grips
+  // with ours, he looks for another, and in the end puts the weapon by and goes to them (heldTooLong).
+  const fouled = shotFouled(world, fighter, opponent);
+  const other = fouled ? clearMark(world, fighter) : null;
+  if (!other && heldTooLong(world, fighter, fouled)) return;
+  if (other) fighter.focus = other.id;
+  if (fouled === 'line') fighter.strafe = teamSpacing(world, fighter, opponent).strafe || fighter.strafe;
+  if (fouled) return;
   const zone = world.random() < gun.headShare ? 'head' : 'body';
   if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
     // From the stance the gun is already up: the shot goes as soon as the sights settle.
@@ -2375,7 +2483,8 @@ function decide(world, fighter, dt) {
     if (apart > AI.net.from && apart < AI.net.to && random() < AI.net.rate * dt) castNet(world, fighter, opponent);
   }
   if (goForWeapon(world, fighter, opponent, dt)) return;
-  let style = STYLES[fighter.style];
+  // A bow or a gun with nothing left to shoot: let fall, the sidearm drawn (castAside).
+  let style = castAside(world, fighter, STYLES[fighter.style]);
   const nerve = confidence(fighter, opponent, world);
   fighter.aiConfidence = nerve;
   // Fear builds and may break him; broken, or passive by choice, he only covers up and gets away.
