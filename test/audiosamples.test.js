@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
+import { LOOP_FILES, SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
 import { playSample, samplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 
@@ -27,7 +27,7 @@ test('every sample is a small MP3 that is there, and nothing else is in the fold
   }
   assert.ok(total <= TOTAL_CAP, `${total} bytes in all`);
   const mp3s = readdirSync(DIR).filter((file) => file.endsWith('.mp3')).map((file) => file.replace(/\.mp3$/, ''));
-  assert.deepEqual(mp3s.sort(), [...SAMPLE_FILES].sort());
+  assert.deepEqual(mp3s.sort(), [...SAMPLE_FILES, ...LOOP_FILES].sort());
   const readme = readFileSync(`${DIR}/README.md`, 'utf8');
   for (const name of SAMPLE_FILES) assert.ok(readme.includes(`${name}.mp3`), `README lists ${name}`);
 });
@@ -116,20 +116,21 @@ test('a decoded take starts at its transient, past any silence before it', () =>
 });
 
 test('the bank decodes every file and picks only among the decoded', async () => {
-  const embed = Object.fromEntries(SAMPLE_FILES.map((name) => [name, readFileSync(`${DIR}/${name}.mp3`).toString('base64')]));
+  const embed = Object.fromEntries([...SAMPLE_FILES, ...LOOP_FILES].map((name) => [name, readFileSync(`${DIR}/${name}.mp3`).toString('base64')]));
   let decoded = 0;
   const ctx = { decodeAudioData: async (bytes) => (decoded += 1, { duration: bytes.byteLength / 5000, sampleRate: 1000, getChannelData: () => new Float32Array([0, 0, 0.5, 0.2]) }) };
   const bank = createSampleBank(ctx, { embed, random: () => 0 });
-  assert.equal(await bank.ready, SAMPLE_FILES.length);
-  assert.equal(decoded, SAMPLE_FILES.length);
+  assert.equal(await bank.ready, SAMPLE_FILES.length + LOOP_FILES.length);
+  assert.equal(decoded, SAMPLE_FILES.length + LOOP_FILES.length);
+  assert.deepEqual([bank.loop('rain').loopStart, bank.loop('rain').loopEnd], [0.25, 0.25 + 9.24]);
   assert.equal(bank.pick('clash').offset, 0.001);
   assert.equal(bank.pick('nothing'), null);
 });
 
 test('the bundle carries every sample\'s bytes', { skip: !existsSync('dist/gladiator.html') && 'no dist/gladiator.html (node tools/bundle.js)' }, () => {
   const page = readFileSync('dist/gladiator.html', 'utf8');
-  assert.ok(statSync('dist/gladiator.html').mtimeMs >= Math.max(...SAMPLE_FILES.map((name) => statSync(`${DIR}/${name}.mp3`).mtimeMs)), 'the bundle is older than the samples: rebuild it');
-  for (const name of SAMPLE_FILES) assert.ok(page.includes(readFileSync(`${DIR}/${name}.mp3`).toString('base64')), `${name} is not in the bundle`);
+  assert.ok(statSync('dist/gladiator.html').mtimeMs >= Math.max(...[...SAMPLE_FILES, ...LOOP_FILES].map((name) => statSync(`${DIR}/${name}.mp3`).mtimeMs)), 'the bundle is older than the samples: rebuild it');
+  for (const name of [...SAMPLE_FILES, ...LOOP_FILES]) assert.ok(page.includes(readFileSync(`${DIR}/${name}.mp3`).toString('base64')), `${name} is not in the bundle`);
 });
 
 test('the third batch: heels, a helmet, a wooden shield, punches, the fist\'s whoosh, thunder', () => {

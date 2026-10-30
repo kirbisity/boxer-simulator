@@ -158,7 +158,7 @@ export function installSoundBench(engine) {
   const pick = { striker: 'blade', covering: 'plate', wound: 'cut', clashA: 'blade', clashB: 'blade', slide: false, surface: 'stone', armour: 'none', depth: 0.3, voice: 'wound', horse: 'hoof', shot: 'bow', mech: 'door', mechState: 'closed', size: 1.78, bodyMass: 80 };
   const source = { x: 2, z: -3 };
   let strength = 0.6;
-  let ambience = { rain: false, wind: false, surf: false, thunder: false, crowd: false, sewer: false };
+  let ambience = { rain: false, wind: false, surf: false, thunder: false, crowd: false, market: false, sewer: false };
   const sectorMen = new Array(FAR_FIELD.sectors).fill(0);
   let thunderClock = 0;
 
@@ -363,7 +363,7 @@ export function installSoundBench(engine) {
   function ambiencePanel() {
     const apply = () => {
       engine.bench.ambience({
-        spec: { wind: ambience.wind ? 54 : 0, surf: ambience.surf ? 72 : 0, crowd: ambience.crowd ? 84 : 0, flow: ambience.sewer ? 50 : 0 },
+        spec: { wind: ambience.wind ? 54 : 0, surf: ambience.surf ? 72 : 0, crowd: ambience.crowd ? 84 : 0, market: ambience.market ? 56 : 0, flow: ambience.sewer ? 50 : 0 },
         rain: ambience.rain ? 0.85 : 0,
         drips: ambience.sewer ? [{ at: [1.5, 2.6, -2] }, { at: [-2, 2.6, 1] }, { at: [0.5, 2.6, 4] }] : [],
         waters: ambience.sewer ? [{ at: [0, 0, 3] }] : [],
@@ -381,7 +381,7 @@ export function installSoundBench(engine) {
       });
       return button;
     }));
-    return panel('Ambience', row, make('p', { className: 'bench-note', textContent: 'The beds of the places: rain on you (a roof over you in a room, a tunnel, the drain), wind, surf, thunder now and then, a crowd, the drain\'s drips and running water.' }));
+    return panel('Ambience', row, make('p', { className: 'bench-note', textContent: 'The beds of the places: rain on you (a roof over you in a room, a tunnel, the drain), wind, surf, thunder now and then, a crowd, a market, the drain\'s drips and running water.' }));
   }
 
   function farPanel() {

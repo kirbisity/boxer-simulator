@@ -228,9 +228,56 @@ function board() {
       refresh();
     }
   }
+  // The ambience loops: each a bed that plays until stopped (ambience.js plays them under the places, at the place's level).
+  const LOOPS = [
+    ['rain', 'Rain', 'Rain in the open: Dunnottar\'s storm, the container quay at night. Under a roof the synth\'s drumming on it instead.'],
+    ['wind', 'Wind', 'Every outdoor place, as strong as the place is open to it (the steppe, the cliffs most); muffled through walls.'],
+    ['market', 'Market', 'A town\'s market square by day: Maidstone, the Jiangnan water town. Thinned by rain, gone at night.'],
+  ];
+  const playing = {};
+  function toggleLoop(name, button) {
+    audio();
+    if (ctx.state !== 'running') ctx.resume();
+    const now = ctx.currentTime;
+    if (playing[name]) {
+      playing[name].gain.gain.setTargetAtTime(0, now, 0.15);
+      playing[name].loop.stop(now + 1);
+      delete playing[name];
+    } else {
+      const loop = bank.loop(name);
+      if (!loop) return (status.textContent = 'Still loading the recordings: try again in a moment.');
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.gain.setTargetAtTime(0.7, now, 0.3);
+      gain.connect(master);
+      playing[name] = { gain, loop: startLoop(ctx, loop, gain, now + 0.03) };
+    }
+    if (button) {
+      button.setAttribute('aria-pressed', String(Boolean(playing[name])));
+      button.textContent = playing[name] ? 'Stop' : 'Play loop';
+    }
+    return Boolean(playing[name]);
+  }
+  {
+    const id = 'ambience-loops';
+    nav.prepend(el('a', { href: `#${id}`, textContent: 'Ambience loops' }));
+    const grid = el('div', { className: 'grid' });
+    root.prepend(el('section', { id, className: 'category' }, el('h2', { textContent: 'Ambience loops' }), el('p', { className: 'blurb', textContent: 'The places\' beds, recorded: each loops seamlessly until stopped (mono, played wide: two reads of it half a loop apart, left and right). Play several at once to hear them together.' }), grid));
+    for (const [name, title, note] of LOOPS) {
+      const spec = AMBIENCE_LOOPS[name];
+      const button = el('button', { type: 'button', className: 'play toggle', textContent: 'Play loop', onclick: () => toggleLoop(name, button) });
+      button.setAttribute('aria-pressed', 'false');
+      button.dataset.loop = name;
+      grid.append(el('article', { className: 'card' },
+        el('header', {}, el('h3', { textContent: title }), el('div', { className: 'tags' }, el('span', { className: 'tag rec', textContent: 'loop' }), el('span', { className: 'tag new', textContent: 'new' }))),
+        el('p', { className: 'note', textContent: note }),
+        el('div', { className: 'actions' }, button),
+        el('p', { className: 'readout', textContent: `${spec.file}.mp3 · ${spec.seconds} s period, its tail crossfaded into its head · looped ${spec.lead}–${(spec.lead + spec.seconds).toFixed(2)} s of the file` })));
+    }
+  }
   const takes = Object.values(SAMPLE_SETS).reduce((sum, list) => sum + list.length, 0);
-  document.getElementById('count').textContent = `${Object.keys(SAMPLE_SETS).length} recorded sets, ${takes} takes, and the synthesised families`;
-  window.soundBoard = { play, playTake, cards: CATEGORIES.flatMap(([, , cards]) => cards), ready: () => bank?.ready };
+  document.getElementById('count').textContent = `${LOOPS.length} ambience loops, ${Object.keys(SAMPLE_SETS).length} recorded sets, ${takes} takes, and the synthesised families`;
+  window.soundBoard = { play, playTake, toggleLoop, loops: () => Object.keys(playing), cards: CATEGORIES.flatMap(([, , cards]) => cards), ready: () => bank?.ready };
 }
 
 const STYLE = `
@@ -276,6 +323,8 @@ h3 { font: 600 17px/1.2 var(--body); margin: 0; }
 button { font: 600 14px/1 var(--body); cursor: pointer; border-radius: 4px; padding: 9px 12px; border: 1px solid var(--bronze); }
 button.play { background: var(--bronze); color: var(--bronze-ink); }
 button.ghost { background: transparent; color: var(--bronze); }
+button.toggle { min-width: 96px; }
+button.toggle[aria-pressed="true"] { background: transparent; color: var(--bronze); }
 button:focus-visible { outline: 2px solid var(--steel); outline-offset: 2px; }
 button:active { transform: translateY(1px); }
 .takes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
