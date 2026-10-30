@@ -459,12 +459,15 @@ export const WEAPONS = {
   },
   // The kanabo: a long oak club shod with iron studs, swung in two hands.
   // Heavy (~5 kg of iron-shod oak), its weight spread along the swelling
-  // upper half rather than packed in a head (`balance`), struck with that
-  // half (`strikeFrom`), not a point; no thrust; slow to turn, slow to raise
-  // and to recover (WORLD.weapons.heavyFrom). Oak gives more than steel: a
-  // longer contact (`contactSeconds`), so a lower peak force for the same blow.
+  // upper half rather than packed in a head (`balance`). Studded from just
+  // above the grip to the end, the whole length strikes (`strikeFrom`): near
+  // the hands slower and lighter (the swing's ω × r, effectiveMassAt), so
+  // the far half hits hardest by the physics; not a point; no thrust; slow
+  // to turn, slow to raise and to recover (WORLD.weapons.heavyFrom). Oak
+  // gives more than steel: a longer contact (`contactSeconds`), so a lower
+  // peak force for the same blow.
   kanabo: {
-    label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.55, handle: 0.35, spacing: 0.17, mass: 5, balance: 0.68, radius: 0.05,
+    label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.25, handle: 0.35, spacing: 0.17, mass: 5, balance: 0.68, radius: 0.05,
     harm: { swing: { blunt: 1.4 }, thrust: { blunt: 0.4 } },
     contactSeconds: 0.006, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
   },
