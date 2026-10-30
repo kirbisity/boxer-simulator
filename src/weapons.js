@@ -234,8 +234,11 @@ export const WEAPONS = {
   // against blows (a long spear, levered from the hands, is easiest lost).
   warhammer: {
     label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 2.6, balance: 0.85, radius: 0.04,
-    harm: { swing: { blunt: 1.6 }, thrust: { blunt: 1, pierce: 0.35 } },
-    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, art: 'artCrush', crush: 0.45,
+    // Its head is a hammer face with a beak behind it (the bec de corbin): a swing lands one or the other, the beak a spike
+    // that goes into plate where an edge skids (pierce). The face is small and hard on a long lever: most of its blow is felt
+    // through plate, which dents and passes it on rather than spreading it (`crush` 0.7; was 0.45, as a mace's flanges).
+    harm: { swing: { blunt: 1.6, pierce: 0.4 }, thrust: { blunt: 1, pierce: 0.35 } },
+    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, art: 'artCrush', crush: 0.7,
   },
   naginata: {
     label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 2.35, balance: 0.55, radius: 0.014,
