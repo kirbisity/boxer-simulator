@@ -149,7 +149,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     shield: undefined, weapon: undefined, offWeapon: undefined, arena: undefined, slot: undefined, formation: undefined, inFront: undefined, wing: undefined,
     shieldPose: undefined, shieldOpen: undefined, strafe: undefined, running: undefined, aimAt: undefined, focus: undefined, goTo: undefined,
     nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
-    weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
+    weave: undefined, carry: undefined, detail: undefined, unposedAt: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
     bleed: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined,
     loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, lowStrike: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
@@ -3894,11 +3894,13 @@ function chooseDetail(world) {
   }
   // A dormant man is a pose that is never worked out: out of the contacts like any proxy, and not drawn.
   if (world.awake !== undefined) for (const fighter of world.fighters) if (fighter.dormant) fighter.detail = 'proxy';
-  // Back into the physics from a pose: moving as the pose was.
+  // Back into the physics from a pose: moving as the pose was. (A pose touches no one: a man may have walked into it. This
+  // step that overlap is put right as a placement, not a speed: pushApart.)
   world.fighters.forEach((fighter, index) => {
     if (previous[index] === 'proxy' && fighter.detail !== 'proxy') {
       const h = (world.lastDt ?? 1 / 60) / WORLD.substeps;
       for (let at = 0; at < fighter.x.length; at += 1) fighter.prev[at] = fighter.x[at] - fighter.v[at] * h;
+      fighter.unposedAt = world.steps;
     }
   });
 }
@@ -5856,6 +5858,10 @@ function pushApart(world, first, second) {
   const firstCapsules = first.capsuleCache.byKey;
   const secondCapsules = second.capsuleCache.byKey;
   let body = null;
+  // One of them just back from a pose (chooseDetail), which touched no one: the overlap it was left in is undone as a
+  // placement (prev moved with x), not turned into a speed. Two trunks 0.2 m into each other, put apart in one substep, met
+  // at 30 m/s and knocked each other cold.
+  const placed = first.unposedAt === world.steps || second.unposedAt === world.steps;
   for (const [firstKey, secondKey] of PUSH_PAIRS) {
     const one = firstKey === 'shoulders' ? shoulderCapsule(first) : firstCapsules[firstKey];
     const two = secondKey === 'shoulders' ? shoulderCapsule(second) : secondCapsules[secondKey];
@@ -5884,7 +5890,10 @@ function pushApart(world, first, second) {
     const total = shares.reduce((sum, [fighter, index, share]) => sum + fighter.invMass[index] * share, 0);
     for (const [fighter, index, share, sign] of shares) {
       const amount = ((reach - distance) * fighter.invMass[index] * share) / total;
-      for (let axis = 0; axis < 3; axis += 1) fighter.x[index * 3 + axis] += sign * normal[axis] * amount;
+      for (let axis = 0; axis < 3; axis += 1) {
+        fighter.x[index * 3 + axis] += sign * normal[axis] * amount;
+        if (placed) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;
+      }
     }
   }
   if (body) crashBodies(world, first, second, 'trunk', 'trunk', body.normal);
