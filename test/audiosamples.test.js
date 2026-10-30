@@ -11,7 +11,8 @@ import { SOUND_FAMILIES } from '../src/audio/families.js';
 const DIR = 'src/audio/samples';
 // (A thunder's roar is the longest take, 2.6 s.)
 const FILE_CAP = 16 * 1024;
-const TOTAL_CAP = 300 * 1024;
+// (Room for the voices and the looping ambience beds coming in; the one-shot takes alone are ~300 KB.)
+const TOTAL_CAP = 700 * 1024;
 const half = () => 0.5;
 const plan = (event) => samplePlan(event.type, SOUND_FAMILIES[event.type].params(event), event, half);
 
