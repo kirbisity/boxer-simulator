@@ -82,6 +82,6 @@ export function playStep(voice, out, params, when, gain) {
     });
     sfxPlayBuffer(voice, out, drops, when, gain * 0.8);
   }
-  if (params.armour !== 'none') playArmourShake(voice, out, params.armour, when + 0.01, gain * (params.armour === 'plate' ? 0.45 : 0.6), 0.08 + params.pace * 0.02);
+  if (params.armour !== 'none') playArmourShake(voice, out, params.armour, when + 0.01, gain * (params.armour === 'plate' ? 0.85 : 0.9), 0.08 + params.pace * 0.02);
   return when + seconds + 0.25;
 }

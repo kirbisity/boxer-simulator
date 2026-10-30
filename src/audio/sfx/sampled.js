@@ -109,9 +109,10 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
     }
     case 'step': {
       const armoured = params.armour === 'plate' || params.armour === 'mail';
-      // The armour's clank with each step (mail lighter and brighter).
+      // The armour's clank with each step (mail lighter and brighter), over the footfall: a man in plate is heard by his kit
+      // before his feet (it was 0.6 and 0.4 of the clip's peak, under the step; raised to carry over it).
       const mail = params.armour === 'mail';
-      const armour = armoured ? { set: 'armourstep', trim: (mail ? 0.4 : 0.6) * sampleLerp(0.7, 1.2, sampleStrength(params.pace, 0.5, 6)), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.25, 0.85, 1.15) * (mail ? 1.15 : 1) * jitter(0.05), seconds: null, fade: 0.06, skip: 0 } : null;
+      const armour = armoured ? { set: 'armourstep', trim: (mail ? 0.8 : 1.2) * sampleLerp(0.8, 1.3, sampleStrength(params.pace, 0.5, 6)), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.25, 0.85, 1.15) * (mail ? 1.15 : 1) * jitter(0.05), seconds: null, fade: 0.06, skip: 0 } : null;
       const ground = groundStep(params, event, jitter);
       // The ground recorded (the armour's take on top of it), or the synth's ground under the armour's take, or the synth alone.
       if (ground) return { ...ground, extra: armour ? [armour] : [], synth: ground.synth, synthGain: ground.synthGain };
