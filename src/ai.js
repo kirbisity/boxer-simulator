@@ -6,9 +6,9 @@ import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volley
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
-import { WEAPONS } from './weapons.js';
+import { BLADES, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { heldOffAt } from './physics/brush.js';
@@ -62,6 +62,15 @@ export const AI = {
   // and not running past him (weighted); a fresh choice every `rethink` s.
   gunKite: { stride: 2.5, directions: 16, wallMargin: 0.7, roomWeight: 0.8, pastWeight: 2.5, rethink: 0.4 },
   bodyShotShare: 0.2,
+  // Armour sense: a trained man fights the kit in front of him, not his drill. Each move he might make (and the zone he aims
+  // it at) is weighted by the share of its harm that gets through that man's kit there (harmThrough: its cut/pierce/blunt
+  // against the protection, a point's chance of a gap in rigid armour) raised to `power` × his sense: none below `from`
+  // (WORLD.guardRead's untrained: he swings as drilled), all of it from `full` (an elite: OUTFITS' tiers). On a knight a
+  // longsword's cut lets ~0.13 of itself through (the edge glances, the blow is spread), its thrust ~0.3 (the gaps: the
+  // armpit, the visor), so to an elite each cut weighs ~1/12 of what his style gives it and ~0.83 of his choices are the
+  // thrust, as the Fechtbücher taught in harness; on an unarmoured man every move gets through alike and he fights as his
+  // style says. A combination is tried as often as its moves are worth it (the mean of their weights against the best).
+  armourSense: { from: 0.3, full: 0.7, power: 3 },
   // Seconds between attacks; pros throw ~40–60 strikes a round, in bursts.
   restMin: 0.9,
   restRange: 2.0,
@@ -2885,12 +2894,16 @@ function decide(world, fighter, dt) {
     const free = (fighter.clinch.hands ?? ['l', 'r']).length < 2;
     if (free) for (const [name, weight] of Object.entries(style.clinchStrikes)) if (!fighter.clinch.hands.includes(MOVES[name].limb[0])) choices[name] = weight;
   }
+  const worth = senseArmour(fighter, opponent, choices);
   let move = pick(choices, random);
   if (!move) return;
-  // Open a combination that starts with a punch that reaches from here.
+  // Open a combination that starts with a punch that reaches from here (as often as its moves get through his kit).
   let combo = null;
-  if (style.combos && !fighter.clinch && random() < (style.comboChance ?? 0)) {
-    const openers = Object.fromEntries(Object.entries(style.combos).filter(([sequence]) => choices[sequence.split(' ')[0]]));
+  const comboWorth = (sequence) => sequence.split(' ').reduce((sum, name) => sum + worth(name), 0) / sequence.split(' ').length;
+  const openers = style.combos && !fighter.clinch ? Object.fromEntries(Object.entries(style.combos).filter(([sequence]) => choices[sequence.split(' ')[0]]).map(([sequence, weight]) => [sequence, weight * comboWorth(sequence)])) : null;
+  // (None open from here: tried as ever, and come to nothing.)
+  const comboOdds = openers && Object.keys(openers).length ? Math.max(...Object.keys(openers).map(comboWorth)) : 1;
+  if (openers && random() < (style.comboChance ?? 0) * comboOdds) {
     const sequence = pick(openers, random);
     if (sequence) [move, ...combo] = sequence.split(' ');
   }
@@ -2903,7 +2916,7 @@ function decide(world, fighter, dt) {
     if (move === 'teep' && choices.roundhouse) move = 'roundhouse';
   }
   const spec = MOVES[move];
-  const zone = spec.zones ? (random() < AI.bodyShotShare ? spec.zones.at(-1) : spec.zones[0]) : null;
+  const zone = spec.zones ? aimZone(fighter, opponent, spec, random) : null;
   if (throwPunch(world, fighter, move, zone, { heavy })) {
     plantNearPoint(fighter, opponent);
     fighter.aiCombo = combo;
@@ -2946,16 +2959,85 @@ function riposte(world, fighter, striker, style, distance) {
     const blade = bladeFor(fighter, spec);
     if (blade?.held && distance <= moveRange(spec, fighter.body, blade.spec) + striker.body.lengths.headRadius) choices[name] = weight;
   }
+  senseArmour(fighter, striker, choices);
   const move = pick(choices, random);
   if (!move) return false;
   perform(world, fighter, 'weaponBlock', { from: striker.id });
   const spec = MOVES[move];
-  const zone = random() < AI.bodyShotShare ? spec.zones.at(-1) : spec.zones[0];
+  const zone = aimZone(fighter, striker, spec, random);
   if (throwPunch(world, fighter, move, zone, { riposte: true })) {
     fighter.stats.ripostes = (fighter.stats.ripostes ?? 0) + 1;
     fighter.aiCombo = null;
   }
   return true;
+}
+
+// Where a zone a move is aimed at strikes him, for his kit (protectionAt): the legs by a thigh.
+const ZONE_PART = { head: 'head', body: 'trunk', legs: 'lThigh' };
+
+/** How far this man reads another's kit (AI.armourSense): 0 untrained, 1 an elite. */
+export function armourSense(fighter) {
+  const { from, full } = AI.armourSense;
+  return Math.min(1, Math.max(0, ((fighter.body.skill ?? 0.5) - from) / (full - from)));
+}
+
+/**
+ * The share of a move's harm that gets through `defender`'s kit at `zone`
+ * (physics registerWeaponImpact, in expectation): its weapon's harm mix for
+ * the move's mode (a blow with no weapon: all blunt) against the protection
+ * there, the blunt of a heavy head driven through (`crush`), and an edge or
+ * point put into a gap in rigid armour as often as this man finds one
+ * (BLADES.gaps × his technique and skill), meeting only what is under it.
+ */
+export function harmThrough(attacker, defender, spec, zone = 'body') {
+  const gear = defender.body?.gear;
+  if (!gear?.protection) return 1;
+  const armed = spec.path === 'blade' || spec.reach === 'weapon';
+  const weapon = armed ? (spec.path === 'blade' ? bladeFor(attacker, spec) : attacker.weapon) : null;
+  const wspec = weapon?.held ? weapon.spec : null;
+  const table = wspec ? (wspec.harm[spec.mode] ?? wspec.harm.swing ?? { blunt: 1 }) : { blunt: 1 };
+  const [blunt, cut, pierce] = [table.blunt ?? 0, table.cut ?? 0, table.pierce ?? 0];
+  const total = blunt + cut + pierce;
+  if (total <= 0) return 1;
+  const covered = protectionAt(gear, ZONE_PART[zone] ?? 'trunk');
+  const gaps = gear.gaps ? { ...BLADES.gaps, ...gear.gaps } : BLADES.gaps;
+  const rigid = (covered.cut ?? 0) >= gaps.rigidFrom && cut + pierce > 0.2;
+  const found = rigid ? Math.min(1, (spec.mode === 'thrust' ? gaps.thrust : gear.cutProof ? 0 : gaps.swing) * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5))) : 0;
+  const edge = (on) => cut * (1 - (on.cut ?? 0)) + pierce * (1 - (on.pierce ?? 0));
+  const felt = blunt * (1 - (covered.blunt ?? 0) * (1 - (wspec?.crush ?? 0)));
+  return (felt + (1 - found) * edge(covered) + found * edge(gaps.under)) / total;
+}
+
+/**
+ * Weights the moves he might make (`choices`, in place) by how much of each
+ * gets through the kit of the man in front of him, as far as he reads it
+ * (AI.armourSense). Returns each move's worth against the best of them (1
+ * for all when he reads nothing, or nothing differs).
+ */
+export function senseArmour(fighter, opponent, choices) {
+  const power = AI.armourSense.power * armourSense(fighter);
+  if (power <= 0 || !opponent?.body?.gear) return () => 1;
+  // (A blow at its best zone: aimZone puts it there the more. A grab or a charge harms nothing itself: left as it was.)
+  const strike = (name) => MOVES[name]?.kind === 'strike';
+  const through = (name) => Math.max(...(MOVES[name].zones ?? ['body']).map((zone) => harmThrough(fighter, opponent, MOVES[name], zone)));
+  const best = Math.max(1e-6, ...Object.keys(choices).filter(strike).map(through));
+  const worth = (name) => (strike(name) ? Math.min(1, through(name) / best) ** power : 1);
+  for (const name of Object.keys(choices)) choices[name] *= worth(name);
+  return worth;
+}
+
+/**
+ * The zone a move is aimed at: its first, or its last `AI.bodyShotShare` of
+ * the time, each weighted by how much of it gets
+ * through his kit there, as far as the striker reads it (AI.armourSense).
+ */
+function aimZone(fighter, opponent, spec, random) {
+  const [first, last] = [spec.zones[0], spec.zones.at(-1)];
+  const power = AI.armourSense.power * armourSense(fighter);
+  const sensed = (zone) => (power > 0 && opponent ? harmThrough(fighter, opponent, spec, zone) ** power : 1);
+  const low = AI.bodyShotShare * sensed(last);
+  const high = (1 - AI.bodyShotShare) * sensed(first);
+  return random() < low / Math.max(1e-9, low + high) ? last : first;
 }
 
 /** Seconds before the next attack: the style's tempo, slower when tired, quicker in the clinch. */
