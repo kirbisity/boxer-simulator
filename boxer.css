@@ -503,6 +503,10 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .crawl-button.on { background: rgba(127, 224, 192, 0.42); border-color: #7fe0c0; color: #0d1f19; }
 .jump-button.blocked, .crawl-button.blocked { opacity: 0.4; }
 .action-button.idle { opacity: 0.3; }
+/* His weapon's art offered (weaponarts.js): the special button glows ember-red and names it. */
+.action-button.art { border-color: #ff8a3d; background: rgba(90, 24, 6, 0.6); color: #ffd2a8; box-shadow: 0 0 14px rgba(255, 110, 40, 0.65); animation: art-glow 1.1s ease-in-out infinite; }
+@keyframes art-glow { 0%, 100% { box-shadow: 0 0 10px rgba(255, 110, 40, 0.45); } 50% { box-shadow: 0 0 20px rgba(255, 110, 40, 0.9); } }
+@media (prefers-reduced-motion: reduce) { .action-button.art { animation: none; } }
 /* Lock: big and gold-edged above the guard, under the thumb; gold, with his name, while on. */
 .lock-button { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 180px); width: 80px; height: 80px; border: 3px solid var(--gold); background: rgba(40, 32, 6, 0.55); color: var(--gold); box-shadow: 0 0 14px rgba(255, 207, 74, 0.35); }
 .lock-button b { font-size: 30px; }
@@ -512,6 +516,12 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .player-status .top { display: flex; justify-content: space-between; gap: 8px; font: 600 13px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .player-status .tag { color: var(--gold); }
 .player-status .bar.stamina { height: 4px; }
+/* Adrenaline: a hair-thin ember line under stamina with a faint tick where his weapon's art comes within reach (--ready);
+   primed, it glows (weaponarts.js). */
+.player-status .bar.adrenaline { position: relative; height: 2px; overflow: visible; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.player-status .bar.adrenaline i { background: linear-gradient(90deg, #c4561c, #ff8a3d); }
+.player-status .bar.adrenaline::after { content: ""; position: absolute; left: var(--ready, 60%); top: -2px; width: 1px; height: 6px; background: rgba(255, 255, 255, 0.35); }
+.player-status .bar.adrenaline.primed i { background: linear-gradient(90deg, #ff6a2a, #ffc070); box-shadow: 0 0 6px rgba(255, 120, 40, 0.95); }
 .target-marker { position: fixed; left: 0; top: 0; display: grid; gap: 3px; justify-items: center; width: 92px; pointer-events: none; transition: opacity 0.4s; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 .target-marker .name { font: 600 12px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .target-marker .bar { width: 100%; height: 5px; }
