@@ -667,17 +667,12 @@ export const PRESETS = {
   // A humanoid robot after Unitree's H1: 1.80 m, fixed at 70 kg (the H1 is
   // ~47 kg; this one is built heavier), no fat, no diet, no ageing. Its
   // actuators are put at a fit man's strength (the H1's ~75 N·m at the arm,
-  // ~360 N·m at the knee, against a man's ~70 and ~250). Its endurance
-  // (`aerobic`) is not its battery (an H1 walks for hours) but its motors'
-  // heat: a joint actuator holds only about a third of its peak torque
-  // continuously, and a hot one is throttled until it cools. Flurries of
-  // full-power strikes heat it faster than a trained man's breath runs out,
-  // and it cools more slowly than he gets his wind back: about an untrained
-  // man's endurance. Kickboxes, as Unitree's G1s did.
+  // ~360 N·m at the knee, against a man's ~70 and ~250); a battery, not
+  // breath, for endurance (`aerobic`). Kickboxes, as Unitree's G1s did.
   humanoid: {
     name: 'H-1 "Unit"', style: 'kickboxing', sex: 'male', heightCm: 180, frame: 'medium', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
     // Rigid (`rigid`): shells and actuators, no flesh to give under a blow.
-    build: { massKg: 70, bodyFat: 0, strength: 1, aerobic: 0.55, rigid: true },
+    build: { massKg: 70, bodyFat: 0, strength: 1, aerobic: 1.1, rigid: true },
     outfit: { kind: 'humanoid', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1d1e22', hairStyle: 'bald', hairColor: '#1d1e22', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -689,13 +684,11 @@ export const PRESETS = {
   // a heavy machine's, not a man's (`strength` 1.5 per kilogram of its
   // frame: ~1.5 times the torque of a muscle of the same mass, as an
   // industrial arm's geared motors give): its arms ~3.1 times an ordinary
-  // man's force and ~1.8 times a trained heavyweight's. Bigger motors driving
-  // a heavier frame shed their heat no better: its endurance is the
-  // humanoid's, a little less for the weight they swing (`aerobic`).
+  // man's force and ~1.8 times a trained heavyweight's.
   combatBot: {
     name: 'CB-170 "Warden"', style: 'combatBot', sex: 'male', heightCm: 180, frame: 'large', age: 27, exercise: 0.6, calories: 2800, skill: 0.6,
     // Motors, not pennate muscle: a thick limb is no slower for it (`bulk`).
-    build: { massKg: 115, bodyFat: 0, strength: 1.5, aerobic: 0.45, bulk: 2, rigid: true },
+    build: { massKg: 115, bodyFat: 0, strength: 1.5, aerobic: 1.1, bulk: 2, rigid: true },
     outfit: { kind: 'combatBot', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1e1f22', hairStyle: 'bald', hairColor: '#1e1f22', facialHair: 'none', eyeColor: 'brown' },
   },
