@@ -262,6 +262,14 @@ export const WORLD = {
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
   staminaRecovery: 0.07,
+  // The player's guard held up (fighter.guardHeld, control.js CONTROL.guard): the shoulders and legs are at work, not resting, so
+  // he gets back only `recovery` of that while he holds it (as a run's WORLD.runMode.recovery): else a fit man's recovery
+  // (0.063 a second) would cancel the guard's own cost and holding it up all day would be free.
+  guardHeld: { recovery: 0.25 },
+  // The guard held up with bare arms (physics.js coverArms): the forearm nearer the blow goes onto its line this share of his
+  // height out from what it is aimed at (~20 cm for a 1.8 m man: a forearm's length before the face or the ribs, where a boxer's
+  // shell meets a punch).
+  guardCover: { out: 0.11 },
   // Accumulated brain strain (Σ(Δv − 1.2)²) a fighter absorbs, per unit of
   // chin, before going down. The count is against the total, and after each
   // knockdown only half as much again puts him back down.

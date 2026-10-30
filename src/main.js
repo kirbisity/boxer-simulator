@@ -1708,8 +1708,8 @@ function moveLabel(name) {
 function command(name) {
   // Any fighting move puts the guard back up.
   if (player()?.walking) setWalking(false);
-  // A blow thrown from a key stops a run, as a tap on the attack does.
-  breakRun(state.orders);
+  // A defence from a key stops a run; a blow does not: it is made in the run, as a tap on the attack is (control.js runStep).
+  if (MOVES[name]?.kind !== 'strike') breakRun(state.orders);
   if (name === 'body') {
     state.aimBody = !state.aimBody;
     document.querySelector('[data-command="body"]')?.classList.toggle('on', state.aimBody);

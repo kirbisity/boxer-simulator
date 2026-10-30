@@ -9,6 +9,7 @@ import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
 import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
+import { drawStamina } from './physics/overdraft.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
 import { WEAPONS } from './weapons.js';
@@ -82,6 +83,37 @@ export const CONTROL = {
   comboWithin: 0.45,
   // Holding the guard, the footwork slows to this share.
   guardFootwork: 0.6,
+  // The guard held (the button held, T held): the block kept up (shield, weapon across, or arms: blockFor) and put onto the line of
+  // the blow coming at him (its striker as the block's `from`: physics.js interceptBlock, shieldOnLine), so it is in the way where
+  // the blow comes rather than wherever it happened to be. Held up, it is work:
+  // - staminaPerSecond: what holding it costs (before his aerobic, as the run's; in place of the per-block cost of a dodge,
+  //   WORLD.overdraft.defenceCost, which re-raising a held block every 0.45 s used to charge: ~0.027 a second). A weapon or a shield
+  //   held up and ready is steady work for the shoulders, a little more than a run's flat out (0.02): with his recovery cut while
+  //   he holds it (WORLD.guardHeld.recovery), a fit man (aerobic 0.9) loses ~0.012 a second net, empty after ~80 s of nothing but
+  //   guarding (at 0.015 and full recovery it was free: the recovery outran it). It does not take him past empty: a man does not
+  //   faint holding his guard up (the blows on it can: perJoule).
+  // - perJoule: each blow taken on it (blocked on the arms or the shield, fended off by the blade, parried) costs this much stamina
+  //   per joule the collision took up (before his aerobic): the arms and legs soak what the blow brought. Blows met on a guard here
+  //   take up ~15-130 J (a light jab to a heavyweight's cross or a full cut): ~0.006-0.05 of the bar each, a dozen hard ones
+  //   in a quarter of a minute about a third of it. This draws like any work (physics/overdraft.js drawStamina).
+  // - spentBelow: stamina under this, he is spent: the block is no longer brought onto the blow's line, only held where it is (and
+  //   the arms holding it are weaker anyway: fatigueScale). A guard kept up too long gives.
+  // He can strike from it: an attack asked for while it is held is thrown (the block keeps what the strike does not need) and the
+  // block is back up after it.
+  guard: { staminaPerSecond: 0.025, perJoule: 0.0004, spentBelow: 0 },
+  // A long weapon's room (its striking part `deadFrom` m or more beyond the hands: weapon.spec.strikeFrom, a spear's head, a
+  // naginata's blade, a hammer's head on its haft): with his man inside it only the haft meets him. His man (an enemy on his feet,
+  // the one he faces) nearer than his reach plus that dead length (plus the man's head's radius, as holdDistance), the stick idle
+  // or not pushed at him (its share towards him under `pushFrom`), he gives ground at `pace` of his footwork until the man is
+  // `room` m past it again. The stick pushed at the man is the player closing on purpose: that wins. Not in a run, a strike of his
+  // own, or on a horse.
+  spacing: { deadFrom: 0.5, pushFrom: 0.3, pace: 0.6, room: 0.15 },
+  // A blow asked for in a run (control.js runStep: the run goes on into it, as a rider's charge does) at a man ahead, closing on
+  // him: readied, it is made when he will be at the blow's reach as it comes out (the run's metres over the move's extendUntil
+  // taken off: closingBy), not at once (thrown at once from 3 m at a run, the blade was out and back with him still beyond it, or
+  // came out with him already inside its arc). It waits for that up to `waitSeconds` (~6-9 m of a sprint), then goes anyway.
+  // Nothing is added to the blow: the run's speed is in the blade's (physics.js handVelocityOf).
+  runStrike: { waitSeconds: 1.5 },
   // A weapon or shield lying within this (m) can be picked up.
   pickupFrom: 2.5,
   // Breaking a man's hold: each try takes this share of his time from it, by grip.
@@ -93,7 +125,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null };
+  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false, blockCursor: undefined };
 }
 
 /**
@@ -190,23 +222,44 @@ function cannotRun(fighter) {
     || fighter.stagger > 0 || fighter.dazed > 0;
 }
 
-/** An attack or guard made outside the orders (a key): the run held on the stick stops until the stick is eased off. */
+/** A guard or action made outside the orders (a key): the run held on the stick stops until the stick is eased off. */
 export function breakRun(orders) {
   orders.runBroken = true;
 }
 
 /**
  * The run: whether he runs this step. The stick past the run threshold (or Shift) is a run for as long as it is held, and ends
- * when it is let go. A guard, an attack, evasion or action asked for also stops it until the stick is eased off the threshold;
- * running out of breath or a blow that staggers him stops it too.
+ * when it is let go. A guard, evasion or action asked for also stops it until the stick is eased off the threshold; running out
+ * of breath or a blow that staggers him stops it too. An attack does not: the blow is made in the run, the run going on into it
+ * (a running strike: the body's speed is in the weapon's, physics.js handVelocityOf), as a rider's charge does (chargeOrder).
  */
 function runStep(fighter, orders, stick) {
-  const breaks = orders.guard || orders.requests.length > 0 || (orders.evasions?.length ?? 0) > 0 || (orders.actions?.length ?? 0) > 0;
+  const breaks = orders.guard || (orders.evasions?.length ?? 0) > 0 || (orders.actions?.length ?? 0) > 0;
   const atRun = Boolean(stick) && stick.amount >= CONTROL.stick.runFrom;
   orders.runBroken = atRun && (breaks || orders.runBroken);
   if (fighter.stamina < CONTROL.run.windedBelow) orders.winded = true;
   else if (fighter.stamina >= CONTROL.run.recoveredTo) orders.winded = false;
   return atRun && !orders.runBroken && !orders.guard && !orders.winded && !cannotRun(fighter);
+}
+
+/**
+ * Whether a long weapon wants room from his man (CONTROL.spacing): its striking part begins `deadFrom` or more beyond his hands,
+ * and the man (an enemy on his feet) is nearer than where it begins; once giving ground, until he is `room` past it. Kept in the
+ * orders (`spacing`) so the step back finishes rather than flickering at the line.
+ */
+function keepsRoom(fighter, orders, man) {
+  const spec = CONTROL.spacing;
+  const weapon = fighter.weapon?.held ? fighter.weapon.spec : null;
+  const able = weapon && !weapon.ranged && weapon.strikeFrom >= spec.deadFrom && man && man.state === 'up' && hostile(man, fighter)
+    && !fighter.punch && !fighter.mount && !fighter.crawling && !fighter.clinch && fighter.state === 'up';
+  if (!able) {
+    orders.spacing = false;
+    return false;
+  }
+  const inside = fighter.body.reach + weapon.strikeFrom + man.body.lengths.headRadius;
+  const distance = reachBetween(fighter, man);
+  orders.spacing = distance < inside || (orders.spacing && distance < inside + spec.room);
+  return orders.spacing;
 }
 
 /** Footwork from the stick, the keys, or (locked on and idle) holding his range. */
@@ -240,6 +293,8 @@ function steer(world, fighter, orders, opponent, dt) {
       fighter.strafe = (way[0] * left[0] + way[1] * left[2]) * pace * slow;
       fighter.running = running && ahead > 0.7 && !orders.guard;
       if (fighter.running) fighter.move = ahead * runMove;
+      // Not pushed at him, a long weapon gives ground to keep him out at its head (CONTROL.spacing).
+      else if (ahead < CONTROL.spacing.pushFrom && keepsRoom(fighter, orders, opponent)) fighter.move = Math.min(fighter.move, -CONTROL.spacing.pace * slow);
     } else {
       // Free: he turns and goes that way (a run bent along any wall in his way: runsteer.js).
       let go = way;
@@ -266,9 +321,15 @@ function steer(world, fighter, orders, opponent, dt) {
   fighter.goTo = null;
   if (!locked || opponent.state !== 'up') {
     fighter.move *= Math.exp(-dt * 6);
+    // The stick idle and his man faced inside a long weapon's head: a step back (CONTROL.spacing).
+    if (!locked && fighter.faceFoe && keepsRoom(fighter, orders, opponent)) fighter.move = -CONTROL.spacing.pace * slow;
     return;
   }
-  // Locked and idle: to the edge of his range, and there he stays.
+  // Locked and idle: to the edge of his range, and there he stays (a long weapon never inside its head: CONTROL.spacing).
+  if (keepsRoom(fighter, orders, opponent)) {
+    fighter.move = -CONTROL.spacing.pace * slow;
+    return;
+  }
   const distance = Math.hypot(opponent.x[P.pelvis * 3] - pelvis[0], opponent.x[P.pelvis * 3 + 2] - pelvis[2]);
   const hold = holdDistance(fighter, opponent);
   const off = distance - hold;
@@ -622,7 +683,7 @@ export function chargeOrder(world, fighter, orders, man, move, zone) {
  */
 function attack(world, fighter, orders, opponent) {
   const requests = orders.requests;
-  while (requests.length && world.time - requests[0].at > CONTROL.bufferSeconds) requests.shift();
+  while (requests.length && world.time - requests[0].at > (requests[0].readied ? CONTROL.runStrike.waitSeconds : CONTROL.bufferSeconds)) requests.shift();
   const request = requests[0];
   if (!request) return;
   // A second tap while the first is still going: the rest of a combination after it.
@@ -642,6 +703,7 @@ function attack(world, fighter, orders, opponent) {
   }
   opponent = attackMark(world, fighter, orders, opponent);
   if (request.move) {
+    if (runStrikeWaits(fighter, request, opponent)) return;
     if (!chargeOrder(world, fighter, orders, opponent, request.move, request.zone)) padAttack(world, fighter, request, opponent);
     requests.shift();
     return;
@@ -666,6 +728,27 @@ function attack(world, fighter, orders, opponent) {
   }
 }
 
+/** The reach of a pad move at his man (m, hips to hips): the move's range, his head, a lunge's step (`step` false: in a run, the run is the step). */
+function padReach(fighter, spec, step = true) {
+  const held = fighter.weapon?.held ? fighter.weapon.spec : null;
+  return moveRange(spec, fighter.body, held) + fighter.body.lengths.headRadius + (step ? (spec.step ?? 0) * CONTROL.padStepReach : 0);
+}
+
+/**
+ * A blow asked for in his run at an enemy ahead that he closes on (CONTROL.runStrike): true while it is readied, kept until he
+ * will be at its reach as it comes out.
+ */
+function runStrikeWaits(fighter, request, man) {
+  const spec = MOVES[request.move];
+  if (!fighter.runMode || spec?.kind !== 'strike' || spec.path === 'aim' || !man || man.state !== 'up' || !hostile(man, fighter)) return false;
+  const closing = closingBy(fighter, man, spec);
+  if (closing <= 0) return false;
+  // (No lunge's step: the run carries him in, and closingBy has it.)
+  const waits = reachBetween(fighter, man) > padReach(fighter, spec, false) + closing;
+  request.readied = waits;
+  return waits;
+}
+
 /**
  * A move from the pad: at his man if he is within its reach (a lunge's or a
  * charge's further), else into the air before him at the zone's height.
@@ -674,17 +757,18 @@ function padAttack(world, fighter, request, opponent) {
   const spec = MOVES[request.move];
   const style = STYLES[fighter.style];
   if (!spec) return;
-  const held = fighter.weapon?.held ? fighter.weapon.spec : null;
   const hips = point(fighter.x, P.pelvis);
   let at = null;
   if (spec.kind === 'strike') {
-    const reach = moveRange(spec, fighter.body, held) + fighter.body.lengths.headRadius + (spec.step ?? 0) * CONTROL.padStepReach;
-    const near = opponent && opponent.state === 'up' && Math.hypot(opponent.x[P.pelvis * 3] - hips[0], opponent.x[P.pelvis * 3 + 2] - hips[2]) <= reach + CONTROL.padSlack;
+    const reach = padReach(fighter, spec);
+    const forward = yawRotate([1, 0, 0], fighter.yaw);
+    const near = opponent && opponent.state === 'up' && Math.hypot(opponent.x[P.pelvis * 3] - hips[0], opponent.x[P.pelvis * 3 + 2] - hips[2]) <= reach + CONTROL.padSlack + closingBy(fighter, opponent, spec);
     // A gun fires at its man wherever he is; with nobody there, it fires ahead.
     if (!near && (spec.path !== 'aim' || !opponent)) {
-      const forward = yawRotate([1, 0, 0], fighter.yaw);
       const height = request.zone === 'head' ? fighter.x[P.head * 3 + 1] : request.zone === 'legs' ? hips[1] * 0.6 : fighter.x[P.neck * 3 + 1] - 0.3;
-      at = [hips[0] + forward[0] * reach, height, hips[2] + forward[2] * reach];
+      // (In a run, the place he will be when the blow is out.)
+      const ahead = reach + closingBy(fighter, null, spec);
+      at = [hips[0] + forward[0] * ahead, height, hips[2] + forward[2] * ahead];
     }
   } else if (!opponent) return;
   const combo = request.strength === 'combo' && spec.kind === 'strike' ? comboAfter(style, request.move, []) : null;
@@ -699,6 +783,24 @@ function padAttack(world, fighter, request, opponent) {
     fighter.orderComboAt = at;
     fighter.orderAt = world.time;
   }
+}
+
+/**
+ * How much nearer (m) a man comes (or, with none, how far on he goes) by the time a blow is out (the move's `extendUntil`): the
+ * speed he closes at, along the line between them, over that time. Standing it is nothing; in a run it is the run's metres.
+ */
+function closingBy(fighter, man, spec) {
+  const at = point(fighter.x, P.pelvis);
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  let way = [forward[0], forward[2]];
+  if (man) {
+    const to = [man.x[P.pelvis * 3] - at[0], man.x[P.pelvis * 3 + 2] - at[2]];
+    const length = Math.hypot(to[0], to[1]);
+    if (length > 1e-6) way = [to[0] / length, to[1] / length];
+  }
+  const his = man?.rootVelocity ?? [0, 0];
+  const closing = (fighter.rootVelocity[0] - his[0]) * way[0] + (fighter.rootVelocity[1] - his[1]) * way[1];
+  return Math.max(0, closing) * (spec.extendUntil ?? 0);
 }
 
 /** The next strike of a combination, as soon as the last one is back. */
@@ -779,16 +881,58 @@ export function evasionFor(world, fighter) {
   return { name: style?.defences?.slip && !fighter.weapon?.held ? 'slip' : 'stepBack', side: world.random() < 0.5 ? 1 : -1, from: null };
 }
 
-function defend(world, fighter, orders) {
+function defend(world, fighter, orders, dt) {
   if (fighter.state !== 'up') return;
-  // Held: the block stays up, put back as each one runs out (not over a strike he is throwing).
-  if (orders.guard && !fighter.punch && !fighter.defence) perform(world, fighter, blockFor(fighter));
+  guardCosts(world, fighter, orders, dt);
+  fighter.guardHeld = Boolean(orders.guard);
+  if (orders.guard) holdGuard(world, fighter);
   for (const request of orders.evasions ?? []) {
     const evasion = evasionFor(world, fighter);
     if (!fighter.punch) perform(world, fighter, evasion.name, { side: evasion.side, from: evasion.from });
     else if (evasion.name === 'stepBack') fighter.punch = null;
   }
   orders.evasions = [];
+}
+
+/** Whether an event is a blow taken on his guard: blocked on his arms or shield, fended off by his blade, or parried by it. */
+function blockedBy(event, id) {
+  if (event.kind === 'blocked') return event.defender === id;
+  if (event.kind === 'bladeBlock') return event.attacker === id;
+  if (event.kind === 'parry') return event.fighter === id;
+  return false;
+}
+
+/**
+ * The guard held (CONTROL.guard): the block stays up, put back as each one runs out (not over a strike he is throwing), set to
+ * meet the blow coming at him: onto its line while he has the breath (`spentBelow`), else held where it is.
+ */
+function holdGuard(world, fighter) {
+  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id);
+  const from = striker && fighter.stamina >= CONTROL.guard.spentBelow ? striker.id : null;
+  if (!fighter.punch && !fighter.defence) perform(world, fighter, blockFor(fighter), { from, held: true });
+  // (A blow begun while the block was already up: the block goes to meet it.)
+  else if (BLOCKS.has(fighter.defence?.name) && from !== null && fighter.defence.from !== from) {
+    fighter.defence.from = from;
+    fighter.defence.cover = undefined;
+  }
+}
+
+/** What the guard costs (CONTROL.guard): held up, a steady draw (never past empty); each blow taken on it, its energy. */
+function guardCosts(world, fighter, orders, dt) {
+  const spec = CONTROL.guard;
+  const aerobic = fighter.body.aerobic;
+  if (orders.guard) fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - spec.staminaPerSecond * dt / aerobic);
+  const events = world.events;
+  if ((orders.blockCursor ?? 0) > events.length) orders.blockCursor = events.length;
+  for (let index = orders.blockCursor ?? events.length; index < events.length; index += 1) {
+    const event = events[index];
+    // (Only fresh ones: events from while he was not on his feet to defend are past.)
+    if (!blockedBy(event, fighter.id) || event.time < world.time - 2 * dt) continue;
+    // (A shield's block has its impulse and closing speed: the energy is half their product over 1 + restitution.)
+    const energy = event.energy ?? 0.5 * (event.impulse ?? 0) * (event.speed ?? 0) / (1 + WORLD.restitution);
+    if (energy > 0) drawStamina(fighter, energy * spec.perJoule / aerobic);
+  }
+  orders.blockCursor = events.length;
 }
 
 // ---- Special actions ---------------------------------------------------------
@@ -1053,6 +1197,7 @@ export function directFighter(world, fighter, orders, dt) {
   fighter.focusAny = Boolean(locked) && orders.lock !== null && !hostile(locked, fighter);
   fighter.faceFoe = facesFoe(world, fighter, orders);
   fighter.runMode = false;
+  fighter.guardHeld = false;
   const opponent = opponentFor(world, fighter);
   // A gun is kept up on the man locked on.
   const style = STYLES[fighter.style];
@@ -1075,13 +1220,15 @@ export function directFighter(world, fighter, orders, dt) {
     orders.charged = orders.charge;
     orders.charge = null;
   }
-  // Running is no fight: while it lasts nothing is guarded, and a block he held when it began comes down. (An attack or the guard
-  // asked for ends the run first: runStep.)
+  // Running, nothing is guarded, and a block he held when it began comes down (the guard asked for ends the run first: runStep).
+  // A blow asked for is made in the run: he runs on into it.
   if (fighter.runMode) {
     if (BLOCKS.has(fighter.defence?.name)) fighter.defence = null;
+    continueCombo(world, fighter);
+    attack(world, fighter, orders, opponent);
     return;
   }
-  defend(world, fighter, orders);
+  defend(world, fighter, orders, dt);
   continueCombo(world, fighter);
   attack(world, fighter, orders, opponent);
 }

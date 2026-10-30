@@ -182,6 +182,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).
     // gaitCarry: running, or carried on from a run until braked to his footwork's pace.
     runMode: undefined, runPose: undefined, runSlope: undefined, turn: undefined, yawWas: undefined, gaitBody: undefined, gaitAlong: undefined, gaitAccel: undefined, gaitCarry: undefined,
+    // guardHeld: the player holding his guard up (control.js CONTROL.guard): he recovers less (WORLD.guardHeld).
+    guardHeld: undefined,
     // limbCache: limbShares worked out this step.
     limbCache: undefined,
   };
@@ -653,21 +655,52 @@ export function strainGrip(world, fighter, impulse, push = [0, 0, 0], weapon = f
 
 /** The weapon's targets for this frame: guard, block or the move in flight, and how many hands hold it. */
 /**
+ * The blow a defence is made against (its striker: `defence.from`): where it is now (`threat`: the blade's striking part, with
+ * two the one striking, else the limb) and the part of him it is aimed at (`mine`: the head, or the chest). Null if none comes.
+ */
+function blowComing(world, fighter) {
+  const attacker = world.fighters[fighter.defence?.from];
+  const punch = attacker?.punch;
+  if (!punch) return null;
+  const coming = punch.spec.path === 'blade' ? bladeFor(attacker, punch.spec) : null;
+  const threat = coming?.held
+    ? vec.add(point(attacker.x, P[`${coming.main}Hand`]), vec.scale(coming.dir, coming.spec.length * 0.7))
+    : point(attacker.x, P[punch.spec.limb]);
+  const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
+  return { attacker, punch, threat, mine };
+}
+
+/**
+ * The guard held up and watching the blow (fighter.guardHeld: the player's guard button) with nothing in his hands to meet it
+ * (the plain 'guard'): the forearm on the side the blow comes from is put onto its line, WORLD.guardCover.out of his height out
+ * from what it is aimed at, so the blow comes into the arm (BLOCKING) and not round or under the gloves. A weapon's or a
+ * shield's arm is set after this (weaponIntent) and keeps its own place.
+ */
+function coverArms(world, fighter, intent) {
+  if (fighter.defence?.name !== 'guard' || !fighter.guardHeld || fighter.punch) return;
+  const blow = blowComing(world, fighter);
+  if (!blow) return;
+  const line = vec.sub(blow.threat, blow.mine);
+  const length = vec.length(line);
+  if (length < 1e-3) return;
+  const meet = toLocal(fighter, vec.add(blow.mine, vec.scale(line, Math.min(1, (WORLD.guardCover.out * fighter.body.heightM) / length))));
+  // (His left is +z in his own frame.)
+  // (The arm is chosen once for the blow, by the side it first comes from: his left is +z in his own frame. Chosen again each
+  // step, a blow straight down the middle had the two arms trading places and neither there.)
+  fighter.defence.cover ??= meet[2] >= 0 ? 'lHand' : 'rHand';
+  intent[fighter.defence.cover] = meet;
+}
+
+/**
  * A block that goes to meet the strike: the blade set across the line from
  * the strike to what it aims at, halfway along it, the edge towards it —
  * a fist or a shin that comes on runs into the edge. Tracks the strike as
  * it comes. Null if there is nothing to meet.
  */
 function interceptBlock(world, fighter, weapon = fighter.weapon) {
-  const attacker = world.fighters[fighter.defence?.from];
-  const punch = attacker?.punch;
-  if (!punch) return null;
-  // The blade coming (with two, the one the strike is made with).
-  const coming = punch.spec.path === 'blade' ? bladeFor(attacker, punch.spec) : null;
-  const threat = coming?.held
-    ? vec.add(point(attacker.x, P[`${coming.main}Hand`]), vec.scale(coming.dir, coming.spec.length * 0.7))
-    : point(attacker.x, P[punch.spec.limb]);
-  const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
+  const blow = blowComing(world, fighter);
+  if (!blow) return null;
+  const { threat, mine } = blow;
   const line = vec.sub(threat, mine);
   if (vec.length(line) < 1e-3) return null;
   const toward = vec.normalize(line);
@@ -695,14 +728,17 @@ export function longPoint(striker, punch) {
   return Boolean(blade?.held) && blade.spec.length + blade.spec.handle >= WORLD.longPoint;
 }
 
-/** Where (local) the shield hand goes to put the shield on a long point's line, held out as far as a block: null for any other strike. */
+/**
+ * Where (local) the shield hand goes to put the shield on a long point's line, held out as far as a block; held up on the guard
+ * button and watching the blow (fighter.guardHeld), onto any blow's line. Null otherwise.
+ */
 function shieldOnLine(world, fighter, guard) {
-  const attacker = world.fighters[fighter.defence?.from];
-  const punch = attacker?.punch;
-  if (!longPoint(attacker, punch)) return null;
-  const blade = bladeFor(attacker, punch.spec);
-  const mine = punch.zone === 'head' ? point(fighter.x, P.head) : vec.lerp(point(fighter.x, P.pelvis), point(fighter.x, P.neck), 0.6);
-  const line = vec.sub(blade.tip, mine);
+  const blow = blowComing(world, fighter);
+  if (!blow) return null;
+  const { attacker, punch, mine } = blow;
+  const long = longPoint(attacker, punch);
+  if (!long && !fighter.guardHeld) return null;
+  const line = vec.sub(long ? bladeFor(attacker, punch.spec).tip : blow.threat, mine);
   if (vec.length(line) < 1e-3) return null;
   return toLocal(fighter, vec.add(mine, vec.scale(vec.normalize(line), (guard[0] + 0.1) * fighter.body.heightM)));
 }
@@ -1187,13 +1223,15 @@ function updateWeapon(fighter, h, weapon = fighter.weapon) {
 /**
  * The hand's own speed for a weapon contact: no faster than its muscles can
  * drive it. Contact corrections from bodies pressed together add apparent
- * speed to the particle that no blade really has.
+ * speed to the particle that no blade really has. The cap is on the arm's
+ * own speed, over what carries it (a horse, or his own body's run: a blow
+ * struck running carries the run's speed on top of the arm's).
  */
 export function handVelocityOf(fighter, index) {
   const velocity = point(fighter.v, index);
   const limit = fighter.body.topSpeed[index] * 1.15;
-  // On a horse, the arm's own speed is capped and the horse's added: the blade moves with both.
-  const carrier = fighter.carrier;
+  // On a horse, the arm's own speed is capped and the horse's added: the blade moves with both. On foot, the body's over the ground.
+  const carrier = fighter.carrier ?? (fighter.rootVelocity ? [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] : null);
   if (carrier) {
     const own = vec.sub(velocity, carrier);
     const ownSpeed = vec.length(own);
@@ -1851,7 +1889,7 @@ export function nearestAnyone(world, fighter, range) {
 }
 
 /** Start a whole-body move (rush, clinch) or a defence. */
-export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1, from = null } = {}) {
+export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 : -1, from = null, held = false } = {}) {
   if (fighter.state !== 'up' || fighter.netted) return false;
   // His shield lost, he covers up with his arms.
   if (name === 'shieldBlock' && !fighter.shield) name = 'guard';
@@ -1861,9 +1899,11 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
   if ((name === 'weaponBlock' || name === 'parry') && fighter.caught) return false;
   if (DEFENCES[name]) {
     // The player's dodge or block takes breath (the plain guard held up does not); he may go into the overdraft for it.
-    if (fighter.player && name !== 'guard') drawStamina(fighter, WORLD.overdraft.defenceCost / fighter.body.aerobic);
+    // (`held`: a block kept up on the guard button, paid for by the second instead: control.js CONTROL.guard.)
+    if (fighter.player && name !== 'guard' && !held) drawStamina(fighter, WORLD.overdraft.defenceCost / fighter.body.aerobic);
     // `from`: who the strike comes from, for a block that goes to meet it.
-    fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from };
+    // (`cover`: the arm a held guard puts on the blow's line, coverArms.)
+    fighter.defence = { name, t: 0, seconds: DEFENCES[name].seconds, side, from, cover: undefined };
     if (name === 'guard') fighter.guardHigh = DEFENCES.guard.seconds;
     if (name === 'slip') {
       fighter.slip = DEFENCES.slip.seconds;
@@ -2090,6 +2130,7 @@ function updateIntent(world, fighter, dt) {
     }
   }
   applyDefence(fighter, intent, dt);
+  coverArms(world, fighter, intent);
   weaponIntent(world, fighter, intent);
   pairedGun(world, fighter, intent, dt);
   weaveHead(world, fighter, intent, dt);
@@ -3880,7 +3921,7 @@ function updateTimers(world, fighter, dt) {
   if (fighter.player) overdraftStep(world, fighter, dt);
   // A machine (gear.machine: a robot) does not tire: what an attack or a run costs a man costs it nothing.
   if (fighter.body.gear.machine) fighter.stamina = 1;
-  else if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+  else if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;
@@ -6843,7 +6884,9 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     const [parrier, blade, striker, stroke] = parried;
     // Parried while his other blade is on its way in: the parry and the cut together.
     const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;
-    world.events.push({ time: world.time, kind: 'parry', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, effects: [`parried with the ${blade.spec.label.toLowerCase()}`] });
+    // (`energy`: what the meeting took up, J, between the two blades' effective masses: what the parrier's arms soaked.)
+    const energy = 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2;
+    world.events.push({ time: world.time, kind: 'parry', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, impulse, energy, effects: [`parried with the ${blade.spec.label.toLowerCase()}`] });
   }
   chipOnSteel();
   strainGrip(world, first, impulse, normal, a);
