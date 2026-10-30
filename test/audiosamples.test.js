@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
-import { playSample, samplePlan } from '../src/audio/sfx/sampled.js';
+import { playSample, playWithSamples, samplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 
 const DIR = 'src/audio/samples';
@@ -191,4 +191,57 @@ test('a take played from its end plays its last seconds', () => {
   const voice = { ctx: { createGain: node, createBufferSource: node }, nodes: [], live: 0, end: 0 };
   playSample(voice, {}, { buffer: { duration: 0.4 }, offset: 0.01 }, { rate: 1, trim: 1, seconds: 0.15, fade: 0.03, fromEnd: true }, 0, 0.5);
   assert.ok(Math.abs(started[0] - 0.25) < 1e-9, `${started[0]}`);
+});
+
+test('the fourth batch: a body falling, a whip\'s lash, a wooden door\'s creak and slam', () => {
+  for (const set of ['bodyfall', 'whip', 'door-creak', 'door-slam']) assert.ok(SAMPLE_SETS[set]?.length, set);
+  assert.equal(SAMPLE_SETS.bodyfall.length, 5);
+  const fall = (fields) => plan({ type: 'fall', mass: 80, speed: 4, surface: 'stone', armour: 'none', ...fields });
+  for (const surface of ['stone', 'tile', 'wood', 'earth', 'grass', 'sand', 'snow']) assert.equal(fall({ surface }).set, 'bodyfall', surface);
+  assert.equal(fall({ surface: 'stone' }).synth, null);
+  assert.equal(fall({ surface: 'water' }), null, 'a fall in water: the synth\'s splash');
+  const plated = fall({ armour: 'plate', surface: 'earth' });
+  assert.equal(plated.set, 'clatter');
+  assert.deepEqual(plated.extra.map((layer) => layer.set), ['bodyfall'], 'the kit\'s crash over the body\'s thud');
+  assert.equal(plated.synth, null);
+  assert.equal(plan({ type: 'land', mass: 80, speed: 4, surface: 'stone', armour: 'none' }), null, 'landing on his feet is not a fall');
+  for (const covering of ['flesh', 'leather', 'mail', 'plate', 'wood']) assert.equal(plan({ type: 'hit', energy: 10, striker: 'lash', covering, part: 'trunk' }).set, 'whip', covering);
+  const lashSkin = plan({ type: 'hit', energy: 10, striker: 'lash', covering: 'flesh', part: 'trunk' });
+  const lashPlate = plan({ type: 'hit', energy: 10, striker: 'lash', covering: 'plate', part: 'trunk' });
+  assert.ok(lashPlate.seconds < lashSkin.seconds && lashPlate.rate > lashSkin.rate && lashPlate.synth && !lashSkin.synth, 'on armour shorter, higher, the synth\'s knock beside it');
+  assert.equal(plan({ type: 'hit', energy: 10, striker: 'blade', covering: 'flesh' }).set, 'slice', 'a blade still slices');
+  const door = (state, kind = 'door') => plan({ type: 'mech', kind, state });
+  assert.equal(door('opening').set, 'door-creak');
+  assert.equal(door('opening').extra, undefined, 'opening: no slam');
+  const shut = door('closing');
+  assert.equal(shut.set, 'door-creak');
+  assert.deepEqual(shut.extra.map((layer) => layer.set), ['door-slam']);
+  assert.ok(shut.extra[0].delay > 0 && shut.extra[0].delay < shut.seconds + 0.2, 'the slam into the creak');
+  assert.equal(door('closed').extra[0].set, 'door-slam');
+  assert.equal(door('closing', 'chest').extra[0].set, 'door-slam');
+  for (const kind of ['gate', 'portcullis', 'lock', 'lever', 'ladder', 'pickup']) assert.equal(door('closing', kind), null, kind);
+});
+
+test('the fourth batch scales: a harder fall or lash louder and longer, a heavier body lower, a door heavier than a chest', () => {
+  const fall = (speed, mass = 80) => plan({ type: 'fall', mass, speed, surface: 'stone', armour: 'none' });
+  assert.ok(fall(8).trim > fall(1.2).trim && fall(8).seconds > fall(1.2).seconds && fall(8).fade > fall(1.2).fade);
+  assert.ok(fall(4, 120).trim > fall(4, 50).trim && fall(4, 120).seconds > fall(4, 50).seconds && fall(4, 120).rate < fall(4, 50).rate, 'a heavier man louder, longer, lower');
+  assert.ok(SOUND_FAMILIES.fall.params({ speed: 8, mass: 80, surface: 'stone' }).level > SOUND_FAMILIES.fall.params({ speed: 1.2, mass: 80, surface: 'stone' }).level);
+  const lash = (energy) => plan({ type: 'hit', energy, striker: 'lash', covering: 'flesh', part: 'trunk' });
+  assert.ok(lash(30).trim > lash(3).trim && lash(30).seconds > lash(3).seconds && lash(30).fade > lash(3).fade);
+  assert.ok(lash(3).trim > 1.5, 'lifted over the tip\'s few joules to be heard');
+  const door = plan({ type: 'mech', kind: 'door', state: 'closing' });
+  const chest = plan({ type: 'mech', kind: 'chest', state: 'closing' });
+  assert.ok(door.trim > chest.trim && door.rate < chest.rate && door.extra[0].seconds > chest.extra[0].seconds && door.extra[0].trim > chest.extra[0].trim);
+});
+
+test('a layer with a delay is played that long after the take', () => {
+  const started = [];
+  const node = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, playbackRate: { value: 1 }, start: (when) => started.push(when), stop() {} });
+  const voice = { ctx: { createGain: node, createBufferSource: node }, nodes: [], live: 0, end: 0, out: {} };
+  const bank = { pick: () => ({ buffer: { duration: 1.5 }, offset: 0 }) };
+  const event = { type: 'mech', kind: 'door', state: 'closing' };
+  playWithSamples(bank, voice, SOUND_FAMILIES.mech, event, SOUND_FAMILIES.mech.params(event), 1, 0.5);
+  assert.equal(started.length, 2);
+  assert.ok(started[1] - started[0] > 0.3, `${started}`);
 });

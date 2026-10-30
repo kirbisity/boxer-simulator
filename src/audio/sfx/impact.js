@@ -25,7 +25,7 @@ export const COVERINGS = {
 };
 
 /** How hard each striker is (0 soft .. 1 steel): the slap's brightness on flesh. A bare fist is bone under skin; a blade an edge of steel. */
-export const STRIKERS = { fist: 0.3, foot: 0.35, knee: 0.5, elbow: 0.55, head: 0.45, blade: 0.9, blunt: 0.8, point: 0.75, shield: 0.65, body: 0.15, arrow: 0.8 };
+export const STRIKERS = { fist: 0.3, foot: 0.35, knee: 0.5, elbow: 0.55, head: 0.45, blade: 0.9, blunt: 0.8, point: 0.75, shield: 0.65, body: 0.15, arrow: 0.8, lash: 0.9 };
 
 /** A part's share of an 80 kg man's mass (kg): the thump of the body under the blow, lower for a heavier part. */
 const PART_MASS = { head: 5, neck: 5, trunk: 30, chest: 30, belly: 30, pelvis: 15, arm: 2.5, upperArm: 2.5, forearm: 1.5, hand: 0.5, thigh: 9, leg: 9, shank: 4, foot: 1.2 };

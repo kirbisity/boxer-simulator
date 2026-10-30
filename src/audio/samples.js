@@ -38,6 +38,11 @@ export const SAMPLE_SETS = {
   punch: Array.from({ length: 7 }, (_, index) => `punch-${index + 1}`),
   fistswing: Array.from({ length: 5 }, (_, index) => `fistswing-${index + 1}`),
   thunder: ['thunder-1', 'thunder-2'],
+  // (The fourth batch: a body falling, a whip's lash, a wooden door's creak and its slam.)
+  bodyfall: Array.from({ length: 5 }, (_, index) => `bodyfall-${index + 1}`),
+  whip: ['whip-1'],
+  'door-creak': ['door-creak-1', 'door-creak-2'],
+  'door-slam': ['door-slam-1'],
 };
 
 /** Every file of every set. */

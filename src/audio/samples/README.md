@@ -5,7 +5,7 @@ silence trimmed; `trim` is how much of the labelled event's window came before i
 with a short fade, peak-normalised to -1 dBFS, MP3 32 kHz 40 kb/s. The game picks one take of a set at random, at the event's instant;
 src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. tools/bundle.js embeds them in the single-file page.
 
-104 files, 256 KB in all.
+113 files, 295 KB in all.
 
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
@@ -113,5 +113,16 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | fistswing-5.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 5.820-6.085 | Fist swings and punches (Sound 3-6) | 0.000 | 1800 | swing: a punch or kick on its way in (its rising end, as long as the drive; a kick lower) |
 | thunder-1.mp3 | ScreenRecording_10-30-2026_13-40-40_1.mov | 0.373-2.973 | LOUD & SCARY THUNDERSTORM LIGHTNIN(G) | 0.043 | 13500 | thunder: near, the whole crack and roar; far, the rumble only, lower, the synth's long rumble under it |
 | thunder-2.mp3 | ScreenRecording_10-30-2026_13-40-40_1.mov | 3.085-4.885 | LOUD & SCARY THUNDERSTORM LIGHTNIN(G) | 0.000 | 9360 | thunder: near, the whole crack and roar; far, the rumble only, lower, the synth's long rumble under it |
+| bodyfall-1.mp3 | ScreenRecording_10-30-2026_13-53-57_1.mov | 0.285-0.873 | Body Fall Sound Effects | 0.085 | 3240 | fall: a man going down on stone, tile, boards, earth, grass, sand or snow (under the clatter in plate or mail; water and mud the synth's) |
+| bodyfall-2.mp3 | ScreenRecording_10-30-2026_13-53-57_1.mov | 2.240-3.318 | Body Fall Sound Effects | 0.140 | 5580 | fall: a man going down on stone, tile, boards, earth, grass, sand or snow (under the clatter in plate or mail; water and mud the synth's) |
+| bodyfall-3.mp3 | ScreenRecording_10-30-2026_13-53-57_1.mov | 4.461-4.717 | Body Fall Sound Effects | 0.111 | 1620 | fall: a man going down on stone, tile, boards, earth, grass, sand or snow (under the clatter in plate or mail; water and mud the synth's) |
+| bodyfall-4.mp3 | ScreenRecording_10-30-2026_13-53-57_1.mov | 6.245-6.803 | Body Fall Sound Effects | 0.145 | 3060 | fall: a man going down on stone, tile, boards, earth, grass, sand or snow (under the clatter in plate or mail; water and mud the synth's) |
+| bodyfall-5.mp3 | ScreenRecording_10-30-2026_13-53-57_1.mov | 8.007-9.022 | Body Fall Sound Effects | 0.057 | 5400 | fall: a man going down on stone, tile, boards, earth, grass, sand or snow (under the clatter in plate or mail; water and mud the synth's) |
+| whip-1.mp3 | ScreenRecording_10-30-2026_13-55-14_1.mov | 0.509-1.038 | Whip Hit Sound Effect | 0.029 | 2880 | hit: a whip's tip on anything (on armour or a shield shorter and higher, the synth's knock beside it) |
+| door-creak-1.mp3 | ScreenRecording_10-30-2026_13-52-06_1.mov | 0.900-1.880 | Medieval Castle Wood Door (7 Version) | 0.000 | 5220 | mech: a wooden door (or a chest's lid, higher and shorter) swinging open, or the start of its shutting |
+| door-creak-2.mp3 | ScreenRecording_10-30-2026_13-52-06_1.mov | 1.880-2.850 | Medieval Castle Wood Door (7 Version) | 0.000 | 5040 | mech: a wooden door (or a chest's lid, higher and shorter) swinging open, or the start of its shutting |
+| door-slam-1.mp3 | ScreenRecording_10-30-2026_13-52-06_1.mov | 2.855-4.297 | Medieval Castle Wood Door (7 Version) | 0.000 | 7560 | mech: a wooden door (or a chest's lid) shut, into the creak |
 
 Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game). The recordings have no sand or snow footsteps and none of a flat sole on boards (the ring's canvas is boards) and no snort: those stay synthesised. The fist's whooshes (fistswing) are the air before each punch of the 10-30 recording, cut from 0.25-0.4 s before its blow to the blow (no onset: the window as it is, faded in over its first quarter); the punches start at the blow. The thunder takes are capped at 2.6 and 1.8 s with a 0.7 s fade.
+
+The fourth batch (10-30): the body falls are the five falls of one recording; the whip's recording has one lash (the low knock before it, at 0.31 s, is not the whip: left out); the door's recording is the first of its seven versions only: a creak swelling as it opens (its first part at a lower quality: cut at 1.88 s into two takes, each the window as it is, faded in over 0.06 s and out over 0.15 s) and the slam that ends it, its ring cut where the recording ends.
