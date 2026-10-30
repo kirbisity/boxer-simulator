@@ -10,7 +10,7 @@ import { P } from '../body.js';
 import { vec } from '../pose.js';
 import { WHIP } from '../weapons.js';
 import { WORLD } from './config.js';
-import { addDamage, capsuleEnds, capsules, closestBetween, point, poiseOf, protectionAt, shieldDisc, stagger, wound } from '../physics.js';
+import { addDamage, aimPoint, bladeFor, capsuleEnds, capsules, closestBetween, point, poiseOf, protectionAt, shieldDisc, stagger, wound } from '../physics.js';
 
 /** A thong hung from the handle's end, straight down off it, at rest. */
 function makeRope(weapon, spec) {
@@ -53,6 +53,8 @@ export function stepWhips(world, h) {
     }
     prev.set(x.subarray(0, 3), 0);
     x.set(weapon.tip, 0);
+    // The stroke laid on its man: the tip driven at him, and held there while the thong comes after it.
+    const homed = homeTip(world, fighter, rope, spec, h);
     for (let pass = 0; pass < spec.passes; pass += 1) {
       for (let index = 0; index < count - 1; index += 1) {
         const a = index * 3;
@@ -62,7 +64,7 @@ export function stepWhips(world, h) {
         const dz = x[b + 2] - x[a + 2];
         const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-9;
         const wa = inverse[index];
-        const wb = inverse[index + 1];
+        const wb = homed && index + 1 === count - 1 ? 0 : inverse[index + 1];
         const share = (length - linkLength) / length / (wa + wb);
         x[a] += dx * share * wa; x[a + 1] += dy * share * wa; x[a + 2] += dz * share * wa;
         x[b] -= dx * share * wb; x[b + 1] -= dy * share * wb; x[b + 2] -= dz * share * wb;
@@ -78,6 +80,74 @@ export function stepWhips(world, h) {
     }
     lash(world, fighter, rope, spec, h);
   }
+}
+
+/**
+ * The man a whip stroke is thrown at, while its tip is still to land on him:
+ * the stroke under way (`laid`: the tip being laid on him, from
+ * `WHIP.home.from` s before the arm's drive ends), its man an enemy on his
+ * feet, not yet lashed by it.
+ */
+function strokeMan(world, fighter, rope, laid = true) {
+  const punch = fighter.punch;
+  if (!punch || punch.spec.path !== 'blade' || bladeFor(fighter, punch.spec) !== fighter.weapon || punch.target === null) return null;
+  if (rope.stroke !== punch) {
+    rope.stroke = punch;
+    rope.strokeLanded = false;
+  }
+  const man = world.fighters[punch.target];
+  if (rope.strokeLanded || !man || man.state === 'out' || man.corner === fighter.corner) return null;
+  if ((laid && punch.t < punch.spec.extendUntil - WHIP.home.from) || punch.t > punch.spec.duration) return null;
+  return man;
+}
+
+/**
+ * A stroke at a man: its tip goes at the place it is thrown at on him (where
+ * he is now, as he moves), at the crack's speed or its own if faster, as far
+ * as the thong reaches from the handle. True while it is so driven (the
+ * tip then leads: the rest of the thong follows it, stepWhips).
+ */
+function homeTip(world, fighter, rope, spec, h) {
+  const man = strokeMan(world, fighter, rope);
+  if (!man) return false;
+  const { x, prev, count } = rope;
+  const at = (count - 1) * 3;
+  const from = [prev[at], prev[at + 1], prev[at + 2]];
+  const root = fighter.weapon.tip;
+  // Where it is laid: the stroke's own mark on him, as far out as the thong reaches.
+  let mark = aimPoint(man, fighter.punch.zone);
+  const out = vec.sub(mark, root);
+  const most = spec.length * WHIP.home.taut;
+  if (vec.length(out) > most) mark = vec.add(root, vec.scale(vec.normalize(out), most));
+  const toward = vec.sub(mark, from);
+  const gap = vec.length(toward);
+  const speed = Math.max(vec.length(vec.sub([x[at], x[at + 1], x[at + 2]], from)) / h, WHIP.home.crack);
+  // (Arriving: put on the mark, a touch through it, so its last stretch meets him.)
+  const step = Math.min(speed * h, gap + WHIP.home.through);
+  x.set(vec.add(from, vec.scale(vec.normalize(toward), step)), at);
+  return true;
+}
+
+/**
+ * His footwork through a whip stroke at a man drawing out of the thong's
+ * reach (null when he need not step): a step in after him, as much as the
+ * tip would fall short of his mark at the crack (`WHIP.home.step`).
+ */
+export function whipDrive(world, fighter) {
+  const weapon = fighter.weapon;
+  const punch = fighter.punch;
+  if (!weapon?.held || !weapon.spec.rope || !weapon.rope || !punch || punch.t < punch.spec.windup) return null;
+  const man = strokeMan(world, fighter, weapon.rope, false);
+  if (!man) return null;
+  const { gain, most, margin, ahead } = WHIP.home.step;
+  // How far he will be by the crack (`ahead` s after the drive), drawing off at the speed he goes from this man.
+  const out = vec.sub(aimPoint(man, punch.zone), weapon.tip);
+  const along = [out[0], out[2]];
+  const flat = Math.hypot(along[0], along[1]) || 1;
+  const drawing = ((man.rootVelocity[0] - fighter.rootVelocity[0]) * along[0] + (man.rootVelocity[1] - fighter.rootVelocity[1]) * along[1]) / flat;
+  const crackIn = Math.max(0, punch.spec.extendUntil - punch.t) + ahead;
+  const short = vec.length(out) + Math.max(0, drawing) * crackIn - weapon.spec.rope.length * WHIP.home.taut * margin;
+  return short > 0 ? Math.min(most, gain * short) : null;
 }
 
 /** The tip's last links, moving fast enough, into a man of the other side (or his shield). */
@@ -98,16 +168,21 @@ function lash(world, fighter, rope, spec, h) {
       if (world.time - (rope.lashed.get(other.id) ?? -Infinity) < 0.4) continue;
       if (other.shield) {
         const disc = shieldDisc(other);
-        const offset = vec.sub(to, disc.centre);
-        if (Math.abs(vec.dot(offset, disc.normal)) < 0.05 && vec.length(offset) < disc.radius) {
+        // (Swept: the tip's whole path this substep, through the board's face or ending on it, at a crack's speed a few cm a substep.)
+        const before = vec.dot(vec.sub(from, disc.centre), disc.normal);
+        const after = vec.dot(vec.sub(to, disc.centre), disc.normal);
+        const crossing = Math.abs(after) < 0.05 ? to : before * after < 0 ? vec.lerp(from, to, before / (before - after)) : null;
+        if (crossing && vec.length(vec.sub(crossing, disc.centre)) < disc.radius) {
           rope.lashed.set(other.id, world.time);
-          world.events.push({ time: world.time, kind: 'blocked', attacker: fighter.id, defender: other.id, weapon: 'whip', target: 'shield', speed, impulse: 0, force: 0, headDeltaV: 0, point: to, normal: disc.normal, effects: ['the lash on the shield'] });
+          rope.strokeLanded = true;
+          let tipKg = 0;
+          for (let link = count - spec.tipLinks; link < count; link += 1) tipKg += mass[link];
+          // The thong's momentum into the board: the shield arm gives a little to it (lashHit's push, onto the arm that holds it).
+          const transferred = tipKg * speed * spec.impact;
+          world.pendingImpulses.push({ fighter: other, shares: [[P.lHand, 1], [P.lElbow, 0.6]], direction: vec.normalize(vec.sub(to, from)), impulse: transferred });
+          world.events.push({ time: world.time, kind: 'blocked', attacker: fighter.id, defender: other.id, weapon: 'whip', target: 'shield', speed, impulse: tipKg * speed, transferred, force: 0, headDeltaV: 0, point: to, normal: disc.normal, effects: ['the lash on the shield'] });
           // Heard: the tip cracking on the shield's face.
-          if (world.ear) {
-            let tipKg = 0;
-            for (let link = count - spec.tipLinks; link < count; link += 1) tipKg += mass[link];
-            soundHit(world, other, fighter, 'shield', to, { energy: 0.5 * tipKg * speed * speed, impulse: tipKg * speed, striker: 'lash', covering: shieldCovering(other.shield) });
-          }
+          if (world.ear) soundHit(world, other, fighter, 'shield', to, { energy: 0.5 * tipKg * speed * speed, impulse: tipKg * speed, striker: 'lash', covering: shieldCovering(other.shield) });
           continue;
         }
       }
@@ -116,6 +191,7 @@ function lash(world, fighter, rope, spec, h) {
         const meet = closestBetween(from, to, a, b);
         if (vec.length(vec.sub(meet.onFirst, meet.onSecond)) > capsule.radius + 0.01) continue;
         rope.lashed.set(other.id, world.time);
+        rope.strokeLanded = true;
         // What strikes: the tip's last links.
         let tipKg = 0;
         for (let link = count - spec.tipLinks; link < count; link += 1) tipKg += mass[link];
@@ -138,6 +214,13 @@ function lashHit(world, attacker, defender, key, tipKg, speed, at, dir) {
     soundHit(world, defender, attacker, key, at, { energy, impulse: tipKg * speed, striker: 'lash' });
     if (through >= 0.5 && defender.state !== 'out') soundVoice(world, defender, 'struck', Math.min(1, through / spec.painSure));
   }
+  // The thong's momentum into the part it struck, whatever he wears (armour turns the cut, not the push): the part flinches
+  // from it, and his body takes a short shove, the less the heavier he is; braced in a shell (`braced` per unit of poise
+  // over 1, m/s) he takes none of that, only the flinch.
+  const capsule = capsules(defender).find((entry) => entry.key === key);
+  const poise = poiseOf(defender);
+  event.transferred = tipKg * speed * spec.impact;
+  if (capsule) world.pendingImpulses.push({ fighter: defender, shares: [[capsule.a, 0.5], [capsule.b, 0.5]], direction: dir, impulse: event.transferred, massShare: WORLD.balance.strikeMassShare * poise, braced: spec.braced * (poise - 1) });
   if (through < 0.5) {
     event.effects.push('the lash turned by what he wears');
     world.events.push(event);
@@ -146,10 +229,6 @@ function lashHit(world, attacker, defender, key, tipKg, speed, at, dir) {
   event.effects.push(through > spec.painSure * 0.6 ? 'a hard lash' : 'lashed');
   wound(defender, 'cut', through * spec.cutShare, key, attacker);
   addDamage(defender, key, through / 40, false);
-  // The tip's momentum into the part it struck.
-  const capsule = capsules(defender).find((entry) => entry.key === key);
-  event.transferred = tipKg * speed * spec.impact;
-  if (capsule) world.pendingImpulses.push({ fighter: defender, shares: [[capsule.a, 0.5], [capsule.b, 0.5]], direction: dir, impulse: event.transferred, massShare: WORLD.balance.strikeMassShare * poiseOf(defender) });
   world.events.push(event);
   // The pain: likelier to put him on his knees the harder it was; short of that, he reels from it.
   const chance = Math.max(0, Math.min(0.9, (through - spec.painFrom) / (spec.painSure - spec.painFrom)));
