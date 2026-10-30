@@ -1449,10 +1449,19 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   const myRange = reachOf(fighter) + opponent.body.lengths.headRadius;
   let phase = fighter.aiCadence;
   // A man held in one of my side's wolf-brushes (physics/brush.js) cannot come at me: there is nothing to wait for or
-  // keep out of. Up to where my point lands (AI.squad.strikeAt of my reach), and strike.
-  if (opponent.caught && world.fighters[opponent.caught.by].corner === fighter.corner) {
-    const at = myRange * AI.squad.strikeAt;
-    fighter.move = distance > at + AI.rangeSlack ? 1 : distance < at - AI.rangeSlack * 2 ? -0.5 : 0;
+  // keep out of. Up to where my point lands (AI.squad.strikeAt of my reach), and strike. A long weapon's head strikes only
+  // past its dead length (AI.pointRoom): he stands midway between there and as far as its blows reach, the point on him.
+  if (heldByMine(world, fighter, opponent)) {
+    const line = pointRoomOf(fighter, opponent);
+    if (line === null) {
+      const at = myRange * AI.squad.strikeAt;
+      fighter.move = distance > at + AI.rangeSlack ? 1 : distance < at - AI.rangeSlack * 2 ? -0.5 : 0;
+    } else {
+      const far = Math.max(line, headReach(fighter, opponent));
+      const at = (line + far) / 2;
+      const band = (far - line) / 4;
+      fighter.move = distance > at + band ? 1 : distance < at - band ? -0.5 : 0;
+    }
     return true;
   }
   // The longer weapon: hold at the edge of his reach, inside mine; answer
@@ -1552,6 +1561,16 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
   return true;
 }
 
+/** Whether his man is held in one of his own side's wolf-brushes (physics/brush.js): he cannot come at anyone. */
+const heldByMine = (world, fighter, man) => Boolean(man.caught) && world.fighters[man.caught.by].corner === fighter.corner;
+
+/** As far (m, hips to hips) as the furthest-reaching blow of his weapon's head lands on his man. */
+function headReach(fighter, opponent) {
+  const weapon = fighter.weapon?.held ? fighter.weapon.spec : null;
+  const attacks = Object.keys((STYLES[fighter.style] ?? STYLES.mix).attacks).filter(strikesWithHead);
+  return Math.max(0, ...attacks.map((name) => moveRange(MOVES[name], fighter.body, weapon))) + opponent.body.lengths.headRadius;
+}
+
 /** How far (m) his man stands beyond where his long weapon begins to strike (moves.js pointRoomOf); null for a short one. */
 function pointGap(fighter, opponent) {
   const line = pointRoomOf(fighter, opponent);
@@ -1569,7 +1588,8 @@ function makeRoom(world, fighter, opponent) {
   const gap = opponent.state === 'up' && !fighter.clinch && !fighter.mount ? pointGap(fighter, opponent) : null;
   // (Kept only while it is looked at each step: a spell away from him, the patience starts again.)
   const kept = fighter.aiRoom && world.time - fighter.aiRoom.seen <= spec.forget ? fighter.aiRoom : null;
-  if (gap === null || gap >= (kept ? spec.room : 0)) {
+  // (A man held in his side's wolf-brush does not press in after him: once out past the line, the point is on him.)
+  if (gap === null || gap >= (kept && !heldByMine(world, fighter, opponent) ? spec.room : 0)) {
     fighter.aiRoom = null;
     return false;
   }
