@@ -101,7 +101,7 @@ export function firstBlow(attackerInputs, targetKey, seed, pass) {
     if (!pass || !horse) think(current, attacker, dt);
   });
   const end = point(man.x, P.pelvis);
-  return { hit, state: man.state, thrown: Math.hypot(end[0] - start[0], end[2] - start[2]) };
+  return { hit, state: man.state, thrown: Math.hypot(end[0] - start[0], end[2] - start[2]), world, attacker };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

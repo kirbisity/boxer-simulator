@@ -19,7 +19,7 @@ import { fightUiHomeSwitch } from './fightui/toggle.js';
 import { STAGE_LIST } from './levelmode/story.js';
 import { audioMixer } from './audio/controls.js';
 import { hitFeelPanel } from './hitfeelview.js';
-import { LAST_GATE, LAST_GATE_HEROES, LAST_GATE_HERO_KEYS } from './lastgate.js';
+import { LAST_GATE, LAST_GATE_MODES, LAST_GATE_MODE_KEYS } from './lastgate.js';
 import { lastGateBoardList } from './lastgateview.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
@@ -114,7 +114,7 @@ export function installMenus(game) {
       choice({ glyph: '🏆', kicker: 'Coming soon', title: 'Career', text: 'One fighter, bout after bout, as he rises. Being built now.', tone: 'career' }),
       choice({ glyph: '🗺️', kicker: 'Set fights', title: 'Battle Mode', text: 'Historical battles in set places. Start with the tutorial.', onClick: levels, tone: 'gold' }),
       choice({ glyph: '🏰', kicker: 'New · Stage 1', title: 'Level Mode', text: 'Fight your way up a storm-swept fortress, one stage at a time.', onClick: stages, tone: 'storm' }),
-      choice({ glyph: '🚪', kicker: 'New · Survival', title: LAST_GATE.title, text: 'Hold the gate against a starving horde out of the fog. How long can you last?', onClick: lastGate, tone: 'mist' }),
+      choice({ glyph: '🚪', kicker: 'New · Survival', title: LAST_GATE.title, text: 'Hold the gate against a horde out of the fog: four heroes, four hordes. How long can you last?', onClick: lastGate, tone: 'mist' }),
       choice({ glyph: '☠️', kicker: 'Who would win?', title: 'Deadliest Warrior', text: 'Pick any two warriors and watch them, or fight as one.', onClick: versus }),
       choice({ glyph: '⚡', kicker: 'Play now', title: 'Who Wins?', text: 'A random fighter against whoever comes. One tap.', onClick: quickEvent }),
       choice({ glyph: '🧪', kicker: 'Expert', title: 'Sandbox', text: 'Every setting: teams, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })),
@@ -167,24 +167,29 @@ export function installMenus(game) {
     fight();
   }
 
-  // ---- The Last Gate: pick a hero, and in (lastgate.js) ----------------------------
-  // One screen: the three heroes as cards (his look, his weapon, what he is good for); a tap starts the run. The best runs
-  // in this browser behind a button, in the cards' place.
+  // ---- The Last Gate: pick a scenario, and in (lastgate.js) ----------------------------
+  // One screen: the four scenarios as cards (the hero's look, the scenario's name, the hero and his weapon, what he is good
+  // for, the horde he faces); a tap starts the run. The best runs in this browser, a board for each, behind a button, in
+  // the cards' place.
   function lastGate() {
-    const body = screen('lastgate-screen', LAST_GATE.title, 'Hold the gate. Pick your hero; five of his men stand with you.', home);
+    const body = screen('lastgate-screen', LAST_GATE.title, 'Hold the gate. Pick a scenario; five of the hero\'s men stand with him.', home);
     body.parentElement.classList.add('lg-pick');
-    const cards = el('div', { className: 'lg-heroes' }, ...LAST_GATE_HERO_KEYS.map((key) => {
-      const hero = LAST_GATE_HEROES[key];
+    const cards = el('div', { className: 'lg-heroes' }, ...LAST_GATE_MODE_KEYS.map((key) => {
+      const mode = LAST_GATE_MODES[key];
       const image = el('img', { alt: '', draggable: false });
-      game.portrait?.(`lastgate-${key}`, hero.hero()).then((url) => { image.src = url; });
+      game.portrait?.(`lastgate-${key}`, mode.hero()).then((url) => { image.src = url; });
       return el('button', { className: 'lg-hero', type: 'button', onclick: () => { close(); game.lastGate(key); } },
         el('span', { className: 'lg-hero-look' }, image),
         el('span', { className: 'lg-hero-words' },
-          el('b', { textContent: `${hero.glyph} ${hero.label}` }),
-          el('em', { textContent: hero.weapon }),
-          el('span', { textContent: hero.strength })));
+          el('b', { textContent: `${mode.glyph} ${mode.title}` }),
+          el('em', { textContent: `${mode.label} · ${mode.weapon}` }),
+          el('span', { textContent: mode.strength }),
+          el('small', { textContent: mode.blurb })));
     }));
-    const board = el('div', { className: 'lg-menu-board', hidden: true }, el('h2', { textContent: 'Best runs' }), lastGateBoardList(game.lastGateBoard?.list() ?? []));
+    const board = el('div', { className: 'lg-menu-board', hidden: true }, el('h2', { textContent: 'Best runs' }),
+      ...LAST_GATE_MODE_KEYS.map((key) => el('section', { className: 'lg-menu-board-mode' },
+        el('h3', { textContent: `${LAST_GATE_MODES[key].glyph} ${LAST_GATE_MODES[key].title}` }),
+        lastGateBoardList(game.lastGateBoard?.list(key) ?? []))));
     const toggle = el('button', { type: 'button', className: 'lg-board-toggle', textContent: '🏆 Best runs', onclick: () => {
       board.hidden = !board.hidden;
       cards.hidden = !board.hidden;

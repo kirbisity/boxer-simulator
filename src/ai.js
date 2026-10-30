@@ -1699,8 +1699,9 @@ export function hurtShare(fighter) {
 
 /**
  * The couched charge: true while it has the fighter (running in, or the
- * blow under way). Once its blow is over the lance goes (dropped: the
- * sidearm is drawn as for any lost weapon) and the style is fought as usual.
+ * blow under way). Once its blow is over the lance is kept (it breaks only
+ * on heavy armour: physics.js shattersOn, the sidearm drawn then as for any
+ * lost weapon) and fought with at the point, as the style says.
  */
 function couchedCharge(world, fighter, opponent, style, distance) {
   const charge = style.couchedCharge;
@@ -1713,7 +1714,6 @@ function couchedCharge(world, fighter, opponent, style, distance) {
       return true;
     }
     fighter.couched = 'done';
-    dropWeapon(world, fighter, 'dropped');
     return false;
   }
   if (punch || fighter.clinch || fighter.slot) return false;
@@ -2680,8 +2680,8 @@ function decide(world, fighter, dt) {
     fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
     return;
   }
-  // A couched charge (style.couchedCharge): the lance used once, as it was meant — run at him and
-  // drive it home in stride; when that blow is done, hit or miss, the lance is let fall and the sidearm drawn.
+  // A couched charge (style.couchedCharge): run at him and drive it home in stride; when that blow is done, hit or
+  // miss, the lance is kept and fought with at the point (it breaks only on heavy armour: then the sidearm).
   if (style.couchedCharge && couchedCharge(world, fighter, opponent, style, distance)) return;
   if (style.couchedCharge) style = STYLES[fighter.style] ?? STYLES.mix;
   // Forearm weapons (`switches`): the one the distance, or the blows thrown with this one, call for.

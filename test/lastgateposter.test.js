@@ -14,7 +14,9 @@ test('the poster says two numbers, the time held and his kills, with his name an
   // Only those: nothing of the defenders' total or the waves on it.
   assert.ok(!Object.values(words).some((text) => text.includes('90') || /\b7\b/.test(text)));
   assert.equal(lastGatePosterWords({ hero: 'knight', seconds: 61, kills: 0 }).name, 'KNIGHT');
-  assert.equal(lastGatePosterWords({ hero: 'ironPagoda', seconds: 61, kills: 1 }).title, 'THE IRON PAGODA · GUANDAO');
+  assert.equal(lastGatePosterWords({ hero: 'mongol', seconds: 61, kills: 1 }).title, 'THE MONGOL ARCHER · COMPOSITE BOW');
+  assert.equal(lastGatePosterWords({ hero: 'police', seconds: 61, kills: 1 }).title, 'THE SWAT OFFICER · AR-15');
+  assert.equal(lastGatePosterWords({ hero: 'knight', seconds: 61, kills: 1 }).title, 'THE KNIGHT · LANCE');
 });
 
 test('sharing: the poster as an image where files share; else saved with the line copied; else the line shared, copied, or shown to copy', async () => {

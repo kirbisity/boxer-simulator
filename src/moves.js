@@ -705,7 +705,7 @@ export const STYLES = {
   // The tournament knight on foot with the lance: he stands his ground and
   // holds his man at the point, thrusts with his weight behind each, and
   // little else; slow in everything (the harness, the helm that cannot turn,
-  // the heavy shaft). The long sword when the lance is gone (his kit's sidearm).
+  // the heavy shaft). The long sword when the lance is broken (his kit's sidearm).
   lance: {
     label: 'Lance', weapon: 'lance', fallback: 'mix',
     // Fought to drive it home: he holds the lance's length off and comes on
@@ -724,7 +724,7 @@ export const STYLES = {
     plans: { pressure: 1.4, outboxer: 1.2, counter: 0.8, brawler: 0.3 },
     pressure: 0.2,
     rangeInside: 0.06,
-    // One charge with the lance couched, then the sidearm (AI couchedCharge): `move` begun within
+    // One charge with the lance couched, then the lance at the point (kept: it breaks only on heavy armour, then the sidearm; AI couchedCharge): `move` begun within
     // `couchFrom` m beyond the reach (the point carried in at the run, driven home near him),
     // running in to it from further, backing off for room (at most `backFor` s) when he is over
     // `pointBand` m inside the point.

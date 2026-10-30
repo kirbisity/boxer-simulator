@@ -415,7 +415,8 @@ function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
   const spec = weapon.spec;
   const centre = vec.add(hand, vec.scale(weapon.dir, (spec.length - spec.handle) / 2));
   const random = world.random;
-  world.debris.push({
+  // Shattered (a lance on plate): splinters, nothing whole left to pick up.
+  if (reason !== 'shattered') world.debris.push({
     id: world.debris.length, kind: 'weapon', weapon: weapon.kind, owner: fighter.id, x: centre, loaded: weapon.loaded, charges: weapon.charges,
     colour: weapon.colour, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
@@ -426,7 +427,7 @@ function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
     if (fighter.punch.with && bladeFor(fighter, fighter.punch.with.spec) === weapon) fighter.punch.with = null;
     else if (bladeFor(fighter, fighter.punch.spec) === weapon) fighter.punch = null;
   }
-  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, off: second || undefined, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : `${spec.label} dropped`] });
+  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, off: second || undefined, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : reason === 'shattered' ? `${spec.label} shattered` : `${spec.label} dropped`] });
 }
 
 /** After losing a weapon, the next: a backup, his kit's sidearm, or his bare hands. */
@@ -492,7 +493,8 @@ export function dropShield(world, fighter, reason, push = [0, 0, 0]) {
   addParticleMass(fighter, P.lHand, -spec.mass * 0.6);
   addParticleMass(fighter, P.lElbow, -spec.mass * 0.4);
   const random = world.random;
-  world.debris.push({
+  // Shattered (a lance on plate): splinters, nothing whole left to pick up.
+  if (reason !== 'shattered') world.debris.push({
     id: world.debris.length, kind: 'shield', shield: fighter.shield.kind, owner: fighter.id, x: shield.centre, plate: true,
     v: vec.add(vec.add(point(fighter.v, P.lHand), push), [0, 0.4, 0]), q: quatFromBasis(shield.across, shield.up, shield.normal),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (1 + random() * 3)), radius: shieldReach(spec), axis: [0, 0, 1], half: 0.02, resting: false,
@@ -665,6 +667,17 @@ function chip(world, fighter) {
     weapon.dulled = true;
     world.events.push({ time: world.time, kind: 'chipped', fighter: fighter.id, effects: ['the obsidian edge is gone'] });
   }
+}
+
+/**
+ * Whether a blow breaks a shaft that shatters (`spec.shatters`, a lance): its point driven (a thrust) onto armour proof
+ * enough against a point that it does not go in (`pierce` or more where it struck: plate, heavy lamellar, mail under
+ * plate), with `joules` or more taken up in the collision. Anything else (flesh, cloth, leather, light armour, a shield)
+ * it goes into or glances from, and is kept.
+ */
+export function shattersOn(weapon, mode, protection, energy) {
+  const rule = weapon?.spec.shatters;
+  return Boolean(rule) && mode === 'thrust' && (protection.pierce ?? 0) >= rule.pierce && energy >= rule.joules;
 }
 
 /** A blow jars the grip (of the weapon, or of the off hand's blade); strained past what the hand can hold, it goes. */
@@ -6894,12 +6907,16 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     }
   }
   if (BLOCKING.has(capsule.key)) for (const held of heldBlades(defender)) if (capsule.key.startsWith(held.main)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1), held);
-  // Jarred by what it hit (least when it cut straight through).
-  strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
+  // A shaft that shatters (a lance: `shatters`) breaks on heavy armour it cannot go into (not into a gap) and is
+  // kept otherwise; any other weapon is jarred by what it hit (least when it cut straight through).
+  const shattered = !haft && !intoGap && shattersOn(weapon, spec.mode, protection, energy);
+  if (shattered) event.effects.push(`the ${wspec.label.toLowerCase()} shattered`);
+  else if (!wspec.shatters) strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   if (weapon.twoHanded) recoil.push([P[`${weapon.off}Hand`], 0.8]);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
   world.events.push(event);
+  if (shattered) dropWeapon(world, attacker, 'shattered');
   if (world.ear) {
     soundHit(world, defender, attacker, capsule.key, contactPoint, { energy, impulse, striker: weaponStriker(mix), deltaV: blocked ? 0 : impulse / struckMass });
     // (A cut through at a joint is logged by sever; a point's severity is how near it came to running him through.)
@@ -7038,7 +7055,8 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   if (defender.defence?.name === 'shieldBlock') defender.defence = null;
   const recoil = striker.weapon ? [[P[`${striker.weapon.main}Hand`], 1], [P[`${striker.weapon.main}Elbow`], 0.6]] : (RECOIL[spec.limb.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${striker.side}${part}`], share]);
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: away, impulse: impulse * (1 - gives) });
-  if (striker.weapon) strainGrip(world, attacker, impulse * 0.25, [0, 0, 0], striker.weapon);
+  // (A lance on a shield is kept: it shatters only on heavy armour, `shatters`.)
+  if (striker.weapon && !striker.weapon.spec.shatters) strainGrip(world, attacker, impulse * 0.25, [0, 0, 0], striker.weapon);
   world.events.push(event);
   if (striker.weapon) world.events.push({ time: world.time, kind: 'clash', fighter: defender.id, point: hit.point, normal: away, impulse });
   // Heard: the blow on the shield's face, braced behind it when he meant the block.

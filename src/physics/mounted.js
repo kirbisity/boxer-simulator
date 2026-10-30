@@ -17,7 +17,7 @@ import { BODY, P } from '../body.js';
 import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
-import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
 
@@ -90,6 +90,16 @@ export function createHorse(fighter, id, random) {
   poseHorse(horse);
   seatRider(fighter, 1 / 60, true);
   return horse;
+}
+
+/** A rider and his horse set down together at (x, z) facing `yaw` (a mode's or a picture's own placing): the horse standing, he in the saddle. */
+export function placeMounted(fighter, x, z, yaw) {
+  const horse = fighter.mount;
+  if (!horse) return;
+  Object.assign(horse, { at: [x, z], yaw, speed: 0, yawRate: 0, shove: [0, 0], goal: { heading: yaw, speed: 0 } });
+  fighter.yaw = yaw;
+  poseHorse(horse);
+  seatRider(fighter, 1 / 60, true);
 }
 
 /** The horse's paces as speeds it can hold (m/s): gallop, canter, trot, walk. */
@@ -718,15 +728,22 @@ export function loseHorse(world, horse) {
   horse.goal = { heading: steerInside(world, horse, away), speed: horse.paces.canter };
 }
 
-/** A heading turned back towards the middle when it would run the horse into the arena's edge. */
+/**
+ * A heading turned back towards the middle when it would run the horse into the arena's edge: the floor's, or the
+ * arena's own field for riders where walls close it in (`ride`: { x: [from, to], z: [from, to] }, m, and its own `edge`;
+ * The Last Gate's field before its wall).
+ */
 export function steerInside(world, horse, heading, edge = WORLD.mount.edge) {
   const ahead = forwardOf(heading);
   const look = Math.max(4, Math.abs(horse.speed) * 1.2);
   const x = horse.at[0] + ahead[0] * look;
   const z = horse.at[1] + ahead[2] * look;
-  const { halfX, halfZ } = world.arena;
-  if (Math.abs(x) < halfX - edge && Math.abs(z) < halfZ - edge) return heading;
-  return Math.atan2(horse.at[1] * 0.3, -horse.at[0]);
+  const { halfX, halfZ, ride } = world.arena;
+  edge = ride?.edge ?? edge;
+  const [x0, x1] = ride?.x ?? [-halfX, halfX];
+  const [z0, z1] = ride?.z ?? [-halfZ, halfZ];
+  if (x > x0 + edge && x < x1 - edge && z > z0 + edge && z < z1 - edge) return heading;
+  return Math.atan2((horse.at[1] - (z0 + z1) / 2) * 0.3, (x0 + x1) / 2 - horse.at[0]);
 }
 
 // ---- Blows on the horse ---------------------------------------------------
@@ -813,11 +830,14 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, attacker);
   // The blow pushes the horse back, by its momentum over the laden horse's mass.
   event.pushed = jolt(world, horse, vec.scale(normal, -impulse / ladenMass(world, horse)), 'brought down by the blows');
-  // The blade is jarred by what it met, and the arm takes the blow back.
-  strainGrip(world, attacker, impulse * (glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
+  // The blade is jarred by what it met, and the arm takes the blow back; a lance (`shatters`) breaks on heavy barding, else is kept.
+  const shattered = shattersOn(weapon, spec.mode, protection, energy);
+  if (shattered) event.effects.push(`the ${wspec.label.toLowerCase()} shattered`);
+  else if (!wspec.shatters) strainGrip(world, attacker, impulse * (glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: normal, impulse: impulse * (1 + WORLD.weaponTransferRestitution.edge) / (1 + WORLD.restitution) });
   world.events.push(event);
+  if (shattered) dropWeapon(world, attacker, 'shattered');
   // Heard: the blow on the horse (on its barding, or its hide), and an edge or a point in it makes it scream.
   if (world.ear) {
     const striker = mix.cut + mix.pierce <= mix.blunt ? 'blunt' : mix.pierce > mix.cut ? 'point' : 'blade';
