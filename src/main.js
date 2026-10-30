@@ -1412,7 +1412,7 @@ lookSelect.addEventListener('change', () => switchLook(lookSelect.value, { remem
 segmented('#speeds', (speed) => { state.speed = Number(speed); });
 for (const corner of ['red', 'blue']) {
   const select = $(`#team-${corner}`);
-  select.append(...Array.from({ length: 20 }, (_, index) => new Option(String(index + 1), String(index + 1))));
+  select.append(...Array.from({ length: 50 }, (_, index) => new Option(String(index + 1), String(index + 1))));
   select.addEventListener('change', () => {
     state.teamSizes[corner] = Number(select.value);
     refreshBuilder();
@@ -2255,7 +2255,7 @@ function loadSetup(file) {
   state.rosters = { red: teams.red.map(fighter), blue: teams.blue.map(fighter) };
   if (state.scenario) state.levelRosters[state.scenario] = state.rosters;
   for (const corner of ['red', 'blue']) {
-    state.teamSizes[corner] = Math.min(20, state.rosters[corner].length);
+    state.teamSizes[corner] = Math.min(50, state.rosters[corner].length);
     state.editing[corner] = 0;
   }
   refreshBuilder();
