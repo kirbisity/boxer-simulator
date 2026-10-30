@@ -2552,6 +2552,11 @@ function decide(world, fighter, dt) {
   fighter.strafe = 0;
   fighter.running = false;
   fighter.aimAt = undefined;
+  // A machine has no morale whatever state it is in, down or dragging itself on a broken leg too (feelFear's rule).
+  if (fighter.body.gear.machine) {
+    fighter.fear = 0;
+    fighter.panicked = false;
+  }
   if (fighter.state !== 'up') {
     fighter.move = 0;
     return;
