@@ -46,7 +46,23 @@ export function breathParams(exertion, size = 1.78) {
   const work = sfxClamp(exertion, 0, 1.5);
   const rate = 0.25 + 0.55 * Math.min(1, work) + 0.2 * Math.max(0, work - 1);
   const cycle = 1 / rate;
-  return { rate, level: 38 + 26 * Math.min(1.2, work), inSeconds: cycle * 0.38, outSeconds: cycle * 0.5, scale: 1.78 / sfxClamp(size, 0.9, 2.4) };
+  return { rate, level: breathLevel(work), inSeconds: cycle * 0.38, outSeconds: cycle * 0.5, scale: 1.78 / sfxClamp(size, 0.9, 2.4) };
+}
+
+/**
+ * How loud a breath is (dB at 1 m) by exertion: through a fight with breath in hand barely there (BREATH_LEVEL.quiet, a
+ * hush under everything), swelling only as his stamina is all but gone (from `swellFrom`) to `spent` at empty, and past it,
+ * in the overdraft, to `gasping` (the heaving of a man near fainting). It was 38 + 26 × exertion: heard from the first exchange.
+ */
+const BREATH_LEVEL = { quiet: [24, 30], swellFrom: 0.85, spent: 56, gasping: 66 };
+function breathLevel(work) {
+  const spec = BREATH_LEVEL;
+  if (work <= spec.swellFrom) return spec.quiet[0] + (spec.quiet[1] - spec.quiet[0]) * (work / spec.swellFrom);
+  if (work <= 1) {
+    const share = (work - spec.swellFrom) / (1 - spec.swellFrom);
+    return spec.quiet[1] + (spec.spent - spec.quiet[1]) * share * share;
+  }
+  return spec.spent + (spec.gasping - spec.spent) * Math.min(1, (work - 1) / 0.5);
 }
 
 const GLOTTAL_WAVES = new WeakMap();
