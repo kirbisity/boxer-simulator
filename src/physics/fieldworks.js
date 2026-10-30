@@ -92,6 +92,21 @@ export const FIELDWORKS = {
     lane: 0.7,
     short: 0.5,
     brake: 1.4,
+    // Foundering (horseFounders): a horse driven faster than a walk through deep, sticky ground cannot draw each hoof
+    // out of the hole it sank into before its weight comes onto that leg again; the leg is held, the next stride
+    // pitches it over its own forehand, and down it goes with its rider thrown (as the French horse at Agincourt in
+    // the ploughed field, and every cavalry put at heavy going since). The depth is read against its leg to the knee,
+    // `knee` of its height at the withers (a 1.58 m destrier's knee ~0.47 m up); past `fetlock` of that (the hoof and
+    // pastern buried, the fetlock going in) the mud starts to hold it, its hold growing to the whole at the knee. Its
+    // pace counts as the share of the way from a walk to a gallop it is going, squared (a stride's swing must clear
+    // the hole in the time the stride gives it, and its weight comes down harder with its speed): at a walk it picks
+    // its feet out, at a trot now and then (one in ten seconds), at a canter every two. At `founder` falls a second, knee-deep at a gallop:
+    // set so a horse ridden at a canter (~6 m/s) through knee-deep plough goes down within some 20-30 m of it most
+    // of the time (the chroniclers' French wings got barely to the stakes, most of them falling or turned back), and
+    // one picking its way at a walk never does. Firm ground (no soft place) has no hold: no horse founders there.
+    knee: 0.3,
+    fetlock: 0.35,
+    founder: 2,
   },
   climb: {
     // A slope slows a man by its grade along his way (rise over run): to 1 / (1 + up × grade) going up, and
@@ -780,6 +795,19 @@ export function horseMire(world, horse) {
   const sunk = sinkage(soft.area, worksHorseKg(world, horse) / spec.hoofs, spec.hoofArea) * soft.share;
   const drag = wadeDrag(soft.area, sunk + standingWater(soft), horse.withers * spec.horseHeight);
   return { sunk, pace: drag.foot };
+}
+
+/**
+ * How often a horse sunk `sunk` m into soft ground goes down at the pace it is going (falls a second; 0 on firm
+ * ground or at a walk): the mud's hold on its legs, from its fetlock to its knee, times its pace between a walk and a
+ * gallop, squared (FIELDWORKS.horse.founder).
+ */
+export function horseFounders(horse, sunk) {
+  if (!(sunk > 0) || horse.state !== 'up') return 0;
+  const spec = FIELDWORKS.horse;
+  const held = Math.max(0, Math.min(1, (sunk / (spec.knee * horse.withers) - spec.fetlock) / (1 - spec.fetlock)));
+  const pace = Math.max(0, Math.min(1, (Math.abs(horse.speed) - horse.paces.walk) / (horse.paces.gallop - horse.paces.walk)));
+  return spec.founder * held * pace * pace;
 }
 
 /**

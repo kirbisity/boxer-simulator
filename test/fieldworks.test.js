@@ -280,3 +280,33 @@ test('the battles with works (Agincourt, Cerignola, Qi Jiguang): the works where
   assert.equal(SCENARIOS.sekigahara.arena.works, undefined, 'in the open: no works');
   assert.ok(ARMIES.east && ARMIES.west, 'the East and the West, for the setup screen');
 });
+
+test('a horse driven at a canter or more through deep mud founders and throws its rider; on firm ground, or at a walk, it does not', () => {
+  // Ridden on across the field at `speed` (m/s) for `seconds`, nothing before it: why it went down, or nothing.
+  const ride = (works, speed, seed, seconds = 6) => {
+    const world = charge(works, seed, { from: -24 });
+    placeFighter(world.fighters[1], 24, 9);
+    const horse = world.horses[0];
+    horse.speed = speed;
+    for (let t = 0; t < seconds && horse.state === 'up'; t += 0.05) {
+      horse.goal = { heading: 0, speed };
+      horse.goalAt = Infinity; // (held to it: the rider's own hand on the reins does not take it back)
+      advance(world, 0.05, () => {});
+    }
+    const down = world.events.find((event) => event.kind === 'horseDown');
+    return { horse, rider: world.fighters[0], reason: down?.effects[0] };
+  };
+  let foundered = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const { horse, rider, reason } = ride(MUD, 9, seed);
+    if (reason !== 'founders in the mud') continue;
+    foundered += 1;
+    assert.ok(!horse.dead, 'down floundering, not dead');
+    assert.notEqual(rider.mount, horse, 'its rider thrown');
+  }
+  assert.ok(foundered >= 5, `${foundered} of 6 went down at the gallop within 6 s of mud`);
+  for (const seed of [1, 2, 3]) {
+    assert.equal(ride(null, 9, seed).reason, undefined, 'on firm ground it gallops on');
+    assert.equal(ride(MUD, 1.5, seed, 20).reason, undefined, 'at a walk it picks its feet out of the mud');
+  }
+});

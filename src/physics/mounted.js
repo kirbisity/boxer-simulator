@@ -19,7 +19,7 @@ import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, harmMix, shieldContact } from '../weapons.js';
 import { bladeFor, bladeStrike, closestBetween, crashBetween, crashHardness, crashHarm, crashOf, fall, fighterParty, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
-import { horseBalks, horseMire, horseOnWorks } from './fieldworks.js';
+import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
 
 /**
  * A horse's shape in units of its height at the withers (x forward, y up,
@@ -284,6 +284,9 @@ export function stepHorse(world, horse, h) {
     // It leans into the turn, as a runner does (gait.js bankOf): the push through its legs is v × yaw rate, positive to the right.
     const leanWanted = -Math.sign(horse.yawRate) * Math.atan(Math.abs(horse.speed * horse.yawRate) / WORLD.gravity);
     horse.bank = (horse.bank ?? 0) + (leanWanted - (horse.bank ?? 0)) * Math.min(1, h / WORLD.mount.motion.bankLag);
+    // Driven faster than a walk through mud that holds its legs, it founders now and then (fieldworks.js horseFounders): down it goes, its rider thrown.
+    const founders = horseFounders(horse, horse.sunk);
+    if (founders > 0 && world.random() < 1 - Math.exp(-founders * h)) bringDown(world, horse, 'founders in the mud');
   }
   const f = forwardOf(horse.yaw);
   const before = [horse.at[0], horse.at[1]];
@@ -877,7 +880,8 @@ export function bringDown(world, horse, reason) {
   horse.state = 'falling';
   horse.fall = 0;
   horse.side = world.random() < 0.5 ? 1 : -1;
-  horse.dead = !horse.lame || reason !== 'goes down on a broken leg';
+  // (A horse that founders in the mud is down floundering, not dead: it lies there as one on a broken leg does.)
+  horse.dead = reason !== 'founders in the mud' && (!horse.lame || reason !== 'goes down on a broken leg');
   world.events.push({ time: world.time, kind: 'horseDown', horse: horse.id, rider: horse.rider ?? undefined, attacker: horse.lastHitBy, effects: [reason] });
   if (world.ear) horseCry(world, horse, 'neigh');
 }
