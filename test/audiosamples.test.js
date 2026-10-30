@@ -42,10 +42,10 @@ test('the events a recording fits play it; the rest are left to the synth', () =
   assert.equal(plan({ type: 'wound', kind: 'cut', severity: 0.8 }).set, 'gore');
   assert.equal(plan({ type: 'wound', kind: 'bone', severity: 0.8 }).set, 'bones');
   assert.equal(plan({ type: 'wound', kind: 'stab', severity: 0.8 }), null);
-  const step = plan({ type: 'step', speed: 2, mass: 90, surface: 'water', depth: 0.4, armour: 'plate' });
+  const step = plan({ type: 'step', speed: 2, mass: 90, surface: 'sand', armour: 'plate' });
   assert.equal(step.set, 'armourstep');
-  assert.equal(step.synth.armour, 'none', 'the ground (here a splash) still the synth, the armour the recording');
-  assert.equal(plan({ type: 'step', speed: 2, mass: 80, surface: 'stone', armour: 'none' }), null);
+  assert.equal(step.synth.armour, 'none', 'the ground with no recording (sand) still the synth, the armour the recording');
+  assert.equal(plan({ type: 'step', speed: 2, mass: 80, surface: 'snow', armour: 'none' }), null);
   assert.equal(plan({ type: 'fall', mass: 85, speed: 4, surface: 'earth', armour: 'plate' }).set, 'clatter');
   assert.equal(plan({ type: 'clatter', speed: 3, mass: 1.2 }).set, 'clatter');
   assert.equal(plan({ type: 'swing', speed: 15, length: 0.7, mass: 1.6, head: 'blunt' }).set, 'maceswing');
@@ -70,6 +70,43 @@ test('a harder event plays longer and louder; a heavier weapon lower', () => {
   // Each take a little off at random.
   const rates = [0, 1].map((r) => samplePlan('clash', SOUND_FAMILIES.clash.params({ speed: 10, a: 'blade', b: 'blade' }), { mass: 1.2 }, () => r).rate);
   assert.ok(rates[1] / rates[0] > 1.08 && rates[1] / rates[0] < 1.2);
+});
+
+test('a footstep plays its ground\'s recording, walking or running by the pace, the armour\'s clank on top', () => {
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'stone', armour: 'none' }).set, 'step-stone-walk');
+  assert.equal(plan({ type: 'step', speed: 5, mass: 80, surface: 'stone', armour: 'none' }).set, 'step-stone-run');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'grass', armour: 'none' }).set, 'step-grass-walk');
+  assert.equal(plan({ type: 'step', speed: 5, mass: 80, surface: 'earth', armour: 'none' }).set, 'step-grass-run');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'mud', armour: 'none' }).set, 'step-mud');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'water', depth: 0.3, armour: 'none' }).set, 'step-water');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'wood', armour: 'none' }), null, 'no recording of boards: the synth');
+  const plated = plan({ type: 'step', speed: 1.4, mass: 90, surface: 'stone', armour: 'plate' });
+  assert.equal(plated.set, 'step-stone-walk');
+  assert.deepEqual(plated.extra.map((layer) => layer.set), ['armourstep']);
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 90, surface: 'sand', armour: 'plate' }).set, 'armourstep');
+});
+
+test('a heavier man\'s step is louder, lower and drawn out; a lighter man\'s quieter, shorter, crisper', () => {
+  const light = plan({ type: 'step', speed: 1.4, mass: 50, surface: 'stone', armour: 'none' });
+  const heavy = plan({ type: 'step', speed: 1.4, mass: 120, surface: 'stone', armour: 'none' });
+  assert.ok(heavy.trim > light.trim * 2, `${heavy.trim} vs ${light.trim}`);
+  assert.ok(heavy.rate <= 0.9 && light.rate > 1.05, `${heavy.rate} ${light.rate}`);
+  assert.ok(heavy.share > light.share && heavy.fade > light.fade);
+  // (And the step's own level already grows with the mass.)
+  assert.ok(SOUND_FAMILIES.step.params({ speed: 1.4, mass: 120, surface: 'stone' }).level > SOUND_FAMILIES.step.params({ speed: 1.4, mass: 50, surface: 'stone' }).level);
+  const run = plan({ type: 'step', speed: 5, mass: 80, surface: 'stone', armour: 'none' });
+  const walk = plan({ type: 'step', speed: 1.4, mass: 80, surface: 'stone', armour: 'none' });
+  assert.ok(run.trim > walk.trim && run.share < walk.share);
+});
+
+test('hooves: hard ground clops, soft ground thuds, by the gait; the neigh recorded, the snort synthesised', () => {
+  const hoof = (surface, gait) => plan({ type: 'horse', kind: 'hoof', surface, gait, speed: 3, mass: 550 });
+  assert.equal(hoof('stone', 'walk').set, 'hoof-stone');
+  assert.equal(hoof('earth', 'gallop').set, 'hoof-soft');
+  assert.equal(hoof('mud', 'trot'), null);
+  assert.ok(hoof('grass', 'gallop').trim > hoof('grass', 'walk').trim);
+  assert.equal(plan({ type: 'horse', kind: 'neigh', mass: 500 }).set, 'neigh');
+  assert.equal(plan({ type: 'horse', kind: 'snort', mass: 500 }), null);
 });
 
 test('a decoded take starts at its transient, past any silence before it', () => {

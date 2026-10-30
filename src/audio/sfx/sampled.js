@@ -6,6 +6,9 @@
 // long: a light blow is cut short with a quick fade, a heavy one rings out. Its pitch: a heavier weapon (or body) a little lower, and
 // every take a few per cent off at random so no two blows are the same. Where a sound has a part no take has (the ground under a step, a
 // blade's scrape), the synth plays that part beside the take.
+//
+// Footsteps: the ground's own take (stone, grass, mud, water; earth from grass), walk or run by the pace, weighed by the man (STEP_WEIGHT),
+// with the armour's clank on top for plate or mail. Hooves: on hard ground or soft by the surface, by the gait; the neigh recorded.
 
 import { sfxClamp, sfxKeep, sfxRun } from '../synth.js';
 
@@ -20,8 +23,56 @@ const sampleLerp = (a, b, share) => a + (b - a) * share;
 export const sampleMassRate = (mass, reference = 1.2) => sfxClamp((reference / Math.max(0.1, mass ?? reference)) ** 0.2, 0.82, 1.2);
 
 /**
+ * A footstep's weight (the user's ask: a light man's step quieter, shorter and crisper; a heavy man's louder, lower and drawn out).
+ * Body mass (kg, the step event's) from `light` to `heavy` takes each value from its first to its second, in a line; past either end it stays.
+ *   gainDb  dB over the step's own level (which already grows with the mass through the foot's energy, +3 dB from 55 to 110 kg)
+ *   rate    the playback rate: a touch high and crisp light, slowed and lowered heavy (which also draws the take out by 1/rate)
+ *   length  the share of the take played before its end is faded: the light man's tail cut, the heavy man's whole
+ *   fade    the fade at its end (s): quick light, long heavy
+ */
+export const STEP_WEIGHT = { light: 55, heavy: 110, gainDb: [-4, 4], rate: [1.08, 0.87], length: [0.6, 1], fade: [0.025, 0.12] };
+/** A step's pace (m/s, the event's speed): from `run` on, the running takes (harder heel strikes), a little louder, shorter and quicker; under `slow`, softer. */
+export const STEP_PACE = { slow: 0.8, run: 2.8, runGainDb: 3, slowGainDb: -3, runLength: 0.85, runRate: 1.04 };
+/**
+ * Each ground the recordings cover: its sets (walk, run), the trim, and a rate under the weight's. Earth (dirt, gravel steppe) has no
+ * recording of its own: the grass's steps, lower and quieter, with the synth's thud kept under them.
+ */
+const GROUND_STEPS = {
+  stone: { walk: 'step-stone-walk', run: 'step-stone-run', trim: 1, rate: 1 },
+  tile: { walk: 'step-stone-walk', run: 'step-stone-run', trim: 0.95, rate: 1.08 },
+  grass: { walk: 'step-grass-walk', run: 'step-grass-run', trim: 1, rate: 1 },
+  earth: { walk: 'step-grass-walk', run: 'step-grass-run', trim: 0.75, rate: 0.88, synthGain: 0.5 },
+  mud: { walk: 'step-mud', run: 'step-mud', trim: 1, rate: 1 },
+  water: { walk: 'step-water', run: 'step-water', trim: 1, rate: 1 },
+};
+const HOOF_HARD = new Set(['stone', 'tile', 'wood']);
+const HOOF_SOFT = new Set(['earth', 'grass', 'sand', 'snow']);
+/** A hoof by its gait: the trim and the rate. */
+const HOOF_PACE = { walk: { trim: 0.7, rate: 0.94 }, trot: { trim: 0.85, rate: 0.97 }, canter: { trim: 1, rate: 1 }, gallop: { trim: 1.1, rate: 1.03 } };
+
+/** Where `mass` (kg) is on the weight curve, 0 (light) .. 1 (heavy). */
+export const stepWeight = (mass) => sfxClamp(((mass ?? 80) - STEP_WEIGHT.light) / (STEP_WEIGHT.heavy - STEP_WEIGHT.light), 0, 1);
+
+/** The recorded ground under a step (its plan without `extra`), or null where the ground has no recording (wood, sand, snow). */
+function groundStep(params, event, jitter) {
+  const ground = GROUND_STEPS[params.surface];
+  if (!ground) return null;
+  const w = stepWeight(event.mass);
+  const pick = (range) => sampleLerp(range[0], range[1], w);
+  const run = params.pace >= STEP_PACE.run;
+  const paceDb = run ? STEP_PACE.runGainDb : params.pace < STEP_PACE.slow ? STEP_PACE.slowGainDb : 0;
+  // (The take's own length, about 0.2-0.5 s, is cut to `length` of itself: seconds here is a share, made seconds in playSample.)
+  return {
+    set: run ? ground.run : ground.walk, trim: ground.trim * 10 ** ((pick(STEP_WEIGHT.gainDb) + paceDb) / 20), rate: ground.rate * pick(STEP_WEIGHT.rate) * (run ? STEP_PACE.runRate : 1) * jitter(0.04),
+    seconds: null, share: pick(STEP_WEIGHT.length) * (run ? STEP_PACE.runLength : 1), fade: pick(STEP_WEIGHT.fade), skip: 0,
+    synth: ground.synthGain ? { ...params, armour: 'none' } : null, synthGain: ground.synthGain ?? 0,
+  };
+}
+
+/**
  * The plan for an event (its type, its family's params, the event): { set, trim (× the gain), rate (playback), seconds (the most to play,
- * null for the whole take), fade (s, at its end), skip (s more into the take), synth (params the synth plays beside it, or null), synthGain },
+ * null for the whole take), share (of that, played; 1 if absent), fade (s, at its end), skip (s more into the take), extra (more takes
+ * played with it: { set, trim, rate, seconds, fade, skip }), synth (params the synth plays beside it, or null), synthGain },
  * or null where the synth alone plays it.
  */
 export function samplePlan(type, params, event = {}, random = Math.random) {
@@ -57,10 +108,14 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       };
     }
     case 'step': {
-      if (params.armour !== 'plate' && params.armour !== 'mail') return null;
-      // The armour's clank with each step (mail lighter and brighter); the ground under the foot still the synth's.
+      const armoured = params.armour === 'plate' || params.armour === 'mail';
+      // The armour's clank with each step (mail lighter and brighter).
       const mail = params.armour === 'mail';
-      return { set: 'armourstep', trim: (mail ? 0.4 : 0.6) * sampleLerp(0.7, 1.2, sampleStrength(params.pace, 0.5, 6)), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.25, 0.85, 1.15) * (mail ? 1.15 : 1) * jitter(0.05), seconds: null, fade: 0.06, skip: 0, synth: { ...params, armour: 'none' }, synthGain: 0.8 };
+      const armour = armoured ? { set: 'armourstep', trim: (mail ? 0.4 : 0.6) * sampleLerp(0.7, 1.2, sampleStrength(params.pace, 0.5, 6)), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.25, 0.85, 1.15) * (mail ? 1.15 : 1) * jitter(0.05), seconds: null, fade: 0.06, skip: 0 } : null;
+      const ground = groundStep(params, event, jitter);
+      // The ground recorded (the armour's take on top of it), or the synth's ground under the armour's take, or the synth alone.
+      if (ground) return { ...ground, extra: armour ? [armour] : [], synth: ground.synth, synthGain: ground.synthGain };
+      return armour ? { ...armour, synth: { ...params, armour: 'none' }, synthGain: 0.8 } : null;
     }
     case 'fall':
     case 'land': {
@@ -81,6 +136,16 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       if (event.head !== 'blunt') return null;
       return { set: 'maceswing', trim: 0.9, rate: sfxClamp((params.speed / 15) ** 0.2, 0.85, 1.2) * jitter(0.05), seconds: sfxClamp(params.seconds * 2, 0.25, 0.6), fade: 0.12, skip: 0.06, synth: null, synthGain: 0 };
     }
+    case 'horse': {
+      if (params.kind === 'neigh') return { set: 'neigh', trim: 1, rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.2, 0.85, 1.2) * jitter(0.04), seconds: null, fade: 0.25, skip: 0, synth: null, synthGain: 0 };
+      if (params.kind !== 'hoof') return null;
+      // A hoof on hard ground (stone, tile, boards) clops; on earth, grass, sand or snow it thuds (the gallop's). Mud and water are the synth's.
+      const set = HOOF_HARD.has(params.surface) ? 'hoof-stone' : HOOF_SOFT.has(params.surface) ? 'hoof-soft' : null;
+      if (!set) return null;
+      // A walking horse sets its hooves down softer and slower than a galloping one comes down on them.
+      const pace = HOOF_PACE[event.gait] ?? HOOF_PACE.trot;
+      return { set, trim: pace.trim, rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.15, 0.85, 1.15) * pace.rate * jitter(0.05), seconds: null, fade: 0.03, skip: 0, synth: null, synthGain: 0 };
+    }
     case 'shot':
       // A matchlock: the recorded report, the synth's low boom under it (what a recording through a phone has little of).
       if (params.kind !== 'matchlock') return null;
@@ -95,7 +160,7 @@ export function playSample(voice, out, take, plan, when, gain) {
   const ctx = voice.ctx;
   const start = Math.min(take.buffer.duration - 0.02, take.offset + (plan.skip ?? 0));
   const whole = (take.buffer.duration - start) / plan.rate;
-  const seconds = Math.max(0.03, Math.min(whole, plan.seconds ?? whole));
+  const seconds = Math.max(0.03, Math.min(whole, plan.seconds ?? whole) * (plan.share ?? 1));
   const fade = Math.min(plan.fade ?? 0.05, seconds * 0.6);
   const peak = Math.max(0.0002, gain * plan.trim);
   const envelope = sfxKeep(voice, ctx.createGain());
@@ -120,6 +185,10 @@ export function playWithSamples(bank, voice, family, event, params, when, gain) 
   const take = plan ? bank.pick(plan.set) : null;
   if (!take) return family.play(voice, voice.out, params, when, gain);
   let end = playSample(voice, voice.out, take, plan, when, gain);
+  for (const layer of plan.extra ?? []) {
+    const more = bank.pick(layer.set);
+    if (more) end = Math.max(end, playSample(voice, voice.out, more, layer, when, gain));
+  }
   if (plan.synth) end = Math.max(end, family.play(voice, voice.out, plan.synth, when, gain * plan.synthGain));
   return end;
 }

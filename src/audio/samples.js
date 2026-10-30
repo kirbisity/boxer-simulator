@@ -1,6 +1,7 @@
 // Recorded sound effects (src/audio/samples/*.mp3, cut from the user's clips: samples/README.md): a sword on a sword, a blade through
 // flesh, a blow on bone, bones breaking, steel on plate, a man in armour walking, a weapon clattering down, a mace's swing, a pistol's
-// shot. Each set is a few takes of one sound; a take is picked at random each time.
+// shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny.
+// Each set is a few takes of one sound; a take is picked at random each time.
 //
 // From the source (the ES-module page, index.html) the files are fetched from src/audio/samples/; the single-file bundle (tools/bundle.js) puts their
 // bytes in SAMPLE_EMBED instead. Each is decoded once, when the AudioContext is made. Until a set has decoded, or where it fails, the
@@ -21,6 +22,15 @@ export const SAMPLE_SETS = {
   clatter: ['clatter-1'],
   maceswing: ['maceswing-1'],
   gunshot: ['gunshot-1', 'gunshot-2'],
+  'step-stone-walk': ['step-stone-walk-1', 'step-stone-walk-2', 'step-stone-walk-3', 'step-stone-walk-4', 'step-stone-walk-5'],
+  'step-stone-run': ['step-stone-run-1', 'step-stone-run-2', 'step-stone-run-3', 'step-stone-run-4'],
+  'step-grass-walk': ['step-grass-walk-1', 'step-grass-walk-2', 'step-grass-walk-3'],
+  'step-grass-run': ['step-grass-run-1', 'step-grass-run-2'],
+  'step-mud': ['step-mud-1', 'step-mud-2', 'step-mud-3'],
+  'step-water': ['step-water-1', 'step-water-2', 'step-water-3', 'step-water-4', 'step-water-5', 'step-water-6'],
+  'hoof-soft': Array.from({ length: 9 }, (_, index) => `hoof-soft-${index + 1}`),
+  'hoof-stone': ['hoof-stone-1', 'hoof-stone-2', 'hoof-stone-3', 'hoof-stone-4'],
+  neigh: ['neigh-1'],
 };
 
 /** Every file of every set. */

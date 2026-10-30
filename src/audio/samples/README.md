@@ -1,11 +1,11 @@
 # Recorded sound effects
 
-Cut from the user's screen recordings (2026-10-29), each labelled on screen. Each clip: mono, the transient at its start (the leading
+Cut from the user's screen recordings (2026-10-29), each labelled on screen; a series of footsteps or hoofbeats is cut into one file per footfall. Each clip: mono, the transient at its start (the leading
 silence trimmed; `trim` is how much of the labelled event's window came before it), its tail cut where it falls 45 dB under its peak
 with a short fade, peak-normalised to -1 dBFS, MP3 32 kHz 40 kb/s. The game picks one take of a set at random, at the event's instant;
 src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. tools/bundle.js embeds them in the single-file page.
 
-45 files, 131 KB in all.
+82 files, 199 KB in all.
 
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
@@ -54,5 +54,42 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | maceswing-1.mp3 | ScreenRecording_10-29-2026_20-59-22_1.mov | 0.163-0.813 | Mace swing sound | 0.063 | 3780 | swing: a weapon led by a weight (mace, club, axe head) |
 | gunshot-1.mp3 | ScreenRecording_10-29-2026_20-50-56_1.mov | 0.250-1.400 | Blackpowder Flintlock Pistol | 0.050 | 6120 | shot: matchlock (with the synth's low boom under it) |
 | gunshot-2.mp3 | ScreenRecording_10-29-2026_20-51-21_1.mov | 0.163-1.363 | pistol sound effect | 0.063 | 6480 | shot: matchlock (with the synth's low boom under it) |
+| step-stone-run-1.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 0.083-0.273 | Walk On Concrete | 0.038 | 1440 | step on stone or tile, running (from 2.8 m/s: the harder strikes) |
+| step-stone-walk-1.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 0.607-0.887 | Walk On Concrete | 0.042 | 1800 | step on stone or tile (tile higher), walking pace (the softer strikes of the series) |
+| step-stone-walk-2.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 1.146-1.396 | Walk On Concrete | 0.041 | 1620 | step on stone or tile (tile higher), walking pace (the softer strikes of the series) |
+| step-stone-walk-3.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 1.685-1.895 | Walk On Concrete | 0.040 | 1440 | step on stone or tile (tile higher), walking pace (the softer strikes of the series) |
+| step-stone-run-2.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 2.184-2.384 | Walk On Concrete | 0.039 | 1440 | step on stone or tile, running (from 2.8 m/s: the harder strikes) |
+| step-stone-walk-4.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 2.716-2.916 | Walk On Concrete | 0.041 | 1440 | step on stone or tile (tile higher), walking pace (the softer strikes of the series) |
+| step-stone-run-3.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 3.249-3.439 | Walk On Concrete | 0.039 | 1440 | step on stone or tile, running (from 2.8 m/s: the harder strikes) |
+| step-stone-run-4.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 3.814-4.004 | Walk On Concrete | 0.039 | 1440 | step on stone or tile, running (from 2.8 m/s: the harder strikes) |
+| step-stone-walk-5.mp3 | ScreenRecording_10-29-2026_21-17-39_1.mov | 4.330-4.462 | Walk On Concrete | 0.040 | 1080 | step on stone or tile (tile higher), walking pace (the softer strikes of the series) |
+| step-grass-walk-1.mp3 | ScreenRecording_10-29-2026_21-19-03_1.mov | 0.835-1.235 | Footsteps on the grass | 0.040 | 2520 | step on grass, walking; on earth lower and quieter with the synth thud under it |
+| step-grass-walk-2.mp3 | ScreenRecording_10-29-2026_21-19-03_1.mov | 1.607-2.007 | Footsteps on the grass | 0.042 | 2520 | step on grass, walking; on earth lower and quieter with the synth thud under it |
+| step-grass-run-1.mp3 | ScreenRecording_10-29-2026_21-19-03_1.mov | 2.370-2.770 | Footsteps on the grass | 0.040 | 2520 | step on grass or earth, running |
+| step-grass-run-2.mp3 | ScreenRecording_10-29-2026_21-19-03_1.mov | 3.137-3.537 | Footsteps on the grass | 0.037 | 2520 | step on grass or earth, running |
+| step-grass-walk-3.mp3 | ScreenRecording_10-29-2026_21-19-03_1.mov | 3.904-4.304 | Footsteps on the grass | 0.039 | 2520 | step on grass, walking; on earth lower and quieter with the synth thud under it |
+| step-mud-1.mp3 | ScreenRecording_10-29-2026_21-16-01_1.mov | 0.191-0.641 | Footsteps in the mud | 0.021 | 2700 | step in mud, any pace |
+| step-mud-2.mp3 | ScreenRecording_10-29-2026_21-16-01_1.mov | 0.965-1.415 | Footsteps in the mud | 0.000 | 2700 | step in mud, any pace |
+| step-mud-3.mp3 | ScreenRecording_10-29-2026_21-16-01_1.mov | 1.720-2.170 | Footsteps in the mud | 0.000 | 2700 | step in mud, any pace |
+| step-water-1.mp3 | ScreenRecording_10-29-2026_21-17-04_1.mov | 0.126-0.626 | Water walk | 0.041 | 2880 | step in water, any pace |
+| step-water-2.mp3 | ScreenRecording_10-29-2026_21-17-04_1.mov | 0.836-1.336 | Water walk | 0.036 | 2880 | step in water, any pace |
+| step-water-3.mp3 | ScreenRecording_10-29-2026_21-17-04_1.mov | 1.485-1.985 | Water walk | 0.055 | 2880 | step in water, any pace |
+| step-water-4.mp3 | ScreenRecording_10-29-2026_21-17-04_1.mov | 2.153-2.653 | Water walk | 0.038 | 2880 | step in water, any pace |
+| step-water-5.mp3 | ScreenRecording_10-29-2026_21-17-04_1.mov | 2.838-3.338 | Water walk | 0.033 | 2880 | step in water, any pace |
+| step-water-6.mp3 | ScreenRecording_10-29-2026_21-17-04_1.mov | 3.502-3.807 | Water walk | 0.037 | 1980 | step in water, any pace |
+| hoof-soft-1.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 1.194-1.270 | Horse Gallop | 0.054 | 900 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-2.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 1.294-1.390 | Horse Gallop | 0.034 | 900 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-3.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 1.418-1.528 | Horse Gallop | 0.038 | 1080 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-4.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 1.741-1.851 | Horse Gallop | 0.041 | 1080 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-5.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 1.962-2.072 | Horse Gallop | 0.042 | 1080 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-6.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 2.280-2.350 | Horse Gallop | 0.040 | 720 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-7.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 2.382-2.492 | Horse Gallop | 0.042 | 1080 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-8.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 2.837-2.947 | Horse Gallop | 0.037 | 1080 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-soft-9.mp3 | ScreenRecording_10-29-2026_21-13-56_1.mov | 3.416-3.470 | Horse Gallop | 0.036 | 720 | horse hoof on earth, grass, sand or snow, every gait (softer and slower at a walk) |
+| hoof-stone-1.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 2.320-2.450 | Horse Hooves On Stone And Whinnies | 0.000 | 1080 | horse hoof on stone, tile or boards, every gait |
+| hoof-stone-2.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 2.707-2.837 | Horse Hooves On Stone And Whinnies | 0.027 | 1080 | horse hoof on stone, tile or boards, every gait |
+| hoof-stone-3.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 3.039-3.169 | Horse Hooves On Stone And Whinnies | 0.029 | 1080 | horse hoof on stone, tile or boards, every gait |
+| hoof-stone-4.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 3.370-3.500 | Horse Hooves On Stone And Whinnies | 0.030 | 1080 | horse hoof on stone, tile or boards, every gait |
+| neigh-1.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 0.885-2.100 | Horse Hooves On Stone And Whinnies | 0.035 | 6480 | horse neigh (a wounded or falling horse) |
 
-Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game).
+Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game). The recordings have no wood, sand or snow footsteps and no snort: those stay synthesised.
