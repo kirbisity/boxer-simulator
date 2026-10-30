@@ -6749,8 +6749,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (A full plate harness has no gap for an edge: `cutProof`.)
   // A heavy point that wanders (punch.wander, m) is put into a gap the less often: a gap is a hand's breadth (`size`).
   const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
-  // (A finisher is put where the plates part, the visor, the armpit, the throat: `finisher.gap` of the time, at the least.)
-  const gapChance = Math.max(spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing, punch.finisher?.gap ?? 0) * placed;
+  // (A finisher's point is placed, not thrown in a fight: put where the plates part, the visor, the armpit, the throat, it finds
+  // the gap `finisher.gap` of the time; put to the middle of the breast, where plate is plate, never.)
+  const gapChance = (punch.finisher ? punch.finisher.gap : spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing) * placed;
   const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
