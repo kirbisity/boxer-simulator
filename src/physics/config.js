@@ -886,6 +886,41 @@ export const WORLD = {
   // behind it, aimed low (in a stage he is seen the later for it: levelmode/awareness.js crawlSight). Crawling costs no stamina
   // (he gets his breath back as he would standing).
   crawl: { strike: 0.35, speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6, thighApart: 2, leanThigh: 0.06, footOut: 0.008, armApart: 0.8 },
+  // A blow at a man low before him (lowstrike.js: lying, getting up, on his knees): made at a place on his body, not at a standing
+  // man's chest in the air above him. The striker bends to it: `stoop` is the share (0 to 1) of the deepest bend he takes, enough
+  // that the striking part (the fist; the blade's contact point; the point) meets the place with the arm (or the leg) `fit` of
+  // its length out (at full stretch it has nothing left to drive with: 0.85, as a punch lands with the elbow not quite
+  // locked); then a cut is pitched down about his shoulder onto it (physics.js strokeTargets, as a rider's down at
+  // a man on foot) and a point steered down at it. Nothing is added to the blow: its force is the stroke's, from a lower shoulder.
+  // - dip, lean: the deepest bend: the hips down this share of his height (0.26, the pin's kneel: knees to the floor for a
+  //   1.8 m man) and the trunk forward this far (rad) past his stance (0.9: chest over thighs, the shoulder ~0.2 m lower and
+  //   ~0.35 m further out than upright); kneeling, past `kneelFrom` of it, the knees go down to the floor as the finisher's do.
+  // - within: a man low within this (m, hips to hips) is the one a tap goes at (a sword's reach and a step or two).
+  // - headBelow: a man on his feet is low when his head is under this share of the striker's standing shoulder height (crouched
+  //   to the floor, on his knees): for a 1.72 m man in his guard (shoulder ~1.3 m up) the line is ~1.1 m; a standing man's head
+  //   (~1.5 m, ~1.4 ducking a blow) is above it, a man kneeling upright (~1.0 m) below it.
+  // - stoopSeconds, recoverSeconds: the bend made (at full depth) before the blow goes, and the straightening after (a crouch to
+  //   the floor takes a man ~0.3 s: the finisher's kneel, 0.28 s).
+  // - approachMost: the steps in to him (s at most, then the blow goes from where he is); standOff: the nearest (m, hips to the
+  //   place) he steps to, his feet off the man's body; approachShare: he steps in to where the blow needs this share of the bend
+  //   (so most of the bend is left for a man who moves), midway between the nearest the place may be and the furthest.
+  // - handIn: the nearest (m) the striking hand comes in to the shoulder in a blow: a place nearer him than that and the
+  //   blade's dead length (a spear's shaft, a naginata's haft: weapon.strikeFrom) meets the haft, not the head, so he steps
+  //   back to it. A point starts from its move's hand with the blade's length before it, and `room` (m) short of the place at
+  //   least (a spear held at a crawling man's head from 1.2 m had its point already past his head at the guard: the thrust drove
+  //   it on past him), so it meets him moving.
+  // - headFurther: the place is the nearest of his head, chest and belly; for a weapon the head counted this much (m)
+  //   further: it is a small mark (~0.1 m round against the trunk's ~0.15 m by half a metre), and a spear's point steered at
+  //   a crawling man's head from 2 m lagged its line by ~0.1 m and passed over it, a cut pitched down at it passed by (one tap
+  //   with fists, katana, spear, mace or naginata at a man lying, rising, kneeling or crawling: 107 of 120 met him with the
+  //   head the mark of cuts too, 116 with it counted further for them). Not for a fist: at a kneeling man's chest behind his head,
+  //   the jab ran into the head on its way and spent itself there.
+  // - downFrom: the blow asked for is made if it goes down onto him this well (lowstrike.js downward: a point or a straight
+  //   blow 1, an overhead cut's hand falling ~0.4-0.5 of his height through it); else the move of his style that goes down best
+  //   (a level sweep pitched down at a man flat on the floor passed over him and beyond as often as not: 4 of 6 met him).
+  // - lost: he gives it up with the man further than this (m); a man up on his feet again before it goes is struck as any
+  //   man standing.
+  lowStrike: { fit: 0.85, dip: 0.26, lean: 0.9, kneelFrom: 0.7, within: 3.2, headBelow: 0.85, stoopSeconds: 0.3, recoverSeconds: 0.3, approachMost: 1.5, standOff: 0.4, approachShare: 0.6, handIn: 0.25, room: 0.15, headFurther: 0.35, downFrom: 0.3, lost: 3.6 },
   pin: { dip: 0.26, lean: 0.5, lockDistance: 0.2, weightShare: 0.6, gripStiffness: 4000, gripShare: 0.6, release: 0.6, lowNeck: 0.4, seconds: 4, retry: 1.2, struggleAfter: 0.8, pinners: 2 },
   // On horseback (physics/mounted.js; the breeds and barding in horses.js).
   // The rider sits his saddle: hips, knees and feet go where the saddle and

@@ -151,7 +151,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     weave: undefined, carry: undefined, detail: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
     bleed: undefined, bleedInside: undefined, bleedOutside: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined,
-    loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
+    loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, lowStrike: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
@@ -1000,9 +1000,11 @@ function strokeTargets(fighter, weapon, stroke) {
   const t = stroke.load > 0 ? 0 : Math.max(0, stroke.t);
   // Leaning out of the saddle to his man (physics/mounted.js saddleReach), the stroke is the one he would make sitting up,
   // carried out and down with his shoulder (`shift`, his frame): its mark is where it is, the rest of it goes with him.
-  const shift = fighter.mount && !stroke.spec.couched ? fighter.seated?.reach?.shift ?? null : null;
-  // From the saddle a cut goes down to a man below: the whole swing pitched down about the shoulder.
-  if (fighter.mount && stroke.spec.mode !== 'thrust') return pitchedSwing(fighter, weapon, stroke, t, shift);
+  // Bent to a man low before him (lowstrike.js), the same: the stroke he would make upright, carried down and out with his shoulder.
+  const low = !fighter.mount && stroke.low && fighter.lowStrike ? stoopShift(fighter, fighter.lowStrike.stoop) : null;
+  const shift = fighter.mount && !stroke.spec.couched ? fighter.seated?.reach?.shift ?? null : low;
+  // From the saddle a cut goes down to a man below: the whole swing pitched down about the shoulder. (On foot, at a man low before him.)
+  if ((fighter.mount || stroke.low) && stroke.spec.mode !== 'thrust') return pitchedSwing(fighter, weapon, stroke, t, shift);
   const target = bladeTargets(stroke.spec, t, shift ? vec.sub(stroke.aim, shift) : stroke.aim, fighter.body, weapon.spec);
   if (shift) target.hand = vec.add(target.hand, shift);
   // A thrust's point is steered at the target from wherever the hand really is (a couched one's line is held as it was set).
@@ -1794,7 +1796,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     wander,
     // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
     riposte: undefined, finisher: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
-    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined,
+    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined, low: undefined,
     // From his knees (the player's crawl: WORLD.crawl.strike): the blow's mass behind it is this share.
     weak: undefined,
   };
@@ -2186,6 +2188,7 @@ function updateIntent(world, fighter, dt) {
     }
   }
   if (fighter.finisher?.kneeling) finisherPose(fighter, intent);
+  if (fighter.lowStrike?.stoop > 0) stoopPose(fighter, intent);
   if (fighter.kneel) kneelPose(fighter, intent);
   if (fighter.crawling) crawlPose(fighter, intent, dt);
   if (fighter.pain) painPose(fighter, intent);
@@ -2310,15 +2313,49 @@ function painPose(fighter, intent) {
  */
 function finisherPose(fighter, intent) {
   const share = fighter.finisher.kneeling;
-  const H = fighter.body.heightM;
-  const L = fighter.body.lengths;
   intent.dip += WORLD.pin.dip * share;
   intent.lean += WORLD.pin.lean * share;
   intent.guardTight = false;
+  kneelLegs(fighter, intent);
+}
+
+/** Both knees down on the floor before him, shins back, feet behind (the finisher's kneel, a scene's, a low blow's). */
+function kneelLegs(fighter, intent) {
+  const H = fighter.body.heightM;
+  const L = fighter.body.lengths;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     intent[`${side}Knee`] = [0.06 * H, L.ankle + 0.02, sign * 0.1 * H];
     intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
   }
+}
+
+/** Down on his knees (the finisher's kneel, a scene's, a blow at a man on the floor that takes him to his knees): the legs go where the kneel puts them. */
+function onKnees(fighter) {
+  return Boolean(fighter.finisher?.kneeling || fighter.kneel || (fighter.lowStrike?.kneels && fighter.lowStrike.stoop > 0));
+}
+
+/**
+ * Bent to a man low before him (lowstrike.js: `fighter.lowStrike.stoop`, 0 to 1 of WORLD.lowStrike's deepest bend): the hips
+ * down, the trunk forward over them, and past `kneelFrom` of it down on his knees as the finisher kneels.
+ */
+function stoopPose(fighter, intent) {
+  const state = fighter.lowStrike;
+  const spec = WORLD.lowStrike;
+  intent.dip += spec.dip * state.stoop;
+  intent.lean += spec.lean * state.stoop;
+  if (state.kneels) kneelLegs(fighter, intent);
+}
+
+/**
+ * How far (local m: forward, up) his shoulder is carried by a bend of `stoop` (0 to 1 of WORLD.lowStrike's deepest): the hips
+ * down by the dip, the trunk turned forward about them by the lean from his stance's own.
+ */
+export function stoopShift(fighter, stoop) {
+  const spec = WORLD.lowStrike;
+  const trunk = fighter.body.lengths.trunk;
+  const upright = STYLES[fighter.style]?.stance?.lean ?? POSE.forwardLean;
+  const bent = upright + spec.lean * stoop;
+  return [trunk * (Math.sin(bent) - Math.sin(upright)), -spec.dip * stoop * fighter.body.heightM + trunk * (Math.cos(bent) - Math.cos(upright)), 0];
 }
 
 /**
@@ -2329,15 +2366,10 @@ function finisherPose(fighter, intent) {
 function kneelPose(fighter, intent) {
   const kneel = fighter.kneel;
   const share = kneel.share ?? 1;
-  const H = fighter.body.heightM;
-  const L = fighter.body.lengths;
   intent.dip += WORLD.pin.dip * share;
   intent.lean += (WORLD.pin.lean + (kneel.lean ?? 0)) * share;
   intent.guardTight = false;
-  for (const [side, sign] of [['l', 1], ['r', -1]]) {
-    intent[`${side}Knee`] = [0.06 * H, L.ankle + 0.02, sign * 0.1 * H];
-    intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
-  }
+  kneelLegs(fighter, intent);
   if (!kneel.hands) return;
   intent.lHand = toLocal(fighter, kneel.hands[0]);
   intent.rHand = toLocal(fighter, kneel.hands[1]);
@@ -2613,7 +2645,7 @@ function runBehind(fighter, foot) {
 
 /** Is he striding (a run's footwork): in the run's pose, or running (or carried on from a run) faster than a run's pace (WORLD.gait.runFrom)? */
 function striding(fighter) {
-  if (fighter.crawling || fighter.pin || fighter.finisher?.kneeling || fighter.kneel || fighter.rush) return false;
+  if (fighter.crawling || fighter.pin || onKnees(fighter) || fighter.rush) return false;
   return fighter.runPose > 0.3 || (fighter.gaitCarry && Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) > WORLD.gait.runFrom);
 }
 
@@ -2822,7 +2854,7 @@ function groundStance(fighter, dt) {
   const lift = fighter.lift ?? 0;
   const pelvis = P.pelvis * 3;
   const feet = fighter.feet;
-  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin && !fighter.finisher?.kneeling && !fighter.kneel)) {
+  if (!(fighter.state === 'up' && !fighter.mount && !fighter.crawling && !fighter.pin && !onKnees(fighter))) {
     fighter.air = false;
     if (fighter.state !== 'rising') {
       const under = floorAt(terrain, fighter.x[pelvis], fighter.x[pelvis + 2], fighter.x[pelvis + 1] + spec.stepUp);
@@ -3338,7 +3370,7 @@ export function step(world, dt) {
  */
 function checkBalance(world, fighter) {
   // Kneeling over a man held down is a base of its own, not a fall.
-  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) return;
+  if (fighter.state !== 'up' || fighter.handsDown || fighter.pin || fighter.crawling || onKnees(fighter)) return;
   // Gathering for a jump or in the air, his feet are no base (the landing is his legs': landJump).
   if (fighter.jump && fighter.jump.phase !== 'land') return;
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
@@ -3500,8 +3532,9 @@ function moveRoot(world, fighter, dt) {
   let drive = fighter.move;
   // A lunge: the legs drive the body in behind the point while it travels.
   const punch = fighter.punch;
-  // (Not kneeling over a man: the stab is driven down from where he kneels.)
-  if (punch?.spec.step && !(punch.load > 0) && !fighter.finisher?.kneeling && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
+  // (Not kneeling over a man: the stab is driven down from where he kneels. Nor at a man low before him: lowstrike.js stepped
+  // him to where the blow meets him, and bent him to it; a lunge on from there carries it past.)
+  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.
   let runPace = null;
   if (fighter.running && !fighter.rush && !fighter.crawling) {
@@ -4071,7 +4104,7 @@ export function standingTarget(fighter, index) {
   const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
-  if ((fighter.pin || fighter.crawling || fighter.finisher?.kneeling || fighter.kneel) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
+  if ((fighter.pin || fighter.crawling || onKnees(fighter)) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
   // (In a jump's flight the feet go with the hips, under them.)
   if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: fighter.jump?.phase === 'air' ? point(fighter.v, P.pelvis) : swingVelocity(fighter, fighter.feet[info.side]) };
   if (info.knee) {

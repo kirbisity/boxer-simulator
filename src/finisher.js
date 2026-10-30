@@ -14,8 +14,10 @@ import { BLADES, WEAPONS } from './weapons.js';
 import { drawForFinisher, hostile, plantFeet, point, protectionAt, restoreAfterFinisher, throwPunch, WORLD } from './physics.js';
 
 export const FINISHER = {
-  // Offered for a man on the floor this near (m, hips to hips).
+  // Offered for a man on the floor this near (m, hips to hips). The attack tapped takes a man this much further off
+  // (`tapReach`): the steps in are the finisher's own (`approachMost`, run from `runFrom`), as a running strike closes.
   reach: 1.6,
+  tapReach: 3.2,
   // A man on his feet and awake this near (m) keeps the attack button for himself: it strikes him, not the man on the floor.
   threat: 2.4,
   // Where he kneels: this far (m) from the man's upper chest, on the side he came from.
@@ -141,14 +143,14 @@ function engaged(world, fighter) {
  * nearest), in a fight with weapons, while he can kneel and no enemy on his feet is on him. `anyone`: a man of any side (a team-mate, a civilian) is
  * also a target, if no enemy is (the player's own choice: an explicit call, not the button).
  */
-export function finishTarget(world, fighter, { anyone = false, locked = null } = {}) {
+export function finishTarget(world, fighter, { anyone = false, locked = null, range = FINISHER.reach } = {}) {
   // Only where it is a fight with weapons (world.armed): in a bout of fists a man down is stood up or counted out, not stabbed.
   if (world.armed === false || !canFinish(fighter) || engaged(world, fighter)) return null;
   const pick = (allowed) => {
     let best = null;
     let bestApart = Infinity;
     for (const man of world.fighters) {
-      if (man === fighter || !helplessOnFloor(man) || !allowed(man) || !within(fighter, man, FINISHER.reach)) continue;
+      if (man === fighter || !helplessOnFloor(man) || !allowed(man) || !within(fighter, man, range)) continue;
       const apart = Math.hypot(man.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) - (man.id === locked ? 0.5 : 0);
       if (apart < bestApart) {
         best = man;
@@ -187,8 +189,8 @@ function logFinisher(world, fighter, kind, target, effects) {
  * Begin the finisher on `target`: the dagger drawn, the steps in. `region` (a REGIONS name) overrides the place chosen. False if he
  * cannot (not on his feet, hands busy, the man not on the floor or too far, no blade to hold).
  */
-export function startFinisher(world, fighter, target, { region = null, force = false } = {}) {
-  if (world.armed === false || !canFinish(fighter) || !target || target === fighter || !helplessOnFloor(target) || !within(fighter, target, FINISHER.reach * (force ? 2 : 1))) return false;
+export function startFinisher(world, fighter, target, { region = null, force = false, range = FINISHER.reach } = {}) {
+  if (world.armed === false || !canFinish(fighter) || !target || target === fighter || !helplessOnFloor(target) || !within(fighter, target, range * (force ? 2 : 1))) return false;
   const entry = (region && REGIONS.find((item) => item.region === region)) || leastProtected(target);
   const kind = finisherBlade(fighter);
   let keep = null;
@@ -264,16 +266,7 @@ export function updateFinisher(world, fighter, dt) {
       state.phase = 'kneel';
       state.t = 0;
     } else {
-      // He steps in facing the place he will strike, forwards and sideways as it lies.
-      const pace = Math.min(FINISHER.approachPace, 0.35 + apart);
-      const way = [(place[0] - hips[0]) / apart, (place[2] - hips[2]) / apart];
-      const ahead = yawRotate([1, 0, 0], fighter.yaw);
-      const left = yawRotate([0, 0, 1], fighter.yaw);
-      fighter.goTo = place;
-      fighter.running = apart > FINISHER.runFrom;
-      fighter.faceAt = { at: aim, until: world.time + 0.25 };
-      fighter.move = pace * (way[0] * ahead[0] + way[1] * ahead[2]);
-      fighter.strafe = Math.max(-1, Math.min(1, (pace * (way[0] * left[0] + way[1] * left[2])) / WORLD.sidestepShare));
+      stepTowards(world, fighter, place, aim);
       return true;
     }
   }
@@ -314,6 +307,25 @@ export function updateFinisher(world, fighter, dt) {
   if (state.kneeling > 0) return true;
   endFinisher(world, fighter, 'done', target);
   return false;
+}
+
+/**
+ * One step of going to `place` (a world point) facing `aim`: forwards and sideways as it lies, run from further than `runFrom`
+ * (the finisher's steps in; lowstrike.js's too).
+ */
+export function stepTowards(world, fighter, place, aim) {
+  const hips = point(fighter.x, P.pelvis);
+  const apart = Math.max(1e-6, Math.hypot(place[0] - hips[0], place[2] - hips[2]));
+  const pace = Math.min(FINISHER.approachPace, 0.35 + apart);
+  const way = [(place[0] - hips[0]) / apart, (place[2] - hips[2]) / apart];
+  const ahead = yawRotate([1, 0, 0], fighter.yaw);
+  const left = yawRotate([0, 0, 1], fighter.yaw);
+  fighter.goTo = place;
+  fighter.faceAt = { at: aim, until: world.time + 0.25 };
+  fighter.move = pace * (way[0] * ahead[0] + way[1] * ahead[2]);
+  // (Backing off, facing his man, he steps: a man does not run backwards.)
+  fighter.running = apart > FINISHER.runFrom && fighter.move > 0;
+  fighter.strafe = Math.max(-1, Math.min(1, (pace * (way[0] * left[0] + way[1] * left[2])) / WORLD.sidestepShare));
 }
 
 /** How far (rad) he is turned from facing a place. */
