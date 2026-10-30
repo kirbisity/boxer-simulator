@@ -159,7 +159,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
     aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined, artEventCursor: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
-    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
+    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
     // What he has left to shoot (physics/ranged.js ammoLeft: arrows, or bolts and charges), and since when he has held a shot his own men foul (ai.js).
     arrows: undefined, rounds: undefined, holdingShot: undefined,
@@ -1788,6 +1788,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   fighter.punch = {
     type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target?.id ?? null, landed: false, peakSpeed: 0, limb: P[spec.limb],
     heavy, load: heavy ? WORLD.heavy.loadSeconds : 0,
+    // Made without the lunge's step (ai.js AI.pointRoom: his man already about the point).
+    planted: false,
     // A place in the world: the strike follows it as he turns to it.
     at: at ? aimed : null,
     // How far off his mark it went (a couched point carried in keeps it as it follows him).
@@ -3536,8 +3538,9 @@ function moveRoot(world, fighter, dt) {
   // A lunge: the legs drive the body in behind the point while it travels.
   const punch = fighter.punch;
   // (Not kneeling over a man: the stab is driven down from where he kneels. Nor at a man low before him: lowstrike.js stepped
-  // him to where the blow meets him, and bent him to it; a lunge on from there carries it past.)
-  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
+  // him to where the blow meets him, and bent him to it; a lunge on from there carries it past. Nor a thrust made `planted`, his
+  // man already about the point: a lunge would carry the point past him and put the haft on him, ai.js AI.pointRoom.)
+  if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && !punch.planted && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   // A weapon art that steps back first (the spear's: physics/arts.js retreatDrive), through its wind-up.
   drive = retreatDrive(punch) ?? drive;
   // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.

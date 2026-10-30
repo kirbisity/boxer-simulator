@@ -1895,6 +1895,21 @@ export function strikeTargets(move, t, aim, body, followThrough) {
   }
 }
 
+// A long weapon's dead length (the player's step back, control.js CONTROL.spacing, and the AI's, ai.js AI.pointRoom): its
+// striking part begins `deadFrom` m or more beyond the hands (weapon.spec.strikeFrom: a spear's head, a naginata's blade, a
+// hammer's head on its haft), so a man nearer than that meets only the haft (WORLD.haft). A sword's edge starts at the guard.
+export const POINT_ROOM = { deadFrom: 0.5 };
+
+/**
+ * Where a fighter's long weapon begins to strike, as a distance between hips (m): his reach, the dead length, and his man's
+ * head's radius (as holdDistance). Null for a weapon that strikes from near the hands (POINT_ROOM.deadFrom), or none held.
+ */
+export function pointRoomOf(fighter, man) {
+  const weapon = fighter.weapon?.held ? fighter.weapon.spec : null;
+  if (!weapon || weapon.ranged || weapon.strikeFrom < POINT_ROOM.deadFrom) return null;
+  return fighter.body.reach + weapon.strikeFrom + man.body.lengths.headRadius;
+}
+
 /** How far a move reaches from the attacker's pelvis, for choosing moves by distance. */
 export function moveRange(move, body, weapon = null) {
   const legReach = body.lengths.thigh + body.lengths.shank;

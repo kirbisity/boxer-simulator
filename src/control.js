@@ -6,7 +6,7 @@
 
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
-import { DEFENCES, MOVES, STYLES, moveRange } from './moves.js';
+import { DEFENCES, MOVES, pointRoomOf, STYLES, moveRange } from './moves.js';
 import { aimPoint, dropWeapon, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, throwPunch, WORLD } from './physics.js';
 import { throwFromHold } from './physics/grappling.js';
 import { drawStamina } from './physics/overdraft.js';
@@ -103,13 +103,14 @@ export const CONTROL = {
   // He can strike from it: an attack asked for while it is held is thrown (the block keeps what the strike does not need) and the
   // block is back up after it.
   guard: { staminaPerSecond: 0.025, perJoule: 0.0004, spentBelow: 0 },
-  // A long weapon's room (its striking part `deadFrom` m or more beyond the hands: weapon.spec.strikeFrom, a spear's head, a
-  // naginata's blade, a hammer's head on its haft): with his man inside it only the haft meets him. His man (an enemy on his feet,
-  // the one he faces) nearer than his reach plus that dead length (plus the man's head's radius, as holdDistance), the stick idle
+  // A long weapon's room (its striking part moves.js POINT_ROOM.deadFrom m or more beyond the hands: weapon.spec.strikeFrom, a
+  // spear's head, a naginata's blade, a hammer's head on its haft; the AI's the same, ai.js AI.pointRoom): with his man inside it
+  // only the haft meets him. His man (an enemy on his feet, the one he faces) nearer than his reach plus that dead length (plus
+  // the man's head's radius, as holdDistance: pointRoomOf), the stick idle
   // or not pushed at him (its share towards him under `pushFrom`), he gives ground at `pace` of his footwork until the man is
   // `room` m past it again. The stick pushed at the man is the player closing on purpose: that wins. Not in a run, a strike of his
   // own, or on a horse.
-  spacing: { deadFrom: 0.5, pushFrom: 0.3, pace: 0.6, room: 0.15 },
+  spacing: { pushFrom: 0.3, pace: 0.6, room: 0.15 },
   // A blow asked for in a run (control.js runStep: the run goes on into it, as a rider's charge does) at a man ahead, closing on
   // him: readied, it is made when he will be at the blow's reach as it comes out (the run's metres over the move's extendUntil
   // taken off: closingBy), not at once (thrown at once from 3 m at a run, the blade was out and back with him still beyond it, or
@@ -245,20 +246,19 @@ function runStep(fighter, orders, stick) {
 }
 
 /**
- * Whether a long weapon wants room from his man (CONTROL.spacing): its striking part begins `deadFrom` or more beyond his hands,
- * and the man (an enemy on his feet) is nearer than where it begins; once giving ground, until he is `room` past it. Kept in the
- * orders (`spacing`) so the step back finishes rather than flickering at the line.
+ * Whether a long weapon wants room from his man (CONTROL.spacing): its striking part begins POINT_ROOM.deadFrom or more beyond
+ * his hands, and the man (an enemy on his feet) is nearer than where it begins (moves.js pointRoomOf); once giving ground, until
+ * he is `room` past it. Kept in the orders (`spacing`) so the step back finishes rather than flickering at the line.
  */
 function keepsRoom(fighter, orders, man) {
   const spec = CONTROL.spacing;
-  const weapon = fighter.weapon?.held ? fighter.weapon.spec : null;
-  const able = weapon && !weapon.ranged && weapon.strikeFrom >= spec.deadFrom && man && man.state === 'up' && hostile(man, fighter)
+  const inside = man ? pointRoomOf(fighter, man) : null;
+  const able = inside !== null && man.state === 'up' && hostile(man, fighter)
     && !fighter.punch && !fighter.mount && !fighter.crawling && !fighter.clinch && fighter.state === 'up';
   if (!able) {
     orders.spacing = false;
     return false;
   }
-  const inside = fighter.body.reach + weapon.strikeFrom + man.body.lengths.headRadius;
   const distance = reachBetween(fighter, man);
   orders.spacing = distance < inside || (orders.spacing && distance < inside + spec.room);
   return orders.spacing;
