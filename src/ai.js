@@ -53,7 +53,7 @@ export const AI = {
   // with). A general led from among his men, not before them: the chanyu among his riders, Surena with his horse
   // archers; the commander who rode out ahead of his own was the one cut off (Publius Crassus at Carrhae).
   // (His kit is his men's way of fighting too: a shooter leading shooters keeps his bow, WORLD.standard.shooters.)
-  general: { body: 0.5, slack: 1, foresee: 1.2, engaged: 0.8, minMen: 3 },
+  // (These are AI.general's `body`, `slack`, `foresee`, `engaged` and `minMen`, set with the rest of it below.)
   // Passive: runs from anyone nearer than `safeDistance` m, at a run while stamina is over `runWhile`.
   passive: { safeDistance: 3.5, runWhile: 0.2 },
   // A gunman running for room: points `stride` m away in `directions`
@@ -305,7 +305,7 @@ export const AI = {
   // and command passes at once to the strongest man still fighting within
   // `successorWithin` m of where he fell (strengthOf: the best-armed, the
   // best-trained, the knight among the levies), else the nearest of them.
-  general: { minSide: 8, threat: 5, guards: 3, guardFrom: 10, heartWithin: 8, heart: 0.06, fell: 0.2, saw: 0.15, sawWithin: 10, fellFor: 8, successorWithin: 8 },
+  general: { minSide: 8, threat: 5, guards: 3, guardFrom: 10, heartWithin: 8, heart: 0.06, fell: 0.2, saw: 0.15, sawWithin: 10, fellFor: 8, successorWithin: 8, body: 0.5, slack: 1, foresee: 1.2, engaged: 0.8, minMen: 3 },
   // Morale in a battle (a side of at least `rout.minSide`): what the men
   // round a man do to his fear, whoever they are. Within `near` m of him:
   // - no man of his own standing there (`alone`): fear; each who stands
