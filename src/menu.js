@@ -1,5 +1,5 @@
 // The way in: a home screen, and from it (in this order) Career (to come),
-// Battle Mode, Level Mode, Deadliest Warrior, Quick Battle and the Sandbox; and a character
+// Battle Mode, Level Mode, The Last Gate, Deadliest Warrior, Who Wins? (the quick battle: a random fighter) and the Sandbox; and a character
 // creator that goes one plain
 // question at a time. The menus only choose fighters and places; the
 // fights themselves are the same world as everywhere else (main.js does
@@ -18,6 +18,8 @@ import { SKIN_TONES } from './render.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
 import { STAGE_LIST } from './levelmode/story.js';
 import { audioMixer } from './audio/controls.js';
+import { LAST_GATE, LAST_GATE_HEROES, LAST_GATE_HERO_KEYS } from './lastgate.js';
+import { lastGateBoardList } from './lastgateview.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
 export const EVENTS = {
@@ -96,7 +98,7 @@ const STYLE_FACTION = (key) => {
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
   const show = (id) => {
-    for (const other of ['home', 'quick', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
+    for (const other of ['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
   };
   const close = () => show(null);
@@ -111,8 +113,9 @@ export function installMenus(game) {
       choice({ glyph: '🏆', kicker: 'Coming soon', title: 'Career', text: 'One fighter, bout after bout, as he rises. Being built now.', tone: 'career' }),
       choice({ glyph: '🗺️', kicker: 'Set fights', title: 'Battle Mode', text: 'Historical battles in set places. Start with the tutorial.', onClick: levels, tone: 'gold' }),
       choice({ glyph: '🏰', kicker: 'New · Stage 1', title: 'Level Mode', text: 'Fight your way up a storm-swept fortress, one stage at a time.', onClick: stages, tone: 'storm' }),
+      choice({ glyph: '🚪', kicker: 'New · Survival', title: LAST_GATE.title, text: 'Hold the gate against a starving horde out of the fog. How long can you last?', onClick: lastGate, tone: 'mist' }),
       choice({ glyph: '☠️', kicker: 'Who would win?', title: 'Deadliest Warrior', text: 'Pick any two warriors and watch them, or fight as one.', onClick: versus }),
-      choice({ glyph: '⚡', kicker: 'Play now', title: 'Quick Battle', text: 'A random fighter against whoever comes. One tap.', onClick: quickEvent }),
+      choice({ glyph: '⚡', kicker: 'Play now', title: 'Who Wins?', text: 'A random fighter against whoever comes. One tap.', onClick: quickEvent }),
       choice({ glyph: '🧪', kicker: 'Expert', title: 'Sandbox', text: 'Every setting: teams, bodies grown from diet and training, every layer.', onClick: () => { close(); game.sandbox(); } })),
       el('div', { className: 'home-links' },
         el('button', { className: 'replay-intro', type: 'button', textContent: '🎯 Tutorial', onclick: () => { close(); game.tutorial(); } }),
@@ -135,10 +138,10 @@ export function installMenus(game) {
     show('settings-screen');
   }
 
-  // ---- Quick Battle ------------------------------------------------------
+  // ---- Who Wins? (the quick battle) ------------------------------------------------
   // One tap from here to the fight (then the side): a random fighter for you. Making your own is the smaller way.
   function quickEvent() {
-    const body = screen('quick', 'Quick Battle', 'Tap a fight: you get a random fighter.', home);
+    const body = screen('quick', 'Who Wins?', 'Tap a fight: you get a random fighter.', home);
     const random = (eventKey) => (eventKey === 'boxing' ? randomBoxer() : randomGladiator());
     body.append(
       el('div', { className: 'choices two' }, ...Object.entries(EVENTS).map(([key, event]) => choice({ glyph: event.glyph, kicker: event.kicker, title: event.title, text: event.blurb, onClick: () => startQuick(key, random(key)) }))),
@@ -160,6 +163,33 @@ export function installMenus(game) {
     close();
     const fight = () => game.match({ red: [player], blue: [opponent()], place: event.place, game: 'quick', label: event.title, next: { text: 'Next opponent', run: fight } });
     fight();
+  }
+
+  // ---- The Last Gate: pick a hero, and in (lastgate.js) ----------------------------
+  // One screen: the three heroes as cards (his look, his weapon, what he is good for); a tap starts the run. The best runs
+  // in this browser behind a button, in the cards' place.
+  function lastGate() {
+    const body = screen('lastgate-screen', LAST_GATE.title, 'Hold the gate. Pick your hero; five of his men stand with you.', home);
+    body.parentElement.classList.add('lg-pick');
+    const cards = el('div', { className: 'lg-heroes' }, ...LAST_GATE_HERO_KEYS.map((key) => {
+      const hero = LAST_GATE_HEROES[key];
+      const image = el('img', { alt: '', draggable: false });
+      game.portrait?.(`lastgate-${key}`, hero.hero()).then((url) => { image.src = url; });
+      return el('button', { className: 'lg-hero', type: 'button', onclick: () => { close(); game.lastGate(key); } },
+        el('span', { className: 'lg-hero-look' }, image),
+        el('span', { className: 'lg-hero-words' },
+          el('b', { textContent: `${hero.glyph} ${hero.label}` }),
+          el('em', { textContent: hero.weapon }),
+          el('span', { textContent: hero.strength })));
+    }));
+    const board = el('div', { className: 'lg-menu-board', hidden: true }, el('h2', { textContent: 'Best runs' }), lastGateBoardList(game.lastGateBoard?.list() ?? []));
+    const toggle = el('button', { type: 'button', className: 'lg-board-toggle', textContent: '🏆 Best runs', onclick: () => {
+      board.hidden = !board.hidden;
+      cards.hidden = !board.hidden;
+      toggle.textContent = board.hidden ? '🏆 Best runs' : '← Heroes';
+    } });
+    body.append(cards, board, toggle);
+    show('lastgate-screen');
   }
 
   // ---- Level Mode: the stages ---------------------------------------------------
@@ -518,5 +548,5 @@ export function installMenus(game) {
 
   // Back to the menu from a fight.
   game.onMenu(home);
-  return { home, levels, stages, versus, quickEvent, close };
+  return { lastGate, home, levels, stages, versus, quickEvent, close };
 }

@@ -26,7 +26,7 @@ const stub = new Proxy(function stand() {}, { get: (_, key) => (key === Symbol.t
 
 async function withPage(run) {
   const kept = { THREE: globalThis.THREE, document: globalThis.document };
-  const page = fakeDocument(['home', 'quick', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
+  const page = fakeDocument(['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
   globalThis.THREE = stub;
   globalThis.document = page.document;
   try {
@@ -48,7 +48,7 @@ test('the home menu offers Battle Mode and Level Mode (no "Levels"), and Level M
     const menus = installMenus({ onMenu() {}, attract() {}, onStage: (key) => started.push(key), level() {}, tutorial() {} });
     menus.home();
     const titles = cards(byId.home).map(titleOf);
-    assert.deepEqual(titles, ['Career', 'Battle Mode', 'Level Mode', 'Deadliest Warrior', 'Quick Battle', 'Sandbox']);
+    assert.deepEqual(titles, ['Career', 'Battle Mode', 'Level Mode', 'The Last Gate', 'Deadliest Warrior', 'Who Wins?', 'Sandbox']);
     cardTitled(byId.home, 'Level Mode').onclick();
     assert.equal(byId['stages-screen'].hidden, false);
     assert.equal(byId.home.hidden, true);

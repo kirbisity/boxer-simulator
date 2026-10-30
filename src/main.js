@@ -65,6 +65,8 @@ import { installMuteButton, installUiSounds } from './audio/controls.js';
 import { installSoundBench } from './audio/bench.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
 import { stageCameraRoom } from './levelmode/kit.js';
+import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
+import { createLastGateView } from './lastgateview.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -324,6 +326,8 @@ function shuffleColors(inputs) {
 function newBout() {
   leaveStage();
   state.seed += 1;
+  // The Last Gate: a run of its own (lastgate.js), the hero picked on its screen.
+  if (state.game === 'lastgate') return newLastGateRun();
   // A scenario is the same world on its own floor, with its own people.
   const scenario = levelNow();
   // Each side: its lead (the one the builder edits) and, in a team fight,
@@ -415,6 +419,71 @@ function buildQueuedViews() {
   showMustering();
 }
 
+// ---- The Last Gate (lastgate.js the run, lastgateview.js its strip and end card) ---------------------------------------
+
+const lastGateView = createLastGateView($('.arena'));
+// The best runs, kept in this browser (behind list/add, so a server's board can take its place).
+const lastGateBoard = createLastGateBoard(browserStorage());
+
+/** Into The Last Gate as this hero (lastgate.js LAST_GATE_HEROES): straight into the run, played. */
+function enterLastGate(heroKey) {
+  setGame('lastgate', { text: 'Play again', retry: true, run: () => newBout() });
+  state.lastGateHero = heroKey;
+  state.scenario = null;
+  state.muster = null;
+  state.lead = { red: 0, blue: 0 };
+  newBout();
+  state.sideAsked = true;
+  takeSide('red');
+}
+
+/** A new run: the world as lastgate.js makes it, drawn in its misty place, the hero's men at their posts. */
+function newLastGateRun() {
+  state.world = createLastGate(state.lastGateHero, { seed: state.seed });
+  const arena = state.world.arena;
+  const place = LAST_GATE.place;
+  clearGore(scene);
+  setPlace(scene, place, arena, LAST_GATE.weather);
+  fightMarks.reset();
+  fightMarks.warm();
+  cameraWalls = cameraRoom(place, arena);
+  followCam.reset();
+  // Behind the gate, looking out into the mist.
+  Object.assign(scene.orbit, { yaw: Math.PI, pitch: 0.22, distance: 5 });
+  watchCam = createWatchCam();
+  cameraNote = '';
+  document.body.dataset.place = place;
+  $('#place').closest('label').hidden = true;
+  rebuildViews({ progressive: true });
+  state.eventCursor = 0;
+  state.finishedAt = null;
+  resetDrama(state.drama);
+  $('#log').replaceChildren();
+  $('#banner').hidden = true;
+  hideSummary();
+  renderHud();
+  state.orders = newOrders();
+  fightControls.reset();
+  lastGateView.start();
+}
+
+/** Each frame of a run: men woken drawn afresh, the run's news, the strip; at its end the card (and the run on the board). */
+function lastGateFrame(world) {
+  const { rebuilds, news } = drainLastGate(world);
+  for (const id of rebuilds) rebuildFighterView(id);
+  for (const item of news) lastGateView.news(item);
+  lastGateView.update(world.lastGate);
+  if (!world.lastGate.over || state.finishedAt !== null) return;
+  state.finishedAt = world.time;
+  const result = lastGateResult(world);
+  const ranked = lastGateBoard.add(result);
+  audioOutcome(world, 'defeat');
+  // A moment to see it happen, then the card (unless the run has been left).
+  setTimeout(() => {
+    if (state.world === world) lastGateView.end(result, ranked, { again: () => newBout(), menu: () => goHome() });
+  }, 1400);
+}
+
 const mustering = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'mustering', hidden: true }));
 function showMustering() {
   const waiting = state.viewQueue?.length ?? 0;
@@ -464,6 +533,8 @@ function thinkForBout(world, dt) {
       yardStep(world, partner);
     }
   }
+  // The Last Gate: the rebels walked at the gate, the hero's men kept near their posts, the waves (lastgate.js).
+  if (world.lastGate) stepLastGate(world, dt, { playerId: players.size ? [...players][0] : null });
   thinkAll(world, dt, still);
   if (!players.size) return;
   // At a bandage, a change of harness, a stoop for a weapon: he stands where he is.
@@ -684,6 +755,8 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   }
   consumeEvents();
   if (state.world.stage?.level) drainLevel();
+  // The Last Gate ends when the gate falls or its defenders are down (lastgate.js), not as a battle does.
+  if (state.world.lastGate) return lastGateFrame(state.world);
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
   if (state.game === 'intro' || state.game === 'tutorial') return;
   // A stage has no banner (levelmode bannerWinner is none there). A duel or a small fight ends with its last man;
@@ -2193,6 +2266,7 @@ function setGame(game, next = null) {
     tutorial.stop();
     delete document.body.dataset.tutorialStep;
   }
+  if (game !== 'lastgate') lastGateView.hide();
   state.game = game;
   state.next = next;
   $('#restart').textContent = 'Restart';
@@ -2834,6 +2908,9 @@ const menus = installMenus({
   intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait,
   // Level Mode: a stage from its card (levelmode/stages.js): its men built at once, the title card over the storm, the world held still behind it.
   onStage: (key) => { enterStage(key, { opening: true }); boxer.finishBuilding(); },
+  // The Last Gate: the hero picked, straight into the run; its board for the menu.
+  lastGate: enterLastGate,
+  lastGateBoard,
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
@@ -3042,6 +3119,11 @@ installLooksBench({
 const boxer = window.boxer = {
   state,
   scene,
+  // The Last Gate as this hero ('samurai', 'ironPagoda', 'knight'), from anywhere (tests, shots).
+  lastGate: (hero = 'samurai') => {
+    menus.close();
+    enterLastGate(hero);
+  },
   // The intro: end it now (true if it was playing), as Skip does; or play it again.
   skipIntro,
   playIntro: () => playIntro(introStage, () => goHome()),

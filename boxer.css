@@ -1049,3 +1049,78 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
   .muster-pick { flex-wrap: wrap; }
   .muster-who { flex-basis: 100%; }
 }
+
+/* ---- The Last Gate (lastgate.js, lastgateview.js) ----------------------------------------------------------------------
+   Cold mist and old iron: the menu's card misty grey-green, the strip at the top a slim pill, the end card the battle summary's panel. */
+.choice.mist { border-color: rgba(176, 190, 180, 0.45); background: linear-gradient(160deg, rgba(52, 58, 56, 0.92), rgba(18, 20, 22, 0.94)); }
+.choice.mist em { color: #c9d6cc; }
+/* The hero pick: three cards that fit a phone's screen without scrolling (a row of three on a wide one). */
+.screen.lg-pick { align-content: start; gap: 10px; }
+.screen.lg-pick .screen-head h1 { font-size: clamp(26px, 5vw, 44px); }
+.lg-heroes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 900px; }
+.lg-hero { display: grid; grid-template-rows: auto 1fr; gap: 8px; padding: 10px; text-align: left; border-radius: 14px; border: 1px solid rgba(176, 190, 180, 0.35); background: linear-gradient(170deg, rgba(48, 54, 54, 0.92), rgba(16, 18, 22, 0.95)); transition: transform 0.12s, border-color 0.12s; }
+.lg-hero:hover, .lg-hero:focus-visible { border-color: var(--gold); transform: translateY(-2px); outline: none; }
+.lg-hero-look { display: block; aspect-ratio: 300 / 380; border-radius: 10px; overflow: hidden; background: radial-gradient(ellipse at 50% 30%, #2a3138, #12151c); }
+.lg-hero-look img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lg-hero-words { display: grid; gap: 3px; align-content: start; }
+.lg-hero-words b { font: 700 22px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+.lg-hero-words em { font: 500 11px var(--mono); font-style: normal; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); }
+.lg-hero-words span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.lg-board-toggle { justify-self: center; }
+.lg-menu-board { width: min(520px, 100%); display: grid; gap: 8px; }
+.lg-menu-board h2 { margin: 0; font: 700 20px var(--display); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+@media (max-width: 640px) {
+  /* A phone: the cards one under another, each a row: his picture to the left, the words beside it. */
+  .lg-heroes { grid-template-columns: 1fr; gap: 8px; }
+  .lg-hero { grid-template-rows: none; grid-template-columns: 84px 1fr; align-items: center; padding: 8px; }
+  .lg-hero-look { aspect-ratio: auto; height: 104px; }
+  .lg-hero-words b { font-size: 20px; }
+  .lg-hero-words span { font-size: 12.5px; }
+}
+
+/* In the run: the usual fighter cards give way to the gate's strip. */
+body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none !important; }
+.lg-hud { position: absolute; z-index: 3; top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; padding: 6px 14px; border-radius: 999px; background: rgba(14, 16, 20, 0.62); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
+.lg-hud > span { display: grid; justify-items: center; gap: 1px; }
+.lg-hud em { font: 500 9.5px var(--mono); font-style: normal; text-transform: uppercase; letter-spacing: 0.12em; color: #b8c2bc; }
+.lg-hud b { font: 700 20px/1 var(--display); font-variant-numeric: tabular-nums; }
+.lg-kills { color: var(--gold); }
+.lg-pips { display: flex; gap: 4px; height: 20px; align-items: center; }
+.lg-pips i { width: 11px; height: 15px; border-radius: 3px 3px 1px 1px; background: #d8ddd6; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+.lg-pips i.lost { background: var(--red); opacity: 0.85; }
+.lg-toast { position: absolute; z-index: 3; top: 30%; left: 50%; transform: translateX(-50%); font: 700 clamp(26px, 6vw, 44px) var(--display); text-transform: uppercase; letter-spacing: 0.06em; color: #eef2ee; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85); pointer-events: none; white-space: nowrap; animation: lg-toast 1.8s ease-out both; }
+.lg-toast.lg-breach { color: #ff6a5e; }
+.lg-toast.lg-hint { font-size: clamp(20px, 4.5vw, 32px); color: #dfe6e0; }
+@keyframes lg-toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 12% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } 100% { opacity: 0; } }
+/* The end card: the battle summary's panel, centred; scrolls inside itself on a short screen. */
+.lg-end { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: radial-gradient(ellipse at 50% 45%, rgba(8, 10, 12, 0.35), rgba(5, 6, 8, 0.8)); animation: lg-in 0.5s ease-out both; }
+@keyframes lg-in { from { opacity: 0; } to { opacity: 1; } }
+.lg-end-card { width: min(440px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 10px; padding: 18px 18px 14px; border-radius: 16px; background: linear-gradient(170deg, rgba(36, 40, 42, 0.96), rgba(14, 16, 20, 0.97)); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); text-align: center; user-select: text; -webkit-user-select: text; }
+.lg-eyebrow { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.14em; color: #b8c2bc; }
+.lg-end-card h2 { margin: 0; font: 700 30px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+.lg-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lg-figure { display: grid; gap: 2px; padding: 8px 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); }
+.lg-figure b { font: 700 22px/1 var(--display); font-variant-numeric: tabular-nums; }
+.lg-figure.big b { font-size: 36px; color: var(--gold); }
+.lg-figure span { font-size: 12px; color: var(--muted); }
+.lg-rank { margin: 0; font: 600 13px var(--body); color: var(--gold); }
+.lg-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; text-align: left; font-size: 13px; }
+.lg-board li { display: grid; grid-template-columns: 22px 1fr auto 44px 52px; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.03); font-variant-numeric: tabular-nums; }
+.lg-board li.mine { background: rgba(255, 207, 74, 0.16); outline: 1px solid rgba(255, 207, 74, 0.45); }
+.lg-board-rank { color: var(--muted); font-family: var(--mono); }
+.lg-board-date { color: var(--muted); font-size: 11.5px; text-align: right; }
+.lg-board-empty { margin: 0; color: var(--muted); text-align: center; }
+.lg-share-note { margin: 0; font-size: 12.5px; color: #c9d6cc; }
+.lg-share-text { width: 100%; resize: none; border-radius: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); color: var(--fg); padding: 6px 8px; font: 13px var(--body); }
+.lg-actions { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; }
+.lg-actions button { padding: 10px 12px; font-size: 15px; }
+@media (max-width: 640px) {
+  /* A phone: the strip between the orders down the left and the sound button on the right. */
+  .lg-hud { left: 122px; right: 54px; transform: none; justify-content: space-between; gap: 6px; padding: 5px 10px; }
+  .lg-hud b { font-size: 17px; }
+  .lg-hud em { font-size: 8.5px; letter-spacing: 0.08em; }
+  .lg-pips { gap: 3px; height: 17px; }
+  .lg-pips i { width: 8px; height: 13px; }
+  .lg-end-card h2 { font-size: 26px; }
+  .lg-figure.big b { font-size: 30px; }
+}
