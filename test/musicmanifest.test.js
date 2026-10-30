@@ -26,7 +26,9 @@ test('every cue decodes to a real MP3 or MP4 file', () => {
 test('the loops run 30-60 s and the stings 8-15 s', () => {
   for (const [id, cue] of Object.entries(MUSIC_CUES)) {
     const seconds = cue.loopEnd - cue.loopStart;
-    if (cue.loop) assert.ok(seconds >= 30 && seconds <= 60, `${id}: a ${seconds} s loop`);
+    // (A whole track looped, the user's own boss music, runs its length: 2 to 4 minutes.)
+    if (id === 'bossChoir') assert.ok(seconds >= 120 && seconds <= 240, `${id}: a ${seconds} s track`);
+    else if (cue.loop) assert.ok(seconds >= 30 && seconds <= 60, `${id}: a ${seconds} s loop`);
     else assert.ok(seconds >= 8 && seconds <= 15, `${id}: a ${seconds} s sting`);
   }
 });
@@ -55,7 +57,8 @@ test('cueFor covers every scenario, Dunnottar and the colosseum', () => {
   assert.equal(cueFor(null, 'opening'), null);
 });
 
-test('the music fits its 4.5 MB budget', () => {
+test('the music fits its 6 MB budget', () => {
+  // (4.5 MB for the generated cues, and the user's 3-minute boss track, 1.4 MB of base64.)
   const total = Object.values(MUSIC_CUES).reduce((sum, cue) => sum + cue.data.length, 0);
-  assert.ok(total <= 4.5e6, `${(total / 1e6).toFixed(2)} MB of base64`);
+  assert.ok(total <= 6e6, `${(total / 1e6).toFixed(2)} MB of base64`);
 });
