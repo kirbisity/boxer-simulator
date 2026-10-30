@@ -10,6 +10,7 @@
 // glossier where the vertex colour says the wall is in shadow at its foot; and a fog that thickens toward the sea (height fog).
 
 import { KIT_FLOOR_OFFSET } from '../depthrange.js';
+import { stoneDetailMaps } from '../detailtex.js';
 import { KT_SHADOW_FUNCTION, KT_SHADOW_PARS, ktShadow, ktShadowInit } from './kitshadow.js';
 import { kwTexture } from './kitwear.js';
 import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktGritData, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
@@ -425,6 +426,12 @@ export function ktMaterials() {
   m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 }, KIT_FLOOR_OFFSET.boards);
   m.wood = make(ktTexture(128, 20, (g, s, r) => ktBoards(g, s, r, [70, 52, 36])), 2, { roughness: 0.85 });
   m.iron = make(ktTexture(128, 21, ktIron), 1.5, { roughness: 0.45, metalness: 0.55 });
+  // The dressed walling and the road's cobbles wear maps baked from modelled stone (detailtex.js, while the detail maps are drawn):
+  // their colour, normal map and roughness. The texture is read once (its tile is large and the macro map breaks it up), and the
+  // joints' depth from the colour's light and dark is mostly not added again (the normal map has them); the grit's grain and chips are.
+  for (const name of ['ashlar', 'cobble']) {
+    if (stoneDetailMaps(m[name], name)) detail[name] = { ...detail[name], two: 0, stone: [detail[name].stone[0] * 0.25, ...detail[name].stone.slice(1)] };
+  }
   for (const name of Object.keys(detail)) ktPatch(m[name], { detail: detail[name], shadow: true });
   const flat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, vertexColors: true, roughness: 0.9, ...options });
   m.bone = flat(0xb9b29a, { roughness: 0.8 });

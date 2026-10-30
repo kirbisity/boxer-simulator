@@ -10,6 +10,7 @@ import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS, mailUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { ribDroop, RULES, rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
@@ -1150,6 +1151,38 @@ function lamellaeOn(mesh, rings, inflate, paint, bones) {
 }
 
 /**
+ * Lamellae as a shell carrying the lamellae's maps (detailmaps.js; instead of lamellaeOn's plates): one loft over the piece, its
+ * rings where the rows step (two at each, the top of the row below and the foot of the one over it standing further out, so the
+ * outline steps row by row as the plates do), `sides` round; its texture coordinates count plate columns round and rows up
+ * (DETAIL_ARMOUR.lamellae), so each row of the picture's plates falls on a row of the piece. The splits are left open (the robe's
+ * backing loft shows in them); the lowest row is `paint.edge` if given, every fourth `steel2`, as lamellaeOn paints its plates.
+ */
+function lamellaeShell(mesh, rings, inflate, paint, bones, sides) {
+  const spec = LOFT.lamellae;
+  const { band, columns, rows: tileRows } = DETAIL_ARMOUR.lamellae;
+  const rising = rings.at(-1).center[1] >= rings[0].center[1];
+  const rows = rings.length - 1;
+  const across = Math.max(1, Math.round(paint.lamellae / columns));
+  const out = (u) => inflate + spec.lift + spec.tilt * Math.max(0, 1 - u);
+  const roleOf = (row) => (row === 0 && paint.edge ? paint.edge : (row + (paint.shade ?? 0)) % 4 === 3 ? 'steel2' : 'steel');
+  const shell = [];
+  // `up`: rows up the piece from its lowest ring (a plate's foot hangs `overlap` of a row below its own ring).
+  const add = (up, outward, role) => shell.push({ ...ringAt(rings, rising ? up : rows - up), out: outward, v: up / tileRows, role });
+  for (let row = 0; row < rows; row += 1) {
+    const foot = row - spec.overlap;
+    if (row > 0) add(foot, out(1 - spec.overlap), roleOf(row - 1));
+    add(foot, out(-spec.overlap), roleOf(row));
+  }
+  add(rows, out(1), roleOf(rows - 1));
+  // (In the run's own order, so the faces wind outward as the piece's own loft does.)
+  if (!rising) shell.reverse();
+  loft(mesh, shell, sides, {
+    color: (ring) => ring.role, inflate, shape: (ring) => ring.out / inflate, capStart: false, capEnd: false, bones,
+    uv: (ring, share) => [band + share * across, ring.v], holes: paint.gaps ? (t, angle) => inLamellaGap(paint, angle) : null,
+  });
+}
+
+/**
  * Laminated plate: `paint.lames` bands along the piece, each its own ring of
  * faces standing out at one edge over the next band (so the steps catch the
  * light), a dark line along that edge, and a few rivet heads on each band.
@@ -1601,7 +1634,14 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // Lamellae drawn as plates over a backing of their dark lacing (the robe showing in the splits), except in a crowd.
     if (paint?.lamellae && !lowDetail) {
       loft(mesh, rings, sides, { color: (ring, angle) => (inLamellaGap(paint, angle) ? 'cloth' : 'lace'), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
-      lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
+      // Laced plates (not the pointed scales) as one shell with the lamellae's maps, where the detail maps are drawn.
+      if (DETAIL_MAPS.on && !paint.pointDown) lamellaeShell(mesh, rings, inflate, paint, bones ?? (() => null), sides + 6);
+      else lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
+      return;
+    }
+    // Mail with the mail's maps (detailmaps.js): one colour, the rings in the picture (not in a crowd).
+    if (paint?.mail && DETAIL_MAPS.on && !lowDetail) {
+      loft(mesh, rings, sides, { color: 'mail', inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: mailUv(rings, inflate) });
       return;
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
@@ -1834,7 +1874,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // Plate's gorget flares down over the tops of the breast and back plates, closing the gap between them and the helmet.
   const collarFrom = plate ? -0.45 : lamellar || kit?.collar ? -0.15 : -0.6;
   const flare = (t) => 1 + (lamellar || kit?.collar ? 0 : (plate ? 0.7 : 0.9) * Math.max(0, -t) / 0.6);
-  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') loft(mesh, tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t))), sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false });
+  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') {
+    const collarRings = tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)));
+    // A mail collar with the mail's maps (detailmaps.js).
+    const mailMaps = kit?.collar === 'mail' && DETAIL_MAPS.on && !lowDetail ? { uv: mailUv(collarRings, 1) } : {};
+    loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
+  }
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -2060,7 +2105,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   }
   // Texture coordinates: the parts that have them, and everything else on a flat patch of the map.
   let uvs = null;
-  if (textured) {
+  // (Not only the textured styles': a piece drawn with the detail maps carries its own, detailmaps.js.)
+  if (textured || mesh.uvs.size) {
     uvs = new Float32Array((positionArray.length / 3) * 2);
     for (let vertex = 0; vertex < positionArray.length / 3; vertex += 1) uvs.set(mesh.uvs.get(vertex) ?? FLAT_UV, vertex * 2);
   }

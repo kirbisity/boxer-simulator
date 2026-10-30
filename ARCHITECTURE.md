@@ -121,6 +121,15 @@ menus; `src/intro.js` the intro on a first visit (the roster's `legend`
 entries, a faction at a time, staged by main.js's `introStage`; skippable,
 remembered in localStorage, replayed from the home screen). Anything removed from the scene is freed with `disposeObject`.
 
+**Detail maps (a pilot).** Fine surface detail drawn by maps instead of geometry: tiles modelled and baked in Blender
+(`tools/blender/*.py`, headless; `tools/blender/pack.py` writes the WebP images into `src/detailmaps-data.js`): mail, laced
+lamellae, the castle's ashlar and cobbles. `src/detailmaps.js` (plain, the skin worker uses it) says who carries them: a mail
+piece is one loft with texture coordinates in the mail's tile (`mailUv`), laced lamellae one stepped shell
+(loftbody.js `lamellaeShell`) instead of a polygon a plate; each kind's u is offset by its band, which is how render.js
+`skinParts` draws those triangles apart in a material with the maps (`src/detailtex.js` `armourDetailMaterial`; the lace
+colour from the albedo's alpha); kittex.js gives the ashlar and the cobbles theirs (`stoneDetailMaps`). `#maps=off` in the
+address draws everything as before (`boxer.detailMaps()`).
+
 ## Looks (browser only)
 
 A **look** is a whole way of drawing the game, switchable at runtime: the

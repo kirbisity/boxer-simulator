@@ -8,6 +8,7 @@
 
 import { buildBody } from './body.js';
 import { buildSkinMesh, makeSkinTextures, skinTextureKey } from './bodystyles.js';
+import { DETAIL_MAPS } from './detailmaps.js';
 
 /** A few numbers that say whether two bodies are the same body. */
 export function bodyCheck(body) {
@@ -15,8 +16,10 @@ export function bodyCheck(body) {
 }
 
 /** Answer one request (also what the tests call). */
-export function skinWorkerAnswer({ id, inputs, style, check, known = [] }) {
+export function skinWorkerAnswer({ id, inputs, style, check, known = [], detailMaps = DETAIL_MAPS.on }) {
   const started = performance.now();
+  // Armour drawn with the detail maps or not, as the page draws it (detailmaps.js).
+  DETAIL_MAPS.on = detailMaps;
   const body = buildBody(inputs);
   if (check && bodyCheck(body).some((value, index) => value !== check[index])) return { answer: { id, mismatch: true }, transfer: [] };
   const built = buildSkinMesh(body, style);
