@@ -6836,7 +6836,7 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   const met = vec.lerp(closest.onFirst, closest.onSecond, 0.5);
   world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, effects: ['blades meet'] });
   // Heard: how fast they met, what of each (an edge, a haft, a head), and whether a point was turned along the blade (a scrape).
-  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed });
+  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed, mass: Math.max(a.spec.mass ?? 1, b.spec.mass ?? 1) });
   if (parried) {
     const [parrier, blade, striker, stroke] = parried;
     // Parried while his other blade is on its way in: the parry and the cut together.
@@ -6849,6 +6849,8 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
 }
 
 /** Loose things — dropped weapons, severed parts — fall, tumble, bounce and come to rest lying flat. */
+// A dropped weapon meeting the floor slower than this (m/s) makes no clatter.
+const CLATTER_FROM = 1.2;
 function moveDebris(world, dt) {
   const spec = WORLD.props;
   for (const piece of world.debris) {
@@ -6882,6 +6884,8 @@ function moveDebris(world, dt) {
         piece.resting = true;
       }
     } else if (lowest < ground) {
+      // A weapon coming down hard on the floor clatters (each bounce while it still falls fast).
+      if (world.ear && piece.kind === 'weapon' && piece.v[1] < -CLATTER_FROM) soundEvent(world, 'clatter', { at: [...piece.x], speed: -piece.v[1], mass: WEAPONS[piece.weapon]?.mass ?? 1 });
       piece.x[1] += ground - lowest;
       piece.v = [piece.v[0] * spec.slide, Math.abs(piece.v[1]) * spec.restitution, piece.v[2] * spec.slide];
       piece.spin = vec.scale(piece.spin, spec.slide);

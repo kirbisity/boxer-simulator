@@ -1,10 +1,10 @@
 // Which synth family plays each recorded event (audio/log.js's types), and the ear's gathering of one tick's events into candidates:
 // each with its family's parameters (its level at 1 m among them), its distance and direction from the ear, its level there, and
-// whether the 10-20 m rule keeps it. Pure (the parameters need no context): Node tests and the timing tool run it.
+// whether the 10-20 m rule keeps it. (Where a recorded take fits an event, sfx/sampled.js plays it instead of, or beside, the family.) Pure (the parameters need no context): Node tests and the timing tool run it.
 
 import { earDirection, isMapWide, levelAtEar, limitPerTick, thinningKeeps } from './ear.js';
 import { clashParams, playClash } from './sfx/clash.js';
-import { fallParams, playFall } from './sfx/fall.js';
+import { clatterParams, fallParams, playClatter, playFall } from './sfx/fall.js';
 import { horseParams, playHorse } from './sfx/horse.js';
 import { arrowHitParams, impactParams, playImpact } from './sfx/impact.js';
 import { playShot, shotParams } from './sfx/ranged.js';
@@ -27,6 +27,7 @@ export const SOUND_FAMILIES = {
   step: { params: stepParams, play: playStep, bus: 'effects' },
   fall: { params: (event) => fallParams(event, 'fall'), play: playFall, bus: 'effects' },
   land: { params: (event) => fallParams(event, 'land'), play: playFall, bus: 'effects' },
+  clatter: { params: clatterParams, play: playClatter, bus: 'effects' },
   voice: { params: voiceParams, play: playVoice, bus: 'voices', silent: true },
   horse: { params: horseParams, play: playHorse, bus: 'effects' },
   shot: { params: shotParams, play: playShot, bus: 'effects', boost: 4 },
