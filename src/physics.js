@@ -737,12 +737,16 @@ function coverArms(world, fighter, intent) {
   const line = vec.sub(blow.threat, blow.mine);
   const length = vec.length(line);
   if (length < 1e-3) return;
-  const meet = toLocal(fighter, vec.add(blow.mine, vec.scale(line, Math.min(1, (WORLD.guardCover.out * fighter.body.heightM) / length))));
+  const meet = vec.add(blow.mine, vec.scale(line, Math.min(1, (WORLD.guardCover.out * fighter.body.heightM) / length)));
+  // A blow coming up at the body (a kick, an uppercut to the ribs) is covered with the elbow dropped onto its line and the hand
+  // kept up, not with the hand reached down to it: the forearm stands along the ribs, where the blow meets it.
+  if (blow.punch.zone !== 'head') meet[1] = Math.max(meet[1], blow.mine[1]);
+  const local = toLocal(fighter, meet);
   // (His left is +z in his own frame.)
   // (The arm is chosen once for the blow, by the side it first comes from: his left is +z in his own frame. Chosen again each
   // step, a blow straight down the middle had the two arms trading places and neither there.)
-  fighter.defence.cover ??= meet[2] >= 0 ? 'lHand' : 'rHand';
-  intent[fighter.defence.cover] = meet;
+  fighter.defence.cover ??= local[2] >= 0 ? 'lHand' : 'rHand';
+  intent[fighter.defence.cover] = local;
 }
 
 /**
@@ -6084,6 +6088,18 @@ export function groundBrace(fighter, direction, set = false) {
   return spec.grip * (fighter.mired?.footing ?? 1) * WORLD.gravity * (set ? spec.shieldSeconds : spec.seconds) * lean * spent;
 }
 
+/**
+ * What a man standing holds against a charge (m/s): his brace (groundBrace) less the charger's drive. The charger's feet
+ * are on the same ground for the same shove, driving him on with the same grip on his own weight, and that drive moves
+ * the man he hits by the ratio of their weights. A heavier man's charge overpowers the brace of a lighter one; a
+ * lighter man's charge is held, in part, by a heavier one's feet.
+ */
+function braceAgainstCharge(fighter, direction, charger) {
+  const spec = WORLD.crash.brace;
+  const drive = spec.grip * (charger.mired?.footing ?? 1) * WORLD.gravity * spec.seconds * (charger.body.massKg / fighter.body.massKg);
+  return Math.max(0, groundBrace(fighter, direction) - drive);
+}
+
 /** How fast a fighter's part (trunk or head) is going into a contact that pushes him along `direction` (m/s; none standing or backing off). */
 function speedInto(fighter, part, direction) {
   return Math.max(0, -vec.dot(partVelocity(fighter, part), direction));
@@ -6141,8 +6157,9 @@ function crashBodies(world, first, second, partFirst, partSecond, normal) {
   const at = point(struck.x, P.neck);
   if (pushing) {
     const everywhere = (part) => (part === 'head' ? [[P.head, 1]] : TRUNK_PARTICLES.map((index) => [index, 1]));
-    // The charger goes in braced by his own run; the man he hits by what his feet can hold against the ground (groundBrace).
-    const braced = (fighter, part, direction) => (fighter === charger ? Math.max(0, vec.dot(partVelocity(fighter, part), vec.scale(direction, -1))) : groundBrace(fighter, direction));
+    // The charger goes in braced by his own run; the man he hits by what his feet can hold against the ground, less the
+    // charger's own drive (braceAgainstCharge).
+    const braced = (fighter, part, direction) => (fighter === charger ? Math.max(0, vec.dot(partVelocity(fighter, part), vec.scale(direction, -1))) : braceAgainstCharge(fighter, direction, charger));
     pushCrash(world, { fighter: first, shares: everywhere(firstKey), direction: normal, impulse: crash.motion, braced: braced(first, firstKey, normal) });
     pushCrash(world, { fighter: second, shares: everywhere(secondKey), direction: vec.scale(normal, -1), impulse: crash.motion, braced: braced(second, secondKey, vec.scale(normal, -1)) });
     world.events.push({ time: world.time, kind: 'collision', attacker: charger.id, defender: struck.id, punch: 'rush', target: 'trunk', speed: closing, impulse: crash.impulse, energy: crash.energy, force: 0, headDeltaV: 0, effects: [], point: at, normal });
@@ -6736,8 +6753,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (A full plate harness has no gap for an edge: `cutProof`.)
   // A heavy point that wanders (punch.wander, m) is put into a gap the less often: a gap is a hand's breadth (`size`).
   const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
-  // (A finisher is put where the plates part, the visor, the armpit, the throat: `finisher.gap` of the time, at the least.)
-  const gapChance = Math.max(spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing, punch.finisher?.gap ?? 0) * placed;
+  // (A finisher's point is placed, not thrown in a fight: put where the plates part, the visor, the armpit, the throat, it finds
+  // the gap `finisher.gap` of the time; put to the middle of the breast, where plate is plate, never.)
+  const gapChance = (punch.finisher ? punch.finisher.gap : spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing) * placed;
   const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;

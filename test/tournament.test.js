@@ -93,11 +93,14 @@ test('the helm costs the man in it a quarter of his skill: a hero\'s 1 to 0.75, 
   assert.equal(buildBody(PRESETS.maximilian).skill, 0.75);
   assert.ok(Math.abs(buildBody({ ...PRESETS.maximilian, skill: 0.8 }).skill - 0.6) < 1e-9);
   assert.equal(buildBody({ ...PRESETS.maximilian, outfit: { kind: 'knight', design: 0 } }).skill, 1, 'out of it, his own');
-  assert.equal(buildBody(PRESETS.knight).skill, 0.5);
+  // (A knight's kit trains him to 0.75 since the skill tiers, OUTFITS.knight.skill; it was the ordinary 0.5.)
+  assert.equal(buildBody(PRESETS.knight).skill, OUTFITS.knight.skill);
 });
 
 test('the head is locked to the trunk: through a bout its place against the chest does not change', () => {
-  const world = createWorld([PRESETS.maximilian, PRESETS.knight], { seed: 2 });
+  // (Seed 6, a bout that runs its 40 s: since the damage model, part health decides, at seed 2 his first lance charge
+  // ran Sir Edric through a gap in the breastplate and the bout was over in a second, too short to see either head move.)
+  const world = createWorld([PRESETS.maximilian, PRESETS.knight], { seed: 6 });
   const [man, other] = world.fighters;
   // The head's place in the trunk's own frame (up the trunk, forward, to the left).
   const inTrunk = (fighter) => {
