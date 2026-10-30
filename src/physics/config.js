@@ -440,7 +440,10 @@ export const WORLD = {
   // - Contact: closing faster than `from` m/s (`fromHead` where a head is one
   //   of them: it whips about on its neck) the pair exchange momentum (impulse =
   //   reduced mass x closing x (1 + `restitution`): a body is no ball) and a
-  //   pair brushing is one meeting every `cooldown` s.
+  //   pair brushing is one meeting every `cooldown` s. A body is its trunk and
+  //   the breadth of its shoulders (a pair's body contacts are one crash);
+  //   the crashes of one substep are met in turn, each from the velocities the
+  //   last left (a man into three at once shares his momentum among them).
   // - Mass: a part brings what is braced behind it standing (a blow's struck
   //   mass) and, as far as the rest of the body is going into the contact (its
   //   speed towards it, against the closing speed), the whole of it
@@ -475,7 +478,20 @@ export const WORLD = {
   //   ~7 kJ, the range of the 'commonly lethal' chest impacts of a vehicle on
   //   a pedestrian (~5 kJ); a horse at the gallop into a man standing gives
   //   his chest ~10 m/s and ~7 kN: ribs broken, in plate a third of the harm.
-  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05, lying: 0.1 },
+  // - Brace (physics.js groundBrace): a man standing on both feet holds
+  //   against a crash's shove with them, beyond what his mass takes. The most
+  //   the ground gives a planted sole sideways is `grip` times his weight
+  //   (leather or a bare foot on turf or packed earth, μ 0.6-0.8), for as long
+  //   as the shove lasts on him: `seconds`, a tenth (two bodies' flesh giving,
+  //   then the push spent), and on a set shield `shieldSeconds` (the board and
+  //   the arm locked behind it give under the blow and spread it over twice
+  //   as long: what a shield wall is set for). 0.7 × 9.81 × 0.1 ≈ 0.7 m/s held
+  //   standing, ≈ 1.4 behind a set shield, against balance.speed's 2.1 that
+  //   puts him over. Met front-on he leans into it off his back foot; from the
+  //   side or behind, his base narrow and nothing to lean with, `sideOn` of
+  //   that. In the air, running (a foot up), mid-blow (the legs drive the
+  //   blow, not the brace) or already reeling, there is nothing (or less) to hold with.
+  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05, lying: 0.1, brace: { grip: 0.7, seconds: 0.1, shieldSeconds: 0.2, sideOn: 0.4 } },
   // Static scenery in the physics (physics/terrain.js), only in an arena that
   // carries `terrain`; none of this is read otherwise.
   //   cell, margin: the lookup grid's cell (m), and how far past a solid's edge it is
