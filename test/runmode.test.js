@@ -208,7 +208,7 @@ test('drag only: the stick steers the run, wherever it is put down; Shift on the
   assert.equal(keys.me.runMode, false, 'Shift let go: a walk');
 });
 
-test('drag only: the guard, an attack or a blow stop a run held on the stick; an attack holds it off until the stick is eased back', () => {
+test('drag only: the guard or a blow stop a run held on the stick; an attack does not: the run goes on into it', () => {
   const running = () => {
     const game = yard();
     game.orders.stick = { dir: [1, 0], amount: 1 };
@@ -220,19 +220,22 @@ test('drag only: the guard, an attack or a blow stop a run held on the stick; an
   guard.orders.guard = true;
   guard.step(0.1);
   assert.equal(guard.me.runMode, false, 'the guard: no run');
+  guard.orders.guard = false;
+  guard.step(0.5);
+  assert.equal(guard.me.runMode, false, 'and the stick must be eased off before he runs again');
+  guard.orders.stick = { dir: [1, 0], amount: 0.5 };
+  guard.step(0.1);
+  guard.orders.stick = { dir: [1, 0], amount: 1 };
+  guard.step(0.3);
+  assert.equal(guard.me.runMode, true, 'eased off and pushed out again: a run');
   const attack = running();
   const thrown = attack.me.stats.thrown;
   attack.orders.requests.push({ at: attack.world.time, line: 'mid', strength: 'quick' });
   attack.step(0.15);
-  assert.equal(attack.me.runMode, false, 'an attack: no run');
-  assert.ok(attack.me.stats.thrown > thrown || attack.me.punch, 'and it is thrown');
+  assert.ok(attack.me.stats.thrown > thrown || attack.me.punch, 'the attack is thrown');
+  assert.equal(attack.me.runMode, true, 'in the run, which goes on');
   attack.step(0.5);
-  assert.equal(attack.me.runMode, false, 'and the stick must be eased off before he runs again');
-  attack.orders.stick = { dir: [1, 0], amount: 0.5 };
-  attack.step(0.1);
-  attack.orders.stick = { dir: [1, 0], amount: 1 };
-  attack.step(0.3);
-  assert.equal(attack.me.runMode, true, 'eased off and pushed out again: a run');
+  assert.equal(attack.me.runMode, true, 'and on after it');
   const hit = running();
   hit.me.stagger = 0.4;
   hit.step(0.1);
