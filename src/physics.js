@@ -577,12 +577,31 @@ export function startPickup(world, fighter, debris, { swap = false } = {}) {
   if (shield && fighter.shield && !swap) return false;
   if (fighter.state !== 'up' || (fighter.weapon?.held && !standard && !shield && !swap) || fighter.punch || fighter.pickup || debris.taken || !debris.resting) return false;
   if (swap && shield && fighter.shield) dropShield(world, fighter, 'dropped');
-  if (swap && !shield && !standard && fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
+  if (swap && !shield && !standard && fighter.weapon?.held) putAway(world, fighter);
   // Stooping for a standard, he lets go of what is in his hands first: a two-handed grip would keep the hand from it.
   if (standard && fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   fighter.pickup = { debris: debris.id, t: 0 };
   fighter.clinch = null;
   return true;
+}
+
+/**
+ * What is in his hand put away for a weapon he stoops for: the kit's sidearm he drew when his weapon was lost goes back in
+ * its sheath (he has it still, to draw again: rearm); anything else is let fall.
+ */
+function putAway(world, fighter) {
+  const weapon = fighter.weapon;
+  if (!fighter.sidearmDrawn || weapon.spec.mounted) {
+    releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
+    return;
+  }
+  weapon.held = false;
+  const shares = handShares(weapon.spec);
+  addParticleMass(fighter, P[`${weapon.main}Hand`], -weapon.spec.mass * shares.main);
+  if (shares.off) addParticleMass(fighter, P[`${weapon.off}Hand`], -weapon.spec.mass * shares.off);
+  if (fighter.punch?.spec.path === 'blade') fighter.punch = null;
+  fighter.sidearmDrawn = false;
+  world.events.push({ time: world.time, kind: 'sheathed', fighter: fighter.id, weapon: weapon.kind, effects: [`sheathes the ${weapon.spec.label.toLowerCase()}`] });
 }
 
 /** Each frame of a pickup: once stooped with the hand on it, the weapon is his. */

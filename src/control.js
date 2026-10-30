@@ -926,14 +926,16 @@ function holder(world, fighter) {
 
 /** The nearest weapon (or shield, for a man of a shield style without one) lying where he can take it up. */
 function looseNearby(world, fighter) {
-  const wantsWeapon = !fighter.weapon?.held;
+  // An empty hand wants any weapon; a hand with a lesser one (the dagger or wakizashi drawn when his own was lost) a deadlier one (WEAPONS threat).
+  const held = fighter.weapon?.held && !fighter.weapon.spec.mounted ? fighter.weapon : null;
+  const wantsWeapon = (kind) => !fighter.weapon?.held || (held && (WEAPONS[kind]?.threat ?? 0) > (held.spec.threat ?? 0));
   const wantsShield = Boolean(STYLES[fighter.style]?.shield) && !fighter.shield;
   const at = point(fighter.x, P.pelvis);
   let best = null;
   let bestDistance = CONTROL.pickupFrom;
   for (const debris of world.debris ?? []) {
     if (debris.taken || !debris.resting) continue;
-    if (debris.kind === 'weapon' ? !wantsWeapon || WEAPONS[debris.weapon]?.flag || !handling(fighter.body, WEAPONS[debris.weapon]).canHold : debris.kind !== 'shield' || !wantsShield) continue;
+    if (debris.kind === 'weapon' ? !wantsWeapon(debris.weapon) || WEAPONS[debris.weapon]?.flag || !handling(fighter.body, WEAPONS[debris.weapon]).canHold : debris.kind !== 'shield' || !wantsShield) continue;
     const distance = Math.hypot(debris.x[0] - at[0], debris.x[2] - at[2]);
     if (distance < bestDistance) {
       best = debris;
@@ -1120,8 +1122,8 @@ function goPickUp(world, fighter) {
     return true;
   }
   fighter.move = 0;
-  // (In a stage, what he holds of that kind is let fall for it: looting a body.)
-  startPickup(world, fighter, debris, { swap: Boolean(world.stage) });
+  // (In a stage, what he holds of that kind is let fall for it: looting a body. A lesser weapon in hand is put away for it.)
+  startPickup(world, fighter, debris, { swap: Boolean(world.stage) || Boolean(fighter.weapon?.held) });
   fighter.orderPickup = null;
   return true;
 }

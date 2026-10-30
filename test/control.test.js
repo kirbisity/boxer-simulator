@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { MOVES, STYLES } from '../src/moves.js';
-import { advance, createWorld, point } from '../src/physics.js';
+import { advance, createWorld, dropWeapon, point } from '../src/physics.js';
 import { attackAt, attackLayout, chooseAttack, contextAction, CONTROL, directFighter, doAction, holdDistance, newOrders, stickPace } from '../src/control.js';
 import { createRecognizer, GESTURE } from '../src/gesture.js';
 
@@ -179,6 +179,20 @@ test('the special button: reload an empty gun, fire a loaded one, pick up a weap
   disarmed.me.weapon.held = false;
   assert.equal(contextAction(disarmed.world, disarmed.me), 'pickUp');
   assert.ok(CONTROL.pickupFrom > 1);
+  // His weapon lost, he draws his sidearm; his own weapon on the floor is still offered, and taken up the sidearm goes back in its sheath.
+  const knight = played(PRESETS.knight, PRESETS.light, { distance: 4, still: true });
+  dropWeapon(knight.world, knight.me, 'dropped', [0.5, 0, 0]);
+  assert.equal(knight.me.weapon?.kind, 'dagger', 'the dagger drawn');
+  let offered = null;
+  for (let tick = 0; tick < 40 && offered !== 'pickUp'; tick += 1) {
+    knight.step(0.1);
+    offered = contextAction(knight.world, knight.me);
+  }
+  assert.equal(offered, 'pickUp', 'his sword on the floor, offered over the dagger');
+  assert.ok(doAction(knight.world, knight.me, 'pickUp'));
+  for (let tick = 0; tick < 40 && knight.me.weapon?.kind === 'dagger'; tick += 1) knight.step(0.1);
+  assert.equal(knight.me.weapon?.kind, 'longsword', 'the sword taken up again');
+  assert.equal(knight.world.debris.filter((debris) => debris.weapon === 'dagger').length, 0, 'the dagger sheathed, not thrown down');
 });
 
 test('the attack pad: every attack of every style has its own place on the screen, where a tap throws it', () => {
