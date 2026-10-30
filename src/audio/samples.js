@@ -1,6 +1,7 @@
 // Recorded sound effects (src/audio/samples/*.mp3, cut from the user's clips: samples/README.md): a sword on a sword, a blade through
 // flesh, a blow on bone, bones breaking, steel on plate, a man in armour walking, a weapon clattering down, a mace's swing, a pistol's
-// shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny.
+// shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny; heels on a
+// hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder.
 // Each set is a few takes of one sound; a take is picked at random each time.
 //
 // From the source (the ES-module page, index.html) the files are fetched from src/audio/samples/; the single-file bundle (tools/bundle.js) puts their
@@ -31,6 +32,12 @@ export const SAMPLE_SETS = {
   'hoof-soft': Array.from({ length: 9 }, (_, index) => `hoof-soft-${index + 1}`),
   'hoof-stone': ['hoof-stone-1', 'hoof-stone-2', 'hoof-stone-3', 'hoof-stone-4'],
   neigh: ['neigh-1'],
+  'step-heel': Array.from({ length: 6 }, (_, index) => `step-heel-${index + 1}`),
+  helmet: ['helmet-1'],
+  woodshield: ['woodshield-1'],
+  punch: Array.from({ length: 7 }, (_, index) => `punch-${index + 1}`),
+  fistswing: Array.from({ length: 5 }, (_, index) => `fistswing-${index + 1}`),
+  thunder: ['thunder-1', 'thunder-2'],
 };
 
 /** Every file of every set. */
@@ -59,7 +66,8 @@ function sampleBytes(base64) {
 
 /**
  * The bank for a context: every file decoded in the background. `pick(set)` a random decoded take of a set ({ buffer, offset }) or null;
- * `count()` how many have decoded; `ready` a promise of that count once all have been tried.
+ * `take(name)` one file's take, or null (the sound board plays each); `count()` how many have decoded; `ready` a promise of that count
+ * once all have been tried.
  */
 export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetcher = globalThis.fetch?.bind(globalThis), random = Math.random } = {}) {
   const takes = new Map();
@@ -80,6 +88,7 @@ export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetch
   return {
     ready,
     count: () => takes.size,
+    take: (name) => takes.get(name) ?? null,
     pick(set) {
       const names = (SAMPLE_SETS[set] ?? []).filter((name) => takes.has(name));
       return names.length ? takes.get(names[Math.floor(random() * names.length)]) : null;

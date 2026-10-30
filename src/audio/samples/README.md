@@ -1,11 +1,11 @@
 # Recorded sound effects
 
-Cut from the user's screen recordings (2026-10-29), each labelled on screen; a series of footsteps or hoofbeats is cut into one file per footfall. Each clip: mono, the transient at its start (the leading
+Cut from the user's screen recordings (2026-10-29 and 2026-10-30), each labelled on screen; a series of footsteps or hoofbeats is cut into one file per footfall. Each clip: mono, the transient at its start (the leading
 silence trimmed; `trim` is how much of the labelled event's window came before it), its tail cut where it falls 45 dB under its peak
 with a short fade, peak-normalised to -1 dBFS, MP3 32 kHz 40 kb/s. The game picks one take of a set at random, at the event's instant;
 src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. tools/bundle.js embeds them in the single-file page.
 
-82 files, 199 KB in all.
+104 files, 256 KB in all.
 
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
@@ -91,5 +91,27 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | hoof-stone-3.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 3.039-3.169 | Horse Hooves On Stone And Whinnies | 0.029 | 1080 | horse hoof on stone, tile or boards, every gait |
 | hoof-stone-4.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 3.370-3.500 | Horse Hooves On Stone And Whinnies | 0.030 | 1080 | horse hoof on stone, tile or boards, every gait |
 | neigh-1.mp3 | ScreenRecording_10-29-2026_21-14-10_1.mov | 0.885-2.100 | Horse Hooves On Stone And Whinnies | 0.035 | 6480 | horse neigh (a wounded or falling horse) |
+| step-heel-1.mp3 | ScreenRecording_10-30-2026_13-32-50_1.mov | 0.404-0.554 | sound of woman's footsteps in heels | 0.039 | 1260 | step in heels (a heeled boot) on stone, tile or boards, any pace (on boards with the synth's knock under it) |
+| step-heel-2.mp3 | ScreenRecording_10-30-2026_13-32-50_1.mov | 0.976-1.236 | sound of woman's footsteps in heels | 0.041 | 1800 | step in heels (a heeled boot) on stone, tile or boards, any pace (on boards with the synth's knock under it) |
+| step-heel-3.mp3 | ScreenRecording_10-30-2026_13-32-50_1.mov | 1.593-1.833 | sound of woman's footsteps in heels | 0.038 | 1620 | step in heels (a heeled boot) on stone, tile or boards, any pace (on boards with the synth's knock under it) |
+| step-heel-4.mp3 | ScreenRecording_10-30-2026_13-32-50_1.mov | 2.234-2.414 | sound of woman's footsteps in heels | 0.039 | 1260 | step in heels (a heeled boot) on stone, tile or boards, any pace (on boards with the synth's knock under it) |
+| step-heel-5.mp3 | ScreenRecording_10-30-2026_13-32-50_1.mov | 2.857-3.027 | sound of woman's footsteps in heels | 0.042 | 1260 | step in heels (a heeled boot) on stone, tile or boards, any pace (on boards with the synth's knock under it) |
+| step-heel-6.mp3 | ScreenRecording_10-30-2026_13-32-50_1.mov | 3.481-3.661 | sound of woman's footsteps in heels | 0.041 | 1260 | step in heels (a heeled boot) on stone, tile or boards, any pace (on boards with the synth's knock under it) |
+| helmet-1.mp3 | ScreenRecording_10-30-2026_13-34-21_1.mov | 0.169-0.859 | Sword Fight Helmet Impact | 0.069 | 3960 | hit: anything but a body's crash on a helmet (plate on the head) |
+| woodshield-1.mp3 | ScreenRecording_10-30-2026_13-35-34_1.mov | 0.207-0.507 | (Axe?)…ke Hit on Dull Hollow Wooden Shie(ld) | 0.067 | 1980 | hit: anything on a wooden shield; clash: steel on a wooden shield or a haft (higher, shorter) |
+| punch-1.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 0.470-0.680 | Fist swings and punches (Sound 3-6) | 0.025 | 1440 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| punch-2.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 1.453-1.713 | Fist swings and punches (Sound 3-6) | 0.023 | 1800 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| punch-3.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 2.710-2.970 | Fist swings and punches (Sound 3-6) | 0.025 | 1800 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| punch-4.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 3.837-4.097 | Fist swings and punches (Sound 3-6) | 0.007 | 1800 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| punch-5.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 5.001-5.261 | Fist swings and punches (Sound 3-6) | 0.001 | 1800 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| punch-6.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 6.067-6.327 | Fist swings and punches (Sound 3-6) | 0.002 | 1800 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| punch-7.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 7.569-7.733 | Fist swings and punches (Sound 3-6) | 0.044 | 1260 | hit: a fist, foot, knee, elbow, head or shoulder on flesh, padding or leather (a kick lower, a shoulder dull) |
+| fistswing-1.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 1.100-1.450 | Fist swings and punches (Sound 3-6) | 0.000 | 2160 | swing: a punch or kick on its way in (its rising end, as long as the drive; a kick lower) |
+| fistswing-2.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 2.300-2.700 | Fist swings and punches (Sound 3-6) | 0.000 | 2520 | swing: a punch or kick on its way in (its rising end, as long as the drive; a kick lower) |
+| fistswing-3.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 3.560-3.850 | Fist swings and punches (Sound 3-6) | 0.000 | 1980 | swing: a punch or kick on its way in (its rising end, as long as the drive; a kick lower) |
+| fistswing-4.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 4.760-5.020 | Fist swings and punches (Sound 3-6) | 0.000 | 1800 | swing: a punch or kick on its way in (its rising end, as long as the drive; a kick lower) |
+| fistswing-5.mp3 | ScreenRecording_10-30-2026_13-37-13_1.mov | 5.820-6.085 | Fist swings and punches (Sound 3-6) | 0.000 | 1800 | swing: a punch or kick on its way in (its rising end, as long as the drive; a kick lower) |
+| thunder-1.mp3 | ScreenRecording_10-30-2026_13-40-40_1.mov | 0.373-2.973 | LOUD & SCARY THUNDERSTORM LIGHTNIN(G) | 0.043 | 13500 | thunder: near, the whole crack and roar; far, the rumble only, lower, the synth's long rumble under it |
+| thunder-2.mp3 | ScreenRecording_10-30-2026_13-40-40_1.mov | 3.085-4.885 | LOUD & SCARY THUNDERSTORM LIGHTNIN(G) | 0.000 | 9360 | thunder: near, the whole crack and roar; far, the rumble only, lower, the synth's long rumble under it |
 
-Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game). The recordings have no wood, sand or snow footsteps and no snort: those stay synthesised.
+Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game). The recordings have no sand or snow footsteps and none of a flat sole on boards (the ring's canvas is boards) and no snort: those stay synthesised. The fist's whooshes (fistswing) are the air before each punch of the 10-30 recording, cut from 0.25-0.4 s before its blow to the blow (no onset: the window as it is, faded in over its first quarter); the punches start at the blow. The thunder takes are capped at 2.6 and 1.8 s with a 0.7 s fade.

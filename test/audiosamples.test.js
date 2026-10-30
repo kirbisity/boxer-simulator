@@ -5,11 +5,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
-import { samplePlan } from '../src/audio/sfx/sampled.js';
+import { playSample, samplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 
 const DIR = 'src/audio/samples';
-const FILE_CAP = 12 * 1024;
+// (A thunder's roar is the longest take, 2.6 s.)
+const FILE_CAP = 16 * 1024;
 const TOTAL_CAP = 300 * 1024;
 const half = () => 0.5;
 const plan = (event) => samplePlan(event.type, SOUND_FAMILIES[event.type].params(event), event, half);
@@ -33,11 +34,10 @@ test('every sample is a small MP3 that is there, and nothing else is in the fold
 
 test('the events a recording fits play it; the rest are left to the synth', () => {
   assert.equal(plan({ type: 'clash', speed: 10, a: 'blade', b: 'blade' }).set, 'clash');
-  assert.equal(plan({ type: 'clash', speed: 10, a: 'blade', b: 'haft' }), null);
   assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'flesh' }).set, 'slice');
   assert.equal(plan({ type: 'hit', energy: 150, striker: 'blunt', covering: 'flesh' }).set, 'bonehit');
   assert.equal(plan({ type: 'hit', energy: 300, striker: 'blade', covering: 'plate' }).set, 'break');
-  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'flesh' }), null);
+  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'plate' }), null);
   assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'mail' }), null);
   assert.equal(plan({ type: 'wound', kind: 'cut', severity: 0.8 }).set, 'gore');
   assert.equal(plan({ type: 'wound', kind: 'bone', severity: 0.8 }).set, 'bones');
@@ -52,7 +52,7 @@ test('the events a recording fits play it; the rest are left to the synth', () =
   assert.equal(plan({ type: 'swing', speed: 22, length: 1, mass: 1.3, head: 'blade' }), null);
   assert.equal(plan({ type: 'shot', kind: 'matchlock' }).set, 'gunshot');
   assert.equal(plan({ type: 'shot', kind: 'bow' }), null);
-  for (const set of ['clash', 'slice', 'bonehit', 'break', 'gore', 'bones', 'armourstep', 'clatter', 'maceswing', 'gunshot']) assert.ok(SAMPLE_SETS[set]?.length, set);
+  for (const set of ['clash', 'slice', 'bonehit', 'break', 'gore', 'bones', 'armourstep', 'clatter', 'maceswing', 'gunshot', 'step-heel', 'helmet', 'woodshield', 'punch', 'fistswing', 'thunder']) assert.ok(SAMPLE_SETS[set]?.length, set);
 });
 
 test('a harder event plays longer and louder; a heavier weapon lower', () => {
@@ -79,7 +79,7 @@ test('a footstep plays its ground\'s recording, walking or running by the pace, 
   assert.equal(plan({ type: 'step', speed: 5, mass: 80, surface: 'earth', armour: 'none' }).set, 'step-grass-run');
   assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'mud', armour: 'none' }).set, 'step-mud');
   assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'water', depth: 0.3, armour: 'none' }).set, 'step-water');
-  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'wood', armour: 'none' }), null, 'no recording of boards: the synth');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 80, surface: 'wood', armour: 'none' }), null, 'no recording of boards (the ring\'s canvas): the synth');
   const plated = plan({ type: 'step', speed: 1.4, mass: 90, surface: 'stone', armour: 'plate' });
   assert.equal(plated.set, 'step-stone-walk');
   assert.deepEqual(plated.extra.map((layer) => layer.set), ['armourstep']);
@@ -130,4 +130,65 @@ test('the bundle carries every sample\'s bytes', { skip: !existsSync('dist/gladi
   const page = readFileSync('dist/gladiator.html', 'utf8');
   assert.ok(statSync('dist/gladiator.html').mtimeMs >= Math.max(...SAMPLE_FILES.map((name) => statSync(`${DIR}/${name}.mp3`).mtimeMs)), 'the bundle is older than the samples: rebuild it');
   for (const name of SAMPLE_FILES) assert.ok(page.includes(readFileSync(`${DIR}/${name}.mp3`).toString('base64')), `${name} is not in the bundle`);
+});
+
+test('the third batch: heels, a helmet, a wooden shield, punches, the fist\'s whoosh, thunder', () => {
+  const heel = (surface, mass = 60) => plan({ type: 'step', speed: 1.4, mass, surface, armour: 'none', heels: true });
+  assert.equal(heel('stone').set, 'step-heel');
+  assert.equal(heel('tile').set, 'step-heel');
+  assert.equal(heel('wood').set, 'step-heel');
+  assert.ok(heel('wood').synth, 'heels on boards: the synth\'s knock of the boards under them');
+  assert.equal(heel('grass').set, 'step-grass-walk', 'heels on grass: the grass');
+  assert.equal(plan({ type: 'step', speed: 1.4, mass: 60, surface: 'stone', armour: 'none' }).set, 'step-stone-walk', 'no heels: the stone');
+  assert.ok(heel('stone', 110).trim > heel('stone', 50).trim, 'a heavier woman in heels louder');
+  assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'plate', part: 'head' }).set, 'helmet');
+  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'plate', part: 'head' }).set, 'helmet');
+  assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'plate', part: 'trunk' }).set, 'break');
+  assert.equal(plan({ type: 'hit', energy: 150, striker: 'blade', covering: 'wood', part: 'shield' }).set, 'woodshield');
+  assert.equal(plan({ type: 'hit', energy: 80, striker: 'body', covering: 'wood', part: 'shield' }).set, 'woodshield');
+  assert.equal(plan({ type: 'clash', speed: 10, a: 'blade', b: 'shield' }).set, 'woodshield');
+  const haft = plan({ type: 'clash', speed: 10, a: 'blade', b: 'haft' });
+  const boards = plan({ type: 'clash', speed: 10, a: 'blade', b: 'shield' });
+  assert.equal(haft.set, 'woodshield');
+  assert.ok(haft.rate > boards.rate && haft.seconds < boards.seconds, 'a haft higher and shorter than a shield');
+  for (const striker of ['fist', 'foot', 'knee', 'elbow']) assert.equal(plan({ type: 'hit', energy: 60, striker, covering: 'flesh', part: 'head' }).set, 'punch', striker);
+  assert.equal(plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'padded', part: 'trunk' }).set, 'punch');
+  assert.ok(plan({ type: 'hit', energy: 60, striker: 'foot', covering: 'flesh' }).rate < plan({ type: 'hit', energy: 60, striker: 'fist', covering: 'flesh' }).rate, 'a kick lower than a punch');
+  const whoosh = plan({ type: 'swing', speed: 8, length: 0.7, mass: 2, head: 'fist', reach: 0.2 });
+  assert.equal(whoosh.set, 'fistswing');
+  assert.ok(whoosh.fromEnd, 'the whoosh\'s rising end, into the blow');
+  assert.equal(plan({ type: 'swing', speed: 8, length: 0.9, mass: 8, head: 'foot', reach: 0.2 }).set, 'fistswing');
+  const near = plan({ type: 'thunder', distance: 200 });
+  const far = plan({ type: 'thunder', distance: 4000 });
+  assert.equal(near.set, 'thunder');
+  assert.ok(far.skip > near.skip && far.rate < near.rate && far.synthGain > near.synthGain, 'far thunder the rumble only, lower, the synth carrying it');
+  assert.equal(near.synth.crack, 0, 'the crack is the recording\'s, not doubled');
+});
+
+test('the new sets scale with the blow: a harder one louder and longer, a faster drive louder', () => {
+  const blow = (type, fields) => [plan({ type, ...fields, energy: 8 }), plan({ type, ...fields, energy: 400 })];
+  for (const [light, heavy] of [
+    blow('hit', { striker: 'blade', covering: 'plate', part: 'head', mass: 1.2 }),
+    blow('hit', { striker: 'blade', covering: 'wood', part: 'shield', mass: 1.2 }),
+    blow('hit', { striker: 'fist', covering: 'flesh', part: 'head' }),
+  ]) {
+    assert.equal(light.set, heavy.set);
+    assert.ok(heavy.trim > light.trim && heavy.seconds > light.seconds && heavy.fade > light.fade, `${heavy.set}: ${light.trim}/${light.seconds} -> ${heavy.trim}/${heavy.seconds}`);
+  }
+  const slowClash = plan({ type: 'clash', speed: 2, a: 'blade', b: 'shield' });
+  const fastClash = plan({ type: 'clash', speed: 18, a: 'blade', b: 'shield' });
+  assert.ok(fastClash.trim > slowClash.trim && fastClash.seconds > slowClash.seconds);
+  const jab = plan({ type: 'swing', speed: 5, length: 0.7, mass: 2, head: 'fist', reach: 0.2 });
+  const cross = plan({ type: 'swing', speed: 13, length: 0.7, mass: 2, head: 'fist', reach: 0.2 });
+  assert.ok(cross.trim > jab.trim && cross.seconds > jab.seconds);
+  // (And the level the trim scales grows with the speed: v^6.)
+  assert.ok(SOUND_FAMILIES.swing.params({ speed: 13, length: 0.7, mass: 2 }).level > SOUND_FAMILIES.swing.params({ speed: 5, length: 0.7, mass: 2 }).level + 20);
+});
+
+test('a take played from its end plays its last seconds', () => {
+  const started = [];
+  const node = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, playbackRate: { value: 1 }, start: (when, offset) => started.push(offset), stop() {} });
+  const voice = { ctx: { createGain: node, createBufferSource: node }, nodes: [], live: 0, end: 0 };
+  playSample(voice, {}, { buffer: { duration: 0.4 }, offset: 0.01 }, { rate: 1, trim: 1, seconds: 0.15, fade: 0.03, fromEnd: true }, 0, 0.5);
+  assert.ok(Math.abs(started[0] - 0.25) < 1e-9, `${started[0]}`);
 });

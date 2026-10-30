@@ -29,7 +29,7 @@ import { painShare, stepWhips } from './physics/whip.js';
 import { canRide } from './horses.js';
 import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
-import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
+import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
 
@@ -3456,7 +3456,10 @@ export function step(world, dt) {
     if (fighter.dormant) continue;
     trackHandSpeed(fighter);
     // Heard: a weapon's stroke whooshing through the air, at its fastest.
-    if (world.ear) for (const weapon of heldBlades(fighter)) trackSwing(world, fighter, weapon, strokeOf(fighter, weapon));
+    if (world.ear) {
+      for (const weapon of heldBlades(fighter)) trackSwing(world, fighter, weapon, strokeOf(fighter, weapon));
+      trackPunchSwing(world, fighter);
+    }
     if (fighter.mount) keepSeat(world, fighter);
     else checkBalance(world, fighter);
     if (fighter.state !== 'up' && fighter.state !== 'rising') knockOff(world, fighter, null);

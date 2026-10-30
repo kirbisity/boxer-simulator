@@ -211,7 +211,8 @@ export function soundDown(world, fighter, type, at, speed) {
 export function soundStep(world, fighter, side, at, speed) {
   if (!world.ear) return;
   const ground = surfaceUnder(world, at[0], at[1], at[2]);
-  soundEvent(world, 'step', { at, speed, mass: fighter.body.massKg, surface: ground.surface, depth: ground.depth, armour: armourOf(fighter), who: fighter.id, foot: side });
+  // `heels`: a heeled boot (outfits.js heels, the gear's lift): it clicks on a hard floor.
+  soundEvent(world, 'step', { at, speed, mass: fighter.body.massKg, surface: ground.surface, depth: ground.depth, armour: armourOf(fighter), heels: (fighter.body.gear?.heelLift ?? 0) > 0, who: fighter.id, foot: side });
 }
 
 // A weapon's tip slower than this (m/s) does not whoosh.
@@ -243,4 +244,28 @@ export function trackSwing(world, fighter, weapon, stroke) {
   const spec = weapon.spec;
   // `head`: what leads the stroke through the air (a weight, a mace's: the recorded whoosh; or an edge).
   soundEvent(world, 'swing', { at: seen.at, speed: seen.peak, length: spec.length, mass: spec.mass, head: (spec.harm?.swing?.cut ?? 0) > 0 ? 'blade' : 'blunt', who: fighter.id });
+}
+
+// The least drive a strike is heard at (m/s): a fist's is 5-9 at its fastest, the guess for a man's first strike.
+const PUNCH_SWING_LEAST = 6;
+// The unarmed strikes already heard (one whoosh a strike).
+const punchesHeard = new WeakSet();
+
+/**
+ * An unarmed strike's whoosh (a punch, a kick, a knee, an elbow), once a step: logged as its drive starts (past the windup), so the
+ * whoosh (sfx/sampled.js: its rising end) is heard on the way in, into the blow (which lands 0.03-0.15 s later). `speed`: the strike's
+ * fastest is not known yet: the faster of the limb's now, the man's last strike's peak and PUNCH_SWING_LEAST; `reach`: the drive's
+ * time (s); `head`: fist (a hand or an elbow) or foot (a foot or a knee).
+ */
+export function trackPunchSwing(world, fighter) {
+  if (!world.ear) return;
+  const punch = fighter.punch;
+  if (!punch || punch.spec.path === 'blade' || punch.landed || punch.limb === undefined || punchesHeard.has(punch)) return;
+  if (punch.t < (punch.spec.windup ?? 0)) return;
+  const i = punch.limb * 3;
+  const speed = Math.hypot(fighter.v[i], fighter.v[i + 1], fighter.v[i + 2]);
+  punchesHeard.add(punch);
+  const limb = punch.spec.limb ?? '';
+  const foot = limb.endsWith('Foot') || limb.endsWith('Knee');
+  soundEvent(world, 'swing', { at: particleAt(fighter, punch.limb), speed: Math.max(speed, fighter.stats?.lastHandSpeed ?? 0, PUNCH_SWING_LEAST), length: foot ? 0.9 : 0.7, mass: foot ? 8 : 2, head: foot ? 'foot' : 'fist', reach: Math.max(0.12, (punch.spec.extendUntil ?? 0.25) - punch.t), who: fighter.id });
 }

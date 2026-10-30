@@ -8,7 +8,9 @@
 // blade's scrape), the synth plays that part beside the take.
 //
 // Footsteps: the ground's own take (stone, grass, mud, water; earth from grass), walk or run by the pace, weighed by the man (STEP_WEIGHT),
-// with the armour's clank on top for plate or mail. Hooves: on hard ground or soft by the surface, by the gait; the neigh recorded.
+// with the armour's clank on top for plate or mail; heels on a hard floor (stone, tile, boards) click (the recorded heels; boards, the
+// ring's canvas among them, are otherwise the synth's). Hooves: on hard ground or soft by the surface, by the gait; the neigh recorded. Blows: a helmet rings, a wooden shield
+// (or a haft) knocks, a fist, foot, knee or elbow on the body punches, the fist's whoosh rises into it; thunder near cracks, far rumbles.
 
 import { sfxClamp, sfxKeep, sfxRun } from '../synth.js';
 
@@ -45,6 +47,14 @@ const GROUND_STEPS = {
   mud: { walk: 'step-mud', run: 'step-mud', trim: 1, rate: 1 },
   water: { walk: 'step-water', run: 'step-water', trim: 1, rate: 1 },
 };
+/** Heels (a heeled boot, outfits.js `heels`: the gear's heelLift) on a hard floor click: the recorded heels, whatever the pace. */
+const HEEL_STEPS = {
+  stone: { walk: 'step-heel', run: 'step-heel', trim: 1.1, rate: 1 },
+  tile: { walk: 'step-heel', run: 'step-heel', trim: 1.1, rate: 1.05 },
+  wood: { walk: 'step-heel', run: 'step-heel', trim: 1.1, rate: 0.95, synthGain: 0.35 },
+};
+/** A limb's (or a body's) blow: its pitch (a foot or a knee heavier than a fist, lower; a shoulder's crash a dull thud) and its trim. */
+const LIMB_BLOWS = { fist: { rate: 1.04, trim: 1.2 }, elbow: { rate: 1, trim: 1.2 }, head: { rate: 0.95, trim: 1.1 }, knee: { rate: 0.92, trim: 1.25 }, foot: { rate: 0.88, trim: 1.3 }, body: { rate: 0.8, trim: 1 } };
 const HOOF_HARD = new Set(['stone', 'tile', 'wood']);
 const HOOF_SOFT = new Set(['earth', 'grass', 'sand', 'snow']);
 /** A hoof by its gait: the trim and the rate. */
@@ -55,7 +65,7 @@ export const stepWeight = (mass) => sfxClamp(((mass ?? 80) - STEP_WEIGHT.light) 
 
 /** The recorded ground under a step (its plan without `extra`), or null where the ground has no recording (wood, sand, snow). */
 function groundStep(params, event, jitter) {
-  const ground = GROUND_STEPS[params.surface];
+  const ground = (event.heels && HEEL_STEPS[params.surface]) || GROUND_STEPS[params.surface];
   if (!ground) return null;
   const w = stepWeight(event.mass);
   const pick = (range) => sampleLerp(range[0], range[1], w);
@@ -79,9 +89,25 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
   const jitter = (spread = 0.06) => 1 + (random() * 2 - 1) * spread;
   switch (type) {
     case 'hit': {
-      if (!SAMPLED_HEADS.has(params.striker)) return null;
+      const limb = LIMB_BLOWS[params.striker];
+      if (!SAMPLED_HEADS.has(params.striker) && !limb) return null;
       const s = sampleStrength(params.energy, 5, 400);
       const rate = sampleMassRate(event.mass) * jitter();
+      // A helmet struck rings (by a weapon, a fist or a boot; a shoulder's crash is the synth's): a heavier blow louder and rung out longer.
+      if (event.part === 'head' && params.covering === 'plate' && params.striker !== 'body') {
+        return { set: 'helmet', trim: (limb ? 0.8 : 1) * sampleLerp(0.75, 1.15, s), rate: rate * (params.striker === 'blunt' ? 0.88 : 1) * (limb ? 1.08 : 1), seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.06, 0.3, s), skip: 0, synth: null, synthGain: 0 };
+      }
+      // A wooden shield's boards knocked hollow (anything on them): a heavier blow fuller and longer, a weight's lower.
+      if (params.covering === 'wood') {
+        return { set: 'woodshield', trim: (limb ? limb.trim * 0.75 : 1) * sampleLerp(0.75, 1.15, s), rate: (limb ? limb.rate : rate) * (params.striker === 'blunt' ? 0.9 : 1), seconds: sampleLerp(0.12, 0.32, s), fade: sampleLerp(0.04, 0.14, s), skip: 0, synth: null, synthGain: 0 };
+      }
+      // A punch, a kick, a knee, an elbow, a head or a shoulder into the body (bare, padded or leather): the recorded punch, the harder
+      // blow louder and its whole take, the lighter one clipped short.
+      if (limb) {
+        if (!SAMPLED_SOFT.has(params.covering)) return null;
+        const p = sampleStrength(params.energy, 3, 300);
+        return { set: 'punch', trim: limb.trim * sampleLerp(0.75, 1.2, p), rate: limb.rate * jitter(), seconds: sampleLerp(0.1, 0.26, p), fade: sampleLerp(0.03, 0.1, p), skip: 0, synth: null, synthGain: 0 };
+      }
       // A blade into flesh slices; a weight into it lands on the bone under it.
       if (SAMPLED_SOFT.has(params.covering)) return { set: params.striker === 'blunt' ? 'bonehit' : 'slice', trim: params.striker === 'blunt' ? 1 : 0.85, rate, seconds: sampleLerp(0.22, 0.75, s), fade: sampleLerp(0.04, 0.2, s), skip: 0, synth: null, synthGain: 0 };
       // Steel on steel plate (or a steel shield): the crash of it; a weight heavier, lower.
@@ -97,9 +123,11 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       return null;
     }
     case 'clash': {
-      // Steel on steel only (a haft or a wooden shield is the synth's chop).
-      if (params.wood) return null;
       const s = sampleStrength(params.speed, 1, 20);
+      // Steel into wood: a wooden shield's boards knocked; a haft (thinner, its first mode higher) the same take a little higher and shorter.
+      if (params.wood) {
+        return { set: 'woodshield', trim: sampleLerp(0.75, 1.15, s), rate: sfxClamp((params.wood.base / 300) ** 0.5, 0.9, 1.3) * jitter(), seconds: sampleLerp(0.1, 0.3, s) * (300 / params.wood.base), fade: sampleLerp(0.04, 0.12, s), skip: 0, synth: null, synthGain: 0 };
+      }
       const blunt = !params.modes.length || params.modes[0].f < 500;
       return {
         set: 'clash', trim: 1, rate: sampleMassRate(event.mass) * (blunt ? 0.85 : 1) * jitter(), seconds: sampleLerp(0.15, 0.8, s), fade: sampleLerp(0.04, 0.25, s), skip: 0,
@@ -134,6 +162,13 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
     case 'swing': {
       // A weight's whoosh (a mace, a club, an axe's head); a blade's thin whistle stays the synth's. The swing is logged at the stroke's
       // fastest, so the take starts a little into its rise.
+      // A fist or a foot driven at a man (log.js trackPunchSwing: logged as the drive starts): the whoosh rising into the blow, its loud
+      // end played (the take's last `seconds`, about the drive's), a faster drive louder and longer, a kick lower. The air off a limb is
+      // 20-30 dB under a blade's (swingParams), lost under the blows at its own level: lifted (×18) to about 8 dB under the punch.
+      if (event.head === 'fist' || event.head === 'foot') {
+        const s = sampleStrength(params.speed, 4, 14);
+        return { set: 'fistswing', trim: 18 * sampleLerp(0.7, 1.3, s), rate: sfxClamp((params.speed / 9) ** 0.15, 0.9, 1.12) * (event.head === 'foot' ? 0.85 : 1) * jitter(0.05), seconds: sfxClamp(event.reach ?? 0.25, 0.15, 0.4) * sampleLerp(0.8, 1.2, s), fade: 0.03, skip: 0, fromEnd: true, synth: null, synthGain: 0 };
+      }
       if (event.head !== 'blunt') return null;
       return { set: 'maceswing', trim: 0.9, rate: sfxClamp((params.speed / 15) ** 0.2, 0.85, 1.2) * jitter(0.05), seconds: sfxClamp(params.seconds * 2, 0.25, 0.6), fade: 0.12, skip: 0.06, synth: null, synthGain: 0 };
     }
@@ -151,6 +186,12 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       // A matchlock: the recorded report, the synth's low boom under it (what a recording through a phone has little of).
       if (params.kind !== 'matchlock') return null;
       return { set: 'gunshot', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.3, skip: 0, synth: params, synthGain: 0.35 };
+    case 'thunder': {
+      // A strike near cracks and roars (the whole take, at its pitch); a far one is the rumble only (the crack skipped), lower and drawn
+      // out, the synth's long rumble under it carrying it on (its loudness is the distance's, the ear's).
+      const near = params.crack;
+      return { set: 'thunder', trim: sampleLerp(0.85, 1.2, near), rate: sampleLerp(0.78, 1, near) * jitter(0.04), seconds: null, fade: sampleLerp(0.9, 0.5, near), skip: sampleLerp(0.12, 0, near), synth: { ...params, crack: 0 }, synthGain: sampleLerp(0.8, 0.35, near) };
+    }
     default:
       return null;
   }
@@ -159,9 +200,11 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
 /** Play a take into `out` at `when` by a plan, at `gain` (the engine's). Returns the end time. */
 export function playSample(voice, out, take, plan, when, gain) {
   const ctx = voice.ctx;
-  const start = Math.min(take.buffer.duration - 0.02, take.offset + (plan.skip ?? 0));
+  let start = Math.min(take.buffer.duration - 0.02, take.offset + (plan.skip ?? 0));
   const whole = (take.buffer.duration - start) / plan.rate;
   const seconds = Math.max(0.03, Math.min(whole, plan.seconds ?? whole) * (plan.share ?? 1));
+  // (`fromEnd`: the take's last `seconds` played, its end where it is loudest: a whoosh rising into the blow.)
+  if (plan.fromEnd) start = Math.max(start, take.buffer.duration - seconds * plan.rate);
   const fade = Math.min(plan.fade ?? 0.05, seconds * 0.6);
   const peak = Math.max(0.0002, gain * plan.trim);
   const envelope = sfxKeep(voice, ctx.createGain());
