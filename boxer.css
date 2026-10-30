@@ -141,6 +141,8 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 
 /* Big moments: a white flash and icons that pop over the body part. */
 #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
+/* A heavy blow (hitfeel.js): the edges darken, warm-black like the night scenes' shadows; the middle, where the men are, is left clear. */
+#hit-vignette { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at 50% 48%, transparent 48%, rgba(14, 8, 6, 0.55) 82%, rgba(8, 4, 3, 0.85) 100%); }
 .camera-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(54px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font: 600 12px var(--body); color: var(--muted); z-index: 3; white-space: nowrap; }
 .camera-bar[data-mode="free"] { color: var(--fg); border-color: rgba(255, 207, 74, 0.5); }
 .camera-bar button { padding: 5px 12px; font-size: 12px; border-radius: 999px; }
@@ -970,6 +972,13 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .mixer-toggle input:checked { background-color: var(--gold); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23191300' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); border-color: transparent; }
 .mixer-toggle em { font-style: normal; font-size: 12px; color: var(--muted); }
 .bench-open { min-height: 44px; justify-self: center; }
+/* Hit feel (hitfeelview.js): a switch and its name, the intensity, its share. */
+.hit-feel-row { grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1fr) 48px; }
+.hit-feel-switch { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; cursor: pointer; }
+.hit-feel-switch input { flex: none; appearance: none; -webkit-appearance: none; width: 44px; height: 44px; margin: 0; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06) center / 24px no-repeat; cursor: pointer; }
+.hit-feel-switch input:checked { background-color: var(--gold); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23191300' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); border-color: transparent; }
+.hit-feel-row input[type="range"]:disabled { opacity: 0.35; }
+.hit-feel-note { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
 .sound-bench { position: absolute; inset: 0; z-index: 8; overflow: auto; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); background: rgba(5, 6, 10, 0.94); display: grid; align-content: start; justify-items: center; gap: 14px; }
 .bench-head { position: relative; width: min(1100px, 100%); display: grid; justify-items: center; gap: 6px; text-align: center; padding: 0 52px; }
 .bench-head .back { position: absolute; left: 0; top: 0; min-height: 44px; }

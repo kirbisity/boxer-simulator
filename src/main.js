@@ -61,6 +61,8 @@ import { pinnedRung, QUALITY_MODES, readQuality, writeQuality } from './levelmod
 import { stormEnvironment, stormLastStrike, stormLook, stormOnSkyArrived, stormReset, stormSetLook, stormStrikeNow } from './levelmode/storm.js';
 import { stageWaters } from './levelmode/water.js';
 import { createAudioEngine } from './audio/engine.js';
+import { createHitFeel, hitFeelFromHash, loadHitFeel, saveHitFeel } from './hitfeel.js';
+import { createHitFeelView } from './hitfeelview.js';
 import { installMuteButton, installUiSounds } from './audio/controls.js';
 import { installSoundBench } from './audio/bench.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
@@ -146,6 +148,17 @@ installMuteButton(audio, $('.arena'));
 installUiSounds(audio);
 const soundBench = installSoundBench(audio);
 
+// How the player's blows feel (hitfeel.js): kept in this browser, a #hitfeel= in the address over it for the visit.
+const hitFeelStorage = (() => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+})();
+const hitFeel = createHitFeel(hitFeelFromHash(loadHitFeel(hitFeelStorage), location.hash));
+const hitFeelView = createHitFeelView(scene, { layer: $('#hit-vignette'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
+
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
 let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
 
@@ -212,6 +225,8 @@ const cutsceneDirector = createCutsceneDirector({
 const twistDirector = createTwistDirector({ orbit: () => scene.orbit, roomTest: (x, z, y) => cameraRoomTest(x, z, y) });
 /** Simulated seconds per real second now: a big moment's slow motion, or the cutscene's (the slower of the two; never a stop). */
 const paceNow = () => Math.min(timeScale(state.drama, realSeconds()), cutsceneDirector.speed());
+// The page's pace: that, held a moment more by a hit-stop of the player's blow (hitfeel.js).
+const fightPace = () => paceNow() * hitFeel.pace(realSeconds());
 const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds, camera: () => scene.camera });
 
 // The ring on the floor round the man locked on.
@@ -655,7 +670,9 @@ function frame(now) {
     // A big moment slows the simulation, not the drawing.
     buildQueuedViews();
     // While an army is still being drawn, the fight waits for it.
-    if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow());
+    // (A hit-stop of the player's blow is the frame's pace too, hitfeel.js: the physics step is never changed, and the
+    // test hooks, boxer.advance and boxer.playFrames, never have one.)
+    if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * fightPace());
     draw(dt);
     // A fighter drawn in the plain loft while his V7 skin is built: a few ms of it a frame (render.js pumpSkinBuilds).
     pumpSkinBuilds(scene);
@@ -1135,6 +1152,8 @@ function drawWorld(dt, drawIt = true) {
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);
+  // The player's blows felt (hitfeel.js): the camera's jolt along the blow, the narrowing, the dark edges, the mist.
+  hitFeelView.apply(hitFeel, realSeconds(), state.paused ? 0 : dt);
   showCameraBar(!followed && !sheet);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
@@ -1183,7 +1202,7 @@ function drawWorld(dt, drawIt = true) {
   placeLockRing();
   placeChargeArrow();
   // The marks keep the fight's pace: slowed with it (a slow-motion moment, ¼×), still while it is paused.
-  fightMarksClock += dt * (state.paused ? 0 : state.speed * paceNow());
+  fightMarksClock += dt * (state.paused ? 0 : state.speed * fightPace());
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
   generalMarks.update(world);
   if (drawIt) render(scene);
@@ -1199,10 +1218,13 @@ function drawWorld(dt, drawIt = true) {
 
 function consumeEvents() {
   const events = state.world.events;
+  const feltBy = state.mode === 'play' && state.game !== 'intro' && state.eventCursor < events.length ? player()?.id ?? null : null;
   while (state.eventCursor < events.length) {
     const event = events[state.eventCursor];
     state.eventCursor += 1;
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
+    // A blow the player's man lands, takes or has blocked: felt (hitfeel.js). Only while he is played (not the fight behind the menus, the intro).
+    if (feltBy !== null) hitFeelView.felt(hitFeel.hear(event, feltBy, realSeconds()));
     // A machine struck (gear.machine: a robot) does not bleed: an edge, a point, an arrow or a ball throws sparks off it instead.
     const machine = Boolean(state.world.fighters[event.defender]?.body.gear.machine);
     const wound = machine ? (view, at) => spawnSparks(view, at.point, 10) : woundBlood;
@@ -2979,6 +3001,7 @@ const menus = installMenus({
   onMenu: (home) => { goHome = home; },
   audio,
   soundBench: () => soundBench.open(),
+  hitFeel: { settings: hitFeel.settings, save: () => saveHitFeel(hitFeelStorage, hitFeel.settings) },
 });
 // The sound bench straight from the address (?bench=sound).
 if (/[?&]bench=sound\b/.test(location.search)) soundBench.open();
@@ -3326,6 +3349,9 @@ const boxer = window.boxer = {
   // The fight's attack controls: 'target' (tap his man himself, the default) or 'buttons' (fightui/index.js); remembered.
   fightUi: (id) => fightUiChoose(id),
   fightMarks,
+  // The hit feel (hitfeel.js): its settings (changed in place), what it is doing now; its view (felt(result): a blow's mist, thump, vibration).
+  hitFeel,
+  hitFeelView,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
