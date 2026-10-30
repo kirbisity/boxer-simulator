@@ -20,6 +20,7 @@ import { fightUiInstall } from './fightui/index.js';
 import { FIGHT_UI_CONTROL_ICONS } from './fightui/icons.js';
 import { fightUiCommandBar } from './fightui/command.js';
 import { paintStamina } from './overdraftview.js';
+import { ARTS, artLabel, artPrimed } from './weaponarts.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -82,7 +83,9 @@ export function installFightControls(root, hooks) {
   crawl.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.crawl}</b><span class="label">Crawl</span><kbd>C</kbd>`;
   crawl.setAttribute('aria-label', 'Crawl');
   const status = root.appendChild(uiElement('div', 'player-status'));
-  status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div>';
+  status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" title="Adrenaline"><i></i></div>';
+  // Adrenaline: a hair-thin line under stamina, a tick where his weapon's art comes within reach (weaponarts.js ARTS.ready).
+  status.querySelector('.adrenaline').style.setProperty('--ready', `${ARTS.ready * 100}%`);
   const marker = root.appendChild(uiElement('div', 'target-marker'));
   marker.innerHTML = '<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div>';
   let incoming = null;
@@ -409,8 +412,10 @@ export function installFightControls(root, hooks) {
       lastAction = name;
       action.disabled = !name;
       action.classList.toggle('idle', !name);
+      // His weapon's art: the button glows and names it (weaponarts.js).
+      action.classList.toggle('art', name === 'art');
       action.querySelector('b').textContent = name ? ACTIONS[name].icon : '·';
-      action.querySelector('span').textContent = name ? ACTIONS[name].label : 'Action';
+      action.querySelector('span').textContent = name === 'art' ? artLabel(me) : name ? ACTIONS[name].label : 'Action';
     }
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
     lock.classList.toggle('on', Boolean(locked));
@@ -429,6 +434,9 @@ export function installFightControls(root, hooks) {
     status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
     paintStamina(status.querySelector('.stamina'), me.stamina);
+    const adrenaline = status.querySelector('.adrenaline');
+    adrenaline.querySelector('i').style.width = `${Math.round(Math.min(1, me.adrenaline ?? 0) * 100)}%`;
+    adrenaline.classList.toggle('primed', artPrimed(me));
     // His man: the one locked, or the one he is on; a marker over his head.
     const target = locked ?? foeFor(world, me);
     for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) awake.set(event.defender, now);
@@ -464,6 +472,7 @@ export function installFightControls(root, hooks) {
     mark.hidden = true;
     guard.classList.remove('on');
     jump.classList.remove('on', 'blocked');
+    action.classList.remove('art');
     crawl.classList.remove('on', 'blocked');
     awake.clear();
     incoming = null;

@@ -18,6 +18,7 @@ import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
 import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
 import { chargeAt } from './riding.js';
+import { artReady, artTarget, feelAdrenaline, startArt } from './weaponarts.js';
 
 export const CONTROL = {
   // The stick (0 at its centre, 1 at full throw): nothing inside `deadZone`; a walk from `walkFrom` of the footwork's pace up
@@ -948,6 +949,8 @@ export const ACTIONS = {
   crawl: { label: 'Crawl', icon: '🐾' },
   stand: { label: 'Stand', icon: '⤒' },
   finish: { label: 'Finish him', icon: '🔪' },
+  // His weapon's art (weaponarts.js), with his blood up: the button names it (weaponarts.js artLabel).
+  art: { label: 'Weapon art', icon: '✦' },
 };
 
 /** Who holds him in a clinch, if anyone. */
@@ -992,6 +995,8 @@ export function contextAction(world, fighter) {
   const weapon = fighter.weapon?.held ? fighter.weapon : null;
   const opponent = opponentFor(world, fighter);
   const distance = opponent ? vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis))) : Infinity;
+  // His blood up and his man before him: his weapon's art (weaponarts.js; never a gun's or a bow's).
+  if (fighter.player && artReady(fighter) && artTarget(world, fighter)) return 'art';
   if (weapon?.spec.ranged && !weapon.spent) {
     const sidearm = fighter.body.gear.sidearm && !fighter.sidearmDrawn;
     if (sidearm && distance < (style?.ranged?.close ?? 1.5) + 0.5) return 'drawSidearm';
@@ -1110,6 +1115,7 @@ export function doAction(world, fighter, name) {
     return true;
   }
   if (name === 'crawl' || name === 'stand') return playerCrawl(world, fighter, name === 'crawl');
+  if (name === 'art') return startArt(world, fighter);
   if (name === 'finish') {
     const prey = finishTarget(world, fighter, { locked: fighter.focus });
     return Boolean(prey) && !fighter.punch && startFinisher(world, fighter, prey);
@@ -1166,6 +1172,8 @@ export function directFighter(world, fighter, orders, dt) {
   if (!fighter || fighter.state === 'out') return;
   // The man whose mind this is is the player: he has the stamina overdraft (physics/overdraft.js), nobody else does.
   fighter.player = true;
+  // His adrenaline: the fight's surges, danger near, and the fade (weaponarts.js; an AI man's is ai.js's).
+  feelAdrenaline(world, fighter, dt);
   // Down on his knees over a man, a dagger going in: that holds him until it is done or he is struck (finisher.js).
   if (fighter.finisher && updateFinisher(world, fighter, dt)) {
     orders.requests.length = 0;

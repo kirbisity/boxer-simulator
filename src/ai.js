@@ -1600,7 +1600,7 @@ export function adrenalineGain(fighter) {
 }
 
 /** Adrenaline from what just happened to him: a man put down, or a hard blow survived. */
-function surge(fighter, event) {
+export function surge(fighter, event) {
   const spec = AI.adrenaline;
   let rise = 0;
   const putDown = event.kind === 'knockout' || ((event.kind === 'landed' || event.kind === 'blocked') && event.effects?.some((effect) => effect.startsWith('knockdown')));

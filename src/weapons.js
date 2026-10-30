@@ -193,6 +193,10 @@ export const SHOTGUN = {
 export const ARM_RIFLE = { ...RIFLE, rounds: Infinity, ammo: Infinity };
 export const ARM_SHOTGUN = { ...SHOTGUN, rounds: Infinity, ammo: Infinity };
 
+// `art`: the weapon art (moves.js, weaponarts.js) its family is made for, the move the player can make with it once his
+// blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's and dao's drawing cut,
+// the polearm's wheel, the hammer's and kanabo's charged blow (a mace's, one-handed), the two-handed spear's step back and lunge (a spear in one hand, a shield on the other arm, cannot make it). No
+// gun or bow has one.
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
@@ -204,13 +208,13 @@ export const WEAPONS = {
   longsword: {
     label: 'Long sword', hands: 'hybrid', length: 0.98, strikeFrom: 0.14, handle: 0.24, spacing: 0.15, mass: 1.45, balance: 0.11, radius: 0.012,
     harm: { swing: { cut: 1, blunt: 0.5 }, thrust: { pierce: 1, cut: 0.15, blunt: 0.15 } },
-    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 17, zeta: 0.8 }, threat: 4,
+    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 17, zeta: 0.8 }, threat: 4, art: 'artPommel',
   },
   // Two hands always: the sharper, shorter blade cuts deeper, stabs less.
   katana: {
     label: 'Katana', hands: 'two', length: 0.8, strikeFrom: 0.12, handle: 0.27, spacing: 0.17, mass: 1.15, balance: 0.12, radius: 0.012,
     harm: { swing: { cut: 1.3, blunt: 0.4 }, thrust: { pierce: 0.7, cut: 0.15, blunt: 0.15 } },
-    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 20, zeta: 0.8 }, threat: 4.5,
+    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 20, zeta: 0.8 }, threat: 4.5, art: 'artIai',
   },
   knife: {
     label: 'Knife', hands: 'one', length: 0.21, strikeFrom: 0.05, handle: 0.1, mass: 0.22, balance: 0, radius: 0.01,
@@ -231,20 +235,20 @@ export const WEAPONS = {
   warhammer: {
     label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 2.6, balance: 0.85, radius: 0.04,
     harm: { swing: { blunt: 1.6 }, thrust: { blunt: 1, pierce: 0.35 } },
-    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, crush: 0.45,
+    contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, art: 'artCrush', crush: 0.45,
   },
   naginata: {
     label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 2.35, balance: 0.55, radius: 0.014,
     // A heavy head on a long shaft (+25% weight, +25% blunt): it knocks men about as it cuts.
     harm: { swing: { cut: 1.3, blunt: 0.625 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.25 } },
-    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5,
+    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5, art: 'artWheel',
   },
   // The war spear: a stout ash shaft and a long socketed iron head, ~2.3 kg;
   // its weight behind a narrow point drives the thrust deep.
   longSpear: {
     pointFrom: 0, label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
     harm: { thrust: { pierce: 1.5, blunt: 0.3, cut: 0.15 }, swing: { blunt: 0.65, cut: 0.2 } },
-    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, grip: 0.5,
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, art: 'artSpear', grip: 0.5,
   },
   // The war lance taken up on foot: an ash shaft of ~3.3 m, swelling at the
   // grip and tapering to a socketed steel war point (not the jousting
@@ -272,7 +276,7 @@ export const WEAPONS = {
   yari: {
     pointFrom: 0, label: 'Yari', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
     harm: { thrust: { pierce: 1.5, blunt: 0.22, cut: 0.3 }, swing: { blunt: 0.5, cut: 0.4 } },
-    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, grip: 0.5,
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, art: 'artSpear', grip: 0.5,
   },
   // The langxian (wolf-brush) of Qi Jiguang's mandarin-duck squad (Jixiao
   // xinshu): a whole bamboo of about 1 zhang 5 chi (some 4.7 m), its side
@@ -469,7 +473,7 @@ export const WEAPONS = {
   kanabo: {
     label: 'Kanabo', hands: 'two', length: 1.15, strikeFrom: 0.25, handle: 0.35, spacing: 0.17, mass: 5, balance: 0.68, radius: 0.05,
     harm: { swing: { blunt: 1.4 }, thrust: { blunt: 0.4 } },
-    contactSeconds: 0.006, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, crush: 0.5,
+    contactSeconds: 0.006, rotation: 1.25, wrist: { omega: 8, zeta: 0.85 }, threat: 4.4, art: 'artCrush', crush: 0.5,
   },
   // One-handed maces, the horseman's answer to armour (swords skate off it):
   // a short iron-bound haft and a heavy head, swung with the wrist and arm
@@ -480,12 +484,12 @@ export const WEAPONS = {
   langya: {
     label: 'Wolf-tooth mace', hands: 'one', length: 0.72, strikeFrom: 0.46, handle: 0.13, mass: 2.0, balance: 0.68, radius: 0.042,
     harm: { swing: { blunt: 1.45, pierce: 0.3 }, thrust: { blunt: 0.4, pierce: 0.15 } },
-    contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, crush: 0.45,
+    contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, art: 'artCrushOne', crush: 0.45,
   },
   flangedMace: {
     label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.72, radius: 0.036,
     harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.35 } },
-    contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, crush: 0.55,
+    contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, art: 'artCrushOne', crush: 0.55,
   },
   // The Inca champi (the Spaniards' porra): a star-shaped head of cast bronze
   // (or ground stone), five or six points round a hole, on a wooden haft of
@@ -598,7 +602,7 @@ export const WEAPONS = {
   dao: {
     label: 'Dao', hands: 'one', length: 0.75, strikeFrom: 0.12, handle: 0.15, mass: 0.95, balance: 0.1, radius: 0.012,
     harm: { swing: { cut: 1.1, blunt: 0.35 }, thrust: { pierce: 0.78, cut: 0.15, blunt: 0.1 } },
-    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2,
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2, art: 'artDrawCut',
   },
   // The guandao: a broad, heavy crescent blade on a long shaft, fought like
   // the naginata but a quarter heavier, its weight knocking men about more
@@ -608,7 +612,7 @@ export const WEAPONS = {
     label: 'Guandao', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.95, balance: 0.6, radius: 0.016,
     harm: { swing: { cut: 1.15, blunt: 1.05 }, thrust: { pierce: 0.55, cut: 0.12, blunt: 0.5 } },
     // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
-    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, art: 'artWheel', crush: 0.3,
   },
   // The jian: the Chinese straight sword, double-edged, one hand. The Han's
   // were long: excavated iron jian run 0.85-1 m of blade and more (to ~1.1 m
@@ -617,7 +621,7 @@ export const WEAPONS = {
   jian: {
     label: 'Jian', hands: 'one', length: 0.95, strikeFrom: 0.1, handle: 0.21, mass: 1.0, balance: 0.1, radius: 0.01,
     harm: { thrust: { pierce: 1.05, cut: 0.2, blunt: 0.08 }, swing: { cut: 0.9, blunt: 0.25 } },
-    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 30, zeta: 0.78 }, threat: 3.6,
+    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 30, zeta: 0.78 }, threat: 3.6, art: 'artDrawCut',
   },
   // The ōdachi (nodachi): a field sword of a metre of blade and more, a long
   // grip for two hands; carried by a strong man at Anegawa (1570) to cut at
@@ -626,7 +630,7 @@ export const WEAPONS = {
   odachi: {
     label: 'Ōdachi', hands: 'two', length: 1.08, strikeFrom: 0.15, handle: 0.42, spacing: 0.36, mass: 2.3, balance: 0.24, radius: 0.013,
     harm: { swing: { cut: 1.4, blunt: 0.6 }, thrust: { pierce: 0.65, cut: 0.15, blunt: 0.2 } },
-    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 14, zeta: 0.82 }, threat: 4.9,
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 14, zeta: 0.82 }, threat: 4.9, art: 'artIai',
   },
   // A wooden baseball bat (~84 cm, ~0.9 kg), swung two-handed: all its
   // harm blunt, its weight out in the barrel.
@@ -641,7 +645,7 @@ export const WEAPONS = {
   qinglong: {
     label: 'Green Dragon Crescent Blade', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.95, balance: 0.6, radius: 0.016,
     harm: { swing: { cut: 1.15, blunt: 1.05 }, thrust: { pierce: 0.55, cut: 0.12, blunt: 0.5 } },
-    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, crush: 0.3,
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, art: 'artWheel', crush: 0.3,
   },
   // A knight's arming sword of the 1420s (Joan's, from Sainte-Catherine-de-
   // Fierbois): one hand, ~0.8 m of stiff tapering blade, a straight cross and
@@ -1348,8 +1352,12 @@ export function bladeTargets(move, t, aim, body, spec, reachShare = 1) {
     // Point on the line from the hand to the aim, then driven along it, so
     // the point arrives first; it goes `depth` past the surface it aims at.
     const dir = vec.normalize(vec.sub(aim, from.hand));
-    if (t < move.windup) return { hand: from.hand, dir: slerpDir(from.dir, dir, Math.min(1, t / Math.max(1e-3, move.windup))) };
+    // Driven hilt first (a weapon art's pommel strike, `hilt`): the blade laid back along the line, the pommel leading.
+    const pointing = move.hilt ? scale3(dir, -1) : dir;
+    if (t < move.windup) return { hand: from.hand, dir: slerpDir(from.dir, pointing, Math.min(1, t / Math.max(1e-3, move.windup))) };
     const u = Math.min(1, (t - move.windup) / (move.extendUntil - move.windup));
+    // (The pommel is `handle` behind the hand: the hand goes to `depth` past the surface, less that.)
+    if (move.hilt) return { hand: vec.lerp(from.hand, vec.sub(aim, vec.scale(dir, spec.handle - (move.depth ?? 0.1))), Math.min(1, u / (move.extendShare ?? 0.75)) ** 2), dir: pointing };
     // Couched: the hand stays at the hip on that line, and goes on along it only as far as the body throws itself in (`drive`).
     if (move.couched) return { hand: vec.add(from.hand, vec.scale(dir, move.couched.drive * Math.min(1, u / (move.extendShare ?? 0.75)) ** 2)), dir };
     // Accelerating all the way in, as a punch does, not easing to a stop at the skin.

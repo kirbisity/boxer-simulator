@@ -17,6 +17,7 @@ import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN,
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
+import { artTurn, coiledTwist, hiltMix, retreatDrive, strikeSpan } from './physics/arts.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
@@ -156,7 +157,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
     panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
-    aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined,
+    aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined, artEventCursor: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
@@ -1013,7 +1014,7 @@ function strokeTargets(fighter, weapon, stroke) {
       // (On foot the hands angle it only so far across him; a rider keeps it on his man as the horse carries it.)
       if (!stroke.driven || !stroke.line || fighter.mount) stroke.line = fighter.mount ? line : withinSwing(line, stroke.spec.couched.swing);
       target.dir = stroke.line;
-    } else target.dir = line;
+    } else target.dir = stroke.spec.hilt ? vec.scale(line, -1) : line;
   }
   return target;
 }
@@ -2112,7 +2113,8 @@ function updateIntent(world, fighter, dt) {
     // (Couched, he runs in upright and throws the body in behind the point only as it is driven home.)
     const phase = spec.couched ? Math.max(0, Math.min(1, (punch.t - spec.windup) / (spec.extendUntil - spec.windup))) : Math.min(1, punch.t / (spec.extendUntil * WORLD.rotationLead));
     const shape = punch.t < spec.extendUntil ? Math.sin(phase * Math.PI * 0.5) : Math.max(0, 1 - (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil));
-    intent.twist += spec.twist * shape;
+    // (A weapon art's coil: the hips wound the other way first, then turned through: physics/arts.js.)
+    intent.twist += spec.twist * (spec.coil ? coiledTwist(spec, punch.t) : shape);
     intent.dip += (spec.dip ?? 0) * shape;
     intent.lean += (spec.lean ?? 0.12) * shape;
     intent.shift += (spec.shift ?? 0) * shape;
@@ -3468,7 +3470,8 @@ function moveRoot(world, fighter, dt) {
   if (facePoint) {
     const from = point(fighter.x, P.pelvis);
     const to = facePoint;
-    const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
+    // (A weapon art that turns the whole body away and back through the blow, `turn`: physics/arts.js artTurn.)
+    const desiredYaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]) + artTurn(fighter.punch);
     let turn = desiredYaw - fighter.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     toTurn = Math.abs(turn);
@@ -3502,6 +3505,8 @@ function moveRoot(world, fighter, dt) {
   const punch = fighter.punch;
   // (Not kneeling over a man: the stab is driven down from where he kneels.)
   if (punch?.spec.step && !(punch.load > 0) && !fighter.finisher?.kneeling && punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
+  // A weapon art that steps back first (the spear's: physics/arts.js retreatDrive), through its wind-up.
+  drive = retreatDrive(punch) ?? drive;
   // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.
   let runPace = null;
   if (fighter.running && !fighter.rush && !fighter.crawling) {
@@ -5279,8 +5284,8 @@ function collideCrowd(world, time, substep) {
 }
 
 /** A striker with every field set (unset ones undefined), so all strikers share one shape. */
-function strikerOf(key, a, b, radius, side, { weapon, haft = false, bash, shin, pa, pb } = {}) {
-  return { key, weapon, haft, bash, shin, a, b, pa, pb, radius, side };
+function strikerOf(key, a, b, radius, side, { weapon, haft = false, bash, shin, pa, pb, span } = {}) {
+  return { key, weapon, haft, bash, shin, a, b, pa, pb, radius, side, span };
 }
 
 /** Whether a weapon has a haft that strikes (WORLD.haft): a shaft at least `shortest` long between the hand and the head. */
@@ -5291,7 +5296,10 @@ export function hasHaft(spec) {
 /** How far along a weapon (m from the main hand) a weapon striker is touched at `s` (0..1) of it: its haft, or its head. */
 function strikerDistance(striker, s) {
   const spec = striker.weapon.spec;
-  return striker.haft ? WORLD.haft.from + s * (spec.strikeFrom - WORLD.haft.from) : spec.strikeFrom + s * (spec.length - spec.strikeFrom);
+  if (striker.haft) return WORLD.haft.from + s * (spec.strikeFrom - WORLD.haft.from);
+  // (Its striking span: the head to the tip, or the pommel behind the hand for a blow with the hilt, physics/arts.js strikeSpan.)
+  const [from, to] = striker.span ?? [spec.strikeFrom, spec.length];
+  return from + s * (to - from);
 }
 
 // The two hands as strikers, by fist radius (gloved or bare): nothing in them changes, so they are made once.
@@ -5329,10 +5337,13 @@ function strikers(fighter) {
     const hand = P[`${weapon.main}Hand`];
     const key = weapon === fighter.weapon ? 'weapon' : 'offWeapon';
     const grip = point(fighter.x, hand);
-    const head = vec.add(grip, vec.scale(weapon.dir, weapon.spec.strikeFrom));
-    list.push(strikerOf(key, hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: head, pb: weapon.tip }));
-    // Its haft, short of the head (WORLD.haft): a man inside the head meets the wood.
-    if (hasHaft(weapon.spec)) list.push(strikerOf(`${key}Haft`, hand, hand, Math.min(WORLD.haft.radius, weapon.spec.radius), weapon.main, { weapon, haft: true, pa: vec.add(grip, vec.scale(weapon.dir, WORLD.haft.from)), pb: head }));
+    // (A blow with the hilt strikes with the pommel behind the hand: physics/arts.js strikeSpan.)
+    const span = strikeSpan(weapon, strokeOf(fighter, weapon));
+    const head = vec.add(grip, vec.scale(weapon.dir, span[0]));
+    const end = span[1] === weapon.spec.length ? weapon.tip : vec.add(grip, vec.scale(weapon.dir, span[1]));
+    list.push(strikerOf(key, hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: head, pb: end, span }));
+    // Its haft, short of the head (WORLD.haft): a man inside the head meets the wood (not when the pommel is what strikes).
+    if (hasHaft(weapon.spec) && span[0] > WORLD.haft.from) list.push(strikerOf(`${key}Haft`, hand, hand, Math.min(WORLD.haft.radius, weapon.spec.radius), weapon.main, { weapon, haft: true, pa: vec.add(grip, vec.scale(weapon.dir, WORLD.haft.from)), pb: head }));
   }
   const punch = fighter.punch;
   if (!punch || punch.t > punch.spec.extendUntil + 0.06) return list;
@@ -6547,8 +6558,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const impulse = reducedMass * goingIn * (1 + WORLD.restitution);
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * goingIn * goingIn;
-  // The haft: round wood, no edge and no point.
-  const mix = haft ? { blunt: WORLD.haft.blunt, cut: 0, pierce: 0 } : harmMix(wspec, spec.mode, along, closest.s);
+  // The haft: round wood, no edge and no point; the pommel: all blunt.
+  const mix = haft ? { blunt: WORLD.haft.blunt, cut: 0, pierce: 0 } : spec.hilt ? hiltMix() : harmMix(wspec, spec.mode, along, closest.s);
   const contactSeconds = haft ? WORLD.haft.contactSeconds : wspec.contactSeconds;
   // A dagger driven into a man lying helpless: all point, little blunt (finisher.js).
   if (punch.finisher) {
