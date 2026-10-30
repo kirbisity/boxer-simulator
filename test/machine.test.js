@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESETS } from '../src/body.js';
+import { PRESETS, buildBody } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld } from '../src/physics.js';
 
@@ -23,4 +23,10 @@ test('a robot has no morale and no blood: never afraid, never runs, never bleeds
   man.bleed = 0.01;
   advance(world, 0.5);
   assert.ok(man.bloodLost > 0);
+});
+
+test('a robot tires: its motors heat under flurries and cool slowly, below a trained man\'s wind', () => {
+  const trained = buildBody(PRESETS.light).aerobic;
+  for (const robot of ['humanoid', 'combatBot']) assert.ok(buildBody(PRESETS[robot]).aerobic < 0.7 * trained, robot);
+  assert.ok(buildBody(PRESETS.combatBot).aerobic < buildBody(PRESETS.humanoid).aerobic, 'the heavier machine tires sooner');
 });
