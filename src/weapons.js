@@ -82,11 +82,19 @@ export const ADAMS = {
 export const WHIP = {
   length: 2.4, links: 16, massKg: 0.28, taper: 0.15, drag: 1.2, passes: 10, tipLinks: 3,
   lashFrom: 14, cutShare: 0.6, painFrom: 5, painSure: 22, kneelSeconds: 1.6, riseSeconds: 0.9,
-  // The lash's push: the tip's momentum into the part it strikes, ×`impact` for the rest of the thong
-  // that wraps on after the tip and the haul of the arm through it (a lash shoves a man as a club
-  // does, without its weight); and the pain's flinch: from
+  // The lash's push: the tip's momentum into the part it strikes, ×`impact` for the rest of the thong that wraps on after
+  // it (the whole 0.28 kg at about half the tip's speed: ~9× the tip's 15 g at its own), armour or not; a man braced in a
+  // shell takes `braced` m/s of the body's shove off per unit of poise over 1 (only the struck part flinches); and the pain's flinch: from
   // `staggerFrom` of painFrom through the skin he reels (a stagger of `staggerSeverity` + `staggerPerPain` × through/painFrom).
-  impact: 4, staggerFrom: 0.4, staggerSeverity: 0.72, staggerPerPain: 0.12,
+  impact: 9, braced: 0.05, staggerFrom: 0.4, staggerSeverity: 0.72, staggerPerPain: 0.12,
+  // A stroke at a man is laid on him (physics/whip.js homeTip): a lorarius's whole craft is putting the fall where he means it,
+  // and the thong's own swing is too loose to find a moving man by itself. From `from` s before the arm's drive ends
+  // (the snap: the tip turns over just after the hand stops) the tip goes at his mark at no less than `crack` m/s (the middle
+  // of a free stroke's tip speeds, 15-50), `through` m past it so its last stretch meets him; the mark held within `taut` of
+  // the thong's length from the handle (a thong pulled straight reaches no further). A man drawing out of that through the
+  // stroke is stepped after (whipDrive): footwork drive `gain` per m he will be beyond `margin` of that reach at the crack
+  // (`ahead` s after the arm's drive, the tip's flight), to `most` (a full step).
+  home: { from: 0.06, crack: 30, through: 0.05, taut: 0.97, step: { gain: 3, most: 1, margin: 0.92, ahead: 0.08 } },
 };
 
 export const MATCHLOCK = {

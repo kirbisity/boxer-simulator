@@ -25,7 +25,7 @@ import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } fr
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
-import { painShare, stepWhips } from './physics/whip.js';
+import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { canRide } from './horses.js';
 import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
@@ -3661,7 +3661,8 @@ function moveRoot(world, fighter, dt) {
   // man already about the point: a lunge would carry the point past him and put the haft on him, ai.js AI.pointRoom.)
   if (punch?.spec.step && !(punch.load > 0) && !onKnees(fighter) && !punch.low && !punch.planted && punch.t >= punch.spec.windup - (punch.spec.stepLead ?? 0) && punch.t <= punch.spec.extendUntil) drive = Math.max(drive, punch.spec.step);
   // A weapon art that steps back first (the spear's: physics/arts.js retreatDrive), through its wind-up.
-  drive = retreatDrive(punch) ?? rangeDrive(punch) ?? drive;
+  // A whip stroke at a man drawing out of the thong's reach: he steps in after him (physics/whip.js).
+  drive = retreatDrive(punch) ?? rangeDrive(punch) ?? whipDrive(world, fighter) ?? drive;
   // Running: as fast as his body runs (physics/gait.js): flat out in the player's run mode, a run's pace else, at the share asked.
   let runPace = null;
   if (fighter.running && !fighter.rush && !fighter.crawling) {
