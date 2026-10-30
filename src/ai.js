@@ -2821,7 +2821,9 @@ function decide(world, fighter, dt) {
       perform(world, fighter, name, { side, from: striker.id, held: guards });
       if (guards) {
         fighter.guardHeld = true;
-        fighter.guardUntil = world.time + WORLD.guardRead.linger;
+        // An afraid man keeps his guard up the longer after the blows stop, a confident one drops it sooner to go in (plan.defend over his style's).
+        fighter.guardLinger = WORLD.guardRead.linger * plan.defend / Math.max(1e-6, basePlan.defend);
+        fighter.guardUntil = world.time + fighter.guardLinger;
       }
       // Slip and fire back: the counter comes while the attacker's hand is out.
       if ((name === 'slip' || name === 'roll') && random() < Math.min(0.9, (style.counter ?? 0) + plan.counter)) {
@@ -2933,7 +2935,7 @@ function decide(world, fighter, dt) {
 function keepGuard(world, fighter) {
   if (!fighter.guardHeld) return;
   const striker = fighter.state === 'up' ? world.fighters.find((other) => hostile(other, fighter) && other.punch?.target === fighter.id) : null;
-  if (striker) fighter.guardUntil = world.time + WORLD.guardRead.linger;
+  if (striker) fighter.guardUntil = world.time + (fighter.guardLinger ?? WORLD.guardRead.linger);
   if (fighter.state !== 'up' || !(world.time < fighter.guardUntil)) {
     fighter.guardHeld = false;
     return;

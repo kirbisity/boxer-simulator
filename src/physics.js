@@ -188,7 +188,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // guardHeld: his guard held up (the player's button, control.js; an AI's, ai.js keepGuard): it costs breath and he recovers
     // less (WORLD.guardHeld). guardUntil: when an AI's held guard comes down with no blow at him (WORLD.guardRead.linger).
     // blowRead: how his block reads the blow it is made against ({ punch, point, at, off }: blowRead, WORLD.guardRead).
-    guardHeld: undefined, guardUntil: undefined, blowRead: undefined,
+    guardHeld: undefined, guardUntil: undefined, guardLinger: undefined, blowRead: undefined,
     // limbCache: limbShares worked out this step.
     limbCache: undefined,
   };

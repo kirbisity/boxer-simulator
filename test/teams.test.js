@@ -63,9 +63,11 @@ test('fear and confidence: the stronger man presses and covers up less, the weak
   const [heavy, light] = [0, 1];
   assert.ok(on[heavy].confidence > 0.3 && on[light].confidence < -0.3, `confidence ${on[heavy].confidence.toFixed(2)} / ${on[light].confidence.toFixed(2)}`);
   assert.ok(on[heavy].advancing > off[heavy].advancing, 'the confident man presses forward more');
-  assert.ok(on[heavy].defencesPerMinute < off[heavy].defencesPerMinute, 'and covers up less');
+  // (Covering up is measured as the time behind a guard: a trained man's guard is held up through the blows that follow,
+  // one defence however many it meets, longer the more afraid he is: ai.js guardLinger.)
+  assert.ok(on[heavy].guarding < off[heavy].guarding, `and covers up less (${on[heavy].guarding.toFixed(3)} / ${off[heavy].guarding.toFixed(3)})`);
   assert.ok(on[light].advancing < off[light].advancing, 'the afraid man keeps away');
-  assert.ok(on[light].defencesPerMinute > off[light].defencesPerMinute, 'and defends more');
+  assert.ok(on[light].guarding > off[light].guarding, `and defends more (${on[light].guarding.toFixed(3)} / ${off[light].guarding.toFixed(3)})`);
 });
 
 test('uneven sides, up to eight a side: everyone fits the floor, team-mates rarely hit each other, nothing breaks', () => {
