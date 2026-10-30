@@ -89,12 +89,14 @@ test('a landed head shot snaps the head, and enough of them put a fighter down a
   for (let second = 0; second < 240 && !knockdown; second += 1) {
     advance(world, 1, (current, dt) => thinkAll(current, dt));
     headShot ??= world.events.find((event) => event.kind === 'landed' && event.target === 'head');
-    knockdown = world.events.find((event) => event.effects?.some((effect) => effect.startsWith('knockdown')));
+    // (Down or out: since the skill guard his read blocks change the bout, and at this seed the heavyweight's third head
+    // shot knocks the amateur out cold, past a knockdown.)
+    knockdown = world.events.find((event) => event.kind === 'knockout' || event.effects?.some((effect) => effect.startsWith('knockdown')));
   }
   assert.ok(headShot, 'a head shot landed');
   assert.ok(headShot.headDeltaV > 0 && headShot.impulse > 0 && headShot.force > 0);
   assert.ok(knockdown, 'the heavyweight dropped the amateur within four minutes');
-  const down = world.fighters[knockdown.defender];
+  const down = world.fighters[knockdown.defender ?? knockdown.fighter];
   advance(world, 1.5);
   assert.ok(point(down.x, P.head)[1] < 0.7, 'and the body fell');
 });
