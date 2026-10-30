@@ -22,7 +22,7 @@ const PARTS = {
 };
 
 /** The floor under him (y): his lower foot, less the ankle. */
-function floorOf(fighter) {
+function groundUnder(fighter) {
   return Math.min(fighter.x[P.lFoot * 3 + 1], fighter.x[P.rFoot * 3 + 1]) - fighter.body.lengths.ankle;
 }
 
@@ -43,7 +43,7 @@ function standingShoulder(fighter) {
 export function lowMan(fighter, man) {
   if (!man || man === fighter || man.state === 'out' || man.dormant || man.fled || man.mount) return false;
   if (man.state === 'down' || man.state === 'rising' || man.crawling) return true;
-  return man.x[P.head * 3 + 1] - floorOf(fighter) < WORLD.lowStrike.headBelow * standingShoulder(fighter)[1];
+  return man.x[P.head * 3 + 1] - groundUnder(fighter) < WORLD.lowStrike.headBelow * standingShoulder(fighter)[1];
 }
 
 /**
@@ -54,7 +54,7 @@ export function lowMan(fighter, man) {
  * with the blade's length before it); a whip's thong. Outer Infinity for a shot. Null for a move that cannot go down to a man on
  * the floor (a knee, a clinch, a rush).
  */
-function reachOf(fighter, spec) {
+function strikeReachOf(fighter, spec) {
   if (!spec || spec.kind !== 'strike' || spec.limb.endsWith('Knee')) return null;
   const { fit, handIn } = WORLD.lowStrike;
   if (spec.path === 'aim') return { from: 'shoulder', outer: Infinity, inner: 0 };
@@ -72,7 +72,7 @@ function reachOf(fighter, spec) {
 /** Whether he can make a move now: a strike of his style that reaches down, with the weapon or shield it needs and its limb whole. */
 function usable(fighter, name) {
   const spec = MOVES[name];
-  if (!reachOf(fighter, spec)) return false;
+  if (!strikeReachOf(fighter, spec)) return false;
   if (spec.reach === 'weapon' && !fighter.weapon?.held && !fighter.offWeapon?.held) return false;
   if (spec.bash && !fighter.shield) return false;
   return !fighter.limp?.has(P[spec.limb]);
@@ -126,7 +126,7 @@ function nearestPart(fighter, man, spec) {
  * m up from his floor: the least that brings its striking part to it (between `inner` and `outer`). Null if not even the deepest does.
  */
 export function stoopNeeded(fighter, spec, apart, height) {
-  const how = reachOf(fighter, spec);
+  const how = strikeReachOf(fighter, spec);
   if (!how) return null;
   const { outer } = how;
   if (how.from === 'hip') {
@@ -154,7 +154,7 @@ function clearOfPoint(fighter, how, apart, height, shift) {
  * between the nearest the place may be (`inner`) and the furthest (`outer`), his feet off the man's body.
  */
 function standingOff(fighter, spec, height, stoop) {
-  const how = reachOf(fighter, spec);
+  const how = strikeReachOf(fighter, spec);
   const { outer } = how;
   if (outer === Infinity) return Infinity;
   if (how.from === 'hip') {
@@ -232,7 +232,7 @@ export function updateLowStrike(world, fighter, dt) {
   const hips = point(fighter.x, P.pelvis);
   const mark = PARTS[state.part].at(man);
   const apart = Math.hypot(mark[0] - hips[0], mark[2] - hips[2]);
-  const height = mark[1] - floorOf(fighter);
+  const height = mark[1] - groundUnder(fighter);
   const move = MOVES[state.move];
   if (state.phase === 'approach' || state.phase === 'stoop') {
     if (!lowMan(fighter, man) || apart > spec.lost) {
