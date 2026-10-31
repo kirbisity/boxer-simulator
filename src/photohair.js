@@ -8,27 +8,18 @@
 //   on an older man. photoScalp gives its numbers, scalpCover the same
 //   coverage on the CPU (a crowd's heads, painted per vertex);
 //
-//   the volume, cards: thin curved strips rooted on the scalp, following it
-//   away from the crown's whorl a little off the skin, alpha-tested with one
-//   shared strand texture (made once, on a canvas): ragged tips, a fringe in
-//   locks, length by style; long hair hangs free below the ears; tied hair is
-//   drawn back to a knot. Beards the same: cards along the jaw and the lip
-//   over the painted density.
+//   beards, cards: thin curved strips along the jaw and the lip over the
+//   painted density, alpha-tested with one shared strand texture (made once,
+//   on a canvas).
 //
-// The drawn styles (face.js LOOK_OPTIONS.hairStyle) map onto lengths: crop
-// (buzz, fade, cornrows: painted only), short, medium, long and tied.
+// The hair's volume is hairmass.js's. The drawn styles (face.js
+// LOOK_OPTIONS.hairStyle) map onto lengths: crop (buzz, fade, cornrows:
+// painted only), short, medium, long and tied.
 
 /* global THREE */
 
 export const PHOTO_HAIR = {
-  // Cards: count over the scalp, length (of the head's radius), width, lift off the skin at the root and the tip.
-  lengths: {
-    crop: { cards: 0, length: 0 },
-    short: { cards: 130, length: 0.42, width: 0.12 },
-    medium: { cards: 140, length: 0.85, width: 0.14, hang: 0.45 },
-    long: { cards: 150, length: 2.0, width: 0.16, hang: 1.4 },
-    tied: { cards: 110, length: 0.9, width: 0.13 },
-  },
+  // Beard cards: segments, lift off the skin at the root and the tip (of the head's radius).
   segments: 5,
   lift: [0.025, 0.07],
   // The scalp's painted hairline (atlas rows, from the crown), by length.
@@ -208,12 +199,10 @@ function mergeStrips(strips) {
 }
 
 /**
- * The hair's cards for a photo head: `group` gets them (tagged userData.photoHair / photoBeard, so a helmet can hide them).
- * `head`: photohead.js's mesh arrays (positions, uvs) and `point`; `r`: the head's radius; `style`, `facialHair`, `colour`.
- * Returns the triangles drawn.
+ * A beard's cards for a photo head: `group` gets them (tagged userData.photoBeard, so a closed helmet can hide them). `head`:
+ * photohead.js's mesh arrays (positions, uvs) and `point`; `r`: the head's radius; `facialHair`, `colour`. Returns the triangles.
  */
-export function buildPhotoHair({ group, head, r, style, facialHair = 'none', colour, scalp, random, coarse = false }) {
-  const length = hairLength(style);
+export function buildPhotoBeard({ group, head, r, facialHair = 'none', colour, random, coarse = false }) {
   const centre = new THREE.Vector3(0, 0.05 * r, 0);
   const surface = (direction) => new THREE.Vector3(...head.point(direction.x, direction.y, direction.z)).multiplyScalar(r);
   const vertices = head.positions.length / 3;
@@ -229,62 +218,6 @@ export function buildPhotoHair({ group, head, r, style, facialHair = 'none', col
     group.add(mesh);
     triangles += strips.length * PHOTO_HAIR.segments * 2;
   };
-  const material = cardMaterial(colour);
-  const spec = PHOTO_HAIR.lengths[length];
-  if (spec && spec.cards && !coarse) {
-    // Roots: vertices of the head well inside the painted hairline, picked at random.
-    const roots = [];
-    for (let index = 0; index < vertices; index += 1) {
-      if (scalpCover(head.uvs[index * 2], head.uvs[index * 2 + 1], { ...scalp, density: 1, crown: 0 }) > 0.9 && rowOf(index) > 0.02) roots.push(index);
-    }
-    const whorl = new THREE.Vector3(-0.45 * r, 0.95 * r, 0.05 * r);
-    const tie = new THREE.Vector3(-0.75 * r, (style === 'topknot' ? 1.1 : 0.75) * r, 0);
-    const strips = [];
-    for (let card = 0; card < spec.cards && roots.length; card += 1) {
-      const index = roots[Math.floor(random() * roots.length)];
-      const root = at(index);
-      // Thin where the crown thins.
-      if (rowOf(index) < 0.14 && random() < scalp.crown) continue;
-      const away = root.clone().sub(whorl);
-      // The front locks fall forward and down over the brow, the rest flow back and down from the whorl.
-      // (A fringe only on longer hair; short hair is swept back off the brow.)
-      const frontLock = duOf(index) < 0.1 && rowOf(index) > scalp.hairline - 0.07 && (length === 'medium' || length === 'long');
-      // Hair rooted over the face that is not a fringe is swept back and to the side, never down over the face.
-      const overFace = !frontLock && ((duOf(index) < 0.16 && root.x > 0) || root.clone().sub(whorl).x > 0);
-      const sideways = new THREE.Vector3(-0.7, -0.15, (root.z >= 0 ? 1 : -1) * (0.6 + 0.4 * random())).normalize();
-      const direction = frontLock ? new THREE.Vector3(0.6, -1, (random() - 0.5) * 0.6) : overFace ? sideways : away.lengthSq() > 1e-6 ? away.normalize() : new THREE.Vector3(-1, 0, 0);
-      const scale = 0.7 + 0.6 * random();
-      const fringe = frontLock ? Math.min(spec.length, 0.26) : spec.length;
-      strips.push(cardStrip({
-        root, direction, length: fringe * scale * r, width: spec.width * r, hang: frontLock ? 0 : (spec.hang ?? 0) * scale * r,
-        surface, centre, random, toward: length === 'tied' ? tie : null,
-      }));
-    }
-    // Long hair: more down the back and sides, longest behind.
-    if (length === 'long') {
-      for (let card = 0; card < 40; card += 1) {
-        const azimuth = Math.PI * 0.45 + random() * Math.PI * 1.1;
-        const root = surface(new THREE.Vector3(Math.cos(azimuth) * 0.55, 0.45, Math.sin(azimuth) * 0.55).normalize());
-        const back = Math.max(0, -Math.cos(azimuth));
-        strips.push(cardStrip({ root, direction: new THREE.Vector3(Math.cos(azimuth) * 0.3, -1, Math.sin(azimuth) * 0.3).normalize(), length: (1.4 + 1.6 * back) * r, width: 0.26 * r, hang: (1.0 + 1.4 * back) * r, surface, centre, random }));
-      }
-    }
-    add(strips, material, 'photoHair');
-    // Tied: the knot at the tie, and a tail for a ponytail.
-    if (length === 'tied') {
-      const knot = new THREE.Mesh(new THREE.SphereGeometry((style === 'topknot' ? 0.2 : 0.3) * r, 10, 8), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.6 }));
-      knot.position.copy(tie);
-      if (style === 'topknot') knot.scale.set(1.6, 0.75, 0.8);
-      knot.userData.photoHair = true;
-      group.add(knot);
-      triangles += 160;
-      if (style === 'ponytail') {
-        const tail = [];
-        for (let card = 0; card < 10; card += 1) tail.push(cardStrip({ root: tie.clone().add(new THREE.Vector3(0, (random() - 0.5) * 0.1 * r, (random() - 0.5) * 0.15 * r)), direction: new THREE.Vector3(-0.4, -1, 0).normalize(), length: 1.6 * r, width: 0.22 * r, hang: 1.6 * r, surface, centre, random }));
-        add(tail, material, 'photoHair');
-      }
-    }
-  }
   // Beards: short cards down along the jaw and chin, a moustache's over the lip (the density is painted under them).
   if (!coarse && (facialHair === 'beard' || facialHair === 'longBeard' || facialHair === 'mustache' || facialHair === 'handlebar')) {
     const beard = [];

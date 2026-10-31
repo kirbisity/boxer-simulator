@@ -1,7 +1,6 @@
-// Photo faces (a prototype): a head drawn from a photographed face, with a
-// normal map for its relief and a roughness map, in place of the drawn anime
-// eyes, brows and mouth. Off unless the page is opened with #faces=photo (or
-// the harness turns it on).
+// Photo faces: a head drawn from a photographed face, with a normal map for
+// its relief and a roughness map, in place of the drawn anime eyes, brows and
+// mouth. On unless the page is opened with #faces=off (the drawn faces).
 //
 // The faces are regional "average face" composites (frontal photos): each is
 // projected offline (tools/photofaces/avg_build.py) into one canonical
@@ -9,17 +8,16 @@
 // and chin at fixed places, the back of the head at both edges), the rest of
 // the head synthesised as skin, its light flattened, and its colour stored
 // relative to its own cheeks: the game multiplies it by the fighter's skin, so
-// face and body match. One set of texture coordinates on the head (face.js
-// photoUV) fits every face.
+// face and body match. One set of texture coordinates on the head (photohead.js)
+// fits every face.
 //
 // Who gets which face: faceregions.js (by culture and kit, or the fighter's
 // own `faceRegion`), two regions blended per fighter, with his skin and
 // proportions jittered by a seed, so an army is not one man cloned.
 //
-// The atlases are not in the repository (their source still has to be
-// cleared): they are loaded at run time from PHOTO_FACES.base, a local folder
-// served by the dev server, each face's maps only when a fighter first wears
-// it. Missing, the heads stay drawn.
+// The atlases are in assets/faces/ (PHOTO_FACES.base), each face's maps
+// fetched when a fighter first wears it; the single-file bundle carries them
+// as data URLs (PHOTO_FACE_EMBED). Missing, the heads stay drawn.
 
 /* global THREE */
 import { nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL } from './faceregions.js';
@@ -33,13 +31,10 @@ import { SCALP_GLSL } from './photohair.js';
 export const PHOTO_ATLAS = { eyeU: 0.0668, earU: 0.258, eyeRow: 0.44, mouthRow: 0.70, chinRow: 0.88, mouthShare: 0.56, chinT: 0.95, hairlineRow: 0.22, hairlineAt: 0.36, eyeHalf: [0.027, 0.013] };
 
 export const PHOTO_FACES = {
-  base: 'faces-local/avg/',
+  base: 'assets/faces/',
   // How much a fighter varies: the second region's share of his face, his skin's brightness and warmth, his face's width and
   // the height of his eyes and mouth (atlas rows).
   vary: { blend: [0.15, 0.45], bright: 0.06, warm: 0.03, width: 0.06, eyeRow: 0.008, mouthRow: 0.012, region: 0.8, shape: 0.25, measured: 0.35 },
-  // How the hair's volume is drawn: 'R4' (round four's sparse cards, photohair.js) or an option of hairoptions.js ('A' sculpted mass,
-  // 'B' dense layered cards, 'C' mass and cards, 'D' clumps). #hair=A|B|C|D in the URL overrides it.
-  hair: 'R4',
   // The face's ambient light, scaled: a fill, so a face under an overhead key is not darker and muddier than the chest beside it.
   fill: 1.8,
   normalScale: 1,
@@ -50,21 +45,20 @@ const photoTextures = new Map();
 let photoWanted = null;
 let photoLoading = null;
 
-/** Whether heads are drawn from photos: #faces=photo in the URL (default off), or set by the harness. */
+/** Whether heads are drawn from photos: on, unless the URL says #faces=off (the drawn faces); the harness may set it. */
 export function photoFacesOn() {
   if (photoWanted === null) {
     const hash = typeof location === 'undefined' ? '' : location.hash.replace(/^#/, '');
-    photoWanted = new URLSearchParams(hash).get('faces') === 'photo';
+    photoWanted = new URLSearchParams(hash).get('faces') !== 'off';
   }
   return photoWanted;
 }
 
-/** How the hair's volume is drawn (PHOTO_FACES.hair, or #hair= in the URL). */
-export function photoHairOption() {
-  const hash = typeof location === 'undefined' ? '' : location.hash.replace(/^#/, '');
-  const wanted = new URLSearchParams(hash).get('hair');
-  return ['A', 'B', 'C', 'D', 'R4'].includes(wanted) ? wanted : PHOTO_FACES.hair;
-}
+// The single-file bundle (tools/bundle.js) fills this with the maps as data URLs, by file name; the page served from the
+// repository fetches them from PHOTO_FACES.base.
+const PHOTO_FACE_EMBED = null;
+/** Where a face file is read from: the bundle's data URL, or the folder. */
+const photoFile = (file) => PHOTO_FACE_EMBED?.[file] ?? `${PHOTO_FACES.base}${file}`;
 
 /** Turn photo faces on or off (the next heads built follow it); loads the manifest on the way on. */
 export function setPhotoFaces(on) {
@@ -74,7 +68,7 @@ export function setPhotoFaces(on) {
 
 /** Load the faces' manifest (once): which faces there are, their skin and hair, a thumbnail each; resolves to how many. */
 export function loadPhotoFaces() {
-  photoLoading ??= fetch(`${PHOTO_FACES.base}manifest.json`).then((answer) => (answer.ok ? answer.json() : null)).catch(() => null).then((data) => {
+  photoLoading ??= fetch(photoFile('manifest.json')).then((answer) => (answer.ok ? answer.json() : null)).catch(() => null).then((data) => {
     if (!data) return 0;
     photoManifest.neutral = data.neutral;
     photoManifest.thumb = data.thumb;
@@ -89,7 +83,7 @@ export function loadPhotoFaces() {
 
 function photoTexture(file) {
   if (photoTextures.has(file)) return photoTextures.get(file).texture;
-  const texture = new THREE.TextureLoader().load(`${PHOTO_FACES.base}${file}`, (loaded) => {
+  const texture = new THREE.TextureLoader().load(photoFile(file), (loaded) => {
     const entry = photoTextures.get(file);
     if (entry) entry.bytes = Math.round(loaded.image.width * loaded.image.height * 4 * (4 / 3));
   });

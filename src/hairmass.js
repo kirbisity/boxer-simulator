@@ -1,28 +1,19 @@
-// Hair for photo faces, four ways to draw it (for picking one): all grow from
-// the same style profile (hairProfile: for each column round the head, the
-// path the hair takes from the crown over the scalp to where it leaves it,
-// then down to where it is cut: a hime's blunt fringe at the brow and side
-// locks at the cheek, long hair to the back, a crop to the hairline), and all
-// take the same painted scalp under them (photohair.js) and swing the same
-// way (hairswing.js).
-//
-//   A  one sculpted mass: a smooth surface over the columns, a strand texture,
-//      a sheen along the strands, ragged (or, cut blunt, straight) tips
-//   B  dense layered cards: three layers of wide overlapping cards along the
-//      columns, the inner one dense, the outer ones sparse at their tips
-//   C  hybrid: A's mass a little inside, with a few B cards over it at the
-//      fringe and tips for breakup
-//   D  clumps: tapered tubes along jittered columns, many of them, so the hair
-//      reads as locks with thickness
-//
-// photohair.js's sparse cards (round 4) stay the default; PHOTO_FACES.hair
-// (photoface.js) or #hair=A|B|C|D picks one of these.
+// Hair for photo faces (photoface.js): one sculpted mass per style, grown
+// from a style profile (hairProfile: for each column round the head, the path
+// the hair takes from the crown over the scalp to where it leaves it, then
+// down to where it is cut: a hime's blunt fringe at the brow and side locks
+// at the cheek, long hair down the back, a crop to the hairline), drawn as one
+// smooth surface with a strand texture, a sheen along the strands and ragged
+// (or, cut blunt, straight) tips; tied styles add a knot and a tail. It sits
+// over the painted scalp and hairline (photohair.js) and swings (hairswing.js).
+// (Picked from four ways tried in the pilot: dense layered cards, a mass with
+// cards over it, and tube clumps were the others.)
 
 /* global THREE */
 import { hairLength } from './photohair.js';
 
-export const HAIR_OPTIONS = {
-  columns: { A: 56, B: 36, C: 56, D: 40 },
+export const HAIR_MASS = {
+  columns: 56,
   scalpRows: 12,
   hangRows: 12,
   // Of the head's radius: the volume over the scalp, the flare of hanging hair, a tube's radius at the root.
@@ -76,8 +67,8 @@ export function hairProfile({ style, surface, r, columns, volumeScale = 1, jitte
     const azimuth = -Math.PI + ((column + 0.5 + (random() - 0.5) * jitter) / columns) * Math.PI * 2;
     const leave = hairLeavePolar(azimuth);
     const points = [];
-    for (let row = 0; row <= HAIR_OPTIONS.scalpRows; row += 1) {
-      const polar = 0.03 + ((leave - 0.03) * row) / HAIR_OPTIONS.scalpRows;
+    for (let row = 0; row <= HAIR_MASS.scalpRows; row += 1) {
+      const polar = 0.03 + ((leave - 0.03) * row) / HAIR_MASS.scalpRows;
       const skin = surface(new THREE.Vector3(Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth)));
       const radial = skin.clone().sub(centre);
       points.push(centre.clone().add(radial.setLength(radial.length() + volume * (1 - 0.35 * (polar / leave)))));
@@ -87,9 +78,9 @@ export function hairProfile({ style, surface, r, columns, volumeScale = 1, jitte
     const from = points[points.length - 1];
     if (end !== null && end < from.y - 0.05 * r) {
       let last = from.clone();
-      for (let row = 1; row <= HAIR_OPTIONS.hangRows; row += 1) {
-        const y = from.y + ((end - from.y) * row) / HAIR_OPTIONS.hangRows;
-        const t = row / HAIR_OPTIONS.hangRows;
+      for (let row = 1; row <= HAIR_MASS.hangRows; row += 1) {
+        const y = from.y + ((end - from.y) * row) / HAIR_MASS.hangRows;
+        const t = row / HAIR_MASS.hangRows;
         const point = new THREE.Vector3();
         if (y > -1.05 * r) {
           const polar = Math.acos(Math.max(-1, Math.min(1, y / (1.06 * r))));
@@ -110,7 +101,7 @@ export function hairProfile({ style, surface, r, columns, volumeScale = 1, jitte
     for (let i = 1; i < points.length; i += 1) lengths.push(lengths[i - 1] + points[i].distanceTo(points[i - 1]));
     const total = lengths[lengths.length - 1] || 1;
     const tangents = points.map((_, i) => points[Math.min(points.length - 1, i + 1)].clone().sub(points[Math.max(0, i - 1)]).normalize());
-    out.push({ azimuth, points, along: lengths.map((l) => l / total), tangents, hangs: points.length > HAIR_OPTIONS.scalpRows + 1 });
+    out.push({ azimuth, points, along: lengths.map((l) => l / total), tangents, hangs: points.length > HAIR_MASS.scalpRows + 1 });
   }
   return { shape, columns: out, centre };
 }
@@ -157,29 +148,11 @@ function massSheet(blunt) {
   });
 }
 
-/** Strands on clear for cards: `count` across, `shortest` the shortest's share of the length (root-to-tip falloff). */
-function strandSheet(name, count, shortest) {
-  return hairCanvas(name, (paint, random) => {
-    for (let strand = 0; strand < count; strand += 1) {
-      const x = 2 + random() * 252;
-      const end = 256 * (shortest + (1 - shortest) * random());
-      const tone = Math.round(150 + 105 * random());
-      paint.strokeStyle = `rgba(${tone},${tone},${tone},${0.5 + 0.5 * random()})`;
-      paint.lineWidth = 0.7 + 1.1 * random();
-      paint.beginPath();
-      paint.moveTo(x, 0);
-      const wave = (random() - 0.5) * 6;
-      paint.bezierCurveTo(x + wave, end * 0.3, x - wave, end * 0.7, x + wave * 0.6, end);
-      paint.stroke();
-    }
-  });
-}
-
 // ---- The material: a lit hair surface with a sheen along its strands (Kajiya-Kay, two lobes) --------------------------------
 
 function sheenMaterial(colour, map, { alphaTest = 0 } = {}) {
   const material = new THREE.MeshStandardMaterial({ color: colour, map, alphaTest, side: THREE.DoubleSide, roughness: 0.75, metalness: 0 });
-  const { primary, secondary, width } = HAIR_OPTIONS.sheen;
+  const { primary, secondary, width } = HAIR_MASS.sheen;
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 hairTangent;\nvarying vec3 vHairTangent;')
@@ -231,7 +204,7 @@ function resampleColumn(column, count, until = 1) {
   return { points, tangents };
 }
 
-/** A: one surface over the columns (around, and down each to its cut). */
+/** One surface over the columns (around, and down each to its cut). */
 function hairMassGeometry(profile, rows, repeat = 6) {
   const positions = [];
   const uvs = [];
@@ -257,36 +230,7 @@ function hairMassGeometry(profile, rows, repeat = 6) {
   return hairGeometryOf(positions, uvs, tangents, indices);
 }
 
-/** B and C: cards along columns, `width` across (of the head's radius, scaled by how far round the head they are). */
-function hairCardGeometry(profile, rows, width, r) {
-  const positions = [];
-  const uvs = [];
-  const tangents = [];
-  const indices = [];
-  const centre = profile.centre;
-  for (const column of profile.columns) {
-    const { points, tangents: along } = resampleColumn(column, rows);
-    const base = positions.length / 3;
-    points.forEach((point, k) => {
-      const normal = point.clone().sub(centre).normalize();
-      const across = new THREE.Vector3().crossVectors(along[k], normal).normalize();
-      const half = width * r * Math.min(1.4, Math.max(0.35, Math.hypot(point.x, point.z) / r)) * 0.5 * (1 - 0.3 * (k / (rows - 1)));
-      for (const side of [-1, 1]) {
-        const p = point.clone().addScaledVector(across, side * half);
-        positions.push(p.x, p.y, p.z);
-        uvs.push(side < 0 ? 0 : 1, 1 - k / (rows - 1));
-        tangents.push(along[k].x, along[k].y, along[k].z);
-      }
-    });
-    for (let k = 0; k < rows - 1; k += 1) {
-      const a = base + k * 2;
-      indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-    }
-  }
-  return hairGeometryOf(positions, uvs, tangents, indices);
-}
-
-/** D: tapered tubes along columns. */
+/** Tapered tubes along columns (a ponytail's tail). */
 function hairTubeGeometry(profile, rows, radius, r, sides = 6) {
   const positions = [];
   const uvs = [];
@@ -341,41 +285,23 @@ function hairTiedExtras(style, r, material, add) {
 }
 
 /**
- * Build option `kind` ('A' | 'B' | 'C' | 'D') of a style's hair into `group` (meshes tagged userData.photoHair). `head` gives the
- * surface (photohead.js `point`); `r` the head's radius. Returns { triangles, drawCalls, meshes }.
+ * Build a style's hair into `group` (meshes tagged userData.photoHair). `head` gives the surface (photohead.js `point`); `r` the
+ * head's radius. Returns the triangles drawn.
  */
-export function buildHairOption(kind, { group, head, r, style, colour, random }) {
+export function buildHairMass({ group, head, r, style, colour, random }) {
   const surface = (direction) => new THREE.Vector3(...head.point(direction.x, direction.y, direction.z)).multiplyScalar(r);
-  const meshes = [];
+  let triangles = 0;
   const add = (mesh) => {
     mesh.userData.photoHair = true;
     mesh.castShadow = true;
     group.add(mesh);
-    meshes.push(mesh);
+    triangles += mesh.geometry.index ? mesh.geometry.index.count / 3 : 0;
   };
   const shape = hairStyleShape(style);
-  if (!shape) return { triangles: 0, drawCalls: 0, meshes };
-  const rows = HAIR_OPTIONS.scalpRows + HAIR_OPTIONS.hangRows + 1;
-  const columns = HAIR_OPTIONS.columns[kind];
-  const blunt = Boolean(shape.blunt);
-  if (kind === 'A' || kind === 'C') {
-    const profile = hairProfile({ style, surface, r, columns, volumeScale: kind === 'C' ? 0.8 : 1, random });
-    const ragged = kind === 'A';
-    add(new THREE.Mesh(hairMassGeometry(profile, rows), sheenMaterial(colour, massSheet(blunt || !ragged), { alphaTest: 0.5 })));
-  }
-  if (kind === 'B' || kind === 'C') {
-    const layers = kind === 'B' ? [[0.55, 'dense', 0.3, 2.4], [0.85, 'sparse', 0.45, 2.2], [1.1, 'sparse', 0.45, 2.0]] : [[1.15, 'sparse', 0.45, 1.6]];
-    for (const [volumeScale, density, alphaTest, width] of layers) {
-      const profile = hairProfile({ style, surface, r, columns: kind === 'B' ? columns : 24, volumeScale, jitter: 0.8, random });
-      const texture = density === 'dense' ? strandSheet('dense', 160, blunt ? 0.95 : 0.7) : strandSheet(blunt ? 'sparseBlunt' : 'sparse', 70, blunt ? 0.9 : 0.5);
-      add(new THREE.Mesh(hairCardGeometry(profile, Math.ceil(rows / 2), (width * Math.PI * 2) / (kind === 'B' ? columns : 24), r), sheenMaterial(colour, texture, { alphaTest })));
-    }
-  }
-  if (kind === 'D') {
-    const profile = hairProfile({ style, surface, r, columns, volumeScale: 0.9, jitter: 1, random });
-    add(new THREE.Mesh(hairTubeGeometry(profile, Math.ceil(rows / 2), HAIR_OPTIONS.tube, r, 5), sheenMaterial(colour, massSheet(true), { alphaTest: 0 })));
-  }
+  if (!shape) return 0;
+  const rows = HAIR_MASS.scalpRows + HAIR_MASS.hangRows + 1;
+  const profile = hairProfile({ style, surface, r, columns: HAIR_MASS.columns, random });
+  add(new THREE.Mesh(hairMassGeometry(profile, rows), sheenMaterial(colour, massSheet(Boolean(shape.blunt)), { alphaTest: 0.5 })));
   if (shape.tied) hairTiedExtras(shape.tied, r, sheenMaterial(colour, massSheet(true)), add);
-  const triangles = meshes.reduce((sum, mesh) => sum + (mesh.geometry.index ? mesh.geometry.index.count / 3 : 0), 0);
-  return { triangles, drawCalls: meshes.length, meshes };
+  return triangles;
 }

@@ -30,6 +30,9 @@ export const HAIR_SWING = {
   maxStep: 1 / 30,
   // Pushed out to this share of a collider's radius.
   clearance: 1.06,
+  // Each chain's swing eased this much towards each neighbour's (a sector without one counts as still), so a solid mass hung
+  // over two chains of different lengths (a hime's side lock beside its long back) bends between them instead of tearing.
+  neighbour: 0.25,
 };
 
 const hairSectorOf = (x, z, count) => {
@@ -73,7 +76,7 @@ export function buildHairSwing(meshes, r) {
     const out = Math.max(reach[sector] * 0.9, 1.0 * r);
     const restLocal = [];
     for (let node = 0; node < config.nodes; node += 1) restLocal.push(new THREE.Vector3(Math.cos(angle) * out, top - (length * node) / (config.nodes - 1), Math.sin(angle) * out));
-    chains.push({ length, top, restLocal, world: null, previous: null, offsets: restLocal.map(() => new THREE.Vector3()) });
+    chains.push({ length, top, restLocal, world: null, previous: null, raw: restLocal.map(() => new THREE.Vector3()), offsets: restLocal.map(() => new THREE.Vector3()) });
   }
   if (!chains.some(Boolean)) return null;
   // Bindings: for each vertex, two sectors' weights and its depth down the hanging hair (0 at the free line).
@@ -159,8 +162,19 @@ export function buildHairSwing(meshes, r) {
       inverse.copy(matrix).invert();
       for (const chain of chains) {
         if (!chain) continue;
-        chain.world.forEach((world, node) => chain.offsets[node].copy(world).applyMatrix4(inverse).sub(chain.restLocal[node]));
+        chain.world.forEach((world, node) => chain.raw[node].copy(world).applyMatrix4(inverse).sub(chain.restLocal[node]));
       }
+      const share = config.neighbour;
+      chains.forEach((chain, sector) => {
+        if (!chain) return;
+        const left = chains[(sector + count - 1) % count];
+        const right = chains[(sector + 1) % count];
+        chain.offsets.forEach((offset, node) => {
+          offset.copy(chain.raw[node]).multiplyScalar(1 - 2 * share);
+          if (left) offset.addScaledVector(left.raw[Math.min(node, left.raw.length - 1)], share);
+          if (right) offset.addScaledVector(right.raw[Math.min(node, right.raw.length - 1)], share);
+        });
+      });
       const last = config.nodes - 1;
       for (const { mesh, rest, binding } of entries) {
         const position = mesh.geometry.attributes.position;

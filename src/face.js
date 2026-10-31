@@ -19,10 +19,10 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 import { assignColour } from './looks/kit.js';
 import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
-import { paintFromFace, PHOTO_ATLAS, photoHairOption, photoSkinMaterial } from './photoface.js';
+import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
 import { buildPhotoHead, PHOTO_HEAD } from './photohead.js';
-import { buildPhotoHair, photoScalp, scalpCover } from './photohair.js';
-import { buildHairOption } from './hairoptions.js';
+import { buildPhotoBeard, photoScalp, scalpCover } from './photohair.js';
+import { buildHairMass } from './hairmass.js';
 import { buildHairSwing, HAIR_SWING } from './hairswing.js';
 
 export const LOOK_OPTIONS = {
@@ -558,12 +558,11 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
         colour.setXYZ(index, ...[hair.r, hair.g, hair.b].map((value, channel) => colour.array[index * 3 + channel] + (value - colour.array[index * 3 + channel]) * cover));
       }
     }
-    // The hair's volume: round four's sparse cards (the default), or one of the options to pick from (hairoptions.js); beards are cards.
-    const option = photoHairOption();
+    // The hair's volume, one sculpted mass (hairmass.js), and a beard's cards (photohair.js); a crowd's are painted only.
     const colour = new THREE.Color(photo.hair);
     const coarse = Boolean(look.photoPainted);
-    photo.hairTriangles = buildPhotoHair({ group, head: photoHead, r, style: option === 'R4' ? look.hairStyle : 'bald', facialHair: look.facialHair, colour, scalp, random, coarse });
-    if (option !== 'R4' && !coarse) photo.hairTriangles += buildHairOption(option, { group, head: photoHead, r, style: look.hairStyle, colour, random }).triangles;
+    photo.hairTriangles = buildPhotoBeard({ group, head: photoHead, r, facialHair: look.facialHair, colour, random, coarse });
+    if (!coarse) photo.hairTriangles += buildHairMass({ group, head: photoHead, r, style: look.hairStyle, colour, random });
     // What hangs free swings (hairswing.js): the meshes placed at the head's origin (a knot is not: it does not hang).
     if (!coarse) hairSwing = buildHairSwing(group.children.filter((child) => child.userData.photoHair && child.position.lengthSq() === 0 && child.scale.x === 1), r);
   }

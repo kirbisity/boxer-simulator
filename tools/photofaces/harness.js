@@ -146,7 +146,7 @@
 
   window.__faceHarness = {
     async run(step) {
-      bench ??= await import('/src/looksbench.js');
+      bench ??= await import('/src/looksbench.js').catch(() => ({ COMPARE_SCENES: {} }));
       Object.assign(bench.COMPARE_SCENES, SCENES);
       const [verb, mode, extra] = step.split(':');
       if (verb === 'faces') {
@@ -199,43 +199,6 @@
           }
         }
         return { shots };
-      }
-      if (verb === 'options') {
-        // Every style in hair option `mode`: front, three-quarter, back, and mid-swing (thrown, a few frames on).
-        window.__photoFaces.hair(mode);
-        const shots = [];
-        const heads = {};
-        for (const scene of Object.keys(SCENES).filter((id) => SCENES[id].options)) {
-          await window.__looks.stage(scene);
-          for (const [index, view] of window.boxer.state.views.entries()) {
-            if (!view.head) continue;
-            const name = view.fighter.body.inputs.name;
-            let triangles = 0;
-            let meshes = 0;
-            view.head.group.traverse((o) => {
-              if (o.isMesh && o.userData.photoHair) {
-                triangles += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
-                meshes += 1;
-              }
-            });
-            heads[name] = { triangles, meshes, chains: view.head.hairSwing ? view.head.hairSwing.chains.filter(Boolean).length : 0 };
-            for (const [view2, turn, distance] of [['front', 0.1, 0.85], ['34', 0.75, 0.9], ['back', 2.9, 1.0]]) {
-              aimAtHead(index, { turn, distance });
-              shots.push(await jpeg(`face-opt-${mode}-${name}-${view2}`, [380, 20, 520, 640]));
-            }
-            const swing = view.head.hairSwing;
-            if (swing) {
-              const started = performance.now();
-              swing.kick(new THREE.Vector3(0, 0.2, 1).normalize(), 7);
-              for (let frame = 0; frame < 9; frame += 1) swing.update(1 / 60, view.head.group, []);
-              heads[name].swingMs = (performance.now() - started) / 9;
-              aimAtHead(index, { turn: 0.75, distance: 0.9 });
-              view.head.group.updateMatrixWorld(true);
-              shots.push(await jpeg(`face-opt-${mode}-${name}-swing`, [380, 20, 520, 640]));
-            }
-          }
-        }
-        return { heads, shots };
       }
       if (verb === 'lum') {
         // The face's lit luminance against the chest's, both in the same frame (cheeks and forehead; the chest's front).
@@ -304,10 +267,6 @@
           shots.push(await jpeg(`uni-${setting}`, [500, 150, 300, 300]));
         }
         return { shots };
-      }
-      if (verb === 'hairset') {
-        window.__photoFaces.hair(mode);
-        return { hair: mode };
       }
       if (verb === 'fill') {
         // Set the photo faces' fill (ambient scale) on the heads in the scene now, and for the next ones.

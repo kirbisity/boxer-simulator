@@ -73,7 +73,7 @@ import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/sta
 import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
-import { loadPhotoFaces, PHOTO_FACES, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
+import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -3212,7 +3212,7 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
   return state.world.fighters.map((fighter) => fighter.style);
 }
 
-// Photo faces (photoface.js, #faces=photo): the fighters are drawn again once their maps are in. The harness turns them on and off.
+// Photo faces (photoface.js; #faces=off for the drawn ones): the fighters are drawn again once the faces' manifest is in. The harness turns them on and off.
 const redrawWithPhotoFaces = (count) => {
   if (!count || !state.world) return count;
   clearCrowdTemplates(scene);
@@ -3225,12 +3225,6 @@ window.__photoFaces = {
   stats: photoFaceStats,
   // The faces' fill on their ambient light (photoface.js PHOTO_FACES.fill): for the next heads and the ones in the scene now.
   fill: (value) => setPhotoFill(value, scene.scene),
-  // How the hair is drawn for the next heads ('R4', 'A', 'B', 'C', 'D': photoface.js PHOTO_FACES.hair).
-  hair: (kind) => {
-    PHOTO_FACES.hair = kind;
-    clearCrowdTemplates(scene);
-    return kind;
-  },
 };
 
 // The looks harness (looksbench.js): staged still-lifes, shots and timings, for comparing looks.
