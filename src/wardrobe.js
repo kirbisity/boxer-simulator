@@ -11,6 +11,9 @@ import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 import { buildStechhelm } from './stechzeug.js';
 import { CLOTH_GARMENTS, clothMaterialOf, HELMET_TILES, MOULDED_TILES } from './detailmaps.js';
 import { clothPropMaterial, wearTile } from './detailtex.js';
+import { HELM_STYLE } from './helmstyle.js';
+import { helmMapsReady } from './helmmaps.js';
+import { buildWarMask } from './menpo.js';
 
 export const WARDROBE = {
   // How far (m, for a 1.8 m man) a sabaton's point runs on past the foot.
@@ -2067,9 +2070,16 @@ function buildKabuto(group, head, r, steel, color) {
       group.add(strand);
     }
   }
+  // A mask in a design under study (helmstyle.js `masks`), drawn with baked maps (menpo.js); the gorget under it as before.
+  if (head.mask && HELM_STYLE.masks !== 'now' && helmMapsReady() && buildWarMask(group, HELM_STYLE.masks, r, head.mask === 'red' ? color : 0x141416, steel.envMap)) {
+    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : lace);
+    throat.material = throat.material.clone();
+    throat.material.side = THREE.DoubleSide;
+    throat.position.y = -1.0 * r;
+    group.add(throat);
+  } else if (head.mask === 'oni') {
   // An oni somen: the whole face in black iron, heavy brows, glaring eye
   // holes, a snarl with fangs, and two short horns at the brow.
-  if (head.mask === 'oni') {
     const iron = metal(steel, 0x101012);
     const face = new THREE.Mesh(new THREE.SphereGeometry(1.08 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.22, Math.PI * 0.62), iron);
     face.material = iron.clone();

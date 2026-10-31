@@ -40,6 +40,7 @@ import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
 import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './blastview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
+import { setHelmStyle } from './helmstyle.js';
 import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { placeMounted } from './physics/mounted.js';
@@ -3299,6 +3300,16 @@ const boxer = window.boxer = {
   sceneryLodStats: () => sceneryLodStats(scene),
   // Whether the detail maps are drawn (detailmaps.js; `#maps=off` in the address draws the armour and the castle as before).
   detailMaps: () => DETAIL_MAPS.on,
+  // The helmets' and masks' design under study (helmstyle.js): `helmStyle({ helmets: 'a', masks: 'oni' })` draws the fighters again in it; no argument: the one in force.
+  helmStyle: (style) => {
+    if (!style) return setHelmStyle();
+    const now = setHelmStyle(style);
+    if (state.world) {
+      clearCrowdTemplates(scene);
+      rebuildViews();
+    }
+    return now;
+  },
   // Fighters waiting for their V7 skin ({ waiting, bodies }); `finishSkins()` builds and swaps them all now (tests, shots).
   skins: () => skinBuildStats(),
   finishSkins: () => pumpSkinBuilds(scene, Infinity),

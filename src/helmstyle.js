@@ -1,0 +1,34 @@
+// Which design the arena helmets and the samurai war masks are drawn in, while the options are compared (a design study:
+// the user picks one, the others go). Plain (no Three.js).
+//
+//   #helmets=now|a|b|c   the gladiators' helmets (arenaview.js): now, the detailed geometry as it was; a "lean", the
+//                        geometry cut hard and the detail in baked maps; b "balanced", the silhouette's features kept as
+//                        geometry, the fine work in maps; c "showpiece", the full silhouette and richer embossed, gilt maps.
+//   #masks=now|oni|ressei|tengu   the samurai's face masks (menpo.js): now, the simple shapes as they were; an oni somen
+//                        (the whole face, a demon's); a ressei-men (the fierce old man, a horsehair moustache); a karasu
+//                        tengu (a crow's beak).
+//
+// Anything but `now` needs the detail maps (`#maps=off` draws `now`). `boxer.helmStyle({ helmets, masks })` switches them in a
+// running page and draws the fighters again.
+
+export const HELMET_STYLES = ['now', 'a', 'b', 'c'];
+export const MASK_STYLES = ['now', 'oni', 'ressei', 'tengu'];
+
+/** The styles an address's hash asks for (`now` for anything missing or unknown). */
+export function helmStyleFrom(hash = '') {
+  const read = (key, allowed) => {
+    const match = new RegExp(`(?:^|[#&])${key}=([a-z]+)`).exec(hash);
+    return match && allowed.includes(match[1]) ? match[1] : 'now';
+  };
+  return { helmets: read('helmets', HELMET_STYLES), masks: read('masks', MASK_STYLES) };
+}
+
+/** The styles in force (read once from the address; changed by `setHelmStyle`). */
+export const HELM_STYLE = helmStyleFrom(typeof location !== 'undefined' ? location.hash ?? '' : '');
+
+/** Change the styles in force (unknown values are ignored); returns them. */
+export function setHelmStyle({ helmets, masks } = {}) {
+  if (HELMET_STYLES.includes(helmets)) HELM_STYLE.helmets = helmets;
+  if (MASK_STYLES.includes(masks)) HELM_STYLE.masks = masks;
+  return { ...HELM_STYLE };
+}
