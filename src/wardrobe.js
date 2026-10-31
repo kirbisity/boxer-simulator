@@ -9,6 +9,8 @@ import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
 import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 import { buildStechhelm } from './stechzeug.js';
+import { HELMET_TILES, MOULDED_TILES } from './detailmaps.js';
+import { wearTile } from './detailtex.js';
 
 export const WARDROBE = {
   // How far (m, for a 1.8 m man) a sabaton's point runs on past the foot.
@@ -1544,6 +1546,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     default:
       return null;
   }
+  // Its metal (a moulded shell: all of it) wearing its tile's detail maps (detailmaps.js HELMET_TILES), not in a crowd.
+  const tile = lowDetail ? null : HELMET_TILES[head.kind];
+  if (tile) wearTile(group, tile, { moulded: MOULDED_TILES.has(tile) });
   inkAll(group);
   // An open-faced helmet (`openFace`) leaves the beard to be seen.
   return { group, hidesHair, showsBeard: Boolean(head.openFace) };
