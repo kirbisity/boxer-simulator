@@ -701,7 +701,6 @@ export const PRESETS = {
     outfit: { kind: 'combatBot', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1e1f22', hairStyle: 'bald', hairColor: '#1e1f22', facialHair: 'none', eyeColor: 'brown' },
   },
-  // ---- Proofs of concept: future machines (not dealt at random: `undealt`) ----
   // A mini humanoid after Unitree's G1: 1.32 m and 35 kg, no fat, rigid, a
   // battery for wind, as the H-1. Its joint motors are the G1's: ~90-120 N·m
   // at the knee against a man's ~250, on legs 0.73 of his length, so its
@@ -712,21 +711,22 @@ export const PRESETS = {
   // (`muscle`), the rest in the legs and trunk. Light and short-limbed: its
   // force per kilogram is ~1.3 times the H-1's, so it starts, turns and gets
   // up quickly; with ~a third of a man's mass in its arm, it hits softly.
-  // Kickboxes, as Unitree's G1s did.
+  // Kickboxes, as Unitree's G1s did. No prize fights (`noPrize`): its 35 kg
+  // are fixed, and no man fights at its weight.
   miniHumanoid: {
-    name: 'G1 "Sprite"', style: 'kickboxing', sex: 'male', heightCm: 132, frame: 'medium', age: 27, exercise: 0.6, calories: 2800, skill: 0.6, undealt: true,
+    name: 'G1 "Sprite"', style: 'kickboxing', sex: 'male', heightCm: 132, frame: 'medium', age: 27, exercise: 0.6, calories: 2800, skill: 0.6, noPrize: true,
     build: { massKg: 35, bodyFat: 0, strength: 1, aerobic: 1.1, rigid: true, muscle: { upperArm: 0.7, forearm: 0.7 } },
     outfit: { kind: 'miniHumanoid', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1d1e22', hairStyle: 'bald', hairColor: '#1d1e22', facialHair: 'none', eyeColor: 'brown' },
   },
   // A soldier in a powered exoskeleton (after Sarcos's Guardian XO; outfits.js
-  // exoKit): a fit man of 1.80 m, ~83 kg, a regular's drill. Nothing of him is
-  // changed by the frame but what the kit says: its mass, its motors, its
-  // cover. Fights as a brawler: the frame's hands are steel, and its kicks
-  // are a walking machine's.
-  exoOpen: {
-    name: 'Pvt. Hale (XO, open)', style: 'street', sex: 'male', heightCm: 180, frame: 'medium', age: 28, exercise: 0.6, calories: 4000, undealt: true,
-    outfit: { kind: 'exoOpen', design: 0 }, accessories: [],
+  // exoKit), its armoured cover: a fit man of 1.80 m, ~83 kg, a regular's
+  // drill. Nothing of him is changed by the frame but what the kit says: its
+  // mass, its motors, its cover. Fights as a brawler: the frame's hands are
+  // steel, and its kicks are a walking machine's.
+  exoArmoured: {
+    name: 'Pvt. Owen Kade', style: 'street', sex: 'male', heightCm: 180, frame: 'medium', age: 28, exercise: 0.6, calories: 4000,
+    outfit: { kind: 'exoArmoured', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#3a2416', facialHair: 'stubble', eyeColor: 'grey' },
   },
   scissor: {
@@ -735,10 +735,6 @@ export const PRESETS = {
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'brown' },
   },
 };
-
-// The same soldier in the armoured and the enclosed frames.
-PRESETS.exoArmoured = { ...PRESETS.exoOpen, name: 'Pvt. Hale (XO, armoured)', outfit: { kind: 'exoArmoured', design: 0 } };
-PRESETS.exoEnclosed = { ...PRESETS.exoOpen, name: 'Pvt. Hale (XO, enclosed)', outfit: { kind: 'exoEnclosed', design: 0 } };
 
 // The joints a powered frame's motors drive, by the part its `assist` names.
 const ASSISTED = {

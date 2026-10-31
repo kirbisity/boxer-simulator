@@ -45,7 +45,8 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
     ...base,
     sex,
     name: pickOne(CAST.names[sex], random),
-    heightCm: Math.round(Math.min(205, Math.max(150, base.heightCm + sexShift + jitter(random) * CAST.height))),
+    // (No shorter than 1.5 m, unless he was to start with: the G1's 1.32 m.)
+    heightCm: Math.round(Math.min(205, Math.max(Math.min(150, base.heightCm), base.heightCm + sexShift + jitter(random) * CAST.height))),
     calories: Math.round(base.calories * (1 + jitter(random) * CAST.calories) * (sex === base.sex ? 1 : sex === 'female' ? 0.85 : 1.15)),
     age: Math.round(Math.min(55, Math.max(18, base.age + jitter(random) * CAST.age))),
     exercise: Math.min(1, Math.max(0.05, base.exercise + jitter(random) * CAST.exercise)),
@@ -123,9 +124,8 @@ function atWeight(inputs, kg) {
   fed.calories = Math.round(caloriesForWeight(fed, kg, (FRAMES[fed.frame] ?? FRAMES.medium).lean));
   return normaliseInputs(fed);
 }
-// The prize fight's men: anyone unarmed, gloved, fighting mixed (not those kept for their own places: `undealt`).
-// The prize fight's men: anyone unarmed, gloved, fighting mixed.
-const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple && !preset.undealt);
+// The prize fight's men: anyone unarmed, gloved, fighting mixed (not one with no weight class among them: `noPrize`, the G1).
+const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple && !preset.noPrize);
 // The arena's: gladiators, knights, samurai and their kin.
 export const GLADIATORS = ['thraex', 'hoplomachus', 'murmillo', 'retiarius', 'scissor', 'secutor', 'maximus', 'commodus', 'knight', 'warhammer', 'samurai', 'naginata', 'yari'];
 

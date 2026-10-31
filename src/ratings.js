@@ -2,13 +2,14 @@
 // Score = strength fitted to all those bouts at once (Bradley-Terry), Maximus held at 100: ∝ inferred K/D.
 // The Starved Rebel rated afterwards against Maximus, the monk and his neighbours, their scores held (48 bouts).
 // The infantryman (Spc. Luis Herrera) rated afterwards against Maximus, SSgt. Brooks and Cpl. Hale, their scores held (22 bouts).
+// The mini humanoid (G1) and the exoskeleton soldier (Pvt. Owen Kade) rated afterwards, each against Maximus and the two nearest by that seed, their scores held (76 bouts).
 export const RATINGS = {
  "references": [
   "maximus",
   "monk"
  ],
  "bouts": 16,
- "totalBouts": 5350,
+ "totalBouts": 5426,
  "characters": {
   "maximilian": {
    "title": "Maximilian I",
@@ -1781,9 +1782,69 @@ export const RATINGS = {
     "specialForces": 0.385,
     "swatShotgun": 5
    }
+  },
+  "miniHumanoid": {
+   "title": "Mini humanoid robot",
+   "faction": "specials",
+   "type": "kickboxing|miniHumanoid",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "muayThai": {
+     "wins": 9,
+     "losses": 7,
+     "draws": 0
+    },
+    "kickboxer": {
+     "wins": 1,
+     "losses": 7,
+     "draws": 0
+    }
+   },
+   "score": 5.3,
+   "provisional": 7.7,
+   "kd": {
+    "maximus": 0.077,
+    "muayThai": 1.267,
+    "kickboxer": 0.2
+   }
+  },
+  "exoArmoured": {
+   "title": "Pvt. Owen Kade",
+   "faction": "specials",
+   "type": "street|exoArmoured",
+   "records": {
+    "maximus": {
+     "wins": 8,
+     "losses": 8,
+     "draws": 0
+    },
+    "azapArcher": {
+     "wins": 9,
+     "losses": 7,
+     "draws": 0
+    },
+    "eagle": {
+     "wins": 2,
+     "losses": 12,
+     "draws": 0
+    }
+   },
+   "score": 69,
+   "provisional": 100,
+   "kd": {
+    "maximus": 1,
+    "azapArcher": 1.267,
+    "eagle": 0.2
+   }
   }
  },
  "types": {
+  "street|exoArmoured": 69,
+  "kickboxing|miniHumanoid": 5.3,
   "rifle|infantry": 5988,
   "lance|tournament": 637,
   "langyaShield|ironPagoda": 1437,

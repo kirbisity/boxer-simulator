@@ -41,12 +41,11 @@ export const CLOTH_COLORS = {
 
 // ---- Armour designs, five of each type (three are kept; the game shuffles them) ----
 
-/** Knight plate in another finish. */
 // A powered exoskeleton's kit (after Sarcos's Guardian XO: a full-body frame
 // round its operator, ~70-160 kg with its battery, rated to lift ~90 kg, its
 // motors carrying its own weight and the load so the man feels ~1/20 of it).
 // `frameKg`: the frame, its battery and what armour is bolted on, against
-// the soldier inside (~83 kg: body.js PRESETS.exoOpen) as `extraMass`. The
+// the soldier inside (~83 kg: body.js PRESETS.exoArmoured) as `extraMass`. The
 // motors are one set in every cover (`assist`, multiples of the man's own
 // force): the legs ~2.4 times his (a 100 kg frame and 83 kg man moved with
 // the man's own force per kilogram, ~1.3 times his body weight in the
@@ -61,7 +60,7 @@ export const CLOTH_COLORS = {
 // he fears and bleeds; a blow its cover does not stop is his to take.
 function exoKit(label, frameKg, kit) {
   return {
-    faction: 'specials', levelOnly: true, skill: 0.55, courage: 0.6,
+    faction: 'specials', skill: 0.55, courage: 0.6,
     label, movement: 'slow', fists: 'gauntlet', balance: 1.6,
     extraMass: frameKg / 83,
     assist: { arm: 4, leg: 2.4, trunk: 2.4 },
@@ -73,6 +72,7 @@ function exoKit(label, frameKg, kit) {
   };
 }
 
+/** Knight plate in another finish. */
 function plateDesign(label, steel, fluted, pointed, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed }, feet: { kind: 'sabaton', color: steel } };
 }
@@ -2014,18 +2014,15 @@ export const OUTFITS = {
       { label: 'Dark grey', armor: { kind: 'robot', color: '#43464c', mail: '#2a2b2f', cloth: '#d97757', backBox: true, robot: { bulk: 1.3, led: '#ff8a5c' } }, head: { kind: 'robotHead', color: '#383b40', visor: '#0b0c0e', trim: '#d97757', led: '#ff8a5c' }, feet: { kind: 'tacticalBoot', color: '#2a2b2f' } },
     ],
   },
-  // ---- Proofs of concept (kept off the pickers and the deal, as Level Mode's kits are: `levelOnly`) ----
   // The mini humanoid, after Unitree's G1 (1.32 m, ~35 kg): the H-1's kit at
   // its scale. Its shells are thinner still (the G1's are moulded plastic over
   // an aluminium frame), so it turns a little less than the H-1's; as hard
   // and round, so an edge skids (`deflects`) and a blow not square on the
   // chest or the head glances. Its head shell is lighter (0.5 kg). A machine:
-  // no morale, no blood. Three looks, alike in the fight: bare, the actuators
-  // standing out of slim grey links, as it ships; a white consumer shell; and
-  // olive, with armour panels bolted on (drawn only: a shipped version would
-  // weigh and rate the panels as their own kit).
+  // no morale, no blood. Bare, as it ships: the actuators standing out of
+  // slim gunmetal links.
   miniHumanoid: {
-    faction: 'specials', bulletRating: 300, machine: true, levelOnly: true,
+    faction: 'specials', bulletRating: 300, machine: true,
     label: 'Mini humanoid robot', movement: 'excellent', fists: 'gloved-tactical', courage: 1,
     breastplate: 0.5,
     helmet: { mass: 0.5, padding: 0.2, curve: 0.85 },
@@ -2036,24 +2033,11 @@ export const OUTFITS = {
     },
     designs: [
       { label: 'Bare frame, gunmetal', armor: { kind: 'robot', color: '#6a6e75', mail: '#2b2d31', robot: { metal: true, bare: true, led: '#dfe8ff' } }, head: { kind: 'robotHead', color: '#26282c', visor: '#08090b', trim: '#6a6e75', led: '#dfe8ff' }, feet: { kind: 'compactBoot', color: '#17181b' } },
-      { label: 'White shell', armor: { kind: 'robot', color: '#eceef1', mail: '#d6d9de', cloth: '#2f7fd8', robot: { led: '#46b4ff' } }, head: { kind: 'robotHead', color: '#f1f2f4', visor: '#0b0c10', trim: '#c9ccd2', led: '#46b4ff' }, feet: { kind: 'compactBoot', color: '#e2e4e8' } },
-      { label: 'Olive, armour panels', armor: { kind: 'robot', color: '#555c3e', mail: '#3d432c', cloth: '#1d1f17', robot: { plates: true, bulk: 1.1, led: '#ff5a3a' } }, head: { kind: 'robotHead', color: '#4a5036', visor: '#0b0c0e', trim: '#2c3021', led: '#ff5a3a' }, feet: { kind: 'tacticalBoot', color: '#2a2c22' } },
     ],
   },
   // A powered exoskeleton after Sarcos's Guardian XO, round a soldier (body.js
-  // PRESETS.exoOpen). One frame and one set of motors in three covers; what
-  // differs is the armour bolted on, and so the weight the motors move.
-  exoOpen: exoKit('Powered exoframe — open', 100, {
-    // The bare frame: struts down the outside of each limb and behind it, a pack on the back; the man's head, chest and
-    // belly bare in it. The struts cover a little of each limb, the pack his back: as much of a blow as they cover.
-    protection: {
-      blunt: 0.1, cut: 0.15, pierce: 0.05, bullet: { head: 0, torso: 0.05, limb: 0.05 },
-      regions: { head: { blunt: 0, cut: 0, pierce: 0 }, limb: { blunt: 0.15, cut: 0.25, pierce: 0.1 } },
-    },
-    designs: [
-      { label: 'Industrial yellow', top: { kind: 'longsleeve', color: '#3c4a5c' }, bottom: { kind: 'cargo', color: '#323d4c' }, feet: { kind: 'tacticalBoot', color: '#2a2622' }, exo: { cover: 'open', frame: '#d9a520', joint: '#1c1d21', accent: '#1c1d21', led: '#49e06a' } },
-    ],
-  }),
+  // PRESETS.exoArmoured), its armoured cover: the frame (~100 kg) and 35 kg
+  // of panels bolted on.
   exoArmoured: exoKit('Powered exoframe — armoured', 135, {
     // 35 kg of composite panels over his chest, belly, shoulders and limbs' fronts (rifle plates front, as a carrier's);
     // a helmet with a visor. His sides, the backs of his arms and his neck are still the man's.
@@ -2064,19 +2048,6 @@ export const OUTFITS = {
     },
     designs: [
       { label: 'Military olive, visor', top: { kind: 'longsleeve', color: '#4e523c' }, bottom: { kind: 'cargo', color: '#45493a' }, armor: { kind: 'plateCarrier', color: '#5a5e44', cloth: '#5a5e44', cloth2: '#3e4230' }, head: { kind: 'riotHelmet', color: '#4a4f36', neck: true }, feet: { kind: 'tacticalBoot', color: '#3a3326' }, exo: { cover: 'armoured', frame: '#3f4246', joint: '#17181b', accent: '#6b6f52', plate: '#5c6243', led: '#ff5a3a' } },
-    ],
-  }),
-  exoEnclosed: exoKit('Powered exoframe — enclosed', 175, {
-    // 75 kg of plate: a hull round his trunk, pauldrons, both faces of his limbs, a closed helm on a gorget. As a knight's
-    // harness (steel and ceramic, past plate's rating): no gap for an edge (`cutProof`), a blade glances (`deflects`).
-    plated: true, bulletRating: 4500, breastplate: 0.75, cutProof: true, deflects: true, arrowproof: true,
-    helmet: { mass: 3, padding: 0.7, curve: 0.8 },
-    protection: {
-      blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.85, torso: 0.95, limb: 0.7 },
-      regions: { head: { blunt: 0.65, cut: 1, pierce: 0.9 }, limb: { blunt: 0.5, cut: 0.95, pierce: 0.85 } },
-    },
-    designs: [
-      { label: 'Heavy enclosed, graphite', top: { kind: 'longsleeve', color: '#26282c' }, bottom: { kind: 'cargo', color: '#202226' }, armor: { kind: 'plateCarrier', color: '#2c2f34', cloth: '#2c2f34', cloth2: '#1d1f22' }, head: { kind: 'robotHead', color: '#3a3e44', visor: '#16120a', trim: '#d97757', led: '#ffb347' }, feet: { kind: 'tacticalBoot', color: '#1a1b1e' }, exo: { cover: 'enclosed', frame: '#2f3237', joint: '#141518', accent: '#d97757', plate: '#4a4f57', led: '#ffb347' } },
     ],
   }),
 };
@@ -2182,7 +2153,7 @@ export const FACTIONS = {
   parthians: { label: 'Parthia', glyph: '🏹', standard: { weapon: 'tug' }, blurb: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.' },
   romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
   law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade.' },
-  specials: { label: 'Beasts & Machines', glyph: '🦍', blurb: 'Not men: a silverback gorilla, a humanoid robot, and a combat bot whose forearms are an AR-15 and a shotgun.' },
+  specials: { label: 'Beasts & Machines', glyph: '🦍', blurb: 'Not men, or not only: a silverback gorilla, a full-size and a mini humanoid robot, a combat bot whose forearms are an AR-15 and a shotgun, and a soldier in a powered exoskeleton.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
 

@@ -1,4 +1,4 @@
-// A machine's (gear.machine: the humanoid robot, the combat bot) electrics
+// A machine's (gear.machine: the humanoid robots, the combat bot; and a powered frame's cut limb) electrics
 // failing, as the view shows it: graphics only, nothing in the fight hangs
 // on it. A man bleeds; a machine shorts out. Its power runs at tens of volts
 // and high current through cables at every joint: cut, or with its control
@@ -61,10 +61,13 @@ export function machineFxClear(store) {
 
 /**
  * What an event asks of a machine's electrics: 'stump' (a part of it cut
- * off), 'death' (it is out of the fight), or null: a man (no machine), or
- * anything else.
+ * off, or of a powered frame), 'death' (it is out of the fight), or null: a
+ * man (no machine), or anything else.
  */
 export function machineFxFor(event, fighter, spec = MACHINE_FX) {
+  // A man in a powered frame (a kit's `assist`: the exoskeleton) is no machine, but a limb cut off takes the frame's cables
+  // with it: that stump shorts out too (he bleeds as well; he does not short out when he falls).
+  if (event.kind === 'severed' && fighter?.body?.gear?.assist) return 'stump';
   if (!fighter?.body?.gear?.machine) return null;
   if (event.kind === 'severed') return 'stump';
   if (spec.downKinds.has(event.kind)) return 'death';

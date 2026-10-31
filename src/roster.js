@@ -115,6 +115,8 @@ export const WARRIORS = [
   // Beasts and machines. The faction opens on the combat bot (`flagship`).
   warrior('gorilla', 'Silverback', PRESETS.gorilla),
   warrior('humanoid', 'Humanoid robot', PRESETS.humanoid),
+  warrior('miniHumanoid', 'Mini humanoid robot', PRESETS.miniHumanoid),
+  warrior('exoArmoured', 'Pvt. Owen Kade', PRESETS.exoArmoured),
   { ...warrior('combatBot', 'Combat bot', PRESETS.combatBot), flagship: true },
   warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),
   warrior('kickboxer', 'Leo Quickhands', PRESETS.light),

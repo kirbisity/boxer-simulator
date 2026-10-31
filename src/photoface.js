@@ -134,7 +134,7 @@ let photoCastCount = 0;
 export function resetPhotoCasting() {
   photoCastCount = 0;
 }
-const PHOTO_NO_FACE_KITS = new Set(['silverback', 'humanoid', 'combatBot']);
+const PHOTO_NO_FACE_KITS = new Set(['silverback', 'humanoid', 'miniHumanoid', 'combatBot']);
 
 /**
  * The face a fighter is drawn with (the same for the same inputs, every time it is asked), or null (photo faces off, the manifest

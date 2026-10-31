@@ -7,10 +7,9 @@
 // held by cuffs, with a motor drum at every joint: shoulders, elbows, hips,
 // knees, ankles. A design's `exo` asks for it: `frame` (the struts' and
 // pack's colour), `joint` (the drums), `accent` (hoses and stripes),
-// `plate` (armour panels' colour), and `cover`: 'open' (the bare frame, the
-// man in it plain to see), 'armoured' (bolt-on panels over his chest,
-// belly, shoulders, forearms, thighs and shins) or 'enclosed' (a hull
-// round his trunk, pauldrons, and the limbs' panels doubled).
+// `plate` (armour panels' colour), and `cover`: 'armoured' (bolt-on panels
+// over his chest, belly, shoulders, forearms, thighs and shins), else the
+// bare frame, the man in it plain to see.
 
 /* global THREE */
 
@@ -18,8 +17,6 @@ import { P } from './body.js';
 import { BONE } from './rig.js';
 import { surface } from './toon.js';
 import { inkAll, steelMaterial } from './wardrobe.js';
-
-const COVERS = ['open', 'armoured', 'enclosed'];
 
 /**
  * The frame round a man, as attachments: [{ object, bone, at }] (each in its
@@ -29,9 +26,7 @@ export function buildExoFrame(body, exo, envMap) {
   const s = body.heightM / 1.8;
   const L = body.lengths;
   const seg = body.segments;
-  const cover = COVERS.includes(exo.cover) ? exo.cover : 'open';
-  const armoured = cover !== 'open';
-  const enclosed = cover === 'enclosed';
+  const armoured = exo.cover === 'armoured';
   const frame = steelMaterial(envMap, { vertexColors: false, color: exo.frame ?? '#5d6168', metalness: 0.55, roughness: 0.45 });
   const joint = surface(new THREE.Color(exo.joint ?? '#1c1d21').getHex(), { roughness: 0.45 });
   const accent = surface(new THREE.Color(exo.accent ?? '#d98a1e').getHex(), { roughness: 0.5 });
@@ -70,7 +65,7 @@ export function buildExoFrame(body, exo, envMap) {
   const width = L.shoulderSpan;
   const packTop = 0.42 * s;
   const packBottom = -0.62 * L.trunk;
-  const packDepth = (enclosed ? 0.2 : 0.16) * s;
+  const packDepth = 0.16 * s;
   const packX = -(depth / 2 + packDepth / 2 + 0.03 * s);
   box(chest, frame, [packDepth, packTop - packBottom, width * 0.62], [packX, (packTop + packBottom) / 2, 0]);
   for (let vent = 0; vent < 4; vent += 1) box(chest, joint, [0.01 * s, 0.018 * s, width * 0.44], [packX - packDepth / 2 - 0.004 * s, packTop - 0.08 * s - vent * 0.04 * s, 0]);
@@ -85,13 +80,8 @@ export function buildExoFrame(body, exo, envMap) {
   }
   if (armoured) {
     // The breast and belly plates, standing off the man on the frame.
-    box(chest, plate, [0.03 * s, 0.22 * L.trunk * 1.6, width * (enclosed ? 0.86 : 0.7)], [depth / 2 + 0.035 * s, -0.24 * L.trunk, 0]);
-    box(chest, plate, [0.025 * s, 0.18 * L.trunk, width * (enclosed ? 0.66 : 0.5)], [depth / 2 + 0.03 * s, -0.55 * L.trunk, 0]);
-  }
-  if (enclosed) {
-    // The hull: side plates closing the trunk between breastplate and pack, and a gorget round the neck.
-    for (const side of [1, -1]) box(chest, plate, [depth * 1.15, 0.5 * L.trunk, 0.03 * s], [-0.02 * s, -0.32 * L.trunk, side * width * 0.46]);
-    add(chest, new THREE.CylinderGeometry(0.09 * s, 0.12 * s, 0.07 * s, 16, 1, true), plate, [0, 0.04 * s, 0]);
+    box(chest, plate, [0.03 * s, 0.22 * L.trunk * 1.6, width * 0.7], [depth / 2 + 0.035 * s, -0.24 * L.trunk, 0]);
+    box(chest, plate, [0.025 * s, 0.18 * L.trunk, width * 0.5], [depth / 2 + 0.03 * s, -0.55 * L.trunk, 0]);
   }
 
   // The hips: the belt round them and the hip drums on its sides.
@@ -120,8 +110,7 @@ export function buildExoFrame(body, exo, envMap) {
     drum(upper, joint, 0.07 * s, 0.05 * s, [0, 0, out * (armR + 0.05 * s)]);
     drum(upper, frame, 0.035 * s, 0.056 * s, [0, 0, out * (armR + 0.052 * s)]);
     struts(upper, out, armR, 0.06 * s, L.upperArm - 0.02 * s);
-    if (armoured) add(upper, new THREE.SphereGeometry(0.09 * s * (enclosed ? 1.15 : 1), 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), plate, [0, 0.03 * s, out * 0.02 * s], { rotate: [0, 0, Math.PI], scale: [1.1, 0.8, 1.2] });
-    if (enclosed) armourPanel(upper, out, armR, 0.06 * s, L.upperArm, 1);
+    if (armoured) add(upper, new THREE.SphereGeometry(0.09 * s, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), plate, [0, 0.03 * s, out * 0.02 * s], { rotate: [0, 0, Math.PI], scale: [1.1, 0.8, 1.2] });
 
     const fore = piece(`${side}Forearm`, `${side}Elbow`);
     const foreR = seg[`${side}Forearm`].skinRadius;
@@ -136,7 +125,6 @@ export function buildExoFrame(body, exo, envMap) {
     drum(thigh, frame, 0.035 * s, 0.056 * s, [0, 0.02 * s, out * (thighR + 0.047 * s)]);
     struts(thigh, out, thighR, 0.07 * s, L.thigh - 0.03 * s);
     if (armoured) armourPanel(thigh, out, thighR, 0.08 * s, L.thigh - 0.04 * s, 1);
-    if (enclosed) armourPanel(thigh, out, thighR, 0.1 * s, L.thigh - 0.06 * s, -1);
 
     const shin = piece(`${side}Shin`, `${side}Knee`);
     const shinR = seg[`${side}Shank`].skinRadius;

@@ -1251,6 +1251,8 @@ function consumeEvents() {
     const machine = Boolean(state.world.fighters[event.defender]?.body.gear.machine);
     const wound = machine ? (view, at) => spawnSparks(view, at.point, 10) : woundBlood;
     if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked') && (!machine || (event.cut ?? 0) + (event.pierce ?? 0) >= 1)) wound(scene, event);
+    // A man in a powered frame (gear.assist) bleeds, and a weapon's blow on him strikes the frame's steel too: a few sparks.
+    if (event.weapon && event.kind === 'landed' && state.world.fighters[event.defender]?.body.gear.assist) spawnSparks(scene, event.point, 6);
     if (event.kind === 'horseHit' && event.cut + event.pierce > 1) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     if (event.kind === 'shot') spawnShot(scene, machine ? { ...event, harm: 0 } : event);
