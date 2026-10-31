@@ -3300,7 +3300,7 @@ const boxer = window.boxer = {
   sceneryLodStats: () => sceneryLodStats(scene),
   // Whether the detail maps are drawn (detailmaps.js; `#maps=off` in the address draws the armour and the castle as before).
   detailMaps: () => DETAIL_MAPS.on,
-  // The helmets' and masks' design under study (helmstyle.js): `helmStyle({ helmets: 'a', masks: 'oni' })` draws the fighters again in it; no argument: the one in force.
+  // The helmets' and masks' designs (helmstyle.js): `helmStyle({ helmets: 'now', masks: 'oni' })` draws the fighters again in them; no argument: the ones in force.
   helmStyle: (style) => {
     if (!style) return setHelmStyle();
     const now = setHelmStyle(style);

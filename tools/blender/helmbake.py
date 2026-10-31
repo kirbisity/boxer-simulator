@@ -1,6 +1,6 @@
-# The helmets' and masks' relief (the height fields helmsheets.py authored) modelled as a mesh, one vertex a pixel, and
+# The helmets' and masks' relief (the height fields helmforms.py and helmsheets.py authored) modelled as a mesh, one vertex a pixel, and
 # rendered from above as tilebake.py does the tiles: its normal map and its occlusion. The colour, roughness, metalness and
-# masks are helmsheets.py's own; packhelm.py puts them together.
+# masks are the authoring scripts' own; packhelm.py puts them together.
 #
 #   Blender -b --factory-startup --python tools/blender/helmbake.py -- <dir> [names...]
 
@@ -15,7 +15,7 @@ import tilebake as tb  # noqa: E402
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 OUT = argv[0]
-NAMES = argv[1:] or ['helmBrim', 'helmBrimThraex', 'helmBrimMurmillo', 'helmSecutor', 'helmScissor', 'maskOni', 'maskRessei', 'maskTengu']
+NAMES = argv[1:] or ['formMurmillo', 'formThraex', 'formHoplomachus', 'formSecutor', 'formScissor', 'maskOni', 'maskRessei', 'maskTengu']
 
 for name in NAMES:
     height = np.load(os.path.join(OUT, f'{name}_src_h.npy')).astype(np.float32)
