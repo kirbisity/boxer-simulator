@@ -9,6 +9,8 @@ import { point } from './physics.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { holdingHand, layCloth, makeCloth, pinCloth, ROPE_NET, shedCloth, steerCloth, stepCloth, tangleCloth } from './netcloth.js';
 import { NET } from './weapons.js';
+import { HELM_STYLE } from './helmstyle.js';
+import { cylinderUv, helmMaterial, HELM_REGIONS, helmMapsReady, latheUv, layUv, ownUv, planarUv, sphereUv } from './helmmaps.js';
 
 const DARK = 0x0c0b09;
 
@@ -56,6 +58,11 @@ function lathe(profile, material, segments = 32, start = 0, length = Math.PI * 2
  */
 export function buildArenaHelm(group, head, r, bronze) {
   const style = head.style ?? 'hoplomachus';
+  // A design under study (helmstyle.js: a, b or c), drawn with the baked maps (helmmaps.js).
+  if (HELM_STYLE.helmets !== 'now' && helmMapsReady()) {
+    mappedHelm(group, head, r, bronze, style, HELM_STYLE.helmets);
+    return;
+  }
   if (style === 'secutor' || style === 'scissor') {
     smoothHelm(group, head, r, bronze, style === 'secutor');
     return;
@@ -413,6 +420,307 @@ function scissorHelm(group, head, r, bronze) {
   }
   for (const part of parts) group.add(part);
   ink(parts, 0.004);
+}
+
+// ---- The helmets drawn with baked maps (the design study: helmstyle.js) ------------------------------------------------
+
+// Each option's geometry: how finely each part is cut, and which parts stay geometry (the rest is in the maps).
+//   a, lean: the shapes only, coarse; rivets, band, rolled edges, seam, grille, rims, ribs all drawn by the maps.
+//   b, balanced: the silhouette's features kept (the band, the rolled brim, the grilles' frames, the chin's roll, the crest
+//      as before but lighter, the secutor's snout and visor edge); the fine work in the maps.
+//   c, showpiece: the full geometry as it was (less the rivets and the old bar grille, which the maps draw better) over
+//      richer maps: embossed and gilt scenes after the Pompeii parade helmets.
+const HELM_CUTS = {
+  a: { bowl: 20, brim: 24, roll: 0, band: 0, visor: [12, 8], chin: 0, frames: 0, seam: false, neck: [16, 5], skull: [8, 6], cone: 5, mane: 0, ribs: false, fin: [6, 0], tufts: 3, hair: 11, ridge: [4, 12], shell: [24, 16], edge: 0, snout: 0, eyes: 0, slits: false, guard: 16, bosses: 0, plate: 12, holes: false, hinge: 0, inked: ['bowl', 'brim', 'visor', 'shell', 'crest', 'plate'] },
+  b: { bowl: 28, brim: 28, roll: [5, 28], band: [5, 28], visor: [16, 10], chin: [4, 14], frames: [5, 18], seam: false, neck: [24, 6], skull: [10, 8], cone: 8, mane: 5, ribs: false, fin: [10, 1], tufts: 4, hair: 16, ridge: [5, 18], shell: [28, 18], edge: [30, 5], snout: [16, 5], eyes: [5, 14], slits: false, guard: 20, bosses: 10, plate: 14, holes: false, hinge: 6, inked: ['bowl', 'brim', 'visor', 'roll', 'chin', 'shell', 'crest', 'plate', 'guard'] },
+  c: { bowl: 36, brim: 40, roll: [6, 40], band: [6, 40], visor: [24, 14], chin: [5, 20], frames: [6, 24], seam: true, neck: [36, 8], skull: [12, 10], cone: 10, mane: 7, ribs: true, fin: [18, 2], tufts: 6, hair: 22, ridge: [6, 24], shell: [40, 28], edge: [60, 8], snout: [30, 8], eyes: [6, 18], slits: true, guard: 30, bosses: 14, plate: 20, holes: true, hinge: 8, inked: ['bowl', 'brim', 'visor', 'roll', 'chin', 'band', 'shell', 'crest', 'plate', 'guard', 'edge', 'snout'] },
+};
+
+/** A mesh of `geometry` (its coordinates laid into `rect` by `at`) in `material`. */
+function mapped(geometry, rect, at, material) {
+  return new THREE.Mesh(layUv(geometry, rect, at), material);
+}
+
+/** A gladiator's helmet in option `option` (a, b, c) drawn with its kind's sheet. */
+function mappedHelm(group, head, r, bronze, style, option) {
+  const cut = HELM_CUTS[option];
+  if (style === 'secutor') mappedSecutor(group, head, r, bronze, cut);
+  else if (style === 'scissor') mappedScissor(group, head, r, bronze, cut);
+  else mappedBrimmed(group, head, r, bronze, style, cut, option);
+}
+
+/** Torus geometry laid flat round the upright axis (as the band and the roll are). */
+function flatRing(radius, tube, [radial, around], y) {
+  const ring = new THREE.TorusGeometry(radius, tube, radial, around);
+  ring.rotateX(Math.PI / 2);
+  ring.translate(0, y, 0);
+  return ring;
+}
+
+function mappedBrimmed(group, head, r, bronze, style, cut, option) {
+  const sheet = option === 'c' ? (style === 'murmillo' ? 'helmBrimMurmillo' : 'helmBrimThraex') : 'helmBrim';
+  const R = HELM_REGIONS.brim;
+  const metal = helmMaterial(bronze, sheet);
+  const twoSided = helmMaterial(bronze, sheet, { side: THREE.DoubleSide });
+  const visorMetal = helmMaterial(bronze, sheet, { side: THREE.DoubleSide, duller: true });
+  const parts = {};
+  const profile = (points) => points.map(([x, y]) => new THREE.Vector2(x * r, y * r)).reverse();
+  parts.bowl = mapped(new THREE.LatheGeometry(profile([[0, 1.4], [0.55, 1.35], [0.98, 1.12], [1.22, 0.75], [1.3, 0.32]]), cut.bowl), R.bowl, latheUv, metal);
+  const wide = style === 'murmillo' ? 2.15 : 2.0;
+  parts.brim = mapped(new THREE.LatheGeometry(profile([[1.28, 0.32], [1.62, 0.24], [wide, 0.1], [wide + 0.08, 0.16]]), cut.brim), R.brim, latheUv, twoSided);
+  if (cut.band) parts.band = mapped(flatRing(1.25 * r, 0.05 * r, cut.band, 0.34 * r), R.plain, ownUv, metal);
+  if (cut.roll) parts.roll = mapped(flatRing((wide + 0.06) * r, 0.05 * r, cut.roll, 0.13 * r), R.plain, ownUv, metal);
+  const visor = mapped(new THREE.SphereGeometry(1.32 * r, cut.visor[0], cut.visor[1], Math.PI * 0.62, Math.PI * 0.76, Math.PI * 0.43, Math.PI * 0.45), R.visor, sphereUv(Math.PI * 0.43, Math.PI * 0.88, Math.PI * 0.38), visorMetal);
+  visor.scale.y = 1.3;
+  parts.visor = visor;
+  if (cut.chin) {
+    const chin = mapped(new THREE.TorusGeometry(1.32 * r * Math.sin(Math.PI * 0.88), 0.045 * r, cut.chin[0], cut.chin[1], Math.PI * 0.76), R.plain, ownUv, metal);
+    chin.rotation.x = Math.PI / 2;
+    chin.rotation.z = -Math.PI * 0.38;
+    chin.position.y = 1.32 * r * Math.cos(Math.PI * 0.88) * 1.3;
+    parts.chin = chin;
+  }
+  if (cut.seam) {
+    const seam = mapped(new THREE.TorusGeometry(1.335 * r, 0.03 * r, 5, 12, Math.PI * 0.42), R.plain, ownUv, metal);
+    seam.rotation.z = -Math.PI * 0.5;
+    group.add(seam);
+  }
+  // The grilles' raised frames, one round each eye (the maps draw the holes inside).
+  if (cut.frames) {
+    const theta = Math.PI / 2 + 0.029;
+    const az = 0.5 / 1.32;
+    for (const side of [1, -1]) {
+      const frame = mapped(new THREE.TorusGeometry(0.34 * r, 0.03 * r, cut.frames[0], cut.frames[1]), R.plain, ownUv, metal);
+      const normal = new THREE.Vector3(Math.cos(az), 0, side * Math.sin(az));
+      frame.position.set(1.33 * r * Math.sin(theta) * Math.cos(az), 1.33 * r * Math.cos(theta) * 1.3, side * 1.33 * r * Math.sin(theta) * Math.sin(az));
+      frame.lookAt(frame.position.clone().add(normal));
+      group.add(frame);
+    }
+  }
+  if (style === 'thraex') parts.crest = mappedGriffin(group, head, r, metal, cut);
+  else if (style === 'murmillo') parts.crest = mappedFish(group, head, r, metal, cut);
+  else parts.crest = mappedBrush(group, head, r, metal, cut);
+  for (const part of Object.values(parts)) group.add(part);
+  ink(cut.inked.map((key) => parts[key]).filter(Boolean), 0.004);
+}
+
+function mappedGriffin(group, head, r, metal, cut) {
+  const R = HELM_REGIONS.brim;
+  const curve = new THREE.CatmullRomCurve3([[-0.9, 1.0], [-0.5, 1.65], [0.2, 2.05], [0.75, 1.95], [1.0, 1.65]].map(([x, y]) => new THREE.Vector3(x * r, y * r, 0)));
+  const neck = mapped(new THREE.TubeGeometry(curve, cut.neck[0], 0.17 * r, cut.neck[1], false), R.tube, ownUv, metal);
+  const skull = mapped(new THREE.SphereGeometry(0.26 * r, cut.skull[0], cut.skull[1]), R.plain, ownUv, metal);
+  skull.position.set(1.0 * r, 1.66 * r, 0);
+  skull.scale.set(1.2, 1, 0.9);
+  const beak = mapped(new THREE.ConeGeometry(0.13 * r, 0.42 * r, cut.cone), R.plain, ownUv, metal);
+  beak.position.set(1.32 * r, 1.48 * r, 0);
+  beak.rotation.z = -Math.PI * 0.7;
+  group.add(skull, beak);
+  for (const side of [1, -1]) {
+    const ear = mapped(new THREE.ConeGeometry(0.07 * r, 0.3 * r, Math.max(4, cut.cone - 4)), R.plain, ownUv, metal);
+    ear.position.set(0.85 * r, 1.92 * r, side * 0.12 * r);
+    ear.rotation.z = 0.5;
+    group.add(ear);
+  }
+  for (let scale = 0; scale < cut.mane; scale += 1) {
+    const t = scale / Math.max(1, cut.mane - 1);
+    const fin = mapped(new THREE.ConeGeometry(0.07 * r, 0.22 * r, 4), R.plain, ownUv, metal);
+    fin.position.set((-0.75 + t * 1.3) * r, (1.3 + Math.sin(t * Math.PI) * 0.85) * r, 0);
+    fin.rotation.z = -0.4 + t;
+    group.add(fin);
+  }
+  ink([skull, beak], 0.003);
+  sideFeathers(group, head, r, metal, 2);
+  return neck;
+}
+
+function mappedFish(group, head, r, metal, cut) {
+  const shape = new THREE.Shape();
+  shape.moveTo(1.0 * r, 1.0 * r);
+  shape.quadraticCurveTo(0.9 * r, 1.65 * r, 0.3 * r, 2.05 * r);
+  shape.quadraticCurveTo(-0.4 * r, 2.35 * r, -1.05 * r, 2.15 * r);
+  shape.lineTo(-0.85 * r, 1.85 * r);
+  shape.lineTo(-1.2 * r, 1.7 * r);
+  shape.quadraticCurveTo(-1.05 * r, 1.15 * r, -0.9 * r, 0.85 * r);
+  shape.quadraticCurveTo(0, 1.25 * r, 1.0 * r, 1.0 * r);
+  const [curveSegments, bevel] = cut.fin;
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.12 * r, bevelEnabled: bevel > 0, bevelThickness: 0.02 * r, bevelSize: 0.02 * r, bevelSegments: Math.max(1, bevel), curveSegments });
+  const fin = mapped(geometry, HELM_REGIONS.brim.crest, planarUv(-1.5 * r, 0.8 * r, 1.5 * r, 2.6 * r), metal);
+  fin.position.z = -0.06 * r;
+  if (cut.ribs) {
+    for (let rib = 0; rib < 6; rib += 1) {
+      const ray = mapped(new THREE.BoxGeometry(0.03 * r, 0.6 * r, 0.16 * r), HELM_REGIONS.brim.plain, ownUv, metal);
+      ray.position.set((0.75 - rib * 0.3) * r, (1.55 + Math.sin((rib / 5) * Math.PI) * 0.35) * r, 0);
+      ray.rotation.z = 0.35;
+      group.add(ray);
+    }
+  }
+  const hair = surface(head.plume ?? 0xb81d22, { roughness: 0.95 });
+  for (let tuft = 0; tuft < cut.tufts; tuft += 1) {
+    const share = cut.tufts > 1 ? tuft / (cut.tufts - 1) : 0.5;
+    const strand = new THREE.Mesh(new THREE.BoxGeometry(0.1 * r * (6 / cut.tufts), 0.35 * r, 0.12 * r), hair);
+    strand.position.set((0.4 - share * 1.25) * r, (2.2 + Math.sin(share * Math.PI) * 0.12) * r, 0);
+    strand.rotation.z = 0.3;
+    group.add(strand);
+  }
+  return fin;
+}
+
+function mappedBrush(group, head, r, metal, cut) {
+  const ridge = mapped(new THREE.TorusGeometry(1.3 * r, 0.1 * r, cut.ridge[0], cut.ridge[1], Math.PI), HELM_REGIONS.brim.plain, ownUv, metal);
+  ridge.position.y = 0.05 * r;
+  const hair = surface(head.plume ?? 0xb81d22, { roughness: 0.95 });
+  // Fewer, wider tufts when there are fewer, so the brush stays as full.
+  const widen = 22 / cut.hair;
+  for (let tuft = 0; tuft < cut.hair; tuft += 1) {
+    const angle = 0.2 + (tuft / (cut.hair - 1)) * (Math.PI - 0.4);
+    const length = (0.8 + 0.25 * Math.sin(tuft * 1.7 * widen)) * r;
+    const strand = new THREE.Mesh(new THREE.BoxGeometry(0.14 * r * widen, length, 0.16 * r), hair);
+    strand.position.set(Math.cos(angle) * (1.35 * r + length / 2), 0.05 * r + Math.sin(angle) * (1.35 * r + length / 2), 0);
+    strand.rotation.z = angle - Math.PI / 2;
+    group.add(strand);
+  }
+  sideFeathers(group, head, r, metal, 1);
+  return ridge;
+}
+
+function mappedSecutor(group, head, r, bronze, cut) {
+  const R = HELM_REGIONS.secutor;
+  const metal = helmMaterial(bronze, 'helmSecutor');
+  const twoSided = helmMaterial(bronze, 'helmSecutor', { side: THREE.DoubleSide });
+  const parts = {};
+  const centre = [0.1, 0.08, 0];
+  const radii = [1.45, 1.62, 1.18];
+  const shell = mapped(new THREE.SphereGeometry(1, cut.shell[0], cut.shell[1]), R.shell, sphereUv(0, Math.PI, Math.PI), metal);
+  shell.scale.set(radii[0] * r, radii[1] * r, radii[2] * r);
+  shell.position.set(centre[0] * r, centre[1] * r, 0);
+  parts.shell = shell;
+  const onShell = (y, z, lift = 0) => {
+    const dy = (y - centre[1]) / radii[1];
+    const dz = z / radii[2];
+    const x = centre[0] + radii[0] * Math.sqrt(Math.max(0, 1 - dy * dy - dz * dz));
+    const normal = new THREE.Vector3((x - centre[0]) / radii[0] ** 2, dy / radii[1], dz / radii[2]).normalize();
+    return { at: [x * r + normal.x * lift * r, y * r + normal.y * lift * r, z * r + normal.z * lift * r], normal };
+  };
+  const tubeAlong = (points, radius, [segments, radial]) => mapped(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p))), segments, radius, radial, false), R.plain, ownUv, metal);
+  if (cut.edge) {
+    const outline = [[0.6, 0.98], [0.85, 0.55], [0.92, 0], [0.85, -0.55], [0.6, -0.98], [0.0, -1.05], [-0.7, -0.85], [-1.15, -0.4], [-1.32, 0], [-1.15, 0.4], [-0.7, 0.85], [0.0, 1.05], [0.6, 0.98]];
+    parts.edge = tubeAlong(outline.map(([y, z]) => onShell(y, z, 0.02).at), 0.05 * r, cut.edge);
+  }
+  if (cut.snout) parts.snout = tubeAlong([0.95, 0.5, 0, -0.5, -1.0, -1.3].map((y) => onShell(y, 0, 0.03).at), 0.06 * r, cut.snout);
+  if (cut.eyes) {
+    for (const side of [1, -1]) {
+      const { at, normal } = onShell(0.2, side * 0.34, 0.01);
+      const rim = mapped(new THREE.TorusGeometry(0.1 * r, 0.03 * r, cut.eyes[0], cut.eyes[1]), R.plain, ownUv, metal);
+      rim.position.set(...at);
+      rim.lookAt(rim.position.clone().add(normal));
+      group.add(rim);
+    }
+  }
+  if (cut.slits) {
+    const dark = surface(DARK);
+    for (const side of [1, -1]) {
+      for (let slit = 0; slit < 3; slit += 1) {
+        const { at, normal } = onShell(-0.55 - slit * 0.14, side * 0.2, 0.005);
+        const hole = new THREE.Mesh(new THREE.PlaneGeometry(0.16 * r, 0.035 * r), dark);
+        hole.position.set(...at);
+        hole.lookAt(hole.position.clone().add(normal));
+        hole.userData.noOutline = true;
+        group.add(hole);
+      }
+    }
+  }
+  const fin = new THREE.Shape();
+  fin.moveTo(1.3 * r, 0.95 * r);
+  fin.quadraticCurveTo(1.15 * r, 1.95 * r, 0.25 * r, 2.35 * r);
+  fin.quadraticCurveTo(-0.6 * r, 2.5 * r, -1.2 * r, 2.0 * r);
+  fin.lineTo(-1.0 * r, 1.75 * r);
+  fin.lineTo(-1.4 * r, 1.45 * r);
+  fin.quadraticCurveTo(-0.6 * r, 1.5 * r, 1.3 * r, 0.95 * r);
+  const [curveSegments, bevel] = cut.fin;
+  const crest = mapped(new THREE.ExtrudeGeometry(fin, { depth: 0.1 * r, bevelEnabled: bevel > 0, bevelThickness: 0.025 * r, bevelSize: 0.025 * r, bevelSegments: Math.max(1, bevel), curveSegments }), R.fin, planarUv(-1.5 * r, 0.9 * r, 1.4 * r, 2.6 * r), metal);
+  crest.position.z = -0.05 * r;
+  parts.crest = crest;
+  if (cut.ribs) {
+    for (let rib = 0; rib < 5; rib += 1) {
+      const ray = mapped(new THREE.BoxGeometry(0.035 * r, 0.55 * r, 0.15 * r), R.plain, ownUv, metal);
+      ray.position.set((0.75 - rib * 0.4) * r, (1.85 + Math.sin(((rib + 0.5) / 5) * Math.PI) * 0.2) * r, 0);
+      ray.rotation.z = 0.45;
+      group.add(ray);
+    }
+  }
+  const guardProfile = [[1.15, -0.95], [1.4, -1.25], [1.72, -1.42], [1.8, -1.4], [1.78, -1.32]].map(([x, y]) => new THREE.Vector2(x * r, y * r)).reverse();
+  parts.guard = mapped(new THREE.LatheGeometry(guardProfile, cut.guard, Math.PI * 0.85, Math.PI * 1.3), R.guard, latheUv, twoSided);
+  if (cut.bosses) {
+    for (const side of [1, -1]) {
+      const boss = mapped(new THREE.CylinderGeometry(0.13 * r, 0.13 * r, 0.06 * r, cut.bosses), R.plain, ownUv, metal);
+      boss.rotation.x = Math.PI / 2;
+      boss.position.set(-0.05 * r, 0.1 * r, side * 1.18 * r);
+      group.add(boss);
+    }
+  }
+  for (const part of Object.values(parts)) group.add(part);
+  ink(cut.inked.map((key) => parts[key]).filter(Boolean), 0.004);
+}
+
+function mappedScissor(group, head, r, bronze, cut) {
+  const R = HELM_REGIONS.scissor;
+  const metal = helmMaterial(bronze, 'helmScissor');
+  const twoSided = helmMaterial(bronze, 'helmScissor', { side: THREE.DoubleSide });
+  const parts = {};
+  const profile = (points) => points.map(([x, y]) => new THREE.Vector2(x * r, y * r)).reverse();
+  parts.bowl = mapped(new THREE.LatheGeometry(profile([[0, 1.55], [0.55, 1.5], [1.05, 1.25], [1.35, 0.75], [1.42, 0.1], [1.38, -0.4]]), cut.bowl), R.bowl, latheUv, metal);
+  const plateR = 2.4 * r;
+  const plate = mapped(new THREE.CylinderGeometry(plateR, plateR, 1.9 * r, cut.plate, 1, true, -0.42, 0.84), R.plate, cylinderUv(0.42), twoSided);
+  plate.rotation.y = Math.PI / 2;
+  plate.position.set(1.48 * r - plateR, -0.25 * r, 0);
+  parts.plate = plate;
+  if (cut.roll) {
+    for (const y of [0.7, -1.2]) {
+      const edge = mapped(new THREE.TorusGeometry(plateR, 0.04 * r, cut.roll[0], Math.round(cut.roll[1] / 2.5), 0.84), R.plain, ownUv, metal);
+      edge.rotation.set(Math.PI / 2, 0, -0.42);
+      edge.position.set(1.48 * r - plateR, y * r, 0);
+      group.add(edge);
+    }
+    const nose = mapped(new THREE.BoxGeometry(0.12 * r, 1.4 * r, 0.12 * r), R.plain, ownUv, metal);
+    nose.position.set(1.5 * r, -0.3 * r, 0);
+    nose.rotation.z = -0.06;
+    group.add(nose);
+  }
+  const ridgeCurve = new THREE.CatmullRomCurve3([[1.35, 0.75], [0.75, 1.5], [-0.2, 1.68], [-1.0, 1.25], [-1.35, 0.5]].map(([x, y]) => new THREE.Vector3(x * r, y * r, 0)));
+  parts.crest = mapped(new THREE.TubeGeometry(ridgeCurve, cut.neck[0], 0.08 * r, cut.neck[1], false), R.plain, ownUv, metal);
+  parts.guard = mapped(new THREE.LatheGeometry(profile([[1.36, -0.4], [1.62, -0.85], [1.98, -1.08], [2.06, -1.06], [2.04, -0.98]]), cut.guard, Math.PI * 0.82, Math.PI * 1.36), R.guard, latheUv, twoSided);
+  if (cut.eyes) {
+    for (const side of [1, -1]) {
+      const facing = new THREE.Vector3(1, 0, side * 0.18).normalize();
+      const rim = mapped(new THREE.TorusGeometry(0.22 * r, 0.035 * r, cut.eyes[0], cut.eyes[1]), R.plain, ownUv, metal);
+      rim.position.set(1.5 * r, 0.12 * r, side * 0.42 * r);
+      rim.lookAt(rim.position.clone().add(facing));
+      group.add(rim);
+    }
+  }
+  if (cut.holes) {
+    const dark = surface(DARK);
+    for (let row = 0; row < 3; row += 1) {
+      for (const side of [1, -1]) {
+        for (let column = 0; column < 2; column += 1) {
+          const hole = new THREE.Mesh(new THREE.CircleGeometry(0.045 * r, 8), dark);
+          hole.position.set(1.505 * r, (-0.45 - row * 0.17) * r, side * (0.18 + column * 0.16) * r);
+          hole.rotation.y = Math.PI / 2;
+          hole.userData.noOutline = true;
+          group.add(hole);
+        }
+      }
+    }
+  }
+  if (cut.hinge) {
+    for (const side of [1, -1]) {
+      const hinge = mapped(new THREE.CylinderGeometry(0.06 * r, 0.06 * r, 0.3 * r, cut.hinge), R.plain, ownUv, metal);
+      hinge.position.set(0.95 * r, -0.2 * r, side * 1.18 * r);
+      group.add(hinge);
+    }
+  }
+  for (const part of Object.values(parts)) group.add(part);
+  ink(cut.inked.map((key) => parts[key]).filter(Boolean), 0.004);
 }
 
 // ---- The scissor's scale shirt ------------------------------------------------------
