@@ -435,6 +435,13 @@ export const PRESETS = {
     outfit: { kind: 'specialForces', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#4a3020', facialHair: 'beard', eyeColor: 'green' },
   },
+  // A modern infantry rifleman: the M4 (the AR-15 family), the combat uniform, helmet and plate carrier, and one frag
+  // grenade (his kit's: outfits.js infantry). A young soldier of ordinary size, fit from the army's training, ~78 kg.
+  infantry: {
+    name: 'Spc. Luis Herrera', style: 'rifle', sex: 'male', heightCm: 176, frame: 'medium', age: 23, exercise: 0.62, calories: 3600,
+    outfit: { kind: 'infantry', design: 0 }, accessories: [],
+    look: { skinTone: 'tan', hairStyle: 'fade', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
   baton: {
     name: 'Officer Reyes', style: 'baton', sex: 'male', heightCm: 182, frame: 'medium', age: 33, exercise: 0.6, calories: 4250,
     outfit: { kind: 'swat', design: 0 },

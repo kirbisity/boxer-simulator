@@ -230,6 +230,16 @@ export function swatOfficer(random = Math.random, style = 'handgun') {
   return normaliseInputs({ ...base, name: `${pickOne(['Officer', 'Sgt.', 'Cpl.'], random)} ${pickOne(['Reyes', 'Cole', 'Novak', 'Burke', 'Ortiz', 'Hale', 'Kowalski', 'Price', 'Walsh', 'Okafor'], random)}`, style, outfit: { kind: 'swat', design: 0 } });
 }
 
+/**
+ * A modern infantry rifleman: the M4 (the AR-15 family), the combat uniform, helmet and plate carrier in one of its
+ * camouflages, and the one frag grenade his kit carries (outfits.js infantry `throwable`).
+ */
+export function infantrySoldier(random = Math.random) {
+  const base = varyCharacter(PRESETS.infantry, random);
+  const name = `${pickOne(['Pvt.', 'PFC', 'Spc.', 'Cpl.', 'Sgt.'], random)} ${pickOne(['Herrera', 'Miller', 'Johnson', 'Nguyen', 'Davis', 'Garcia', 'Wright', 'Kim', 'Thompson', 'Jackson', 'Lopez', 'Carter'], random)}`;
+  return normaliseInputs({ ...base, name, style: 'rifle', outfit: { kind: 'infantry', design: randomDesign('infantry', random) } });
+}
+
 /** A yakuza soldier: bare-backed and tattooed, with a knife, a katana or a pistol. */
 export function yakuza(random = Math.random, style = 'knife') {
   const base = varyCharacter(PRESETS.knife, random, { sex: 'male' });

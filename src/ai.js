@@ -11,6 +11,7 @@ import { vec, yawRotate } from './pose.js';
 import { BLADES, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
+import { startThrow, throwChoice } from './physics/throwable.js';
 import { heldOffAt } from './physics/brush.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
@@ -39,6 +40,10 @@ export const AI = {
   // distance from his pursuer: the run away still wins, but bends homeward.
   // The retiarius's net: thrown from `from` to `to` m, at `rate` a second while there.
   net: { from: 1.3, to: 3.2, rate: 1.2 },
+  // A grenade carried (physics/throwable.js throwChoice; where and at whom: the throwable's own `ai`): looked for at `rate` a
+  // second (a man takes a moment to see his chance, not the first frame it comes), never with an enemy within `melee` m (locked
+  // in a fight, he fights); while he throws he stands.
+  throwable: { rate: 0.8, melee: 3 },
   // A man going to take up his fallen standard runs to it from further than `runFor` m.
   // Weighted heavily: a man keeps with his leader (and picks men near him) before going off on his own fight.
   cohesion: { radius: 1.6, radiusPerSqrt: 0.6, ramp: 2.5, strafe: 0.8, holdBack: 0.9, engaged: 0.8, focus: 0.6, escape: 0.5, runFor: 1.5 },
@@ -2697,6 +2702,15 @@ function decide(world, fighter, dt) {
   if (fighter.net?.held && opponent.state === 'up' && !opponent.netted) {
     const apart = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
     if (apart > AI.net.from && apart < AI.net.to && random() < AI.net.rate * dt) castNet(world, fighter, opponent);
+  }
+  // A grenade: thrown into a knot of enemies at a throw's distance with none of his own near it (throwChoice); he stands to throw.
+  if (fighter.throwable?.left > 0 && random() < AI.throwable.rate * dt) {
+    const mark = throwChoice(world, fighter, AI.throwable.melee);
+    if (mark) startThrow(world, fighter, mark);
+  }
+  if (fighter.throwing) {
+    fighter.move = 0;
+    return;
   }
   if (goForWeapon(world, fighter, opponent, dt)) return;
   // A bow or a gun with nothing left to shoot: let fall, the sidearm drawn (castAside).

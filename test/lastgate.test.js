@@ -1,5 +1,5 @@
 // The Last Gate (lastgate.js): the four modes (their heroes and kit, their men, their hordes), the rebels' kits and their
-// desperation, the androids, the lance kept, the horse archer's mace when his quiver is empty, the waves' ramp, the breach
+// desperation, the androids, the lance kept, the horse archer's arrows that never run out, the waves' ramp, the breach
 // and the gate's fall, the pool that never grows however long the run, the boards of best runs, and the line to share.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,9 +15,9 @@ const think = (world, dt) => {
   thinkAll(world, dt);
 };
 
-test('four modes, each its own hero, his kit and his men: the samurai in ō-yoroi with the ōdachi, the knight on his destrier with the lance, the Mongol horse archer in iron lamellar, the SWAT officer with the AR-15', () => {
+test('four modes, each its own hero, his kit and his men: the samurai in tōsei gusoku with the ōdachi, the knight on his destrier with the lance, the Mongol horse archer in iron lamellar, the SWAT officer with the AR-15', () => {
   const expected = {
-    samurai: { weapon: 'odachi', kit: 'oyoroi', horse: null, men: ['samurai', 'samuraiTosei', 'ashigaru'] },
+    samurai: { weapon: 'odachi', kit: 'samuraiTosei', horse: null, men: ['samurai', 'samuraiTosei', 'ashigaru'] },
     knight: { weapon: 'lance', kit: 'knight', horse: ['destrier', 'plate'], sidearm: 'mace', men: ['knight', 'footman'] },
     mongol: { weapon: 'compositeBow', kit: 'mingIronLamellar', horse: ['steppe', 'bare'], sidearm: 'mace', men: ['steppeMedium'] },
     police: { weapon: 'rifle', kit: 'swat', horse: null, sidearm: 'baton', men: ['swat'] },
@@ -49,9 +49,11 @@ test('four modes, each its own hero, his kit and his men: the samurai in ō-yoro
   // Armour that turns an edge on every hero; the Mongol's iron lamellar heavy against a point (a lance breaks on it).
   for (const key of LAST_GATE_MODE_KEYS) assert.ok(createLastGate(key, { companions: 0 }).fighters[0].body.gear.protection.cut >= 0.5, key);
   assert.ok(createLastGate('mongol', { companions: 0 }).fighters[0].body.gear.protection.pierce >= 0.7);
-  // The finite: his quiver and the rifle's magazines.
+  // The Mongol's arrows kept up from the gate's stores (endlessAmmo); the rifle's magazines counted, and his men's quivers.
   const archer = createLastGate('mongol', { companions: 0 }).fighters[0];
-  assert.ok(Number.isFinite(ammoCarried(archer)) && ammoCarried(archer) <= 40, `${ammoCarried(archer)} arrows`);
+  assert.equal(ammoCarried(archer), Infinity);
+  const bowman = createLastGate('mongol', { companions: 2 }).fighters[1];
+  assert.ok(Number.isFinite(ammoCarried(bowman)), `${ammoCarried(bowman)} arrows for his men`);
   const officer = createLastGate('police', { companions: 0 }).fighters[0];
   assert.ok(Number.isFinite(ammoCarried(officer)), 'rounds counted');
 });
@@ -131,20 +133,15 @@ test('the knight\'s lance is kept: it runs the rebels through (no armour to brea
   if (knight.mount) assert.equal(knight.weapon?.kind, 'lance', 'still in his hand while he rides');
 });
 
-test('the Mongol shoots from the saddle until his quiver is empty, then draws the mace and fights on', () => {
+test('the Mongol shoots from the saddle and never runs out of arrows: the bow stays in his hand', () => {
   const world = createLastGate('mongol', { companions: 0, seed: 1 });
   const archer = world.fighters[0];
-  // (His quiver nearly spent: the last few arrows.)
-  archer.arrows = 3;
-  let emptied = null;
-  for (let t = 0; t < 60 && !world.lastGate.over && archer.weapon?.kind === 'compositeBow'; t += 0.25) {
-    advance(world, 0.25, think);
-    if (emptied === null && world.events.some((event) => event.kind === 'quiverEmpty' && event.fighter === 0)) emptied = world.time;
-  }
-  assert.ok(emptied !== null, 'his quiver ran out');
-  assert.ok(world.events.some((event) => event.kind === 'arrow' && event.attacker === 0) || world.events.filter((event) => event.kind === 'loosed' && event.fighter === 0).length > 0 || archer.arrows === 0, 'he shot');
-  assert.equal(archer.weapon?.kind, 'flangedMace', `then the ${archer.weapon?.kind}`);
-  assert.ok(archer.weapon.held);
+  for (let t = 0; t < 40 && !world.lastGate.over; t += 0.25) advance(world, 0.25, think);
+  const loosed = world.events.filter((event) => event.kind === 'loosed' && event.attacker === 0).length;
+  assert.ok(loosed > 0, 'he shot');
+  assert.ok(!world.events.some((event) => event.kind === 'quiverEmpty' && event.fighter === 0), 'never out of arrows');
+  assert.ok(!archer.weapon?.spent, 'nor his bow spent');
+  if (archer.mount) assert.equal(archer.weapon?.kind, 'compositeBow', `still the bow, not the ${archer.weapon?.kind}`);
 });
 
 test('each mode\'s waves: intense from the first (foes on the field, one woken every few seconds), and steeper from two minutes on', () => {

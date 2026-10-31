@@ -117,6 +117,113 @@ export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, re
 // share it reaches each place.
 export const CYLINDER_LOAD = { hand: [0.3, 0.6, 0.02], dir: [0.65, -0.5, -0.12], pouch: [0.12, 0.58, 0.16], mouth: [0.07, 0.035], rammer: [0.13, -0.04], phases: [0.25, 0.5, 0.75] };
 
+// How a gun is loaded (`shot.reload`), which picks the reload's motion
+// (physics weaponIntent) and what the view puts in the support hand
+// (weaponview.js): 'muzzle' (powder and ball down the barrel, rammed: the
+// matchlock, the three-eyed gun; the default), 'span' (a crossbow's string
+// drawn back to the nut: `shot.bolt`), 'cylinder' (the revolver's chambers
+// loaded one by one at the front: `shot.cylinder`), 'magazine' (a
+// detachable box changed whole: the AR-15) and 'tube' (shells pushed one at
+// a time up into a magazine tube under the barrel: the pump shotgun).
+export function reloadKind(shot) {
+  if (!shot) return null;
+  return shot.reload ?? (shot.bolt ? 'span' : shot.cylinder ? 'cylinder' : 'muzzle');
+}
+
+// A magazine change (an AR-15's, `reload: 'magazine'`), the whole of it in
+// the reload's couple of seconds: the gun brought down off the shoulder to
+// the "workspace" before the chest (`hand`, heights, local), muzzle forward
+// and a little down (`dir`), so the eyes can drop to the magazine well
+// without the muzzle leaving the threat. The trigger finger presses the
+// release and the empty falls clear on its own (`drop`, the share of the
+// reload); the support hand leaves the handguard for the pouch on the chest
+// rig (`pouch`, heights, on the support hand's side), takes the fresh one
+// (`take`), brings it to the mouth of the well under the receiver, pushes it
+// home (`seat`) and tugs it to be sure; then slaps the bolt catch on the
+// receiver's side (the bolt runs home on a round) and goes back to the
+// handguard; up to the shoulder again. `stops`: where the support hand is at
+// each share of the reload, `gun` [m along the barrel from the trigger hand,
+// m up from it] or `body` [heights, local; the side's sign the support
+// hand's], eased from each to the next.
+export const MAGAZINE_CHANGE = {
+  hand: [0.24, 0.62, 0], dir: [0.9, -0.4, 0],
+  pouch: [0.14, 0.67, 0.1],
+  drop: 0.08, take: 0.34, seat: 0.66,
+  stops: [
+    { at: 0, gun: [0.3, -0.01] }, // on the handguard
+    { at: 0.1, gun: [0.3, -0.01] }, // still there as the release is pressed and the empty falls
+    { at: 0.34, body: 'pouch' }, // the fresh one out of the chest pouch
+    { at: 0.56, gun: [0.12, -0.19] }, // its top in the mouth of the well
+    { at: 0.66, gun: [0.12, -0.13] }, // pushed home (and tugged)
+    { at: 0.8, gun: [0.04, 0.02] }, // the bolt catch on the receiver's side, slapped
+    { at: 1, gun: [0.3, -0.01] }, // back on the handguard
+  ],
+};
+
+// A pump shotgun's tube loaded (`reload: 'tube'`), shell by shell over each
+// one's share of the reload: the gun held low at the waist (`hand`), muzzle
+// forward and up, rolled a little so the loading port under the receiver
+// shows; the support hand takes a shell from the belt or the sidesaddle
+// (`pouch`, heights, its side's), brings it under the receiver to the port
+// and thumbs it up into the tube (`port`, `push`: m along and up from the
+// trigger hand), back for the next. `stops` as the magazine change's; the
+// shell is in the hand from the pouch until it is pushed (`push` stop's `at`).
+export const TUBE_LOAD = {
+  hand: [0.24, 0.58, 0], dir: [0.8, 0.45, 0],
+  pouch: [0.06, 0.56, 0.15],
+  pushed: 0.62,
+  stops: [
+    { at: 0, body: 'pouch' },
+    { at: 0.42, gun: [0.05, -0.06] }, // the shell's nose at the loading port
+    { at: 0.62, gun: [0.13, -0.045] }, // thumbed up into the tube
+    { at: 1, body: 'pouch' },
+  ],
+};
+
+/**
+ * Where the support hand is (local, m) at `phase` (0..1) of a staged load
+ * (MAGAZINE_CHANGE, TUBE_LOAD): between the stops either side, eased.
+ * `hand`, `dir`: the gun as held (local); `side`: +1 the support hand the
+ * left, −1 the right; `H`: his height.
+ */
+export function loadStop(load, phase, hand, dir, side, H) {
+  const where = (stop) => (stop.body
+    ? vec.scale([load[stop.body][0], load[stop.body][1], load[stop.body][2] * side], H)
+    : vec.add(vec.add(hand, vec.scale(dir, stop.gun[0])), [0, stop.gun[1], 0]));
+  const stops = load.stops;
+  let next = 1;
+  while (next < stops.length - 1 && stops[next].at <= phase) next += 1;
+  const from = stops[next - 1];
+  const to = stops[next];
+  const share = Math.max(0, Math.min(1, (phase - from.at) / Math.max(1e-6, to.at - from.at)));
+  return vec.lerp(where(from), where(to), share * share * (3 - 2 * share));
+}
+
+/**
+ * What a staged reload has in its hands now, for the view: { kind, phase,
+ * onGun (the gun's own magazine in the well), inHand (a magazine or a
+ * shell in the support hand), dropAge (s since the empty fell; null before)
+ * }; null when he is not reloading a magazine or a tube.
+ */
+export function reloadProps(fighter, weapon) {
+  const shot = weapon?.spec.shot;
+  const kind = reloadKind(shot);
+  if (!fighter.reloading || weapon.loaded || (kind !== 'magazine' && kind !== 'tube')) return null;
+  const done = weapon.reloaded ?? 0;
+  if (kind === 'tube') {
+    const phase = ((done / (shot.reloadSeconds / (shot.rounds ?? 1))) % 1);
+    return { kind, phase, onGun: true, inHand: phase < TUBE_LOAD.pushed, dropAge: null };
+  }
+  const load = MAGAZINE_CHANGE;
+  const phase = Math.min(1, done / shot.reloadSeconds);
+  return {
+    kind, phase,
+    onGun: phase < load.drop || phase >= load.seat,
+    inHand: phase >= load.take && phase < load.seat,
+    dropAge: phase >= load.drop ? (phase - load.drop) * shot.reloadSeconds : null,
+  };
+}
+
 export let referenceSegments = null;
 
 /** The body parts of the man the gun's numbers are for: 80 kg, average build. */
@@ -308,10 +415,11 @@ export function loose(world, fighter, bolt = null) {
 /**
  * The missiles a man carries for a weapon at the start (bolts, balls, arrows): a bow's from his kit's `quiver`
  * (a horse archer's) or the bow's own `ammo`; a gun's or a crossbow's, its shot's `ammo`. None counted: Infinity
- * (a forearm gun fed from the body, a modern pistol).
+ * (a forearm gun fed from the body, a modern pistol), or kept up without end (his kit's `endlessAmmo`: outfits.js).
  */
 export function ammoCarried(fighter, weapon = fighter.weapon) {
   const spec = weapon.spec;
+  if (fighter.body.gear.endlessAmmo) return Infinity;
   return (spec.bow ? fighter.body.gear.quiver ?? spec.ammo : spec.shot?.ammo) ?? Infinity;
 }
 
@@ -768,7 +876,8 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   // A round through the gun arm takes the gun with it.
   if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key)) dropWeapon(world, victim, 'disarmed', dir);
   if (victim.gunshot >= 1 && victim.state !== 'out') {
-    knockOut(world, victim, event, region === 'head' ? 'shot through the head' : 'shot dead', 'killed');
+    // (A grenade's fragment says so: `killedBy`, physics/throwable.js.)
+    knockOut(world, victim, event, shot?.killedBy ?? (region === 'head' ? 'shot through the head' : 'shot dead'), 'killed');
     return;
   }
   if (region !== 'limb') stagger(world, victim, WORLD.stagger.startAt + harm * 1.6, event, true);

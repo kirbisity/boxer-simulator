@@ -17,7 +17,7 @@ import { sweepReach } from '../physics/terrain.js';
 import { P } from '../body.js';
 import { overdraftDepth } from '../physics/overdraft.js';
 import { readSounds } from './log.js';
-import { EAR, airCutoff, allocateVoices, behindCutoff, createListener, distanceGain, earDirection, isPhone, placeListener } from './ear.js';
+import { EAR, airCutoff, allocateVoices, behindCutoff, createListener, distanceGain, earDirection, isMapWide, isPhone, placeListener } from './ear.js';
 import { OPEN_ROOM, PROBE, copyRoom, createReverb, probeRays, reverbSend, roomFromProbe, smoothRoom } from './acoustics.js';
 import { countSectors, createFarField, createSectors } from './farfield.js';
 import { ambienceTargets, createAmbience } from './ambience.js';
@@ -25,16 +25,23 @@ import { createMusic, musicMoment } from './music.js';
 import { SOUND_FAMILIES, soundCandidates } from './families.js';
 import { gainOfLevel, sfxVoice } from './synth.js';
 import { createSampleBank } from './samples.js';
-import { playWithSamples } from './sfx/sampled.js';
-import { breathParams, playBreath, voiceOfBody } from './sfx/voice.js';
+import { breathHeard, breathPlan, playPlan, playWithSamples, uiSamplePlan } from './sfx/sampled.js';
+import { breathParams, cryRate, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
-import { CRIES, createCryDirector } from './cries.js';
+import { CRIES, createCryDirector, voiceOfFighter } from './cries.js';
 import { CHARGE, chargeOf } from './charge.js';
 import { playUi, uiParams } from './sfx/ui.js';
 import { playThump, thumpParams } from './sfx/thump.js';
 import { artDrawParams, artImpactParams, playArtDraw, playArtImpact } from './sfx/art.js';
 
 /** The mixer's settings: the five levels (0..1), the Speakers toggle (null: the machine's default), mute. Kept in this browser. */
+/**
+ * Deafened by a blast (engine `deafen`): the mix's low-pass from `open` Hz down toward `muffled` Hz at full strength, its level
+ * ducked by `duck`, both back over `seconds` (the least, the most: a flashbang at its foot leaves a man half deaf for some
+ * seconds), and the ringing: a tone of `ring` Hz at `ringLevel`.
+ */
+export const DEAFEN = { open: 20000, muffled: 500, duck: 0.6, seconds: [1.5, 7], ring: 3800, ringLevel: 0.06 };
+
 export const AUDIO_SETTINGS = { key: 'gladiator-audio', defaults: { master: 0.8, effects: 1, ambience: 0.8, music: 0.6, voices: 1, speakers: null, muted: false } };
 
 /** The settings kept in `storage` (localStorage, or null where it is denied), over the defaults. */
@@ -97,7 +104,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
   const sectors = createSectors();
   const listeners = new Set();
   const state = {
-    ctx: null, samples: null, buses: null, master: null, mute: null, reverb: null, music: null, ambience: null, farField: null, farMode: null,
+    ctx: null, samples: null, buses: null, master: null, mute: null, reverb: null, music: null, ambience: null, farField: null, farMode: null, deafFilter: null, deafGain: null, compressor: null,
     active: [], world: null, cursor: 0, clock: 0, occlusionClock: 0, probeClock: 0, ambienceClock: 0,
     room: copyRoom(OPEN_ROOM), probeHits: new Array(12), terrain: null, roomTest: null,
     breaths: new Map(), whizzed: new WeakSet(), excitement: 0, loud: 0, loudNow: 0, worldBorn: 0,
@@ -162,7 +169,15 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     compressor.connect(state.mute);
     state.mute.connect(ctx.destination);
     state.master = ctx.createGain();
-    state.master.connect(compressor);
+    // The man played's ears after a blast (deafen): the whole mix through a low-pass and a gain, wide open and at 1 until then.
+    state.deafFilter = ctx.createBiquadFilter();
+    state.deafFilter.type = 'lowpass';
+    state.deafFilter.frequency.value = DEAFEN.open;
+    state.deafGain = ctx.createGain();
+    state.master.connect(state.deafFilter);
+    state.deafFilter.connect(state.deafGain);
+    state.deafGain.connect(compressor);
+    state.compressor = compressor;
     const reverbIn = ctx.createGain();
     const reverbOut = ctx.createGain();
     reverbOut.connect(state.master);
@@ -556,7 +571,11 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     }
   }
 
-  /** Breathing: the player always, and the nearest few others, each breath scheduled from his exertion. */
+  /**
+   * Breathing: the player always, and the nearest few others, each breath scheduled from his exertion; heard only when he is all but
+   * spent (sampled.js BREATH_TAKES), the recorded breath of his sex at his voice's pitch (the synth's until it has loaded). A machine
+   * does not breathe.
+   */
   function breathe(info, now) {
     const world = info.world;
     const wanted = [];
@@ -580,15 +599,20 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       if (now < breather.next) continue;
       const exertion = exertionOf(fighter);
       const breath = breathParams(exertion, fighterHeight(fighter));
+      const inhale = breather.inhale;
+      breather.next = now + (inhale ? breath.inSeconds : breath.outSeconds) + 0.05;
+      breather.inhale = !inhale;
+      if (!breathHeard(exertion) || fighter.body?.gear?.machine) continue;
       const head = P.head * 3;
       const at = [fighter.x[head], fighter.x[head + 1], fighter.x[head + 2]];
       // His own mouth is a hand from his ears: the nearest a breath is heard from.
       const d = Math.max(0.3, Math.hypot(at[0] - listener.x, at[1] - listener.y, at[2] - listener.z));
       const atEar = breath.level + 20 * Math.log10(Math.max(EAR.floor, 1 / d));
       const voice = placeVoice(at, 'voices', { atEar, priority: fighter === player ? 0 : -Infinity });
-      breather.next = now + (breather.inhale ? breath.inSeconds : breath.outSeconds) + 0.05;
-      if (voice) voice.chain.ends = playBreath(voice, voice.out, breath, now + 0.01, gainOfLevel(atEar), breather.inhale);
-      breather.inhale = !breather.inhale;
+      if (!voice) continue;
+      const own = voiceOfFighter(fighter);
+      const recorded = playPlan(state.samples, voice, breathPlan(breath, inhale, exertion, own.sex, cryRate(own)), now + 0.01, gainOfLevel(atEar));
+      voice.chain.ends = recorded ?? playBreath(voice, voice.out, breath, now + 0.01, gainOfLevel(atEar), inhale);
     }
     for (const fighter of state.breaths.keys()) if (!wanted.includes(fighter)) state.breaths.delete(fighter);
   }
@@ -622,11 +646,48 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
 
   // ---- The menus' sounds and the bench -------------------------------------------------------------------------------------------------
 
-  /** A UI sound (click, confirm, back, victory, defeat), straight into the effects bus. */
+  /** A UI sound (click, confirm, back, victory, defeat), straight into the effects bus (its slider and the master's). */
   function ui(kind) {
     if (!state.ctx || state.ctx.state !== 'running') return;
     const voice = sfxVoice(state.ctx, state.buses.effects.dry);
-    playUi(voice, voice.out, uiParams(kind), state.ctx.currentTime + 0.005, 0.8);
+    // The recorded tap and chime (sampled.js uiSamplePlan); victory and defeat, or before they load, the synth's notes.
+    const when = state.ctx.currentTime + 0.005;
+    if (playPlan(state.samples, voice, uiSamplePlan(kind), when, 0.8) === null) playUi(voice, voice.out, uiParams(kind), when, 0.8);
+  }
+
+  /**
+   * The man played deafened by a blast near him (blastview.js: a flashbang he took, `strength` 0..1 by how near and how
+   * much of it; a frag near him, less): the mix muffled (low-passed down toward DEAFEN.muffled) and ducked, coming back over
+   * a few seconds as the ear recovers, and a high ringing (tinnitus) over it, fading as long. Not through the buses: it is in
+   * his head, under the master's level only (and the mute).
+   */
+  function deafen(strength) {
+    if (!state.ctx || state.ctx.state !== 'running' || !state.deafFilter || !(strength > 0)) return;
+    const ctx = state.ctx;
+    const now = ctx.currentTime;
+    const k = Math.min(1, strength);
+    const seconds = DEAFEN.seconds[0] + (DEAFEN.seconds[1] - DEAFEN.seconds[0]) * k;
+    const low = DEAFEN.open * (DEAFEN.muffled / DEAFEN.open) ** k;
+    const frequency = state.deafFilter.frequency;
+    frequency.cancelScheduledValues(now);
+    frequency.setValueAtTime(Math.min(frequency.value, low), now);
+    frequency.exponentialRampToValueAtTime(DEAFEN.open, now + seconds);
+    const gain = state.deafGain.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(Math.min(gain.value, 1 - DEAFEN.duck * k), now);
+    gain.linearRampToValueAtTime(1, now + seconds);
+    // The ringing: a pure high tone, a little unsteady, fading out with the muffling.
+    const tone = ctx.createOscillator();
+    tone.type = 'sine';
+    tone.frequency.value = DEAFEN.ring * (0.95 + Math.random() * 0.1);
+    const level = ctx.createGain();
+    level.gain.setValueAtTime(0.0001, now);
+    level.gain.exponentialRampToValueAtTime(Math.max(0.0002, DEAFEN.ringLevel * k * settings.master), now + 0.05);
+    level.gain.exponentialRampToValueAtTime(0.0001, now + seconds);
+    tone.connect(level);
+    level.connect(state.compressor);
+    tone.start(now);
+    tone.stop(now + seconds + 0.05);
   }
 
   /** The hit feel's thump (hitfeel.js) of a blow the player felt, at `gain` (0..1), a blow of `strength` (0..1: lower and longer the heavier), straight into the effects bus. */
@@ -660,7 +721,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     const direction = earDirection(listener, at[0], at[1], at[2]);
     const params = family.params(full);
     const distance = event.type === 'thunder' ? Math.max(direction.distance, event.distance ?? 2000) : direction.distance;
-    const atEar = params.level + 20 * Math.log10(distanceGain(distance, event.type === 'thunder' || event.kind === 'matchlock' || event.kind === 'cannon'));
+    const atEar = params.level + 20 * Math.log10(distanceGain(distance, isMapWide(full)));
     playCandidate({ event: full, family, params, distance, azimuth: direction.azimuth, elevation: direction.elevation, atEar, mapWide: true });
     return { params, atEar, distance, azimuth: direction.azimuth };
   }
@@ -696,6 +757,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     ui,
     thump,
     art,
+    deafen,
     unlock,
     /** Set a mixer level or toggle (name: master, effects, ambience, music, voices, speakers, muted); kept. */
     set(name, value) {

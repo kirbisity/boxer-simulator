@@ -1191,7 +1191,7 @@ export function createCastleView(stage) {
   const mechanisms = [];
   const markers = [];
   const lights = [];
-  // What the ear hears of the castle's decor (audio/ambience.js): the flames (a brazier's, a torch's: not the filth's green glow) and the drips.
+  // What the ear hears of the castle's decor (audio/ambience.js): the flames by their size (a brazier's, a torch's: not a candle's, nor the filth's green glow) and the drips.
   const sounding = { fires: [], drips: [] };
   const stats = { land: 0, sections: {} };
   // The standing water (kitwater.js): its meshes go in the sections' detail, its drops in the stage's group.
@@ -1238,7 +1238,8 @@ export function createCastleView(stage) {
       markers.push(marker);
     }
     for (const l of detail.dyn.lights) lights.push({ ...l, section: section.id });
-    for (const l of detail.dyn.lights) if (l.color !== 0x8fdc50) sounding.fires.push({ at: l.at, power: l.power, section: section.id });
+    // (Every flame by its size: a torch, a brazier, a hearth, a lantern; a candle's still flame makes no sound.)
+    for (const f of detail.dyn.flames) if (!f.candle) sounding.fires.push({ at: f.at, size: f.size, section: section.id });
     for (const d of detail.dyn.drips) sounding.drips.push({ at: d.at, section: section.id });
     // A man buried in a heap of filth (a spawn's `lurk`): the heap, which slides off him as he rises (kitfilth.js kfHeap, world.stage.lurk).
     for (const spawn of section.spawns ?? []) {

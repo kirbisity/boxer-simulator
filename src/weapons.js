@@ -162,6 +162,8 @@ export const RIFLE = {
   misfire: 0.002,
   rounds: 30,
   reloadSeconds: 2.5,
+  // The empty magazine dropped and a full one seated from the chest pouch (physics/ranged.js MAGAZINE_CHANGE).
+  reload: 'magazine',
   // A soldier's basic load: seven magazines (210 rounds).
   ammo: 210,
   // Fully automatic (the M16/M4 family's select fire): ~12 rounds a second (~720 a minute), in bursts of 3-6.
@@ -192,6 +194,8 @@ export const SHOTGUN = {
   misfire: 0.002,
   rounds: 5,
   reloadSeconds: 4,
+  // Shell by shell up into the tube under the barrel (physics/ranged.js TUBE_LOAD).
+  reload: 'tube',
   // Five in the tube and a bandolier or a sidesaddle of shells: ~30.
   ammo: 30,
 };
@@ -831,6 +835,72 @@ export const SHIELDS = {
  * edge in his hand to cut it. On the floor, past `lies` s, it is done.
  */
 export const NET = { speed: 8.5, radius: 0.75, open: 0.25, flightMax: 1.2, step: 0.35, footing: 0.7, freeRate: 0.22, bladeFree: 2.2, lies: 30 };
+
+/**
+ * Hand grenades (physics/throwable.js): one carried by a kit that has a `throwable` (outfits.js: the modern infantryman's
+ * frag, a SWAT officer's flashbang), thrown once overhand and gone. The pin is pulled as the throw begins and the fuse burns
+ * from then (`fuse` s); in flight it is a body under gravity that bounces and rolls where it lands; at the end of its fuse
+ * it goes off. Nothing here is a damage figure: what it does is the physics of what it throws out.
+ *
+ * frag, the US M67: a 0.4 kg steel sphere round 185 g of Composition B, a 4-5.5 s fuse. Its notched steel body breaks into
+ * hundreds of fragments of a fraction of a gram at ~1500 m/s; the manuals give a lethal radius of 5 m and a casualty radius
+ * of 15 m, fragments carrying to 230 m. Here:
+ * - `fragments`: how many effective fragments go out over the half of the sphere above the ground (the other half goes into
+ *   it). A man takes as many as his body presents of that half sphere at his distance (his capsules' area square to the
+ *   line, over 2πd²): a dozen and more at 2 m, ~3 at 5 m, ~0.4 at 15 m (a bare man at 5 m: a quarter killed outright, most
+ *   of the rest badly hurt and bleeding; at 15 m a scratch or nothing). Each is a projectile hit through the rounds' path (ranged.js
+ *   bulletHit: his armour's bullet protection, proof against so small a fragment, takes its share; a man between takes it
+ *   instead of the one behind him); at most `raysMost` are traced on any one man (by then he has more than enough).
+ * - `joules`: a fragment's energy as it leaves (~0.2 g at ~1500 m/s, ~225 J); `fade` m: its energy's e-fold in the air (a
+ *   small, ragged fragment slows fast: drag over its mass), so ~70 % is left at 5 m and ~30 % at 15 m.
+ * - `lethal`, `bleed`: one fragment at `joules` (scaled by the energy it still has), as the guns' (GUN, of what kills an
+ *   80 kg man): a fragment fresh from the burst is most of a pistol round's wound (half its energy, but ragged: it tumbles
+ *   and tears), half of one by 5 m, a quarter by 15 m.
+ * - `impulse`: what a fragment carries into what it hits (N·s: 0.2 g × 1500 m/s).
+ * - `blast`: the shock's push on a body (N·s at 1 m, falling as 1/d: the positive impulse of 185 g of explosive, ~170 Pa·s at
+ *   1 m, over a standing man's ~0.7 m²), no nearer than `near` m, out to `reach` m: at 1 m it throws a man off his feet
+ *   (WORLD.balance.speed), at 3 m it rocks him.
+ * flashbang, the M84 stun grenade: a perforated steel tube that stays whole (no fragments) round 4.5 g of magnesium and
+ * perchlorate: a flash of some 6-8 million candela and a bang of 170-180 dB at 1.5 m, its fuse 1-2.3 s. It blinds and
+ * deafens: the eyes' rods bleached for about five seconds, the ear's balance upset, a man at its foot disoriented, not hurt.
+ * - `flash.stun`: [distance m, s] of being dazed (WORLD.daze: slower to react, weaker, swaying; interpolated between rows)
+ *   for a man facing it with nothing between; facing away the bang alone (`away` of it), behind a wall `hidden` of it.
+ *   `staggerWithin` m: the blast and the shock set him reeling (WORLD.stagger, severity `stagger` at its foot falling to
+ *   the threshold at `staggerWithin`); `stunShare`: the share of the daze his limbs are slack (fighter.stun).
+ * - `blast`: a few grams: a small push, enough to rock a man at its foot.
+ * `ai`: when a man of the AI throws it (ai.js): at least `least` enemies within `within` m of a mark `from`-`to` m off, no
+ * man of his own within `clear` m of it.
+ */
+export const THROWABLES = {
+  frag: {
+    label: 'Frag', name: 'fragmentation grenade', massKg: 0.4, radius: 0.032, fuse: 4.5,
+    fragments: 1200, raysMost: 12, joules: 225, fade: 14, reach: 30,
+    lethal: { head: 0.8, torso: 0.4, limb: 0.15 },
+    bleed: { head: 0.0012, torso: 0.0018, limb: 0.0008 },
+    impulse: 0.3,
+    blast: { impulse: 120, near: 0.6, reach: 12 },
+    flash: null,
+    ai: { least: 3, within: 5, clear: 10, from: 8, to: 25 },
+  },
+  flashbang: {
+    label: 'Flashbang', name: 'stun grenade', massKg: 0.47, radius: 0.025, fuse: 1.5,
+    fragments: 0,
+    blast: { impulse: 12, near: 0.6, reach: 4 },
+    flash: { stun: [[1, 6], [3, 5], [5, 3.5], [8, 2], [12, 0.8], [15, 0]], away: 0.45, hidden: 0.3, staggerWithin: 3, stagger: 1, stunShare: 0.5 },
+    ai: { least: 2, within: 4, clear: 6, from: 4, to: 18 },
+  },
+};
+
+/**
+ * The throw (physics/throwable.js), with the hand not on a weapon (the off hand behind a gun): the pin pulled at the chest
+ * (`pin` s), the arm cocked back high behind the head with the shoulder turned away (to `release` s), then whipped over and
+ * let go, the arm following through (to `seconds`). Lobbed at `angle` rad over the horizontal (a soldier's 30-40° arc that
+ * drops it over cover), as fast as that needs to land on the mark, up to `speedMost` m/s (a fit man's ~35-40 m with a
+ * grenade); off the mark by `spread` of the distance (a gaussian, wider for the unskilled, × (1.5 - skill)). Where it lands
+ * it bounces (`bounce`: the vertical speed kept; `keep`: the horizontal) and rolls to a stop at `roll` m/s² (grass, earth).
+ * Pressed with nobody to throw at, it goes `ahead` m straight on; a mark further than `reach` m is thrown at `reach`.
+ */
+export const THROW = { pin: 0.35, release: 0.8, seconds: 1.1, angle: 0.6, speedMost: 21, spread: 0.07, bounce: 0.3, keep: 0.5, roll: 5, ahead: 15, reach: 35 };
 
 /** A shield's outer bound (m from its centre): its radius, or a shaped shield's half-diagonal. */
 export function shieldReach(spec) {

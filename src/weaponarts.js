@@ -14,11 +14,16 @@
 // stagger), and more of the fight's everyday ones (a blow of his landing, a blow taken, a man killed),
 // each scaled by how much his body surges (ai.js adrenalineGain: young, big and male more); danger near
 // (enemies on their feet close to him) holds it up to a floor; it fades with ai.js's half-life.
+//
+// A man who carries a grenade (physics/throwable.js: a soldier's frag, a SWAT officer's flashbang) has it on this same button
+// first, and it needs no blood up: pressed, he pulls the pin and throws it at his man (or straight on). It is one throw: once
+// it is gone the button is the art's again (shown only while the art is charged).
 
 import { AI, adrenalineGain, surge } from './ai.js';
 import { P } from './body.js';
 import { MOVES } from './moves.js';
 import { hostile, inFight, opponentFor, point, reachOf, throwPunch } from './physics.js';
+import { startThrow, throwableOf, throwBlocked } from './physics/throwable.js';
 
 export const ARTS = {
   // Adrenaline (0..1) at which an art can be made: very high, more than one hard exchange's worth (a knockdown alone gives
@@ -60,6 +65,8 @@ export function artCost(fighter, name) {
 
 /** Whether his art is charged (its button shown, glowing): a weapon with an art, and the charge banked (or his blood up now). */
 export function artPrimed(fighter) {
+  // (A grenade still carried: the button is its, ready whatever his blood.)
+  if (throwableOf(fighter)) return true;
   return Boolean(artOf(fighter)) && (Boolean(fighter.artCharged) || (fighter.adrenaline ?? 0) >= ARTS.ready);
 }
 
@@ -69,6 +76,8 @@ export function artPrimed(fighter) {
  * not charged).
  */
 export function artBlocked(fighter) {
+  // (A grenade: costs no more breath than a throw; held back only while he is busy, `busy`.)
+  if (throwableOf(fighter)) return throwBlocked(fighter);
   const name = artOf(fighter);
   if (!name || !artPrimed(fighter)) return 'none';
   if (fighter.stamina < artCost(fighter, name)) return 'winded';
@@ -105,6 +114,8 @@ function artIntoAir(world, fighter) {
 
 /** The name of his art for the button. */
 export function artLabel(fighter) {
+  const grenade = throwableOf(fighter);
+  if (grenade) return grenade.label;
   return ARTS.labels[artOf(fighter)] ?? 'Art';
 }
 
@@ -115,6 +126,8 @@ export function artLabel(fighter) {
  */
 export function startArt(world, fighter) {
   if (!artReady(fighter)) return false;
+  // A grenade first: thrown (physics/throwable.js), the art left charged for after.
+  if (throwableOf(fighter)) return startThrow(world, fighter);
   const man = artTarget(world, fighter);
   const name = artOf(fighter);
   const spec = MOVES[name];

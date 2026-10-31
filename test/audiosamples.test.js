@@ -5,8 +5,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { LOOP_FILES, SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
-import { BLOW_TAIL, playSample, playWithSamples, samplePlan } from '../src/audio/sfx/sampled.js';
+import { BLOW_TAIL, BOW_DRAW_PLAY, BREATH_TAKES, breathHeard, breathPlan, playPlan, playSample, playWithSamples, samplePlan, uiSamplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
+import { breathParams } from '../src/audio/sfx/voice.js';
+import { exertionOf } from '../src/audio/engine.js';
+import { normaliseInputs, PRESETS } from '../src/body.js';
+import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
+import { machineFxCreate, machineFxHear } from '../src/machinefx.js';
 
 const DIR = 'src/audio/samples';
 // (A thunder's roar is the longest single take, 2.6 s; the army's charge loop, 6 s of a dull roar at 32 kb/s, is the largest one-shot file.)
@@ -258,8 +263,8 @@ test('the fifth batch: a bow, a crossbow, a portcullis, a sword on mail and into
   assert.ok(plan({ type: 'shot', kind: 'bow' }).synth, 'the synth\'s thrum of the string under the release');
   assert.equal(plan({ type: 'shot', kind: 'crossbow' }).set, 'crossbow');
   const cannon = plan({ type: 'shot', kind: 'cannon' });
-  assert.equal(cannon.set, 'gunshot');
-  assert.ok(cannon.rate < 0.6 && cannon.synth, 'a cannon: the report slowed, the synth\'s boom under it');
+  assert.equal(cannon.set, 'explosion-big');
+  assert.ok(cannon.extra[0].set === 'gunshot' && cannon.extra[0].rate < 0.6 && cannon.synth, 'a cannon: the big explosion\'s roar, the report slowed over its head, the synth\'s boom under it');
   const down = plan({ type: 'mech', kind: 'portcullis', state: 'down' });
   assert.equal(down.set, 'portcullis-chain');
   assert.deepEqual(down.extra.map((layer) => layer.set), ['portcullis-slam']);
@@ -325,4 +330,164 @@ test('every blow is played a little longer than before, the heaviest the longest
   assert.ok(BLOW_TAIL.heavy > BLOW_TAIL.light && BLOW_TAIL.light > 1 && BLOW_TAIL.fadeHeavy > BLOW_TAIL.fadeLight);
   // The loudness is as it was.
   assert.equal(blade(400).trim, 0.85);
+});
+
+test('the sixth batch: a robot\'s shock, a heavy chain and shackles, a man\'s and a woman\'s breath, the menu\'s tap and chime, each in its set', () => {
+  for (const set of ['shock', 'chain', 'shackle', 'breath-male-in', 'breath-male-out', 'breath-female-in', 'breath-female-out', 'ui-tap', 'ui-chime']) {
+    assert.ok(SAMPLE_SETS[set]?.length, set);
+    for (const name of SAMPLE_SETS[set]) assert.ok(SAMPLE_FILES.includes(name), name);
+  }
+});
+
+test('a robot\'s short (robotSpark) plays the shock, a death louder and longer than a stump; a man\'s death or cut never does', () => {
+  const world = createWorld([
+    { inputs: structuredClone(PRESETS.humanoid), corner: 'red' },
+    { inputs: normaliseInputs(structuredClone(PRESETS.contender)), corner: 'blue' },
+  ], { seed: 1 });
+  world.ear = { x: 0, z: 0, radius: 100 };
+  const [robot, man] = world.fighters;
+  const store = machineFxCreate();
+  machineFxHear(store, { kind: 'killed', fighter: man.id }, world, 0);
+  machineFxHear(store, { kind: 'severed', fighter: robot.id, joint: 'elbow', side: 'l' }, world, 0);
+  machineFxHear(store, { kind: 'killed', fighter: robot.id }, world, 0.5);
+  const sparks = world.sounds.slice(0, world.soundsCount).filter((event) => event.type === 'robotSpark');
+  assert.deepEqual(sparks.map((event) => [event.kind, event.fighter]), [['stump', robot.id], ['death', robot.id]], 'the robot\'s two shorts, nothing of the man\'s');
+  const [stump, death] = sparks.map((event) => plan(event));
+  assert.equal(stump.set, 'shock');
+  assert.equal(death.set, 'shock');
+  assert.ok(death.trim > stump.trim && death.seconds > stump.seconds && death.rate < stump.rate, 'a death louder, longer, lower');
+  assert.ok(SOUND_FAMILIES.robotSpark.params(sparks[1]).level > SOUND_FAMILIES.robotSpark.params(sparks[0]).level);
+  // (The death and the cut themselves are not the shock: no double play, a robot's or a man's.)
+  for (const event of [{ type: 'wound', kind: 'cut', severity: 1 }, { type: 'voice', kind: 'death', strength: 1, sex: 'male' }]) assert.notEqual(plan(event)?.set, 'shock');
+});
+
+test('a chain: a portcullis raised and a drawbridge on the heavy chain; a chained prisoner\'s shackles as he sobs and under the lash', () => {
+  assert.equal(plan({ type: 'mech', kind: 'portcullis', state: 'opening' }).set, 'chain');
+  assert.equal(plan({ type: 'mech', kind: 'portcullis', state: 'down' }).set, 'portcullis-chain', 'let down: its own chain into its slam');
+  const bridge = plan({ type: 'mech', kind: 'drawbridge', state: 'down' });
+  assert.equal(bridge.set, 'chain');
+  assert.equal(bridge.extra[0].set, 'chain');
+  assert.ok(bridge.extra[0].delay > 1 && bridge.synth, 'two runs, the synth\'s timber beside');
+  const sob = plan({ type: 'mech', kind: 'shackles', state: 'open', strength: 0.45 });
+  const wail = plan({ type: 'mech', kind: 'shackles', state: 'open', strength: 0.85 });
+  assert.equal(sob.set, 'shackle');
+  assert.ok(wail.trim > sob.trim && wail.seconds > sob.seconds);
+  assert.equal(plan({ type: 'hit', energy: 20, striker: 'lash', covering: 'flesh', part: 'trunk', chained: true }).extra[0].set, 'shackle');
+  assert.equal(plan({ type: 'hit', energy: 20, striker: 'lash', covering: 'flesh', part: 'trunk' }).extra, undefined, 'a man not chained: the lash alone');
+});
+
+test('breathing is silent through a fight with breath in hand, heard (recorded, by sex, at the voice\'s pitch) only when all but spent', () => {
+  const at = (stamina) => exertionOf({ stamina });
+  for (const stamina of [1, 0.5, 0.3, 0.15]) assert.equal(breathPlan(breathParams(at(stamina)), true, at(stamina), 'male'), null, `stamina ${stamina}: silent`);
+  for (const stamina of [0.08, 0, -0.3]) {
+    const exertion = at(stamina);
+    const breath = breathParams(exertion);
+    const inhale = breathPlan(breath, true, exertion, 'male', 0.9);
+    const exhale = breathPlan(breath, false, exertion, 'female', 1.2);
+    assert.equal(inhale.set, 'breath-male-in', `stamina ${stamina}`);
+    assert.equal(exhale.set, 'breath-female-out');
+    assert.equal(inhale.rate, 0.9, 'his voice\'s pitch');
+    assert.ok(Math.abs(inhale.seconds - breath.inSeconds * BREATH_TAKES.length) < 1e-9 && Math.abs(exhale.seconds - breath.outSeconds * BREATH_TAKES.length) < 1e-9, 'in step with the breathing rate');
+  }
+  assert.ok(breathHeard(at(0)) && !breathHeard(at(0.5)));
+});
+
+test('the menu\'s buttons play the recorded tap (a back lower, a confirm higher with the chime under it); victory and defeat stay the synth\'s', () => {
+  const click = uiSamplePlan('click', half);
+  const back = uiSamplePlan('back', half);
+  const confirm = uiSamplePlan('confirm', half);
+  for (const kind of [click, back, confirm]) assert.equal(kind.set, 'ui-tap');
+  assert.ok(back.rate < click.rate && confirm.rate > click.rate);
+  assert.deepEqual(confirm.extra.map((layer) => layer.set), ['ui-chime']);
+  assert.equal(uiSamplePlan('victory', half), null);
+  assert.equal(uiSamplePlan('defeat', half), null);
+  // Played from the bank (the take and its layers), or null to leave it to the synth until the takes load.
+  const started = [];
+  const node = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, playbackRate: { value: 1 }, start: (when) => started.push(when), stop() {} });
+  const voice = { ctx: { createGain: node, createBufferSource: node }, nodes: [], live: 0, end: 0, out: {} };
+  assert.ok(playPlan({ pick: () => ({ buffer: { duration: 0.8 }, offset: 0 }) }, voice, confirm, 1, 0.8) > 1);
+  assert.equal(started.length, 2, 'the tap and the chime');
+  assert.equal(playPlan({ pick: () => null }, voice, click, 1, 0.8), null);
+});
+
+test('the seventh batch: a bow drawn, each take in its set; the fire\'s loop among the loops', () => {
+  assert.deepEqual(SAMPLE_SETS.bowdraw, ['bowdraw-1', 'bowdraw-2', 'bowdraw-3']);
+  for (const name of SAMPLE_SETS.bowdraw) assert.ok(SAMPLE_FILES.includes(name) && existsSync(`${DIR}/${name}.mp3`), name);
+  assert.ok(LOOP_FILES.includes('loop-fire') && existsSync(`${DIR}/loop-fire.mp3`));
+});
+
+/** A shooter (`preset`) and a man 10 m off, heard; one shot (`move`) and 2 s after it: the sound events of his. */
+function oneShot(preset, move, setUp = () => {}) {
+  const world = createWorld([
+    { inputs: normaliseInputs(structuredClone(PRESETS[preset])), corner: 'red' },
+    { inputs: normaliseInputs(structuredClone(PRESETS.contender)), corner: 'blue' },
+  ], { seed: 3, arena: { halfX: 14, halfZ: 6 } });
+  const [shooter, target] = world.fighters;
+  placeFighter(shooter, -5, 0);
+  placeFighter(target, 5, 0);
+  setUp(shooter);
+  world.ear = { x: 0, y: 1.6, z: 0, radius: 100 };
+  advance(world, 0.3);
+  const from = world.soundsCount ?? 0;
+  assert.ok(throwPunch(world, shooter, move, 'body'), `${preset}: ${move} thrown`);
+  const thrown = world.time;
+  advance(world, 2);
+  return { thrown, sounds: world.sounds.slice(from, world.soundsCount).filter((event) => event.who === shooter.id && (event.type === 'draw' || event.type === 'shot')) };
+}
+
+test('a bow\'s shot: the creak from the draw\'s start, then the release at the loose (two sounds, one action); a crossbow or a gun no creak', () => {
+  // A bow, a composite bow, a yumi, a longbow.
+  for (const preset of ['bow', 'steppeBow', 'tametomo', 'longbow']) {
+    const { thrown, sounds } = oneShot(preset, 'loose');
+    assert.deepEqual(sounds.map((event) => event.type), ['draw', 'shot'], preset);
+    const [draw, shot] = sounds;
+    assert.equal(shot.kind, 'bow');
+    assert.ok(draw.t - thrown < 0.05, `${preset}: the creak at the draw's start (${(draw.t - thrown).toFixed(3)} s in)`);
+    // The creak lasts the draw: it ends about when the release comes (the loose waits on the sights a little at most).
+    assert.ok(shot.t >= draw.t + draw.seconds - 0.05 && shot.t - (draw.t + draw.seconds) < 0.25, `${preset}: drawn ${draw.seconds.toFixed(2)} s, loosed at ${(shot.t - draw.t).toFixed(2)} s`);
+    const creak = plan(draw);
+    assert.equal(creak.set, 'bowdraw');
+    assert.ok(creak.fromEnd && Math.abs(creak.seconds - draw.seconds) < 1e-9 && Math.abs(creak.fit - draw.seconds) < 1e-9, 'fitted to the draw, ending at the loose');
+    // The release as before.
+    assert.equal(plan(shot).set, 'bow');
+  }
+  const crossbow = oneShot('crossbow', 'fireLong');
+  assert.ok(crossbow.sounds.some((event) => event.type === 'shot' && event.kind === 'crossbow'), 'the crossbow shot');
+  assert.ok(!crossbow.sounds.some((event) => event.type === 'draw'), 'no creak for a crossbow');
+  const gun = oneShot('matchlock', 'fireLong');
+  assert.ok(gun.sounds.some((event) => event.type === 'shot' && event.kind === 'matchlock'), 'the gun shot');
+  assert.ok(!gun.sounds.some((event) => event.type === 'draw'), 'no creak for a gun');
+});
+
+test('a bow\'s creak is fitted to its draw: a quick draw squeezed, a slow one stretched, never past its range; it ends at the loose', () => {
+  const started = [];
+  const node = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, playbackRate: { value: 1 }, start: (when, offset) => started.push({ when, offset }), stop() {} });
+  const voice = { ctx: { createGain: node, createBufferSource: node }, nodes: [], live: 0, end: 0, out: {} };
+  const take = { buffer: { duration: 1.12 }, offset: 0 };
+  const at = (seconds) => {
+    const creak = plan({ type: 'draw', seconds });
+    started.length = 0;
+    const end = playSample(voice, voice.out, take, { ...creak, rate: 1 }, 10, 0.5);
+    return { end, start: started[0] };
+  };
+  const quick = at(0.5);
+  assert.ok(Math.abs(quick.end - 10.51) < 1e-9, 'it ends at the loose');
+  assert.ok(Math.abs(quick.start.offset - (1.12 - 0.5 * BOW_DRAW_PLAY.stretch[1])) < 1e-9, 'squeezed as far as it goes, its last part played');
+  const slow = at(1.6);
+  // Stretched to its most and still short of the draw: started late, so it still ends at the loose.
+  assert.ok(Math.abs(slow.end - 11.61) < 1e-9 && slow.start.when > 10, `${slow.start.when}`);
+  // Not a crossbow's nor a gun's: the shot's plans are as they were.
+  assert.equal(plan({ type: 'shot', kind: 'crossbow' }).set, 'crossbow');
+  assert.equal(SOUND_FAMILIES.draw.sampledOnly, true, 'no synth creak: silent until the takes load');
+});
+
+test('grenades: a frag is a grenade blast with the big explosion\'s rumble under it, a flashbang the crack alone; both heard map-wide', () => {
+  for (const set of ['grenade', 'flashbang', 'explosion-big', 'explosion-rumble']) assert.ok(SAMPLE_SETS[set]?.length, set);
+  const frag = plan({ type: 'shot', kind: 'frag' });
+  assert.equal(frag.set, 'grenade');
+  assert.deepEqual(frag.extra.map((layer) => layer.set), ['explosion-rumble']);
+  const flash = plan({ type: 'shot', kind: 'flashbang' });
+  assert.equal(flash.set, 'flashbang');
+  assert.ok(flash.seconds < 0.5 && !flash.extra, 'short, no rumble');
+  assert.ok(SOUND_FAMILIES.shot.params({ kind: 'frag' }).level > 160);
 });

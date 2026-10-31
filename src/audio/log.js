@@ -21,8 +21,8 @@ import { surfaceAt, surfaceUnder } from './surface.js';
 /** How many events the log keeps: a reader more than this far behind has lost the oldest. */
 export const SOUND_RING = 4096;
 
-// Heard over the whole map, wherever the ear is: thunder and gunpowder.
-const MAP_WIDE_SHOTS = new Set(['matchlock', 'cannon']);
+// Heard over the whole map, wherever the ear is: thunder and gunpowder (and a grenade's explosion).
+const MAP_WIDE_SHOTS = new Set(['matchlock', 'cannon', 'frag', 'flashbang']);
 
 /** Record a sound event at `data.x, data.y, data.z` (or `data.at`, a point), unless the ear is too far off to hear it. */
 export function soundEvent(world, type, data) {
@@ -173,7 +173,8 @@ export function soundHit(world, struck, by, part, at, { energy, impulse, striker
   // `mass`: the weapon's (kg) for a weapon's blow: a heavier one is heard lower.
   const mass = WEAPON_STRIKERS.has(striker) ? by?.weapon?.spec?.mass : undefined;
   const met = covering ?? coveringAt(struck, part);
-  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: met, part, braced, who: struck.id, by: by ? by.id : -1, mass });
+  // (`chained`: a prisoner chained up where he kneels: his shackles rattle under the blow.)
+  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: met, part, braced, who: struck.id, by: by ? by.id : -1, mass, ...(struck.kneel?.chained ? { chained: true } : {}) });
   // (The blow's energy and what it met go with his voice: the pain of it to him is the cry director's, audio/cries.js.)
   if (deltaV > 0 && struck.state !== 'out') soundVoice(world, struck, 'struck', Math.min(1, deltaV / STRUCK_FULL), { energy, covering: met });
 }

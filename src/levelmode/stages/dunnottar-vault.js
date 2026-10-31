@@ -149,8 +149,8 @@ export function buildVault() {
   dnSpawn(sec, 'mourner2', 'vaultPrisoner', 'prisoner', 0, [21.0, V, -33.7], DN_FACE.S, { inputs: { name: 'A weeping prisoner' }, kneel: { hands: 'face', lean: 0.5 }, mourn: { wail: 0.35 } });
   // Out in the cellar, two chained at its north wall beside the bones of the ones who were there before them, on their knees and weeping (within reach: nothing to
   // free them with, and they do not fight or run).
-  dnSpawn(sec, 'mourner3', 'vaultPrisoner', 'prisoner', 0, [3.4, V, -25.3], DN_FACE.N, { inputs: { name: 'A chained prisoner' }, kneel: { hands: 'face', lean: 0.4 }, mourn: true });
-  dnSpawn(sec, 'mourner4', 'vaultPrisonerWoman', 'prisoner', 0, [27.2, V, -25.3], DN_FACE.N, { inputs: { name: 'A chained woman' }, kneel: { hands: 'face', lean: 0.55 }, mourn: { wail: 0.3 } });
+  dnSpawn(sec, 'mourner3', 'vaultPrisoner', 'prisoner', 0, [3.4, V, -25.3], DN_FACE.N, { inputs: { name: 'A chained prisoner' }, kneel: { hands: 'face', lean: 0.4, chained: true }, mourn: true });
+  dnSpawn(sec, 'mourner4', 'vaultPrisonerWoman', 'prisoner', 0, [27.2, V, -25.3], DN_FACE.N, { inputs: { name: 'A chained woman' }, kneel: { hands: 'face', lean: 0.55, chained: true }, mourn: { wail: 0.3 } });
 
   dnItem(sec, 'note-ledger', 'note', [29.6, V, -25.4], { note: 'ledger', lift: 0.95 });
   dnItem(sec, 'cellkey', 'key', [31.6, V, -26.2], { label: 'Take the cell key', lift: 1.2 });

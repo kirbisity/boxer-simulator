@@ -7,7 +7,8 @@ import { clashParams, playClash } from './sfx/clash.js';
 import { clatterParams, fallParams, playClatter, playFall } from './sfx/fall.js';
 import { horseParams, playHorse } from './sfx/horse.js';
 import { arrowHitParams, impactParams, playImpact } from './sfx/impact.js';
-import { playShot, shotParams } from './sfx/ranged.js';
+import { drawParams, playShot, shotParams } from './sfx/ranged.js';
+import { playSpark, sparkParams } from './sfx/spark.js';
 import { playStep, stepParams } from './sfx/step.js';
 import { playSwing, swingParams } from './sfx/swing.js';
 import { cryLevel, cryOfEvent, playVoice, voiceParams } from './sfx/voice.js';
@@ -35,6 +36,10 @@ export const SOUND_FAMILIES = {
   arrowhit: { params: arrowHitParams, play: playImpact, bus: 'effects', boost: 4 },
   mech: { params: mechParams, play: playMech, bus: 'effects' },
   thunder: { params: thunderParams, play: playThunder, bus: 'ambience' },
+  // A robot shorting out (machinefx.js): the recorded shock.
+  robotSpark: { params: sparkParams, play: playSpark, bus: 'effects' },
+  // A bow bent as its string is drawn (physics.js, at the draw's start): the recorded creak only (the synth has none: silent until it loads).
+  draw: { params: drawParams, play: playShot, bus: 'effects', sampledOnly: true },
 };
 
 /** A voice event's params: the synth's, at its cry's level where it is one (cryOfEvent), else silent (an effort: no recording). */

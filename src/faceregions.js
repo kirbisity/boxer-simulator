@@ -8,6 +8,8 @@
 // both: a region missing for a sex falls back to the nearest one that has it
 // (by the map, REGION_PLACES).
 
+import { SKIN_TONES } from './skintones.js';
+
 /** Each source region's place (latitude, longitude, degrees), for the nearest-region fallback. */
 export const REGION_PLACES = {
   england: [52, -1], ireland: [53, -8], france: [47, 2], germany: [51, 10], netherlands: [52, 5], switzerland: [47, 8], austria: [47, 14],
@@ -82,7 +84,114 @@ export function nearestRegion(region, available) {
 export function regionsFor(inputs, outfitRegion = null) {
   const own = inputs.faceRegion ?? inputs.look?.faceRegion ?? outfitRegion;
   if (own) return Array.isArray(own) ? own : [own];
-  return KIT_REGIONS[inputs.outfit?.kind] ?? TONE_REGIONS[inputs.look?.skinTone ?? 'medium'] ?? TONE_REGIONS.medium;
+  return kitRegions(inputs);
+}
+
+/** The regions his kit (or, without a kit of a people, his skin tone) gives him: everything but a `faceRegion` of his own. */
+const kitRegions = (inputs) => KIT_REGIONS[inputs.outfit?.kind] ?? TONE_REGIONS[inputs.look?.skinTone ?? 'medium'] ?? TONE_REGIONS.medium;
+
+// ---- Choosing an origin: the character creator -------------------------------------------------------------------------
+//
+// In the character creator (menu.js) the player may say where a fighter is from: one of the composites' regions, for his sex,
+// whatever he wears and whatever he fights with (a Korean in a knight's harness, an Englishman in a samurai's). It is kept as
+// `look.faceRegion`, which wins over his kit's (regionsFor). Left alone, he is cast as before, from his kit: the creator shows
+// that kit's commonest region (originOf) as the one chosen, and writes nothing until the player changes it.
+//
+// The skin is the origin's, within reason. Each region has a tone of the game's ladder (SKIN_TONES, lightest to deepest) that
+// its composite stands for, and the player may move it a step or so either way (TONE_REACH): lighter or darker men of the same
+// people, not a different people (that is what the origin is for). The photo face's own skin (the composite's, photoface.js) is
+// shifted by the ratio of the chosen tone to the region's, so the region's own tone leaves the composite's skin exactly as it
+// was. Only a fighter with an origin of his own is shifted: everyone else's `skinTone` (the presets', the dealt men's) never
+// touched the photo skin, and still does not.
+
+/** The origins offered, grouped by continent, each labelled as its source composite is (a country, or a people). */
+export const REGION_ORIGINS = [
+  { label: 'Europe', regions: {
+    england: 'England', ireland: 'Ireland', france: 'France', netherlands: 'Netherlands', germany: 'Germany', switzerland: 'Switzerland', austria: 'Austria',
+    sweden: 'Sweden', poland: 'Poland', czechRepublic: 'Czech Republic', hungary: 'Hungary', romania: 'Romania', serbia: 'Serbia', ukraine: 'Ukraine',
+    russia: 'Russia', italy: 'Italy', spain: 'Spain', greece: 'Greece',
+  } },
+  { label: 'Middle East', regions: { turkey: 'Turkey', israel: 'Israel', lebanon: 'Lebanon', iraq: 'Iraq', iran: 'Iran', saudiArabia: 'Saudi Arabia' } },
+  { label: 'Central & South Asia', regions: { afghanistan: 'Afghanistan', uzbekistan: 'Uzbekistan', tibet: 'Tibet', india: 'India', southIndia: 'South India' } },
+  { label: 'East Asia', regions: { mongolia: 'Mongolia', china: 'China', taiwan: 'Taiwan', korea: 'Korea', japan: 'Japan' } },
+  { label: 'Southeast Asia & Pacific', regions: { burma: 'Burma', thailand: 'Thailand', cambodia: 'Cambodia', vietnam: 'Vietnam', philippines: 'Philippines', samoa: 'Samoa' } },
+  { label: 'Africa', regions: { ethiopia: 'Ethiopia', chadCameroon: 'Chad & Cameroon', westAfrica: 'West Africa', southAfrica: 'South Africa' } },
+  { label: 'The Americas', regions: {
+    whiteAmerican: 'White American', africanAmerican: 'African American', mexico: 'Mexico', puertoRico: 'Puerto Rico', peru: 'Peru', brazil: 'Brazil', argentina: 'Argentina',
+  } },
+];
+
+/** A region's name, as the creator shows it. */
+export const regionName = (region) => REGION_ORIGINS.find((group) => group.regions[region])?.regions[region] ?? region;
+
+/**
+ * The tone of the game's ladder (SKIN_TONES) each region's composite stands for: the middle of the range the player may pick
+ * from. Read off the composites' cheeks (manifest.json `skin`) against the ladder, rounded to the tone a player would call it,
+ * the two sexes together. Light for northern and central Europe; light tan round the Mediterranean and in East Asia (the
+ * composites there are as light as southern Europe's, with more yellow); medium for the Middle East, the Andes, the Caribbean and
+ * most of Southeast Asia; tan for India and Cambodia; deep for Africa and African Americans.
+ */
+export const REGION_TONES = {
+  england: 'light', ireland: 'light', france: 'light', netherlands: 'light', germany: 'light', switzerland: 'light', austria: 'light', sweden: 'light',
+  poland: 'light', czechRepublic: 'light', hungary: 'light', romania: 'light', serbia: 'light', ukraine: 'light', russia: 'light', whiteAmerican: 'light',
+  italy: 'lightTan', spain: 'lightTan', greece: 'lightTan', argentina: 'lightTan', turkey: 'lightTan', israel: 'lightTan', lebanon: 'lightTan',
+  uzbekistan: 'lightTan', tibet: 'lightTan', mongolia: 'lightTan', china: 'lightTan', taiwan: 'lightTan', korea: 'lightTan', japan: 'lightTan',
+  iraq: 'medium', iran: 'medium', saudiArabia: 'medium', afghanistan: 'medium', burma: 'medium', thailand: 'medium', vietnam: 'medium', philippines: 'medium',
+  samoa: 'medium', mexico: 'medium', puertoRico: 'medium', peru: 'medium', brazil: 'medium',
+  india: 'tan', southIndia: 'tan', cambodia: 'tan',
+  ethiopia: 'deep', chadCameroon: 'deep', westAfrica: 'deep', southAfrica: 'deep', africanAmerican: 'deep',
+};
+
+/**
+ * How far from its region's tone the player may move a fighter's skin, in steps of the ladder: one either way for most, the
+ * ladder's ends cutting it short (a West African may be tan or deep). Two for the peoples whose composite averages a wide spread
+ * of skins: a mixed population (Brazil, Puerto Rico, African Americans, South Africa) or a country of many peoples from the
+ * fair north to the dark south (India).
+ */
+export const TONE_REACH = { steps: 1, wide: { brazil: 2, puertoRico: 2, africanAmerican: 2, southAfrica: 2, india: 2 } };
+
+const TONE_LADDER = Object.keys(SKIN_TONES);
+
+/** The tone a region's composite stands for (REGION_TONES), medium for one not listed. */
+export const regionTone = (region) => REGION_TONES[region] ?? 'medium';
+
+/** The tones a fighter of `region` may have, lightest first: the region's own, and TONE_REACH steps either way. */
+export function toneRange(region) {
+  const middle = TONE_LADDER.indexOf(regionTone(region));
+  const reach = TONE_REACH.wide[region] ?? TONE_REACH.steps;
+  return TONE_LADDER.slice(Math.max(0, middle - reach), middle + reach + 1);
+}
+
+/** `tone` kept within `region`'s range: itself if it is in it, else the nearer end; the region's own tone for none. */
+export function clampTone(region, tone) {
+  const range = toneRange(region);
+  if (range.includes(tone)) return tone;
+  if (!TONE_LADDER.includes(tone)) return regionTone(region);
+  return TONE_LADDER.indexOf(tone) < TONE_LADDER.indexOf(range[0]) ? range[0] : range[range.length - 1];
+}
+
+/**
+ * Where a fighter is from, as the creator shows it, among the `available` regions (the composites of his sex): his own
+ * `faceRegion` (the first, if a list), else his kit's commonest (KIT_REGIONS' first, or his skin tone's), each the nearest of
+ * those there are.
+ */
+export function originOf(inputs, available, outfitRegion = null) {
+  const own = inputs.faceRegion ?? inputs.look?.faceRegion ?? outfitRegion;
+  const regions = own ? (Array.isArray(own) ? own : [own]) : kitRegions(inputs);
+  return nearestRegion(regions[0], available);
+}
+
+/**
+ * The tone a photo face's skin is shifted from and to, or null to leave it as the composite's: only a fighter with an origin of
+ * his own (`look.faceRegion`), whose tone (clamped to the origin's range) is not the origin's.
+ */
+export function toneShift(inputs) {
+  const own = inputs.look?.faceRegion;
+  const origin = Array.isArray(own) ? own[0] : own;
+  if (!origin || !inputs.look?.skinTone) return null;
+  const from = regionTone(origin);
+  const to = clampTone(origin, inputs.look.skinTone);
+  return to === from ? null : { from, to };
 }
 
 // ---- The head's shape by region ----------------------------------------------------------------------------------------

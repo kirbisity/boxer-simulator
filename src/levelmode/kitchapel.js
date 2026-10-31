@@ -66,7 +66,7 @@ function kcChandelier(batch, dyn, decor) {
     const pz = z + Math.sin(a) * r;
     kgCylinder(batch, 'iron', px, y - 0.02, pz, 0.075, 0.05, 0.08, { sides: 6 });
     kgCylinder(batch, 'bone', px, y + 0.05, pz, 0.038, 0.042, 0.24, { sides: 6, tint: [1.35, 1.2, 0.9] });
-    dyn.flames.push({ at: [px, y + 0.32, pz], size: 0.3 });
+    dyn.flames.push({ at: [px, y + 0.32, pz], size: 0.3, candle: true });
   }
   dyn.lights.push({ at: [x, y - 0.5, z], color: 0xffb468, power: decor.power ?? 2.4, range: decor.range ?? 24 });
 }
@@ -83,7 +83,7 @@ function kcVotive(batch, dyn, decor) {
     const pz = z + Math.sin(angle) * reach;
     const height = 0.07 + random() * 0.24;
     kgCylinder(batch, 'bone', px, y + 0.05, pz, 0.026 + random() * 0.01, 0.034, height, { sides: 5, tint: [1.3, 1.15, 0.85] });
-    dyn.flames.push({ at: [px, y + 0.05 + height + 0.05, pz], size: 0.085 + random() * 0.03 });
+    dyn.flames.push({ at: [px, y + 0.05 + height + 0.05, pz], size: 0.085 + random() * 0.03, candle: true });
   }
 }
 

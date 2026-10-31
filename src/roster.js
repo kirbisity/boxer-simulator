@@ -110,6 +110,7 @@ export const WARRIORS = [
   warrior('policeBaton', 'Officer Ana Ruiz', PRESETS.police, { name: 'Officer Ana Ruiz', sex: 'female', heightCm: 166, style: 'baton', calories: 2300, outfit: { kind: 'police', design: 1 }, look: { skinTone: 'tan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
   warrior('swatShotgun', 'Cpl. Marcus Hale', PRESETS.shotgun),
   warrior('specialForces', 'SSgt. Ryan Brooks', PRESETS.rifle),
+  warrior('infantry', 'Spc. Luis Herrera', PRESETS.infantry),
   warrior('knife', 'Ryo Kanda', PRESETS.knife),
   // Beasts and machines. The faction opens on the combat bot (`flagship`).
   warrior('gorilla', 'Silverback', PRESETS.gorilla),

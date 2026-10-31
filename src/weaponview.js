@@ -6,6 +6,7 @@
 /* global THREE */
 import { P } from './body.js';
 import { floorUnder, SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
+import { reloadProps } from './physics/ranged.js';
 import { BONE } from './rig.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
@@ -15,7 +16,8 @@ import { featherDevice, steelMaterial } from './wardrobe.js';
 import { buildArenaShield, buildArenaWeapon } from './arenaview.js';
 import { crowdBatch } from './crowdview.js';
 import { bloodDyeClear, bloodDyeCreate, bloodDyeLand, bloodDyeUpload } from './blooddye.js';
-import { BATTLE_FX, BLACK_POWDER, battleFxAddGlint, battleFxClear, battleFxGlint, battleFxPrimary, battleFxShot, battleFxSpark, battleFxUpdate } from './battlefx.js';
+import { BATTLE_FX, BLACK_POWDER, battleFxAddGlint, battleFxArc, battleFxClear, battleFxElectricFlash, battleFxGlint, battleFxPrimary, battleFxShot, battleFxSpark, battleFxUpdate } from './battlefx.js';
+import { machineFxBusy, machineFxClear, machineFxCreate, machineFxHear, machineFxStep } from './machinefx.js';
 
 export const GORE = {
   // Blood: drops thrown from a wound or a stump, and the stains they leave.
@@ -486,10 +488,13 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       buffer.position.z = 0.03;
       const optic = cylinder(0.018, 0.018, 0.05, 0.14, anodised, 12);
       optic.position.z = 0.095;
+      // The magazine is its own piece: changed in a reload, out of the well and in the hand (drawHeld, reloadProps).
+      const magazine = box([0.02, 0.05, 0.14], [0, 0.12, -0.04], polymer, 0.2);
+      group.userData.magazine = magazine;
       group.add(
         box([0.03, 0.27, 0.05], [0, 0.07, 0.035], anodised), // receivers
         box([0.038, 0.26, 0.042], [0, 0.32, 0.04], polymer), // handguard
-        box([0.02, 0.05, 0.14], [0, 0.12, -0.04], polymer, 0.2), // magazine
+        magazine,
         box([0.024, 0.035, 0.085], [0, -0.01, -0.03], polymer, -0.35), // pistol grip
         box([0.032, 0.14, 0.06], [0, -spec.handle + 0.07, 0.02], polymer), // stock
         box([0.008, 0.03, 0.02], [0, 0.09, 0.07], anodised), // optic mount
@@ -1629,6 +1634,7 @@ function drawHeld(view, fighterView, arms, weapon, time) {
         // A crowd member's weapon is the batch's, shared: only his own is freed.
         if (!fighterView.baked) disposeObject(arms.weapon);
       }
+      clearReloadProps(fighterView, arms);
       arms.weapon = fighterView.baked ? crowdArms(view, key, () => buildWeaponMesh(weapon.kind, view.steelEnv, weapon.colour)) : buildWeaponMesh(weapon.kind, view.steelEnv, weapon.colour);
       arms.kind = key;
       fighterView.group.add(arms.weapon);
@@ -1663,11 +1669,122 @@ function drawHeld(view, fighterView, arms, weapon, time) {
     if (arms.weapon.userData.bow) drawString(arms.weapon, fighter);
     if (showing) arms.weapon.userData.batch?.add(arms.weapon.matrix);
     if (showing) bladeGlint(view, weapon.kind, hand, along, flat, edge);
+    // A crowd member's gun is the batch's, its magazine shared: only a fighter drawn alone shows his reload's pieces.
+    if (weapon.spec.shot && !fighterView.baked) drawReloadProps(fighterView, arms, weapon, flat, along, edge, showing, time);
   } else if (arms.weapon) {
+    clearReloadProps(fighterView, arms);
     fighterView.group.remove(arms.weapon);
     arms.weapon = null;
     arms.kind = null;
   }
+}
+
+// ---- A reload's pieces in the hand ---------------------------------------------------
+
+// The pump shotgun's shell, as the support hand carries it to the port: a
+// red plastic hull on a brass head, along the gun (+y) as it goes in. One
+// geometry and material for every shell, built once.
+const SHELL = { radius: 0.0105, length: 0.065, brass: 0.012, hull: 0x9b1b1e, head: 0xc9a14a };
+let shellParts = null;
+// The empty magazine falls as a dropped thing does, tumbling end over end
+// (`spin`, rad/s) to the floor below his feet (`floorBelowFeet`, m), and
+// lies there this long after it fell (`lies`, s) before it is gone.
+const DROPPED_MAGAZINE = { spin: 7, floorBelowFeet: 0.04, lies: 6 };
+const reloadScratch = { at: new THREE.Vector3(), turn: new THREE.Matrix4() };
+
+function shellMesh() {
+  shellParts ??= {
+    hull: new THREE.CylinderGeometry(SHELL.radius, SHELL.radius, SHELL.length - SHELL.brass, 8),
+    head: new THREE.CylinderGeometry(SHELL.radius * 1.08, SHELL.radius * 1.08, SHELL.brass, 8),
+    hullMaterial: surface(SHELL.hull, { roughness: 0.5 }),
+    headMaterial: surface(SHELL.head, { roughness: 0.35 }),
+  };
+  const group = new THREE.Group();
+  const hull = new THREE.Mesh(shellParts.hull, shellParts.hullMaterial);
+  hull.position.y = SHELL.brass / 2;
+  const head = new THREE.Mesh(shellParts.head, shellParts.headMaterial);
+  head.position.y = -(SHELL.length - SHELL.brass) / 2;
+  group.add(hull, head);
+  return group;
+}
+
+/** A piece of the reload drawn in the gun's own frame (`flat`, `along`, `edge`) at `at` (world). */
+function placeProp(prop, flat, along, edge, at) {
+  prop.matrixAutoUpdate = false;
+  prop.matrix.makeBasis(flat, along, edge).setPosition(at[0], at[1], at[2]);
+  prop.matrixWorldNeedsUpdate = true;
+}
+
+/**
+ * A magazine change or a tube fed (physics/ranged.js reloadProps), drawn:
+ * the gun's own magazine leaves the well as the empty drops (it falls
+ * tumbling to the floor and lies there a while), a fresh one is in the
+ * support hand from the pouch to the well, and is the gun's again once it
+ * is seated; a shotgun's shell is in the hand from the belt to the port.
+ * Each piece is built once per gun drawn and kept (hidden between reloads).
+ */
+function drawReloadProps(fighterView, arms, weapon, flat, along, edge, showing, time) {
+  const fighter = fighterView.fighter;
+  const props = reloadProps(fighter, weapon);
+  const magazine = arms.weapon.userData.magazine;
+  if (magazine) magazine.visible = !props || props.onGun;
+  // In the support hand: a clone of the gun's own magazine (its geometry and material shared), or a shell.
+  if (props?.inHand && !arms.inHand) {
+    arms.inHand = new THREE.Group();
+    const piece = props.kind === 'magazine' && magazine ? magazine.clone() : shellMesh();
+    piece.visible = true;
+    // Held by its body: the magazine's top a little above the palm, the shell by its middle.
+    if (props.kind === 'magazine') piece.position.set(0, 0, 0.03);
+    arms.inHand.add(piece);
+    fighterView.group.add(arms.inHand);
+  }
+  if (arms.inHand) {
+    arms.inHand.visible = Boolean(showing && props?.inHand);
+    if (arms.inHand.visible) placeProp(arms.inHand, flat, along, edge, point(fighter.x, P[`${weapon.off}Hand`]));
+  }
+  // The empty: where it was in the well when it fell, then down.
+  // (A second reload's empty, the first still on the floor: the first is taken for the second.)
+  if (props?.dropAge != null && magazine && (arms.droppedAt === undefined || time - props.dropAge > arms.droppedAt + 0.05)) {
+    if (!arms.dropped) {
+      const piece = magazine.clone();
+      piece.position.set(0, 0, 0);
+      piece.visible = true;
+      arms.dropped = new THREE.Group().add(piece);
+    }
+    if (!arms.dropped.parent) fighterView.group.add(arms.dropped);
+    const from = reloadScratch.at.copy(magazine.position).applyMatrix4(arms.weapon.matrix);
+    arms.droppedFrom = [from.x, from.y, from.z];
+    arms.droppedFrame = [flat.clone(), along.clone(), edge.clone()];
+    arms.droppedAt = time - props.dropAge;
+    const feet = Math.min(point(fighter.x, P.lFoot)[1], point(fighter.x, P.rFoot)[1]);
+    arms.droppedFloor = feet - DROPPED_MAGAZINE.floorBelowFeet;
+  }
+  if (arms.droppedAt !== undefined) {
+    const age = time - arms.droppedAt;
+    // A new reload's empty, or long enough on the floor: this one is gone.
+    if (age > DROPPED_MAGAZINE.lies || age < 0) {
+      arms.dropped.visible = false;
+      arms.droppedAt = undefined;
+    } else {
+      const [from, [dropFlat, dropAlong, dropEdge]] = [arms.droppedFrom, arms.droppedFrame];
+      const fallTime = Math.sqrt(Math.max(0, 2 * (from[1] - arms.droppedFloor) / 9.81));
+      const falling = Math.min(age, fallTime);
+      const y = Math.max(arms.droppedFloor, from[1] - 0.5 * 9.81 * falling * falling);
+      placeProp(arms.dropped, dropFlat, dropAlong, dropEdge, [from[0], y, from[2]]);
+      // Tumbling end over end as it falls (about the gun's flat axis); landed, it lies as it came down.
+      arms.dropped.matrix.multiply(reloadScratch.turn.makeRotationX(DROPPED_MAGAZINE.spin * falling));
+      arms.dropped.visible = showing;
+    }
+  }
+}
+
+/** The gun's gone from the hand, or another is in it: its reload's pieces go too (their geometry is the gun's, freed with it). */
+function clearReloadProps(fighterView, arms) {
+  for (const key of ['inHand', 'dropped']) {
+    if (arms[key]) fighterView.group.remove(arms[key]);
+    arms[key] = null;
+  }
+  arms.droppedAt = undefined;
 }
 
 // Where each kind's blade runs in its own frame (from the grip, +y): the
@@ -1848,24 +1965,28 @@ export function severView(view, fighterView, event, debris) {
   for (const bone of boneIndices) fighterView.severedBones.add(bone);
   for (const bone of boneIndices) fighterView.skeleton[bone].visible = false;
   // The stump: raw flesh where the part was.
-  const base = P[name(part.base)];
-  const proximal = event.joint === 'neck' ? P.neck : P[name({ shoulder: 'Shoulder', elbow: 'Shoulder', wrist: 'Elbow', hip: 'Hip', knee: 'Hip', ankle: 'Knee' }[event.joint])];
+  const ends = stumpEnds(event);
   const radius = debris.radius * (event.joint === 'neck' ? 0.55 : 1.12);
   // A machine (gear.machine) has no flesh and no blood: the stump is dark metal round a bright actuator, and it throws sparks, not blood.
   const machine = Boolean(fighterView.fighter.body.gear.machine);
   const stump = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), machine ? surface(GORE.machineStump, { roughness: 0.5, metalness: 0.7 }) : surface(0x7e1016, { roughness: 0.4 }));
   stump.add(new THREE.Mesh(new THREE.SphereGeometry(radius * 0.35, 8, 6), surface(machine ? GORE.machineCore : 0xe8dcc4)));
   fighterView.group.add(stump);
-  (fighterView.stumps ??= []).push({ mesh: stump, base: event.joint === 'neck' ? P.head : base, from: proximal, along: event.joint === 'neck' ? 0.55 : 1 });
-  if (machine) {
-    spawnSparks(view, event.point, 30);
-    return;
-  }
+  (fighterView.stumps ??= []).push({ mesh: stump, ...ends });
+  // (A machine's stump sputters sparks and arcs instead, for a while: machineFxHear, from the same event.)
+  if (machine) return;
   // Blood: from the stump in beats, and from the piece's cut face.
   const blood = bloodOf(view);
-  blood.emitters.push({ kind: 'stump', fighterView, base: event.joint === 'neck' ? P.head : base, from: proximal, along: event.joint === 'neck' ? 0.55 : 1, start: view.clock ?? 0, seconds: GORE.stumpSeconds });
+  blood.emitters.push({ kind: 'stump', fighterView, ...ends, start: view.clock ?? 0, seconds: GORE.stumpSeconds });
   blood.emitters.push({ kind: 'piece', debris, start: view.clock ?? 0, seconds: GORE.pieceSeconds });
   spawnBlood(view, event.point, [0, 1, 0], 40, 3.2);
+}
+
+/** A severed part's stump (an event's `joint` and `side`): the particle it ends at (`base`), the one before (`from`), how far out along (`along`). */
+function stumpEnds(event) {
+  if (event.joint === 'neck') return { base: P.head, from: P.neck, along: 0.55 };
+  const proximal = { shoulder: 'Shoulder', elbow: 'Shoulder', wrist: 'Elbow', hip: 'Hip', knee: 'Hip', ankle: 'Knee' }[event.joint];
+  return { base: P[`${event.side}${SEVER_PARTS[event.joint].base}`], from: P[`${event.side}${proximal}`], along: 1 };
 }
 
 /** The triangles of a skinned mesh owned by these bones, posed as last drawn, in a piece's frame. */
@@ -1998,6 +2119,7 @@ export function updateDebris(view, world) {
 /** A new bout: clear what lay on the floor. */
 export function clearGore(view) {
   battleFxClear(view);
+  if (view.machineFx) machineFxClear(view.machineFx);
   for (const shot of view.shots ?? []) {
     view.scene.remove(shot.tracer);
     shot.tracer.geometry.dispose();
@@ -2015,6 +2137,7 @@ export function clearGore(view) {
     view.blood.stainCount = 0;
     view.blood.stains.count = 0;
     view.blood.dropMesh.count = 0;
+    view.blood.spare.push(...view.blood.sparks);
     view.blood.sparks = [];
     bloodDyeClear(view.blood.dye);
     bloodDyeUpload(view.blood.dye, view.clock ?? 0);
@@ -2036,7 +2159,7 @@ function bloodOf(view) {
   stains.receiveShadow = true;
   view.scene.add(dropMesh, stains);
   // The sparks are drawn with the other glowing things (battlefx.js); only their flight is kept here.
-  view.blood = { drops: [], sparks: [], emitters: [], dropMesh, stains, stainCount: 0, dye: bloodDyeCreate() };
+  view.blood = { drops: [], sparks: [], spare: [], emitters: [], dropMesh, stains, stainCount: 0, dye: bloodDyeCreate() };
   return view.blood;
 }
 
@@ -2192,16 +2315,107 @@ export function updateArrows(view, world) {
  * red as they fall; each drawn as a short streak along its flight. `flash`:
  * a brief burst of light at the point of contact.
  */
-export function spawnSparks(view, at, count = 26, { flash = true } = {}) {
+// `along`: thrown mostly that way (a stump's cut cables spray out of the
+// cut, not all round); `electric`: torn off a short (machinefx.js), drawn
+// blue-white before it cools (battlefx.js). Spent sparks are kept and
+// reused (`spare`), so a stump's sputter allocates nothing once it starts.
+export function spawnSparks(view, at, count = 26, { flash = true, along = null, electric = false } = {}) {
   const blood = bloodOf(view);
   for (let index = 0; index < count && blood.sparks.length < GORE.maxSparks; index += 1) {
-    const velocity = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9 - 0.1, Math.random() - 0.5).normalize().multiplyScalar(2 + Math.random() ** 2 * 5);
+    const spark = blood.spare.pop() ?? { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
+    const velocity = spark.velocity.set(Math.random() - 0.5, Math.random() * 0.9 - 0.1, Math.random() - 0.5).normalize();
+    if (along) velocity.multiplyScalar(0.6).add(sparkAlong.set(along[0], along[1], along[2]).normalize()).normalize();
+    velocity.multiplyScalar(2 + Math.random() ** 2 * 5);
     // Most die in the air in a few tenths of a second; some last to the floor.
     const life = 0.25 + Math.random() ** 2 * 0.6;
-    blood.sparks.push({ position: toVector(at), velocity, life, lifeAtStart: life, width: 0.005 + Math.random() * 0.004, bounced: false });
+    spark.position.set(at[0], at[1], at[2]);
+    spark.life = life;
+    spark.lifeAtStart = life;
+    spark.width = 0.005 + Math.random() * 0.004;
+    spark.bounced = false;
+    spark.electric = electric;
+    blood.sparks.push(spark);
   }
   if (flash) battleFxSpark(view, at, 0.08 + Math.min(count, 30) * 0.004);
 }
+const sparkAlong = new THREE.Vector3();
+
+// ---- A machine shorting out ---------------------------------------------------------
+
+// Where a dying machine's arcs jump: across its joints, from the particle
+// at the joint (the first) a little way along the part beyond it (`out`,
+// the share of the way to the second), wandering `jump` m off it.
+const MACHINE_ARCS = {
+  joints: [['lShoulder', 'lElbow'], ['rShoulder', 'rElbow'], ['lElbow', 'lHand'], ['rElbow', 'rHand'], ['lHip', 'lKnee'], ['rHip', 'rKnee'], ['lKnee', 'lFoot'], ['rKnee', 'rFoot'], ['neck', 'head'], ['neck', 'lShoulder'], ['neck', 'rShoulder']],
+  out: 0.3, jump: 0.06,
+  // The first flash, at the chest: this share of the way from the pelvis to the neck.
+  chest: 0.7,
+  // A stump's arc: out of the cut along the part (m) and off it (m).
+  stumpOut: 0.07, stumpJump: 0.05,
+};
+const machineScratch = { from: [0, 0, 0], to: [0, 0, 0], along: [0, 0, 0] };
+
+/** A machine's electrics hear the fight (main.js, every event): a machine down or cut shorts out (machinefx.js). */
+export function machineEvent(view, event, world) {
+  view.machineFx ??= machineFxCreate();
+  return machineFxHear(view.machineFx, event, world, view.clock ?? 0);
+}
+
+/** Where an emitter is on its machine now: `from` (the root), `to` (where an arc reaches), `along` (the way sparks go). */
+function machinePlace(emitter, fighter) {
+  const { from, to, along } = machineScratch;
+  if (emitter.kind === 'stump') {
+    const ends = stumpEnds(emitter);
+    const at = stumpPoint(fighter, ends);
+    const back = point(fighter.x, ends.from);
+    for (let axis = 0; axis < 3; axis += 1) {
+      from[axis] = at[axis];
+      along[axis] = at[axis] - back[axis];
+    }
+    const length = Math.hypot(along[0], along[1], along[2]) || 1;
+    for (let axis = 0; axis < 3; axis += 1) to[axis] = at[axis] + (along[axis] / length) * MACHINE_ARCS.stumpOut + (Math.random() - 0.5) * 2 * MACHINE_ARCS.stumpJump;
+    return;
+  }
+  if (emitter.first) {
+    // The first flash: in the chest.
+    const pelvis = point(fighter.x, P.pelvis);
+    const neck = point(fighter.x, P.neck);
+    for (let axis = 0; axis < 3; axis += 1) {
+      from[axis] = pelvis[axis] + (neck[axis] - pelvis[axis]) * MACHINE_ARCS.chest;
+      to[axis] = from[axis];
+      along[axis] = axis === 1 ? 1 : 0;
+    }
+    return;
+  }
+  const [a, b] = MACHINE_ARCS.joints[Math.floor(Math.random() * MACHINE_ARCS.joints.length)];
+  const joint = point(fighter.x, P[a]);
+  const beyond = point(fighter.x, P[b]);
+  for (let axis = 0; axis < 3; axis += 1) {
+    from[axis] = joint[axis];
+    to[axis] = joint[axis] + (beyond[axis] - joint[axis]) * MACHINE_ARCS.out + (Math.random() - 0.5) * 2 * MACHINE_ARCS.jump;
+    along[axis] = beyond[axis] - joint[axis];
+  }
+}
+
+// What the emitters ask of the view (machinefx.js machineFxStep), the machine found in this frame's world.
+const machineEmit = {
+  view: null,
+  world: null,
+  fighter(emitter) {
+    const fighter = this.world?.fighters[emitter.fighter];
+    if (fighter) machinePlace(emitter, fighter);
+    return fighter;
+  },
+  flash(emitter, size) {
+    if (this.fighter(emitter)) battleFxElectricFlash(this.view, machineScratch.from, size, BATTLE_FX.lightPeak * 1.2);
+  },
+  sparks(emitter, count) {
+    if (this.fighter(emitter)) spawnSparks(this.view, machineScratch.from, count, { flash: false, along: emitter.kind === 'stump' ? machineScratch.along : null, electric: true });
+  },
+  arc(emitter, strength) {
+    if (this.fighter(emitter)) battleFxArc(this.view, machineScratch.from, machineScratch.to, strength);
+  },
+};
 
 /** A cut or a stab: blood from the wound, out against the blade. */
 export function woundBlood(view, event) {
@@ -2214,8 +2428,14 @@ const placer = new THREE.Object3D();
 
 /** Drops fly and fall and stain the floor; stumps pump; sparks die out. */
 export function updateBlood(view, world, dt) {
-  const blood = view.blood;
   view.clock = (view.clock ?? 0) + dt;
+  // A machine shorting out (machinefx.js): its sparks join the rest below (the first of them may make the store).
+  if (view.machineFx && machineFxBusy(view.machineFx)) {
+    machineEmit.view = view;
+    machineEmit.world = world;
+    machineFxStep(view.machineFx, view.clock, machineEmit);
+  }
+  const blood = view.blood;
   if (!blood) return;
   const now = view.clock;
   blood.emitters = blood.emitters.filter((emitter) => {
@@ -2282,7 +2502,9 @@ export function updateBlood(view, world, dt) {
       spark.position.y = floor;
       spark.velocity.set(spark.velocity.x * 0.55, -spark.velocity.y * 0.3, spark.velocity.z * 0.55);
     }
-    return spark.life > 0;
+    if (spark.life > 0) return true;
+    blood.spare.push(spark);
+    return false;
   });
   // Pieces follow their debris.
   for (const [id, piece] of view.pieces ?? []) {

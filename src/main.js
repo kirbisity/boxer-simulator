@@ -38,6 +38,7 @@ import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
+import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './blastview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
 import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
@@ -74,7 +75,7 @@ import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
-import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
+import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -166,6 +167,8 @@ const hitFeelView = createHitFeelView(scene, { layer: $('#hit-vignette'), audio,
 // The player's weapon arts made an event of (artdrama.js): toned down for a visitor who asks for less motion.
 const artDrama = createArtDrama({ reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
 const artDramaView = createArtDramaView(scene, { flash: $('#art-flash'), caption: $('#art-name'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
+// A flashbang's white-out and a near frag's glare over the stage, for the man played (blastview.js).
+const blastScreen = createBlastScreen($('#blast-flash'), { reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
 
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
 let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}, active: false };
@@ -1210,6 +1213,8 @@ function drawWorld(dt, drawIt = true) {
   endCrowdBatches(scene);
   updateArrows(scene, world);
   updateNets(scene, world, dt * (state.paused ? 0 : state.speed));
+  updateThrown(scene, world);
+  blastScreen.update(state.paused ? 0 : dt);
   updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
@@ -1249,12 +1254,17 @@ function consumeEvents() {
     if (event.kind === 'horseHit' && event.cut + event.pierce > 1) woundBlood(scene, event);
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     if (event.kind === 'shot') spawnShot(scene, machine ? { ...event, harm: 0 } : event);
+    // A grenade gone off and its fragments' strikes (blastview.js); the white-out and the ringing only for the man played.
+    if (event.kind === 'blast') blastEvent(scene, event, { playerId: state.mode === 'play' && state.game !== 'intro' ? player()?.id ?? null : null, screen: blastScreen, audio });
+    if (event.kind === 'fragment') fragmentEvent(scene, machine ? { ...event, harm: 0, plate: true } : event);
     if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : wound(scene, event));
     if (event.kind === 'bladeBlock') (event.cut > 1 ? wound : (view, at) => spawnSparks(view, at.point, 18))(scene, event);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);
     }
+    // A machine down or cut: its electrics short out, arcs and sparks for a moment (machinefx.js; graphics only).
+    machineEvent(scene, event, state.world);
     const moment = momentFor(event);
     if (moment) {
       // Slow motion and the camera's push-in are for one man against

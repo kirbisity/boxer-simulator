@@ -1,10 +1,10 @@
 // The Last Gate: hold a gate against a horde out of the fog, as long as you can. Four scenarios (LAST_GATE_MODES), each a
 // hero with up to five men of his own kind in the gateway of a short stone wall, and a horde of its own:
-// - The Rice Riot: a samurai in ō-yoroi with the ōdachi, against starving peasants;
+// - The Rice Riot: a samurai in tōsei gusoku with the ōdachi, against starving peasants;
 // - The Jacquerie: a knight in full plate on his destrier with the lance (it breaks only on heavy armour: weapons.js
 //   `shatters`; here it is kept, couched again and again), against starving peasants with more staves and spears;
-// - The Red Turbans: a Mongol horse archer in iron lamellar with the composite bow and a quiver of arrows (out of them, the
-//   mace), against starving rebels who run at him sooner;
+// - The Red Turbans: a Mongol horse archer in iron lamellar with the composite bow, his arrows kept up from the gate's
+//   stores (never out of them), the mace for close work, against starving rebels who run at him sooner;
 // - Night Shift: a special police officer (SWAT) with the AR-15 and its magazines (empty, the baton), against an army of
 //   service androids (the humanoid robot, not the combat bot) that never tire, never bleed and never fear.
 // Out of the mist they come, wave on wave, and every one that gets past the gate's line is a breach: the gate falls at
@@ -126,10 +126,11 @@ const LG_TEAM = ['shotgun', 'handgun', 'baton', 'baton', 'baton'];
 export const LAST_GATE_MODES = {
   samurai: {
     title: 'The Rice Riot', label: 'Samurai', glyph: '⛩️', weapon: 'Ōdachi', foe: 'rebel', foes: 'rebels', felled: 'cut down',
-    strength: 'Ō-yoroi and the longest blade: cuts them down before they close.',
+    strength: 'Tōsei gusoku and the longest blade: cuts them down before they close.',
     blurb: 'A famine ikki: starving peasants at the castle gate.',
-    // Makara Naotaka in the great armour (outfits.js oyoroi: the detailed ō-yoroi, its kuwagata crest), the ōdachi in both hands.
-    hero: () => ({ ...structuredClone(PRESETS.odachi), outfit: { kind: 'oyoroi', design: 0 }, accessories: ['crest'], skill: LAST_GATE.heroSkill }),
+    // Makara Naotaka in the later armour of the Sengoku (outfits.js samuraiTosei: the riveted steel cuirass, the menpo, its
+    // crest), the ōdachi in both hands.
+    hero: () => ({ ...structuredClone(PRESETS.odachi), outfit: { kind: 'samuraiTosei', design: 0 }, accessories: ['crest'], skill: LAST_GATE.heroSkill }),
     companion: (random, index) => (index < 2 ? sengokuWarrior(random, LG_SAMURAI_SIDE, 'katana', 'samurai') : sengokuWarrior(random, LG_SAMURAI_SIDE, 'spear', 'ashigaru')),
     enemy: (random, kind) => lastGateRebel(random, kind),
     pool: { unarmed: 11, staff: 7, spear: 6 },
@@ -175,12 +176,13 @@ export const LAST_GATE_MODES = {
   },
   mongol: {
     title: 'The Red Turbans', label: 'Mongol archer', glyph: '🏹', weapon: 'Composite bow', foe: 'rebel', foes: 'rebels', felled: 'shot down',
-    strength: 'Iron lamellar on a steppe horse: arrows from the saddle; the quiver empty, the mace.',
+    strength: 'Iron lamellar on a steppe horse: arrows from the saddle, never short of them; the mace up close.',
     blurb: '1351: famine and the Yellow River\'s flood raise the Red Turbans against the Yuan.',
     // A horse archer of the Yuan's guard in iron lamellar to the knees, cut as the Mongols wore it (outfits.js
     // mingIronLamellar: the mongolIron coat, the spiked helmet with its lamellar aventail), on his steppe horse; the composite
-    // bow and his kit's quiver, then the mace (STYLES.kheshigBow's fallback).
-    hero: () => ({ ...structuredClone(PRESETS.kheshig), name: 'Jebe', style: 'kheshigBow', outfit: { kind: 'mingIronLamellar', design: 0 }, mounted: true, sidearm: 'mace', skill: LAST_GATE.heroSkill }),
+    // bow, his quiver kept full from the gate's stores behind him (`endlessAmmo`: outfits.js gearTraits), and the mace
+    // (STYLES.kheshigBow's fallback) for close work.
+    hero: () => ({ ...structuredClone(PRESETS.kheshig), name: 'Jebe', style: 'kheshigBow', outfit: { kind: 'mingIronLamellar', design: 0 }, mounted: true, sidearm: 'mace', endlessAmmo: true, skill: LAST_GATE.heroSkill }),
     // His men on foot at the gate: two archers (shooting over him, then the sabre), one with sabre and shield, two with the mace.
     companion: (random, index) => steppeWarrior(random, index < 2 ? 'steppeBow' : index === 2 ? 'saberShield' : 'maceShield', 'medium'),
     enemy: (random, kind) => lastGateRebel(random, kind),

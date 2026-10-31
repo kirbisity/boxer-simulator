@@ -8,7 +8,7 @@
 
 import { P } from '../body.js';
 import { opponentFor } from '../physics.js';
-import { attackMark } from '../control.js';
+import { attackMark, chargeTarget } from '../control.js';
 import { fightUiColour, fightUiReady, fightUiTarget, FIGHT_UI } from './logic.js';
 import { fightUiElement, fightUiFlash, fightUiPaintReady } from './kit.js';
 
@@ -41,6 +41,28 @@ export function fightUiPlaceOnHim(at, head, neck, hips, feet, spec = FIGHT_UI_TA
   return { zone, side };
 }
 
+/**
+ * On horseback, the enemy a tap at [x, y] (px) lands on among all within a charge's run (control.js chargeTarget), the
+ * nearest to the rider if it lands on more than one: { man, place } or null. `project` puts a point of the world on the
+ * screen ([x, y, in front]).
+ */
+export function fightUiChargePick(world, me, at, project) {
+  if (!world || !me?.mount) return null;
+  const onScreen = (man, index) => project([man.x[index * 3], man.x[index * 3 + 1], man.x[index * 3 + 2]]);
+  let best = null;
+  for (const man of world.fighters) {
+    if (!chargeTarget(world, me, man.id)) continue;
+    const head = onScreen(man, P.head);
+    const hips = onScreen(man, P.pelvis);
+    if (!head[2] || !hips[2]) continue;
+    const place = fightUiPlaceOnHim(at, head, onScreen(man, P.neck), hips, [onScreen(man, P.lFoot), onScreen(man, P.rFoot)]);
+    if (!place) continue;
+    const apart = Math.hypot(man.x[P.pelvis * 3] - me.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]);
+    if (!best || apart < best.apart) best = { man, place, apart };
+  }
+  return best && { man: best.man, place: best.place };
+}
+
 export function fightUiTargetBody(root, kit, hooks) {
   const ring = root.appendChild(fightUiElement('div', 'fu-reticle', FIGHT_UI_RETICLE));
   ring.setAttribute('aria-hidden', 'true');
@@ -61,14 +83,14 @@ export function fightUiTargetBody(root, kit, hooks) {
 
   const onScreen = (target, index) => hooks.project([target.x[index * 3], target.x[index * 3 + 1], target.x[index * 3 + 2]]);
 
-  /** A tap on a place on him: its best move (the next on a quick second tap). */
-  function strikeAt(zone, side) {
+  /** A tap on a place on him (or on the man `id`, tapped to charge): its best move (the next on a quick second tap). */
+  function strikeAt(zone, side, id = null) {
     const now = hooks.now();
     const again = last && last.zone === zone && last.side === side && now - last.at < FIGHT_UI.againWithin ? last.again + 1 : 0;
     const pick = fightUiTarget(kit.moves(), zone, side, again);
     if (!pick) return;
     last = { zone, side, at: now, again };
-    kit.throwMove(pick.entry, pick.zone, side, ring, { again: again > 0 });
+    kit.throwMove(pick.entry, pick.zone, side, ring, { again: again > 0, target: id });
     const colour = fightUiColour(pick.entry.group);
     fightUiFlash(ring, 'asked', colour);
     ring.style.setProperty('--fu-lit', colour);
@@ -76,20 +98,27 @@ export function fightUiTargetBody(root, kit, hooks) {
     litUntil = now + FIGHT_UI_TAP.litFor;
   }
 
-  /** A tap in the fight: on his man, struck where it landed; off him, the ring pulses to show where to tap. */
+  /**
+   * A tap in the fight: on his man, struck where it landed; on horseback, on another enemy within a charge's run
+   * (fightUiChargePick), a charge at him; off them, the ring pulses to show where to tap.
+   */
   function tapInWorld(event) {
     const target = targetMan();
-    if (!target) return false;
-    const head = onScreen(target, P.head);
-    const hips = onScreen(target, P.pelvis);
-    if (!head[2] || !hips[2]) return false;
-    const place = fightUiPlaceOnHim(event.at, head, onScreen(target, P.neck), hips, [onScreen(target, P.lFoot), onScreen(target, P.rFoot)]);
-    if (!place) {
-      fightUiFlash(ring, 'nudge');
-      return false;
+    const head = target ? onScreen(target, P.head) : null;
+    const hips = target ? onScreen(target, P.pelvis) : null;
+    const seen = Boolean(head?.[2] && hips?.[2]);
+    const place = seen ? fightUiPlaceOnHim(event.at, head, onScreen(target, P.neck), hips, [onScreen(target, P.lFoot), onScreen(target, P.rFoot)]) : null;
+    if (place) {
+      strikeAt(place.zone, place.side);
+      return true;
     }
-    strikeAt(place.zone, place.side);
-    return true;
+    const far = fightUiChargePick(kit.world(), kit.me(), event.at, hooks.project);
+    if (far) {
+      strikeAt(far.place.zone, far.place.side, far.man.id);
+      return true;
+    }
+    if (seen) fightUiFlash(ring, 'nudge');
+    return false;
   }
 
   kit.listen({

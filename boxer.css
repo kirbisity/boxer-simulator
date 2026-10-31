@@ -144,6 +144,8 @@ body.sheet .hud, body.sheet .controls, body.sheet .log { display: none; }
 /* A heavy blow (hitfeel.js): the edges darken, warm-black like the night scenes' shadows; the middle, where the men are, is left clear. */
 /* A weapon art (artdrama.js): a warm glare at contact, brightest where the blow is (the middle), and its name low and quiet. */
 #art-flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse at 50% 45%, rgba(255, 244, 226, 0.95), rgba(255, 214, 170, 0.55) 45%, rgba(255, 190, 140, 0.15) 100%); mix-blend-mode: screen; }
+/* A flashbang's white-out, a near frag's glare (blastview.js). */
+#blast-flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 5; background: #fff; }
 #art-name { position: fixed; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 128px); z-index: 5; pointer-events: none; font: italic 400 22px/1 Georgia, 'Times New Roman', serif; letter-spacing: 0.32em; text-indent: 0.32em; color: rgba(255, 238, 214, 0.92); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 14px rgba(255, 140, 60, 0.35); white-space: nowrap; }
 #art-name::before, #art-name::after { content: ''; display: inline-block; vertical-align: middle; width: 28px; height: 1px; margin: 0 14px; background: linear-gradient(90deg, transparent, rgba(255, 200, 150, 0.7), transparent); }
 @media (max-width: 560px), (max-height: 480px) { #art-name { font-size: 17px; letter-spacing: 0.24em; bottom: calc(var(--controls-height, 56px) + 150px); } }
@@ -254,6 +256,9 @@ button.big { padding: 12px 34px; font-size: 18px; }
 .step-body { display: grid; gap: 16px; min-height: 230px; align-content: start; }
 .wizard .field { display: grid; grid-template-columns: none; gap: 8px; font-size: 14px; }
 .wizard .field > b, .slider-head b { font-weight: 600; }
+/* The origin: one native list (by continent), a single line however many peoples there are, so the face step still fits a phone. 16px: no zoom on focus. */
+.wizard .field select { justify-self: start; max-width: 100%; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 16px; }
+.wizard .field select optgroup, .wizard .field select option { background: #10131d; }
 .wizard input[type=text] { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 16px; user-select: text; -webkit-user-select: text; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { padding: 8px 12px; min-height: 38px; border-radius: 999px; text-transform: capitalize; }
