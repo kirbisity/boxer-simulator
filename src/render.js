@@ -14,8 +14,8 @@ import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps,
 import { bodyCheck } from './skinworker.js';
 import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
-import { DETAIL_MAPS, detailKindOf } from './detailmaps.js';
-import { armourDetailMaterial, preloadDetailMaps } from './detailtex.js';
+import { DETAIL_MAPS, clothCellOf, detailKindOf } from './detailmaps.js';
+import { armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { SKIN_TONES } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
@@ -74,6 +74,7 @@ export function createScene(canvas, { alpha = false } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha });
   // The detail maps' pictures decoded now, ready before the first man or wall that wears them (detailtex.js).
   preloadDetailMaps();
+  clothAtlasTexture();
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -457,7 +458,10 @@ function shaderWarmers() {
   // A retiarius's net: cord drawn as lines.
   const cord = new THREE.LineSegments(geometry, netCord());
   for (const instanced of [drops, stains]) instanced.setMatrixAt(0, new THREE.Matrix4());
-  group.add(severed, outlineFor(severed), skinV7, outlineFor(skinV7), skinV7Low, drops, stains, vane, tracer, cord);
+  // A fighter's cloth in the cloth atlas (skinParts), where the detail maps are drawn.
+  const cloth = new THREE.SkinnedMesh(skinnedGeometry, clothMaterial());
+  cloth.bind(skinV7.skeleton, new THREE.Matrix4());
+  group.add(severed, outlineFor(severed), skinV7, outlineFor(skinV7), skinV7Low, cloth, drops, stains, vane, tracer, cord);
   group.traverse((object) => {
     object.frustumCulled = false;
     object.userData.shared = true;
@@ -2138,10 +2142,14 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   const steelIndices = [];
   // Armour drawn with the detail maps (detailmaps.js: its texture coordinates in a kind's band): each kind apart, in its own material.
   const detailIndices = DETAIL_MAPS.on && built.uvs ? {} : null;
+  // Cloth drawn with the cloth atlas (its coordinates in a family's cell, detailmaps.js clothUvAt): all of it in one material.
+  const clothIndices = [];
   for (let triangle = 0; triangle < triangles; triangle += 1) {
-    const kind = detailIndices ? detailKindOf(built.uvs[built.indices[triangle * 3] * 2]) : null;
-    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : bodyIndices;
-    target.push(built.indices[triangle * 3], built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
+    const first = built.indices[triangle * 3];
+    const kind = detailIndices ? detailKindOf(built.uvs[first * 2]) : null;
+    const cloth = detailIndices && !kind && clothCellOf(built.uvs[first * 2], built.uvs[first * 2 + 1]) !== null;
+    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : cloth ? clothIndices : bodyIndices;
+    target.push(first, built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
   const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
@@ -2171,12 +2179,28 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
       detailMeshes.push(mesh);
       detailOutlines.push(outlineFor(mesh));
     }
+    if (clothIndices.length) {
+      const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(clothIndices), material: clothMaterial(), share: skinMesh.geometry });
+      mesh.userData.detailMaps = 'cloth';
+      detailMeshes.push(mesh);
+      detailOutlines.push(outlineFor(mesh));
+    }
   }
   // Which body segment each skin vertex belongs to, by its strongest bone.
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   const shell = soft ? new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) : null;
   return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, detailMeshes, detailOutlines, vertexSegment, shell };
+}
+
+/**
+ * A fighter's cloth: the look's own skin material (a Lambert one made standard, so the relief shows), wearing the cloth atlas
+ * (detailtex.js clothDetailMaterial). One per fighter, as his skin's is (a ghosted man's goes see-through on its own).
+ */
+function clothMaterial() {
+  const base = surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.85 });
+  const standard = base.isMeshLambertMaterial ? new THREE.MeshStandardMaterial({ color: base.color, vertexColors: true, skinning: true, roughness: 0.85, metalness: 0 }) : base;
+  return clothDetailMaterial(standard);
 }
 
 // Bodies being built, by the body's key: { body, style, steps, built, phase, views: the fighter views waiting for it }.

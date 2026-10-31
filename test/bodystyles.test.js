@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildBody, P, PRESETS } from '../src/body.js';
 import { BODY_STYLE_KEYS, buildSkinMesh } from '../src/bodystyles.js';
 import { buildLoftBody } from '../src/loftbody.js';
+import { CLOTH_BAND, DETAIL_MAPS } from '../src/detailmaps.js';
 import { buildFleshBody } from '../src/fleshbody.js';
 import { buildDetailMap, DETAIL, detailUv } from '../src/skindetail.js';
 import { BONES } from '../src/rig.js';
@@ -78,7 +79,14 @@ test('a crowd member is built as he was, whatever style is asked for; the defaul
   const plain = buildLoftBody(body);
   assert.deepEqual(Array.from(lofted.positions), Array.from(plain.positions), 'lofted is the default build');
   assert.ok(crowd.indices.length < plain.indices.length / 2, 'and a crowd member is far cheaper');
-  assert.equal(plain.uvs, undefined, 'the baseline carries no texture coordinates');
+  // (Its clothes carry the cloth atlas's, detailmaps.js, where the detail maps are drawn: its skin none.)
+  const was = DETAIL_MAPS.on;
+  DETAIL_MAPS.on = false;
+  try {
+    assert.equal(buildLoftBody(body).uvs, undefined, 'the baseline carries no texture coordinates');
+  } finally {
+    DETAIL_MAPS.on = was;
+  }
 });
 
 test('the sculpt style is a build of the same loft: deterministic, a few times the triangles, clothes still fit over it', () => {
@@ -124,7 +132,8 @@ test('the detail style: the loft with texture coordinates, and a map whose texel
   checkMesh('detail', mesh);
   const count = mesh.positions.length / 3;
   assert.equal(mesh.uvs.length, count * 2);
-  for (const value of mesh.uvs) assert.ok(value >= 0 && value <= 1, `a coordinate in the map (${value})`);
+  // (A garment's coordinates are the cloth atlas's, from CLOTH_BAND up: detailmaps.js.)
+  for (let index = 0; index < mesh.uvs.length; index += 2) if (mesh.uvs[index] < CLOTH_BAND) for (const value of [mesh.uvs[index], mesh.uvs[index + 1]]) assert.ok(value >= 0 && value <= 1, `a coordinate in the map (${value})`);
   const { width, height, bump, occlusion, range } = mesh.detail;
   assert.equal(bump.length, width * height);
   assert.equal(occlusion.length, width * height);

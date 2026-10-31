@@ -1,13 +1,15 @@
 // The detail maps' textures and materials (detailmaps.js says what they are and who carries them): each baked tile's WebP images
 // (detailmaps-data.js, from tools/blender) decoded once into repeating textures shared by everything that wears the tile, and the
 // materials that wear them: an armour's metal (render.js skinParts, oyoroi.js), the castle's stone, timber and paving
-// (levelmode/kittex.js), and the places' grounds (ground/painted.js, as its layers). A texture is made at once with a tiny
+// (levelmode/kittex.js), the places' grounds (ground/painted.js, as its layers), and every outfit's cloth and organics (the
+// cloth atlas, clothmaps-data.js: a fighter's garments, render.js skinParts; his hat and shoes, wardrobe.js). A texture is made at once with a tiny
 // picture of the tile's mean (so nothing is ever drawn with an empty map, and no program is compiled twice) and takes the real
 // picture when it is decoded, a few milliseconds later. Only the tiles something wears are decoded and sent to the GPU.
 
 /* global THREE */
 import { DETAIL_MAP_DATA } from './detailmaps-data.js';
-import { DETAIL_MAPS } from './detailmaps.js';
+import { CLOTH_BAND, DETAIL_MAPS, clothFamilyOf } from './detailmaps.js';
+import { CLOTH_MAP_DATA } from './clothmaps-data.js';
 
 const detailTextureCache = new Map();
 /** What the GPU holds of the tiles in use (bytes, RGBA8 with mipmaps), by tile. */
@@ -127,4 +129,178 @@ export function groundDetailLayer(name) {
   const entry = bakedTileTextures(name);
   if (!entry) return null;
   return { colour: entry.map, normal: entry.normalMap, mean: entry.mean, bytes: DETAIL_MAP_MEMORY[name] ?? 0, metres: entry.metres, baked: name };
+}
+
+// ---- Cloth ------------------------------------------------------------------------------------------------------------------
+
+let clothAtlas = null;
+
+/**
+ * The cloth atlas (clothmaps-data.js: every textile and organic tile in one RGBA picture, detailmaps.js CLOTH_FAMILIES), one
+ * texture for every fighter: a stand-in of flat cloth until it is decoded. Null when the maps are off (or no browser).
+ */
+export function clothAtlasTexture() {
+  if (!DETAIL_MAPS.on || typeof THREE === 'undefined' || typeof Image === 'undefined' || typeof document === 'undefined') return null;
+  if (clothAtlas) return clothAtlas;
+  const [width, height] = CLOTH_MAP_DATA.size;
+  clothAtlas = new THREE.Texture(standIn([128, 128, 224, 217]));
+  // The shader wraps each cell itself (its padding takes the mipmaps' spread); the atlas is not repeated.
+  clothAtlas.wrapS = THREE.ClampToEdgeWrapping;
+  clothAtlas.wrapT = THREE.ClampToEdgeWrapping;
+  clothAtlas.anisotropy = 8;
+  clothAtlas.needsUpdate = true;
+  const image = new Image();
+  image.onload = () => {
+    clothAtlas.image = image;
+    clothAtlas.needsUpdate = true;
+  };
+  image.src = `data:image/webp;base64,${CLOTH_MAP_DATA.atlas}`;
+  DETAIL_MAP_MEMORY.cloth = Math.round((width * height * 4 * 4) / 3);
+  return clothAtlas;
+}
+
+// How far the detail is drawn: past this mipmap level of a cell (its tile then a few dozen pixels across the screen) the relief
+// fades to the cell's mean, so the coarse levels, where the cells' paddings run out, are never read for relief.
+const CLOTH_FADE = [5.0, 6.5];
+
+/**
+ * A fighter's cloth wearing the atlas: `material` (the look's own skin material, MeshStandard, Toon or Phong, vertex-coloured)
+ * takes each face's tile by the cell its texture coordinates name (detailmaps.js clothUvAt): the relief as its normals, the
+ * fibre's shade (over the cell's mean, so the outfit's colour is kept on average) times its colour, and the roughness. A tile
+ * is read with the gradients of the unwrapped coordinates, so the wrap at a tile's edge is seamless; far off the relief fades
+ * to the cell's mean. Returns the material (unchanged where the maps are off or the material cannot take a normal map).
+ */
+export function clothDetailMaterial(material) {
+  const atlas = clothAtlasTexture();
+  if (!atlas || !(material.isMeshStandardMaterial || material.isMeshToonMaterial || material.isMeshPhongMaterial)) return material;
+  const { grid, cell, pad, means } = CLOTH_MAP_DATA;
+  const cells = grid * grid;
+  const meanValues = Array.from({ length: cells }, (_, index) => new THREE.Vector2(...(means[index] ?? [0.9, 0.6])));
+  material.normalMap = atlas;
+  if (material.isMeshStandardMaterial) material.roughness = 1;
+  const inner = (cell - 2 * pad) / cell;
+  const f = (value) => value.toFixed(6);
+  const uniforms = { uClothMeans: { value: meanValues } };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = `uniform vec2 uClothMeans[${cells}];\nvarying vec2 vClothMean;\n${shader.vertexShader}`.replace(
+      '#include <uv_vertex>',
+      `#include <uv_vertex>
+  vec2 clothBandV = floor(uv / ${f(CLOTH_BAND)});
+  int clothIndex = int(clamp(clothBandV.x - 1.0 + ${f(grid)} * clothBandV.y, 0.0, ${f(cells - 1)}));
+  vClothMean = uClothMeans[clothIndex];`,
+    );
+    shader.fragmentShader = `varying vec2 vClothMean;\n${shader.fragmentShader}`
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+  vec2 clothBand = floor(vUv / ${f(CLOTH_BAND)});
+  vec2 clothAt = (vec2(clothBand.x - 1.0, clothBand.y) + ${f(pad / cell)} + fract(vUv) * ${f(inner)}) / ${f(grid)};
+  vec2 clothDx = dFdx(vUv) * ${f(inner / grid)};
+  vec2 clothDy = dFdy(vUv) * ${f(inner / grid)};
+#if __VERSION__ >= 300
+  vec4 clothTexel = textureGrad(normalMap, clothAt, clothDx, clothDy);
+#else
+  vec4 clothTexel = texture2D(normalMap, clothAt);
+#endif
+  float clothLevel = log2(max(max(length(dFdx(vUv)), length(dFdy(vUv))) * ${f(cell - 2 * pad)}, 1e-6));
+  float clothNear = 1.0 - smoothstep(${f(CLOTH_FADE[0])}, ${f(CLOTH_FADE[1])}, clothLevel);
+  diffuseColor.rgb *= mix(1.0, clothTexel.b / max(vClothMean.x, 0.05), clothNear);`,
+      )
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(vClothMean.y, clothTexel.a, clothNear);')
+      .replace(
+        '#include <normal_fragment_maps>',
+        `vec3 clothN = vec3((clothTexel.xy * 2.0 - 1.0) * normalScale * clothNear, 0.0);
+  clothN.z = sqrt(max(0.0, 1.0 - dot(clothN.xy, clothN.xy)));
+  normal = perturbNormal2Arb(-vViewPosition, normal, clothN, faceDirection);`,
+      );
+  };
+  material.customProgramCacheKey = () => 'cloth-atlas';
+  material.needsUpdate = true;
+  return material;
+}
+
+/**
+ * A rigid piece worn (a hat, a shoe: wardrobe.js) wearing a material's tile of the cloth atlas without texture coordinates of
+ * its own: projected three ways over the piece in its own metres (its mesh's scale taken in, so a stretched sphere of a shoe
+ * reads in true size), the three blended by the surface's facing; the relief as normals, the shade and the roughness as on a
+ * body's cloth (clothDetailMaterial). `material`: a CLOTH_MATERIALS key; none, or the maps off: the material as it was. A
+ * material is fitted once (it may be shared by several meshes of the piece).
+ */
+export function clothPropMaterial(target, material) {
+  const spec = clothFamilyOf(material);
+  const atlas = spec ? clothAtlasTexture() : null;
+  if (!atlas || !target || target.userData?.clothProp || !(target.isMeshStandardMaterial || target.isMeshToonMaterial || target.isMeshPhongMaterial || target.isMeshLambertMaterial)) return target;
+  const { grid, cell, pad, means } = CLOTH_MAP_DATA;
+  const inner = (cell - 2 * pad) / cell;
+  const f = (value) => value.toFixed(6);
+  const uniforms = {
+    uClothAtlas: { value: atlas },
+    uClothCell: { value: new THREE.Vector2(spec.cell % grid, Math.floor(spec.cell / grid)) },
+    uClothMean: { value: new THREE.Vector2(...(means[spec.cell] ?? [0.9, 0.6])) },
+    uClothTile: { value: spec.metres * spec.scale },
+  };
+  target.userData.clothProp = material;
+  if (target.isMeshStandardMaterial) target.roughness = 1;
+  const normals = !target.isMeshLambertMaterial;
+  target.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = `uniform float uClothTile;\nvarying vec3 vClothP;\nvarying vec3 vClothN;\nvarying vec3 vClothAx0;\nvarying vec3 vClothAx1;\nvarying vec3 vClothAx2;\n${shader.vertexShader}`.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+  vec3 clothScale = vec3(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz), length(modelMatrix[2].xyz));
+  vClothP = position * clothScale / uClothTile;
+  vClothN = normalize(normal / clothScale);
+  vClothAx0 = normalize(mat3(modelViewMatrix) * vec3(1.0, 0.0, 0.0));
+  vClothAx1 = normalize(mat3(modelViewMatrix) * vec3(0.0, 1.0, 0.0));
+  vClothAx2 = normalize(mat3(modelViewMatrix) * vec3(0.0, 0.0, 1.0));`,
+    );
+    shader.fragmentShader = `uniform sampler2D uClothAtlas;
+uniform vec2 uClothCell;
+uniform vec2 uClothMean;
+varying vec3 vClothP;
+varying vec3 vClothN;
+varying vec3 vClothAx0;
+varying vec3 vClothAx1;
+varying vec3 vClothAx2;
+vec4 clothRead(vec2 p) {
+  vec2 at = (uClothCell + ${f(pad / cell)} + fract(p) * ${f(inner)}) / ${f(grid)};
+#if __VERSION__ >= 300
+  return textureGrad(uClothAtlas, at, dFdx(p) * ${f(inner / grid)}, dFdy(p) * ${f(inner / grid)});
+#else
+  return texture2D(uClothAtlas, at);
+#endif
+}
+${shader.fragmentShader}`
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+  vec3 clothW = pow(abs(normalize(vClothN)), vec3(4.0));
+  clothW /= max(clothW.x + clothW.y + clothW.z, 1e-4);
+  vec4 clothX = clothRead(vClothP.zy);
+  vec4 clothY = clothRead(vClothP.xz);
+  vec4 clothZ = clothRead(vClothP.xy);
+  float clothLevel = log2(max(max(length(dFdx(vClothP)), length(dFdy(vClothP))) * ${f(cell - 2 * pad)}, 1e-6));
+  float clothNear = 1.0 - smoothstep(${f(CLOTH_FADE[0])}, ${f(CLOTH_FADE[1])}, clothLevel);
+  vec4 clothTexel = clothX * clothW.x + clothY * clothW.y + clothZ * clothW.z;
+  diffuseColor.rgb *= mix(1.0, clothTexel.b / max(uClothMean.x, 0.05), clothNear);`,
+      )
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(uClothMean.y, clothTexel.a, clothNear);')
+      .replace(
+        '#include <normal_fragment_maps>',
+        normals
+          ? `#include <normal_fragment_maps>
+  {
+    vec2 nx = (clothX.xy * 2.0 - 1.0) * clothNear;
+    vec2 ny = (clothY.xy * 2.0 - 1.0) * clothNear;
+    vec2 nz = (clothZ.xy * 2.0 - 1.0) * clothNear;
+    vec3 bent = (vClothAx2 * nx.x + vClothAx1 * nx.y) * clothW.x + (vClothAx0 * ny.x + vClothAx2 * ny.y) * clothW.y + (vClothAx0 * nz.x + vClothAx1 * nz.y) * clothW.z;
+    normal = normalize(normal + bent);
+  }`
+          : '#include <normal_fragment_maps>',
+      );
+  };
+  target.customProgramCacheKey = () => `cloth-prop-${normals}`;
+  target.needsUpdate = true;
+  return target;
 }

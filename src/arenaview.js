@@ -7,6 +7,7 @@
 import { P } from './body.js';
 import { point } from './physics.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
+import { clothPropMaterial } from './detailtex.js';
 import { holdingHand, layCloth, makeCloth, pinCloth, ROPE_NET, shedCloth, steerCloth, stepCloth, tangleCloth } from './netcloth.js';
 import { NET } from './weapons.js';
 
@@ -486,8 +487,9 @@ export function buildScaleShirt(body, colorHex, envMap, steelMaterial, part) {
  */
 export function buildHarness(body, armor, envMap, steelMaterial, part) {
   const group = new THREE.Group();
-  const leather = surface(new THREE.Color(armor.color).getHex(), { roughness: 0.85 });
-  const edge = surface(new THREE.Color(armor.lace ?? armor.color).getHex(), { roughness: 0.9 });
+  // Leather, with the cloth atlas's grain (detailtex.js clothPropMaterial).
+  const leather = clothPropMaterial(surface(new THREE.Color(armor.color).getHex(), { roughness: 0.85 }), 'leather');
+  const edge = clothPropMaterial(surface(new THREE.Color(armor.lace ?? armor.color).getHex(), { roughness: 0.9 }), 'leather');
   const brass = steelMaterial(envMap, { vertexColors: false, color: new THREE.Color(armor.gold ?? '#b98a3e').getHex(), roughness: 0.32 });
   const skin = body.segments.trunk.skinRadius;
   const trunk = body.lengths.trunk;
@@ -1008,9 +1010,10 @@ function dropNetView(view, key) {
  * sides, the hide down over the nape.
  */
 export function buildLionHead(group, head, r) {
-  const fur = surface(new THREE.Color(head.color).getHex(), { roughness: 1 });
-  const mane = surface(new THREE.Color(head.mane ?? head.color).getHex(), { roughness: 1 });
-  const maneLight = surface(new THREE.Color(head.mane ?? head.color).lerp(new THREE.Color(head.color), 0.5).getHex(), { roughness: 1 });
+  // The lion's fur and mane, with the cloth atlas's fur (detailtex.js clothPropMaterial).
+  const fur = clothPropMaterial(surface(new THREE.Color(head.color).getHex(), { roughness: 1 }), 'pelt');
+  const mane = clothPropMaterial(surface(new THREE.Color(head.mane ?? head.color).getHex(), { roughness: 1 }), 'fur');
+  const maneLight = clothPropMaterial(surface(new THREE.Color(head.mane ?? head.color).lerp(new THREE.Color(head.color), 0.5).getHex(), { roughness: 1 }), 'fur');
   const dark = surface(0x1e1410, { roughness: 0.8 });
   const bone = surface(0xeee6d2, { roughness: 0.5 });
   const inked = [];
@@ -1079,8 +1082,8 @@ export function buildLionHead(group, head, r) {
  */
 export function buildLionPelt(body, armor) {
   const group = new THREE.Group();
-  const fur = surface(new THREE.Color(armor.color).getHex(), { roughness: 1 });
-  const mane = surface(new THREE.Color(armor.lace ?? armor.color).getHex(), { roughness: 1 });
+  const fur = clothPropMaterial(surface(new THREE.Color(armor.color).getHex(), { roughness: 1 }), 'pelt');
+  const mane = clothPropMaterial(surface(new THREE.Color(armor.lace ?? armor.color).getHex(), { roughness: 1 }), 'fur');
   const dark = surface(0x1e1410, { roughness: 0.8 });
   const skin = body.segments.trunk.skinRadius;
   const trunk = body.lengths.trunk;

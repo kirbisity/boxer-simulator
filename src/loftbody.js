@@ -9,8 +9,8 @@ import { P } from './body.js';
 import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
-import { glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
-import { DETAIL_ARMOUR, DETAIL_MAPS, mailUv, measureRings, plateUvAt, tileUv } from './detailmaps.js';
+import { factionOf, glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS, clothMaterialOf, clothUvAt, mailUv, measureRings, plateUvAt, tileUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { ribDroop, RULES, rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
@@ -170,6 +170,27 @@ function patchUv(mesh, rings, role, index, place, angle) {
 }
 
 /**
+ * A loft's cloth coordinates (detailmaps.js clothUvAt), or null where none of its roles is a material with a tile: each vertex
+ * in its own role's material's cell, measured over the run of rings (the weave closing round it, its length up it).
+ */
+function clothLoftUv(mesh, rings, sides, inflate, paint) {
+  const materials = new Map();
+  const materialOf = (role) => {
+    if (!materials.has(role)) materials.set(role, mesh.clothOf(role) ?? 'none');
+    return materials.get(role);
+  };
+  let any = false;
+  for (const [index, ring] of rings.entries()) {
+    for (let step = 0; step < sides && !any; step += 1) any = materialOf(paint(ring, (step / sides) * Math.PI * 2, index, step)) !== 'none';
+    if (any) break;
+  }
+  if (!any) return null;
+  const measure = measureRings(rings, inflate);
+  const along = new Map(rings.map((ring, index) => [ring, measure.along[index]]));
+  return (ring, share, index, step) => clothUvAt(measure, materialOf(paint(ring, share * Math.PI * 2, index, step)), share, along.get(ring) ?? 0);
+}
+
+/**
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
@@ -181,6 +202,10 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   // Steel with the plate's maps (`mesh.steelUv`, detailmaps.js): a loft all of steel (every point of it steel, steel2 or gilt) takes
   // the plate tile's coordinates. (Not a loft of steel and something else: a triangle across the two would read the skin's maps.)
   if (!uv && mesh.steelUv && !holes && rings.every((ring, index) => Array.from({ length: sides }, (_, step) => paint(ring, (step / sides) * Math.PI * 2, index, step)).every((role) => STEEL_ROLES.has(role)))) uv = tileUv(rings, inflate, 'plate');
+  // Cloth with the cloth atlas's maps (`mesh.clothOf`: role -> material, detailmaps.js): a loft any of whose roles is a material
+  // with a tile takes coordinates in that tile's cell, vertex by vertex (its other roles in the flat cell, so no triangle of it
+  // reads the skin's maps).
+  if (!uv && mesh.clothOf) uv = clothLoftUv(mesh, rings, sides, inflate, paint);
   // A part with texture coordinates (`uv`: ring, share of the way round -> [u, v]) has its first column of vertices twice, so the
   // texture does not run backwards across the last quad: the pairs are welded again for relaxing and for the normals.
   const stride = uv ? sides + 1 : sides;
@@ -198,12 +223,13 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       // off the skin would otherwise follow the bones less than the skin
       // under it, and the skin would come through when a limb moves.
       mesh.weightPositions.push(...vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width))));
-      mesh.colors.push(paint(ring, angle, ringIndex, step));
+      // (The seam's second column is painted as the first: the same place round.)
+      mesh.colors.push(paint(ring, angle, ringIndex, step % sides));
       mesh.bones.push(bones(ring, Math.cos(angle)));
       mesh.ringT.push(ring.t);
       mesh.ringA.push(angle);
       if (uv) {
-        mesh.uvs.set(mesh.positions.length / 3 - 1, uv(ring, step / sides));
+        mesh.uvs.set(mesh.positions.length / 3 - 1, uv(ring, step / sides, ringIndex, step % sides));
         if (step === sides) mesh.welds.push([mesh.positions.length / 3 - 1, mesh.positions.length / 3 - 1 - sides]);
       }
     }
@@ -224,7 +250,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
     mesh.bones.push(bones(rings[row], 0));
     mesh.ringT.push(rings[row].t);
     mesh.ringA.push(0);
-    if (uv) mesh.uvs.set(center, uv(rings[row], 0));
+    if (uv) mesh.uvs.set(center, uv(rings[row], 0, row, 0));
     for (let step = 0; step < sides; step += 1) {
       const a = start + row * stride + step;
       const b = uv ? a + 1 : start + row * sides + ((step + 1) % sides);
@@ -1650,6 +1676,9 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const armor = look.armor ?? null;
   // Steel drawn with the plate's maps (detailmaps.js), not in a crowd, not leather or horn.
   mesh.steelUv = DETAIL_MAPS.on && !lowDetail && Boolean(armor) && !armor.matte;
+  // Cloth drawn with the cloth atlas's maps (detailmaps.js clothMaterialOf: each role's material), not in a crowd or faceted.
+  const clothContext = { faction: factionOf(body.inputs), outfit: outfitOf(body.inputs).kind };
+  mesh.clothOf = DETAIL_MAPS.on && !lowDetail && !faceted ? (role) => clothMaterialOf(look, role, clothContext) : null;
   const plate = armor?.kind === 'plate';
   const lamellar = armor?.kind === 'lamellar';
   const hoplomachus = armor?.kind === 'hoplomachus';

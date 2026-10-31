@@ -10,6 +10,7 @@ import { bindPoints } from '../src/rig.js';
 import { P } from '../src/body.js';
 import { FACE_MORPH, faceMarks, faceMorphWeights, morphHeadPoint } from '../src/facemorph.js';
 import { DETAIL } from '../src/skindetail.js';
+import { CLOTH_BAND } from '../src/detailmaps.js';
 import { progression } from '../tools/bodysheet-cast.js';
 
 // Round two's body styles (bodystyles.js v1..v6): textures, the rules, blended joins and the face that follows the body.
@@ -40,7 +41,8 @@ test('the textured lofts build for the thinnest, the fittest and the heaviest: f
       finite(`${sex} ${key} ${style} positions`, mesh.positions);
       finite(`${sex} ${key} ${style} normals`, mesh.normals);
       assert.equal(mesh.uvs.length, count * 2);
-      for (const value of mesh.uvs) assert.ok(value >= 0 && value <= 1, `${style}: a coordinate in the atlas (${value})`);
+      // (A garment's coordinates are the cloth atlas's, from CLOTH_BAND up: detailmaps.js.)
+      for (let index = 0; index < mesh.uvs.length; index += 2) if (mesh.uvs[index] < CLOTH_BAND) for (const value of [mesh.uvs[index], mesh.uvs[index + 1]]) assert.ok(value >= 0 && value <= 1, `${style}: a coordinate in the atlas (${value})`);
       let highest = 0;
       for (const index of mesh.indices) highest = Math.max(highest, index);
       assert.ok(highest < count);
@@ -217,7 +219,7 @@ test('V7: the loft wrapped onto the flesh field: 8-12k triangles, finite, textur
     assert.ok(triangles >= 8000 && triangles <= 12000, `${sex} ${key}: ${triangles} triangles`);
     finite(`${sex} ${key} v7 positions`, mesh.positions);
     finite(`${sex} ${key} v7 normals`, mesh.normals);
-    for (const value of mesh.uvs) assert.ok(value >= 0 && value <= 1);
+    for (let index = 0; index < mesh.uvs.length; index += 2) if (mesh.uvs[index] < CLOTH_BAND) for (const value of [mesh.uvs[index], mesh.uvs[index + 1]]) assert.ok(value >= 0 && value <= 1);
     for (let vertex = 0; vertex < mesh.normals.length / 3; vertex += 1) {
       const length = Math.hypot(mesh.normals[vertex * 3], mesh.normals[vertex * 3 + 1], mesh.normals[vertex * 3 + 2]);
       assert.ok(Math.abs(length - 1) < 1e-3, 'unit normals');

@@ -3,7 +3,9 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
-import { heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
+import { factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
+import { CLOTH_GARMENTS, clothMaterialOf } from './detailmaps.js';
+import { clothPropMaterial } from './detailtex.js';
 import { outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
@@ -22,6 +24,12 @@ export const WARDROBE = {
 };
 
 const darker = (hex, share = 0.72) => new THREE.Color(hex).multiplyScalar(share);
+
+/** What a worn piece of a slot (`feet`, the shoe of this kind) is made of for this man (detailmaps.js clothMaterialOf). */
+function pieceMaterial(body, slot, kind) {
+  const inputs = body.inputs ?? {};
+  return clothMaterialOf({ [slot]: { kind } }, slot === 'feet' ? 'boot' : 'top', { faction: factionOf(inputs), outfit: outfitOf(inputs).kind });
+}
 
 /** The design's garments, with 'corner' and the fighter's own colour choices resolved. */
 export function dressFor(inputs, cornerHex) {
@@ -232,19 +240,24 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     bare: { width: 0.042, height: 0.032 },
   }[kind] ?? { width: 0.05, height: 0.045, sole: 0x17171c };
   const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: spec.patent ? 0.12 : 0.5 });
+  // The cloth atlas's tile on the upper (detailtex.js clothPropMaterial: leather, a trainer's knit, a tabi's cotton).
+  const stuff = pieceMaterial(body, 'feet', kind);
+  if (kind !== 'sabaton' && kind !== 'bare' && !spec.skin) clothPropMaterial(upperMaterial, stuff);
   const upper = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), upperMaterial);
   upper.scale.set(spec.width, length / 2, spec.height);
   upper.position.set(-0.012, length * 0.28, 0);
   shoe.add(upper);
   if (spec.sole !== undefined) {
-    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.018, length * 0.95, spec.height * 1.9), surface(spec.sole));
+    // A tabi's waraji and a sandal's sole are plaited straw or leather (the people's: a Mexica's of fibre).
+    const soleStuff = kind === 'tabi' ? 'straw' : kind === 'sandal' ? stuff : 'none';
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.018, length * 0.95, spec.height * 1.9), clothPropMaterial(surface(spec.sole), soleStuff));
     sole.position.set(-spec.width * 0.95, length * 0.28, 0);
     shoe.add(sole);
   }
   if (kind === 'sandal') {
     // Straps across the bare foot.
     for (const along of [0.15, 0.45, 0.72]) {
-      const strap = new THREE.Mesh(new THREE.TorusGeometry(spec.height * 1.02, 0.005, 5, 14, Math.PI), surface(upperColor));
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(spec.height * 1.02, 0.005, 5, 14, Math.PI), clothPropMaterial(surface(upperColor), stuff));
       strap.rotation.y = Math.PI / 2;
       strap.rotation.z = Math.PI / 2;
       strap.position.set(-0.01, length * along, 0);
@@ -253,7 +266,7 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
   }
   if (kind === 'footRags') {
     // A strip of rag wound round the middle of the foot and one round the ankle: two open, eight-sided bands, the toes bare.
-    const rag = surface(upperColor, { roughness: 0.95 });
+    const rag = clothPropMaterial(surface(upperColor, { roughness: 0.95 }), stuff);
     rag.side = THREE.DoubleSide;
     for (const [along, wide] of [[0.3, 0.32], [-0.02, 0.18]]) {
       const band = new THREE.Mesh(new THREE.CylinderGeometry(spec.height * 1.08, spec.height * 1.12, length * wide, 8, 1, true), rag);
@@ -1543,6 +1556,16 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     }
     default:
       return null;
+  }
+  // The hat's own stuff (detailmaps.js CLOTH_GARMENTS.head: felt, fur, feathers, cotton...) on its parts in its colour (or its
+  // fur's), from the cloth atlas; its metal, plumes and trims as they were. Not in a crowd.
+  const stuff = CLOTH_GARMENTS.head[head.kind];
+  if (stuff && stuff !== 'none' && !lowDetail) {
+    const own = new Set([color, head.fur].filter((value) => value !== undefined && value !== null).map((value) => new THREE.Color(value).getHex()));
+    group.traverse((object) => {
+      const material = object.isMesh ? object.material : null;
+      if (material?.color && !(material.metalness > 0.5) && own.has(material.color.getHex())) clothPropMaterial(material, stuff);
+    });
   }
   inkAll(group);
   // An open-faced helmet (`openFace`) leaves the beard to be seen.
