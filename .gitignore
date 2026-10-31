@@ -2,3 +2,6 @@ dist/
 shots/
 node_modules/
 .DS_Store
+
+# Photo-face evaluation scans (photoface.js): never committed
+/faces-local

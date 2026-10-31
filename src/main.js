@@ -72,6 +72,7 @@ import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/sta
 import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
+import { loadPhotoFaces, photoFaceStats, photoFacesOn, setPhotoFaces } from './photoface.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -3206,6 +3207,19 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
   rebuildViews();
   return state.world.fighters.map((fighter) => fighter.style);
 }
+
+// Photo faces (photoface.js, #faces=photo): the fighters are drawn again once their maps are in. The harness turns them on and off.
+const redrawWithPhotoFaces = (count) => {
+  if (!count || !state.world) return count;
+  clearCrowdTemplates(scene);
+  rebuildViews();
+  return count;
+};
+if (photoFacesOn()) loadPhotoFaces().then(redrawWithPhotoFaces);
+window.__photoFaces = {
+  set: (on) => setPhotoFaces(on).then(() => { clearCrowdTemplates(scene); return photoFacesOn(); }),
+  stats: photoFaceStats,
+};
 
 // The looks harness (looksbench.js): staged still-lifes, shots and timings, for comparing looks.
 installLooksBench({

@@ -28,6 +28,7 @@ import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
+import { photoFaceFor } from './photoface.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, simplifyTemplate, stretchedInverses } from './crowdview.js';
@@ -1874,7 +1875,10 @@ function leaderDress(dress, fighter) {
 /** A fighter's look, with any its outfit's design sets over it (`face`: a powdered complexion, hair colour, makeup). */
 function lookOf(inputs) {
   const face = outfitOf(inputs).look.face;
-  return face ? { ...(inputs.look ?? {}), ...face } : inputs.look ?? {};
+  const look = face ? { ...(inputs.look ?? {}), ...face } : inputs.look ?? {};
+  // A photographed face (photoface.js) gives the body its skin, so the neck meets the face.
+  const photo = photoFaceFor(inputs);
+  return photo && !look.skinColor && !look.faceColor ? { ...look, skinColor: photo.skin } : look;
 }
 
 function detailedView(view, fighter, simple) {
@@ -1919,7 +1923,9 @@ function detailedView(view, fighter, simple) {
   // A round-two body style's face follows the body (facemorph.js).
   // (Under a closed helm the face is never seen: not morphed, not drawn.)
   const faceHidden = !simple && CLOSED_HELMS.includes(dress.head?.kind);
-  const faceLook = { ...(dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look), faceMorph: Boolean(styleSpec(wanted).face) && !faceHidden };
+  // A photographed face (photoface.js, #faces=photo), unless a machine's or a face no one sees; in a crowd painted per vertex.
+  const photoFace = machine || faceHidden ? null : photoFaceFor(body.inputs);
+  const faceLook = { ...(dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look), faceMorph: Boolean(styleSpec(wanted).face) && !faceHidden, photoFace, photoPainted: simple };
   const headView = buildHead(body, faceLook, faceColor, corner);
   headView.group.matrixAutoUpdate = false;
   if (faceHidden) {

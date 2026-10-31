@@ -19,6 +19,7 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 import { assignColour } from './looks/kit.js';
 import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
+import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
@@ -45,6 +46,8 @@ export const FACE_SHAPES = {
   shonen: { jawWidth: 0.8, jawAt: 0.5, chinWidth: 0.16, chinLength: 1.0, chinForward: 0.74, faceFront: 0.84, cheek: 0, crown: 1.0, eye: { width: 0.34, height: 0.25, slant: 0.14, lash: 0.055 } },
   shojo: { jawWidth: 0.9, jawAt: 0.38, chinWidth: 0.16, chinLength: 0.9, chinForward: 0.7, faceFront: 0.88, cheek: 0.07, crown: 1.06, eye: { width: 0.38, height: 0.42, slant: 0, lash: 0.07 } },
   seinen: { jawWidth: 0.88, jawAt: 0.62, chinWidth: 0.32, chinLength: 1.14, chinForward: 0.8, faceFront: 0.86, cheek: 0, crown: 0.97, eye: { width: 0.3, height: 0.19, slant: 0.06, lash: 0.04 } },
+  // For a photographed face (photoface.js): a real head's broad jaw and chin, the face only a little flattened.
+  photo: { jawWidth: 0.92, jawAt: 0.55, chinWidth: 0.46, chinLength: 1.08, chinForward: 0.82, faceFront: 0.92, cheek: 0.03, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
 };
 // Makeup (look.makeup): `eyes` 'smoky' (a dark shadow round the eye),
 // `liner` 'winged' (a heavy upper line flicked out), `lowerLash` 'heavy',
@@ -156,6 +159,70 @@ function faceMap(shape) {
   FACE_MAPS.set(key, texture);
   return texture;
 }
+
+/**
+ * Texture coordinates on a head for a photo face's atlas (photoface.js PHOTO_ATLAS), from each vertex's place on the drawn head:
+ * u round the head from its azimuth (the face at 0.5, the back at 0 and 1, u growing to the fighter's left), v up it from its
+ * height, so the atlas' eye line, lip line and chin land on the head's (the dome by its angle of elevation, so the crown is
+ * not pinched). `sphereU`, the sphere's own u, keeps the seam at the back (and the poles) on the right side.
+ */
+function photoUV(geometry, radius, shape, sphereU = null) {
+  const position = geometry.attributes.position;
+  const eye = FACE.eyeLine / SKULL[1];
+  const chin = -PHOTO_ATLAS.chinT * shape.chinLength;
+  const mouth = eye + PHOTO_ATLAS.mouthShare * (chin - eye);
+  // (The dome: the unwraps squeeze the hair over the crown into their top rows, so the atlas' upper band is spread over the top of the head and the forehead kept low.)
+  const knots = [[1, 1], [PHOTO_ATLAS.hairlineAt, 1 - PHOTO_ATLAS.hairlineRow], [eye, 1 - PHOTO_ATLAS.eyeRow], [mouth, 1 - PHOTO_ATLAS.mouthRow], [chin, 1 - PHOTO_ATLAS.chinRow], [-shape.chinLength, 0]];
+  const uv = new Float32Array(position.count * 2);
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index) / (radius * SKULL[1]);
+    const z = position.getZ(index);
+    const height = y >= 0 ? Math.asin(Math.min(1, y / shape.crown)) / (Math.PI / 2) : Math.max(-shape.chinLength, y);
+    let v = 0;
+    for (let knot = 1; knot < knots.length; knot += 1) {
+      const [h0, v0] = knots[knot - 1];
+      const [h1, v1] = knots[knot];
+      if (height >= h1 || knot === knots.length - 1) {
+        v = v0 + ((v1 - v0) * (h0 - height)) / (h0 - h1);
+        break;
+      }
+    }
+    const guess = sphereU ? 1 - sphereU.getX(index) : 0.5;
+    let u = Math.hypot(x, z) < 1e-5 * radius ? guess : 0.5 + Math.atan2(z, x) / (Math.PI * 2);
+    while (u - guess > 0.5) u -= 1;
+    while (guess - u > 0.5) u += 1;
+    uv[index * 2] = u;
+    uv[index * 2 + 1] = Math.min(1, Math.max(0, v));
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geometry;
+}
+
+/**
+ * A photo face's nose in the head's outline: the skull pushed out along a ridge from between the eyes to the nose's tip (where
+ * the atlas has them, read from each vertex's texture coordinates), so the face has a profile. Only the nose: the rest of the
+ * relief is in the normal map.
+ */
+function photoNose(geometry, radius) {
+  const uv = geometry.attributes.uv;
+  const position = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  const bridge = PHOTO_ATLAS.eyeRow - 0.01;
+  const tip = PHOTO_ATLAS.eyeRow + 0.55 * (PHOTO_ATLAS.mouthRow - PHOTO_ATLAS.eyeRow);
+  for (let index = 0; index < position.count; index += 1) {
+    const across = uv.getX(index) - 0.5;
+    const row = 1 - uv.getY(index);
+    const along = Math.min(1, Math.max(0, (row - bridge) / (tip - bridge)));
+    const below = row > tip ? Math.exp(-(((row - tip) / 0.022) ** 2)) : row < bridge ? Math.exp(-(((bridge - row) / 0.03) ** 2)) : 1;
+    const lift = PHOTO_FACE_NOSE.height * radius * (0.25 + 0.75 * along) * below * Math.exp(-((across / PHOTO_FACE_NOSE.width) ** 2));
+    if (lift < 1e-5 * radius) continue;
+    position.setXYZ(index, position.getX(index) + normal.getX(index) * lift, position.getY(index) + normal.getY(index) * lift, position.getZ(index) + normal.getZ(index) * lift);
+  }
+  geometry.computeVertexNormals();
+}
+// The nose's height (of the head's radius) at its tip, and its half-width (of the way round the head).
+const PHOTO_FACE_NOSE = { height: 0.13, width: 0.02 };
 
 function headGeometry(radius, shape, segments = 36) {
   const geometry = new THREE.SphereGeometry(1, segments, Math.round(segments * 0.75));
@@ -319,14 +386,19 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const look = { ...DEFAULT_LOOK, ...lookInput };
   const r = body.lengths.headRadius;
   const female = body.inputs.sex === 'female';
+  // A photographed face (photoface.js; `look.photoFace`, with `photoPainted` in a crowd): its eyes, brows, mouth, ears and
+  // beard are in its maps, so none is drawn; its head is a real one's shape. A man's hair is the photo's; a woman keeps her
+  // drawn hair (the photo's on a round skull reads as a bald cap), in the photo's colour.
+  const photo = look.photoFace ?? null;
+  if (photo) Object.assign(look, { hairStyle: female ? look.hairStyle : 'bald', hairColor: photo.hair, facialHair: 'none', makeup: null });
   // Chosen from the design sheet: shonen for women, seinen for men.
-  const drawn = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
+  const drawn = photo ? FACE_SHAPES.photo : FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
   // `faceMorph`: the face follows the body (facemorph.js): the skull, hair and beard bent alike, and a map of its shading.
   const morph = look.faceMorph ? faceMorphWeights(body) : null;
   const shape = morph ? { ...drawn, morph } : drawn;
   const group = new THREE.Group();
-  const skinMaterial = surface(skinHex, { steps: STYLE.faceSteps });
-  if (morph) {
+  const skinMaterial = photo ? photoSkinMaterial(photo, { painted: look.photoPainted }) : surface(skinHex, { steps: STYLE.faceSteps });
+  if (morph && !photo) {
     skinMaterial.map = faceMap(shape);
     skinMaterial.color.multiplyScalar(1 / FACE_MORPH.neutral);
     skinMaterial.needsUpdate = true;
@@ -335,7 +407,18 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const hairMaterial = surface(look.hairColor);
   const ink = 0x24181a;
 
-  const skull = new SoftShell(headGeometry(r, shape, morph ? 48 : 36), skinMaterial, body.segments.head.fleshFirmness);
+  // (A photo face is finer, for its nose; in a crowd it is as coarse as any.)
+  const skullGeometry = headGeometry(r, shape, morph || (photo && !look.photoPainted) ? 48 : 36);
+  // (The photo's coordinates, and in a crowd its colours per vertex, the ears' and nose's too, read where they sit on the head.)
+  const photoParts = (geometry, sphereU = null) => {
+    if (!photo) return geometry;
+    photoUV(geometry, r, shape, sphereU);
+    if (look.photoPainted) paintFromFace(geometry, photo);
+    return geometry;
+  };
+  photoParts(skullGeometry, skullGeometry.attributes.uv);
+  if (photo) photoNose(skullGeometry, r);
+  const skull = new SoftShell(skullGeometry, skinMaterial, body.segments.head.fleshFirmness);
   group.add(skull.mesh);
   skull.mesh.add(outlineFor(skull.mesh, 0.0035));
   for (const side of [1, -1]) {
@@ -344,6 +427,14 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     ear.position.set(-0.06 * r, -0.08 * r, side * SKULL[2] * r * 0.98);
     ear.rotation.z = 0.12;
     ear.castShadow = true;
+    if (photo) {
+      ear.updateMatrix();
+      ear.geometry.applyMatrix4(ear.matrix);
+      ear.position.set(0, 0, 0);
+      ear.rotation.set(0, 0, 0);
+      ear.scale.set(1, 1, 1);
+      photoParts(ear.geometry);
+    }
     group.add(ear);
   }
 
@@ -355,7 +446,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const eyeWidth = shape.eye.width * r;
   const eyeHeight = shape.eye.height * r;
   const irisColor = new THREE.Color(EYE_COLORS[look.eyeColor] ?? EYE_COLORS.brown);
-  const eyes = [1, -1].map((side) => {
+  const eyes = (photo ? [] : [1, -1]).map((side) => {
     const holder = onSurface(new THREE.Group(), probe, raycaster, r, FACE.eyeLine, side * FACE.eyeSpread, 0.006 * r);
     // Mirror one eye so the outer flick points outward on both.
     const mirror = new THREE.Group();
@@ -398,7 +489,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   browShape.moveTo(-eyeWidth * 0.55, 0);
   browShape.quadraticCurveTo(0, 0.045 * r, eyeWidth * 0.6, -0.01 * r);
   browShape.quadraticCurveTo(0, 0.025 * r, -eyeWidth * 0.55, -0.025 * r);
-  const brows = [1, -1].map((side) => {
+  const brows = (photo ? [] : [1, -1]).map((side) => {
     const holder = onSurface(new THREE.Group(), probe, raycaster, r, FACE.eyeLine + 0.3, side * FACE.eyeSpread * 1.02, 0.008 * r);
     const mirror = new THREE.Group();
     mirror.scale.x = side > 0 ? -1 : 1;
@@ -415,10 +506,13 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const noseAt = onSurface(new THREE.Group(), probe, raycaster, r, -0.3, 0, 0);
   noseAt.matrix.decompose(nose.position, nose.quaternion, new THREE.Vector3());
   nose.scale.set(0.05 * r, 0.06 * r, 0.07 * r);
-  group.add(nose);
+  // (A photo face's nose is in its skull: photoNose.)
+  if (!photo) group.add(nose);
 
   // Mouth: a drawn line that opens into a dark mouth with the guard showing.
-  const mouth = onSurface(new THREE.Group(), probe, raycaster, r, -0.6, 0, 0.004 * r);
+  // (A photo's mouth where its lips are: photoUV's lip line.)
+  const photoMouth = (FACE.eyeLine / SKULL[1] + PHOTO_ATLAS.mouthShare * (-PHOTO_ATLAS.chinT * shape.chinLength - FACE.eyeLine / SKULL[1])) * SKULL[1];
+  const mouth = onSurface(new THREE.Group(), probe, raycaster, r, photo ? photoMouth : -0.6, 0, 0.004 * r);
   const lineShape = new THREE.Shape();
   lineShape.moveTo(-0.12 * r, 0.01 * r);
   lineShape.quadraticCurveTo(0, -0.012 * r, 0.12 * r, 0.01 * r);
@@ -426,6 +520,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   lineShape.quadraticCurveTo(0, -0.026 * r, -0.12 * r, 0);
   const lipColor = look.makeup?.lips ?? null;
   const mouthLine = flat(lineShape, lipColor ?? 0x6a2c2c, 0.001);
+  // (A photo's lips are its own: the drawn line never shows, the mouth only when it opens.)
+  if (photo) mouthLine.material.visible = false;
   // A starved mouth is a thin, taut line.
   if (morph) mouthLine.scale.set(1 - 0.12 * morph.gaunt + 0.08 * morph.full, 1 - 0.35 * morph.gaunt, 1);
   // Painted lips: a full, crisp mouth in the lipstick's colour while it is closed.
