@@ -131,55 +131,8 @@ def scale(n):
     return t
 
 
-def mountain(n):
-    # Mountain-pattern armour (shanwen jia), as Song and Ming statues and paintings show it and its modern reconstructions
-    # (https://lbas.lboro.ac.uk/pattern/mountain-pattern-armour.html; https://dragonsarmory.blogspot.com/2017/07/heavy-song-dynasty-armor.html;
-    # Ming guardian figures at the Ming tombs): small iron plates each shaped as a three-armed star (the 山 / Y), the arms
-    # of each plate locking between its neighbours' so the plates close up without lacing on the face, each arm with a raised
-    # rib, its arm's end in the fork between two arms of the next plate: the plates on a triangular lattice along their arms.
-    # Lattice step 24 mm (plates ~30 mm across): tile 83 x 72 mm.
-    d = 0.024
-    W, H = 2 * math.sqrt(3) * d, 3 * d
-    t = Tile(W, H, n, 53)
-    a1 = np.array([0.0, d])
-    a2 = np.array([math.sqrt(3) * d / 2, d / 2])
-    reach = 0.56 * d
-    arms = [reach * np.array([math.cos(a), math.sin(a)]) for a in (math.pi / 2, math.pi * 7 / 6, math.pi * 11 / 6)]
-    pts = np.stack([t.X.ravel(), t.Y.ravel()], axis=1)
-    d1 = np.full(len(pts), 1e9)
-    d2 = np.full(len(pts), 1e9)
-    owner = np.zeros(len(pts))
-    k = 0
-    for m in range(-8, 8):
-        for nn in range(-2, 7):
-            c = m * a1 + nn * a2
-            if not (-d < c[0] < W + d and -d < c[1] < H + d):
-                continue
-            # (Each plate known by its place on the torus, so its tone and tilt repeat with the tile.)
-            k = round((c[0] % W) / (math.sqrt(3) * d / 2)) * 13 + round((c[1] % H) / (d / 2)) * 7 + 1
-            dist = np.full(len(pts), 1e9)
-            for arm in arms:
-                rel = pts - c
-                tt = np.clip((rel @ arm) / (arm @ arm), 0, 1)
-                dist = np.minimum(dist, np.linalg.norm(rel - tt[:, None] * arm[None, :], axis=1))
-            closer = dist < d1
-            d2 = np.where(closer, d1, np.minimum(d2, dist))
-            owner = np.where(closer, k, owner)
-            d1 = np.where(closer, dist, d1)
-    shape = t.X.shape
-    b = ((d2 - d1) / 2).reshape(shape)
-    d1 = d1.reshape(shape)
-    owner = owner.reshape(shape)
-    t.z = 0.0013 * smooth(0.00012, 0.0016, b) + 0.0006 * np.clip(1 - d1 / 0.0035, 0, 1) ** 1.5 + 0.0003 * np.sin(owner * 2.7) * smooth(0, 0.002, b) + t.noise(30, 3, 20, 0.00004)
-    gap = b < 0.00018
-    tone = 0.76 + 0.07 * np.sin(owner * 1.9) + t.noise(20, 2, 12, 0.03)
-    t.grey(np.where(gap, 0.2, tone))
-    t.rough = np.where(gap, 0.8, 0.34 + 0.04 * np.cos(owner * 1.3))
-    return t
-
-
 def brigandine(n):
-    # Brigandine (Ming bumian jia, and the European foot soldier's): cloth over small overlapping iron plates, the plates riveted
+    # The Ming brigandine (bumian jia): cloth over small overlapping iron plates, the plates riveted
     # to the cloth from inside, so the face shows rows of domed copper-alloy rivet heads, each plate's foot standing a little
     # out through the cloth (https://greatmingmilitary.blogspot.com/2024/09/brigandine-armours-of-ming-dynasty.html: iron plates
     # fixed to the cloth with copper rivets, two to three to a plate; the Hangzhou Arts and Crafts Museum brigandine,
@@ -210,6 +163,54 @@ def brigandine(n):
     cloth = 0.84 - 0.08 * (0.5 + 0.5 * np.sin(TAU * t.X / 0.0008) * np.sin(TAU * t.Y / 0.0008)) + t.noise(16, 1, 6, 0.03)
     t.grey(np.where(t.mask1 > 0.5, 0.95, cloth))
     t.rough = np.where(t.mask1 > 0.5, 0.33, 0.9)
+    t.metal = np.where(t.mask1 > 0.5, 1.0, 0.0)
+    return t
+
+
+def euro_brigandine(n):
+    # The European brigandine of the 15th century (Italian, and the English and Flemish foot soldier's): a doublet of velvet or
+    # fustian lined with rows of larger tinned iron plates, each curved to the body, the rows overlapping upward (each plate's top
+    # edge over the foot of the plate above) and the plates of a row lapping sideways, each fixed through the cloth by a
+    # triangular cluster of three rivets with a single rivet above it, their heads tinned or gilt and often struck as eight-
+    # pointed stars (the Worcester Art Museum's Italian fragment, c. 1450, six tinned plates in two columns "overlapping upwards",
+    # triangular clusters of three star-headed rivets with a fourth above each, https://worcester.emuseum.com/objects/49120;
+    # Royal Armouries III.1664, Italian, c. 1470; the triangular groups of three as the 15th century's mark against the 16th
+    # century's straight rows, https://en.wikipedia.org/wiki/Brigandine). Plates 64 x 50 mm showing, heads ~7 mm: tile two
+    # plates across and two rows up (detailmaps.js `euroBrigandine`).
+    pw, ph = 0.064, 0.05
+    W, H = 2 * pw, 2 * ph
+    t = Tile(W, H, n, 62)
+    yl = t.Y % ph
+    xs = t.X % pw
+    # Under the cloth: each plate rising to its top edge, which stands over the foot of the plate above; a soft dip where the
+    # plates of a row lap; the cloth's pile.
+    rise = 0.0011 * (yl / ph) * smooth(0, 0.0035, ph - yl)
+    lap = -0.00035 * np.exp(-((np.minimum(xs, pw - xs)) / 0.002) ** 2)
+    pile = t.noise(90, 40, 120, 0.000018) + t.noise(16, 1, 6, 0.00012)
+    t.z = rise + lap + pile
+    heads = np.zeros_like(t.z)
+    for row in range(2):
+        for col in range(2):
+            cx = col * pw + pw / 2
+            base = row * ph
+            for (dx, dy) in ((-0.0065, 0.014), (0.0065, 0.014), (0.0, 0.025), (0.0, 0.039)):
+                hx, hy = cx + dx, base + dy
+                rx = wrap(t.X - hx, W)
+                ry = wrap(t.Y - hy, H)
+                ang = np.arctan2(ry, rx)
+                # An eight-pointed star struck in the head: its radius waving with the points.
+                r = 0.0036 * (1 + 0.12 * np.cos(8 * ang))
+                q = (rx * rx + ry * ry) / (r * r)
+                head = np.where(q < 1, 0.0015 * np.sqrt(np.clip(1 - q, 0, 1)), 0.0)
+                mask = smooth(1.05, 0.9, q)
+                dimple, _ = dome(t.X, t.Y, W, H, hx, hy, 0.0056, 0.00035)
+                t.z = t.z - dimple * (1 - mask)
+                heads = np.maximum(heads, head)
+                t.mask1 = np.maximum(t.mask1, mask)
+    t.z = np.maximum(t.z, heads + 0.0003 * (t.mask1 > 0.5))
+    velvet = 0.8 + t.noise(40, 20, 80, 0.035) + t.noise(10, 1, 4, 0.03)
+    t.grey(np.where(t.mask1 > 0.5, 0.95, velvet))
+    t.rough = np.where(t.mask1 > 0.5, 0.3, 0.95)
     t.metal = np.where(t.mask1 > 0.5, 1.0, 0.0)
     return t
 
@@ -265,24 +266,28 @@ def krug(n):
     return t
 
 
-def iyozane(n):
-    # Tosei gusoku's riveted cuirass (byo-toji yokohagi okegawa-do: MFAH 2010.1126,
-    # https://emuseum.mfah.org/objects/139649; the Koelliker collection, Fortuny museum): horizontal iron lames about 45 mm
-    # deep, each riveted over the next with domed rivet heads (byo) about every 30 mm along its foot, lacquered over (a
-    # smooth, faintly orange-peeled skin). Tile 120 mm round, two lames up.
-    W, H, lame = 0.12, 0.09, 0.045
+def yokohagi(n):
+    # The tosei gusoku's solid cuirass (yokohagi okegawa-do): horizontal iron lames riveted one to the next into a rigid shell, each
+    # lame's foot lapping over the head of the one below, the rivets set flush and the whole lacquered over (kakushi-byo), so the
+    # face is a smooth lacquer skin ridged at every lame (MFAH 2010.1126, https://emuseum.mfah.org/objects/139649; the Penn
+    # Museum's front cuirass of nine horizontal iron plates, https://collections.penn.museum/collections/object/151683; Sotheby's
+    # "horizontally constructed solid plates (yokohagi okegawa)" black-lacquered iron do). Lames 40 mm deep: nine to a front
+    # plate. Tile 120 mm round, two lames up; no studs.
+    W, H, lame = 0.12, 0.08, 0.04
     t = Tile(W, H, n, 57)
     yl = t.Y % lame
     s = yl / lame
-    t.z = 0.0011 * (1 - s) - 0.0005 * (1 - smooth(0, 0.0012, yl)) + t.noise(60, 10, 40, 0.000012) + t.noise(10, 1, 4, 0.00008)
-    for li in range(2):
-        for k in range(4):
-            head, mask = dome(t.X, t.Y, W, H, 0.015 + k * 0.03, li * lame + 0.008, 0.003, 0.0013)
-            t.z = t.z + head
-            t.mask1 = np.maximum(t.mask1, mask)
-    t.grey(np.where(t.mask1 > 0.5, 0.9, 0.9 + t.noise(10, 1, 6, 0.02)))
-    t.rough = np.where(t.mask1 > 0.5, 0.35, 0.26)
-    t.metal = np.where(t.mask1 > 0.5, 1.0, 0.0)
+    # Thickest at the foot, which stands out over the next lame's head, thinning upward to where it runs under the lame above;
+    # the foot's edge rounded under its lacquer, and a crease in the lacquer just above it.
+    body = 0.0019 * (1 - s) ** 1.3
+    edge = smooth(0, 0.0016, yl)
+    bead = 0.0003 * np.exp(-((yl - 0.0022) / 0.0012) ** 2)
+    crease = -0.00012 * np.exp(-((yl - 0.0055) / 0.0008) ** 2)
+    hammer = t.noise(12, 1, 5, 0.00012) + t.noise(60, 10, 40, 0.000012)
+    t.z = body * edge + bead * edge + crease + hammer
+    t.grey(0.9 + t.noise(10, 1, 6, 0.015))
+    t.rough = 0.24 + t.noise(20, 4, 20, 0.02)
+    t.metal = np.zeros_like(t.z)
     return t
 
 
@@ -417,8 +422,9 @@ def panels(n):
 
 
 FAMILIES = {
-    'segmentata': segmentata, 'scale': scale, 'mountain': mountain, 'brigandine': brigandine, 'harnessEdge': harness_edge,
-    'krug': krug, 'iyozane': iyozane, 'sugake': sugake, 'etched': etched, 'polymer': polymer, 'panels': panels,
+    'segmentata': segmentata, 'scale': scale, 'brigandine': brigandine, 'euroBrigandine': euro_brigandine,
+    'harnessEdge': harness_edge, 'krug': krug, 'yokohagi': yokohagi, 'sugake': sugake, 'etched': etched, 'polymer': polymer,
+    'panels': panels,
 }
 
 

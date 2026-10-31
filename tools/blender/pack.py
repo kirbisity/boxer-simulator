@@ -28,8 +28,8 @@ ARMOUR = {
     'plate': {'size': 512, 'quality': 92},
     # The hard armour tiles (hardtiles.py), at 512² (their detail is millimetres over a tile a hand across or less).
     **{name: {'size': 512, 'quality': 88, 'masks': masks} for name, masks in (
-        ('segmentata', True), ('scale', False), ('mountain', False), ('brigandine', True), ('harnessEdge', True), ('krug', False),
-        ('iyozane', True), ('sugake', True), ('etched', False), ('polymer', False), ('panels', False))},
+        ('segmentata', True), ('scale', False), ('brigandine', True), ('euroBrigandine', True), ('harnessEdge', True),
+        ('krug', False), ('yokohagi', False), ('sugake', True), ('etched', False), ('polymer', False), ('panels', False))},
 }
 # Ground tiles and the metres each covers (as baked).
 GROUND = {name: {'size': 1024, 'quality': 86, 'metres': metres} for name, metres in (

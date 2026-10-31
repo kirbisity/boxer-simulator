@@ -8,7 +8,7 @@
 
 /* global THREE */
 import { DETAIL_MAP_DATA } from './detailmaps-data.js';
-import { CLOTH_BAND, DETAIL_MAPS, clothFamilyOf, tileSize } from './detailmaps.js';
+import { CLOTH_BAND, DETAIL_ARMOUR, DETAIL_MAPS, clothFamilyOf, tileSize } from './detailmaps.js';
 import { CLOTH_MAP_DATA } from './clothmaps-data.js';
 
 const detailTextureCache = new Map();
@@ -146,23 +146,27 @@ export function uvMetres(geometry, most = 4000) {
  * (metalness 0.3 or more), or with `moulded` every opaque one, or only those of the materials in `only`, has its material
  * copied once per size with the tile's maps repeated over its own texture coordinates (uvMetres) to the tile's metres
  * (detailmaps.js tileSize). Meshes that already wear a normal map, see-through ones and unlit ones are left as they are. The
- * textures are the shared ones; only the materials (a repeat each) are new.
+ * textures are the shared ones; only the materials (a repeat each) are new. `part`: only the meshes marked `userData.helmPart`
+ * so (a helmet's aventail). `rows`: a laced tile's rows of plates over each mesh's height (a tier of the aventail: one row),
+ * not its real height. `cords`: a laced tile's masks drawn in those colours (armourDetailMaterial).
  */
-export function wearTile(root, name, { moulded = false, only = null } = {}) {
+export function wearTile(root, name, { moulded = false, only = null, part = null, rows = null, cords = null } = {}) {
   if (!bakedTileTextures(name)) return;
   const [round, up] = tileSize(name);
   const made = new Map();
   root.traverse((object) => {
     const material = object.material;
     if (!object.isMesh || object.userData.outline || Array.isArray(material) || !material || !object.geometry?.attributes?.uv) return;
+    if (part && object.userData.helmPart !== part) return;
     if (material.normalMap || material.userData?.clothProp || material.transparent || material.isMeshBasicMaterial || material.isShaderMaterial || material.side === THREE.BackSide) return;
     if (only ? !only.has(material) : !moulded && !((material.metalness ?? 0) >= 0.3)) return;
     const [mu, mv] = uvMetres(object.geometry);
     if (!(mu > 0 && mv > 0)) return;
     const scale = Math.cbrt(Math.abs(object.scale.x * object.scale.y * object.scale.z)) || 1;
-    const repeat = [Math.max(1, Math.round((mu * scale) / round)), Math.max(0.25, (mv * scale) / up)];
+    const upward = rows ? rows / (DETAIL_ARMOUR[name]?.rows ?? 1) : Math.max(0.25, (mv * scale) / up);
+    const repeat = [Math.max(1, Math.round((mu * scale) / round)), upward];
     const key = `${material.uuid}|${repeat[0]}|${repeat[1].toFixed(2)}`;
-    if (!made.has(key)) made.set(key, armourDetailMaterial(material.clone(), name, { repeat, metalness: material.metalness ?? 1 }));
+    if (!made.has(key)) made.set(key, armourDetailMaterial(material.clone(), name, { repeat, cords, metalness: material.metalness ?? 1 }));
     object.material = made.get(key);
   });
 }

@@ -1731,8 +1731,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const tile = DETAIL_MAPS.on && !lowDetail ? armourTileOf(armor?.kind, material, slot) : null;
     const boned = bones ?? (() => null);
     // Lamellae (and scales hung point down) drawn as plates over a backing of their dark lacing (the robe showing in the
-    // splits), except in a crowd: with the maps, one shell in rows wearing its laced tile, or a field tile over the backing
-    // (the mountain pattern); else plate by plate.
+    // splits), except in a crowd: with the maps, one shell in rows wearing its laced tile, or a field tile of the kind's own over
+    // the backing; else plate by plate.
     if (paint?.lamellae && !lowDetail) {
       const gaps = paint.gaps ? (t, angle) => inLamellaGap(paint, angle) : null;
       loft(mesh, rings, sides, { color: (ring, angle) => (inLamellaGap(paint, angle) ? 'cloth' : 'lace'), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });

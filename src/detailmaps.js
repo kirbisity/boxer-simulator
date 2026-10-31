@@ -39,11 +39,11 @@ export const DETAIL_ARMOUR = {
   // https://www.yalealumnimagazine.com/articles/3919-heavy-metal-from-the-ancient-romans; Roman scale sizes,
   // https://www.romanarmytalk.com/rat/showthread.php?tid=12652).
   scale: { band: 600, columns: 6, pitch: 0.02, rows: 2, row: 0.024, hangs: true },
-  // Mountain pattern (shanwen jia): interlocking three-armed iron plates on a 24 mm lattice, each arm's end in the fork of the
-  // next, as Song and Ming statues and paintings show it (https://lbas.lboro.ac.uk/pattern/mountain-pattern-armour.html,
-  // https://dragonsarmory.blogspot.com/2017/07/heavy-song-dynasty-armor.html).
-  mountain: { band: 700, tile: [0.0831, 0.072] },
-  // Brigandine: cloth over 48 x 24 mm plates, two domed copper rivets to a plate on a 24 mm staggered grid (Ming bumian jia,
+  // The European brigandine (15th century, Italian and English): velvet over 64 x 50 mm tinned plates in rows overlapping
+  // upward, each held by a triangle of three star-headed rivets with a fourth above (the Worcester Art Museum's Italian
+  // fragment, c. 1450, https://worcester.emuseum.com/objects/49120; Royal Armouries III.1664; https://en.wikipedia.org/wiki/Brigandine).
+  euroBrigandine: { band: 700, tile: [0.128, 0.1], masks: 'gold' },
+  // The Ming brigandine: cloth over 48 x 24 mm plates, two domed copper rivets to a plate on a 24 mm staggered grid (Ming bumian jia,
   // https://greatmingmilitary.blogspot.com/2024/09/brigandine-armours-of-ming-dynasty.html; the Hangzhou Arts and Crafts
   // Museum's, doi:10.1080/17416124.2024.2316985; the Met's dingjia, https://www.metmuseum.org/art/collection/search/24010).
   brigandine: { band: 800, tile: 0.096, masks: 'gold' },
@@ -54,9 +54,10 @@ export const DETAIL_ARMOUR = {
   // Ottoman mail and plate: 30 x 55 mm plates set in 6 mm mail (the Met's Shirt of Mail and Plate, Turkish,
   // https://www.metmuseum.org/art/collection/search/24193).
   krug: { band: 1000, tile: [0.072, 0.063] },
-  // Tosei gusoku's riveted lames (byo-toji yokohagi okegawa-do, MFAH https://emuseum.mfah.org/objects/139649): 45 mm lacquered
-  // lames, a rivet head every 30 mm.
-  iyozane: { band: 1100, tile: [0.12, 0.09], masks: 'gold' },
+  // Tosei gusoku's solid do of horizontal lames (yokohagi okegawa-do: MFAH https://emuseum.mfah.org/objects/139649; the Penn
+  // Museum's nine-plate front, https://collections.penn.museum/collections/object/151683): 40 mm lames riveted flush and
+  // lacquered over, each lame's foot a ridge over the next; no studs.
+  yokohagi: { band: 1100, tile: [0.12, 0.08] },
   // Sugake odoshi: pairs of braids every 50 mm down kiritsuke itazane (Bonhams 17816 lot 61,
   // https://www.bonhams.com/auction/17816/lot/61/an-okegawa-do-tosei-gusoku-armour-late-edo-period-19th-century).
   sugake: { band: 1200, columns: 2, pitch: 0.05, rows: 2, row: 0.05, masks: 'lace' },
@@ -76,9 +77,10 @@ export function detailKindOf(u) {
   return u >= 50 ? DETAIL_BANDS[Math.round(u / 100) * 100] ?? null : null;
 }
 
-/** A field tile's size (m): [round, up]. */
+/** A tile's size (m): [round, up] (a laced tile's: its plates across by its rows up). */
 export function tileSize(kind) {
-  const { tile } = DETAIL_ARMOUR[kind];
+  const { tile, columns, pitch, rows, row } = DETAIL_ARMOUR[kind];
+  if (columns) return [columns * pitch, rows * row];
   return Array.isArray(tile) ? tile : [tile, tile];
 }
 
@@ -92,16 +94,16 @@ export const isLacedTile = (kind) => Boolean(DETAIL_ARMOUR[kind]?.columns);
 const DEFAULT_TILES = { steel: 'plate', mail: 'mail', lamellae: 'lamellae', kozane: 'kozane', scales: 'scale', studded: 'brigandine' };
 export const ARMOUR_TILES = {
   segmentata: { steel: 'segmentata' },
-  // The Iron Pagoda's cuirass in the mountain pattern; its skirt and arms stay laced lamellae.
-  ironPagoda: { 'trunk.lamellae': 'mountain' },
   // Han lamellar (the small laced plates of the Han tomb figures), painted as rows of scales: lamellae.
   hanLamellar: { scales: 'lamellae' },
   krug: { 'trunk.steel': 'krug' },
   conquistador: { 'trunk.steel': 'etched' },
-  // Tosei gusoku: the riveted, lacquered do; its kusazuri and sleeves in sugake.
-  toseiDo: { 'trunk.steel': 'iyozane', kozane: 'sugake' },
-  roninDo: { 'trunk.steel': 'iyozane', kozane: 'sugake' },
-  okegawa: { armor: 'iyozane', kozane: 'sugake' },
+  // The European foot soldier's brigandine: its own plates and rivet clusters, not the Ming coat's grid of studs.
+  brigandine: { studded: 'euroBrigandine' },
+  // Tosei gusoku: the solid do of lacquered horizontal lames; its kusazuri and sleeves in sugake.
+  toseiDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
+  roninDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
+  okegawa: { armor: 'yokohagi', kozane: 'sugake' },
   riot: { armor: 'polymer', pad: 'polymer' },
   heavyRiot: { armor: 'polymer', pad: 'polymer' },
 };
@@ -112,14 +114,14 @@ export const ARMOUR_TILES = {
  */
 export const ARMOUR_COVERAGE = {
   heavyRiot: ['polymer'], riot: ['polymer'], patrolVest: null, plateCarrier: null,
-  plate: ['plate', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['brigandine', 'plate'], haubergeon: ['mail'], breastplate: ['plate'],
-  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['iyozane', 'sugake', 'plate'], okegawa: ['iyozane', 'sugake'], roninDo: ['iyozane', 'sugake'],
+  plate: ['plate', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'plate'], haubergeon: ['mail'], breastplate: ['plate'],
+  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['yokohagi', 'sugake'],
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
   mingVest: null, mingBrigandine: ['brigandine', 'plate'], mingLamellar: ['lamellae', 'plate'], mingScaleCoat: ['scale', 'plate'],
   mingElite: ['brigandine', 'plate'], mingScale: ['scale', 'plate'], mingEliteLamellar: ['lamellae', 'plate'],
-  ironPagoda: ['mountain', 'lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
+  ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
   segmentata: ['segmentata'], centurion: ['mail', 'plate'], hauberk: ['mail'], hamata: ['mail'],
   mongolDeel: null, mongolLamellar: ['lamellae'], mongolIron: ['lamellae', 'plate'], kheshig: ['scale', 'plate'], girdle: null,
   cataphract: ['scale', 'plate'], deel: null, dolama: null, krug: ['krug', 'mail', 'plate'], kazaghand: ['mail', 'plate'],
@@ -164,6 +166,13 @@ export const HELMET_TILES = {
   riotHelmet: 'polymer', opsHelmet: 'polymer',
   robotHead: 'panels',
 };
+/**
+ * A helmet's laced lower part (its aventail and neck guard: the meshes its builder marks `userData.helmPart`) and the laced tile
+ * it wears, one row of plates to a tier, laced in its people's lamellar cord as the body's lamellae are (render.js); with the maps
+ * off or in a crowd the builder draws the plates one by one. The Song and Jin helmet's aventail was rows of the same small
+ * lamellae as the coat (https://dragonsarmory.blogspot.com/2017/07/heavy-jin-dynasty-armor.html).
+ */
+export const HELMET_PART_TILES = { pagodaHelm: { aventail: 'lamellae' } };
 /** The tiles worn by every opaque part of a piece (a moulded shell, a machine), not only its metal. */
 export const MOULDED_TILES = new Set(['polymer', 'panels']);
 /** Machines' bodies (robotview.js's shells, exoview.js's frame) and the tile they wear. */

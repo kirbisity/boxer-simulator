@@ -3,13 +3,13 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
-import { factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
+import { FACTIONS, factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
 import { outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
 import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 import { buildStechhelm } from './stechzeug.js';
-import { CLOTH_GARMENTS, clothMaterialOf, HELMET_TILES, MOULDED_TILES } from './detailmaps.js';
+import { CLOTH_GARMENTS, clothMaterialOf, DETAIL_MAPS, HELMET_PART_TILES, HELMET_TILES, MOULDED_TILES } from './detailmaps.js';
 import { clothPropMaterial, wearTile } from './detailtex.js';
 import { HELM_STYLE } from './helmstyle.js';
 import { helmMapsReady } from './helmmaps.js';
@@ -409,6 +409,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
   const color = head.color === 'corner' ? cornerHex : head.color;
   const cloth = surface(color);
   let hidesHair = true;
+  // Its laced parts that wear a laced tile (detailmaps.js HELMET_PART_TILES), drawn as tiers for it; not in a crowd.
+  const partTiles = DETAIL_MAPS.on && !lowDetail ? HELMET_PART_TILES[head.kind] ?? {} : {};
   switch (head.kind) {
     case 'headguard': {
       const shell = new THREE.Mesh(new THREE.SphereGeometry(1.14 * r, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.52), cloth);
@@ -1012,7 +1014,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'pagodaHelm':
-      buildPagodaHelm(group, head, r, steel, color);
+      buildPagodaHelm(group, head, r, steel, color, { laced: Boolean(partTiles.aventail) });
       break;
     case 'ayyubidHelm':
       buildAyyubidHelm(group, head, r, steel, color);
@@ -1618,6 +1620,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       return null;
   }
   // Its metal (a moulded shell: all of it) wearing its tile's detail maps (detailmaps.js HELMET_TILES), not in a crowd.
+  // Its laced parts first, one row of plates to a tier, laced as its people lace their lamellar (render.js's body cords).
+  for (const [part, partTile] of Object.entries(partTiles)) {
+    const cord = new THREE.Color((body.inputs && FACTIONS[factionOf(body.inputs)]?.lamellarCord) ?? head.lace ?? 0x141416);
+    wearTile(group, partTile, { part, rows: 1, cords: [cord, cord] });
+  }
   const tile = lowDetail ? null : HELMET_TILES[head.kind];
   if (tile) wearTile(group, tile, { moulded: MOULDED_TILES.has(tile) });
   // The hat's own stuff (detailmaps.js CLOTH_GARMENTS.head: felt, fur, feathers, cotton...) on its parts in its colour (or its
@@ -1763,9 +1770,11 @@ const PAGODA_HELM = {
  * a plume (dark feathers) or a horsehair tassel falling behind, a riveted
  * brow peak; and the aventail, tiers of small dotted iron plates rolled up
  * round the neck and chin to just under the eyes, so only the eyes show.
- * The aventail's plates are instanced: dozens of them for the cost of two meshes.
+ * The aventail's plates are instanced: dozens of them for the cost of two meshes;
+ * or (`laced`, where the detail maps draw them) each tier one band marked as the
+ * aventail (`userData.helmPart`), wearing a row of the laced lamellae's tile.
  */
-function buildPagodaHelm(group, head, r, steel, color) {
+function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
   const spec = PAGODA_HELM;
   const iron = metal(steel, color);
   iron.side = THREE.DoubleSide;
@@ -1857,6 +1866,15 @@ function buildPagodaHelm(group, head, r, steel, color) {
     band.position.y = y * r;
     band.userData.noOutline = true;
     group.add(band);
+    if (laced) {
+      // The tier as one band of plates, flared at its foot as the plates are, the tile's row on it.
+      const tierBand = new THREE.Mesh(new THREE.CylinderGeometry((radius - flare) * r, (radius + flare) * r, spec.plate[1] * r, 40, 1, true, Math.PI / 2 + open, Math.PI * 2 - open * 2), plateMaterial);
+      tierBand.position.y = y * r;
+      tierBand.userData.noOutline = true;
+      tierBand.userData.helmPart = 'aventail';
+      group.add(tierBand);
+      return;
+    }
     for (let index = 0; index < spec.plates; index += 1) {
       const angle = ((index + (tier % 2) * 0.5) / spec.plates) * Math.PI * 2;
       const ahead = Math.cos(angle);
@@ -1869,6 +1887,7 @@ function buildPagodaHelm(group, head, r, steel, color) {
       placements.push(holder.matrix.clone());
     }
   });
+  if (laced) return;
   const plates = new THREE.InstancedMesh(plateGeometry, plateMaterial, placements.length);
   const dots = new THREE.InstancedMesh(dotGeometry, dotMaterial, placements.length * 2);
   const dotOffset = new THREE.Matrix4();
