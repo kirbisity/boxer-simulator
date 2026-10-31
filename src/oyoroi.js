@@ -14,6 +14,8 @@
 import { Dangle } from './dangle.js';
 import { inkAll } from './wardrobe.js';
 import { surface } from './toon.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS } from './detailmaps.js';
+import { armourDetailMaterial } from './detailtex.js';
 
 export const OYOROI = {
   // The dō round the trunk: half-depth and half-width as shares of the trunk's skin
@@ -112,8 +114,21 @@ function stencilTexture(leather, stencil) {
   return texture;
 }
 
-/** The laced surface's material, its rows repeated `across` × `down` times. */
+/**
+ * The laced surface's material, its rows repeated `across` × `down` times: with the detail maps, the kozane's (detailmaps.js; the
+ * plates in the armour's lacquer, the braid and the binding in its lace, the tile at its true size over the piece's girth and
+ * height); else the painted canvas.
+ */
 function lacedMaterial(armor, across, down) {
+  if (DETAIL_MAPS.on) {
+    const tile = DETAIL_ARMOUR.kozane;
+    const girth = across * OYOROI.plateRepeat;
+    const height = down / OYOROI.rowsPerMetre;
+    const lace = new THREE.Color(armor.lace);
+    const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(armor.color), side: THREE.DoubleSide });
+    armourDetailMaterial(material, 'kozane', { cords: [lace, lace], metalness: 0.15, repeat: [Math.max(1, Math.round(girth / (tile.columns * tile.pitch))), height / (tile.rows * tile.row)] });
+    if (material.normalMap) return material;
+  }
   const texture = odoshiTexture(armor.color, armor.lace, armor.gold).clone();
   texture.needsUpdate = true;
   texture.repeat.set(Math.max(1, Math.round(across)), Math.max(1, Math.round(down)));

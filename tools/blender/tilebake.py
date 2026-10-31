@@ -8,7 +8,7 @@
 #   albedo  the base colour.
 #   orm     R the ambient occlusion (Cycles' AO node, `ao_distance` m), G the roughness, B the metalness.
 #   height  how far out of the tile's plane (0..1 over [h_lo, h_hi] m).
-#   mask    a material's own mask (the lacing of lamellae: where the lace colour shows).
+#   mask    a material's own masks: R `Mask`, G `Mask2` (kozane: where the suspension braid and the binding cord show).
 #
 # Each is written as a float EXR (scene linear: the numbers as authored, no view transform) and turned into a .npy array
 # (rows top first) for tools/blender/pack.py, which writes the images the game embeds.
@@ -74,6 +74,7 @@ def out_group(ao_distance, h_lo, h_hi):
     iface.new_socket('Roughness', in_out='INPUT', socket_type='NodeSocketFloat')
     iface.new_socket('Metal', in_out='INPUT', socket_type='NodeSocketFloat')
     iface.new_socket('Mask', in_out='INPUT', socket_type='NodeSocketFloat')
+    iface.new_socket('Mask2', in_out='INPUT', socket_type='NodeSocketFloat')
     iface.new_socket('Normal', in_out='INPUT', socket_type='NodeSocketVector')
     iface.new_socket('Shader', in_out='OUTPUT', socket_type='NodeSocketShader')
     nodes = group.nodes
@@ -134,7 +135,7 @@ def out_group(ao_distance, h_lo, h_hi):
     hmap.inputs['From Max'].default_value = h_hi
     links.new(sep.outputs['Z'], hmap.inputs['Value'])
     height = combine(hmap.outputs['Result'], hmap.outputs['Result'], hmap.outputs['Result'])
-    mask = combine(gin.outputs['Mask'], gin.outputs['Mask'], gin.outputs['Mask'])
+    mask = combine(gin.outputs['Mask'], gin.outputs['Mask2'], 0.0)
 
     total = None
     for k, value in enumerate([normal, albedo, orm, height, mask]):
@@ -150,7 +151,7 @@ def out_group(ao_distance, h_lo, h_hi):
 
 def material(name, group, build):
     """A material ending in the shared group: `build(nodes, links, geometry_normal)` returns the group's inputs
-    (color, roughness, metal, mask, normal): each a socket or a constant."""
+    (color, roughness, metal, mask, normal[, mask2]): each a socket or a constant."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
@@ -161,7 +162,7 @@ def material(name, group, build):
     node.node_tree = group
     geometry = nodes.new('ShaderNodeNewGeometry')
     values = build(nodes, links, geometry)
-    for key, socket in zip(['Color', 'Roughness', 'Metal', 'Mask', 'Normal'], values):
+    for key, socket in zip(['Color', 'Roughness', 'Metal', 'Mask', 'Normal', 'Mask2'], values):
         if socket is None:
             continue
         if isinstance(socket, (int, float)):

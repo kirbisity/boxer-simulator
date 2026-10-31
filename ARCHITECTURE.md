@@ -121,14 +121,19 @@ menus; `src/intro.js` the intro on a first visit (the roster's `legend`
 entries, a faction at a time, staged by main.js's `introStage`; skippable,
 remembered in localStorage, replayed from the home screen). Anything removed from the scene is freed with `disposeObject`.
 
-**Detail maps (a pilot).** Fine surface detail drawn by maps instead of geometry: tiles modelled and baked in Blender
-(`tools/blender/*.py`, headless; `tools/blender/pack.py` writes the WebP images into `src/detailmaps-data.js`): mail, laced
-lamellae, the castle's ashlar and cobbles. `src/detailmaps.js` (plain, the skin worker uses it) says who carries them: a mail
-piece is one loft with texture coordinates in the mail's tile (`mailUv`), laced lamellae one stepped shell
-(loftbody.js `lamellaeShell`) instead of a polygon a plate; each kind's u is offset by its band, which is how render.js
-`skinParts` draws those triangles apart in a material with the maps (`src/detailtex.js` `armourDetailMaterial`; the lace
-colour from the albedo's alpha); kittex.js gives the ashlar and the cobbles theirs (`stoneDetailMaps`). `#maps=off` in the
-address draws everything as before (`boxer.detailMaps()`).
+**Detail maps.** Fine surface detail drawn by maps instead of geometry: tiles modelled and baked in Blender
+(`tools/blender/*.py`, headless: `mail`, `lamellar` (kozane | steppe), `plate`, `ashlar`, `cobble`, `ground` (setts, slabs,
+rubble, planks, earth, grass, drygrass, gravel, sand, beach, concrete); `tools/blender/pack.py` writes 1024² (or smaller) WebP
+images into `src/detailmaps-data.js`). `src/detailmaps.js` (plain, the skin worker uses it) says who carries them: a mail
+piece is one loft with texture coordinates in the mail's tile (`mailUv`); laced lamellar one stepped shell in rows of the
+tile's height (loftbody.js `lacedShell`: the steppe's and the Chinese tile for `lamellae` paints, the Japanese kozane for
+`kozane` rows and the ō-yoroi kind) instead of a polygon a plate; a loft or patch all of steel the plate tile
+(`mesh.steelUv`). Each kind's u is offset by its band, which is how render.js `skinParts` draws those triangles apart in a
+material with the maps (`src/detailtex.js` `armourDetailMaterial`; the two cord masks in the albedo's and the normal map's
+alpha, drawn in the armour's `cord`, else its faction's `lamellarCord`, else its lace). oyoroi.js's laced panels wear the
+kozane too. The castle kit (kittex.js `stoneDetailMaps`) and the painted grounds of every place (ground/painted.js
+`PAINTED_GROUND_BAKED`: a baked tile instead of a painted layer) share the ground tiles. `#maps=off` in the address draws
+everything as before (`boxer.detailMaps()`).
 
 ## Looks (browser only)
 

@@ -19,7 +19,7 @@ import { armourDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { SKIN_TONES } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
-import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
+import { FACTIONS, factionOf, glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
 import { orbitAboveGround } from './watchcam.js';
@@ -2143,9 +2143,14 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
     const roles = roleColors(dress, new THREE.Color(skinHex(look)));
     // Leather or horn (`armor.matte`) is not metal: the same maps, no metalness.
     const matte = Boolean(dress.armor?.matte);
+    // Laced lamellar's cords: the armour's own `cord`, else its people's (outfits.js FACTIONS `lamellarCord`), else its lace;
+    // Japanese kozane keep their lace. Lacquer over iron (a Japanese kit's) is less of a mirror than bright steel.
+    const cord = dress.armor?.cord ?? FACTIONS[factionOf(body.inputs)]?.lamellarCord;
+    const cords = { lamellae: cord ? [new THREE.Color(cord), new THREE.Color(cord)] : [roles.lace, roles.lace], kozane: [roles.lace, roles.lace] };
     for (const [kind, indices] of Object.entries(detailIndices)) {
       const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
-      const material = armourDetailMaterial(base, kind, { lace: kind === 'lamellae' ? roles.lace : null, matte });
+      const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
+      const material = armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness });
       const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(indices), material, share: skinMesh.geometry });
       mesh.userData.detailMaps = kind;
       detailMeshes.push(mesh);
