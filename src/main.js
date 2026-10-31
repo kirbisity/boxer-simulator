@@ -43,7 +43,7 @@ import { DETAIL_MAPS } from './detailmaps.js';
 import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { placeMounted } from './physics/mounted.js';
-import { canRide, HORSES, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
+import { boltedOn, breedOf, canRide, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
 import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
@@ -370,7 +370,7 @@ function newBout() {
     if (count > 1) entry.inputs = { ...entry.inputs, name: `${entry.inputs.name.split(" ")[0]} ${count}` };
   }
   // Horsemen need room to charge and wheel: a place too small for it gives way to the open field.
-  const mounted = [...sides[0], ...sides[1]].some((entry) => entry.inputs.mounted && canRide(entry.inputs));
+  const mounted = [...sides[0], ...sides[1]].some((entry) => isMounted(entry.inputs));
   const place = scenario?.scene ?? (mounted && (PLACE_ARENAS[state.place]?.halfX ?? 0) < PLACE_ARENAS.field.halfX * 0.6 ? 'field' : state.place);
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
@@ -1253,7 +1253,8 @@ function consumeEvents() {
     if (event.weapon && (event.kind === 'landed' || event.kind === 'blocked') && (!machine || (event.cut ?? 0) + (event.pierce ?? 0) >= 1)) wound(scene, event);
     // A man in a powered frame (gear.assist) bleeds, and a weapon's blow on him strikes the frame's steel too: a few sparks.
     if (event.weapon && event.kind === 'landed' && state.world.fighters[event.defender]?.body.gear.assist) spawnSparks(scene, event.point, 6);
-    if (event.kind === 'horseHit' && event.cut + event.pierce > 1) woundBlood(scene, event);
+    // (A robot dog struck, robotdogs.js `machine`: sparks off its shell, not blood.)
+    if (event.kind === 'horseHit' && event.cut + event.pierce > 1) (state.world.horses?.[event.horse]?.spec?.machine ? spawnSparks(scene, event.point, 10) : woundBlood(scene, event));
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     if (event.kind === 'shot') spawnShot(scene, machine ? { ...event, harm: 0 } : event);
     // A grenade gone off and its fragments' strikes (blastview.js); the white-out and the ringing only for the man played.
@@ -1319,6 +1320,9 @@ function renderHud() {
 function logEvent(event) {
   const world = state.world;
   const name = (id) => shortName(world.fighters[id].body.inputs.name);
+  // A rider's horse, or a robot dog by its own name (what it carries is bolted on: robotdogs.js).
+  const steed = (event) => (world.horses?.[event.horse]?.spec?.robot && event.rider !== undefined ? `<b>${name(event.rider)}</b>` : event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'a horse');
+  const steedGlyph = (event) => (world.horses?.[event.horse]?.spec?.robot ? '🤖' : '🐎');
   let text;
   if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
   else if (event.kind === 'knockout') text = `💥 <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
@@ -1357,9 +1361,9 @@ function logEvent(event) {
   else if (event.kind === 'impact') text = `💥 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'pain') text = `😣 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'unhorsed') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'horseDown') text = `🐎 ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'A horse'} goes down · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? `A ${event.weapon}` : `<b>${name(event.attacker)}</b>`} ${event.punch ?? (event.weapon === 'stake' ? 'meets' : 'hits')} → ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'a horse'} (${event.target}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
-  else if (event.kind === 'horseCrash') text = `🐎 ${event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'A horse'} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'horseDown') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} goes down · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? `A ${event.weapon}` : `<b>${name(event.attacker)}</b>`} ${event.punch ?? (event.weapon === 'stake' ? 'meets' : 'hits')} → ${steed(event)} (${event.target}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
+  else if (event.kind === 'horseCrash') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'trampled') text =`🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'crash') text = `💥 <b>${name(event.defender)}</b> crashed into${event.attacker === undefined ? '' : ` by <b>${name(event.attacker)}</b>`} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J · ${(event.force / 1000).toFixed(1)} kN${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
@@ -2169,10 +2173,12 @@ function fillCornerForm(corner) {
   const rides = canRide(inputs);
   const mount = form.querySelector('.mount-check');
   form.querySelector('.mount-row').hidden = corner === 'hero' || Boolean(state.scenario);
-  mount.disabled = !rides;
-  mount.checked = rides && Boolean(inputs.mounted);
+  // (A robot dog is its chassis, never on foot: boltedOn.)
+  const bolted = boltedOn(inputs);
+  mount.disabled = !rides || bolted;
+  mount.checked = isMounted(inputs);
   const horse = mountOf(inputs);
-  form.querySelector('.mount-note').textContent = !rides ? 'his people did not ride' : mount.checked ? `${HORSES[horse.breed].label}${horse.barding === 'bare' ? '' : `, ${horse.barding} barding`}` : 'on foot';
+  form.querySelector('.mount-note').textContent = !rides ? 'his people did not ride' : bolted ? breedOf(horse.breed).label : mount.checked ? `${breedOf(horse.breed).label}${horse.barding === 'bare' ? '' : `, ${horse.barding} barding`}` : 'on foot';
   form.querySelector('.copy').textContent = 'Copy code';
   for (const field of FIELDS) {
     const input = form.querySelector(`[data-key="${field.key}"]`);
@@ -2793,9 +2799,12 @@ function drawPortrait(inputs, yaw = -0.45) {
   updateProps(portraitView, [view], world);
   const horse = fighter.mount ? buildHorseView(portraitView, fighter.mount) : null;
   if (horse) updateHorseView(horse, world);
-  // A rider framed with his horse (PORTRAIT_RIDER): further off, higher, from his horse's quarter.
-  Object.assign(portraitView.orbit, horse ? PORTRAIT_RIDER.orbit : { distance: 2.35, pitch: 0.08, yaw: 0.15 });
-  portraitView.orbit.target.set(0, horse ? PORTRAIT_RIDER.target : 1.0, 0);
+  // A rider framed with his horse (PORTRAIT_RIDER): further off, higher, from his horse's quarter. A robot dog (PORTRAIT_ROBOT_DOG)
+  // close and low, by its height; a small primate closer in, by his (none shorter than a man is drawn smaller than one).
+  const robotDog = fighter.mount?.spec?.robot;
+  const small = Math.min(1, (fighter.body.heightM ?? 1.75) / 1.75);
+  Object.assign(portraitView.orbit, robotDog ? PORTRAIT_ROBOT_DOG.orbit : horse ? PORTRAIT_RIDER.orbit : { distance: 2.35 * Math.max(0.45, small), pitch: 0.08, yaw: 0.15 });
+  portraitView.orbit.target.set(0, robotDog ? PORTRAIT_ROBOT_DOG.target * fighter.mount.withers : horse ? PORTRAIT_RIDER.target : 1.0 * small, 0);
   placeCamera(portraitView, null);
   flattenView(portraitView);
   render(portraitView);
@@ -2807,6 +2816,8 @@ function drawPortrait(inputs, yaw = -0.45) {
 
 // A rider's portrait and poster figure take in his horse: the camera this much further off and aimed this high (m), its yaw off his side.
 const PORTRAIT_RIDER = { orbit: { distance: 4.9, pitch: 0.1, yaw: 0.55 }, target: 1.45 };
+// A robot dog's: a few of its heights off, aimed below its back (`target`, in its heights: robotdogs.js `withers`).
+const PORTRAIT_ROBOT_DOG = { orbit: { distance: 2.2, pitch: 0.18, yaw: 0.6 }, target: 0.75 };
 
 /** A fighter alone in a world of his own, in his guard (on his horse, if he rides), facing `yaw`, settled for a moment. */
 function posedAlone(inputs, yaw, seed) {

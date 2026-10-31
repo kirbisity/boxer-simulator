@@ -204,6 +204,8 @@ export const SHOTGUN = {
 // buckshot, fed from the body (`rounds` without end: never reloaded).
 export const ARM_RIFLE = { ...RIFLE, rounds: Infinity, ammo: Infinity };
 export const ARM_SHOTGUN = { ...SHOTGUN, rounds: Infinity, ammo: Infinity };
+// (the SPUR turret's 6.5 Creedmoor, semi-automatic: ~3.0 kJ at the muzzle against the AR-15's 1.75.)
+export const TURRET_RIFLE = { ...RIFLE, energy: 3000, automatic: undefined, rounds: Infinity, ammo: Infinity };
 
 // `art`: the weapon art (moves.js, weaponarts.js) its family is made for, the move the player can make with it once his
 // blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's and dao's drawing cut,
@@ -430,6 +432,16 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 18, zeta: 0.8 }, threat: 7, ranged: true,
     muzzle: [0.34, 0.03],
     shot: ARM_RIFLE,
+  },
+  // SWORD Defense's SPUR, the rifle turret shown on Ghost Robotics' Vision 60: a 6.5 Creedmoor
+  // (~9 g at ~820 m/s, ~3.0 kJ: TURRET_RIFLE) on a pan-and-tilt mount on the robot's back, fired one round at a time.
+  // Drawn and aimed as the combat bot's forearm rifle (`mounted`); never dropped; its ten-round box not counted (fudged).
+  turretRifle: {
+    label: 'SPUR rifle turret', hands: 'one', hand: 'r', mounted: true, length: 0.7, strikeFrom: 0.18, handle: 0.02, mass: 4, balance: 0.3, radius: 0.03,
+    harm: { swing: { blunt: 0.5 }, thrust: { blunt: 0.3 } },
+    contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 14, zeta: 0.85 }, threat: 7, ranged: true,
+    muzzle: [0.6, 0.03],
+    shot: TURRET_RIFLE,
   },
   armShotgun: {
     label: 'Arm shotgun and mace', hands: 'one', hand: 'l', mounted: true, length: 0.42, strikeFrom: 0.16, handle: 0.02, mass: 4.0, balance: 0.3, radius: 0.05,

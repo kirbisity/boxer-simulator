@@ -112,10 +112,17 @@ export const WARRIORS = [
   warrior('specialForces', 'SSgt. Ryan Brooks', PRESETS.rifle),
   warrior('infantry', 'Spc. Luis Herrera', PRESETS.infantry),
   warrior('knife', 'Ryo Kanda', PRESETS.knife),
-  // Beasts and machines. The faction opens on the combat bot (`flagship`).
-  warrior('gorilla', 'Silverback', PRESETS.gorilla),
+  // Apes and monkeys. The faction opens on the silverback (`flagship`).
+  { ...warrior('gorilla', 'Silverback', PRESETS.gorilla), flagship: true },
+  warrior('chimp', 'Chimpanzee', PRESETS.chimp),
+  warrior('baboon', 'Chacma baboon', PRESETS.baboon),
+  warrior('macaque', 'Rhesus macaque', PRESETS.macaque),
+  // Machines, and a man in one. The faction opens on the combat bot (`flagship`).
   warrior('humanoid', 'Humanoid robot', PRESETS.humanoid),
   warrior('miniHumanoid', 'Mini humanoid robot', PRESETS.miniHumanoid),
+  warrior('dogGo2', 'Go2 robot dog', PRESETS.dogGo2),
+  warrior('dogSpot', 'Spot with arm', PRESETS.dogSpot),
+  warrior('dogVision60', 'Vision 60, rifle turret', PRESETS.dogVision60),
   warrior('exoArmoured', 'Pvt. Owen Kade', PRESETS.exoArmoured),
   { ...warrior('combatBot', 'Combat bot', PRESETS.combatBot), flagship: true },
   warrior('boxer', 'Marcus "The Wall"', PRESETS.heavy),

@@ -127,8 +127,8 @@ test('empty, with a man on him, the gunner draws his own sidearm: a wakizashi fo
   }
 });
 
-test('characters fall into fifteen factions, by what they wear: knights, Japanese, Chinese, Mexica, Inca, steppe, Ottomans, gladiators, Rome, the Goths and Parthia among them', () => {
-  assert.equal(FACTION_KEYS.length, 15);
+test('characters fall into sixteen factions, by what they wear: knights, Japanese, Chinese, Mexica, Inca, steppe, Ottomans, gladiators, Rome, the Goths and Parthia among them', () => {
+  assert.equal(FACTION_KEYS.length, 16);
   assert.ok(FACTION_KEYS.includes('goths') && FACTION_KEYS.includes('parthians'), 'the Goths and Parthia (the Catalaunian Plains, Carrhae)');
   assert.ok(FACTION_KEYS.includes('inca'), 'the Inca (Cajamarca), by the uncu');
   assert.deepEqual(['legionary', 'centurion'].map((key) => factionOf(PRESETS[key])), ['romans', 'romans']);
@@ -143,7 +143,7 @@ test('characters fall into fifteen factions, by what they wear: knights, Japanes
   assert.equal(of('hoplomachus'), 'gladiators');
   assert.deepEqual(['heavy', 'sumo', 'clinchBrawl'].map(of), ['ring', 'ring', 'ring']);
   assert.deepEqual(['handgun', 'baton'].map(of), ['law', 'law']);
-  assert.deepEqual(['gorilla', 'humanoid', 'combatBot'].map(of), ['specials', 'specials', 'specials']);
+  assert.deepEqual(['gorilla', 'humanoid', 'combatBot'].map(of), ['primates', 'machines', 'machines']);
   assert.deepEqual(['street', 'knife', 'passive'].map(of), ['street', 'street', 'street']);
   assert.equal(factionOf(ARQUEBUSIER), 'knights', 'the arquebusier is a European foot soldier');
   for (const preset of Object.values(PRESETS)) assert.ok(FACTION_KEYS.includes(factionOf(preset)), preset.name);

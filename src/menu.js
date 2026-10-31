@@ -15,7 +15,7 @@ import { battleOf, SCENARIOS } from './scenarios.js';
 import { musterScreen } from './musterview.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
-import { canRide, HORSES, mountOf } from './horses.js';
+import { boltedOn, breedOf, canRide, mountOf } from './horses.js';
 import { SKIN_TONES } from './render.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
 import { STAGE_LIST } from './levelmode/story.js';
@@ -54,11 +54,11 @@ const STYLE_NOTES = {
   taichi: 'Rooted and soft: deflects nearly everything, answers with palms and pushes.', taekwondo: 'Kicks from range, turning and spinning; little defence.',
   staff: 'A long staff, both ends striking: blunt and quick.', kanabo: 'An iron-studded club: huge slow swings, no thrust.', threeEyed: 'Three barrels fired in turn, then a club.',
   dao: 'A one-handed curved sabre: quick cuts.', saber: 'The steppe and Turkish sabre: long draw cuts.', saberShield: 'Sabre and kalkan, the wicker round shield.', saladin: 'The straight Ayyubid sword and a leather-faced round shield: long cuts from behind it, patient, quick to answer.', yatagan: 'The Janissary\'s forward-curved short sword.',
-  gorilla: 'A silverback upright: huge hooks and shoves, charges; little defence.', combatBot: 'Forearm guns: the AR-15 arm from afar, the shotgun arm closer, never reloading; then a mace and a heavy blade.',
+  gorilla: 'A silverback upright: huge hooks and shoves, charges; little defence.', chimp: 'Charges in on all fours, grabs, beats with both arms and bites; drags and throws.', baboon: 'Lunges and grabs low, slashes with canines longer than a leopard\'s, hangs on and bites again.', macaque: 'Small, fast and nervy: darts in on all fours, grabs a leg, bites and bites; runs when hurt.', combatBot: 'Forearm guns: the AR-15 arm from afar, the shotgun arm closer, never reloading; then a mace and a heavy blade.',
   rifle: 'The AR-15: fast, accurate, devastating; thirty rounds, then a magazine change.', shotgun: 'A pump shotgun: slow, a hard kick, nine pellets that devastate up close.',
   langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', champi: 'The Inca star mace: a bronze star on a wooden haft, swung overhead and from the side.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', kheshigBow: 'Up to five quick arrows, then straight in with the flanged mace.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', infantry: '🪖', knight: '🏰', tournament: '🏇', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', archer: '🏹', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', sohei: '📿', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', mingIronLamellar: '🏮', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', saladin: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁', lorarius: '🪢', hanSoldier: '🏮', wuxia: '🗡️', riot: '🛡️', thug: '🧢', legionary: '🦅', centurion: '🦅', silverback: '🦍', humanoid: '🤖', miniHumanoid: '🤖', combatBot: '🤖', exoArmoured: '🦾' };
+const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', infantry: '🪖', knight: '🏰', tournament: '🏇', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', archer: '🏹', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', sohei: '📿', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', mingIronLamellar: '🏮', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', saladin: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁', lorarius: '🪢', hanSoldier: '🏮', wuxia: '🗡️', riot: '🛡️', thug: '🧢', legionary: '🦅', centurion: '🦅', silverback: '🦍', monkeyFur: '🐒', go2Dog: '🐕', spotDog: '🐕', vision60Dog: '🐕', humanoid: '🤖', miniHumanoid: '🤖', combatBot: '🤖', exoArmoured: '🦾' };
 const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
@@ -338,7 +338,9 @@ export function installMenus(game) {
       // Mounted or on foot: offered to a man who rides, with his horse and its armour.
       const rides = canRide(shown.inputs);
       const kit = rides ? mountOf(shown.inputs) : null;
-      const mount = el('button', { type: 'button', className: `dw-mount${rides && mounted[corner] ? ' on' : ''}`, disabled: !rides, textContent: rides ? (mounted[corner] ? `🐎 Mounted · ${HORSES[kit.breed].label}${kit.barding === 'bare' ? '' : `, ${kit.barding} barding`}` : '🐎 On foot (tap to ride)') : '🚶 Fights on foot', title: rides ? 'Ride or fight on foot' : 'His people did not fight on horseback' });
+      // (A robot dog is its own legs: boltedOn, never on foot.)
+      const bolted = rides && boltedOn(shown.inputs);
+      const mount = el('button', { type: 'button', className: `dw-mount${rides && (mounted[corner] || bolted) ? ' on' : ''}`, disabled: !rides || bolted, textContent: bolted ? `🤖 ${breedOf(kit.breed).label}` : rides ? (mounted[corner] ? `🐎 Mounted · ${breedOf(kit.breed).label}${kit.barding === 'bare' ? '' : `, ${kit.barding} barding`}` : '🐎 On foot (tap to ride)') : '🚶 Fights on foot', title: bolted ? 'A robot on four legs' : rides ? 'Ride or fight on foot' : 'His people did not fight on horseback' });
       mount.onclick = () => {
         mounted[corner] = !mounted[corner];
         draw(corner);
@@ -353,8 +355,8 @@ export function installMenus(game) {
       const red = normaliseInputs(redress(structuredClone(entry('red').inputs)));
       const blue = normaliseInputs(redress(structuredClone(entry('blue').inputs)));
       const armed = [red, blue].some((inputs) => STYLES[inputs.style]?.weapon);
-      red.mounted = mounted.red && canRide(red);
-      blue.mounted = mounted.blue && canRide(blue);
+      red.mounted = (mounted.red || boltedOn(red)) && canRide(red);
+      blue.mounted = (mounted.blue || boltedOn(blue)) && canRide(blue);
       // Horsemen fight on the open field: room to charge and wheel round.
       const place = red.mounted || blue.mounted ? 'field' : armed ? 'colosseum' : 'ring';
       close();

@@ -42,8 +42,8 @@ export const MACHINE_FX = {
   // Heard: each short is a sound event (audio/log.js) of this type at the spark's root, `intensity` 0..1 by kind
   // (the death's the harder: every drive at once; a cut stump's one cable bundle).
   sound: 'robotSpark', intensity: { death: 1, stump: 0.7 },
-  // What brings a machine's death sparks: the events of a man put out of the fight (physics knockOut).
-  downKinds: new Set(['killed', 'knockout', 'out', 'drowned']),
+  // What brings a machine's death sparks: the events of a man put out of the fight (physics knockOut; 'disabled': a robot dog down).
+  downKinds: new Set(['killed', 'knockout', 'out', 'drowned', 'disabled']),
 };
 
 /** A store of emitters for one view: a fixed pool, and the machines already shorted out (once each). */

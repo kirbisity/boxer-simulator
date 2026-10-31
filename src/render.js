@@ -2849,6 +2849,11 @@ export function setLayer(fighterView, layer) {
 // ---- Per-frame update -----------------------------------------------------
 
 export function updateFighterView(fighterView, dt, time) {
+  // (What a robot dog carries, bolted on its back, is drawn with the robot, not as a man: robotdogview.js.)
+  if (fighterView.fighter.body.gear.bolted) {
+    fighterView.group.visible = false;
+    return;
+  }
   // A shed standard lies on the ground now (a loose weapon), not on his back.
   if (fighterView.fighter.wornStandard?.shed && !fighterView.standardShed) {
     fighterView.standardShed = true;

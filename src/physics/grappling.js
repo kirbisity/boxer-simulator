@@ -33,9 +33,10 @@ export function holdClinch(world, fighter) {
       return;
     }
   }
+  const held = clinchGrip(fighter, target);
   for (const side of fighter.clinch.hands ?? ['l', 'r']) {
     const hand = P[`${side}Hand`];
-    const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown * 0.5, 0]);
+    const neck = vec.add(point(target.x, held.index), [0, -held.drop * 0.5, 0]);
     const offset = vec.sub(point(fighter.x, hand), neck);
     const distance = vec.length(offset);
     // The hands reach the neck under their own muscles; the grip takes hold
@@ -56,14 +57,35 @@ export function holdClinch(world, fighter) {
     if (distance <= WORLD.clinch.lockDistance) continue;
     const correction = vec.scale(offset, (distance - WORLD.clinch.lockDistance) / distance);
     const wHand = fighter.invMass[hand];
-    const wNeck = target.invMass[P.neck];
+    const wNeck = target.invMass[held.index];
     const total = wHand + wNeck;
     for (let axis = 0; axis < 3; axis += 1) {
       fighter.x[hand * 3 + axis] -= correction[axis] * (wHand / total);
-      target.x[P.neck * 3 + axis] += correction[axis] * (wNeck / total);
+      target.x[held.index * 3 + axis] += correction[axis] * (wNeck / total);
     }
   }
 }
+
+/**
+ * Where a clinch's hands take hold of the man (the particle, and how far below it they pull): the back
+ * of his neck, pulled down. An animal too small to reach his neck (a style's `bite.low`: the monkeys)
+ * takes hold of the highest part of him its hands reach from its shoulders (his neck,
+ * his waist or his knee) and hangs on there.
+ */
+export function clinchGrip(fighter, target) {
+  const neck = { index: P.neck, drop: WORLD.clinch.pullDown };
+  if (!STYLES[fighter.style]?.bite?.low) return neck;
+  const L = fighter.body.lengths;
+  const top = point(fighter.x, P.lShoulder)[1] + 0.9 * (L.upperArm + L.forearmToFist);
+  // (It hangs on where it holds; it does not drag a man's head down onto its own: a light body pulling a heavy neck down
+  // through its hands is pulled up into it instead.)
+  for (const index of [P.neck, P.pelvis]) if (point(target.x, index)[1] <= top) return { index, drop: 0 };
+  return { index: P.lKnee, drop: 0 };
+}
+
+// What a bite can take: the neck and shoulders, the upper arms; a small animal at a man's legs (`bite.low`), his thighs and calves too.
+const BITTEN = [['trunk', P.neck], ['lUpperArm', P.lShoulder], ['rUpperArm', P.rShoulder]];
+const BITTEN_LOW = [...BITTEN, ['lThigh', P.lKnee], ['rThigh', P.rKnee], ['lShank', P.lFoot], ['rShank', P.rFoot], ['lForearm', P.lHand], ['rForearm', P.rHand]];
 
 /**
  * A bite on a man held close (a style's `bite`: { forceN, depth,
@@ -76,13 +98,18 @@ export function holdClinch(world, fighter) {
  */
 function bite(world, fighter, target, spec) {
   const mouth = point(fighter.x, P.head);
-  const parts = [['trunk', P.neck], ['lUpperArm', P.lShoulder], ['rUpperArm', P.rShoulder]];
+  const parts = spec.low ? BITTEN_LOW : BITTEN;
   const [key, at] = parts.reduce((best, part) => (vec.length(vec.sub(point(target.x, part[1]), mouth)) < vec.length(vec.sub(point(target.x, best[1]), mouth)) ? part : best));
   const energy = spec.forceN * spec.depth * Math.max(0.3, fighter.motorScale ?? 1);
   const covered = protectionAt(target.body.gear, key);
-  const pierce = energy * spec.pierceShare * (1 - (covered.pierce ?? 0));
-  const cut = energy * (1 - spec.pierceShare) * (1 - (covered.cut ?? 0));
-  const toBone = key === 'trunk' ? () => 1 : (joules) => boneShare(joules, 1);
+  // A bite torn out (`slash`, m: the monkeys'): the canines go in to their depth (the puncture) and are
+  // dragged through him as the head is wrenched back (the tear, the jaw's force over the length of the gash).
+  const motor = Math.max(0.3, fighter.motorScale ?? 1);
+  const pierce = (spec.slash ? spec.forceN * spec.depth * motor : energy * spec.pierceShare) * (1 - (covered.pierce ?? 0));
+  const cut = (spec.slash ? spec.forceN * spec.slash * motor : energy * (1 - spec.pierceShare)) * (1 - (covered.cut ?? 0));
+  // (A bite torn out of a limb, `slash`, is a tear in its flesh: canines of a few cm reach no bone under a man's
+  // thigh or arm; it bleeds and it hurts the muscle, it breaks nothing. At the neck it is the throat, as any bite there.)
+  const toBone = key === 'trunk' ? () => 1 : spec.slash ? () => 0 : (joules) => boneShare(joules, 1);
   const event = { time: world.time, kind: 'bite', attacker: fighter.id, defender: target.id, punch: 'bite', target: key, cut, pierce, energy, point: point(target.x, at), effects: [] };
   if (pierce > 0.5) {
     wound(target, 'pierce', pierce, key, fighter);
@@ -92,7 +119,8 @@ function bite(world, fighter, target, spec) {
     wound(target, 'cut', cut, key, fighter);
     addDamage(target, key, cut / 6, false, toBone(cut));
   }
-  event.effects.push(pierce + cut > 0.5 ? (key === 'trunk' ? 'bitten in the neck' : 'bitten in the arm') : 'teeth on his armour');
+  const where = key === 'trunk' ? 'neck' : /Thigh/.test(key) ? 'thigh' : /Shank/.test(key) ? 'leg' : /Forearm/.test(key) ? 'hand' : 'arm';
+  event.effects.push(pierce + cut > 0.5 ? `bitten in the ${where}` : 'teeth on his armour');
   world.events.push(event);
 }
 
