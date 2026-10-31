@@ -134,3 +134,9 @@ npm test
 npm run bout -- heavy:muayThai light:kickboxing 10 180   # headless bouts by preset:style
 npm run bundle       # dist/gladiator.html, one self-contained page
 ```
+
+## Photo faces (prototype)
+
+`#faces=photo` in the URL (off by default) draws heads from regional "average face" composites instead of the drawn anime faces (`src/photoface.js`; who gets which face: `src/faceregions.js`, by kit or skin tone, or a fighter's own `faceRegion`). The atlases are built by `tools/photofaces/avg_tiles.py` and `avg_build.py` and loaded at run time from the git-ignored `faces-local/avg/`; they are not in the repository.
+
+**Provenance, to verify before release.** The composites are the widely shared "average faces of the world" set (40 women's and 46 men's regional averages), found here as reposted grids, one of them marked "via 9GAG" (that strip is cropped out and never used). The set is believed to be free to use, but its original author and licence have not been confirmed; check both before shipping anything built from it.

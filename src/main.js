@@ -72,7 +72,7 @@ import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/sta
 import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
-import { loadPhotoFaces, photoFaceStats, photoFacesOn, setPhotoFaces } from './photoface.js';
+import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces } from './photoface.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -428,7 +428,10 @@ function rebuildViews({ progressive = false } = {}) {
   const order = [...state.world.fighters].sort((a, b) => Number(leads.has(b.id)) - Number(leads.has(a.id)));
   // Built a few a frame (the two leads first, a frame each: each is a full model), or all now.
   const now = progressive && crowd ? [] : order;
+  resetPhotoCasting();
   state.views = now.map(build);
+  // (The last fight's photo faces are let go; this one's are loaded as its men are built.)
+  releaseUnusedPhotoFaces(scene.scene);
   state.viewQueue = order.slice(now.length);
   state.buildView = build;
   showMustering();

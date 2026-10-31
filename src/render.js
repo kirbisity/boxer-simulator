@@ -1877,8 +1877,8 @@ function lookOf(inputs) {
   const face = outfitOf(inputs).look.face;
   const look = face ? { ...(inputs.look ?? {}), ...face } : inputs.look ?? {};
   // A photographed face (photoface.js) gives the body its skin, so the neck meets the face.
-  const photo = photoFaceFor(inputs);
-  return photo && !look.skinColor && !look.faceColor ? { ...look, skinColor: photo.skin } : look;
+  const photo = look.skinColor || look.faceColor ? null : photoFaceFor(inputs, outfitOf(inputs).faceRegion);
+  return photo ? { ...look, skinColor: photo.skin } : look;
 }
 
 function detailedView(view, fighter, simple) {
@@ -1924,7 +1924,8 @@ function detailedView(view, fighter, simple) {
   // (Under a closed helm the face is never seen: not morphed, not drawn.)
   const faceHidden = !simple && CLOSED_HELMS.includes(dress.head?.kind);
   // A photographed face (photoface.js, #faces=photo), unless a machine's or a face no one sees; in a crowd painted per vertex.
-  const photoFace = machine || faceHidden ? null : photoFaceFor(body.inputs);
+  // (Not over a face of its own colour: Guan Yu's stays red.)
+  const photoFace = machine || faceHidden || look.faceColor ? null : photoFaceFor(body.inputs, outfitOf(body.inputs).faceRegion);
   const faceLook = { ...(dress.look.hair ? { ...look, hairStyle: dress.look.hair } : look), faceMorph: Boolean(styleSpec(wanted).face) && !faceHidden, photoFace, photoPainted: simple };
   const headView = buildHead(body, faceLook, faceColor, corner);
   headView.group.matrixAutoUpdate = false;

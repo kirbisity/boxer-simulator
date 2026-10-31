@@ -166,13 +166,15 @@ function faceMap(shape) {
  * height, so the atlas' eye line, lip line and chin land on the head's (the dome by its angle of elevation, so the crown is
  * not pinched). `sphereU`, the sphere's own u, keeps the seam at the back (and the poles) on the right side.
  */
-function photoUV(geometry, radius, shape, sphereU = null) {
+function photoUV(geometry, radius, shape, sphereU = null, jitter = null) {
   const position = geometry.attributes.position;
   const eye = FACE.eyeLine / SKULL[1];
   const chin = -PHOTO_ATLAS.chinT * shape.chinLength;
   const mouth = eye + PHOTO_ATLAS.mouthShare * (chin - eye);
   // (The dome: the unwraps squeeze the hair over the crown into their top rows, so the atlas' upper band is spread over the top of the head and the forehead kept low.)
-  const knots = [[1, 1], [PHOTO_ATLAS.hairlineAt, 1 - PHOTO_ATLAS.hairlineRow], [eye, 1 - PHOTO_ATLAS.eyeRow], [mouth, 1 - PHOTO_ATLAS.mouthRow], [chin, 1 - PHOTO_ATLAS.chinRow], [-shape.chinLength, 0]];
+  // (A fighter's own proportions, `jitter`: his eyes and mouth a little higher or lower on his head, his face a little wider.)
+  const { width = 0, eyeRow = 0, mouthRow = 0 } = jitter ?? {};
+  const knots = [[1, 1], [PHOTO_ATLAS.hairlineAt, 1 - PHOTO_ATLAS.hairlineRow], [eye, 1 - PHOTO_ATLAS.eyeRow - eyeRow], [mouth, 1 - PHOTO_ATLAS.mouthRow - mouthRow], [chin, 1 - PHOTO_ATLAS.chinRow], [-shape.chinLength, 0]];
   const uv = new Float32Array(position.count * 2);
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index);
@@ -189,7 +191,8 @@ function photoUV(geometry, radius, shape, sphereU = null) {
       }
     }
     const guess = sphereU ? 1 - sphereU.getX(index) : 0.5;
-    let u = Math.hypot(x, z) < 1e-5 * radius ? guess : 0.5 + Math.atan2(z, x) / (Math.PI * 2);
+    const azimuth = Math.atan2(z, x);
+    let u = Math.hypot(x, z) < 1e-5 * radius ? guess : 0.5 + (azimuth / (Math.PI * 2)) / (1 + width * Math.exp(-((azimuth / 0.9) ** 2)));
     while (u - guess > 0.5) u -= 1;
     while (guess - u > 0.5) u += 1;
     uv[index * 2] = u;
@@ -214,7 +217,7 @@ function photoNose(geometry, radius) {
     const across = uv.getX(index) - 0.5;
     const row = 1 - uv.getY(index);
     const along = Math.min(1, Math.max(0, (row - bridge) / (tip - bridge)));
-    const below = row > tip ? Math.exp(-(((row - tip) / 0.022) ** 2)) : row < bridge ? Math.exp(-(((bridge - row) / 0.03) ** 2)) : 1;
+    const below = row > tip ? Math.exp(-(((row - tip) / 0.032) ** 2)) : row < bridge ? Math.exp(-(((bridge - row) / 0.03) ** 2)) : 1;
     const lift = PHOTO_FACE_NOSE.height * radius * (0.25 + 0.75 * along) * below * Math.exp(-((across / PHOTO_FACE_NOSE.width) ** 2));
     if (lift < 1e-5 * radius) continue;
     position.setXYZ(index, position.getX(index) + normal.getX(index) * lift, position.getY(index) + normal.getY(index) * lift, position.getZ(index) + normal.getZ(index) * lift);
@@ -222,7 +225,7 @@ function photoNose(geometry, radius) {
   geometry.computeVertexNormals();
 }
 // The nose's height (of the head's radius) at its tip, and its half-width (of the way round the head).
-const PHOTO_FACE_NOSE = { height: 0.13, width: 0.02 };
+const PHOTO_FACE_NOSE = { height: 0.1, width: 0.02 };
 
 function headGeometry(radius, shape, segments = 36) {
   const geometry = new THREE.SphereGeometry(1, segments, Math.round(segments * 0.75));
@@ -386,11 +389,11 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const look = { ...DEFAULT_LOOK, ...lookInput };
   const r = body.lengths.headRadius;
   const female = body.inputs.sex === 'female';
-  // A photographed face (photoface.js; `look.photoFace`, with `photoPainted` in a crowd): its eyes, brows, mouth, ears and
-  // beard are in its maps, so none is drawn; its head is a real one's shape. A man's hair is the photo's; a woman keeps her
-  // drawn hair (the photo's on a round skull reads as a bald cap), in the photo's colour.
+  // A photographed face (photoface.js; `look.photoFace`, with `photoPainted` in a crowd): its eyes, brows and mouth are in its
+  // maps, so none is drawn; its head is a real one's shape. The hair is drawn, in the photo's hair colour; a drawn beard is
+  // not (over a photo it reads as a mask; the averages carry their own stubble and moustaches).
   const photo = look.photoFace ?? null;
-  if (photo) Object.assign(look, { hairStyle: female ? look.hairStyle : 'bald', hairColor: photo.hair, facialHair: 'none', makeup: null });
+  if (photo) Object.assign(look, { hairColor: photo.hair, facialHair: 'none', makeup: null });
   // Chosen from the design sheet: shonen for women, seinen for men.
   const drawn = photo ? FACE_SHAPES.photo : FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
   // `faceMorph`: the face follows the body (facemorph.js): the skull, hair and beard bent alike, and a map of its shading.
@@ -412,7 +415,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // (The photo's coordinates, and in a crowd its colours per vertex, the ears' and nose's too, read where they sit on the head.)
   const photoParts = (geometry, sphereU = null) => {
     if (!photo) return geometry;
-    photoUV(geometry, r, shape, sphereU);
+    photoUV(geometry, r, shape, sphereU, photo.jitter);
     if (look.photoPainted) paintFromFace(geometry, photo);
     return geometry;
   };
@@ -609,6 +612,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     guard.visible = opening.visible;
     opening.scale.set(0.5 + 0.5 * face.mouth, Math.max(0.15, face.mouth), 1);
     for (const disc of blush) disc.material.opacity = face.flush * 0.55;
+    // A photo face blinks and winces with its eyelids drawn down in the shader.
+    if (skinMaterial.userData.lid) skinMaterial.userData.lid.value = face.lid;
     assignColour(skinMaterial, 'color', baseSkin.clone().lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare));
   }
 
