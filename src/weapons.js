@@ -200,6 +200,25 @@ export const SHOTGUN = {
   ammo: 30,
 };
 
+/**
+ * The M2 flamethrower (1943-): two ~9 L tanks of thickened fuel and a small
+ * one of nitrogen on the back (~30 kg full), a hose to the wand. The trigger
+ * opens the valve: a jet of burning fuel, thickened so that it carries as a
+ * rope and arcs under gravity to 20-40 m, sticks where it lands and burns on
+ * there. About 7 s of fire in all, in bursts of a second or so. Fired as an
+ * automatic gun is (`automatic`): each "round" is a tenth of a second of the
+ * valve open (physics/flame.js FLAME: the stream, what it does to a man).
+ */
+export const FLAMER = {
+  flame: true,
+  rounds: 70,
+  ammo: 70,
+  reloadSeconds: Infinity,
+  automatic: { rate: 10, burst: [6, 11] },
+  misfire: 0,
+  spread: 0.02,
+};
+
 // The combat bot's forearm guns: the AR-15's round and rate, the shotgun's
 // buckshot, fed from the body (`rounds` without end: never reloaded).
 export const ARM_RIFLE = { ...RIFLE, rounds: Infinity, ammo: Infinity };
@@ -418,6 +437,15 @@ export const WEAPONS = {
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 11, zeta: 0.9 }, threat: 6.5, grip: 0.7, ranged: true, edgeUp: true,
     muzzle: [0.72, 0.03],
     shot: SHOTGUN,
+  },
+  // The flamethrower's wand (the tanks on his back are his kit's weight: physics/flame.js withTanks); swung, a steel tube.
+  flamethrower: {
+    label: 'Flamethrower', hands: 'two', length: 0.8, strikeFrom: 0.3, handle: 0.2, spacing: 0.42, supportAhead: true, longGun: true,
+    mass: 4.5, balance: 0.35, radius: 0.028,
+    harm: { swing: { blunt: 0.8 }, thrust: { blunt: 0.6 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 10, zeta: 0.9 }, threat: 8, grip: 0.7, ranged: true, edgeUp: true,
+    muzzle: [0.8, 0],
+    shot: FLAMER,
   },
   // Forearm weapons (`mounted`): built into an arm (`hand`), no grip to
   // lose (never dropped or knocked away), their weight the body's own. Each

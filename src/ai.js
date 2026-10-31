@@ -2069,7 +2069,8 @@ function keepShock(world, dt) {
  */
 export function shockFear(world, fighter) {
   const spec = AI.shock;
-  const guns = Math.min(spec.blastMost * strangeness(fighter, 'gun'), fighter.startle ?? 0);
+  // Fire (physics/flame.js `flameFright`): on him, on a man near him, the stream going past.
+  const guns = Math.min(spec.blastMost * strangeness(fighter, 'gun'), fighter.startle ?? 0) + (fighter.flameFright ?? 0);
   if (fighter.mount) return guns;
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   let horse = 0;
@@ -2524,6 +2525,12 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   }
   // Stood off: the stance, the gun on him, backing away while he can.
   fighter.aimAt = opponent.id;
+  // A weapon that does not carry far (`ranged.reach`, m: the flamethrower's stream): beyond it he walks in on him.
+  if (gun.reach && distance > gun.reach) {
+    fighter.move = 1;
+    fighter.strafe = 0;
+    return;
+  }
   const back = point(fighter.x, P.pelvis);
   const away = [back[0] - opponent.x[P.pelvis * 3], back[2] - opponent.x[P.pelvis * 3 + 2]];
   const roomBehind = room(world, [back[0] + away[0] / distance, back[2] + away[1] / distance]);

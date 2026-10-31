@@ -502,6 +502,24 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       );
       break;
     }
+    case 'flamethrower': {
+      // The M2's wand (+z up): a steel tube from the rear grip and valve to the nozzle, the front grip, the igniter cylinder under
+      // the muzzle; the hose from its back end (to the tanks: flameview.js).
+      const olive = surface(0x3d4434, { roughness: 0.6 });
+      const steel = steelMaterial(envMap, { vertexColors: false, color: 0x2e3034, roughness: 0.5 });
+      const tube = cylinder(0.016, 0.016, -spec.handle, spec.length - 0.06, steel, 10);
+      const nozzle = cylinder(0.024, 0.02, spec.length - 0.08, spec.length, steel, 10);
+      const igniter = cylinder(0.022, 0.022, spec.length - 0.3, spec.length - 0.12, olive, 10);
+      igniter.position.z = -0.035;
+      const hose = cylinder(0.014, 0.014, -spec.handle - 0.25, -spec.handle, surface(0x18191b, { roughness: 0.9 }), 8);
+      group.add(
+        tube, nozzle, igniter, hose,
+        box([0.04, 0.12, 0.05], [0, 0.02, -0.01], olive), // valve body
+        box([0.026, 0.035, 0.09], [0, -0.03, -0.05], olive, -0.3), // rear grip
+        box([0.026, 0.035, 0.09], [0, 0.32, -0.05], olive, 0.2), // front grip
+      );
+      break;
+    }
     case 'armRifle':
     case 'armShotgun': {
       // A combat bot's forearm weapon, from the wrist on (the forearm's own

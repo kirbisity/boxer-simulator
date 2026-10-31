@@ -296,3 +296,16 @@ The cannon was the pistol's report slowed to half under the synth's boom; it is 
 report than any gun's and a recorded one, with the slowed report kept over its head for the crack and the synth's boom quieter.
 A flashbang's ringing in the ears of the man played (near it, looking) is the engine's own (engine.js `deafen`: a high tone
 fading, the mix low-passed and ducked for a few seconds), not a recording.
+
+## The flamethrower (proof of concept)
+
+Cut from two of the user's recordings of 10-31 (a flamethrower, 4.3 s; a fire burning, 13.1 s) for audio/flamesound.js: the ignition's whoosh as a
+clip (cut as the clips above, 40 kb/s), the roar and the fire as loops (as the ambience loops: a steady section found by search, its tail
+crossfaded into its head, -20 dBFS RMS, the period with 0.25 s of its own tail before it and of its head after it; 48 kb/s; played as one
+mono loop each, panned, not as a bed).
+
+| File | Source recording | Time (s) | Period (s) | Crossfade (s) | Bytes | Used for |
+|---|---|---|---|---|---|---|
+| flame-start-1.mp3 | 0abecb9a.wav (flamethrower) | 0.35-1.15 | - | - | 4500 | the valve opened: the head of each burst |
+| flame-roar-1.mp3 | 0abecb9a.wav (flamethrower) | 1.05-3.35 | 2.0 | 0.3 | 15552 | the jet's roar while the valve is open, looped |
+| flame-burn-1.mp3 | 9adad3cd.wav (fire burning) | 7.30-11.10 | 3.0 | 0.8 | 21600 | a man alight, a patch of fuel burning on the floor, looped |

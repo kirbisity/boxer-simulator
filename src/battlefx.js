@@ -21,8 +21,8 @@
 export const BATTLE_FX = {
   // Live smoke sprites, all shots together: a volley of thirty matchlocks is ~250.
   maxPuffs: 420,
-  // Live glow sprites: sparks, flashes and glints together.
-  maxGlows: 640,
+  // Live glow sprites: sparks, flashes, glints and fire (flameview.js) together.
+  maxGlows: 1100,
   // A light breeze (m/s, x and z): the cloud drifts off at a slow walk.
   wind: [0.35, 0.12],
   // Warm smoke rises, slowly (m/s), and loses it as it cools.
@@ -116,7 +116,7 @@ export function battleFxStepPuff(puff, dt, spec = BATTLE_FX) {
   const keep = Math.exp(-spec.drag * dt);
   const share = puff.age / puff.life;
   // Warm at first, it rises; cooling, it floats on the breeze.
-  const rise = spec.rise * (1 - share);
+  const rise = (puff.rise ?? spec.rise) * (1 - share);
   const target = [spec.wind[0], rise, spec.wind[1]];
   for (let axis = 0; axis < 3; axis += 1) {
     puff.velocity[axis] = target[axis] + (puff.velocity[axis] - target[axis]) * keep;
@@ -190,6 +190,7 @@ varying vec2 vUv;
 varying vec2 vCorner;
 varying float vAlpha;
 varying vec3 vGlow;
+varying float vSoot;
 #include <fog_pars_vertex>
 void main() {
   vec3 centre = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
@@ -204,6 +205,7 @@ void main() {
   vUv = cell + (vec2(c * corner.x - s * corner.y, s * corner.x + c * corner.y) * 0.96 + 0.5) * 0.5;
   vCorner = corner * 2.0;
   vAlpha = aPuff.x;
+  vSoot = aPuff.w;
   vec3 toFlash = uFlashPos - centre;
   vGlow = uFlashColour / (1.0 + dot(toFlash, toFlash) * 5.0);
   // The nearest lamp (a street light at night), fading out to its range as the scene's lights do.
@@ -222,6 +224,7 @@ varying vec2 vUv;
 varying vec2 vCorner;
 varying float vAlpha;
 varying vec3 vGlow;
+varying float vSoot;
 #include <fog_pars_fragment>
 void main() {
   vec4 tex = texture2D(uMap, vUv);
@@ -235,6 +238,8 @@ void main() {
   vec3 light = uAmbient * (0.8 + 0.2 * n.y) + uSunColour * wrap;
   // The painted density: thicker parts a little darker inside.
   vec3 colour = uAlbedo * light * mix(0.78, 1.04, tex.r) + vGlow * uAlbedo;
+  // Soot (a fuel fire's smoke, flameview.js): near black.
+  colour *= 1.0 - 0.88 * vSoot;
   gl_FragColor = vec4(colour, alpha);
   #include <fog_fragment>
 }`;
@@ -413,7 +418,7 @@ export function battleFxOf(view) {
   // The arcs: a fixed pool, each slot reused (no allocation while they flicker).
   const arcs = [];
   for (let slot = 0; slot < BATTLE_FX.maxArcs; slot += 1) arcs.push({ live: false, from: [0, 0, 0], to: [0, 0, 0], age: 0, strength: 0 });
-  view.battleFx = { smoke, glow, light, puffs: [], flashes: [], glints: [], arcs, lightAge: Infinity, primary: null, scratch: new THREE.Vector3() };
+  view.battleFx = { smoke, glow, light, puffs: [], flashes: [], glints: [], arcs, fires: [], fireLight: null, lightAge: Infinity, primary: null, scratch: new THREE.Vector3() };
   return view.battleFx;
 }
 
@@ -425,6 +430,8 @@ export function battleFxClear(view) {
   fx.flashes = [];
   fx.glints = [];
   for (const arc of fx.arcs) arc.live = false;
+  fx.fires = [];
+  fx.fireLight = null;
   fx.lightAge = Infinity;
   fx.light.intensity = 0;
   fx.smoke.count = 0;
@@ -549,6 +556,26 @@ export function battleFxAddGlint(view, at, strength, colour, size) {
   fx.glints.push({ at, strength, colour, size });
 }
 
+/** A flame to draw this frame (flameview.js), as a flash is drawn: world point, size (m), colour, `tail` a streak that far off it. */
+export function battleFxAddFire(view, at, size, colour, tail = null) {
+  battleFxOf(view).fires.push({ at, size, colour, tail });
+}
+
+/** A puff of smoke ({ at, velocity, size0, size1, grow, alpha, life, rise?, soot? 0..1 }), with the shots' (the oldest gives way). */
+export function battleFxAddPuff(view, puff) {
+  const fx = battleFxOf(view);
+  if (fx.puffs.length >= BATTLE_FX.maxPuffs) fx.puffs.shift();
+  puff.spin = Math.random() * Math.PI * 2;
+  puff.spinRate = (Math.random() - 0.5) * 0.4;
+  puff.cell = Math.floor(Math.random() * 4);
+  fx.puffs.push(puff);
+}
+
+/** The flash's light lent to a fire this frame (at a point, as bright), where the fire outshines the last shot's flash. */
+export function battleFxFireLight(view, at, intensity) {
+  battleFxOf(view).fireLight = { at, intensity };
+}
+
 /** The scene's brightest light, for glints: { light, lamp } or null. */
 export function battleFxPrimary(view) {
   return view.battleFx?.primary ?? null;
@@ -659,6 +686,12 @@ export function battleFxUpdate(view, dt, sparks = []) {
   fx.lightAge += dt;
   const flicker = fx.lightAge < 0.2 ? Math.exp(-fx.lightAge / BATTLE_FX.lightSeconds) : 0;
   fx.light.intensity = (fx.lightPeak ?? BATTLE_FX.lightPeak) * flicker;
+  const fire = fx.fireLight;
+  if (fire && fire.intensity > fx.light.intensity) {
+    fx.light.position.set(fire.at[0], fire.at[1], fire.at[2]);
+    fx.light.intensity = fire.intensity;
+  }
+  fx.fireLight = null;
   const uniforms = fx.smoke.material.uniforms;
   uniforms.uFlashPos.value.copy(fx.light.position);
   uniforms.uFlashColour.value.copy(fx.light.color).multiplyScalar(fx.light.intensity * 0.5);
@@ -684,7 +717,7 @@ export function battleFxUpdate(view, dt, sparks = []) {
     puffData[drawn * 4] = now.opacity;
     puffData[drawn * 4 + 1] = puff.spin;
     puffData[drawn * 4 + 2] = puff.cell;
-    puffData[drawn * 4 + 3] = 0;
+    puffData[drawn * 4 + 3] = puff.soot ?? 0;
     drawn += 1;
     return true;
   });
@@ -777,6 +810,8 @@ export function battleFxUpdate(view, dt, sparks = []) {
     put(spark.position.toArray(battleFxDraw.at), spark.width ?? 0.007, colour, 2, streak);
   }
   for (const glint of fx.glints) put(glint.at, glint.size, glint.colour.map((c) => c * glint.strength), 1, null);
+  for (const flame of fx.fires) put(flame.at, flame.size, flame.colour, 0, flame.tail);
+  fx.fires = [];
   // How many were drawn (tests, tuning).
   fx.glintsDrawn = fx.glints.length;
   fx.glints = [];

@@ -77,6 +77,8 @@ import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGate
 import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
+import { updateFlames } from './flameview.js';
+import { withTanks } from './physics/flame.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -1218,6 +1220,7 @@ function drawWorld(dt, drawIt = true) {
   blastScreen.update(state.paused ? 0 : dt);
   updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
+  updateFlames(scene, world);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -3542,6 +3545,15 @@ const boxer = window.boxer = {
     },
     clouds: () => scene.blood?.dye.clouds ?? [],
   },
+  // The flamethrower's proof of concept (physics/flame.js, flameview.js): the flamethrower and his tanks against four swords, watched.
+  // `#flame` in the address opens it.
+  flameDemo: (place = 'field', seed = 1) => {
+    skipIntro();
+    menus.close();
+    fight([withTanks({ ...PRESETS.rifle, style: 'flamethrower' })], ['knight', 'samurai', 'swordShield', 'gaziAlp'].map((preset) => ({ preset })), { place, seed });
+    $('#modes button[data-value="watch"]')?.click();
+    return state.world.fighters.map((fighter) => fighter.style);
+  },
   // Shots and sparks (tests, shots): fire a shot event ({ from, to, weapon, attacker }); throw sparks at a point; let them run on `seconds`.
   fx: {
     shot: (event) => spawnShot(scene, { attacker: 0, time: state.world.time, point: event.to, normal: [0, 0, 1], harm: 0, ...event }),
@@ -3554,3 +3566,5 @@ const boxer = window.boxer = {
     },
   },
 };
+// `#flame` in the address: the flamethrower's demo (boxer.flameDemo).
+if (/^#(.*&)?flame(&|$)/.test(location.hash)) setTimeout(() => boxer.flameDemo(), 0);

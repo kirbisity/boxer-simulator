@@ -954,6 +954,19 @@ export const STYLES = {
     tempo: 1,
     ...STAND_OFF,
   },
+  // The flamethrower (a proof of concept: hidden from the pickers; physics/flame.js): the wand shouldered as the AR-15 is, the
+  // valve opened in bursts (the weapon's `automatic`) at a man within `reach` m, walked in on one further; he keeps 3 m off.
+  flamethrower: {
+    label: 'Flamethrower', hidden: true, weapon: 'flamethrower', fallback: 'mix',
+    ranged: { flee: 3, rest: 1, runFor: 1.2, standFor: 2, close: 1.5, shotSeconds: 0.4, headShare: 0, between: [1.4, 1.2], move: 'fireRifle', reloadSafe: Infinity, reach: 20 },
+    cadence: { work: 1.4, move: 0.6, burst: 0.6, mobility: 0.4 },
+    stance: { blade: 0.45, crouch: 0.1, width: 1.2, lean: 0.12, guardHeight: -0.02 },
+    weaponGuard: { hand: [0.16, 0.66, -0.12], dir: [0.9, -0.35, 0.05] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.2 },
+    attacks: { fireRifle: 1 },
+    tempo: 1,
+    ...STAND_OFF,
+  },
   // The pump shotgun: a slow shot, a heavy kick, devastating up close.
   shotgun: {
     label: 'Shotgun', weapon: 'shotgun', fallback: 'mix',

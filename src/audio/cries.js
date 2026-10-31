@@ -94,6 +94,8 @@ export const CRY_CHANCE = {
  */
 export const CRY_STRIKERS = {
   lash: { chance: 0.96, mask: 0.15, scream: 0.28, floor: 0.6, gap: 0.65 },
+  // A man on fire (physics/flame.js): a cry each second and a half or so, a scream once it is well alight.
+  burn: { chance: 0.9, mask: 0.1, scream: 0.4, floor: 0.6, gap: 1.2 },
 };
 
 /**

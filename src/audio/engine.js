@@ -30,6 +30,7 @@ import { breathParams, cryRate, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
 import { CRIES, createCryDirector, voiceOfFighter } from './cries.js';
 import { CHARGE, chargeOf } from './charge.js';
+import { createFlameSound } from './flamesound.js';
 import { playUi, uiParams } from './sfx/ui.js';
 import { playThump, thumpParams } from './sfx/thump.js';
 import { artDrawParams, artImpactParams, playArtDraw, playArtImpact } from './sfx/art.js';
@@ -110,6 +111,8 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     breaths: new Map(), whizzed: new WeakSet(), excitement: 0, loud: 0, loudNow: 0, worldBorn: 0,
     // The cries rationed (cries.js), and each side's charge roar (charge.js): { sides (chargeOf's last), beds: corner → { source, gain, chain } }.
     cries: createCryDirector(), charge: { sides: null, beds: new Map() },
+    // The flamethrower's roar and what burns (flamesound.js).
+    flame: createFlameSound(),
     bench: { room: null, ambience: null, far: null, open: false },
   };
   const speakers = () => (settings.speakers === null ? phone : Boolean(settings.speakers));
@@ -388,6 +391,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       state.breaths.clear();
       state.cries.reset();
       stopCharges();
+      state.flame.stop(state.ctx?.currentTime ?? 0);
       state.strikeCount = info.strike?.count ?? 0;
     }
     // The storm's lightning (levelmode/storm.js): each new strike is thunder, heard at its distance (after distance / 343 s: playCandidate).
@@ -461,6 +465,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     }
     breathe(info, now);
     whizz(world, now);
+    state.flame.update(world, now, { ctx, samples: state.samples, out: state.buses.effects.dry, listener });
     // The room: probed a few times a second (or the bench's place), eased.
     state.probeClock -= dt;
     if (state.probeClock <= 0) {

@@ -28,6 +28,7 @@ import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
 import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
+import { stepFlame } from './physics/flame.js';
 import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
@@ -152,7 +153,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
     weave: undefined, carry: undefined, detail: undefined, unposedAt: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
-    bleed: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined,
+    bleed: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined, burning: undefined, flameFright: undefined,
     loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, lowStrike: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
@@ -3519,6 +3520,7 @@ export function step(world, dt) {
   if (world.arrows.length) flyArrows(world, dt);
   if (world.nets?.length) flyNets(world, dt);
   if (world.thrown?.length) flyThrown(world, dt);
+  if (world.flame) stepFlame(world, dt);
   if (world.brushTouches) holdBrushes(world, dt);
   payForBlocks(world);
   world.time += dt;

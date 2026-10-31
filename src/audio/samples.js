@@ -89,6 +89,10 @@ export const SAMPLE_SETS = {
   flashbang: ['flashbang-1', 'flashbang-2', 'flashbang-3'],
   'explosion-big': ['explosion-big-1'],
   'explosion-rumble': ['explosion-rumble-1'],
+  // The flamethrower (a proof of concept: flamesound.js plays them): the valve's whoosh, the jet's roar and a fire, the last two loops.
+  'flame-start': ['flame-start-1'],
+  'flame-roar': ['flame-roar-1'],
+  'flame-burn': ['flame-burn-1'],
 };
 
 /** The cry sets: voice-<sex>-<kind>, each `count` takes. */

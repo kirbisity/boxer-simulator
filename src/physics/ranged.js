@@ -14,6 +14,7 @@ import { ARROW, BLADES, bleedToLose, bulletProof, bulletRegion, GUN, slerpDir, S
 import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
 import { gaitAt, harmHorse } from './mounted.js';
+import { flamePulse } from './flame.js';
 
 /**
  * The gun arm for a shot: up from the guard and out along the line from the
@@ -763,8 +764,9 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
       return;
     }
   }
-  // A crossbow looses its bolt.
+  // A crossbow looses its bolt; a flamethrower opens its valve a moment longer (flame.js).
   if (shot?.bolt) return loose(world, fighter, shot);
+  if (shot?.flame) return flamePulse(world, fighter, weapon);
   // Heard: the powder going off, over the whole field (a matchlock's, or any firearm's: `weapon` says which).
   if (world.ear) soundEvent(world, 'shot', { at: point(fighter.x, P[`${weapon.main}Hand`]), kind: 'matchlock', weapon: weapon.kind, who: fighter.id });
   const handIndex = P[`${weapon.main}Hand`];
