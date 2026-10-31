@@ -18,7 +18,7 @@ export const DIRS = { E: [1, 0, 0], W: [-1, 0, Math.PI], N: [0, -1, Math.PI / 2]
 
 // ---- Builders -------------------------------------------------------------------------------
 
-export const dnSection = (id, name) => ({ id, name, bounds: [], terrain: [], portals: [], spawns: [], items: [], levers: [], gates: [], ladders: [], decor: [] });
+export const dnSection = (id, name) => ({ id, name, bounds: [], terrain: [], portals: [], spawns: [], items: [], levers: [], gates: [], ladders: [], decor: [], seals: [] });
 
 /** A slab by extents. `style`: how the top is drawn (cobble, flags, grass, path, rock, boards, earth). */
 export function dnSlab(sec, x0, x1, z0, z1, top, style, opts = {}) {

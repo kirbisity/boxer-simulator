@@ -177,8 +177,10 @@ test('twist: Noname alive (the sewer skipped) hunts the man who drops in; the re
   dropIn(world);
   assert.equal(endingOf(world).nonameAlive, true);
   run(world, 1);
-  assert.ok(['aggro', 'charge'].includes(mindState(world, noname.id)), 'he comes at him');
+  // (Buried in his heap on the island, he comes up out of it at the man who dropped in first: awareness.js `lurk`.)
+  assert.ok(['rise', 'aggro', 'charge'].includes(mindState(world, noname.id)), 'he comes up at him');
   run(world, 3);
+  assert.ok(['aggro', 'charge'].includes(mindState(world, noname.id)), 'he comes at him');
   assert.equal(endingOf(world).phase, 'landing', 'no reveal while he stands');
   assert.ok(!world.stage.level.dropped?.length, 'his helmet is on');
   knockOut(world, noname, { time: world.time, attacker: 0, effects: [] }, 'is cut down', 'killed');

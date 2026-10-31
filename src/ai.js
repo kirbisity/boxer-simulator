@@ -16,6 +16,7 @@ import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 import { ammoLeft, emptied } from './physics/ranged.js';
+import { rayBlocked } from './physics/terrain.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -451,6 +452,14 @@ export const AI = {
   // reason to pause: no circling between flurries, no surge-and-retreat against a longer reach, one
   // attack after another as fast as its motors reset (`rest`: this share of a fresh man's pause after an attack).
   machine: { rest: 0.35 },
+  // A relentless man (`inputs.relentless`: a boss, Dunnottar's Noname and Lord Vaelen) knows no fear and gives no ground: he works without
+  // the spells of circling, never steps back to keep his distance, retreats from no longer reach and makes no room for his own long weapon;
+  // a blow at him is met with his guard, not a step back. `rest`: this share of a fresh man's pause after an attack (his wind is his body's,
+  // body.js `inputs.aerobic`). Backed against a wall or the edge of his pen with his man before him, he steps out along it toward open ground
+  // and the man: a wall within `wallProbe` m behind him (on the line from his man through him), a side clear for `sideProbe` m, at `outPace`
+  // of his footwork forward while he goes. Never standing: his feet drive him on into his man at `drive` of his footwork at the least (a man
+  // leaning into another, who is not shoved back by the other walking into him).
+  relentless: { rest: 0.45, wallProbe: 1.0, sideProbe: 1.6, outPace: 0.6, drive: 1 },
   // Numbers: confidence gained per doubling of my side's standing fighters
   // over theirs (lost when outnumbered).
   numbersConfidence: 0.45,
@@ -1475,14 +1484,14 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   }
   // The longer weapon: hold at the edge of his reach, inside mine; answer
   // whoever steps in with a burst; step back when pressed.
-  const outreaching = !wary && fighter.weapon?.held && reachOf(fighter) - reachOf(opponent) > blade.outreachedBy;
+  const outreaching = !wary && !relentless(fighter) && fighter.weapon?.held && reachOf(fighter) - reachOf(opponent) > blade.outreachedBy;
   if (outreaching) return holdTheRange(world, fighter, opponent, distance, cadence, dt);
   const start = (name, length) => {
     phase = fighter.aiCadence = { name, t: 0, length, thrownAtStart: fighter.stats.thrown, burstLeft: 0 };
     if (name === 'work' && wary) world.events.push({ time: world.time, kind: 'surge', fighter: fighter.id, style: fighter.style, effects: [] });
   };
-  // A machine works without a pause, and wary of nothing (AI.machine).
-  if (fighter.body.gear.machine) {
+  // A machine works without a pause, and wary of nothing (AI.machine); so does a relentless man (AI.relentless).
+  if (fighter.body.gear.machine || relentless(fighter)) {
     wary = false;
     if (phase?.name !== 'work') start('work', Infinity);
   }
@@ -1529,9 +1538,9 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   const workRange = range - AI.confidence.closer * Math.max(0, cadence.nerve);
   // Coming into his range he checks his pace (AI.approachBrake m out, down to approachFloor): he arrives set, not walking onto the other man's fist.
   if (distance > workRange + AI.rangeSlack) fighter.move = approach * Math.min(1, AI.approachFloor + (distance - workRange) / AI.approachBrake);
-  else if (distance < workRange - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
+  else if (distance < workRange - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = relentless(fighter) ? 0 : -0.7;
   else fighter.move *= Math.exp(-dt * 4);
-  if (fighter.stamina < 0.25 && distance < range + 0.4) fighter.move = -0.6;
+  if (fighter.stamina < 0.25 && distance < range + 0.4 && !relentless(fighter)) fighter.move = -0.6;
   if (phase.t > phase.length && !fighter.punch && !fighter.aiCombo?.length) start('move', phaseLength(random, cadence.move));
   return true;
 }
@@ -1588,6 +1597,41 @@ function pointGap(fighter, opponent) {
 }
 
 /**
+ * A relentless man's footwork (AI.relentless): never back from his man; and with a wall (or his pen's edge, or the arena's) close at his back on
+ * the line from his man, a step out along it to whichever side is clear (toward the man and open ground), going forward as he does, so that he
+ * is never pinned in a corner.
+ */
+function pressOn(world, fighter, opponent) {
+  const spec = AI.relentless;
+  if (fighter.move < 0) fighter.move = 0;
+  if (fighter.clinch || opponent.state !== 'up') return;
+  fighter.move = Math.max(fighter.move, spec.drive);
+  const at = point(fighter.x, P.pelvis);
+  const away = [at[0] - opponent.x[P.pelvis * 3], at[2] - opponent.x[P.pelvis * 3 + 2]];
+  const length = Math.hypot(away[0], away[1]) || 1;
+  const back = [away[0] / length, away[1] / length];
+  const blocked = (dx, dz, far) => {
+    const to = [at[0] + dx * far, at[2] + dz * far];
+    const terrain = world.arena.terrain;
+    if (terrain && rayBlocked(terrain, [at[0], at[2]], to, (fighter.lift ?? 0) + 0.6)) return true;
+    const pen = fighter.spawn?.pen;
+    if (pen && (Math.abs(to[0] - pen.at[0]) > pen.size[0] / 2 || Math.abs(to[1] - pen.at[1]) > pen.size[1] / 2)) return true;
+    const { halfX, halfZ, open } = world.arena;
+    return !open && (Math.abs(to[0]) > halfX || Math.abs(to[1]) > halfZ);
+  };
+  if (!blocked(back[0], back[1], spec.wallProbe)) return;
+  // His left, as he faces (physics.js strafe: + to the left).
+  const left = yawRotate([0, 0, 1], fighter.yaw);
+  const sides = [1, -1].filter((sign) => !blocked(left[0] * sign, left[2] * sign, spec.sideProbe));
+  if (!sides.length) return;
+  // (Both clear: the side the wall leans from, the one whose way out goes less back toward the wall.)
+  const sign = sides.length === 1 ? sides[0] : (left[0] * back[0] + left[2] * back[1] <= 0 ? 1 : -1);
+  fighter.strafe = sign;
+  fighter.move = Math.max(fighter.move, spec.outPace);
+  fighter.aiUnpinned = world.time;
+}
+
+/**
  * A long weapon's room (AI.pointRoom): his man nearer than where its striking part begins, he gives ground, and until the
  * man is `room` past that line again (or `patience` has run out, or his place in the ranks lets him give no more) the
  * weapon's head is not struck with. Returns whether he holds those blows.
@@ -1629,6 +1673,7 @@ function nextGap(world, fighter, style, plan, cadence) {
   const random = world.random;
   const phase = fighter.aiCadence;
   if (fighter.body.gear.machine) return restAfterAttack(fighter, style, random) * AI.machine.rest;
+  if (relentless(fighter)) return restAfterAttack(fighter, style, random) * AI.relentless.rest;
   if (phase?.burstLeft > 0) {
     phase.burstLeft -= 1;
     return AI.cadence.burstGap;
@@ -2182,6 +2227,18 @@ export function fearTarget(world, fighter, nerve, opponent) {
   return Math.max(0, Math.min(1, felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring * ranks * discipline));
 }
 
+/** A relentless man (`inputs.relentless`: a boss): AI.relentless. */
+export const relentless = (fighter) => Boolean(fighter.body.inputs?.relentless);
+
+/**
+ * Whether he is past fear: a machine (no morale); a relentless man; or a man of a side on its own ground (`world.homeGround[corner]`: a
+ * stage's `homeGround`, levelmode/stage.js: the garrison inside its own castle), who has nowhere to run to and no thought of it. He still
+ * keeps his distance, steps back from a blow and makes room for a long weapon as his style does: he never breaks.
+ */
+export function knowsNoFear(world, fighter) {
+  return Boolean(fighter.body.gear.machine || relentless(fighter) || world.homeGround?.[fighter.corner]);
+}
+
 /**
  * Fear, settling towards what he feels now; past breaking point he may
  * break (unless adrenaline holds him), and once calm again he recovers.
@@ -2195,6 +2252,13 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
     return;
   }
   fighter.adrenaline = (fighter.adrenaline ?? 0) * 0.5 ** (dt / AI.adrenaline.halfLife);
+  // On his own ground, or relentless: no fear, no breaking (a broken leg still puts him on his knees).
+  if (knowsNoFear(world, fighter)) {
+    fighter.fear = 0;
+    fighter.panicked = false;
+    crawlOnBrokenLimb(world, fighter, dt);
+    return;
+  }
   // Come back from a rout, he has talked himself into it: for a while he feels it the less (AI.rout rally).
   const steadied = world.time < (fighter.steadyUntil ?? -Infinity) ? 1 - AI.rout.rally.steadied : 1;
   const target = fearTarget(world, fighter, nerve, opponent) * steadied;
@@ -2582,8 +2646,8 @@ function decide(world, fighter, dt) {
   fighter.strafe = 0;
   fighter.running = false;
   fighter.aimAt = undefined;
-  // A machine has no morale whatever state it is in, down or dragging itself on a broken leg too (feelFear's rule).
-  if (fighter.body.gear.machine) {
+  // A machine has no morale whatever state it is in, down or dragging itself on a broken leg too (feelFear's rule); nor has a man on his own ground or a relentless one.
+  if (knowsNoFear(world, fighter)) {
     fighter.fear = 0;
     fighter.panicked = false;
   }
@@ -2677,7 +2741,7 @@ function decide(world, fighter, dt) {
   if (opponent.state !== 'up') {
     fighter.aiCombo = null;
     if (holdDown(world, fighter, opponent)) return;
-    fighter.move = distance < AI.neutralDistance ? -0.8 : 0;
+    fighter.move = distance < AI.neutralDistance && !relentless(fighter) ? -0.8 : 0;
     return;
   }
   // A couched charge (style.couchedCharge): run at him and drive it home in stride; when that blow is done, hit or
@@ -2763,7 +2827,7 @@ function decide(world, fighter, dt) {
   // His own cadence: spells of moving and of working, in bursts; against a
   // longer reach or a blade, held off out of reach between surges.
   // A machine that knows no fear (`courage` 1) in plate no edge can cut (`cutProof`) walks in under the longer weapon.
-  const fearless = fighter.body.gear.courage >= 1 && fighter.body.gear.cutProof;
+  const fearless = (fighter.body.gear.courage >= 1 && fighter.body.gear.cutProof) || relentless(fighter);
   const wary = !waiting && !fighter.clinch && !fearless && outreached(fighter, opponent);
   const cadence = cadenceOf(world, fighter, style, plan, nerve);
   let mayAttack = true;
@@ -2775,8 +2839,10 @@ function decide(world, fighter, dt) {
   } else if (!fighter.defence || (fighter.defence.name !== 'stepBack' && fighter.defence.name !== 'sidestep')) {
     mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt });
   }
-  // His man inside his long weapon's head: room first, then the point (AI.pointRoom).
-  const cramped = makeRoom(world, fighter, opponent);
+  // His man inside his long weapon's head: room first, then the point (AI.pointRoom). A relentless man makes none: he strikes from where he stands.
+  const cramped = relentless(fighter) ? false : makeRoom(world, fighter, opponent);
+  // Relentless: never a step back, and out from a wall at his back (AI.relentless).
+  if (relentless(fighter)) pressOn(world, fighter, opponent);
 
   // React to a strike once it can be seen coming: after a reaction time
   // that training shortens, and only if not busy throwing one.
@@ -2818,6 +2884,8 @@ function decide(world, fighter, dt) {
       if (guards) name = blockFor(fighter);
       // A blade coming is got away from, not blocked with an arm.
       else if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';
+      // A relentless man gives no ground to a blow: his guard meets it.
+      if (relentless(fighter) && name === 'stepBack') name = blockFor(fighter);
       perform(world, fighter, name, { side, from: striker.id, held: guards });
       if (guards) {
         fighter.guardHeld = true;

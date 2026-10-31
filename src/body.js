@@ -871,8 +871,9 @@ export function buildBody(rawInputs) {
 
   const armKg = (side) => segments[`${side}UpperArm`].mass + segments[`${side}Forearm`].mass + BODY.gloveKg;
   const technique = 0.75 + 0.25 * inputs.training;
-  // A build may set its own endurance (a machine's battery): `aerobic`.
-  const aerobic = build?.aerobic ?? clamp((0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15)) * aged.aerobic, 0.1, 1.1);
+  // A build may set its own endurance (a machine's battery): `aerobic`; so may a man of uncommon wind (`inputs.aerobic`: a boss who never tires,
+  // levelmode/presets.js; his costs over it and his recovery times it, as anyone's: physics.js).
+  const aerobic = build?.aerobic ?? inputs.aerobic ?? clamp((0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15)) * aged.aerobic, 0.1, 1.1);
 
   return {
     inputs, heightM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,

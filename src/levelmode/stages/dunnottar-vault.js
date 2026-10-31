@@ -4,8 +4,9 @@
 // into the court again, past the Well, to the keep's door. There is no way from the cellar into the keep but through the court. Everything else is optional and dim
 // (no way-marks; the chevrons stay on the main
 // line): a torture chamber and a stores branch off the cellar, a well-shaft stair down to the crypt, and in the crypt an ossuary, the
-// keepers' tombs, a flooded way on a raised causeway to the sea-gate, a hidden lever there that lifts the bars of a stair back up into the
-// torture chamber (a loop: cellar, shaft, crypt, causeway, lever, stair, torture chamber, cellar).
+// keepers' tombs, a flooded way on a raised causeway to the sea-gate. The stair from the sea-gate up into the torture chamber is shut by a heavy
+// door that nothing opens any more (its lever is gone, the user's call): a man who comes up the old drain into the sea-gate goes on through the
+// crypt, by the flooded way, the gallery and the well shaft's stair, up into the cellar.
 //
 //   vault  (y 6)     x -3..47, z -39..0
 //     the long cellar      x 0..32.8, z -26..-19    (doors north: torture chamber x 6.6, the cell x 16.7, the well shaft x 28.6; south: the stores x 15.2)
@@ -18,7 +19,7 @@
 //     the ossuary          x 11..22.2, z -35.4..-27.2
 //     the keepers' tombs   x 12.8..21, z -21.8..-18.4
 //     the flooded way      x 4.6..7.8, z -35.4..-26.2 (north from the gallery's west end, on a causeway)
-//     the sea-gate         x 0..9.6, z -39.2..-35.2 (a barred arch over the sea, the hidden lever, a dead man in plate)
+//     the sea-gate         x 0..9.6, z -39.2..-35.2 (a barred arch over the sea, the old drain's low door, the heavy door of the stair, shut)
 
 import { wallOf, windingStairs } from '../../physics/terrain.js';
 import { DN_SEAGATE_DOOR } from './dunnottar-sewer.js';
@@ -95,8 +96,12 @@ export function buildVault() {
   dnCeiling(sec, 11.6, 21.8, -34.4, -26.8, V + HEAD, V + 4.8);
   sec.decor.push({ kind: 'vault', a: [11.6, -30.6, V + 3.0 + LIFT], b: [21.8, -30.6, V + 3.0 + LIFT], width: 7.6, crown: 1.4, style: 'vault' });
   dnGate(sec, 'celldoor', [16.7, V, -25.4], [{ ...wallOf([16.7, -26.8], [3.4, 0.3], V, V + 3.4, { id: 'celldoor' }), style: 'iron', skin: false }], { kind: 'bars', width: 3.4, height: 3.4 }, { key: 'cellkey', frees: ['miner', 'captive'], opensFrom: { at: [16.7, -22.5], size: [10, 8.6], y: [V - 1, V + 4] }, label: 'Unlock the cell door', lockedText: 'Locked. The turnkey keeps the key at his desk.' });
-  sec.decor.push({ kind: 'bars', a: [11.6, -31.8], b: [14.8, -31.8], y0: V, y1: V + 3.2 });
-  sec.decor.push({ kind: 'bars', a: [18.6, -31.8], b: [21.8, -31.8], y0: V, y1: V + 3.2 });
+  // Two cells in its north end, behind bars on the front and the inner side (seen through: `hidden` solids, levelmode/visibility.js), the hall's walls the rest.
+  for (const [a, b] of [[[11.6, -31.8], [14.8, -31.8]], [[14.8, -31.8], [14.8, -34.4]], [[18.6, -31.8], [21.8, -31.8]], [[18.6, -31.8], [18.6, -34.4]]]) {
+    sec.decor.push({ kind: 'bars', a, b, y0: V, y1: V + 3.2 });
+    const along = a[0] === b[0];
+    sec.terrain.push({ ...wallOf([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], along ? [0.12, Math.abs(b[1] - a[1])] : [Math.abs(b[0] - a[0]), 0.12], V, V + 3.2, { id: `cellbars${a[0]}${b[1]}` }), style: 'hidden', skin: false });
+  }
   // The turnkey's end: a desk, a peg of keys, a brazier.
   dnProp(sec, 'table', [30.0, V, -25.2], { yaw: 0 });
   dnProp(sec, 'stool', [29.6, V, -24.2], { yaw: 0 });
@@ -137,7 +142,15 @@ export function buildVault() {
   dnSpawn(sec, 'jailer1', 'dunnottarGuard', 'enemy', 2, [12, V, -21.4], DN_FACE.W, { inputs: { name: 'Jailer Wyllie' }, patrol: [[12, -21.4], [12, -24.2]] });
   dnSpawn(sec, 'turnkey', 'turnkey', 'enemy', 2, [23.5, V, -22.4], DN_FACE.W, { inputs: { name: 'The Turnkey' } });
   dnSpawn(sec, 'miner', 'cabyMiner', 'prisoner', 0, [14.4, V, -33.2], DN_FACE.S, { inputs: { name: 'Bran the miner' }, follows: false });
-  dnSpawn(sec, 'captive', 'cabySoldier', 'prisoner', 0, [18.8, V, -33.2], DN_FACE.S, { inputs: { name: 'One-Eye Colm' }, follows: false });
+  dnSpawn(sec, 'captive', 'cabySoldier', 'prisoner', 0, [19.5, V, -33.2], DN_FACE.S, { inputs: { name: 'One-Eye Colm' }, follows: false });
+  // Behind the bars with them, a prisoner in each cell on her knees or his, weeping into their hands (awareness.js `kneel`, `mourn`): seen and heard through the bars
+  // from the hall, and nothing to be done for them (the cell door frees the miner and the soldier; these two stay as they are).
+  dnSpawn(sec, 'mourner1', 'vaultPrisonerWoman', 'prisoner', 0, [12.5, V, -33.7], DN_FACE.S, { inputs: { name: 'A weeping woman' }, kneel: { hands: 'face', lean: 0.45 }, mourn: true });
+  dnSpawn(sec, 'mourner2', 'vaultPrisoner', 'prisoner', 0, [21.0, V, -33.7], DN_FACE.S, { inputs: { name: 'A weeping prisoner' }, kneel: { hands: 'face', lean: 0.5 }, mourn: { wail: 0.35 } });
+  // Out in the cellar, two chained at its north wall beside the bones of the ones who were there before them, on their knees and weeping (within reach: nothing to
+  // free them with, and they do not fight or run).
+  dnSpawn(sec, 'mourner3', 'vaultPrisoner', 'prisoner', 0, [3.4, V, -25.3], DN_FACE.N, { inputs: { name: 'A chained prisoner' }, kneel: { hands: 'face', lean: 0.4 }, mourn: true });
+  dnSpawn(sec, 'mourner4', 'vaultPrisonerWoman', 'prisoner', 0, [27.2, V, -25.3], DN_FACE.N, { inputs: { name: 'A chained woman' }, kneel: { hands: 'face', lean: 0.55 }, mourn: { wail: 0.3 } });
 
   dnItem(sec, 'note-ledger', 'note', [29.6, V, -25.4], { note: 'ledger', lift: 0.95 });
   dnItem(sec, 'cellkey', 'key', [31.6, V, -26.2], { label: 'Take the cell key', lift: 1.2 });
@@ -156,7 +169,7 @@ export function buildVault() {
 function buildTortureChamber(sec) {
   const wallTop = V + 4.6;
   // The floor east of the stairwell; the west strip is the stair itself, a flight of 23 treads from the sea-gate chamber (it starts inside it) up to this floor at
-  // z -29.4, a landing of the floor's own beyond the head of it. Half way up it is shut by a heavy door (`cryptgate`), which the lever below opens.
+  // z -29.4, a landing of the floor's own beyond the head of it. Half way up it is shut by a heavy door (`cryptgate`): it stays shut (nothing opens it now).
   dnSlab(sec, 4.0, 10.0, -35.2, -27.6, V, 'flags', { bottom: V - FLOOR, extra: { room: true } });
   dnSlab(sec, 0, 4.0, -29.5, -27.6, V, 'flags', { bottom: V - FLOOR, extra: { room: true } });
   dnRun(sec, [-0.8, -36.4], [-0.8, -27.6], 1.6, V - 1, wallTop, 'rubble');
@@ -184,6 +197,12 @@ function buildTortureChamber(sec) {
   dnProp(sec, 'torch', [9.9, V + 2.4, -29.4], { face: 'W', dim: true });
   dnProp(sec, 'drip', [8, V + 3.4 + (HEAD - 3.6), -30], {});
   dnSpawn(sec, 'questioner', 'dunnottarGuard', 'enemy', 2, [8.4, V, -30.6], DN_FACE.N, { inputs: { name: 'The Questioner' } });
+  // The whipping: a prisoner on his knees at the north wall, his arms chained up to its rings (`kneel.hands`: the rings), his bare back to the room; behind him the
+  // questioner's man lays a whip on it (`torment`: real strokes of the thong, physics/whip.js), in bursts, the prisoner crying out at every lash (audio/cries.js
+  // CRY_STRIKERS) and weeping between (`mourn`). The man with the whip is an enemy like any other: once he sees the operative he stops and fights.
+  dnProp(sec, 'chains', [5.2, V + 1.8, -35.15], {});
+  dnSpawn(sec, 'whipped', 'vaultPrisoner', 'prisoner', 0, [5.2, V, -34.25], DN_FACE.N, { inputs: { name: 'A prisoner at the wall' }, kneel: { hands: [[4.85, V + 1.7, -35.05], [5.55, V + 1.7, -35.05]], lean: 0.15 }, mourn: { every: [6, 10], wail: 0.2 } });
+  dnSpawn(sec, 'lasher', 'dunnottarLasher', 'enemy', 1, [5.0, V, -32.15], DN_FACE.N, { inputs: { name: 'The Lasher' }, torment: { victim: 'whipped' } });
   dnItem(sec, 'bandage10', 'bandage', [7.6, V, -34.4]);
 }
 
@@ -286,7 +305,7 @@ export function buildCrypt() {
   });
   // The keepers' tombs: a dead end south of the gallery.
   dnRoom(sec, { x0: 12.8, x1: 21, z0: -21.8, z1: -18.4, floor: C, head: 3.4, walls: ['s', 'e', 'w'], foot: C - 1, vault: { crown: 1.1, ribs: 3.7 } });
-  // The sea-gate: a landing over the sea, a barred arch, the lever behind a loose stone; the stair back up is the vault's.
+  // The sea-gate: a landing over the sea, a barred arch; the stair back up is the vault's, its heavy door shut.
   dnRoom(sec, {
     x0: 0, x1: 9.6, z0: -39.2, z1: -35.2, floor: C, head: 3.6, walls: ['n', 'e', 'w'], foot: C - 1, vault: { crown: 1.2, ribs: 3.7 },
     // (The west wall has a low door: the old drain's last stretch comes in by it, `dunnottar-sewer.js`.)
@@ -325,14 +344,12 @@ export function buildCrypt() {
   for (const [x, z, yaw] of [[14.8, -20.6, 0], [17.0, -19.6, 0], [19.4, -20.6, 0]]) dnProp(sec, 'sarcophagus', [x, C, z], { yaw });
   dnProp(sec, 'torch', [16.9, C + 2.4, -18.5], { face: 'N', dim: true });
   dnProp(sec, 'bones', [13.8, C, -19.0], { yaw: 0.4 });
-  // The sea-gate: a chest, a rotted bed, the dead man's weapons, a brazier, the lever.
+  // The sea-gate: a chest, a rotted bed, a dead man's weapons, a brazier. (No lever: the heavy door of the stair is not opened from here, and the way on is the crypt's.)
   dnProp(sec, 'chest', [8.6, C, -37.6], { yaw: Math.PI });
   dnProp(sec, 'bed', [7.0, C, -38.6], { yaw: 0 });
   dnProp(sec, 'brazier', [8.8, C, -35.9], { lit: true });
   dnProp(sec, 'torch', [0.5, C + 2.4, -35.8], { face: 'E', dim: true });
-  dnProp(sec, 'lever', [9.5, C + 1.2, -37.2], { face: 'W' });
   dnProp(sec, 'weapon', [4.4, C, -38.5], { what2: 'halberd', yaw: 0.8 });
-  sec.levers.push({ id: 'seagatelever', at: [8.6, C, -37.2], target: 'cryptgate', state: 'open', label: 'Pull the hidden lever' });
 
   // (The stair's foot, in the sea-gate chamber, a metre to its side too: a man who stands there is in the stair's way, and the stair is the vault's.)
   sec.portals.push({ to: 'vault', area: [{ at: DN_SHAFT.at, size: [11.4, 11.4], y: [-1, 12] }, { at: [1.7, -32.3], size: [3.6, 10], y: [-1, 12] }, { at: [2.4, -36.2], size: [5, 2.6], y: [-1, 12] }] });

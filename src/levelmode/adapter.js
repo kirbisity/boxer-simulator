@@ -20,6 +20,11 @@ export function levelAware(world, fighter) {
   return Math.hypot(fighter.x[P.pelvis * 3] - me.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]) <= LEVEL_CONFIG.awareRange;
 }
 
+/** Whether an enemy has the player or is coming up out of his hiding at him (a buried man's rise, awareness.js `lurk`): the fight with him is on. */
+export function levelRoused(world, fighter) {
+  return levelAware(world, fighter) || (!fighter.dormant && fighter.state !== 'out' && mindState(world, fighter.id) === 'rise');
+}
+
 /** The prisoner `id` (a spawn id) is let out and fights beside the player from now on (awareness.js freePrisoner). */
 export function levelFreePrisoner(world, id) {
   return freePrisoner(world, id);

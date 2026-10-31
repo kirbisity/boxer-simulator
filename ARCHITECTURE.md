@@ -87,6 +87,14 @@ of real lights lent to the nearest flames (six on the high tier, three on low: `
 and the kit's materials fade in a screen-door tube between camera and man (`ktSightline`) while the
 follow camera is kept off the stage's walls and roofs (`stageCameraRoom`, `followcam.js` `march`).
 
+**Boss rooms, lurkers and the dungeon's people (level mode).** A section's `seals` (stage.js `keepSeals`) shut a boss room's ways out (ordinary gates
+whose `look.kind` is a `portcullis` or a `sluice`, drawn by kit.js and heard as a portcullis) once the player is inside and the fight is on, never on a
+man in a doorway, and open them when the boss is out (or a death or a rest has put the player outside). A spawn's `lurk` (awareness.js) lies buried on his
+knees under a heap of filth (kitfilth.js `kfHeap`, `world.stage.lurk`) until the player comes near, then rises (the `rise` state, a groan and a roar,
+drama.js's `rise` moment) and fights; `kneel` and `mourn` keep a prisoner on his knees and weeping (audio/cries.js `grief`), whatever is fought round him;
+`torment` has a guard lay real whip strokes on a prisoner until he sees the player. A lash is pain itself (cries.js `CRY_STRIKERS`). A stage's `homeGround`
+corners know no fear (ai.js `knowsNoFear`); a relentless man (`inputs.relentless`, ai.js `AI.relentless`) never gives ground and steps out of a corner.
+
 **What a stage paints (conditional painting).** A stage is one scene but each frame paints only what can be seen. `levelmode/visibility.js` (pure; `test/visibility.test.js`)
 decides: the sections the man is in are painted in `detail`; so is any section reached from them, up to three portals deep, through openings that are inside the camera's frustum
 and that a sight line from the eye reaches (`terrain.js` `rayBlocked` with the bars of a gate and the ladders left out: `seeThroughIds`; a shut door or a wall closes the way);

@@ -28,8 +28,10 @@
 //   spawn.dead: true         a body that lies where it was put, from the start (weapon dropped); never respawned
 //   spawn.boss               { title?, phase2?: { at, foot, accel, work, burst } | false } on a spawn of role 'boss'
 //   spawn.miniboss           { title? } on any spawn: the boss's bar (bossStatus) while he is awake and aware of the player; he stays down after a rest (checkpoints.js)
-//   spawn.reveal             'text': said (a toast) the first time in a run he is on the player (a boss kept out of sight until then: the cesspool's Noname)
+//   spawn.reveal             'text': said (a toast) the first time in a run he comes at the player (a boss kept out of sight until then: the cesspool's Noname)
 //   spawn.ambush, spawn.pen  regions: the ground he lies in wait for (awareness.js), and the box he never leaves (stage.js, physics.js keepToPen)
+//   spawn.lurk               buried where he lies until the player is near (awareness.js): his bar and the boss's music from the moment he rises
+//   section.seals            a boss room's gates shut while its fight is on (stage.js); said as they shut and open (SEAL.text, openText)
 //   (and the items / rest / levers / gates / ladders fields of interact.js)
 
 import { hurtShare } from '../ai.js';
@@ -38,8 +40,8 @@ import { advance, boutWinner, knockOut, opponentFor, reclothe } from '../physics
 import { LEVEL_CONFIG } from './config.js';
 import { levelOf, updateAction, updateTonics } from './items.js';
 import { noteDeath, playerStands, respawnPlayer, setCheckpoint, spawnDefinitions } from './checkpoints.js';
-import { levelAware } from './adapter.js';
-import { createStageWorld } from './stage.js';
+import { levelAware, levelRoused } from './adapter.js';
+import { createStageWorld, SEAL } from './stage.js';
 import { endingBusy, endingFinal, endingRelease, endingRespawn, finishEpilogue, watchEnding } from './ending.js';
 import { watchTeam } from './team.js';
 import { beginAttempt } from './attempts.js';
@@ -133,6 +135,7 @@ export function levelThink(world, dt) {
   updateTonics(world, dt);
   if (level.boss) watchBoss(world, level.boss);
   watchMinibosses(world);
+  watchSeals(world);
   watchEnding(world);
 }
 
@@ -266,13 +269,26 @@ function watchMinibosses(world) {
   for (const fighter of world.fighters) {
     if (!fighter.spawn || fighter.dormant) continue;
     const def = level.spawns[fighter.spawn.id]?.def;
-    // A man with a `reveal` (the cesspool's Noname, out of sight until the player is in his hall): the line, once a run, the first time he is on him.
-    if (def?.reveal && !level.revealed?.has(fighter.spawn.id) && levelAware(world, fighter)) {
+    // A man with a `reveal` (the cesspool's Noname, out of sight until the player is in his hall): the line, once a run, the first time he comes at him.
+    if (def?.reveal && !level.revealed?.has(fighter.spawn.id) && levelRoused(world, fighter)) {
       (level.revealed ??= new Set()).add(fighter.spawn.id);
       level.ui.push({ type: 'toast', text: def.reveal });
     }
     if (fighter.state !== 'out' || level.minibossDown?.[fighter.id] !== undefined) continue;
     if (def?.miniboss) (level.minibossDown ??= {})[fighter.id] = world.time;
+  }
+}
+
+/** A boss room's seals (stage.js), shutting and opening: said once each time ({ type: 'toast' }, and { type: 'sealed' | 'unsealed', id }). */
+function watchSeals(world) {
+  const level = levelOf(world);
+  for (const seal of world.stage.seals ?? []) {
+    if (Boolean(level.sealsTold?.[seal.id]) === seal.sealed) continue;
+    (level.sealsTold ??= {})[seal.id] = seal.sealed;
+    level.ui.push({ type: seal.sealed ? 'sealed' : 'unsealed', id: seal.id });
+    // (Opened again by a rest or a death, which put him outside: nothing to say. Opened by the boss's fall: the way on.)
+    if (seal.sealed) level.ui.push({ type: 'toast', text: seal.text ?? SEAL.text });
+    else if (seal.boss?.state === 'out') level.ui.push({ type: 'toast', text: seal.openText ?? SEAL.openText });
   }
 }
 
@@ -309,7 +325,7 @@ export function bossStatus(world) {
     const apart = apartFromPlayer(world, fighter);
     const down = level.minibossDown?.[fighter.id];
     const felled = fighter.state === 'out' && down !== undefined && world.time - down < LEVEL_CONFIG.boss.felledSeconds;
-    const engaged = fighter.state !== 'out' && apart <= LEVEL_CONFIG.boss.barRange && levelAware(world, fighter);
+    const engaged = fighter.state !== 'out' && apart <= LEVEL_CONFIG.boss.barRange && levelRoused(world, fighter);
     if ((felled || engaged) && (!best || apart < best.apart)) {
       best = { apart, status: { show: true, name: fighter.body.inputs.name, title: def.miniboss.title ?? '', fraction: felled ? 0 : 1 - hurtShare(fighter), felled } };
     }
