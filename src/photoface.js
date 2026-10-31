@@ -20,7 +20,8 @@
 // as data URLs (PHOTO_FACE_EMBED). Missing, the heads stay drawn.
 
 /* global THREE */
-import { nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL } from './faceregions.js';
+import { nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL, toneShift } from './faceregions.js';
+import { SKIN_TONES } from './skintones.js';
 import { SCALP_GLSL } from './photohair.js';
 
 /**
@@ -41,6 +42,13 @@ export const PHOTO_FACES = {
 };
 
 const photoManifest = { faces: null, neutral: 0.8, thumb: [32, 16] };
+/** The regions there are faces of for a sex (the character creator's origins), or null: photo faces off, or not loaded yet. */
+export function photoFaceRegions(sex) {
+  if (!photoFacesOn() || !photoManifest.faces) return null;
+  const wanted = sex === 'female' ? 'female' : 'male';
+  return Object.values(photoManifest.faces).filter((face) => face.sex === wanted).map((face) => face.region);
+}
+
 const photoTextures = new Map();
 let photoWanted = null;
 let photoLoading = null;
@@ -156,6 +164,15 @@ export function photoFaceFor(inputs, outfitRegion = null) {
   const skin = new THREE.Color(primary.skin).lerp(new THREE.Color(secondary.skin), blend);
   const hsl = skin.getHSL({});
   skin.setHSL(hsl.h + (random() - 0.5) * 2 * vary.warm * 0.1, hsl.s * (1 + (random() - 0.5) * 2 * vary.warm), hsl.l * (1 + (random() - 0.5) * 2 * vary.bright));
+  // An origin chosen with a lighter or darker skin than its own (faceregions.js toneShift): the composite's skin moved by the
+  // ratio of the two tones, channel by channel, so it stays this face's skin, a shade off. (No draw from `random`: the rest of
+  // his casting is the same whatever his tone.)
+  const shift = toneShift(inputs);
+  if (shift) {
+    const from = new THREE.Color(SKIN_TONES[shift.from]);
+    const to = new THREE.Color(SKIN_TONES[shift.to]);
+    skin.setRGB(Math.min(1, (skin.r * to.r) / from.r), Math.min(1, (skin.g * to.g) / from.g), Math.min(1, (skin.b * to.b) / from.b));
+  }
   const age = inputs.age ?? 30;
   const grey = Math.min(1, Math.max(0, (age - 42) / 30)) * 0.75;
   const hair = new THREE.Color(primary.hair).lerp(new THREE.Color(secondary.hair), blend).lerp(new THREE.Color(0x9a958e), grey);

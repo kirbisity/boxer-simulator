@@ -254,6 +254,9 @@ button.big { padding: 12px 34px; font-size: 18px; }
 .step-body { display: grid; gap: 16px; min-height: 230px; align-content: start; }
 .wizard .field { display: grid; grid-template-columns: none; gap: 8px; font-size: 14px; }
 .wizard .field > b, .slider-head b { font-weight: 600; }
+/* The origin: one native list (by continent), a single line however many peoples there are, so the face step still fits a phone. 16px: no zoom on focus. */
+.wizard .field select { justify-self: start; max-width: 100%; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 16px; }
+.wizard .field select optgroup, .wizard .field select option { background: #10131d; }
 .wizard input[type=text] { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 16px; user-select: text; -webkit-user-select: text; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { padding: 8px 12px; min-height: 38px; border-radius: 999px; text-transform: capitalize; }
