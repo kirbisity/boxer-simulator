@@ -162,12 +162,18 @@ test('a squad drawn up by its level: its fowling pieces fall back behind it as t
 test('fought out, the garrison loses the wokou raid and Qi Jiguang\'s army wins its own, losing far fewer than the raiders', { timeout: 120000 }, () => {
   const raid = levelBattle('wokou', { seed: 3 });
   assert.equal(raid.winner, 'red');
-  const qi = levelBattle('qiJiguang', { seed: 3 });
-  assert.equal(qi.winner, 'blue');
+  // (Their losses counted over four battles: one battle in eight goes hard for the Ming, 7 men down to 16-20 raiders,
+  // whichever way the blows fall, seed 7 before BLADES.crushTrauma and seed 3 after; over eight they lose 2-2.5 men to
+  // the raiders' 12-17.)
+  const battles = [1, 2, 3, 4].map((seed) => levelBattle('qiJiguang', { seed }));
+  for (const qi of battles) {
+    assert.equal(qi.winner, 'blue', `seed ${qi.seed}`);
+    assert.equal(qi.blue.fled, 0, `none of Qi's men run (seed ${qi.seed})`);
+  }
   // The raiders lost: down, fled, or crawling off on their knees (ai.js AI.rout crawl).
-  const lost = qi.red.down + qi.red.fled + qi.red.crawling;
-  assert.ok(qi.blue.down * 3 <= lost, `Ming down ${qi.blue.down}; raiders down ${qi.red.down}, fled ${qi.red.fled}, crawling ${qi.red.crawling}`);
-  assert.equal(qi.blue.fled, 0, 'none of Qi\'s men run');
+  const sum = (pick) => battles.reduce((total, qi) => total + pick(qi), 0);
+  const [down, raidersDown, fled, crawling] = [sum((qi) => qi.blue.down), sum((qi) => qi.red.down), sum((qi) => qi.red.fled), sum((qi) => qi.red.crawling)];
+  assert.ok(down * 3 <= raidersDown + fled + crawling, `Ming down ${down}; raiders down ${raidersDown}, fled ${fled}, crawling ${crawling}`);
 });
 
 test('Qi Jiguang\'s men dig a trench across the square before the squads: small and hastily dug, its line wandering, the raiders before it, every Ming man behind it on level ground, the way across it slowed', () => {

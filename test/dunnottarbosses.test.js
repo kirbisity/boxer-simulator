@@ -223,9 +223,21 @@ test('dungeon: the lasher lays real strokes of the whip on the prisoner at the w
   step(1.5);
   assert.equal(mindState(w, lasher.id), 'aggro');
   assert.ok(!lasher.focusAny, 'the prisoner let be');
-  const before = w.events.filter((event) => event.kind === 'landed' && event.weapon === 'whip' && event.defender === victim.id).length;
-  step(3);
-  assert.equal(w.events.filter((event) => event.kind === 'landed' && event.weapon === 'whip' && event.defender === victim.id).length, before, 'no more lashes on him');
+  // No stroke of his goes at the prisoner again. (The prisoner kneels a couple of metres behind him: the thong of a stroke
+  // at the operative may still catch him on its way back or round, physics/whip.js lash, which is the whip's, not the man's.)
+  const turned = w.time;
+  const aims = [];
+  advance(w, 3, (current, dt) => {
+    updateStage(current);
+    levelThink(current, dt);
+    thinkAll(current, dt, new Set([0]));
+    aims.push([current.time, lasher.punch?.target]);
+  });
+  assert.ok(aims.every(([, target]) => target !== victim.id), 'no stroke aimed at him');
+  const aimedAt = (time) => aims.findLast(([at]) => at <= time)?.[1];
+  for (const event of w.events.filter((entry) => entry.kind === 'landed' && entry.weapon === 'whip' && entry.defender === victim.id && entry.time > turned)) {
+    assert.equal(aimedAt(event.time), w.fighters[0].id, `a lash on him at ${(event.time - turned).toFixed(2)} s was a stroke at the operative`);
+  }
 });
 
 test('dungeon: the weeping prisoners kneel where they are kept, some behind the cells\' bars and some out in the cellar, and no fight sends them running', () => {
