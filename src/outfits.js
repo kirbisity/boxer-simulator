@@ -2238,6 +2238,9 @@ export function gearTraits(inputs) {
     arrowproof: Boolean(spec.arrowproof),
     // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).
     quiver: spec.quiver ?? null,
+    // His missiles never run out (`inputs.endlessAmmo`: a mode's say, a man holding his own gate with its stores behind
+    // him and hands to bring them up): his bow or gun is never spent for want of them (physics/ranged.js ammoCarried).
+    endlessAmmo: Boolean(inputs.endlessAmmo),
     damageDealt: { hand: 1, foot: 1, ...spec.damageDealt },
   };
 }

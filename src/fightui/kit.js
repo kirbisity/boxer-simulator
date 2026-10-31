@@ -135,9 +135,9 @@ export function fightUiKit(root, hooks) {
     return (orders.lock !== null ? fightWorld.fighters[orders.lock] : null) ?? attackMark(fightWorld, fighter, orders, opponentFor(fightWorld, fighter));
   }
 
-  /** Mark a blow on his man: where it goes, its way, its colour. */
-  function markAim(entry, zone, side) {
-    const target = targetMan();
+  /** Mark a blow on his man (or the man `id`, tapped to charge): where it goes, its way, its colour. */
+  function markAim(entry, zone, side, id = null) {
+    const target = id !== null ? world()?.fighters[id] : targetMan();
     if (!target || !entry) return;
     marks()?.aim({ target: target.id, from: me().id, zone, side, group: entry.group, travel: entry.travel });
   }
@@ -146,14 +146,15 @@ export function fightUiKit(root, hooks) {
    * Ask for a move (an entry of moves()) at a zone, on a side of him: thrown
    * at once (or as soon as the hands are back), and marked on him. `source`
    * (the button or place pressed) is told when it begins; `again`: a quick
-   * second press (the next blow of a combination).
+   * second press (the next blow of a combination); `target`: the man it is at, if not his man (a rider's tap on a man
+   * far off, to charge him: control.js chargeTarget).
    */
-  function throwMove(entry, zone, side, source = null, { again = false } = {}) {
+  function throwMove(entry, zone, side, source = null, { again = false, target = null } = {}) {
     const orders = hooks.orders();
     const now = world()?.time ?? 0;
-    orders.requests.push({ move: entry.move, zone, strength: 'quick', at: now });
+    orders.requests.push({ move: entry.move, zone, strength: 'quick', at: now, ...(target !== null ? { target } : {}) });
     asked = { move: entry.move, entry, zone, side, source, at: hooks.clock?.() ?? hooks.now() };
-    markAim(entry, zone, side);
+    markAim(entry, zone, side, target);
     navigator.vibrate?.(8);
     hooks.signal?.(again ? 'combo' : 'tap', entry.move);
     return true;

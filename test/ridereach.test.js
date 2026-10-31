@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { directFighter, newOrders, swingAt } from '../src/control.js';
+import { attackMark, chargeTarget, CONTROL, directFighter, newOrders, swingAt } from '../src/control.js';
 import { advance, createWorld, placeFighter, point, throwPunch } from '../src/physics.js';
 import { WORLD } from '../src/physics/config.js';
 import { vec, yawRotate } from '../src/pose.js';
@@ -199,4 +199,61 @@ test('steering himself, a tap readies the blow for the pass: the reins stay his 
     if (w.events.some((event) => (event.kind === 'landed' || event.kind === 'blocked') && event.attacker === me.id)) landed += 1;
   }
   assert.ok(landed >= 2, `met him on ${landed} of ${passes} passes`);
+});
+
+/** A rider standing his horse (or a man on foot) with a man of his own beside him, an enemy 10 m off and another `far` m off. */
+function riderAmongMen(far, mounted = true) {
+  const w = createWorld([
+    { inputs: { ...structuredClone(PRESETS.saber), mounted }, corner: 'red' },
+    { inputs: structuredClone(PRESETS.saber), corner: 'red' },
+    { inputs: structuredClone(PRESETS.street), corner: 'blue' },
+    { inputs: structuredClone(PRESETS.street), corner: 'blue' },
+  ], { seed: 4, arena: { halfX: 60, halfZ: 20 } });
+  const [me, mate, near, distant] = w.fighters;
+  const hips = point(me.x, P.pelvis);
+  placeFighter(mate, hips[0], hips[2] + 1.5);
+  placeFighter(near, hips[0] + 10, hips[2] - 6);
+  placeFighter(distant, hips[0] + far, hips[2] + 4);
+  advance(w, 0.3);
+  return { w, me, mate, near, distant };
+}
+
+test('on horseback a tap on an enemy far off (not the nearest, a comrade at his stirrup) charges him: the horse rides to him', () => {
+  const { w, me, distant } = riderAmongMen(34);
+  assert.ok(CONTROL.chargeWithin >= 30, `${CONTROL.chargeWithin} m: a charge's run-up`);
+  const orders = newOrders();
+  orders.requests.push({ move: 'gladiusCut', zone: 'head', strength: 'quick', at: w.time, target: distant.id });
+  const apart = () => Math.hypot(distant.x[P.pelvis * 3] - me.mount.at[0], distant.x[P.pelvis * 3 + 2] - me.mount.at[1]);
+  const before = apart();
+  let target = null;
+  advance(w, 3, (world, dt) => {
+    directFighter(world, me, orders, dt);
+    target ??= orders.charge?.target ?? null;
+  });
+  assert.equal(target, distant.id, 'the charge is at the man tapped');
+  assert.ok(apart() < before - 10, `ridden at him: ${before.toFixed(1)} m to ${apart().toFixed(1)} m`);
+  // Out past a charge's run, a tap on him picks nobody (the attack goes as any other).
+  const beyond = riderAmongMen(CONTROL.chargeWithin + 3);
+  assert.equal(chargeTarget(beyond.w, beyond.me, beyond.distant.id), null);
+});
+
+test('on horseback the enemy owns the blow out to a charge\'s run, before a comrade at hand; on foot as before', () => {
+  const { w, me, near } = riderAmongMen(34);
+  assert.equal(attackMark(w, me, newOrders(), near), near, 'the enemy 10 m off, not the man beside him');
+  const foot = riderAmongMen(34, false);
+  assert.equal(attackMark(foot.w, foot.me, newOrders(), foot.near), foot.mate, 'on foot: the man at hand, as before');
+  assert.equal(chargeTarget(foot.w, foot.me, foot.distant.id), null, 'and no tap far off');
+});
+
+test('a tap from the saddle on an enemy far off picks the one it lands on; none on foot', async () => {
+  const { fightUiChargePick } = await import('../src/fightui/target.js');
+  const { w, me, near, distant } = riderAmongMen(34);
+  // A side view across the field: x along the screen, height up it.
+  const project = ([x, y]) => [100 + x * 10, 400 - y * 100, 1];
+  const at = (man) => [100 + man.x[P.pelvis * 3] * 10, 400 - man.x[P.pelvis * 3 + 1] * 100];
+  assert.equal(fightUiChargePick(w, me, at(distant), project)?.man, distant);
+  assert.equal(fightUiChargePick(w, me, at(near), project)?.man, near);
+  assert.equal(fightUiChargePick(w, me, [5, 5], project), null, 'on nobody');
+  const foot = riderAmongMen(34, false);
+  assert.equal(fightUiChargePick(foot.w, foot.me, at(foot.distant), project), null);
 });
