@@ -458,6 +458,50 @@ export function battleFxShot(view, { from, dir, powder, long, pan }) {
   }
 }
 
+/**
+ * The cloud of a grenade gone off on the floor at `at` (plain numbers, as battleFxShotPuffs): a frag's (`frag`) burst of grey
+ * smoke thrown out a metre or two and the dust and earth kicked up in a low ring round it, rising and drifting for ten seconds
+ * or so; a flashbang's a small puff of white smoke from its ports.
+ */
+export function battleFxBlastPuffs(at, frag, random = Math.random) {
+  const puffs = [];
+  const count = frag ? 26 : 5;
+  for (let index = 0; index < count; index += 1) {
+    const turn = random() * Math.PI * 2;
+    // Half low and outward (the dust ring), half up through the middle (the burst's smoke).
+    const dust = index % 2 === 0;
+    const rise = dust ? 0.15 + random() * 0.25 : 0.6 + random() * 0.8;
+    const speed = (frag ? 3 + random() * 6 : 1 + random() * 2) * (dust ? 1.2 : 0.8);
+    const velocity = [Math.cos(turn) * speed, rise * speed, Math.sin(turn) * speed];
+    const size1 = frag ? (dust ? 1 + random() * 0.8 : 1.4 + random() * 1) : 0.5 + random() * 0.3;
+    puffs.push({ at: [at[0], at[1] + 0.1, at[2]], velocity, size0: 0.2, size1, grow: 0.35 + random() * 0.4, alpha: frag ? 0.75 : 0.45, life: frag ? 7 + random() * 6 : 3 + random() * 2 });
+  }
+  return puffs;
+}
+
+/**
+ * A grenade going off at `at`: a frag's orange flash of its burning charge and its light (far brighter than a gun's, for a
+ * moment), its smoke and dust; a flashbang's white flash, brighter still, and its puff.
+ */
+export function battleFxBlast(view, at, frag) {
+  const fx = battleFxOf(view);
+  const colour = frag ? BATTLE_FX.flashColour : [1, 1, 1];
+  const core = [at[0], at[1] + 0.25, at[2]];
+  fx.flashes.push({ at: core, size: frag ? 1.4 : 1.1, colour: colour.map((c) => c * 2.6), tail: [0, 0, 0], age: 0, seconds: frag ? 0.09 : 0.06 });
+  fx.flashes.push({ at: core, size: frag ? 0.8 : 0.6, colour: [2.4, 2.3, 2.1], tail: [0, 0.4, 0], age: 0, seconds: frag ? 0.06 : 0.05 });
+  fx.light.position.set(core[0], core[1] + 0.3, core[2]);
+  fx.light.color.fromArray(colour);
+  fx.lightAge = 0;
+  fx.lightPeak = BATTLE_FX.lightPeak * (frag ? 12 : 20);
+  for (const puff of battleFxBlastPuffs(at, frag)) {
+    if (fx.puffs.length >= BATTLE_FX.maxPuffs) fx.puffs.shift();
+    puff.spin = Math.random() * Math.PI * 2;
+    puff.spinRate = (Math.random() - 0.5) * 0.4;
+    puff.cell = Math.floor(Math.random() * 4);
+    fx.puffs.push(puff);
+  }
+}
+
 /** A brief flash of light where steel struck steel. */
 export function battleFxSpark(view, at, size = 0.14) {
   const fx = battleFxOf(view);

@@ -21,8 +21,8 @@ import { surfaceAt, surfaceUnder } from './surface.js';
 /** How many events the log keeps: a reader more than this far behind has lost the oldest. */
 export const SOUND_RING = 4096;
 
-// Heard over the whole map, wherever the ear is: thunder and gunpowder.
-const MAP_WIDE_SHOTS = new Set(['matchlock', 'cannon']);
+// Heard over the whole map, wherever the ear is: thunder and gunpowder (and a grenade's explosion).
+const MAP_WIDE_SHOTS = new Set(['matchlock', 'cannon', 'frag', 'flashbang']);
 
 /** Record a sound event at `data.x, data.y, data.z` (or `data.at`, a point), unless the ear is too far off to hear it. */
 export function soundEvent(world, type, data) {

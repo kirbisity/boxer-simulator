@@ -876,7 +876,8 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   // A round through the gun arm takes the gun with it.
   if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key)) dropWeapon(world, victim, 'disarmed', dir);
   if (victim.gunshot >= 1 && victim.state !== 'out') {
-    knockOut(world, victim, event, region === 'head' ? 'shot through the head' : 'shot dead', 'killed');
+    // (A grenade's fragment says so: `killedBy`, physics/throwable.js.)
+    knockOut(world, victim, event, shot?.killedBy ?? (region === 'head' ? 'shot through the head' : 'shot dead'), 'killed');
     return;
   }
   if (region !== 'limb') stagger(world, victim, WORLD.stagger.startAt + harm * 1.6, event, true);

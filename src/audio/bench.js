@@ -4,7 +4,7 @@
 // and the music's cues. Opened from Settings (menu.js), or `boxer.soundBench()`, or ?bench=sound. Browser only, but `measureFamilies`
 // (each family rendered offline, its peak and RMS) is how the families were checked without ears.
 
-import { EAR, airCutoff, createListener, earDirection, placeListener } from './ear.js';
+import { EAR, airCutoff, createListener, earDirection, isMapWide, placeListener } from './ear.js';
 import { PROBE_RAYS, roomFromProbe } from './acoustics.js';
 import { FAR_FIELD, createSectors } from './farfield.js';
 import { MUSIC_CUES } from './music/manifest.js';
@@ -79,6 +79,8 @@ export const MEASURE_PRESETS = [
   ['shot crossbow', { type: 'shot', kind: 'crossbow' }],
   ['shot matchlock (40 m)', { type: 'shot', kind: 'matchlock' }, 40],
   ['shot cannon (200 m)', { type: 'shot', kind: 'cannon' }, 200],
+  ['frag grenade (30 m)', { type: 'shot', kind: 'frag' }, 30],
+  ['flashbang (10 m)', { type: 'shot', kind: 'flashbang' }, 10],
   ['arrow hit mail', { type: 'arrowhit', speed: 55, covering: 'mail' }],
   ['mech door shut', { type: 'mech', kind: 'door', state: 'closed' }],
   ['mech portcullis', { type: 'mech', kind: 'portcullis', state: 'down' }],
@@ -103,7 +105,7 @@ export async function measureFamilies(Offline = globalThis.OfflineAudioContext) 
     ...MEASURE_PRESETS.map(([name, event, distance = 2]) => [name, (voice, out, when) => {
       const family = SOUND_FAMILIES[event.type];
       const params = family.params(event);
-      const mapWide = event.type === 'thunder' || event.kind === 'matchlock' || event.kind === 'cannon';
+      const mapWide = isMapWide(event);
       const atEar = params.level + 20 * Math.log10(mapWide ? 1 / distance : Math.max(EAR.floor, 1 / distance));
       return family.play(voice, out, params, when, gainOfLevel(atEar));
     }, distance]),
@@ -273,7 +275,7 @@ export function installSoundBench(engine) {
         select('Height (m)', 'size', ['1.5', '1.65', '1.78', '1.9', '2.05']),
         select('Body (kg)', 'bodyMass', ['55', '70', '80', '95', '120']),
         select('Horse', 'horse', ['hoof', 'snort', 'neigh']),
-        select('Shot', 'shot', ['bow', 'crossbow', 'matchlock', 'cannon']),
+        select('Shot', 'shot', ['bow', 'crossbow', 'matchlock', 'cannon', 'frag', 'flashbang']),
         select('Mechanism', 'mech', Object.keys(MECHS)),
         select('Its state', 'mechState', ['open', 'closed'])),
       readout);
