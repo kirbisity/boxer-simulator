@@ -1,24 +1,21 @@
-// Which design the arena helmets and the samurai war masks are drawn in, while the options are compared (a design study:
-// the user picks one, the others go). Plain (no Three.js).
+// Which design the arena helmets and the samurai war masks are drawn in. Plain (no Three.js).
 //
-//   #helmets=now|a|b|c   the gladiators' helmets (arenaview.js): now, the detailed geometry as it was; a "lean", the
-//                        geometry cut hard and the detail in baked maps; b "balanced", the silhouette's features kept as
-//                        geometry, the fine work in maps; c "showpiece", the full silhouette and richer embossed, gilt maps.
+//   #helmets=new|now     the gladiators' helmets (arenaview.js): new (the default), remodelled from the surviving helmets
+//                        (helmforms.js), the fine work in baked maps; now, the geometry as it was before, for comparison.
 //   #masks=now|oni|ressei|tengu   the samurai's face masks (menpo.js): now, the simple shapes as they were; an oni somen
 //                        (the whole face, a demon's); a ressei-men (the fierce old man, a horsehair moustache); a karasu
-//                        tengu (a crow's beak).
+//                        tengu (a crow's beak). A mask other than `now` needs the detail maps (`#maps=off` draws `now`).
 //
-// Anything but `now` needs the detail maps (`#maps=off` draws `now`). `boxer.helmStyle({ helmets, masks })` switches them in a
-// running page and draws the fighters again.
+// `boxer.helmStyle({ helmets, masks })` switches them in a running page and draws the fighters again.
 
-export const HELMET_STYLES = ['now', 'a', 'b', 'c'];
+export const HELMET_STYLES = ['new', 'now'];
 export const MASK_STYLES = ['now', 'oni', 'ressei', 'tengu'];
 
-/** The styles an address's hash asks for (`now` for anything missing or unknown). */
+/** The styles an address's hash asks for (the first of each list for anything missing or unknown). */
 export function helmStyleFrom(hash = '') {
   const read = (key, allowed) => {
     const match = new RegExp(`(?:^|[#&])${key}=([a-z]+)`).exec(hash);
-    return match && allowed.includes(match[1]) ? match[1] : 'now';
+    return match && allowed.includes(match[1]) ? match[1] : allowed[0];
   };
   return { helmets: read('helmets', HELMET_STYLES), masks: read('masks', MASK_STYLES) };
 }

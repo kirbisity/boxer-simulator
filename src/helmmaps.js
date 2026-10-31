@@ -1,18 +1,23 @@
-// The arena helmets' and the war masks' baked maps (helmmaps-data.js: authored by tools/blender/helmsheets.py, baked in
-// Blender by helmbake.py, packed by packhelm.py): each helmet kind has one sheet (an atlas), and each part of the helmet
-// lays its texture coordinates into its own region of it, folded at the middle of the face (the two halves of a helmet
-// mirror each other, so the sheet holds only one, at twice the detail). The regions here are helmsheets.py's.
+// The arena helmets' and the war masks' baked maps (helmmaps-data.js: authored by tools/blender/helmforms.py for the
+// helmets, over the remodelled surfaces of helmforms.js, and by helmsheets.py for the masks; baked in Blender by
+// helmbake.py, packed by packhelm.py): each helmet kind has one sheet (an atlas), and each part of the helmet lays its
+// texture coordinates into its own region of it (helmforms.js FORM_REGIONS), folded at the middle of the face (the two
+// halves of a helmet mirror each other, so the sheet holds only one, at twice the detail).
 //
-// What the detail is drawn from (photographs not copied; see helmsheets.py for which detail is whose):
+// What the helmets are drawn from (photographs not copied; see helmforms.js and helmforms.py for which detail is whose):
 //   Pompeii gladiator barracks finds, Naples National Archaeological Museum, listed with inventory numbers and
 //     descriptions at https://pompeiiinpictures.eu/R8/8%2007%2016%20p7.htm (thraex inv. 5649, griffin crest and Gorgon;
 //     murmillo inv. 5672, 5673, 5674; secutor inv. 5642; provocator inv. 5657).
-//   British Museum murmillo helmet 1946,0514.1 (Room 69, Hercules head at the front):
-//     https://imperiumromanum.pl/en/curiosities/helmet-of-murmillo-in-the-british-museum/ ; the grille of linked circles:
-//     https://heritage-key.com/?p=3936
-//   The Louvre's thraex helmet from Pompeii (given to Napoleon, 1802): https://following-hadrian.libraries.rutgers.edu/items/show/120
+//   British Museum murmillo helmet 1946,0514.1 (Room 69, Hercules head at the front, about 3.5 kg):
+//     https://imperiumromanum.pl/en/curiosities/helmet-of-murmillo-in-the-british-museum/ ; 46 cm high:
+//     https://www.ipernity.com/doc/laurieannie/37607936
+//   The Louvre's thraex helmet from Pompeii (Br 1108, 38 cm; broad brim, griffin, Gorgon, feather holders, movable visor
+//     with a grille): https://heritage-key.com/?p=3936 ; https://following-hadrian.libraries.rutgers.edu/items/show/120
+//   The thraex's crest ending in a griffin, feather sockets, palm: https://penelope.uchicago.edu/~grout/encyclopaedia_Romana/gladiators/thraexhelmet.html
+//   The secutor's two small eyeholes, rounded top, smooth fin-like flanges: https://en.wikipedia.org/wiki/Secutor ;
+//     https://penelope.uchicago.edu/encyclopaedia_romana/gladiators/secutorhelmet.html
+//   The scissor's closed helmet, like the secutor's or the hoplomachus's: https://en.wikipedia.org/wiki/Scissor_(gladiator)
 //   The 2025 Leeds loan of three Pompeii helmets: https://www.theartnewspaper.com/2025/06/23/are-you-not-entertained-three-ancient-helmets-headline-uk-exhibition-exploring-gladiators
-//   The secutor's small round eyeholes: https://penelope.uchicago.edu/encyclopaedia_romana/gladiators/secutorhelmet.html
 //   Samurai masks, the Met: somen https://www.metmuseum.org/art/collection/search/24176 , grimacing man (Myōchin
 //     Munesuke) https://www.metmuseum.org/art/collection/search/22080 , mountain demon https://www.metmuseum.org/art/collection/search/24145 ,
 //     tengu https://www.metmuseum.org/art/collection/search/23997 , menpō https://www.metmuseum.org/art/collection/search/31974 ;
@@ -22,13 +27,6 @@
 /* global THREE */
 import { HELM_MAP_DATA } from './helmmaps-data.js';
 import { DETAIL_MAPS } from './detailmaps.js';
-
-/** The sheets' regions (u0, v0, u1, v1; v up), as helmsheets.py lays them out. */
-export const HELM_REGIONS = {
-  brim: { bowl: [0, 0.64, 1, 1], brim: [0, 0.47, 1, 0.64], visor: [0, 0, 0.44, 0.47], crest: [0.44, 0.12, 1, 0.47], plain: [0.44, 0, 0.56, 0.12], tube: [0.56, 0, 1, 0.12] },
-  secutor: { shell: [0, 0.25, 1, 1], fin: [0, 0, 0.62, 0.25], guard: [0.62, 0, 1, 0.25], plain: [0.64, 0.02, 0.98, 0.1] },
-  scissor: { bowl: [0, 0.6, 1, 1], plate: [0, 0, 0.36, 0.6], guard: [0.36, 0, 1, 0.6], plain: [0.4, 0.4, 0.6, 0.5] },
-};
 
 /** Whether the helmets' and masks' maps can be drawn (a browser, the maps on). */
 export function helmMapsReady() {
@@ -115,42 +113,6 @@ export function maskMaterial(name, tint, envMap) {
   material.customProgramCacheKey = () => 'war-mask';
   return material;
 }
-
-// ---- Texture coordinates laid into a region -------------------------------------------------------------------------
-
-/** Set a geometry's texture coordinates: `at(position, uv)` -> [u, v] in 0..1 over the region `rect`. */
-export function layUv(geometry, rect, at) {
-  const position = geometry.attributes.position;
-  const old = geometry.attributes.uv;
-  const uv = new Float32Array(position.count * 2);
-  const p = new THREE.Vector3();
-  for (let index = 0; index < position.count; index += 1) {
-    p.fromBufferAttribute(position, index);
-    const [u, v] = at(p, old ? [old.getX(index), old.getY(index)] : [0, 0]);
-    uv[index * 2] = rect[0] + Math.min(1, Math.max(0, u)) * (rect[2] - rect[0]);
-    uv[index * 2 + 1] = rect[1] + Math.min(1, Math.max(0, v)) * (rect[3] - rect[1]);
-  }
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  return geometry;
-}
-
-/** The angle from the front (+x), folded (0 at the front, 1 at the back, the same either side). */
-export const foldedAngle = (p) => Math.abs(Math.atan2(p.z, p.x)) / Math.PI;
-
-/** A lathe's coordinates: round it the folded angle, along it three's own v (by profile point, the bottom first). */
-export const latheUv = (p, uv) => [foldedAngle(p), uv[1]];
-
-/** A sphere patch's: the folded angle over `az` either side, the polar angle from `bottom` (0) up to `top` (1). */
-export const sphereUv = (top, bottom, az) => (p) => [Math.abs(Math.atan2(p.z, p.x)) / az, (bottom - Math.acos(Math.max(-1, Math.min(1, p.y / p.length())))) / (bottom - top)];
-
-/** A cylinder's (three's: the angle about y from +z): the folded angle over `half`, up it three's own v. */
-export const cylinderUv = (half) => (p, uv) => [Math.abs(Math.atan2(p.x, p.z)) / half, uv[1]];
-
-/** A flat side view: x and y (head coordinates) over the rectangle (x0, y0)-(x1, y1). */
-export const planarUv = (x0, y0, x1, y1) => (p) => [(p.x - x0) / (x1 - x0), (p.y - y0) / (y1 - y0)];
-
-/** Three's own coordinates, squeezed into the region. */
-export const ownUv = (p, uv) => uv;
 
 /** Triangles drawn for a group (outlines included), for the comparison. */
 export function triangleCount(object) {

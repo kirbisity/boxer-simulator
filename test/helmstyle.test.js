@@ -2,19 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { helmStyleFrom, HELM_STYLE, setHelmStyle } from '../src/helmstyle.js';
 import { HELM_MAP_DATA } from '../src/helmmaps-data.js';
+import { HELM_FORMS } from '../src/helmforms.js';
 
-test('the helmet and mask designs under study are read from the address, now unless asked', () => {
-  assert.deepEqual(helmStyleFrom(''), { helmets: 'now', masks: 'now' });
-  assert.deepEqual(helmStyleFrom('#helmets=b&masks=ressei'), { helmets: 'b', masks: 'ressei' });
-  assert.deepEqual(helmStyleFrom('#maps=off&helmets=c'), { helmets: 'c', masks: 'now' });
-  assert.deepEqual(helmStyleFrom('#helmets=z&masks=kabuki'), { helmets: 'now', masks: 'now' });
-  assert.deepEqual(HELM_STYLE, { helmets: 'now', masks: 'now' });
-  assert.deepEqual(setHelmStyle({ helmets: 'a', masks: 'nope' }), { helmets: 'a', masks: 'now' });
-  setHelmStyle({ helmets: 'now' });
+test('the helmets are the remodelled ones unless the address asks for the old; the masks as they were unless asked', () => {
+  assert.deepEqual(helmStyleFrom(''), { helmets: 'new', masks: 'now' });
+  assert.deepEqual(helmStyleFrom('#helmets=now&masks=ressei'), { helmets: 'now', masks: 'ressei' });
+  assert.deepEqual(helmStyleFrom('#maps=off&helmets=now'), { helmets: 'now', masks: 'now' });
+  assert.deepEqual(helmStyleFrom('#helmets=b&masks=kabuki'), { helmets: 'new', masks: 'now' });
+  assert.deepEqual(HELM_STYLE, { helmets: 'new', masks: 'now' });
+  assert.deepEqual(setHelmStyle({ helmets: 'now', masks: 'nope' }), { helmets: 'now', masks: 'now' });
+  setHelmStyle({ helmets: 'new' });
 });
 
-test('every helmet and mask sheet is baked; a mask carries its mesh relief', () => {
-  for (const name of ['helmBrim', 'helmBrimThraex', 'helmBrimMurmillo', 'helmSecutor', 'helmScissor', 'maskOni', 'maskRessei', 'maskTengu']) {
+test('every helmet kind and mask has its sheet baked; a mask carries its mesh relief', () => {
+  const sheets = [...Object.values(HELM_FORMS).map((form) => form.sheet), 'maskOni', 'maskRessei', 'maskTengu'];
+  for (const name of sheets) {
     const sheet = HELM_MAP_DATA[name];
     assert.ok(sheet && sheet.albedo && sheet.normal && sheet.orm, name);
     if (name.startsWith('mask')) assert.equal(sheet.grid.heights.length, sheet.grid.size ** 2, name);
