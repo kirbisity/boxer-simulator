@@ -272,4 +272,27 @@ loose. A fire burning (13.1 s, steady throughout, a big fire's crackle and low r
 whose ends match best, its last second crossfaded into its head at equal power, RMS -20 dBFS, 32 kHz, the period's own 0.25 s either
 side), 6.24 s (short, to keep it small: each fire reads it from a random point, at its own pitch, so two fires side by side are not heard
 in step). Checked decoded and looped four times: the step across each seam is within the rest's (0.020 against a 99th percentile of 0.038),
-its change of spectrum under the median. Not used yet: the batch's grenade, flamethrower and explosion.
+its change of spectrum under the median. The batch's grenade and explosion are cut below; its flamethrower is not used yet.
+
+## Explosions (10-31): a frag grenade, a flashbang, the cannon
+
+Cut from two of the user's recordings of 10-31 (as WAV, mono 44.1 kHz): "Grenade explosion" (12.8 s: four blasts, each from
+silence, the fourth cut off by the recording's end and not used) and "Big Explosion" (9 s: one long roar, 1.5-7.6 s). Each cut
+from its transient (the first sample within 24 dB of its peak, 1 ms before it), faded out squared over its last second or so,
+peak-normalised to -1 dBFS, MP3 32 kHz 32 kb/s (the rumble 16 kHz 24 kb/s: it has nothing above 300 Hz). 8 files, 58 KB.
+
+| File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
+|---|---|---|---|---|---|---|
+| grenade-1.mp3 | eef9aeab.wav | 0.354-3.154 | Grenade explosion | 0.104 | 11376 | the first blast, capped at 2.8 s (fade 1.1 s); shot `frag`: a frag grenade going off (physics/throwable.js), the rumble under it |
+| grenade-2.mp3 | eef9aeab.wav | 5.543-8.343 | Grenade explosion | 0.093 | 11376 | the second blast, the same; shot `frag` |
+| grenade-3.mp3 | eef9aeab.wav | 10.541-11.750 | Grenade explosion | 0.091 | 5040 | the third, shorter (its tail cut in the recording, faded 0.25 s); shot `frag` |
+| flashbang-1.mp3 | eef9aeab.wav | 0.354-0.754 | Grenade explosion | 0.104 | 1872 | the first blast's head, high-passed at 900 Hz (4th order: its boom gone), 0.4 s, faded 0.3 s; shot `flashbang`: a stun grenade's crack |
+| flashbang-2.mp3 | eef9aeab.wav | 5.543-5.943 | Grenade explosion | 0.093 | 1872 | the second's head, the same; shot `flashbang` |
+| flashbang-3.mp3 | eef9aeab.wav | 10.541-10.941 | Grenade explosion | 0.091 | 1872 | the third's head, the same; shot `flashbang` |
+| explosion-big-1.mp3 | f18560c8.wav | 1.582-4.782 | Big Explosion | 0.182 | 12960 | the roar's first 3.2 s (fade 1.4 s); shot `cannon` (its first 3 s, a little lower, the pistol's report slowed to half over its head) |
+| explosion-rumble-1.mp3 | f18560c8.wav | 1.592-5.592 | Big Explosion | 0.192 | 12312 | the roar low-passed at 280 Hz (4th order), 4 s (fade 1.8 s); under a frag's blast (its weight: what a phone's recording of one has little of) |
+
+The cannon was the pistol's report slowed to half under the synth's boom; it is now the recorded big explosion, a far bigger
+report than any gun's and a recorded one, with the slowed report kept over its head for the crack and the synth's boom quieter.
+A flashbang's ringing in the ears of the man played (near it, looking) is the engine's own (engine.js `deafen`: a high tone
+fading, the mix low-passed and ducked for a few seconds), not a recording.

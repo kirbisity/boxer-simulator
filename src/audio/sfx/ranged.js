@@ -12,6 +12,10 @@ export const SHOTS = {
   crossbow: { level: 92, thrum: 75, seconds: 0.3, knock: 260 },
   matchlock: { level: 150, seconds: 0.9, boom: 160 },
   cannon: { level: 165, seconds: 3, boom: 55 },
+  // Hand grenades (physics/throwable.js): a frag's 185 g of explosive is a deep crack and a rolling boom, ~170 dB at 1 m;
+  // a flashbang's bang is all crack (its few grams burn in a flash, 170-180 dB at 1.5 m), short and high, hardly a boom.
+  frag: { level: 172, seconds: 2.5, boom: 65 },
+  flashbang: { level: 174, seconds: 0.5, boom: 220 },
 };
 
 /** What a shot sounds like, without a context. */

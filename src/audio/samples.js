@@ -82,6 +82,13 @@ export const SAMPLE_SETS = {
   ...voiceSets({ male: { hurt: 7, scream: 3, moan: 4, fear: 4, dying: 2 }, female: { hurt: 4, scream: 3, moan: 3, fear: 2, dying: 2 } }),
   // An army's charge roared: one loop (engine.js plays it under a large side running at the enemy: audio/charge.js).
   charge: ['charge-1'],
+  // Explosions (cut from the user's grenade and big-explosion recordings of 10-31): a frag's blast (three), a flashbang's
+  // crack (the head of each blast, high-passed: its boom gone), a big explosion's whole roar (the cannon) and its low rumble
+  // alone (under a frag).
+  grenade: ['grenade-1', 'grenade-2', 'grenade-3'],
+  flashbang: ['flashbang-1', 'flashbang-2', 'flashbang-3'],
+  'explosion-big': ['explosion-big-1'],
+  'explosion-rumble': ['explosion-rumble-1'],
 };
 
 /** The cry sets: voice-<sex>-<kind>, each `count` takes. */

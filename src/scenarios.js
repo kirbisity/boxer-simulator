@@ -8,7 +8,7 @@ import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
 import { atahualpa, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, wokouSamurai, yakuza } from './cast.js';
-import { gallicHorseman, gothWarrior, hunRider, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from './cast.js';
+import { gallicHorseman, gothWarrior, hunRider, infantrySoldier, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from './cast.js';
 
 // Rome against Han: thirty-five a side (every level's armies are kept to about seventy men in all: the
 // physics steps every one of them every frame), ten to a rank; a centurion to every
@@ -699,6 +699,11 @@ export const ARMIES = {
     label: 'SWAT',
     ranks: { officer: { label: 'Officer', kinds: ['swat'], styles: ['handgun', 'baton'], make: (random, style) => swatOfficer(random, style) } },
   },
+  // Modern infantry: riflemen with the M4, each carrying one frag grenade (outfits.js infantry).
+  infantry: {
+    label: 'Infantry',
+    ranks: { rifleman: { label: 'Rifleman', kinds: ['infantry'], styles: ['rifle'], make: (random) => infantrySoldier(random) } },
+  },
   yakuza: {
     label: 'The yakuza',
     ranks: { soldier: { label: 'Yakuza', kinds: ['yakuza'], styles: ['knife', 'katana', 'handgun'], make: (random, style) => yakuza(random, style) } },
@@ -1312,7 +1317,7 @@ export const SCENARIOS = {
       blue: [yakuza(random, 'knife'), yakuza(random, 'katana'), yakuza(random, 'knife'), yakuza(random, 'handgun'), yakuza(random, 'knife'), yakuza(random, 'knife')],
     }),
     // The armies its sides may be set up from (ARMIES; muster.js).
-    armies: { red: ['swat'], blue: ['yakuza'] },
+    armies: { red: ['swat', 'infantry'], blue: ['yakuza'] },
     fighters: [],
   },
   pride: {

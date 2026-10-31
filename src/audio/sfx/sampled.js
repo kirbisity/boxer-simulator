@@ -351,7 +351,14 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       // synth's deep boom and rumble carrying it.
       if (params.kind === 'bow') return { set: 'bow', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.06, skip: 0, synth: params, synthGain: 0.45 };
       if (params.kind === 'crossbow') return { set: 'crossbow', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.1, skip: 0, synth: params, synthGain: 0.3 };
-      if (params.kind === 'cannon') return { set: 'gunshot', trim: 1, rate: 0.5 * jitter(0.04), seconds: null, fade: 0.8, skip: 0, synth: params, synthGain: 0.8 };
+      // (A cannon is now the recorded big explosion's roar, its first 3 s, with the pistol's report slowed to half laid over its
+      // head for the crack and the synth's boom under it, quieter: a far bigger report than a gun's, and a recorded one.)
+      if (params.kind === 'cannon') return { set: 'explosion-big', trim: 1, rate: 0.9 * jitter(0.04), seconds: 3, fade: 1.2, skip: 0, synth: params, synthGain: 0.4, extra: [{ set: 'gunshot', trim: 0.6, rate: 0.5 * jitter(0.04), seconds: null, fade: 0.5, skip: 0, delay: 0 }] };
+      // A frag grenade (physics/throwable.js): one of the grenade's blasts, the big explosion's low rumble under it (a frag's
+      // weight of explosive: the roll a phone's recording of one has little of), the synth's boom quieter beside them. A
+      // flashbang: the crack alone (a blast's head, high-passed), short, the synth's crack beside it.
+      if (params.kind === 'frag') return { set: 'grenade', trim: 1, rate: jitter(0.05), seconds: null, fade: 0.9, skip: 0, synth: params, synthGain: 0.3, extra: [{ set: 'explosion-rumble', trim: 0.7, rate: jitter(0.04), seconds: 3.5, fade: 1.5, skip: 0, delay: 0.01 }] };
+      if (params.kind === 'flashbang') return { set: 'flashbang', trim: 1, rate: 1.05 * jitter(0.05), seconds: 0.3, fade: 0.15, skip: 0, synth: params, synthGain: 0.3 };
       if (params.kind !== 'matchlock') return null;
       return { set: 'gunshot', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.3, skip: 0, synth: params, synthGain: 0.35 };
     case 'thunder': {

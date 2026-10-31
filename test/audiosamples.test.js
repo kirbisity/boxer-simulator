@@ -263,8 +263,8 @@ test('the fifth batch: a bow, a crossbow, a portcullis, a sword on mail and into
   assert.ok(plan({ type: 'shot', kind: 'bow' }).synth, 'the synth\'s thrum of the string under the release');
   assert.equal(plan({ type: 'shot', kind: 'crossbow' }).set, 'crossbow');
   const cannon = plan({ type: 'shot', kind: 'cannon' });
-  assert.equal(cannon.set, 'gunshot');
-  assert.ok(cannon.rate < 0.6 && cannon.synth, 'a cannon: the report slowed, the synth\'s boom under it');
+  assert.equal(cannon.set, 'explosion-big');
+  assert.ok(cannon.extra[0].set === 'gunshot' && cannon.extra[0].rate < 0.6 && cannon.synth, 'a cannon: the big explosion\'s roar, the report slowed over its head, the synth\'s boom under it');
   const down = plan({ type: 'mech', kind: 'portcullis', state: 'down' });
   assert.equal(down.set, 'portcullis-chain');
   assert.deepEqual(down.extra.map((layer) => layer.set), ['portcullis-slam']);
@@ -479,4 +479,15 @@ test('a bow\'s creak is fitted to its draw: a quick draw squeezed, a slow one st
   // Not a crossbow's nor a gun's: the shot's plans are as they were.
   assert.equal(plan({ type: 'shot', kind: 'crossbow' }).set, 'crossbow');
   assert.equal(SOUND_FAMILIES.draw.sampledOnly, true, 'no synth creak: silent until the takes load');
+});
+
+test('grenades: a frag is a grenade blast with the big explosion\'s rumble under it, a flashbang the crack alone; both heard map-wide', () => {
+  for (const set of ['grenade', 'flashbang', 'explosion-big', 'explosion-rumble']) assert.ok(SAMPLE_SETS[set]?.length, set);
+  const frag = plan({ type: 'shot', kind: 'frag' });
+  assert.equal(frag.set, 'grenade');
+  assert.deepEqual(frag.extra.map((layer) => layer.set), ['explosion-rumble']);
+  const flash = plan({ type: 'shot', kind: 'flashbang' });
+  assert.equal(flash.set, 'flashbang');
+  assert.ok(flash.seconds < 0.5 && !flash.extra, 'short, no rumble');
+  assert.ok(SOUND_FAMILIES.shot.params({ kind: 'frag' }).level > 160);
 });

@@ -16,6 +16,7 @@ import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from '.
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, loadStop, LONG_GUN, MAGAZINE_CHANGE, raisedAim, reload, reloadKind, sightsOn, SUPPORT_GRIP, TUBE_LOAD } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
+import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, coiledTwist, hiltMix, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
@@ -160,6 +161,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined, artEventCursor: undefined,
     // The player's weapon art banked (weaponarts.js: charged at his blood's height, kept till he makes it).
     artCharged: undefined,
+    // A hand grenade carried (physics/throwable.js: { kind, left }, from his kit) and the throw under way ({ kind, hand, t, mark, lit, released }).
+    throwable: undefined, throwing: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
@@ -198,6 +201,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
   for (const [a, b] of BONE_LINKS) addConstraint(fighter, a, b, 0);
   for (const [a, b, key] of BRACES) addConstraint(fighter, a, b, WORLD[key]);
   armFighter(fighter, fighter.style, { random: random ?? Math.random });
+  fighter.throwable = carriedThrowable(body.gear);
   return fighter;
 }
 
@@ -1852,7 +1856,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   const drain = cost / fighter.body.aerobic;
   // On his knees by his own choice (the player's crawl), a blow of the hand is still his: low and weak (WORLD.crawl.strike).
   const fromKnees = fighter.crawling && fighter.crawlChosen && fighter.player && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
-  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
+  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
   if (blade && fighter.caught && blade === caughtBlade(fighter)) return false;
   const aimZone = fromKnees ? 'legs' : spec.zones.includes(zone) ? zone : spec.zones[0];
@@ -2335,6 +2339,8 @@ function updateIntent(world, fighter, dt) {
       intent[`${side}Foot`] = [0.06 * H - L.shank * 0.95, L.ankle, sign * 0.11 * H];
     }
   }
+  // Throwing a grenade: the throwing arm's pin, wind and release (physics/throwable.js).
+  if (fighter.throwing) throwPose(fighter, intent);
   if (fighter.finisher?.kneeling) finisherPose(fighter, intent);
   if (fighter.lowStrike?.stoop > 0) stoopPose(fighter, intent);
   if (fighter.kneel) kneelPose(fighter, intent);
@@ -3509,6 +3515,7 @@ export function step(world, dt) {
   moveDebris(world, dt);
   if (world.arrows.length) flyArrows(world, dt);
   if (world.nets?.length) flyNets(world, dt);
+  if (world.thrown?.length) flyThrown(world, dt);
   if (world.brushTouches) holdBrushes(world, dt);
   payForBlocks(world);
   world.time += dt;
@@ -4100,6 +4107,8 @@ function updateTimers(world, fighter, dt) {
     if (fighter.state !== 'up' || painShare(fighter) <= 0 && fighter.pain.t > 0.3) fighter.pain = null;
   }
   reload(world, fighter, dt);
+  // A grenade on its way out of his hand (physics/throwable.js).
+  if (fighter.throwing) stepThrow(world, fighter, dt);
   // A machine (gear.machine: a robot) has no blood: what would open a wound in a man opens nothing that
   // bleeds, and it is never weakened or dropped by blood loss; only broken (its injuries, below) or knocked out.
   if (fighter.body.gear.machine) fighter.bleed = 0;

@@ -22,6 +22,7 @@ import { FIGHT_UI_CONTROL_ICONS } from './fightui/icons.js';
 import { fightUiCommandBar } from './fightui/command.js';
 import { paintStamina } from './overdraftview.js';
 import { ARTS, artBlocked, artLabel, artPrimed } from './weaponarts.js';
+import { throwableOf } from './physics/throwable.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -444,9 +445,13 @@ export function installFightControls(root, hooks) {
       const label = artLabel(me);
       if (art.querySelector('.label').textContent !== label) art.querySelector('.label').textContent = label;
       const winded = artBlocked(me) === 'winded';
+      // (A grenade carried has the button first: its own mark, no adrenaline asked: physics/throwable.js.)
+      const grenade = Boolean(throwableOf(me));
+      const glyph = grenade ? '💣' : '✦';
+      if (art.querySelector('b').textContent !== glyph) art.querySelector('b').textContent = glyph;
       art.classList.toggle('winded', winded);
       art.querySelector('.why').textContent = winded ? 'winded' : '';
-      art.setAttribute('aria-label', winded ? `${label}: weapon art, too winded` : `${label}: weapon art`);
+      art.setAttribute('aria-label', grenade ? `${label}: throw it` : winded ? `${label}: weapon art, too winded` : `${label}: weapon art`);
     }
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
     lock.classList.toggle('on', Boolean(locked));
@@ -467,7 +472,8 @@ export function installFightControls(root, hooks) {
     paintStamina(status.querySelector('.stamina'), me.stamina);
     const adrenaline = status.querySelector('.adrenaline');
     adrenaline.querySelector('i').style.width = `${Math.round(Math.min(1, me.adrenaline ?? 0) * 100)}%`;
-    adrenaline.classList.toggle('primed', artPrimed(me));
+    // (Lit for the art's charge, not for a grenade, which asks none.)
+    adrenaline.classList.toggle('primed', artPrimed(me) && !throwableOf(me));
     // His man: the one locked, or the one he is on; a marker over his head.
     const target = locked ?? foeFor(world, me);
     for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) awake.set(event.defender, now);

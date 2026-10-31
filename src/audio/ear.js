@@ -96,9 +96,9 @@ export function behindCutoff(azimuth) {
   return 20000 * (EAR.behindCutoff / 20000) ** behind;
 }
 
-/** Whether an event is heard over the whole map (thunder, a gun, a cannon): never thinned, never cut off by the circle. */
+/** Whether an event is heard over the whole map (thunder, a gun, a cannon, a grenade): never thinned, never cut off by the circle. */
 export function isMapWide(event) {
-  return event.type === 'thunder' || (event.type === 'shot' && (event.kind === 'matchlock' || event.kind === 'cannon'));
+  return event.type === 'thunder' || (event.type === 'shot' && (event.kind === 'matchlock' || event.kind === 'cannon' || event.kind === 'frag' || event.kind === 'flashbang'));
 }
 
 /** The level at the ear (dB SPL) of a level at 1 m heard `distance` m off (with the circle's floor). */

@@ -417,6 +417,8 @@ export const OUTFITS = {
     label: 'SWAT', movement: 'limited', fists: 'gloved-tactical',
     palette: [['charcoal', 'charcoal'], ['olive', 'olive'], ['slate', 'slate']],
     balance: 1.5, extraMass: 0.2,
+    // A flashbang on the vest (the M84 a tactical team throws into a room before it goes in: weapons.js THROWABLES).
+    throwable: 'flashbang',
     // The ballistic vest guards the torso: against rounds; against a blade
     // its fabric turns some of a slash and little of a point. The helmet
     // takes blows; riot pads on the limbs spread a blow but not an edge.
@@ -486,6 +488,29 @@ export const OUTFITS = {
     designs: [
       { label: 'Coyote carrier, green uniform', top: { kind: 'longsleeve', color: '#5a5e44' }, bottom: { kind: 'cargo', color: '#4e523c' }, armor: { kind: 'plateCarrier', color: '#7a6a4a', cloth: '#7a6a4a', cloth2: '#4a3e2a' }, head: { kind: 'opsHelmet', color: '#6a5e44' }, feet: { kind: 'tacticalBoot', color: '#5a4a32' } },
       { label: 'Black carrier, grey uniform', top: { kind: 'longsleeve', color: '#4a4c50' }, bottom: { kind: 'cargo', color: '#3a3c40' }, armor: { kind: 'plateCarrier', color: '#1c1d20', cloth: '#1c1d20', cloth2: '#2c2d31' }, head: { kind: 'opsHelmet', color: '#1c1d20' }, feet: { kind: 'tacticalBoot', color: '#141416' } },
+    ],
+  },
+  // A modern infantry rifleman (a US soldier of the 2010s-20s): the combat uniform in its camouflage, the combat helmet
+  // (aramid, rated against pistol rounds and fragments), a plate carrier with rifle plates front and back and soft armour
+  // round the sides, and the fighting load (magazines, water, aid kit, one frag grenade: `throwable`, weapons.js
+  // THROWABLES): ~25 kg. A soldier's training is shorter than special forces' and broader than a police team's; his
+  // helmet and plates are as good as theirs, his limbs as bare (a fragment or a round there is stopped by nothing).
+  infantry: {
+    // Trained: basic and unit training (`skill`: OUTFITS' tiers).
+    skill: 0.55,
+    faction: 'law', bulletRating: 4000, plated: true,
+    label: 'Infantry — combat uniform', movement: 'limited', fists: 'gloved-tactical',
+    sidearm: 'dagger',
+    throwable: 'frag',
+    extraMass: 0.32,
+    courage: 0.45,
+    protection: {
+      blunt: 0.4, cut: 0.5, pierce: 0.2, bullet: { head: 0.55, torso: 0.95, limb: 0 },
+      regions: { head: { blunt: 0.55, cut: 0.6, pierce: 0.4 }, limb: { blunt: 0.05, cut: 0.1, pierce: 0.05 } },
+    },
+    designs: [
+      { label: 'Camouflage, coyote carrier', top: { kind: 'longsleeve', color: '#7a765a' }, bottom: { kind: 'cargo', color: '#706c52' }, armor: { kind: 'plateCarrier', color: '#7a6a4a', cloth: '#7a6a4a', cloth2: '#5e5238' }, head: { kind: 'opsHelmet', color: '#6e6650' }, feet: { kind: 'tacticalBoot', color: '#9a8462' } },
+      { label: 'Woodland, green carrier', top: { kind: 'longsleeve', color: '#4f5640' }, bottom: { kind: 'cargo', color: '#474d3a' }, armor: { kind: 'plateCarrier', color: '#4a5038', cloth: '#4a5038', cloth2: '#3a3f2c' }, head: { kind: 'opsHelmet', color: '#4a5038' }, feet: { kind: 'tacticalBoot', color: '#3a3226' } },
     ],
   },
   knight: {
@@ -2060,7 +2085,7 @@ export const FACTIONS = {
   // Parthia (Surena's army at Carrhae, 53 BC): Iranian horsemen.
   parthians: { label: 'Parthia', glyph: '🏹', standard: { weapon: 'tug' }, blurb: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.' },
   romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
-  law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT and special forces: the baton, the service pistol, the shotgun and the AR-15.' },
+  law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade.' },
   specials: { label: 'Beasts & Machines', glyph: '🦍', blurb: 'Not men: a silverback gorilla, a humanoid robot, and a combat bot whose forearms are an AR-15 and a shotgun.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
@@ -2230,6 +2255,8 @@ export function gearTraits(inputs) {
     breastplate: spec.breastplate ?? 0,
     // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.
     sidearm: inputs.sidearm ?? spec.sidearm ?? null,
+    // A hand grenade carried with this kit (weapons.js THROWABLES: 'frag', 'flashbang'), thrown once (physics/throwable.js); a man's own (`inputs.throwable`, null for none) before the kit's.
+    throwable: inputs.throwable !== undefined ? inputs.throwable : spec.throwable ?? null,
     // Weapons built into the forearms, by side (`mounted`: { r, l }, weapon kinds): one in use at a time, the other drawn on its arm.
     mounted: spec.mounted ?? null,
     // Never takes up a weapon off the floor (a beast).

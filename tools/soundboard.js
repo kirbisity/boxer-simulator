@@ -122,7 +122,9 @@ function board() {
         return sound({ type: 'shot', kind: 'bow' }, when + seconds);
       }, ends: ['a quick 0.45 s', 'a slow 1.1 s'], note: 'One action in the game, two sounds: the draw, then the release.' },
       { title: 'Crossbow', sets: ['crossbow'], isNew: true, event: () => ({ type: 'shot', kind: 'crossbow' }), ends: null },
-      { title: 'Cannon at 200 m', sets: ['gunshot'], isNew: true, event: () => ({ type: 'shot', kind: 'cannon' }), distance: 200, ends: null, note: 'The pistol\'s report at half speed over the synth\'s boom.' },
+      { title: 'Cannon at 200 m', sets: ['explosion-big', 'gunshot'], isNew: true, event: () => ({ type: 'shot', kind: 'cannon' }), distance: 200, ends: null, note: 'The recorded big explosion\'s roar, the pistol\'s report at half speed over its head, the synth\'s boom under it.' },
+      { title: 'Frag grenade', sets: ['grenade', 'explosion-rumble'], isNew: true, event: () => ({ type: 'shot', kind: 'frag' }), distance: (s) => log(150, 5, s), ends: ['150 m', '5 m'], note: 'A grenade\'s blast, the big explosion\'s low rumble under it.' },
+      { title: 'Flashbang', sets: ['flashbang'], isNew: true, event: () => ({ type: 'shot', kind: 'flashbang' }), distance: (s) => log(60, 3, s), ends: ['60 m', '3 m'], note: 'The crack alone: a blast\'s head, high-passed. (The ringing in a near man\'s ears is the engine\'s.)' },
       { title: 'Arrow on mail', sets: ['mail'], isNew: true, event: (s) => ({ type: 'arrowhit', speed: log(15, 90, s), covering: 'mail' }), ends: ['15 m/s', '90 m/s'] },
       { title: 'Arrow into the body', sets: ['stab'], isNew: true, event: (s) => ({ type: 'arrowhit', speed: log(15, 90, s), covering: 'flesh' }), ends: ['15 m/s', '90 m/s'] },
       { title: 'Arrow on plate', sets: ['break'], isNew: true, event: (s) => ({ type: 'arrowhit', speed: log(15, 90, s), covering: 'plate' }), ends: ['15 m/s', '90 m/s'] },
