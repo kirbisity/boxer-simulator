@@ -214,7 +214,9 @@ test('the default bundle is minified, keeps the long data strings whole, and wri
     execFileSync('node', ['tools/bundle.js', out, ...(flag === '--no-minify' ? [flag] : [])], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
     return { out, page: readFileSync(out, 'utf8') };
   });
-  assert.ok(small.page.length < plain.page.length * 0.8, 'the minified page is much smaller');
+  // The embedded base64 (detail maps, sounds, music) is kept whole and now outweighs the code, so the code alone is compared.
+  const codeLength = (page) => page.replace(/'[A-Za-z0-9+/=]{20000,}'/g, "''").length;
+  assert.ok(codeLength(small.page) < codeLength(plain.page) * 0.8, 'the minified code is much smaller');
   assert.ok(!small.page.includes('// ---- src/'), 'no comments left');
   assert.ok(!small.page.includes('@@DATA'), 'no placeholder left');
   const longStrings = (page) => (page.match(/'[A-Za-z0-9+/=]{20000,}'/g) ?? []).map((text) => createHash('sha1').update(text).digest('hex'));
