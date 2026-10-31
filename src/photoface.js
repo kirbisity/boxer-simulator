@@ -37,6 +37,9 @@ export const PHOTO_FACES = {
   // How much a fighter varies: the second region's share of his face, his skin's brightness and warmth, his face's width and
   // the height of his eyes and mouth (atlas rows).
   vary: { blend: [0.15, 0.45], bright: 0.06, warm: 0.03, width: 0.06, eyeRow: 0.008, mouthRow: 0.012, region: 0.8, shape: 0.25, measured: 0.35 },
+  // How the hair's volume is drawn: 'R4' (round four's sparse cards, photohair.js) or an option of hairoptions.js ('A' sculpted mass,
+  // 'B' dense layered cards, 'C' mass and cards, 'D' clumps). #hair=A|B|C|D in the URL overrides it.
+  hair: 'R4',
   // The face's ambient light, scaled: a fill, so a face under an overhead key is not darker and muddier than the chest beside it.
   fill: 1.8,
   normalScale: 1,
@@ -54,6 +57,13 @@ export function photoFacesOn() {
     photoWanted = new URLSearchParams(hash).get('faces') === 'photo';
   }
   return photoWanted;
+}
+
+/** How the hair's volume is drawn (PHOTO_FACES.hair, or #hair= in the URL). */
+export function photoHairOption() {
+  const hash = typeof location === 'undefined' ? '' : location.hash.replace(/^#/, '');
+  const wanted = new URLSearchParams(hash).get('hair');
+  return ['A', 'B', 'C', 'D', 'R4'].includes(wanted) ? wanted : PHOTO_FACES.hair;
 }
 
 /** Turn photo faces on or off (the next heads built follow it); loads the manifest on the way on. */

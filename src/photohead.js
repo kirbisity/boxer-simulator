@@ -31,7 +31,7 @@ export const PHOTO_HEAD = {
   anatomy: { occiput: 0.08, temple: 0.045, zygoma: 0.03, jawEdge: 0.09, width: 0.85, lowerLength: 1.12 },
   // The face's structure, of the head's radius (unit space) and of the atlas (u round, rows down), before the region's changes.
   nose: { root: 0.05, tip: 0.2, width: 0.013, tipWidth: 0.022, tipHeight: 0.018, wing: 0.06, wingAt: 0.024 },
-  brow: { height: 0.03, width: 0.055, depth: 0.024, above: 0.05 },
+  brow: { height: 0.018, width: 0.06, depth: 0.03, above: 0.055 },
   socket: { depth: 0.05, width: 0.032, height: 0.022, eyeball: 0.025 },
   cheekbone: { height: 0.045, at: 0.115, below: 0.07, width: 0.045, depth: 0.035 },
   lips: { upper: 0.032, lower: 0.036, width: 0.034 },

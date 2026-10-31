@@ -17,8 +17,8 @@ const SHAPES = {
   shonen: { jawWidth: 0.8, jawAt: 0.5, chinWidth: 0.16, chinLength: 1.0, chinForward: 0.74, faceFront: 0.84, cheek: 0, crown: 1.0 },
   seinen: { jawWidth: 0.88, jawAt: 0.62, chinWidth: 0.32, chinLength: 1.14, chinForward: 0.8, faceFront: 0.86, cheek: 0, crown: 0.97 },
   round3: { jawWidth: 0.92, jawAt: 0.55, chinWidth: 0.46, chinLength: 1.08, chinForward: 0.82, faceFront: 0.92, cheek: 0.03, crown: 1.0 },
-  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.27, chinLength: 1.12, chinForward: 0.8, faceFront: 0.88, cheek: 0, crown: 1.0 },
-  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.2, chinLength: 1.06, chinForward: 0.76, faceFront: 0.88, cheek: 0.02, crown: 1.02 },
+  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.27, chinLength: 1.12, chinForward: 0.8, faceFront: 1.0, cheek: 0, crown: 1.0 },
+  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.2, chinLength: 1.06, chinForward: 0.76, faceFront: 1.0, cheek: 0.02, crown: 1.02 },
 };
 const ease = (t) => t * t * (3 - 2 * t);
 

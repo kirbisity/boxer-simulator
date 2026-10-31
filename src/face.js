@@ -19,9 +19,11 @@ import { SoftShell } from './soft.js';
 import { outlineFor, STYLE, surface } from './toon.js';
 import { assignColour } from './looks/kit.js';
 import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
-import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
+import { paintFromFace, PHOTO_ATLAS, photoHairOption, photoSkinMaterial } from './photoface.js';
 import { buildPhotoHead, PHOTO_HEAD } from './photohead.js';
 import { buildPhotoHair, photoScalp, scalpCover } from './photohair.js';
+import { buildHairOption } from './hairoptions.js';
+import { buildHairSwing, HAIR_SWING } from './hairswing.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
@@ -52,8 +54,8 @@ export const FACE_SHAPES = {
   // and cheekbones, narrowing through the cheeks to the jaw's corners and on to a defined chin, the face taller than it is wide.
   // A woman's jaw narrower and her chin smaller. The body widens them (photoShape): fat rounds the lower face, training squares
   // the jaw, starving hollows the cheeks.
-  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.27, chinLength: 1.12, chinForward: 0.8, faceFront: 0.88, cheek: 0, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
-  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.2, chinLength: 1.06, chinForward: 0.76, faceFront: 0.88, cheek: 0.02, crown: 1.02, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
+  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.27, chinLength: 1.12, chinForward: 0.8, faceFront: 1.0, cheek: 0, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
+  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.2, chinLength: 1.06, chinForward: 0.76, faceFront: 1.0, cheek: 0.02, crown: 1.02, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
 };
 /** A photo head's shape: its sex's real one, widened by the body (facemorph.js weights): fat, a trained jaw, starving. */
 function photoShape(female, morph) {
@@ -520,6 +522,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
 
   // Hair down the back hangs from the upper back, not the head (render.js hangs it: hairCurtain).
   const curtains = [];
+  let hairSwing = null;
+  let lastHairHit = -Infinity;
   // A photo head's hair grows out of it (photohair.js: painted scalp and cards), its beard the same; the drawn hair is for the
   // drawn head.
   const dangles = photo ? [] : buildHair(group, look, r, shape, hairMaterial, female, curtains);
@@ -554,7 +558,14 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
         colour.setXYZ(index, ...[hair.r, hair.g, hair.b].map((value, channel) => colour.array[index * 3 + channel] + (value - colour.array[index * 3 + channel]) * cover));
       }
     }
-    photo.hairTriangles = buildPhotoHair({ group, head: photoHead, r, style: look.hairStyle, facialHair: look.facialHair, colour: new THREE.Color(photo.hair), scalp, random, coarse: Boolean(look.photoPainted) });
+    // The hair's volume: round four's sparse cards (the default), or one of the options to pick from (hairoptions.js); beards are cards.
+    const option = photoHairOption();
+    const colour = new THREE.Color(photo.hair);
+    const coarse = Boolean(look.photoPainted);
+    photo.hairTriangles = buildPhotoHair({ group, head: photoHead, r, style: option === 'R4' ? look.hairStyle : 'bald', facialHair: look.facialHair, colour, scalp, random, coarse });
+    if (option !== 'R4' && !coarse) photo.hairTriangles += buildHairOption(option, { group, head: photoHead, r, style: look.hairStyle, colour, random }).triangles;
+    // What hangs free swings (hairswing.js): the meshes placed at the head's origin (a knot is not: it does not hang).
+    if (!coarse) hairSwing = buildHairSwing(group.children.filter((child) => child.userData.photoHair && child.position.lengthSq() === 0 && child.scale.x === 1), r);
   }
   // The beard in a material of its own: an open-faced helmet hides the hair, not the beard.
   const beardMaterial = hairMaterial.clone();
@@ -617,6 +628,16 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     guard.visible = opening.visible;
     opening.scale.set(0.5 + 0.5 * face.mouth, Math.max(0.15, face.mouth), 1);
     for (const disc of blush) disc.material.opacity = face.flush * 0.55;
+    // A photo face's hair swings, and a blow to the head throws it.
+    if (hairSwing) {
+      const hitAt = fighter.hitAt[P.head];
+      if (hitAt !== lastHairHit && time - hitAt >= 0 && time - hitAt < 0.2) {
+        lastHairHit = hitAt;
+        const angle = Math.random() * Math.PI * 2;
+        hairSwing.kick(new THREE.Vector3(Math.cos(angle), 0.3, Math.sin(angle)).normalize(), HAIR_SWING.hitShare);
+      }
+      hairSwing.update(dt, group, colliders);
+    }
     // A photo face blinks and winces with its eyelids drawn down in the shader.
     if (skinMaterial.userData.lid) skinMaterial.userData.lid.value = face.lid;
     assignColour(skinMaterial, 'color', baseSkin.clone().lerp(new THREE.Color(0x9c3b48), damage * FACE.bruiseShare));
@@ -629,8 +650,9 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
       if (object.isMesh && (object.material === hairMaterial || object.userData.photoHair || (!beard && (object.material === beardMaterial || object.userData.photoBeard)))) object.visible = false;
     });
     dangles.length = 0;
+    if (hairSwing) hairSwing.enabled = false;
   }
-  return { group, shell: skull, update, dangles, hideHair, curtains, hairMaterial };
+  return { group, shell: skull, update, dangles, hideHair, curtains, hairMaterial, get hairSwing() { return hairSwing; } };
 }
 
 function hairLock(group, material, points, width, thickness, taper = 1) {

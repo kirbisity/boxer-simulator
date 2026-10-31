@@ -75,6 +75,10 @@ def strokes(rng, hair_dark, brow_rows=(None, None)):
     for side, brow_row in zip((-1, 1), brow_rows):
         inner, outer = CX + side * (E - 0.6 * 0.0668 * W * 0.35), CX + side * (E + 0.03 * W)
         base = brow_row if brow_row is not None else ER - 0.048 * H
+        # The brow's mass: a soft dark band along the arc, thick at the head, thin at the tail.
+        mass = [((inner + (outer - inner) * t) * k, (base - 2.2 * np.sin(np.pi * min(1, t * 1.4))) * k) for t in np.linspace(0, 1, 16)]
+        for (x0, y0), (x1, y1), t in zip(mass[:-1], mass[1:], np.linspace(0, 1, 15)):
+            draw.line([(x0, y0), (x1, y1)], fill=int(165 * hair_dark), width=int(k * (2.8 - 1.5 * t)))
         for _ in range(150):
             t = rng.random()
             x = inner + (outer - inner) * t
@@ -137,6 +141,7 @@ def roughness():
     rough = np.minimum(rough, 0.62 - 0.25 * gauss(xx, yy, cx, mr + 0.02 * e, 0.42 * e, 0.16 * e, 1))
     for s in (-1, 1):
         rough = np.minimum(rough, 0.62 - 0.5 * gauss(xx, yy, cx + s * e, er, 0.24 * e, 0.09 * e, 1))
+        rough = np.maximum(rough, 0.9 * gauss(xx, yy, cx + s * e, er - 0.048 * H, 0.5 * e, 0.035 * H, 1))
     return rough
 
 
@@ -213,6 +218,10 @@ def build(key, mark, tiles_dir, out):
     level = np.clip(lum(rel), 0.3, 1.12 + 1.0 * eyes[..., 0])
     tint = np.clip(rel / np.maximum(lum(rel), 1e-3)[..., None], [0.85, 0.85, 0.6], [1.3, 1.08, 1.05])
     rel = tint * level[..., None]
+    brow_top = min(ER - 0.05 * H, (ER - 0.048 * H))
+    forehead = smoothstep(brow_top - 0.015 * H, brow_top - 0.06 * H, YY)[..., None]
+    broad = np.stack([gaussian_filter(rel[..., c], 6) for c in range(3)], axis=2)
+    rel = rel * (1 - forehead) + (rel / np.maximum(broad, 1e-3)) * forehead
     # Drawn brow hairs and lashes in the composite's brow colour (darkened), seeded per face.
     rng = np.random.default_rng(zlib.crc32(key.encode()))
     brow_tone = np.array([colour_at(tile, cx + s * half, ey - 0.33 * (my - ey), max(1.5, half * 0.12)) for s in (-1, 1)]).mean(axis=0)
@@ -230,7 +239,7 @@ def build(key, mark, tiles_dir, out):
     # Normal map: the generic relief and the photo's fine detail (soft: the source is about 40 px between the eyes).
     l = lum(rel)
     fine = (l - gaussian_filter(l, 1.2)) * mask
-    height = relief() * RELIEF_GAIN * GEOMETRY_SHARE + fine * 2.0 + lines * 1.5
+    height = relief() * RELIEF_GAIN * GEOMETRY_SHARE + fine * 2.0 + lines * 0.25
     nrm = normals_from(height)
     Image.fromarray((np.clip(rel, 0, 1) * 255 + 0.5).astype(np.uint8)).save(f'{out}/{key}-albedo.jpg', quality=90)
     Image.fromarray(((nrm * 0.5 + 0.5) * 255 + 0.5).astype(np.uint8)).save(f'{out}/{key}-normal.png')
