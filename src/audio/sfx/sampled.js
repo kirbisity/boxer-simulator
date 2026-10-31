@@ -21,6 +21,10 @@
 // a barred gate creaks and clangs, a drawbridge runs its chain, a lock's latch clicks, a lever ratchets, a ladder knocks; a man falls
 // into water or mud (the steps' splash and squelch, lower); steps on boards, sand and snow (stone's and grass's, lower, the synth's ground
 // beside); hooves in mud and water.
+// The sixth batch: a robot shorting out (robotSpark: at its death and at a cut stump) is the recorded electric shock, a death's whole,
+// a stump's shorter and higher; a portcullis raised and a drawbridge run on the heavy chain's runs (a portcullis let down keeps its own
+// chain, the slam's recording); a chained prisoner's shackles rattle as he sobs and under the lash (the chain shaken short). The breath and
+// the menu's tap and chime are played by the engine (breathPlan, uiSamplePlan).
 // Every blow (a hit, a clash, an arrow) is played a little longer than its energy's share of the take alone, the heaviest ringing out
 // longest, with a long fade (BLOW_TAIL).
 // Cries (a voice event the cry director, audio/cries.js, let through: its `cry`): the sex's set of its kind, at the voice's pitch, a
@@ -143,7 +147,9 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       if (params.striker === 'lash') {
         const s = sampleStrength(params.energy, WHIP_LASH.low, WHIP_LASH.high);
         const soft = SAMPLED_SOFT.has(params.covering);
-        return { set: 'whip', trim: WHIP_LASH.lift * (soft ? 1 : 0.6) * sampleLerp(0.7, 1.25, s), rate: (soft ? 1 : 1.1) * sampleLerp(1.06, 0.96, s) * jitter(0.05), seconds: (soft ? 1 : 0.6) * sampleLerp(0.18, 0.55, s), fade: sampleLerp(0.05, 0.2, s), skip: 0, synth: soft ? null : params, synthGain: soft ? 0 : 0.6 };
+        // (A prisoner chained up at the wall jerks against his shackles under it.)
+        const shackles = event.chained ? { extra: [{ set: 'shackle', trim: sampleLerp(0.5, 0.9, s), rate: jitter(0.06), seconds: null, fade: 0.06, skip: 0, delay: 0.04 }] } : {};
+        return { ...shackles, set: 'whip', trim: WHIP_LASH.lift * (soft ? 1 : 0.6) * sampleLerp(0.7, 1.25, s), rate: (soft ? 1 : 1.1) * sampleLerp(1.06, 0.96, s) * jitter(0.05), seconds: (soft ? 1 : 0.6) * sampleLerp(0.18, 0.55, s), fade: sampleLerp(0.05, 0.2, s), skip: 0, synth: soft ? null : params, synthGain: soft ? 0 : 0.6 };
       }
       const limb = LIMB_BLOWS[params.striker];
       if (!SAMPLED_HEADS.has(params.striker) && !limb) return null;
@@ -263,12 +269,22 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const shutting = params.state === 'closed' || params.state === 'shut' || params.state === 'down' || params.state === 'closing';
       // A portcullis: its chain run over the wheel (raised, a little slower and lower: wound up), let down it runs and the grate slams
       // on the stone and rumbles (the slam `delay` s into the chain, as the recording has it).
+      // (Raised: the heavy chain wound up, a little slower and lower. Let down: the portcullis's own chain, the slam's recording, 1 s to it.)
       if (params.kind === 'portcullis') {
-        const chain = { set: 'portcullis-chain', trim: 1, rate: (shutting ? 1 : 0.9) * jitter(0.03), seconds: null, fade: 0.1, skip: 0, synth: null, synthGain: 0 };
-        return shutting ? { ...chain, extra: [{ set: 'portcullis-slam', trim: 1.2, rate: jitter(0.03), seconds: null, fade: 0.6, skip: 0, delay: 1 }] } : chain;
+        if (!shutting) return { set: 'chain', trim: 1, rate: 0.9 * jitter(0.03), seconds: null, fade: 0.15, skip: 0, synth: null, synthGain: 0 };
+        return { set: 'portcullis-chain', trim: 1, rate: jitter(0.03), seconds: null, fade: 0.1, skip: 0, synth: null, synthGain: 0, extra: [{ set: 'portcullis-slam', trim: 1.2, rate: jitter(0.03), seconds: null, fade: 0.6, skip: 0, delay: 1 }] };
       }
-      // A drawbridge: the portcullis's chain, slower and lower (a bigger wheel), the synth's chain and timber slam carrying it on.
-      if (params.kind === 'drawbridge') return { set: 'portcullis-chain', trim: 1, rate: 0.8 * jitter(0.03), seconds: null, fade: 0.2, skip: 0, synth: params, synthGain: 0.5 };
+      // A drawbridge: the heavy chain, slower and lower (a bigger wheel), two runs one after the other, the synth's chain and timber slam
+      // carrying it on.
+      if (params.kind === 'drawbridge') {
+        const run = { set: 'chain', trim: 1, rate: 0.82 * jitter(0.03), seconds: null, fade: 0.2, skip: 0 };
+        return { ...run, extra: [{ ...run, rate: 0.8 * jitter(0.03), delay: 1.25 }], synth: params, synthGain: 0.5 };
+      }
+      // A prisoner's shackles shaken (a sob, a jerk at the wall): the chain shaken short, a harder one louder and longer.
+      if (params.kind === 'shackles') {
+        const k = sfxClamp(event.strength ?? 0.5, 0, 1);
+        return { set: 'shackle', trim: sampleLerp(0.45, 0.9, k), rate: sampleLerp(1.1, 0.95, k) * jitter(0.05), seconds: sampleLerp(0.2, 0.6, k), fade: 0.08, skip: 0, synth: null, synthGain: 0 };
+      }
       // A gate of bars: its hinges creak (the door's creak, lower: iron), shut it clangs (the portcullis's slam, higher and shorter: a lighter grate).
       if (params.kind === 'gate') {
         const creak = { set: 'door-creak', trim: 0.9, rate: 0.85 * jitter(0.04), seconds: shutting ? 0.6 : 1, fade: shutting ? 0.08 : 0.25, skip: 0, synth: null, synthGain: 0 };
@@ -349,12 +365,47 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const share = cry.kind === 'hurt' ? sampleLerp(CRY_PLAY.hurtShare, 1, i) : 1;
       return { set: `voice-${cry.sex}-${cry.kind}`, trim: sampleLerp(CRY_PLAY.trim[0], CRY_PLAY.trim[1], i), rate: cry.rate ?? 1, seconds: null, share, fade: CRY_PLAY.fade[cry.kind] ?? 0.08, skip: 0, synth: null, synthGain: 0 };
     }
+    case 'robotSpark': {
+      // A robot shorting out: the shock, a death's (intensity 1) its whole take and a stump's (0.7) shorter, higher and quieter.
+      const i = sfxClamp(params.intensity ?? 1, 0, 1);
+      return { set: 'shock', trim: sampleLerp(0.6, 1, i), rate: sampleLerp(1.15, 1, i) * jitter(0.05), seconds: sampleLerp(0.35, 1.4, i), fade: sampleLerp(0.08, 0.25, i), skip: 0, synth: null, synthGain: 0 };
+    }
     case 'charge':
       // The army's roar (engine.js loops it; the board plays it once): its whole take.
       return { set: 'charge', trim: 1, rate: jitter(0.03), seconds: null, fade: 0.5, skip: 0, synth: null, synthGain: 0 };
     default:
       return null;
   }
+}
+
+/**
+ * The recorded breath (engine.js breathe): heard only when he is all but spent (`from`: his exertion, 0 rested .. 1 at empty, past 1 in the
+ * overdraft: the stamina's last tenth), silent before; each breath a take of his sex's, drawn in or let out, at his voice's pitch (cryRate),
+ * cut to the breath's own length (`length` of it: the cadence is breathParams's) with a fade. Exhaled louder than drawn in (as recorded).
+ */
+export const BREATH_TAKES = { from: 0.9, trim: 1, inTrim: 1, length: 1.05, fade: { in: 0.08, out: 0.12 } };
+
+/** Is a breath at this exertion heard at all. */
+export const breathHeard = (exertion) => exertion >= BREATH_TAKES.from;
+
+/** A breath's plan (breath: breathParams's; sex 'male' | 'female'; rate: his voice's), or null when he is not tired enough to be heard. */
+export function breathPlan(breath, inhale, exertion, sex, rate = 1) {
+  if (!breathHeard(exertion)) return null;
+  const spec = BREATH_TAKES;
+  return { set: `breath-${sex === 'female' ? 'female' : 'male'}-${inhale ? 'in' : 'out'}`, trim: spec.trim * (inhale ? spec.inTrim : 1), rate, seconds: (inhale ? breath.inSeconds : breath.outSeconds) * spec.length, fade: inhale ? spec.fade.in : spec.fade.out, skip: 0, synth: null, synthGain: 0 };
+}
+
+/**
+ * A menu's sound (engine.js ui): a click the recorded tap, a back the tap lower, a confirm the tap a little higher with the chime under it.
+ * Victory and defeat stay the synth's (null).
+ */
+export function uiSamplePlan(kind, random = Math.random) {
+  const jitter = (spread) => 1 + (random() * 2 - 1) * spread;
+  const tap = { set: 'ui-tap', trim: 0.55, rate: jitter(0.03), seconds: null, fade: 0.04, skip: 0, synth: null, synthGain: 0 };
+  if (kind === 'click') return tap;
+  if (kind === 'back') return { ...tap, rate: 0.8 * jitter(0.02) };
+  if (kind === 'confirm') return { ...tap, rate: 1.12 * jitter(0.02), extra: [{ set: 'ui-chime', trim: 0.4, rate: 1, seconds: 0.7, fade: 0.3, skip: 0, delay: 0.02 }] };
+  return null;
 }
 
 /** A cry's take: its trim from none to full intensity (the takes are cut to one peak), the least share of a hurt cry played, each kind's fade (s). */
@@ -381,6 +432,18 @@ export function playSample(voice, out, take, plan, when, gain) {
   source.connect(envelope);
   sfxRun(voice, source, when, when + seconds + 0.005, start);
   return when + seconds + 0.01;
+}
+
+/** Play a plan's take and its extra layers from `bank` into `voice.out` (no synth beside it). Returns the end time, or null where its set has no take loaded. */
+export function playPlan(bank, voice, plan, when, gain) {
+  const take = plan && bank ? bank.pick(plan.set) : null;
+  if (!take) return null;
+  let end = playSample(voice, voice.out, take, plan, when, gain);
+  for (const layer of plan.extra ?? []) {
+    const more = bank.pick(layer.set);
+    if (more) end = Math.max(end, playSample(voice, voice.out, more, layer, when + (layer.delay ?? 0), gain));
+  }
+  return end;
 }
 
 /**

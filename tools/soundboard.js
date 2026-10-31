@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 // In load order (each after what it imports).
-const MODULES = ['audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families'];
+const MODULES = ['audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/spark', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families'];
 const out = process.argv[2] ?? 'dist/sound-board.html';
 
 const SAMPLE_EMBED_LINE = 'const SAMPLE_EMBED = null;';
@@ -119,9 +119,11 @@ function board() {
       { title: 'Door shuts', sets: ['door-creak', 'door-slam'], isNew: true, event: () => ({ type: 'mech', kind: 'door', state: 'closing' }), ends: null },
       { title: 'Chest lid shuts', sets: ['door-creak', 'door-slam'], isNew: true, event: () => ({ type: 'mech', kind: 'chest', state: 'closing' }), ends: null, note: 'The door\'s takes, higher, quieter, shorter.' },
       { title: 'Portcullis let down', sets: ['portcullis-chain', 'portcullis-slam'], isNew: true, event: () => ({ type: 'mech', kind: 'portcullis', state: 'down' }), ends: null },
-      { title: 'Portcullis raised', sets: ['portcullis-chain'], isNew: true, event: () => ({ type: 'mech', kind: 'portcullis', state: 'opening' }), ends: null },
+      { title: 'Portcullis raised', sets: ['chain'], isNew: true, event: () => ({ type: 'mech', kind: 'portcullis', state: 'opening' }), ends: null },
       { title: 'Barred gate shuts', sets: ['door-creak', 'portcullis-slam'], isNew: true, event: () => ({ type: 'mech', kind: 'gate', state: 'closing' }), ends: null, note: 'The door\'s creak lower, the portcullis\'s slam higher and shorter.' },
-      { title: 'Drawbridge', sets: ['portcullis-chain'], isNew: true, event: () => ({ type: 'mech', kind: 'drawbridge', state: 'down' }), ends: null, note: 'The chain slower and lower, the synth\'s chain and timber beside it.' },
+      { title: 'Drawbridge', sets: ['chain'], isNew: true, event: () => ({ type: 'mech', kind: 'drawbridge', state: 'down' }), ends: null, note: 'The heavy chain slower and lower, two runs, the synth\'s chain and timber beside it.' },
+      { title: 'Shackles shaken', sets: ['shackle'], isNew: true, event: (s) => ({ type: 'mech', kind: 'shackles', state: 'open', strength: s }), ends: ['a sob', 'a wail'], note: 'A chained prisoner (Dunnottar\'s vault) as he weeps.' },
+      { title: 'Whip on a chained prisoner', sets: ['whip', 'shackle'], isNew: true, event: (s) => ({ type: 'hit', energy: log(2, 40, s), striker: 'lash', covering: 'flesh', part: 'trunk', chained: true }), ends: ['2 J', '40 J'], note: 'The lash, his shackles jerked under it.' },
       { title: 'Lock', sets: ['crossbow-latch'], isNew: true, event: () => ({ type: 'mech', kind: 'lock', state: 'unlocked' }), ends: null, note: 'The crossbow\'s latch: the key\'s click, the bolt over.' },
       { title: 'Lever', sets: ['crossbow-crank'], isNew: true, event: () => ({ type: 'mech', kind: 'lever', state: 'opening' }), ends: null, note: 'The crossbow\'s crank, the synth\'s clunk beside it.' },
       { title: 'Ladder set down', sets: ['woodshield'], isNew: true, event: () => ({ type: 'mech', kind: 'ladder', state: 'opening' }), ends: null },
@@ -143,7 +145,27 @@ function board() {
         return take ? playSample(voice, out, take, { rate: 1, trim: 1, seconds: 4, fade: 1, skip: 0 }, when, gainOfLevel(92 + 10 * Math.log10(men / 3600))) : when;
       }, ends: ['16 men', '400 men'], note: 'Heard only when a side of 20 or more has 10 or more (and a third of it) running at the enemy together; fades as the lines meet.' },
     ]],
-    ['Synthesised families', 'What the game makes with no recording: the synth\'s voices (not played in the game: the recorded cries are), breath, an arrow going past, the hit-feel thump, the weapon art and the menu.', [
+    ['Robots, breath and the menu', 'A robot shorting out (at its death and at a cut stump); breathing, heard only when a man is all but spent (the slider: from the stamina\'s last tenth to deep in the overdraft); the menu\'s buttons.', [
+      { title: 'Robot shorting out', sets: ['shock'], isNew: true, event: (s) => ({ type: 'robotSpark', kind: s < 0.5 ? 'stump' : 'death', intensity: lerp(0.7, 1, s) }), ends: ['a stump', 'its death'] },
+      ...['male', 'female'].map((sex) => ({
+        title: `${sex === 'male' ? 'Man' : 'Woman'} out of breath`, sets: [`breath-${sex}-in`, `breath-${sex}-out`], isNew: true,
+        direct: (voice, out, when, s) => {
+          // (Two breaths, in and out, at the engine's cadence for the exertion, at an adult's voice.)
+          const exertion = lerp(0.9, 1.5, s);
+          const p = breathParams(exertion, sex === 'male' ? 1.78 : 1.65);
+          const rate = cryRate({ sex, id: 7, height: sex === 'male' ? 1.78 : 1.65, mass: sex === 'male' ? 80 : 62, age: 30 });
+          let t = when;
+          for (const inhale of [true, false, true, false]) {
+            if (bank) playPlan(bank, voice, breathPlan(p, inhale, exertion, sex, rate), t, gainOfLevel(p.level - 6));
+            t += (inhale ? p.inSeconds : p.outSeconds) + 0.05;
+          }
+          return t;
+        },
+        ends: ['stamina 10%', 'deep overdraft'],
+      })),
+      ...['click', 'confirm', 'back'].map((kind) => ({ title: `Menu: ${kind}`, sets: kind === 'confirm' ? ['ui-tap', 'ui-chime'] : ['ui-tap'], isNew: true, direct: (voice, out, when) => (bank && playPlan(bank, voice, uiSamplePlan(kind), when, 0.8)) ?? playUi(voice, out, uiParams(kind), when, 0.8), ends: null, note: { click: 'The recorded tap.', back: 'The tap, lower.', confirm: 'The tap a little higher, the chime under it.' }[kind] })),
+    ]],
+    ['Synthesised families', 'What the game makes with no recording: the synth\'s voices (not played in the game: the recorded cries are), its breath (in the game only before the recordings load), an arrow going past, the hit-feel thump, the weapon art and the menu\'s notes (now only the victory and the defeat).', [
       { title: 'Voice: effort', sets: [], event: (s) => ({ type: 'voice', kind: 'effort', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'], note: 'The synth\'s voices are not played in the game: the recorded cries are (Synth only plays this one).' },
       { title: 'Voice: struck', sets: [], event: (s) => ({ type: 'voice', kind: 'struck', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'] },
       { title: 'Voice: cry of a wound', sets: [], event: (s) => ({ type: 'voice', kind: 'wound', strength: s, size: 1.8, mass: 85 }), ends: ['soft', 'strong'] },

@@ -44,7 +44,7 @@
 // the same intents a player has: goTo, move, running); `fighter.mayTarget` limits whom a follower fights;
 // `world.stage.rout` and `world.stage.escape` make a frightened man run along walkable ground.
 
-import { soundVoice } from '../audio/log.js';
+import { particleAt, soundEvent, soundVoice } from '../audio/log.js';
 import { hurtShare } from '../ai.js';
 import { P } from '../body.js';
 import { placeOnFloor, startCrawl, throwPunch } from '../physics.js';
@@ -1007,7 +1007,9 @@ function lookStill(world, aware, mind, fighter) {
       const head = [x[P.head * 3], x[P.head * 3 + 1], x[P.head * 3 + 2]];
       hands = [-1, 1].map((sign) => [head[0] + ahead[0] * 0.13 + side[0] * 0.06 * sign, head[1] - 0.04, head[2] + ahead[1] * 0.13 + side[1] * 0.06 * sign]);
     }
-    fighter.kneel = { share: 1, lean: kneel.lean ?? 0.35, ...(hands ? { hands } : {}) };
+    // (Chained: held up at the rings, or `chained` though his hands are at his face: his shackles are heard.)
+    const chained = Array.isArray(kneel.hands) || Boolean(kneel.chained);
+    fighter.kneel = { share: 1, lean: kneel.lean ?? 0.35, ...(hands ? { hands } : {}), ...(chained ? { chained } : {}) };
   }
   const mourn = mind.mourn;
   if (!mourn || fighter.state !== 'up') return;
@@ -1015,7 +1017,10 @@ function lookStill(world, aware, mind, fighter) {
   if (world.time < mind.nextAt) return;
   const n = (mind.beats += 1);
   mind.nextAt = world.time + awBetween(mourn.every, awSteady(fighter.id, n));
-  soundVoice(world, fighter, 'grief', awSteady(fighter.id, n + 0.5) < mourn.wail ? 0.85 : 0.45);
+  const strength = awSteady(fighter.id, n + 0.5) < mourn.wail ? 0.85 : 0.45;
+  soundVoice(world, fighter, 'grief', strength);
+  // His chains shaken as he sobs.
+  if (fighter.kneel?.chained && world.ear) soundEvent(world, 'mech', { at: particleAt(fighter, P.neck), kind: 'shackles', state: 'open', strength, id: `shackles${fighter.id}` });
 }
 
 function lookNeutral(world, aware, mind, fighter) {

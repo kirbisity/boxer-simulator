@@ -3,7 +3,8 @@
 // shot; footsteps on stone, grass, mud and in water (walking and running); hooves on stone and on turf, and a horse's whinny; heels on a
 // hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder; a bow and a crossbow, a
 // portcullis, a sword on mail and into leather (and variants derived from the takes: a fist on plate, lamellar, a blade's swing); a man's and a woman's
-// cries (hurt, scream, moan, fear, dying), an army's charge. And three ambience loops, the places' beds (ambience.js): rain, wind, a town's market.
+// cries (hurt, scream, moan, fear, dying), an army's charge; a robot's short (an electric shock), a heavy chain run and shaken, a man's and a
+// woman's breath (in and out), a menu's tap and its chime. And three ambience loops, the places' beds (ambience.js): rain, wind, a town's market.
 // Each set is a few takes of one sound; a take is picked at random each time.
 //
 // From the source (the ES-module page, index.html) the files are fetched from src/audio/samples/; the single-file bundle (tools/bundle.js) puts their
@@ -63,6 +64,17 @@ export const SAMPLE_SETS = {
   bladeswing: ['bladeswing-1', 'bladeswing-2', 'bladeswing-3', 'bladeswing-4'],
   // Steel on a steel shield: the shells' takes already here (a helmet's ring, steel on plate), none new.
   shieldclang: ['helmet-1', 'break-1', 'break-3'],
+  // (The sixth batch: an electric shock, a heavy chain run over a wheel and shaken short, a man's and a woman's breath drawn in and let
+  // out, a menu's tap and its chime.)
+  shock: ['shock-1', 'shock-2', 'shock-3'],
+  chain: ['chain-1', 'chain-2', 'chain-3'],
+  shackle: ['shackle-1', 'shackle-2', 'shackle-3'],
+  'breath-male-in': ['breath-male-in-1', 'breath-male-in-2', 'breath-male-in-3'],
+  'breath-male-out': ['breath-male-out-1', 'breath-male-out-2', 'breath-male-out-3'],
+  'breath-female-in': ['breath-female-in-1', 'breath-female-in-2', 'breath-female-in-3'],
+  'breath-female-out': ['breath-female-out-1', 'breath-female-out-2', 'breath-female-out-3'],
+  'ui-tap': ['ui-tap-1', 'ui-tap-2'],
+  'ui-chime': ['ui-chime-1'],
   // Cries (sfx/voice.js CRY_KINDS; chosen by audio/cries.js): a man's and a woman's, each a set per kind (a few composed of two pieces).
   ...voiceSets({ male: { hurt: 7, scream: 3, moan: 4, fear: 4, dying: 2 }, female: { hurt: 4, scream: 3, moan: 3, fear: 2, dying: 2 } }),
   // An army's charge roared: one loop (engine.js plays it under a large side running at the enemy: audio/charge.js).

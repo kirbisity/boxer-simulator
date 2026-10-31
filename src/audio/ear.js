@@ -34,7 +34,7 @@ export const EAR = {
   // Speakers (no head-related filtering): a sound behind is dulled as the outer ear shadows it (from 90° off the nose to straight behind).
   behindCutoff: 4500,
   // The most of each kind started in one tick (the rest merged or dropped): the steps of many men at once are a single patter.
-  perTick: { step: 6, swing: 5, voice: 4, hit: 8, wound: 6, clash: 6, fall: 4, land: 4, clatter: 3, horse: 6, shot: 6, arrowhit: 6, mech: 4, thunder: 2 },
+  perTick: { step: 6, swing: 5, voice: 4, hit: 8, wound: 6, clash: 6, fall: 4, land: 4, clatter: 3, horse: 6, shot: 6, arrowhit: 6, mech: 4, thunder: 2, robotSpark: 3 },
 };
 
 /** A listener: where the head is and how the camera faces (its right, up and forward, unit vectors in the world). */

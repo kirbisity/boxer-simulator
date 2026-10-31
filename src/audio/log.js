@@ -173,7 +173,8 @@ export function soundHit(world, struck, by, part, at, { energy, impulse, striker
   // `mass`: the weapon's (kg) for a weapon's blow: a heavier one is heard lower.
   const mass = WEAPON_STRIKERS.has(striker) ? by?.weapon?.spec?.mass : undefined;
   const met = covering ?? coveringAt(struck, part);
-  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: met, part, braced, who: struck.id, by: by ? by.id : -1, mass });
+  // (`chained`: a prisoner chained up where he kneels: his shackles rattle under the blow.)
+  soundEvent(world, 'hit', { at, energy, impulse, striker, covering: met, part, braced, who: struck.id, by: by ? by.id : -1, mass, ...(struck.kneel?.chained ? { chained: true } : {}) });
   // (The blow's energy and what it met go with his voice: the pain of it to him is the cry director's, audio/cries.js.)
   if (deltaV > 0 && struck.state !== 'out') soundVoice(world, struck, 'struck', Math.min(1, deltaV / STRUCK_FULL), { energy, covering: met });
 }

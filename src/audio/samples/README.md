@@ -11,6 +11,8 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 
 174 files, 746 KB in all, the three ambience loops among them (the fifth batch and its derived variants: 23 files, 56 KB).
 
+198 files, 817 KB in all (the sixth batch: 24 files, 72 KB).
+
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
 | slice-1.mp3 | ScreenRecording_10-29-2026_20-52-57_1.mov | 0.359-1.109 | SLICE | 0.029 | 4140 | hit: a blade or point on flesh, padding or leather |
@@ -185,6 +187,30 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | voice-male-dying-1.mp3 | ScreenRecording_10-30-2026_14-00-47_1.mov | 13.51-14.45 + 15.54-16.22 | Sounds of a man crying | 0.022 + 0.000 | 7920 | composed: a loud cry falling into low sobs; cry: a death (not a knockout) (man) |
 | voice-male-dying-2.mp3 | ScreenRecording_10-30-2026_14-00-47_1.mov | 9.18-10.10 + 11.20-12.10 | Sounds of a man crying | 0.032 + 0.022 | 8640 | composed: a cry, then sobs fading; cry: a death (not a knockout) (man) |
 | charge-1.mp3 | ScreenRecording_10-30-2026_14-05-21_1.mov | 0.55-7.55 | Army Charge | 0.000 | 24192 | a loop: the roar's last 1.0 s crossfaded into its head; the army's charge (charge.js): looped under a side of 20+ with 10+ men (a third of it) running at the enemy; by their number and distance; fades as the lines meet |
+| shock-1.mp3 | ScreenRecording_10-31-2026_10-41-53_1.mov | 0.308-1.695 | Electric SHOCK | 0.068 | 7200 | the whole zap; robotSpark: a robot shorting out (machinefx.js), at its death the whole take, at a cut stump shorter, higher, quieter |
+| shock-2.mp3 | ScreenRecording_10-31-2026_10-41-53_1.mov | 0.640-1.130 | Electric SHOCK | 0.000 | 2700 | its middle (faded in); robotSpark: a robot shorting out (machinefx.js), at its death the whole take, at a cut stump shorter, higher, quieter |
+| shock-3.mp3 | ScreenRecording_10-31-2026_10-41-53_1.mov | 0.960-1.700 | Electric SHOCK | 0.000 | 3960 | its second half to its end (faded in); robotSpark: a robot shorting out (machinefx.js), at its death the whole take, at a cut stump shorter, higher, quieter |
+| chain-1.mp3 | ScreenRecording_10-31-2026_10-46-56_1.mov | 0.965-2.265 | Heavy Chain Sound Effect | 0.000 | 5472 | a run of the chain; mech: a portcullis raised (slower, lower: wound up); a drawbridge (two runs, slower and lower, the synth's beside it) |
+| chain-2.mp3 | ScreenRecording_10-31-2026_10-46-56_1.mov | 3.950-5.210 | Heavy Chain Sound Effect | 0.000 | 5184 | a run; mech: a portcullis raised (slower, lower: wound up); a drawbridge (two runs, slower and lower, the synth's beside it) |
+| chain-3.mp3 | ScreenRecording_10-31-2026_10-46-56_1.mov | 5.955-7.175 | Heavy Chain Sound Effect | 0.000 | 5040 | a run, denser; mech: a portcullis raised (slower, lower: wound up); a drawbridge (two runs, slower and lower, the synth's beside it) |
+| shackle-1.mp3 | ScreenRecording_10-31-2026_10-46-56_1.mov | 9.032-9.640 | Heavy Chain Sound Effect | 0.032 | 3240 | a short shake; mech: a chained prisoner's shackles shaken as he sobs (Dunnottar's vault); under a lash on a prisoner chained at the wall |
+| shackle-2.mp3 | ScreenRecording_10-31-2026_10-46-56_1.mov | 10.476-10.820 | Heavy Chain Sound Effect | 0.016 | 1980 | a short shake; mech: a chained prisoner's shackles shaken as he sobs (Dunnottar's vault); under a lash on a prisoner chained at the wall |
+| shackle-3.mp3 | ScreenRecording_10-31-2026_10-46-56_1.mov | 10.970-11.270 | Heavy Chain Sound Effect | 0.000 | 1800 | the last shake, quieter; mech: a chained prisoner's shackles shaken as he sobs (Dunnottar's vault); under a lash on a prisoner chained at the wall |
+| breath-male-in-1.mp3 | ScreenRecording_10-31-2026_10-50-02_1.mov | 1.665-2.165 | Breathing Male | 0.000 | 2160 | a breath in; breath drawn in (a man), only when all but spent (the stamina's last tenth, the overdraft), at his voice's pitch |
+| breath-male-in-2.mp3 | ScreenRecording_10-31-2026_10-50-02_1.mov | 2.830-3.340 | Breathing Male | 0.000 | 2304 | a breath in; breath drawn in (a man), only when all but spent (the stamina's last tenth, the overdraft), at his voice's pitch |
+| breath-male-in-3.mp3 | ScreenRecording_10-31-2026_10-50-02_1.mov | 3.960-4.510 | Breathing Male | 0.000 | 2448 | a breath in; breath drawn in (a man), only when all but spent (the stamina's last tenth, the overdraft), at his voice's pitch |
+| breath-male-out-1.mp3 | ScreenRecording_10-31-2026_10-50-02_1.mov | 0.925-1.595 | Breathing Male | 0.000 | 2880 | a breath out; breath let out (a man), only when all but spent, at his voice's pitch |
+| breath-male-out-2.mp3 | ScreenRecording_10-31-2026_10-50-02_1.mov | 2.170-2.735 | Breathing Male | 0.000 | 2448 | a breath out; breath let out (a man), only when all but spent, at his voice's pitch |
+| breath-male-out-3.mp3 | ScreenRecording_10-31-2026_10-50-02_1.mov | 3.340-3.880 | Breathing Male | 0.000 | 2448 | a breath out; breath let out (a man), only when all but spent, at his voice's pitch |
+| breath-female-in-1.mp3 | ScreenRecording_10-31-2026_10-50-45_1.mov | 1.380-1.825 | Female Breathing | 0.000 | 2016 | a breath in; breath drawn in (a woman), only when all but spent, at her voice's pitch |
+| breath-female-in-2.mp3 | ScreenRecording_10-31-2026_10-50-45_1.mov | 2.245-2.560 | Female Breathing | 0.000 | 1440 | a breath in; breath drawn in (a woman), only when all but spent, at her voice's pitch |
+| breath-female-in-3.mp3 | ScreenRecording_10-31-2026_10-50-45_1.mov | 4.960-5.525 | Female Breathing | 0.000 | 2448 | a breath in; breath drawn in (a woman), only when all but spent, at her voice's pitch |
+| breath-female-out-1.mp3 | ScreenRecording_10-31-2026_10-50-45_1.mov | 1.825-2.245 | Female Breathing | 0.000 | 1872 | a breath out; breath let out (a woman), only when all but spent, at her voice's pitch |
+| breath-female-out-2.mp3 | ScreenRecording_10-31-2026_10-50-45_1.mov | 2.735-3.295 | Female Breathing | 0.000 | 2448 | a breath out; breath let out (a woman), only when all but spent, at her voice's pitch |
+| breath-female-out-3.mp3 | ScreenRecording_10-31-2026_10-50-45_1.mov | 5.525-6.340 | Female Breathing | 0.000 | 3456 | a breath out; breath let out (a woman), only when all but spent, at her voice's pitch |
+| ui-tap-1.mp3 | copy_94989AD7-55CF-415D-897D-98CE9548B813.mov | 1.982-2.210 | Menu sounds | 0.022 | 1440 | a soft low tap; menu: a click (the tap), a back (lower), a confirm (higher, the chime under it) |
+| ui-tap-2.mp3 | copy_94989AD7-55CF-415D-897D-98CE9548B813.mov | 2.344-2.565 | Menu sounds | 0.014 | 1440 | the same tap, again; menu: a click (the tap), a back (lower), a confirm (higher, the chime under it) |
+| ui-chime-1.mp3 | copy_94989AD7-55CF-415D-897D-98CE9548B813.mov | 0.358-1.400 | Menu sounds | 0.028 | 5400 | a low swelling tone, decaying; menu: under a confirm's tap (its first 0.7 s, faded) |
 Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game). The recordings have no sand or snow footsteps and none of a flat sole on boards (the ring's canvas is boards) and no snort: those stay synthesised. The fist's whooshes (fistswing) are the air before each punch of the 10-30 recording, cut from 0.25-0.4 s before its blow to the blow (no onset: the window as it is, faded in over its first quarter); the punches start at the blow. The thunder takes are capped at 2.6 and 1.8 s with a 0.7 s fade.
 
 The fourth batch (10-30): the body falls are the five falls of one recording; the whip's recording has one lash (the low knock before it, at 0.31 s, is not the whip: left out); the door's recording is the first of its seven versions only: a creak swelling as it opens (its first part at a lower quality: cut at 1.88 s into two takes, each the window as it is, faded in over 0.06 s and out over 0.15 s) and the slam that ends it, its ring cut where the recording ends.
@@ -220,3 +246,14 @@ takes already here: helmet-1, break-1, break-3.
 
 Every blow (sfx/sampled.js BLOW_TAIL) is played a little longer than before (x1.15 at the lightest), the heaviest longest (x1.8, its fade
 x2.4): a take is never played past its own end, where it was cut 45 dB under its peak.
+
+The sixth batch (10-31, five recordings, cut with numpy and ffmpeg from their audio, mono 44.1 kHz): an electric shock (one zap,
+0.31-1.70 s: the whole of it, and two windows of its buzz, each faded in over 5 ms and out over 0.08-0.15 s); a heavy chain (10 s of it
+rattling: three runs of 1.2-1.3 s for a wheel's chain, their ends at the quietest 5 ms within 50 ms, faded in 20 ms and out 0.1 s,
+normalised together, at 32 kb/s; and its three last short shakes, 9.0-11.3 s, between silences, for a prisoner's shackles); a man's and
+a woman's breathing, fast and hard (a man panting about once in 1.2 s, a woman faster): each breath in and each out its own take (cut at
+the quietest 5 ms between them), faded in 30-40 ms and out 60-200 ms, the sex's six takes normalised together so a breath drawn in stays
+as much quieter than one let out as recorded (6-12 dB), at 32 kb/s; a menu's sounds (13 s: a low swelling tone at 0.36 s, four soft taps
+at 1.98, 2.34, 2.62 and 2.81 s, the same tap each time (two kept), then from 3.05 s to the end a bed of music with a low thump inside it
+at 8.4 s, not used: not a button's sound, and nothing clean to cut). The portcullis of the fifth batch keeps its own chain when let down
+(it leads into its slam, as recorded); raised, it runs on the heavy chain.

@@ -25,10 +25,10 @@ import { createMusic, musicMoment } from './music.js';
 import { SOUND_FAMILIES, soundCandidates } from './families.js';
 import { gainOfLevel, sfxVoice } from './synth.js';
 import { createSampleBank } from './samples.js';
-import { playWithSamples } from './sfx/sampled.js';
-import { breathParams, playBreath, voiceOfBody } from './sfx/voice.js';
+import { breathHeard, breathPlan, playPlan, playWithSamples, uiSamplePlan } from './sfx/sampled.js';
+import { breathParams, cryRate, playBreath, voiceOfBody } from './sfx/voice.js';
 import { playWhizz, whizzParams } from './sfx/ranged.js';
-import { CRIES, createCryDirector } from './cries.js';
+import { CRIES, createCryDirector, voiceOfFighter } from './cries.js';
 import { CHARGE, chargeOf } from './charge.js';
 import { playUi, uiParams } from './sfx/ui.js';
 import { playThump, thumpParams } from './sfx/thump.js';
@@ -556,7 +556,11 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     }
   }
 
-  /** Breathing: the player always, and the nearest few others, each breath scheduled from his exertion. */
+  /**
+   * Breathing: the player always, and the nearest few others, each breath scheduled from his exertion; heard only when he is all but
+   * spent (sampled.js BREATH_TAKES), the recorded breath of his sex at his voice's pitch (the synth's until it has loaded). A machine
+   * does not breathe.
+   */
   function breathe(info, now) {
     const world = info.world;
     const wanted = [];
@@ -580,15 +584,20 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       if (now < breather.next) continue;
       const exertion = exertionOf(fighter);
       const breath = breathParams(exertion, fighterHeight(fighter));
+      const inhale = breather.inhale;
+      breather.next = now + (inhale ? breath.inSeconds : breath.outSeconds) + 0.05;
+      breather.inhale = !inhale;
+      if (!breathHeard(exertion) || fighter.body?.gear?.machine) continue;
       const head = P.head * 3;
       const at = [fighter.x[head], fighter.x[head + 1], fighter.x[head + 2]];
       // His own mouth is a hand from his ears: the nearest a breath is heard from.
       const d = Math.max(0.3, Math.hypot(at[0] - listener.x, at[1] - listener.y, at[2] - listener.z));
       const atEar = breath.level + 20 * Math.log10(Math.max(EAR.floor, 1 / d));
       const voice = placeVoice(at, 'voices', { atEar, priority: fighter === player ? 0 : -Infinity });
-      breather.next = now + (breather.inhale ? breath.inSeconds : breath.outSeconds) + 0.05;
-      if (voice) voice.chain.ends = playBreath(voice, voice.out, breath, now + 0.01, gainOfLevel(atEar), breather.inhale);
-      breather.inhale = !breather.inhale;
+      if (!voice) continue;
+      const own = voiceOfFighter(fighter);
+      const recorded = playPlan(state.samples, voice, breathPlan(breath, inhale, exertion, own.sex, cryRate(own)), now + 0.01, gainOfLevel(atEar));
+      voice.chain.ends = recorded ?? playBreath(voice, voice.out, breath, now + 0.01, gainOfLevel(atEar), inhale);
     }
     for (const fighter of state.breaths.keys()) if (!wanted.includes(fighter)) state.breaths.delete(fighter);
   }
@@ -622,11 +631,13 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
 
   // ---- The menus' sounds and the bench -------------------------------------------------------------------------------------------------
 
-  /** A UI sound (click, confirm, back, victory, defeat), straight into the effects bus. */
+  /** A UI sound (click, confirm, back, victory, defeat), straight into the effects bus (its slider and the master's). */
   function ui(kind) {
     if (!state.ctx || state.ctx.state !== 'running') return;
     const voice = sfxVoice(state.ctx, state.buses.effects.dry);
-    playUi(voice, voice.out, uiParams(kind), state.ctx.currentTime + 0.005, 0.8);
+    // The recorded tap and chime (sampled.js uiSamplePlan); victory and defeat, or before they load, the synth's notes.
+    const when = state.ctx.currentTime + 0.005;
+    if (playPlan(state.samples, voice, uiSamplePlan(kind), when, 0.8) === null) playUi(voice, voice.out, uiParams(kind), when, 0.8);
   }
 
   /** The hit feel's thump (hitfeel.js) of a blow the player felt, at `gain` (0..1), a blow of `strength` (0..1: lower and longer the heavier), straight into the effects bus. */

@@ -1,6 +1,6 @@
 // The world's own sounds: thunder (a `thunder` event: a crack near, a long rumble far, the bolt's channel heard a stretch at a time as
 // its kilometres of length arrive one after another), the mechanisms of the castle (`mech`: a door's creak and slam, a gate's or a
-// portcullis's chain, a drawbridge's, a ladder of wood, a lock and its key, a thing picked up, a chest, a lever), and the one-shots the
+// portcullis's chain, a drawbridge's, a ladder of wood, a lock and its key, a prisoner's shackles, a thing picked up, a chest, a lever), and the one-shots the
 // ambience scatters (ambience.js): a drip, a fire's crackle, a bird.
 
 import { sfxBuffer, sfxBurst, sfxClamp, sfxEnvelope, sfxFilter, sfxGain, sfxModes, sfxNoise, sfxPlayBuffer, sfxRun, sfxTone, writeCrackle, writeGrains, lowpassInPlace } from '../synth.js';
@@ -44,12 +44,14 @@ export const MECHS = {
   pickup: { level: 55 },
   chest: { level: 70 },
   lever: { level: 78 },
+  // A prisoner's chains shaken where he is chained (levelmode/awareness.js: as he sobs).
+  shackles: { level: 64 },
 };
 
 /** What a mechanism sounds like, without a context: { kind, state, level, seconds }. */
 export function mechParams(event) {
   const kind = MECHS[event.kind] ? event.kind : 'door';
-  const seconds = { door: 0.9, gate: 1.4, portcullis: 2.4, drawbridge: 3, ladder: 0.35, lock: 0.5, pickup: 0.25, chest: 0.8, lever: 0.6 }[kind];
+  const seconds = { door: 0.9, gate: 1.4, portcullis: 2.4, drawbridge: 3, ladder: 0.35, lock: 0.5, pickup: 0.25, chest: 0.8, lever: 0.6, shackles: 0.4 }[kind];
   return { kind, state: event.state ?? 'open', level: MECHS[kind].level, seconds };
 }
 
@@ -109,6 +111,10 @@ export function playMech(voice, out, params, when, gain) {
     if (kind === 'portcullis') sfxModes(voice, out, when + seconds, [{ f: 240, decay: 0.5, amp: 1 }, { f: 610, decay: 0.3, amp: 0.6 }, { f: 1450, decay: 0.2, amp: 0.4 }], gain);
     else playSlam(voice, out, when + seconds, gain * 1.1, 70);
     return when + seconds + 0.6;
+  }
+  if (kind === 'shackles') {
+    playChain(voice, out, when, seconds, gain * 0.6);
+    return when + seconds + 0.05;
   }
   if (kind === 'ladder') {
     sfxModes(voice, out, when, [{ f: 330, decay: 0.12, amp: 1 }, { f: 820, decay: 0.07, amp: 0.5 }], gain);
