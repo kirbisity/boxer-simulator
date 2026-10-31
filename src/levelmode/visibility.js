@@ -191,9 +191,9 @@ export function seeThroughIds(stage) {
   };
   for (const section of stage.sections) {
     for (const solid of section.terrain ?? []) if (['ladder', 'fence', 'hidden'].includes(solid.style)) see(solid);
-    // A gate of bars, or a ladder, is seen through; a door (planks or iron plate) is not.
+    // A gate of bars (a portcullis too), or a ladder, is seen through; a door (planks or iron plate) or a sluice's boards is not.
     for (const mechanism of [...(section.gates ?? []), ...(section.ladders ?? [])]) {
-      if (!['bars', 'ladder'].includes(mechanism.look?.kind)) continue;
+      if (!['bars', 'ladder', 'portcullis'].includes(mechanism.look?.kind)) continue;
       for (const solids of Object.values(mechanism.states ?? {})) for (const solid of solids) see(solid);
     }
   }

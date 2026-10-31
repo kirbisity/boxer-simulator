@@ -23,10 +23,10 @@
 //   vault   Whigs' Vault        x -2..46, z -39..-3 (y 3..11.5): the long cellar (floor y 6), the cell hall, the iron gate (its bar lifted from the cellar side) and its stair up to the
 //                              court, the turnkey's desk with the keep's key; off the cellar the torture chamber, the stores and the well shaft (dunnottar-vault.js)
 //   crypt   The Crypt           x -1..34, z -40..-18 (y -1..5.4): under the cellar, by the shaft's winding stair: gallery, ossuary, tombs, a
-//                              flooded way on a causeway to the sea-gate and a hidden lever (a loop back up through the torture chamber)
+//                              flooded way on a causeway to the sea-gate (its stair up to the torture chamber shut by a heavy door nothing opens)
 //   sewer   The Old Drain      x -56..0, z -40..56 (y -5..1.4): the way round the guarded gate: a sea cave at the foot of the gorge shelf (its mouth, its stair and its
-//                              lantern are the cliff path's), a grotto, a long drain, a flooded cistern, two stairs, and a low door into the crypt's sea-gate chamber,
-//                              whose lever lifts the heavy door of the stair up into the torture chamber (dunnottar-sewer.js)
+//                              lantern are the cliff path's), a grotto, a long drain, a flooded cistern, two stairs, the cesspool, and a low door into the crypt's
+//                              sea-gate chamber, from which the way on is through the crypt and up the well shaft into the cellar (dunnottar-sewer.js)
 //   tower   Tower House & Upper Walls: the keep hall (y 12.18), the winding tower stair (to y 24.93), the north wall walk, a stair
 //                              down to the ladder room (y 17.18: Shortcut 2 kicks a ladder down into the quad) and Rest 3
 //   chapel  The Sanctuary       x -35..-2, z -48..-24 (y 17.18): the fully vaulted summit nave, 30 x 20 m, Lord Vaelen; the cell's double doors in its west end
@@ -868,7 +868,6 @@ const DN_DEAD = {
   quad: [['fallen3', 'dunnottarGuard', 2, [27.4, Y.quad, 4.6], 1.2, 'A guard, a crossbow bolt in his back']],
   tower: [['fallen4', 'dunnottarGuard', 2, [36.6, Y.walk, -37], 0.1, 'A guard, who held the wall']],
   vault: [['fallen5', 'dunnottarGuard', 2, [6.6, Y.vault, -33.8], 2.6, 'A guard, killed at the rack: a poor man, the questioner\'s own sergeant']],
-  crypt: [['fallen6', 'dunnottarKnight', 3, [4.4, Y.crypt, -37.4], 0.5, 'A man-at-arms, his harness on, sat down by the sea-gate and did not rise']],
 };
 // The lit things the dark rooms want beyond their builders' (dunnottar-light.js).
 dnLightDecor(DN_SECTIONS);
@@ -900,6 +899,8 @@ export const DN_TEAM = [
 export const DUNNOTTAR = {
   id: 'dunnottar',
   title: 'Memories of Dunnottar',
+  // The garrison is in its own castle: nobody of it is frightened off (ai.js knowsNoFear); a man still gives ground as his weapon wants, and never breaks.
+  homeGround: ['blue'],
   // The render.js place it is set in (a storm, levelmode/storm.js).
   place: 'dunnottar',
   sea: DN_Y.sea,
@@ -957,6 +958,14 @@ const dnSpiralWaypoints = (every = 2) => {
   return points;
 };
 
+/** The well shaft's winding stair, from the landing down to the crypt: the treads to aim at. */
+const dnShaftWaypoints = (every = 2) => {
+  const points = [];
+  for (let step = DN_SHAFT_SPIRAL.steps - 1; step >= 0; step -= every) points.push(windingTread(DN_SHAFT_SPIRAL, step));
+  points.push(windingTread(DN_SHAFT_SPIRAL, 0));
+  return points;
+};
+
 /**
  * Stage 1 as it was, with company: the two Forger comrades beside him at the start (DN_TEAM, appended last in the cliff section) and the vault's prisoners
  * following him once freed. For the team's tests (the code is kept for a stage that wants it).
@@ -994,9 +1003,9 @@ export const DUNNOTTAR_ROUTE = [
 /**
  * The way round the guarded gate, as DUNNOTTAR_ROUTE is the way through it: down the cliff path as before, then not east to the postern but along
  * the shelf to the head of the sea cave's stair, down it, in at the cave and along the old drain (the grotto, the first drain, the cistern's
- * causeway, the second drain and its stair, the long drain and its stair) to the sea-gate chamber, the hidden lever there, and up the stair behind
- * the heavy door into the vault's torture chamber and the cellar, where it joins the main route. `lever` names the lever a leg ends at (a walker
- * can set the mechanism it works instead, `open`).
+ * causeway, the second drain and its stair, the long drain, the cesspool and the stair after it) to the sea-gate chamber; then through the crypt (the
+ * flooded way north, the gallery east past the ossuary's door) to the well shaft, up its winding stair into the cellar, where it joins the main route.
+ * (It went up the stair behind the heavy door, opened by a lever at the sea-gate: the lever is gone, the user's call, and the door stays shut.)
  */
 export const DUNNOTTAR_SEWER_ROUTE = [
   DUNNOTTAR_ROUTE[0],
@@ -1006,8 +1015,9 @@ export const DUNNOTTAR_SEWER_ROUTE = [
   { name: 'the cistern causeway', to: 'sewer', points: [[-48.5, 20], [-48.5, 14], [-48.5, 8], [-48.5, 2]] },
   { name: 'the second drain and its stair', to: 'sewer', points: [[-48.5, -4], [-48.5, -8], [-48.5, -12], [-48.5, -16], [-48.5, -24], [-48.5, -32], [-48.5, -36.4]] },
   { name: 'the long drain', to: 'sewer', points: [[-46, -37.9], [-40, -37.9], [-30, -37.9], [-20, -37.9], [-13, -37.9], [-9, -37.9], [-4, -37.9]] },
-  { name: 'the sea-gate and the lever', to: 'crypt', points: [[0.8, -37.9], [4, -37.7], [6.6, -36.9]], lever: 'seagatelever', open: ['cryptgate'] },
-  { name: 'the stair behind the heavy door', to: 'vault', points: [[3, -37.6], [1.7, -36.2], [1.7, -34.6], [1.7, -32], [1.7, -30.4], [1.7, -29], [3, -28.4], [6.4, -27.8], [6.6, -26.3], [6.6, -23.6]] },
+  { name: 'the sea-gate', to: 'crypt', points: [[0.8, -37.9], [4, -37.7], [5.8, -37.2]] },
+  { name: 'the flooded way and the gallery', to: 'crypt', points: [[6.2, -34.2], [6.2, -31.5], [6.2, -28], [6.2, -25.6], [8.5, -24.4], [12, -24.4], [18, -24.4], [26, -24.4], [28.6, -25.2], [28.6, -27.4]] },
+  { name: 'up the well shaft', to: 'vault', points: [...dnShaftWaypoints(2).reverse(), [27.2, -29.4], [28.6, -27.6], [28.6, -25], [28.6, -22.5]] },
   ...DUNNOTTAR_ROUTE.slice(DUNNOTTAR_ROUTE.findIndex((leg) => leg.name === 'the long cellar')),
 ];
 
@@ -1023,23 +1033,13 @@ export const DUNNOTTAR_SHORTCUTS = [
   { name: 'the inner cell door', mechanism: 'innerdoor', start: [-30.4, DN_Y.ladderRoom, -36], facing: DN_FACE.W, points: [[-34.4, -36], [-38, -36], [-42, -36]], blockedWhenClosed: true },
 ];
 
-/** The well shaft's winding stair, from the landing down to the crypt: the treads to aim at. */
-const dnShaftWaypoints = (every = 2) => {
-  const points = [];
-  for (let step = DN_SHAFT_SPIRAL.steps - 1; step >= 0; step -= every) points.push(windingTread(DN_SHAFT_SPIRAL, step));
-  points.push(windingTread(DN_SHAFT_SPIRAL, 0));
-  return points;
-};
-
 /**
  * The optional ways off the main route, each a walk from a start (a point [x, y, z] and a facing) that a man can make: `to` is the section he is in
  * at the end (and `seen` the sections that wake along it), `open` the mechanisms to set first. They are the vault's branches: the torture chamber,
- * the stores, the well shaft down to the crypt (its gallery, the ossuary, the keepers' tombs, the flooded way, the sea-gate), and the way back
- * up the stair behind the heavy door into the torture chamber (`cryptgate`, opened by the hidden lever at the sea-gate).
+ * the stores, the well shaft down to the crypt (its gallery, the ossuary, the keepers' tombs, the flooded way, the sea-gate).
  */
 export const DUNNOTTAR_BRANCHES = [
   { name: 'the torture chamber', start: [20, DN_Y.vault, -22.5], facing: DN_FACE.W, to: 'vault', points: [[9, -22.5], [6.6, -23.8], [6.6, -26.6], [6.6, -29], [5.4, -31], [5.2, -34], [9, -34.4], [9.2, -30.6], [7, -29.4]] },
   { name: 'the stores', start: [20, DN_Y.vault, -22.5], facing: DN_FACE.W, to: 'vault', points: [[15.2, -22.5], [15.2, -19.5], [15.2, -16], [15.2, -14.6], [15.2, -12.5], [16.4, -10], [17.4, -8.6], [13.4, -8.4]] },
   { name: 'the well shaft, the crypt and the sea-gate', start: [20, DN_Y.vault, -22.5], facing: DN_FACE.E, to: 'crypt', seen: ['crypt'], points: [[28.6, -22.5], [28.6, -25], [28.6, -27.6], [27.2, -29.4], ...dnShaftWaypoints(2), [28.6, -27.4], [28.6, -25.2], [26, -24.4], [18, -24.4], [16.9, -23.4], [16.9, -20.2], [16.6, -24.4], [16.6, -26.4], [16.6, -28.4], [15.4, -30.4], [16.6, -28.4], [16.6, -25.6], [12, -24.4], [8.5, -24.4], [6.2, -25.6], [6.2, -28], [6.2, -31.5], [6.2, -34.2], [5.8, -37.2]] },
-  { name: 'back up from the sea-gate, behind the heavy door', start: [1.7, DN_Y.crypt, -36.2], facing: DN_FACE.S, to: 'vault', open: ['cryptgate'], points: [[1.7, -34.6], [1.7, -32], [1.7, -30.4], [1.7, -29], [3, -28.4], [6.4, -27.8], [6.6, -26.3], [6.6, -23.6]] },
 ];

@@ -100,8 +100,8 @@ test('sewer: the drain is walkable from the cave to the sea-gate, without a drop
   // The walker's way through the sewer: each point of it stands in the sewer (or the crypt) and on a floor.
   for (const leg of DUNNOTTAR_SEWER_ROUTE.filter((entry) => ['sewer', 'crypt'].includes(entry.to))) {
     for (const [x, z] of leg.points) {
-      // (Looking down from under the shelf's level, so as to find the drain's floor and not the shelf's; from higher at the last stair.)
-      const floor = floorAt(terrain, x, z, x > -13 && z < -30 ? 3 : -0.8);
+      // (Looking down from under the shelf's level, so as to find the drain's floor and not the shelf's; from higher at the last stair and in the crypt.)
+      const floor = floorAt(terrain, x, z, x > -13 ? 3 : -0.8);
       assert.ok(Number.isFinite(floor), `${leg.name}: ${x},${z} has a floor`);
       assert.ok(activeSections(DUNNOTTAR, [x, floor + 0.95, z]).some((id) => ['sewer', 'crypt'].includes(id)), `${leg.name}: ${x},${z} is in the sewer or the crypt`);
     }
@@ -116,7 +116,7 @@ test('sewer: nothing else claims the drain: no other section holds a point of it
   assert.deepEqual(activeSections(DUNNOTTAR, [-3, DN_Y.crypt + 0.95, -37.9]), ['crypt', 'sewer']);
 });
 
-test('sewer: a ghost walk at a sprint goes from the cliff path through the sea cave and the old drain, up the stair behind the heavy door, into the vault', () => {
+test('sewer: a ghost walk at a sprint goes from the cliff path through the sea cave and the old drain, through the crypt and up the well shaft, into the vault', () => {
   const w = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 21 });
   w.stage.ghost = true;
   const me = w.fighters[0];
@@ -141,11 +141,10 @@ test('sewer: a ghost walk at a sprint goes from the cliff path through the sea c
   assert.ok(w.time < 400, `the whole way takes ${w.time.toFixed(0)} s`);
 });
 
-test('sewer: the sea-gate lever lifts the heavy door, and the route from the sea-gate joins the main one in the cellar', () => {
-  const lever = DUNNOTTAR_SEWER_ROUTE.find((leg) => leg.lever);
-  assert.ok(lever);
-  assert.equal(lever.lever, 'seagatelever');
-  assert.deepEqual(lever.open, ['cryptgate']);
+test('sewer: from the sea-gate the way on is the crypt (no lever, the heavy door shut), and the route joins the main one in the cellar', () => {
+  assert.ok(!DUNNOTTAR_SEWER_ROUTE.some((leg) => leg.lever || leg.open?.includes('cryptgate')), 'nothing on it opens the heavy door');
+  const names = DUNNOTTAR_SEWER_ROUTE.map((leg) => leg.name);
+  assert.deepEqual(names.slice(names.indexOf('the sea-gate'), names.indexOf('the long cellar')), ['the sea-gate', 'the flooded way and the gallery', 'up the well shaft']);
   // It joins the main route in the cellar and goes on as it does: the iron gate, the stair up into the court, its lane to the keep's door, the keep.
   const tail = (route) => route.slice(route.findIndex((leg) => leg.name === 'the long cellar')).map((leg) => leg.name);
   assert.deepEqual(tail(DUNNOTTAR_SEWER_ROUTE), tail(DUNNOTTAR_ROUTE));

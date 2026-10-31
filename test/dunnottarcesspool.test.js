@@ -19,6 +19,7 @@ import { approachLevels, interiorLevels, levelsSettled, STAGE_LOOKS } from '../s
 import { addRipple, ageRipples, newRipples, rippleRing, stageWaters, WATER, wadeDrag, waterAt, waterContains, waterSources } from '../src/levelmode/water.js';
 import { DUNNOTTAR } from '../src/levelmode/stages/dunnottar.js';
 import { DN_CESSPOOL, DN_CESSPOOL_REGION, DN_NONAME_POST, DN_NONAME_SPAWN } from '../src/levelmode/stages/dunnottar-sewer.js';
+import { mindState } from '../src/levelmode/awareness.js';
 import { DN_DARK_FLOOR, DN_DARK_MOST, DN_INTERIOR } from '../src/levelmode/stages/dunnottar-light.js';
 
 const sewer = sectionById(DUNNOTTAR, 'sewer');
@@ -35,7 +36,7 @@ const noname = (w) => w.fighters.find((fighter) => fighter.spawn?.id === DN_NONA
 
 // ---- the sewer's cast ----------------------------------------------------------------------------------------
 
-test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 waiting in the alcove off the pit; the levies, the sergeant and everybody else are gone', () => {
+test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 buried in a heap on the island in the middle of the pit; the levies, the sergeant and everybody else are gone', () => {
   assert.equal(sewer.spawns.length, 1);
   const [spawn] = sewer.spawns;
   assert.equal(spawn.id, 'noname');
@@ -46,9 +47,11 @@ test('cesspool: the sewer holds one man, Noname, an enemy of tier 3 waiting in t
   assert.equal(spawn.inputs.name, 'Noname');
   assert.ok(spawn.miniboss, 'a miniboss (he stays dead after a rest)');
   for (const gone of ['drain1', 'drain2', 'drainward', 'drain3']) assert.ok(!DUNNOTTAR.sections.some((section) => section.spawns.some((entry) => entry.id === gone)), `${gone} is gone`);
-  // He waits at the back of the alcove north of the pit, facing it (the ending lays the body out on the island, a hand under the sludge: a man who dies on it has his face out of it).
+  // He lies buried in the middle, on the island (a hand under the sludge: a man who dies on it has his face out of it), where the way over the pit goes; he waited in the alcove
+  // and came out of it from the left once (the user's call: he starts in the middle, hidden, and rises).
   assert.deepEqual(spawn.post, DN_NONAME_POST);
-  assert.ok(spawn.post[2] < P0.at[2] - P0.hall - 1, 'north of the hall, in the alcove');
+  assert.ok(Math.abs(spawn.post[0] - P0.island.at[0]) < 0.01 && Math.abs(spawn.post[2] - P0.island.at[1]) < 0.01 && spawn.post[1] === P0.island.top, 'on the island');
+  assert.ok(spawn.lurk && !spawn.ambush, 'buried (`lurk`), not lying in wait in an alcove');
   assert.ok(P0.island.top < P0.at[1] && P0.island.top + 0.2 > P0.at[1], 'the island just under the surface');
   assert.ok(P0.island.top - P0.floor <= 0.45, 'a step up from the bed');
 });
@@ -153,9 +156,12 @@ test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health
   };
   advance(w, 1, look);
   assert.equal(bar().show, false, 'not yet: he is hidden');
-  // Two strides on, over the pit's edge: he has him, he fights, the bar is up.
-  placeOnFloor(w.fighters[0], P0.at[0] - P0.radius + 1.2, P0.at[2], P0.rim, 0);
-  advance(w, 1, look);
+  // Over the pit's edge and on toward the heap, within a few metres of it: he rises, he fights, the bar is up from the moment he begins to rise.
+  placeOnFloor(w.fighters[0], P0.island.at[0] - 3, P0.at[2], P0.floor, 0);
+  advance(w, 0.4, look);
+  assert.equal(mindState(w, man.id), 'rise');
+  assert.equal(bar().show, true, 'rising at the player: the bar (and the boss music) from now');
+  advance(w, 3, look);
   assert.equal(bar().show, true, 'aware of the player');
   assert.equal(bar().name, 'Noname');
   assert.equal(bar().title, 'The Cesspool');
@@ -165,7 +171,7 @@ test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health
   const me = w.fighters[0];
   placeOnFloor(me, P0.at[0] - P0.hall - 25, P0.at[2], P0.rim, 0);
   assert.equal(bar().show, false, `${LEVEL_CONFIG.boss.barRange} m is the bar's reach`);
-  placeOnFloor(me, P0.at[0] - P0.radius + 1.2, P0.at[2], P0.rim, 0);
+  placeOnFloor(me, P0.island.at[0] - 3, P0.at[2], P0.floor, 0);
   assert.equal(bar().show, true);
   // He falls: the bar is empty and struck through for the felled seconds, then gone. He is not the stage's boss (no phase two, no cutscene).
   knockOut(w, man, { time: w.time, effects: [] }, 'dies', 'killed');
@@ -178,16 +184,7 @@ test('cesspool: Noname has the boss\'s bar (his name, "The Cesspool", his health
   assert.equal(w.stage.level.boss.id !== man.id, true, 'the stage boss is Vaelen, not him');
 });
 
-test('cesspool: the reveal: Noname is out of sight from the long drain and the hall\'s west door; over the pit\'s edge he comes out at the player, his bar up, a line said once', () => {
-  const terrain = createLevelWorld(DUNNOTTAR, levelPreset('forger'), { seed: 2 });
-  placeOnFloor(terrain.fighters[0], P0.at[0] - P0.hall + 0.4, P0.at[2], P0.rim, 0);
-  updateStage(terrain, true);
-  const solids = terrain.arena.terrain;
-  const eye = P0.rim + 1.6;
-  // The way in: the long drain from the pocket to the hall's west door, and three steps into the hall. From none of it is he in sight (at a man's eye, his and the player's).
-  for (let x = -52; x <= P0.at[0] - P0.hall + 2; x += 0.5) {
-    for (const z of [P0.at[2] - 1.2, P0.at[2], P0.at[2] + 1.2]) assert.ok(rayBlocked(solids, [x, z], [DN_NONAME_POST[0], DN_NONAME_POST[2]], eye, eye), `he is seen from ${x}, ${z}`);
-  }
+test('cesspool: the reveal: buried in the heap Noname is nowhere to be seen or fought; near it he rises at the player, his bar up, a line said once', () => {
   const w = inCesspool(5);
   const man = noname(w);
   const me = w.fighters[0];
@@ -199,27 +196,34 @@ test('cesspool: the reveal: Noname is out of sight from the long drain and the h
   step(2);
   assert.equal(bossStatus(w).show, false, 'at the door: no bar');
   assert.ok(!w.stage.level.ui.some((message) => message.type === 'toast' && message.text === sewer.spawns[0].reveal));
-  // Over the pit's edge (the arena, stage.regions.cesspool): he has him.
+  // Over the pit's edge (the arena, stage.regions.cesspool): still buried, he does not stir.
   placeOnFloor(me, DN_CESSPOOL_REGION.at[0] - DN_CESSPOOL_REGION.size[0] / 2 + 1, P0.at[2], P0.rim, 0);
+  step(1);
+  assert.equal(mindState(w, man.id), 'lurk', 'the heap lies still');
+  assert.equal(bossStatus(w).show, false);
+  // On to within a few metres of the heap: he rises.
+  placeOnFloor(me, P0.island.at[0] - 3.2, P0.at[2], P0.floor, 0);
   step(0.5);
   assert.equal(bossStatus(w).show, true, 'his bar is up (and with it the boss music, main.js audioScene)');
   assert.equal(w.stage.level.ui.filter((message) => message.type === 'toast' && message.text === sewer.spawns[0].reveal).length, 1, 'the line, once');
-  const from = man.x[P.pelvis * 3 + 2];
   step(3);
-  assert.ok(man.x[P.pelvis * 3 + 2] > from + 1.5, `he comes out of the alcove (z ${from.toFixed(1)} to ${man.x[P.pelvis * 3 + 2].toFixed(1)})`);
+  assert.ok(['aggro', 'search'].includes(mindState(w, man.id)), 'risen, he fights');
+  step(2);
+  assert.equal(w.stage.level.ui.filter((message) => message.type === 'toast' && message.text === sewer.spawns[0].reveal).length, 1, 'once');
 });
 
 test('cesspool: Noname never leaves his hall: the player who backs out into the drain is not followed past its door', () => {
   const w = inCesspool(6);
   const man = noname(w);
   const me = w.fighters[0];
-  placeOnFloor(me, DN_CESSPOOL_REGION.at[0] - DN_CESSPOOL_REGION.size[0] / 2 + 1, P0.at[2], P0.rim, 0);
+  placeOnFloor(me, P0.island.at[0] - 3.2, P0.at[2], P0.floor, 0);
   const step = (seconds) => advance(w, seconds, (current, dt) => {
     updateStage(current);
     levelThink(current, dt);
     thinkAll(current, dt, new Set([0]));
   });
-  step(1);
+  step(3.5);
+  // (The sluices came down as he rose; put out in the drain, as a death or a rest would put him, the player has them open again: stage.js keepSeals.)
   // Out into the drain, 6 m past the door, and he stands there.
   placeOnFloor(me, P0.at[0] - P0.hall - 6, P0.at[2], P0.rim, 0);
   let west = Infinity;
@@ -230,6 +234,7 @@ test('cesspool: Noname never leaves his hall: the player who backs out into the 
     west = Math.min(west, man.x[P.pelvis * 3]);
   }
   const pen = sewer.spawns[0].pen;
+  assert.notEqual(mindState(w, man.id), 'lurk', 'he had risen at the player');
   assert.ok(west > pen.at[0] - pen.size[0] / 2 - 0.5, `the farthest west he went: ${west.toFixed(2)} (the hall's wall at ${(P0.at[0] - P0.hall).toFixed(2)})`);
 });
 

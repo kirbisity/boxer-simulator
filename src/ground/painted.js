@@ -17,6 +17,7 @@
 /* global THREE */
 import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
 import { LAST_GATE } from '../lastgate.js';
+import { groundDetailLayer } from '../detailtex.js';
 
 const PAINTED_GROUND_TEXELS = 512;
 
@@ -875,10 +876,25 @@ const PAINTED_GROUND_LAYERS = {
   },
 };
 
-/** Each layer once per page, shared by the places that use it. */
+/**
+ * The tile baked in Blender (detailtex.js, tools/blender/ground.py) that draws each layer where the detail maps are drawn, shared
+ * between the places (and the castle's kit) whose surface is the same material.
+ */
+const PAINTED_GROUND_BAKED = {
+  grass: 'grass', 'grass:flowers': 'grass', trampled: 'grass', dirt: 'earth', mud: 'earth', 'mud:hoof': 'earth', 'mud:foot': 'earth', 'mud:mixed': 'earth',
+  drygrass: 'drygrass', steppe: 'drygrass', grit: 'gravel', gravel: 'gravel', 'gravel:pale': 'gravel', desert: 'sand', sandRaked: 'sand', sandTrodden: 'sand',
+  beachDry: 'beach', beachWet: 'beach', cobbles: 'cobble', 'cobbles:worn': 'setts', slabs: 'slabs', concrete: 'concrete', 'concrete:worn': 'concrete',
+};
+
+/** Each layer once per page, shared by the places that use it: the baked tile if there is one, else painted here. */
 const paintedGroundLayerCache = new Map();
 function paintedGroundLayer(name) {
   if (!paintedGroundLayerCache.has(name)) {
+    const baked = PAINTED_GROUND_BAKED[name] ? groundDetailLayer(PAINTED_GROUND_BAKED[name]) : null;
+    if (baked) {
+      paintedGroundLayerCache.set(name, { ...baked, ms: 0 });
+      return paintedGroundLayerCache.get(name);
+    }
     const [painter, variant] = name.split(':');
     const options = { 'grass:flowers': { flowers: true }, 'mud:foot': { prints: 'foot' }, 'mud:mixed': { prints: 'mixed' }, 'cobbles:worn': { worn: true }, 'concrete:worn': { worn: true }, 'gravel:pale': { pale: true } }[name] ?? {};
     void variant;
@@ -1279,6 +1295,8 @@ function paintedGroundBuild({ place, view, scale, keepOut, grounds, rng }) {
   const started = performance.now();
   const fresh = [spec.a, spec.b].filter((name) => !paintedGroundLayerCache.has(name));
   const layers = { a: paintedGroundLayer(spec.a), b: paintedGroundLayer(spec.b) };
+  // (A baked layer tiles over its own metres.)
+  const tiled = { ...spec, tiles: [layers.a.metres ?? spec.tiles[0], layers.b.metres ?? spec.tiles[1]] };
   const group = new THREE.Group();
   let bytes = fresh.reduce((sum, name) => sum + paintedGroundLayerCache.get(name).bytes, 0);
   let layoutMs = 0;
@@ -1296,7 +1314,7 @@ function paintedGroundBuild({ place, view, scale, keepOut, grounds, rng }) {
     const own = paintedGroundMeanOf(ground.material.map);
     const mine = layers.a.mean;
     const calib = own ? own.map((value, channel) => Math.max(0.6, Math.min(1.6, 1 + (value / Math.max(0.02, mine[channel]) - 1) * spec.match))) : [1, 1, 1];
-    const material = paintedGroundMaterial(view, spec, layers, layout.texture, box, { map: ground.material.map, roughness: ground.material.roughness ?? 0.95, calib });
+    const material = paintedGroundMaterial(view, tiled, layers, layout.texture, box, { map: ground.material.map, roughness: ground.material.roughness ?? 0.95, calib });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     mesh.userData.paintedGround = true;

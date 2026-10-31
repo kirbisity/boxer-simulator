@@ -70,8 +70,8 @@ test('interact: the lever and the gate answer with a label that names the target
   const w = world();
   const found = stand(w, -3, DN_Y.gorge, 46.2).find((entry) => entry.id === 'gate:cliffgate');
   assert.match(found.label, /bar|gate/i);
-  const crypt = DUNNOTTAR.sections.find((section) => section.id === 'crypt');
-  assert.match(crypt.levers[0].label, /lever/i);
+  // (Dunnottar has no lever now: the sea-gate's is gone, the user's call. Every lever a stage has names itself one.)
+  for (const lever of DUNNOTTAR.sections.flatMap((section) => section.levers)) assert.match(lever.label ?? 'Pull lever', /lever/i);
   const me = w.fighters[0];
   assert.ok(Number.isFinite(me.x[P.pelvis * 3]));
 });

@@ -1800,7 +1800,7 @@ export function severView(view, fighterView, event, debris) {
   const boneIndices = new Set(part.bones.map((bone) => BONE[name(bone)]));
   const origin = new THREE.Vector3(...debris.origin);
   const piece = new THREE.Group();
-  for (const mesh of [fighterView.skinMesh, fighterView.steelMesh].filter(Boolean)) {
+  for (const mesh of [fighterView.skinMesh, fighterView.steelMesh, ...(fighterView.detailMeshes ?? [])].filter(Boolean)) {
     // A crowd fighter's ink has its own index: it loses the part too.
     const ink = mesh.userData.ink?.geometry;
     if (ink && ink !== mesh.geometry) {

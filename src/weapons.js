@@ -245,7 +245,9 @@ export const WEAPONS = {
     // Its head is a hammer face with a beak behind it (the bec de corbin): a swing lands one or the other, the beak a spike
     // that goes into plate where an edge skids (pierce). The face is small and hard on a long lever: most of its blow is felt
     // through plate, which dents and passes it on rather than spreading it (`crush` 0.7; was 0.45, as a mace's flanges).
-    harm: { swing: { blunt: 1.6, pierce: 0.4 }, thrust: { blunt: 1, pierce: 0.35 } },
+    // The top spike (the last fifth of the head, BLADES.pointShare) is a 14 cm square point: thrust, it goes in as a
+    // dagger's does (`pierce` 0.8, the dagger's; was 0.35), the heavy head behind it (`blunt` 1).
+    harm: { swing: { blunt: 1.6, pierce: 0.4 }, thrust: { blunt: 1, pierce: 0.8 } },
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, art: 'artCrush', crush: 0.7,
   },
   naginata: {
@@ -1097,6 +1099,14 @@ export const BLADES = {
   // is the injury, not the bleeding. It was 0.04 and then 0.1, when the wound's bleeding was taken for its harm:
   // a spear in the belly then barely moved the health he had, and only killed by bleeding.
   pierceTrauma: 0.17,
+  // A weapon's blunt blow crushes the tissue under it: of the contact's energy that its blunt share puts through the
+  // armour (J), this much counts as injury to the part (as an edge's 1/6 and a point's pierceTrauma; physics.js
+  // bluntConsequences takes it where it is worse than the part's speed change, the fist's and the fall's measure). The
+  // speed change of the whole part alone is the blow's momentum spread over 28 kg of trunk: a hard head of 1.7 kg at
+  // 23 m/s (430 J) then did less than a heavy jab twice over, and the hammer's blows off the head did next to nothing.
+  // Calibrated on the chest: Kroell's pendulum (23.4 kg, a flat 15 cm face, at 6.7 m/s: ~285 J of collision on a 28 kg
+  // trunk) breaks several ribs (AIS 3), what WORLD.damageCapacity calls seriously hurt (8.8 m/s): 0.03 × 285 ≈ 8.6.
+  crushTrauma: 0.03,
   // Edge alignment: a cut needs the edge moving across the blade, not along it.
   cutAlignmentPower: 2,
   // A thrust pierces only with the point: contact this far out along the striking length.

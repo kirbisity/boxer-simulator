@@ -14,12 +14,17 @@
 //   - A cry follows the blow by a reaction's time (it never lands on the blow's transient) and is pitched by his body (sfx/voice.js
 //     cryRate): his own voice, a little different each time.
 //   - A machine (gear.machine: a robot) never cries.
+//   - Some blows are pain itself, whatever else is going on (CRY_STRIKERS, by what struck: a whip's lash): a living man lashed nearly always
+//     screams or cries out, adrenaline hardly masking it, and the budget, the spacing and his cooldown do not hold it back; only his own short
+//     gap between two such cries does (a flurry is a cry a lash, not ten at once).
+//   - Grief (`grief` voices: a prisoner weeping, levelmode/awareness.js `mourn`) is heard as a sob (a moan) or now and then a wail (fear), rationed
+//     as the moans are; a `roar` (a thing rising out of the filth to fight, the same file's `lurk`) is always heard, a groan or a roar pitched low.
 //
 // Pure (no context): `createCryDirector().tick(...)` takes the tick's logged events and the fighters and returns the events with the
 // voices replaced by the cries let through (each a voice event carrying its `cry`). Node tests run it on a battle.
 
 import { P } from '../body.js';
-import { CRY_KINDS, cryRate, crySex } from './sfx/voice.js';
+import { CRY_KINDS, CRY_VOICE, cryRate, crySex } from './sfx/voice.js';
 
 /** The director's numbers. */
 export const CRIES = {
@@ -76,6 +81,27 @@ export const CRY_CHANCE = {
   fear: { every: [4, 9], chance: 0.6 },
   breaks: 0.8,
 };
+
+/**
+ * What struck, when it is pain itself (a voice event's `striker`, audio/log.js): a whip's lash (physics/whip.js) cuts the skin and stings far past its
+ * energy (the cry director's cryPain reads energy, and a lash's few joules would leave most men silent), and a man lashed screams or cries out:
+ *   chance    the chance a landed lash on a living, conscious man cries (machines never do), whatever its energy
+ *   mask      the share of that adrenaline takes away at full (a man fighting hot still cries at the whip, most of the time)
+ *   scream    the voice's strength (log.js: its share of the pain that floors a man) from which it is a scream, not a cry of hurt
+ *   floor     the least intensity of the cry
+ *   gap       s: the least time between two of a man's lash cries (a flurry of three is a cry, a cry, a cry; not one over another)
+ * The budget, the spacing and the cooldowns of the other cries (CRIES) do not hold a lash's back.
+ */
+export const CRY_STRIKERS = {
+  lash: { chance: 0.96, mask: 0.15, scream: 0.28, floor: 0.6, gap: 0.65 },
+};
+
+/**
+ * Other voices the director knows (neither blows nor deaths):
+ *   grief   a weeping man's sob (`strength` under `wailFrom`: a moan at it) or wail (a fear cry): rationed as the moans are (CRIES.ambientGap)
+ *   roar    a groan or a roar (a moan, or at `roarFrom` and up a scream), always heard, pitched `pitch` of his voice (deeper), not under the range's floor
+ */
+export const CRY_VOICES = { grief: { wailFrom: 0.7 }, roar: { roarFrom: 0.7, pitch: 0.82 } };
 
 /** A fighter's voice: { sex, height, mass, age, id, machine }. */
 export function voiceOfFighter(fighter) {
@@ -173,6 +199,19 @@ export function createCryDirector({ random = Math.random } = {}) {
         want(fighter, 'dying', 1, at, { always: true });
       } else if (event.kind === 'wound') {
         if (random() < woundChance(event.strength ?? 0.5, adrenaline)) want(fighter, 'scream', (event.strength ?? 0.5) * (1 - CRY_CHANCE.intensityMask * adrenaline * 0.5), at, { delayed: true });
+      } else if (event.kind === 'struck' && CRY_STRIKERS[event.striker]) {
+        // Pain itself (a lash): he cries out nearly every time, whatever else is sounding; only his own gap holds one back.
+        const spec = CRY_STRIKERS[event.striker];
+        const when = event.t ?? now;
+        if (when < (seen.painUntil ?? -Infinity) || random() >= spec.chance * (1 - spec.mask * Math.min(1, adrenaline))) continue;
+        seen.painUntil = when + spec.gap;
+        const strength = event.strength ?? 0.5;
+        want(fighter, strength >= spec.scream ? 'scream' : 'hurt', Math.max(spec.floor, strength), at, { delayed: true, pain: true });
+      } else if (event.kind === 'grief') {
+        const wail = (event.strength ?? 0.5) >= CRY_VOICES.grief.wailFrom;
+        want(fighter, wail ? 'fear' : 'moan', event.strength ?? 0.5, at, { grief: true });
+      } else if (event.kind === 'roar') {
+        want(fighter, (event.strength ?? 1) >= CRY_VOICES.roar.roarFrom ? 'scream' : 'moan', event.strength ?? 1, at, { always: true, pitch: CRY_VOICES.roar.pitch });
       } else if (event.kind === 'struck') {
         // The pain of it to him (its energy and covering logged with it), or else the part's jolt.
         const pain = event.energy !== undefined ? cryPain(fighter, event.energy, event.covering) : event.strength ?? 0;
@@ -220,15 +259,17 @@ export function createCryDirector({ random = Math.random } = {}) {
     const cries = [];
     for (const cry of wanted) {
       const seen = memory(cry.fighter, now);
-      if (!cry.always && now < seen.quietUntil) continue;
-      if (sounding.some((other) => other.who === cry.fighter.id) && !cry.always) continue;
-      if (sounding.length >= budget) continue;
-      if (now < lastStart + spacing && !cry.always) continue;
-      const ambient = cry.kind === 'moan' || cry.kind === 'fear';
+      // (A lash's cry, `pain`, is not held back by the rationing: CRY_STRIKERS.)
+      const free = cry.always || cry.pain;
+      if (!free && now < seen.quietUntil) continue;
+      if (sounding.some((other) => other.who === cry.fighter.id) && !free) continue;
+      if (sounding.length >= budget && !free) continue;
+      if (now < lastStart + spacing && !free) continue;
+      const ambient = !cry.pain && (cry.kind === 'moan' || cry.kind === 'fear') && !cry.always;
       if (ambient && now < lastAmbient + (battle ? CRIES.ambientGap.battle : CRIES.ambientGap.few)) continue;
       if (ambient) lastAmbient = now;
       const voice = voiceOfFighter(cry.fighter);
-      const rate = cryRate(voice, random() * 2 - 1);
+      const rate = cry.pitch ? Math.max(CRY_VOICE.range[0], cryRate(voice, random() * 2 - 1) * cry.pitch) : cryRate(voice, random() * 2 - 1);
       const intensity = Math.max(0, Math.min(1, cry.intensity));
       const delay = cry.delayed ? lerp(...CRIES.delay, random()) : 0;
       seen.quietUntil = now + delay + CRIES.cooldown[cry.kind];

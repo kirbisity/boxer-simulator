@@ -38,6 +38,7 @@ import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
+import { DETAIL_MAPS } from './detailmaps.js';
 import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { placeMounted } from './physics/mounted.js';
@@ -1258,7 +1259,7 @@ function consumeEvents() {
     if (moment) {
       // Slow motion and the camera's push-in are for one man against
       // another; in a crowd something is always happening, and the icon says enough.
-      if (state.world.fighters.length <= 2) startMoment(state.drama, moment, realSeconds());
+      if (state.world.fighters.length <= 2 || moment.always) startMoment(state.drama, moment, realSeconds());
       addIcon(state.drama, moment, realSeconds());
     }
     logEvent(event);
@@ -3273,6 +3274,8 @@ const boxer = window.boxer = {
     return sceneryLodOn();
   },
   sceneryLodStats: () => sceneryLodStats(scene),
+  // Whether the detail maps are drawn (detailmaps.js; `#maps=off` in the address draws the armour and the castle as before).
+  detailMaps: () => DETAIL_MAPS.on,
   // Fighters waiting for their V7 skin ({ waiting, bodies }); `finishSkins()` builds and swaps them all now (tests, shots).
   skins: () => skinBuildStats(),
   finishSkins: () => pumpSkinBuilds(scene, Infinity),

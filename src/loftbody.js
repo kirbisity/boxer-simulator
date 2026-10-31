@@ -10,6 +10,7 @@ import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS, mailUv, measureRings, plateUvAt, tileUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { ribDroop, RULES, rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
@@ -157,20 +158,34 @@ export const LOFT = {
   slice: 400,
 };
 
+// The roles drawn as metal that the plate's maps go on.
+const STEEL_ROLES = new Set(['steel', 'steel2', 'gold']);
+// Each run of rings measured once (girth, slant length), for the plate tile's coordinates on a patch laid over it.
+const ringMeasures = new WeakMap();
+/** A flat patch's corners in the plate tile, where the mesh carries the plate's maps and the patch is steel; else nothing. */
+function patchUv(mesh, rings, role, index, place, angle) {
+  if (!mesh.steelUv || !STEEL_ROLES.has(role)) return;
+  if (!ringMeasures.has(rings)) ringMeasures.set(rings, measureRings(rings, 1));
+  mesh.uvs.set(index, plateUvAt(ringMeasures.get(rings), place, angle));
+}
+
 /**
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
 function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null, holes = null } = {}) {
   const start = mesh.positions.length / 3;
+  // A colour may be a pattern: a function of the ring (and its index), and
+  // of the angle round it (0 at the front, as the depth axis points).
+  const paint = typeof color === 'function' ? color : () => color;
+  // Steel with the plate's maps (`mesh.steelUv`, detailmaps.js): a loft all of steel (every point of it steel, steel2 or gilt) takes
+  // the plate tile's coordinates. (Not a loft of steel and something else: a triangle across the two would read the skin's maps.)
+  if (!uv && mesh.steelUv && !holes && rings.every((ring, index) => Array.from({ length: sides }, (_, step) => paint(ring, (step / sides) * Math.PI * 2, index, step)).every((role) => STEEL_ROLES.has(role)))) uv = tileUv(rings, inflate, 'plate');
   // A part with texture coordinates (`uv`: ring, share of the way round -> [u, v]) has its first column of vertices twice, so the
   // texture does not run backwards across the last quad: the pairs are welded again for relaxing and for the normals.
   const stride = uv ? sides + 1 : sides;
   // `holes`: cloth torn away (t, angle -> true where it is gone, asked at each quad's middle): those quads are left out.
   const gone = holes ? tornQuads(rings, sides, holes) : null;
-  // A colour may be a pattern: a function of the ring (and its index), and
-  // of the angle round it (0 at the front, as the depth axis points).
-  const paint = typeof color === 'function' ? color : () => color;
   for (const [ringIndex, ring] of rings.entries()) {
     for (let step = 0; step < stride; step += 1) {
       const angle = (step / sides) * Math.PI * 2;
@@ -512,7 +527,8 @@ function computeNormals(positions, indices) {
 // roles: rows (by ring), mail (rings in a weave), rivets (dots on a base),
 // a front panel, or heraldry (the design's surcoat field).
 const MAIL = { mail: true };
-const LACED = { rows: ['steel', 'lace'] };
+// Japanese laced rows (kozane in kebiki-odoshi): drawn with the kozane's maps where those are drawn (`kozane`).
+const LACED = { rows: ['steel', 'lace'], kozane: true };
 const MANICA = { rows: ['steel', 'lace'] };
 // The Ming elite's neck guard: steel lames lying over the shoulders and the
 // top of the chest, each stepping out over the one below, with a steel band
@@ -536,24 +552,24 @@ export const ARMOR_KINDS = {
   roninDo: {
     trunk: [-0.08, 1.0, 1.18, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.4, 0.36, 1.22, LACED],
     belt: [0.02, 0.14, 1.3, { rows: ['cloth2', 'gold', 'cloth2'] }],
-    thigh: [0.05, 0.88, 1.5, { rows: ['steel', 'steel', 'lace'] }],
+    thigh: [0.05, 0.88, 1.5, { rows: ['steel', 'steel', 'lace'], kozane: true }],
     forearm: [0.3, -0.04, 1.2, 'cloth2'], shin: [0.08, 0.88, 1.3, 'cloth'],
   },
   // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,
   // cloth sleeves and simple shin guards.
   okegawa: {
-    trunk: [-0.05, 0.96, 1.17, { mon: [0.68, 0.07, 'gold'], base: 'armor' }], skirt: [0.3, 0.4, 1.2, { rows: ['armor', 'lace'] }],
+    trunk: [-0.05, 0.96, 1.17, { mon: [0.68, 0.07, 'gold'], base: 'armor' }], skirt: [0.3, 0.4, 1.2, { rows: ['armor', 'lace'], kozane: true }],
     forearm: [-0.04, -0.04, 1.22, 'top'], shin: [0.1, 0.8, 1.3, 'armor'],
   },
   // A sea raider's dō-maru: laced lames round the trunk and a laced skirt,
   // nothing on the arms or legs (often a captured or cast-off piece).
   doMaru: {
-    trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'] }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'] }],
+    trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'], kozane: true }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'], kozane: true }],
   },
   // The same with the great shoulder plates (sode) over bare arms.
   doMaruSode: {
-    trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'] }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'] }],
-    upperArm: [-0.18, 0.36, 1.6, { rows: ['armor', 'lace'] }],
+    trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'], kozane: true }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'], kozane: true }],
+    upperArm: [-0.18, 0.36, 1.6, { rows: ['armor', 'lace'], kozane: true }],
   },
   // A knight in mail: hauberk to the knees, mail sleeves and chausses, and a
   // surcoat in his colours over it.
@@ -1050,6 +1066,7 @@ function addPatch(mesh, rings, corners, role, bones) {
     mesh.weightPositions.push(...onRing(ring, angle, 1));
     mesh.colors.push(role);
     mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
+    patchUv(mesh, rings, role, start + index, place, angle);
   }
   // Wound so its face looks away from the piece's axis.
   const [place0, angle0] = corners[0];
@@ -1078,6 +1095,7 @@ function addGrid(mesh, rings, grid, role, bones) {
       mesh.weightPositions.push(...onRing(ring, angle, 1));
       mesh.colors.push(role);
       mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
+      patchUv(mesh, rings, role, mesh.positions.length / 3 - 1, place, angle);
     }
   }
   const at = (row, column) => start + row * columns + column;
@@ -1148,6 +1166,44 @@ function lamellaeOn(mesh, rings, inflate, paint, bones) {
     }
   }
 }
+
+/**
+ * Laced lamellar as a shell carrying a laced tile's maps (detailmaps.js `style`: 'lamellae' the steppe's and the Chinese, 'kozane'
+ * the Japanese; instead of lamellaeOn's plates or rows painted in two colours): one loft over the piece in rows of the tile's own
+ * height (DETAIL_ARMOUR[style].row, as many as fit the piece), two rings where the rows meet (the head of the row below standing
+ * out in front of the foot of the row above, so the outline steps row by row as the plates do), `sides` round; its texture
+ * coordinates count the tile's plates round (a whole number of tiles, by the piece's girth) and its rows up. `roleOf(row, rows)`:
+ * each row's paint, the lowest row 0; `holes(t, angle)`: where the shell is left open (a split, a leather panel).
+ */
+function lacedShell(mesh, rings, inflate, roleOf, bones, sides, style, holes = null) {
+  const spec = LOFT.lamellae;
+  const tile = DETAIL_ARMOUR[style];
+  const measure = measureRings(rings, inflate);
+  const across = Math.max(1, Math.round(measure.girth / (tile.columns * tile.pitch)));
+  const rows = Math.max(1, Math.round(measure.length / tile.row));
+  const last = rings.length - 1;
+  const low = inflate + spec.lift;
+  const high = inflate + spec.lift + spec.tilt;
+  const shell = [];
+  // `up`: rows up the piece (0 at its lowest ring).
+  const add = (up, outward, role) => {
+    const place = (up / rows) * last;
+    shell.push({ ...ringAt(rings, measure.rising ? place : last - place), out: outward, v: up / tile.rows, role });
+  };
+  for (let row = 0; row < rows; row += 1) {
+    add(row, low, roleOf(row, rows));
+    add(row + 1, high, roleOf(row, rows));
+  }
+  // (In the run's own order, so the faces wind outward as the piece's own loft does.)
+  if (!measure.rising) shell.reverse();
+  loft(mesh, shell, sides, {
+    color: (ring) => ring.role, inflate, shape: (ring) => ring.out / inflate, capStart: false, capEnd: false, bones,
+    uv: (ring, share) => [tile.band + share * across, ring.v], holes,
+  });
+}
+
+/** A lamellae paint's rows (lamellaeOn's colours): the lowest `paint.edge` if given, every fourth `steel2`. */
+const lamellaRole = (paint) => (row) => (row === 0 && paint.edge ? paint.edge : (row + (paint.shade ?? 0)) % 4 === 3 ? 'steel2' : 'steel');
 
 /**
  * Laminated plate: `paint.lames` bands along the piece, each its own ring of
@@ -1592,6 +1648,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const topShape = top ? TOPS[top.kind] : null;
   const bottom = look.bottom ?? null;
   const armor = look.armor ?? null;
+  // Steel drawn with the plate's maps (detailmaps.js), not in a crowd, not leather or horn.
+  mesh.steelUv = DETAIL_MAPS.on && !lowDetail && Boolean(armor) && !armor.matte;
   const plate = armor?.kind === 'plate';
   const lamellar = armor?.kind === 'lamellar';
   const hoplomachus = armor?.kind === 'hoplomachus';
@@ -1601,7 +1659,19 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // Lamellae drawn as plates over a backing of their dark lacing (the robe showing in the splits), except in a crowd.
     if (paint?.lamellae && !lowDetail) {
       loft(mesh, rings, sides, { color: (ring, angle) => (inLamellaGap(paint, angle) ? 'cloth' : 'lace'), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
-      lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
+      // Laced plates (not the pointed scales) as one shell with the lamellae's maps, where the detail maps are drawn.
+      if (DETAIL_MAPS.on && !paint.pointDown) lacedShell(mesh, rings, inflate, lamellaRole(paint), bones ?? (() => null), sides + 6, 'lamellae', paint.gaps ? (t, angle) => inLamellaGap(paint, angle) : null);
+      else lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
+      return;
+    }
+    // Japanese laced rows as one shell with the kozane's maps, in the rows' base colour (not in a crowd).
+    if (paint?.kozane && DETAIL_MAPS.on && !lowDetail) {
+      lacedShell(mesh, rings, inflate, () => paint.rows[0], bones ?? (() => null), sides + 6, 'kozane');
+      return;
+    }
+    // Mail with the mail's maps (detailmaps.js): one colour, the rings in the picture (not in a crowd).
+    if (paint?.mail && DETAIL_MAPS.on && !lowDetail) {
+      loft(mesh, rings, sides, { color: 'mail', inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: mailUv(rings, inflate) });
       return;
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
@@ -1699,7 +1769,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     if (!lowDetail && !armor.over) lamesOn(mesh, fauld, 1.2, { lames: LOFT.fauld.lames, base: 'steel2' }, () => hanging3);
   }
   // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
-  if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
+  // (With the detail maps, its laced rows are the kozane's: one stepped shell.)
+  const kozane = lamellar && DETAIL_MAPS.on && !lowDetail;
+  if (kozane) lacedShell(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), 1.24, (row) => (row === 0 && armor.trim ? 'gold' : 'steel'), () => hanging3, sides + 6, 'kozane');
+  else if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
   // A long gown's skirt, belled out from the waist to below the knee.
   // A gown, or a skirt over another bottom (`gown`: bloomers under a bubble skirt).
   const gownShape = bottom?.kind === 'gown' ? bottom.shape ?? 'crinoline' : bottom?.gown ?? null;
@@ -1759,7 +1832,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       return 'armor';
     };
     const shellRings = shell ? trunkRings(shell[0], shell[1], count(lamellar ? 15 : 12)) : null;
-    if (shell) loft(mesh, shellRings, sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen, ...(plate ? { shape: ridgedPlate } : {}) });
+    if (shell && kozane) {
+      // The dō's laced rows: the lacing's colour under them (and the leather front panel, left open in the shell), the kozane over.
+      const panel = (t, angle) => armor.panel && t > 0.3 && t < 0.86 && Math.cos(angle) > 0.82;
+      loft(mesh, shellRings, sides, { color: (ring, angle) => (panel(ring.t, angle) ? 'leather' : 'lace'), inflate: shell[2], capStart: false, capEnd: false, bones: abdomen });
+      lacedShell(mesh, shellRings, shell[2], (row, rows) => (armor.trim && row === rows - 1 ? 'gold' : 'steel'), abdomen, sides + 6, 'kozane', armor.panel ? panel : null);
+    } else if (shell) loft(mesh, shellRings, sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen, ...(plate ? { shape: ridgedPlate } : {}) });
     // (Under cloth worn over it, the plate's front is not seen: drawn plain.)
     if (plate && !lowDetail && !armor.over) breastplateOn(mesh, shellRings, shell[2], ridgedPlate, breastplate, { lanceRest: true }, abdomen);
   }
@@ -1834,7 +1912,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // Plate's gorget flares down over the tops of the breast and back plates, closing the gap between them and the helmet.
   const collarFrom = plate ? -0.45 : lamellar || kit?.collar ? -0.15 : -0.6;
   const flare = (t) => 1 + (lamellar || kit?.collar ? 0 : (plate ? 0.7 : 0.9) * Math.max(0, -t) / 0.6);
-  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') loft(mesh, tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t))), sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false });
+  if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') {
+    const collarRings = tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)));
+    // A mail collar with the mail's maps (detailmaps.js).
+    const mailMaps = kit?.collar === 'mail' && DETAIL_MAPS.on && !lowDetail ? { uv: mailUv(collarRings, 1) } : {};
+    loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
+  }
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
 
   for (const side of ['l', 'r']) {
@@ -1894,7 +1977,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     sleeveOf(topShape, 'top');
     if (lamellar) {
       // Sode: broad laced shoulder plates; kote: armoured cloth sleeves.
-      armorPiece(upperArmRings(-0.18, 0.5, count(4)), 1.85 * (armor.sode ?? 1), (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
+      if (kozane) lacedShell(mesh, upperArmRings(-0.18, 0.5, count(4)), 1.85 * (armor.sode ?? 1), () => 'steel', () => null, sides + 6, 'kozane');
+      else armorPiece(upperArmRings(-0.18, 0.5, count(4)), 1.85 * (armor.sode ?? 1), (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
       armorPiece(forearmRings(-0.04, wrist - 0.04, count(4)), 1.3, 'top');
     } else if (hoplomachus) {
       // The manica: a segmented guard down the sword arm only.
@@ -2060,7 +2144,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   }
   // Texture coordinates: the parts that have them, and everything else on a flat patch of the map.
   let uvs = null;
-  if (textured) {
+  // (Not only the textured styles': a piece drawn with the detail maps carries its own, detailmaps.js.)
+  if (textured || mesh.uvs.size) {
     uvs = new Float32Array((positionArray.length / 3) * 2);
     for (let vertex = 0; vertex < positionArray.length / 3; vertex += 1) uvs.set(mesh.uvs.get(vertex) ?? FLAT_UV, vertex * 2);
   }

@@ -39,10 +39,12 @@ test('dunnottar: registered, sound, ten sections with the cast the spec calls fo
   const front = enemies.filter((spawn) => spawn.alarm === 'front');
   assert.deepEqual(front.map((spawn) => spawn.id).sort(), ['archer1', 'archer2', 'archer3', 'archer4', 'archer5', 'archer6', 'bridgeguard1', 'bridgeguard2', 'bridgelevy', 'forecourtbow1', 'forecourtbow2', 'frontcrossbow', 'frontguard', 'frontknight1', 'frontknight2', 'gateknight'].sort());
   assert.ok(front.filter((spawn) => spawn.preset === 'dunnottarArcher').every((spawn) => spawn.perch && spawn.post[1] > 6));
-  assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 2);
+  // (The two the cell door frees, the two weeping in the cells behind the bars, the two chained in the cellar and the one at the torture chamber's wall.)
+  assert.equal(spawns.filter((spawn) => spawn.role === 'prisoner').length, 7);
   assert.ok(spawns.some((spawn) => spawn.role === 'boss' && spawn.preset === 'vaelen'));
   assert.deepEqual(DUNNOTTAR.sections.filter((section) => section.rest).map((section) => section.rest.id), ['rest1', 'rest2', 'rest2b', 'restdrain', 'rest3']);
-  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['archbar', 'cliffgate', 'celldoor', 'chapelgate', 'cryptgate', 'innerdoor', 'irongate', 'keepdoor', 'ladder1'].sort());
+  // (With the boss rooms' seals: the cesspool's two sluices and the sanctuary's portcullis, stage.js `seals`.)
+  assert.deepEqual(mechanismsOf(DUNNOTTAR).map((mechanism) => mechanism.id).sort(), ['archbar', 'cesspooleast', 'cesspoolwest', 'chapelgate', 'chapelportcullis', 'cliffgate', 'celldoor', 'cryptgate', 'innerdoor', 'irongate', 'keepdoor', 'ladder1'].sort());
   const notes = DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'note').map((item) => item.note).sort();
   assert.deepEqual(notes, ['bridge', 'cellar', 'drain', 'ledger', 'order', 'powder', 'seagate', 'servant', 'soldier', 'warden']);
   assert.deepEqual(DUNNOTTAR.sections.flatMap((section) => section.items).filter((item) => item.kind === 'key').map((item) => item.id).sort(), ['cellkey', 'keepkey']);
@@ -141,13 +143,16 @@ const CLIFFS = [
 ];
 
 test('dunnottar: a man can walk off the map only where there is a cliff (every state of the doors)', () => {
-  for (const open of [false, true]) {
-    const states = Object.fromEntries(mechanismsOf(DUNNOTTAR).map((mechanism) => [mechanism.id, open ? Object.keys(mechanism.states).find((state) => state !== mechanism.state) : mechanism.state]));
+  // (Every door open is every mechanism in its `open` state, or the state it does not start in; the boss rooms' seals, which start open, are also tried shut.)
+  const seals = new Set(['cesspooleast', 'cesspoolwest', 'chapelportcullis']);
+  for (const open of [false, true, 'sealed']) {
+    const states = Object.fromEntries(mechanismsOf(DUNNOTTAR).map((mechanism) => [mechanism.id, open === 'sealed' ? (seals.has(mechanism.id) ? 'closed' : mechanism.state) : open ? ('open' in mechanism.states ? 'open' : Object.keys(mechanism.states).find((state) => state !== mechanism.state)) : mechanism.state]));
     const terrain = stageTerrain(DUNNOTTAR, DUNNOTTAR.sections.map((section) => section.id), states);
     const flood = floodFill(terrain, DUNNOTTAR.start.at);
     assert.ok(!flood.truncated);
     // (The court is a lane now: the ranges that line it are masonry, where it was open ground to the walls: 17800 places to stand closed, 23100 with every door open.)
-    assert.ok(flood.standing > (open ? 22500 : 17300), `${flood.standing} places to stand`);
+    // (Sealed, the cesspool's sluices cut the old drain, and with the front's doors shut there is no further way from the start: what is left need only be sound.)
+    if (open !== 'sealed') assert.ok(flood.standing > (open === true ? 22500 : 17300), `${flood.standing} places to stand`);
     const stray = flood.edges.filter((edge) => !CLIFFS.some((allowed) => allowed(edge)));
     assert.deepEqual(stray.map((edge) => `${edge.at.map((v) => v.toFixed(1))} at ${edge.floor.toFixed(2)}`), [], `open ${open}`);
   }
@@ -187,11 +192,13 @@ test('dunnottar: the crypt sleeps until he is on the well shaft or at the stair 
   assert.ok(w.stage.active.includes('crypt'), `down in the gallery the crypt is the section (${w.stage.active})`);
 });
 
-test('dunnottar: the hidden lever at the sea-gate lifts the heavy door of the stair, and only then', () => {
+test('dunnottar: the heavy door on the stair up from the sea-gate is shut, and nothing in the stage opens it (its lever is gone)', () => {
   const w = world(6);
-  const lever = DUNNOTTAR.sections.find((section) => section.id === 'crypt').levers[0];
-  assert.equal(lever.target, 'cryptgate');
   assert.equal(w.stage.mechanisms.cryptgate, 'closed');
-  assert.equal(pullLever(w, lever.id), true);
-  assert.equal(w.stage.mechanisms.cryptgate, 'open');
+  const levers = DUNNOTTAR.sections.flatMap((section) => section.levers);
+  assert.ok(!levers.some((lever) => lever.target === 'cryptgate'), 'no lever works it');
+  assert.equal(pullLever(w, 'seagatelever'), false, 'the sea-gate lever is no more');
+  const gate = DUNNOTTAR.sections.flatMap((section) => section.gates).find((entry) => entry.id === 'cryptgate');
+  assert.ok(!gate.opensFrom && !gate.key, 'nor is it opened by hand or with a key');
+  assert.equal(w.stage.mechanisms.cryptgate, 'closed');
 });

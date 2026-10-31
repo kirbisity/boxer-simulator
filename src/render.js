@@ -14,10 +14,12 @@ import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps,
 import { bodyCheck } from './skinworker.js';
 import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
+import { DETAIL_MAPS, detailKindOf } from './detailmaps.js';
+import { armourDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { SKIN_TONES } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
-import { glovedFists, headgearOptions, outfitOf } from './outfits.js';
+import { FACTIONS, factionOf, glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
 import { orbitAboveGround } from './watchcam.js';
@@ -69,6 +71,8 @@ const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 export function createScene(canvas, { alpha = false } = {}) {
   // (`alpha`: a view drawn over something else, its background clear: The Last Gate's poster, its hero drawn alone.)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha });
+  // The detail maps' pictures decoded now, ready before the first man or wall that wears them (detailtex.js).
+  preloadDetailMaps();
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1913,6 +1917,7 @@ function detailedView(view, fighter, simple) {
   const skin = skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, soft: !simple && !rigid });
   const { skinMesh, skinOutline, steelMesh, baseColors, vertexSegment } = skin;
   if (steelMesh) layers.skin.add(steelMesh, skin.steelOutline);
+  for (const mesh of [...skin.detailMeshes, ...skin.detailOutlines]) layers.skin.add(mesh);
   layers.skin.add(skinMesh, skinOutline);
   const shells = simple || rigid ? [] : [{ key: 'body', shell: skin.shell }];
 
@@ -2046,7 +2051,7 @@ function detailedView(view, fighter, simple) {
   view.scene.add(group);
   const fighterView = {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells,
-    baseColors, vertexSegment, damageVersion: -1, headProps, dangles, steelMesh, steelOutline: skin.steelOutline,
+    baseColors, vertexSegment, damageVersion: -1, headProps, dangles, steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
   };
   if (later) queueSkin(fighterView, wanted);
@@ -2123,8 +2128,11 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   const triangles = machine ? 0 : built.indices.length / 3;
   const bodyIndices = [];
   const steelIndices = [];
+  // Armour drawn with the detail maps (detailmaps.js: its texture coordinates in a kind's band): each kind apart, in its own material.
+  const detailIndices = DETAIL_MAPS.on && built.uvs ? {} : null;
   for (let triangle = 0; triangle < triangles; triangle += 1) {
-    const target = steelTriangle(triangle) ? steelIndices : bodyIndices;
+    const kind = detailIndices ? detailKindOf(built.uvs[built.indices[triangle * 3] * 2]) : null;
+    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : bodyIndices;
     target.push(built.indices[triangle * 3], built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
@@ -2135,11 +2143,32 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
     steelMesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(steelIndices), material: steel, share: skinMesh.geometry });
     steelOutline = outlineFor(steelMesh);
   }
+  const detailMeshes = [];
+  const detailOutlines = [];
+  if (detailIndices) {
+    const dress = dressFor(body.inputs, corner);
+    const roles = roleColors(dress, new THREE.Color(skinHex(look)));
+    // Leather or horn (`armor.matte`) is not metal: the same maps, no metalness.
+    const matte = Boolean(dress.armor?.matte);
+    // Laced lamellar's cords: the armour's own `cord`, else its people's (outfits.js FACTIONS `lamellarCord`), else its lace;
+    // Japanese kozane keep their lace. Lacquer over iron (a Japanese kit's) is less of a mirror than bright steel.
+    const cord = dress.armor?.cord ?? FACTIONS[factionOf(body.inputs)]?.lamellarCord;
+    const cords = { lamellae: cord ? [new THREE.Color(cord), new THREE.Color(cord)] : [roles.lace, roles.lace], kozane: [roles.lace, roles.lace] };
+    for (const [kind, indices] of Object.entries(detailIndices)) {
+      const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
+      const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
+      const material = armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness });
+      const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(indices), material, share: skinMesh.geometry });
+      mesh.userData.detailMaps = kind;
+      detailMeshes.push(mesh);
+      detailOutlines.push(outlineFor(mesh));
+    }
+  }
   // Which body segment each skin vertex belongs to, by its strongest bone.
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   const shell = soft ? new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) : null;
-  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, vertexSegment, shell };
+  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, detailMeshes, detailOutlines, vertexSegment, shell };
 }
 
 // Bodies being built, by the body's key: { body, style, steps, built, phase, views: the fighter views waiting for it }.
@@ -2250,7 +2279,7 @@ export function pumpSkinBuilds(view, budgetMs = SKIN_BUILD.sliceMs) {
       job.id = (skinWorkerState.next += 1);
       job.phase = 'worker';
       skinWorkerState.asked.set(job.id, { job, worker });
-      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()] });
+      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()], detailMaps: DETAIL_MAPS.on });
     }
   }
   // What no worker takes (none could be made, or the body was refused), or everything now (`all`): built here, a slice at a time.
@@ -2341,7 +2370,7 @@ function swapSkin(view, fighterView, style, made = null) {
   if (fighterView.disposed || fighterView.severedBones?.size || fighterView.headDetached) return false;
   const built = readySkin(fighterView.fighter.body, style) ?? (made ? { ...made, positions: made.positions.slice() } : null);
   if (!built) return false;
-  const old = [fighterView.skinMesh, fighterView.skinOutline, fighterView.steelMesh, fighterView.steelOutline].filter(Boolean);
+  const old = [fighterView.skinMesh, fighterView.skinOutline, fighterView.steelMesh, fighterView.steelOutline, ...(fighterView.detailMeshes ?? []), ...(fighterView.detailOutlines ?? [])].filter(Boolean);
   const skin = skinParts(view, fighterView.fighter, built, style, fighterView.bones, { machine: fighterView.machine, lacquer: fighterView.lacquer, soft: !fighterView.rigid });
   const { layers } = fighterView;
   for (const mesh of old) layers.skin.remove(mesh);
@@ -2349,8 +2378,9 @@ function swapSkin(view, fighterView, style, made = null) {
   holder.add(...old);
   disposeObject(holder);
   if (skin.steelMesh) layers.skin.add(skin.steelMesh, skin.steelOutline);
+  for (const mesh of [...skin.detailMeshes, ...skin.detailOutlines]) layers.skin.add(mesh);
   layers.skin.add(skin.skinMesh, skin.skinOutline);
-  Object.assign(fighterView, { built, skinMesh: skin.skinMesh, skinOutline: skin.skinOutline, steelMesh: skin.steelMesh, steelOutline: skin.steelOutline, baseColors: skin.baseColors, vertexSegment: skin.vertexSegment, bodyStyle: style, damageVersion: -1 });
+  Object.assign(fighterView, { built, skinMesh: skin.skinMesh, skinOutline: skin.skinOutline, steelMesh: skin.steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines, baseColors: skin.baseColors, vertexSegment: skin.vertexSegment, bodyStyle: style, damageVersion: -1 });
   const entry = fighterView.shells.find((shell) => shell.key === 'body');
   if (entry && skin.shell) entry.shell = skin.shell;
   // As he was drawn: ghosted or not, his ink, his shadow.
@@ -2797,7 +2827,7 @@ export function setLayer(fighterView, layer) {
   layers.bone.visible = layer === 'muscle' || layer === 'bone';
   layers.physics.visible = layer === 'physics';
   // Ghosting: the body goes see-through and drops its ink; the head and kit hide.
-  for (const mesh of [skinMesh, fighterView.steelMesh].filter(Boolean)) {
+  for (const mesh of [skinMesh, fighterView.steelMesh, ...(fighterView.detailMeshes ?? [])].filter(Boolean)) {
     mesh.material.transparent = ghost < 1;
     mesh.material.opacity = ghost;
     mesh.material.depthWrite = ghost === 1;

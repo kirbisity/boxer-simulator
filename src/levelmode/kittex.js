@@ -10,6 +10,7 @@
 // glossier where the vertex colour says the wall is in shadow at its foot; and a fog that thickens toward the sea (height fog).
 
 import { KIT_FLOOR_OFFSET } from '../depthrange.js';
+import { stoneDetailMaps } from '../detailtex.js';
 import { KT_SHADOW_FUNCTION, KT_SHADOW_PARS, ktShadow, ktShadowInit } from './kitshadow.js';
 import { kwTexture } from './kitwear.js';
 import { ktAshlar, ktCobbles, ktFlags, ktGrain, ktGrass, ktGritData, ktMacroData, ktPath, ktRandom, ktRock, ktRubble, ktRuinWall, ktShade } from './kitpaint.js';
@@ -330,6 +331,8 @@ export function ktPatch(material, { detail = null, fog = true, shadow = false } 
   const two = detail ? detail.two ?? 0 : 0;
   const mean = material.map?.kitMean ?? [0.5, 0.5, 0.5];
   const stone = detail?.stone ?? null;
+  // A baked tile's roughness is its colour's alpha (detailtex.js stoneDetailMaps).
+  const roughA = Boolean(detail && material.userData?.roughInAlpha);
   ktWeather.uKitFog.value ??= new THREE.Vector4(0, 0, 0.05, 0);
   if (shadow) ktShadowInit();
   ktLodInit();
@@ -359,7 +362,7 @@ export function ktPatch(material, { detail = null, fog = true, shadow = false } 
         .replace('void main() {', 'void main() {\n  float kitWet = 0.0;\n  float kitPool = 0.0;\n  float kitShine = 0.0;\n  float kitStoneOn = 0.0;\n  float kitRelief = 0.0;\n  vec2 kitDH = vec2(0.0);')
         .replace('#include <lights_fragment_maps>', `${KT_ENV_REACH}${KT_POOL_SKY}`)
         // (Wet stone is glossier, but only a little and only in the damp patches: the roughness comes down a third of the way to 0.6 at most; the rest of the surfaces, by their wet, to half.)
-        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n  ${stone ? 'roughnessFactor = mix(roughnessFactor, 0.6, 0.35 * kitShine);' : 'roughnessFactor *= 1.0 - 0.5 * kitWet;'}\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);`);
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n  ${roughA ? 'roughnessFactor *= texelColor.a;\n  diffuseColor.a = opacity;\n  ' : ''}${stone ? 'roughnessFactor = mix(roughnessFactor, 0.6, 0.35 * kitShine);' : 'roughnessFactor *= 1.0 - 0.5 * kitWet;'}\n  roughnessFactor = mix(roughnessFactor, 0.05, kitPool);`);
       if (stone) fragment = fragment.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  #ifdef USE_MAP\n  normal = kitBump(-vViewPosition, normal, kitDH, gl_FrontFacing ? 1.0 : -1.0);\n  #endif');
     }
     if (shadow) {
@@ -374,7 +377,7 @@ export function ktPatch(material, { detail = null, fog = true, shadow = false } 
     }
     shader.fragmentShader = `${uniforms}${fragment}`;
   };
-  material.customProgramCacheKey = () => `kit-${detail ? `d${two}p${detail.pools ?? 0}${stone ? 'S' : ''}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
+  material.customProgramCacheKey = () => `kit-${detail ? `d${two}p${detail.pools ?? 0}${stone ? 'S' : ''}${roughA ? 'R' : ''}` : ''}${fog ? 'f' : ''}${shadow ? 's' : ''}`;
 }
 
 /**
@@ -425,6 +428,18 @@ export function ktMaterials() {
   m.boards = make(ktTexture(128, 19, (g, s, r) => ktBoards(g, s, r)), 2, { roughness: 0.8 }, KIT_FLOOR_OFFSET.boards);
   m.wood = make(ktTexture(128, 20, (g, s, r) => ktBoards(g, s, r, [70, 52, 36])), 2, { roughness: 0.85 });
   m.iron = make(ktTexture(128, 21, ktIron), 1.5, { roughness: 0.45, metalness: 0.55 });
+  // The dressed walling and the road's cobbles wear maps baked from modelled stone (detailtex.js, while the detail maps are drawn):
+  // their colour, normal map and roughness. The texture is read once (its tile is large and the macro map breaks it up), and the
+  // joints' depth from the colour's light and dark is mostly not added again (the normal map has them); the grit's grain and chips are.
+  // (Which baked tile each wears: the dressed walling its ashlar, the rough walls and the sewer rubble, the paving dressed slabs, the
+  // court its round cobbles, timber sawn boards, the paths trodden earth, the grass turf. The natural rock keeps its painted face.)
+  const baked = { ashlar: 'ashlar', ruin: 'rubble', rubble: 'rubble', cobble: 'cobble', flags: 'slabs', boards: 'planks', wood: 'planks', path: 'earth', grass: 'grass' };
+  for (const [name, tile] of Object.entries(baked)) {
+    if (!stoneDetailMaps(m[name], tile)) continue;
+    detail[name] = { ...detail[name], two: 0, ...(detail[name].stone ? { stone: [detail[name].stone[0] * 0.25, ...detail[name].stone.slice(1)] } : {}) };
+    // (A wall's relief a little under the bake's, so a raking sun picks out the blocks without sparkling along every arris.)
+    m[name].normalScale.set(0.75, 0.75);
+  }
   for (const name of Object.keys(detail)) ktPatch(m[name], { detail: detail[name], shadow: true });
   const flat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, vertexColors: true, roughness: 0.9, ...options });
   m.bone = flat(0xb9b29a, { roughness: 0.8 });

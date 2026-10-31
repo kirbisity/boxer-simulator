@@ -6476,10 +6476,14 @@ function strikerRecoil(attacker, defender, capsule, limb, closing, strikeMass, s
  * part struck, the head shaken (knockdowns, knockouts), cuts opened, faces
  * and ribs broken, legs worn down; a checked kick hurts the kicker.
  */
-function bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked = false, rotation, cuts = false, cutForce = Infinity, side, push = false, concentration = 1, braced = false }) {
+function bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked = false, rotation, cuts = false, cutForce = Infinity, side, push = false, concentration = 1, braced = false, crushing = 0 }) {
   const body = defender.body;
   const onLeg = /Thigh|Shank/.test(capsule.key);
-  addDamage(defender, capsule.key, (impulse / struckMass) * harm, blocked);
+  // The part's speed change (a guard's forearm takes a share of it), or what a weapon's hard head crushes under it
+  // (`crushing`, BLADES.crushTrauma: a forearm put in the way of a hammer is no glove's guard), whichever is worse.
+  const shaken = (impulse / struckMass) * harm;
+  if (crushing > shaken * (blocked ? WORLD.blockedDamageShare : 1)) addDamage(defender, capsule.key, crushing, false);
+  else addDamage(defender, capsule.key, shaken, blocked);
   if (blocked) {
     attacker.stats.blocked += 1;
     event.headDeltaV = BLOCKING.has(capsule.key) ? (impulse * WORLD.head.blockedShare) / body.headEffectiveMass : 0;
@@ -6529,9 +6533,9 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     }
   } else if (onLeg) {
     const legSide = capsule.key[0];
-    // The defender's own leg takes the blow: its speed change is the damage.
+    // The defender's own leg takes the blow: its speed change is the damage (or what a weapon's head crushes, above).
     const before = defender.legDamage[legSide];
-    defender.legDamage[legSide] += (impulse / struckMass) * harm;
+    defender.legDamage[legSide] += Math.max(shaken, crushing);
     event.effects.push('leg struck');
     const buckles = (damage) => (damage < legCapacity() ? 0 : 1 + Math.floor((damage / legCapacity() - 1) / WORLD.legGivesAgainEvery));
     if (buckles(defender.legDamage[legSide]) > buckles(before) && defender.state === 'up') {
@@ -6846,7 +6850,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // A cut on the helmet takes what is fixed on it (a crest) away, whatever the helmet turns.
   if (capsule.key === 'head') cutOffHeadgear(world, defender, event, energy * mix.cut, contactPoint);
   const concentration = Math.sqrt(WORLD.contactSeconds / contactSeconds);
-  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration });
+  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration, crushing: energy * bluntShare * BLADES.crushTrauma });
   if (glanced) {
     // Off the plate: the blade is turned along it.
     const across = vec.sub(relative, vec.scale(normal, vec.dot(relative, normal)));

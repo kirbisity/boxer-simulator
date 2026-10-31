@@ -111,7 +111,8 @@
 //
 // ---- Phase F (two ways in: the plate knight at the front gate, the old drain round him) --------------------------------------------
 // Sir Alasdair (`dunnottarPlateKnight`: the man-at-arms' blackened full plate, skill 0.25) holds the ledge to the postern; the sea cave under the gorge shelf
-// leads by the old drain (stages/dunnottar-sewer.js) to the sea-gate, the lever, and the stair behind the heavy door up into the vault. `--route front,sewer`
+// leads by the old drain (stages/dunnottar-sewer.js) to the sea-gate, and (since the lever there is gone and the heavy door stays shut) through the crypt and up the
+// well shaft into the vault (it went by the lever and the stair behind the heavy door when the table below was made). `--route front,sewer`
 // sweeps each (`DUNNOTTAR_ROUTE`, `DUNNOTTAR_SEWER_ROUTE`; the sewer's rest is the smugglers' brazier). Careful, `--allies 2`, seeds 1-12, 10 deaths a fail, 3600 s:
 //                          reached Vaelen   beat him   failed (10 deaths)   timed out   mean deaths   where they died
 //   front                  10/12            9/12       2/12                 1/12        4.6           cliff 45 (Sir Alasdair 47 of 55), gate 4, chapel 3
@@ -202,7 +203,7 @@ const STEP = 1 / 60;
 let ALLIES = 2;
 /**
  * Which way he goes: `front` (DUNNOTTAR_ROUTE: the gorge, the ledge past Sir Alasdair, the gatehouse, the ascent, the quadrangle) or `sewer`
- * (DUNNOTTAR_SEWER_ROUTE: the sea cave under the shelf, the old drain, the sea-gate and the stair behind the heavy door up into the vault).
+ * (DUNNOTTAR_SEWER_ROUTE: the sea cave under the shelf, the old drain, the sea-gate, the crypt and the well shaft up into the vault).
  * `--route front,sewer` sweeps both. A run reads it when it is made.
  */
 let ROUTE = 'front';

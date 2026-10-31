@@ -56,11 +56,11 @@ export const NOTES = {
   },
   warden: {
     title: 'Scratched on a tomb lid',
-    body: 'They bring the dead down by the well stair and put them where the water cannot reach, and still the water comes. The lever is a stone that does not match its neighbours, down where the way floods. Pull it and the old stair opens; I have never dared.',
+    body: 'They bring the dead down by the well stair and put them where the water cannot reach, and still the water comes. The old stair from the sea-gate is shut for good: they broke the lever off and barred the door above. Whoever comes in from the sea comes up my stair, past me.',
   },
   seagate: {
     title: 'A sailor\'s last page',
-    body: 'The gate looks out over a drop to the sea, and the sea does not look back. I came by the flooded way with a lamp and a good heart and the door behind me fell shut. Whoever follows: the stone by the chest is the lever. It was never meant for a man to keep in.',
+    body: 'The gate looks out over a drop to the sea, and the sea does not look back. The door on the stair is oak and iron and it will not move; the lever that worked it is a stump. Whoever follows: the flooded way, then the gallery, then the well stair. The dead keep the crypt, and so do the living.',
   },
   order: {
     title: 'Sealed order: Alta to Vaelen',

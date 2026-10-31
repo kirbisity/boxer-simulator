@@ -9,6 +9,7 @@
 //   stage = {
 //     id: 'testyard',                     // its key
 //     title: 'The Test Yard',
+//     homeGround: ['blue'],               // the corners on their own ground (a garrison in its castle): they know no fear and never break (ai.js knowsNoFear)
 //     sea: -8,                            // y below which a body is lost to the sea (default: none)
 //     start: { section: 'yard', at: [x, y, z], facing: yaw },   // where the player begins
 //     sections: [ section, ... ],
@@ -44,6 +45,13 @@
 //     // thing under two names (an open gate stops blocking; a kicked ladder becomes a ramp).
 //     gates:   [ { id: 'gate1', at: [x, y, z], state: 'closed', states: { closed: [solids], open: [solids] } } ],
 //     ladders: [ { id: 'ladder1', at: [x, y, z], state: 'up', states: { up: [solids], down: [solids] } } ],
+//     // A boss room's seals: once the player is in `room` (a region) and the fight with the boss (`boss`, a spawn id) is on (`when`: 'enter', he
+//     // is in the room and the boss is awake; 'roused', the boss has noticed him, levelmode/awareness.js), every gate named in `gates` shuts
+//     // (each an ordinary gate of the stage, standing open: its `look.kind` says how it goes, a portcullis dropping, a door slamming, a sluice's
+//     // boards coming down, and how it sounds); they open when the boss is out. Never on a man of the player's side in a doorway: they wait
+//     // until every one is clear of every gate (`clear` m round its leaf). A death or a rest, which put him outside the room, open them again.
+//     // `text`: what is said as they shut (default SEAL.text).
+//     seals: [ { id: 'pitseal', room: region, boss: 'noname', when: 'roused', gates: ['pitwest', 'piteast'], clear: 0.6, text } ],
 //     // `activeOnly: true`: the drawing shows this section in detail only while it is active, not when it is merely seen through a portal.
 //     // A place to rest (not used here).
 //     rest: { at: [x, y, z] },
@@ -75,7 +83,7 @@ import { soundEvent } from '../audio/log.js';
 import { P, PRESETS } from '../body.js';
 import { createWorld, placeOnFloor } from '../physics.js';
 import { createTerrain, floorAt } from '../physics/terrain.js';
-import { createAwareness, rehomeFollowers, updateAwareness } from './awareness.js';
+import { createAwareness, mindState, rehomeFollowers, updateAwareness } from './awareness.js';
 import { LEVEL_PRESETS, levelPreset } from './presets.js';
 
 /** Whether a preset key is known: the game's own (body.js PRESETS) or the level cast's (presets.js LEVEL_PRESETS). */
@@ -167,6 +175,11 @@ export function checkStage(stage) {
   }
   for (const section of stage.sections) {
     for (const lever of section.levers ?? []) if (!mechanisms.has(lever.target)) problems.push(`lever ${lever.id} works ${lever.target}, which is not there`);
+    for (const seal of section.seals ?? []) {
+      if (!spawns.has(seal.boss)) problems.push(`seal ${seal.id} waits on ${seal.boss}, who is not there`);
+      if (!seal.room) problems.push(`seal ${seal.id} has no room`);
+      for (const gate of seal.gates ?? []) if (!mechanisms.has(gate)) problems.push(`seal ${seal.id} shuts ${gate}, which is not there`);
+    }
   }
   if (stage.ending) {
     if (!mechanisms.has(stage.ending.door)) problems.push(`the ending opens ${stage.ending.door}, which is not there`);
@@ -263,6 +276,8 @@ export function createStageWorld(stage, playerInputs, { seed = 1, awareness = tr
     placeOnFloor(fighter, at[0], at[2], at[1], facing);
   });
   world.fighters[0].walking = true;
+  // The sides on their own ground (a garrison in its castle: ai.js knowsNoFear).
+  world.homeGround = Object.fromEntries((stage.homeGround ?? []).map((corner) => [corner, true]));
   world.stage = { def: stage, active: [], mechanisms: Object.fromEntries(mechanismsOf(stage).map((mechanism) => [mechanism.id, mechanism.state])), steps: 0 };
   arena.terrain = stageTerrain(stage, [], world.stage.mechanisms);
   // Who has noticed whom, and what the unaware do (levelmode/awareness.js); `awareness: false` leaves every man to the fight AI.
@@ -299,6 +314,7 @@ export function updateStage(world, force = false) {
   if (run.steps % REHOME_EVERY === 0) rehome(world);
   keepHeld(world);
   updateAwareness(world);
+  keepSeals(world);
   return changed;
 }
 
@@ -315,6 +331,67 @@ function keepHeld(world) {
     if (run.mechanisms[id] !== state) setMechanism(world, id, state);
   }
 }
+
+// ---- A boss room's seals ------------------------------------------------------------------------------------------
+
+/** The seals' defaults: how far (m) round a gate's leaf a man of the player's side keeps it from shutting, and what is said as they shut. */
+export const SEAL = { clear: 0.6, text: 'The way out is shut.', openText: 'The way out is open.' };
+
+/** Every seal of a stage, with its section: [{ id, section, room, boss, when, gates, clear, text }]. */
+export const sealsOf = (stage) => stage.sections.flatMap((section) => (section.seals ?? []).map((seal) => ({ when: 'enter', clear: SEAL.clear, ...seal, section: section.id })));
+
+/** The awareness states of a boss who has the player: on him, rising to him, after him. */
+const ROUSED = new Set(['aggro', 'search', 'charge', 'rise']);
+
+/** Whether a man of the player's side stands in the way of a gate's leaf (within `clear` m of its closed solid). */
+function inDoorway(world, gate, clear) {
+  const leaf = gate.states.closed?.[0];
+  if (!leaf?.size) return false;
+  const yaw = leaf.yaw ?? 0;
+  return world.fighters.some((fighter) => {
+    if (fighter.corner !== 'red' || fighter.state === 'out' || fighter.dormant) return false;
+    const dx = fighter.x[P.pelvis * 3] - leaf.at[0];
+    const dz = fighter.x[P.pelvis * 3 + 2] - leaf.at[1];
+    const u = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+    const v = dx * Math.sin(yaw) + dz * Math.cos(yaw);
+    return Math.abs(u) <= leaf.size[0] / 2 + clear && Math.abs(v) <= leaf.size[1] / 2 + clear;
+  });
+}
+
+/**
+ * The seals of the boss rooms (a section's `seals`), every step: shut once the player is in the room, clear of every gate, and the fight is on;
+ * open once the boss is out, or once the player is outside the room again (a death or a rest has made him new elsewhere; the boss is back at his
+ * post). The comrades left outside as they shut are noted (`outside`: fighter ids; levelmode/awareness.js keeps them at the door). The seal's
+ * state is `world.stage.seals` ([{ id, sealed, outside, ... }]); the gates are ordinary mechanisms (setMechanism: the sound, the drawing).
+ */
+function keepSeals(world) {
+  const run = world.stage;
+  if (!run.seals) {
+    const gates = mechanismsOf(run.def);
+    run.seals = sealsOf(run.def).map((seal) => ({ ...seal, sealed: false, outside: [], boss: world.fighters.find((fighter) => fighter.spawn?.id === seal.boss) ?? null, leaves: (seal.gates ?? []).map((id) => gates.find((gate) => gate.id === id)) }));
+  }
+  if (!run.seals.length) return;
+  const me = world.fighters[0];
+  const inRoom = (fighter, seal) => regionContains(seal.room, fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2], fighter.x[P.pelvis * 3 + 1]);
+  for (const seal of run.seals) {
+    const boss = seal.boss;
+    const meIn = inRoom(me, seal);
+    let sealed = seal.sealed;
+    if (!boss || boss.state === 'out' || run.ghost) sealed = false;
+    else if (!seal.sealed) {
+      const on = !boss.dormant && (seal.when === 'enter' || (run.aware ? ROUSED.has(mindState(world, boss.id)) : true));
+      sealed = on && meIn && me.state !== 'out' && !seal.leaves.some((gate) => inDoorway(world, gate, seal.clear));
+    } else if (!meIn && me.state !== 'out') sealed = false;
+    if (sealed === seal.sealed) continue;
+    seal.sealed = sealed;
+    seal.outside = sealed ? world.fighters.filter((fighter) => fighter.id !== 0 && fighter.corner === 'red' && fighter.state !== 'out' && !inRoom(fighter, seal)).map((fighter) => fighter.id) : [];
+    for (const gate of seal.leaves) setMechanism(world, gate.id, sealed ? 'closed' : 'open');
+    world.events.push({ time: world.time, kind: sealed ? 'sealed' : 'unsealed', seal: seal.id, effects: [sealed ? 'the way out is shut' : 'the way out is open'] });
+  }
+}
+
+/** Whether a fighter of the player's side was left outside a sealed room (he waits at its door). */
+export const sealedOut = (world, fighter) => Boolean(world.stage?.seals?.some((seal) => seal.sealed && seal.outside.includes(fighter.id)));
 
 /** A think function for `advance`/the page: the stage keeps up, then the fight AI thinks (`then`). */
 export function stageThink(world, dt, then = null) {
@@ -416,7 +493,8 @@ export function setMechanism(world, id, state) {
 }
 
 // What a gate is, as it sounds going over, by how the kit draws it (its `look.kind`): a door's leaf or leaves, or bars (a gate).
-const GATE_SOUND = { door: 'door', doubledoor: 'door', bars: 'gate' };
+// (A sluice's boards come down a winch's chain into their grooves, as a portcullis does.)
+const GATE_SOUND = { door: 'door', doubledoor: 'door', bars: 'gate', portcullis: 'portcullis', sluice: 'portcullis' };
 // A mechanism's new state, as the sound of it starting to move: a gate swings open or shut, a ladder falls (it is down: open).
 const STATE_SOUND = { open: 'opening', closed: 'closing', down: 'opening', up: 'closing' };
 

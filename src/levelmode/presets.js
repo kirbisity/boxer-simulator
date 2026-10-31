@@ -75,6 +75,13 @@ export const LEVEL_PRESETS = {
     outfit: { kind: 'knight', design: 2 }, accessories: ['plume'],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'grey' },
   },
+  // The questioner's man in the torture chamber: a levy's body with a whip (the lorarius's thong, weapons.js WHIP), who lays it on a prisoner chained
+  // to the wall until he sees the operative (levelmode/awareness.js `torment`); then he fights with it, as a man with a whip fights.
+  dunnottarLasher: {
+    name: 'Dunnottar lasher', style: 'whip', sex: 'male', heightCm: 174, frame: 'medium', age: 36, exercise: 0.2, calories: 2600, skill: 0.3,
+    outfit: { kind: 'levy', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'bald', hairColor: '#3a2a1c', facialHair: 'beard', eyeColor: 'brown' },
+  },
   // The jailer of Whigs' Vault: heavy, a club, a ring of keys.
   turnkey: {
     name: 'The Turnkey', style: 'baton', sex: 'male', heightCm: 181, frame: 'large', age: 45, exercise: 0.35, calories: 3941, skill: 0.4,
@@ -93,6 +100,18 @@ export const LEVEL_PRESETS = {
     name: 'Caby soldier', style: 'spear', sex: 'male', heightCm: 176, frame: 'medium', age: 29, exercise: 0.5, calories: 2973, skill: 0.5,
     outfit: { kind: 'commoner', design: 0, colors: { top: '#5a2a2a', bottom: '#33302b' } }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#1c130c', facialHair: 'stubble', eyeColor: 'hazel' },
+  },
+  // The vault's prisoners who are no fighters any more: starved, in rags torn open at the back, nothing in their hands (the style that covers
+  // up). They kneel where they are kept and weep (levelmode/awareness.js `mourn`), and one is chained to the wall and whipped (`torment`).
+  vaultPrisoner: {
+    name: 'Prisoner', style: 'passive', sex: 'male', heightCm: 170, frame: 'medium', age: 34, exercise: 0.15, calories: 1750, skill: 0.1,
+    outfit: { kind: 'rags', design: 0, tear: { seed: 5, amount: 0.8, sleeve: 'r' } }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#3a2a1c', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  vaultPrisonerWoman: {
+    name: 'Prisoner', style: 'passive', sex: 'female', heightCm: 160, frame: 'small', age: 41, exercise: 0.15, calories: 1500, skill: 0.1,
+    outfit: { kind: 'rags', design: 0, tear: { seed: 9, amount: 0.5, sleeve: 'l' } }, accessories: ['headWrap'],
+    look: { skinTone: 'light', hairStyle: 'bun', hairColor: '#5a4030', facialHair: 'none', eyeColor: 'grey' },
   },
   // The Prince of Caby: young, gaunt, nothing in his hands (the style that covers up and gets away).
   cabyPrince: {
@@ -154,9 +173,13 @@ export const LEVEL_PRESETS = {
   // calories 4500 to 4800 (the same 80 kg, but 37.5 kg of muscle for 36, 5 kg of fat for 7: harder hands, a firmer grip on the sword) and skill 0.85 to 0.9.
   // Body, training and drill only: no damage or health multiplier. Not re-run with the `noname` tool (the 40 % above is the figure before this change; expect
   // the operative's share to fall by a few points).
+  // Relentless (`relentless`, ai.js AI.relentless: he never backs off, gives no ground to a blow and steps out of a corner rather than be pinned in
+  // it), with the wind of a man who has lived on his feet in the sludge (`aerobic` 2: his effort costs half what an ordinary fit man's does and his
+  // breath comes back twice as fast; body.js), standing low and braced into his man (`outfit.poise` 0.6: more of him behind each part struck).
+  // His body's, not a multiplier on anything he does to anyone.
   noname: {
     name: 'Noname', style: 'longsword', sex: 'male', heightCm: 178, frame: 'medium', age: 24, exercise: 0.88, calories: 4800, skill: 0.9,
-    outfit: { kind: 'scissor', design: 4, courage: 1, balance: 2.5 }, accessories: [], helmetOffOnDeath: true,
+    outfit: { kind: 'scissor', design: 4, courage: 1, balance: 2.5, poise: 0.6 }, accessories: [], helmetOffOnDeath: true, relentless: true, aerobic: 2,
     temperament: { work: 1.4, burst: 1.3 },
     look: { skinTone: 'porcelain', hairStyle: 'long', hairColor: '#16110d', facialHair: 'none', eyeColor: 'grey' },
   },
@@ -168,9 +191,11 @@ export const LEVEL_PRESETS = {
   // kit's own 0.8 would make it 120 kg), 195 kg in all, with the poleaxe in both hands. Slow in the harness, hard
   // to knock down (`poise`); skill 0.8 of which the helm leaves him three quarters (skillFactor).
   // Tuned (tools/dunnottar.js): a rested operative with the sword and buckler beats him about one time in four.
+  // Relentless as Noname is (ai.js AI.relentless: no backing off, no room made for the poleaxe, out of a corner along the wall), with a big man's
+  // deep wind (`aerobic` 1.8) and his weight set low behind the harness (`outfit.poise` 0.5).
   vaelen: {
     name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.35, calories: 5515, skill: 0.9,
-    outfit: { kind: 'tournament', design: 1, extraMass: 0.3, balance: 1.5 }, accessories: [],
+    outfit: { kind: 'tournament', design: 1, extraMass: 0.3, balance: 1.5, poise: 0.5 }, accessories: [], relentless: true, aerobic: 1.8,
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#1c1c20', facialHair: 'beard', eyeColor: 'grey' },
   },
 };
