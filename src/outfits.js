@@ -60,7 +60,7 @@ export const CLOTH_COLORS = {
 // he fears and bleeds; a blow its cover does not stop is his to take.
 function exoKit(label, frameKg, kit) {
   return {
-    faction: 'specials', skill: 0.55, courage: 0.6,
+    faction: 'machines', skill: 0.55, courage: 0.6,
     label, movement: 'slow', fists: 'gauntlet', balance: 1.6,
     extraMass: frameKg / 83,
     assist: { arm: 4, leg: 2.4, trunk: 2.4 },
@@ -1950,12 +1950,50 @@ export const OUTFITS = {
   // skin's colour, the grey saddle over his back and hips, the ape's head.
   // A gorilla's hide is thick, but it turns nothing an armour would.
   silverback: {
-    faction: 'specials',
+    faction: 'primates',
     label: 'Silverback', movement: 'excellent', fists: 'bare', courage: 0.6, unarmed: true,
     protection: { blunt: 0.05, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
     designs: [
       { label: 'Silverback', armor: { kind: 'silverback', color: '#8c8c89', cloth: '#232226', matte: true }, head: { kind: 'gorillaHead', color: '#232226' }, feet: { kind: 'bare' } },
     ],
+  },
+  // The monkeys' and the chimpanzee's coats (body.js PRESETS), drawn as
+  // the silverback's (loftbody.js `silverback`: the coat, `cloth`, and a region over the back and hips,
+  // `color`): a rhesus's grey-brown coat over its orange rump, a chacma's olive-grey with its darker cape,
+  // a chimpanzee's black. Nothing turns a blow or an edge. Each its own head (wardrobe.js). The monkeys give
+  // ground sooner than a silverback (`courage`): a hurt monkey runs.
+  monkeyFur: {
+    faction: 'primates',
+    label: 'Primate', movement: 'excellent', fists: 'bare', courage: 0.45, unarmed: true,
+    protection: { blunt: 0.03, cut: 0.03, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    designs: [
+      { label: 'Rhesus macaque', armor: { kind: 'silverback', color: '#b5733c', cloth: '#8a7656', matte: true }, head: { kind: 'macaqueHead', color: '#8a7656', face: '#d99a8a' }, feet: { kind: 'bare' } },
+      { label: 'Chacma baboon', armor: { kind: 'silverback', color: '#4e4637', cloth: '#6e6248', matte: true }, head: { kind: 'baboonHead', color: '#6e6248', face: '#2e2826' }, feet: { kind: 'bare' } },
+      { label: 'Chimpanzee', armor: { kind: 'silverback', color: '#1c1918', cloth: '#1c1918', matte: true }, head: { kind: 'chimpHead', color: '#1c1918', face: '#6a5547' }, feet: { kind: 'bare' } },
+    ],
+  },
+  // The robot dogs (src/robotdogs.js). The fighter is what each carries on its back
+  // (the "rider" physics/mounted.js seats, `bolted` there: never thrown, out when the robot is down), its mount the robot
+  // dog (`horse`: robotdogs.js, its shell `barding`). Machines: no fear, no blood. The core's own protection is its
+  // housing (thin aluminium, as the humanoid's). Drawn by robotdogview.js, not as a man.
+  go2Dog: {
+    faction: 'machines', machine: true, bolted: true, unarmed: true, horse: 'go2', barding: 'robotShell',
+    label: 'Robot dog — Go2', movement: 'good', fists: 'bare', courage: 1,
+    protection: { blunt: 0.3, cut: 0.7, pierce: 0.5, bullet: { head: 0.1, torso: 0.15, limb: 0.1 } },
+    designs: [{ label: 'Unitree grey', armor: { kind: 'robot', color: '#c8ccd2', mail: '#2a2b2f', robot: { metal: true, led: '#46b4ff' } }, head: { kind: 'robotHead', color: '#2a2b2f', visor: '#0d0e11', trim: '#c8ccd2', led: '#46b4ff' }, feet: { kind: 'bare' } }],
+  },
+  spotDog: {
+    faction: 'machines', machine: true, bolted: true, unarmed: true, horse: 'spot', barding: 'robotShell',
+    label: 'Robot dog — Spot with arm', movement: 'good', fists: 'bare', courage: 1,
+    protection: { blunt: 0.3, cut: 0.7, pierce: 0.5, bullet: { head: 0.1, torso: 0.15, limb: 0.1 } },
+    designs: [{ label: 'Spot yellow', armor: { kind: 'robot', color: '#f2c21b', mail: '#1d1e22', robot: { metal: true, led: '#ffffff' } }, head: { kind: 'robotHead', color: '#1d1e22', visor: '#0d0e11', trim: '#f2c21b', led: '#ffffff' }, feet: { kind: 'bare' } }],
+  },
+  vision60Dog: {
+    faction: 'machines', machine: true, bolted: true, unarmed: true, horse: 'vision60', barding: 'robotShell',
+    label: 'Robot dog — Vision 60', movement: 'good', fists: 'bare', courage: 1,
+    mounted: { r: 'turretRifle' },
+    protection: { blunt: 0.35, cut: 0.75, pierce: 0.55, bullet: { head: 0.15, torso: 0.2, limb: 0.1 } },
+    designs: [{ label: 'Olive drab', armor: { kind: 'robot', color: '#4d5446', mail: '#1d1e22', robot: { metal: true, led: '#ff5a3c' } }, head: { kind: 'robotHead', color: '#2b2f28', visor: '#0d0e11', trim: '#4d5446', led: '#ff5a3c' }, feet: { kind: 'bare' } }],
   },
   // A humanoid robot (Unitree's G1 and H1): rigid shells of brushed
   // aluminium over each part, white panels on the chest and thighs, dark
@@ -1970,7 +2008,7 @@ export const OUTFITS = {
   // edge finds them as it finds plate's gaps. No fear, and no blood
   // (`machine`: no morale at all, nothing to bleed; ai.js, physics.js).
   humanoid: {
-    faction: 'specials', bulletRating: 500, machine: true,
+    faction: 'machines', bulletRating: 500, machine: true,
     label: 'Humanoid robot', movement: 'good', fists: 'gloved-tactical', courage: 1,
     breastplate: 0.6,
     helmet: { mass: 0.8, padding: 0.25, curve: 0.8 },
@@ -1998,7 +2036,7 @@ export const OUTFITS = {
   combatBot: {
     // Its neck in an armoured collar (`arrowproof`: the throat covered as the trunk; an arrow glances off the plate).
     // A machine (`machine`): no morale, no blood, as the humanoid.
-    faction: 'specials', bulletRating: 3500, plated: true, arrowproof: true, machine: true,
+    faction: 'machines', bulletRating: 3500, plated: true, arrowproof: true, machine: true,
     label: 'Combat bot — armoured', movement: 'limited', fists: 'gauntlet', courage: 1,
     extraMass: 55 / 115, balance: 1.5,
     mounted: { r: 'armRifle', l: 'armShotgun' },
@@ -2022,7 +2060,7 @@ export const OUTFITS = {
   // no morale, no blood. Bare, as it ships: the actuators standing out of
   // slim gunmetal links.
   miniHumanoid: {
-    faction: 'specials', bulletRating: 300, machine: true,
+    faction: 'machines', bulletRating: 300, machine: true,
     label: 'Mini humanoid robot', movement: 'excellent', fists: 'gloved-tactical', courage: 1,
     breastplate: 0.5,
     helmet: { mass: 0.5, padding: 0.2, curve: 0.85 },
@@ -2053,8 +2091,8 @@ export const OUTFITS = {
 };
 
 export const OUTFIT_KEYS = Object.keys(OUTFITS);
-/** The outfits the builders offer: not Level Mode's own (`levelOnly`). */
-export const PICKABLE_OUTFIT_KEYS = OUTFIT_KEYS.filter((key) => !OUTFITS[key].levelOnly);
+/** The outfits the builders offer: not Level Mode's own (`levelOnly`), nor a robot dog's chassis (`bolted`: a character, not worn). */
+export const PICKABLE_OUTFIT_KEYS = OUTFIT_KEYS.filter((key) => !OUTFITS[key].levelOnly && !OUTFITS[key].bolted);
 
 /**
  * Headgear and head decoration, one at a time, knocked off by a blow that
@@ -2153,7 +2191,8 @@ export const FACTIONS = {
   parthians: { label: 'Parthia', glyph: '🏹', standard: { weapon: 'tug' }, blurb: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.' },
   romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
   law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade.' },
-  specials: { label: 'Beasts & Machines', glyph: '🦍', blurb: 'Not men, or not only: a silverback gorilla, a full-size and a mini humanoid robot, a combat bot whose forearms are an AR-15 and a shotgun, and a soldier in a powered exoskeleton.' },
+  primates: { label: 'Apes & Monkeys', glyph: '🐒', blurb: 'Not men: a silverback gorilla, a chimpanzee, a chacma baboon and a rhesus macaque, fighting as their kinds fight: the charge, the grab, the clubbing arm and the bite.' },
+  machines: { label: 'Machines', glyph: '🤖', blurb: 'Machines, and a man in one: a full-size and a mini humanoid robot, a combat bot whose forearms are an AR-15 and a shotgun, three robot dogs (a Go2, Spot with its arm, a Vision 60 with a rifle turret), and a soldier in a powered exoskeleton.' },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
 
@@ -2328,6 +2367,8 @@ export function gearTraits(inputs) {
     mounted: spec.mounted ?? null,
     // Never takes up a weapon off the floor (a beast).
     unarmed: Boolean(spec.unarmed),
+    // Bolted to its mount, never thrown (a robot dog's turret or arm: physics/mounted.js keepSeat).
+    bolted: Boolean(spec.bolted),
     spare: spec.spare ?? null,
     arrowproof: Boolean(spec.arrowproof),
     // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).

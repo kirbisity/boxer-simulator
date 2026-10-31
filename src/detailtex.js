@@ -8,7 +8,7 @@
 
 /* global THREE */
 import { DETAIL_MAP_DATA } from './detailmaps-data.js';
-import { CLOTH_BAND, DETAIL_MAPS, clothFamilyOf } from './detailmaps.js';
+import { CLOTH_BAND, DETAIL_MAPS, clothFamilyOf, tileSize } from './detailmaps.js';
 import { CLOTH_MAP_DATA } from './clothmaps-data.js';
 
 const detailTextureCache = new Map();
@@ -107,6 +107,67 @@ export function armourDetailMaterial(material, name, { cords = null, matte = fal
 }
 
 /**
+ * A geometry's metres per unit of its own texture coordinates, round (u) and up (v): each triangle's stretch, weighted by its
+ * area (so a sphere's, a lathe's, a shape's or a box's coordinates all come out in metres alike). At most `most` triangles read.
+ */
+export function uvMetres(geometry, most = 4000) {
+  const position = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  const index = geometry.index;
+  const count = index ? index.count / 3 : position.count / 3;
+  const step = Math.max(1, Math.floor(count / most));
+  const corner = (triangle, k) => (index ? index.getX(triangle * 3 + k) : triangle * 3 + k);
+  let u = 0;
+  let v = 0;
+  let total = 0;
+  for (let triangle = 0; triangle < count; triangle += step) {
+    const [a, b, c] = [0, 1, 2].map((k) => corner(triangle, k));
+    const at = (vertex) => [position.getX(vertex), position.getY(vertex), position.getZ(vertex)];
+    const [pa, pb, pc] = [at(a), at(b), at(c)];
+    const e1 = [0, 1, 2].map((axis) => pb[axis] - pa[axis]);
+    const e2 = [0, 1, 2].map((axis) => pc[axis] - pa[axis]);
+    const d1 = [uv.getX(b) - uv.getX(a), uv.getY(b) - uv.getY(a)];
+    const d2 = [uv.getX(c) - uv.getX(a), uv.getY(c) - uv.getY(a)];
+    const det = d1[0] * d2[1] - d2[0] * d1[1];
+    if (Math.abs(det) < 1e-12) continue;
+    const tu = e1.map((value, axis) => (value * d2[1] - e2[axis] * d1[1]) / det);
+    const tv = e1.map((value, axis) => (e2[axis] * d1[0] - value * d2[0]) / det);
+    const cross = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const area = Math.hypot(...cross) / 2;
+    u += Math.hypot(...tu) * area;
+    v += Math.hypot(...tv) * area;
+    total += area;
+  }
+  return total > 0 ? [u / total, v / total] : [0, 0];
+}
+
+/**
+ * A built piece (a helmet, a machine's shells) wearing an armour tile at its real size: every mesh under `root` of metal
+ * (metalness 0.3 or more), or with `moulded` every opaque one, or only those of the materials in `only`, has its material
+ * copied once per size with the tile's maps repeated over its own texture coordinates (uvMetres) to the tile's metres
+ * (detailmaps.js tileSize). Meshes that already wear a normal map, see-through ones and unlit ones are left as they are. The
+ * textures are the shared ones; only the materials (a repeat each) are new.
+ */
+export function wearTile(root, name, { moulded = false, only = null } = {}) {
+  if (!bakedTileTextures(name)) return;
+  const [round, up] = tileSize(name);
+  const made = new Map();
+  root.traverse((object) => {
+    const material = object.material;
+    if (!object.isMesh || object.userData.outline || Array.isArray(material) || !material || !object.geometry?.attributes?.uv) return;
+    if (material.normalMap || material.userData?.clothProp || material.transparent || material.isMeshBasicMaterial || material.isShaderMaterial || material.side === THREE.BackSide) return;
+    if (only ? !only.has(material) : !moulded && !((material.metalness ?? 0) >= 0.3)) return;
+    const [mu, mv] = uvMetres(object.geometry);
+    if (!(mu > 0 && mv > 0)) return;
+    const scale = Math.cbrt(Math.abs(object.scale.x * object.scale.y * object.scale.z)) || 1;
+    const repeat = [Math.max(1, Math.round((mu * scale) / round)), Math.max(0.25, (mv * scale) / up)];
+    const key = `${material.uuid}|${repeat[0]}|${repeat[1].toFixed(2)}`;
+    if (!made.has(key)) made.set(key, armourDetailMaterial(material.clone(), name, { repeat, metalness: material.metalness ?? 1 }));
+    object.material = made.get(key);
+  });
+}
+
+/**
  * The castle's surfaces wearing a ground tile (kittex.js): its colour (its mean kept for the kit's blend; its alpha is the
  * roughness, read by kittex's patch), its normal map, tiling over the tile's own metres (the kit's UVs are in metres). Returns
  * whether it took them (false: the maps are off, or there is no such tile).
@@ -187,7 +248,7 @@ export function clothDetailMaterial(material) {
       '#include <uv_vertex>',
       `#include <uv_vertex>
   vec2 clothBandV = floor(uv / ${f(CLOTH_BAND)});
-  int clothIndex = int(clamp(clothBandV.x - 1.0 + ${f(grid)} * clothBandV.y, 0.0, ${f(cells - 1)}));
+  int clothIndex = int(clamp(-clothBandV.x - 1.0 + ${f(grid)} * clothBandV.y, 0.0, ${f(cells - 1)}));
   vClothMean = uClothMeans[clothIndex];`,
     );
     shader.fragmentShader = `varying vec2 vClothMean;\n${shader.fragmentShader}`
@@ -195,7 +256,7 @@ export function clothDetailMaterial(material) {
         '#include <color_fragment>',
         `#include <color_fragment>
   vec2 clothBand = floor(vUv / ${f(CLOTH_BAND)});
-  vec2 clothAt = (vec2(clothBand.x - 1.0, clothBand.y) + ${f(pad / cell)} + fract(vUv) * ${f(inner)}) / ${f(grid)};
+  vec2 clothAt = (vec2(-clothBand.x - 1.0, clothBand.y) + ${f(pad / cell)} + fract(vUv) * ${f(inner)}) / ${f(grid)};
   vec2 clothDx = dFdx(vUv) * ${f(inner / grid)};
   vec2 clothDy = dFdy(vUv) * ${f(inner / grid)};
 #if __VERSION__ >= 300
@@ -230,7 +291,8 @@ export function clothDetailMaterial(material) {
 export function clothPropMaterial(target, material) {
   const spec = clothFamilyOf(material);
   const atlas = spec ? clothAtlasTexture() : null;
-  if (!atlas || !target || target.userData?.clothProp || !(target.isMeshStandardMaterial || target.isMeshToonMaterial || target.isMeshPhongMaterial || target.isMeshLambertMaterial)) return target;
+  // (A piece already wearing a tile, a metal one or this, is left as it is.)
+  if (!atlas || !target || target.userData?.clothProp || target.normalMap || target.onBeforeCompile?.toString().includes('uDetail') || !(target.isMeshStandardMaterial || target.isMeshToonMaterial || target.isMeshPhongMaterial || target.isMeshLambertMaterial)) return target;
   const { grid, cell, pad, means } = CLOTH_MAP_DATA;
   const inner = (cell - 2 * pad) / cell;
   const f = (value) => value.toFixed(6);

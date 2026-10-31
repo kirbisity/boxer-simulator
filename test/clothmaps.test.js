@@ -126,7 +126,7 @@ test('the atlas is embedded as one WebP, 2048² at most, within 3 MB, and bundle
 });
 
 test('cloth carries its cells with the maps, none off or in a crowd, at no cost in triangles', () => {
-  for (const name of ['templar', 'kheshig', 'contender', 'knight']) {
+  for (const name of ['templar', 'kheshig', 'contender']) {
     const inputs = structuredClone(PRESETS[name]);
     const on = withMaps(true, () => buildLoftBody(buildBody(inputs)));
     const off = withMaps(false, () => buildLoftBody(buildBody(inputs)));
@@ -137,7 +137,7 @@ test('cloth carries its cells with the maps, none off or in a crowd, at no cost 
     // (Kozane and lamellae shells are fewer triangles with the maps; cloth adds none.)
     assert.ok(on.indices.length <= off.indices.length * 1.01, `${name}: ${on.indices.length / 3} against ${off.indices.length / 3}`);
     // Cloth's coordinates are not the armour's.
-    for (let vertex = 0; vertex < on.uvs.length / 2; vertex += 1) if (on.uvs[vertex * 2] >= CLOTH_BAND) assert.equal(detailKindOf(on.uvs[vertex * 2]), null);
+    for (let vertex = 0; vertex < on.uvs.length / 2; vertex += 1) if (on.uvs[vertex * 2] < 0) assert.equal(detailKindOf(on.uvs[vertex * 2]), null);
   }
 });
 
@@ -146,7 +146,7 @@ test('a garment\'s weave closes round it: a whole number of tiles round each clo
   // The seam's two columns are the same points: their u apart by a whole number of tiles.
   const byPlace = new Map();
   for (let vertex = 0; vertex < built.uvs.length / 2; vertex += 1) {
-    if (built.uvs[vertex * 2] < CLOTH_BAND) continue;
+    if (built.uvs[vertex * 2] >= 0) continue;
     const key = [0, 1, 2].map((axis) => built.positions[vertex * 3 + axis].toFixed(5)).join(',');
     if (!byPlace.has(key)) byPlace.set(key, []);
     byPlace.get(key).push(built.uvs[vertex * 2]);

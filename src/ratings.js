@@ -3,13 +3,14 @@
 // The Starved Rebel rated afterwards against Maximus, the monk and his neighbours, their scores held (48 bouts).
 // The infantryman (Spc. Luis Herrera) rated afterwards against Maximus, SSgt. Brooks and Cpl. Hale, their scores held (22 bouts).
 // The mini humanoid (G1) and the exoskeleton soldier (Pvt. Owen Kade) rated afterwards, each against Maximus and the two nearest by that seed, their scores held (76 bouts).
+// The apes and monkeys (chimpanzee, chacma baboon, rhesus macaque) and the robot dogs (Go2, Spot, Vision 60) rated afterwards, each against Maximus and the two nearest by that seed (the Vision 60, unbeaten, also against the two top-rated), their scores held (182 bouts).
 export const RATINGS = {
  "references": [
   "maximus",
   "monk"
  ],
  "bouts": 16,
- "totalBouts": 5426,
+ "totalBouts": 5608,
  "characters": {
   "maximilian": {
    "title": "Maximilian I",
@@ -81,7 +82,7 @@ export const RATINGS = {
   },
   "combatBot": {
    "title": "Combat bot",
-   "faction": "specials",
+   "faction": "machines",
    "type": "combatBot|combatBot",
    "records": {
     "maximus": {
@@ -1035,7 +1036,7 @@ export const RATINGS = {
   },
   "humanoid": {
    "title": "Humanoid robot",
-   "faction": "specials",
+   "faction": "machines",
    "type": "kickboxing|humanoid",
    "records": {
     "maximus": {
@@ -1058,7 +1059,7 @@ export const RATINGS = {
   },
   "gorilla": {
    "title": "Silverback",
-   "faction": "specials",
+   "faction": "primates",
    "type": "gorilla|silverback",
    "records": {
     "maximus": {
@@ -1785,7 +1786,7 @@ export const RATINGS = {
   },
   "miniHumanoid": {
    "title": "Mini humanoid robot",
-   "faction": "specials",
+   "faction": "machines",
    "type": "kickboxing|miniHumanoid",
    "records": {
     "maximus": {
@@ -1814,7 +1815,7 @@ export const RATINGS = {
   },
   "exoArmoured": {
    "title": "Pvt. Owen Kade",
-   "faction": "specials",
+   "faction": "machines",
    "type": "street|exoArmoured",
    "records": {
     "maximus": {
@@ -1840,9 +1841,201 @@ export const RATINGS = {
     "azapArcher": 1.267,
     "eagle": 0.2
    }
+  },
+  "macaque": {
+   "title": "Rhesus macaque",
+   "faction": "primates",
+   "type": "macaque|monkeyFur",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 8,
+     "draws": 8
+    },
+    "lordAshford": {
+     "wins": 0,
+     "losses": 5,
+     "draws": 1
+    },
+    "azapSpear": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    }
+   },
+   "score": 14,
+   "provisional": 36,
+   "kd": {
+    "maximus": 0.36,
+    "lordAshford": 0.167,
+    "azapSpear": 0.077
+   }
+  },
+  "baboon": {
+   "title": "Chacma baboon",
+   "faction": "primates",
+   "type": "baboon|monkeyFur",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 10,
+     "draws": 6
+    },
+    "joan": {
+     "wins": 8,
+     "losses": 8,
+     "draws": 0
+    },
+    "baton": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    }
+   },
+   "score": 18,
+   "provisional": 26,
+   "kd": {
+    "maximus": 0.259,
+    "joan": 1,
+    "baton": 0.077
+   }
+  },
+  "chimp": {
+   "title": "Chimpanzee",
+   "faction": "primates",
+   "type": "chimp|monkeyFur",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "muayThai": {
+     "wins": 7,
+     "losses": 1,
+     "draws": 0
+    },
+    "kickboxer": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 30,
+   "provisional": 7.7,
+   "kd": {
+    "maximus": 0.077,
+    "muayThai": 5,
+    "kickboxer": 13
+   }
+  },
+  "dogGo2": {
+   "title": "Go2 robot dog",
+   "faction": "machines",
+   "type": "dogRam|go2Dog",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 2,
+     "draws": 14
+    },
+    "steppeArcher": {
+     "wins": 0,
+     "losses": 5,
+     "draws": 1
+    },
+    "jaguar": {
+     "wins": 0,
+     "losses": 5,
+     "draws": 1
+    }
+   },
+   "score": 41,
+   "provisional": 79,
+   "kd": {
+    "maximus": 0.789,
+    "steppeArcher": 0.167,
+    "jaguar": 0.167
+   }
+  },
+  "dogSpot": {
+   "title": "Spot with arm",
+   "faction": "machines",
+   "type": "dogGrip|spotDog",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 5,
+     "draws": 1
+    },
+    "mingSpear": {
+     "wins": 3,
+     "losses": 3,
+     "draws": 10
+    },
+    "lorarius": {
+     "wins": 0,
+     "losses": 0,
+     "draws": 16
+    }
+   },
+   "score": 16,
+   "provisional": 17,
+   "kd": {
+    "maximus": 0.167,
+    "mingSpear": 1,
+    "lorarius": 1
+   }
+  },
+  "dogVision60": {
+   "title": "Vision 60, rifle turret",
+   "faction": "machines",
+   "type": "dogTurret|vision60Dog",
+   "records": {
+    "maximus": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    },
+    "ironPagoda": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    },
+    "kanabo": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    },
+    "specialForces": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    },
+    "infantry": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    }
+   },
+   "score": 43389,
+   "provisional": 1300,
+   "kd": {
+    "maximus": 13,
+    "ironPagoda": 13,
+    "kanabo": 13,
+    "specialForces": 13,
+    "infantry": 13
+   }
   }
  },
  "types": {
+  "dogTurret|vision60Dog": 43389,
+  "dogGrip|spotDog": 16,
+  "dogRam|go2Dog": 41,
+  "chimp|monkeyFur": 30,
+  "baboon|monkeyFur": 18,
+  "macaque|monkeyFur": 14,
   "street|exoArmoured": 69,
   "kickboxing|miniHumanoid": 5.3,
   "rifle|infantry": 5988,

@@ -16,6 +16,8 @@ import { P } from './body.js';
 import { BONE } from './rig.js';
 import { surface } from './toon.js';
 import { inkAll, steelMaterial } from './wardrobe.js';
+import { MACHINE_TILES } from './detailmaps.js';
+import { wearTile } from './detailtex.js';
 
 export const ROBOT_VIEW = {
   joint: 0x1d1e22, // the actuators and the waist
@@ -156,6 +158,9 @@ export function buildRobotBody(body, armor, envMap) {
     for (const offset of [-1, 1]) tube(shin, joint, 0.007 * s, 0.007 * s, L.shank - 0.11 * s, L.shank - 0.005 * s, { sides: 8 }).position.x = offset * shinR * 0.5;
     ball(shin, hardware, 0.02 * s * k, [0, L.shank - 0.005 * s, 0]);
   }
+  // The shells, panels and accents wear the machine's panel tile (seams, screws, grain: detailmaps.js MACHINE_TILES).
+  const shells = new Set([shell, panel, accent]);
+  for (const { object } of pieces) wearTile(object, MACHINE_TILES.robot, { only: shells });
   // The status lights glow; everything else is inked.
   for (const { object } of pieces) inkAll(object);
   return pieces;

@@ -17,6 +17,8 @@ import { P } from './body.js';
 import { BONE } from './rig.js';
 import { surface } from './toon.js';
 import { inkAll, steelMaterial } from './wardrobe.js';
+import { MACHINE_TILES } from './detailmaps.js';
+import { wearTile } from './detailtex.js';
 
 /**
  * The frame round a man, as attachments: [{ object, bone, at }] (each in its
@@ -139,6 +141,9 @@ export function buildExoFrame(body, exo, envMap) {
       add(shin, new THREE.SphereGeometry(0.06 * s, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), plate, [thighR * 0.7, 0, 0], { rotate: [0, 0, -Math.PI / 2], scale: [1, 0.7, 1.1] });
     }
   }
+  // The frame and its bolt-on panels wear the machine's panel tile (detailmaps.js MACHINE_TILES).
+  const panelled = new Set([frame, plate]);
+  for (const { object } of pieces) wearTile(object, MACHINE_TILES.exo, { only: panelled });
   for (const { object } of pieces) inkAll(object);
   return pieces;
 }

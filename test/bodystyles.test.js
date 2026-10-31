@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildBody, P, PRESETS } from '../src/body.js';
 import { BODY_STYLE_KEYS, buildSkinMesh } from '../src/bodystyles.js';
 import { buildLoftBody } from '../src/loftbody.js';
-import { CLOTH_BAND, DETAIL_MAPS } from '../src/detailmaps.js';
+import { DETAIL_MAPS } from '../src/detailmaps.js';
 import { buildFleshBody } from '../src/fleshbody.js';
 import { buildDetailMap, DETAIL, detailUv } from '../src/skindetail.js';
 import { BONES } from '../src/rig.js';
@@ -132,8 +132,8 @@ test('the detail style: the loft with texture coordinates, and a map whose texel
   checkMesh('detail', mesh);
   const count = mesh.positions.length / 3;
   assert.equal(mesh.uvs.length, count * 2);
-  // (A garment's coordinates are the cloth atlas's, from CLOTH_BAND up: detailmaps.js.)
-  for (let index = 0; index < mesh.uvs.length; index += 2) if (mesh.uvs[index] < CLOTH_BAND) for (const value of [mesh.uvs[index], mesh.uvs[index + 1]]) assert.ok(value >= 0 && value <= 1, `a coordinate in the map (${value})`);
+  // (A garment's coordinates are the cloth atlas's, below zero: detailmaps.js.)
+  for (let index = 0; index < mesh.uvs.length; index += 2) if (mesh.uvs[index] >= 0) for (const value of [mesh.uvs[index], mesh.uvs[index + 1]]) assert.ok(value >= 0 && value <= 1, `a coordinate in the map (${value})`);
   const { width, height, bump, occlusion, range } = mesh.detail;
   assert.equal(bump.length, width * height);
   assert.equal(occlusion.length, width * height);

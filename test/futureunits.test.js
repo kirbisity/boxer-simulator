@@ -42,14 +42,14 @@ test('the exoskeleton is a soldier in the armoured frame: his own body, the fram
   assert.ok(exo.gear.protection.cut > man.gear.protection.cut);
 });
 
-test('the chosen two are real units: in the pickers, the roster\'s Beasts & Machines, dealt; only the G1 kept out of the prize fight', () => {
+test('the chosen two are real units: in the pickers, the roster\'s Machines, dealt; the G1 (not the exo) kept out of the prize fight', () => {
   for (const kind of ['miniHumanoid', 'exoArmoured']) {
     assert.ok(!OUTFITS[kind].levelOnly);
     assert.ok(PICKABLE_OUTFIT_KEYS.includes(kind));
     assert.ok(!PRESETS[kind].undealt);
     const entry = WARRIORS.find((warrior) => warrior.key === kind);
     assert.ok(entry, `${kind} in the roster`);
-    assert.equal(entry.faction, 'specials');
+    assert.equal(entry.faction, 'machines');
     assert.equal(OUTFITS[kind].designs.length, 1, 'one look: the one chosen');
   }
   for (const gone of ['exoOpen', 'exoEnclosed']) assert.ok(!OUTFITS[gone] && !PRESETS[gone]);

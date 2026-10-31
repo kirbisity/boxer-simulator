@@ -14,7 +14,7 @@ import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps,
 import { bodyCheck } from './skinworker.js';
 import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
-import { DETAIL_MAPS, clothCellOf, detailKindOf } from './detailmaps.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf } from './detailmaps.js';
 import { armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { SKIN_TONES } from './skintones.js';
 import { buildSkeleton } from './bones.js';
@@ -2169,7 +2169,10 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
     // Laced lamellar's cords: the armour's own `cord`, else its people's (outfits.js FACTIONS `lamellarCord`), else its lace;
     // Japanese kozane keep their lace. Lacquer over iron (a Japanese kit's) is less of a mirror than bright steel.
     const cord = dress.armor?.cord ?? FACTIONS[factionOf(body.inputs)]?.lamellarCord;
-    const cords = { lamellae: cord ? [new THREE.Color(cord), new THREE.Color(cord)] : [roles.lace, roles.lace], kozane: [roles.lace, roles.lace] };
+    const laces = cord ? [new THREE.Color(cord), new THREE.Color(cord)] : [roles.lace, roles.lace];
+    // The other tiles' masks (detailmaps.js DETAIL_ARMOUR `masks`): rivet heads and fittings in the kit's gilt, lacing in its lace.
+    const masked = { gold: [roles.gold, roles.gold], lace: [roles.lace, roles.lace] };
+    const cords = { ...Object.fromEntries(Object.entries(DETAIL_ARMOUR).filter(([, spec]) => spec.masks).map(([kind, spec]) => [kind, masked[spec.masks]])), lamellae: laces, kozane: [roles.lace, roles.lace] };
     for (const [kind, indices] of Object.entries(detailIndices)) {
       const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
       const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
@@ -2873,6 +2876,11 @@ export function setLayer(fighterView, layer) {
 // ---- Per-frame update -----------------------------------------------------
 
 export function updateFighterView(fighterView, dt, time) {
+  // (What a robot dog carries, bolted on its back, is drawn with the robot, not as a man: robotdogview.js.)
+  if (fighterView.fighter.body.gear.bolted) {
+    fighterView.group.visible = false;
+    return;
+  }
   // A shed standard lies on the ground now (a loose weapon), not on his back.
   if (fighterView.fighter.wornStandard?.shed && !fighterView.standardShed) {
     fighterView.standardShed = true;

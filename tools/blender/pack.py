@@ -3,6 +3,8 @@
 #
 #   python3 tools/blender/pack.py <bake dir> [--preview]
 #
+# A tile not in the bake dir keeps its images from the current src/detailmaps-data.js (so one family can be baked again alone).
+#
 # Every map is resampled to a power of two (`size`; the bakes are rendered larger and filtered down, which is also what keeps
 # a normal map from sparkling), and is one of two kinds:
 #   armour  `albedo` RGB (A: the first mask, where there is one), `normal` RGB (A: the second mask), `orm` R occlusion,
@@ -24,6 +26,10 @@ ARMOUR = {
     'kozane': {'size': 1024, 'quality': 90, 'masks': True},
     'lamellae': {'size': 1024, 'quality': 90, 'masks': True},
     'plate': {'size': 512, 'quality': 92},
+    # The hard armour tiles (hardtiles.py), at 512² (their detail is millimetres over a tile a hand across or less).
+    **{name: {'size': 512, 'quality': 88, 'masks': masks} for name, masks in (
+        ('segmentata', True), ('scale', False), ('mountain', False), ('brigandine', True), ('harnessEdge', True), ('krug', False),
+        ('iyozane', True), ('sugake', True), ('etched', False), ('polymer', False), ('panels', False))},
 }
 # Ground tiles and the metres each covers (as baked).
 GROUND = {name: {'size': 1024, 'quality': 86, 'metres': metres} for name, metres in (
@@ -104,9 +110,29 @@ def pack(folder, name, spec, kind, preview):
     return {'kind': kind, 'size': [size, size], 'mean': mean, **extra, **{key: base64.b64encode(data).decode('ascii') for key, data in out.items()}}
 
 
+def current_blocks():
+    """The current data file's entries, as their lines (name -> text), for the tiles not baked this time."""
+    path = os.path.join(ROOT, 'src', 'detailmaps-data.js')
+    blocks = {}
+    if not os.path.exists(path):
+        return blocks
+    name = None
+    with open(path) as file:
+        for line in file:
+            if line.startswith('  ') and not line.startswith('    ') and line.rstrip().endswith(': {'):
+                name = line.strip()[:-3]
+                blocks[name] = [line.rstrip('\n')]
+            elif name:
+                blocks[name].append(line.rstrip('\n'))
+                if line.rstrip() == '  },':
+                    name = None
+    return blocks
+
+
 def main():
     folder = sys.argv[1]
     preview = '--preview' in sys.argv
+    kept = current_blocks()
     entries = {}
     for kind, table in (('armour', ARMOUR), ('ground', GROUND)):
         for name, spec in table.items():
@@ -115,6 +141,9 @@ def main():
                 entries[name] = packed
                 sizes = {key: len(packed[key]) * 3 // 4 for key in ('albedo', 'normal', 'orm') if key in packed}
                 print(name, kind, packed['size'], sizes)
+            elif name in kept:
+                entries[name] = kept[name]
+                print(name, 'kept')
             else:
                 print(name, 'missing')
     if preview:
@@ -127,6 +156,9 @@ def main():
         'export const DETAIL_MAP_DATA = {',
     ]
     for name, entry in entries.items():
+        if isinstance(entry, list):
+            lines.extend(entry)
+            continue
         lines.append(f'  {name}: {{')
         metres = f", metres: {entry['metres']}" if 'metres' in entry else ''
         lines.append(f"    kind: '{entry['kind']}', size: {json.dumps(entry['size'])}, mean: {json.dumps(entry['mean'])}{metres},")

@@ -4,13 +4,13 @@
 
 import { Dangle } from './dangle.js';
 import { factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
-import { CLOTH_GARMENTS, clothMaterialOf } from './detailmaps.js';
-import { clothPropMaterial } from './detailtex.js';
 import { outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
 import { buildArenaHelm, buildGalea, buildLionHead } from './arenaview.js';
 import { buildStechhelm } from './stechzeug.js';
+import { CLOTH_GARMENTS, clothMaterialOf, HELMET_TILES, MOULDED_TILES } from './detailmaps.js';
+import { clothPropMaterial, wearTile } from './detailtex.js';
 
 export const WARDROBE = {
   // How far (m, for a 1.8 m man) a sabaton's point runs on past the foot.
@@ -26,7 +26,7 @@ export const WARDROBE = {
 const darker = (hex, share = 0.72) => new THREE.Color(hex).multiplyScalar(share);
 
 /** What a worn piece of a slot (`feet`, the shoe of this kind) is made of for this man (detailmaps.js clothMaterialOf). */
-function pieceMaterial(body, slot, kind) {
+function wornMaterial(body, slot, kind) {
   const inputs = body.inputs ?? {};
   return clothMaterialOf({ [slot]: { kind } }, slot === 'feet' ? 'boot' : 'top', { faction: factionOf(inputs), outfit: outfitOf(inputs).kind });
 }
@@ -241,7 +241,7 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
   }[kind] ?? { width: 0.05, height: 0.045, sole: 0x17171c };
   const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: spec.patent ? 0.12 : 0.5 });
   // The cloth atlas's tile on the upper (detailtex.js clothPropMaterial: leather, a trainer's knit, a tabi's cotton).
-  const stuff = pieceMaterial(body, 'feet', kind);
+  const stuff = wornMaterial(body, 'feet', kind);
   if (kind !== 'sabaton' && kind !== 'bare' && !spec.skin) clothPropMaterial(upperMaterial, stuff);
   const upper = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), upperMaterial);
   upper.scale.set(spec.width, length / 2, spec.height);
@@ -930,6 +930,63 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       }
       break;
     }
+    // The monkeys' and the chimpanzee's heads over the man's, as the silverback's.
+    case 'macaqueHead':
+    case 'baboonHead':
+    case 'chimpHead': {
+      // A rhesus: a round furred cranium, the bare pink face set flat in it, close-set eyes under a light brow, a short
+      // muzzle, small ears. A chacma: a long dog-like muzzle, dark and bare, the eyes deep under a heavy brow, a mane over
+      // the crown and nape. A chimpanzee: a bare face under a heavy brow ridge, a jutting muzzle, big ears out to the sides.
+      const kind = head.kind;
+      const fur = surface(color, { roughness: 0.95 });
+      const skin = surface(head.face ?? 0x6a5547, { roughness: 0.7 });
+      const dark = surface(0x120c08, { roughness: 0.3 });
+      const cranium = new THREE.Mesh(new THREE.SphereGeometry(1.1 * r, 20, 14), fur);
+      cranium.scale.set(kind === 'baboonHead' ? 1.05 : 1, kind === 'chimpHead' ? 0.92 : 1, 0.98);
+      cranium.position.y = 0.05 * r;
+      group.add(cranium);
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.82 * r, 18, 12), skin);
+      face.scale.set(0.5, 0.95, 0.9);
+      face.position.set(0.72 * r, -0.02 * r, 0);
+      group.add(face);
+      const muzzleLength = kind === 'baboonHead' ? 1.25 : kind === 'chimpHead' ? 0.72 : 0.52;
+      const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * r, 0.42 * r, muzzleLength * r, 14), skin);
+      muzzle.rotation.z = -Math.PI / 2 + (kind === 'baboonHead' ? 0.28 : 0.1);
+      muzzle.position.set((0.75 + muzzleLength * 0.45) * r, (kind === 'baboonHead' ? -0.42 : -0.38) * r, 0);
+      muzzle.scale.set(1, 1, kind === 'baboonHead' ? 0.82 : 1.1);
+      group.add(muzzle);
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.2 * r, 10, 8), kind === 'baboonHead' ? dark : skin);
+      nose.position.set((0.78 + muzzleLength * 0.92) * r, (kind === 'baboonHead' ? -0.55 : -0.3) * r, 0);
+      group.add(nose);
+      const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * r, 0.16 * r, 1.25 * r, 10), kind === 'macaqueHead' ? skin : fur);
+      brow.rotation.x = Math.PI / 2;
+      brow.scale.set(1, 1, kind === 'macaqueHead' ? 0.6 : 1);
+      brow.position.set(0.9 * r, 0.26 * r, 0);
+      group.add(brow);
+      if (kind === 'baboonHead') {
+        // The mane: a cape of longer fur over the crown and down the nape.
+        const mane = new THREE.Mesh(new THREE.SphereGeometry(1.25 * r, 16, 10, Math.PI * 0.55, Math.PI * 0.9), fur);
+        mane.scale.set(1.05, 1.1, 1.15);
+        mane.position.set(-0.25 * r, 0, 0);
+        group.add(mane);
+      }
+      for (const side of [1, -1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11 * r, 10, 8), dark);
+        eye.position.set(0.98 * r, 0.1 * r, side * 0.27 * r);
+        const ear = new THREE.Mesh(new THREE.SphereGeometry((kind === 'chimpHead' ? 0.38 : 0.24) * r, 10, 8), skin);
+        ear.scale.set(0.45, 1, 0.4);
+        ear.position.set(-0.05 * r, 0.12 * r, side * (kind === 'chimpHead' ? 1.12 : 0.98) * r);
+        group.add(eye, ear);
+        if (kind === 'baboonHead') {
+          // A male's canines, longer than a leopard's: a pair down past the lips.
+          const canine = new THREE.Mesh(new THREE.ConeGeometry(0.06 * r, 0.36 * r, 6), surface(0xeae2cc, { roughness: 0.4 }));
+          canine.rotation.z = Math.PI;
+          canine.position.set((0.75 + muzzleLength * 0.62) * r, -0.68 * r, side * 0.16 * r);
+          group.add(canine);
+        }
+      }
+      break;
+    }
     case 'opsHelmet': {
       // A high-cut ballistic helmet: the shell cut high over the ears, rails
       // on the sides, the night-vision mount on the front, electronic ear
@@ -1557,6 +1614,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     default:
       return null;
   }
+  // Its metal (a moulded shell: all of it) wearing its tile's detail maps (detailmaps.js HELMET_TILES), not in a crowd.
+  const tile = lowDetail ? null : HELMET_TILES[head.kind];
+  if (tile) wearTile(group, tile, { moulded: MOULDED_TILES.has(tile) });
   // The hat's own stuff (detailmaps.js CLOTH_GARMENTS.head: felt, fur, feathers, cotton...) on its parts in its colour (or its
   // fur's), from the cloth atlas; its metal, plumes and trims as they were. Not in a crowd.
   const stuff = CLOTH_GARMENTS.head[head.kind];

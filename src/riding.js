@@ -364,13 +364,15 @@ function styleReach(fighter, style) {
 function passWidth(fighter, opponent, style, lance) {
   if (lance) return WORLD.mount.passLance;
   if (opponent.mount) return WORLD.mount.passMounted;
-  const drop = point(fighter.x, P.rShoulder)[1] - aimPoint(opponent, markZone(opponent))[1];
+  const drop = point(fighter.x, P.rShoulder)[1] - aimPoint(opponent, markZone(opponent, fighter))[1];
   const beside = Math.sqrt(Math.max(0, (styleReach(fighter, style) * WORLD.mount.passReach) ** 2 - drop * drop)) + fighter.body.lengths.shoulderSpan / 2;
   return Math.max(WORLD.mount.pass, beside);
 }
 
 /** What a rider strikes at: a man on foot below him, his head and shoulders (what is in reach from the saddle); a rider, his body. */
-function markZone(opponent) {
+function markZone(opponent, rider = null) {
+  // (A robot dog's arm, below him: his legs: an outfit's `bolted`.)
+  if (rider?.body.gear.bolted && !opponent.mount) return 'legs';
   return opponent.mount ? 'body' : 'head';
 }
 
@@ -454,7 +456,7 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     // chasing places beside one another ride round and round: each takes it in turns (drawn, every few seconds) to stand and
     // let the other come.
     const shoulder = point(fighter.x, P.rShoulder);
-    const mark = aimPoint(opponent, markZone(opponent));
+    const mark = aimPoint(opponent, markZone(opponent, fighter));
     if (opponent.mount && world.time >= (ride.rollAt ?? 0)) {
       ride.stand = world.random() < RIDING.melee.standing;
       ride.rollAt = world.time + RIDING.melee.reroll;
@@ -501,7 +503,7 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     return true;
   }
   // A blow in passing: at a man on foot, his head or body from above; at a rider, his body.
-  const zone = markZone(opponent);
+  const zone = markZone(opponent, fighter);
   strikeInPassing(world, fighter, opponent, style.attacks, (who) => aimPoint(who, zone), (spec) => (spec.zones.includes(zone) ? zone : spec.zones[0]), forward);
   return true;
 }

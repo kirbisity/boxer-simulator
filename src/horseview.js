@@ -17,6 +17,7 @@ import { buildHorseModel, horseModelKey } from './horsemesh.js';
 import { hairChain, stepHair } from './horsehair.js';
 import { steelMaterial } from './wardrobe.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
+import { buildRobotDogView, disposeRobotDogView, updateRobotDogView } from './robotdogview.js';
 
 const HORSE_LOOK = {
   outline: 0.005,
@@ -148,6 +149,8 @@ function layStrap(mesh, from, to) {
 
 /** Build a horse's model (added to the scene); returns its view. */
 export function buildHorseView(view, horse, { detail = 'full' } = {}) {
+  // (A robot dog: robotdogview.js draws it.)
+  if (horse.spec?.robot) return buildRobotDogView(view, horse);
   const model = horseModelFor(horse, detail);
   const { rig, parts } = model;
   const W = horse.withers;
@@ -602,6 +605,7 @@ const horseDown = [0, -1, 0];
 
 /** Put the horse where it is now (its legs in their stride, rolled over if down). `world` gives the time and the rider. */
 export function updateHorseView(view, world = null) {
+  if (view.robot) return updateRobotDogView(view, world);
   const horse = view.horse;
   const drawn = view.drawn;
   const rig = view.model.rig;
@@ -691,6 +695,7 @@ export function updateHorseView(view, world = null) {
 
 /** Remove a horse's model. */
 export function disposeHorseView(view, horseView) {
+  if (horseView.robot) return disposeRobotDogView(view, horseView);
   view.scene.remove(horseView.group);
   disposeObject(horseView.group);
   for (const mesh of horseView.owned) {

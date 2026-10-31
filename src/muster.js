@@ -13,7 +13,7 @@
 // `placed` (physics.js createWorld: his riders too), the side keeping its
 // level's drill, discipline and wings. The world is built from it as from any level.
 
-import { canRide } from './horses.js';
+import { isMounted } from './horses.js';
 import { STYLES } from './moves.js';
 import { WORLD } from './physics.js';
 import { WINGS, placeWings } from './formation.js';
@@ -51,7 +51,7 @@ const MUSTER_SIGN = { red: -1, blue: 1 };
 /** He shoots (a bow, a crossbow, a gun). */
 const musterShoots = (inputs) => Boolean(STYLES[inputs.style]?.ranged);
 /** He rides into this battle. */
-const musterRides = (inputs) => Boolean(inputs.mounted) && canRide(inputs);
+const musterRides = isMounted;
 
 /**
  * A side's units: each kind of man its armies have, one to a rank and style

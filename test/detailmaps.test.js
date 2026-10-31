@@ -45,12 +45,19 @@ test('laced lamellae are one mapped shell: far fewer triangles than plate by pla
 });
 
 test('mail carries the mail maps and plate the plate maps at no cost in triangles', () => {
-  for (const [inputs, kind] of [[TEMPLAR, 'mail'], [KNIGHT, 'plate']]) {
+  for (const [inputs, kind] of [[TEMPLAR, 'mail'], [structuredClone(PRESETS.legionary), 'segmentata']]) {
     const on = built(inputs, true);
     const off = built(inputs, false);
     assert.ok(on.kinds[kind] > 0, kind);
     assert.ok(on.triangles <= off.triangles * 1.01, `${kind}: ${on.triangles} against ${off.triangles}`);
   }
+});
+
+test('a plate harness wears the plate maps, its edges the roped edge strip and its cops their lames, for a fifth more triangles at most', () => {
+  const on = built(KNIGHT, true);
+  const off = built(KNIGHT, false);
+  assert.ok(on.kinds.plate > 0 && on.kinds.harnessEdge > 0, JSON.stringify(on.kinds));
+  assert.ok(on.triangles <= off.triangles * 1.2, `${on.triangles} against ${off.triangles}`);
 });
 
 test('Japanese laced rows wear the kozane tile', () => {
@@ -161,6 +168,44 @@ test('the materials wear the maps from the start (a stand-in until decoded), the
     for (const [name, value] of Object.entries(kept)) {
       if (value === undefined) delete globalThis[name];
       else globalThis[name] = value;
+    }
+  }
+});
+
+test('every armour kind in the outfits says what hard surface it has: tiles that exist, or explicitly none', async () => {
+  const { OUTFITS } = await import('../src/outfits.js');
+  const { ARMOUR_COVERAGE, HELMET_TILES } = await import('../src/detailmaps.js');
+  const kinds = new Set();
+  const heads = new Set();
+  for (const outfit of Object.values(OUTFITS)) {
+    for (const design of outfit.designs ?? []) {
+      if (design.armor?.kind) kinds.add(design.armor.kind);
+      if (design.head?.kind) heads.add(design.head.kind);
+    }
+  }
+  for (const kind of kinds) {
+    assert.ok(kind in ARMOUR_COVERAGE, `${kind} has no entry in ARMOUR_COVERAGE`);
+    for (const tile of ARMOUR_COVERAGE[kind] ?? []) assert.ok(DETAIL_ARMOUR[tile] && DETAIL_MAP_DATA[tile], `${kind}: ${tile}`);
+  }
+  for (const head of heads) if (HELMET_TILES[head]) assert.ok(DETAIL_MAP_DATA[HELMET_TILES[head]], head);
+});
+
+test('each armoured outfit\'s body wears the tiles its kind is said to (and no others)', async () => {
+  const { OUTFITS } = await import('../src/outfits.js');
+  const { ARMOUR_COVERAGE } = await import('../src/detailmaps.js');
+  // Drawn apart from the body: the machines' shells (robotview.js), the o-yoroi's box and panels (oyoroi.js).
+  const apart = { robot: ['panels'], oyoroi: ['kozane'] };
+  const seen = new Map();
+  for (const [key, outfit] of Object.entries(OUTFITS)) {
+    for (const [design, look] of (outfit.designs ?? []).entries()) {
+      const kind = look.armor?.kind;
+      if (!kind || seen.has(`${key}|${kind}`)) continue;
+      const inputs = { ...structuredClone(PRESETS.knight), outfit: { kind: key, design } };
+      const tiles = Object.keys(built(inputs, true).kinds);
+      seen.set(`${key}|${kind}`, tiles);
+      const listed = ARMOUR_COVERAGE[kind] ?? [];
+      for (const tile of tiles) assert.ok(listed.includes(tile), `${key} (${kind}) wears ${tile}, not listed`);
+      for (const tile of listed) if (!(apart[kind] ?? []).includes(tile) && !look.armor.matte) assert.ok(tiles.includes(tile), `${key} (${kind}) is said to wear ${tile}: ${tiles}`);
     }
   }
 });
