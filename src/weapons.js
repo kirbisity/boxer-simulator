@@ -162,6 +162,8 @@ export const RIFLE = {
   misfire: 0.002,
   rounds: 30,
   reloadSeconds: 2.5,
+  // The empty magazine dropped and a full one seated from the chest pouch (physics/ranged.js MAGAZINE_CHANGE).
+  reload: 'magazine',
   // A soldier's basic load: seven magazines (210 rounds).
   ammo: 210,
   // Fully automatic (the M16/M4 family's select fire): ~12 rounds a second (~720 a minute), in bursts of 3-6.
@@ -192,6 +194,8 @@ export const SHOTGUN = {
   misfire: 0.002,
   rounds: 5,
   reloadSeconds: 4,
+  // Shell by shell up into the tube under the barrel (physics/ranged.js TUBE_LOAD).
+  reload: 'tube',
   // Five in the tube and a bandolier or a sidesaddle of shells: ~30.
   ammo: 30,
 };
