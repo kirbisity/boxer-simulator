@@ -126,6 +126,11 @@ export function buildChapel() {
   // (Overlapping the wall walk's end at x -2, so that the walk stays awake the whole way in: a gap here dropped the wall walk's floor for a step.)
   sec.portals.push({ to: 'tower', area: { at: [-5, -36], size: [7, 7] } });
   sec.portals.push({ to: 'cell', area: { at: [-34.4, -36], size: [10, 8] } });
+  // The seal (stage.js `seals`): an iron portcullis hung in the great door's arch, just inside the iron door, raised; once the player is in the nave with the boss
+  // awake it crashes down behind him, and it goes up again when the boss is dead (the cutscene, the horde that comes in by the door after).
+  const port = CH.x1 - 0.25;
+  dnGate(sec, 'chapelportcullis', [port, L, mid], [{ ...wallOf([port, mid], [0.3, CH.gate.width + 0.3], L - 0.1, L + CH.gate.height, { id: 'chapelportcullis' }), style: 'iron', skin: false }], { kind: 'portcullis', width: CH.gate.width + 0.3, height: CH.gate.height, drop: 10 }, { state: 'open' });
+  sec.seals.push({ id: 'sanctuaryseal', boss: 'vaelen', when: 'enter', gates: ['chapelportcullis'], room: { at: [(CH.x0 + CH.x1 - 1) / 2, mid], size: [CH.x1 - 1 - CH.x0, CH.z1 - CH.z0], y: [L - 1, L + 8] }, text: 'The portcullis crashes down behind you.' });
   // (Held to the nave, `pen`: he fights in his hall and never follows the player out of the great door; at its threshold he stops and waits.)
   dnSpawn(sec, 'vaelen', 'vaelen', 'boss', 4, [-22, floor, mid], DN_FACE.E, { inputs: { name: 'Lord Vaelen' }, boss: { title: "The Queen's Chief Jailer" }, pen: { at: [(CH.x0 + CH.x1) / 2, (CH.z0 + CH.z1) / 2], size: [CH.x1 - CH.x0, CH.z1 - CH.z0] } });
   dnHorde(sec);

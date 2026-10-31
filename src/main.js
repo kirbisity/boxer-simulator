@@ -1255,7 +1255,7 @@ function consumeEvents() {
     if (moment) {
       // Slow motion and the camera's push-in are for one man against
       // another; in a crowd something is always happening, and the icon says enough.
-      if (state.world.fighters.length <= 2) startMoment(state.drama, moment, realSeconds());
+      if (state.world.fighters.length <= 2 || moment.always) startMoment(state.drama, moment, realSeconds());
       addIcon(state.drama, moment, realSeconds());
     }
     logEvent(event);

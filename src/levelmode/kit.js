@@ -29,7 +29,7 @@ import { ktShadowBake, ktShadowRelease } from './kitshadow.js';
 import { FaceRegistry } from '../depthrange.js';
 import { lampShare, newLamps, pickLit, stepLamps, torchFlicker } from './torchpool.js';
 import { kwtCreate } from './kitwater.js';
-import { kfDropped, kfDynamics } from './kitfilth.js';
+import { kfDropped, kfDynamics, kfHeap } from './kitfilth.js';
 import { skyDirection } from './stagesky.js';
 import { ktDispose, ktMaterials, ktRandom, ktSetLod, ktWeather } from './kittex.js';
 import { QUALITY_LAMPS_MOST, TIER_NAMES, tierOf } from './quality.js';
@@ -988,6 +988,11 @@ function kitMen(state, world, terrain, safe, dt) {
   const eye2 = VISIBILITY.eyeNear * VISIBILITY.eyeNear;
   for (const fighter of world.fighters) {
     if (fighter.id === 0 || fighter.dormant) continue;
+    // (A man buried under a heap, awareness.js `lurk`, is not drawn: the heap is, kitfilth.js kfHeap.)
+    if (fighter.buried) {
+      state.hidden.add(fighter.id);
+      continue;
+    }
     const x = fighter.x[P.pelvis * 3];
     const y = fighter.x[P.pelvis * 3 + 1];
     const z = fighter.x[P.pelvis * 3 + 2];
@@ -1020,7 +1025,33 @@ function kitMechanism(section, mech, mats) {
   const batch = new KitBatch(mats, 41);
   const closed = mech.states.closed?.[0] ?? mech.states.up?.[0];
   let apply = () => {};
-  if (look.kind === 'door' || look.kind === 'bars' || look.kind === 'doubledoor') {
+  if (look.kind === 'portcullis' || look.kind === 'sluice') {
+    // A boss room's seal (stage.js `seals`): an iron grate (a portcullis: uprights and cross bars, spiked at the foot) or a sluice's oak boards bound with iron,
+    // hung up over its door in grooves; it comes down fast (look.drop, below) and goes back up slowly.
+    const solid = closed;
+    const alongU = solid.size[0] >= solid.size[1];
+    const width = alongU ? solid.size[0] : solid.size[1];
+    const yaw = (solid.yaw ?? 0) + (alongU ? 0 : -Math.PI / 2);
+    const height = solid.top - solid.bottom;
+    if (look.kind === 'portcullis') {
+      const count = Math.round(width / 0.26);
+      for (let k = 0; k <= count; k += 1) {
+        const u = -width / 2 + (width * k) / count;
+        kgBox(batch, 'iron', u, height / 2 + 0.05, 0, 0.07, height - 0.1, 0.07, 0, { jitter: 0 });
+        // (The spikes at the foot.)
+        kgBox(batch, 'iron', u, 0.06, 0, 0.035, 0.12, 0.035, 0, { jitter: 0 });
+      }
+      for (let h = 0.12; h < height; h += 0.42) kgBox(batch, 'iron', 0, h, 0, width, 0.06, 0.09, 0, { jitter: 0 });
+    } else {
+      const boards = Math.max(4, Math.round(height / 0.3));
+      for (let k = 0; k < boards; k += 1) kgBox(batch, 'wood', 0, (height * (k + 0.5)) / boards, 0, width - 0.06, height / boards - 0.02, 0.14, 0, { aoFrom: -1, jitter: 0.1 });
+      for (const u of [-0.42, 0, 0.42]) kgBox(batch, 'iron', u * width, height / 2, 0.08, 0.1, height - 0.06, 0.03, 0, { jitter: 0 });
+      kgBox(batch, 'iron', 0, height - 0.08, 0.08, width - 0.1, 0.08, 0.03, 0, { jitter: 0 });
+    }
+    group.position.set(solid.at[0], solid.bottom, solid.at[1]);
+    group.rotation.y = yaw;
+    apply = (open) => { group.position.y = solid.bottom + open * (height * 0.96); };
+  } else if (look.kind === 'door' || look.kind === 'bars' || look.kind === 'doubledoor') {
     const solid = closed;
     const alongU = solid.size[0] >= solid.size[1];
     const width = alongU ? solid.size[0] : solid.size[1];
@@ -1169,6 +1200,7 @@ export function createCastleView(stage) {
   // What the dead leave lying (a helmet off a head: kitfilth.js), from the run's `level.dropped`.
   const dropped = kfDropped();
   group.add(dropped.group);
+  const heaps = [];
   let seed = 7;
   for (const section of stage.sections) {
     seed += 13;
@@ -1208,6 +1240,13 @@ export function createCastleView(stage) {
     for (const l of detail.dyn.lights) lights.push({ ...l, section: section.id });
     for (const l of detail.dyn.lights) if (l.color !== 0x8fdc50) sounding.fires.push({ at: l.at, power: l.power, section: section.id });
     for (const d of detail.dyn.drips) sounding.drips.push({ at: d.at, section: section.id });
+    // A man buried in a heap of filth (a spawn's `lurk`): the heap, which slides off him as he rises (kitfilth.js kfHeap, world.stage.lurk).
+    for (const spawn of section.spawns ?? []) {
+      if (!spawn.lurk) continue;
+      const heap = kfHeap(spawn);
+      detail.group.add(heap.group);
+      heaps.push(heap);
+    }
     sections[section.id] = holder;
     parts[section.id] = { detail, far, dynamic, moving, marks, ext, filth, chunks, decals, silhouette };
     stats.sections[section.id] = { detail: detail.triangles, far: far.triangles };
@@ -1352,8 +1391,10 @@ export function createCastleView(stage) {
       if (near.has(section.id) || detailed) {
         for (const moving of entry.moving) {
           const target = ['open', 'down'].includes(run.mechanisms[moving.id]) ? 1 : 0;
+          // (A seal comes down at `drop` a second, a dropped grate's or boards' fall, and goes back up at the winch's pace.)
+          const rate = target < moving.open && moving.look?.drop ? moving.look.drop : 2.6;
           if (moving.open < 0) moving.open = target;
-          else moving.open += Math.max(-1, Math.min(1, (target - moving.open) * Math.min(1, dt * 2.6)));
+          else moving.open += Math.max(-1, Math.min(1, (target - moving.open) * Math.min(1, dt * rate)));
           moving.apply(moving.open);
         }
       }
@@ -1387,6 +1428,7 @@ export function createCastleView(stage) {
     // The water: rings round the men wading in it, splashes, the reflections (kitwater.js).
     water.update(world, state.time, dt, states, q);
     dropped.update(run.level?.dropped);
+    for (const heap of heaps) heap.update(run.lurk?.[heap.id], state.time);
     // The lights: the nearest of the lit things in the sections shown (as many as the tier lights), a few times a second.
     const lamps = Math.min(pool.length, q.lamps ?? pool.length);
     const reachNow = stormTorchReach();

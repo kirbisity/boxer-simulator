@@ -312,3 +312,80 @@ export function kfDropped() {
   };
   return { group, update };
 }
+
+// ---- A man buried in filth ------------------------------------------------------------------------------------
+
+/** The heap's lumps: [dx, dz, dy, rx, ry, rz, out] in m about the man's post (dy: the lump's middle over the floor), `out` how far it slides as he rises. */
+const KF_HEAP = [
+  [0, 0, 0.32, 1.25, 0.72, 1.1, 0],
+  [0.55, 0.35, 0.78, 0.62, 0.42, 0.55, 1.0], [-0.5, -0.3, 0.8, 0.66, 0.4, 0.58, 1.1], [0.1, -0.55, 0.72, 0.55, 0.36, 0.5, 0.9],
+  [-0.3, 0.55, 0.7, 0.58, 0.38, 0.52, 1.0], [0.05, 0.05, 1.02, 0.5, 0.34, 0.46, 0.7],
+  [1.15, -0.2, 0.18, 0.5, 0.26, 0.6, 0.5], [-1.1, 0.3, 0.16, 0.55, 0.24, 0.5, 0.5], [0.3, 1.05, 0.14, 0.6, 0.22, 0.45, 0.4], [-0.4, -1.05, 0.15, 0.5, 0.24, 0.55, 0.4],
+];
+
+/**
+ * The heap of filth a man lies buried in (a spawn's `lurk`, levelmode/awareness.js): sewage and rotten straw heaped over him on his knees, high enough to hide him.
+ * `update(state, t)` each frame from world.stage.lurk[spawn id] ({ risen: 0..1 }): as he rises its top slides off him, outward and down, and the rest slumps and
+ * spreads, wet, into what is left at his feet. Returns { id, group, update }.
+ */
+export function kfHeap(spawn) {
+  const group = new THREE.Group();
+  group.name = `heap:${spawn.id}`;
+  const size = spawn.lurk?.size ?? 1;
+  const [x, y, z] = spawn.post;
+  group.position.set(x, y, z);
+  const random = ktRandom(Math.floor(Math.abs(x * 31 + z * 17)) + 5);
+  const muck = new THREE.MeshLambertMaterial({ color: 0x3a3320, fog: true });
+  const slime = new THREE.MeshLambertMaterial({ color: 0x2c3414, fog: true });
+  const lumps = KF_HEAP.map(([dx, dz, dy, rx, ry, rz, out], k) => {
+    const geometry = new THREE.IcosahedronGeometry(1, 2);
+    const position = geometry.attributes.position;
+    const jitter = new Map();
+    for (let v = 0; v < position.count; v += 1) {
+      const key = `${position.getX(v).toFixed(3)},${position.getY(v).toFixed(3)},${position.getZ(v).toFixed(3)}`;
+      if (!jitter.has(key)) jitter.set(key, 0.8 + random() * 0.4);
+      const f = jitter.get(key);
+      position.setXYZ(v, position.getX(v) * f, position.getY(v) * f, position.getZ(v) * f);
+    }
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, k % 3 === 1 ? slime : muck);
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    const base = { at: [dx * size, dy * size, dz * size], r: [rx * size, ry * size, rz * size], out: out * size, way: Math.hypot(dx, dz) > 0.01 ? [dx / Math.hypot(dx, dz), dz / Math.hypot(dx, dz)] : [0, 0], spin: random() * 6 };
+    group.add(mesh);
+    return { mesh, base };
+  });
+  // (Something of the straw and the rags in it: a few flat scraps on the top.)
+  const scraps = new THREE.MeshLambertMaterial({ color: 0x6a5a38, fog: true });
+  for (let k = 0; k < 5; k += 1) {
+    const scrap = new THREE.Mesh(new THREE.PlaneGeometry(0.35 * size, 0.18 * size), scraps);
+    scrap.rotation.set(-Math.PI / 2 + (random() - 0.5) * 0.8, random() * 6, 0);
+    scrap.position.set((random() - 0.5) * 1.2 * size, (0.9 + random() * 0.25) * size, (random() - 0.5) * 1.0 * size);
+    group.add(scrap);
+    lumps.push({ mesh: scrap, base: { at: scrap.position.toArray(), r: null, out: 1.2 * size, way: [Math.sign(scrap.position.x) || 1, 0], spin: 0 } });
+  }
+  const place = (risen) => {
+    const fall = Math.min(1, risen * 1.15);
+    for (const { mesh, base } of lumps) {
+      const [ax, ay, az] = base.at;
+      const slide = base.out * fall;
+      // Off the top, out and down onto the floor round him; the core slumps where it was, and spreads.
+      const drop = base.out > 0 ? Math.min(ay - (base.r ? base.r[1] * 0.35 : 0.02), ay * fall * 0.9) : 0;
+      mesh.position.set(ax + base.way[0] * slide, ay - drop, az + base.way[1] * slide);
+      if (!base.r) continue;
+      const slump = base.out > 0 ? 1 - 0.45 * fall : 1 - 0.7 * fall;
+      const spread = 1 + (base.out > 0 ? 0.25 : 0.35) * fall;
+      mesh.scale.set(base.r[0] * spread, base.r[1] * slump, base.r[2] * spread);
+      mesh.rotation.y = base.spin + fall * 0.6;
+    }
+  };
+  place(0);
+  let shown = -1;
+  const update = (state) => {
+    const risen = state?.risen ?? 0;
+    if (Math.abs(risen - shown) < 1e-4) return;
+    shown = risen;
+    place(risen);
+  };
+  return { id: spawn.id, group, update };
+}

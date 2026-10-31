@@ -22,6 +22,8 @@ export const DRAMA = {
   // Held down: no blow, so no shake or flash; the camera closes in.
   held: { slowest: 1, seconds: 1.2, hold: 0.2, shake: 0, pushIn: 0.85, flash: 0 },
   pinned: { slowest: 0.5, seconds: 1.6, hold: 0.4, shake: 0, pushIn: 0.75, flash: 0 },
+  // A thing rising out of the filth to fight (levelmode/awareness.js `lurk`): the camera drawn in on him and a tremor as he comes up, a little slowed.
+  rise: { slowest: 0.75, seconds: 2.6, hold: 0.6, shake: 0.035, pushIn: 0.8, flash: 0 },
   // Real seconds to slow from full speed to the slowest: a slide, not a cut.
   easeIn: 0.18,
   shakeHz: 23,
@@ -52,6 +54,8 @@ export function momentFor(event) {
   if (event.kind === 'severed') return { kind: 'severed', fighter: event.fighter, particle: event.joint === 'neck' ? P.neck : P[`${event.side}${{ shoulder: 'Shoulder', elbow: 'Elbow', wrist: 'Hand', hip: 'Hip', knee: 'Knee', ankle: 'Foot' }[event.joint]}`] };
   if (event.kind === 'held' || event.kind === 'pinned') return { kind: event.kind, fighter: event.fighter, particle: P.neck };
   if (event.kind === 'panic' || event.kind === 'rally') return { kind: event.kind, fighter: event.fighter, particle: P.head };
+  // (Played whoever else is about: `always`, a stage's crowd notwithstanding.)
+  if (event.kind === 'rise') return { kind: 'rise', fighter: event.fighter, particle: P.head, always: true };
   // Thrown from the saddle: as a knockdown.
   if (event.kind === 'unhorsed' && !event.effects[0]?.startsWith('slumps')) return { kind: 'knockdown', fighter: event.fighter, particle: P.neck };
   // Ridden down and put over by a horse: as a knockdown.

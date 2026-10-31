@@ -24,13 +24,14 @@ test('dunnottar bot: the boss duel starts at the chapel gate and runs', () => {
   assert.ok(['beaten', 'died', 'timeout'].includes(result.result));
 });
 
-test('dunnottar bot: the sewer route is a policy option: the plan goes by the sea cave, pulls the sea-gate lever and joins the main route, and a run on it walks on', () => {
+test('dunnottar bot: the sewer route is a policy option: the plan goes by the sea cave, through the crypt and up the well shaft (no lever), joins the main route, and a run on it walks on', () => {
   setRoute('sewer');
   try {
     const plan = basePlan();
     assert.equal(plan.length, DUNNOTTAR_SEWER_ROUTE.reduce((total, leg) => total + leg.points.length, 0));
     assert.ok(plan.some((entry) => entry.leg === 'the cistern causeway'));
-    assert.ok(plan.some((entry) => entry.acts.some((act) => act.kind === 'lever' && act.id === 'seagatelever')), 'the lever is pulled');
+    assert.ok(!plan.some((entry) => entry.acts.some((act) => act.kind === 'lever')), 'no lever to pull: the heavy door stays shut');
+    assert.ok(plan.some((entry) => entry.leg === 'up the well shaft'), 'up the well shaft into the cellar');
     assert.ok(!plan.some((entry) => entry.leg === 'the oillet stair'), 'the gatehouse is not on it');
     assert.ok(plan.some((entry) => entry.leg === 'the long cellar'), 'it joins the main route in the cellar');
     const run = new Run({ policy: 'careful', seed: 3, plan });

@@ -5,7 +5,8 @@
 // hidden lever) comes up into the vault's torture chamber: the way into the dungeon level that never goes near the gatehouse. It is dark, wet, rotten and long
 // (about 150 m of passage), slimed green-black, the sewage of the castle standing in it, rubbish and the dead washed against its walls; not a place to rest in
 // but for one smugglers' brazier, in the grotto at the way in (the lobby): a man who dies at the cesspool wakes there and walks the drain again. No garrison comes down here: no soldier, no prisoner, nobody, but the one thing that lives in the cesspool, Noname, in a
-// gladiator's smooth helmet with a long sword, who waits in the sludge and fights to the death.
+// gladiator's smooth helmet with a long sword, who lies buried in a heap of the filth on the island in the middle of the pit, rises out of it when a man
+// comes near, and fights to the death; as he rises the sluice boards come down over both drains (the hall's `seals`), and go up again when he is dead.
 //
 //   sewer  (y -5 .. 1.4)  x -56..0, z -52..56 (it runs under the shelf, the mainland and the rock of the headland: nothing else is there)
 //     the grotto           x -55..-42, z 44..54.8, floor -5   (tide pools, a dead man's kegs; the mouth in the cliff face at z 55.4; the smugglers' brazier, the way's one rest)
@@ -15,8 +16,8 @@
 //     the long drain       x -52.8..-45.6, z -39.6..-36.2     (the pocket where it turns east, a last lit brazier before the cesspool)
 //     the cesspool         centre (-36, -37.9), DN_CESSPOOL   (an eight-sided sump hall 17.2 m across under the inner cell: a pit of sludge 13.6 m across,
 //                                                             thigh-deep, a rim walk round it, ramps down into it on the drain's line and north and south,
-//                                                             outfalls pouring into it, a dead-end alcove north where Noname waits among the dead, out of
-//                                                             sight of the drain, and a low island in the middle)
+//                                                             outfalls pouring into it, a dead-end alcove north where the drain's dead are washed, and a
+//                                                             low island in the middle, where Noname lies buried in a heap of filth; sluices over both drains)
 //     the long drain, east x -26.4..-13, z -39.6..-36.2      and a stair of 15 treads up to y 1.4
 //     the low door         x -7..0                            (into the crypt's sea-gate chamber at x 0)
 //
@@ -26,8 +27,8 @@
 //
 // A section's `decor` is for the drawing only (levelmode/kit.js); the solids carry a `style`.
 
-import { rampOf, slabOf } from '../../physics/terrain.js';
-import { DN_FACE, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnItem, dnProp, dnRoom, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
+import { rampOf, slabOf, wallOf } from '../../physics/terrain.js';
+import { DN_FACE, Y, dnBounds, dnBox, dnCeiling, dnFence, dnFlight, dnFlightVault, dnFlightWalls, dnGate, dnItem, dnProp, dnRoom, dnRun, dnSection, dnSlab, dnSpawn } from './dnbuild.js';
 
 /** The levels (y) of the old drain and the line it runs on (x): the cave, the cistern and the first drains at `floor`; the long drain at `drain`; the crypt's at Y.crypt. */
 // (`mouth`: its width, 5.4 m; it was the drain's 3.4, and the camera behind a man walking in, a little to one side of him, was cut in on him by its jamb.)
@@ -47,11 +48,22 @@ export const DN_CESSPOOL_REGION = { at: [DN_CESSPOOL.at[0], DN_CESSPOOL.at[2]], 
 /** The one man in the drain: his spawn id. */
 export const DN_NONAME_SPAWN = 'noname';
 /**
- * Where he waits: the back of the dead-end alcove north of the pit (its inside z from the hall's wall, `hall` + 1 from the centre, 3.8 m north; 1.4 m short
- * of its end wall, a little west of its middle), on the rim walk's level, facing south into the hall. The drain comes in on the pit's west-east line, and the alcove's jambs hide its
- * back from the whole of the drain and the hall's west door: the line to him opens a few metres into the hall.
+ * Where he lies: on the island in the middle of the pit, buried in a heap of the filth (awareness.js `lurk`, drawn by kitfilth.js `kfHeaps`), on his knees under
+ * it, facing west, the way the drain comes in. The way over the pit (the drain's line, its way-marks) goes over the island: a man who crosses comes within a few
+ * metres of the heap, and the heap comes up at him. (He waited at the back of the alcove north of the pit and came out of the dark from the left: the user's
+ * call, he starts in the middle, hidden, and rises.)
  */
-export const DN_NONAME_POST = [DN_CESSPOOL.at[0] - 0.4, DN_CESSPOOL.rim, DN_CESSPOOL.at[2] - (DN_CESSPOOL.hall + 1) - 3.8 + 1.4];
+export const DN_NONAME_POST = [DN_CESSPOOL.island.at[0], DN_CESSPOOL.island.top, DN_CESSPOOL.island.at[1]];
+/**
+ * The cesspool's seals (stage.js `seals`): the hall and its alcove (`room`), and a sluice over each drain's door, at the inner face of the hall's wall (`west`,
+ * `east`: x), boards that come down in their grooves as he rises and go up when he is dead. `wake`: the rim before the east door, where a man who went round the
+ * pit rather than over it, for the way on, passes: the heap hears him there too.
+ */
+export const DN_CESSPOOL_SEAL = {
+  west: DN_CESSPOOL.at[0] - DN_CESSPOOL.hall - 0.2,
+  east: DN_CESSPOOL.at[0] + DN_CESSPOOL.hall + 0.2,
+  wake: { at: [DN_CESSPOOL.at[0] + DN_CESSPOOL.hall - 1.1, DN_CESSPOOL.at[2]], size: [2.2, 6], y: [DN_CESSPOOL.floor - 0.5, DN_CESSPOOL.rim + 3] },
+};
 /**
  * Where the rest is, in the grotto (the drain's lobby: the entry hall, a long walk from the cesspool: a death at Noname's is a walk back through the whole drain,
  * which is the price of the fight; it was in the pocket by the cesspool's door, so near the arena that a death cost half a minute), and where the pocket's last
@@ -273,14 +285,21 @@ export function buildSewer() {
   sec.decor.push({ kind: 'waymarks', points: [[-46.2, -37.9, D], [px - P.radius - 0.4, -37.9, D]], gap: 2.6, first: 0.6 });
   sec.decor.push({ kind: 'waymarks', points: [[px + P.radius + 0.4, -37.9, D], [-14, -37.9, D], [-4, -37.9, C]], gap: 2.6, first: 0.6 });
 
-  // The one man down here: Noname (presets.js `noname`; a guard's mind: he waits, he sees, he fights to the death). He waits at the back of the alcove, among
-  // the drain's dead, facing the pit (DN_NONAME_POST): from the long drain and its door the alcove's jambs hide him (he stood on the island in the middle and
-  // was seen 15 m off down the drain, a man in a helmet with a sword: no surprise left). The player walks into the hall; once he is over the pit's edge
-  // (`ambush`: the arena, DN_CESSPOOL_REGION) Noname has him, and comes out of the dark at him: his bar, the boss's music, a line (`reveal`). He never
-  // leaves the hall (`pen`: the hall and the alcove; the drains are not his).
-  dnSpawn(sec, DN_NONAME_SPAWN, 'noname', 'enemy', 3, DN_NONAME_POST, DN_FACE.S, {
-    inputs: { name: 'Noname' }, miniboss: { title: 'The Cesspool' }, ambush: DN_CESSPOOL_REGION, reveal: 'Something stirs among the dead in the alcove.',
+  // The one man down here: Noname (presets.js `noname`; a guard's mind: he waits, he fights to the death). He lies buried in a heap of the filth on the island in
+  // the middle of the pit (DN_NONAME_POST, `lurk`: awareness.js), on his knees under it, nothing of him to be seen. The player crosses the pit; within a few metres of
+  // the heap (or on the rim before the east door, `wake`) it comes up: Noname rises out of it, slowly, the filth sliding off him, a groan, a roar; his bar, the boss's
+  // music, a line (`reveal`), and the sluices come down over both drains (the hall's `seals`). He never leaves the hall (`pen`: the hall and the alcove).
+  dnSpawn(sec, DN_NONAME_SPAWN, 'noname', 'enemy', 3, DN_NONAME_POST, DN_FACE.W, {
+    inputs: { name: 'Noname' }, miniboss: { title: 'The Cesspool' }, lurk: { radius: 4, wake: DN_CESSPOOL_SEAL.wake, size: 1 }, reveal: 'The heap of filth heaves, and a man rises out of it.',
     pen: { at: [px, (alcove.z0 + pz + P.hall) / 2], size: [P.hall * 2, pz + P.hall - alcove.z0] },
+  });
+  // The sluices: a gate of oak boards over each drain's door, hung up in the lintel's grooves (open) until he rises.
+  for (const [id, x] of [['cesspoolwest', DN_CESSPOOL_SEAL.west], ['cesspooleast', DN_CESSPOOL_SEAL.east]]) {
+    dnGate(sec, id, [x, P.rim, pz], [{ ...wallOf([x, pz], [0.3, SW_WIDE + 0.3], P.rim - 0.1, P.rim + 3, { id }), style: 'hidden', skin: false }], { kind: 'sluice', width: SW_WIDE + 0.3, height: 3.1, drop: 8 }, { state: 'open' });
+  }
+  sec.seals.push({
+    id: 'cesspoolseal', boss: DN_NONAME_SPAWN, when: 'roused', gates: ['cesspoolwest', 'cesspooleast'], text: 'The sluices crash down over the drains. There is no way out.',
+    room: [{ at: [px, pz], size: [P.hall * 2 - 0.2, P.hall * 2 - 0.2], y: [P.floor - 0.5, P.rim + 4.5] }, { at: [px, (alcove.z0 + alcove.z1) / 2], size: [alcove.x1 - alcove.x0, alcove.z1 - alcove.z0], y: [P.floor - 0.5, P.rim + 4.5] }],
   });
 
   dnItem(sec, 'bandage12', 'bandage', [-53.4, F, 52.6]);

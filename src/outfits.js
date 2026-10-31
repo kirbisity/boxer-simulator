@@ -2209,8 +2209,9 @@ export function gearTraits(inputs) {
     headLocked: Boolean(spec.headLocked) && !inputs.outfit?.bareHead,
     // His skill in this kit, as a share of his own (a man who cannot turn his head fights by feel).
     skillFactor: spec.skillFactor ?? 1,
-    // Poise beyond the armour's weight and shell (physics poiseOf): one rigid shell bolted together.
-    poise: spec.poise ?? 0,
+    // Poise beyond the armour's weight and shell (physics poiseOf): one rigid shell bolted together; or a man's own (`outfit.poise`: a fighter who
+    // stands low and wide and leans into his man, braced behind every part he is struck on, a boss who is not driven back).
+    poise: inputs.outfit?.poise ?? spec.poise ?? 0,
     // Courage from good armour: less fear, readier to close (0 to 1); a man's own (`outfit.courage`: one who never breaks) before the kit's.
     courage: inputs.outfit?.courage ?? spec.courage ?? 0,
     // A machine (a robot): no morale (never afraid, never runs; ai.js feelFear) and no blood (never bleeds, nothing spilt; physics.js, weaponview.js).

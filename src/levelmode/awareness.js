@@ -5,13 +5,23 @@
 // down. Awake men of a stage each have a "mind" (world.stage.aware.minds[fighterId]):
 //
 //   guard (role enemy | boss, corner 'blue')
-//     idle     at his post, facing as the spawn says
+//     lurk     buried where he lies (`spawn.lurk`: the cesspool's Noname in his heap of filth), on his knees under it, unseen and seeing
+//              nothing, until the player comes within `radius` m or into `wake` (a region), or strikes him, or a scene sends him: then
+//     rise     he comes up out of it, slowly (`seconds`), the filth sliding off him (world.stage.lurk[spawn id].risen, 0..1, for the drawing),
+//              a groan as he starts and a roar as he stands (audio/cries.js `roar`), a `rise` event (drama.js: the camera's moment); then aggro
+//     idle     at his post, facing as the spawn says (one with a `torment` lays his whip on his victim meanwhile: below)
 //     patrol   walks spawn.patrol (to and fro), a pause at each end
 //     aggro    the fight AI has him (ai.js think): targets the player and his followers
 //     search   lost sight for AWARE.loseSeconds: goes to where he last saw them, looks about
 //     return   walks back to his post (the way he came if the straight line is walled), then idle or patrol
 //   civilian (role civilian, corner 'grey')    idle | patrol | flee | cower | return
 //   captive (role prisoner, corner 'grey')     idle | flee | cower | return; freePrisoner() makes him an ally
+//     A prisoner who `kneel`s (on his knees at his post: hands to his face, or chained up at the given points) or `mourn`s (weeps: a sob every
+//     few seconds, now and then a wail: audio/cries.js `grief`) neither runs nor cowers: he stays as he is, whatever is fought round him.
+//   A guard's `torment` ({ victim: spawn id, moves, zone, every, burst, pause, spare }): while he is unaware he lays a whip on his victim (a
+//     kneeling prisoner): a burst of `burst` strokes (from..to), `every` s apart (from..to), then `pause` s (from..to); real strokes, at the victim
+//     (physics/whip.js lashes him), until the victim is hurt past `spare` (hurtShare). The lashes are no alarm to anyone. Aware of the player,
+//     he stops and fights.
 //   ally (role ally, corner 'red')             follow (2-4 m behind the player, along his route) | stayed | aggro
 //
 // Seeing (the user's algorithm, run from the player outward, about 5 times a second, each man on his own beat):
@@ -34,10 +44,12 @@
 // the same intents a player has: goTo, move, running); `fighter.mayTarget` limits whom a follower fights;
 // `world.stage.rout` and `world.stage.escape` make a frightened man run along walkable ground.
 
+import { soundVoice } from '../audio/log.js';
+import { hurtShare } from '../ai.js';
 import { P } from '../body.js';
-import { placeOnFloor, startCrawl } from '../physics.js';
+import { placeOnFloor, startCrawl, throwPunch } from '../physics.js';
 import { floorAt, rayBlocked } from '../physics/terrain.js';
-import { regionContains, sectionById, stageTerrain } from './stage.js';
+import { regionContains, sealedOut, sectionById, stageTerrain } from './stage.js';
 
 export const AWARE = {
   // How far a man sees (m) ahead of him in full light; at light 0 this share of it. A section's own `vision` overrides; a post's (`spawn.vision`) caps it
@@ -114,7 +126,22 @@ export const AWARE = {
   // The player's route, remembered for the followers: a point each 0.7 m, so many of them.
   trailStep: 0.7,
   trailMax: 160,
+  // A man buried (`spawn.lurk`) by default: he comes up when the player is within `radius` m on about his floor (`floor` m), over `seconds` s,
+  // bowed `lean` rad at the start of it (a man getting up off his knees under a weight).
+  lurk: { radius: 4, floor: 2, seconds: 2.6, lean: 0.9 },
+  // A weeping prisoner (`spawn.mourn`) by default: a sob every `every` s (from..to), a wail `wail` of the time.
+  mourn: { every: [3.5, 7], wail: 0.25 },
+  // A whipping (`spawn.torment`) by default: the strokes (moves.js), where on him, the gap between strokes in a burst (s), the burst, the pause
+  // after it (s), and how hurt (hurtShare) the victim may be before he is spared.
+  torment: { moves: ['overhand', 'forehand'], zone: 'body', every: [1.3, 2.0], burst: [2, 4], pause: [5, 9], spare: 0.55 },
 };
+
+/** A share 0..1 from a man and a count, the same every run (a cadence that must not draw on world.random: a sound heard or not must not change the fight). */
+const awSteady = (id, n) => {
+  const v = Math.sin(id * 12.9898 + n * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+const awBetween = ([low, high], share) => low + (high - low) * share;
 
 const TWO_PI = Math.PI * 2;
 const GUARDS = new Set(['enemy', 'boss']);
@@ -201,6 +228,13 @@ export function createAwareness(world, config = {}) {
       ambush: post.ambush ?? null,
       // A prisoner who, freed, goes his own way and not with the player (`spawn.follows: false`: freePrisoner).
       follows: post.follows ?? null,
+      // Buried where he lies (`spawn.lurk`), on his knees where he is kept (`kneel`), weeping (`mourn`), whipping a prisoner (`torment`).
+      lurk: post.lurk ? { ...aware.config.lurk, ...(post.lurk === true ? {} : post.lurk) } : null,
+      kneel: post.kneel ?? null,
+      mourn: post.mourn ? { ...aware.config.mourn, ...(post.mourn === true ? {} : post.mourn) } : null,
+      torment: post.torment ? { ...aware.config.torment, ...post.torment } : null,
+      beats: 0,
+      nextAt: 0,
       leg: 0,
       step: 1,
       pauseUntil: 0,
@@ -213,9 +247,68 @@ export function createAwareness(world, config = {}) {
     };
     aware.minds.push(mind);
     if (kind === 'ally') setState(world, aware, mind, fighter, 'follow');
+    else if (mind.lurk && kind === 'guard' && fighter.state !== 'out') bury(world, aware, mind, fighter);
     else setState(world, aware, mind, fighter, mind.patrol && kind !== 'captive' ? 'patrol' : 'idle');
   });
   return aware;
+}
+
+// ---- Buried, and rising -------------------------------------------------------------------------------
+
+/** What the drawing reads of a buried man: world.stage.lurk[spawn id] = { at: [x, y, z], risen: 0..1, size }. */
+function lurkState(world, fighter, mind) {
+  world.stage.lurk ??= {};
+  return (world.stage.lurk[fighter.spawn.id] ??= { at: [...mind.post], size: mind.lurk.size ?? 1, risen: 0 });
+}
+
+/** Down on his knees under the heap (keeping his weapon), not walking (so he is no one's to fight: physics inFight), drawn hidden (`buried`). */
+function bury(world, aware, mind, fighter) {
+  setState(world, aware, mind, fighter, 'lurk', 'buried');
+  startCrawl(world, fighter, 'lies buried', { keep: true });
+  fighter.walking = false;
+  fighter.buried = true;
+  lurkState(world, fighter, mind).risen = 0;
+}
+
+/** He comes up out of it at the player (or at whoever struck him): the rise begins. */
+function startRise(world, aware, mind, fighter, why) {
+  setState(world, aware, mind, fighter, 'rise', why);
+  fighter.crawling = false;
+  fighter.buried = false;
+  fighter.walking = false;
+  fighter.kneel = { share: 1, lean: mind.lurk.lean };
+  mind.rose = world.time;
+  world.events.push({ time: world.time, kind: 'rise', fighter: fighter.id, effects: ['rises out of the filth'] });
+  // (Heard: a groan as he starts; the roar is as he stands.)
+  soundVoice(world, fighter, 'roar', 0.5);
+}
+
+/** Each step of the rise: the knees' share eased off, facing the player; at its end the roar and the fight. */
+function stepRise(world, aware, mind, fighter) {
+  const me = world.fighters[0];
+  const u = Math.min(1, (world.time - mind.rose) / mind.lurk.seconds);
+  const eased = u * u * (3 - 2 * u);
+  lurkState(world, fighter, mind).risen = eased;
+  stand(fighter, yawToward(hipX(me) - hipX(fighter), hipZ(me) - hipZ(fighter)));
+  fighter.walking = false;
+  if (fighter.state !== 'up') return;
+  if (u < 1) {
+    fighter.kneel = { share: 1 - eased, lean: mind.lurk.lean * (1 - eased) };
+    return;
+  }
+  fighter.kneel = undefined;
+  soundVoice(world, fighter, 'roar', 1);
+  mind.state = 'risen';
+  alarm(world, aware, mind, fighter, 'rose', me);
+}
+
+/** Buried: whether the player has come to him (near, or into his `wake` region). */
+function lookLurk(world, aware, mind, fighter) {
+  const me = world.fighters[0];
+  if (me.state === 'out' || me.dormant || world.stage.ghost) return;
+  const lurk = mind.lurk;
+  const near = flatApart(fighter, me) <= lurk.radius && Math.abs(floorOf(me) - floorOf(fighter)) <= lurk.floor;
+  if (near || (lurk.wake && regionContains(lurk.wake, hipX(me), hipZ(me), floorOf(me)))) startRise(world, aware, mind, fighter, near ? 'near' : 'passing');
 }
 
 /** What each man is up to, for a look: [{ id, name, kind, state, since, at, aware: the letter }]. */
@@ -231,7 +324,7 @@ export function awarenessReport(world) {
 /** The state of one man, by fighter id. */
 export const mindState = (world, id) => world.stage?.aware?.minds[id]?.state;
 
-const LETTER = { idle: 'I', patrol: 'P', aggro: 'A', charge: 'H', search: 'S', return: 'R', flee: 'F', cower: 'C', follow: 'f', stayed: 's', down: 'x' };
+const LETTER = { lurk: 'L', rise: 'U', idle: 'I', patrol: 'P', aggro: 'A', charge: 'H', search: 'S', return: 'R', flee: 'F', cower: 'C', follow: 'f', stayed: 's', down: 'x' };
 /** The letter for a state, for an overlay. */
 export const stateLetter = (state) => LETTER[state] ?? '?';
 
@@ -245,6 +338,8 @@ function setState(world, aware, mind, fighter, state, why = '') {
   mind.set = true;
   if (aware.log.length >= 200) aware.log.shift();
   aware.log.push({ time: Number(world.time.toFixed(2)), id: mind.id, from: before, to: state, why });
+  // (A whipping's mark is let go: focusAny, set on the victim, is the player's lock's otherwise.)
+  if (mind.torment) fighter.focusAny = undefined;
   if (state === 'aggro') {
     fighter.driven = false;
     fighter.walking = false;
@@ -364,7 +459,12 @@ function heardPlayer(world, aware, fighter) {
 
 /** A guard turns aggro: the fight AI has him; he shouts (unless he was himself called, `why` shout). */
 function alarm(world, aware, mind, fighter, why, target = null) {
-  if (mind.state === 'aggro' || mind.state === 'down') return;
+  if (mind.state === 'aggro' || mind.state === 'down' || mind.state === 'rise') return;
+  // Buried: he comes up first (stepRise alarms him as he stands).
+  if (mind.state === 'lurk') {
+    startRise(world, aware, mind, fighter, why);
+    return;
+  }
   const at = target ?? world.fighters[0];
   setState(world, aware, mind, fighter, 'aggro', why);
   mind.seenAt = world.time;
@@ -443,6 +543,9 @@ function readEvents(world, aware) {
     if (!defender) continue;
     const attacker = world.fighters[event.attacker];
     const mind = aware.minds[defender.id];
+    // A whipping (a guard's `torment`) is no alarm to anyone: the place is used to it.
+    const tormentor = aware.minds[event.attacker];
+    if (tormentor?.torment && tormentor.state !== 'aggro' && tormentor.victim === defender.id) continue;
     // A civilian or prisoner the player's side wounded.
     if (event.kind === 'landed' && defender.corner === 'grey' && attacker?.corner === 'red') world.stage.civiliansHarmed = true;
     if (!mind) {
@@ -512,6 +615,7 @@ export function updateAwareness(world) {
   readEvents(world, aware);
   keepTrail(world, aware);
   for (const mind of aware.minds) {
+    if (mind?.state === 'rise' && !world.fighters[mind.id].dormant) stepRise(world, aware, mind, world.fighters[mind.id]);
     if (!mind || time < mind.next) continue;
     mind.next = time + aware.config.every;
     look(world, aware, mind, world.fighters[mind.id]);
@@ -650,11 +754,16 @@ function lookGuard(world, aware, mind, fighter) {
   // Ghost walk (a designer's debug, the sandbox): the garrison neither sees nor hears him; a hunt already on is given up.
   if (world.stage.ghost && !mind.hunt) {
     if (mind.state === 'aggro' || mind.state === 'search') setState(world, aware, mind, fighter, 'return', 'ghost');
-    if (mind.state === 'idle') doIdle(world, aware, mind, fighter);
+    if (mind.state === 'idle') (mind.torment ? doTorment : doIdle)(world, aware, mind, fighter);
     else if (mind.state === 'patrol') doPatrol(world, aware, mind, fighter);
     else if (mind.state === 'return') doReturn(world, aware, mind, fighter);
     return;
   }
+  if (mind.state === 'lurk') {
+    lookLurk(world, aware, mind, fighter);
+    return;
+  }
+  if (mind.state === 'rise') return;
   if (mind.hunt) {
     lookHunt(world, aware, mind, fighter);
     return;
@@ -687,10 +796,45 @@ function lookGuard(world, aware, mind, fighter) {
     setState(world, aware, mind, fighter, 'search', 'noise');
     return;
   }
-  if (mind.state === 'idle') doIdle(world, aware, mind, fighter);
+  if (mind.state === 'idle') (mind.torment ? doTorment : doIdle)(world, aware, mind, fighter);
   else if (mind.state === 'patrol') doPatrol(world, aware, mind, fighter);
   else if (mind.state === 'return') doReturn(world, aware, mind, fighter);
   else if (mind.state === 'search') doSearch(world, aware, mind, fighter);
+}
+
+/**
+ * A whipping (`torment`): at his post, facing his victim, he lays the whip on him in bursts (real strokes: throwPunch at the victim, the thong
+ * lashing him, physics/whip.js) until the victim is spared (hurt past `spare`, out, or gone); then he only stands his post.
+ */
+function doTorment(world, aware, mind, fighter) {
+  const torment = mind.torment;
+  const victim = world.fighters.find((other) => other.spawn?.id === torment.victim);
+  if (!victim || victim.state === 'out' || victim.dormant || hurtShare(victim) >= torment.spare || Math.hypot(mind.post[0] - hipX(fighter), mind.post[2] - hipZ(fighter)) > 2) {
+    mind.victim = undefined;
+    fighter.focusAny = undefined;
+    doIdle(world, aware, mind, fighter);
+    return;
+  }
+  mind.victim = victim.id;
+  stand(fighter, yawToward(hipX(victim) - hipX(fighter), hipZ(victim) - hipZ(fighter)));
+  // (In his stance, the whip in hand: not the walk's guardless carry.)
+  fighter.walking = false;
+  if (fighter.punch || world.time < mind.nextAt) return;
+  fighter.focus = victim.id;
+  fighter.focusAny = true;
+  const n = (mind.beats += 1);
+  const move = torment.moves[Math.floor(awSteady(fighter.id, n) * torment.moves.length) % torment.moves.length];
+  if (!throwPunch(world, fighter, move, torment.zone)) {
+    mind.nextAt = world.time + 0.5;
+    return;
+  }
+  // (The first stroke begins a burst.)
+  mind.left = (mind.left ?? Math.round(awBetween(torment.burst, awSteady(fighter.id, 0.3)))) - 1;
+  if (mind.left > 0) mind.nextAt = world.time + awBetween(torment.every, awSteady(fighter.id, n + 0.5));
+  else {
+    mind.left = Math.round(awBetween(torment.burst, awSteady(fighter.id, n + 0.25)));
+    mind.nextAt = world.time + awBetween(torment.pause, awSteady(fighter.id, n + 0.75));
+  }
 }
 
 /** A man sent at the player (`rouse`): at a run while he is far (`charge`, driven), the fight AI's once he is near (aggro, and knowing where the player is). */
@@ -843,7 +987,42 @@ function flight(world, fighter, threat, { refuge = null, rear = null } = {}) {
   return best;
 }
 
+/**
+ * A prisoner who kneels or weeps where he is kept: no fight sends him running or cowering. On his knees (`kneel`: physics.js's scene kneel), his
+ * hands to his face (`hands: 'face'`) or held up where he is chained (`hands`: two world points), bowed `lean`; a sob or a wail now and then.
+ */
+function lookStill(world, aware, mind, fighter) {
+  if (fighter.crawling) fighter.crawling = false;
+  stand(fighter, mind.facing);
+  fighter.walking = false;
+  const kneel = mind.kneel;
+  if (kneel) {
+    let hands = Array.isArray(kneel.hands) ? kneel.hands : null;
+    if (kneel.hands === 'face') {
+      // Before his face, a hand either side of it.
+      const x = fighter.x;
+      const yaw = fighter.yaw;
+      const ahead = [Math.cos(yaw), -Math.sin(yaw)];
+      const side = [Math.sin(yaw), Math.cos(yaw)];
+      const head = [x[P.head * 3], x[P.head * 3 + 1], x[P.head * 3 + 2]];
+      hands = [-1, 1].map((sign) => [head[0] + ahead[0] * 0.13 + side[0] * 0.06 * sign, head[1] - 0.04, head[2] + ahead[1] * 0.13 + side[1] * 0.06 * sign]);
+    }
+    fighter.kneel = { share: 1, lean: kneel.lean ?? 0.35, ...(hands ? { hands } : {}) };
+  }
+  const mourn = mind.mourn;
+  if (!mourn || fighter.state !== 'up') return;
+  if (!mind.nextAt) mind.nextAt = world.time + awBetween(mourn.every, awSteady(fighter.id, 0));
+  if (world.time < mind.nextAt) return;
+  const n = (mind.beats += 1);
+  mind.nextAt = world.time + awBetween(mourn.every, awSteady(fighter.id, n));
+  soundVoice(world, fighter, 'grief', awSteady(fighter.id, n + 0.5) < mourn.wail ? 0.85 : 0.45);
+}
+
 function lookNeutral(world, aware, mind, fighter) {
+  if (mind.kneel || mind.mourn) {
+    lookStill(world, aware, mind, fighter);
+    return;
+  }
   const config = aware.config;
   // What frightens him: a fight near, an aggro enemy in sight, a blow on himself.
   let threat = null;
@@ -964,6 +1143,12 @@ function lookAlly(world, aware, mind, fighter) {
   const config = aware.config;
   const player = world.fighters[0];
   if (!fighter.mayTarget) fighter.mayTarget = (other) => mayFight(world, aware, mind, fighter, other);
+  // Shut out of a boss room as it was sealed (stage.js seals): he waits where he is, at its door, until it opens.
+  if (sealedOut(world, fighter)) {
+    if (mind.state === 'aggro') setState(world, aware, mind, fighter, 'follow', 'sealed out');
+    stand(fighter, fighter.yaw);
+    return;
+  }
   // Is there a fight to join?
   let fight = false;
   for (const other of aware.minds) {

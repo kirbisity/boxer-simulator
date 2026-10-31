@@ -209,10 +209,11 @@ function lashHit(world, attacker, defender, key, tipKg, speed, at, dir) {
   const protection = protectionAt(defender.body.gear, key);
   const through = energy * (1 - (protection.cut ?? 0)) * (1 - 0.5 * (protection.blunt ?? 0));
   const event = { time: world.time, kind: 'landed', attacker: attacker.id, defender: defender.id, weapon: 'whip', mode: 'swing', punch: 'lash', target: key, speed, impulse: tipKg * speed, force: 0, headDeltaV: 0, harm: 0, cut: through, energy, point: at, normal: vec.scale(dir, -1), effects: [] };
-  // Heard: the thong's tip cracking on him (a thin, fast contact, as an edge's: sfx/sampled.js plays the recorded lash), and the sting of it as much as it gets through to the pain that floors a man.
+  // Heard: the thong's tip cracking on him (a thin, fast contact, as an edge's: sfx/sampled.js plays the recorded lash), and the sting of it as much as it gets through to the pain that floors a man
+  // (`striker` lash: a lash is pain itself, and the cry director lets him cry out at nearly every one, audio/cries.js CRY_STRIKERS).
   if (world.ear) {
     soundHit(world, defender, attacker, key, at, { energy, impulse: tipKg * speed, striker: 'lash' });
-    if (through >= 0.5 && defender.state !== 'out') soundVoice(world, defender, 'struck', Math.min(1, through / spec.painSure));
+    if (through >= 0.5 && defender.state !== 'out') soundVoice(world, defender, 'struck', Math.min(1, through / spec.painSure), { striker: 'lash' });
   }
   // The thong's momentum into the part it struck, whatever he wears (armour turns the cut, not the push): the part flinches
   // from it, and his body takes a short shove, the less the heavier he is; braced in a shell (`braced` per unit of poise
