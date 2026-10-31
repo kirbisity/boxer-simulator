@@ -25,6 +25,9 @@
 // a stump's shorter and higher; a portcullis raised and a drawbridge run on the heavy chain's runs (a portcullis let down keeps its own
 // chain, the slam's recording); a chained prisoner's shackles rattle as he sobs and under the lash (the chain shaken short). The breath and
 // the menu's tap and chime are played by the engine (breathPlan, uiSamplePlan).
+// The seventh batch: a bow (bow, composite bow, yumi, longbow: not a crossbow) creaks as it is drawn (the `draw` event at the draw's start,
+// BOW_DRAW_PLAY): the take stretched or squeezed toward the draw's length and its last part played, so the creak is tightest as the
+// string goes and the release (the bow's `shot`, unchanged) follows it. A fire's crackle is a loop (ambience.js).
 // Every blow (a hit, a clash, an arrow) is played a little longer than its energy's share of the take alone, the heaviest ringing out
 // longest, with a long fade (BLOW_TAIL).
 // Cries (a voice event the cry director, audio/cries.js, let through: its `cry`): the sex's set of its kind, at the voice's pitch, a
@@ -365,6 +368,9 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const share = cry.kind === 'hurt' ? sampleLerp(CRY_PLAY.hurtShare, 1, i) : 1;
       return { set: `voice-${cry.sex}-${cry.kind}`, trim: sampleLerp(CRY_PLAY.trim[0], CRY_PLAY.trim[1], i), rate: cry.rate ?? 1, seconds: null, share, fade: CRY_PLAY.fade[cry.kind] ?? 0.08, skip: 0, synth: null, synthGain: 0 };
     }
+    case 'draw':
+      // A bow bent as it is drawn: the creak fitted to the draw (BOW_DRAW_PLAY), ending as the string is loosed.
+      return { set: 'bowdraw', trim: BOW_DRAW_PLAY.trim, rate: jitter(BOW_DRAW_PLAY.jitter), fit: params.seconds, fitRange: BOW_DRAW_PLAY.stretch, fromEnd: true, seconds: params.seconds, fadeIn: BOW_DRAW_PLAY.fadeIn, fade: BOW_DRAW_PLAY.fade, skip: 0, synth: null, synthGain: 0 };
     case 'robotSpark': {
       // A robot shorting out: the shock, a death's (intensity 1) its whole take and a stump's (0.7) shorter, higher and quieter.
       const i = sfxClamp(params.intensity ?? 1, 0, 1);
@@ -408,27 +414,42 @@ export function uiSamplePlan(kind, random = Math.random) {
   return null;
 }
 
+/**
+ * A bow's draw (the `draw` event: its `seconds` to the loose): the creak's rate scaled toward the draw's length (the take's length over
+ * the draw's, within `stretch`: a quick draw a little higher and tighter, a slow one lower), and its last `seconds` played (`fromEnd`:
+ * the creak tightest as the string goes), faded in over `fadeIn` (it starts inside the take) and out over `fade` into the release.
+ */
+export const BOW_DRAW_PLAY = { trim: 0.9, jitter: 0.04, stretch: [0.85, 1.3], fadeIn: 0.06, fade: 0.04 };
+
 /** A cry's take: its trim from none to full intensity (the takes are cut to one peak), the least share of a hurt cry played, each kind's fade (s). */
 export const CRY_PLAY = { trim: [0.55, 1], hurtShare: 0.6, fade: { hurt: 0.06, scream: 0.12, moan: 0.25, fear: 0.1, dying: 0.35 } };
 
-/** Play a take into `out` at `when` by a plan, at `gain` (the engine's). Returns the end time. */
-export function playSample(voice, out, take, plan, when, gain) {
+/** Play a take into `out` at `at` by a plan, at `gain` (the engine's). Returns the end time. */
+export function playSample(voice, out, take, plan, at, gain) {
   const ctx = voice.ctx;
   let start = Math.min(take.buffer.duration - 0.02, take.offset + (plan.skip ?? 0));
-  const whole = (take.buffer.duration - start) / plan.rate;
+  // (`fit`: a length (s) the take is stretched or squeezed toward, its rate scaled within `fitRange`: a bow's creak to its draw.)
+  const rate = plan.fit ? plan.rate * sfxClamp((take.buffer.duration - start) / plan.fit, plan.fitRange?.[0] ?? 1, plan.fitRange?.[1] ?? 1) : plan.rate;
+  const whole = (take.buffer.duration - start) / rate;
   const seconds = Math.max(0.03, Math.min(whole, plan.seconds ?? whole) * (plan.share ?? 1));
   // (`fromEnd`: the take's last `seconds` played, its end where it is loudest: a whoosh rising into the blow.)
-  if (plan.fromEnd) start = Math.max(start, take.buffer.duration - seconds * plan.rate);
+  if (plan.fromEnd) start = Math.max(start, take.buffer.duration - seconds * rate);
+  // (Fitted from its end and still shorter than the fit: started late, so it ends where the fit does: a creak ends at the loose.)
+  const when = at + (plan.fit && plan.fromEnd ? Math.max(0, plan.fit - seconds) : 0);
   const fade = Math.min(plan.fade ?? 0.05, seconds * 0.6);
   const peak = Math.max(0.0002, gain * plan.trim);
   const envelope = sfxKeep(voice, ctx.createGain());
-  envelope.gain.setValueAtTime(peak, when);
+  // (`fadeIn`: a take started inside itself, faded in so it does not click.)
+  if (plan.fadeIn) {
+    envelope.gain.setValueAtTime(peak * 0.001, when);
+    envelope.gain.exponentialRampToValueAtTime(peak, when + Math.min(plan.fadeIn, seconds * 0.4));
+  } else envelope.gain.setValueAtTime(peak, when);
   envelope.gain.setValueAtTime(peak, when + seconds - fade);
   envelope.gain.exponentialRampToValueAtTime(peak * 0.001, when + seconds);
   envelope.connect(out);
   const source = ctx.createBufferSource();
   source.buffer = take.buffer;
-  source.playbackRate.value = plan.rate;
+  source.playbackRate.value = rate;
   source.connect(envelope);
   sfxRun(voice, source, when, when + seconds + 0.005, start);
   return when + seconds + 0.01;

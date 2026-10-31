@@ -9,6 +9,11 @@
 // where it fails, the synth bed plays (the market has none: the square is then as it was, the wind and the birds). The beds sit under the
 // fight: as loud blows ring out they dip by up to 6 dB, and rise again as the fight quietens.
 //
+// Fires (a torch, a brazier, a hearth: any fire the scene lists with a size, `info.fires`) crackle where they burn: the recorded
+// fire's loop, one read at each of the nearest few, placed in the world (panned as the ear turns), falling off with distance as an
+// event does; a small fire quiet and thin, a large one louder, fuller and lower (FIRE_SOUND). Until the loop decodes, the synth's
+// crackles scattered at the nearest.
+//
 // Each bed's level is a sound pressure level at the ear (dB SPL), played through the same window as everything else (synth.js
 // gainOfLevel): a breeze ~45 dB, heavy rain ~65, surf under a cliff ~70, a full Colosseum ~85.
 //
@@ -17,7 +22,7 @@
 import { EAR, distanceGain } from './ear.js';
 import { gainOfLevel, sfxRandom, writeCrackle, writeGrains, lowpassInPlace } from './synth.js';
 import { playBird, playCrackle, playDrip } from './sfx/world.js';
-import { AMBIENCE_LOOPS, loopRms, startLoop } from './samples.js';
+import { loopRms, startLoop } from './samples.js';
 
 /**
  * Each place: its beds' levels (dB SPL at the ear) when the weather is fair: `wind`, `surf` (a shore near), `crowd` (an arena's),
@@ -185,6 +190,53 @@ export const AMBIENCE_BEDS = ['wind', 'rain', 'roof', 'surf', 'crowd', 'hum', 'f
 /** The synth bed whose level each recorded one is matched to (the market's: the crowd's voices), and a trim over that (dB). */
 const RECORDED = { rain: { match: 'rain', trim: 0 }, wind: { match: 'wind', trim: 0 }, market: { match: 'crowd', trim: 0 } };
 
+/**
+ * A fire's crackle by its size (m: the flame's, levelmode/kitprops.js KP_FLAME: a dim torch 0.12, a torch 0.28, a lantern's 0.16, a
+ * brazier 0.5 (a great one 0.63), a hearth 0.6; a bonfire, a burning house, 1.5 and more). Any fire with a size is heard.
+ *   level      dB SPL at 1 m: `torch` at a torch's size (`ref`), rising `slope` dB a tenfold of size. A flame's height goes as its heat
+ *              release to the 2/5 (Heskestad: L ∝ Q^0.4), so its heat, and the noise of its burning (the fuel splitting and spitting,
+ *              the gases' roar: a share of the heat), as L^2.5: 25 dB a tenfold. A torch ~51 dB at 1 m (a quiet crackle, under a man's
+ *              steps), a brazier ~57, a hearth ~59, a blaze of 1.5 m ~69; never past `most`.
+ *   character  from `small` (a torch's size and under: a thin hiss and tick, its lows gone: the take a little fast, high-passed high)
+ *              to `large` (a blaze: a deep dark roar: the take slowed, its highs taken off), in a line over the log of the size, each
+ *              of `rate`, `highpass` and `lowpass` (Hz) on a log scale between; a brazier comes out near the take as recorded (a
+ *              good fire, full).
+ *   nearest    how many fires are heard at once (the nearest: a phone's voices), within `within` m (past it a torch is under 30 dB);
+ *              one already heard counts `stay` m nearer than a rival (two at about one distance do not take turns); a fire taken up
+ *              or let go eases in or out over about `ease` s.
+ *   from       the least size heard (a dim torch's 0.12 just; a candle's still flame, ~0.1, not).
+ *   trim       the loop's gain over its level's (the loop's RMS is -20 dBFS, a bed's).
+ */
+export const FIRE_SOUND = {
+  ref: 0.28, torch: 51, slope: 25, most: 75,
+  small: { size: 0.2, rate: 1.15, highpass: 500, lowpass: 9000 },
+  large: { size: 1.5, rate: 0.82, highpass: 45, lowpass: 3200 },
+  nearest: 3, within: 16, stay: 1.5, ease: 0.4, from: 0.12, trim: 1,
+};
+
+/** A fire of `size` m: { level (dB SPL at 1 m), rate, highpass, lowpass }. */
+export function fireVoice(size, spec = FIRE_SOUND) {
+  const s = Math.max(1e-3, size);
+  const share = Math.min(1, Math.max(0, Math.log(s / spec.small.size) / Math.log(spec.large.size / spec.small.size)));
+  const between = (key) => spec.small[key] * (spec.large[key] / spec.small[key]) ** share;
+  return { level: Math.min(spec.most, spec.torch + spec.slope * Math.log10(s / spec.ref)), rate: between('rate'), highpass: between('highpass'), lowpass: between('lowpass') };
+}
+
+/**
+ * The fires heard now: of `fires` ([{ at, size }]) those of a size heard within reach of `ear`, the nearest `spec.nearest` (one in
+ * `heard`, already sounding, a little nearer), each { fire, distance, level (dB SPL at the ear: its own, by the distance's falloff) }.
+ */
+export function heardFires(fires, ear, heard = [], spec = FIRE_SOUND) {
+  const near = [];
+  for (const fire of fires ?? []) {
+    if (!(fire.size >= spec.from)) continue;
+    const distance = Math.hypot(fire.at[0] - ear[0], fire.at[1] - ear[1], fire.at[2] - ear[2]);
+    if (distance <= spec.within) near.push({ fire, distance, rank: distance - (heard.includes(fire) ? spec.stay : 0) });
+  }
+  near.sort((a, b) => a.rank - b.rank);
+  return near.slice(0, spec.nearest).map(({ fire, distance }) => ({ fire, distance, level: fireVoice(fire.size, spec).level + 20 * Math.log10(distanceGain(distance)) }));
+}
+
 /** A buffer's RMS over its channels. */
 function bufferRms(buffer) {
   let sum = 0;
@@ -237,11 +289,72 @@ export function createAmbience(ctx, out, place, bank = null) {
     beds[name] = gain;
   }
   const clocks = { fire: 0, drip: 0, bird: 0 };
+  // The fires sounding: each fire heard → its loop's read (source → high-pass → low-pass → gain → panner, placed at the fire).
+  const fires = new Map();
+  function fireStart(fire, loop, voice, when) {
+    const source = ctx.createBufferSource();
+    source.buffer = loop.buffer;
+    source.loop = true;
+    source.loopStart = loop.loopStart;
+    source.loopEnd = loop.loopEnd;
+    source.playbackRate.value = voice.rate;
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = voice.highpass;
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = voice.lowpass;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    // (Placed in the world: the context's listener is the ear, set each tick; the level of distance is set here, not by the panner.)
+    const panner = ctx.createPanner();
+    panner.panningModel = 'equalpower';
+    panner.distanceModel = 'linear';
+    panner.rolloffFactor = 0;
+    if (panner.positionX) {
+      panner.positionX.value = fire.at[0];
+      panner.positionY.value = fire.at[1];
+      panner.positionZ.value = fire.at[2];
+    } else panner.setPosition?.(fire.at[0], fire.at[1], fire.at[2]);
+    source.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(gain);
+    gain.connect(panner);
+    panner.connect(out);
+    // (Each fire somewhere else in the loop: two torches side by side do not crackle together.)
+    source.start(when, loop.loopStart + Math.random() * (loop.loopEnd - loop.loopStart));
+    const playing = { source, gain, nodes: [highpass, lowpass, gain, panner] };
+    fires.set(fire, playing);
+    return playing;
+  }
+  function fireStop(fire, when) {
+    const playing = fires.get(fire);
+    fires.delete(fire);
+    playing.gain.gain.setTargetAtTime(0, when, FIRE_SOUND.ease / 3);
+    playing.source.stop(when + FIRE_SOUND.ease * 2);
+    playing.source.onended = () => {
+      for (const node of [playing.source, ...playing.nodes]) node.disconnect();
+    };
+  }
+  /** The nearest fires' loops eased to their levels at the ear; the rest let go. Returns whether the loop is there (false: the synth's crackles). */
+  function burn(info, when) {
+    const loop = bank?.loop?.('fire');
+    if (!loop) return false;
+    const heard = info.ear ? heardFires(info.fires, info.ear, [...fires.keys()]) : [];
+    const keep = new Set(heard.map((one) => one.fire));
+    for (const fire of [...fires.keys()]) if (!keep.has(fire)) fireStop(fire, when);
+    for (const { fire, level } of heard) {
+      const playing = fires.get(fire) ?? fireStart(fire, loop, fireVoice(fire.size), when);
+      playing.gain.gain.setTargetAtTime(gainOfLevel(level) * FIRE_SOUND.trim, when, FIRE_SOUND.ease);
+    }
+    return true;
+  }
   return {
     beds,
     recorded,
+    fires,
     update(targets, info, when, dt) {
-      for (const name of Object.keys(AMBIENCE_LOOPS)) adopt(name);
+      for (const name of Object.keys(RECORDED)) adopt(name);
       for (const name of AMBIENCE_BEDS) {
         let level = targets[name];
         // Water running near: the stage's waters, by the inverse distance from the nearest (the bed's level is at 1 m).
@@ -258,13 +371,14 @@ export function createAmbience(ctx, out, place, bank = null) {
       }
       muffle.frequency.setTargetAtTime(targets.cutoff, when, 0.3);
       // The one-shots, each kind on its own clock (a rate a second, at random: a Poisson scatter).
+      // The fires: the recorded loop at the nearest few; until it has decoded, the synth's crackles scattered at the nearest.
       clocks.fire -= dt;
-      if (clocks.fire <= 0 && info.fires?.length && info.ear) {
+      if (!burn(info, when) && clocks.fire <= 0 && info.fires?.length && info.ear) {
         clocks.fire = 0.15 + Math.random() * 0.35;
-        const fire = nearestOf(info.fires, info.ear);
-        if (fire && fire.distance < 12) {
-          const voice = place(fire.at, 'ambience');
-          if (voice) playCrackle(voice, voice.out, when, gainOfLevel((fire.power > 1.2 ? 62 : 55) + 20 * Math.log10(distanceGain(fire.distance))));
+        const [fire] = heardFires(info.fires, info.ear, [], { ...FIRE_SOUND, nearest: 1 });
+        if (fire) {
+          const voice = place(fire.fire.at, 'ambience');
+          if (voice) playCrackle(voice, voice.out, when, gainOfLevel(fire.level));
         }
       }
       clocks.drip -= dt;

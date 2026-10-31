@@ -21,6 +21,17 @@ export function shotParams(event) {
 }
 
 /**
+ * A bow drawn (the `draw` event: a bow's, not a crossbow's, at the draw's start; physics.js): its limbs bending, a creak of wood and
+ * string some 16 dB under the release (~64 dB at 1 m), lasting the draw's `seconds` (to the loose).
+ */
+export const BOW_DRAW = { level: 64, seconds: 0.62 };
+
+/** A bow's draw, without a context: { level, seconds }. */
+export function drawParams(event) {
+  return { level: BOW_DRAW.level, seconds: sfxClamp(event.seconds ?? BOW_DRAW.seconds, 0.2, 2) };
+}
+
+/**
  * An arrow going past (from the live arrow, not an event): { level at 1 m, centre (Hz), seconds, drop (the Doppler's ratio of pitch
  * before to after: (c + v cos) / (c - v cos)) }. Aeolian like a swing: ~70 dB for a 50 m/s arrow, ∝ v^6.
  */

@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 // In load order (each after what it imports).
-const MODULES = ['audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/spark', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families'];
+const MODULES = ['audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/spark', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families', 'audio/ambience'];
 const out = process.argv[2] ?? 'dist/sound-board.html';
 
 const SAMPLE_EMBED_LINE = 'const SAMPLE_EMBED = null;';
@@ -109,6 +109,18 @@ function board() {
       { title: 'Matchlock at 40 m', sets: ['gunshot'], event: () => ({ type: 'shot', kind: 'matchlock' }), distance: 40, ends: null },
       { title: 'Thunder', sets: ['thunder'], isNew: true, event: (s) => ({ type: 'thunder', distance: log(5000, 150, s) }), distance: (s) => log(5000, 150, s), ends: ['5 km', '150 m'], note: 'Far: the rumble only, lower. Near: the crack.' },
       { title: 'Bow', sets: ['bow'], isNew: true, event: () => ({ type: 'shot', kind: 'bow' }), ends: null, note: 'The release recorded, the synth\'s thrum of the string under it.' },
+      { title: 'Bow drawn', sets: ['bowdraw'], isNew: true, event: (s) => ({ type: 'draw', seconds: lerp(0.45, 1.1, s) }), ends: ['a quick 0.45 s', 'a slow 1.1 s'], note: 'Its wood and string bending: the creak fitted to the draw, tightest as the string goes. A bow only (not a crossbow or a gun).' },
+      { title: 'Bow drawn and loosed', sets: ['bowdraw', 'bow'], isNew: true, direct: (voice, out, when, s) => {
+        // (One loose as the game plays it at 2 m: the creak from the draw's first instant, the release at the loose.)
+        const seconds = lerp(0.45, 1.1, s);
+        const sound = (event, at) => {
+          const family = SOUND_FAMILIES[event.type];
+          const params = family.params(event);
+          return playWithSamples(bank, voice, family, event, params, at, gainOfLevel(levelAtEar(params.level + (family.boost ?? 0), 2, false)));
+        };
+        sound({ type: 'draw', seconds }, when);
+        return sound({ type: 'shot', kind: 'bow' }, when + seconds);
+      }, ends: ['a quick 0.45 s', 'a slow 1.1 s'], note: 'One action in the game, two sounds: the draw, then the release.' },
       { title: 'Crossbow', sets: ['crossbow'], isNew: true, event: () => ({ type: 'shot', kind: 'crossbow' }), ends: null },
       { title: 'Cannon at 200 m', sets: ['gunshot'], isNew: true, event: () => ({ type: 'shot', kind: 'cannon' }), distance: 200, ends: null, note: 'The pistol\'s report at half speed over the synth\'s boom.' },
       { title: 'Arrow on mail', sets: ['mail'], isNew: true, event: (s) => ({ type: 'arrowhit', speed: log(15, 90, s), covering: 'mail' }), ends: ['15 m/s', '90 m/s'] },
@@ -341,9 +353,71 @@ function board() {
         el('p', { className: 'readout', textContent: `${spec.file}.mp3 · ${spec.seconds} s period, its tail crossfaded into its head · looped ${spec.lead}–${(spec.lead + spec.seconds).toFixed(2)} s of the file` })));
     }
   }
+  // Fires: the fire's loop at each size as ambience.js plays it at 2 m (FIRE_SOUND: louder, fuller and lower the bigger the fire).
+  const FIRES = [
+    ['torch', 'Torch', 0.28, 'A torch in its bracket: a quiet, thin crackle.'],
+    ['brazier', 'Brazier', 0.5, 'A brazier: louder and fuller.'],
+    ['hearth', 'Hearth', 0.6, 'A hearth\'s fire.'],
+    ['blaze', 'Large blaze', 1.5, 'A bonfire, a burning house: loudest, a deep roar. (None in the game yet: any fire given a size is heard so.)'],
+  ];
+  function toggleFire(key, size, button) {
+    audio();
+    if (ctx.state !== 'running') ctx.resume();
+    const now = ctx.currentTime;
+    if (playing[key]) {
+      playing[key].gain.gain.setTargetAtTime(0, now, 0.15);
+      playing[key].loop.stop(now + 1);
+      delete playing[key];
+    } else {
+      const loop = bank.loop('fire');
+      if (!loop) return (status.textContent = 'Still loading the recordings: try again in a moment.');
+      const voice = fireVoice(size);
+      const source = ctx.createBufferSource();
+      Object.assign(source, { buffer: loop.buffer, loop: true, loopStart: loop.loopStart, loopEnd: loop.loopEnd });
+      source.playbackRate.value = voice.rate;
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = voice.highpass;
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = voice.lowpass;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.gain.setTargetAtTime(gainOfLevel(voice.level + 20 * Math.log10(distanceGain(2))) * FIRE_SOUND.trim, now, 0.3);
+      source.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(gain);
+      gain.connect(master);
+      source.start(now + 0.03, loop.loopStart + Math.random() * (loop.loopEnd - loop.loopStart));
+      playing[key] = { gain, loop: { stop: (at) => source.stop(at) } };
+    }
+    if (button) {
+      button.setAttribute('aria-pressed', String(Boolean(playing[key])));
+      button.textContent = playing[key] ? 'Stop' : 'Play fire';
+    }
+    return Boolean(playing[key]);
+  }
+  {
+    const id = 'fires';
+    const grid = el('div', { className: 'grid' });
+    const section = el('section', { id, className: 'category' }, el('h2', { textContent: 'Fires' }), el('p', { className: 'blurb', textContent: `The fire's crackle, looped where a fire burns in a level, by its size: louder, fuller and lower the bigger it is. Here at 2 m; in the game at the ${FIRE_SOUND.nearest} nearest within ${FIRE_SOUND.within} m, placed and falling off with distance.` }), grid);
+    root.querySelector('#ambience-loops').after(section);
+    nav.querySelector('a[href="#ambience-loops"]').after(el('a', { href: `#${id}`, textContent: 'Fires' }));
+    for (const [key, title, size, note] of FIRES) {
+      const voice = fireVoice(size);
+      const button = el('button', { type: 'button', className: 'play toggle', textContent: 'Play fire', onclick: () => toggleFire(key, size, button) });
+      button.setAttribute('aria-pressed', 'false');
+      button.dataset.loop = key;
+      grid.append(el('article', { className: 'card' },
+        el('header', {}, el('h3', { textContent: title }), el('div', { className: 'tags' }, el('span', { className: 'tag rec', textContent: 'loop' }), el('span', { className: 'tag new', textContent: 'new' }))),
+        el('p', { className: 'note', textContent: note }),
+        el('div', { className: 'actions' }, button),
+        el('p', { className: 'readout', textContent: `size ${size} m · ${voice.level.toFixed(0)} dB at 1 m · pitch ×${voice.rate.toFixed(2)} · high-pass ${voice.highpass.toFixed(0)} Hz · low-pass ${voice.lowpass.toFixed(0)} Hz · ${FIRE_LOOP.file}.mp3, a ${FIRE_LOOP.seconds} s loop` })));
+    }
+  }
   const takes = Object.values(SAMPLE_SETS).reduce((sum, list) => sum + list.length, 0);
-  document.getElementById('count').textContent = `${LOOPS.length} ambience loops, ${Object.keys(SAMPLE_SETS).length} recorded sets, ${takes} takes, and the synthesised families`;
-  window.soundBoard = { play, playTake, toggleLoop, loops: () => Object.keys(playing), cards: CATEGORIES.flatMap(([, , cards]) => cards), ready: () => bank?.ready };
+  document.getElementById('count').textContent = `${LOOPS.length} ambience loops, a fire's loop at ${FIRES.length} sizes, ${Object.keys(SAMPLE_SETS).length} recorded sets, ${takes} takes, and the synthesised families`;
+  window.soundBoard = { play, playTake, toggleLoop, toggleFire, loops: () => Object.keys(playing), cards: CATEGORIES.flatMap(([, , cards]) => cards), ready: () => bank?.ready };
 }
 
 const STYLE = `

@@ -5,12 +5,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { LOOP_FILES, SAMPLE_FILES, SAMPLE_SETS, createSampleBank, transientStart } from '../src/audio/samples.js';
-import { BLOW_TAIL, BREATH_TAKES, breathHeard, breathPlan, playPlan, playSample, playWithSamples, samplePlan, uiSamplePlan } from '../src/audio/sfx/sampled.js';
+import { BLOW_TAIL, BOW_DRAW_PLAY, BREATH_TAKES, breathHeard, breathPlan, playPlan, playSample, playWithSamples, samplePlan, uiSamplePlan } from '../src/audio/sfx/sampled.js';
 import { SOUND_FAMILIES } from '../src/audio/families.js';
 import { breathParams } from '../src/audio/sfx/voice.js';
 import { exertionOf } from '../src/audio/engine.js';
 import { normaliseInputs, PRESETS } from '../src/body.js';
-import { createWorld } from '../src/physics.js';
+import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { machineFxCreate, machineFxHear } from '../src/machinefx.js';
 
 const DIR = 'src/audio/samples';
@@ -408,4 +408,75 @@ test('the menu\'s buttons play the recorded tap (a back lower, a confirm higher 
   assert.ok(playPlan({ pick: () => ({ buffer: { duration: 0.8 }, offset: 0 }) }, voice, confirm, 1, 0.8) > 1);
   assert.equal(started.length, 2, 'the tap and the chime');
   assert.equal(playPlan({ pick: () => null }, voice, click, 1, 0.8), null);
+});
+
+test('the seventh batch: a bow drawn, each take in its set; the fire\'s loop among the loops', () => {
+  assert.deepEqual(SAMPLE_SETS.bowdraw, ['bowdraw-1', 'bowdraw-2', 'bowdraw-3']);
+  for (const name of SAMPLE_SETS.bowdraw) assert.ok(SAMPLE_FILES.includes(name) && existsSync(`${DIR}/${name}.mp3`), name);
+  assert.ok(LOOP_FILES.includes('loop-fire') && existsSync(`${DIR}/loop-fire.mp3`));
+});
+
+/** A shooter (`preset`) and a man 10 m off, heard; one shot (`move`) and 2 s after it: the sound events of his. */
+function oneShot(preset, move, setUp = () => {}) {
+  const world = createWorld([
+    { inputs: normaliseInputs(structuredClone(PRESETS[preset])), corner: 'red' },
+    { inputs: normaliseInputs(structuredClone(PRESETS.contender)), corner: 'blue' },
+  ], { seed: 3, arena: { halfX: 14, halfZ: 6 } });
+  const [shooter, target] = world.fighters;
+  placeFighter(shooter, -5, 0);
+  placeFighter(target, 5, 0);
+  setUp(shooter);
+  world.ear = { x: 0, y: 1.6, z: 0, radius: 100 };
+  advance(world, 0.3);
+  const from = world.soundsCount ?? 0;
+  assert.ok(throwPunch(world, shooter, move, 'body'), `${preset}: ${move} thrown`);
+  const thrown = world.time;
+  advance(world, 2);
+  return { thrown, sounds: world.sounds.slice(from, world.soundsCount).filter((event) => event.who === shooter.id && (event.type === 'draw' || event.type === 'shot')) };
+}
+
+test('a bow\'s shot: the creak from the draw\'s start, then the release at the loose (two sounds, one action); a crossbow or a gun no creak', () => {
+  // A bow, a composite bow, a yumi, a longbow.
+  for (const preset of ['bow', 'steppeBow', 'tametomo', 'longbow']) {
+    const { thrown, sounds } = oneShot(preset, 'loose');
+    assert.deepEqual(sounds.map((event) => event.type), ['draw', 'shot'], preset);
+    const [draw, shot] = sounds;
+    assert.equal(shot.kind, 'bow');
+    assert.ok(draw.t - thrown < 0.05, `${preset}: the creak at the draw's start (${(draw.t - thrown).toFixed(3)} s in)`);
+    // The creak lasts the draw: it ends about when the release comes (the loose waits on the sights a little at most).
+    assert.ok(shot.t >= draw.t + draw.seconds - 0.05 && shot.t - (draw.t + draw.seconds) < 0.25, `${preset}: drawn ${draw.seconds.toFixed(2)} s, loosed at ${(shot.t - draw.t).toFixed(2)} s`);
+    const creak = plan(draw);
+    assert.equal(creak.set, 'bowdraw');
+    assert.ok(creak.fromEnd && Math.abs(creak.seconds - draw.seconds) < 1e-9 && Math.abs(creak.fit - draw.seconds) < 1e-9, 'fitted to the draw, ending at the loose');
+    // The release as before.
+    assert.equal(plan(shot).set, 'bow');
+  }
+  const crossbow = oneShot('crossbow', 'fireLong');
+  assert.ok(crossbow.sounds.some((event) => event.type === 'shot' && event.kind === 'crossbow'), 'the crossbow shot');
+  assert.ok(!crossbow.sounds.some((event) => event.type === 'draw'), 'no creak for a crossbow');
+  const gun = oneShot('matchlock', 'fireLong');
+  assert.ok(gun.sounds.some((event) => event.type === 'shot' && event.kind === 'matchlock'), 'the gun shot');
+  assert.ok(!gun.sounds.some((event) => event.type === 'draw'), 'no creak for a gun');
+});
+
+test('a bow\'s creak is fitted to its draw: a quick draw squeezed, a slow one stretched, never past its range; it ends at the loose', () => {
+  const started = [];
+  const node = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, playbackRate: { value: 1 }, start: (when, offset) => started.push({ when, offset }), stop() {} });
+  const voice = { ctx: { createGain: node, createBufferSource: node }, nodes: [], live: 0, end: 0, out: {} };
+  const take = { buffer: { duration: 1.12 }, offset: 0 };
+  const at = (seconds) => {
+    const creak = plan({ type: 'draw', seconds });
+    started.length = 0;
+    const end = playSample(voice, voice.out, take, { ...creak, rate: 1 }, 10, 0.5);
+    return { end, start: started[0] };
+  };
+  const quick = at(0.5);
+  assert.ok(Math.abs(quick.end - 10.51) < 1e-9, 'it ends at the loose');
+  assert.ok(Math.abs(quick.start.offset - (1.12 - 0.5 * BOW_DRAW_PLAY.stretch[1])) < 1e-9, 'squeezed as far as it goes, its last part played');
+  const slow = at(1.6);
+  // Stretched to its most and still short of the draw: started late, so it still ends at the loose.
+  assert.ok(Math.abs(slow.end - 11.61) < 1e-9 && slow.start.when > 10, `${slow.start.when}`);
+  // Not a crossbow's nor a gun's: the shot's plans are as they were.
+  assert.equal(plan({ type: 'shot', kind: 'crossbow' }).set, 'crossbow');
+  assert.equal(SOUND_FAMILIES.draw.sampledOnly, true, 'no synth creak: silent until the takes load');
 });

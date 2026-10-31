@@ -1880,7 +1880,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     wander,
     // What the stroke gains as it goes, named here (unset) so that every stroke has one shape.
     riposte: undefined, finisher: undefined, with: undefined, burst: undefined, drove: undefined, stopped: undefined, driven: undefined,
-    fired: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined, low: undefined, rangeOff: undefined,
+    fired: undefined, drawn: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined, low: undefined, rangeOff: undefined,
     // From his knees (the player's crawl: WORLD.crawl.strike): the blow's mass behind it is this share.
     weak: undefined,
   };
@@ -2203,6 +2203,11 @@ function updateIntent(world, fighter, dt) {
     // The stroke at the pace his arms give the weapon; a bow drawn as fast as he can pull it (handling.js).
     const held = punch.spec.path === 'blade' ? (blade?.held ? blade : null) : fighter.weapon?.held ? fighter.weapon : null;
     const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
+    // Heard: a bow (not a crossbow) bending as its string is drawn, from the draw's first instant to the loose (the release is the `shot`).
+    if (!punch.drawn && punch.spec.path === 'aim' && held?.spec.bow && !held.spent) {
+      punch.drawn = true;
+      if (world.ear) soundEvent(world, 'draw', { at: particleAt(fighter, P[`${held.main}Hand`]), seconds: (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) / Math.max(0.2, pace * (fighter.wading?.act ?? 1)), who: fighter.id });
+    }
     // (Waist-deep in sludge: slower, a little. Levelmode/level.js wadeGear; nothing in a battle.)
     punch.t += (punch.t < punch.spec.windup || punch.t > punch.spec.extendUntil ? dt / heavy : dt) * pace * (fighter.wading?.act ?? 1);
     punch.age += dt;

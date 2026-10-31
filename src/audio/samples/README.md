@@ -13,6 +13,8 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 
 198 files, 817 KB in all (the sixth batch: 24 files, 72 KB).
 
+202 files, 864 KB in all (the seventh batch: 4 files, 47 KB: three takes of a bow drawn and a fire's loop).
+
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
 | slice-1.mp3 | ScreenRecording_10-29-2026_20-52-57_1.mov | 0.359-1.109 | SLICE | 0.029 | 4140 | hit: a blade or point on flesh, padding or leather |
@@ -211,6 +213,9 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | ui-tap-1.mp3 | copy_94989AD7-55CF-415D-897D-98CE9548B813.mov | 1.982-2.210 | Menu sounds | 0.022 | 1440 | a soft low tap; menu: a click (the tap), a back (lower), a confirm (higher, the chime under it) |
 | ui-tap-2.mp3 | copy_94989AD7-55CF-415D-897D-98CE9548B813.mov | 2.344-2.565 | Menu sounds | 0.014 | 1440 | the same tap, again; menu: a click (the tap), a back (lower), a confirm (higher, the chime under it) |
 | ui-chime-1.mp3 | copy_94989AD7-55CF-415D-897D-98CE9548B813.mov | 0.358-1.400 | Menu sounds | 0.028 | 5400 | a low swelling tone, decaying; menu: under a confirm's tap (its first 0.7 s, faded) |
+| bowdraw-1.mp3 | d2dfb089 (10-31) | 0.240-1.360 | Bow | 0.000 | 5940 | the whole creak, rising; a bow (bow, composite bow, yumi, longbow; not a crossbow or a gun) drawn: from the draw's first instant, fitted to the draw (rate x0.85-1.3 toward its length), its last part played so it ends at the loose; the release (bow-1) follows |
+| bowdraw-2.mp3 | d2dfb089 (10-31) | 0.240-0.920 | Bow | 0.000 | 3600 | its first part, lighter; a bow (bow, composite bow, yumi, longbow; not a crossbow or a gun) drawn: from the draw's first instant, fitted to the draw (rate x0.85-1.3 toward its length), its last part played so it ends at the loose; the release (bow-1) follows |
+| bowdraw-3.mp3 | d2dfb089 (10-31) | 0.500-1.360 | Bow | 0.000 | 4500 | its last part, tighter; a bow (bow, composite bow, yumi, longbow; not a crossbow or a gun) drawn: from the draw's first instant, fitted to the draw (rate x0.85-1.3 toward its length), its last part played so it ends at the loose; the release (bow-1) follows |
 Not used: SWORD UNSHEATHE, SHARPENING BLADE (no such event in the game). The recordings have no sand or snow footsteps and none of a flat sole on boards (the ring's canvas is boards) and no snort: those stay synthesised. The fist's whooshes (fistswing) are the air before each punch of the 10-30 recording, cut from 0.25-0.4 s before its blow to the blow (no onset: the window as it is, faded in over its first quarter); the punches start at the blow. The thunder takes are capped at 2.6 and 1.8 s with a 0.7 s fade.
 
 The fourth batch (10-30): the body falls are the five falls of one recording; the whip's recording has one lash (the low knock before it, at 0.31 s, is not the whip: left out); the door's recording is the first of its seven versions only: a creak swelling as it opens (its first part at a lower quality: cut at 1.88 s into two takes, each the window as it is, faded in over 0.06 s and out over 0.15 s) and the slam that ends it, its ring cut where the recording ends.
@@ -226,6 +231,7 @@ Checked decoded (as the encoder left it, and again with the encoder's 1105-sampl
 | loop-rain.mp3 | ScreenRecording_10-30-2026_13-46-20_1.mov | 0.45-10.44 | Relaxing Rain Sounds | 9.24 | 0.75 | 58968 | rain in the open, wherever it falls (Dunnottar's storm; a place's own weather: the port); 48 kb/s |
 | loop-wind.mp3 | ScreenRecording_10-30-2026_13-47-23_1.mov | 7.00-21.00 | Wind Sound | 12.5 | 1.5 | 65520 | the wind of every outdoor place at its place's level, muffled through walls; 40 kb/s |
 | loop-market.mp3 | ScreenRecording_10-30-2026_13-49-57_1.mov | 3.30-21.80 | Medieval city market sound effect | 17.0 | 1.5 | 105624 | a town's market square by day (places tagged `market`: Maidstone, the Jiangnan water town); thinned by rain, none at night; 48 kb/s |
+| loop-fire.mp3 | 9adad3cd (10-31) | 1.30-8.54 | Burning Fire | 6.24 | 1.0 | 34020 | a fire's crackle (samples.js `FIRE_LOOP`), one read at each of the 3 nearest fires within 16 m (ambience.js `FIRE_SOUND`), placed and falling off with distance, by the fire's size: a torch quiet and thin (51 dB at 1 m, x1.09, high-passed at 330 Hz), a brazier fuller (57 dB), a blaze louder and lower (69 dB, x0.82, low-passed at 3.2 kHz); 40 kb/s |
 
 The cries (2026-10-30, three recordings: a woman sobbing and crying, whose second half ("#2", from 16.47 s) repeats the first exactly and was not used; a man crying; an army's charge) are cut one vocalisation at a time: the onset the first 10 ms frame within 30 dB of the piece's peak, from 8 ms before it; the end the last frame within 38 dB, plus 30 ms; a 4 ms fade in and the fade out given; -1 dBFS. Times are the piece's in the recording; a `+` joins pieces composed into one take with an equal-power crossfade (30-80 ms), the second at 0.85 of the first's peak; `trim` is each piece's lead cut. The man's recording at 2.13-2.6 s (a broadband rush, no voice in it) is not used. The charge is one loop: 0.55-7.55 s of the roar, its last 1 s crossfaded into its head, 6.0 s, at 32 kb/s; engine.js loops it from its first sound for 6 s (the decoder's padding left out).
 
@@ -257,3 +263,13 @@ as much quieter than one let out as recorded (6-12 dB), at 32 kb/s; a menu's sou
 at 1.98, 2.34, 2.62 and 2.81 s, the same tap each time (two kept), then from 3.05 s to the end a bed of music with a low thump inside it
 at 8.4 s, not used: not a button's sound, and nothing clean to cut). The portcullis of the fifth batch keeps its own chain when let down
 (it leads into its slam, as recorded); raised, it runs on the heavy chain.
+
+The seventh batch (10-31, two recordings, cut with numpy and ffmpeg, mono 44.1 kHz): a bow drawn (1.6 s: silence to 0.24 s, then the
+wood and string creaking, rising to its tightest at about 1.2 s and gone by 1.36 s; no release in it): the whole creak and two windows of it,
+each faded in over 30 ms and out over 50-60 ms, normalised together (the first part stays quieter, as recorded), at 40 kb/s. The game's
+bow release (bow-1, the fifth batch) is kept: a loose is one action and two sounds, the draw's creak from its start and the release at the
+loose. A fire burning (13.1 s, steady throughout, a big fire's crackle and low roar): one loop as the beds are cut (tools: the section
+whose ends match best, its last second crossfaded into its head at equal power, RMS -20 dBFS, 32 kHz, the period's own 0.25 s either
+side), 6.24 s (short, to keep it small: each fire reads it from a random point, at its own pitch, so two fires side by side are not heard
+in step). Checked decoded and looped four times: the step across each seam is within the rest's (0.020 against a 99th percentile of 0.038),
+its change of spectrum under the median. Not used yet: the batch's grenade, flamethrower and explosion.

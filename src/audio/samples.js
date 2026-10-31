@@ -4,7 +4,8 @@
 // hard floor, a blow on a helmet, a blow on a wooden shield, punches and the fist's whoosh before them, thunder; a bow and a crossbow, a
 // portcullis, a sword on mail and into leather (and variants derived from the takes: a fist on plate, lamellar, a blade's swing); a man's and a woman's
 // cries (hurt, scream, moan, fear, dying), an army's charge; a robot's short (an electric shock), a heavy chain run and shaken, a man's and a
-// woman's breath (in and out), a menu's tap and its chime. And three ambience loops, the places' beds (ambience.js): rain, wind, a town's market.
+// woman's breath (in and out), a menu's tap and its chime; a bow's creak as it is drawn. And three ambience loops, the places' beds
+// (ambience.js): rain, wind, a town's market; and a fire's crackle, looped at each fire near the ear (ambience.js FIRE_SOUND).
 // Each set is a few takes of one sound; a take is picked at random each time.
 //
 // From the source (the ES-module page, index.html) the files are fetched from src/audio/samples/; the single-file bundle (tools/bundle.js) puts their
@@ -75,6 +76,8 @@ export const SAMPLE_SETS = {
   'breath-female-out': ['breath-female-out-1', 'breath-female-out-2', 'breath-female-out-3'],
   'ui-tap': ['ui-tap-1', 'ui-tap-2'],
   'ui-chime': ['ui-chime-1'],
+  // (The seventh batch: a bow drawn, its wood and string bending: the whole creak, its first part and its tighter last part.)
+  bowdraw: ['bowdraw-1', 'bowdraw-2', 'bowdraw-3'],
   // Cries (sfx/voice.js CRY_KINDS; chosen by audio/cries.js): a man's and a woman's, each a set per kind (a few composed of two pieces).
   ...voiceSets({ male: { hurt: 7, scream: 3, moan: 4, fear: 4, dying: 2 }, female: { hurt: 4, scream: 3, moan: 3, fear: 2, dying: 2 } }),
   // An army's charge roared: one loop (engine.js plays it under a large side running at the enemy: audio/charge.js).
@@ -103,8 +106,14 @@ export const AMBIENCE_LOOPS = {
   market: { file: 'loop-market', seconds: 17, lead: 0.25 },
 };
 
+/** A fire's crackle (ambience.js plays it at each fire near the ear, by the fire's size): cut and looped as the beds are, mono, one read. */
+export const FIRE_LOOP = { file: 'loop-fire', seconds: 6.24, lead: 0.25 };
+
+/** Every loop the bank decodes: the beds and the fire. */
+const ALL_LOOPS = { ...AMBIENCE_LOOPS, fire: FIRE_LOOP };
+
 /** Every loop's file. */
-export const LOOP_FILES = Object.values(AMBIENCE_LOOPS).map((loop) => loop.file);
+export const LOOP_FILES = Object.values(ALL_LOOPS).map((loop) => loop.file);
 
 /** The bytes of each file (base64), put here by tools/bundle.js; null from the source, which fetches the files. */
 const SAMPLE_EMBED = null;
@@ -152,14 +161,14 @@ export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetch
     takes.set(name, { buffer, offset: transientStart(buffer.getChannelData(0), buffer.sampleRate) });
   }
   async function loadLoop(name) {
-    const { file, seconds, lead } = AMBIENCE_LOOPS[name];
+    const { file, seconds, lead } = ALL_LOOPS[name];
     const buffer = await decode(file);
     // (A file cut short would loop on its padding: refused, and the synth bed plays.)
     if (buffer.duration < lead + seconds + 0.02) throw new Error(`${buffer.duration.toFixed(3)} s, short of its period`);
     loops.set(name, { buffer, loopStart: lead, loopEnd: lead + seconds });
   }
   const warn = (name) => (error) => console.warn(`Gladiator: the sound ${name} could not be loaded`, error);
-  const ready = Promise.all([...SAMPLE_FILES.map((name) => load(name).catch(warn(name))), ...Object.keys(AMBIENCE_LOOPS).map((name) => loadLoop(name).catch(warn(name)))]).then(() => takes.size + loops.size);
+  const ready = Promise.all([...SAMPLE_FILES.map((name) => load(name).catch(warn(name))), ...Object.keys(ALL_LOOPS).map((name) => loadLoop(name).catch(warn(name)))]).then(() => takes.size + loops.size);
   return {
     ready,
     count: () => takes.size + loops.size,
