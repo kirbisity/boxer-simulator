@@ -308,10 +308,11 @@ export function loose(world, fighter, bolt = null) {
 /**
  * The missiles a man carries for a weapon at the start (bolts, balls, arrows): a bow's from his kit's `quiver`
  * (a horse archer's) or the bow's own `ammo`; a gun's or a crossbow's, its shot's `ammo`. None counted: Infinity
- * (a forearm gun fed from the body, a modern pistol).
+ * (a forearm gun fed from the body, a modern pistol), or kept up without end (his kit's `endlessAmmo`: outfits.js).
  */
 export function ammoCarried(fighter, weapon = fighter.weapon) {
   const spec = weapon.spec;
+  if (fighter.body.gear.endlessAmmo) return Infinity;
   return (spec.bow ? fighter.body.gear.quiver ?? spec.ammo : spec.shot?.ammo) ?? Infinity;
 }
 

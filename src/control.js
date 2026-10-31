@@ -67,6 +67,11 @@ export const CONTROL = {
   // team-mate, a man on the floor): the player can strike at anything. An enemy nearer than `foeEngaged` owns the blow.
   anyoneWithin: 2.2,
   foeEngaged: 4,
+  // On horseback the enemy owns the blow out to `chargeWithin` m, and a tap on any enemy that far off is a charge at him
+  // (chargeOrder): a rider's blow is a charge, and a charge wants its run-up. Some sixteen horse lengths (~2.5 m each):
+  // the best part of 30 m for a horse to come up from a stand to the gallop, and the gallop to close at it, as far
+  // across the field as the follow camera shows a man.
+  chargeWithin: 40,
   // Lock, with no enemy to take, takes the nearest man of any side within this (m).
   lockAnyoneWithin: 5,
   // A pad attack goes at his man within its reach (m more for each unit of a lunge's step, and this slack), else at the air.
@@ -608,12 +613,24 @@ export function airAhead(fighter, zone, share = 1) {
 }
 
 /**
- * Who an attack goes at: his enemy if one is engaged (within `foeEngaged` m) or he is locked on one; else whoever stands nearest within
- * `anyoneWithin` m, enemy or not; else the enemy he has (far off), else nobody (the blow goes into the air).
+ * Who an attack goes at: his enemy if one is engaged (within `foeEngaged` m; on horseback `chargeWithin`) or he is locked on
+ * one; else whoever stands nearest within `anyoneWithin` m, enemy or not; else the enemy he has (far off), else nobody (the
+ * blow goes into the air).
  */
 export function attackMark(world, fighter, orders, opponent) {
-  if (opponent && (orders.lock !== null || reachBetween(fighter, opponent) <= CONTROL.foeEngaged)) return opponent;
+  const engaged = fighter.mount ? CONTROL.chargeWithin : CONTROL.foeEngaged;
+  if (opponent && (orders.lock !== null || reachBetween(fighter, opponent) <= engaged)) return opponent;
   return nearestAnyone(world, fighter, CONTROL.anyoneWithin) ?? opponent;
+}
+
+/**
+ * The man a tap on horseback picks to charge (a request's `target`, fightui/target.js): an enemy on his feet within
+ * CONTROL.chargeWithin m of the rider; else null (the attack goes as any other: attackMark). On foot, never.
+ */
+export function chargeTarget(world, fighter, id) {
+  const man = id === undefined || id === null ? null : world.fighters[id];
+  if (!fighter.mount || !man || man === fighter || !hostile(man, fighter) || !inFight(man) || man.state !== 'up') return null;
+  return reachBetween(fighter, man) <= CONTROL.chargeWithin ? man : null;
 }
 
 /** The man Lock takes: the enemy he is on (`foe`), else the nearest man of any side within `lockAnyoneWithin` m (a civilian, a prisoner, a team-mate); null if none. */
@@ -710,7 +727,8 @@ function attack(world, fighter, orders, opponent) {
     requests.shift();
     return;
   }
-  opponent = attackMark(world, fighter, orders, opponent);
+  // (A man tapped from the saddle, far off: the charge is at him.)
+  opponent = chargeTarget(world, fighter, request.target) ?? attackMark(world, fighter, orders, opponent);
   // A man low before him (on the floor, getting up, on his knees): the blow goes down to his body as it lies.
   if (!request.point && (!request.move || MOVES[request.move]?.kind === 'strike')) {
     const wanted = request.move ?? chooseAttack(world, fighter, opponent, request.line ?? 'mid', request.strength)?.move;
