@@ -23,22 +23,27 @@ def grid(n=N):
 
 def periodic_noise(n, cells, seed, octaves=1):
     """Smooth periodic value noise: `cells` lattice points to the tile (each octave twice as many), -1..1."""
+    return periodic_noise_xy(n, cells, cells, seed, octaves)
+
+
+def periodic_noise_xy(n, cells_x, cells_y, seed, octaves=1):
+    """periodic_noise with its own number of lattice cells across (x) and up (y): blotches drawn out one way."""
     rng = np.random.default_rng(seed)
     x, y = grid(n)
     total = np.zeros((n, n))
     amp = 1.0
     norm = 0.0
     for octave in range(octaves):
-        k = cells * 2 ** octave
-        lattice = rng.uniform(-1, 1, (k, k))
-        fx, fy = x * k, y * k
+        kx, ky = cells_x * 2 ** octave, cells_y * 2 ** octave
+        lattice = rng.uniform(-1, 1, (ky, kx))
+        fx, fy = x * kx, y * ky
         ix, iy = np.floor(fx).astype(int), np.floor(fy).astype(int)
         tx, ty = fx - ix, fy - iy
         sx, sy = tx * tx * (3 - 2 * tx), ty * ty * (3 - 2 * ty)
-        a = lattice[iy % k, ix % k]
-        b = lattice[iy % k, (ix + 1) % k]
-        c = lattice[(iy + 1) % k, ix % k]
-        d = lattice[(iy + 1) % k, (ix + 1) % k]
+        a = lattice[iy % ky, ix % kx]
+        b = lattice[iy % ky, (ix + 1) % kx]
+        c = lattice[(iy + 1) % ky, ix % kx]
+        d = lattice[(iy + 1) % ky, (ix + 1) % kx]
         total += amp * (a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy)
         norm += amp
         amp *= 0.5
@@ -510,10 +515,194 @@ def knit():
     return {'height': h * pitch, 'shade': np.clip(shade, 0, 1), 'rough': np.full((n, n), 0.86), 'metres': 0.014}
 
 
+def jack():
+    """
+    The jack: a coat of many layers of linen stitched through, not stuffed (the archers' and foot soldiers' armour of the
+    15th c.). A French ordinance asks 25 to 30 linens and a buckskin, worn linens the best, the collar as strong as the rest
+    (https://www.bookandsword.com/armour-in-texts/french-and-burgundian-military-ordinances/); Sir John Howard's books a doublet
+    of fence of 21-23 folds of fustian and linen (https://myarmoury.com/feature_spot_quilted.html); 18-30 layers, high in the
+    collar (https://en.wikipedia.org/wiki/Gambeson). Stitched through so many layers it is firm: shallow ribs between sunk
+    rows of close running stitch (rows 20 mm apart, stitches 5 mm; the spacing of reproductions from period art, no surviving
+    jack being measured), the layers' edges rippling the ribs a little, the coarse linen (12/cm) of its face over it all.
+    """
+    metres = 0.08
+    rows = 4
+    x, y = grid()
+    u = (x * rows) % 1
+    rib = np.sin(np.pi * u) ** 0.35
+    wobble = periodic_noise(N, 10, 151, 2)
+    h = 0.0016 * rib * (1 + 0.15 * wobble)
+    # The running stitch down each row: the thread over the face 3.5 mm, under it 1.5 mm, drawn into the groove.
+    near = np.abs(u - 0.5) > 0.48
+    along = (y * metres / 0.005 + 0.3 * (np.floor(x * rows) % 2)) % 1
+    over = along < 0.7
+    h += np.where(near & over, 0.00035, np.where(near, -0.00025, 0.0))
+    h += cloth_ground(N, 96, 152, 0.00035)
+    shade = 0.82 + 0.13 * rib ** 0.6 + 0.03 * periodic_noise(N, 20, 153) + np.where(near & over, 0.06, 0.0)
+    return {'height': h, 'shade': np.clip(shade, 0, 1), 'rough': np.full((N, N), 0.9), 'metres': metres}
+
+
+def camo():
+    """
+    Printed woodland camouflage on cotton or NYCO ripstop, a rifleman's combat uniform: the US M81 Woodland, four colours
+    (light green, brown, dark green, black) in broad horizontal blotches with black 'branches', a 1.6x enlargement of ERDL
+    that repeats every 62 cm (https://camopedia.org/index.php/M81_Woodland); OCP (Scorpion W2) as worn since 2015 is the same
+    idea in softer, smaller blotches (https://soldiersystems.net/2014/09/09/the-official-color-palette-for-ocp-scorpion-w2-vatiant/).
+    The print as the shade (its four tones' lightness, the garment's colour the middle of them) on the ripstop's 6 mm grid
+    of doubled threads (https://www.rothco.com/blog/what-is-rip-stop); the 0.4 m tile carries blotches 4-15 cm across.
+    """
+    metres = 0.4
+    x, y = grid()
+
+    def field(seed, cells_x, cells_y):
+        # Stretched across (the woodland's horizontal lie): fewer lattice cells across than up the tile.
+        return periodic_noise_xy(N, cells_x, cells_y, seed, 3)
+
+    # The two broad colours laid over the light ground, each a third of the cloth; the black branches a tenth, over them.
+    brown = field(161, 3, 6) > 0.12
+    green = (field(162, 3, 6) > 0.1) & ~brown
+    # The branches: the thin contours of a field, broken where a second is low.
+    black = (np.abs(field(163, 4, 9)) < 0.06) & (field(164, 5, 10) > -0.05)
+    tone = np.where(black, 0.25, np.where(brown, 0.6, np.where(green, 0.46, 0.9)))
+    tone = blur(tone, 1)
+    # The ripstop: plain weave too fine to draw at this scale; the reinforcing grid as low ridges.
+    gx = np.abs(((x * metres / 0.006) % 1) - 0.5)
+    gy = np.abs(((y * metres / 0.006) % 1) - 0.5)
+    grid_ridge = np.clip(1 - np.minimum(0.5 - gx, 0.5 - gy) / 0.08, 0, 1)
+    h = 0.00006 * grid_ridge + 0.00004 * periodic_noise(N, 160, 164) + 0.0004 * periodic_noise(N, 3, 165, 2)
+    shade = tone * (1 - 0.03 * grid_ridge) + 0.015 * periodic_noise(N, 128, 166)
+    rough = 0.8 + 0.04 * grid_ridge
+    return {'height': h, 'shade': np.clip(shade, 0, 1), 'rough': rough, 'metres': metres}
+
+
+def hexagon_lattice(x, y, columns, rows):
+    """A flat-topped hexagon lattice periodic over the tile: `columns` (even) columns and `rows` rows of cells. Returns the
+    position in its cell (dx, dy, in units of the hexagon's circumradius) and the distance to the cell's edge (same units)."""
+    sx = x * columns * 1.5
+    sy = y * rows * math.sqrt(3)
+    best = np.full(x.shape, 1e9)
+    bx = np.zeros(x.shape)
+    by = np.zeros(x.shape)
+    for dc in (-1, 0, 1, 2):
+        c = np.floor(sx / 1.5) + dc
+        for dr in (-1, 0, 1):
+            r = np.floor(sy / math.sqrt(3)) + dr
+            cx = c * 1.5
+            cy = r * math.sqrt(3) + (c % 2) * math.sqrt(3) / 2
+            d = (sx - cx) ** 2 + (sy - cy) ** 2
+            better = d < best
+            best = np.where(better, d, best)
+            bx = np.where(better, sx - cx, bx)
+            by = np.where(better, sy - cy, by)
+    # Distance to the edge of a flat-topped hexagon of circumradius 1 (apothem sqrt(3)/2).
+    a = math.sqrt(3) / 2
+    ax, ay = np.abs(bx), np.abs(by)
+    edge = np.minimum(a - ay, a - (ax * a + ay * 0.5))
+    return bx, by, edge
+
+
+def kikko():
+    """
+    Kikkō-hanabishi: hexagons of tortoiseshell linked over the cloth, a four-petalled flower in each, the courtly pattern
+    (yūsoku mon'yō) of Heian robes and the brocade of a samurai's armour robe (MAK Vienna, kikkō tsunagi:
+    https://sammlung.mak.at/en/collect/part-of-a-set-surface-pattern-waritsuke-monyo-割付文様-plant-pattern-shokubutsu-monyo-植物文様-kikko-tsunagi-亀甲繋-312433;
+    Nelson-Atkins karaori with flowers in hexagons, hanabishi kikkō: https://art.nelson-atkins.org/objects/18701/fragment-from-no-robe-karaori-type-with-design-of-flowers;
+    the Met's karaori, twill silk brocade with supplementary weft: https://www.metmuseum.org/art/collection/search/44883).
+    Hexagons 17 mm across, 8 columns and 7 rows to the 100 mm tile (1% squeezed to close the tile); the figure (a double
+    border and the flower) in weft floats, glossier and lighter than the twill ground's diagonal ribs.
+    """
+    metres = 0.1
+    x, y = grid()
+    bx, by, edge = hexagon_lattice(x, y, 8, 7)
+    border = ((edge > 0.03) & (edge < 0.11)) | ((edge > 0.16) & (edge < 0.21))
+    # The flower: four rhombic petals on the diagonals, a round heart.
+    r = np.hypot(bx, by)
+    th = np.arctan2(by, bx)
+    petal_axis = np.abs(((th - math.pi / 4) % (math.pi / 2)) - math.pi / 4)
+    petal = (r < 0.5) & (r > 0.08) & (petal_axis < 0.5 * (1 - r / 0.5) + 0.05)
+    flower = petal | (r < 0.06)
+    fig = blur((border | flower).astype(float), 1)
+    # Twill ground ribs on the diagonal (silk, c. 0.25 mm pitch), weft floats across in the figure.
+    ground = np.sin(2 * np.pi * (x + y) * metres / 0.0003) * 0.5 + 0.5
+    floats = np.sin(2 * np.pi * y * metres / 0.00035) * 0.5 + 0.5
+    h = 0.000015 * (ground * (1 - fig) + floats * fig) + 0.00009 * fig
+    # The figure's wefts a lighter silk than the ground's (as the karaori's own coloured floats over their ground).
+    shade = 0.76 + 0.2 * fig + 0.01 * periodic_noise(N, 32, 171)
+    rough = 0.48 - 0.14 * fig
+    return {'height': h, 'shade': shade, 'rough': rough, 'metres': metres}
+
+
+def cloud_damask():
+    """
+    Chinese silk satin damask of auspicious clouds (xiangyun): ruyi-headed clouds, a three-lobed head curling in on itself
+    and a trailing tail, scattered in staggered rows; the robes of officers and the elite (MFA Boston, Ming silk damask woven
+    with auspicious clouds: https://collections.mfa.org/objects/9588; the Met, damask with cloud palmettes:
+    https://www.metmuseum.org/art/collection/search/70996). Satin damask: the ground warp-faced, the figure weft-faced, both
+    smooth, told apart by the sheen as the floats turn. Clouds c. 45 mm long, four to the 100 mm tile, half-dropped.
+    """
+    metres = 0.1
+    x, y = grid()
+    figure = np.zeros((N, N), bool)
+    cut = np.zeros((N, N), bool)
+    rng = np.random.default_rng(181)
+    for cx, cy, flip in ((0.25, 0.22, 1), (0.75, 0.47, -1), (0.25, 0.72, -1), (0.75, 0.97, 1)):
+        cx += rng.uniform(-0.03, 0.03)
+        dx = ((x - cx + 0.5) % 1 - 0.5) * flip
+        dy = (y - cy + 0.5) % 1 - 0.5
+        # The ruyi head: a big lobe over two side lobes.
+        for lx, ly, lr in ((0.0, 0.03, 0.075), (-0.075, -0.02, 0.055), (0.075, -0.02, 0.055)):
+            d = np.hypot(dx - lx, dy - ly)
+            figure |= d < lr
+            # The curl in each lobe: a spiral groove of ground.
+            th = np.arctan2(dy - ly, dx - lx)
+            spiral = np.abs(((d / lr) * 2.0 - th / (2 * np.pi)) % 1 - 0.5) < 0.09
+            cut |= (d < lr * 0.85) & (d > lr * 0.15) & spiral
+        # The tail: a tapering band sweeping off to the side and down.
+        t = np.clip((dx + 0.02) / 0.32, 0, 1)
+        centre = -0.06 - 0.035 * np.sin(np.pi * t) + 0.05 * t * t
+        width = 0.03 * (1 - t) + 0.004
+        figure |= (dx > -0.02) & (dx < 0.3) & (np.abs(dy - centre) < width)
+    fig = blur((figure & ~cut).astype(float), 1)
+    ground = np.sin(2 * np.pi * x * metres / 0.0004) * 0.5 + 0.5
+    floats = np.sin(2 * np.pi * y * metres / 0.0004) * 0.5 + 0.5
+    h = 0.000015 * (ground * (1 - fig) + floats * fig) + 0.00006 * fig
+    shade = 0.82 + 0.1 * fig
+    rough = 0.4 - 0.12 * fig
+    return {'height': h, 'shade': shade, 'rough': rough, 'metres': metres}
+
+
+def tapestry():
+    """
+    Andean interlocked tapestry, the uncu's cloth: weft-faced, the camelid wefts packed down to hide the cotton warps, so the
+    face is all weft in fine ribs over each warp. A Peabody tocapu band: cotton warp 11/cm, camelid wefts 30-60/cm
+    (https://collections.peabody.harvard.edu/objects/details/90334); the Met: wefts turned at each colour and packed to cover
+    the warp (https://www.metmuseum.org/art/collection/search/313152). Warps across the tunic as worn, as the Wari's and after
+    them the Inca's were woven (https://www.clevelandart.org/art/126684): ribs running round the body, 4 warps to the
+    3.6 mm tile (few to a tile, so the fine regular ribs fade out before they would shimmer), 16 weft passes across them,
+    each weft's twist slanting it.
+    """
+    metres = 0.003636
+    warps, wefts = 4, 16
+    x, y = grid()
+    # The warp ribs: horizontal on the body (along x), one per warp up the tile.
+    v = (y * warps) % 1
+    # Rounded (a raised cosine: no steep walls, whose normals would light differently from one mipmap level to the next).
+    rib = 0.5 - 0.5 * np.cos(2 * np.pi * v)
+    # Each weft pass a slanted bead over the rib (S-spun camelid).
+    bead = 0.5 - 0.5 * np.cos(2 * np.pi * ((x * wefts + 0.25 * v) % 1))
+    thick = 1 + 0.15 * line_noise(wefts, N, 191, 5)[(x * wefts).astype(int) % wefts, (y * N).astype(int) % N]
+    hpitch = metres / warps
+    # (The ribs kept low: packed weft rounds them over, and a rib this fine and this regular would shimmer far off.)
+    h = hpitch * (0.12 * rib + 0.1 * bead * rib * thick) + fuzz(N, 192, 0.02) * hpitch
+    shade = 0.84 + 0.08 * rib * bead + 0.03 * periodic_noise(N, 16, 193)
+    return {'height': h, 'shade': np.clip(shade, 0, 1), 'rough': np.full((N, N), 0.88), 'metres': metres}
+
+
 FAMILIES = {
     'plain': plain, 'twill': twill, 'denim': denim, 'quilt': quilt, 'diamondQuilt': diamond_quilt, 'felt': felt,
     'damask': damask, 'leather': leather, 'fur': fur, 'feathers': feathers, 'straw': straw, 'cordura': cordura,
-    'ripstop': ripstop, 'knit': knit,
+    'ripstop': ripstop, 'knit': knit, 'jack': jack, 'camo': camo, 'kikko': kikko,
+    'cloudDamask': cloud_damask, 'tapestry': tapestry,
 }
 
 

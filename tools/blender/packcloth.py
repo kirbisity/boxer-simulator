@@ -3,9 +3,10 @@
 #
 #   python3 tools/blender/packcloth.py <bake dir> [--preview]
 #
-# The atlas is 4 x 4 cells of CELL pixels, each family's tile filtered down to CELL - 2 PAD and wrapped PAD pixels round on
-# every side (so the coarser mipmaps of a cell blend only its own tile, never its neighbour's); cell k at column k % 4 and
-# row k // 4 counted up from the bottom of the picture (texture v up, as three flips it). One RGBA picture:
+# The atlas is 8 x 8 cells of CELL pixels (2048² in all: the GPU budget, and a power of two so every mipmap level halves
+# every cell exactly), each family's tile filtered down to CELL - 2 PAD and wrapped PAD pixels round on
+# every side (so the coarser mipmaps of a cell blend only its own tile, never its neighbour's); cell k at column k % 8 and
+# row k // 8 counted up from the bottom of the picture (texture v up, as three flips it). One RGBA picture:
 #   R, G  the normal's x and y (tangent space, OpenGL, green up; z = sqrt(1 - x² - y²))
 #   B     the shade: the fibre's own grey times the occlusion (the garment's colour is multiplied by it over its mean)
 #   A     the roughness
@@ -24,11 +25,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pack import normals, resample, to8  # noqa: E402
 
 # In the order of src/detailmaps.js CLOTH_FAMILIES (each one's cell is its index); the tile's side in metres as baked.
-FAMILIES = ['plain', 'twill', 'denim', 'quilt', 'diamondQuilt', 'felt', 'damask', 'leather', 'fur', 'feathers', 'straw', 'cordura', 'ripstop', 'knit']
-CELL = 512
-PAD = 32
-GRID = 4
-QUALITY = 82
+FAMILIES = ['plain', 'twill', 'denim', 'quilt', 'diamondQuilt', 'felt', 'damask', 'leather', 'fur', 'feathers', 'straw', 'cordura', 'ripstop', 'knit',
+            'jack', 'camo', 'kikko', 'cloudDamask', 'tapestry']
+# 256 px a cell (224 of tile): finer than a garment is ever seen (a 13 mm weave tile at 60 µm a pixel, its threads 9 px).
+CELL = 256
+PAD = 16
+GRID = 8
+QUALITY = 90
 # How much of the occlusion goes into the shade.
 AO_IN_SHADE = 0.8
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

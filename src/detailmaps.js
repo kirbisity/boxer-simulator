@@ -276,6 +276,12 @@ export function plateUvAt(measure, place, angle, kind = 'plate') {
  *   cordura      1000D nylon in a 2 x 2 basket weave (https://ripstopbytheroll.com/collections/all-products/products/1000d-cordura)
  *   ripstop      plain weave with a 6 mm grid of doubled threads (https://www.rothco.com/blog/what-is-rip-stop)
  *   knit         single jersey, 11 wales/cm (28 gauge: https://organiccottonplus.com/products/medium-jersey-28-tubular)
+ *   jack         25-30 linens stitched through in rows 20 mm apart: the archers' jack
+ *                (https://www.bookandsword.com/armour-in-texts/french-and-burgundian-military-ordinances/)
+ *   camo         woodland camouflage printed on ripstop, blotches drawn out across (https://camopedia.org/index.php/M81_Woodland)
+ *   kikko        kikkō-hanabishi silk brocade, hexagons with a flower in each (https://www.metmuseum.org/art/collection/search/44883)
+ *   cloudDamask  Chinese satin damask of ruyi-headed auspicious clouds (https://collections.mfa.org/objects/9588)
+ *   tapestry     Andean weft-faced interlocked tapestry, ribs round the body (https://collections.peabody.harvard.edu/objects/details/90334)
  */
 export const CLOTH_FAMILIES = {
   plain: { cell: 0, metres: 0.0133 },
@@ -292,11 +298,16 @@ export const CLOTH_FAMILIES = {
   cordura: { cell: 11, metres: 0.024 },
   ripstop: { cell: 12, metres: 0.012 },
   knit: { cell: 13, metres: 0.014 },
+  jack: { cell: 14, metres: 0.08 },
+  camo: { cell: 15, metres: 0.4 },
+  kikko: { cell: 16, metres: 0.1 },
+  cloudDamask: { cell: 17, metres: 0.1 },
+  tapestry: { cell: 18, metres: 0.003636 },
 };
 /** The atlas's flat cell: the faces of a cloth loft whose own material has no tile (skin through lace, satin). */
-export const CLOTH_FLAT_CELL = 15;
+export const CLOTH_FLAT_CELL = 63;
 // The atlas's cells to a side, and the span of a cell's band in cloth's u (counted down from 0: column k in -(k + 1) bands) and v.
-export const CLOTH_GRID = 4;
+export const CLOTH_GRID = 8;
 export const CLOTH_BAND = 1000;
 
 /**
@@ -312,8 +323,8 @@ export const CLOTH_MATERIALS = {
   woolTabby: { family: 'plain', scale: 2 },
   // Heavy canvas (a sumo's mawashi).
   canvas: { family: 'plain', scale: 2.6 },
-  // The Andean qompi tapestry of an uncu: weft-faced and very fine.
-  camelid: { family: 'plain', scale: 0.7 },
+  // The Andean qompi tapestry of an uncu: weft-faced, interlocked.
+  camelid: { family: 'tapestry', scale: 1 },
   wool: { family: 'twill', scale: 1 },
   // Worsted suiting, fine; flannel, a brushed twill a little coarser; rope, the slant of its strands.
   worsted: { family: 'twill', scale: 0.55 },
@@ -328,6 +339,14 @@ export const CLOTH_MATERIALS = {
   // Fulled wool broadcloth (a Janissary's çuha dolama): felted, finer.
   broadcloth: { family: 'felt', scale: 0.6 },
   silk: { family: 'damask', scale: 1 },
+  // A jack of many linens stitched through (the archers' and foot soldiers' of the 15th c.).
+  jack: { family: 'jack', scale: 1 },
+  // A rifleman's printed camouflage (woodland) on cotton or NYCO ripstop.
+  camouflage: { family: 'camo', scale: 1 },
+  // Japanese court brocade (kikkō-hanabishi): the ō-yoroi's armour robe and its brocade sleeve.
+  brocade: { family: 'kikko', scale: 1 },
+  // Chinese satin damask woven with auspicious clouds: the officers' and the elite's robes.
+  cloudSilk: { family: 'cloudDamask', scale: 1 },
   leather: { family: 'leather', scale: 1 },
   // Hardened hide (lacquered or boiled leather armour): the grain coarser.
   hide: { family: 'leather', scale: 1.6 },
@@ -376,7 +395,7 @@ export const CLOTH_GARMENTS = {
     doMaru: { '*': 'none', lace: 'silk' },
     doMaruSode: { '*': 'none', lace: 'silk' },
     lamellar: { '*': 'none', lace: 'silk' },
-    oyoroi: { '*': 'none', lace: 'silk', cloth2: 'silk' },
+    oyoroi: { '*': 'none', lace: 'silk', cloth2: 'brocade' },
     // Europe: the cloth over mail and plate (surcoats, a huque, a joust's mantling), a brigandine's facing, the arming coat.
     mail: { '*': 'wool', armor: 'none', pad: 'quiltedFine' },
     templar: { '*': 'wool', armor: 'none' },
@@ -387,7 +406,8 @@ export const CLOTH_GARMENTS = {
     plate: { '*': 'wool', armor: 'none', pad: 'quiltedFine' },
     conquistador: { '*': 'wool', armor: 'none' },
     huque: { '*': 'wool' },
-    // The Spaniards' escaupil was the Mexica cotton armour taken up.
+    // The Spaniards' escaupil was the Mexica cotton armour taken up; the same coat in a European's company is his jack
+    // (CLOTH_BY_FACTION).
     escaupil: { '*': 'ichcahuipilli' },
     corset: { '*': 'silk', lace: 'none' },
     overbust: { '*': 'silk', lace: 'none' },
@@ -408,15 +428,15 @@ export const CLOTH_GARMENTS = {
     mingQuilt: { '*': 'quilted' },
     mingVest: { '*': 'hemp', leather: 'cotton' },
     mingBrigandine: { '*': 'cotton', armor: 'none' },
-    mingElite: { '*': 'silk', armor: 'none' },
+    mingElite: { '*': 'cloudSilk', armor: 'none' },
     mingLamellar: { '*': 'cotton', armor: 'none' },
     mingScaleCoat: { '*': 'cotton', armor: 'none' },
     mingScale: { '*': 'cotton', armor: 'none' },
-    mingEliteLamellar: { '*': 'silk', armor: 'none' },
-    ironPagoda: { '*': 'silk', armor: 'none', lace: 'leather' },
-    guanYu: { '*': 'silk', armor: 'none' },
+    mingEliteLamellar: { '*': 'cloudSilk', armor: 'none' },
+    ironPagoda: { '*': 'cloudSilk', armor: 'none', lace: 'leather' },
+    guanYu: { '*': 'cloudSilk', armor: 'none' },
     hanLamellar: { '*': 'hemp', armor: 'none', lace: 'leather' },
-    wuxiaRobe: { '*': 'silk' },
+    wuxiaRobe: { '*': 'cloudSilk' },
     // The steppe: the wool deel, leather lacing and belts, the fur stole; hardened leather lamellar.
     deel: { '*': 'wool' },
     mongolDeel: { '*': 'wool' },
@@ -452,7 +472,7 @@ export const CLOTH_GARMENTS = {
   head: {
     arenaHelm: 'none', ayyubidHelm: 'none', bascinet: 'none', bashlyk: 'felt', beanie: 'rib', bork: 'felt', cabasset: 'none', chichak: 'none',
     clothWrap: 'cotton', eagleHelm: 'feathers', featherBand: 'feathers', feltHat: 'felt', flower: 'none', furHat: 'fur', galea: 'none',
-    gorillaHead: 'fur', greatHelm: 'none', guanYuCap: 'silk', hachimaki: 'cotton', hanHelm: 'none', jaguarHelm: 'pelt', jingasa: 'none',
+    gorillaHead: 'fur', greatHelm: 'none', guanYuCap: 'cloudSilk', hachimaki: 'cotton', hanHelm: 'none', jaguarHelm: 'pelt', jingasa: 'none',
     kabuto: 'none', katozukin: 'cotton', kettleHat: 'none', lionHead: 'fur', llautu: 'camelid', loovuuz: 'fur', mingHat: 'none',
     mingHelm: 'none', montefortino: 'none', morion: 'none', opsHelmet: 'cordura', pagodaHelm: 'none', policeCap: 'worsted', potHelmet: 'none',
     ridgeHelm: 'none', riotHelmet: 'none', robotHead: 'none', spangenhelm: 'none', stechhelm: 'none', steppeHelm: 'none', tiltHat: 'felt',
@@ -463,12 +483,13 @@ export const CLOTH_GARMENTS = {
 };
 
 /**
- * Where a people or an outfit differ from a garment's usual stuff (`slot.kind` -> material). The undershirt (`longsleeve`) is
- * what goes under each people's armour: a knight's quilted arming coat, a samurai's hemp hitatare, a steppe man's wool, a
- * soldier's ripstop.
+ * Where a people or an outfit differ from a garment's usual stuff (`slot.kind` -> material; `armor.kind` for the whole of an
+ * armour's cloth). The undershirt (`longsleeve`) is what goes under each people's armour: a knight's quilted arming coat, a
+ * samurai's hemp hitatare, a steppe man's wool, a soldier's ripstop.
  */
 export const CLOTH_BY_FACTION = {
-  knights: { 'top.longsleeve': 'quiltedFine', 'top.tunic': 'wool', 'bottom.pants': 'wool' },
+  // A European's quilted coat is his jack of linens, not the Mexica cotton.
+  knights: { 'top.longsleeve': 'quiltedFine', 'top.tunic': 'wool', 'bottom.pants': 'wool', 'armor.escaupil': 'jack' },
   japanese: { 'top.longsleeve': 'hemp', 'bottom.pants': 'hemp', 'feet.sandal': 'straw' },
   chinese: { 'top.tunic': 'hemp', 'top.flannel': 'cotton' },
   steppe: { 'top.longsleeve': 'wool', 'bottom.pants': 'wool' },
@@ -482,14 +503,18 @@ export const CLOTH_BY_FACTION = {
   specials: { 'top.longsleeve': 'ripstop' },
 };
 export const CLOTH_BY_OUTFIT = {
-  oyoroi: { 'top.longsleeve': 'silk', 'bottom.hakama': 'silk' },
-  samuraiTosei: { 'top.longsleeve': 'silk' },
+  // The armour robe (yoroi hitatare) of a man of rank: brocade.
+  oyoroi: { 'top.longsleeve': 'brocade', 'bottom.hakama': 'brocade' },
+  samuraiTosei: { 'top.longsleeve': 'brocade' },
   saladin: { 'top.longsleeve': 'silk' },
-  guanYu: { 'top.longsleeve': 'silk' },
-  wuxia: { 'top.longsleeve': 'silk' },
+  guanYu: { 'top.longsleeve': 'cloudSilk' },
+  wuxia: { 'top.longsleeve': 'cloudSilk' },
   police: { 'top.longsleeve': 'cotton' },
   conquistadorPlate: { 'top.longsleeve': 'wool' },
-  conquistadorQuilted: { 'top.longsleeve': 'wool' },
+  // The escaupil proper: the Mexica cotton armour the Spaniards took up.
+  conquistadorQuilted: { 'top.longsleeve': 'wool', 'armor.escaupil': 'ichcahuipilli' },
+  // Both the rifleman's uniforms are printed (woodland, and OCP: the same idea in smaller, softer blotches, drawn with the one tile).
+  infantry: { 'top.longsleeve': 'camouflage', 'bottom.cargo': 'camouflage' },
   victorianLady: { 'top.longsleeve': 'silk' },
   victorianGent: { 'bottom.pants': 'worsted' },
   commoner: { 'top.tunic': 'hemp', 'bottom.pants': 'hemp' },
@@ -521,7 +546,11 @@ export function clothMaterialOf(look, role, { faction = null, outfit = null } = 
   const byKind = armourKind ? CLOTH_GARMENTS.armor[armourKind] : null;
   // The armour's own say over its roles (and over leather and fur, where it names them).
   if (byKind?.[role]) return byKind[role];
-  if (source === 'armor') return armourKind ? byKind?.['*'] : 'none';
+  if (source === 'armor') {
+    if (!armourKind) return 'none';
+    const whole = `armor.${armourKind}`;
+    return CLOTH_BY_OUTFIT[outfit]?.[whole] ?? CLOTH_BY_FACTION[faction]?.[whole] ?? byKind?.['*'];
+  }
   if (source in CLOTH_MATERIALS) return source;
   const kind = look?.[source]?.kind;
   if (!kind) return source === 'feet' ? 'leather' : 'cotton';
@@ -536,7 +565,7 @@ export function clothFamilyOf(material) {
   return { ...CLOTH_FAMILIES[spec.family], family: spec.family, scale: spec.scale };
 }
 
-/** The atlas cell (0..15) a vertex's texture coordinates put it in, or null where they are not cloth's. */
+/** The atlas cell (0..63) a vertex's texture coordinates put it in, or null where they are not cloth's. */
 export function clothCellOf(u, v) {
   if (!(u < 0)) return null;
   return -Math.floor(u / CLOTH_BAND) - 1 + CLOTH_GRID * Math.floor(v / CLOTH_BAND);

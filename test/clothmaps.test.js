@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { PRESETS, buildBody } from '../src/body.js';
 import { buildLoftBody } from '../src/loftbody.js';
 import {
-  CLOTH_BAND, CLOTH_FAMILIES, CLOTH_FLAT_CELL, CLOTH_GARMENTS, CLOTH_MATERIALS, CLOTH_ROLES, DETAIL_MAPS, clothCellOf, clothFamilyOf, clothMaterialOf, detailKindOf,
+  CLOTH_BAND, CLOTH_FAMILIES, CLOTH_FLAT_CELL, CLOTH_GARMENTS, CLOTH_GRID, CLOTH_MATERIALS, CLOTH_ROLES, DETAIL_MAPS, clothCellOf, clothFamilyOf, clothMaterialOf, detailKindOf,
 } from '../src/detailmaps.js';
 import { CLOTH_MAP_DATA } from '../src/clothmaps-data.js';
 import { OUTFITS, factionOf } from '../src/outfits.js';
@@ -102,11 +102,23 @@ test('the peoples\' stuff: what the references say each was made of', () => {
   assert.equal(family('boxing', 'kit'), null, 'satin trunks: smooth');
   assert.equal(family('legionary', 'steel'), null, 'metal is the armour tiles\'');
   assert.equal(family('ashigaru', 'kit'), 'plain', 'hemp');
+  assert.equal(family('archer', 'cloth'), 'jack', 'a European\'s jack of linens, not the Mexica cotton');
+  assert.equal(family('levy', 'cloth'), 'jack');
+  assert.equal(family('infantry', 'top'), 'camo', 'the rifleman\'s printed uniform');
+  assert.equal(family('infantry', 'kit'), 'camo');
+  assert.equal(family('specialForces', 'top'), 'ripstop', 'a plain uniform stays plain');
+  assert.equal(family('oyoroi', 'top'), 'kikko', 'the armour robe of a man of rank');
+  assert.equal(family('oyoroi', 'cloth2'), 'kikko', 'the ō-yoroi\'s brocade sleeve');
+  assert.equal(family('oyoroi', 'lace'), 'damask', 'the silk braid');
+  for (const kind of ['guanYu', 'wuxia', 'mingElite', 'ironPagoda']) assert.equal(family(kind, 'cloth'), 'cloudDamask', kind);
+  assert.equal(family('incaUncu', 'cloth'), 'tapestry', 'the uncu\'s interlocked tapestry');
 });
 
-test('the families: 14 cells of the atlas, in its order, and the flat cell past them', () => {
+test('the families: cells of the atlas, in its order, and the flat cell past them', () => {
   const names = Object.keys(CLOTH_FAMILIES);
-  assert.ok(names.length >= 10 && names.length <= 15, `${names.length} families`);
+  assert.ok(names.length >= 10 && names.length < CLOTH_MAP_DATA.grid ** 2, `${names.length} families`);
+  assert.equal(CLOTH_GRID, CLOTH_MAP_DATA.grid, 'the tables and the atlas agree on its grid');
+  assert.equal(CLOTH_FLAT_CELL, CLOTH_GRID ** 2 - 1, 'the flat cell is the last');
   assert.deepEqual(CLOTH_MAP_DATA.families, names, 'the atlas holds the families in their order');
   names.forEach((name, index) => assert.equal(CLOTH_FAMILIES[name].cell, index, name));
   assert.ok(names.length <= CLOTH_FLAT_CELL);
@@ -188,7 +200,7 @@ test('the cloth material wears the atlas from the start, one texture for all, an
     };
     a.onBeforeCompile(shader);
     assert.ok(shader.fragmentShader.includes('textureGrad') && shader.fragmentShader.includes('perturbNormal2Arb'), 'the cell read with its gradients, the relief as normals');
-    assert.equal(shader.uniforms.uClothMeans.value.length, 16);
+    assert.equal(shader.uniforms.uClothMeans.value.length, CLOTH_MAP_DATA.grid ** 2);
     const lambert = clothDetailMaterial({ isMeshLambertMaterial: true });
     assert.equal(lambert.normalMap, undefined, 'a material that cannot take a normal map is left as it is');
   } finally {

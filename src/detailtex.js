@@ -226,7 +226,8 @@ export function clothAtlasTexture() {
 
 // How far the detail is drawn: past this mipmap level of a cell (its tile then a few dozen pixels across the screen) the relief
 // fades to the cell's mean, so the coarse levels, where the cells' paddings run out, are never read for relief.
-const CLOTH_FADE = [5.0, 6.5];
+// (From the level at which a cell's padding is one pixel: log2 of the padding.)
+const CLOTH_FADE = [Math.log2(CLOTH_MAP_DATA.pad), Math.log2(CLOTH_MAP_DATA.pad) + 1.5];
 
 /**
  * A fighter's cloth wearing the atlas: `material` (the look's own skin material, MeshStandard, Toon or Phong, vertex-coloured)
