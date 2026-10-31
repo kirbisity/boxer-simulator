@@ -14,7 +14,7 @@ import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawC
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
-import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
+import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, coiledTwist, hiltMix, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
@@ -2043,7 +2043,9 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
     // (Heard: a charge goes in with the whole of him, and he shouts it.)
     if (world.ear) soundVoice(world, fighter, 'effort', 1);
   } else if (spec.kind === 'clinch') {
-    const distance = vec.length(vec.sub(point(target.x, P.neck), point(fighter.x, P.neck)));
+    // (A small animal reaches for what of him it can: grappling.js clinchGrip; from its shoulder, not its neck.)
+    const held = clinchGrip(fighter, target).index;
+    const distance = vec.length(vec.sub(point(target.x, held), point(fighter.x, held === P.neck ? P.neck : P.lShoulder)));
     if (distance > fighter.body.reach * WORLD.clinch.range) return false;
     // Who holds on longer is a contest of grip and arm strength.
     const grip = (who) => who.body.strikeForce[P.lHand] + who.body.strikeForce[P.rHand];
@@ -2285,7 +2287,8 @@ function updateIntent(world, fighter, dt) {
   if (fighter.clinch) {
     const target = world.fighters[fighter.clinch.target];
     // The holding hands behind the opponent's neck, pulling it down.
-    const neck = vec.add(point(target.x, P.neck), [0, -WORLD.clinch.pullDown, 0]);
+    const held = clinchGrip(fighter, target);
+    const neck = vec.add(point(target.x, held.index), [0, -held.drop, 0]);
     for (const [side, sign] of [['l', 1], ['r', -1]]) if ((fighter.clinch.hands ?? ['l', 'r']).includes(side)) intent[`${side}Hand`] = vec.add(toLocal(fighter, neck), [0.05, 0.04, sign * 0.07]);
     intent.lean += 0.08;
   }
@@ -3521,7 +3524,10 @@ function checkBalance(world, fighter) {
   // long lunge are on it; what counts is how far outside it they are.
   const planted = Object.values(fighter.feet).every((foot) => !foot.lifted);
   // (A runner's hips are never over a base: they are carried from one foot to the other.)
-  const outside = planted && !striding(fighter) ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
+  // (An animal running on all fours, PROOF OF CONCEPT: a style's `charge.fours`: its base runs from its feet to its hands.)
+  const fours = fighter.rush && STYLES[fighter.style]?.charge?.fours;
+  const between = (a, b) => vec.scale(vec.add(point(fighter.x, a), point(fighter.x, b)), 0.5);
+  const outside = fours ? outsideBase(point(fighter.x, P.pelvis), between(P.lFoot, P.rFoot), between(P.lHand, P.rHand)) : planted && !striding(fighter) ? outsideBase(point(fighter.x, P.pelvis), point(fighter.x, P.lFoot), point(fighter.x, P.rFoot)) : 0;
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   // (Wet clay under him, fieldworks.js `mired`: a shove puts him down sooner.)
@@ -5917,6 +5923,20 @@ function collideStriker(world, attacker, defender, striker, time) {
  */
 const PUSH_PAIRS = [['trunk', 'trunk'], ['head', 'head'], ['head', 'trunk'], ['trunk', 'head'], ['shoulders', 'trunk'], ['trunk', 'shoulders'], ['shoulders', 'shoulders']];
 const BODY_PARTS = new Set(['trunk', 'shoulders']);
+// PROOF OF CONCEPT (beasts): an animal small enough to run under a man's trunk (a style's `bite.low`) meets
+// his legs: its trunk and head are kept out of his thighs and shins (pushed apart only; no crash is reckoned there).
+const UNDER_LEGS = ['lThigh', 'rThigh', 'lShank', 'rShank'];
+const UNDER_LEG_PAIRS = ['trunk', 'head'].flatMap((part) => UNDER_LEGS.flatMap((leg) => [[part, leg], [leg, part]]));
+const UNDER_LEG_KEYS = new Set(UNDER_LEGS);
+const runsUnder = (fighter) => Boolean(STYLES[fighter.style]?.bite?.low);
+const UNDER_LEG_EASE = 1.5;
+
+/** A small animal's charge that runs into a man's legs ends there: it takes hold of him (a clinch, grappling.js clinchGrip). */
+function leapOn(world, animal, man) {
+  if (!animal.rush || !runsUnder(animal) || animal.clinch || animal.state !== 'up' || !hostile(animal, man)) return;
+  animal.rush = null;
+  perform(world, animal, 'clinch');
+}
 
 /** The breadth of a man's shoulders as a capsule, joint to joint, as thick as the deltoid over them (kept with his capsules). */
 function shoulderCapsule(fighter) {
@@ -5935,7 +5955,8 @@ function pushApart(world, first, second) {
   // placement (prev moved with x), not turned into a speed. Two trunks 0.2 m into each other, put apart in one substep, met
   // at 30 m/s and knocked each other cold.
   const placed = first.unposedAt === world.steps || second.unposedAt === world.steps;
-  for (const [firstKey, secondKey] of PUSH_PAIRS) {
+  const pairs = runsUnder(first) || runsUnder(second) ? [...PUSH_PAIRS, ...UNDER_LEG_PAIRS] : PUSH_PAIRS;
+  for (const [firstKey, secondKey] of pairs) {
     const one = firstKey === 'shoulders' ? shoulderCapsule(first) : firstCapsules[firstKey];
     const two = secondKey === 'shoulders' ? shoulderCapsule(second) : secondCapsules[secondKey];
     // A part cut off no longer meets anything.
@@ -5955,14 +5976,17 @@ function pushApart(world, first, second) {
     // Body against body (trunk or shoulders, the trunk's mass either way): the deepest touch is the crash, after the loop.
     if (BODY_PARTS.has(firstKey) && BODY_PARTS.has(secondKey)) {
       if (!body || reach - distance > body.depth) body = { depth: reach - distance, normal };
-    } else crashBodies(world, first, second, firstKey, secondKey, normal);
+    } else if (!UNDER_LEG_KEYS.has(firstKey) && !UNDER_LEG_KEYS.has(secondKey)) crashBodies(world, first, second, firstKey, secondKey, normal);
+    else leapOn(world, UNDER_LEG_KEYS.has(firstKey) ? second : first, UNDER_LEG_KEYS.has(firstKey) ? first : second);
     const shares = [
       [first, one.a, one.a === one.b ? 1 : 1 - closest.s, 1], [first, one.b, one.a === one.b ? 0 : closest.s, 1],
       [second, two.a, two.a === two.b ? 1 : 1 - closest.t, -1], [second, two.b, two.a === two.b ? 0 : closest.t, -1],
     ].filter(([, , share]) => share > 0);
     const total = shares.reduce((sum, [fighter, index, share]) => sum + fighter.invMass[index] * share, 0);
+    // (A small body against a leg is eased out, no faster than UNDER_LEG_EASE m/s: put out of a deep overlap in one substep it would fly.)
+    const depth = UNDER_LEG_KEYS.has(firstKey) || UNDER_LEG_KEYS.has(secondKey) ? Math.min(reach - distance, UNDER_LEG_EASE * world.lastDt / WORLD.substeps) : reach - distance;
     for (const [fighter, index, share, sign] of shares) {
-      const amount = ((reach - distance) * fighter.invMass[index] * share) / total;
+      const amount = (depth * fighter.invMass[index] * share) / total;
       for (let axis = 0; axis < 3; axis += 1) {
         fighter.x[index * 3 + axis] += sign * normal[axis] * amount;
         if (placed) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;

@@ -4,6 +4,7 @@
 // Nothing here names a character; the outfits name their horses.
 
 import { outfitOf } from './outfits.js';
+import { ROBOT_DOGS, ROBOT_SHELL } from './robotdogs.js';
 
 /**
  * The breeds, each as it went to war. `mass` (kg) unladen; `withers` (m)
@@ -59,17 +60,22 @@ export const BARDING = {
   plate: { label: 'Steel plate barding', mass: 34, parts: { head: PLATE_BARD, neck: PLATE_BARD, chest: PLATE_BARD, body: { ...PLATE_BARD, blunt: 0.45 }, legs: NONE } },
   lamellar: { label: 'Steel lamellar barding', mass: 30, parts: { head: LAMELLAR_BARD, neck: LAMELLAR_BARD, chest: LAMELLAR_BARD, body: LAMELLAR_BARD, legs: NONE } },
   bare: { label: 'Bare horse', mass: 0, parts: { head: NONE, neck: NONE, chest: NONE, body: NONE, legs: NONE } },
+  // (PROOF OF CONCEPT: a robot dog's shell, robotdogs.js.)
+  robotShell: ROBOT_SHELL,
 };
+
+/** A mount's breed: a horse, or a robot dog (robotdogs.js, PROOF OF CONCEPT). */
+export const breedOf = (key) => HORSES[key] ?? ROBOT_DOGS[key];
 
 /** Whether a character rides: his kit names the horse his people rode. */
 export function canRide(inputs) {
-  return Boolean(HORSES[outfitOf(inputs).spec.horse]);
+  return Boolean(breedOf(outfitOf(inputs).spec.horse));
 }
 
 /** His horse and its armour (null if he does not ride): { breed, barding }. */
 export function mountOf(inputs) {
   const spec = outfitOf(inputs).spec;
-  if (!HORSES[spec.horse]) return null;
+  if (!breedOf(spec.horse)) return null;
   return { breed: spec.horse, barding: BARDING[spec.barding] ? spec.barding : 'bare' };
 }
 

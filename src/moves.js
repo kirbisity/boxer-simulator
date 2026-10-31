@@ -526,6 +526,82 @@ export const STYLES = {
     plans: { brawler: 3, pressure: 1.5, outboxer: 0.1, counter: 0.2 },
     pressure: 0.6,
   },
+  // PROOF OF CONCEPT (beasts, round 1): the monkeys and the chimpanzee (src/beasts.js), hidden from the
+  // builder's pick. Each as the gorilla is fought, by what its kind does in a fight:
+  // - the rhesus macaque: fast and nervy, all bites. It runs in on all fours (`rush`, `charge`), takes hold
+  //   of what of him it can reach (his leg: `bite.low`, physics/grappling.js clinchGrip) and bites again and
+  //   again, quick shallow slashes of short canines (~1.2 cm), scratching and slapping with its hands
+  //   (`swipe`: a slap; nails are not modelled as an edge), darting off when struck (`stepBack`).
+  // - the chacma baboon: a male's fight is its canines (~4 cm), slashed in and pulled out; it lunges and
+  //   grabs and bites, hangs on, bites again (the way it kills a dog or a leopard).
+  // - the chimpanzee: Goodall's attacks: the charge, the grab, beating him with its arms, biting the
+  //   hands, the face, the feet (Travis, Moe: the attacks on people), drags and throws as the gorilla does.
+  // Bites: force ~mass^(2/3) from the silverback's ~2.5 kN (macaque ~280 N, baboon ~640 N, chimp ~960 N),
+  // `depth` the canines' length, `slash` the gash torn as the head is wrenched back (a baboon's canine slashes
+  // are long, ~5-10 cm; a macaque's and a chimpanzee's bites shorter tears); how often, as quick as the kind
+  // bites (a macaque in a frenzy two a second).
+  macaque: {
+    label: 'Rhesus macaque', hidden: true,
+    cadence: { work: 1.8, move: 0.9, burst: 1, mobility: 0.9 },
+    stance: { blade: 0.1, crouch: 0.08, width: 1.3, lean: 0.25, guardHeight: -0.25 },
+    idle: { bounce: 0.6, sway: 1.2, rock: 0.8 },
+    attacks: { swipeR: 0.16, swipeL: 0.14, clinch: 0.3, rush: 0.4 },
+    combos: { 'rush clinch': 0.7, 'swipeL swipeR': 0.3 },
+    comboChance: 0.6,
+    clinchStrikes: { swipeR: 1 },
+    bite: { first: 0.15, every: 0.45, forceN: 280, depth: 0.012, slash: 0.03, low: true },
+    charge: { lean: 0.45, dip: 0.08, hands: [0.4, 0.22, 0.14], fours: true },
+    tempo: 0.6,
+    defences: { stepBack: 0.7, guard: 0.3 },
+    defendChance: 0.45,
+    headMovement: 0.3,
+    counter: 0.2,
+    plans: { brawler: 2, pressure: 2, outboxer: 0.3, counter: 0.3 },
+    pressure: 0.7,
+  },
+  baboon: {
+    label: 'Chacma baboon', hidden: true,
+    cadence: { work: 1.7, move: 0.8, burst: 1, mobility: 0.7 },
+    stance: { blade: 0.1, crouch: 0.08, width: 1.3, lean: 0.25, guardHeight: -0.22 },
+    idle: { bounce: 0.4, sway: 1.2, rock: 0.7 },
+    attacks: { swipeR: 0.14, swipeL: 0.1, clubR: 0.08, clinch: 0.3, rush: 0.38 },
+    combos: { 'rush clinch': 0.7, 'swipeL clubR': 0.3 },
+    comboChance: 0.55,
+    clinchStrikes: { swipeR: 0.6, clubR: 0.4 },
+    clinchDrive: true,
+    clinchDriveShare: 0.5,
+    bite: { first: 0.2, every: 0.8, forceN: 640, depth: 0.035, slash: 0.08, low: true },
+    charge: { lean: 0.45, dip: 0.08, hands: [0.42, 0.24, 0.14], fours: true },
+    tempo: 0.7,
+    defences: { stepBack: 0.6, guard: 0.4 },
+    defendChance: 0.4,
+    headMovement: 0.2,
+    counter: 0.15,
+    plans: { brawler: 2.5, pressure: 2, outboxer: 0.2, counter: 0.3 },
+    pressure: 0.7,
+  },
+  chimp: {
+    label: 'Chimpanzee', hidden: true,
+    cadence: { work: 1.7, move: 0.6, burst: 1, mobility: 0.45 },
+    stance: { blade: 0.1, crouch: 0.12, width: 1.3, lean: 0.3, guardHeight: -0.2 },
+    idle: { bounce: 0.3, sway: 1.2, rock: 0.8 },
+    attacks: { clubR: 0.16, clubL: 0.12, swipeR: 0.12, swipeL: 0.08, collarTie: 0.12, clinch: 0.16, rush: 0.3 },
+    combos: { 'rush clinch': 0.4, 'clubL clubR': 0.3, 'swipeL clubR': 0.3 },
+    comboChance: 0.5,
+    clinchStrikes: { clubR: 0.7, swipeR: 0.3 },
+    clinchDrive: true,
+    clinchDriveShare: 1,
+    throws: { after: 0.6, rate: 0.7 },
+    bite: { first: 0.25, every: 1, forceN: 960, depth: 0.022, slash: 0.04, low: true },
+    charge: { lean: 0.5, dip: 0.1, hands: [0.4, 0.28, 0.14], fours: true },
+    tempo: 0.8,
+    defences: { guard: 0.4, stepBack: 0.45, parry: 0.15 },
+    defendChance: 0.3,
+    headMovement: 0.1,
+    counter: 0.1,
+    plans: { brawler: 3, pressure: 1.5, outboxer: 0.1, counter: 0.2 },
+    pressure: 0.6,
+  },
   // Weapon styles: `weapon` is what is carried; `weaponGuard` where the
   // main hand rests (heights, local) and where the weapon points. Knocked
   // out of the hand, the fighter boxes.
@@ -1806,6 +1882,24 @@ STYLES.botBlade = {
   switches: [{ to: 'combatBot', beyond: 3.5 }, { to: 'botMace', strikes: 1 }],
   weaponGuard: { hand: [0.1, 0.62, -0.12], dir: [1, 0.3, 0.05] },
   attacks: { botCut: 0.45, botThrust: 0.35, botSweep: 0.2 },
+};
+
+// PROOF OF CONCEPT (beasts, round 1): what a robot dog carries on its back (src/robotdogs.js, src/beasts.js), fought
+// from it as a rider fights from the saddle (riding.js ride): hidden from the builder's pick.
+// - Go2: nothing; it runs at his legs (riding.js's charge and pass, the body's crash: physics/mounted.js rideDown).
+// - Spot: its arm's gripper snatched at his leg as it passes (`gripLeg`: the arm swung at the knee, a pull more than a
+//   blow: 130 N at the gripper, ~1 kg of arm at its end).
+// - Vision 60: its SPUR rifle turret, from its back, keeping off as a horse archer does (riding.js `archer.gunRadius`).
+MOVES.gripLeg = { ...MOVES.swipeR, zones: ['legs'], harm: undefined, shove: 0.5, contactSeconds: 0.02 };
+const DOG_CORE = { ...BOT, hidden: true, fallback: 'dogRam', defences: {}, defendChance: 0, plans: { pressure: 1 } };
+STYLES.dogRam = { ...DOG_CORE, label: 'Robot dog (ram)', attacks: {} };
+// (Its arm carried folded low over its back between grabs: `guardHeight`.)
+STYLES.dogGrip = { ...DOG_CORE, label: 'Robot dog (gripper arm)', stance: { ...BOT.stance, guardHeight: -0.6 }, attacks: { gripLeg: 1 } };
+STYLES.dogTurret = {
+  ...DOG_CORE, label: 'Robot dog (rifle turret)', weapon: 'turretRifle',
+  ranged: { flee: 0, rest: 0, runFor: 0, standFor: 2, close: 1.2, shotSeconds: 0.25, headShare: 0.2, between: [0.6, 1], move: 'fireRifle', holdGround: true, advance: 0.45, reloadSafe: Infinity },
+  weaponGuard: { hand: [0.2, 0.62, -0.14], dir: [1, -0.1, 0.05] },
+  attacks: { fireRifle: 1 },
 };
 
 // The spear's ways with a people's own spear: the ashigaru's yari, the rebel's pitchfork.

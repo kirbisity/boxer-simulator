@@ -456,6 +456,8 @@ export const MOVE_NAMES = {
   knee: ['Knee'], elbow: ['Elbow'], upElbow: ['Rising elbow'], palm: ['Palm strike'], taichiPush: ['Push', 'both hands'],
   tsuppariL: ['Tsuppari', 'left thrust'], tsuppariR: ['Tsuppari', 'right thrust'], oshi: ['Oshi', 'two-hand shove'],
   clubR: ['Club', 'overhead'], clubL: ['Club', 'left overhead'], swipeR: ['Swipe'], swipeL: ['Swipe', 'left'],
+  // (PROOF OF CONCEPT, beasts: a robot dog's arm at his leg.)
+  gripLeg: ['Grab', 'at the leg'],
   rush: ['Charge'], clinch: ['Clinch'], collarTie: ['Collar tie'], shieldBash: ['Shield bash'],
   overhand: ['Overhand', 'downward blow'], forehand: ['Forehand', 'side cut'], legSwing: ['Leg strike'], poke: ['Poke', 'end thrust'],
   oberhau: ['Oberhau', 'cut from above'], zwerchhau: ['Zwerchhau', 'cross cut'], unterhau: ['Unterhau', 'rising cut'], lunge: ['Lunge', 'thrust'],

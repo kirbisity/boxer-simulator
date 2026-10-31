@@ -1901,6 +1901,44 @@ export const OUTFITS = {
       { label: 'Silverback', armor: { kind: 'silverback', color: '#8c8c89', cloth: '#232226', matte: true }, head: { kind: 'gorillaHead', color: '#232226' }, feet: { kind: 'bare' } },
     ],
   },
+  // PROOF OF CONCEPT (beasts, round 1): the monkeys' and the chimpanzee's coats (src/beasts.js), drawn as
+  // the silverback's (loftbody.js `silverback`: the coat, `cloth`, and a region over the back and hips,
+  // `color`): a rhesus's grey-brown coat over its orange rump, a chacma's olive-grey with its darker cape,
+  // a chimpanzee's black. Nothing turns a blow or an edge. Each its own head (wardrobe.js). The monkeys give
+  // ground sooner than a silverback (`courage`): a hurt monkey runs.
+  monkeyFur: {
+    faction: 'specials',
+    label: 'Primate', movement: 'excellent', fists: 'bare', courage: 0.45, unarmed: true,
+    protection: { blunt: 0.03, cut: 0.03, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    designs: [
+      { label: 'Rhesus macaque', armor: { kind: 'silverback', color: '#b5733c', cloth: '#8a7656', matte: true }, head: { kind: 'macaqueHead', color: '#8a7656', face: '#d99a8a' }, feet: { kind: 'bare' } },
+      { label: 'Chacma baboon', armor: { kind: 'silverback', color: '#4e4637', cloth: '#6e6248', matte: true }, head: { kind: 'baboonHead', color: '#6e6248', face: '#2e2826' }, feet: { kind: 'bare' } },
+      { label: 'Chimpanzee', armor: { kind: 'silverback', color: '#1c1918', cloth: '#1c1918', matte: true }, head: { kind: 'chimpHead', color: '#1c1918', face: '#6a5547' }, feet: { kind: 'bare' } },
+    ],
+  },
+  // PROOF OF CONCEPT (beasts, round 1): the robot dogs (src/robotdogs.js). The fighter is what each carries on its back
+  // (the "rider" physics/mounted.js seats, `bolted` there: never thrown, out when the robot is down), its mount the robot
+  // dog (`horse`: robotdogs.js, its shell `barding`). Machines: no fear, no blood. The core's own protection is its
+  // housing (thin aluminium, as the humanoid's). Drawn by robotdogview.js, not as a man.
+  go2Dog: {
+    faction: 'specials', machine: true, bolted: true, unarmed: true, horse: 'go2', barding: 'robotShell',
+    label: 'Robot dog: Go2', movement: 'good', fists: 'bare', courage: 1,
+    protection: { blunt: 0.3, cut: 0.7, pierce: 0.5, bullet: { head: 0.1, torso: 0.15, limb: 0.1 } },
+    designs: [{ label: 'Unitree grey', armor: { kind: 'robot', color: '#c8ccd2', mail: '#2a2b2f', robot: { metal: true, led: '#46b4ff' } }, head: { kind: 'robotHead', color: '#2a2b2f', visor: '#0d0e11', trim: '#c8ccd2', led: '#46b4ff' }, feet: { kind: 'bare' } }],
+  },
+  spotDog: {
+    faction: 'specials', machine: true, bolted: true, unarmed: true, horse: 'spot', barding: 'robotShell',
+    label: 'Robot dog: Spot with arm', movement: 'good', fists: 'bare', courage: 1,
+    protection: { blunt: 0.3, cut: 0.7, pierce: 0.5, bullet: { head: 0.1, torso: 0.15, limb: 0.1 } },
+    designs: [{ label: 'Spot yellow', armor: { kind: 'robot', color: '#f2c21b', mail: '#1d1e22', robot: { metal: true, led: '#ffffff' } }, head: { kind: 'robotHead', color: '#1d1e22', visor: '#0d0e11', trim: '#f2c21b', led: '#ffffff' }, feet: { kind: 'bare' } }],
+  },
+  vision60Dog: {
+    faction: 'specials', machine: true, bolted: true, unarmed: true, horse: 'vision60', barding: 'robotShell',
+    label: 'Robot dog: Vision 60 with rifle turret', movement: 'good', fists: 'bare', courage: 1,
+    mounted: { r: 'turretRifle' },
+    protection: { blunt: 0.35, cut: 0.75, pierce: 0.55, bullet: { head: 0.15, torso: 0.2, limb: 0.1 } },
+    designs: [{ label: 'Olive drab', armor: { kind: 'robot', color: '#4d5446', mail: '#1d1e22', robot: { metal: true, led: '#ff5a3c' } }, head: { kind: 'robotHead', color: '#2b2f28', visor: '#0d0e11', trim: '#4d5446', led: '#ff5a3c' }, feet: { kind: 'bare' } }],
+  },
   // A humanoid robot (Unitree's G1 and H1): rigid shells of brushed
   // aluminium over each part, white panels on the chest and thighs, dark
   // actuators bare at every joint and the waist, black hands and shoes; a
@@ -2234,6 +2272,8 @@ export function gearTraits(inputs) {
     mounted: spec.mounted ?? null,
     // Never takes up a weapon off the floor (a beast).
     unarmed: Boolean(spec.unarmed),
+    // Bolted to its mount, never thrown (a robot dog's turret or arm: PROOF OF CONCEPT, physics/mounted.js keepSeat).
+    bolted: Boolean(spec.bolted),
     spare: spec.spare ?? null,
     arrowproof: Boolean(spec.arrowproof),
     // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).

@@ -14,10 +14,10 @@
 import { shieldCovering, soundEvent, soundHit } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
-import { BARDING, HORSES, HORSE_LOAD, mountOf } from '../horses.js';
+import { BARDING, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
-import { bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
 
@@ -64,10 +64,19 @@ export function gaitAt(speed) {
   return GAITS.find((gait) => pace <= gait.upTo);
 }
 
+/** A mount's own gait at its speed (a robot dog's are its own: robotdogs.js), and its strides a second: past its longest stride a robot steps faster. */
+function mountGait(horse) {
+  const pace = Math.abs(horse.speed);
+  return (horse.gaits ?? GAITS).find((gait) => pace <= gait.upTo);
+}
+function mountStrideRate(horse, gait) {
+  return horse.spec?.robot && gait.hz > 0 ? Math.max(gait.hz, Math.abs(horse.speed) / (horse.shape.strideMost * horse.withers)) : gait.hz;
+}
+
 /** A rider's horse, for createWorld: under him, facing his way. */
 export function createHorse(fighter, id, random) {
   const kit = mountOf(fighter.body.inputs);
-  const breed = HORSES[kit.breed];
+  const breed = breedOf(kit.breed);
   const barding = BARDING[kit.barding];
   const coat = breed.coats[Math.floor(random() * breed.coats.length)];
   // His load: the man, what he wears and carries, and the horse's armour.
@@ -85,6 +94,8 @@ export function createHorse(fighter, id, random) {
     goal: { heading: fighter.yaw, speed: 0 }, goalAt: -Infinity,
     stride: 0, state: 'up', fall: 0, roll: 0, bleed: 0, bloodLost: 0, trauma: 0, wounds: {},
     capsules: [], legs: {},
+    // Its shape and gaits (a robot dog's are its own: robotdogs.js).
+    shape: breed.shape ?? HORSE_SHAPE, gaits: breed.gaits ?? GAITS,
   };
   fighter.mount = horse;
   poseHorse(horse);
@@ -177,7 +188,8 @@ function gaitWeights(speed) {
  */
 export function horseMotion(horse) {
   const motion = { bob: 0, pitch: 0, rock: 0 };
-  if (horse.state !== 'up') return motion;
+  // (A robot's controller holds its body level: robotdogs.js `level`.)
+  if (horse.state !== 'up' || horse.spec?.level) return motion;
   const speed = Math.abs(horse.speed);
   const gate = Math.min(1, speed / 0.8);
   if (gate <= 0) return motion;
@@ -211,8 +223,10 @@ export function horseVelocityAt(horse, at) {
 export function poseHorse(horse) {
   const W = horse.withers;
   const scale = (p) => [p[0] * W, p[1] * W, p[2] * W];
-  const gait = gaitAt(horse.speed);
-  const stride = gait.hz > 0 ? Math.min(0.7 * W, Math.abs(horse.speed) / gait.hz) : 0;
+  const shape = horse.shape ?? HORSE_SHAPE;
+  const gait = mountGait(horse);
+  const rate = mountStrideRate(horse, gait);
+  const stride = rate > 0 ? Math.min((shape.strideMost ?? 0.7) * W, Math.abs(horse.speed) / rate) : 0;
   // The body rises and falls, pitches and rocks with the stride.
   const motion = horseMotion(horse);
   horse.bob = motion.bob;
@@ -220,8 +234,8 @@ export function poseHorse(horse) {
   horse.rock = motion.rock;
   const capsules = horse.capsules;
   capsules.length = 0;
-  for (const part of HORSE_SHAPE.parts) capsules.push({ key: part.key, part: part.part, a: horsePoint(horse, scale(part.a)), b: horsePoint(horse, scale(part.b)), radius: part.radius * W, mass: part.mass });
-  for (const leg of HORSE_SHAPE.legs) {
+  for (const part of shape.parts) capsules.push({ key: part.key, part: part.part, a: horsePoint(horse, scale(part.a)), b: horsePoint(horse, scale(part.b)), radius: part.radius * W, mass: part.mass });
+  for (const leg of shape.legs) {
     const root = scale(leg.root);
     let hoof;
     if (horse.state !== 'up') {
@@ -243,10 +257,10 @@ export function poseHorse(horse) {
     // (A hoof on the ground stays there as the body rises over it and pitches: the leg is longer or shorter.)
     if (horse.state === 'up') hoof[1] -= horse.bob + horse.pitch * hoof[0];
     // The knee bends forward on a foreleg, the hock back on a hind leg.
-    const knee = twoBoneIK(root, hoof, HORSE_SHAPE.upperLeg * W, HORSE_SHAPE.lowerLeg * W, [leg.fore ? 1 : -1, 0, 0]);
+    const knee = twoBoneIK(root, hoof, shape.upperLeg * W, shape.lowerLeg * W, [leg.bend ?? (leg.fore ? 1 : -1), 0, 0]);
     const world = { root: horsePoint(horse, root), knee: horsePoint(horse, knee), hoof: horsePoint(horse, hoof) };
     horse.legs[leg.key] = world;
-    capsules.push({ key: leg.key, part: 'legs', a: world.root, b: world.hoof, radius: HORSE_SHAPE.legRadius * W * 1.4, mass: leg.mass });
+    capsules.push({ key: leg.key, part: 'legs', a: world.root, b: world.hoof, radius: shape.legRadius * W * 1.4, mass: leg.mass });
   }
 }
 
@@ -285,7 +299,8 @@ export function stepHorse(world, horse, h) {
     // A gallop tires it, a canter or slower rests it.
     const stamina = WORLD.mount.stamina;
     const effort = Math.max(0, Math.min(1, (Math.abs(horse.speed) / horse.paces.gallop - stamina.easy) / (1 - stamina.easy)));
-    horse.tire = Math.max(0, Math.min(1, (horse.tire ?? 0) + h * (effort / stamina.gallopSeconds - (1 - effort) / stamina.restSeconds)));
+    // (A robot runs on its battery, hours of it: robotdogs.js `battery`.)
+    if (!horse.spec?.robot) horse.tire = Math.max(0, Math.min(1, (horse.tire ?? 0) + h * (effort / stamina.gallopSeconds - (1 - effort) / stamina.restSeconds)));
     let turn = goal.heading - horse.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     const rate = turnRateAt(horse, horse.speed);
@@ -317,12 +332,12 @@ export function stepHorse(world, horse, h) {
     horse.at = clamped;
     horse.speed *= Math.exp(-h * 6);
   }
-  const gait = gaitAt(horse.speed);
+  const gait = mountGait(horse);
   const stride = horse.stride;
-  horse.stride = (horse.stride + gait.hz * h) % 1;
+  horse.stride = (horse.stride + mountStrideRate(horse, gait) * h) % 1;
   horse.velocity = [f[0] * horse.speed + horse.shove[0], 0, f[2] * horse.speed + horse.shove[1]];
   poseHorse(horse);
-  if (world.ear && horse.state === 'up' && gait.hz > 0) hoofBeats(world, horse, gait, stride);
+  if (world.ear && horse.state === 'up' && gait.hz > 0 && !horse.spec?.robot) hoofBeats(world, horse, gait, stride);
   const rider = horse.rider === null ? null : world.fighters[horse.rider];
   if (rider?.mount === horse) absorbMotion(rider, horse, h);
 }
@@ -342,6 +357,7 @@ function hoofBeats(world, horse, gait, before) {
 
 /** A horse's cry (a neigh in pain, as it goes down), from its head. */
 function horseCry(world, horse, kind) {
+  if (horse.spec?.robot) return;
   const head = horse.capsules.find((capsule) => capsule.key === 'head')?.b ?? [horse.at[0], horse.withers, horse.at[1]];
   soundEvent(world, 'horse', { at: head, kind, gait: gaitAt(horse.speed).name, speed: Math.abs(horse.speed), surface: surfaceAt(world, horse.at[0], 0, horse.at[1]), mass: ladenMass(world, horse), horse: horse.id });
 }
@@ -385,7 +401,8 @@ function seatPoints(fighter, horse) {
 /** Where the saddle's seat is now (m), with the horse's body rising, pitching and rocking under it. */
 function seatOf(horse) {
   const W = horse.withers;
-  return vec.add(horsePoint(horse, [HORSE_SHAPE.seat[0] * W, HORSE_SHAPE.seat[1] * W, 0]), [0, WORLD.mount.seatHeight, 0]);
+  const seat = (horse.shape ?? HORSE_SHAPE).seat;
+  return vec.add(horsePoint(horse, [seat[0] * W, seat[1] * W, 0]), [0, horse.spec?.robot ? 0 : WORLD.mount.seatHeight, 0]);
 }
 
 /**
@@ -630,6 +647,11 @@ export function keepSeat(world, fighter) {
   const seat = WORLD.mount.seat;
   // (What his knees held of the speed his horse lost goes with it, not with him.)
   const flung = lost.map((value) => value * (1 - seat.grip));
+  // Bolted to its mount (a robot dog's turret or arm, PROOF OF CONCEPT: an outfit's `bolted`): never thrown; the robot down, it is out.
+  if (fighter.body.gear.bolted) {
+    if (horse.state !== 'up' && fighter.state !== 'out') knockOut(world, fighter, { time: world.time, kind: 'disabled', attacker: horse.lastHitBy ?? fighter.id, effects: [] }, 'the robot is down', 'disabled');
+    return;
+  }
   if (fighter.state !== 'up') return unhorse(world, fighter, fighter.state === 'out' ? 'slumps from the saddle' : 'falls from the saddle', false, flung);
   if (horse.state !== 'up') {
     // A horse going down slowly lets him step clear: carried down with it, not flung.
@@ -855,8 +877,9 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
  * blow to the head drops it, and blunt harm summed on its body kills it.
  */
 export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, attacker = null) {
-  const spec = WORLD.mount.horse;
-  const share = spec.manBlood / horse.mass;
+  // (A robot dog: its own limits, and no blood: robotdogs.js `harm`, `machine`.)
+  const spec = { ...WORLD.mount.horse, ...horse.spec?.harm };
+  const share = horse.spec?.machine ? 0 : spec.manBlood / horse.mass;
   const zone = capsule.part === 'legs' ? 'limb' : capsule.part === 'head' ? 'head' : 'trunk';
   const bleed = (bleedRate('cut', cut, zone) + bleedRate('pierce', pierce, zone)) * share;
   horse.bleed += bleed;
@@ -864,7 +887,7 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
   if (attacker) horse.lastHitBy = attacker.id;
   if (cut > 1) event.effects.push(cut > 60 ? 'a deep cut' : 'cut');
   if (pierce > 1) event.effects.push(pierce > 40 ? 'run through' : 'stabbed');
-  if ((capsule.part === 'chest' || capsule.part === 'neck') && pierce > BLADES.lethalPierce * BODY.toughness * Math.sqrt(horse.mass / spec.manBlood)) {
+  if (!horse.spec?.machine && (capsule.part === 'chest' || capsule.part === 'neck') && pierce > BLADES.lethalPierce * BODY.toughness * Math.sqrt(horse.mass / spec.manBlood)) {
     horse.bleed += bleedToLose(collapseShare() - horse.bloodLost, spec.heartSeconds);
     event.effects.push('through the heart');
   }
@@ -1053,6 +1076,14 @@ function yieldTo(horse, man, pelvis, neck, radius) {
   man.root[1] += deepest.normal[2] * -deepest.gap;
 }
 
+/** A man's thighs and shins as capsules [from, to, radius, key] (what a robot dog meets of him). */
+function manLegSegments(fighter) {
+  return ['l', 'r'].flatMap((side) => [
+    [point(fighter.x, P[`${side}Hip`]), point(fighter.x, P[`${side}Knee`]), fighter.body.segments[`${side}Thigh`].skinRadius, `${side}Thigh`],
+    [point(fighter.x, P[`${side}Knee`]), point(fighter.x, P[`${side}Foot`]), fighter.body.segments[`${side}Shank`].skinRadius, `${side}Shank`],
+  ]);
+}
+
 /**
  * A horse (with its rider) running into men on foot. The men it touches,
  * and those standing in close order with them, are one block: its mass and
@@ -1088,16 +1119,18 @@ function rideDown(world, horse) {
     // His body: the trunk (hips to neck) and the breadth of his shoulders (joint to joint, the deltoid over them),
     // so a horse's chest that takes a man on the shoulder is not let through beside his spine.
     const shoulders = [point(fighter.x, P.lShoulder), point(fighter.x, P.rShoulder), fighter.body.segments.lUpperArm.skinRadius];
+    // (A robot dog runs into his legs, PROOF OF CONCEPT: its body is below his trunk.)
+    const parts = [[pelvis, neck, radius, 'trunk'], [...shoulders, 'trunk'], ...(horse.spec?.robot ? manLegSegments(fighter) : [])];
     for (const capsule of horse.capsules) {
       if (capsule.part === 'legs') continue;
-      for (const [from, to, thick] of [[pelvis, neck, radius], shoulders]) {
+      for (const [from, to, thick, key] of parts) {
         const closest = closestBetween(from, to, capsule.a, capsule.b);
         const offset = vec.sub(closest.onFirst, closest.onSecond);
         const gap = vec.length(offset) - thick - capsule.radius;
         if (gap >= 0 || (best && gap >= best.gap)) continue;
         const flat = [offset[0], 0, offset[2]];
         const normal = vec.length(flat) > 1e-6 ? vec.normalize(flat) : vec.normalize([forwardOf(horse.yaw)[2], 0, -forwardOf(horse.yaw)[0]]);
-        best = { fighter, capsule, gap, normal, at: closest.onSecond };
+        best = { fighter, capsule, gap, normal, at: closest.onSecond, key };
       }
     }
     // A shield held in front of him is what the horse meets first.
@@ -1168,7 +1201,7 @@ function rideDown(world, horse) {
     const met = crashBetween(horseParty(world, horse, entry.capsule), fighterParty(man, 'trunk'), direction, closingMan);
     // (Heard: the horse's chest into him.)
     if (world.ear) soundHit(world, man, rider, 'trunk', entry.at, { energy: met.energy, impulse: met.impulse, striker: 'body', deltaV: met.impulse / met.massSecond });
-    crashHarm(world, man, 'trunk', { impulse: met.impulse, mass: met.massSecond, closing: closingMan, energy: met.energy, point: entry.at, normal: direction, source: rider, hard });
+    crashHarm(world, man, entry.key ?? 'trunk', { impulse: met.impulse, mass: met.massSecond, closing: closingMan, energy: met.energy, point: entry.at, normal: direction, source: rider, hard });
     const blunt = horseCrashHarm(horse, entry.capsule, met.energy, crashHardness(man.body.gear.protection.blunt));
     crash.energy += blunt;
     harmHorse(world, horse, entry.capsule, { blunt, cut: 0, pierce: 0 }, crash);
@@ -1223,7 +1256,7 @@ function trodOn(world, horse) {
     if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
     const neck = point(fighter.x, P.neck);
     const reach = fighter.body.segments.trunk.skinRadius + HORSE_SHAPE.legRadius * horse.withers;
-    for (const leg of HORSE_SHAPE.legs) {
+    for (const leg of (horse.shape ?? HORSE_SHAPE).legs) {
       const hoof = horse.legs[leg.key]?.hoof;
       // Down on the ground, in the stance (a hoof in the air touches nothing).
       if (!hoof || hoof[1] > spec.height * horse.withers) continue;

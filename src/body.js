@@ -906,7 +906,8 @@ export function buildBody(rawInputs) {
       uppercut: (armKg('r') * 0.6 + massKg * 0.01) * technique,
     },
     // Head speed change that drops this fighter, ~3–4.5 m/s ("chin").
-    chin: 3.1 * (0.8 + 0.25 * neckIndex) * Math.max(0.6, 1 - 0.004 * yearsAging) * BODY.toughness,
+    // A build's `brain` (PROOF OF CONCEPT, beasts.js): how much more of a speed change its brain takes than a man's.
+    chin: 3.1 * (0.8 + 0.25 * neckIndex) * Math.max(0.6, 1 - 0.004 * yearsAging) * BODY.toughness * (build?.brain ?? 1),
     // A man's own hand breaking on a punch is the attacker's risk, not his health: it stays.
     // A build's `bones`: its bones' strength against a man's (thicker in section).
     fracture: {
