@@ -146,6 +146,8 @@ The head itself (`src/photohead.js`) keeps the drawn head's construction and the
 - Le TT, Farkas LG, Ngim RCK, Levin LS, Forrest CR. Proportionality in Asian and North American Caucasian faces using neoclassical facial canons as criteria. *Aesthetic Plast Surg.* 2002;26(1):64–69.
 - Cephalic-index surveys as summarised in Martin R, Saller K. *Lehrbuch der Anthropologie*, 3rd ed. Stuttgart: Fischer; 1957.
 
+The head's base is a real one's construction rather than the drawn sphere: an inverted egg from the front, taller than it is wide, with the jaw tapering to the chin and widening with fat. `tools/photofaces/proportions.mjs` measures it. Hair grows out of the scalp (`src/photohair.js`): a painted hairline with strands, plus alpha-tested hair cards for volume.
+
 The nose width also takes 35% from each composite's own measured nostril spacing (`tools/photofaces/avg_tiles.py`). The numbers are hand-set offsets, not measurements; refine them against the sources before relying on them.
 
 **Provenance, to verify before release.** The composites are the widely shared "average faces of the world" set (40 women's and 46 men's regional averages), found here as reposted grids, one of them marked "via 9GAG" (that strip is cropped out and never used). The set is believed to be free to use, but its original author and licence have not been confirmed; check both before shipping anything built from it.
