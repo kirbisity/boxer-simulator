@@ -74,7 +74,7 @@ import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
-import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
+import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -1255,6 +1255,8 @@ function consumeEvents() {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);
     }
+    // A machine down or cut: its electrics short out, arcs and sparks for a moment (machinefx.js; graphics only).
+    machineEvent(scene, event, state.world);
     const moment = momentFor(event);
     if (moment) {
       // Slow motion and the camera's push-in are for one man against

@@ -49,6 +49,18 @@ export const BATTLE_FX = {
   glintBevel: 0.55,
   // At most this many glints a frame (a crowd's blades).
   maxGlints: 120,
+  // An electric arc (a machine shorting out, machinefx.js): a jagged line of `arcSegments` streaks, re-jagged every
+  // frame (`arcJag`: how far off the straight it wanders, a share of its length), blue-white (`arcColour`, display
+  // values, hot enough to bloom), each frame between `arcFlicker` and full brightness; `arcWidth` m across; it lasts
+  // `arcSeconds`. At most `maxArcs` at once. Its light is the flash's light, turned the arc's colour (`arcLight`).
+  maxArcs: 32,
+  arcSegments: 5,
+  arcJag: 0.28,
+  arcColour: [1.3, 1.7, 3.2],
+  arcFlicker: 0.3,
+  arcWidth: 0.006,
+  arcSeconds: 0.09,
+  arcLight: [0.6, 0.78, 1],
 };
 
 // Which guns burn black powder (the rest are modern, smokeless).
@@ -398,7 +410,10 @@ export function battleFxOf(view) {
   const light = new THREE.PointLight(new THREE.Color().fromArray(BATTLE_FX.flashColour), 0, BATTLE_FX.lightRange, 2);
   light.userData.battleFx = true;
   view.scene.add(smoke, glow, light);
-  view.battleFx = { smoke, glow, light, puffs: [], flashes: [], glints: [], lightAge: Infinity, primary: null, scratch: new THREE.Vector3() };
+  // The arcs: a fixed pool, each slot reused (no allocation while they flicker).
+  const arcs = [];
+  for (let slot = 0; slot < BATTLE_FX.maxArcs; slot += 1) arcs.push({ live: false, from: [0, 0, 0], to: [0, 0, 0], age: 0, strength: 0 });
+  view.battleFx = { smoke, glow, light, puffs: [], flashes: [], glints: [], arcs, lightAge: Infinity, primary: null, scratch: new THREE.Vector3() };
   return view.battleFx;
 }
 
@@ -409,6 +424,7 @@ export function battleFxClear(view) {
   fx.puffs = [];
   fx.flashes = [];
   fx.glints = [];
+  for (const arc of fx.arcs) arc.live = false;
   fx.lightAge = Infinity;
   fx.light.intensity = 0;
   fx.smoke.count = 0;
@@ -429,6 +445,7 @@ export function battleFxShot(view, { from, dir, powder, long, pan }) {
   fx.flashes.push({ at: [...from], size: 0.22 * big, colour: colour.map((c) => c * 1.7), tail: dir.map((d) => d * 0.55 * big), age: 0, seconds: BATTLE_FX.flashSeconds * 0.8 });
   if (pan) fx.flashes.push({ at: [...pan], size: 0.09, colour: colour.map((c) => c * 1.8), tail: [0, 0.06, 0], age: 0, seconds: BATTLE_FX.flashSeconds * 1.4 });
   fx.light.position.set(from[0], from[1], from[2]);
+  fx.light.color.fromArray(colour);
   fx.lightAge = 0;
   fx.lightPeak = BATTLE_FX.lightPeak * (powder ? 1 : 0.7);
   for (const puff of battleFxShotPuffs({ from, dir, powder, long, pan })) {
@@ -445,6 +462,40 @@ export function battleFxShot(view, { from, dir, powder, long, pan }) {
 export function battleFxSpark(view, at, size = 0.14) {
   const fx = battleFxOf(view);
   fx.flashes.push({ at: [...at], size, colour: [1.6, 1.3, 0.8], tail: [0, 0, 0], age: 0, seconds: 0.05 });
+}
+
+/**
+ * An electric arc from `from` to `to` (arrays, copied), `strength` 0..1: a
+ * jagged blue-white line that flickers for a moment, with a small flash at
+ * its root and the flash's light turned blue-white on it. Full, the oldest
+ * arc gives way.
+ */
+export function battleFxArc(view, from, to, strength = 1) {
+  const fx = battleFxOf(view);
+  let slot = fx.arcs.find((arc) => !arc.live);
+  if (!slot) slot = fx.arcs.reduce((oldest, arc) => (arc.age > oldest.age ? arc : oldest));
+  slot.live = true;
+  slot.age = 0;
+  slot.strength = strength;
+  for (let axis = 0; axis < 3; axis += 1) {
+    slot.from[axis] = from[axis];
+    slot.to[axis] = to[axis];
+  }
+  battleFxElectricFlash(view, from, 0.06 + 0.1 * strength, 0.5 + 1.5 * strength);
+}
+
+/** The blue-white flash of a short (at `at`, `size` m) and the light it throws (`peak`, as a shot's). */
+export function battleFxElectricFlash(view, at, size = 0.3, peak = BATTLE_FX.lightPeak) {
+  const fx = battleFxOf(view);
+  const colour = BATTLE_FX.arcColour;
+  fx.flashes.push({ at: [...at], size, colour: [colour[0] * 0.8, colour[1] * 0.8, colour[2] * 0.8], tail: [0, 0, 0], age: 0, seconds: 0.06 });
+  // A brighter short than the light already up takes it.
+  const current = fx.lightAge < 0.2 ? (fx.lightPeak ?? 0) * Math.exp(-fx.lightAge / BATTLE_FX.lightSeconds) : 0;
+  if (peak < current) return;
+  fx.light.position.set(at[0], at[1], at[2]);
+  fx.light.color.fromArray(BATTLE_FX.arcLight);
+  fx.lightAge = 0;
+  fx.lightPeak = peak;
 }
 
 /** A glint to draw this frame (world point, strength 0..1, colour of the light, size m). */
@@ -549,6 +600,9 @@ function battleFxLighting(view, fx) {
   } else uniforms.uSunColour.value.setRGB(0, 0, 0);
 }
 
+// Scratch for filling the glow batch (a frame's streaks and arcs allocate nothing).
+const battleFxDraw = { streak: [0, 0, 0], colour: [0, 0, 0], head: [0, 0, 0], last: [0, 0, 0], at: [0, 0, 0] };
+
 /**
  * Move the smoke on, age the flashes and the light, and fill both batches
  * for this frame: the puffs, then the flashes, the sparks (from `sparks`:
@@ -627,20 +681,56 @@ export function battleFxUpdate(view, dt, sparks = []) {
     put(flash.at, flash.size * swell, flash.colour.map((c) => c * fade), 0, flash.tail);
     return true;
   });
-  const streak = [0, 0, 0];
-  const colour = [0, 0, 0];
+  const streak = battleFxDraw.streak;
+  const colour = battleFxDraw.colour;
+  // The arcs: each frame a new jag between its ends, at a flickering brightness.
+  const head = battleFxDraw.head;
+  const last = battleFxDraw.last;
+  const arcColour = BATTLE_FX.arcColour;
+  for (const arc of fx.arcs) {
+    if (!arc.live) continue;
+    arc.age += dt;
+    if (arc.age > BATTLE_FX.arcSeconds) {
+      arc.live = false;
+      continue;
+    }
+    const length = Math.hypot(arc.to[0] - arc.from[0], arc.to[1] - arc.from[1], arc.to[2] - arc.from[2]);
+    const bright = arc.strength * (BATTLE_FX.arcFlicker + (1 - BATTLE_FX.arcFlicker) * Math.random()) * (1 - arc.age / BATTLE_FX.arcSeconds * 0.5);
+    for (let c = 0; c < 3; c += 1) colour[c] = arcColour[c] * bright;
+    for (let axis = 0; axis < 3; axis += 1) last[axis] = arc.from[axis];
+    const segments = BATTLE_FX.arcSegments;
+    for (let step = 1; step <= segments; step += 1) {
+      const share = step / segments;
+      // The ends are pinned; between, it wanders most in the middle.
+      const wander = step === segments ? 0 : BATTLE_FX.arcJag * length * Math.sin(share * Math.PI);
+      for (let axis = 0; axis < 3; axis += 1) {
+        head[axis] = arc.from[axis] + (arc.to[axis] - arc.from[axis]) * share + (Math.random() - 0.5) * wander;
+        streak[axis] = last[axis] - head[axis];
+      }
+      put(head, BATTLE_FX.arcWidth * (0.6 + arc.strength * 0.6), colour, 2, streak);
+      for (let axis = 0; axis < 3; axis += 1) last[axis] = head[axis];
+    }
+  }
   for (const spark of sparks) {
-    // White-yellow hot, cooling to orange and dull red as it flies.
     const heat = Math.max(0, Math.min(1, spark.life / (spark.lifeAtStart ?? 0.4)));
-    colour[0] = 1.5 + heat * 0.9;
-    colour[1] = 0.45 + heat * 1.3;
-    colour[2] = 0.08 + heat * 0.7;
+    if (spark.electric) {
+      // Torn off a short: blue-white in the arc's light at first, then the molten metal's own orange as it cools.
+      const blue = Math.max(0, heat * 2 - 1);
+      colour[0] = 1.5 + heat * 0.6 - blue * 0.4;
+      colour[1] = 0.45 + heat * 1.1 + blue * 0.2;
+      colour[2] = 0.08 + heat * 0.5 + blue * 2.1;
+    } else {
+      // White-yellow hot, cooling to orange and dull red as it flies.
+      colour[0] = 1.5 + heat * 0.9;
+      colour[1] = 0.45 + heat * 1.3;
+      colour[2] = 0.08 + heat * 0.7;
+    }
     const hot = 0.35 + heat * 0.65;
     for (let c = 0; c < 3; c += 1) colour[c] *= hot;
     streak[0] = -spark.velocity.x * BATTLE_FX.sparkStreakSeconds;
     streak[1] = -spark.velocity.y * BATTLE_FX.sparkStreakSeconds;
     streak[2] = -spark.velocity.z * BATTLE_FX.sparkStreakSeconds;
-    put(spark.position.toArray(), spark.width ?? 0.007, colour, 2, streak);
+    put(spark.position.toArray(battleFxDraw.at), spark.width ?? 0.007, colour, 2, streak);
   }
   for (const glint of fx.glints) put(glint.at, glint.size, glint.colour.map((c) => c * glint.strength), 1, null);
   // How many were drawn (tests, tuning).

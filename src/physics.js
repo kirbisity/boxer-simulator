@@ -13,7 +13,7 @@ import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTa
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
-import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, LONG_GUN, raisedAim, reload, sightsOn, SUPPORT_GRIP } from './physics/ranged.js';
+import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, loadStop, LONG_GUN, MAGAZINE_CHANGE, raisedAim, reload, reloadKind, sightsOn, SUPPORT_GRIP, TUBE_LOAD } from './physics/ranged.js';
 import { countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
@@ -1013,14 +1013,25 @@ function weaponIntent(world, fighter, intent) {
     intent[off] = intent[off] ? vec.lerp(intent[off], flung, Math.sin(out * Math.PI * 0.5)) : flung;
   }
   if (fighter.reloading && weapon.spec.shot && !weapon.loaded && !punch) {
-    const spanning = weapon.spec.shot.bolt;
+    const kind = reloadKind(weapon.spec.shot);
     const stroke = 0.5 - 0.5 * Math.cos(2 * Math.PI * LONG_GUN.ramPerSecond * (weapon.reloaded ?? 0));
-    if (spanning) {
+    if (kind === 'magazine' || kind === 'tube') {
+      // A magazine changed whole, or a tube fed shell by shell: the gun held
+      // before him as the load says, the support hand from stop to stop
+      // (physics/ranged.js MAGAZINE_CHANGE, TUBE_LOAD), the magazine over the
+      // whole reload, a shell over each round's share of it.
+      const load = kind === 'magazine' ? MAGAZINE_CHANGE : TUBE_LOAD;
+      const shot = weapon.spec.shot;
+      const done = weapon.reloaded ?? 0;
+      const phase = kind === 'magazine' ? Math.min(1, done / shot.reloadSeconds) : (done / (shot.reloadSeconds / (shot.rounds ?? 1))) % 1;
+      target = { hand: vec.scale(load.hand, H), dir: vec.normalize(load.dir) };
+      intent[`${weapon.off}Hand`] = loadStop(load, phase, target.hand, target.dir, weapon.off === 'l' ? 1 : -1, H);
+    } else if (kind === 'span') {
       // Spanning a crossbow: its nose down before his feet, the hand on the
       // tiller, the other drawing the string up the stock to the nut.
       target = { hand: vec.scale(LONG_GUN.spanHand, H), dir: vec.normalize(LONG_GUN.spanDir) };
       intent[`${weapon.off}Hand`] = vec.add(target.hand, vec.scale(target.dir, LONG_GUN.spanFrom - LONG_GUN.spanStroke * stroke));
-    } else if (weapon.spec.shot.cylinder) {
+    } else if (kind === 'cylinder') {
       // A revolver: held low, muzzle down; for each chamber the support hand
       // to the pouch, to the chamber's mouth, then down on the rammer lever.
       const load = CYLINDER_LOAD;
